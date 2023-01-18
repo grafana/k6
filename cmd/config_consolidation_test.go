@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"path/filepath"
 	"testing"
 	"time"
 
@@ -11,6 +10,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/types"
@@ -143,11 +144,9 @@ type configConsolidationTestCase struct {
 }
 
 func getConfigConsolidationTestCases() []configConsolidationTestCase {
+	defaultFlags := state.GetDefaultFlags(".config")
 	defaultConfig := func(jsonConfig string) afero.Fs {
-		return getFS([]file{{
-			filepath.Join(".config", "loadimpact", "k6", defaultConfigFileName), // TODO: improve
-			jsonConfig,
-		}})
+		return getFS([]file{{defaultFlags.ConfigFilePath, jsonConfig}})
 	}
 	I := null.IntFrom // shortcut for "Valid" (i.e. user-specified) ints
 	// This is a function, because some of these test cases actually need for the init() functions
@@ -488,15 +487,15 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd string) {
 	t.Logf("Test for `k6 %s` with opts=%#v and exp=%#v\n", subCmd, testCase.options, testCase.expected)
 
-	ts := newGlobalTestState(t)
-	ts.args = append([]string{"k6", subCmd}, testCase.options.cli...)
-	ts.envVars = buildEnvMap(testCase.options.env)
+	ts := tests.NewGlobalTestState(t)
+	ts.CmdArgs = append([]string{"k6", subCmd}, testCase.options.cli...)
+	ts.Env = state.BuildEnvMap(testCase.options.env)
 	if testCase.options.fs != nil {
-		ts.globalState.fs = testCase.options.fs
+		ts.GlobalState.FS = testCase.options.fs
 	}
 
-	rootCmd := newRootCommand(ts.globalState)
-	cmd, args, err := rootCmd.cmd.Find(ts.args[1:])
+	rootCmd := newRootCommand(ts.GlobalState)
+	cmd, args, err := rootCmd.cmd.Find(ts.CmdArgs[1:])
 	require.NoError(t, err)
 
 	err = cmd.ParseFlags(args)
@@ -526,7 +525,7 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	if testCase.options.runner != nil {
 		opts = *testCase.options.runner
 	}
-	consolidatedConfig, err := getConsolidatedConfig(ts.globalState, cliConf, opts)
+	consolidatedConfig, err := getConsolidatedConfig(ts.GlobalState, cliConf, opts)
 	if testCase.expected.consolidationError {
 		require.Error(t, err)
 		return
@@ -534,14 +533,14 @@ func runTestCase(t *testing.T, testCase configConsolidationTestCase, subCmd stri
 	require.NoError(t, err)
 
 	derivedConfig := consolidatedConfig
-	derivedConfig.Options, err = executor.DeriveScenariosFromShortcuts(consolidatedConfig.Options, ts.logger)
+	derivedConfig.Options, err = executor.DeriveScenariosFromShortcuts(consolidatedConfig.Options, ts.Logger)
 	if testCase.expected.derivationError {
 		require.Error(t, err)
 		return
 	}
 	require.NoError(t, err)
 
-	if warnings := ts.loggerHook.Drain(); testCase.expected.logWarning {
+	if warnings := ts.LoggerHook.Drain(); testCase.expected.logWarning {
 		assert.NotEmpty(t, warnings)
 	} else {
 		assert.Empty(t, warnings)

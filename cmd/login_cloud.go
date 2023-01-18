@@ -12,12 +12,13 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui"
 )
 
 //nolint:funlen,gocognit
-func getCmdLoginCloud(globalState *globalState) *cobra.Command {
+func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 	// loginCloudCommand represents the 'login cloud' command
 	loginCloudCommand := &cobra.Command{
 		Use:   "cloud",
@@ -36,7 +37,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
   k6 login cloud`[1:],
 		Args: cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			currentDiskConf, err := readDiskConfig(globalState)
+			currentDiskConf, err := readDiskConfig(gs)
 			if err != nil {
 				return err
 			}
@@ -53,7 +54,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			// We want to use this fully consolidated config for things like
 			// host addresses, so users can overwrite them with env vars.
 			consolidatedCurrentConfig, err := cloudapi.GetConsolidatedConfig(
-				currentJSONConfigRaw, globalState.envVars, "", nil)
+				currentJSONConfigRaw, gs.Env, "", nil)
 			if err != nil {
 				return err
 			}
@@ -67,7 +68,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			switch {
 			case reset.Valid:
 				newCloudConf.Token = null.StringFromPtr(nil)
-				printToStdout(globalState, "  token reset\n")
+				printToStdout(gs, "  token reset\n")
 			case show.Bool:
 			case token.Valid:
 				newCloudConf.Token = token
@@ -85,10 +86,10 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 					},
 				}
 				if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
-					globalState.logger.Warn("Stdin is not a terminal, falling back to plain text input")
+					gs.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
 				}
 				var vals map[string]string
-				vals, err = form.Run(globalState.stdIn, globalState.stdOut)
+				vals, err = form.Run(gs.Stdin, gs.Stdout)
 				if err != nil {
 					return err
 				}
@@ -96,7 +97,7 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 				password := vals["Password"]
 
 				client := cloudapi.NewClient(
-					globalState.logger,
+					gs.Logger,
 					"",
 					consolidatedCurrentConfig.Host.String,
 					consts.Version,
@@ -122,17 +123,17 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 			if err != nil {
 				return err
 			}
-			if err := writeDiskConfig(globalState, currentDiskConf); err != nil {
+			if err := writeDiskConfig(gs, currentDiskConf); err != nil {
 				return err
 			}
 
 			if newCloudConf.Token.Valid {
-				valueColor := getColor(globalState.flags.noColor || !globalState.stdOut.isTTY, color.FgCyan)
-				if !globalState.flags.quiet {
-					printToStdout(globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+				valueColor := getColor(gs.Flags.NoColor || !gs.Stdout.IsTTY, color.FgCyan)
+				if !gs.Flags.Quiet {
+					printToStdout(gs, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
 				}
-				printToStdout(globalState, fmt.Sprintf(
-					"Logged in successfully, token saved in %s\n", globalState.flags.configFilePath,
+				printToStdout(gs, fmt.Sprintf(
+					"Logged in successfully, token saved in %s\n", gs.Flags.ConfigFilePath,
 				))
 			}
 			return nil

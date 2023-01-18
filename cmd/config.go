@@ -15,6 +15,7 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
@@ -104,10 +105,10 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 // an error. The only situation in which an error won't be returned is if the
 // user didn't explicitly specify a config file path and the default config file
 // doesn't exist.
-func readDiskConfig(globalState *globalState) (Config, error) {
+func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	// Try to see if the file exists in the supplied filesystem
-	if _, err := globalState.fs.Stat(globalState.flags.configFilePath); err != nil {
-		if os.IsNotExist(err) && globalState.flags.configFilePath == globalState.defaultFlags.configFilePath {
+	if _, err := gs.FS.Stat(gs.Flags.ConfigFilePath); err != nil {
+		if os.IsNotExist(err) && gs.Flags.ConfigFilePath == gs.DefaultFlags.ConfigFilePath {
 			// If the file doesn't exist, but it was the default config file (i.e. the user
 			// didn't specify anything), silence the error
 			err = nil
@@ -115,31 +116,31 @@ func readDiskConfig(globalState *globalState) (Config, error) {
 		return Config{}, err
 	}
 
-	data, err := afero.ReadFile(globalState.fs, globalState.flags.configFilePath)
+	data, err := afero.ReadFile(gs.FS, gs.Flags.ConfigFilePath)
 	if err != nil {
-		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", globalState.flags.configFilePath, err)
+		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", gs.Flags.ConfigFilePath, err)
 	}
 	var conf Config
 	err = json.Unmarshal(data, &conf)
 	if err != nil {
-		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", globalState.flags.configFilePath, err)
+		return Config{}, fmt.Errorf("couldn't parse the configuration from %q: %w", gs.Flags.ConfigFilePath, err)
 	}
 	return conf, nil
 }
 
 // Serializes the configuration to a JSON file and writes it in the supplied
 // location on the supplied filesystem
-func writeDiskConfig(globalState *globalState, conf Config) error {
+func writeDiskConfig(gs *state.GlobalState, conf Config) error {
 	data, err := json.MarshalIndent(conf, "", "  ")
 	if err != nil {
 		return err
 	}
 
-	if err := globalState.fs.MkdirAll(filepath.Dir(globalState.flags.configFilePath), 0o755); err != nil {
+	if err := gs.FS.MkdirAll(filepath.Dir(gs.Flags.ConfigFilePath), 0o755); err != nil {
 		return err
 	}
 
-	return afero.WriteFile(globalState.fs, globalState.flags.configFilePath, data, 0o644)
+	return afero.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, 0o644)
 }
 
 // Reads configuration variables from the environment.
@@ -162,14 +163,14 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // - set some defaults if they weren't previously specified
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
-func getConsolidatedConfig(globalState *globalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
+func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
 	// TODO: use errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig) where it makes sense?
 
-	fileConf, err := readDiskConfig(globalState)
+	fileConf, err := readDiskConfig(gs)
 	if err != nil {
 		return conf, err
 	}
-	envConf, err := readEnvConfig(globalState.envVars)
+	envConf, err := readEnvConfig(gs.Env)
 	if err != nil {
 		return conf, err
 	}

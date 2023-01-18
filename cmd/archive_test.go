@@ -13,6 +13,7 @@ import (
 
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext/exitcodes"
 )
 
@@ -78,17 +79,17 @@ func TestArchiveThresholds(t *testing.T) {
 			testScript, err := ioutil.ReadFile(testCase.testFilename)
 			require.NoError(t, err)
 
-			testState := newGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, testCase.testFilename), testScript, 0o644))
-			testState.args = []string{"k6", "archive", testCase.testFilename}
+			ts := tests.NewGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, testCase.testFilename), testScript, 0o644))
+			ts.CmdArgs = []string{"k6", "archive", testCase.testFilename}
 			if testCase.noThresholds {
-				testState.args = append(testState.args, "--no-thresholds")
+				ts.CmdArgs = append(ts.CmdArgs, "--no-thresholds")
 			}
 
 			if testCase.wantErr {
-				testState.expectedExitCode = int(exitcodes.InvalidConfig)
+				ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
 			}
-			newRootCommand(testState.globalState).execute()
+			newRootCommand(ts.GlobalState).execute()
 		})
 	}
 }
@@ -99,16 +100,16 @@ func TestArchiveContainsEnv(t *testing.T) {
 	// given some script that will be archived
 	fileName := "script.js"
 	testScript := []byte(`export default function () {}`)
-	testState := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, fileName), testScript, 0o644))
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
 
 	// when we do archiving and passing the `--env` flags
-	testState.args = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", fileName}
+	ts.CmdArgs = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", fileName}
 
-	newRootCommand(testState.globalState).execute()
-	require.NoError(t, untar(t, testState.fs, "archive.tar", "tmp/"))
+	newRootCommand(ts.GlobalState).execute()
+	require.NoError(t, untar(t, ts.FS, "archive.tar", "tmp/"))
 
-	data, err := afero.ReadFile(testState.fs, "tmp/metadata.json")
+	data, err := afero.ReadFile(ts.FS, "tmp/metadata.json")
 	require.NoError(t, err)
 
 	metadata := struct {
@@ -132,16 +133,16 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 	// given some script that will be archived
 	fileName := "script.js"
 	testScript := []byte(`export default function () {}`)
-	testState := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, fileName), testScript, 0o644))
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
 
 	// when we do archiving and passing the `--env` flags altogether with `--exclude-env-vars` flag
-	testState.args = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", "--exclude-env-vars", fileName}
+	ts.CmdArgs = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", "--exclude-env-vars", fileName}
 
-	newRootCommand(testState.globalState).execute()
-	require.NoError(t, untar(t, testState.fs, "archive.tar", "tmp/"))
+	newRootCommand(ts.GlobalState).execute()
+	require.NoError(t, untar(t, ts.FS, "archive.tar", "tmp/"))
 
-	data, err := afero.ReadFile(testState.fs, "tmp/metadata.json")
+	data, err := afero.ReadFile(ts.FS, "tmp/metadata.json")
 	require.NoError(t, err)
 
 	metadata := struct {

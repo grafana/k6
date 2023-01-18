@@ -6,9 +6,10 @@ import (
 
 	v1 "go.k6.io/k6/api/v1"
 	"go.k6.io/k6/api/v1/client"
+	"go.k6.io/k6/cmd/state"
 )
 
-func getCmdPause(globalState *globalState) *cobra.Command {
+func getCmdPause(gs *state.GlobalState) *cobra.Command {
 	// pauseCmd represents the pause command
 	pauseCmd := &cobra.Command{
 		Use:   "pause",
@@ -17,17 +18,17 @@ func getCmdPause(globalState *globalState) *cobra.Command {
 
   Use the global --address flag to specify the URL to the API server.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := client.New(globalState.flags.address)
+			c, err := client.New(gs.Flags.Address)
 			if err != nil {
 				return err
 			}
-			status, err := c.SetStatus(globalState.ctx, v1.Status{
+			status, err := c.SetStatus(gs.Ctx, v1.Status{
 				Paused: null.BoolFrom(true),
 			})
 			if err != nil {
 				return err
 			}
-			return yamlPrint(globalState.stdOut, status)
+			return yamlPrint(gs.Stdout, status)
 		},
 	}
 	return pauseCmd

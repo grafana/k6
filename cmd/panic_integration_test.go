@@ -10,6 +10,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/testutils"
@@ -84,14 +85,14 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 			t.Parallel()
 
 			testFilename := "script.js"
-			testState := newGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, testFilename), []byte(tc.testScript), 0o644))
-			testState.args = []string{"k6", "run", testFilename}
+			ts := tests.NewGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, testFilename), []byte(tc.testScript), 0o644))
+			ts.CmdArgs = []string{"k6", "run", testFilename}
 
-			testState.expectedExitCode = int(exitcodes.ScriptAborted)
-			newRootCommand(testState.globalState).execute()
+			ts.ExpectedExitCode = int(exitcodes.ScriptAborted)
+			newRootCommand(ts.GlobalState).execute()
 
-			logs := testState.loggerHook.Drain()
+			logs := ts.LoggerHook.Drain()
 
 			assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, tc.expectedLogMessage))
 			assert.False(t, testutils.LogContains(logs, logrus.InfoLevel, "lorem ipsum"))

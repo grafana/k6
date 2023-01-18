@@ -8,13 +8,14 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/converter/har"
 	"go.k6.io/k6/lib"
 )
 
 // TODO: split apart like `k6 run` and `k6 archive`?
 //nolint:funlen,gocognit
-func getCmdConvert(globalState *globalState) *cobra.Command {
+func getCmdConvert(gs *state.GlobalState) *cobra.Command {
 	var (
 		convertOutput       string
 		optionsFilePath     string
@@ -48,7 +49,7 @@ func getCmdConvert(globalState *globalState) *cobra.Command {
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse the HAR file
-			r, err := globalState.fs.Open(args[0])
+			r, err := gs.FS.Open(args[0])
 			if err != nil {
 				return err
 			}
@@ -64,7 +65,7 @@ func getCmdConvert(globalState *globalState) *cobra.Command {
 			options := lib.Options{MaxRedirects: null.IntFrom(0)}
 
 			if optionsFilePath != "" {
-				optionsFileContents, readErr := afero.ReadFile(globalState.fs, optionsFilePath)
+				optionsFileContents, readErr := afero.ReadFile(gs.FS, optionsFilePath)
 				if readErr != nil {
 					return readErr
 				}
@@ -84,11 +85,11 @@ func getCmdConvert(globalState *globalState) *cobra.Command {
 
 			// Write script content to stdout or file
 			if convertOutput == "" || convertOutput == "-" { //nolint:nestif
-				if _, err := io.WriteString(globalState.stdOut, script); err != nil {
+				if _, err := io.WriteString(gs.Stdout, script); err != nil {
 					return err
 				}
 			} else {
-				f, err := globalState.fs.Create(convertOutput)
+				f, err := gs.FS.Create(convertOutput)
 				if err != nil {
 					return err
 				}

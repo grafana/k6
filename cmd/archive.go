@@ -3,11 +3,13 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
+
+	"go.k6.io/k6/cmd/state"
 )
 
 // cmdArchive handles the `k6 archive` sub-command
 type cmdArchive struct {
-	gs *globalState
+	gs *state.GlobalState
 
 	archiveOut     string
 	excludeEnvVars bool
@@ -31,13 +33,13 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 
 	// Archive.
 	arc := testRunState.Runner.MakeArchive()
-	f, err := c.gs.fs.Create(c.archiveOut)
+	f, err := c.gs.FS.Create(c.archiveOut)
 	if err != nil {
 		return err
 	}
 
 	if c.excludeEnvVars {
-		c.gs.logger.Debug("environment variables will be excluded from the archive")
+		c.gs.Logger.Debug("environment variables will be excluded from the archive")
 
 		arc.Env = nil
 	}
@@ -66,7 +68,7 @@ func (c *cmdArchive) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func getCmdArchive(gs *globalState) *cobra.Command {
+func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 	c := &cmdArchive{
 		gs:         gs,
 		archiveOut: "archive.tar",

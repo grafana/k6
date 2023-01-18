@@ -18,6 +18,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/fsext"
@@ -200,14 +201,14 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
 
-			testState := newGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, tc.testFilename), testScript, 0o644))
-			testState.args = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
+			ts := tests.NewGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
+			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
-			testState.expectedExitCode = int(tc.expExitCode)
-			newRootCommand(testState.globalState).execute()
+			ts.ExpectedExitCode = int(tc.expExitCode)
+			newRootCommand(ts.GlobalState).execute()
 
-			logs := testState.loggerHook.Drain()
+			logs := ts.LoggerHook.Drain()
 
 			if tc.expErr != "" {
 				assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, tc.expErr))
@@ -255,12 +256,12 @@ func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
 			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
 
-			testState := newGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, tc.testFilename), testScript, 0o644))
-			testState.args = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
+			ts := tests.NewGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
+			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
-			testState.expectedExitCode = int(tc.expExitCode)
-			newRootCommand(testState.globalState).execute()
+			ts.ExpectedExitCode = int(tc.expExitCode)
+			newRootCommand(ts.GlobalState).execute()
 		})
 	}
 }
@@ -305,20 +306,20 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
 			require.NoError(t, err)
 
-			testState := newGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(testState.fs, filepath.Join(testState.cwd, tc.testFilename), testScript, 0o644))
+			ts := tests.NewGlobalTestState(t)
+			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 
-			testState.args = []string{"k6", "run", tc.testFilename}
-			testState.expectedExitCode = int(tc.expExitCode)
-			newRootCommand(testState.globalState).execute()
+			ts.CmdArgs = []string{"k6", "run", tc.testFilename}
+			ts.ExpectedExitCode = int(tc.expExitCode)
+			newRootCommand(ts.GlobalState).execute()
 
 			if tc.expStdoutContains != "" {
-				assert.Contains(t, testState.stdOut.String(), tc.expStdoutContains)
+				assert.Contains(t, ts.Stdout.String(), tc.expStdoutContains)
 			}
 
 			if tc.expStdoutNotContains != "" {
-				log.Println(testState.stdOut.String())
-				assert.NotContains(t, testState.stdOut.String(), tc.expStdoutNotContains)
+				log.Println(ts.Stdout.String())
+				assert.NotContains(t, ts.Stdout.String(), tc.expStdoutNotContains)
 			}
 		})
 	}

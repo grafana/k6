@@ -9,12 +9,13 @@ import (
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/output/influxdb"
 	"go.k6.io/k6/ui"
 )
 
 //nolint:funlen
-func getCmdLoginInfluxDB(globalState *globalState) *cobra.Command {
+func getCmdLoginInfluxDB(gs *state.GlobalState) *cobra.Command {
 	// loginInfluxDBCommand represents the 'login influxdb' command
 	loginInfluxDBCommand := &cobra.Command{
 		Use:   "influxdb [uri]",
@@ -24,7 +25,7 @@ func getCmdLoginInfluxDB(globalState *globalState) *cobra.Command {
 This will set the default server used when just "-o influxdb" is passed.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			config, err := readDiskConfig(globalState)
+			config, err := readDiskConfig(gs)
 			if err != nil {
 				return err
 			}
@@ -70,9 +71,9 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				},
 			}
 			if !term.IsTerminal(int(syscall.Stdin)) { //nolint:unconvert
-				globalState.logger.Warn("Stdin is not a terminal, falling back to plain text input")
+				gs.Logger.Warn("Stdin is not a terminal, falling back to plain text input")
 			}
-			vals, err := form.Run(globalState.stdIn, globalState.stdOut)
+			vals, err := form.Run(gs.Stdin, gs.Stdout)
 			if err != nil {
 				return err
 			}
@@ -97,7 +98,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 			if err != nil {
 				return err
 			}
-			return writeDiskConfig(globalState, config)
+			return writeDiskConfig(gs, config)
 		},
 	}
 	return loginInfluxDBCommand

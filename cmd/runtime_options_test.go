@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
@@ -58,21 +59,21 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	fs := afero.NewMemMapFs()
 	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode.Bytes(), 0o644))
 
-	ts := newGlobalTestState(t) // TODO: move upwards, make this into an almost full integration test
+	ts := tests.NewGlobalTestState(t) // TODO: move upwards, make this into an almost full integration test
 	registry := metrics.NewRegistry()
 	test := &loadedTest{
 		sourceRootPath: "script.js",
 		source:         &loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
 		fileSystems:    map[string]afero.Fs{"file": fs},
 		preInitState: &lib.TestPreInitState{
-			Logger:         ts.logger,
+			Logger:         ts.Logger,
 			RuntimeOptions: rtOpts,
 			Registry:       registry,
 			BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		},
 	}
 
-	require.NoError(t, test.initializeFirstRunner(ts.globalState))
+	require.NoError(t, test.initializeFirstRunner(ts.GlobalState))
 
 	archive := test.initRunner.MakeArchive()
 	archiveBuf := &bytes.Buffer{}
@@ -84,7 +85,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 			source:         &loader.SourceData{Data: archiveBuf.Bytes(), URL: &url.URL{Path: "/script.tar", Scheme: "file"}},
 			fileSystems:    map[string]afero.Fs{"file": fs},
 			preInitState: &lib.TestPreInitState{
-				Logger:         ts.logger,
+				Logger:         ts.Logger,
 				RuntimeOptions: rtOpts,
 				Registry:       registry,
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
@@ -93,11 +94,11 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	}
 
 	archTest := getRunnerErr(lib.RuntimeOptions{})
-	require.NoError(t, archTest.initializeFirstRunner(ts.globalState))
+	require.NoError(t, archTest.initializeFirstRunner(ts.GlobalState))
 
 	for key, val := range tc.expRTOpts.Env {
 		archTest = getRunnerErr(lib.RuntimeOptions{Env: map[string]string{key: "almost " + val}})
-		require.NoError(t, archTest.initializeFirstRunner(ts.globalState))
+		require.NoError(t, archTest.initializeFirstRunner(ts.GlobalState))
 		assert.Equal(t, archTest.initRunner.MakeArchive().Env[key], "almost "+val)
 	}
 }

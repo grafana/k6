@@ -4,9 +4,10 @@ import (
 	"github.com/spf13/cobra"
 
 	"go.k6.io/k6/api/v1/client"
+	"go.k6.io/k6/cmd/state"
 )
 
-func getCmdStatus(globalState *globalState) *cobra.Command {
+func getCmdStatus(gs *state.GlobalState) *cobra.Command {
 	// statusCmd represents the status command
 	statusCmd := &cobra.Command{
 		Use:   "status",
@@ -15,16 +16,16 @@ func getCmdStatus(globalState *globalState) *cobra.Command {
 
   Use the global --address flag to specify the URL to the API server.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			c, err := client.New(globalState.flags.address)
+			c, err := client.New(gs.Flags.Address)
 			if err != nil {
 				return err
 			}
-			status, err := c.Status(globalState.ctx)
+			status, err := c.Status(gs.Ctx)
 			if err != nil {
 				return err
 			}
 
-			return yamlPrint(globalState.stdOut, status)
+			return yamlPrint(gs.Stdout, status)
 		},
 	}
 	return statusCmd

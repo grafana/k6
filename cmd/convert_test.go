@@ -9,6 +9,7 @@ import (
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/cmd/tests"
 )
 
 const testHAR = `
@@ -107,16 +108,16 @@ func TestConvertCmdCorrelate(t *testing.T) {
 	expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
 	require.NoError(t, err)
 
-	testState := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(testState.fs, "correlate.har", har, 0o644))
-	testState.args = []string{
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.FS, "correlate.har", har, 0o644))
+	ts.CmdArgs = []string{
 		"k6", "convert", "--output=result.js", "--correlate=true", "--no-batch=true",
 		"--enable-status-code-checks=true", "--return-on-failed-check=true", "correlate.har",
 	}
 
-	newRootCommand(testState.globalState).execute()
+	newRootCommand(ts.GlobalState).execute()
 
-	result, err := afero.ReadFile(testState.fs, "result.js")
+	result, err := afero.ReadFile(ts.FS, "result.js")
 	require.NoError(t, err)
 
 	// Sanitizing to avoid windows problems with carriage returns
@@ -142,24 +143,24 @@ func TestConvertCmdCorrelate(t *testing.T) {
 
 func TestConvertCmdStdout(t *testing.T) {
 	t.Parallel()
-	testState := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(testState.fs, "stdout.har", []byte(testHAR), 0o644))
-	testState.args = []string{"k6", "convert", "stdout.har"}
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.FS, "stdout.har", []byte(testHAR), 0o644))
+	ts.CmdArgs = []string{"k6", "convert", "stdout.har"}
 
-	newRootCommand(testState.globalState).execute()
-	assert.Equal(t, "Command \"convert\" is deprecated, please use har-to-k6 (https://github.com/grafana/har-to-k6) instead.\n"+testHARConvertResult, testState.stdOut.String())
+	newRootCommand(ts.GlobalState).execute()
+	assert.Equal(t, "Command \"convert\" is deprecated, please use har-to-k6 (https://github.com/grafana/har-to-k6) instead.\n"+testHARConvertResult, ts.Stdout.String())
 }
 
 func TestConvertCmdOutputFile(t *testing.T) {
 	t.Parallel()
 
-	testState := newGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(testState.fs, "output.har", []byte(testHAR), 0o644))
-	testState.args = []string{"k6", "convert", "--output", "result.js", "output.har"}
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.FS, "output.har", []byte(testHAR), 0o644))
+	ts.CmdArgs = []string{"k6", "convert", "--output", "result.js", "output.har"}
 
-	newRootCommand(testState.globalState).execute()
+	newRootCommand(ts.GlobalState).execute()
 
-	output, err := afero.ReadFile(testState.fs, "result.js")
+	output, err := afero.ReadFile(ts.FS, "result.js")
 	assert.NoError(t, err)
 	assert.Equal(t, testHARConvertResult, string(output))
 }

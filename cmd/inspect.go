@@ -5,12 +5,13 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 )
 
 // TODO: split apart like `k6 run` and `k6 archive`
-func getCmdInspect(gs *globalState) *cobra.Command {
+func getCmdInspect(gs *state.GlobalState) *cobra.Command {
 	var addExecReqs bool
 
 	// inspectCmd represents the inspect command
@@ -60,7 +61,9 @@ func getCmdInspect(gs *globalState) *cobra.Command {
 
 // If --execution-requirements is enabled, this will consolidate the config,
 // derive the value of `scenarios` and calculate the max test duration and VUs.
-func inspectOutputWithExecRequirements(gs *globalState, cmd *cobra.Command, test *loadedTest) (interface{}, error) {
+func inspectOutputWithExecRequirements(
+	gs *state.GlobalState, cmd *cobra.Command, test *loadedTest,
+) (interface{}, error) {
 	// we don't actually support CLI flags here, so we pass nil as the getter
 	configuredTest, err := test.consolidateDeriveAndValidateConfig(gs, cmd, nil)
 	if err != nil {
