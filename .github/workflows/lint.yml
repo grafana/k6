@@ -47,7 +47,7 @@ jobs:
           check-latest: true
       - name: Retrieve golangci-lint version
         run: |
-          echo "::set-output name=Version::$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')"
+          echo "Version=$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')" >> $GITHUB_OUTPUT
         id: version
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v3
