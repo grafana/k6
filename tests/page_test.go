@@ -654,12 +654,13 @@ func TestPageWaitForLoadState(t *testing.T) {
 }
 
 // See: The issue #187 for details.
-func TestPageWaitForNavigationShouldNotPanic(t *testing.T) {
+func TestPageWaitForNavigationErrOnCtxDone(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
-	p := newTestBrowser(t, withContext(ctx)).NewPage(nil)
+	p := newTestBrowser(t, ctx).NewPage(nil)
 	go cancel()
 	<-ctx.Done()
-	require.NotPanics(t, func() { p.WaitForNavigation(nil) })
+	_, err := p.WaitForNavigation(nil)
+	require.ErrorContains(t, err, "canceled")
 }
 
 func TestPagePress(t *testing.T) {

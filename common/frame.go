@@ -1744,7 +1744,9 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
+//
+//nolint:funlen,cyclop
+func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
@@ -1786,49 +1788,53 @@ func (f *Frame) WaitForNavigation(opts goja.Value) *goja.Promise {
 		return nil
 	}
 
-	return k6ext.Promise(f.ctx, func() (result any, reason error) {
-		defer func() {
-			timeoutCancel()
-			navEvtCancel()
-			lifecycleEvtCancel()
-		}()
+	defer func() {
+		timeoutCancel()
+		navEvtCancel()
+		lifecycleEvtCancel()
+	}()
 
-		var (
-			resp       *Response
-			sameDocNav bool
-		)
-		select {
-		case evt := <-navEvtCh:
-			if e, ok := evt.(*NavigationEvent); ok {
-				if e.newDocument == nil {
-					sameDocNav = true
-					break
-				}
-				// request could be nil if navigating to e.g. about:blank
-				req := e.newDocument.request
-				if req != nil {
-					req.responseMu.RLock()
-					resp = req.response
-					req.responseMu.RUnlock()
-				}
+	var (
+		resp       *Response
+		sameDocNav bool
+	)
+	select {
+	case evt := <-navEvtCh:
+		if e, ok := evt.(*NavigationEvent); ok {
+			if e.newDocument == nil {
+				sameDocNav = true
+				break
 			}
+			// request could be nil if navigating to e.g. about:blank
+			req := e.newDocument.request
+			if req != nil {
+				req.responseMu.RLock()
+				resp = req.response
+				req.responseMu.RUnlock()
+			}
+		}
+	case <-timeoutCtx.Done():
+		return nil, handleTimeoutError(timeoutCtx.Err())
+	}
+
+	// A lifecycle event won't be received when navigating within the same
+	// document, so don't wait for it. The event might've also already been
+	// fired once we're here, so also skip waiting in that case.
+	if !sameDocNav && !f.hasLifecycleEventFired(parsedOpts.WaitUntil) {
+		select {
+		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
 			return nil, handleTimeoutError(timeoutCtx.Err())
 		}
+	}
 
-		// A lifecycle event won't be received when navigating within the same
-		// document, so don't wait for it. The event might've also already been
-		// fired once we're here, so also skip waiting in that case.
-		if !sameDocNav && !f.hasLifecycleEventFired(parsedOpts.WaitUntil) {
-			select {
-			case <-lifecycleEvtCh:
-			case <-timeoutCtx.Done():
-				return nil, handleTimeoutError(timeoutCtx.Err())
-			}
-		}
+	// Since response will be in an interface, it will never be nil,
+	// so we need to return nil explicitly.
+	if resp == nil {
+		return nil, nil
+	}
 
-		return resp, nil
-	})
+	return resp, nil
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.

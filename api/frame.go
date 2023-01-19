@@ -51,7 +51,7 @@ type Frame interface {
 	URL() string
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) *goja.Promise
 	WaitForLoadState(state string, opts goja.Value)
-	WaitForNavigation(opts goja.Value) *goja.Promise
+	WaitForNavigation(opts goja.Value) (Response, error)
 	WaitForSelector(selector string, opts goja.Value) ElementHandle
 	WaitForTimeout(timeout int64)
 }

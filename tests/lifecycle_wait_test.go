@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"sync"
@@ -14,6 +15,9 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 )
+
+// TODO
+// Remove the promises. We don't need them anymore.
 
 // General guidelines on lifecycle events:
 //
@@ -126,10 +130,13 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 				result := p.TextContent("#pingRequestText", nil)
 				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 
-				waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+				opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
 					Timeout:   1000,
 					WaitUntil: common.LifecycleEventNetworkIdle,
-				}))
+				})
+				waitForNav := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
+					return p.WaitForNavigation(opts)
+				})
 
 				return tb.promise(waitForNav)
 			},
@@ -163,15 +170,24 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 				result = p.TextContent("#pingJSText", nil)
 				tt.pingJSTextAssert(result)
 
-				waitForNav := p.WaitForNavigation(tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-					Timeout:   30000,
-					WaitUntil: tt.waitUntil,
-				}))
-				click := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-					return nil, p.Click(`a`, nil)
+				waitForNav := func() error {
+					opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+						Timeout:   30000,
+						WaitUntil: tt.waitUntil,
+					})
+					_, err := p.WaitForNavigation(opts)
+					return err
+				}
+				click := func() error {
+					return p.Click(`a`, nil)
+				}
+				runAll := k6ext.Promise(tb.ctx, func() (result any, reason error) {
+					ctx, cancel := context.WithTimeout(tb.ctx, 5*time.Second)
+					defer cancel()
+					return nil, tb.run(ctx, waitForNav, click)
 				})
 
-				return tb.promiseAll(waitForNav, click)
+				return tb.promise(runAll)
 			}, func() {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result, 20)

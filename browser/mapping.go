@@ -287,19 +287,27 @@ func mapFrame(ctx context.Context, vu k6modules.VU, f api.Frame) mapping {
 			mf := mapFrame(ctx, vu, f.ParentFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"press":             f.Press,
-		"selectOption":      f.SelectOption,
-		"setContent":        f.SetContent,
-		"setInputFiles":     f.SetInputFiles,
-		"tap":               f.Tap,
-		"textContent":       f.TextContent,
-		"title":             f.Title,
-		"type":              f.Type,
-		"uncheck":           f.Uncheck,
-		"url":               f.URL,
-		"waitForFunction":   f.WaitForFunction,
-		"waitForLoadState":  f.WaitForLoadState,
-		"waitForNavigation": f.WaitForNavigation,
+		"press":            f.Press,
+		"selectOption":     f.SelectOption,
+		"setContent":       f.SetContent,
+		"setInputFiles":    f.SetInputFiles,
+		"tap":              f.Tap,
+		"textContent":      f.TextContent,
+		"title":            f.Title,
+		"type":             f.Type,
+		"uncheck":          f.Uncheck,
+		"url":              f.URL,
+		"waitForFunction":  f.WaitForFunction,
+		"waitForLoadState": f.WaitForLoadState,
+		"waitForNavigation": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				resp, err := f.WaitForNavigation(opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapResponse(ctx, vu, resp), nil
+			})
+		},
 		"waitForSelector": func(selector string, opts goja.Value) *goja.Object {
 			eh := f.WaitForSelector(selector, opts)
 			ehm := mapElementHandle(ctx, vu, eh)
@@ -427,12 +435,20 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"waitForEvent":                p.WaitForEvent,
 		"waitForFunction":             p.WaitForFunction,
 		"waitForLoadState":            p.WaitForLoadState,
-		"waitForNavigation":           p.WaitForNavigation,
-		"waitForRequest":              p.WaitForRequest,
-		"waitForResponse":             p.WaitForResponse,
-		"waitForSelector":             p.WaitForSelector,
-		"waitForTimeout":              p.WaitForTimeout,
-		"workers":                     p.Workers,
+		"waitForNavigation": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				resp, err := p.WaitForNavigation(opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapResponse(ctx, vu, resp), nil
+			})
+		},
+		"waitForRequest":  p.WaitForRequest,
+		"waitForResponse": p.WaitForResponse,
+		"waitForSelector": p.WaitForSelector,
+		"waitForTimeout":  p.WaitForTimeout,
+		"workers":         p.Workers,
 	}
 	maps["$"] = func(selector string) *goja.Object {
 		eh := p.Query(selector)

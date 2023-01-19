@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"os"
@@ -11,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6ext"
 )
 
 func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
@@ -46,31 +46,20 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			require.NoError(t, err)
 			require.NotNil(t, resp)
 
-			var done bool
-			err = tb.awaitWithTimeout(timeout, func() error {
-				// TODO
-				// remove this once we have finished our work on the mapping layer.
-				// for now: provide a fake promise
-				fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-					return nil, nil
+			waitForNav := func() error {
+				opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+					Timeout: time.Duration(timeout.Milliseconds()), // interpreted as ms
 				})
-				tb.promise(fakePromise).then(func() testPromise {
-					opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-						Timeout: time.Duration(timeout.Milliseconds()), // interpreted as ms
-					})
-					waitForNav := p.WaitForNavigation(opts)
-					click := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-						return nil, p.Click(tc.selector, nil)
-					})
-					return tb.promiseAll(waitForNav, click)
-				}).then(func() {
-					done = true
-				})
-
-				return nil
-			})
+				_, err := p.WaitForNavigation(opts)
+				return err
+			}
+			click := func() error {
+				return p.Click(tc.selector, nil)
+			}
+			ctx, cancel := context.WithTimeout(tb.ctx, timeout)
+			defer cancel()
+			err = tb.run(ctx, waitForNav, click)
 			require.NoError(t, err)
-			require.True(t, done)
 		})
 	}
 }
@@ -111,32 +100,20 @@ func TestWaitForFrameNavigation(t *testing.T) {
 	_, err := p.Goto(tb.URL("/first"), opts)
 	require.NoError(t, err)
 
-	var done bool
-	err = tb.await(func() error {
-		// TODO
-		// remove this once we have finished our work on the mapping layer.
-		// for now: provide a fake promise
-		fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-			return nil, nil
+	waitForNav := func() error {
+		opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
+			Timeout: 5000, // interpreted as ms
 		})
-		tb.promise(fakePromise).
-			then(func() testPromise {
-				opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-					Timeout: 5000, // interpreted as ms
-				})
-				waitForNav := p.WaitForNavigation(opts)
-				click := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-					return nil, p.Click(`a`, nil)
-				})
-				return tb.promiseAll(waitForNav, click)
-			}).
-			then(func() {
-				assert.Equal(t, "Second page", p.Title())
-				done = true
-			})
-
-		return nil
-	})
+		_, err := p.WaitForNavigation(opts)
+		return err
+	}
+	click := func() error {
+		return p.Click(`a`, nil)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	err = tb.run(ctx, waitForNav, click)
 	require.NoError(t, err)
-	require.True(t, done)
+
+	assert.Equal(t, "Second page", p.Title())
 }
