@@ -1,13 +1,14 @@
 # xk6-output-prometheus-remote
+
 [k6](https://github.com/grafana/k6) extension for publishing test-run metrics to Prometheus via Remote Write endpoint.
 
 > :warning: Not to be confused with [Prometheus Remote Write **client** extension](https://github.com/grafana/xk6-client-prometheus-remote) which is for load testing _Prometheus_ itself.
 
-> :bookmark: As of k6 v0.42.0, this extension is available within k6 as an _experimental module_. 
+> :bookmark: As of k6 v0.42.0, this extension is available within k6 as an _experimental module_.
 > This means that the extension has entered the process of being fully merged into the core of k6 and does not require a special build with xk6 to utilize this feature.
-> 
+>
 > See the [Prometheus remote write guide](https://k6.io/docs/results-output/real-time/prometheus-remote-write/) to utilize this feature.
-> 
+>
 
 There are many options for remote-write compatible agents, the official list can be found [here](https://prometheus.io/docs/operating/integrations/). The exact details of how metrics will be processed or stored depends on the underlying agent used.
 
@@ -20,16 +21,19 @@ Key points to know:
 ### Usage
 
 To build k6 binary with the Prometheus remote write output extension use:
+
 ```
 xk6 build --with github.com/grafana/xk6-output-prometheus-remote@latest 
 ```
 
 Then run new k6 binary with:
+
 ```
 K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write ./k6 run -o xk6-prometheus-rw script.js 
 ```
 
 Add TLS and HTTP basic authentication:
+
 ```
 K6_PROMETHEUS_RW_SERVER_URL=https://localhost:9090/api/v1/write \
 K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY=false \
@@ -51,8 +55,9 @@ All the k6 metric types are converted into an equivalent Prometheus' type:
 
 The obvious conversion with a classic Prometheus Histogram is not convenient because k6 can't determine the fixed buckets in advance, so the Output maps a Trend metric by default into a Gauge representing p(99). It is possible to map the same Trend to multiple stats at the same time (count, sum, min, max, avg, med, p(x)), it is possible to specify them via the `K6_PROMETHEUS_RW_TREND_STATS` environment variable (e.g `K6_PROMETHEUS_RW_TREND_STATS=avg,p(90),p(99),min,max`). Note that for each added stat a new time series will be generated.
 Mapping Trend by stats has the following cons:
-* It is impossible to aggregate some Gauge's value (especially the percentiles).
-* It uses a memory-expensive k6's data structure.
+
+- It is impossible to aggregate some Gauge's value (especially the percentiles).
+- It uses a memory-expensive k6's data structure.
 
 The previous points can be resolved by mapping Trend as [Prometheus Native Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram). Enabling the conversion by the `K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true` environment variable (or one of the other ways), then the Output converts all the Trend types into a dedicated Native Histogram.
 
@@ -60,8 +65,7 @@ Native Histogram is a Prometheus' experimental feature, so it has to be enabled 
 
 ### Prometheus as remote-write agent
 
-To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-receiver` option. See docker-compose samples in `example/`. Options for remote write storage can be found [here](https://prometheus.io/docs/operating/integrations/). 
-
+To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-receiver` option. See docker-compose samples in `example/`. Options for remote write storage can be found [here](https://prometheus.io/docs/operating/integrations/).
 
 ### Docker Compose
 
@@ -71,13 +75,14 @@ Note: the `docker-compose.yml` file has the Native Histogram mapping set as enab
 
 > This is just a quick setup to show the usage. For a real use case, you will want to deploy outside of docker.
 
-Clone the repo to get started and follow these steps: 
+Clone the repo to get started and follow these steps:
 
 1. Start the docker compose environment.
+
     ```shell
     docker-compose up -d
     ```
-    
+
     > Some users have encountered failures for the k6 build portion. A workaround may be to disable the _"Use Docker Compose V2"_ checkbox in the _General_ section of Docker Desktop settings.
 
     ```shell
@@ -88,23 +93,38 @@ Clone the repo to get started and follow these steps:
     ```
 
 2. Use the k6 Docker image to run the k6 script and send metrics to the Prometheus container started on the previous step. You must [set the `testid` tag](https://k6.io/docs/using-k6/tags-and-groups/#test-wide-tags) with a unique identifier to segment the metrics into discrete test runs for the Grafana dashboards.
+
     ```shell
     docker-compose run --rm -T k6 run -<samples/test.js --tag testid=<SOME-ID>
     ```
+
     For convenience, the `docker-run.sh` can be used to simply:
+
     ```shell
     ./docker-run.sh samples/test.js
     ```
 
-3. Visit http://localhost:3000/ to view results in Grafana.
+3. Visit <http://localhost:3000/> to view results in Grafana.
 
 ## Dashboards
+
 The docker-compose setup comes with two pre-built Grafana dashboards. One for listing the discrete test runs as a list, and the other for visualizing the results of a specific test run.
 >Note: The dashboards work with the Native Histogram mapping so it is required to enable it.
 
 ### Test result dashboard
-![Prometheus dashboard of k6 test result](./images/prometheus-dashboard-k6-test-result.png)
 
-### Test list dashboard
-![Prometheus dashboard of k6 test runs](./images/prometheus-dashboard-k6-test-runs.png)
+[<img src="./images/prometheus-dashboard-k6-test-result.png" width="500"/>](./images/prometheus-dashboard-k6-test-result.png)
+
+Results can be filtered by:
+
+- testid
+- scenario
+- url
+
+[<img src="./images/prometheus-dashboard-k6-test-result-variables.png" width="500"/>](./images/prometheus-dashboard-k6-test-result-variables.png)
+
+Response time metrics are based on the **metrics** variable, and the values can be:
+
+- k6_http_req_duration_seconds (default)
+- k6_http_req_waiting_seconds
 
