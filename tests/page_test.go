@@ -440,12 +440,13 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 func TestPageWaitForFunction(t *testing.T) {
 	t.Parallel()
 
+	// script is here to test we're not getting an error from the
+	// waitForFunction call itself and the tests that use it are
+	// testing the polling functionality—not the response from
+	// waitForFunction.
 	script := `
-        page.waitForFunction(%s, %s, %s).then(ok => {
-            log('ok: '+ok);
-        }, err => {
-            log('err: '+err);
-        });`
+		let resp = page.waitForFunction(%s, %s, %s)
+		log('ok: '+resp);`
 
 	t.Run("ok_func_raf_default", func(t *testing.T) {
 		t.Parallel()
@@ -456,7 +457,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 		require.NoError(t, tb.runtime().Set("page", p))
 
-		_, err := tb.runtime().RunString(`fn = () => {
+		_, err := tb.runJavaScript(`fn = () => {
 			if (typeof window._cnt == 'undefined') window._cnt = 0;
 			if (window._cnt >= 50) return true;
 			window._cnt++;
@@ -464,10 +465,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		}`)
 		require.NoError(t, err)
 
-		err = tb.vu.Loop.Start(func() error {
-			_, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", "null"))
-			return err
-		})
+		_, err = tb.runJavaScript(script, "fn", "{}", "null")
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
 	})
@@ -481,17 +479,14 @@ func TestPageWaitForFunction(t *testing.T) {
 		var log []string
 		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 
-		_, err := tb.runtime().RunString(`fn = arg => {
+		_, err := tb.runJavaScript(`fn = arg => {
 			window._arg = arg;
 			return true;
 		}`)
 		require.NoError(t, err)
 
 		arg := "raf_arg"
-		err = tb.vu.Loop.Start(func() error {
-			_, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("%q", arg)))
-			return err
-		})
+		_, err = tb.runJavaScript(script, "fn", "{}", fmt.Sprintf("%q", arg))
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
 
@@ -512,7 +507,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		var log []string
 		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 
-		_, err := tb.runtime().RunString(`fn = (...args) => {
+		_, err := tb.runJavaScript(`fn = (...args) => {
 			window._args = args;
 			return true;
 		}`)
@@ -522,10 +517,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		argsJS, err := json.Marshal(args)
 		require.NoError(t, err)
 
-		err = tb.vu.Loop.Start(func() error {
-			_, err := tb.runtime().RunString(fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS))))
-			return err
-		})
+		_, err = tb.runJavaScript(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS)))
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
 
@@ -547,13 +539,8 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 		require.NoError(t, rt.Set("page", p))
 
-		err := tb.vu.Loop.Start(func() error {
-			_, err := rt.RunString(fmt.Sprintf(script, "false", "{ polling: 'raf', timeout: 500, }", "null"))
-			return err
-		})
-		require.NoError(t, err)
-		require.Len(t, log, 1)
-		assert.Contains(t, log[0], "timed out after 500ms")
+		_, err := tb.runJavaScript(script, "false", "{ polling: 'raf', timeout: 500, }", "null")
+		require.ErrorContains(t, err, "timed out after 500ms")
 	})
 
 	t.Run("err_wrong_polling", func(t *testing.T) {
@@ -564,10 +551,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		rt := tb.vu.Runtime()
 		require.NoError(t, rt.Set("page", p))
 
-		err := tb.vu.Loop.Start(func() error {
-			_, err := rt.RunString(fmt.Sprintf(script, "false", "{ polling: 'blah' }", "null"))
-			return err
-		})
+		_, err := tb.runJavaScript(script, "false", "{ polling: 'blah' }", "null")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
 			`parsing waitForFunction options: wrong polling option value:`,
@@ -592,17 +576,15 @@ func TestPageWaitForFunction(t *testing.T) {
 		}`))
 
 		script := `
-	        page.waitForFunction(%s, %s, %s).then(ok => {
-	            log('ok: '+ok.innerHTML());
-	        }, err => {
-	            log('err: '+err);
-	        });`
+			let resp = page.waitForFunction(%s, %s, %s);
+			if (resp) {
+				log('ok: '+resp.innerHTML());
+			} else {
+				log('err: '+err);
+			}`
 
-		err := tb.vu.Loop.Start(func() error {
-			s := fmt.Sprintf(script, `"document.querySelector('h1')"`, "{ polling: 100, timeout: 2000, }", "null")
-			_, err := tb.runtime().RunString(s)
-			return err
-		})
+		s := fmt.Sprintf(script, `"document.querySelector('h1')"`, "{ polling: 100, timeout: 2000, }", "null")
+		_, err := tb.runJavaScript(s)
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: Hello")
 	})
@@ -616,7 +598,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		var log []string
 		require.NoError(t, tb.runtime().Set("log", func(s string) { log = append(log, s) }))
 
-		_, err := tb.runtime().RunString(`fn = () => document.querySelector('h1') !== null`)
+		_, err := tb.runJavaScript(`fn = () => document.querySelector('h1') !== null`)
 		require.NoError(t, err)
 
 		p.Evaluate(tb.toGojaValue(`() => {
@@ -629,11 +611,8 @@ func TestPageWaitForFunction(t *testing.T) {
 			}, 1000);
 		}`))
 
-		err = tb.vu.Loop.Start(func() error {
-			s := fmt.Sprintf(script, "fn", "{ polling: 'mutation', timeout: 2000, }", "null")
-			_, err := tb.runtime().RunString(s)
-			return err
-		})
+		s := fmt.Sprintf(script, "fn", "{ polling: 'mutation', timeout: 2000, }", "null")
+		_, err = tb.runJavaScript(s)
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
 	})

@@ -287,17 +287,21 @@ func mapFrame(ctx context.Context, vu k6modules.VU, f api.Frame) mapping {
 			mf := mapFrame(ctx, vu, f.ParentFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"press":            f.Press,
-		"selectOption":     f.SelectOption,
-		"setContent":       f.SetContent,
-		"setInputFiles":    f.SetInputFiles,
-		"tap":              f.Tap,
-		"textContent":      f.TextContent,
-		"title":            f.Title,
-		"type":             f.Type,
-		"uncheck":          f.Uncheck,
-		"url":              f.URL,
-		"waitForFunction":  f.WaitForFunction,
+		"press":         f.Press,
+		"selectOption":  f.SelectOption,
+		"setContent":    f.SetContent,
+		"setInputFiles": f.SetInputFiles,
+		"tap":           f.Tap,
+		"textContent":   f.TextContent,
+		"title":         f.Title,
+		"type":          f.Type,
+		"uncheck":       f.Uncheck,
+		"url":           f.URL,
+		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				return f.WaitForFunction(pageFunc, opts, args...) //nolint:wrapcheck
+			})
+		},
 		"waitForLoadState": f.WaitForLoadState,
 		"waitForNavigation": func(opts goja.Value) *goja.Promise {
 			return k6ext.Promise(ctx, func() (result any, reason error) {
@@ -433,8 +437,12 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"video":                       p.Video,
 		"viewportSize":                p.ViewportSize,
 		"waitForEvent":                p.WaitForEvent,
-		"waitForFunction":             p.WaitForFunction,
-		"waitForLoadState":            p.WaitForLoadState,
+		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) *goja.Promise {
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				return p.WaitForFunction(pageFunc, opts, args...) //nolint:wrapcheck
+			})
+		},
+		"waitForLoadState": p.WaitForLoadState,
 		"waitForNavigation": func(opts goja.Value) *goja.Promise {
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				resp, err := p.WaitForNavigation(opts)

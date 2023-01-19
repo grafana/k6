@@ -70,7 +70,7 @@ type Page interface {
 	Video() *goja.Promise
 	ViewportSize() map[string]float64
 	WaitForEvent(event string, optsOrPredicate goja.Value) *goja.Promise
-	WaitForFunction(fn, opts goja.Value, args ...goja.Value) *goja.Promise
+	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (Response, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) *goja.Promise

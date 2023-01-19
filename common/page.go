@@ -890,7 +890,7 @@ func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) *goja.Prom
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (p *Page) WaitForFunction(fn, opts goja.Value, args ...goja.Value) *goja.Promise {
+func (p *Page) WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error) {
 	p.logger.Debugf("Page:WaitForFunction", "sid:%v", p.sessionID())
 
 	return p.frameManager.MainFrame().WaitForFunction(fn, opts, args...)

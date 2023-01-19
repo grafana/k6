@@ -437,77 +437,6 @@ func (f *Frame) waitForExecutionContext(world executionWorld) {
 	}
 }
 
-func (f *Frame) waitForFunction(
-	apiCtx context.Context, world executionWorld, js string,
-	polling any, timeout time.Duration, args ...any,
-) (*goja.Promise, error) {
-	f.log.Debugf(
-		"Frame:waitForFunction",
-		"fid:%s furl:%q world:%s poll:%s timeout:%s",
-		f.ID(), f.URL(), world, polling, timeout)
-
-	f.waitForExecutionContext(world)
-
-	f.executionContextMu.RLock()
-	defer f.executionContextMu.RUnlock()
-
-	execCtx := f.executionContexts[world]
-	if execCtx == nil {
-		return nil, fmt.Errorf("waiting for function: execution context %q not found", world)
-	}
-	injected, err := execCtx.getInjectedScript(apiCtx)
-	if err != nil {
-		return nil, fmt.Errorf("getting injected script: %w", err)
-	}
-
-	pageFn := `
-		(injected, predicate, polling, timeout, ...args) => {
-			return injected.waitForPredicateFunction(predicate, polling, timeout, ...args);
-		}
-	`
-
-	cb := f.vu.RegisterCallback()
-	rt := f.vu.Runtime()
-	promise, resolve, reject := rt.NewPromise()
-
-	go func() {
-		// First evaluate the predicate function itself to get its handle.
-		opts := evalOptions{forceCallable: false, returnByValue: false}
-		handle, err := execCtx.eval(apiCtx, opts, js)
-		if err != nil {
-			cb(func() error {
-				reject(fmt.Errorf("waiting for function promise rejected: %w", err))
-				return nil
-			})
-			return
-		}
-
-		// Then evaluate the injected function call, passing it the predicate
-		// function handle and the rest of the arguments.
-		opts = evalOptions{forceCallable: true, returnByValue: false}
-		result, err := execCtx.eval(
-			apiCtx, opts, pageFn, append([]any{
-				injected,
-				handle,
-				polling,
-				timeout.Milliseconds(), // The JS value is in ms integers
-			}, args...)...)
-		if err != nil {
-			cb(func() error {
-				reject(fmt.Errorf("waiting for function promise rejected: %w", err))
-				return nil
-			})
-			return
-		}
-		cb(func() error {
-			resolve(result)
-			return nil
-		})
-	}()
-
-	return promise, nil
-}
-
 func (f *Frame) waitForSelectorRetry(
 	selector string, opts *FrameWaitForSelectorOptions, retry int,
 ) (h *ElementHandle, err error) {
@@ -1666,13 +1595,13 @@ func (f *Frame) setURL(url string) {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.Value) *goja.Promise {
+func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.Value) (any, error) {
 	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
 
 	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
 	err := parsedOpts.Parse(f.ctx, opts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "parsing waitForFunction options: %w", err)
+		return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
 	}
 
 	js := fn.ToString().String()
@@ -1691,13 +1620,74 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 		polling = parsedOpts.Interval
 	}
 
-	promise, err := f.waitForFunction(f.ctx, mainWorld, js,
+	result, err := f.waitForFunction(f.ctx, mainWorld, js,
 		polling, parsedOpts.Timeout, args...)
 	if err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		return nil, err
+	}
+	// prevent passing a non-nil interface to the upper layers.
+	if result == nil {
+		return nil, nil
 	}
 
-	return promise
+	return result, err
+}
+
+func (f *Frame) waitForFunction(
+	apiCtx context.Context, world executionWorld, js string,
+	polling any, timeout time.Duration, args ...any,
+) (any, error) {
+	f.log.Debugf(
+		"Frame:waitForFunction",
+		"fid:%s furl:%q world:%s poll:%s timeout:%s",
+		f.ID(), f.URL(), world, polling, timeout)
+
+	f.waitForExecutionContext(world)
+
+	f.executionContextMu.RLock()
+	defer f.executionContextMu.RUnlock()
+
+	execCtx := f.executionContexts[world]
+	if execCtx == nil {
+		return nil, fmt.Errorf("waiting for function: execution context %q not found", world)
+	}
+	injected, err := execCtx.getInjectedScript(apiCtx)
+	if err != nil {
+		return nil, fmt.Errorf("getting injected script: %w", err)
+	}
+
+	pageFn := `
+		(injected, predicate, polling, timeout, ...args) => {
+			return injected.waitForPredicateFunction(predicate, polling, timeout, ...args);
+		}
+	`
+
+	// First evaluate the predicate function itself to get its handle.
+	opts := evalOptions{forceCallable: false, returnByValue: false}
+	handle, err := execCtx.eval(apiCtx, opts, js)
+	if err != nil {
+		return nil, fmt.Errorf("waiting for function, getting handle: %w", err)
+	}
+
+	// Then evaluate the injected function call, passing it the predicate
+	// function handle and the rest of the arguments.
+	opts = evalOptions{forceCallable: true, returnByValue: false}
+	result, err := execCtx.eval(
+		apiCtx, opts, pageFn, append([]any{
+			injected,
+			handle,
+			polling,
+			timeout.Milliseconds(), // The JS value is in ms integers
+		}, args...)...)
+	if err != nil {
+		return nil, fmt.Errorf("waiting for function, polling: %w", err)
+	}
+	// prevent passing a non-nil interface to the upper layers.
+	if result == nil {
+		return nil, nil
+	}
+
+	return result, nil
 }
 
 // WaitForLoadState waits for the given load state to be reached.
