@@ -130,19 +130,6 @@ Response time metrics are based on the **metrics** variable, and the values can 
 
 The board is structured into 4 sections
 
-#### Apex Overview
-
-[<img src="./images/prometheus-dashboard-k6-test-result-apdex.png" width="500"/>](./images/prometheus-dashboard-k6-test-result-apdex.png)
-
-The Apdex score is calculated based on your SLA ```([T]target time (seconds) Apdex
-    variable, default 0.3 sec)``` required where you can define a response time threshold of T seconds, where all responses handled in T seconds or less satisfy the end user.
-
-If you want to know more
-
-<https://medium.com/@tristan_96324/prometheus-apdex-alerting-d17a065e39d0>
-
-<https://en.wikipedia.org/wiki/Apdex>
-
 #### Performance Overview
 
 [<img src="./images/prometheus-dashboard-k6-test-result-performance.png" width="500"/>](./images/prometheus-dashboard-k6-test-result-performance.png)
@@ -160,3 +147,33 @@ If you want to know more
 [<img src="./images/prometheus-dashboard-k6-test-runs.png" width="500"/>](./images/prometheus-dashboard-k6-test-runs.png)
 
 >Note: This dashboard depends on the use of testid tag
+
+
+#### Apex Overview Dashboard
+
+[<img src="./images/prometheus-dashboard-k6-test-result-apdex.png" width="500"/>](./images/prometheus-dashboard-k6-test-result-apdex.png)
+
+The Apdex score is calculated based on your SLA ```([T]target time (seconds) Apdex
+    variable, default 0.3 sec)``` required where you can define a response time threshold of T seconds, where all responses handled in T seconds or less satisfy the end user.
+
+If you want to know more
+
+<https://medium.com/@tristan_96324/prometheus-apdex-alerting-d17a065e39d0>
+
+<https://en.wikipedia.org/wiki/Apdex>
+
+
+
+#### Custom Metrics Example Dashboard
+
+[<img src="./images/prometheus-dashboard-k6-test-result-apdex.png" width="500"/>](./images/prometheus-dashboard-k6-test-result-apdex.png)
+
+This dashboard is an example of a dashboard with panels showing custom metrics.
+
+To test this dashboard, you must run the test.
+
+If you want to know more
+
+<https://medium.com/@tristan_96324/prometheus-apdex-alerting-d17a065e39d0>
+
+<https://en.wikipedia.org/wiki/Apdex>
