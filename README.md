@@ -21,51 +21,16 @@ Key points to know:
 ### Usage
 
 To build k6 binary with the Prometheus remote write output extension use:
-
 ```
 xk6 build --with github.com/grafana/xk6-output-prometheus-remote@latest 
 ```
 
-Then run new k6 binary with:
-
+Then run new k6 binary with the following command for using the default configuration (e.g. remote write server url set to `http://localhost:9090/api/v1/write`):
 ```
-K6_PROMETHEUS_RW_SERVER_URL=http://localhost:9090/api/v1/write ./k6 run -o xk6-prometheus-rw script.js 
-```
-
-Add TLS and HTTP basic authentication:
-
-```
-K6_PROMETHEUS_RW_SERVER_URL=https://localhost:9090/api/v1/write \
-K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY=false \
-K6_PROMETHEUS_RW_USERNAME=foo \
-K6_PROMETHEUS_RW_PASSWORD=bar \
 ./k6 run -o xk6-prometheus-rw script.js 
 ```
 
-### Metric types conversions
-
-All the k6 metric types are converted into an equivalent Prometheus' type:
-
-| k6 | Prometheus |
-|----|------------|
-| Counter | Counter |
-| Gauge | Gauge |
-| Rate | Gauge |
-| Trend | Gauges / Native Histogram |
-
-The obvious conversion with a classic Prometheus Histogram is not convenient because k6 can't determine the fixed buckets in advance, so the Output maps a Trend metric by default into a Gauge representing p(99). It is possible to map the same Trend to multiple stats at the same time (count, sum, min, max, avg, med, p(x)), it is possible to specify them via the `K6_PROMETHEUS_RW_TREND_STATS` environment variable (e.g `K6_PROMETHEUS_RW_TREND_STATS=avg,p(90),p(99),min,max`). Note that for each added stat a new time series will be generated.
-Mapping Trend by stats has the following cons:
-
-- It is impossible to aggregate some Gauge's value (especially the percentiles).
-- It uses a memory-expensive k6's data structure.
-
-The previous points can be resolved by mapping Trend as [Prometheus Native Histogram](https://prometheus.io/docs/concepts/metric_types/#histogram). Enabling the conversion by the `K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true` environment variable (or one of the other ways), then the Output converts all the Trend types into a dedicated Native Histogram.
-
-Native Histogram is a Prometheus' experimental feature, so it has to be enabled (`--enable-feature=native-histograms`). Note that other Remote-write implementations don't support it yet.
-
-### Prometheus as remote-write agent
-
-To enable remote write in Prometheus 2.x use `--enable-feature=remote-write-receiver` option. See docker-compose samples in `example/`. Options for remote write storage can be found [here](https://prometheus.io/docs/operating/integrations/).
+Check [the documentation](https://k6.io/docs/results-output/real-time/prometheus-remote-write) for advanced configurations.
 
 ### Docker Compose
 
@@ -108,23 +73,8 @@ Clone the repo to get started and follow these steps:
 
 ## Dashboards
 
-The docker-compose setup comes with two pre-built Grafana dashboards. One for listing the discrete test runs as a list, and the other for visualizing the results of a specific test run.
->Note: The dashboards work with the Native Histogram mapping so it is required to enable it.
-
-### Test result dashboard
-
 [<img src="./images/prometheus-dashboard-k6-test-result.png" width="500"/>](./images/prometheus-dashboard-k6-test-result.png)
 
-Results can be filtered by:
+The docker-compose setup comes with some pre-built Grafana dashboards. Check the [dashboard guide](/grafana/dashboards) for details.
 
-- testid
-- scenario
-- url
-
-[<img src="./images/prometheus-dashboard-k6-test-result-variables.png" width="500"/>](./images/prometheus-dashboard-k6-test-result-variables.png)
-
-Response time metrics are based on the **metrics** variable, and the values can be:
-
-- k6_http_req_duration_seconds (default)
-- k6_http_req_waiting_seconds
-
+>Note: The dashboards work with the Native Histogram mapping so it is required to enable it.
