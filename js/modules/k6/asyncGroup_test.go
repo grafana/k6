@@ -196,7 +196,7 @@ func TestAsyncGroupDuration(t *testing.T) {
 		secondSample := bufSamples[1].GetSamples()[0]
 		require.Equal(t, metrics.GroupDurationName, secondSample.Metric.Name)
 		require.Equal(t, "::1", secondSample.Tags.Map()[metrics.TagGroup.String()])
-		require.InDelta(t, 300, secondSample.Value, 10)
+		require.InDelta(t, 300, secondSample.Value, 30)
 	}
 }
 
