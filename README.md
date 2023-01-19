@@ -162,7 +162,7 @@ If you want to know more
 
 <https://en.wikipedia.org/wiki/Apdex>
 
-
+<!-- 
 
 #### Custom Metrics Example Dashboard
 
@@ -176,4 +176,4 @@ If you want to know more
 
 <https://medium.com/@tristan_96324/prometheus-apdex-alerting-d17a065e39d0>
 
-<https://en.wikipedia.org/wiki/Apdex>
+<https://en.wikipedia.org/wiki/Apdex> -->
