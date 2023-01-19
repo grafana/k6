@@ -22,10 +22,12 @@ var (
 // AsyncContextTracker is a handler that allows to track async function's execution context. Every time an async
 // function is suspended on 'await', Suspended() is called. The trackingObject it returns is remembered and
 // the next time just before the context is resumed, Resumed is called with the same trackingObject as argument.
+// Completed is called when an async function returns or throws.
 // To register it call Runtime.SetAsyncContextTracker().
 type AsyncContextTracker interface {
 	Suspended() (trackingObject interface{})
 	Resumed(trackingObject interface{})
+	Completed()
 }
 
 type funcObjectImpl interface {
@@ -562,12 +564,20 @@ func (f *asyncFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
 }
 
+func (f *asyncFuncObject) export(*objectExportCtx) interface{} {
+	return f.Call
+}
+
 func (f *asyncArrowFuncObject) Call(call FunctionCall) Value {
 	return f.asyncCall(call, f.arrowFuncObject.vmCall)
 }
 
 func (f *asyncArrowFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
+}
+
+func (f *asyncArrowFuncObject) export(*objectExportCtx) interface{} {
+	return f.Call
 }
 
 func (f *asyncArrowFuncObject) vmCall(vm *vm, n int) {
@@ -580,6 +590,10 @@ func (f *asyncMethodFuncObject) Call(call FunctionCall) Value {
 
 func (f *asyncMethodFuncObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return f.Call, true
+}
+
+func (f *asyncMethodFuncObject) export(ctx *objectExportCtx) interface{} {
+	return f.Call
 }
 
 func (f *asyncMethodFuncObject) vmCall(vm *vm, n int) {
@@ -640,29 +654,33 @@ func (ar *asyncRunner) onRejected(call FunctionCall) Value {
 }
 
 func (ar *asyncRunner) step(res Value, done bool, ex *Exception) {
-	if ex != nil {
-		ar.promiseCap.reject(ex.val)
+	r := ar.f.runtime
+	if done || ex != nil {
+		if tracker := r.asyncContextTracker; tracker != nil {
+			tracker.Completed()
+		}
+		if ex == nil {
+			ar.promiseCap.resolve(res)
+		} else {
+			ar.promiseCap.reject(ex.val)
+		}
 		return
 	}
-	if done {
-		ar.promiseCap.resolve(res)
-	} else {
-		// await
-		r := ar.f.runtime
-		if tracker := r.asyncContextTracker; tracker != nil {
-			ar.trackingObj = tracker.Suspended()
-		}
-		promise := r.promiseResolve(r.global.Promise, res)
-		promise.self.(*Promise).addReactions(&promiseReaction{
-			typ:         promiseReactionFulfill,
-			handler:     &jobCallback{callback: ar.onFulfilled},
-			asyncRunner: ar,
-		}, &promiseReaction{
-			typ:         promiseReactionReject,
-			handler:     &jobCallback{callback: ar.onRejected},
-			asyncRunner: ar,
-		})
+
+	// await
+	if tracker := r.asyncContextTracker; tracker != nil {
+		ar.trackingObj = tracker.Suspended()
 	}
+	promise := r.promiseResolve(r.global.Promise, res)
+	promise.self.(*Promise).addReactions(&promiseReaction{
+		typ:         promiseReactionFulfill,
+		handler:     &jobCallback{callback: ar.onFulfilled},
+		asyncRunner: ar,
+	}, &promiseReaction{
+		typ:         promiseReactionReject,
+		handler:     &jobCallback{callback: ar.onRejected},
+		asyncRunner: ar,
+	})
 }
 
 func (ar *asyncRunner) start(nArgs int) {

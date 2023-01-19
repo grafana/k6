@@ -577,9 +577,7 @@ func (vm *vm) run() {
 		}
 		v.stack = vm.captureStack(nil, 0)
 		vm.interruptLock.Unlock()
-		panic(&uncatchableException{
-			err: v,
-		})
+		panic(v)
 	}
 }
 
@@ -806,9 +804,7 @@ func (vm *vm) pushCtx() {
 	if len(vm.callStack) > vm.maxCallStackSize {
 		ex := &StackOverflowError{}
 		ex.stack = vm.captureStack(nil, 0)
-		panic(&uncatchableException{
-			err: ex,
-		})
+		panic(ex)
 	}
 	vm.callStack = append(vm.callStack, context{})
 	ctx := &vm.callStack[len(vm.callStack)-1]
