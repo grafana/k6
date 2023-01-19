@@ -292,21 +292,26 @@ func (f *StackFrame) Write(b *bytes.Buffer) {
 	}
 }
 
+// An un-catchable exception is not catchable by try/catch statements (finally is not executed either),
+// but it is returned as an error to a Go caller rather than causing a panic.
+type uncatchableException interface {
+	error
+	_uncatchableException()
+}
+
 type Exception struct {
 	val   Value
 	stack []StackFrame
 }
 
-type uncatchableException struct {
-	err error
+type baseUncatchableException struct {
+	Exception
 }
 
-func (ue *uncatchableException) Unwrap() error {
-	return ue.err
-}
+func (e *baseUncatchableException) _uncatchableException() {}
 
 type InterruptedError struct {
-	Exception
+	baseUncatchableException
 	iface interface{}
 }
 
@@ -318,7 +323,7 @@ func (e *InterruptedError) Unwrap() error {
 }
 
 type StackOverflowError struct {
-	Exception
+	baseUncatchableException
 }
 
 func (e *InterruptedError) Value() interface{} {
@@ -1412,6 +1417,27 @@ func (r *Runtime) RunScript(name, src string) (Value, error) {
 	return r.RunProgram(p)
 }
 
+func isUncatchableException(e error) bool {
+	for ; e != nil; e = errors.Unwrap(e) {
+		if _, ok := e.(uncatchableException); ok {
+			return true
+		}
+	}
+	return false
+}
+
+func asUncatchableException(v interface{}) error {
+	switch v := v.(type) {
+	case uncatchableException:
+		return v
+	case error:
+		if isUncatchableException(v) {
+			return v
+		}
+	}
+	return nil
+}
+
 // RunProgram executes a pre-compiled (see Compile()) code in the global context.
 func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 	vm := r.vm
@@ -1423,8 +1449,8 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 			vm.callStack = vm.callStack[:len(vm.callStack)-1]
 		}
 		if x := recover(); x != nil {
-			if ex, ok := x.(*uncatchableException); ok {
-				err = ex.err
+			if ex := asUncatchableException(x); ex != nil {
+				err = ex
 				if len(vm.callStack) == 0 {
 					r.leaveAbrupt()
 				}
@@ -1990,17 +2016,14 @@ func (r *Runtime) wrapReflectFunc(value reflect.Value) func(FunctionCall) Value 
 			return _undefined
 		}
 
-		if last := out[len(out)-1]; last.Type().Name() == "error" {
+		if last := out[len(out)-1]; last.Type() == reflectTypeError {
 			if !last.IsNil() {
 				err := last.Interface().(error)
 				if _, ok := err.(*Exception); ok {
 					panic(err)
 				}
-				var intErr *InterruptedError
-				if errors.As(err, &intErr) {
-					panic(&uncatchableException{
-						err: err,
-					})
+				if isUncatchableException(err) {
+					panic(err)
 				}
 				panic(r.NewGoError(err))
 			}
@@ -2442,8 +2465,8 @@ func AssertConstructor(v Value) (Constructor, bool) {
 func (r *Runtime) runWrapped(f func()) (err error) {
 	defer func() {
 		if x := recover(); x != nil {
-			if ex, ok := x.(*uncatchableException); ok {
-				err = ex.err
+			if ex := asUncatchableException(x); ex != nil {
+				err = ex
 				if len(r.vm.callStack) == 0 {
 					r.leaveAbrupt()
 				}
