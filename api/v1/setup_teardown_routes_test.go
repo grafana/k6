@@ -15,12 +15,14 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/core"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
+	"go.k6.io/k6/output"
 )
 
 func TestSetupData(t *testing.T) {
@@ -138,31 +140,30 @@ func TestSetupData(t *testing.T) {
 
 			execScheduler, err := execution.NewScheduler(testState)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(testState, execScheduler, nil)
+			metricsEngine, err := engine.NewMetricsEngine(execScheduler.GetState())
 			require.NoError(t, err)
 
 			globalCtx, globalCancel := context.WithCancel(context.Background())
-			t.Cleanup(globalCancel)
+			defer globalCancel()
 			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
 			defer runAbort(fmt.Errorf("unexpected abort"))
 
-			require.NoError(t, engine.OutputManager.StartOutputs())
-			defer engine.OutputManager.StopOutputs(nil)
+			outputManager := output.NewManager([]output.Output{metricsEngine.CreateIngester()}, testState.Logger, runAbort)
+			samples := make(chan metrics.SampleContainer, 1000)
+			_, stopOutputs, err := outputManager.Start(samples)
+			require.NoError(t, err)
+			defer stopOutputs(nil)
 
 			cs := &ControlSurface{
 				RunCtx:        runCtx,
-				Samples:       engine.Samples,
-				MetricsEngine: engine.MetricsEngine,
+				Samples:       samples,
+				MetricsEngine: metricsEngine,
 				Scheduler:     execScheduler,
 				RunState:      testState,
 			}
-			run, wait, err := engine.Init(globalCtx, runCtx)
-			require.NoError(t, err)
-
-			defer wait()
 
 			errC := make(chan error)
-			go func() { errC <- run() }()
+			go func() { errC <- execScheduler.Run(globalCtx, runCtx, samples) }()
 
 			handler := NewHandler(cs)
 
@@ -194,6 +195,7 @@ func TestSetupData(t *testing.T) {
 			case <-time.After(10 * time.Second):
 				t.Fatal("Test timed out")
 			case err := <-errC:
+				close(samples)
 				require.NoError(t, err)
 			}
 		})

@@ -10,22 +10,26 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
 	"go.k6.io/k6/api"
 	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/core"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
+	"go.k6.io/k6/output"
 	"go.k6.io/k6/ui/pb"
 )
 
@@ -38,11 +42,39 @@ type cmdRun struct {
 //
 //nolint:funlen,gocognit,gocyclo,cyclop
 func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
+	var logger logrus.FieldLogger = c.gs.Logger
+	defer func() {
+		if err == nil {
+			logger.Debug("Everything has finished, exiting k6 normally!")
+		} else {
+			logger.WithError(err).Debug("Everything has finished, exiting k6 with an error!")
+		}
+	}()
 	printBanner(c.gs)
+
+	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
+	defer globalCancel()
+
+	// lingerCtx is cancelled by Ctrl+C, and is used to wait for that event when
+	// k6 was started with the --linger option.
+	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
+	defer lingerCancel()
+
+	// runCtx is used for the test run execution and is created with the special
+	// execution.NewTestRunContext() function so that it can be aborted even
+	// from sub-contexts while also attaching a reason for the abort.
+	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
 
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
 	if err != nil {
 		return err
+	}
+	if test.keyLogger != nil {
+		defer func() {
+			if klErr := test.keyLogger.Close(); klErr != nil {
+				logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
+			}
+		}()
 	}
 
 	// Write the full consolidated *and derived* options back to the Runner.
@@ -52,26 +84,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	// We prepare a bunch of contexts:
-	//  - The runCtx is cancelled as soon as the Engine's run() lambda finishes,
-	//    and can trigger things like the usage report and end of test summary.
-	//    Crucially, metrics processing by the Engine will still work after this
-	//    context is cancelled!
-	//  - The lingerCtx is cancelled by Ctrl+C, and is used to wait for that
-	//    event when k6 was ran with the --linger option.
-	//  - The globalCtx is cancelled only after we're completely done with the
-	//    test execution and any --linger has been cleared, so that the Engine
-	//    can start winding down its metrics processing.
-	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
-	defer globalCancel()
-	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
-	defer lingerCancel()
-	runCtx, runCancel := context.WithCancel(lingerCtx)
-	defer runCancel()
-
-	logger := testRunState.Logger
-	runSubCtx, runSubAbort := execution.NewTestRunContext(runCtx, logger)
-
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
 	execScheduler, err := execution.NewScheduler(testRunState)
@@ -79,9 +91,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	progressBarWG := &sync.WaitGroup{}
-	progressBarWG.Add(1)
-	defer progressBarWG.Wait()
+	backgroundProcesses := &sync.WaitGroup{}
+	defer backgroundProcesses.Wait()
 
 	// This is manually triggered after the Engine's Run() has completed,
 	// and things like a single Ctrl+C don't affect it. We use it to make
@@ -89,9 +100,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// state one last time, after the test run has finished.
 	progressCtx, progressCancel := context.WithCancel(globalCtx)
 	defer progressCancel()
+
 	initBar := execScheduler.GetInitProgressBar()
+	backgroundProcesses.Add(1)
 	go func() {
-		defer progressBarWG.Done()
+		defer backgroundProcesses.Done()
 		pbs := []*pb.ProgressBar{initBar}
 		for _, s := range execScheduler.GetExecutors() {
 			pbs = append(pbs, s.GetProgress())
@@ -106,22 +119,103 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	// TODO: create a MetricsEngine here and add its ingester to the list of
-	// outputs (unless both NoThresholds and NoSummary were enabled)
-
-	// TODO: remove this completely
-	// Create the engine.
-	initBar.Modify(pb.WithConstProgress(0, "Init engine"))
-	engine, err := core.NewEngine(testRunState, execScheduler, outputs)
+	executionState := execScheduler.GetState()
+	metricsEngine, err := engine.NewMetricsEngine(executionState)
 	if err != nil {
 		return err
 	}
-	engine.AbortFn = runSubAbort
+	if !testRunState.RuntimeOptions.NoSummary.Bool || !testRunState.RuntimeOptions.NoThresholds.Bool {
+		// We'll need to pipe metrics to the MetricsEngine if either the
+		// thresholds or the end-of-test summary are enabled.
+		outputs = append(outputs, metricsEngine.CreateIngester())
+	}
+
+	if !testRunState.RuntimeOptions.NoSummary.Bool {
+		defer func() {
+			logger.Debug("Generating the end-of-test summary...")
+			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
+				Metrics:         metricsEngine.ObservedMetrics,
+				RootGroup:       testRunState.Runner.GetDefaultGroup(),
+				TestRunDuration: executionState.GetCurrentTestRunDuration(),
+				NoColor:         c.gs.Flags.NoColor,
+				UIState: lib.UIState{
+					IsStdOutTTY: c.gs.Stdout.IsTTY,
+					IsStdErrTTY: c.gs.Stderr.IsTTY,
+				},
+			})
+			if hsErr == nil {
+				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
+			}
+			if hsErr != nil {
+				logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
+			}
+		}()
+	}
+
+	// Create and start the outputs. We do it quite early to get any output URLs
+	// or other details below. It also allows us to ensure when they have
+	// flushed their samples and when they have stopped in the defer statements.
+	initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
+	outputManager := output.NewManager(outputs, logger, func(err error) {
+		if err != nil {
+			logger.WithError(err).Error("Received error to stop from output")
+		}
+		// TODO: attach run status and exit code?
+		runAbort(err)
+	})
+	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
+	waitOutputsFlushed, stopOutputs, err := outputManager.Start(samples)
+	if err != nil {
+		return err
+	}
+	defer func() {
+		logger.Debug("Stopping outputs...")
+		// We call waitOutputsFlushed() below because the threshold calculations
+		// need all of the metrics to be sent to the MetricsEngine before we can
+		// calculate them one last time. We need the threshold calculated here,
+		// since they may change the run status for the outputs.
+		stopOutputs(err)
+	}()
+
+	if !testRunState.RuntimeOptions.NoThresholds.Bool {
+		finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort)
+		defer func() {
+			// This gets called after the Samples channel has been closed and
+			// the OutputManager has flushed all of the cached samples to
+			// outputs (including MetricsEngine's ingester). So we are sure
+			// there won't be any more metrics being sent.
+			logger.Debug("Finalizing thresholds...")
+			breachedThresholds := finalizeThresholds()
+			if len(breachedThresholds) > 0 {
+				tErr := errext.WithAbortReasonIfNone(
+					errext.WithExitCodeIfNone(
+						fmt.Errorf("thresholds on metrics '%s' have been breached", strings.Join(breachedThresholds, ", ")),
+						exitcodes.ThresholdsHaveFailed,
+					), errext.AbortedByThresholdsAfterTestEnd)
+
+				if err == nil {
+					err = tErr
+				} else {
+					logger.WithError(tErr).Debug("Breached thresholds, but test already exited with another error")
+				}
+			}
+		}()
+	}
+
+	defer func() {
+		logger.Debug("Waiting for metric processing to finish...")
+		close(samples)
+		waitOutputsFlushed()
+		logger.Debug("Metrics processing finished!")
+	}()
 
 	// Spin up the REST API server, if not disabled.
 	if c.gs.Flags.Address != "" { //nolint:nestif
 		initBar.Modify(pb.WithConstProgress(0, "Init API server"))
 
+		// We cannot use backgroundProcesses here, since we need the REST API to
+		// be down before we can close the samples channel above and finish the
+		// processing the metrics pipeline.
 		apiWG := &sync.WaitGroup{}
 		apiWG.Add(2)
 		defer apiWG.Wait()
@@ -129,7 +223,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		srvCtx, srvCancel := context.WithCancel(globalCtx)
 		defer srvCancel()
 
-		srv := api.GetServer(runSubCtx, c.gs.Flags.Address, testRunState, engine.Samples, engine.MetricsEngine, execScheduler)
+		srv := api.GetServer(runCtx, c.gs.Flags.Address, testRunState, samples, metricsEngine, execScheduler)
 		go func() {
 			defer apiWG.Done()
 			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
@@ -154,26 +248,16 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
-	// We do this here so we can get any output URLs below.
-	initBar.Modify(pb.WithConstProgress(0, "Starting outputs"))
-	// TODO: directly create the MutputManager here, not in the Engine
-	err = engine.OutputManager.StartOutputs()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		engine.OutputManager.StopOutputs(err)
-	}()
-
 	printExecutionDescription(
 		c.gs, "local", args[0], "", conf, execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
 	)
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.
+	// TODO: move upwards, right after runCtx is created
 	gracefulStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
 		// first abort the test run this way, to propagate the error
-		runSubAbort(errext.WithAbortReasonIfNone(
+		runAbort(errext.WithAbortReasonIfNone(
 			errext.WithExitCodeIfNone(
 				fmt.Errorf("test run was aborted because k6 received a '%s' signal", sig), exitcodes.ExternalAbort,
 			), errext.AbortedByUser,
@@ -182,111 +266,69 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 	onHardStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
-		globalCancel() // not that it matters, given the following command...
+		globalCancel() // not that it matters, given that os.Exit() will be called right after
 	}
 	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
-	// Initialize the engine
-	initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
-	engineRun, engineWait, err := engine.Init(globalCtx, runSubCtx)
-	if err != nil {
-		err = common.UnwrapGojaInterruptedError(err)
-		// Add a generic engine exit code if we don't have a more specific one
-		return errext.WithExitCodeIfNone(err, exitcodes.GenericEngine)
+	if conf.Linger.Bool {
+		defer func() {
+			msg := "The test is done, but --linger was enabled, so k6 is waiting for Ctrl+C to continue..."
+			select {
+			case <-lingerCtx.Done():
+				// do nothing, we were interrupted by Ctrl+C already
+			default:
+				logger.Debug(msg)
+				if !c.gs.Flags.Quiet {
+					printToStdout(c.gs, msg)
+				}
+				<-lingerCtx.Done()
+				logger.Debug("Ctrl+C received, exiting...")
+			}
+		}()
 	}
+
+	// Initialize VUs and start the test! However, we won't immediately return
+	// if there was an error, we still have things to do.
+	err = execScheduler.Run(globalCtx, runCtx, samples)
 
 	// Init has passed successfully, so unless disabled, make sure we send a
 	// usage report after the context is done.
 	if !conf.NoUsageReport.Bool {
-		reportDone := make(chan struct{})
+		backgroundProcesses.Add(2)
+		reportCtx, reportCancel := context.WithCancel(globalCtx)
+		reportDone := make(chan error)
 		go func() {
-			<-runCtx.Done()
-			_ = reportUsage(execScheduler)
+			logger.Debug("Sending usage report...")
+			reportDone <- reportUsage(reportCtx, execScheduler)
 			close(reportDone)
+			backgroundProcesses.Done()
 		}()
-		defer func() {
+		go func() {
 			select {
 			case <-reportDone:
 			case <-time.After(3 * time.Second):
 			}
+			reportCancel()
+			backgroundProcesses.Done()
 		}()
 	}
 
-	// Start the test run
-	initBar.Modify(pb.WithConstProgress(0, "Starting test..."))
-	err = engineRun()
+	// Check what the execScheduler.Run() error is.
 	if err != nil {
-		err = errext.WithExitCodeIfNone(common.UnwrapGojaInterruptedError(err), exitcodes.GenericEngine)
-		logger.WithError(err).Debug("Engine terminated with an error")
-	} else {
-		logger.Debug("Engine run terminated cleanly")
+		err = common.UnwrapGojaInterruptedError(err)
+		logger.WithError(err).Debug("Test finished with an error")
+		return err
 	}
-	runCancel()
 
-	progressCancel()
-	progressBarWG.Wait()
-
-	executionState := execScheduler.GetState()
 	// Warn if no iterations could be completed.
-	if err == nil && executionState.GetFullIterationCount() == 0 {
-		logger.Warn("No script iterations finished, consider making the test duration longer")
+	if executionState.GetFullIterationCount() == 0 {
+		logger.Warn("No script iterations fully finished, consider making the test duration longer")
 	}
 
-	// Handle the end-of-test summary.
-	if !testRunState.RuntimeOptions.NoSummary.Bool {
-		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
-		summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
-			Metrics:         engine.MetricsEngine.ObservedMetrics,
-			RootGroup:       testRunState.Runner.GetDefaultGroup(),
-			TestRunDuration: executionState.GetCurrentTestRunDuration(),
-			NoColor:         c.gs.Flags.NoColor,
-			UIState: lib.UIState{
-				IsStdOutTTY: c.gs.Stdout.IsTTY,
-				IsStdErrTTY: c.gs.Stderr.IsTTY,
-			},
-		})
-		engine.MetricsEngine.MetricsLock.Unlock()
-		if hsErr == nil {
-			hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
-		}
-		if hsErr != nil {
-			logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
-		}
-	}
+	logger.Debug("Test finished cleanly")
 
-	if conf.Linger.Bool {
-		select {
-		case <-lingerCtx.Done():
-			// do nothing, we were interrupted by Ctrl+C already
-		default:
-			logger.Debug("Linger set; waiting for Ctrl+C...")
-			if !c.gs.Flags.Quiet {
-				printToStdout(c.gs, "Linger set; waiting for Ctrl+C...")
-			}
-			<-lingerCtx.Done()
-			logger.Debug("Ctrl+C received, exiting...")
-		}
-	}
-	globalCancel() // signal the Engine that it should wind down
-	logger.Debug("Waiting for engine processes to finish...")
-	engineWait()
-	logger.Debug("Everything has finished, exiting k6!")
-	if test.keyLogger != nil {
-		if klErr := test.keyLogger.Close(); klErr != nil {
-			logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
-		}
-	}
-
-	if engine.IsTainted() {
-		if err == nil {
-			err = errors.New("some thresholds have failed")
-		}
-		err = errext.WithAbortReasonIfNone(
-			errext.WithExitCodeIfNone(err, exitcodes.ThresholdsHaveFailed), errext.AbortedByThresholdsAfterTestEnd,
-		)
-	}
-	return err
+	return nil
 }
 
 func (c *cmdRun) flagSet() *pflag.FlagSet {
@@ -338,7 +380,7 @@ a commandline interface for interacting with it.`,
 	return runCmd
 }
 
-func reportUsage(execScheduler *execution.Scheduler) error {
+func reportUsage(ctx context.Context, execScheduler *execution.Scheduler) error {
 	execState := execScheduler.GetState()
 	executorConfigs := execScheduler.GetExecutorConfigs()
 
@@ -359,13 +401,15 @@ func reportUsage(execScheduler *execution.Scheduler) error {
 	if err != nil {
 		return err
 	}
-	res, err := http.Post("https://reports.k6.io/", "application/json", bytes.NewBuffer(body)) //nolint:noctx
-	defer func() {
-		if err == nil {
-			_ = res.Body.Close()
-		}
-	}()
-
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://reports.k6.io/", bytes.NewBuffer(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	res, err := http.DefaultClient.Do(req)
+	if err == nil {
+		_ = res.Body.Close()
+	}
 	return err
 }
 

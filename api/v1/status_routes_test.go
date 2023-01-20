@@ -15,10 +15,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/core"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils/minirunner"
+	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
+	"go.k6.io/k6/output"
 )
 
 func TestGetStatus(t *testing.T) {
@@ -111,39 +113,40 @@ func TestPatchStatus(t *testing.T) {
 			testState := getTestRunState(t, lib.Options{Scenarios: scenarios}, &minirunner.MiniRunner{})
 			execScheduler, err := execution.NewScheduler(testState)
 			require.NoError(t, err)
-			engine, err := core.NewEngine(testState, execScheduler, nil)
+
+			metricsEngine, err := engine.NewMetricsEngine(execScheduler.GetState())
 			require.NoError(t, err)
 
-			require.NoError(t, engine.OutputManager.StartOutputs())
-			defer engine.OutputManager.StopOutputs(nil)
-
 			globalCtx, globalCancel := context.WithCancel(context.Background())
-			t.Cleanup(globalCancel)
+			defer globalCancel()
 			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
 			defer runAbort(fmt.Errorf("unexpected abort"))
-			engine.AbortFn = runAbort
+
+			outputManager := output.NewManager([]output.Output{metricsEngine.CreateIngester()}, testState.Logger, runAbort)
+			samples := make(chan metrics.SampleContainer, 1000)
+			waitMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
+			require.NoError(t, err)
+			defer stopOutputs(nil)
 
 			cs := &ControlSurface{
 				RunCtx:        runCtx,
-				Samples:       engine.Samples,
-				MetricsEngine: engine.MetricsEngine,
+				Samples:       samples,
+				MetricsEngine: metricsEngine,
 				Scheduler:     execScheduler,
 				RunState:      testState,
 			}
-
-			run, wait, err := engine.Init(globalCtx, runCtx)
-			require.NoError(t, err)
 
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
 			defer func() {
 				runAbort(fmt.Errorf("custom cancel signal"))
-				wait()
+				waitMetricsFlushed()
 				wg.Wait()
 			}()
 
 			go func() {
-				assert.ErrorContains(t, run(), "custom cancel signal")
+				assert.ErrorContains(t, execScheduler.Run(globalCtx, runCtx, samples), "custom cancel signal")
+				close(samples)
 				wg.Done()
 			}()
 			// wait for the executor to initialize to avoid a potential data race below

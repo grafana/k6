@@ -33,7 +33,6 @@ import (
 	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/core"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/modules/k6"
@@ -48,6 +47,7 @@ import (
 	"go.k6.io/k6/lib/testutils/mockoutput"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
 )
 
@@ -387,30 +387,37 @@ func TestDataIsolation(t *testing.T) {
 	execScheduler, err := execution.NewScheduler(testRunState)
 	require.NoError(t, err)
 
-	mockOutput := mockoutput.New()
-	engine, err := core.NewEngine(testRunState, execScheduler, []output.Output{mockOutput})
+	metricsEngine, err := engine.NewMetricsEngine(execScheduler.GetState())
 	require.NoError(t, err)
-	require.NoError(t, engine.OutputManager.StartOutputs())
-	defer engine.OutputManager.StopOutputs(nil)
 
-	ctx, cancel := context.WithCancel(context.Background())
-	run, wait, err := engine.Init(ctx, ctx)
+	globalCtx, globalCancel := context.WithCancel(context.Background())
+	defer globalCancel()
+	runCtx, runAbort := execution.NewTestRunContext(globalCtx, testRunState.Logger)
+
+	mockOutput := mockoutput.New()
+	outputManager := output.NewManager([]output.Output{mockOutput, metricsEngine.CreateIngester()}, testRunState.Logger, runAbort)
+	samples := make(chan metrics.SampleContainer, 1000)
+	waitForMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
 	require.NoError(t, err)
+	defer stopOutputs(nil)
+
+	finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort)
 
 	require.Empty(t, runner.defaultGroup.Groups)
 
 	errC := make(chan error)
-	go func() { errC <- run() }()
+	go func() { errC <- execScheduler.Run(globalCtx, runCtx, samples) }()
 
 	select {
 	case <-time.After(20 * time.Second):
-		cancel()
+		runAbort(fmt.Errorf("unexpected abort"))
 		t.Fatal("Test timed out")
 	case err := <-errC:
-		cancel()
+		close(samples)
 		require.NoError(t, err)
-		wait()
-		require.False(t, engine.IsTainted())
+		waitForMetricsFlushed()
+		breached := finalizeThresholds()
+		require.Empty(t, breached)
 	}
 	require.Contains(t, runner.defaultGroup.Groups, "setup")
 	require.Contains(t, runner.defaultGroup.Groups, "teardown")
