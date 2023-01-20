@@ -4,6 +4,7 @@ package engine
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -245,8 +246,10 @@ func (me *MetricsEngine) evaluateThresholds(ignoreEmptySinks bool) (breachedThre
 			shouldAbort = true
 		}
 	}
-
-	me.logger.Debugf("Thresholds on %d metrics breached: %v", len(breachedThresholds), breachedThresholds)
+	if len(breachedThresholds) > 0 {
+		sort.Strings(breachedThresholds)
+		me.logger.Debugf("Thresholds on %d metrics breached: %v", len(breachedThresholds), breachedThresholds)
+	}
 	atomic.StoreUint32(&me.breachedThresholdsCount, uint32(len(breachedThresholds)))
 	return breachedThresholds, shouldAbort
 }

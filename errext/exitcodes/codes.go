@@ -14,11 +14,10 @@ const (
 	SetupTimeout             ExitCode = 100
 	TeardownTimeout          ExitCode = 101
 	GenericTimeout           ExitCode = 102 // TODO: remove?
-	GenericEngine            ExitCode = 103 // TODO: remove after https://github.com/grafana/k6/issues/2804
+	CannotStartRESTAPI       ExitCode = 103
 	InvalidConfig            ExitCode = 104
 	ExternalAbort            ExitCode = 105
-	CannotStartRESTAPI       ExitCode = 106
+	ScriptStoppedFromRESTAPI ExitCode = 106
 	ScriptException          ExitCode = 107
 	ScriptAborted            ExitCode = 108
-	ScriptStoppedFromRESTAPI ExitCode = 109
 )

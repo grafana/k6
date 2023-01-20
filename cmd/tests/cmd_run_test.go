@@ -569,7 +569,8 @@ func TestThresholdsFailed(t *testing.T) {
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
+	expErr := "thresholds on metrics 'iterations{scenario:sc1}, iterations{scenario:sc2}' have been breached"
+	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, `   ✓ iterations...........: 3`)
@@ -661,7 +662,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	logs := ts.LoggerHook.Drain()
-	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `some thresholds have failed`))
+	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `thresholds on metrics`))
 	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run was aborted because k6 received a 'interrupt' signal`))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -854,7 +855,7 @@ func runTestWithNoLinger(t *testing.T, ts *GlobalTestState) {
 
 func runTestWithLinger(t *testing.T, ts *GlobalTestState) {
 	ts.CmdArgs = append(ts.CmdArgs, "--linger")
-	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "Linger set; waiting for Ctrl+C")
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "waiting for Ctrl+C to continue")
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
@@ -945,7 +946,7 @@ func testAbortedByScriptError(t *testing.T, script string, runTest func(*testing
 	t.Log(stdout)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
-	assert.Contains(t, stdout, `level=debug msg="Everything has finished, exiting k6!"`)
+	assert.Contains(t, stdout, `level=debug msg="Everything has finished, exiting k6 with an error!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 	return ts
 }
@@ -1056,7 +1057,6 @@ func TestAbortedByScriptAbortInSetup(t *testing.T) {
 		t.Parallel()
 		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
-
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
 		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
@@ -1118,6 +1118,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 
 		export default function () {};
 	`
+
 	ts := getSimpleCloudOutputTestState(
 		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort,
 	)
@@ -1395,7 +1396,7 @@ func TestActiveVUsCount(t *testing.T) {
 		if i < 3 {
 			assert.Equal(t, "Insufficient VUs, reached 10 active VUs and cannot initialize more", logEntry.Message)
 		} else {
-			assert.Equal(t, "No script iterations finished, consider making the test duration longer", logEntry.Message)
+			assert.Equal(t, "No script iterations fully finished, consider making the test duration longer", logEntry.Message)
 		}
 	}
 }
