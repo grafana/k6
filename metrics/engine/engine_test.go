@@ -1,459 +1,186 @@
 package engine
 
-// TODO: refactor and move the tests that still make sense in other packages
+import (
+	"testing"
+	"time"
 
-/*
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/metrics"
+)
 
-const isWindows = runtime.GOOS == "windows"
-
-func TestEngineRun(t *testing.T) {
-	t.Parallel()
-	logrus.SetLevel(logrus.DebugLevel)
-	t.Run("exits with context", func(t *testing.T) {
-		t.Parallel()
-		done := make(chan struct{})
-		runner := &minirunner.MiniRunner{
-			Fn: func(ctx context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
-				<-ctx.Done()
-				close(done)
-				return nil
-			},
-		}
-
-		duration := 100 * time.Millisecond
-		test := newTestEngine(t, &duration, runner, nil, lib.Options{})
-		defer test.wait()
-
-		startTime := time.Now()
-		assert.ErrorContains(t, test.run(), "context deadline exceeded")
-		assert.WithinDuration(t, startTime.Add(duration), time.Now(), 100*time.Millisecond)
-		<-done
-	})
-	t.Run("exits with executor", func(t *testing.T) {
-		t.Parallel()
-		test := newTestEngine(t, nil, nil, nil, lib.Options{
-			VUs:        null.IntFrom(10),
-			Iterations: null.IntFrom(100),
-		})
-		defer test.wait()
-		assert.NoError(t, test.run())
-		assert.Equal(t, uint64(100), test.engine.ExecutionScheduler.GetState().GetFullIterationCount())
-	})
-	// Make sure samples are discarded after context close (using "cutoff" timestamp in local.go)
-	t.Run("collects samples", func(t *testing.T) {
-		t.Parallel()
-
-		piState := getTestPreInitState(t)
-		testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Trend)
-		require.NoError(t, err)
-
-		signalChan := make(chan interface{})
-
-		runner := &minirunner.MiniRunner{
-			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-				metrics.PushIfNotDone(ctx, out, metrics.Sample{
-					TimeSeries: metrics.TimeSeries{Metric: testMetric, Tags: piState.Registry.RootTagSet()},
-					Time:       time.Now(),
-					Value:      1,
-				})
-				close(signalChan)
-				<-ctx.Done()
-				metrics.PushIfNotDone(ctx, out, metrics.Sample{
-					TimeSeries: metrics.TimeSeries{Metric: testMetric, Tags: piState.Registry.RootTagSet()},
-					Time:       time.Now(), Value: 1,
-				})
-				return nil
-			},
-		}
-
-		mockOutput := mockoutput.New()
-		test := newTestEngineWithTestPreInitState(t, nil, runner, []output.Output{mockOutput}, lib.Options{
-			VUs:        null.IntFrom(1),
-			Iterations: null.IntFrom(1),
-		}, piState)
-
-		errC := make(chan error)
-		go func() { errC <- test.run() }()
-		<-signalChan
-		test.runAbort(fmt.Errorf("custom error"))
-		assert.ErrorContains(t, <-errC, "custom error")
-		test.wait()
-
-		found := 0
-		for _, s := range mockOutput.Samples {
-			if s.Metric != testMetric {
-				continue
-			}
-			found++
-			assert.Equal(t, 1.0, s.Value, "wrong value")
-		}
-		assert.Equal(t, 1, found, "wrong number of samples")
-	})
-}
-
-func TestEngineOutput(t *testing.T) {
+func TestNewMetricsEngineWithThresholds(t *testing.T) {
 	t.Parallel()
 
-	piState := getTestPreInitState(t)
-	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Trend)
-	require.NoError(t, err)
-
-	runner := &minirunner.MiniRunner{
-		Fn: func(_ context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-			out <- metrics.Sample{TimeSeries: metrics.TimeSeries{Metric: testMetric}}
-			return nil
+	trs := &lib.TestRunState{
+		TestPreInitState: &lib.TestPreInitState{
+			Logger:   testutils.NewLogger(t),
+			Registry: metrics.NewRegistry(),
 		},
-	}
-
-	mockOutput := mockoutput.New()
-	test := newTestEngineWithTestPreInitState(t, nil, runner, []output.Output{mockOutput}, lib.Options{
-		VUs:        null.IntFrom(1),
-		Iterations: null.IntFrom(1),
-	}, piState)
-
-	assert.NoError(t, test.run())
-	test.wait()
-
-	cSamples := []metrics.Sample{}
-	for _, sample := range mockOutput.Samples {
-		if sample.Metric == testMetric {
-			cSamples = append(cSamples, sample)
-		}
-	}
-	metric := test.engine.MetricsEngine.ObservedMetrics["test_metric"]
-	if assert.NotNil(t, metric) {
-		sink := metric.Sink.(*metrics.TrendSink) //nolint:forcetypeassert
-		if assert.NotNil(t, sink) {
-			numOutputSamples := len(cSamples)
-			numEngineSamples := len(sink.Values)
-			assert.Equal(t, numEngineSamples, numOutputSamples)
-		}
-	}
-}
-
-func TestEngine_processSamples(t *testing.T) {
-	t.Parallel()
-
-	t.Run("metric", func(t *testing.T) {
-		t.Parallel()
-
-		piState := getTestPreInitState(t)
-		metric, err := piState.Registry.NewMetric("my_metric", metrics.Gauge)
-		require.NoError(t, err)
-
-		done := make(chan struct{})
-		runner := &minirunner.MiniRunner{
-			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-				out <- metrics.Sample{
-					TimeSeries: metrics.TimeSeries{
-						Metric: metric,
-						Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1"}),
-					},
-					Value: 1.25,
-					Time:  time.Now(),
-				}
-				close(done)
-				return nil
-			},
-		}
-		test := newTestEngineWithTestPreInitState(t, nil, runner, nil, lib.Options{}, piState)
-
-		go func() {
-			assert.NoError(t, test.run())
-		}()
-
-		select {
-		case <-done:
-			return
-		case <-time.After(10 * time.Second):
-			assert.Fail(t, "Test should have completed within 10 seconds")
-		}
-
-		test.wait()
-
-		assert.IsType(t, &metrics.GaugeSink{}, test.engine.MetricsEngine.ObservedMetrics["my_metric"].Sink)
-	})
-	t.Run("submetric", func(t *testing.T) {
-		t.Parallel()
-
-		piState := getTestPreInitState(t)
-		metric, err := piState.Registry.NewMetric("my_metric", metrics.Gauge)
-		require.NoError(t, err)
-
-		ths := metrics.NewThresholds([]string{`value<2`})
-		gotParseErr := ths.Parse()
-		require.NoError(t, gotParseErr)
-
-		done := make(chan struct{})
-		runner := &minirunner.MiniRunner{
-			Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-				out <- metrics.Sample{
-					TimeSeries: metrics.TimeSeries{
-						Metric: metric,
-						Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1", "b": "2"}),
-					},
-					Value: 1.25,
-					Time:  time.Now(),
-				}
-				close(done)
-				return nil
-			},
-		}
-		test := newTestEngineWithTestPreInitState(t, nil, runner, nil, lib.Options{
+		Options: lib.Options{
 			Thresholds: map[string]metrics.Thresholds{
-				"my_metric{a:1}": ths,
+				"metric1": {Thresholds: []*metrics.Threshold{}},
+				"metric2": {Thresholds: []*metrics.Threshold{}},
 			},
-		}, piState)
-
-		go func() {
-			assert.NoError(t, test.run())
-		}()
-
-		select {
-		case <-done:
-			return
-		case <-time.After(10 * time.Second):
-			assert.Fail(t, "Test should have completed within 10 seconds")
-		}
-		test.wait()
-
-		assert.Len(t, test.engine.MetricsEngine.ObservedMetrics, 2)
-		sms := test.engine.MetricsEngine.ObservedMetrics["my_metric{a:1}"]
-		assert.EqualValues(t, map[string]string{"a": "1"}, sms.Sub.Tags.Map())
-
-		assert.IsType(t, &metrics.GaugeSink{}, test.engine.MetricsEngine.ObservedMetrics["my_metric"].Sink)
-		assert.IsType(t, &metrics.GaugeSink{}, test.engine.MetricsEngine.ObservedMetrics["my_metric{a:1}"].Sink)
-	})
-}
-
-func TestEngineThresholdsWillAbort(t *testing.T) {
-	t.Parallel()
-
-	piState := getTestPreInitState(t)
-	metric, err := piState.Registry.NewMetric("my_metric", metrics.Gauge)
-	require.NoError(t, err)
-
-	// The incoming samples for the metric set it to 1.25. Considering
-	// the metric is of type Gauge, value > 1.25 should always fail, and
-	// trigger an abort.
-	ths := metrics.NewThresholds([]string{"value>1.25"})
-	gotParseErr := ths.Parse()
-	require.NoError(t, gotParseErr)
-	ths.Thresholds[0].AbortOnFail = true
-
-	thresholds := map[string]metrics.Thresholds{metric.Name: ths}
-
-	done := make(chan struct{})
-	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-			out <- metrics.Sample{
-				TimeSeries: metrics.TimeSeries{
-					Metric: metric,
-					Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1"}),
-				},
-				Time:  time.Now(),
-				Value: 1.25,
-			}
-			close(done)
-			return nil
 		},
 	}
-	test := newTestEngineWithTestPreInitState(t, nil, runner, nil, lib.Options{Thresholds: thresholds}, piState)
-
-	go func() {
-		assert.NoError(t, test.run())
-	}()
-
-	select {
-	case <-done:
-		return
-	case <-time.After(10 * time.Second):
-		assert.Fail(t, "Test should have completed within 10 seconds")
-	}
-	test.wait()
-	assert.True(t, test.engine.IsTainted())
-}
-
-func TestEngineAbortedByThresholds(t *testing.T) {
-	t.Parallel()
-
-	piState := getTestPreInitState(t)
-	metric, err := piState.Registry.NewMetric("my_metric", metrics.Gauge)
+	_, err := trs.Registry.NewMetric("metric1", metrics.Counter)
 	require.NoError(t, err)
 
-	// The MiniRunner sets the value of the metric to 1.25. Considering
-	// the metric is of type Gauge, value > 1.25 should always fail, and
-	// trigger an abort.
-	// **N.B**: a threshold returning an error, won't trigger an abort.
-	ths := metrics.NewThresholds([]string{"value>1.25"})
-	gotParseErr := ths.Parse()
-	require.NoError(t, gotParseErr)
-	ths.Thresholds[0].AbortOnFail = true
+	_, err = trs.Registry.NewMetric("metric2", metrics.Counter)
+	require.NoError(t, err)
 
-	thresholds := map[string]metrics.Thresholds{metric.Name: ths}
+	me, err := NewMetricsEngine(trs)
+	require.NoError(t, err)
+	require.NotNil(t, me)
 
-	doneIter := make(chan struct{})
-	doneRun := make(chan struct{})
-	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
-			out <- metrics.Sample{
-				TimeSeries: metrics.TimeSeries{
-					Metric: metric,
-					Tags:   piState.Registry.RootTagSet().WithTagsFromMap(map[string]string{"a": "1"}),
-				},
-				Time:  time.Now(),
-				Value: 1.25,
-			}
-			<-ctx.Done()
-			close(doneIter)
-			return nil
-		},
-	}
-
-	test := newTestEngineWithTestPreInitState(t, nil, runner, nil, lib.Options{Thresholds: thresholds}, piState)
-	defer test.wait()
-
-	go func() {
-		defer close(doneRun)
-		t.Logf("test run done with err '%s'", err)
-		assert.ErrorContains(t, test.run(), "thresholds on metrics 'my_metric' were breached")
-	}()
-
-	select {
-	case <-doneIter:
-	case <-time.After(10 * time.Second):
-		assert.Fail(t, "Iteration should have completed within 10 seconds")
-	}
-	select {
-	case <-doneRun:
-	case <-time.After(10 * time.Second):
-		assert.Fail(t, "Test should have completed within 10 seconds")
-	}
+	assert.Len(t, me.metricsWithThresholds, 2)
 }
 
-func TestEngine_processThresholds(t *testing.T) {
+func TestMetricsEngineGetThresholdMetricOrSubmetricError(t *testing.T) {
 	t.Parallel()
 
-	testdata := map[string]struct {
-		pass bool
-		ths  map[string][]string
+	cases := []struct {
+		metricDefinition string
+		expErr           string
 	}{
-		"passing": {true, map[string][]string{"my_metric": {"value<2"}}},
-		"failing": {false, map[string][]string{"my_metric": {"value>1.25"}}},
-
-		"submetric,match,passing":   {true, map[string][]string{"my_metric{a:1}": {"value<2"}}},
-		"submetric,match,failing":   {false, map[string][]string{"my_metric{a:1}": {"value>1.25"}}},
-		"submetric,nomatch,passing": {true, map[string][]string{"my_metric{a:2}": {"value<2"}}},
-		"submetric,nomatch,failing": {false, map[string][]string{"my_metric{a:2}": {"value>1.25"}}},
-
-		"unused,passing":      {true, map[string][]string{"unused_counter": {"count==0"}}},
-		"unused,failing":      {false, map[string][]string{"unused_counter": {"count>1"}}},
-		"unused,subm,passing": {true, map[string][]string{"unused_counter{a:2}": {"count<1"}}},
-		"unused,subm,failing": {false, map[string][]string{"unused_counter{a:2}": {"count>1"}}},
-
-		"used,passing":               {true, map[string][]string{"used_counter": {"count==2"}}},
-		"used,failing":               {false, map[string][]string{"used_counter": {"count<1"}}},
-		"used,subm,passing":          {true, map[string][]string{"used_counter{b:1}": {"count==2"}}},
-		"used,not-subm,passing":      {true, map[string][]string{"used_counter{b:2}": {"count==0"}}},
-		"used,invalid-subm,passing1": {true, map[string][]string{"used_counter{c:''}": {"count==0"}}},
-		"used,invalid-subm,failing1": {false, map[string][]string{"used_counter{c:''}": {"count>0"}}},
-		"used,invalid-subm,passing2": {true, map[string][]string{"used_counter{c:}": {"count==0"}}},
-		"used,invalid-subm,failing2": {false, map[string][]string{"used_counter{c:}": {"count>0"}}},
+		{metricDefinition: "metric1{test:a", expErr: "missing ending bracket"},
+		{metricDefinition: "metric2", expErr: "'metric2' does not exist in the script"},
+		{metricDefinition: "metric1{}", expErr: "submetric criteria for metric 'metric1' cannot be empty"},
 	}
 
-	for name, data := range testdata {
-		name, data := name, data
-		t.Run(name, func(t *testing.T) {
+	for _, tc := range cases {
+		tc := tc
+		t.Run("", func(t *testing.T) {
 			t.Parallel()
 
-			piState := getTestPreInitState(t)
-			gaugeMetric, err := piState.Registry.NewMetric("my_metric", metrics.Gauge)
-			require.NoError(t, err)
-			counterMetric, err := piState.Registry.NewMetric("used_counter", metrics.Counter)
-			require.NoError(t, err)
-			_, err = piState.Registry.NewMetric("unused_counter", metrics.Counter)
+			me := newTestMetricsEngine(t)
+			_, err := me.test.Registry.NewMetric("metric1", metrics.Counter)
 			require.NoError(t, err)
 
-			thresholds := make(map[string]metrics.Thresholds, len(data.ths))
-			for m, srcs := range data.ths {
-				ths := metrics.NewThresholds(srcs)
-				gotParseErr := ths.Parse()
-				require.NoError(t, gotParseErr)
-				thresholds[m] = ths
-			}
-
-			test := newTestEngineWithTestPreInitState(
-				t, nil, nil, nil, lib.Options{Thresholds: thresholds}, piState,
-			)
-
-			tag1 := piState.Registry.RootTagSet().With("a", "1")
-			tag2 := piState.Registry.RootTagSet().With("b", "1")
-
-			test.engine.OutputManager.AddMetricSamples(
-				[]metrics.SampleContainer{
-					metrics.Sample{
-						TimeSeries: metrics.TimeSeries{
-							Metric: gaugeMetric,
-							Tags:   tag1,
-						},
-						Time:  time.Now(),
-						Value: 1.25,
-					},
-					metrics.Sample{
-						TimeSeries: metrics.TimeSeries{
-							Metric: counterMetric,
-							Tags:   tag2,
-						},
-						Time:  time.Now(),
-						Value: 2,
-					},
-				},
-			)
-
-			require.NoError(t, test.run())
-			test.wait()
-
-			assert.Equal(t, data.pass, !test.engine.IsTainted())
+			_, err = me.getThresholdMetricOrSubmetric(tc.metricDefinition)
+			assert.ErrorContains(t, err, tc.expErr)
 		})
 	}
 }
 
-func getMetricSum(mo *mockoutput.MockOutput, name string) (result float64) {
-	for _, sc := range mo.SampleContainers {
-		for _, s := range sc.GetSamples() {
-			if s.Metric.Name == name {
-				result += s.Value
-			}
-		}
+func TestNewMetricsEngineNoThresholds(t *testing.T) {
+	t.Parallel()
+
+	trs := &lib.TestRunState{
+		TestPreInitState: &lib.TestPreInitState{
+			Logger: testutils.NewLogger(t),
+		},
 	}
-	return
+
+	me, err := NewMetricsEngine(trs)
+	require.NoError(t, err)
+	require.NotNil(t, me)
+
+	assert.Empty(t, me.metricsWithThresholds)
 }
 
-func getMetricCount(mo *mockoutput.MockOutput, name string) (result uint) {
-	for _, sc := range mo.SampleContainers {
-		for _, s := range sc.GetSamples() {
-			if s.Metric.Name == name {
-				result++
-			}
-		}
+func TestMetricsEngineCreateIngester(t *testing.T) {
+	t.Parallel()
+
+	me := MetricsEngine{
+		logger: testutils.NewLogger(t),
 	}
-	return
+	ingester := me.CreateIngester()
+	assert.NotNil(t, ingester)
+	require.NoError(t, ingester.Start())
+	require.NoError(t, ingester.Stop())
 }
 
-func getMetricMax(mo *mockoutput.MockOutput, name string) (result float64) {
-	for _, sc := range mo.SampleContainers {
-		for _, s := range sc.GetSamples() {
-			if s.Metric.Name == name && s.Value > result {
-				result = s.Value
-			}
-		}
+func TestMetricsEngineEvaluateThresholdNoAbort(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		threshold   string
+		abortOnFail bool
+		expBreached []string
+	}{
+		{threshold: "count>5", expBreached: nil},
+		{threshold: "count<5", expBreached: []string{"m1"}},
+		{threshold: "count<5", expBreached: []string{"m1"}, abortOnFail: true},
 	}
-	return
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.threshold, func(t *testing.T) {
+			t.Parallel()
+			me := newTestMetricsEngine(t)
+
+			m1, err := me.test.Registry.NewMetric("m1", metrics.Counter)
+			require.NoError(t, err)
+			m2, err := me.test.Registry.NewMetric("m2", metrics.Counter)
+			require.NoError(t, err)
+
+			ths := metrics.NewThresholds([]string{tc.threshold})
+			require.NoError(t, ths.Parse())
+			m1.Thresholds = ths
+			m1.Thresholds.Thresholds[0].AbortOnFail = tc.abortOnFail
+
+			me.metricsWithThresholds = []*metrics.Metric{m1, m2}
+			m1.Sink.Add(metrics.Sample{Value: 6.0})
+
+			breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
+			require.Equal(t, tc.abortOnFail, abort)
+			assert.Equal(t, tc.expBreached, breached)
+		})
+	}
 }
 
-const expectedHeaderMaxLength = 550
+func TestMetricsEngineEvaluateIgnoreEmptySink(t *testing.T) {
+	t.Parallel()
 
-// FIXME: This test is too brittle, consider simplifying.
+	me := newTestMetricsEngine(t)
+
+	m1, err := me.test.Registry.NewMetric("m1", metrics.Counter)
+	require.NoError(t, err)
+	m2, err := me.test.Registry.NewMetric("m2", metrics.Counter)
+	require.NoError(t, err)
+
+	ths := metrics.NewThresholds([]string{"count>5"})
+	require.NoError(t, ths.Parse())
+	m1.Thresholds = ths
+	m1.Thresholds.Thresholds[0].AbortOnFail = true
+
+	me.metricsWithThresholds = []*metrics.Metric{m1, m2}
+
+	breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
+	require.True(t, abort)
+	require.Equal(t, []string{"m1"}, breached)
+
+	breached, abort = me.evaluateThresholds(true, zeroTestRunDuration)
+	require.False(t, abort)
+	assert.Empty(t, breached)
+}
+
+func newTestMetricsEngine(t *testing.T) MetricsEngine {
+	trs := &lib.TestRunState{
+		TestPreInitState: &lib.TestPreInitState{
+			Logger:   testutils.NewLogger(t),
+			Registry: metrics.NewRegistry(),
+		},
+	}
+
+	return MetricsEngine{
+		logger: trs.Logger,
+		test:   trs,
+	}
+}
+
+func zeroTestRunDuration() time.Duration {
+	return 0
+}
+
+/*
+// FIXME: This test is too brittle,
+// move them as e2e tests and consider to simplify.
+//
 func TestSentReceivedMetrics(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
