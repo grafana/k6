@@ -89,8 +89,9 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 
 	metric := me.test.Registry.Get(nameParts[0])
 	if metric == nil {
-		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[1])
+		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[0])
 	}
+
 	if len(nameParts) == 1 { // no sub-metric
 		return metric, nil
 	}
