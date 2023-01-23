@@ -1578,6 +1578,42 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
+func TestRunWithCloudOutputMoreOverrides(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(
+		t, "export default function () {};",
+		[]string{"-v", "--log-output=stdout", "--out=cloud"}, 0,
+	)
+
+	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprint(resp, `{
+			"reference_id": "1337",
+			"config": {
+				"webAppURL": "https://bogus.url",
+				"testRunDetails": "https://some.other.url/foo/tests/org/1337?bar=baz"
+			},
+			"logs": [
+				{"level": "debug", "message": "test debug message"},
+				{"level": "info", "message": "test message"}
+			]
+		}`)
+		assert.NoError(t, err)
+	})
+	srv := getCloudTestEndChecker(t, 1337, configOverride, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, "execution: local")
+	assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
+	assert.Contains(t, stdout, `level=debug msg="test debug message" output=cloud source=grafana-k6-cloud`)
+	assert.Contains(t, stdout, `level=info msg="test message" output=cloud source=grafana-k6-cloud`)
+}
+
 func TestPrometheusRemoteWriteOutput(t *testing.T) {
 	t.Parallel()
 

@@ -161,9 +161,13 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
-	refID, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
+	cloudTestRun, err := client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 	if err != nil {
 		return err
+	}
+	refID := cloudTestRun.ReferenceID
+	if cloudTestRun.ConfigOverride != nil {
+		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
 	}
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.

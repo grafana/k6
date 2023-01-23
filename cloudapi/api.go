@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
 )
 
@@ -28,9 +29,17 @@ type TestRun struct {
 	Duration int64 `json:"duration"`
 }
 
+// LogEntry can be used by the cloud to tell k6 to log something to the console,
+// so the user can see it.
+type LogEntry struct {
+	Level   string `json:"level"`
+	Message string `json:"message"`
+}
+
 type CreateTestRunResponse struct {
-	ReferenceID    string  `json:"reference_id"`
-	ConfigOverride *Config `json:"config"`
+	ReferenceID    string     `json:"reference_id"`
+	ConfigOverride *Config    `json:"config"`
+	Logs           []LogEntry `json:"logs"`
 }
 
 type TestProgressResponse struct {
@@ -44,6 +53,20 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
+func (c *Client) handleLogEntriesFromCloud(ctrr CreateTestRunResponse) {
+	logger := c.logger.WithField("source", "grafana-k6-cloud")
+	for _, logEntry := range ctrr.Logs {
+		level, err := logrus.ParseLevel(logEntry.Level)
+		if err != nil {
+			logger.Debugf("invalid message level '%s' for message '%s': %s", logEntry.Level, logEntry.Message, err)
+			level = logrus.ErrorLevel
+		}
+		logger.Log(level, logEntry.Message)
+	}
+}
+
+// CreateTestRun is used when a test run is being executed locally, while the
+// results are streamed to the cloud, i.e. `k6 run --out cloud script.js`.
 func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error) {
 	url := fmt.Sprintf("%s/tests", c.baseURL)
 	req, err := c.NewRequest("POST", url, testRun)
@@ -57,6 +80,7 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 		return nil, err
 	}
 
+	c.handleLogEntriesFromCloud(ctrr)
 	if ctrr.ReferenceID == "" {
 		return nil, fmt.Errorf("failed to get a reference ID")
 	}
@@ -64,47 +88,49 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 	return &ctrr, nil
 }
 
-func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (string, error) {
+// StartCloudTestRun starts a cloud test run, i.e. `k6 cloud script.js`.
+func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
 	requestUrl := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
 	var buf bytes.Buffer
 	mp := multipart.NewWriter(&buf)
 
 	if err := mp.WriteField("name", name); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if projectID != 0 {
 		if err := mp.WriteField("project_id", strconv.FormatInt(projectID, 10)); err != nil {
-			return "", err
+			return nil, err
 		}
 	}
 
 	fw, err := mp.CreateFormFile("file", "archive.tar")
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := arc.Write(fw); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	if err := mp.Close(); err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req, err := http.NewRequest("POST", requestUrl, &buf)
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
 	req.Header.Set("Content-Type", mp.FormDataContentType())
 
 	ctrr := CreateTestRunResponse{}
 	if err := c.Do(req, &ctrr); err != nil {
-		return "", err
+		return nil, err
 	}
-	return ctrr.ReferenceID, nil
+	c.handleLogEntriesFromCloud(ctrr)
+	return &ctrr, nil
 }
 
 func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool, runStatus lib.RunStatus) error {
