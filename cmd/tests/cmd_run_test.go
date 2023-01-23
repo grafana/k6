@@ -424,15 +424,19 @@ func getTestServer(t *testing.T, routes map[string]http.Handler) *httptest.Serve
 	return httptest.NewServer(mux)
 }
 
-func getCloudTestEndChecker(t *testing.T, expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus) *httptest.Server {
+func getCloudTestEndChecker(
+	t *testing.T, testRunID int,
+	testStart http.Handler, expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus,
+) *httptest.Server {
 	testFinished := false
+
+	if testStart == nil {
+		testStart = cloudTestStartSimple(t, testRunID)
+	}
+
 	srv := getTestServer(t, map[string]http.Handler{
-		"POST ^/v1/tests$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			resp.WriteHeader(http.StatusOK)
-			_, err := fmt.Fprintf(resp, `{"reference_id": "111"}`)
-			assert.NoError(t, err)
-		}),
-		"POST ^/v1/tests/111$": http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		"POST ^/v1/tests$": testStart,
+		fmt.Sprintf("POST ^/v1/tests/%d$", testRunID): http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 			require.NotNil(t, req.Body)
 			buf := &bytes.Buffer{}
 			_, err := io.Copy(buf, req.Body)
@@ -476,7 +480,7 @@ func getSimpleCloudOutputTestState(
 	}
 	cliFlags = append(cliFlags, "--out", "cloud")
 
-	srv := getCloudTestEndChecker(t, expRunStatus, expResultStatus)
+	srv := getCloudTestEndChecker(t, 111, nil, expRunStatus, expResultStatus)
 	ts := getSingleFileTestState(t, script, cliFlags, expExitCode)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 	return ts
@@ -818,7 +822,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		export { handleSummary } from "./bar.js";
 	`
 
-	srv := getCloudTestEndChecker(t, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 123, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
@@ -840,7 +844,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	}
 	assert.Contains(t, stdout, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:9(3))\n\tat `+
 		rootPath+`test/bar.js:3:3(3)\n\tat setup (`+rootPath+`test/test.js:5:3(9))\n" hint="script exception"`)
-	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
+	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=123 run_status=7 tainted=false`)
 	assert.Contains(t, stdout, "bogus summary")
 }
 
@@ -1084,6 +1088,8 @@ func testAbortedByScriptTestAbort(
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
+	assert.Contains(t, stdout, "execution: local")
+	assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/111)")
 	assert.Contains(t, stdout, "test aborted: foo")
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
@@ -1157,6 +1163,8 @@ func TestAbortedByScriptInitError(t *testing.T) {
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
+	assert.Contains(t, stdout, "execution: local")
+	assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/111)")
 	assert.Contains(t, stdout, `level=error msg="Error: oops in 2\n\tat file:///`)
 	assert.Contains(t, stdout, `hint="error while initializing VU #2 (script exception)"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
@@ -1255,6 +1263,8 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
+	assert.NotContains(t, stdout, "execution: local") // because of --quiet
+	assert.NotContains(t, stdout, "output: cloud")    // because of --quiet
 	assert.Equal(t, 12, strings.Count(stdout, "✓"))
 }
 
@@ -1541,6 +1551,31 @@ func TestRunTags(t *testing.T) {
 	assert.Equal(t, 0, len(getSampleValues(t, jsonResults, "http_req_duration", expTags)))
 	expTags["check"] = "status is 101"
 	assert.Equal(t, float64(3), sum(getSampleValues(t, jsonResults, "checks", expTags)))
+}
+
+func TestRunWithCloudOutputOverrides(t *testing.T) {
+	t.Parallel()
+
+	ts := getSingleFileTestState(
+		t, "export default function () {};",
+		[]string{"-v", "--log-output=stdout", "--out=cloud", "--out", "json=results.json"}, 0,
+	)
+
+	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprint(resp, `{"reference_id": "132", "config": {"webAppURL": "https://bogus.url"}}`)
+		assert.NoError(t, err)
+	})
+	srv := getCloudTestEndChecker(t, 132, configOverride, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, "execution: local")
+	assert.Contains(t, stdout, "output: cloud (https://bogus.url/runs/132), json (results.json)")
+	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
 func TestPrometheusRemoteWriteOutput(t *testing.T) {
