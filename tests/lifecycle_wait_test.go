@@ -13,7 +13,6 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6ext"
 )
 
 // TODO
@@ -71,7 +70,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 		waitUntil             common.LifecycleEvent
 		pingRequestTextAssert func(result string, pingCount int)
 		pingJSTextAssert      func(result string)
-		assertFunc            func(tb *testBrowser, p api.Page) testPromise
+		assertFunc            func(tb *testBrowser, p api.Page) error
 		wantError             string
 	}{
 		{
@@ -126,7 +125,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 			pingSlowness: 0,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventNetworkIdle,
-			assertFunc: func(tb *testBrowser, p api.Page) testPromise {
+			assertFunc: func(tb *testBrowser, p api.Page) error {
 				result := p.TextContent("#pingRequestText", nil)
 				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 
@@ -134,13 +133,11 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 					Timeout:   1000,
 					WaitUntil: common.LifecycleEventNetworkIdle,
 				})
-				waitForNav := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-					return p.WaitForNavigation(opts)
-				})
+				_, err := p.WaitForNavigation(opts)
 
-				return tb.promise(waitForNav)
+				return err
 			},
-			wantError: "Uncaught (in promise) waiting for navigation: timed out after 1s",
+			wantError: "waiting for navigation: timed out after 1s",
 		},
 	}
 
@@ -157,13 +154,13 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			if tt.assertFunc != nil {
-				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+				assertHome(t, tb, p, tt.waitUntil, func() error {
 					return tt.assertFunc(tb, p)
 				}, nil, tt.wantError)
 				return
 			}
 
-			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+			assertHome(t, tb, p, tt.waitUntil, func() error {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result, 10)
 
@@ -181,13 +178,11 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 				click := func() error {
 					return p.Click(`a`, nil)
 				}
-				runAll := k6ext.Promise(tb.ctx, func() (result any, reason error) {
-					ctx, cancel := context.WithTimeout(tb.ctx, 5*time.Second)
-					defer cancel()
-					return nil, tb.run(ctx, waitForNav, click)
-				})
 
-				return tb.promise(runAll)
+				ctx, cancel := context.WithTimeout(tb.ctx, 5*time.Second)
+				defer cancel()
+
+				return tb.run(ctx, waitForNav, click)
 			}, func() {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result, 20)
@@ -297,14 +292,14 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			if tt.assertFunc != nil {
-				assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+				assertHome(t, tb, p, tt.waitUntil, func() error {
 					tt.assertFunc(p)
-					return testPromise{}
+					return nil
 				}, nil, "")
 				return
 			}
 
-			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+			assertHome(t, tb, p, tt.waitUntil, func() error {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result)
 
@@ -314,7 +309,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 				// This shouldn't block and return after calling hasLifecycleEventFired.
 				p.WaitForLoadState(tt.waitUntil.String(), nil)
 
-				return testPromise{}
+				return nil
 			}, nil, "")
 		})
 	}
@@ -391,7 +386,7 @@ func TestLifecycleReload(t *testing.T) {
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
-			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+			assertHome(t, tb, p, tt.waitUntil, func() error {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result, 10)
 
@@ -410,7 +405,7 @@ func TestLifecycleReload(t *testing.T) {
 				result = p.TextContent("#pingJSText", nil)
 				tt.pingJSTextAssert(result)
 
-				return testPromise{}
+				return nil
 			}, nil, "")
 		})
 	}
@@ -488,14 +483,14 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, true)
 
-			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+			assertHome(t, tb, p, tt.waitUntil, func() error {
 				result := p.TextContent("#subFramePingRequestText", nil)
 				tt.pingRequestTextAssert(result)
 
 				result = p.TextContent("#subFramePingJSText", nil)
 				tt.pingJSTextAssert(result)
 
-				return testPromise{}
+				return nil
 			}, nil, "")
 		})
 	}
@@ -559,14 +554,14 @@ func TestLifecycleGoto(t *testing.T) {
 			withPingHandler(t, tb, tt.pingSlowness, nil)
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
-			assertHome(t, tb, p, tt.waitUntil, func() testPromise {
+			assertHome(t, tb, p, tt.waitUntil, func() error {
 				result := p.TextContent("#pingRequestText", nil)
 				tt.pingRequestTextAssert(result)
 
 				result = p.TextContent("#pingJSText", nil)
 				tt.pingJSTextAssert(result)
 
-				return testPromise{}
+				return nil
 			}, nil, "")
 		})
 	}
@@ -594,11 +589,11 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 
 		withPingJSHandler(t, tb, false, nil, false)
 
-		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
+		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() error {
 			result := p.TextContent("#pingJSText", nil)
 			assert.EqualValues(t, "ping.js loaded from server", result)
 
-			return testPromise{}
+			return nil
 		}, nil, "")
 	})
 
@@ -613,14 +608,14 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withPingHandler(t, tb, 50*time.Millisecond, ch)
 		withPingJSHandler(t, tb, false, ch, false)
 
-		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
+		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() error {
 			result := p.TextContent("#pingRequestText", nil)
 			assert.EqualValues(t, "Waiting... pong 4 - for loop complete", result)
 
 			result = p.TextContent("#pingJSText", nil)
 			assert.EqualValues(t, "ping.js loaded from server", result)
 
-			return testPromise{}
+			return nil
 		}, nil, "")
 	})
 
@@ -633,11 +628,11 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withHomeHandler(t, tb, "lifecycle_no_ping_js.html")
 		withPingHandler(t, tb, 50*time.Millisecond, nil)
 
-		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() testPromise {
+		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() error {
 			result := p.TextContent("#pingRequestText", nil)
 			assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 
-			return testPromise{}
+			return nil
 		}, nil, "")
 	})
 }
@@ -711,12 +706,12 @@ func assertHome(
 	t *testing.T,
 	tb *testBrowser, p api.Page,
 	waitUntil common.LifecycleEvent,
-	check func() testPromise, secondCheck func(), wantError string,
+	check func() error, secondCheck func(), wantError string,
 ) {
 	t.Helper()
 
 	var resolved, rejected bool
-	err := tb.await(func() error {
+	err := func() error {
 		opts := tb.toGojaValue(common.FrameGotoOptions{
 			WaitUntil: waitUntil,
 			Timeout:   30 * time.Second,
@@ -728,19 +723,17 @@ func assertHome(
 			rejected = true
 		}
 
-		// TODO
-		// remove this once we have finished our work on the mapping layer.
-		// for now: provide a fake promise
-		fakePromise := k6ext.Promise(tb.vu.Context(), func() (result any, reason error) {
-			return nil, nil
-		})
-		prm := tb.promise(fakePromise).then(check)
+		err = check()
+		if err != nil {
+			return err
+		}
+
 		if secondCheck != nil {
-			prm.then(secondCheck)
+			secondCheck()
 		}
 
 		return nil
-	})
+	}()
 
 	if wantError != "" {
 		require.EqualError(t, err, wantError)

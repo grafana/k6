@@ -234,13 +234,6 @@ func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
 	return b.runtime().RunString(fmt.Sprintf(s, args...))
 }
 
-// await runs fn in the event loop and awaits its return.
-// Note: Do not confuse the method name with await in JavaScript.
-func (b *testBrowser) await(fn func() error) error {
-	b.t.Helper()
-	return b.vu.Loop.Start(fn)
-}
-
 // Run the given functions in parallel and waits for them to finish.
 func (b *testBrowser) run(ctx context.Context, fs ...func() error) error { //nolint:unused,deadcode
 	b.t.Helper()
@@ -271,7 +264,7 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	errC := make(chan error)
 	go func() {
 		defer close(errC)
-		errC <- b.await(fn)
+		errC <- fn()
 	}()
 
 	// use timer instead of time.After to not leak time.After for the duration of the timeout
