@@ -11,6 +11,7 @@ import (
 )
 
 // Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
+//
 //nolint:lll
 type Config struct {
 	// TODO: refactor common stuff between cloud execution and output
@@ -21,11 +22,12 @@ type Config struct {
 	Host    null.String        `json:"host" envconfig:"K6_CLOUD_HOST"`
 	Timeout types.NullDuration `json:"timeout" envconfig:"K6_CLOUD_TIMEOUT"`
 
-	LogsTailURL null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
-	PushRefID   null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
-	WebAppURL   null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
-	NoCompress  null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
-	StopOnError null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
+	LogsTailURL    null.String `json:"-" envconfig:"K6_CLOUD_LOGS_TAIL_URL"`
+	PushRefID      null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
+	WebAppURL      null.String `json:"webAppURL" envconfig:"K6_CLOUD_WEB_APP_URL"`
+	TestRunDetails null.String `json:"testRunDetails" envconfig:"K6_CLOUD_TEST_RUN_DETAILS"`
+	NoCompress     null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
+	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 
 	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"K6_CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
 
@@ -185,6 +187,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL
+	}
+	if cfg.TestRunDetails.Valid {
+		c.TestRunDetails = cfg.TestRunDetails
 	}
 	if cfg.NoCompress.Valid {
 		c.NoCompress = cfg.NoCompress

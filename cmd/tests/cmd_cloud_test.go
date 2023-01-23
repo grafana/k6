@@ -60,7 +60,7 @@ func getMockCloud(
 
 func getSimpleCloudTestState(
 	t *testing.T, script []byte, cliFlags []string,
-	progressCallback func() cloudapi.TestProgressResponse,
+	archiveUpload http.Handler, progressCallback func() cloudapi.TestProgressResponse,
 ) *GlobalTestState {
 	if script == nil {
 		script = []byte(`export default function() {}`)
@@ -70,7 +70,7 @@ func getSimpleCloudTestState(
 		cliFlags = []string{"--verbose", "--log-output=stdout"}
 	}
 
-	srv := getMockCloud(t, 123, nil, progressCallback)
+	srv := getMockCloud(t, 123, archiveUpload, progressCallback)
 
 	ts := NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), script, 0o644))
@@ -85,7 +85,7 @@ func getSimpleCloudTestState(
 func TestCloudNotLoggedIn(t *testing.T) {
 	t.Parallel()
 
-	ts := getSimpleCloudTestState(t, nil, nil, nil)
+	ts := getSimpleCloudTestState(t, nil, nil, nil, nil)
 	delete(ts.Env, "K6_CLOUD_TOKEN")
 	ts.ExpectedExitCode = -1 // TODO: use a more specific exit code?
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -112,7 +112,7 @@ func TestCloudLoggedInWithScriptToken(t *testing.T) {
 		export default function() {};
 	`
 
-	ts := getSimpleCloudTestState(t, []byte(script), nil, nil)
+	ts := getSimpleCloudTestState(t, []byte(script), nil, nil, nil)
 	delete(ts.Env, "K6_CLOUD_TOKEN")
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -134,7 +134,7 @@ func TestCloudExitOnRunning(t *testing.T) {
 		}
 	}
 
-	ts := getSimpleCloudTestState(t, nil, []string{"--exit-on-running", "--log-output=stdout"}, cs)
+	ts := getSimpleCloudTestState(t, nil, []string{"--exit-on-running", "--log-output=stdout"}, nil, cs)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
@@ -142,4 +142,36 @@ func TestCloudExitOnRunning(t *testing.T) {
 	assert.Contains(t, stdout, `execution: cloud`)
 	assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 	assert.Contains(t, stdout, `test status: Running`)
+}
+
+func TestCloudWithConfigOverride(t *testing.T) {
+	t.Parallel()
+
+	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		resp.WriteHeader(http.StatusOK)
+		_, err := fmt.Fprint(resp, `{
+			"reference_id": "123",
+			"config": {
+				"webAppURL": "https://bogus.url",
+				"testRunDetails": "something from the cloud"
+			},
+			"logs": [
+				{"level": "invalid", "message": "test debug message"},
+				{"level": "warning", "message": "test warning"},
+				{"level": "error", "message": "test error"}
+			]
+		}`)
+		assert.NoError(t, err)
+	})
+	ts := getSimpleCloudTestState(t, nil, nil, configOverride, nil)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, "execution: cloud")
+	assert.Contains(t, stdout, "output: something from the cloud")
+	assert.Contains(t, stdout, `level=debug msg="invalid message level 'invalid' for message 'test debug message'`)
+	assert.Contains(t, stdout, `level=error msg="test debug message" source=grafana-k6-cloud`)
+	assert.Contains(t, stdout, `level=warning msg="test warning" source=grafana-k6-cloud`)
+	assert.Contains(t, stdout, `level=error msg="test error" source=grafana-k6-cloud`)
 }
