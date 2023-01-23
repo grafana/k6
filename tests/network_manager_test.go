@@ -5,10 +5,11 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/common"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
 
 	k6lib "go.k6.io/k6/lib"
 	k6types "go.k6.io/k6/lib/types"

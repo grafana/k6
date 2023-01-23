@@ -9,7 +9,7 @@ type Browser interface {
 	IsConnected() bool
 	NewContext(opts goja.Value) BrowserContext
 	NewPage(opts goja.Value) Page
-	On(string) *goja.Promise
+	On(string) (bool, error)
 	UserAgent() string
 	Version() string
 }

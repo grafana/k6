@@ -495,18 +495,17 @@ func (b *Browser) NewPage(opts goja.Value) api.Page {
 
 // On returns a Promise that is resolved when the browser process is disconnected.
 // The only accepted event value is "disconnected".
-func (b *Browser) On(event string) *goja.Promise {
+func (b *Browser) On(event string) (bool, error) {
 	if event != EventBrowserDisconnected {
-		k6ext.Panic(b.ctx, "unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
+		return false, fmt.Errorf("unknown browser event: %q, must be %q", event, EventBrowserDisconnected)
 	}
-	return k6ext.Promise(b.ctx, func() (any, error) {
-		select {
-		case <-b.browserProc.lostConnection:
-			return true, nil
-		case <-b.ctx.Done():
-			return nil, fmt.Errorf("browser.on promise rejected: %w", b.ctx.Err())
-		}
-	})
+
+	select {
+	case <-b.browserProc.lostConnection:
+		return true, nil
+	case <-b.ctx.Done():
+		return false, fmt.Errorf("browser.on promise rejected: %w", b.ctx.Err())
+	}
 }
 
 // UserAgent returns the controlled browser's user agent string.
