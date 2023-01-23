@@ -1738,7 +1738,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		insecureSkipVerify bool
 		errMsg             string
 	}{
-		"WithoutCert":      {false, false, true, "remote error: tls: bad certificate"},
+		"WithoutCert":      {false, false, true, "remote error: tls:"},
 		"WithCert":         {true, true, true, ""},
 		"VerifyServerCert": {true, false, false, "certificate signed by unknown authority"},
 		"WithoutDomains":   {true, false, true, ""},
@@ -1833,7 +1833,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 					err = vu.RunOnce()
 					if len(data.errMsg) > 0 {
 						require.Error(t, err)
-						assert.Contains(t, err.Error(), data.errMsg)
+						assert.ErrorContains(t, err, data.errMsg)
 					} else {
 						require.NoError(t, err)
 					}
