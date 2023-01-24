@@ -43,10 +43,10 @@ type CreateTestRunResponse struct {
 }
 
 type TestProgressResponse struct {
-	RunStatusText string        `json:"run_status_text"`
-	RunStatus     lib.RunStatus `json:"run_status"`
-	ResultStatus  ResultStatus  `json:"result_status"`
-	Progress      float64       `json:"progress"`
+	RunStatusText string       `json:"run_status_text"`
+	RunStatus     RunStatus    `json:"run_status"`
+	ResultStatus  ResultStatus `json:"result_status"`
+	Progress      float64      `json:"progress"`
 }
 
 type LoginResponse struct {
@@ -133,7 +133,9 @@ func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archiv
 	return &ctrr, nil
 }
 
-func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool, runStatus lib.RunStatus) error {
+// TestFinished sends the result and run status values to the cloud, along with
+// information for the test thresholds, and marks the test run as finished.
+func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, tained bool, runStatus RunStatus) error {
 	url := fmt.Sprintf("%s/tests/%s", c.baseURL, referenceID)
 
 	resultStatus := ResultStatusPassed
@@ -143,7 +145,7 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 
 	data := struct {
 		ResultStatus ResultStatus    `json:"result_status"`
-		RunStatus    lib.RunStatus   `json:"run_status"`
+		RunStatus    RunStatus       `json:"run_status"`
 		Thresholds   ThresholdResult `json:"thresholds"`
 	}{
 		resultStatus,

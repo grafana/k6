@@ -24,7 +24,6 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
@@ -426,7 +425,7 @@ func getTestServer(t *testing.T, routes map[string]http.Handler) *httptest.Serve
 
 func getCloudTestEndChecker(
 	t *testing.T, testRunID int,
-	testStart http.Handler, expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus,
+	testStart http.Handler, expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus,
 ) *httptest.Server {
 	testFinished := false
 
@@ -449,7 +448,7 @@ func getCloudTestEndChecker(
 			runStatus := gjson.GetBytes(body, "run_status")
 			require.True(t, runStatus.Exists()) // important to check, since run_status can be 0
 			assert.Equalf(
-				t, expRunStatus, lib.RunStatus(runStatus.Int()),
+				t, expRunStatus, cloudapi.RunStatus(runStatus.Int()),
 				"received wrong run_status value",
 			)
 
@@ -473,7 +472,7 @@ func getCloudTestEndChecker(
 
 func getSimpleCloudOutputTestState(
 	t *testing.T, script string, cliFlags []string,
-	expRunStatus lib.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode exitcodes.ExitCode,
+	expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode exitcodes.ExitCode,
 ) *GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
@@ -520,7 +519,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`)
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdOut := ts.Stdout.String()
@@ -566,7 +565,7 @@ func TestThresholdsFailed(t *testing.T) {
 	// Since these thresholds don't have an abortOnFail property, the run_status
 	// in the cloud will still be Finished, even if the test itself failed.
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
+		t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -607,7 +606,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	`
 
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
+		t, script, nil, cloudapi.RunStatusAbortedThreshold, cloudapi.ResultStatusFailed, exitcodes.ThresholdsHaveFailed,
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -654,7 +653,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 		};
 	`
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort)
+	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort)
 
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "simple iter 2")
 
@@ -782,7 +781,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 
 	ts := getSimpleCloudOutputTestState(
 		t, script, []string{"-v", "--log-output=stdout", "--iterations", "20"},
-		lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
+		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptStoppedFromRESTAPI,
 	)
 
 	asyncWaitForStdoutAndStopTestFromRESTAPI(t, ts, 15, time.Second, "a simple iteration")
@@ -822,7 +821,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 		export { handleSummary } from "./bar.js";
 	`
 
-	srv := getCloudTestEndChecker(t, 123, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 123, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed)
 
 	ts := NewGlobalTestState(t)
 	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(mainScript), 0o644))
@@ -937,7 +936,7 @@ func TestAbortedByScriptTeardownError(t *testing.T) {
 
 func testAbortedByScriptError(t *testing.T, script string, runTest func(*testing.T, *GlobalTestState)) *GlobalTestState {
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
+		t, script, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
 	)
 	runTest(t, ts)
 
@@ -1082,7 +1081,7 @@ func testAbortedByScriptTestAbort(
 	t *testing.T, shouldHaveMetrics bool, script string, runTest func(*testing.T, *GlobalTestState),
 ) *GlobalTestState { //nolint:unparam
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptAborted,
+		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptAborted,
 	)
 	runTest(t, ts)
 
@@ -1125,7 +1124,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 	// This is testing the current behavior, which is expected, but it's not
 	// actually the desired one! See https://github.com/grafana/k6/issues/2804
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedSystem, cloudapi.ResultStatusPassed, exitcodes.GenericEngine,
+		t, script, nil, cloudapi.RunStatusAbortedSystem, cloudapi.ResultStatusPassed, exitcodes.GenericEngine,
 	)
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "VU init sleeping for a while")
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -1157,7 +1156,7 @@ func TestAbortedByScriptInitError(t *testing.T) {
 	`
 
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, lib.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
+		t, script, nil, cloudapi.RunStatusAbortedScriptError, cloudapi.ResultStatusPassed, exitcodes.ScriptException,
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -1257,7 +1256,7 @@ func TestMetricTagAndSetupDataIsolation(t *testing.T) {
 
 	ts := getSimpleCloudOutputTestState(
 		t, script, []string{"--quiet", "--log-output", "stdout"},
-		lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0,
+		cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0,
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -1414,7 +1413,7 @@ func TestMinIterationDuration(t *testing.T) {
 		import { Counter } from 'k6/metrics';
 
 		export let options = {
-			minIterationDuration: '5s',
+			minIterationDuration: '7s',
 			setupTimeout: '2s',
 			teardownTimeout: '2s',
 			thresholds: {
@@ -1429,14 +1428,14 @@ func TestMinIterationDuration(t *testing.T) {
 		export function teardown() { c.add(1); };
 	`
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, lib.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 
 	start := time.Now()
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	elapsed := time.Since(start)
-	assert.Greater(t, elapsed, 5*time.Second, "expected more time to have passed because of minIterationDuration")
+	assert.Greater(t, elapsed, 7*time.Second, "expected more time to have passed because of minIterationDuration")
 	assert.Less(
-		t, elapsed, 10*time.Second,
+		t, elapsed, 14*time.Second,
 		"expected less time to have passed because minIterationDuration should not affect setup() and teardown() ",
 	)
 
@@ -1566,7 +1565,7 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 		_, err := fmt.Fprint(resp, `{"reference_id": "132", "config": {"webAppURL": "https://bogus.url"}}`)
 		assert.NoError(t, err)
 	})
-	srv := getCloudTestEndChecker(t, 132, configOverride, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 132, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -1601,7 +1600,7 @@ func TestRunWithCloudOutputMoreOverrides(t *testing.T) {
 		}`)
 		assert.NoError(t, err)
 	})
-	srv := getCloudTestEndChecker(t, 1337, configOverride, lib.RunStatusFinished, cloudapi.ResultStatusPassed)
+	srv := getCloudTestEndChecker(t, 1337, configOverride, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)

@@ -142,7 +142,7 @@ func TestSetupData(t *testing.T) {
 			require.NoError(t, err)
 
 			require.NoError(t, engine.OutputManager.StartOutputs())
-			defer engine.OutputManager.StopOutputs()
+			defer engine.OutputManager.StopOutputs(nil)
 
 			globalCtx, globalCancel := context.WithCancel(context.Background())
 			runCtx, runCancel := context.WithCancel(globalCtx)

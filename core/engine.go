@@ -107,7 +107,6 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	// TODO: if we ever need metrics processing in the init context, we can move
 	// this below the other components... or even start them concurrently?
 	if err := e.ExecutionScheduler.Init(runCtx, e.Samples); err != nil {
-		e.setRunStatusFromError(err)
 		return nil, nil, err
 	}
 
@@ -147,18 +146,6 @@ func (e *Engine) Init(globalCtx, runCtx context.Context) (run func() error, wait
 	return runFn, waitFn, nil
 }
 
-func (e *Engine) setRunStatusFromError(err error) {
-	var serr errext.Exception
-	switch {
-	case errors.As(err, &serr):
-		e.OutputManager.SetRunStatus(lib.RunStatusAbortedScriptError)
-	case errext.IsInterruptError(err):
-		e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
-	default:
-		e.OutputManager.SetRunStatus(lib.RunStatusAbortedSystem)
-	}
-}
-
 // This starts a bunch of goroutines to process metrics, thresholds, and set the
 // test run status when it ends. It returns a function that can be used after
 // the provided context is called, to wait for the complete winding down of all
@@ -195,27 +182,31 @@ func (e *Engine) startBackgroundProcesses(
 		case err = <-execRunResult:
 			if err != nil {
 				e.logger.WithError(err).Debug("run: execution scheduler returned an error")
-				e.setRunStatusFromError(err)
 			} else {
 				e.logger.Debug("run: execution scheduler finished nominally")
-				e.OutputManager.SetRunStatus(lib.RunStatusFinished)
 			}
 			// do nothing, return the same err value we got from the Run()
 			// ExecutionScheduler result, we just set the run_status based on it
 		case <-runCtx.Done():
 			e.logger.Debug("run: context expired; exiting...")
-			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
-			err = errext.WithExitCodeIfNone(errors.New("test run aborted by signal"), exitcodes.ExternalAbort)
+			err = errext.WithAbortReasonIfNone(
+				errext.WithExitCodeIfNone(errors.New("test run aborted by signal"), exitcodes.ExternalAbort),
+				errext.AbortedByUser,
+			)
 		case <-e.stopChan:
 			runSubCancel()
 			e.logger.Debug("run: stopped by user via REST API; exiting...")
-			e.OutputManager.SetRunStatus(lib.RunStatusAbortedUser)
-			err = errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI)
+			err = errext.WithAbortReasonIfNone(
+				errext.WithExitCodeIfNone(errors.New("test run stopped from the REST API"), exitcodes.ScriptStoppedFromRESTAPI),
+				errext.AbortedByUser,
+			)
 		case <-thresholdAbortChan:
 			e.logger.Debug("run: stopped by thresholds; exiting...")
 			runSubCancel()
-			e.OutputManager.SetRunStatus(lib.RunStatusAbortedThreshold)
-			err = errext.WithExitCodeIfNone(errors.New("test run aborted by failed thresholds"), exitcodes.ThresholdsHaveFailed)
+			err = errext.WithAbortReasonIfNone(
+				errext.WithExitCodeIfNone(errors.New("test run aborted by failed thresholds"), exitcodes.ThresholdsHaveFailed),
+				errext.AbortedByThreshold,
+			)
 		}
 	}()
 

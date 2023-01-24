@@ -13,7 +13,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd"
-	"go.k6.io/k6/lib"
 )
 
 func cloudTestStartSimple(t *testing.T, testRunID int) http.Handler {
@@ -34,7 +33,7 @@ func getMockCloud(
 	testProgressURL := fmt.Sprintf("GET ^/v1/test-progress/%d$", testRunID)
 	defaultProgress := cloudapi.TestProgressResponse{
 		RunStatusText: "Finished",
-		RunStatus:     lib.RunStatusFinished,
+		RunStatus:     cloudapi.RunStatusFinished,
 		ResultStatus:  cloudapi.ResultStatusPassed,
 		Progress:      1,
 	}
@@ -130,7 +129,7 @@ func TestCloudExitOnRunning(t *testing.T) {
 	cs := func() cloudapi.TestProgressResponse {
 		return cloudapi.TestProgressResponse{
 			RunStatusText: "Running",
-			RunStatus:     lib.RunStatusRunning,
+			RunStatus:     cloudapi.RunStatusRunning,
 		}
 	}
 
