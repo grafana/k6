@@ -14,8 +14,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/core/local"
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
@@ -82,7 +82,7 @@ func newTestEngineWithTestPreInitState( //nolint:golint
 
 	testRunState := getTestRunState(t, piState, newOpts, runner)
 
-	execScheduler, err := local.NewExecutionScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState)
 	require.NoError(t, err)
 
 	engine, err := NewEngine(testRunState, execScheduler, outputs)
@@ -927,7 +927,7 @@ func TestVuInitException(t *testing.T) {
 
 	testState := getTestRunState(t, piState, opts, runner)
 
-	execScheduler, err := local.NewExecutionScheduler(testState)
+	execScheduler, err := execution.NewScheduler(testState)
 	require.NoError(t, err)
 	engine, err := NewEngine(testState, execScheduler, nil)
 	require.NoError(t, err)
@@ -1315,7 +1315,7 @@ func TestActiveVUsCount(t *testing.T) {
 	require.NoError(t, err)
 
 	testState := getTestRunState(t, piState, opts, runner)
-	execScheduler, err := local.NewExecutionScheduler(testState)
+	execScheduler, err := execution.NewScheduler(testState)
 	require.NoError(t, err)
 	engine, err := NewEngine(testState, execScheduler, []output.Output{mockOutput})
 	require.NoError(t, err)

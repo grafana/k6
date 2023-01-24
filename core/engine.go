@@ -10,6 +10,7 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
@@ -33,7 +34,7 @@ type Engine struct {
 
 	// TODO: completely remove the engine and use all of these separately, in a
 	// much more composable and testable manner
-	ExecutionScheduler lib.ExecutionScheduler
+	ExecutionScheduler *execution.Scheduler
 	MetricsEngine      *engine.MetricsEngine
 	OutputManager      *output.Manager
 
@@ -53,7 +54,7 @@ type Engine struct {
 }
 
 // NewEngine instantiates a new Engine, without doing any heavy initialization.
-func NewEngine(testState *lib.TestRunState, ex lib.ExecutionScheduler, outputs []output.Output) (*Engine, error) {
+func NewEngine(testState *lib.TestRunState, ex *execution.Scheduler, outputs []output.Output) (*Engine, error) {
 	if ex == nil {
 		return nil, errors.New("missing ExecutionScheduler instance")
 	}

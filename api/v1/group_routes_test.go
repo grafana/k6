@@ -11,7 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/core"
-	"go.k6.io/k6/core/local"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
@@ -50,7 +50,7 @@ func TestGetGroups(t *testing.T) {
 	assert.NoError(t, err)
 
 	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{Group: g0})
-	execScheduler, err := local.NewExecutionScheduler(testState)
+	execScheduler, err := execution.NewScheduler(testState)
 	require.NoError(t, err)
 	engine, err := core.NewEngine(testState, execScheduler, nil)
 	require.NoError(t, err)
