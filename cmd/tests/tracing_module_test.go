@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -18,10 +19,10 @@ func TestTracingModuleClient(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	gotRequests := 0
+	var gotRequests int64
 
 	tb.Mux.HandleFunc("/tracing", func(w http.ResponseWriter, r *http.Request) {
-		gotRequests++
+		atomic.AddInt64(&gotRequests, 1)
 		assert.NotEmpty(t, r.Header.Get("traceparent"))
 		assert.Len(t, r.Header.Get("traceparent"), 55)
 	})
@@ -50,7 +51,7 @@ func TestTracingModuleClient(t *testing.T) {
 	ts := getSingleFileTestState(t, script, []string{"--out", "json=results.json"}, 0)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.Equal(t, 8, gotRequests)
+	assert.Equal(t, int64(8), atomic.LoadInt64(&gotRequests))
 
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
@@ -92,14 +93,14 @@ func TestTracingClient_DoesNotInterfereWithHTTPModule(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	gotRequests := 0
-	gotInstrumentedRequests := 0
+	var gotRequests int64
+	var gotInstrumentedRequests int64
 
 	tb.Mux.HandleFunc("/tracing", func(w http.ResponseWriter, r *http.Request) {
-		gotRequests++
+		atomic.AddInt64(&gotRequests, 1)
 
 		if r.Header.Get("traceparent") != "" {
-			gotInstrumentedRequests++
+			atomic.AddInt64(&gotInstrumentedRequests, 1)
 			assert.Len(t, r.Header.Get("traceparent"), 55)
 		}
 	})
@@ -123,8 +124,8 @@ func TestTracingClient_DoesNotInterfereWithHTTPModule(t *testing.T) {
 	ts := getSingleFileTestState(t, script, []string{"--out", "json=results.json"}, 0)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.Equal(t, 3, gotRequests)
-	assert.Equal(t, 2, gotInstrumentedRequests)
+	assert.Equal(t, int64(3), atomic.LoadInt64(&gotRequests))
+	assert.Equal(t, int64(2), atomic.LoadInt64(&gotInstrumentedRequests))
 }
 
 // sampleEnvelope is a trimmed version of the struct found
