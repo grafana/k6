@@ -96,8 +96,6 @@ func (c *Client) Configure(opts options) error {
 // Request instruments the http module's request function with tracing headers,
 // and ensures the trace_id is emitted as part of the output's data points metadata.
 func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
-	rt := c.vu.Runtime()
-
 	// The http module's request function expects the first argument to be the
 	// request body. If no body is provided, we need to pass null to the function.
 	if len(args) == 0 {
@@ -112,21 +110,21 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*ht
 
 	encodedTraceID, err := traceID.Encode()
 	if err != nil {
-		common.Throw(rt, fmt.Errorf("failed to encode the generated trace ID; reason: %w", err))
+		return nil, fmt.Errorf("failed to encode the generated trace ID; reason: %w", err)
 	}
 
 	// Produce a trace header in the format defined by the
 	// configured propagator.
 	traceContextHeader, err := c.propagator.Propagate(encodedTraceID)
 	if err != nil {
-		common.Throw(rt, fmt.Errorf("failed to propagate trace ID; reason: %w", err))
+		return nil, fmt.Errorf("failed to propagate trace ID; reason: %w", err)
 	}
 
 	// update the `params` argument with the trace context header
 	// so that it can be used by the http module's request function.
 	args, err = c.instrumentArguments(traceContextHeader, args...)
 	if err != nil {
-		common.Throw(rt, fmt.Errorf("failed to instrument request arguments; reason: %w", err))
+		return nil, fmt.Errorf("failed to instrument request arguments; reason: %w", err)
 	}
 
 	// Add the trace ID to the VU's state, so that it can be
@@ -137,7 +135,7 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*ht
 
 	response, err := c.requestFunc(method, url, args...)
 	if err != nil {
-		common.Throw(rt, err)
+		return nil, err
 	}
 
 	// Remove the trace ID from the VU's state, so that it doesn't
