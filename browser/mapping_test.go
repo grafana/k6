@@ -128,6 +128,12 @@ func TestMappings(t *testing.T) {
 				return mapResponse(vu.Context(), vu, &common.Response{})
 			},
 		},
+		"mapWorker": {
+			apiInterface: (*api.Worker)(nil),
+			mapp: func() mapping {
+				return mapWorker(vu.Context(), vu, &common.Worker{})
+			},
+		},
 	} {
 		tt := tt
 		t.Run(name, func(t *testing.T) {

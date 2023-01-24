@@ -401,8 +401,8 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"evaluate":                p.Evaluate,
 		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
 			var (
-				h = p.EvaluateHandle(pageFunc, args...)
-				m = mapJSHandle(ctx, vu, h)
+				jsh = p.EvaluateHandle(pageFunc, args...)
+				m   = mapJSHandle(ctx, vu, jsh)
 			)
 			return rt.ToValue(m).ToObject(rt)
 		},
@@ -496,7 +496,14 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"waitForResponse": p.WaitForResponse,
 		"waitForSelector": p.WaitForSelector,
 		"waitForTimeout":  p.WaitForTimeout,
-		"workers":         p.Workers,
+		"workers": func() *goja.Object {
+			var mws []mapping
+			for _, w := range p.Workers() {
+				mw := mapWorker(ctx, vu, w)
+				mws = append(mws, mw)
+			}
+			return rt.ToValue(mws).ToObject(rt)
+		},
 	}
 	maps["$"] = func(selector string) *goja.Object {
 		eh := p.Query(selector)
@@ -516,6 +523,20 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 	}
 
 	return maps
+}
+
+// mapWorker to the JS module.
+func mapWorker(ctx context.Context, vu k6modules.VU, w api.Worker) mapping {
+	rt := vu.Runtime()
+	return mapping{
+		"evaluate": w.Evaluate,
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
+			h := w.EvaluateHandle(pageFunc, args...)
+			m := mapJSHandle(ctx, vu, h)
+			return rt.ToValue(m).ToObject(rt)
+		},
+		"url": w.URL(),
+	}
 }
 
 // mapBrowserContext to the JS module.
