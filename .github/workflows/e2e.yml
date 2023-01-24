@@ -6,6 +6,9 @@ on:
     branches:
       - main
   pull_request:
+  schedule:
+    # Daily at 06:00 AM UTC
+    - cron:  '0 6 * * *'
 
 defaults:
   run:
