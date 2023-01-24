@@ -130,25 +130,50 @@ func mapResponse(ctx context.Context, vu k6modules.VU, r api.Response) mapping {
 	return maps
 }
 
+// mapJSHandle to the JS module.
+func mapJSHandle(ctx context.Context, vu k6modules.VU, jsh api.JSHandle) mapping {
+	rt := vu.Runtime()
+	return mapping{
+		"asElement": func() *goja.Object {
+			m := mapElementHandle(ctx, vu, jsh.AsElement())
+			return rt.ToValue(m).ToObject(rt)
+		},
+		"dispose":  jsh.Dispose,
+		"evaluate": jsh.Evaluate,
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
+			var (
+				h = jsh.EvaluateHandle(pageFunc, args...)
+				m = mapJSHandle(ctx, vu, h)
+			)
+			return rt.ToValue(m).ToObject(rt)
+		},
+		"getProperties": func() *goja.Object {
+			dst := make(map[string]any)
+			for k, v := range jsh.GetProperties() {
+				dst[k] = mapJSHandle(ctx, vu, v)
+			}
+			return rt.ToValue(dst).ToObject(rt)
+		},
+		"getProperty": func(propertyName string) *goja.Object {
+			var (
+				h = jsh.GetProperty(propertyName)
+				m = mapJSHandle(ctx, vu, h)
+			)
+			return rt.ToValue(m).ToObject(rt)
+		},
+		"jsonValue": jsh.JSONValue,
+		"objectID":  jsh.ObjectID,
+	}
+}
+
 // mapElementHandle to the JS module.
 //
 //nolint:funlen
 func mapElementHandle(ctx context.Context, vu k6modules.VU, eh api.ElementHandle) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
-		"asElement": func() *goja.Object {
-			m := mapElementHandle(ctx, vu, eh.AsElement())
-			return rt.ToValue(m).ToObject(rt)
-		},
-		"dispose":        eh.Dispose,
-		"evaluate":       eh.Evaluate,
-		"evaluateHandle": eh.EvaluateHandle,
-		"getProperties":  eh.GetProperties,
-		"getProperty":    eh.GetProperty,
-		"jSONValue":      eh.JSONValue,
-		"objectID":       eh.ObjectID,
-		"boundingBox":    eh.BoundingBox,
-		"check":          eh.Check,
+		"boundingBox": eh.BoundingBox,
+		"check":       eh.Check,
 		"click": func(opts goja.Value) *goja.Promise {
 			return k6ext.Promise(ctx, func() (any, error) {
 				err := eh.Click(opts)
@@ -214,6 +239,11 @@ func mapElementHandle(ctx context.Context, vu k6modules.VU, eh api.ElementHandle
 		return rt.ToValue(mehs).ToObject(rt)
 	}
 
+	jsHandleMap := mapJSHandle(ctx, vu, eh)
+	for k, v := range jsHandleMap {
+		maps[k] = v
+	}
+
 	return maps
 }
 
@@ -242,13 +272,17 @@ func mapFrame(ctx context.Context, vu k6modules.VU, f api.Frame) mapping {
 				return nil, err //nolint:wrapcheck
 			})
 		},
-		"content":        f.Content,
-		"dblclick":       f.Dblclick,
-		"dispatchEvent":  f.DispatchEvent,
-		"evaluate":       f.Evaluate,
-		"evaluateHandle": f.EvaluateHandle,
-		"fill":           f.Fill,
-		"focus":          f.Focus,
+		"content":       f.Content,
+		"dblclick":      f.Dblclick,
+		"dispatchEvent": f.DispatchEvent,
+		"evaluate":      f.Evaluate,
+		"evaluateHandle": func(pageFunction goja.Value, args ...goja.Value) *goja.Object {
+			jsh := f.EvaluateHandle(pageFunction, args...)
+			ehm := mapJSHandle(ctx, vu, jsh)
+			return rt.ToValue(ehm).ToObject(rt)
+		},
+		"fill":  f.Fill,
+		"focus": f.Focus,
 		"frameElement": func() *goja.Object {
 			eh := mapElementHandle(ctx, vu, f.FrameElement())
 			return rt.ToValue(eh).ToObject(rt)
@@ -365,12 +399,18 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
 		"evaluate":                p.Evaluate,
-		"evaluateHandle":          p.EvaluateHandle,
-		"exposeBinding":           p.ExposeBinding,
-		"exposeFunction":          p.ExposeFunction,
-		"fill":                    p.Fill,
-		"focus":                   p.Focus,
-		"frame":                   p.Frame,
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
+			var (
+				h = p.EvaluateHandle(pageFunc, args...)
+				m = mapJSHandle(ctx, vu, h)
+			)
+			return rt.ToValue(m).ToObject(rt)
+		},
+		"exposeBinding":  p.ExposeBinding,
+		"exposeFunction": p.ExposeFunction,
+		"fill":           p.Fill,
+		"focus":          p.Focus,
+		"frame":          p.Frame,
 		"frames": func() *goja.Object {
 			var (
 				mfrs []mapping

@@ -104,6 +104,12 @@ func TestMappings(t *testing.T) {
 				return mapElementHandle(vu.Context(), vu, &common.ElementHandle{})
 			},
 		},
+		"jsHandle": {
+			apiInterface: (*api.JSHandle)(nil),
+			mapp: func() mapping {
+				return mapJSHandle(vu.Context(), vu, &common.BaseJSHandle{})
+			},
+		},
 		"frame": {
 			apiInterface: (*api.Frame)(nil),
 			mapp: func() mapping {
@@ -133,13 +139,17 @@ func TestMappings(t *testing.T) {
 
 // toFirstLetterLower converts the first letter of the string to lower case.
 func toFirstLetterLower(s string) string {
-	// Special case for URL.
+	// Special cases.
 	// Instead of loading up an acronyms list, just do this.
 	// Good enough for our purposes.
-	if s == "URL" {
+	switch s {
+	default:
+		return strings.ToLower(s[:1]) + s[1:]
+	case "URL":
 		return "url"
+	case "JSONValue":
+		return "jsonValue"
 	}
-	return strings.ToLower(s[:1]) + s[1:]
 }
 
 // isWildcard returns true if the method is a wildcard method and
