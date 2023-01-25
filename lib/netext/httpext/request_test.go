@@ -11,12 +11,12 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"runtime"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
 
 	"github.com/mccutchen/go-httpbin/httpbin"
-	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -253,10 +253,14 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
-		Transport:      srv.Client().Transport,
-		Samples:        samples,
-		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		Transport: srv.Client().Transport,
+		Samples:   samples,
+		Logger:    logger,
+		BufferPool: &sync.Pool{
+			New: func() interface{} {
+				return bytes.NewBuffer([]byte{})
+			},
+		},
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
@@ -331,10 +335,14 @@ func TestTrailFailed(t *testing.T) {
 				Options: lib.Options{
 					SystemTags: &metrics.DefaultSystemTagSet,
 				},
-				Transport:      srv.Client().Transport,
-				Samples:        samples,
-				Logger:         logger,
-				BPool:          bpool.NewBufferPool(2),
+				Transport: srv.Client().Transport,
+				Samples:   samples,
+				Logger:    logger,
+				BufferPool: &sync.Pool{
+					New: func() interface{} {
+						return bytes.NewBuffer([]byte{})
+					},
+				},
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
@@ -398,9 +406,13 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 				Timeout: 1 * time.Microsecond,
 			}).DialContext,
 		},
-		Samples:        samples,
-		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		Samples: samples,
+		Logger:  logger,
+		BufferPool: &sync.Pool{
+			New: func() interface{} {
+				return bytes.NewBuffer([]byte{})
+			},
+		},
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
@@ -453,10 +465,14 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
-		Transport:      srv.Client().Transport,
-		Samples:        samples,
-		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		Transport: srv.Client().Transport,
+		Samples:   samples,
+		Logger:    logger,
+		BufferPool: &sync.Pool{
+			New: func() interface{} {
+				return bytes.NewBuffer([]byte{})
+			},
+		},
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
@@ -522,11 +538,15 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
-		RPSLimit:       rate.NewLimiter(rate.Limit(1), 1),
-		Transport:      ts.Client().Transport,
-		Samples:        samples,
-		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		RPSLimit:  rate.NewLimiter(rate.Limit(1), 1),
+		Transport: ts.Client().Transport,
+		Samples:   samples,
+		Logger:    logger,
+		BufferPool: &sync.Pool{
+			New: func() interface{} {
+				return bytes.NewBuffer([]byte{})
+			},
+		},
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
