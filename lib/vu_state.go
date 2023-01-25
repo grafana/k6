@@ -8,7 +8,6 @@ import (
 	"net/http/cookiejar"
 	"sync"
 
-	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
@@ -58,7 +57,7 @@ type State struct {
 
 	// Buffer pool; use instead of allocating fresh buffers when possible.
 	// TODO: maybe use https://golang.org/pkg/sync/#Pool ?
-	BPool *bpool.BufferPool
+	BufferPool *sync.Pool
 
 	VUID, VUIDGlobal uint64
 	Iteration        int64

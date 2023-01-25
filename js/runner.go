@@ -1,6 +1,7 @@
 package js
 
 import (
+	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -17,7 +18,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/oxtoacart/bpool"
 	"github.com/spf13/afero"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
@@ -55,8 +55,9 @@ type Runner struct {
 	RPSLimit       *rate.Limiter
 	RunTags        *metrics.TagSet
 
-	console   *console
-	setupData []byte
+	console    *console
+	setupData  []byte
+	BufferPool *sync.Pool
 }
 
 // New returns a new Runner for the provided source
@@ -100,6 +101,9 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 		Resolver: netext.NewResolver(
 			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
 		ActualResolver: net.LookupIP,
+		BufferPool: &sync.Pool{
+			New: func() interface{} { return bytes.NewBuffer([]byte{}) },
+		},
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -225,7 +229,7 @@ func (r *Runner) newVU(
 		CookieJar:      cookieJar,
 		TLSConfig:      tlsConfig,
 		Console:        r.console,
-		BPool:          bpool.NewBufferPool(100),
+		BufferPool:     r.BufferPool,
 		Samples:        samplesOut,
 		scenarioIter:   make(map[string]uint64),
 	}
@@ -238,7 +242,7 @@ func (r *Runner) newVU(
 		TLSConfig:      vu.TLSConfig,
 		CookieJar:      cookieJar,
 		RPSLimit:       vu.Runner.RPSLimit,
-		BPool:          vu.BPool,
+		BufferPool:     vu.BufferPool,
 		VUID:           vu.ID,
 		VUIDGlobal:     vu.IDGlobal,
 		Samples:        vu.Samples,
@@ -583,8 +587,8 @@ type VU struct {
 	IDGlobal  uint64 // global across all instances
 	iteration int64
 
-	Console *console
-	BPool   *bpool.BufferPool
+	Console    *console
+	BufferPool *sync.Pool
 
 	Samples chan<- metrics.SampleContainer
 

@@ -171,7 +171,9 @@ func readResponseBody(
 			rc = &readCloser{decoder}
 		}
 	}
-	buf := bytes.NewBuffer([]byte{})
+
+	buf := state.BufferPool.Get().(*bytes.Buffer)
+	defer state.BufferPool.Put(buf)
 	_, err := io.Copy(buf, rc.Reader)
 	if err != nil {
 		respErr = wrapDecompressionError(err)
