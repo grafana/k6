@@ -19,6 +19,7 @@ import (
 // CompressionType is used to specify what compression is to be used to compress the body of a
 // request
 // The conversion and validation methods are auto-generated with https://github.com/alvaroloes/enumer:
+//
 //go:generate enumer -type=CompressionType -transform=snake -trimprefix CompressionType -output compression_type_gen.go
 type CompressionType uint
 
@@ -170,9 +171,7 @@ func readResponseBody(
 			rc = &readCloser{decoder}
 		}
 	}
-	buf := state.BPool.Get()
-	defer state.BPool.Put(buf)
-	buf.Reset()
+	buf := bytes.NewBuffer([]byte{})
 	_, err := io.Copy(buf, rc.Reader)
 	if err != nil {
 		respErr = wrapDecompressionError(err)
