@@ -169,6 +169,10 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 func (me *MetricsEngine) StartThresholdCalculations(abortRun func(error)) (
 	finalize func() (breached []string),
 ) {
+	if len(me.metricsWithThresholds) == 0 {
+		return nil // no thresholds were defined
+	}
+
 	stop := make(chan struct{})
 	done := make(chan struct{})
 

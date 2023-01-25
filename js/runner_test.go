@@ -402,6 +402,7 @@ func TestDataIsolation(t *testing.T) {
 	defer stopOutputs(nil)
 
 	finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort)
+	require.Nil(t, finalizeThresholds)
 
 	require.Empty(t, runner.defaultGroup.Groups)
 
@@ -416,8 +417,6 @@ func TestDataIsolation(t *testing.T) {
 		close(samples)
 		require.NoError(t, err)
 		waitForMetricsFlushed()
-		breached := finalizeThresholds()
-		require.Empty(t, breached)
 	}
 	require.Contains(t, runner.defaultGroup.Groups, "setup")
 	require.Contains(t, runner.defaultGroup.Groups, "teardown")
