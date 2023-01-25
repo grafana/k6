@@ -177,9 +177,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		stopOutputs(err)
 	}()
 
-	if !testRunState.RuntimeOptions.NoThresholds.Bool {
+	if !testRunState.RuntimeOptions.NoThresholds.Bool { //nolint:nestif
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort)
 		defer func() {
+			if finalizeThresholds == nil {
+				return
+			}
 			// This gets called after the Samples channel has been closed and
 			// the OutputManager has flushed all of the cached samples to
 			// outputs (including MetricsEngine's ingester). So we are sure

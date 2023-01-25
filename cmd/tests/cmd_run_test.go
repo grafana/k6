@@ -533,6 +533,8 @@ func TestSetupTeardownThresholds(t *testing.T) {
 			assert.Failf(t, "unexpected log message", "level %s, msg '%s'", msg.Level, msg.Message)
 		}
 	}
+	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Running thresholds on 3 metrics..."))
+	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Finalizing thresholds..."))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics emission of VUs and VUsMax metrics stopped"))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics processing finished!"))
 }
@@ -799,6 +801,8 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.NotContains(t, stdout, `Running thresholds`)
+	assert.NotContains(t, stdout, `Finalizing thresholds`)
 }
 
 func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
