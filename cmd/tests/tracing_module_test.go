@@ -203,7 +203,6 @@ func TestTracingInstrumentHTTP_FillsParams(t *testing.T) {
 
 	script := tb.Replacer.Replace(`
 		import http from "k6/http";
-		import { check } from "k6";
 		import tracing from "k6/experimental/tracing";
 
 		tracing.instrumentHTTP({
