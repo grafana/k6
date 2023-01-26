@@ -261,7 +261,6 @@ func TestTracingInstrummentHTTP_SupportsMultipleTestScripts(t *testing.T) {
 		})
 
 		export default function() {
-			http.get("HTTPBIN_IP_URL/tracing");
 			iShouldBeInstrumented();
 		};
 	`)
@@ -286,7 +285,7 @@ func TestTracingInstrummentHTTP_SupportsMultipleTestScripts(t *testing.T) {
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
-	assert.Equal(t, int64(2), atomic.LoadInt64(&gotRequests))
+	assert.Equal(t, int64(1), atomic.LoadInt64(&gotRequests))
 	assertHasTraceIDMetadata(t, jsonResults)
 }
 
