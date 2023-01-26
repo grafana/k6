@@ -1,7 +1,6 @@
 package js
 
 import (
-	"bytes"
 	"context"
 	"crypto/tls"
 	"encoding/json"
@@ -57,7 +56,7 @@ type Runner struct {
 
 	console    *console
 	setupData  []byte
-	BufferPool *sync.Pool
+	BufferPool *lib.BufferPool
 }
 
 // New returns a new Runner for the provided source
@@ -101,9 +100,7 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 		Resolver: netext.NewResolver(
 			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
 		ActualResolver: net.LookupIP,
-		BufferPool: &sync.Pool{
-			New: func() interface{} { return bytes.NewBuffer([]byte{}) },
-		},
+		BufferPool:     lib.NewBufferPool(),
 	}
 
 	err = r.SetOptions(r.Bundle.Options)
@@ -588,7 +585,7 @@ type VU struct {
 	iteration int64
 
 	Console    *console
-	BufferPool *sync.Pool
+	BufferPool *lib.BufferPool
 
 	Samples chan<- metrics.SampleContainer
 

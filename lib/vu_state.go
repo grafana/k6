@@ -56,8 +56,7 @@ type State struct {
 	Samples chan<- metrics.SampleContainer
 
 	// Buffer pool; use instead of allocating fresh buffers when possible.
-	// TODO: maybe use https://golang.org/pkg/sync/#Pool ?
-	BufferPool *sync.Pool
+	BufferPool *BufferPool
 
 	VUID, VUIDGlobal uint64
 	Iteration        int64
