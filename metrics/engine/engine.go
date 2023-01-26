@@ -21,13 +21,21 @@ import (
 
 const thresholdsRate = 2 * time.Second
 
+type testRunState struct {
+	*lib.TestRunState
+	testDuration func() time.Duration
+}
+
+func (trs testRunState) TestRunDuration() time.Duration {
+	return trs.testDuration()
+}
+
 // MetricsEngine is the internal metrics engine that k6 uses to keep track of
 // aggregated metric sample values. They are used to generate the end-of-test
 // summary and to evaluate the test thresholds.
 type MetricsEngine struct {
-	es     *lib.ExecutionState
-	logger logrus.FieldLogger
-
+	logger         logrus.FieldLogger
+	test           *testRunState
 	outputIngester *outputIngester
 
 	// These can be both top-level metrics or sub-metrics
@@ -47,13 +55,15 @@ type MetricsEngine struct {
 // NewMetricsEngine creates a new metrics Engine with the given parameters.
 func NewMetricsEngine(es *lib.ExecutionState) (*MetricsEngine, error) {
 	me := &MetricsEngine{
-		es:     es,
-		logger: es.Test.Logger.WithField("component", "metrics-engine"),
-
+		test: &testRunState{
+			TestRunState: es.Test,
+			testDuration: es.GetCurrentTestRunDuration,
+		},
+		logger:          es.Test.Logger.WithField("component", "metrics-engine"),
 		ObservedMetrics: make(map[string]*metrics.Metric),
 	}
 
-	if !(me.es.Test.RuntimeOptions.NoSummary.Bool && me.es.Test.RuntimeOptions.NoThresholds.Bool) {
+	if !(me.test.RuntimeOptions.NoSummary.Bool && me.test.RuntimeOptions.NoThresholds.Bool) {
 		err := me.initSubMetricsAndThresholds()
 		if err != nil {
 			return nil, err
@@ -77,9 +87,9 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 	// TODO: replace with strings.Cut after Go 1.18
 	nameParts := strings.SplitN(name, "{", 2)
 
-	metric := me.es.Test.Registry.Get(nameParts[0])
+	metric := me.test.Registry.Get(nameParts[0])
 	if metric == nil {
-		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[0])
+		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[1])
 	}
 	if len(nameParts) == 1 { // no sub-metric
 		return metric, nil
@@ -126,10 +136,10 @@ func (me *MetricsEngine) markObserved(metric *metrics.Metric) {
 }
 
 func (me *MetricsEngine) initSubMetricsAndThresholds() error {
-	for metricName, thresholds := range me.es.Test.Options.Thresholds {
+	for metricName, thresholds := range me.test.Options.Thresholds {
 		metric, err := me.getThresholdMetricOrSubmetric(metricName)
 
-		if me.es.Test.RuntimeOptions.NoThresholds.Bool {
+		if me.test.RuntimeOptions.NoThresholds.Bool {
 			if err != nil {
 				me.logger.WithError(err).Warnf("Invalid metric '%s' in threshold definitions", metricName)
 			}
@@ -154,7 +164,7 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 
 	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
 	// lands and there is a better way to enable a metric with tag
-	if me.es.Test.Options.SystemTags.Has(metrics.TagExpectedResponse) {
+	if me.test.Options.SystemTags.Has(metrics.TagExpectedResponse) {
 		_, err := me.getThresholdMetricOrSubmetric("http_req_duration{expected_response:true}")
 		if err != nil {
 			return err // shouldn't happen, but ¯\_(ツ)_/¯
@@ -225,7 +235,7 @@ func (me *MetricsEngine) evaluateThresholds(ignoreEmptySinks bool) (breachedThre
 	me.MetricsLock.Lock()
 	defer me.MetricsLock.Unlock()
 
-	t := me.es.GetCurrentTestRunDuration()
+	t := me.test.TestRunDuration()
 
 	me.logger.Debugf("Running thresholds on %d metrics...", len(me.metricsWithThresholds))
 	for _, m := range me.metricsWithThresholds {
