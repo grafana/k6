@@ -120,7 +120,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	executionState := execScheduler.GetState()
-	metricsEngine, err := engine.NewMetricsEngine(executionState)
+	metricsEngine, err := engine.NewMetricsEngine(executionState.Test)
 	if err != nil {
 		return err
 	}
@@ -178,7 +178,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}()
 
 	if !testRunState.RuntimeOptions.NoThresholds.Bool { //nolint:nestif
-		finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort)
+		finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort, executionState.GetCurrentTestRunDuration)
 		defer func() {
 			if finalizeThresholds == nil {
 				return
