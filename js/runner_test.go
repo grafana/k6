@@ -387,7 +387,7 @@ func TestDataIsolation(t *testing.T) {
 	execScheduler, err := execution.NewScheduler(testRunState)
 	require.NoError(t, err)
 
-	metricsEngine, err := engine.NewMetricsEngine(execScheduler.GetState())
+	metricsEngine, err := engine.NewMetricsEngine(testRunState)
 	require.NoError(t, err)
 
 	globalCtx, globalCancel := context.WithCancel(context.Background())
@@ -401,7 +401,7 @@ func TestDataIsolation(t *testing.T) {
 	require.NoError(t, err)
 	defer stopOutputs(nil)
 
-	finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort)
+	finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort, execScheduler.GetState().GetCurrentTestRunDuration)
 	require.Nil(t, finalizeThresholds)
 
 	require.Empty(t, runner.defaultGroup.Groups)
