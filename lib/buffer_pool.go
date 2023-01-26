@@ -24,7 +24,11 @@ func NewBufferPool() *BufferPool {
 
 // Get return a bytes.Buffer from the pool
 func (bp BufferPool) Get() *bytes.Buffer {
-	return bp.pool.Get().(*bytes.Buffer)
+	b, ok := bp.pool.Get().(*bytes.Buffer)
+	if !ok {
+		return bytes.NewBuffer([]byte{})
+	}
+	return b
 }
 
 // Put return the given bytes.Buffer to the pool calling Buffer.Reset() before
