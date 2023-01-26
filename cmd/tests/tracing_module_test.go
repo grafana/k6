@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -233,6 +234,59 @@ func TestTracingInstrumentHTTP_FillsParams(t *testing.T) {
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
+	assertHasTraceIDMetadata(t, jsonResults)
+}
+
+func TestTracingInstrummentHTTP_SupportsMultipleTestScripts(t *testing.T) {
+	t.Parallel()
+
+	var gotRequests int64
+
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	tb.Mux.HandleFunc("/tracing", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&gotRequests, 1)
+
+		assert.NotEmpty(t, r.Header.Get("traceparent"))
+		assert.Len(t, r.Header.Get("traceparent"), 55)
+	})
+
+	mainScript := tb.Replacer.Replace(`
+		import http from "k6/http";
+		import tracing from "k6/experimental/tracing";
+
+		import { iShouldBeInstrumented } from "./imported.js";
+		
+		tracing.instrumentHTTP({
+			propagator: "w3c",
+		})
+
+		export default function() {
+			http.get("HTTPBIN_IP_URL/tracing");
+			iShouldBeInstrumented();
+		};
+	`)
+
+	importedScript := tb.Replacer.Replace(`
+		import http from "k6/http";
+
+		export function iShouldBeInstrumented() {
+			http.head("HTTPBIN_IP_URL/tracing");
+		}
+	`)
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "main.js"), []byte(mainScript), 0o644))
+	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "imported.js"), []byte(importedScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--out", "json=results.json", "main.js"}
+	ts.ExpectedExitCode = 0
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	require.NoError(t, err)
+
+	assert.Equal(t, int64(2), atomic.LoadInt64(&gotRequests))
 	assertHasTraceIDMetadata(t, jsonResults)
 }
 
