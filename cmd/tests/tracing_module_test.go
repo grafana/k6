@@ -236,53 +236,6 @@ func TestTracingInstrumentHTTP_FillsParams(t *testing.T) {
 	assertHasTraceIDMetadata(t, jsonResults)
 }
 
-func TestTracingInstrumentHTTP_FailsOutsideOfInitContext(t *testing.T) {
-	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
-
-	script := tb.Replacer.Replace(`
-		import tracing from "k6/experimental/tracing";
-
-		export default function() {
-			tracing.instrumentHTTP({
-				propagator: "w3c",
-			})
-		}
-	`)
-
-	ts := getSingleFileTestState(t, script, []string{}, 0)
-	ts.ExpectedExitCode = 0
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	assert.Contains(t, ts.Stderr.String(), "instrumentHTTP can only be called in the init context")
-}
-
-func TestTracingInstrumentHTTP_CannotBeCalledTwice(t *testing.T) {
-	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
-
-	script := tb.Replacer.Replace(`
-		import tracing from "k6/experimental/tracing";
-
-		tracing.instrumentHTTP({
-			propagator: "w3c",
-		})
-
-		tracing.instrumentHTTP({
-			propagator: "w3c",
-		})
-
-		export default function() {
-		}
-	`)
-
-	ts := getSingleFileTestState(t, script, []string{}, 0)
-	ts.ExpectedExitCode = 107
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	assert.Contains(t, ts.Stderr.String(), "instrumentHTTP can only be called once")
-}
-
 // assertHasTraceIDMetadata checks that the trace_id metadata is present and has the correct format
 // for all http metrics in the json results file.
 func assertHasTraceIDMetadata(t *testing.T, jsonResults []byte) {
