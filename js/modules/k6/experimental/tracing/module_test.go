@@ -14,21 +14,10 @@ import (
 func TestInstrumentHTTP_SucceedsInInitContext(t *testing.T) {
 	t.Parallel()
 
-	ts := modulestest.NewRuntime(t)
-	m := new(RootModule).NewModuleInstance(ts.VU)
-
-	rt := ts.VU.Runtime()
-	require.NoError(t, rt.Set("instrumentHTTP", m.Exports().Named["instrumentHTTP"]))
-
-	require.NoError(t, rt.Set("require", func(module string) *goja.Object {
-		require.Equal(t, "k6/http", module)
-		export := http.New().NewModuleInstance(ts.VU).Exports().Default
-
-		return rt.ToValue(export).ToObject(rt)
-	}))
+	ts := newTestSetup(t)
 
 	// Calling in the init context should succeed
-	_, err := ts.VU.Runtime().RunString(`
+	_, err := ts.TestRuntime.VU.Runtime().RunString(`
 		instrumentHTTP({propagator: 'w3c'})
 	`)
 
@@ -38,21 +27,10 @@ func TestInstrumentHTTP_SucceedsInInitContext(t *testing.T) {
 func TestInstrumentHTTP_FailsWhenCalledTwice(t *testing.T) {
 	t.Parallel()
 
-	ts := modulestest.NewRuntime(t)
-	m := new(RootModule).NewModuleInstance(ts.VU)
-
-	rt := ts.VU.Runtime()
-	require.NoError(t, rt.Set("instrumentHTTP", m.Exports().Named["instrumentHTTP"]))
-
-	require.NoError(t, rt.Set("require", func(module string) *goja.Object {
-		require.Equal(t, "k6/http", module)
-		export := http.New().NewModuleInstance(ts.VU).Exports().Default
-
-		return rt.ToValue(export).ToObject(rt)
-	}))
+	ts := newTestSetup(t)
 
 	// Calling it twice in the init context should fail
-	_, err := ts.VU.Runtime().RunString(`
+	_, err := ts.TestRuntime.VU.Runtime().RunString(`
 		instrumentHTTP({propagator: 'w3c'})
 		instrumentHTTP({propagator: 'w3c'})
 	`)
@@ -63,8 +41,24 @@ func TestInstrumentHTTP_FailsWhenCalledTwice(t *testing.T) {
 func TestInstrumentHTTP_FailsInVUContext(t *testing.T) {
 	t.Parallel()
 
+	ts := newTestSetup(t)
+	ts.TestRuntime.MoveToVUContext(&lib.State{})
+
+	// Calling in the VU context should fail
+	_, err := ts.TestRuntime.VU.Runtime().RunString(`
+		instrumentHTTP({propagator: 'w3c'})
+	`)
+
+	assert.Error(t, err)
+}
+
+type testSetup struct {
+	t           *testing.T
+	TestRuntime *modulestest.Runtime
+}
+
+func newTestSetup(t *testing.T) testSetup {
 	ts := modulestest.NewRuntime(t)
-	ts.MoveToVUContext(&lib.State{})
 	m := new(RootModule).NewModuleInstance(ts.VU)
 
 	rt := ts.VU.Runtime()
@@ -77,10 +71,8 @@ func TestInstrumentHTTP_FailsInVUContext(t *testing.T) {
 		return rt.ToValue(export).ToObject(rt)
 	}))
 
-	// Calling in the VU context should fail
-	_, err := ts.VU.Runtime().RunString(`
-		instrumentHTTP({propagator: 'w3c'})
-	`)
-
-	assert.Error(t, err)
+	return testSetup{
+		t:           t,
+		TestRuntime: ts,
+	}
 }
