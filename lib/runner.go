@@ -94,6 +94,7 @@ type UIState struct {
 // Summary contains all of the data the summary handler gets.
 type Summary struct {
 	Metrics         map[string]*metrics.Metric
+	Thresholds      map[*metrics.Metric]metrics.Thresholds
 	RootGroup       *Group
 	TestRunDuration time.Duration // TODO: use lib.ExecutionState-based interface instead?
 	NoColor         bool          // TODO: drop this when noColor is part of the (runtime) options
