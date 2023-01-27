@@ -4,8 +4,6 @@ import (
 	"encoding/json"
 	"io/ioutil"
 	"net/http"
-
-	"go.k6.io/k6/api/common"
 )
 
 // NullSetupData is wrapper around null to satisfy jsonapi
@@ -38,13 +36,12 @@ func handleSetupDataOutput(rw http.ResponseWriter, setupData json.RawMessage) {
 }
 
 // handleGetSetupData just returns the current JSON-encoded setup data
-func handleGetSetupData(rw http.ResponseWriter, r *http.Request) {
-	runner := common.GetEngine(r.Context()).ExecutionScheduler.GetRunner()
-	handleSetupDataOutput(rw, runner.GetSetupData())
+func handleGetSetupData(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request) {
+	handleSetupDataOutput(rw, cs.RunState.Runner.GetSetupData())
 }
 
 // handleSetSetupData just parses the JSON request body and sets the result as setup data for the runner
-func handleSetSetupData(rw http.ResponseWriter, r *http.Request) {
+func handleSetSetupData(cs *ControlSurface, rw http.ResponseWriter, r *http.Request) {
 	body, err := ioutil.ReadAll(r.Body)
 	if err != nil {
 		apiError(rw, "Error reading request body", err.Error(), http.StatusBadRequest)
@@ -59,8 +56,7 @@ func handleSetSetupData(rw http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	runner := common.GetEngine(r.Context()).ExecutionScheduler.GetRunner()
-
+	runner := cs.RunState.Runner
 	if len(body) == 0 {
 		runner.SetSetupData(nil)
 	} else {
@@ -71,11 +67,10 @@ func handleSetSetupData(rw http.ResponseWriter, r *http.Request) {
 }
 
 // handleRunSetup executes the runner's Setup() method and returns the result
-func handleRunSetup(rw http.ResponseWriter, r *http.Request) {
-	engine := common.GetEngine(r.Context())
-	runner := engine.ExecutionScheduler.GetRunner()
+func handleRunSetup(cs *ControlSurface, rw http.ResponseWriter, r *http.Request) {
+	runner := cs.RunState.Runner
 
-	if err := runner.Setup(r.Context(), engine.Samples); err != nil {
+	if err := cs.RunState.Runner.Setup(r.Context(), cs.Samples); err != nil {
 		apiError(rw, "Error executing setup", err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -84,11 +79,8 @@ func handleRunSetup(rw http.ResponseWriter, r *http.Request) {
 }
 
 // handleRunTeardown executes the runner's Teardown() method
-func handleRunTeardown(rw http.ResponseWriter, r *http.Request) {
-	engine := common.GetEngine(r.Context())
-	runner := common.GetEngine(r.Context()).ExecutionScheduler.GetRunner()
-
-	if err := runner.Teardown(r.Context(), engine.Samples); err != nil {
+func handleRunTeardown(cs *ControlSurface, rw http.ResponseWriter, r *http.Request) {
+	if err := cs.RunState.Runner.Teardown(r.Context(), cs.Samples); err != nil {
 		apiError(rw, "Error executing teardown", err.Error(), http.StatusInternalServerError)
 	}
 }

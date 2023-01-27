@@ -70,6 +70,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	defer runCancel()
 
 	logger := testRunState.Logger
+	runSubCtx, runSubAbort := execution.NewTestRunContext(runCtx, logger)
+
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
 	execScheduler, err := execution.NewScheduler(testRunState)
@@ -114,6 +116,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+	engine.AbortFn = runSubAbort
 
 	// Spin up the REST API server, if not disabled.
 	if c.gs.Flags.Address != "" { //nolint:nestif
@@ -126,8 +129,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		srvCtx, srvCancel := context.WithCancel(globalCtx)
 		defer srvCancel()
 
-		// TODO: send the ExecutionState and MetricsEngine instead of the Engine
-		srv := api.GetServer(c.gs.Flags.Address, engine, logger)
+		srv := api.GetServer(runSubCtx, c.gs.Flags.Address, testRunState, engine.Samples, engine.MetricsEngine, execScheduler)
 		go func() {
 			defer apiWG.Done()
 			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
@@ -170,7 +172,13 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Trap Interrupts, SIGINTs and SIGTERMs.
 	gracefulStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
-		lingerCancel() // stop the test run, metric processing is cancelled below
+		// first abort the test run this way, to propagate the error
+		runSubAbort(errext.WithAbortReasonIfNone(
+			errext.WithExitCodeIfNone(
+				fmt.Errorf("test run was aborted because k6 received a '%s' signal", sig), exitcodes.ExternalAbort,
+			), errext.AbortedByUser,
+		))
+		lingerCancel() // cancel this context as well, since the user did Ctrl+C
 	}
 	onHardStop := func(sig os.Signal) {
 		logger.WithField("sig", sig).Error("Aborting k6 in response to signal")
@@ -181,7 +189,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Initialize the engine
 	initBar.Modify(pb.WithConstProgress(0, "Init VUs..."))
-	engineRun, engineWait, err := engine.Init(globalCtx, runCtx)
+	engineRun, engineWait, err := engine.Init(globalCtx, runSubCtx)
 	if err != nil {
 		err = common.UnwrapGojaInterruptedError(err)
 		// Add a generic engine exit code if we don't have a more specific one
@@ -230,7 +238,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		engine.MetricsEngine.MetricsLock.Lock() // TODO: refactor so this is not needed
 		summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 			Metrics:         engine.MetricsEngine.ObservedMetrics,
-			RootGroup:       execScheduler.GetRunner().GetDefaultGroup(),
+			RootGroup:       testRunState.Runner.GetDefaultGroup(),
 			TestRunDuration: executionState.GetCurrentTestRunDuration(),
 			NoColor:         c.gs.Flags.NoColor,
 			UIState: lib.UIState{
@@ -273,8 +281,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if engine.IsTainted() {
 		if err == nil {
 			err = errors.New("some thresholds have failed")
-		} else {
-			logger.Error("some thresholds have failed") // log this, even if there was already a previous error
 		}
 		err = errext.WithAbortReasonIfNone(
 			errext.WithExitCodeIfNone(err, exitcodes.ThresholdsHaveFailed), errext.AbortedByThresholdsAfterTestEnd,

@@ -610,7 +610,8 @@ func TestAbortedByThreshold(t *testing.T) {
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `test run aborted by failed thresholds`))
+	expErr := "thresholds on metrics 'iterations' were breached; at least one has abortOnFail enabled, stopping test prematurely"
+	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `✗ iterations`)
@@ -661,7 +662,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 
 	logs := ts.LoggerHook.Drain()
 	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `some thresholds have failed`))
-	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run aborted by signal`))
+	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run was aborted because k6 received a 'interrupt' signal`))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, `✓ iterations`)
@@ -793,7 +794,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdout, `a simple iteration`)
 	assert.Contains(t, stdout, `teardown() called`)
 	assert.Contains(t, stdout, `PATCH /v1/status`)
-	assert.Contains(t, stdout, `run: stopped by user via REST API; exiting...`)
+	assert.Contains(t, stdout, `level=error msg="test run stopped from REST API`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)

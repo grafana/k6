@@ -10,8 +10,6 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/core"
-	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/metrics"
@@ -23,18 +21,15 @@ func TestGetMetrics(t *testing.T) {
 	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{})
 	testMetric, err := testState.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
-	execScheduler, err := execution.NewScheduler(testState)
-	require.NoError(t, err)
-	engine, err := core.NewEngine(testState, execScheduler, nil)
-	require.NoError(t, err)
+	cs := getControlSurface(t, testState)
 
-	engine.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
+	cs.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
 		"my_metric": testMetric,
 	}
-	engine.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
+	cs.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	rw := httptest.NewRecorder()
-	NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics", nil))
+	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics", nil))
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
@@ -82,21 +77,18 @@ func TestGetMetric(t *testing.T) {
 	testState := getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{})
 	testMetric, err := testState.Registry.NewMetric("my_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
-	execScheduler, err := execution.NewScheduler(testState)
-	require.NoError(t, err)
-	engine, err := core.NewEngine(testState, execScheduler, nil)
-	require.NoError(t, err)
+	cs := getControlSurface(t, testState)
 
-	engine.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
+	cs.MetricsEngine.ObservedMetrics = map[string]*metrics.Metric{
 		"my_metric": testMetric,
 	}
-	engine.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
+	cs.MetricsEngine.ObservedMetrics["my_metric"].Tainted = null.BoolFrom(true)
 
 	t.Run("nonexistent", func(t *testing.T) {
 		t.Parallel()
 
 		rw := httptest.NewRecorder()
-		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/notreal", nil))
+		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics/notreal", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
@@ -105,7 +97,7 @@ func TestGetMetric(t *testing.T) {
 		t.Parallel()
 
 		rw := httptest.NewRecorder()
-		NewHandler().ServeHTTP(rw, newRequestWithEngine(engine, "GET", "/v1/metrics/my_metric", nil))
+		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics/my_metric", nil))
 		res := rw.Result()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 
