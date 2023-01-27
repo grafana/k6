@@ -37,7 +37,7 @@ func TestTracingModuleClient(t *testing.T) {
 			propagator: "w3c",
 		})
 
-		export default function () {
+		export default async function () {
 			instrumentedHTTP.del("HTTPBIN_IP_URL/tracing");
 			instrumentedHTTP.get("HTTPBIN_IP_URL/tracing");
 			instrumentedHTTP.head("HTTPBIN_IP_URL/tracing");
@@ -46,13 +46,14 @@ func TestTracingModuleClient(t *testing.T) {
 			instrumentedHTTP.post("HTTPBIN_IP_URL/tracing");
 			instrumentedHTTP.put("HTTPBIN_IP_URL/tracing");
 			instrumentedHTTP.request("GET", "HTTPBIN_IP_URL/tracing");
+            await instrumentedHTTP.asyncRequest("GET", "HTTPBIN_IP_URL/tracing");
 		};
 	`)
 
 	ts := getSingleFileTestState(t, script, []string{"--out", "json=results.json"}, 0)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.Equal(t, int64(8), atomic.LoadInt64(&gotRequests))
+	assert.Equal(t, int64(9), atomic.LoadInt64(&gotRequests))
 
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
@@ -119,7 +120,7 @@ func TestTracingInstrumentHTTP_W3C(t *testing.T) {
 			propagator: "w3c",
 		})
 
-		export default function () {
+		export default async function () {
 			http.del("HTTPBIN_IP_URL/tracing");
 			http.get("HTTPBIN_IP_URL/tracing");
 			http.head("HTTPBIN_IP_URL/tracing");
@@ -128,13 +129,14 @@ func TestTracingInstrumentHTTP_W3C(t *testing.T) {
 			http.post("HTTPBIN_IP_URL/tracing");
 			http.put("HTTPBIN_IP_URL/tracing");
 			http.request("GET", "HTTPBIN_IP_URL/tracing");
+			await http.asyncRequest("GET", "HTTPBIN_IP_URL/tracing");
 		};
 	`)
 
 	ts := getSingleFileTestState(t, script, []string{"--out", "json=results.json"}, 0)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.Equal(t, int64(8), atomic.LoadInt64(&gotRequests))
+	assert.Equal(t, int64(9), atomic.LoadInt64(&gotRequests))
 
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)

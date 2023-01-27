@@ -71,7 +71,11 @@ func (mi *ModuleInstance) newClient(cc goja.ConstructorCall) *goja.Object {
 		common.Throw(rt, fmt.Errorf("unable to parse options object; reason: %w", err))
 	}
 
-	return rt.ToValue(NewClient(mi.vu, opts)).ToObject(rt)
+	client, err := NewClient(mi.vu, opts)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+	return rt.ToValue(client).ToObject(rt)
 }
 
 // InstrumentHTTP instruments the HTTP module with tracing headers.
@@ -96,7 +100,11 @@ func (mi *ModuleInstance) instrumentHTTP(options options) {
 
 	// Initialize the tracing module's instance default client,
 	// and configure it using the user-supplied set of options.
-	mi.Client = NewClient(mi.vu, options)
+	var err error
+	mi.Client, err = NewClient(mi.vu, options)
+	if err != nil {
+		common.Throw(rt, err)
+	}
 
 	// Explicitly inject the http module in the VU's runtime.
 	// This allows us to later on override the http module's methods
@@ -136,4 +144,5 @@ func (mi *ModuleInstance) instrumentHTTP(options options) {
 	mustSetHTTPMethod("post", httpModuleObj, mi.Client.Patch)
 	mustSetHTTPMethod("put", httpModuleObj, mi.Client.Patch)
 	mustSetHTTPMethod("request", httpModuleObj, mi.Client.Request)
+	mustSetHTTPMethod("asyncRequest", httpModuleObj, mi.Client.AsyncRequest)
 }
