@@ -95,7 +95,7 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 		return nil, ErrGroupInInitContext
 	}
 
-	if val == nil || goja.IsNull(val) {
+	if isNullish(val) {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
 	fn, ok := goja.AssertFunction(val)
