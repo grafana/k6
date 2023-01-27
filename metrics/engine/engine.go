@@ -39,7 +39,7 @@ type MetricsEngine struct {
 	outputIngester *outputIngester
 
 	// These can be both top-level metrics or sub-metrics
-	metricsWithThresholds []*metrics.Metric
+	metricsWithThresholds map[*metrics.Metric]metrics.Thresholds
 
 	breachedThresholdsCount uint32
 
@@ -59,8 +59,9 @@ func NewMetricsEngine(es *lib.ExecutionState) (*MetricsEngine, error) {
 			TestRunState: es.Test,
 			testDuration: es.GetCurrentTestRunDuration,
 		},
-		logger:          es.Test.Logger.WithField("component", "metrics-engine"),
-		ObservedMetrics: make(map[string]*metrics.Metric),
+		logger:                es.Test.Logger.WithField("component", "metrics-engine"),
+		metricsWithThresholds: make(map[*metrics.Metric]metrics.Thresholds),
+		ObservedMetrics:       make(map[string]*metrics.Metric),
 	}
 
 	if !(me.test.RuntimeOptions.NoSummary.Bool && me.test.RuntimeOptions.NoThresholds.Bool) {
@@ -81,6 +82,16 @@ func (me *MetricsEngine) CreateIngester() output.Output {
 		metricsEngine: me,
 	}
 	return me.outputIngester
+}
+
+// DetectedThresholds ... TODO
+func (me *MetricsEngine) DetectedThresholds() map[*metrics.Metric]metrics.Thresholds {
+	me.MetricsLock.Lock()
+	defer me.MetricsLock.Unlock()
+
+	// TODO: make a copy
+
+	return me.metricsWithThresholds
 }
 
 func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Metric, error) {
@@ -151,8 +162,13 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 			return fmt.Errorf("invalid metric '%s' in threshold definitions: %w", metricName, err)
 		}
 
-		metric.Thresholds = thresholds
-		me.metricsWithThresholds = append(me.metricsWithThresholds, metric)
+		// metric.Thresholds = thresholds
+		// me.metricsWithThresholds = append(me.metricsWithThresholds, metric)
+
+		// TODO: confirm that this check is not an issue
+		if len(thresholds.Thresholds) > 0 {
+			me.metricsWithThresholds[metric] = thresholds
+		}
 
 		// Mark the metric (and the parent metric, if we're dealing with a
 		// submetric) as observed, so they are shown in the end-of-test summary,
@@ -239,15 +255,15 @@ func (me *MetricsEngine) evaluateThresholds(ignoreEmptySinks bool) (breachedThre
 	t := me.test.TestRunDuration()
 
 	me.logger.Debugf("Running thresholds on %d metrics...", len(me.metricsWithThresholds))
-	for _, m := range me.metricsWithThresholds {
+	for m, ths := range me.metricsWithThresholds {
 		// If either the metric has no thresholds defined, or its sinks
 		// are empty, let's ignore its thresholds execution at this point.
-		if len(m.Thresholds.Thresholds) == 0 || (ignoreEmptySinks && m.Sink.IsEmpty()) {
+		if len(ths.Thresholds) == 0 || (ignoreEmptySinks && m.Sink.IsEmpty()) {
 			continue
 		}
 		m.Tainted = null.BoolFrom(false)
 
-		succ, err := m.Thresholds.Run(m.Sink, t)
+		succ, err := ths.Run(m.Sink, t)
 		if err != nil {
 			me.logger.WithField("metric_name", m.Name).WithError(err).Error("Threshold error")
 			continue
@@ -257,7 +273,7 @@ func (me *MetricsEngine) evaluateThresholds(ignoreEmptySinks bool) (breachedThre
 		}
 		breachedThresholds = append(breachedThresholds, m.Name)
 		m.Tainted = null.BoolFrom(true)
-		if m.Thresholds.Abort {
+		if ths.Abort {
 			shouldAbort = true
 		}
 	}

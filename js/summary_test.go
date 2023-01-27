@@ -75,6 +75,61 @@ func TestTextSummary(t *testing.T) {
 	}
 }
 
+func TestTextSummaryWithThresholdNoData(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	parentMetric, err := registry.NewMetric("one", metrics.Counter)
+	require.NoError(t, err)
+
+	parentMetricPost, err := registry.NewMetric("two", metrics.Counter)
+	require.NoError(t, err)
+	parentMetricPost.Sink.Add(metrics.Sample{Value: 42})
+
+	subMetric, err := parentMetric.AddSubmetric("tag:xyz")
+	require.NoError(t, err)
+
+	observed := map[string]*metrics.Metric{
+		parentMetric.Name:     parentMetric,
+		parentMetricPost.Name: parentMetricPost,
+		subMetric.Name:        subMetric.Metric,
+	}
+
+	ths := metrics.NewThresholds([]string{})
+	require.NoError(t, ths.Parse())
+
+	summary := &lib.Summary{
+		Metrics:         observed,
+		Thresholds:      map[*metrics.Metric]metrics.Thresholds{subMetric.Metric: ths},
+		RootGroup:       &lib.Group{},
+		TestRunDuration: time.Second,
+	}
+
+	runner, err := getSimpleRunner(
+		t,
+		"/script.js",
+		"exports.default = function() {/* we don't run this, metrics are mocked */};",
+		lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
+	)
+	require.NoError(t, err)
+
+	result, err := runner.HandleSummary(context.Background(), summary)
+	require.NoError(t, err)
+
+	require.Len(t, result, 1)
+	stdout := result["stdout"]
+	require.NotNil(t, stdout)
+
+	summaryOut, err := ioutil.ReadAll(stdout)
+	require.NoError(t, err)
+
+	expected := "\n     one.............: 0  0/s\n" +
+		"       { tag:xyz }...: 0  0/s\n" +
+		"     two.............: 42 42/s\n\n"
+
+	assert.Equal(t, expected, string(summaryOut))
+}
+
 func TestTextSummaryWithSubMetrics(t *testing.T) {
 	t.Parallel()
 
@@ -144,12 +199,10 @@ func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
 	countMetric, err := registry.NewMetric("http_reqs", metrics.Counter)
 	require.NoError(t, err)
 	countMetric.Tainted = null.BoolFrom(true)
-	countMetric.Thresholds = metrics.Thresholds{Thresholds: []*metrics.Threshold{{Source: "rate<100", LastFailed: true}}}
 
 	checksMetric, err := registry.NewMetric("checks", metrics.Rate)
 	require.NoError(t, err)
 	checksMetric.Tainted = null.BoolFrom(false)
-	checksMetric.Thresholds = metrics.Thresholds{Thresholds: []*metrics.Threshold{{Source: "rate>70", LastFailed: false}}}
 	sink := &metrics.TrendSink{}
 
 	samples := []float64{10.0, 15.0, 20.0}
@@ -167,14 +220,6 @@ func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
 		Contains: metrics.Time,
 		Sink:     sink,
 		Tainted:  null.BoolFrom(true),
-		Thresholds: metrics.Thresholds{
-			Thresholds: []*metrics.Threshold{
-				{
-					Source:     "my_trend<1000",
-					LastFailed: true,
-				},
-			},
-		},
 	}
 
 	rootG, err := lib.NewGroup("", nil)
@@ -206,12 +251,39 @@ func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
 }
 
 func createTestSummary(t *testing.T) *lib.Summary {
-	metrics, rootG := createTestMetrics(t)
-	return &lib.Summary{
-		Metrics:         metrics,
-		RootGroup:       rootG,
+	sy := &lib.Summary{
 		TestRunDuration: time.Second,
 	}
+	sy.Metrics, sy.RootGroup = createTestMetrics(t)
+	ths := make(map[*metrics.Metric]metrics.Thresholds)
+
+	for _, m := range sy.Metrics {
+		if m.Name == "http_reqs" {
+			ths[m] = metrics.Thresholds{
+				Thresholds: []*metrics.Threshold{{Source: "rate<100", LastFailed: true}},
+			}
+		}
+
+		if m.Name == "checks" {
+			ths[m] = metrics.Thresholds{
+				Thresholds: []*metrics.Threshold{{Source: "rate>70", LastFailed: false}},
+			}
+		}
+
+		if m.Name == "my_trend" {
+			ths[m] = metrics.Thresholds{
+				Thresholds: []*metrics.Threshold{
+					{
+						Source:     "my_trend<1000",
+						LastFailed: true,
+					},
+				},
+			}
+		}
+	}
+
+	sy.Thresholds = ths
+	return sy
 }
 
 const expectedOldJSONExportResult = `{

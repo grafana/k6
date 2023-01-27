@@ -137,6 +137,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				Metrics:         metricsEngine.ObservedMetrics,
 				RootGroup:       testRunState.Runner.GetDefaultGroup(),
 				TestRunDuration: executionState.GetCurrentTestRunDuration(),
+				Thresholds:      metricsEngine.DetectedThresholds(),
 				NoColor:         c.gs.Flags.NoColor,
 				UIState: lib.UIState{
 					IsStdOutTTY: c.gs.Stdout.IsTTY,

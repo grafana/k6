@@ -18,7 +18,6 @@ type Metric struct {
 	// TODO: decouple the metrics from the sinks and thresholds... have them
 	// linked, but not in the same struct?
 	Tainted    null.Bool    `json:"tainted"`
-	Thresholds Thresholds   `json:"thresholds"`
 	Submetrics []*Submetric `json:"submetrics"`
 	Sub        *Submetric   `json:"-"`
 	Sink       Sink         `json:"-"`
