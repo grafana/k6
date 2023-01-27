@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"golang.org/x/exp/slices"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -118,5 +117,5 @@ func (l *LaunchOptions) shouldIgnoreOnCloud(opt string) bool {
 	if !l.onCloud {
 		return false
 	}
-	return slices.Contains([]string{"devtools", "executablePath", "headless"}, opt)
+	return opt == "devtools" || opt == "executablePath" || opt == "headless"
 }
