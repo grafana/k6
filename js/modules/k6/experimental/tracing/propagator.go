@@ -28,18 +28,41 @@ const (
 )
 
 // W3CPropagator is a Propagator for the W3C trace context header
-type W3CPropagator struct{}
+type W3CPropagator struct {
+	// Sampler is used to determine whether or not a trace should be sampled.
+	Sampler
+}
+
+// NewW3CPropagator returns a new W3CPropagator using the provided sampler
+// to base its sampling decision upon.
+//
+// Note that we allocate the propagator on the heap to ensure we conform
+// to the Sampler interface, as the [Sampler.SetSamplingRate]
+// method has a pointer receiver.
+func NewW3CPropagator(s Sampler) *W3CPropagator {
+	return &W3CPropagator{
+		Sampler: s,
+	}
+}
 
 // Propagate returns a header with a random trace ID in the W3C format
 func (p *W3CPropagator) Propagate(traceID string) (http.Header, error) {
 	parentID := randHexString(16)
+	flags := pick(p.ShouldSample(), W3CSampledTraceFlag, W3CUnsampledTraceFlag)
 
 	return http.Header{
 		W3CHeaderName: {
-			W3CVersion + "-" + traceID + "-" + parentID + "-" + W3CSampledTraceFlag,
+			W3CVersion + "-" + traceID + "-" + parentID + "-" + flags,
 		},
 	}, nil
 }
+
+// Ensures that W3CPropagator implements the Propagator and
+// SampledPropagator interface
+var (
+	_ Propagator = &W3CPropagator{}
+	_ Sampler    = &W3CPropagator{}
+)
 
 const (
 	// JaegerPropagatorName is the name of the Jaeger trace context propagator
@@ -52,18 +75,54 @@ const (
 	// Its value is zero, which is described in the Jaeger documentation as:
 	// "0 value is valid and means “root span” (when not ignored)"
 	JaegerRootSpanID = "0"
+
+	// JaegerSampledTraceFlag is the trace-flag value for an unsampled trace.
+	JaegerSampledTraceFlag = "0"
+
+	// JaegerUnsampledTraceFlag is the trace-flag value for a sampled trace.
+	JaegerUnsampledTraceFlag = "1"
 )
 
 // JaegerPropagator is a Propagator for the Jaeger trace context header
-type JaegerPropagator struct{}
+type JaegerPropagator struct {
+	// Sampler is used to determine whether or not a trace should be sampled.
+	Sampler
+}
+
+// NewJaegerPropagator returns a new JaegerPropagator with the given sampler.
+//
+// Note that we allocate the propagator on the heap to ensure we conform
+// to the Sampler interface, as the [Sampler.SetSamplingRate]
+// method has a pointer receiver.
+func NewJaegerPropagator(s Sampler) *JaegerPropagator {
+	return &JaegerPropagator{
+		Sampler: s,
+	}
+}
 
 // Propagate returns a header with a random trace ID in the Jaeger format
 func (p *JaegerPropagator) Propagate(traceID string) (http.Header, error) {
 	spanID := randHexString(8)
-	// flags set to 1 means the span is sampled
-	flags := "1"
+	flags := pick(p.ShouldSample(), JaegerSampledTraceFlag, JaegerUnsampledTraceFlag)
 
 	return http.Header{
 		JaegerHeaderName: {traceID + ":" + spanID + ":" + JaegerRootSpanID + ":" + flags},
 	}, nil
 }
+
+// Pick returns either the left or right value, depending on the value of the `decision`
+// boolean value.
+func pick[T any](decision bool, lhs, rhs T) T {
+	if decision {
+		return lhs
+	}
+
+	return rhs
+}
+
+// Ensure the JaegerPropagator implements the Propagator and
+// SampledPropagator interface
+var (
+	_ Propagator = &JaegerPropagator{}
+	_ Sampler    = &JaegerPropagator{}
+)
