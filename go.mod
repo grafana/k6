@@ -6,7 +6,6 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2
 	github.com/dop251/goja v0.0.0-20221229151140-b95230a9dbad
 	github.com/gorilla/websocket v1.5.0
-	github.com/hashicorp/go-multierror v1.1.1
 	github.com/mailru/easyjson v0.7.7
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
@@ -31,7 +30,6 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible // indirect
 	github.com/golang/protobuf v1.5.2 // indirect
 	github.com/google/go-cmp v0.5.8 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/klauspost/compress v1.15.11 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
