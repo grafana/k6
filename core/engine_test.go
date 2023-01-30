@@ -893,57 +893,6 @@ func TestSetupException(t *testing.T) {
 	}
 }
 
-// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
-// test functionality was duplicated in cmd/integration_test.go
-func TestVuInitException(t *testing.T) {
-	t.Parallel()
-
-	script := []byte(`
-		export let options = {
-			vus: 3,
-			iterations: 5,
-		};
-
-		export default function() {};
-
-		if (__VU == 2) {
-			throw new Error('oops in ' + __VU);
-		}
-	`)
-
-	piState := getTestPreInitState(t)
-	runner, err := js.New(
-		piState,
-		&loader.SourceData{URL: &url.URL{Scheme: "file", Path: "/script.js"}, Data: script},
-		nil,
-	)
-	require.NoError(t, err)
-
-	opts, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions(), nil)
-	require.NoError(t, err)
-
-	testState := getTestRunState(t, piState, opts, runner)
-
-	execScheduler, err := execution.NewScheduler(testState)
-	require.NoError(t, err)
-	engine, err := NewEngine(testState, execScheduler, nil)
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	_, _, err = engine.Init(ctx, ctx) // no need for 2 different contexts
-
-	require.Error(t, err)
-
-	var exception errext.Exception
-	require.ErrorAs(t, err, &exception)
-	assert.Equal(t, "Error: oops in 2\n\tat file:///script.js:10:9(29)\n", err.Error())
-
-	var errWithHint errext.HasHint
-	require.ErrorAs(t, err, &errWithHint)
-	assert.Equal(t, "error while initializing VU #2 (script exception)", errWithHint.Hint())
-}
-
 func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
