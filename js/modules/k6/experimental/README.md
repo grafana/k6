@@ -6,6 +6,7 @@ Although [accessible in k6 scripts](../../../initcontext.go) under the `k6/exper
 * [`k6/experimental/k6-redis`](https://github.com/grafana/xk6-redis)
 * [`k6/experimental/k6-websockets`](https://github.com/grafana/xk6-websockets)
 * [`k6/experimental/k6-timers`](https://github.com/grafana/xk6-timers)
+* [`k6/experimental/k6-browser`](https://github.com/grafana/xk6-browser)
 
 While we intend to keep these modules as stable as possible, we may need to add features or introduce breaking changes. This could happen at any time until we release the module as stable. **use them at your own risk**.
 
