@@ -13,7 +13,6 @@ import (
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/hashicorp/go-multierror"
 	"github.com/sirupsen/logrus"
 )
 
@@ -40,17 +39,62 @@ func (pe *objectPropertyParseError) Unwrap() error {
 	return pe.error
 }
 
+type multiError struct {
+	Errors []error
+}
+
+func (me *multiError) append(err error) {
+	me.Errors = append(me.Errors, err)
+}
+
+func (me multiError) Error() string {
+	if len(me.Errors) == 0 {
+		return ""
+	}
+	if len(me.Errors) == 1 {
+		return me.Errors[0].Error()
+	}
+
+	var buf strings.Builder
+	fmt.Fprintf(&buf, "%d errors occurred:\n", len(me.Errors))
+	for _, e := range me.Errors {
+		fmt.Fprintf(&buf, "\t* %s\n", e)
+	}
+
+	return buf.String()
+}
+
+func multierror(err error, errs ...error) error {
+	me := &multiError{}
+	// We can't use errors.As(), as we want to know if err is of type
+	// multiError, not any error in the chain. If err contains a wrapped
+	// multierror, start a new multiError that will contain err.
+	e, ok := err.(*multiError) //nolint:errorlint
+
+	if ok {
+		me = e
+	} else if err != nil {
+		me.append(err)
+	}
+
+	for _, e := range errs {
+		me.append(e)
+	}
+
+	return me
+}
+
 func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, error) {
 	obj := make(map[string]any)
 	var result error
 	if op.Overflow {
-		result = multierror.Append(result, &objectOverflowError{})
+		result = multierror(result, &objectOverflowError{})
 	}
 
 	for _, p := range op.Properties {
 		val, err := parseRemoteObjectValue(p.Type, p.Value, p.ValuePreview)
 		if err != nil {
-			result = multierror.Append(result, &objectPropertyParseError{err, p.Name})
+			result = multierror(result, &objectPropertyParseError{err, p.Name})
 			continue
 		}
 		obj[p.Name] = val
@@ -145,8 +189,8 @@ func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.E
 		ooe *objectOverflowError
 		ope *objectPropertyParseError
 	)
-	merr, ok := err.(*multierror.Error)
-	if !ok {
+	var merr *multiError
+	if !errors.As(err, &merr) {
 		// If this panics it's a bug :)
 		k6ext.Panic(ctx, "parsing remote object value: %w", err)
 	}
