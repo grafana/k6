@@ -4,14 +4,14 @@ go 1.19
 
 require (
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2
-	github.com/dop251/goja v0.0.0-20221229151140-b95230a9dbad
+	github.com/dop251/goja v0.0.0-20230128084908-78b980256d04
 	github.com/gorilla/websocket v1.5.0
 	github.com/mailru/easyjson v0.7.7
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.0
-	go.k6.io/k6 v0.42.1-0.20230109152238-8418147fa630
+	go.k6.io/k6 v0.42.1-0.20230130080633-582ec4d3940c
 	golang.org/x/net v0.1.0
 	golang.org/x/sync v0.1.0
 	gopkg.in/guregu/null.v3 v3.3.0
