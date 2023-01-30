@@ -11,7 +11,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"github.com/sirupsen/logrus"
 )
 
@@ -33,10 +32,20 @@ func NewNullLogger() *Logger {
 
 // New creates a new logger.
 func New(logger *logrus.Logger, iterID string) *Logger {
-	return &Logger{
+	var defLogger bool
+	if logger == nil {
+		defLogger = true
+		logger = logrus.New()
+	}
+	l := &Logger{
 		Logger: logger,
 		iterID: iterID,
 	}
+	if defLogger {
+		l.Warnf("Logger", "no logger supplied, using default")
+	}
+
+	return l
 }
 
 // Tracef logs a trace message.
@@ -86,11 +95,6 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...a
 	}()
 
 	if l.categoryFilter != nil && !l.categoryFilter.MatchString(category) {
-		return
-	}
-	if l.Logger == nil {
-		magenta := color.New(color.FgMagenta).SprintFunc()
-		fmt.Printf("%s [%d]: %s - %s ms\n", magenta(category), goRoutineID(), string(msg), magenta(elapsed))
 		return
 	}
 	fields := logrus.Fields{
