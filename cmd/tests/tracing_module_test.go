@@ -14,6 +14,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/metrics"
 )
 
 func TestTracingModuleClient(t *testing.T) {
@@ -58,7 +59,7 @@ func TestTracingModuleClient(t *testing.T) {
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
-	assertHasTraceIDMetadata(t, jsonResults)
+	assertHasTraceIDMetadata(t, jsonResults, 9, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
 }
 
 func TestTracingClient_DoesNotInterfereWithHTTPModule(t *testing.T) {
@@ -98,6 +99,107 @@ func TestTracingClient_DoesNotInterfereWithHTTPModule(t *testing.T) {
 
 	assert.Equal(t, int64(3), atomic.LoadInt64(&gotRequests))
 	assert.Equal(t, int64(2), atomic.LoadInt64(&gotInstrumentedRequests))
+}
+
+func TestTracingModuleClient_HundredPercentSampling(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	var gotRequests int64
+	var gotSampleFlags int64
+
+	tb.Mux.HandleFunc("/tracing", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&gotRequests, 1)
+
+		traceparent := r.Header.Get("traceparent")
+		require.NotEmpty(t, traceparent)
+		require.Len(t, traceparent, 55)
+
+		if traceparent[54] == '1' {
+			atomic.AddInt64(&gotSampleFlags, 1)
+		}
+	})
+
+	script := tb.Replacer.Replace(`
+		import http from "k6/http";
+		import { check } from "k6";
+		import tracing from "k6/experimental/tracing";
+
+		export const options = {
+			// 100 iterations to make sure we get 100% sampling
+			iterations: 100,
+		}
+
+		const instrumentedHTTP = new tracing.Client({
+			propagator: "w3c",
+
+			// 100% sampling
+			sampling: 1.0,
+		})
+
+		export default function () {
+			instrumentedHTTP.get("HTTPBIN_IP_URL/tracing");
+		};
+	`)
+
+	ts := getSingleFileTestState(t, script, []string{"--out", "json=results.json"}, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	assert.Equal(t, int64(100), atomic.LoadInt64(&gotSampleFlags))
+	assert.Equal(t, int64(100), atomic.LoadInt64(&gotRequests))
+
+	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	require.NoError(t, err)
+
+	assertHasTraceIDMetadata(t, jsonResults, 100, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
+}
+
+func TestTracingModuleClient_ZeroPercentSampling(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+
+	var gotRequests int64
+	var gotSampleFlags int64
+
+	tb.Mux.HandleFunc("/tracing", func(w http.ResponseWriter, r *http.Request) {
+		atomic.AddInt64(&gotRequests, 1)
+
+		traceparent := r.Header.Get("traceparent")
+		require.NotEmpty(t, traceparent)
+		require.Len(t, traceparent, 55)
+
+		if traceparent[54] == '1' {
+			atomic.AddInt64(&gotSampleFlags, 1)
+		}
+	})
+
+	script := tb.Replacer.Replace(`
+		import http from "k6/http";
+		import { check } from "k6";
+		import tracing from "k6/experimental/tracing";
+
+		export const options = {
+			// 100 iterations to make sure we get 100% sampling
+			iterations: 100,
+		}
+
+		const instrumentedHTTP = new tracing.Client({
+			propagator: "w3c",
+
+			// 0% sampling
+			sampling: 0.0,
+		})
+
+		export default function () {
+			instrumentedHTTP.get("HTTPBIN_IP_URL/tracing");
+		};
+	`)
+
+	ts := getSingleFileTestState(t, script, []string{}, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	assert.Equal(t, int64(0), atomic.LoadInt64(&gotSampleFlags))
+	assert.Equal(t, int64(100), atomic.LoadInt64(&gotRequests))
 }
 
 func TestTracingInstrumentHTTP_W3C(t *testing.T) {
@@ -141,7 +243,7 @@ func TestTracingInstrumentHTTP_W3C(t *testing.T) {
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
-	assertHasTraceIDMetadata(t, jsonResults)
+	assertHasTraceIDMetadata(t, jsonResults, 9, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
 }
 
 func TestTracingInstrumentHTTP_Jaeger(t *testing.T) {
@@ -185,7 +287,7 @@ func TestTracingInstrumentHTTP_Jaeger(t *testing.T) {
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
-	assertHasTraceIDMetadata(t, jsonResults)
+	assertHasTraceIDMetadata(t, jsonResults, 8, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
 }
 
 func TestTracingInstrumentHTTP_FillsParams(t *testing.T) {
@@ -236,7 +338,7 @@ func TestTracingInstrumentHTTP_FillsParams(t *testing.T) {
 	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
-	assertHasTraceIDMetadata(t, jsonResults)
+	assertHasTraceIDMetadata(t, jsonResults, 8, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
 }
 
 func TestTracingInstrummentHTTP_SupportsMultipleTestScripts(t *testing.T) {
@@ -288,13 +390,22 @@ func TestTracingInstrummentHTTP_SupportsMultipleTestScripts(t *testing.T) {
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(1), atomic.LoadInt64(&gotRequests))
-	assertHasTraceIDMetadata(t, jsonResults)
+	assertHasTraceIDMetadata(t, jsonResults, 1, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
 }
 
 // assertHasTraceIDMetadata checks that the trace_id metadata is present and has the correct format
 // for all http metrics in the json results file.
-func assertHasTraceIDMetadata(t *testing.T, jsonResults []byte) {
+//
+// The `expectOccurences` parameter is used to check that the trace_id metadata is present for the
+// expected number of http metrics. For instance, in a script with 2 http requests, the
+// `expectOccurences` parameter should be 2.
+//
+// The onUrls parameter is used to check that the trace_id metadata is present for the data points
+// with the expected URLs. Its value should reflect the URLs used in the script.
+func assertHasTraceIDMetadata(t *testing.T, jsonResults []byte, expectOccurences int, onUrls ...string) {
 	gotHTTPDataPoints := false
+
+	urlHTTPTraceIDs := make(map[string]map[string]int)
 
 	for _, jsonLine := range bytes.Split(jsonResults, []byte("\n")) {
 		if len(jsonLine) == 0 {
@@ -322,9 +433,28 @@ func assertHasTraceIDMetadata(t *testing.T, jsonResults []byte) {
 		require.True(t, gotTraceID)
 
 		assert.Len(t, traceID, 32)
+
+		if _, ok := urlHTTPTraceIDs[line.Data.Tags["url"]]; !ok {
+			urlHTTPTraceIDs[line.Data.Tags["url"]] = make(map[string]int)
+			urlHTTPTraceIDs[line.Data.Tags["url"]][metrics.HTTPReqsName] = 0
+		}
+		urlHTTPTraceIDs[line.Data.Tags["url"]][line.Metric]++
 	}
 
 	assert.True(t, gotHTTPDataPoints)
+
+	for _, url := range onUrls {
+		assert.Contains(t, urlHTTPTraceIDs, url)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqsName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqFailedName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqDurationName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqBlockedName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqConnectingName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqTLSHandshakingName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqSendingName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqWaitingName], expectOccurences)
+		assert.Equal(t, urlHTTPTraceIDs[url][metrics.HTTPReqReceivingName], expectOccurences)
+	}
 }
 
 // sampleEnvelope is a trimmed version of the struct found
@@ -335,6 +465,7 @@ type sampleEnvelope struct {
 	Type   string `json:"type"`
 	Data   struct {
 		Value    float64                `json:"value"`
+		Tags     map[string]string      `json:"tags"`
 		Metadata map[string]interface{} `json:"metadata"`
 	} `json:"data"`
 }
