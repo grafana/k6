@@ -37,10 +37,11 @@ type Client struct {
 	asyncRequestFunc HTTPAsyncRequestFunc
 }
 
-// HTTPRequestFunc is a type alias representing the prototype of
-// k6's http module's request function
 type (
-	HTTPRequestFunc      func(method string, url goja.Value, args ...goja.Value) (*httpmodule.Response, error)
+	// HTTPRequestFunc is a type alias representing the prototype of k6's http module's request function
+	HTTPRequestFunc func(method string, url goja.Value, args ...goja.Value) (*httpmodule.Response, error)
+
+	// HTTPAsyncRequestFunc is a type alias representing the prototype of k6's http module's asyncRequest function
 	HTTPAsyncRequestFunc func(method string, url goja.Value, args ...goja.Value) (*goja.Promise, error)
 )
 
@@ -85,11 +86,16 @@ func (c *Client) Configure(opts options) error {
 		return fmt.Errorf("invalid options: %w", err)
 	}
 
+	var sampler Sampler = NewAlwaysOnSampler()
+	if opts.Sampling != 1.0 {
+		sampler = NewProbabilisticSampler(opts.Sampling)
+	}
+
 	switch opts.Propagator {
 	case "w3c":
-		c.propagator = &W3CPropagator{}
+		c.propagator = NewW3CPropagator(sampler)
 	case "jaeger":
-		c.propagator = &JaegerPropagator{}
+		c.propagator = NewJaegerPropagator(sampler)
 	default:
 		return fmt.Errorf("unknown propagator: %s", opts.Propagator)
 	}
