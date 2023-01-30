@@ -733,9 +733,7 @@ func (g *generator) step() (res Value, resultType resultType, ex *Exception) {
 		g.ctx = execCtx{}
 		g.vm.pc = -g.vm.pc + 1
 		res = g.vm.pop()
-		g.vm.suspend(&g.ctx, uint32(len(g.vm.tryStack))-g.tryStackLen,
-			uint32(len(g.vm.iterStack))-g.iterStackLen,
-			uint32(len(g.vm.refStack))-g.refStackLen)
+		g.vm.suspend(&g.ctx, g.tryStackLen, g.iterStackLen, g.refStackLen)
 		g.vm.sp = g.vm.sb - 1
 		g.vm.callStack = g.vm.callStack[:len(g.vm.callStack)-1] // remove the frame with pc == -2, as ret would do
 	}

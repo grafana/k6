@@ -167,16 +167,19 @@ func (self *_parser) parseFunctionParameterList() *ast.ParameterList {
 	opening := self.expect(token.LEFT_PARENTHESIS)
 	var list []*ast.Binding
 	var rest ast.Expression
+	if !self.scope.inFuncParams {
+		self.scope.inFuncParams = true
+		defer func() {
+			self.scope.inFuncParams = false
+		}()
+	}
 	for self.token != token.RIGHT_PARENTHESIS && self.token != token.EOF {
 		if self.token == token.ELLIPSIS {
 			self.next()
 			rest = self.reinterpretAsDestructBindingTarget(self.parseAssignmentExpression())
 			break
 		}
-		item := self.parseVariableDeclaration(&list)
-		if _, ok := item.Initializer.(*ast.AwaitExpression); ok {
-			self.error(item.Idx0(), "Illegal await-expression in formal parameters of async function")
-		}
+		self.parseVariableDeclaration(&list)
 		if self.token != token.RIGHT_PARENTHESIS {
 			self.expect(token.COMMA)
 		}
