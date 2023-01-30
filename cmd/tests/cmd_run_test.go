@@ -1133,6 +1133,27 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 	assert.Contains(t, stdOut, `level=error msg="test run was aborted because k6 received a 'interrupt' signal"`)
 }
 
+func TestAbortedByInterruptWhenPaused(t *testing.T) {
+	t.Parallel()
+	script := `export default function () {};`
+	ts := getSimpleCloudOutputTestState(
+		t, script, []string{"-v", "--log-output=stdout", "--paused"},
+		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort,
+	)
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(
+		t, ts, 10, time.Second, "Execution is paused, waiting for resume or interrupt...",
+	)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdOut := ts.Stdout.String()
+	t.Log(stdOut)
+
+	assert.Contains(t, stdOut, `level=debug msg="Stopping k6 in response to signal..." sig=interrupt`)
+	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `level=error msg="test run was aborted because k6 received a 'interrupt' signal"`)
+}
+
 func TestAbortedByScriptInitError(t *testing.T) {
 	t.Parallel()
 	script := `
