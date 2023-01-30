@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
 	"os/exec"
 	"strings"
@@ -242,8 +243,14 @@ func (p *devToolsURLParser) err() error {
 	if len(p.errs) > 0 {
 		return p.errs[0]
 	}
-	if err := p.sc.Err(); err != nil {
-		return fmt.Errorf("%w", err)
+
+	err := p.sc.Err()
+	if errors.Is(err, fs.ErrClosed) {
+		return fmt.Errorf("browser process shutdown unexpectedly before establishing a connection: %w", err)
 	}
+	if err != nil {
+		return err //nolint:wrapcheck
+	}
+
 	return nil
 }
