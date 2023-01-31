@@ -2,11 +2,11 @@
 
 A FileSystem Abstraction System for Go
 
-[![Build Status](https://travis-ci.org/spf13/afero.svg)](https://travis-ci.org/spf13/afero) [![Build status](https://ci.appveyor.com/api/projects/status/github/spf13/afero?branch=master&svg=true)](https://ci.appveyor.com/project/spf13/afero) [![GoDoc](https://godoc.org/github.com/spf13/afero?status.svg)](https://godoc.org/github.com/spf13/afero) [![Join the chat at https://gitter.im/spf13/afero](https://badges.gitter.im/Dev%20Chat.svg)](https://gitter.im/spf13/afero?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
+[![Test](https://github.com/spf13/afero/actions/workflows/test.yml/badge.svg)](https://github.com/spf13/afero/actions/workflows/test.yml) [![GoDoc](https://godoc.org/github.com/spf13/afero?status.svg)](https://godoc.org/github.com/spf13/afero) [![Join the chat at https://gitter.im/spf13/afero](https://badges.gitter.im/Dev%20Chat.svg)](https://gitter.im/spf13/afero?utm_source=badge&utm_medium=badge&utm_campaign=pr-badge&utm_content=badge)
 
 # Overview
 
-Afero is an filesystem framework providing a simple, uniform and universal API
+Afero is a filesystem framework providing a simple, uniform and universal API
 interacting with any filesystem, as an abstraction layer providing interfaces,
 types and methods. Afero has an exceptionally clean interface and simple design
 without needless constructors or initialization methods.
@@ -18,7 +18,7 @@ and benefit of the os and ioutil packages.
 Afero provides significant improvements over using the os package alone, most
 notably the ability to create mock and testing filesystems without relying on the disk.
 
-It is suitable for use in a any situation where you would consider using the OS
+It is suitable for use in any situation where you would consider using the OS
 package as it provides an additional abstraction that makes it easy to use a
 memory backed file system during testing. It also adds support for the http
 filesystem for full interoperability.
@@ -33,7 +33,7 @@ filesystem for full interoperability.
 * Support for compositional (union) file systems by combining multiple file systems acting as one
 * Specialized backends which modify existing filesystems (Read Only, Regexp filtered)
 * A set of utility functions ported from io, ioutil & hugo to be afero aware
-
+* Wrapper for go 1.16 filesystem abstraction `io/fs.FS`
 
 # Using Afero
 
@@ -41,8 +41,8 @@ Afero is easy to use and easier to adopt.
 
 A few different ways you could use Afero:
 
-* Use the interfaces alone to define you own file system.
-* Wrap for the OS packages.
+* Use the interfaces alone to define your own file system.
+* Wrapper for the OS packages.
 * Define different filesystems for different parts of your application.
 * Use Afero for mock filesystems while testing
 
@@ -79,11 +79,11 @@ would.
 
 So if my application before had:
 ```go
-os.Open('/tmp/foo')
+os.Open("/tmp/foo")
 ```
 We would replace it with:
 ```go
-AppFs.Open('/tmp/foo')
+AppFs.Open("/tmp/foo")
 ```
 
 `AppFs` being the variable we defined above.
@@ -94,6 +94,7 @@ AppFs.Open('/tmp/foo')
 File System Methods Available:
 ```go
 Chmod(name string, mode os.FileMode) : error
+Chown(name string, uid, gid int) : error
 Chtimes(name string, atime time.Time, mtime time.Time) : error
 Create(name string) : File, error
 Mkdir(name string, perm os.FileMode) : error
@@ -227,7 +228,7 @@ operation and a mock filesystem during testing or as needed.
 
 ```go
 appfs := afero.NewOsFs()
-appfs.MkdirAll("src/a", 0755))
+appfs.MkdirAll("src/a", 0755)
 ```
 
 ## Memory Backed Storage
@@ -241,7 +242,7 @@ safely.
 
 ```go
 mm := afero.NewMemMapFs()
-mm.MkdirAll("src/a", 0755))
+mm.MkdirAll("src/a", 0755)
 ```
 
 #### InMemoryFile
@@ -257,6 +258,18 @@ system using InMemoryFile.
 
 Afero has experimental support for secure file transfer protocol (sftp). Which can
 be used to perform file operations over a encrypted channel.
+
+### GCSFs
+
+Afero has experimental support for Google Cloud Storage (GCS). You can either set the
+`GOOGLE_APPLICATION_CREDENTIALS_JSON` env variable to your JSON credentials or use `opts` in
+`NewGcsFS` to configure access to your GCS bucket.
+
+Some known limitations of the existing implementation:
+* No Chmod support - The GCS ACL could probably be mapped to *nix style permissions but that would add another level of complexity and is ignored in this version.
+* No Chtimes support - Could be simulated with attributes (gcs a/m-times are set implicitly) but that's is left for another version.
+* Not thread safe - Also assumes all file operations are done through the same instance of the GcsFs. File operations between different GcsFs instances are not guaranteed to be consistent.
+
 
 ## Filtering Backends
 
@@ -306,7 +319,7 @@ Any Afero FileSystem can be used as an httpFs.
 
 ```go
 httpFs := afero.NewHttpFs(<ExistingFS>)
-fileserver := http.FileServer(httpFs.Dir(<PATH>)))
+fileserver := http.FileServer(httpFs.Dir(<PATH>))
 http.Handle("/", fileserver)
 ```
 
@@ -380,8 +393,6 @@ The following is a short list of possible backends we hope someone will
 implement:
 
 * SSH
-* ZIP
-* TAR
 * S3
 
 # About the project
@@ -406,28 +417,7 @@ Googles very well.
 
 ## Release Notes
 
-* **0.10.0** 2015.12.10
-  * Full compatibility with Windows
-  * Introduction of afero utilities
-  * Test suite rewritten to work cross platform
-  * Normalize paths for MemMapFs
-  * Adding Sync to the file interface
-  * **Breaking Change** Walk and ReadDir have changed parameter order
-  * Moving types used by MemMapFs to a subpackage
-  * General bugfixes and improvements
-* **0.9.0** 2015.11.05
-  * New Walk function similar to filepath.Walk
-  * MemMapFs.OpenFile handles O_CREATE, O_APPEND, O_TRUNC
-  * MemMapFs.Remove now really deletes the file
-  * InMemoryFile.Readdir and Readdirnames work correctly
-  * InMemoryFile functions lock it for concurrent access
-  * Test suite improvements
-* **0.8.0** 2014.10.28
-  * First public version
-  * Interfaces feel ready for people to build using
-  * Interfaces satisfy all known uses
-  * MemMapFs passes the majority of the OS test suite
-  * OsFs passes the majority of the OS test suite
+See the [Releases Page](https://github.com/spf13/afero/releases).
 
 ## Contributing
 

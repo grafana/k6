@@ -78,24 +78,27 @@ func (ce Elem) ctype() ceType {
 // For normal collation elements, we assume that a collation element either has
 // a primary or non-default secondary value, not both.
 // Collation elements with a primary value are of the form
-// 01pppppp pppppppp ppppppp0 ssssssss
-//   - p* is primary collation value
-//   - s* is the secondary collation value
-// 00pppppp pppppppp ppppppps sssttttt, where
-//   - p* is primary collation value
-//   - s* offset of secondary from default value.
-//   - t* is the tertiary collation value
-// 100ttttt cccccccc pppppppp pppppppp
-//   - t* is the tertiar collation value
-//   - c* is the canonical combining class
-//   - p* is the primary collation value
+//
+//	01pppppp pppppppp ppppppp0 ssssssss
+//	  - p* is primary collation value
+//	  - s* is the secondary collation value
+//	00pppppp pppppppp ppppppps sssttttt, where
+//	  - p* is primary collation value
+//	  - s* offset of secondary from default value.
+//	  - t* is the tertiary collation value
+//	100ttttt cccccccc pppppppp pppppppp
+//	  - t* is the tertiar collation value
+//	  - c* is the canonical combining class
+//	  - p* is the primary collation value
+//
 // Collation elements with a secondary value are of the form
-// 1010cccc ccccssss ssssssss tttttttt, where
-//   - c* is the canonical combining class
-//   - s* is the secondary collation value
-//   - t* is the tertiary collation value
-// 11qqqqqq qqqqqqqq qqqqqqq0 00000000
-//   - q* quaternary value
+//
+//	1010cccc ccccssss ssssssss tttttttt, where
+//	  - c* is the canonical combining class
+//	  - s* is the secondary collation value
+//	  - t* is the tertiary collation value
+//	11qqqqqq qqqqqqqq qqqqqqq0 00000000
+//	  - q* quaternary value
 const (
 	ceTypeMask              = 0xC0000000
 	ceTypeMaskExt           = 0xE0000000
@@ -296,6 +299,7 @@ func (ce Elem) Weight(l Level) int {
 //   - n* is the size of the first node in the contraction trie.
 //   - i* is the index of the first node in the contraction trie.
 //   - b* is the offset into the contraction collation element table.
+//
 // See contract.go for details on the contraction trie.
 const (
 	maxNBits              = 4
@@ -326,6 +330,7 @@ func splitExpandIndex(ce Elem) (index int) {
 // The Elem, in this case, is of the form 11110000 00000000 wwwwwwww vvvvvvvv, where
 //   - v* is the replacement tertiary weight for the first rune,
 //   - w* is the replacement tertiary weight for the second rune,
+//
 // Tertiary weights of subsequent runes should be replaced with maxTertiary.
 // See https://www.unicode.org/reports/tr10/#Compatibility_Decompositions for more details.
 func splitDecompose(ce Elem) (t1, t2 uint8) {

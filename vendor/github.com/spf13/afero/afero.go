@@ -91,8 +91,11 @@ type Fs interface {
 	// The name of this FileSystem
 	Name() string
 
-	//Chmod changes the mode of the named file to mode.
+	// Chmod changes the mode of the named file to mode.
 	Chmod(name string, mode os.FileMode) error
+
+	// Chown changes the uid and gid of the named file.
+	Chown(name string, uid, gid int) error
 
 	//Chtimes changes the access and modification times of the named file
 	Chtimes(name string, atime time.Time, mtime time.Time) error
@@ -100,8 +103,8 @@ type Fs interface {
 
 var (
 	ErrFileClosed        = errors.New("File is closed")
-	ErrOutOfRange        = errors.New("Out of range")
-	ErrTooLarge          = errors.New("Too large")
+	ErrOutOfRange        = errors.New("out of range")
+	ErrTooLarge          = errors.New("too large")
 	ErrFileNotFound      = os.ErrNotExist
 	ErrFileExists        = os.ErrExist
 	ErrDestinationExists = os.ErrExist

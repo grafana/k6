@@ -22,6 +22,57 @@ github.com/beorn7/perks/quantile
 # github.com/cespare/xxhash/v2 v2.1.2
 ## explicit; go 1.11
 github.com/cespare/xxhash/v2
+# github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2
+## explicit; go 1.19
+github.com/chromedp/cdproto
+github.com/chromedp/cdproto/accessibility
+github.com/chromedp/cdproto/animation
+github.com/chromedp/cdproto/audits
+github.com/chromedp/cdproto/backgroundservice
+github.com/chromedp/cdproto/browser
+github.com/chromedp/cdproto/cachestorage
+github.com/chromedp/cdproto/cast
+github.com/chromedp/cdproto/cdp
+github.com/chromedp/cdproto/css
+github.com/chromedp/cdproto/database
+github.com/chromedp/cdproto/debugger
+github.com/chromedp/cdproto/deviceorientation
+github.com/chromedp/cdproto/dom
+github.com/chromedp/cdproto/domdebugger
+github.com/chromedp/cdproto/domsnapshot
+github.com/chromedp/cdproto/domstorage
+github.com/chromedp/cdproto/emulation
+github.com/chromedp/cdproto/eventbreakpoints
+github.com/chromedp/cdproto/fetch
+github.com/chromedp/cdproto/headlessexperimental
+github.com/chromedp/cdproto/heapprofiler
+github.com/chromedp/cdproto/indexeddb
+github.com/chromedp/cdproto/input
+github.com/chromedp/cdproto/inspector
+github.com/chromedp/cdproto/io
+github.com/chromedp/cdproto/layertree
+github.com/chromedp/cdproto/log
+github.com/chromedp/cdproto/media
+github.com/chromedp/cdproto/memory
+github.com/chromedp/cdproto/network
+github.com/chromedp/cdproto/overlay
+github.com/chromedp/cdproto/page
+github.com/chromedp/cdproto/performance
+github.com/chromedp/cdproto/performancetimeline
+github.com/chromedp/cdproto/profiler
+github.com/chromedp/cdproto/runtime
+github.com/chromedp/cdproto/security
+github.com/chromedp/cdproto/serviceworker
+github.com/chromedp/cdproto/storage
+github.com/chromedp/cdproto/systeminfo
+github.com/chromedp/cdproto/target
+github.com/chromedp/cdproto/tethering
+github.com/chromedp/cdproto/tracing
+github.com/chromedp/cdproto/webaudio
+github.com/chromedp/cdproto/webauthn
+# github.com/chromedp/sysutil v1.0.0
+## explicit; go 1.15
+github.com/chromedp/sysutil
 # github.com/davecgh/go-spew v1.1.1
 ## explicit
 github.com/davecgh/go-spew/spew
@@ -80,6 +131,17 @@ github.com/golang/snappy
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
+# github.com/grafana/xk6-browser v0.8.0
+## explicit; go 1.19
+github.com/grafana/xk6-browser/api
+github.com/grafana/xk6-browser/browser
+github.com/grafana/xk6-browser/chromium
+github.com/grafana/xk6-browser/common
+github.com/grafana/xk6-browser/common/js
+github.com/grafana/xk6-browser/k6ext
+github.com/grafana/xk6-browser/keyboardlayout
+github.com/grafana/xk6-browser/log
+github.com/grafana/xk6-browser/storage
 # github.com/grafana/xk6-output-prometheus-remote v0.1.0
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
@@ -148,7 +210,7 @@ github.com/matttproud/golang_protobuf_extensions/pbutil
 github.com/mccutchen/go-httpbin/httpbin
 github.com/mccutchen/go-httpbin/httpbin/assets
 github.com/mccutchen/go-httpbin/httpbin/digest
-# github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd
+# github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 ## explicit; go 1.18
 github.com/mstoykov/atlas
 # github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
@@ -190,9 +252,10 @@ github.com/serenize/snaker
 ## explicit; go 1.13
 github.com/sirupsen/logrus
 github.com/sirupsen/logrus/hooks/test
-# github.com/spf13/afero v1.1.2
-## explicit
+# github.com/spf13/afero v1.9.2
+## explicit; go 1.16
 github.com/spf13/afero
+github.com/spf13/afero/internal/common
 github.com/spf13/afero/mem
 # github.com/spf13/cobra v1.4.0
 ## explicit; go 1.15
@@ -223,14 +286,14 @@ go.buf.build/grpc/go/prometheus/prometheus
 ## explicit; go 1.18
 go.uber.org/goleak
 go.uber.org/goleak/internal/stack
-# golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
+# golang.org/x/crypto v0.1.0
 ## explicit; go 1.17
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
 # golang.org/x/lint v0.0.0-20210508222113-6edffad5e616
 ## explicit; go 1.11
-# golang.org/x/net v0.0.0-20221002022538-bcab6841153b
+# golang.org/x/net v0.1.0
 ## explicit; go 1.17
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -240,16 +303,16 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec
+# golang.org/x/sys v0.1.0
 ## explicit; go 1.17
 golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.0.0-20220919170432-7a66f970e087
+# golang.org/x/term v0.1.0
 ## explicit; go 1.17
 golang.org/x/term
-# golang.org/x/text v0.3.7
+# golang.org/x/text v0.4.0
 ## explicit; go 1.17
 golang.org/x/text/cases
 golang.org/x/text/collate
@@ -259,14 +322,17 @@ golang.org/x/text/internal/language
 golang.org/x/text/internal/language/compact
 golang.org/x/text/internal/tag
 golang.org/x/text/language
+golang.org/x/text/runes
 golang.org/x/text/secure/bidirule
 golang.org/x/text/transform
 golang.org/x/text/unicode/bidi
 golang.org/x/text/unicode/norm
 golang.org/x/text/unicode/rangetable
-# golang.org/x/time v0.0.0-20220922220347-f3bd1da661af
+# golang.org/x/time v0.1.0
 ## explicit
 golang.org/x/time/rate
+# golang.org/x/tools v0.2.0
+## explicit; go 1.18
 # google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21
 ## explicit; go 1.15
 google.golang.org/genproto/googleapis/rpc/status
@@ -370,7 +436,7 @@ google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/typepb
 google.golang.org/protobuf/types/known/wrapperspb
 google.golang.org/protobuf/types/pluginpb
-# gopkg.in/guregu/null.v3 v3.3.0
+# gopkg.in/guregu/null.v3 v3.5.0
 ## explicit
 gopkg.in/guregu/null.v3
 # gopkg.in/yaml.v3 v3.0.1

@@ -137,3 +137,12 @@ func (f Float) Ptr() *float64 {
 func (f Float) IsZero() bool {
 	return !f.Valid
 }
+
+// Equal returns true if both floats have the same value or are both null.
+// Warning: calculations using floating point numbers can result in different ways
+// the numbers are stored in memory. Therefore, this function is not suitable to
+// compare the result of a calculation. Use this method only to check if the value
+// has changed in comparison to some previous value.
+func (f Float) Equal(other Float) bool {
+	return f.Valid == other.Valid && (!f.Valid || f.Float64 == other.Float64)
+}
