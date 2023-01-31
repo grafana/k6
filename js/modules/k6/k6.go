@@ -23,7 +23,7 @@ var (
 	ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
 )
 
-const asyncFunctionNotSupportedMsg = "%s: async functions are not supported as arguments, " +
+const asyncFunctionNotSupportedMsg = "%s() does not support async functions as arguments, " +
 	"please see https://k6.io/docs/javascript-api/k6/group/#working-with-async-functions for more info"
 
 type (
