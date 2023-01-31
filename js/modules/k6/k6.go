@@ -24,7 +24,7 @@ var (
 )
 
 const asyncFunctionNotSupportedMsg = "%s: async functions are not supported as arguments, " +
-	"please see https://github.com/grafana/k6/issues/2728#issuecomment-1404747660 for more info"
+	"please see https://k6.io/docs/javascript-api/k6/group/#working-with-async-functions for more info"
 
 type (
 	// RootModule is the global module instance that will create module
