@@ -88,8 +88,6 @@ func newTestScheduler(
 		}
 	}()
 
-	require.NoError(t, execScheduler.Init(ctx, samples))
-
 	return ctx, cancel, execScheduler, samples
 }
 
@@ -107,9 +105,9 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name, script, expErr string
+		name, script string
 	}{
-		{"defaultOK", `export default function () {}`, ""},
+		{"defaultOK", `export default function () {}`},
 		{"nonDefaultOK", `
 	export let options = {
 		scenarios: {
@@ -121,7 +119,7 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 			},
 		}
 	}
-	export function nonDefault() {}`, ""},
+	export function nonDefault() {}`},
 	}
 
 	for _, tc := range testCases {
@@ -146,13 +144,7 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
 			go func() {
-				err := execScheduler.Init(ctx, samples)
-				if tc.expErr != "" {
-					assert.EqualError(t, err, tc.expErr)
-				} else {
-					assert.NoError(t, err)
-					assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
-				}
+				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 				close(done)
 			}()
 			for {
@@ -263,7 +255,6 @@ func TestSchedulerRunEnv(t *testing.T) {
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
 			go func() {
-				assert.NoError(t, execScheduler.Init(ctx, samples))
 				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 				close(done)
 			}()
@@ -333,7 +324,6 @@ func TestSchedulerSystemTags(t *testing.T) {
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		require.NoError(t, execScheduler.Init(ctx, samples))
 		require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	}()
 
@@ -464,7 +454,6 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 			samples := make(chan metrics.SampleContainer)
 			go func() {
 				defer close(done)
-				require.NoError(t, execScheduler.Init(ctx, samples))
 				require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 			}()
 			var gotTrailTag, gotNetTrailTag bool
@@ -626,7 +615,6 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 
 	samples := make(chan metrics.SampleContainer)
 	go func() {
-		assert.NoError(t, execScheduler.Init(ctx, samples))
 		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 		close(samples)
 	}()
@@ -959,7 +947,6 @@ func TestSchedulerEndIterations(t *testing.T) {
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, 300)
-	require.NoError(t, execScheduler.Init(ctx, samples))
 	require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 
 	assert.Equal(t, uint64(100), execScheduler.GetState().GetFullIterationCount())
@@ -1170,7 +1157,6 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	done := make(chan struct{})
 	sampleContainers := make(chan metrics.SampleContainer)
 	go func() {
-		require.NoError(t, execScheduler.Init(ctx, sampleContainers))
 		assert.NoError(t, execScheduler.Run(ctx, ctx, sampleContainers))
 		close(done)
 	}()

@@ -114,6 +114,7 @@ func TestOptions(t *testing.T) {
 	t.Run("TLSCipherSuites", func(t *testing.T) {
 		t.Parallel()
 		for suiteName, suiteID := range SupportedTLSCipherSuites {
+			suiteName, suiteID := suiteName, suiteID
 			t.Run(suiteName, func(t *testing.T) {
 				t.Parallel()
 				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})

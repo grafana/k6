@@ -610,7 +610,8 @@ func TestAbortedByThreshold(t *testing.T) {
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `test run aborted by failed thresholds`))
+	expErr := "thresholds on metrics 'iterations' were breached; at least one has abortOnFail enabled, stopping test prematurely"
+	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
 	assert.Contains(t, stdOut, `✗ iterations`)
@@ -661,7 +662,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 
 	logs := ts.LoggerHook.Drain()
 	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `some thresholds have failed`))
-	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run aborted by signal`))
+	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run was aborted because k6 received a 'interrupt' signal`))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, `✓ iterations`)
@@ -793,7 +794,7 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdout, `a simple iteration`)
 	assert.Contains(t, stdout, `teardown() called`)
 	assert.Contains(t, stdout, `PATCH /v1/status`)
-	assert.Contains(t, stdout, `run: stopped by user via REST API; exiting...`)
+	assert.Contains(t, stdout, `level=error msg="test run stopped from REST API`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
@@ -981,11 +982,18 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 
 		export default function () {};
 
-		// Should not be called, since error is in the init context
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	testAbortedByScriptTestAbort(t, false, script, runTestWithNoLinger)
+	t.Run("noLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
+	})
+
+	t.Run("withLinger", func(t *testing.T) {
+		t.Parallel()
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
+	})
 }
 
 func TestAbortedByScriptAbortInVUCode(t *testing.T) {
@@ -1000,12 +1008,12 @@ func TestAbortedByScriptAbortInVUCode(t *testing.T) {
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
 
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
 	})
 }
 
@@ -1024,12 +1032,12 @@ func TestAbortedByScriptAbortInVUCodeInGroup(t *testing.T) {
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
 
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
 	})
 }
 
@@ -1046,12 +1054,12 @@ func TestAbortedByScriptAbortInSetup(t *testing.T) {
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
 
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
 	})
 }
 
@@ -1068,18 +1076,16 @@ func TestAbortedByScriptAbortInTeardown(t *testing.T) {
 
 	t.Run("noLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithNoLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
 
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
-		testAbortedByScriptTestAbort(t, true, script, runTestWithLinger)
+		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
 	})
 }
 
-func testAbortedByScriptTestAbort(
-	t *testing.T, shouldHaveMetrics bool, script string, runTest func(*testing.T, *GlobalTestState),
-) *GlobalTestState { //nolint:unparam
+func testAbortedByScriptTestAbort(t *testing.T, script string, runTest func(*testing.T, *GlobalTestState)) {
 	ts := getSimpleCloudOutputTestState(
 		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ScriptAborted,
 	)
@@ -1092,13 +1098,8 @@ func testAbortedByScriptTestAbort(
 	assert.Contains(t, stdout, "test aborted: foo")
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
-	if shouldHaveMetrics {
-		assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
-		assert.Contains(t, stdout, "bogus summary")
-	} else {
-		assert.NotContains(t, stdout, "bogus summary")
-	}
-	return ts
+	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
+	assert.Contains(t, stdout, "bogus summary")
 }
 
 func TestAbortedByInterruptDuringVUInit(t *testing.T) {
@@ -1117,14 +1118,8 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 
 		export default function () {};
 	`
-
-	// TODO: fix this to exect lib.RunStatusAbortedUser and
-	// exitcodes.ExternalAbort
-	//
-	// This is testing the current behavior, which is expected, but it's not
-	// actually the desired one! See https://github.com/grafana/k6/issues/2804
 	ts := getSimpleCloudOutputTestState(
-		t, script, nil, cloudapi.RunStatusAbortedSystem, cloudapi.ResultStatusPassed, exitcodes.GenericEngine,
+		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort,
 	)
 	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "VU init sleeping for a while")
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
@@ -1134,10 +1129,29 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 
 	assert.Contains(t, stdOut, `level=debug msg="Stopping k6 in response to signal..." sig=interrupt`)
 	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `level=error msg="test run was aborted because k6 received a 'interrupt' signal"`)
+}
 
-	// TODO: same as above, fix expected error message and run_status to 5
-	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=6 tainted=false`)
-	assert.Contains(t, stdOut, `level=error msg="context canceled`)
+func TestAbortedByInterruptWhenPaused(t *testing.T) {
+	t.Parallel()
+	script := `export default function () {};`
+	ts := getSimpleCloudOutputTestState(
+		t, script, []string{"-v", "--log-output=stdout", "--paused"},
+		cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort,
+	)
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(
+		t, ts, 10, time.Second, "Execution is paused, waiting for resume or interrupt...",
+	)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdOut := ts.Stdout.String()
+	t.Log(stdOut)
+
+	assert.Contains(t, stdOut, `level=debug msg="Stopping k6 in response to signal..." sig=interrupt`)
+	assert.Contains(t, stdOut, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
+	assert.Contains(t, stdOut, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.Contains(t, stdOut, `level=error msg="test run was aborted because k6 received a 'interrupt' signal"`)
 }
 
 func TestAbortedByScriptInitError(t *testing.T) {

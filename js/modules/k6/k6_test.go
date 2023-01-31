@@ -186,6 +186,20 @@ func TestGroup(t *testing.T) {
 		_, err := rt.RunString(`k6.group("::", function() { throw new Error("nooo") })`)
 		assert.Contains(t, err.Error(), "group and check names may not contain '::'")
 	})
+
+	t.Run("async function", func(t *testing.T) {
+		t.Parallel()
+		rt, _, _ := setupGroupTest()
+		_, err := rt.RunString(`k6.group("something", async function() { })`)
+		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
+	})
+
+	t.Run("async lambda", func(t *testing.T) {
+		t.Parallel()
+		rt, _, _ := setupGroupTest()
+		_, err := rt.RunString(`k6.group("something", async () => { })`)
+		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
+	})
 }
 
 func checkTestRuntime(t testing.TB) (*goja.Runtime, chan metrics.SampleContainer, *metrics.BuiltinMetrics) {
@@ -270,6 +284,20 @@ func TestCheckObject(t *testing.T) {
 		rt, _, _ := checkTestRuntime(t)
 		_, err := rt.RunString(`k6.check(null, { "::": true })`)
 		assert.Contains(t, err.Error(), "group and check names may not contain '::'")
+	})
+
+	t.Run("async function", func(t *testing.T) {
+		t.Parallel()
+		rt, _, _ := checkTestRuntime(t)
+		_, err := rt.RunString(`k6.check("something", {"async": async function() { }})`)
+		assert.ErrorContains(t, err, "check() does not support async functions as arguments")
+	})
+
+	t.Run("async lambda", func(t *testing.T) {
+		t.Parallel()
+		rt, _, _ := checkTestRuntime(t)
+		_, err := rt.RunString(`k6.check("something", {"async": async () =>{ }})`)
+		assert.ErrorContains(t, err, "check() does not support async functions as arguments")
 	})
 }
 

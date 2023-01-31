@@ -3,7 +3,6 @@ package v1
 import (
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/core"
 	"go.k6.io/k6/lib"
 )
 
@@ -18,15 +17,21 @@ type Status struct {
 	Tainted bool      `json:"tainted" yaml:"tainted"`
 }
 
-func NewStatus(engine *core.Engine) Status {
-	executionState := engine.ExecutionScheduler.GetState()
+func newStatus(cs *ControlSurface) Status {
+	executionState := cs.Scheduler.GetState()
+	isStopped := false
+	select {
+	case <-cs.RunCtx.Done():
+		isStopped = true
+	default:
+	}
 	return Status{
 		Status:  executionState.GetCurrentExecutionStatus(),
 		Running: executionState.HasStarted() && !executionState.HasEnded(),
 		Paused:  null.BoolFrom(executionState.IsPaused()),
-		Stopped: engine.IsStopped(),
+		Stopped: isStopped,
 		VUs:     null.IntFrom(executionState.GetCurrentlyActiveVUsCount()),
 		VUsMax:  null.IntFrom(executionState.GetInitializedVUsCount()),
-		Tainted: engine.IsTainted(),
+		Tainted: cs.MetricsEngine.GetMetricsWithBreachedThresholdsCount() > 0,
 	}
 }

@@ -223,7 +223,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Install pandoc
-        uses: crazy-max/ghaction-chocolatey@b6061d587628735be315d74358228b83a7dba9a7
+        uses: crazy-max/ghaction-chocolatey@90deb87d9fbf0bb2f022b91e3bf11b4441cddda5 # v2.1.0
         with:
           args: install -y pandoc
       - name: Install wix tools

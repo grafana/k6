@@ -34,17 +34,19 @@ const isWindows = runtime.GOOS == "windows"
 // TODO: completely rewrite all of these tests
 
 type testStruct struct {
-	engine    *Engine
-	run       func() error
-	runCancel func()
-	wait      func()
-	piState   *lib.TestPreInitState
+	engine   *Engine
+	run      func() error
+	runAbort func(error)
+	wait     func()
+	piState  *lib.TestPreInitState
 }
 
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 	reg := metrics.NewRegistry()
+	logger := testutils.NewLogger(tb)
+	logger.SetLevel(logrus.DebugLevel)
 	return &lib.TestPreInitState{
-		Logger:         testutils.NewLogger(tb),
+		Logger:         logger,
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
@@ -97,16 +99,19 @@ func newTestEngineWithTestPreInitState( //nolint:golint
 	} else {
 		runCtx, runCancel = context.WithCancel(globalCtx)
 	}
-	run, waitFn, err := engine.Init(globalCtx, runCtx)
+	runSubCtx, runSubAbort := execution.NewTestRunContext(runCtx, piState.Logger)
+	engine.AbortFn = runSubAbort
+
+	run, waitFn, err := engine.Init(globalCtx, runSubCtx)
 	require.NoError(t, err)
 
 	var test *testStruct
 	test = &testStruct{
-		engine:    engine,
-		run:       run,
-		runCancel: runCancel,
+		engine:   engine,
+		run:      run,
+		runAbort: runSubAbort,
 		wait: func() {
-			test.runCancel()
+			runCancel()
 			globalCancel()
 			waitFn()
 			engine.OutputManager.StopOutputs(nil)
@@ -141,7 +146,7 @@ func TestEngineRun(t *testing.T) {
 		defer test.wait()
 
 		startTime := time.Now()
-		assert.ErrorContains(t, test.run(), "test run aborted by signal")
+		assert.ErrorContains(t, test.run(), "context deadline exceeded")
 		assert.WithinDuration(t, startTime.Add(duration), time.Now(), 100*time.Millisecond)
 		<-done
 	})
@@ -191,8 +196,8 @@ func TestEngineRun(t *testing.T) {
 		errC := make(chan error)
 		go func() { errC <- test.run() }()
 		<-signalChan
-		test.runCancel()
-		assert.ErrorContains(t, <-errC, "test run aborted by signal")
+		test.runAbort(fmt.Errorf("custom error"))
+		assert.ErrorContains(t, <-errC, "custom error")
 		test.wait()
 
 		found := 0
@@ -216,21 +221,6 @@ func TestEngineAtTime(t *testing.T) {
 	defer test.wait()
 
 	assert.NoError(t, test.run())
-}
-
-func TestEngineStopped(t *testing.T) {
-	t.Parallel()
-	test := newTestEngine(t, nil, nil, nil, lib.Options{
-		VUs:      null.IntFrom(1),
-		Duration: types.NullDurationFrom(20 * time.Second),
-	})
-	defer test.wait()
-
-	assert.NoError(t, test.run())
-	assert.Equal(t, false, test.engine.IsStopped(), "engine should be running")
-	test.engine.Stop()
-	assert.Equal(t, true, test.engine.IsStopped(), "engine should be stopped")
-	test.engine.Stop() // test that a second stop doesn't panic
 }
 
 func TestEngineOutput(t *testing.T) {
@@ -413,7 +403,7 @@ func TestEngineThresholdsWillAbort(t *testing.T) {
 		assert.Fail(t, "Test should have completed within 10 seconds")
 	}
 	test.wait()
-	assert.True(t, test.engine.thresholdsTainted)
+	assert.True(t, test.engine.IsTainted())
 }
 
 func TestEngineAbortedByThresholds(t *testing.T) {
@@ -434,7 +424,8 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 
 	thresholds := map[string]metrics.Thresholds{metric.Name: ths}
 
-	done := make(chan struct{})
+	doneIter := make(chan struct{})
+	doneRun := make(chan struct{})
 	runner := &minirunner.MiniRunner{
 		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
 			out <- metrics.Sample{
@@ -446,7 +437,7 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 				Value: 1.25,
 			}
 			<-ctx.Done()
-			close(done)
+			close(doneIter)
 			return nil
 		},
 	}
@@ -455,12 +446,18 @@ func TestEngineAbortedByThresholds(t *testing.T) {
 	defer test.wait()
 
 	go func() {
-		require.ErrorContains(t, test.run(), "aborted by failed thresholds")
+		defer close(doneRun)
+		t.Logf("test run done with err '%s'", err)
+		assert.ErrorContains(t, test.run(), "thresholds on metrics 'my_metric' were breached")
 	}()
 
 	select {
-	case <-done:
-		return
+	case <-doneIter:
+	case <-time.After(10 * time.Second):
+		assert.Fail(t, "Iteration should have completed within 10 seconds")
+	}
+	select {
+	case <-doneRun:
 	case <-time.After(10 * time.Second):
 		assert.Fail(t, "Test should have completed within 10 seconds")
 	}
@@ -896,57 +893,6 @@ func TestSetupException(t *testing.T) {
 	}
 }
 
-// TODO: delete when implementing https://github.com/grafana/k6/issues/1889, the
-// test functionality was duplicated in cmd/integration_test.go
-func TestVuInitException(t *testing.T) {
-	t.Parallel()
-
-	script := []byte(`
-		export let options = {
-			vus: 3,
-			iterations: 5,
-		};
-
-		export default function() {};
-
-		if (__VU == 2) {
-			throw new Error('oops in ' + __VU);
-		}
-	`)
-
-	piState := getTestPreInitState(t)
-	runner, err := js.New(
-		piState,
-		&loader.SourceData{URL: &url.URL{Scheme: "file", Path: "/script.js"}, Data: script},
-		nil,
-	)
-	require.NoError(t, err)
-
-	opts, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions(), nil)
-	require.NoError(t, err)
-
-	testState := getTestRunState(t, piState, opts, runner)
-
-	execScheduler, err := execution.NewScheduler(testState)
-	require.NoError(t, err)
-	engine, err := NewEngine(testState, execScheduler, nil)
-	require.NoError(t, err)
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-	_, _, err = engine.Init(ctx, ctx) // no need for 2 different contexts
-
-	require.Error(t, err)
-
-	var exception errext.Exception
-	require.ErrorAs(t, err, &exception)
-	assert.Equal(t, "Error: oops in 2\n\tat file:///script.js:10:9(29)\n", err.Error())
-
-	var errWithHint errext.HasHint
-	require.ErrorAs(t, err, &errWithHint)
-	assert.Equal(t, "error while initializing VU #2 (script exception)", errWithHint.Hint())
-}
-
 func TestEmittedMetricsWhenScalingDown(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
@@ -1208,7 +1154,7 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 	var test *testStruct
 	runner := &minirunner.MiniRunner{
 		Fn: func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
-			test.runCancel() // we cancel the run immediately after the test starts
+			test.runAbort(fmt.Errorf("custom error")) // we cancel the run immediately after the test starts
 			return nil
 		},
 		TeardownFn: func(_ context.Context, out chan<- metrics.SampleContainer) error {
@@ -1229,7 +1175,7 @@ func TestEngineRunsTeardownEvenAfterTestRunIsAborted(t *testing.T) {
 		VUs: null.IntFrom(1), Iterations: null.IntFrom(1),
 	}, piState)
 
-	assert.ErrorContains(t, test.run(), "test run aborted by signal")
+	assert.ErrorContains(t, test.run(), "custom error")
 	test.wait()
 
 	var count float64

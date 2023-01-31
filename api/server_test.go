@@ -9,15 +9,8 @@ import (
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/api/common"
-	"go.k6.io/k6/core"
-	"go.k6.io/k6/execution"
-	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/testutils/minirunner"
-	"go.k6.io/k6/metrics"
 )
 
 func testHTTPHandler(rw http.ResponseWriter, r *http.Request) {
@@ -37,7 +30,7 @@ func TestLogger(t *testing.T) {
 
 					l, hook := logtest.NewNullLogger()
 					l.Level = logrus.DebugLevel
-					newLogger(l, http.HandlerFunc(testHTTPHandler))(rw, r)
+					withLoggingHandler(l, http.HandlerFunc(testHTTPHandler))(rw, r)
 
 					res := rw.Result()
 					assert.Equal(t, http.StatusOK, res.StatusCode)
@@ -57,36 +50,10 @@ func TestLogger(t *testing.T) {
 	}
 }
 
-func TestWithEngine(t *testing.T) {
-	logger := logrus.New()
-	logger.SetOutput(testutils.NewTestOutput(t))
-	registry := metrics.NewRegistry()
-	testState := &lib.TestRunState{
-		TestPreInitState: &lib.TestPreInitState{
-			Logger:         logger,
-			Registry:       registry,
-			BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		},
-		Options: lib.Options{},
-		Runner:  &minirunner.MiniRunner{},
-	}
-
-	execScheduler, err := execution.NewScheduler(testState)
-	require.NoError(t, err)
-	engine, err := core.NewEngine(testState, execScheduler, nil)
-	require.NoError(t, err)
-
-	rw := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "http://example.com/", nil)
-	withEngine(engine, http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		assert.Equal(t, engine, common.GetEngine(r.Context()))
-	}))(rw, r)
-}
-
 func TestPing(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	mux := newHandler(logger)
+	mux := handlePing(logger)
 
 	rw := httptest.NewRecorder()
 	r := httptest.NewRequest("GET", "/ping", nil)
