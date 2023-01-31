@@ -1644,3 +1644,75 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 
 	assert.Contains(t, stdout, "output: Prometheus remote write")
 }
+
+func TestBrowserPermissions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		envVarValue      string
+		envVarMsgValue   string
+		expectedExitCode exitcodes.ExitCode
+		expectedError    string
+	}{
+		{
+			name:             "no env var set",
+			envVarValue:      "",
+			expectedExitCode: 107,
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true",
+		},
+		{
+			name:             "env var set but set to false",
+			envVarValue:      "false",
+			expectedExitCode: 107,
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true",
+		},
+		{
+			name:             "env var set but set to 09adsu",
+			envVarValue:      "09adsu",
+			expectedExitCode: 107,
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true",
+		},
+		{
+			name:             "with custom message",
+			envVarValue:      "09adsu",
+			envVarMsgValue:   "Try again later",
+			expectedExitCode: 107,
+			expectedError:    "Try again later",
+		},
+		{
+			name:             "env var set and set to true",
+			envVarValue:      "true",
+			expectedExitCode: 0,
+			expectedError:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			script := `
+			import { chromium } from 'k6/experimental/browser';
+
+			export default function() {};
+			`
+
+			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
+			if tt.envVarValue != "" {
+				t.Setenv("K6_BROWSER_ENABLE_RUN", tt.envVarValue)
+			}
+			if tt.envVarMsgValue != "" {
+				t.Setenv("K6_BROWSER_ENABLE_RUN_MSG", tt.envVarMsgValue)
+			}
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			loglines := ts.LoggerHook.Drain()
+
+			if tt.expectedError == "" {
+				require.Len(t, loglines, 0)
+				return
+			}
+
+			assert.Contains(t, loglines[0].Message, tt.expectedError)
+		})
+	}
+}
