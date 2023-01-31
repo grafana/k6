@@ -3,6 +3,7 @@ package k6
 
 import (
 	"errors"
+	"fmt"
 	"math/rand"
 	"sync/atomic"
 	"time"
@@ -21,6 +22,9 @@ var (
 	// ErrCheckInInitContext is returned when check() are using in the init context.
 	ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
 )
+
+const asyncFunctionNotSupportedMsg = "%s() does not support async functions as arguments, " +
+	"please see https://k6.io/docs/javascript-api/k6/group/#working-with-async-functions for more info"
 
 type (
 	// RootModule is the global module instance that will create module
@@ -85,16 +89,24 @@ func (mi *K6) RandomSeed(seed int64) {
 }
 
 // Group wraps a function call and executes it within the provided group name.
-func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
+func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 	state := mi.vu.State()
 	if state == nil {
 		return nil, ErrGroupInInitContext
 	}
 
-	if fn == nil {
+	if isNullish(val) {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
-
+	fn, ok := goja.AssertFunction(val)
+	if !ok {
+		return nil, errors.New("group() requires a callback as a second argument")
+	}
+	rt := mi.vu.Runtime()
+	o := val.ToObject(rt)
+	if o.ClassName() == "AsyncFunction" {
+		return goja.Undefined(), fmt.Errorf(asyncFunctionNotSupportedMsg, "group")
+	}
 	g, err := state.Group.Group(name)
 	if err != nil {
 		return goja.Undefined(), err
@@ -137,7 +149,12 @@ func (mi *K6) Group(name string, fn goja.Callable) (goja.Value, error) {
 	return ret, err
 }
 
+func isNullish(val goja.Value) bool {
+	return val == nil || goja.IsNull(val) || goja.IsUndefined(val)
+}
+
 // Check will emit check metrics for the provided checks.
+//
 //nolint:cyclop
 func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := mi.vu.State()
@@ -174,6 +191,10 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 		tags := commonTagsAndMeta.Tags
 		if state.Options.SystemTags.Has(metrics.TagCheck) {
 			tags = tags.With("check", check.Name)
+		}
+
+		if !isNullish(val) && val.ToObject(rt).ClassName() == "AsyncFunction" {
+			return false, fmt.Errorf(asyncFunctionNotSupportedMsg, "check")
 		}
 
 		// Resolve callables into values.
