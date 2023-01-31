@@ -1,5 +1,5 @@
 import { check } from 'k6';
-import { chromium } from 'k6/x/browser';
+import { chromium } from 'k6/experimental/browser';
 
 export const options = {
   thresholds: {
