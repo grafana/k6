@@ -191,14 +191,14 @@ func TestGroup(t *testing.T) {
 		t.Parallel()
 		rt, _, _ := setupGroupTest()
 		_, err := rt.RunString(`k6.group("something", async function() { })`)
-		assert.ErrorContains(t, err, "group: async functions are not supported as arguments")
+		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
 	})
 
 	t.Run("async lambda", func(t *testing.T) {
 		t.Parallel()
 		rt, _, _ := setupGroupTest()
 		_, err := rt.RunString(`k6.group("something", async () => { })`)
-		assert.ErrorContains(t, err, "group: async functions are not supported as arguments")
+		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
 	})
 }
 
@@ -290,14 +290,14 @@ func TestCheckObject(t *testing.T) {
 		t.Parallel()
 		rt, _, _ := checkTestRuntime(t)
 		_, err := rt.RunString(`k6.check("something", {"async": async function() { }})`)
-		assert.ErrorContains(t, err, "check: async functions are not supported as arguments")
+		assert.ErrorContains(t, err, "check() does not support async functions as arguments")
 	})
 
 	t.Run("async lambda", func(t *testing.T) {
 		t.Parallel()
 		rt, _, _ := checkTestRuntime(t)
 		_, err := rt.RunString(`k6.check("something", {"async": async () =>{ }})`)
-		assert.ErrorContains(t, err, "check: async functions are not supported as arguments")
+		assert.ErrorContains(t, err, "check() does not support async functions as arguments")
 	})
 }
 
