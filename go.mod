@@ -13,7 +13,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.5.0
-	github.com/grafana/xk6-browser v0.7.0
+	github.com/grafana/xk6-browser v0.8.0
 	github.com/grafana/xk6-output-prometheus-remote v0.1.0
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
@@ -61,8 +61,6 @@ require (
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-redis/redis/v8 v8.11.5 // indirect
 	github.com/golang/snappy v0.0.4 // indirect
-	github.com/hashicorp/errwrap v1.1.0 // indirect
-	github.com/hashicorp/go-multierror v1.1.1 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.2-0.20181231171920-c182affec369 // indirect
@@ -74,9 +72,9 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	go.buf.build/grpc/go/gogo/protobuf v1.4.9 // indirect
 	go.buf.build/grpc/go/prometheus/prometheus v1.4.4 // indirect
-	golang.org/x/exp v0.0.0-20221106115401-f9659909a136 // indirect
 	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
 	golang.org/x/sys v0.1.0 // indirect
 	golang.org/x/text v0.4.0 // indirect
+	golang.org/x/tools v0.2.0 // indirect
 	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
 )
