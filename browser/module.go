@@ -2,15 +2,11 @@
 package browser
 
 import (
-	"errors"
-	"os"
-
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 
-	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 )
 
@@ -47,15 +43,6 @@ func New() *RootModule {
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	if _, ok := os.LookupEnv("K6_BROWSER_DISABLE_RUN"); ok {
-		msg := "Disable run flag enabled, browser test run aborted. Please contact support."
-		if m, ok := os.LookupEnv("K6_BROWSER_DISABLE_RUN_MSG"); ok {
-			msg = m
-		}
-
-		k6common.Throw(vu.Runtime(), errors.New(msg))
-	}
-
 	// promises and inner objects need the VU object to be
 	// able to use k6-core specific functionality.
 	ctx := k6ext.WithVU(vu.Context(), vu)
