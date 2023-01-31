@@ -29,7 +29,7 @@ type httpDir struct {
 }
 
 func (d httpDir) Open(name string) (http.File, error) {
-	if filepath.Separator != '/' && strings.ContainsRune(name, filepath.Separator) ||
+	if filepath.Separator != '/' && strings.IndexRune(name, filepath.Separator) >= 0 ||
 		strings.Contains(name, "\x00") {
 		return nil, errors.New("http: invalid character in file path")
 	}
@@ -65,10 +65,6 @@ func (h HttpFs) Create(name string) (File, error) {
 
 func (h HttpFs) Chmod(name string, mode os.FileMode) error {
 	return h.source.Chmod(name, mode)
-}
-
-func (h HttpFs) Chown(name string, uid, gid int) error {
-	return h.source.Chown(name, uid, gid)
 }
 
 func (h HttpFs) Chtimes(name string, atime time.Time, mtime time.Time) error {

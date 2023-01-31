@@ -75,10 +75,6 @@ func (u *CacheOnReadFs) copyToLayer(name string) error {
 	return copyToLayer(u.base, u.layer, name)
 }
 
-func (u *CacheOnReadFs) copyFileToLayer(name string, flag int, perm os.FileMode) error {
-	return copyFileToLayer(u.base, u.layer, name, flag, perm)
-}
-
 func (u *CacheOnReadFs) Chtimes(name string, atime, mtime time.Time) error {
 	st, _, err := u.cacheStatus(name)
 	if err != nil {
@@ -119,27 +115,6 @@ func (u *CacheOnReadFs) Chmod(name string, mode os.FileMode) error {
 		return err
 	}
 	return u.layer.Chmod(name, mode)
-}
-
-func (u *CacheOnReadFs) Chown(name string, uid, gid int) error {
-	st, _, err := u.cacheStatus(name)
-	if err != nil {
-		return err
-	}
-	switch st {
-	case cacheLocal:
-	case cacheHit:
-		err = u.base.Chown(name, uid, gid)
-	case cacheStale, cacheMiss:
-		if err := u.copyToLayer(name); err != nil {
-			return err
-		}
-		err = u.base.Chown(name, uid, gid)
-	}
-	if err != nil {
-		return err
-	}
-	return u.layer.Chown(name, uid, gid)
 }
 
 func (u *CacheOnReadFs) Stat(name string) (os.FileInfo, error) {
@@ -216,7 +191,7 @@ func (u *CacheOnReadFs) OpenFile(name string, flag int, perm os.FileMode) (File,
 	switch st {
 	case cacheLocal, cacheHit:
 	default:
-		if err := u.copyFileToLayer(name, flag, perm); err != nil {
+		if err := u.copyToLayer(name); err != nil {
 			return nil, err
 		}
 	}

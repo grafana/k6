@@ -106,5 +106,5 @@ func glob(fs Fs, dir, pattern string, matches []string) (m []string, e error) {
 // recognized by Match.
 func hasMeta(path string) bool {
 	// TODO(niemeyer): Should other magic characters be added here?
-	return strings.ContainsAny(path, "*?[")
+	return strings.IndexAny(path, "*?[") >= 0
 }

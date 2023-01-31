@@ -18,19 +18,15 @@ import (
 	"bytes"
 	"errors"
 	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
 	"sync/atomic"
-	"time"
-
-	"github.com/spf13/afero/internal/common"
 )
 
-const FilePathSeparator = string(filepath.Separator)
+import "time"
 
-var _ fs.ReadDirFile = &File{}
+const FilePathSeparator = string(filepath.Separator)
 
 type File struct {
 	// atomic requires 64-bit alignment for struct field access
@@ -61,8 +57,6 @@ type FileData struct {
 	dir     bool
 	mode    os.FileMode
 	modtime time.Time
-	uid     int
-	gid     int
 }
 
 func (d *FileData) Name() string {
@@ -76,7 +70,7 @@ func CreateFile(name string) *FileData {
 }
 
 func CreateDir(name string) *FileData {
-	return &FileData{name: name, memDir: &DirMap{}, dir: true, modtime: time.Now()}
+	return &FileData{name: name, memDir: &DirMap{}, dir: true}
 }
 
 func ChangeFileName(f *FileData, newname string) {
@@ -99,18 +93,6 @@ func SetModTime(f *FileData, mtime time.Time) {
 
 func setModTime(f *FileData, mtime time.Time) {
 	f.modtime = mtime
-}
-
-func SetUID(f *FileData, uid int) {
-	f.Lock()
-	f.uid = uid
-	f.Unlock()
-}
-
-func SetGID(f *FileData, gid int) {
-	f.Lock()
-	f.gid = gid
-	f.Unlock()
 }
 
 func GetFileInfo(f *FileData) *FileInfo {
@@ -188,23 +170,10 @@ func (f *File) Readdirnames(n int) (names []string, err error) {
 	return names, err
 }
 
-// Implements fs.ReadDirFile
-func (f *File) ReadDir(n int) ([]fs.DirEntry, error) {
-	fi, err := f.Readdir(n)
-	if err != nil {
-		return nil, err
-	}
-	di := make([]fs.DirEntry, len(fi))
-	for i, f := range fi {
-		di[i] = common.FileInfoDirEntry{FileInfo: f}
-	}
-	return di, nil
-}
-
 func (f *File) Read(b []byte) (n int, err error) {
 	f.fileData.Lock()
 	defer f.fileData.Unlock()
-	if f.closed {
+	if f.closed == true {
 		return 0, ErrFileClosed
 	}
 	if len(b) > 0 && int(f.at) == len(f.fileData.data) {
@@ -224,15 +193,12 @@ func (f *File) Read(b []byte) (n int, err error) {
 }
 
 func (f *File) ReadAt(b []byte, off int64) (n int, err error) {
-	prev := atomic.LoadInt64(&f.at)
 	atomic.StoreInt64(&f.at, off)
-	n, err = f.Read(b)
-	atomic.StoreInt64(&f.at, prev)
-	return
+	return f.Read(b)
 }
 
 func (f *File) Truncate(size int64) error {
-	if f.closed {
+	if f.closed == true {
 		return ErrFileClosed
 	}
 	if f.readOnly {
@@ -241,8 +207,6 @@ func (f *File) Truncate(size int64) error {
 	if size < 0 {
 		return ErrOutOfRange
 	}
-	f.fileData.Lock()
-	defer f.fileData.Unlock()
 	if size > int64(len(f.fileData.data)) {
 		diff := size - int64(len(f.fileData.data))
 		f.fileData.data = append(f.fileData.data, bytes.Repeat([]byte{00}, int(diff))...)
@@ -254,24 +218,21 @@ func (f *File) Truncate(size int64) error {
 }
 
 func (f *File) Seek(offset int64, whence int) (int64, error) {
-	if f.closed {
+	if f.closed == true {
 		return 0, ErrFileClosed
 	}
 	switch whence {
-	case io.SeekStart:
+	case 0:
 		atomic.StoreInt64(&f.at, offset)
-	case io.SeekCurrent:
-		atomic.AddInt64(&f.at, offset)
-	case io.SeekEnd:
+	case 1:
+		atomic.AddInt64(&f.at, int64(offset))
+	case 2:
 		atomic.StoreInt64(&f.at, int64(len(f.fileData.data))+offset)
 	}
 	return f.at, nil
 }
 
 func (f *File) Write(b []byte) (n int, err error) {
-	if f.closed {
-		return 0, ErrFileClosed
-	}
 	if f.readOnly {
 		return 0, &os.PathError{Op: "write", Path: f.fileData.name, Err: errors.New("file handle is read only")}
 	}
@@ -285,7 +246,7 @@ func (f *File) Write(b []byte) (n int, err error) {
 		tail = f.fileData.data[n+int(cur):]
 	}
 	if diff > 0 {
-		f.fileData.data = append(f.fileData.data, append(bytes.Repeat([]byte{00}, int(diff)), b...)...)
+		f.fileData.data = append(bytes.Repeat([]byte{00}, int(diff)), b...)
 		f.fileData.data = append(f.fileData.data, tail...)
 	} else {
 		f.fileData.data = append(f.fileData.data[:cur], b...)
@@ -293,7 +254,7 @@ func (f *File) Write(b []byte) (n int, err error) {
 	}
 	setModTime(f.fileData, time.Now())
 
-	atomic.AddInt64(&f.at, int64(n))
+	atomic.StoreInt64(&f.at, int64(len(f.fileData.data)))
 	return
 }
 
@@ -348,8 +309,8 @@ func (s *FileInfo) Size() int64 {
 
 var (
 	ErrFileClosed        = errors.New("File is closed")
-	ErrOutOfRange        = errors.New("out of range")
-	ErrTooLarge          = errors.New("too large")
+	ErrOutOfRange        = errors.New("Out of range")
+	ErrTooLarge          = errors.New("Too large")
 	ErrFileNotFound      = os.ErrNotExist
 	ErrFileExists        = os.ErrExist
 	ErrDestinationExists = os.ErrExist

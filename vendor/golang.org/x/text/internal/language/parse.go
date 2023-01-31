@@ -270,7 +270,7 @@ func parse(scan *scanner, s string) (t Tag, err error) {
 	} else if n >= 4 {
 		return Und, ErrSyntax
 	} else { // the usual case
-		t, end = parseTag(scan, true)
+		t, end = parseTag(scan)
 		if n := len(scan.token); n == 1 {
 			t.pExt = uint16(end)
 			end = parseExtensions(scan)
@@ -296,8 +296,7 @@ func parse(scan *scanner, s string) (t Tag, err error) {
 
 // parseTag parses language, script, region and variants.
 // It returns a Tag and the end position in the input that was parsed.
-// If doNorm is true, then <lang>-<extlang> will be normalized to <extlang>.
-func parseTag(scan *scanner, doNorm bool) (t Tag, end int) {
+func parseTag(scan *scanner) (t Tag, end int) {
 	var e error
 	// TODO: set an error if an unknown lang, script or region is encountered.
 	t.LangID, e = getLangID(scan.token)
@@ -308,17 +307,14 @@ func parseTag(scan *scanner, doNorm bool) (t Tag, end int) {
 	for len(scan.token) == 3 && isAlpha(scan.token[0]) {
 		// From http://tools.ietf.org/html/bcp47, <lang>-<extlang> tags are equivalent
 		// to a tag of the form <extlang>.
-		if doNorm {
-			lang, e := getLangID(scan.token)
-			if lang != 0 {
-				t.LangID = lang
-				langStr := lang.String()
-				copy(scan.b[langStart:], langStr)
-				scan.b[langStart+len(langStr)] = '-'
-				scan.start = langStart + len(langStr) + 1
-			}
-			scan.gobble(e)
+		lang, e := getLangID(scan.token)
+		if lang != 0 {
+			t.LangID = lang
+			copy(scan.b[langStart:], lang.String())
+			scan.b[langStart+3] = '-'
+			scan.start = langStart + 4
 		}
+		scan.gobble(e)
 		end = scan.scan()
 	}
 	if len(scan.token) == 4 && isAlpha(scan.token[0]) {
@@ -563,7 +559,7 @@ func parseExtension(scan *scanner) int {
 	case 't': // https://www.ietf.org/rfc/rfc6497.txt
 		scan.scan()
 		if n := len(scan.token); n >= 2 && n <= 3 && isAlpha(scan.token[1]) {
-			_, end = parseTag(scan, false)
+			_, end = parseTag(scan)
 			scan.toLower(start, end)
 		}
 		for len(scan.token) == 2 && !isAlpha(scan.token[1]) {
