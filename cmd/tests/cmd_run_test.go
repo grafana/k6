@@ -1698,10 +1698,10 @@ func TestBrowserPermissions(t *testing.T) {
 
 			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
 			if tt.envVarValue != "" {
-				t.Setenv("K6_BROWSER_ENABLE_RUN", tt.envVarValue)
+				ts.Env["K6_BROWSER_ENABLE_RUN"] = tt.envVarValue
 			}
 			if tt.envVarMsgValue != "" {
-				t.Setenv("K6_BROWSER_ENABLE_RUN_MSG", tt.envVarMsgValue)
+				ts.Env["K6_BROWSER_ENABLE_RUN_MSG"] = tt.envVarMsgValue
 			}
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 

@@ -2,7 +2,6 @@ package browser
 
 import (
 	"errors"
-	"os"
 	"strconv"
 
 	xk6browser "github.com/grafana/xk6-browser/browser"
@@ -25,16 +24,18 @@ func New() *RootModule {
 }
 
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	env := vu.InitEnv()
+
 	throwError := func() {
 		msg := "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true"
-		if m, ok := os.LookupEnv("K6_BROWSER_ENABLE_RUN_MSG"); ok && m != "" {
+		if m, ok := env.LookupEnv("K6_BROWSER_ENABLE_RUN_MSG"); ok && m != "" {
 			msg = m
 		}
 
 		common.Throw(vu.Runtime(), errors.New(msg))
 	}
 
-	vs, ok := os.LookupEnv("K6_BROWSER_ENABLE_RUN")
+	vs, ok := env.LookupEnv("K6_BROWSER_ENABLE_RUN")
 	if !ok {
 		throwError()
 	}
