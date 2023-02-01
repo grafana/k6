@@ -568,50 +568,6 @@ func TestSetupRemove(t *testing.T) {
 	assert.Contains(t, stdOut, `checks.........................: 100.00% ✓ 1000`)
 }
 
-func BenchmarkReadResponseBody(b *testing.B) {
-	httpSrv := httpmultibin.NewHTTPMultiBin(b)
-
-	script := httpSrv.Replacer.Replace(`
-		import http from "k6/http";
-		import { check } from "k6";
-
-		let statusCheck = { "status is 200": (r) => r.status === 200 }
-
-		export let options = {
-			iterations: 10000,
-			vus: 100
-		};
-		
-		export default function () {
-			let bytes = randomIntBetween(10 * 1024, 1 * 1024 * 1024)
-
-			let response = http.get(http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `)
-			check(response, statusCheck)
-
-			let responses = http.batch([
-										["GET", http.url` + "`HTTPBIN_IP_URL/stream-bytes/${bytes}`" + `],
-										["GET", http.url` + "`HTTPBIN_IP_URL/stream-bytes/${bytes}`" + `],
-										["GET", http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `],
-										["GET", http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `],
-										["GET", http.url` + "`HTTPBIN_IP_URL/gzip`" + `],
-										["GET", http.url` + "`HTTPBIN_IP_URL/deflate`" + `],
-										["GET", http.url` + "`HTTPBIN_IP_URL/image/jpeg`" + `],
-									]);
-			responses.forEach(res => check(res, statusCheck))
-		};
-		
-		function randomIntBetween(min, max) {
-			return Math.floor(Math.random() * (max - min + 1) + min);
-		}
-	`)
-
-	ts := getSimpleCloudOutputTestState(b, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	stdOut := ts.Stdout.String()
-	assert.Contains(b, stdOut, `checks.........................: 9`)
-}
-
 func TestThresholdsFailed(t *testing.T) {
 	t.Parallel()
 	script := `
@@ -1718,4 +1674,47 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 	ts.OutMutex.Unlock()
 
 	assert.Contains(t, stdout, "output: Prometheus remote write")
+}
+
+func BenchmarkReadResponseBody(b *testing.B) {
+	httpSrv := httpmultibin.NewHTTPMultiBin(b)
+	fmt.Println(httpSrv.ServerHTTP.URL)
+
+	script := httpSrv.Replacer.Replace(`
+		import http from "k6/http";
+		import { check, sleep } from "k6";
+
+		let statusCheck = { "status is 200": (r) => r.status === 200 }
+
+		export let options = {
+			duration: '2m',
+			vus: 500
+		};
+		
+		export default function () {
+			let bytes = randomIntBetween(100 * 1024, 5 * 1024 * 1024)
+
+			let response = http.get(http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `)
+			check(response, statusCheck)
+
+			let responses = http.batch([
+										["GET", http.url` + "`HTTPBIN_IP_URL/stream-bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/stream-bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/gzip`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/deflate`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/image/jpeg`" + `],
+									]);
+			responses.forEach(res => check(res, statusCheck))
+			sleep(0.1)
+		};
+		
+		function randomIntBetween(min, max) {
+			return Math.floor(Math.random() * (max - min + 1) + min);
+		}
+	`)
+
+	ts := getSimpleCloudOutputTestState(b, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
