@@ -1687,7 +1687,7 @@ func BenchmarkReadResponseBody(b *testing.B) {
 		let statusCheck = { "status is 200": (r) => r.status === 200 }
 
 		export let options = {
-			duration: '2m',
+			duration: '10s',
 			vus: 500
 		};
 		
