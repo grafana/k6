@@ -1656,7 +1656,7 @@ func BenchmarkReadResponseBody(b *testing.B) {
 
 		export let options = {
 			duration: '10s',
-			vus: 500
+			vus: 10
 		};
 		
 		export default function () {
