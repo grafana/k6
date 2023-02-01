@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -500,9 +501,10 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		export let options = {
 			iterations: 5,
 			thresholds: {
-				"setup_teardown": ["count == 2"],
+				"setup_teardown": ["count == 3"],
 				"iterations": ["count == 5"],
-				"http_reqs": ["count == 7"],
+				"http_reqs": ["count == 8"],
+				"checks": ["rate == 1"]
 			},
 		};
 
@@ -519,13 +521,37 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`)
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	cliFlags := []string{"-v", "--log-output=stdout", "--linger"}
+	ts := getSimpleCloudOutputTestState(t, script, cliFlags, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+
+	sendSignal := injectMockSignalNotifier(ts)
+	asyncWaitForStdoutAndRun(t, ts, 20, 500*time.Millisecond, "waiting for Ctrl+C to continue", func() {
+		defer func() {
+			sendSignal <- syscall.SIGINT
+			<-sendSignal
+		}()
+		t.Logf("Linger reached, running teardown again and stopping the test...")
+		req, err := http.NewRequestWithContext(
+			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.Address), nil,
+		)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		t.Logf("Response body: %s", body)
+		assert.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdOut := ts.Stdout.String()
-	assert.Contains(t, stdOut, `✓ http_reqs......................: 7`)
+	t.Log(stdOut)
+	assert.Contains(t, stdOut, `✓ checks.........................: 100.00% ✓ 8`)
+	assert.Contains(t, stdOut, `✓ http_reqs......................: 8`)
 	assert.Contains(t, stdOut, `✓ iterations.....................: 5`)
-	assert.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
+	assert.Contains(t, stdOut, `✓ setup_teardown.................: 3`)
 
 	logMsgs := ts.LoggerHook.Drain()
 	for _, msg := range logMsgs {
@@ -533,7 +559,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 			assert.Failf(t, "unexpected log message", "level %s, msg '%s'", msg.Level, msg.Message)
 		}
 	}
-	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Running thresholds on 3 metrics..."))
+	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Running thresholds on 4 metrics..."))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Finalizing thresholds..."))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics emission of VUs and VUsMax metrics stopped"))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics processing finished!"))
@@ -659,7 +685,7 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 
 	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort)
 
-	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "simple iter 2")
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 30, 300*time.Millisecond, "simple iter 2")
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -717,10 +743,8 @@ func asyncWaitForStdoutAndRun(
 	t.Cleanup(wg.Wait) // ensure the test waits for the goroutine to finish
 }
 
-func asyncWaitForStdoutAndStopTestWithInterruptSignal(
-	t *testing.T, ts *GlobalTestState, attempts int, interval time.Duration, expText string,
-) {
-	sendSignal := make(chan struct{})
+func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
+	sendSignal = make(chan os.Signal)
 	ts.GlobalState.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
 		isAbortNotify := false
 		for _, s := range signals {
@@ -733,16 +757,22 @@ func asyncWaitForStdoutAndStopTestWithInterruptSignal(
 			return
 		}
 		go func() {
-			<-sendSignal
-			c <- os.Interrupt
+			sig := <-sendSignal
+			c <- sig
 			close(sendSignal)
 		}()
 	}
 	ts.GlobalState.SignalStop = func(c chan<- os.Signal) { /* noop */ }
+	return sendSignal
+}
 
+func asyncWaitForStdoutAndStopTestWithInterruptSignal(
+	t *testing.T, ts *GlobalTestState, attempts int, interval time.Duration, expText string,
+) {
+	sendSignal := injectMockSignalNotifier(ts)
 	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
 		t.Log("expected stdout text was found, sending interrupt signal...")
-		sendSignal <- struct{}{}
+		sendSignal <- syscall.SIGINT
 		<-sendSignal
 	})
 }
