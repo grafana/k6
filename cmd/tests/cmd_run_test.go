@@ -1647,7 +1647,6 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 
 func BenchmarkReadResponseBody(b *testing.B) {
 	httpSrv := httpmultibin.NewHTTPMultiBin(b)
-	fmt.Println(httpSrv.ServerHTTP.URL)
 
 	script := httpSrv.Replacer.Replace(`
 		import http from "k6/http";
