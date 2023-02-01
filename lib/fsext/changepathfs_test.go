@@ -1,10 +1,12 @@
 package fsext
 
 import (
+	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"path"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -73,15 +75,15 @@ func TestChangePathFs(t *testing.T) {
 	t.Run("OpenFile", func(t *testing.T) {
 		t.Parallel()
 		c := newTestFS()
-		f, err := c.OpenFile(filePath, os.O_RDWR, 0o644)
+		f, err := c.OpenFile(filePath, syscall.O_RDWR, 0o644)
 		require.NoError(t, err)
 		require.Equal(t, filePath, f.Name())
 
-		_, err = c.OpenFile("/notanother/path/to/file.txt", os.O_RDWR, 0o644)
+		_, err = c.OpenFile("/notanother/path/to/file.txt", syscall.O_RDWR, 0o644)
 		checkErrorPath(t, err, "/notanother/path/to/file.txt")
 
-		_, err = c.OpenFile("/another/nonexistant", os.O_RDWR, 0o644)
-		require.True(t, os.IsNotExist(err))
+		_, err = c.OpenFile("/another/nonexistant", syscall.O_RDWR, 0o644)
+		require.True(t, errors.Is(err, fs.ErrNotExist))
 	})
 
 	t.Run("Stat Chmod Chtimes", func(t *testing.T) {
@@ -96,7 +98,7 @@ func TestChangePathFs(t *testing.T) {
 		require.NoError(t, c.Chtimes(filePath, time.Now(), sometime))
 		require.Equal(t, sometime, info.ModTime())
 
-		mode := os.FileMode(0o007)
+		mode := fs.FileMode(0o007)
 		require.NotEqual(t, mode, info.Mode())
 		require.NoError(t, c.Chmod(filePath, mode))
 		require.Equal(t, mode, info.Mode())
@@ -132,7 +134,7 @@ func TestChangePathFs(t *testing.T) {
 
 		_, err = c.Stat(filePath)
 		require.Error(t, err)
-		require.True(t, os.IsNotExist(err))
+		require.True(t, errors.Is(err, fs.ErrNotExist))
 
 		info, err = c.Stat("/another/path/to/file.doc")
 		require.NoError(t, err)
@@ -158,7 +160,7 @@ func TestChangePathFs(t *testing.T) {
 
 		_, err = c.Stat(removeFilePath)
 		require.Error(t, err)
-		require.True(t, os.IsNotExist(err))
+		require.True(t, errors.Is(err, fs.ErrNotExist))
 
 		_, err = c.Create(removeFilePath)
 		require.NoError(t, err)
@@ -167,7 +169,7 @@ func TestChangePathFs(t *testing.T) {
 
 		_, err = c.Stat(removeFilePath)
 		require.Error(t, err)
-		require.True(t, os.IsNotExist(err))
+		require.True(t, errors.Is(err, fs.ErrNotExist))
 
 		checkErrorPath(t,
 			c.Remove("/notanother/path/to/file.txt"),
@@ -181,7 +183,7 @@ func TestChangePathFs(t *testing.T) {
 
 func checkErrorPath(t *testing.T, err error, path string) {
 	require.Error(t, err)
-	p, ok := err.(*os.PathError)
-	require.True(t, ok)
-	require.Equal(t, p.Path, path)
+	var perr *fs.PathError
+	require.True(t, errors.As(err, &perr))
+	require.Equal(t, perr.Path, path)
 }

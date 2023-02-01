@@ -6,9 +6,9 @@ import (
 	"crypto/x509"
 	"fmt"
 	"io"
-	"os"
 	"path/filepath"
 	"sync"
+	"syscall"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -113,7 +113,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			// this is against our general approach of not using `os` directly and makes testing harder
 			keylogFilename = filepath.Join(lt.pwd, keylogFilename)
 		}
-		f, err := lt.fs.OpenFile(keylogFilename, os.O_WRONLY|os.O_CREATE|os.O_APPEND, 0o600)
+		f, err := lt.fs.OpenFile(keylogFilename, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_APPEND, 0o600)
 		if err != nil {
 			return fmt.Errorf("couldn't get absolute path for keylog file: %w", err)
 		}

@@ -4,11 +4,13 @@ package log
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"strings"
+	"syscall"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -96,11 +98,11 @@ func (h *fileHook) openFile(getCwd func() (string, error)) error {
 		path = filepath.Join(cwd, path)
 	}
 
-	if _, err := h.fs.Stat(filepath.Dir(path)); os.IsNotExist(err) {
+	if _, err := h.fs.Stat(filepath.Dir(path)); errors.Is(err, fs.ErrNotExist) {
 		return fmt.Errorf("provided directory '%s' does not exist", filepath.Dir(path))
 	}
 
-	file, err := h.fs.OpenFile(path, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o600)
+	file, err := h.fs.OpenFile(path, syscall.O_WRONLY|syscall.O_APPEND|syscall.O_CREAT, 0o600)
 	if err != nil {
 		return fmt.Errorf("failed to open logfile %s: %w", path, err)
 	}
