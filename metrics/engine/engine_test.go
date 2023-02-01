@@ -75,7 +75,8 @@ func TestNewMetricsEngineNoThresholds(t *testing.T) {
 
 	trs := &lib.TestRunState{
 		TestPreInitState: &lib.TestPreInitState{
-			Logger: testutils.NewLogger(t),
+			Logger:   testutils.NewLogger(t),
+			Registry: metrics.NewRegistry(),
 		},
 	}
 
@@ -131,7 +132,16 @@ func TestMetricsEngineEvaluateThresholdNoAbort(t *testing.T) {
 			// me.metricsWithThresholds = []*metrics.Metric{m1, m2}
 			me.metricsWithThresholds[m1] = ths
 			me.metricsWithThresholds[m2] = metrics.Thresholds{}
-			m1.Sink.Add(metrics.Sample{Value: 6.0})
+
+			csink := &metrics.CounterSink{}
+			csink.Add(metrics.Sample{Value: 6.0})
+			me.observedMetrics[m1] = &ObservedMetric{
+				sink: csink,
+			}
+
+			me.observedMetrics[m2] = &ObservedMetric{
+				sink: &metrics.CounterSink{},
+			}
 
 			breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
 			require.Equal(t, tc.abortOnFail, abort)
@@ -159,6 +169,16 @@ func TestMetricsEngineEvaluateIgnoreEmptySink(t *testing.T) {
 	// me.metricsWithThresholds = []*metrics.Metric{m1, m2}
 	me.metricsWithThresholds[m1] = ths
 	me.metricsWithThresholds[m2] = metrics.Thresholds{}
+
+	me.observedMetrics[m1] = &ObservedMetric{
+		Metric: m1,
+		sink:   &metrics.CounterSink{},
+	}
+
+	me.observedMetrics[m2] = &ObservedMetric{
+		Metric: m2,
+		sink:   &metrics.CounterSink{},
+	}
 
 	breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
 	require.True(t, abort)
@@ -205,6 +225,7 @@ func newTestMetricsEngine(t *testing.T) MetricsEngine {
 		logger:                trs.Logger,
 		test:                  trs,
 		metricsWithThresholds: make(map[*metrics.Metric]metrics.Thresholds),
+		observedMetrics:       make(map[*metrics.Metric]*ObservedMetric),
 	}
 }
 

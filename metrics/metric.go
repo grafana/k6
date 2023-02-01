@@ -20,8 +20,6 @@ type Metric struct {
 	Tainted    null.Bool    `json:"tainted"`
 	Submetrics []*Submetric `json:"submetrics"`
 	Sub        *Submetric   `json:"-"`
-	Sink       Sink         `json:"-"`
-	Observed   bool         `json:"-"`
 }
 
 // A Submetric represents a filtered dataset based on a parent metric.

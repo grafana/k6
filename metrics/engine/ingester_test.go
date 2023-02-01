@@ -21,9 +21,14 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	ingester := outputIngester{
 		logger: piState.Logger,
 		metricsEngine: &MetricsEngine{
-			ObservedMetrics: make(map[string]*metrics.Metric),
+			observedMetrics: make(map[*metrics.Metric]*ObservedMetric),
 		},
 	}
+	ingester.metricsEngine.observedMetrics[testMetric] = &ObservedMetric{
+		Metric: testMetric,
+		sink:   &metrics.TrendSink{},
+	}
+
 	require.NoError(t, ingester.Start())
 	ingester.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		TimeSeries: metrics.TimeSeries{Metric: testMetric},
@@ -35,13 +40,12 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	require.Len(t, ingester.metricsEngine.ObservedMetrics, 1)
-	metric := ingester.metricsEngine.ObservedMetrics["test_metric"]
-	require.NotNil(t, metric)
-	require.NotNil(t, metric.Sink)
-	assert.Equal(t, testMetric, metric)
+	ometric := ingester.metricsEngine.observedMetrics[testMetric]
+	require.NotNil(t, ometric)
+	require.NotNil(t, ometric.sink)
+	assert.Equal(t, testMetric, ometric.Metric)
 
-	sink := metric.Sink.(*metrics.TrendSink) //nolint:forcetypeassert
+	sink := ometric.sink.(*metrics.TrendSink) //nolint:forcetypeassert
 	assert.Equal(t, 42.0, sink.Sum)
 }
 
@@ -56,13 +60,13 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 		test: &lib.TestRunState{
 			TestPreInitState: piState,
 		},
-		ObservedMetrics: make(map[string]*metrics.Metric),
+		observedMetrics: make(map[*metrics.Metric]*ObservedMetric),
 	}
-	_, err = me.getThresholdMetricOrSubmetric("test_metric{a:1}")
+	submetric, err := me.getThresholdMetricOrSubmetric("test_metric{a:1}")
 	require.NoError(t, err)
 
 	// assert that observed metrics is empty before to start
-	require.Empty(t, me.ObservedMetrics)
+	require.Len(t, me.observedMetrics, 0)
 
 	ingester := outputIngester{
 		logger:        piState.Logger,
@@ -79,21 +83,23 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	require.Len(t, ingester.metricsEngine.ObservedMetrics, 2)
+	require.Len(t, ingester.metricsEngine.observedMetrics, 2)
 
 	// assert the parent has been observed
-	metric := ingester.metricsEngine.ObservedMetrics["test_metric"]
-	require.NotNil(t, metric)
-	require.NotNil(t, metric.Sink)
-	assert.IsType(t, &metrics.GaugeSink{}, metric.Sink)
+	ometric := ingester.metricsEngine.observedMetrics[testMetric]
+	require.NotNil(t, ometric)
+	require.NotNil(t, ometric.sink)
+	assert.IsType(t, &metrics.GaugeSink{}, ometric.sink)
+	assert.Equal(t, 21, ometric.sink.(*metrics.GaugeSink).Value)
 
 	// assert the submetric has been observed
-	metric = ingester.metricsEngine.ObservedMetrics["test_metric{a:1}"]
-	require.NotNil(t, metric)
-	require.NotNil(t, metric.Sink)
-	require.NotNil(t, metric.Sub)
-	assert.EqualValues(t, map[string]string{"a": "1"}, metric.Sub.Tags.Map())
-	assert.IsType(t, &metrics.GaugeSink{}, metric.Sink)
+	ometric = ingester.metricsEngine.observedMetrics[submetric]
+	require.NotNil(t, ometric)
+	require.NotNil(t, ometric.sink)
+	require.NotNil(t, ometric.Metric.Sub)
+	assert.EqualValues(t, map[string]string{"a": "1"}, ometric.Metric.Sub.Tags.Map())
+	assert.IsType(t, &metrics.GaugeSink{}, ometric.sink)
+	assert.Equal(t, 21, ometric.sink.(*metrics.GaugeSink).Value)
 }
 
 func newTestPreInitState(tb testing.TB) *lib.TestPreInitState {
