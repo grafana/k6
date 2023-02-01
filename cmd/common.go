@@ -74,6 +74,7 @@ func printToStdout(gs *state.GlobalState, s string) {
 
 // Trap Interrupts, SIGINTs and SIGTERMs and call the given.
 func handleTestAbortSignals(gs *state.GlobalState, gracefulStopHandler, onHardStop func(os.Signal)) (stop func()) {
+	gs.Logger.Debug("Trapping interrupt signals so k6 can handle them gracefully...")
 	sigC := make(chan os.Signal, 2)
 	done := make(chan struct{})
 	gs.SignalNotify(sigC, os.Interrupt, syscall.SIGINT, syscall.SIGTERM)
@@ -100,6 +101,7 @@ func handleTestAbortSignals(gs *state.GlobalState, gracefulStopHandler, onHardSt
 	}()
 
 	return func() {
+		gs.Logger.Debug("Releasing signal trap...")
 		close(done)
 		gs.SignalStop(sigC)
 	}

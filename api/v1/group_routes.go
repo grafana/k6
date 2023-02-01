@@ -3,14 +3,10 @@ package v1
 import (
 	"encoding/json"
 	"net/http"
-
-	"go.k6.io/k6/api/common"
 )
 
-func handleGetGroups(rw http.ResponseWriter, r *http.Request) {
-	engine := common.GetEngine(r.Context())
-
-	root := NewGroup(engine.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
+func handleGetGroups(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request) {
+	root := NewGroup(cs.RunState.Runner.GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	data, err := json.Marshal(newGroupsJSONAPI(groups))
@@ -21,10 +17,8 @@ func handleGetGroups(rw http.ResponseWriter, r *http.Request) {
 	_, _ = rw.Write(data)
 }
 
-func handleGetGroup(rw http.ResponseWriter, r *http.Request, id string) {
-	engine := common.GetEngine(r.Context())
-
-	root := NewGroup(engine.ExecutionScheduler.GetRunner().GetDefaultGroup(), nil)
+func handleGetGroup(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request, id string) {
+	root := NewGroup(cs.RunState.Runner.GetDefaultGroup(), nil)
 	groups := FlattenGroup(root)
 
 	var group *Group
