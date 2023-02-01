@@ -16,6 +16,7 @@ type InitEnvironment struct {
 	FileSystems map[string]afero.Fs
 	CWD         *url.URL
 	Registry    *metrics.Registry
+	LookupEnv   func(key string) (val string, ok bool)
 	// TODO: add RuntimeOptions and other properties, goja sources, etc.
 	// ideally, we should leave this as the only data structure necessary for
 	// executing the init context for all JS modules

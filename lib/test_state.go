@@ -14,6 +14,7 @@ type TestPreInitState struct {
 	Registry       *metrics.Registry
 	BuiltinMetrics *metrics.BuiltinMetrics
 	KeyLogger      io.Writer
+	LookupEnv      func(key string) (val string, ok bool)
 
 	// TODO: replace with logrus.FieldLogger when all of the tests can be fixed
 	Logger *logrus.Logger

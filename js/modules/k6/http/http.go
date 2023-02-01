@@ -86,6 +86,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mustExport("del", mi.defaultClient.getMethodClosure(http.MethodDelete))
 	mustExport("options", mi.defaultClient.getMethodClosure(http.MethodOptions))
 	mustExport("request", mi.defaultClient.Request)
+	mustExport("asyncRequest", mi.defaultClient.asyncRequest)
 	mustExport("batch", mi.defaultClient.Batch)
 	mustExport("setResponseCallback", mi.defaultClient.SetResponseCallback)
 
