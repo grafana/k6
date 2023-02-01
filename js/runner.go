@@ -10,7 +10,6 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
-	"os"
 	"strconv"
 	"strings"
 	"sync"
@@ -203,7 +202,7 @@ func (r *Runner) newVU(
 		MaxIdleConnsPerHost: int(r.Bundle.Options.BatchPerHost.Int64),
 	}
 
-	if forceHTTP1() {
+	if r.forceHTTP1() {
 		transport.TLSNextProto = make(map[string]func(string, *tls.Conn) http.RoundTripper) // send over h1 protocol
 	} else {
 		_ = http2.ConfigureTransport(transport) // send over h2 protocol
@@ -261,8 +260,11 @@ func (r *Runner) newVU(
 
 // forceHTTP1 checks if force http1 env variable has been set in order to force requests to be sent over h1
 // TODO: This feature is temporary until #936 is resolved
-func forceHTTP1() bool {
-	godebug := os.Getenv("GODEBUG")
+func (r *Runner) forceHTTP1() bool {
+	if r.preInitState.LookupEnv == nil {
+		return false
+	}
+	godebug, _ := r.preInitState.LookupEnv("GODEBUG")
 	if godebug == "" {
 		return false
 	}
@@ -403,7 +405,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 
 	wrapperArgs := []goja.Value{
 		handleSummaryFn,
-		vu.Runtime.ToValue(r.Bundle.RuntimeOptions.SummaryExport.String),
+		vu.Runtime.ToValue(r.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
 		vu.Runtime.ToValue(summaryDataForJS),
 	}
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)

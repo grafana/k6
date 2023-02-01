@@ -70,6 +70,10 @@ func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loaded
 		RuntimeOptions: runtimeOptions,
 		Registry:       registry,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		LookupEnv: func(key string) (string, bool) {
+			val, ok := gs.Env[key]
+			return val, ok
+		},
 	}
 
 	test := &loadedTest{

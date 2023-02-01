@@ -20,7 +20,6 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/loader"
-	"go.k6.io/k6/metrics"
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.
@@ -33,9 +32,8 @@ type Bundle struct {
 
 	BaseInitContext *InitContext
 
-	RuntimeOptions    lib.RuntimeOptions
 	CompatibilityMode lib.CompatibilityMode // parsed value
-	registry          *metrics.Registry
+	preInitState      *lib.TestPreInitState
 
 	exports map[string]goja.Callable
 }
@@ -95,11 +93,10 @@ func newBundle(
 		Source:            code,
 		Program:           pgm,
 		BaseInitContext:   NewInitContext(piState.Logger, rt, c, compatMode, filesystems, loader.Dir(src.URL)),
-		RuntimeOptions:    piState.RuntimeOptions,
 		Options:           options,
 		CompatibilityMode: compatMode,
 		exports:           make(map[string]goja.Callable),
-		registry:          piState.Registry,
+		preInitState:      piState,
 	}
 	if err = bundle.instantiate(bundle.BaseInitContext, 0); err != nil {
 		return nil, err
@@ -148,13 +145,13 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		FilenameURL:       b.Filename,
 		Data:              []byte(b.Source),
 		PwdURL:            b.BaseInitContext.pwd,
-		Env:               make(map[string]string, len(b.RuntimeOptions.Env)),
+		Env:               make(map[string]string, len(b.preInitState.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
 		K6Version:         consts.Version,
 		Goos:              runtime.GOOS,
 	}
 	// Copy env so changes in the archive are not reflected in the source Bundle
-	for k, v := range b.RuntimeOptions.Env {
+	for k, v := range b.preInitState.RuntimeOptions.Env {
 		arc.Env[k] = v
 	}
 
@@ -225,7 +222,7 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 	bi := &BundleInstance{
 		Runtime:      rt,
 		exports:      make(map[string]goja.Callable),
-		env:          b.RuntimeOptions.Env,
+		env:          b.preInitState.RuntimeOptions.Env,
 		moduleVUImpl: vuImpl,
 		pgm:          pgm,
 	}
@@ -282,8 +279,8 @@ func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 
-	env := make(map[string]string, len(b.RuntimeOptions.Env))
-	for key, value := range b.RuntimeOptions.Env {
+	env := make(map[string]string, len(b.preInitState.RuntimeOptions.Env))
+	for key, value := range b.preInitState.RuntimeOptions.Env {
 		env[key] = value
 	}
 	rt.Set("__ENV", env)
@@ -298,7 +295,8 @@ func (b *Bundle) instantiate(init *InitContext, vuID uint64) (err error) {
 		Logger:      logger,
 		FileSystems: init.filesystems,
 		CWD:         init.pwd,
-		Registry:    b.registry,
+		Registry:    b.preInitState.Registry,
+		LookupEnv:   b.preInitState.LookupEnv,
 	}
 	unbindInit := b.setInitGlobals(rt, init)
 	init.moduleVUImpl.initEnv = initenv
