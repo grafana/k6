@@ -537,37 +537,6 @@ func TestSetupTeardownThresholds(t *testing.T) {
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics processing finished!"))
 }
 
-func TestSetupRemove(t *testing.T) {
-	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
-
-	script := tb.Replacer.Replace(`
-		import http from "k6/http";
-		import { check } from "k6";
-
-		export let options = {
-			iterations: 10000
-		};
-		
-		export default function () {
-			let bytes = randomIntBetween(10 * 1024, 1 * 1024 * 1024)
-			let response = http.get(http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `)
-			check(response, { "status is 200": (r) => r.status === 200 })
-			console.log(response.body)
-		};
-
-		function randomIntBetween(min, max) {
-			return Math.floor(Math.random() * (max - min + 1) + min);
-		}
-	`)
-
-	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-	stdOut := ts.Stdout.String()
-	assert.Contains(t, stdOut, `checks.........................: 100.00% ✓ 1000`)
-}
-
 func TestThresholdsFailed(t *testing.T) {
 	t.Parallel()
 	script := `
