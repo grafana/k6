@@ -2501,8 +2501,8 @@ func TestMinIterationDurationIsCancellable(t *testing.T) {
 	}
 }
 
-//nolint:paralleltest
 func TestForceHTTP1Feature(t *testing.T) {
+	t.Parallel()
 	cases := map[string]struct {
 		godebug               string
 		expectedForceH1Result bool
@@ -2521,15 +2521,16 @@ func TestForceHTTP1Feature(t *testing.T) {
 	}
 
 	for name, tc := range cases {
+		name, tc := name, tc
 		t.Run(name, func(t *testing.T) {
-			err := os.Setenv("GODEBUG", tc.godebug)
-			require.NoError(t, err)
-			defer func() {
-				err = os.Unsetenv("GODEBUG")
-				require.NoError(t, err)
-			}()
-			assert.Equal(t, tc.expectedForceH1Result, forceHTTP1())
+			t.Parallel()
 
+			lookupEnv := func(key string) (string, bool) {
+				if key == "GODEBUG" {
+					return tc.godebug, true
+				}
+				return "", false
+			}
 			tb := httpmultibin.NewHTTPMultiBin(t)
 
 			data := fmt.Sprintf(`var k6 = require("k6");
@@ -2550,6 +2551,9 @@ func TestForceHTTP1Feature(t *testing.T) {
 
 			r1, err := getSimpleRunner(t, "/script.js", tb.Replacer.Replace(data))
 			require.NoError(t, err)
+			r1.preInitState.LookupEnv = lookupEnv
+
+			assert.Equal(t, tc.expectedForceH1Result, r1.forceHTTP1())
 
 			err = r1.SetOptions(lib.Options{
 				Hosts: types.NullHosts{Trie: tb.Dialer.Hosts},
@@ -2569,6 +2573,8 @@ func TestForceHTTP1Feature(t *testing.T) {
 					Registry:       registry,
 				}, r1.MakeArchive())
 			require.NoError(t, err)
+			r2.preInitState.LookupEnv = lookupEnv
+			assert.Equal(t, tc.expectedForceH1Result, r2.forceHTTP1())
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
 			for name, r := range runners {

@@ -813,8 +813,8 @@ func TestBundleEnv(t *testing.T) {
 		b := b
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			require.Equal(t, "1", b.RuntimeOptions.Env["TEST_A"])
-			require.Equal(t, "", b.RuntimeOptions.Env["TEST_B"])
+			require.Equal(t, "1", b.preInitState.RuntimeOptions.Env["TEST_A"])
+			require.Equal(t, "", b.preInitState.RuntimeOptions.Env["TEST_B"])
 
 			bi, err := b.Instantiate(context.Background(), 0)
 			require.NoError(t, err)
