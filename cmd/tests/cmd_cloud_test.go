@@ -15,11 +15,11 @@ import (
 	"go.k6.io/k6/cmd"
 )
 
-func cloudTestStartSimple(t *testing.T, testRunID int) http.Handler {
+func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
 	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		resp.WriteHeader(http.StatusOK)
 		_, err := fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
-		assert.NoError(t, err)
+		assert.NoError(tb, err)
 	})
 }
 
