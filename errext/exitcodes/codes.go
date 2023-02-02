@@ -14,10 +14,10 @@ const (
 	SetupTimeout             ExitCode = 100
 	TeardownTimeout          ExitCode = 101
 	GenericTimeout           ExitCode = 102 // TODO: remove?
-	CannotStartRESTAPI       ExitCode = 103
+	ScriptStoppedFromRESTAPI ExitCode = 103
 	InvalidConfig            ExitCode = 104
 	ExternalAbort            ExitCode = 105
-	ScriptStoppedFromRESTAPI ExitCode = 106
+	CannotStartRESTAPI       ExitCode = 106
 	ScriptException          ExitCode = 107
 	ScriptAborted            ExitCode = 108
 )
