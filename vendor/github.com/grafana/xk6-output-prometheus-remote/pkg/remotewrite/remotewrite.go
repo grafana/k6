@@ -340,8 +340,7 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 	case metrics.Rate:
 		ts := mapMonoSeries(swm.TimeSeries, "rate", swm.Latest)
 		// pass zero duration here because time is useless for formatting rate
-		rateVals := swm.Measure.(*metrics.RateSink).Format(time.Duration(0))
-		ts.Samples[0].Value = rateVals["rate"]
+		ts.Samples[0].Value = swm.Measure.(*metrics.RateSink).Rate()
 		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Trend:
