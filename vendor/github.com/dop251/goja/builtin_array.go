@@ -1468,7 +1468,7 @@ func (r *Runtime) createArray(val *Object) objectImpl {
 }
 
 func (r *Runtime) createArrayIterProto(val *Object) objectImpl {
-	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
+	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
 	o._putProp("next", r.newNativeFunc(r.arrayIterProto_next, nil, "next", nil, 0), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classArrayIterator), false, false, true))
@@ -1480,17 +1480,21 @@ func (r *Runtime) initArray() {
 	r.global.arrayValues = r.newNativeFunc(r.arrayproto_values, nil, "values", nil, 0)
 	r.global.arrayToString = r.newNativeFunc(r.arrayproto_toString, nil, "toString", nil, 0)
 
-	r.global.ArrayIteratorPrototype = r.newLazyObject(r.createArrayIterProto)
-	//r.global.ArrayPrototype = r.newArray(r.global.ObjectPrototype).val
-	//o := r.global.ArrayPrototype.self
 	r.global.ArrayPrototype = r.newLazyObject(r.createArrayProto)
 
-	//r.global.Array = r.newNativeFuncConstruct(r.builtin_newArray, "Array", r.global.ArrayPrototype, 1)
-	//o = r.global.Array.self
-	//o._putProp("isArray", r.newNativeFunc(r.array_isArray, nil, "isArray", nil, 1), true, false, true)
 	r.global.Array = r.newLazyObject(r.createArray)
-
 	r.addToGlobal("Array", r.global.Array)
+}
+
+func (r *Runtime) getArrayIteratorPrototype() *Object {
+	var o *Object
+	if o = r.global.ArrayIteratorPrototype; o == nil {
+		o = &Object{runtime: r}
+		r.global.ArrayIteratorPrototype = o
+		o.self = r.createArrayIterProto(o)
+	}
+	return o
+
 }
 
 type sortable interface {

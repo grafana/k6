@@ -670,6 +670,29 @@ func (vm *vm) popTryFrame() {
 	vm.tryStack = vm.tryStack[:len(vm.tryStack)-1]
 }
 
+func (vm *vm) restoreStacks(iterLen, refLen uint32) (ex *Exception) {
+	// Restore other stacks
+	iterTail := vm.iterStack[iterLen:]
+	for i := len(iterTail) - 1; i >= 0; i-- {
+		if iter := iterTail[i].iter; iter != nil {
+			ex1 := vm.try(func() {
+				iter.returnIter()
+			})
+			if ex1 != nil && ex == nil {
+				ex = ex1
+			}
+		}
+		iterTail[i] = iterStackItem{}
+	}
+	vm.iterStack = vm.iterStack[:iterLen]
+	refTail := vm.refStack[refLen:]
+	for i := range refTail {
+		refTail[i] = nil
+	}
+	vm.refStack = vm.refStack[:refLen]
+	return
+}
+
 func (vm *vm) handleThrow(arg interface{}) *Exception {
 	ex := vm.exceptionFromValue(arg)
 	for len(vm.tryStack) > 0 {
@@ -688,23 +711,7 @@ func (vm *vm) handleThrow(arg interface{}) *Exception {
 		vm.sp = int(tf.sp)
 		vm.stash = tf.stash
 		vm.privEnv = tf.privEnv
-
-		// Restore other stacks
-		iterTail := vm.iterStack[tf.iterLen:]
-		for i := range iterTail {
-			if iter := iterTail[i].iter; iter != nil {
-				_ = vm.try(func() {
-					iter.returnIter()
-				})
-			}
-			iterTail[i] = iterStackItem{}
-		}
-		vm.iterStack = vm.iterStack[:tf.iterLen]
-		refTail := vm.refStack[tf.refLen:]
-		for i := range refTail {
-			refTail[i] = nil
-		}
-		vm.refStack = vm.refStack[:tf.refLen]
+		_ = vm.restoreStacks(tf.iterLen, tf.refLen)
 
 		if tf.catchPos == tryPanicMarker {
 			break
@@ -3613,6 +3620,10 @@ func (e *enterFuncStashless) exec(vm *vm) {
 	vm.pc++
 }
 
+type newFuncInstruction interface {
+	getPrg() *Program
+}
+
 type newFunc struct {
 	prg    *Program
 	name   unistring.String
@@ -3632,12 +3643,30 @@ func (n *newFunc) exec(vm *vm) {
 	vm.pc++
 }
 
+func (n *newFunc) getPrg() *Program {
+	return n.prg
+}
+
 type newAsyncFunc struct {
 	newFunc
 }
 
 func (n *newAsyncFunc) exec(vm *vm) {
 	obj := vm.r.newAsyncFunc(n.name, n.length, n.strict)
+	obj.prg = n.prg
+	obj.stash = vm.stash
+	obj.privEnv = vm.privEnv
+	obj.src = n.source
+	vm.push(obj.val)
+	vm.pc++
+}
+
+type newGeneratorFunc struct {
+	newFunc
+}
+
+func (n *newGeneratorFunc) exec(vm *vm) {
+	obj := vm.r.newGeneratorFunc(n.name, n.length, n.strict)
 	obj.prg = n.prg
 	obj.stash = vm.stash
 	obj.privEnv = vm.privEnv
@@ -3676,6 +3705,15 @@ func (n *newAsyncMethod) exec(vm *vm) {
 	n._exec(vm, &obj.methodFuncObject)
 }
 
+type newGeneratorMethod struct {
+	newMethod
+}
+
+func (n *newGeneratorMethod) exec(vm *vm) {
+	obj := vm.r.newGeneratorMethod(n.name, n.length, n.strict)
+	n._exec(vm, &obj.methodFuncObject)
+}
+
 type newArrowFunc struct {
 	newFunc
 }
@@ -3701,6 +3739,8 @@ func getHomeObject(v Value) *Object {
 	if o, ok := v.(*Object); ok {
 		switch fn := o.self.(type) {
 		case *methodFuncObject:
+			return fn.homeObject
+		case *generatorMethodFuncObject:
 			return fn.homeObject
 		case *asyncMethodFuncObject:
 			return fn.homeObject
@@ -4332,7 +4372,7 @@ func (leaveFinally) exec(vm *vm) {
 		vm.throw(ex)
 		return
 	} else {
-		if ret >= 0 {
+		if ret != -1 {
 			vm.pc = int(ret)
 		} else {
 			vm.pc++
@@ -5496,9 +5536,27 @@ func (r *getPrivateRefId) exec(vm *vm) {
 	vm.pc++
 }
 
-type await struct{}
+func (y *yieldMarker) exec(vm *vm) {
+	vm.pc = -vm.pc // this will terminate the run loop
+	vm.push(y)     // marker so the caller knows it's a yield, not a return
+}
 
-func (await) exec(vm *vm) {
-	vm.pc = -vm.pc             // this will terminate the run loop
-	vm.push(resultAwaitMarker) // a special marker value to indicate this is an await, not return
+func (y *yieldMarker) String() string {
+	if y == yieldEmpty {
+		return "empty"
+	}
+	switch y.resultType {
+	case resultYield:
+		return "yield"
+	case resultYieldRes:
+		return "yieldRes"
+	case resultYieldDelegate:
+		return "yield*"
+	case resultYieldDelegateRes:
+		return "yield*Res"
+	case resultAwait:
+		return "await"
+	default:
+		return "unknown"
+	}
 }

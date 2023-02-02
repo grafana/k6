@@ -4,12 +4,20 @@ import (
 	"math"
 )
 
-func (r *Runtime) functionCtor(args []Value, proto *Object, async bool) *Object {
+func (r *Runtime) functionCtor(args []Value, proto *Object, async, generator bool) *Object {
 	var sb valueStringBuilder
 	if async {
-		sb.WriteString(asciiString("(async function anonymous("))
+		if generator {
+			sb.WriteString(asciiString("(async function* anonymous("))
+		} else {
+			sb.WriteString(asciiString("(async function anonymous("))
+		}
 	} else {
-		sb.WriteString(asciiString("(function anonymous("))
+		if generator {
+			sb.WriteString(asciiString("(function* anonymous("))
+		} else {
+			sb.WriteString(asciiString("(function anonymous("))
+		}
 	}
 	if len(args) > 1 {
 		ar := args[:len(args)-1]
@@ -32,11 +40,15 @@ func (r *Runtime) functionCtor(args []Value, proto *Object, async bool) *Object 
 }
 
 func (r *Runtime) builtin_Function(args []Value, proto *Object) *Object {
-	return r.functionCtor(args, proto, false)
+	return r.functionCtor(args, proto, false, false)
 }
 
 func (r *Runtime) builtin_asyncFunction(args []Value, proto *Object) *Object {
-	return r.functionCtor(args, proto, true)
+	return r.functionCtor(args, proto, true, false)
+}
+
+func (r *Runtime) builtin_generatorFunction(args []Value, proto *Object) *Object {
+	return r.functionCtor(args, proto, false, true)
 }
 
 func (r *Runtime) functionproto_toString(call FunctionCall) Value {
@@ -221,20 +233,118 @@ func (r *Runtime) createAsyncFunctionProto(val *Object) objectImpl {
 	}
 	o.init()
 
-	o._putProp("constructor", r.global.AsyncFunction, true, false, true)
+	o._putProp("constructor", r.getAsyncFunction(), true, false, true)
 
 	o._putSym(SymToStringTag, valueProp(asciiString(classAsyncFunction), false, false, true))
 
 	return o
 }
 
+func (r *Runtime) getAsyncFunctionPrototype() *Object {
+	var o *Object
+	if o = r.global.AsyncFunctionPrototype; o == nil {
+		o = r.newLazyObject(r.createAsyncFunctionProto)
+		r.global.AsyncFunctionPrototype = o
+	}
+	return o
+}
+
 func (r *Runtime) createAsyncFunction(val *Object) objectImpl {
-	o := r.newNativeFuncConstructObj(val, r.builtin_asyncFunction, "AsyncFunction", r.global.AsyncFunctionPrototype, 1)
+	o := r.newNativeFuncConstructObj(val, r.builtin_asyncFunction, "AsyncFunction", r.getAsyncFunctionPrototype(), 1)
 
 	return o
 }
 
-func (r *Runtime) initAsyncFunction() {
-	r.global.AsyncFunctionPrototype = r.newLazyObject(r.createAsyncFunctionProto)
-	r.global.AsyncFunction = r.newLazyObject(r.createAsyncFunction)
+func (r *Runtime) getAsyncFunction() *Object {
+	var o *Object
+	if o = r.global.AsyncFunction; o == nil {
+		o = &Object{runtime: r}
+		r.global.AsyncFunction = o
+		o.self = r.createAsyncFunction(o)
+	}
+	return o
+}
+
+func (r *Runtime) builtin_genproto_next(call FunctionCall) Value {
+	if o, ok := call.This.(*Object); ok {
+		if gen, ok := o.self.(*generatorObject); ok {
+			return gen.next(call.Argument(0))
+		}
+	}
+	panic(r.NewTypeError("Method [Generator].prototype.next called on incompatible receiver"))
+}
+
+func (r *Runtime) builtin_genproto_return(call FunctionCall) Value {
+	if o, ok := call.This.(*Object); ok {
+		if gen, ok := o.self.(*generatorObject); ok {
+			return gen._return(call.Argument(0))
+		}
+	}
+	panic(r.NewTypeError("Method [Generator].prototype.return called on incompatible receiver"))
+}
+
+func (r *Runtime) builtin_genproto_throw(call FunctionCall) Value {
+	if o, ok := call.This.(*Object); ok {
+		if gen, ok := o.self.(*generatorObject); ok {
+			return gen.throw(call.Argument(0))
+		}
+	}
+	panic(r.NewTypeError("Method [Generator].prototype.throw called on incompatible receiver"))
+}
+
+func (r *Runtime) createGeneratorFunctionProto(val *Object) objectImpl {
+	o := newBaseObjectObj(val, r.global.FunctionPrototype, classObject)
+
+	o._putProp("constructor", r.getGeneratorFunction(), false, false, true)
+	o._putProp("prototype", r.getGeneratorPrototype(), false, false, true)
+	o._putSym(SymToStringTag, valueProp(asciiString(classGeneratorFunction), false, false, true))
+
+	return o
+}
+
+func (r *Runtime) getGeneratorFunctionPrototype() *Object {
+	var o *Object
+	if o = r.global.GeneratorFunctionPrototype; o == nil {
+		o = r.newLazyObject(r.createGeneratorFunctionProto)
+		r.global.GeneratorFunctionPrototype = o
+	}
+	return o
+}
+
+func (r *Runtime) createGeneratorFunction(val *Object) objectImpl {
+	o := r.newNativeFuncConstructObj(val, r.builtin_generatorFunction, "GeneratorFunction", r.getGeneratorFunctionPrototype(), 1)
+	return o
+}
+
+func (r *Runtime) getGeneratorFunction() *Object {
+	var o *Object
+	if o = r.global.GeneratorFunction; o == nil {
+		o = &Object{runtime: r}
+		r.global.GeneratorFunction = o
+		o.self = r.createGeneratorFunction(o)
+	}
+	return o
+}
+
+func (r *Runtime) createGeneratorProto(val *Object) objectImpl {
+	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
+
+	o._putProp("constructor", r.getGeneratorFunctionPrototype(), false, false, true)
+	o._putProp("next", r.newNativeFunc(r.builtin_genproto_next, nil, "next", nil, 1), true, false, true)
+	o._putProp("return", r.newNativeFunc(r.builtin_genproto_return, nil, "return", nil, 1), true, false, true)
+	o._putProp("throw", r.newNativeFunc(r.builtin_genproto_throw, nil, "throw", nil, 1), true, false, true)
+
+	o._putSym(SymToStringTag, valueProp(asciiString(classGenerator), false, false, true))
+
+	return o
+}
+
+func (r *Runtime) getGeneratorPrototype() *Object {
+	var o *Object
+	if o = r.global.GeneratorPrototype; o == nil {
+		o = &Object{runtime: r}
+		r.global.GeneratorPrototype = o
+		o.self = r.createGeneratorProto(o)
+	}
+	return o
 }

@@ -15,6 +15,7 @@ type _scope struct {
 	inFunction      bool
 	inAsync         bool
 	allowAwait      bool
+	allowYield      bool
 	declarationList []*ast.VariableDeclaration
 
 	labels []unistring.String

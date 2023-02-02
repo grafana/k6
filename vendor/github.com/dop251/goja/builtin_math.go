@@ -282,7 +282,7 @@ func (r *Runtime) math_trunc(call FunctionCall) Value {
 
 func (r *Runtime) createMath(val *Object) objectImpl {
 	m := &baseObject{
-		class:      classMath,
+		class:      classObject,
 		val:        val,
 		extensible: true,
 		prototype:  r.global.ObjectPrototype,

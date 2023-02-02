@@ -929,7 +929,7 @@ func (r *Runtime) stringIterProto_next(call FunctionCall) Value {
 }
 
 func (r *Runtime) createStringIterProto(val *Object) objectImpl {
-	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
+	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
 	o._putProp("next", r.newNativeFunc(r.stringIterProto_next, nil, "next", nil, 0), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classStringIterator), false, false, true))
@@ -937,8 +937,17 @@ func (r *Runtime) createStringIterProto(val *Object) objectImpl {
 	return o
 }
 
+func (r *Runtime) getStringIteratorPrototype() *Object {
+	var o *Object
+	if o = r.global.StringIteratorPrototype; o == nil {
+		o = &Object{runtime: r}
+		r.global.StringIteratorPrototype = o
+		o.self = r.createStringIterProto(o)
+	}
+	return o
+}
+
 func (r *Runtime) initString() {
-	r.global.StringIteratorPrototype = r.newLazyObject(r.createStringIterProto)
 	r.global.StringPrototype = r.builtin_newString([]Value{stringEmpty}, r.global.ObjectPrototype)
 
 	o := r.global.StringPrototype.self

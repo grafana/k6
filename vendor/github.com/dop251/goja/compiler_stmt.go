@@ -660,7 +660,7 @@ func (c *compiler) compileContinue(label *ast.Identifier, idx file.Idx) {
 
 func (c *compiler) compileIfBody(s ast.Statement, needResult bool) {
 	if !c.scope.strict {
-		if s, ok := s.(*ast.FunctionDeclaration); ok && !s.Function.Async {
+		if s, ok := s.(*ast.FunctionDeclaration); ok && !s.Function.Async && !s.Function.Generator {
 			c.compileFunction(s)
 			if needResult {
 				c.emit(clearResult)

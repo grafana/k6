@@ -23,7 +23,6 @@ const (
 	classString        = "String"
 	classBoolean       = "Boolean"
 	classError         = "Error"
-	classAggError      = "AggregateError"
 	classRegExp        = "RegExp"
 	classDate          = "Date"
 	classJSON          = "JSON"
@@ -35,6 +34,9 @@ const (
 	classSetIterator          = "Set Iterator"
 	classStringIterator       = "String Iterator"
 	classRegExpStringIterator = "RegExp String Iterator"
+
+	classGenerator         = "Generator"
+	classGeneratorFunction = "GeneratorFunction"
 )
 
 var (

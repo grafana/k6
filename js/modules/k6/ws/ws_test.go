@@ -615,7 +615,7 @@ func TestSocketSendBinary(t *testing.T) { //nolint:tparallel
 		{"3.14", "Number"},
 		{"'str'", "String"},
 		{"[1, 2, 3]", "Array"},
-		{"new Uint8Array([1, 2, 3])", "Object"},
+		{"new Uint8Array([1, 2, 3])", "Uint8Array"},
 		{"Symbol('a')", "Symbol"},
 		{"function() {}", "Function"},
 	}

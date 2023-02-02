@@ -110,6 +110,10 @@ type global struct {
 	SetPrototype         *Object
 	PromisePrototype     *Object
 
+	GeneratorFunctionPrototype *Object
+	GeneratorFunction          *Object
+	GeneratorPrototype         *Object
+
 	AsyncFunctionPrototype *Object
 
 	IteratorPrototype             *Object
@@ -406,6 +410,16 @@ func (r *Runtime) createIterProto(val *Object) objectImpl {
 	return o
 }
 
+func (r *Runtime) getIteratorPrototype() *Object {
+	var o *Object
+	if o = r.global.IteratorPrototype; o == nil {
+		o = &Object{runtime: r}
+		r.global.IteratorPrototype = o
+		o.self = r.createIterProto(o)
+	}
+	return o
+}
+
 func (r *Runtime) init() {
 	r.rand = rand.Float64
 	r.now = time.Now
@@ -423,11 +437,8 @@ func (r *Runtime) init() {
 	r.global.FunctionPrototype = funcProto
 	funcProtoObj := funcProto.self.(*nativeFuncObject)
 
-	r.global.IteratorPrototype = r.newLazyObject(r.createIterProto)
-
 	r.initObject()
 	r.initFunction()
-	r.initAsyncFunction()
 	r.initArray()
 	r.initString()
 	r.initGlobalObject()
@@ -583,10 +594,21 @@ func (r *Runtime) newFunc(name unistring.String, length int, strict bool) (f *fu
 func (r *Runtime) newAsyncFunc(name unistring.String, length int, strict bool) (f *asyncFuncObject) {
 	f = &asyncFuncObject{}
 	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
-	f.class = classAsyncFunction
-	f.prototype = r.global.AsyncFunctionPrototype
+	f.class = classFunction
+	f.prototype = r.getAsyncFunctionPrototype()
 	f.val.self = f
 	f.init(name, intToValue(int64(length)))
+	return
+}
+
+func (r *Runtime) newGeneratorFunc(name unistring.String, length int, strict bool) (f *generatorFuncObject) {
+	f = &generatorFuncObject{}
+	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
+	f.class = classFunction
+	f.prototype = r.getGeneratorFunctionPrototype()
+	f.val.self = f
+	f.init(name, intToValue(int64(length)))
+	f._putProp("prototype", r.newBaseObject(r.getGeneratorPrototype(), classObject).val, true, false, false)
 	return
 }
 
@@ -623,6 +645,16 @@ func (r *Runtime) newMethod(name unistring.String, length int, strict bool) (f *
 	return
 }
 
+func (r *Runtime) newGeneratorMethod(name unistring.String, length int, strict bool) (f *generatorMethodFuncObject) {
+	f = &generatorMethodFuncObject{}
+	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
+	f.prototype = r.getGeneratorFunctionPrototype()
+	f.val.self = f
+	f.init(name, intToValue(int64(length)))
+	f._putProp("prototype", r.newBaseObject(r.getGeneratorPrototype(), classObject).val, true, false, false)
+	return
+}
+
 func (r *Runtime) newAsyncMethod(name unistring.String, length int, strict bool) (f *asyncMethodFuncObject) {
 	f = &asyncMethodFuncObject{}
 	r.initBaseJsFunction(&f.baseJsFuncObject, strict)
@@ -647,8 +679,8 @@ func (r *Runtime) newArrowFunc(name unistring.String, length int, strict bool) (
 func (r *Runtime) newAsyncArrowFunc(name unistring.String, length int, strict bool) (f *asyncArrowFuncObject) {
 	f = &asyncArrowFuncObject{}
 	r.initArrowFunc(&f.arrowFuncObject, strict)
-	f.class = classAsyncFunction
-	f.prototype = r.global.AsyncFunctionPrototype
+	f.class = classObject
+	f.prototype = r.getAsyncFunctionPrototype()
 	f.val.self = f
 	f.init(name, intToValue(int64(length)))
 	return
@@ -1463,6 +1495,9 @@ func (r *Runtime) RunProgram(p *Program) (result Value, err error) {
 	if recursive {
 		vm.pushCtx()
 		vm.stash = &r.global.stash
+		vm.privEnv = nil
+		vm.newTarget = nil
+		vm.args = 0
 		sp := vm.sp
 		vm.stack.expand(sp + 1)
 		vm.stack[sp] = _undefined // 'callee'
@@ -2684,6 +2719,14 @@ func (r *Runtime) getIterator(obj Value, method func(FunctionCall) Value) *itera
 	}
 }
 
+func iteratorComplete(iterResult *Object) bool {
+	return nilSafe(iterResult.self.getStr("done", nil)).ToBoolean()
+}
+
+func iteratorValue(iterResult *Object) Value {
+	return nilSafe(iterResult.self.getStr("value", nil))
+}
+
 func (ir *iteratorRecord) iterate(step func(Value)) {
 	r := ir.iterator.runtime
 	for {
@@ -2691,10 +2734,10 @@ func (ir *iteratorRecord) iterate(step func(Value)) {
 			panic(r.NewTypeError("iterator.next is missing or not a function"))
 		}
 		res := r.toObject(ir.next(FunctionCall{This: ir.iterator}))
-		if nilSafe(res.self.getStr("done", nil)).ToBoolean() {
+		if iteratorComplete(res) {
 			break
 		}
-		value := nilSafe(res.self.getStr("value", nil))
+		value := iteratorValue(res)
 		ret := tryFunc(func() {
 			step(value)
 		})
@@ -2711,9 +2754,9 @@ func (ir *iteratorRecord) step() (value Value, ex *Exception) {
 	r := ir.iterator.runtime
 	ex = r.vm.try(func() {
 		res := r.toObject(ir.next(FunctionCall{This: ir.iterator}))
-		done := nilSafe(res.self.getStr("done", nil)).ToBoolean()
+		done := iteratorComplete(res)
 		if !done {
-			value = nilSafe(res.self.getStr("value", nil))
+			value = iteratorValue(res)
 		} else {
 			ir.close()
 		}
