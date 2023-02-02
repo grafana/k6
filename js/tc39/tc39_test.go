@@ -209,10 +209,6 @@ var (
 		"test/language/statements/class/elements/wrapped-in-sc-rs-static-async-generator",
 		"test/language/statements/switch/scope-lex-async-generator.js",
 
-		"test/built-ins/Function/prototype/toString/async",
-		"test/built-ins/Function/prototype/toString/async",
-		"test/built-ins/Function/prototype/toString/proxy-async",
-
 		"test/built-ins/FinalizationRegistry", // still in proposal
 
 		"test/built-ins/RegExp/property-escapes",  // none of those work
