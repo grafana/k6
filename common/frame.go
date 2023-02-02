@@ -486,17 +486,15 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 }
 
 // AddScriptTag is not implemented.
-func (f *Frame) AddScriptTag(opts goja.Value) *goja.Promise {
+func (f *Frame) AddScriptTag(opts goja.Value) {
 	k6ext.Panic(f.ctx, "Frame.AddScriptTag() has not been implemented yet")
 	applySlowMo(f.ctx)
-	return nil
 }
 
 // AddStyleTag is not implemented.
-func (f *Frame) AddStyleTag(opts goja.Value) *goja.Promise {
+func (f *Frame) AddStyleTag(opts goja.Value) {
 	k6ext.Panic(f.ctx, "Frame.AddStyleTag() has not been implemented yet")
 	applySlowMo(f.ctx)
-	return nil
 }
 
 // ChildFrames returns a list of child frames.
@@ -1460,9 +1458,8 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 }
 
 // SetInputFiles is not implemented.
-func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) *goja.Promise {
+func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
 	k6ext.Panic(f.ctx, "Frame.setInputFiles(selector, files, opts) has not been implemented yet")
-	return nil
 	// TODO: needs slowMo
 }
 

@@ -6,9 +6,9 @@ import (
 
 // BrowserType is the public interface of a CDP browser client.
 type BrowserType interface {
-	Connect(opts goja.Value) *goja.Promise
+	Connect(opts goja.Value)
 	ExecutablePath() string
 	Launch(opts goja.Value) Browser
-	LaunchPersistentContext(userDataDir string, opts goja.Value) *goja.Promise
+	LaunchPersistentContext(userDataDir string, opts goja.Value) Browser
 	Name() string
 }

@@ -33,7 +33,7 @@ type ElementHandle interface {
 	ScrollIntoViewIfNeeded(opts goja.Value)
 	SelectOption(values goja.Value, opts goja.Value) []string
 	SelectText(opts goja.Value)
-	SetInputFiles(files goja.Value, opts goja.Value) *goja.Promise
+	SetInputFiles(files goja.Value, opts goja.Value)
 	Tap(opts goja.Value)
 	TextContent() string
 	Type(text string, opts goja.Value)
