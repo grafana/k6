@@ -177,32 +177,33 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		stopOutputs(err)
 	}()
 
-	if !testRunState.RuntimeOptions.NoThresholds.Bool { //nolint:nestif
+	if !testRunState.RuntimeOptions.NoThresholds.Bool {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort, executionState.GetCurrentTestRunDuration)
-		defer func() {
-			if finalizeThresholds == nil {
-				return
-			}
+		handleFinalThresholdCalculation := func() {
 			// This gets called after the Samples channel has been closed and
 			// the OutputManager has flushed all of the cached samples to
 			// outputs (including MetricsEngine's ingester). So we are sure
 			// there won't be any more metrics being sent.
 			logger.Debug("Finalizing thresholds...")
 			breachedThresholds := finalizeThresholds()
-			if len(breachedThresholds) > 0 {
-				tErr := errext.WithAbortReasonIfNone(
-					errext.WithExitCodeIfNone(
-						fmt.Errorf("thresholds on metrics '%s' have been breached", strings.Join(breachedThresholds, ", ")),
-						exitcodes.ThresholdsHaveFailed,
-					), errext.AbortedByThresholdsAfterTestEnd)
-
-				if err == nil {
-					err = tErr
-				} else {
-					logger.WithError(tErr).Debug("Breached thresholds, but test already exited with another error")
-				}
+			if len(breachedThresholds) == 0 {
+				return
 			}
-		}()
+			tErr := errext.WithAbortReasonIfNone(
+				errext.WithExitCodeIfNone(
+					fmt.Errorf("thresholds on metrics '%s' have been breached", strings.Join(breachedThresholds, ", ")),
+					exitcodes.ThresholdsHaveFailed,
+				), errext.AbortedByThresholdsAfterTestEnd)
+
+			if err == nil {
+				err = tErr
+			} else {
+				logger.WithError(tErr).Debug("Breached thresholds, but test already exited with another error")
+			}
+		}
+		if finalizeThresholds != nil {
+			defer handleFinalThresholdCalculation()
+		}
 	}
 
 	defer func() {
