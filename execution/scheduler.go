@@ -372,17 +372,42 @@ func (e *Scheduler) runExecutor(
 	runResults <- err
 }
 
+// Init concurrently initializes all of the planned VUs and then sequentially
+// initializes all of the configured executors. It also starts the measurement
+// and emission of the `vus` and `vus_max` metrics.
+func (e *Scheduler) Init(
+	runCtx context.Context, samplesOut chan<- metrics.SampleContainer,
+) (stopVUEmission func(), err error) {
+	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-init")
+
+	execSchedRunCtx, execSchedRunCancel := context.WithCancel(runCtx)
+	waitForVUsMetricPush := e.emitVUsAndVUsMax(execSchedRunCtx, samplesOut)
+	stopVUEmission = func() {
+		logger.Debugf("Stopping vus and vux_max metrics emission...")
+		execSchedRunCancel()
+		waitForVUsMetricPush()
+	}
+
+	defer func() {
+		if interruptErr := GetCancelReasonIfTestAborted(runCtx); interruptErr != nil {
+			logger.Debugf("The test run was interrupted, returning '%s' instead of '%s'", interruptErr, err)
+			e.state.SetExecutionStatus(lib.ExecutionStatusInterrupted)
+			err = interruptErr
+		}
+		if err != nil {
+			stopVUEmission()
+		}
+	}()
+
+	return stopVUEmission, e.initVUsAndExecutors(execSchedRunCtx, samplesOut)
+}
+
 // Run the Scheduler, funneling all generated metric samples through the supplied
 // out channel.
 //
 //nolint:funlen
 func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) (err error) {
 	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-run")
-
-	execSchedRunCtx, execSchedRunCancel := context.WithCancel(runCtx)
-	waitForVUsMetricPush := e.emitVUsAndVUsMax(execSchedRunCtx, samplesOut)
-	defer waitForVUsMetricPush()
-	defer execSchedRunCancel()
 
 	defer func() {
 		if interruptErr := GetCancelReasonIfTestAborted(runCtx); interruptErr != nil {
@@ -392,10 +417,6 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 		}
 	}()
 
-	if err := e.initVUsAndExecutors(execSchedRunCtx, samplesOut); err != nil {
-		return err
-	}
-
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
 	if e.state.IsPaused() {
 		logger.Debug("Execution is paused, waiting for resume or interrupt...")
@@ -404,7 +425,7 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 		select {
 		case <-e.state.ResumeNotify():
 			// continue
-		case <-execSchedRunCtx.Done():
+		case <-runCtx.Done():
 			return nil
 		}
 	}
@@ -422,7 +443,7 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 	// TODO: get rid of this context, pass the e.state directly to VUs when they
 	// are initialized by e.initVUsAndExecutors(). This will also give access to
 	// its properties in their init context executions.
-	withExecStateCtx := lib.WithExecutionState(execSchedRunCtx, e.state)
+	withExecStateCtx := lib.WithExecutionState(runCtx, e.state)
 
 	// Run setup() before any executors, if it's not disabled
 	if !e.state.Test.Options.NoSetup.Bool {
