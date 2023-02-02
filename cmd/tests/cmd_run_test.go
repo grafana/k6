@@ -1020,15 +1020,7 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	t.Run("noLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
-	})
-
-	t.Run("withLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
-	})
+	testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 }
 
 func TestAbortedByScriptAbortInVUCode(t *testing.T) {

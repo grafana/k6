@@ -88,6 +88,13 @@ func newTestScheduler(
 		}
 	}()
 
+	stopEmission, err := execScheduler.Init(ctx, samples)
+	require.NoError(t, err)
+	t.Cleanup(func() {
+		stopEmission()
+		close(samples)
+	})
+
 	return ctx, cancel, execScheduler, samples
 }
 
@@ -143,6 +150,12 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
+			defer close(samples)
+
+			stopEmission, err := execScheduler.Init(ctx, samples)
+			require.NoError(t, err)
+			defer stopEmission()
+
 			go func() {
 				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 				close(done)
@@ -254,6 +267,12 @@ func TestSchedulerRunEnv(t *testing.T) {
 
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
+			defer close(samples)
+
+			stopEmission, err := execScheduler.Init(ctx, samples)
+			require.NoError(t, err)
+			defer stopEmission()
+
 			go func() {
 				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 				close(done)
@@ -321,6 +340,12 @@ func TestSchedulerSystemTags(t *testing.T) {
 	defer cancel()
 
 	samples := make(chan metrics.SampleContainer)
+	defer close(samples)
+
+	stopEmission, err := execScheduler.Init(ctx, samples)
+	require.NoError(t, err)
+	defer stopEmission()
+
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
@@ -452,6 +477,12 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 
 			done := make(chan struct{})
 			samples := make(chan metrics.SampleContainer)
+			defer close(samples)
+
+			stopEmission, err := execScheduler.Init(ctx, samples)
+			require.NoError(t, err)
+			defer stopEmission()
+
 			go func() {
 				defer close(done)
 				require.NoError(t, execScheduler.Run(ctx, ctx, samples))
@@ -614,8 +645,13 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	defer cancel()
 
 	samples := make(chan metrics.SampleContainer)
+
+	stopEmission, err := execScheduler.Init(ctx, samples)
+	require.NoError(t, err)
+
 	go func() {
 		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
+		stopEmission()
 		close(samples)
 	}()
 
@@ -947,6 +983,12 @@ func TestSchedulerEndIterations(t *testing.T) {
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, 300)
+	defer close(samples)
+
+	stopEmission, err := execScheduler.Init(ctx, samples)
+	require.NoError(t, err)
+	defer stopEmission()
+
 	require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 
 	assert.Equal(t, uint64(100), execScheduler.GetState().GetFullIterationCount())
@@ -1155,9 +1197,15 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	defer cancel()
 
 	done := make(chan struct{})
-	sampleContainers := make(chan metrics.SampleContainer)
+	samples := make(chan metrics.SampleContainer)
+	defer close(samples)
+
+	stopEmission, err := execScheduler.Init(ctx, samples)
+	require.NoError(t, err)
+	defer stopEmission()
+
 	go func() {
-		assert.NoError(t, execScheduler.Run(ctx, ctx, sampleContainers))
+		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
 		close(done)
 	}()
 
@@ -1167,7 +1215,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		to *= time.Millisecond
 		for {
 			select {
-			case sampleContainer := <-sampleContainers:
+			case sampleContainer := <-samples:
 				gotVus := false
 				for _, s := range sampleContainer.GetSamples() {
 					if s.Metric == piState.BuiltinMetrics.VUs || s.Metric == piState.BuiltinMetrics.VUsMax {
@@ -1257,7 +1305,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 
 	for {
 		select {
-		case s := <-sampleContainers:
+		case s := <-samples:
 			t.Fatalf("Did not expect anything in the sample channel bug got %#v", s)
 		case <-time.After(3 * time.Second):
 			t.Fatalf("Local execScheduler took way to long to finish")

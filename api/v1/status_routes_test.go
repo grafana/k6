@@ -101,6 +101,7 @@ func TestPatchStatus(t *testing.T) {
 	}
 
 	for name, testCase := range testData {
+		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
@@ -136,6 +137,9 @@ func TestPatchStatus(t *testing.T) {
 				RunState:      testState,
 			}
 
+			stopEmission, err := execScheduler.Init(runCtx, samples)
+			require.NoError(t, err)
+
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
 			defer func() {
@@ -146,6 +150,7 @@ func TestPatchStatus(t *testing.T) {
 
 			go func() {
 				assert.ErrorContains(t, execScheduler.Run(globalCtx, runCtx, samples), "custom cancel signal")
+				stopEmission()
 				close(samples)
 				wg.Done()
 			}()

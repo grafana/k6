@@ -274,6 +274,13 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
+	// Initialize the VUs and executors
+	stopVUEmission, err := execScheduler.Init(runCtx, samples)
+	if err != nil {
+		return err
+	}
+	defer stopVUEmission()
+
 	if conf.Linger.Bool {
 		defer func() {
 			msg := "The test is done, but --linger was enabled, so k6 is waiting for Ctrl+C to continue..."
@@ -291,8 +298,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
-	// Initialize VUs and start the test! However, we won't immediately return
-	// if there was an error, we still have things to do.
+	// Start the test! However, we won't immediately return if there was an
+	// error, we still have things to do.
 	err = execScheduler.Run(globalCtx, runCtx, samples)
 
 	// Init has passed successfully, so unless disabled, make sure we send a
