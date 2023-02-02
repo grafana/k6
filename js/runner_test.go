@@ -406,6 +406,9 @@ func TestDataIsolation(t *testing.T) {
 
 	require.Empty(t, runner.defaultGroup.Groups)
 
+	stopEmission, err := execScheduler.Init(runCtx, samples)
+	require.NoError(t, err)
+
 	errC := make(chan error)
 	go func() { errC <- execScheduler.Run(globalCtx, runCtx, samples) }()
 
@@ -414,6 +417,7 @@ func TestDataIsolation(t *testing.T) {
 		runAbort(fmt.Errorf("unexpected abort"))
 		t.Fatal("Test timed out")
 	case err := <-errC:
+		stopEmission()
 		close(samples)
 		require.NoError(t, err)
 		waitForMetricsFlushed()
