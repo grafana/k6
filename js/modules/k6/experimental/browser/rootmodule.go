@@ -1,3 +1,6 @@
+// Package browser contains a RootModule wrapper
+// that wraps around the experimental browser
+// RootModule.
 package browser
 
 import (
@@ -10,19 +13,25 @@ import (
 )
 
 type (
-	// RootModule is the global module instance that will create module
-	// instances for each VU.
+	// RootModule is a wrapper around the experimental
+	// browser RootModule. It will prevent browser tests
+	// runs unless K6_BROWSER_ENABLED env var is set.
 	RootModule struct {
 		rm *xk6browser.RootModule
 	}
 )
 
+// New creates a experimental browser RootModule
+// and wraps it around this internal RootModule.
 func New() *RootModule {
 	return &RootModule{
 		rm: xk6browser.New(),
 	}
 }
 
+// NewModuleInstance will check to see if
+// K6_BROWSER_ENABLED is set before allowing
+// test runs to continue.
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	env := vu.InitEnv()
 
