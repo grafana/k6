@@ -35,7 +35,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		common.Throw(vu.Runtime(), errors.New(msg))
 	}
 
-	vs, ok := env.LookupEnv("K6_BROWSER_ENABLE_RUN")
+	vs, ok := env.LookupEnv("K6_BROWSER_ENABLED")
 	if !ok {
 		throwError()
 	}
