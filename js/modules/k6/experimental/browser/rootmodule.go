@@ -14,14 +14,14 @@ import (
 
 type (
 	// RootModule is a wrapper around the experimental
-	// browser RootModule. It will prevent browser tests
+	// browser RootModule. It will prevent browser test
 	// runs unless K6_BROWSER_ENABLED env var is set.
 	RootModule struct {
 		rm *xk6browser.RootModule
 	}
 )
 
-// New creates a experimental browser RootModule
+// New creates an experimental browser RootModule
 // and wraps it around this internal RootModule.
 func New() *RootModule {
 	return &RootModule{
