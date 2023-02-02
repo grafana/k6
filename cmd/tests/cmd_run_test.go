@@ -1659,19 +1659,19 @@ func TestBrowserPermissions(t *testing.T) {
 			name:             "no env var set",
 			envVarValue:      "",
 			expectedExitCode: 107,
-			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true",
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
 		},
 		{
 			name:             "env var set but set to false",
 			envVarValue:      "false",
 			expectedExitCode: 107,
-			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true",
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
 		},
 		{
 			name:             "env var set but set to 09adsu",
 			envVarValue:      "09adsu",
 			expectedExitCode: 107,
-			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true",
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
 		},
 		{
 			name:             "with custom message",
@@ -1700,10 +1700,10 @@ func TestBrowserPermissions(t *testing.T) {
 
 			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
 			if tt.envVarValue != "" {
-				ts.Env["K6_BROWSER_ENABLE_RUN"] = tt.envVarValue
+				ts.Env["K6_BROWSER_ENABLED"] = tt.envVarValue
 			}
 			if tt.envVarMsgValue != "" {
-				ts.Env["K6_BROWSER_ENABLE_RUN_MSG"] = tt.envVarMsgValue
+				ts.Env["K6_BROWSER_ENABLED_MSG"] = tt.envVarMsgValue
 			}
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 

@@ -27,8 +27,8 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	env := vu.InitEnv()
 
 	throwError := func() {
-		msg := "To run browser tests set env var K6_BROWSER_ENABLE_RUN=true"
-		if m, ok := env.LookupEnv("K6_BROWSER_ENABLE_RUN_MSG"); ok && m != "" {
+		msg := "To run browser tests set env var K6_BROWSER_ENABLED=true"
+		if m, ok := env.LookupEnv("K6_BROWSER_ENABLED_MSG"); ok && m != "" {
 			msg = m
 		}
 
