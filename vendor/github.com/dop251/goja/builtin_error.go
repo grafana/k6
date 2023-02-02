@@ -128,7 +128,7 @@ func (r *Runtime) builtin_Error(args []Value, proto *Object) *Object {
 }
 
 func (r *Runtime) builtin_AggregateError(args []Value, proto *Object) *Object {
-	obj := r.newErrorObject(proto, classAggError)
+	obj := r.newErrorObject(proto, classError)
 	if len(args) > 1 && args[1] != nil && args[1] != _undefined {
 		obj._putProp("message", args[1].toString(), true, false, true)
 	}

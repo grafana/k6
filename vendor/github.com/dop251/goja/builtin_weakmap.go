@@ -109,7 +109,7 @@ func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 	o := &Object{runtime: r}
 
 	wmo := &weakMapObject{}
-	wmo.class = classWeakMap
+	wmo.class = classObject
 	wmo.val = o
 	wmo.extensible = true
 	o.self = wmo

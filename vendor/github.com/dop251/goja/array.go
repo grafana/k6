@@ -52,11 +52,11 @@ func (r *Runtime) createArrayIterator(iterObj *Object, kind iterationKind) Value
 		obj:  iterObj,
 		kind: kind,
 	}
-	ai.class = classArrayIterator
+	ai.class = classObject
 	ai.val = o
 	ai.extensible = true
 	o.self = ai
-	ai.prototype = r.global.ArrayIteratorPrototype
+	ai.prototype = r.getArrayIteratorPrototype()
 	ai.init()
 
 	return o

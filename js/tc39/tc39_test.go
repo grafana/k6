@@ -48,7 +48,6 @@ var (
 	featuresBlockList = []string{
 		"BigInt",                      // not supported at all
 		"IsHTMLDDA",                   // not supported at all
-		"generators",                  // not supported in a meaningful way IMO
 		"async-iteration",             // not supported at all
 		"top-level-await",             // not supported at all
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
@@ -81,16 +80,18 @@ var (
 
 		"array-find-from-last", // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
 	}
-	skipWords = []string{"yield", "generator", "Generator", "module"}
+	skipWords = []string{"module"}
 	skipList  = map[string]bool{
-		"test/built-ins/Object/seal/seal-generatorfunction.js": true,
-
 		"test/built-ins/Date/parse/without-utc-offset.js": true, // some other reason ?!? depending on local time
 
 		"test/built-ins/Array/prototype/concat/arg-length-exceeding-integer-limit.js": true, // takes forever and is broken
 		"test/built-ins/Array/prototype/splice/throws-if-integer-limit-exceeded.js":   true, // takes forever and is broken
 		"test/built-ins/Array/prototype/unshift/clamps-to-integer-limit.js":           true, // takes forever and is broken
 		"test/built-ins/Array/prototype/unshift/throws-if-integer-limit-exceeded.js":  true, // takes forever and is broken
+
+		// async generator
+		"test/built-ins/Object/seal/seal-asyncgeneratorfunction.js": true,
+		"test/language/expressions/async-generator/name.js":         true,
 
 		// wrong tests after change in the specification https://github.com/tc39/test262/issues/3407
 		"test/language/expressions/prefix-decrement/S11.4.5_A6_T3.js":        true,
@@ -160,35 +161,56 @@ var (
 		"test/annexB/built-ins/RegExp/legacy-accessors/",
 		"test/language/literals/string/legacy-", // legecy string escapes
 
-		// Async/Promise and other totally unsupported functionality
+		"test/built-ins/Atomics",
+		"test/built-ins/BigInt",
+		"test/built-ins/SharedArrayBuffer",
+
+		// Async generators are not currently supported
 		"test/built-ins/AsyncFromSyncIteratorPrototype",
 		"test/built-ins/AsyncGeneratorFunction",
 		"test/built-ins/AsyncGeneratorPrototype",
 		"test/built-ins/AsyncIteratorPrototype",
-		"test/built-ins/Atomics",
-		"test/built-ins/BigInt",
-		"test/built-ins/SharedArrayBuffer",
-		"test/language/expressions/dynamic-import",
-		"test/language/module-code/top-level-await",
-
-		// generator methods seem to just not work at all
-		"test/language/arguments-object/cls-decl-gen-met",
-		"test/language/arguments-object/cls-decl-private-gen-meth",
-		"test/language/arguments-object/cls-expr-gen-meth",
-		"test/language/arguments-object/cls-expr-private-gen-meth",
-		"test/language/eval-code/direct/gen-",
-		"test/language/eval-code/direct/async-gen-",
-		"test/language/expressions/class/gen-method",
-		"test/language/expressions/class/dstr/gen-meth",
-		"test/language/expressions/class/dstr/private-gen-meth",
-		"test/language/expressions/object/dstr/gen-meth",
-		"test/language/statements/class/gen-method",
-		"test/language/statements/class/dstr/gen-meth",
-		"test/language/statements/class/dstr/private-gen-meth",
+		"test/language/eval-code/direct/async-gen",
+		"test/language/expressions/async-generator",
+		"test/language/expressions/class/elements/after-same-line-gen-rs-static-async-generator",
+		"test/language/expressions/class/elements/after-same-line-method-rs-static-async-generator",
+		"test/language/expressions/class/elements/after-same-line-static-async-method-rs-static-async-generator",
+		"test/language/expressions/class/elements/after-same-line-static-gen-rs-static-async-generator",
+		"test/language/expressions/class/elements/after-same-line-static-method-rs-static-async-generator",
+		"test/language/expressions/class/elements/multiple-definitions-rs-static-async-generator",
+		"test/language/expressions/class/elements/multiple-stacked-definitions-rs-static-async-generator",
+		"test/language/expressions/class/elements/new-no-sc-line-gen-rs-static-async-generator",
+		"test/language/expressions/class/elements/new-no-sc-line-method-rs-static-async-generator",
+		"test/language/expressions/class/elements/new-sc-line-gen-rs-static-async-generator",
+		"test/language/expressions/class/elements/new-sc-line-method-rs-static-async-generator",
+		"test/language/expressions/class/elements/private-async-generator",
+		"test/language/expressions/class/elements/private-static-async-generator",
+		"test/language/expressions/class/elements/regular-definitions-rs-static-async-generator",
+		"test/language/expressions/class/elements/same-line-async-method-rs-static-async-generator",
+		"test/language/expressions/class/elements/same-line-gen-rs-static-async-generator",
+		"test/language/expressions/class/elements/same-line-method-rs-static-async-generator",
+		"test/language/expressions/class/elements/wrapped-in-sc-rs-static-async-generator",
+		"test/language/statements/class/elements/after-same-line-gen-rs-static-async-generator",
+		"test/language/statements/class/elements/after-same-line-method-rs-static-async-generator",
+		"test/language/statements/class/elements/after-same-line-static-async-method-rs-static-async-generator",
+		"test/language/statements/class/elements/after-same-line-static-gen-rs-static-async-generator",
+		"test/language/statements/class/elements/after-same-line-static-method-rs-static-async-generator",
+		"test/language/statements/class/elements/multiple-definitions-rs-static-async-generator",
+		"test/language/statements/class/elements/multiple-stacked-definitions-rs-static-async-generator",
+		"test/language/statements/class/elements/new-no-sc-line-method-rs-static-async-generator",
+		"test/language/statements/class/elements/new-sc-line-gen-rs-static-async-generator",
+		"test/language/statements/class/elements/new-sc-line-method-rs-static-async-generator",
+		"test/language/statements/class/elements/private-async-generator",
+		"test/language/statements/class/elements/private-static-async-generator",
+		"test/language/statements/class/elements/regular-definitions-rs-static-async-generator",
+		"test/language/statements/class/elements/same-line-async-method-rs-static-async-generator",
+		"test/language/statements/class/elements/same-line-gen-rs-static-async-generator",
+		"test/language/statements/class/elements/same-line-method-rs-static-async-generator",
+		"test/language/statements/class/elements/wrapped-in-sc-rs-static-async-generator",
+		"test/language/statements/switch/scope-lex-async-generator.js",
 
 		"test/built-ins/Function/prototype/toString/async",
 		"test/built-ins/Function/prototype/toString/async",
-		"test/built-ins/Function/prototype/toString/generator",
 		"test/built-ins/Function/prototype/toString/proxy-async",
 
 		"test/built-ins/FinalizationRegistry", // still in proposal
@@ -199,7 +221,8 @@ var (
 		"test/built-ins/Object/prototype/__lookup", // AnnexB lookupGetter lookupSetter
 		"test/built-ins/Object/prototype/__define", // AnnexB defineGetter defineSetter
 
-		"test/language/module-code/", // this requires that we rewrite the js package in a way that it can this tests - which is unlikely to ever happen
+		"test/language/module-code/",               // this requires that we rewrite the js package in a way that it can this tests - which is unlikely to ever happen
+		"test/language/expressions/dynamic-import", // not supported
 	}
 )
 
