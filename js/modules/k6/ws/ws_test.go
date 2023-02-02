@@ -217,7 +217,7 @@ func TestSessionInterval(t *testing.T) {
 	assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 }
 
-func TestSessionBadInterval(t *testing.T) {
+func TestSessionNegativeInterval(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
@@ -234,6 +234,24 @@ func TestSessionBadInterval(t *testing.T) {
 		`))
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "setInterval requires a >0 timeout parameter, received -1.23 ")
+}
+
+func TestSessionIntervalSub1(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	sr := tb.Replacer.Replace
+
+	test := newTestState(t)
+	_, err := test.VU.Runtime().RunString(sr(`
+		var counter = 0;
+		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
+			socket.setInterval(function () {
+				counter += 1;
+				if (counter > 2) { socket.close(); }
+			}, 0.3);
+		});
+		`))
+	require.NoError(t, err)
 }
 
 func TestSessionTimeout(t *testing.T) {

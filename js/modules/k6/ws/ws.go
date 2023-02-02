@@ -115,6 +115,7 @@ func (mi *WS) Exports() modules.Exports {
 }
 
 // Connect establishes a WebSocket connection based on the parameters provided.
+//
 //nolint:funlen
 func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 	ctx := mi.vu.Context()
@@ -453,7 +454,7 @@ func (s *Socket) SetInterval(fn goja.Callable, intervalMs float64) error {
 		return fmt.Errorf("setInterval requires a >0 timeout parameter, received %.2f", intervalMs)
 	}
 	go func() {
-		ticker := time.NewTicker(time.Duration(intervalMs) * time.Millisecond)
+		ticker := time.NewTicker(d)
 		defer ticker.Stop()
 
 		for {
