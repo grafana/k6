@@ -15,10 +15,13 @@ var (
 	_ Sink = &DummySink{}
 )
 
+// Sink collects Sample's values.
 type Sink interface {
-	Add(s Sample)                              // Add a sample to the sink.
-	Format(t time.Duration) map[string]float64 // Data for thresholds.
-	IsEmpty() bool                             // Check if the Sink is empty.
+	// Add adds a sample to the sink.
+	Add(s Sample)
+
+	// IsEmpty checks if the Sink has never received a value.
+	IsEmpty() bool
 }
 
 type CounterSink struct {
@@ -36,11 +39,12 @@ func (c *CounterSink) Add(s Sample) {
 // IsEmpty indicates whether the CounterSink is empty.
 func (c *CounterSink) IsEmpty() bool { return c.First.IsZero() }
 
-func (c *CounterSink) Format(t time.Duration) map[string]float64 {
-	return map[string]float64{
-		"count": c.Value,
-		"rate":  c.Value / (float64(t) / float64(time.Second)),
+// Rate computes the rate per second of the aggregated values.
+func (c *CounterSink) Rate(t time.Duration) float64 {
+	if t == 0 {
+		return 0
 	}
+	return c.Value / (float64(t) / float64(time.Second))
 }
 
 type GaugeSink struct {
@@ -61,10 +65,6 @@ func (g *GaugeSink) Add(s Sample) {
 		g.Min = s.Value
 		g.minSet = true
 	}
-}
-
-func (g *GaugeSink) Format(t time.Duration) map[string]float64 {
-	return map[string]float64{"value": g.Value}
 }
 
 type TrendSink struct {
@@ -118,18 +118,6 @@ func (t *TrendSink) P(pct float64) float64 {
 	}
 }
 
-func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
-	// TODO: respect the summaryTrendStats for REST API
-	return map[string]float64{
-		"min":   t.Min,
-		"max":   t.Max,
-		"avg":   t.Avg,
-		"med":   t.P(0.5),
-		"p(90)": t.P(0.90),
-		"p(95)": t.P(0.95),
-	}
-}
-
 type RateSink struct {
 	Trues int64
 	Total int64
@@ -145,13 +133,13 @@ func (r *RateSink) Add(s Sample) {
 	}
 }
 
-func (r RateSink) Format(t time.Duration) map[string]float64 {
+// Rate computes the rate of non-zero aggregated values.
+func (r RateSink) Rate() float64 {
 	var rate float64
 	if r.Total > 0 {
 		rate = float64(r.Trues) / float64(r.Total)
 	}
-
-	return map[string]float64{"rate": rate}
+	return rate
 }
 
 type DummySink map[string]float64
@@ -161,8 +149,4 @@ func (d DummySink) IsEmpty() bool { return len(d) == 0 }
 
 func (d DummySink) Add(s Sample) {
 	panic(errors.New("you can't add samples to a dummy sink"))
-}
-
-func (d DummySink) Format(t time.Duration) map[string]float64 {
-	return map[string]float64(d)
 }
