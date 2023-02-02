@@ -17,7 +17,6 @@ type Metric struct {
 
 	// TODO: decouple the metrics from the sinks and thresholds... have them
 	// linked, but not in the same struct?
-	Tainted    null.Bool    `json:"tainted"`
 	Submetrics []*Submetric `json:"submetrics"`
 	Sub        *Submetric   `json:"-"`
 }
@@ -140,4 +139,11 @@ func ParseMetricName(name string) (string, []string, error) {
 	}
 
 	return name[0:openingTokenPos], tags, nil
+}
+
+type ObservedMetric struct {
+	*Metric
+	Sink       Sink
+	Thresholds []Threshold
+	Tainted    null.Bool
 }

@@ -21,18 +21,16 @@ import (
 
 const thresholdsRate = 2 * time.Second
 
-type TrackedMetric struct {
+type trackedMetric struct {
 	*metrics.Metric
 
 	sink     metrics.Sink
 	observed bool
+	tainted  bool
 	m        sync.Mutex
-
-	// TODO: store thresholds
-	// thresholds metrics.Thresholds
 }
 
-func (om *TrackedMetric) AddSamples(samples ...metrics.Sample) {
+func (om *trackedMetric) AddSamples(samples ...metrics.Sample) {
 	om.m.Lock()
 	defer om.m.Unlock()
 
@@ -43,8 +41,6 @@ func (om *TrackedMetric) AddSamples(samples ...metrics.Sample) {
 	if !om.observed {
 		om.observed = true
 	}
-
-	// TODO: run the thresholds
 }
 
 // MetricsEngine is the internal metrics engine that k6 uses to keep track of
@@ -57,12 +53,9 @@ type MetricsEngine struct {
 
 	// they can be both top-level metrics or sub-metrics
 	//
-	// TODO: move thresholds as observed metrics and run
-	// the check directly when a sample is added.
-	//
 	// TODO: remove the tracked map using the sequence number
 	metricsWithThresholds map[*metrics.Metric]metrics.Thresholds
-	trackedMetrics        map[*metrics.Metric]*TrackedMetric
+	trackedMetrics        map[*metrics.Metric]*trackedMetric
 
 	breachedThresholdsCount uint32
 }
@@ -73,12 +66,12 @@ func NewMetricsEngine(runState *lib.TestRunState) (*MetricsEngine, error) {
 		test:                  runState,
 		logger:                runState.Logger.WithField("component", "metrics-engine"),
 		metricsWithThresholds: make(map[*metrics.Metric]metrics.Thresholds),
-		trackedMetrics:        make(map[*metrics.Metric]*TrackedMetric),
+		trackedMetrics:        make(map[*metrics.Metric]*trackedMetric),
 	}
 
 	for _, registered := range me.test.Registry.All() {
 		typ := registered.Type
-		me.trackedMetrics[registered] = &TrackedMetric{
+		me.trackedMetrics[registered] = &trackedMetric{
 			Metric: registered,
 			sink:   newSinkByType(typ),
 		}
@@ -169,15 +162,14 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 		// submetric) as observed, so they are shown in the end-of-test summary,
 		// even if they don't have any metric samples during the test run
 
-		me.trackedMetrics[metric] = &TrackedMetric{
+		me.trackedMetrics[metric] = &trackedMetric{
 			Metric:   metric,
 			sink:     newSinkByType(metric.Type),
 			observed: true,
-			// thresholds: thresholds,
 		}
 
 		if metric.Sub != nil {
-			me.trackedMetrics[metric.Sub.Parent] = &TrackedMetric{
+			me.trackedMetrics[metric.Sub.Parent] = &trackedMetric{
 				Metric:   metric.Sub.Parent,
 				sink:     newSinkByType(metric.Sub.Parent.Type),
 				observed: true,
@@ -192,7 +184,7 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 		if err != nil {
 			return err // shouldn't happen, but ¯\_(ツ)_/¯
 		}
-		me.trackedMetrics[expResMetric] = &TrackedMetric{
+		me.trackedMetrics[expResMetric] = &trackedMetric{
 			Metric: expResMetric,
 			sink:   newSinkByType(expResMetric.Type),
 		}
@@ -280,7 +272,7 @@ func (me *MetricsEngine) evaluateThresholds(
 		if len(ths.Thresholds) == 0 || (ignoreEmptySinks && observedMetric.sink.IsEmpty()) {
 			return
 		}
-		m.Tainted = null.BoolFrom(false)
+		observedMetric.tainted = false
 
 		succ, err := ths.Run(observedMetric.sink, t)
 		if err != nil {
@@ -291,7 +283,7 @@ func (me *MetricsEngine) evaluateThresholds(
 			return // threshold passed
 		}
 		breachedThresholds = append(breachedThresholds, m.Name)
-		m.Tainted = null.BoolFrom(true)
+		observedMetric.tainted = true
 		if ths.Abort {
 			shouldAbort = true
 		}
@@ -310,45 +302,69 @@ func (me *MetricsEngine) evaluateThresholds(
 	return breachedThresholds, shouldAbort
 }
 
-// DetectedThresholds ... TODO
-func (me *MetricsEngine) DetectedThresholds() map[*metrics.Metric]metrics.Thresholds {
-	// TODO: make a copy to be safe
-
-	return me.metricsWithThresholds
-}
-
-func (me *MetricsEngine) Sinks() map[*metrics.Metric]metrics.Sink {
-	ometrics := make(map[*metrics.Metric]metrics.Sink, len(me.trackedMetrics))
-	for _, om := range me.trackedMetrics {
-		if !om.observed {
+func (me *MetricsEngine) ObservedMetrics() map[string]metrics.ObservedMetric {
+	ometrics := make(map[string]metrics.ObservedMetric, len(me.trackedMetrics))
+	for _, tm := range me.trackedMetrics {
+		if !tm.observed {
 			continue
 		}
-		ometrics[om.Metric] = om.sink
-	}
-	return ometrics
-}
-
-func (me *MetricsEngine) ObservedMetrics() map[string]*metrics.Metric {
-	ometrics := make(map[string]*metrics.Metric, len(me.trackedMetrics))
-	for _, om := range me.trackedMetrics {
-		if !om.observed {
-			continue
-		}
-		ometrics[om.Name] = om.Metric
+		ometrics[tm.Name] = me.trackedToObserved(tm)
 	}
 	return ometrics
 }
 
 // TODO: check and confirm this is not an issue done in this way
 // it should serve an endpoint used with a low frequency
-func (me *MetricsEngine) ObservedMetricByID(id string) (*metrics.Metric, bool) {
-	for _, om := range me.trackedMetrics {
-		if om.Name != id {
+func (me *MetricsEngine) ObservedMetricByID(id string) (metrics.ObservedMetric, bool) {
+	for _, tm := range me.trackedMetrics {
+		if !tm.observed {
 			continue
 		}
-		return om.Metric, true
+		if tm.Name != id {
+			continue
+		}
+		return me.trackedToObserved(tm), true
 	}
-	return nil, false
+	return metrics.ObservedMetric{}, false
+}
+
+// trackedToObserved executes a memory safe copy to adapt from
+// a dynamic tracked metric to a static observed metric.
+func (me *MetricsEngine) trackedToObserved(tm *trackedMetric) metrics.ObservedMetric {
+	tm.m.Lock()
+	defer tm.m.Unlock()
+
+	var sink metrics.Sink
+	switch sinktyp := tm.sink.(type) {
+	case *metrics.CounterSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	case *metrics.GaugeSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	case *metrics.RateSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	case *metrics.TrendSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	}
+
+	var ths []metrics.Threshold
+	definedThs := me.metricsWithThresholds[tm.Metric]
+	if len(definedThs.Thresholds) > 0 {
+		ths = make([]metrics.Threshold, 0, len(definedThs.Thresholds))
+	}
+	for _, th := range definedThs.Thresholds {
+		ths = append(ths, *th)
+	}
+
+	return metrics.ObservedMetric{
+		Metric:     tm.Metric,
+		Sink:       sink,
+		Tainted:    null.BoolFrom(tm.tainted), // TODO: if null is required then rollback
+		Thresholds: ths,
+	}
 }
 
 // GetMetricsWithBreachedThresholdsCount returns the number of metrics for which

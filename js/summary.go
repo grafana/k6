@@ -81,12 +81,12 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData 
 		metricData := map[string]interface{}{
 			"type":     m.Type.String(),
 			"contains": m.Contains.String(),
-			"values":   getMetricValues(data.Sinks[m], data.TestRunDuration),
+			"values":   getMetricValues(m.Sink, data.TestRunDuration),
 		}
 
-		if ths, ok := data.Thresholds[m]; ok && len(ths.Thresholds) > 0 {
+		if len(m.Thresholds) > 0 {
 			thresholds := make(map[string]interface{})
-			for _, threshold := range ths.Thresholds {
+			for _, threshold := range m.Thresholds {
 				thresholds[threshold.Source] = map[string]interface{}{
 					"ok": !threshold.LastFailed,
 				}
