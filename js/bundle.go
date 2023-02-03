@@ -274,8 +274,8 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, c *compiler.Comp
 	}
 
 	cjsLoad := generateCJSLoad(b, c)
-	modSys := newModuleSystem(b.modResolution, vuImpl, cjsLoad)
-	unbindInit := b.setInitGlobals(rt, modSys)
+	modSys := newModuleSystem(b.modResolution, vuImpl)
+	unbindInit := b.setInitGlobals(rt, modSys, cjsLoad)
 	vuImpl.initEnv = initenv
 	defer func() {
 		unbindInit()
@@ -298,7 +298,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, c *compiler.Comp
 	err = common.RunWithPanicCatching(b.logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
 			//nolint:shadow,govet // here we shadow err on purpose
-			mod, err := b.modResolution.resolve(b.pwd, b.Filename.String(), cjsLoad)
+			mod, err := modSys.resolve(b.pwd, b.Filename.String(), cjsLoad)
 			if err != nil {
 				return err // TODO wrap as this should never happen
 			}
@@ -361,7 +361,7 @@ func (b *Bundle) setupJSRuntime(rt *goja.Runtime, vuID int64, logger logrus.Fiel
 	return nil
 }
 
-func (b *Bundle) setInitGlobals(rt *goja.Runtime, modSys *moduleSystem) (unset func()) {
+func (b *Bundle) setInitGlobals(rt *goja.Runtime, modSys *moduleSystem, cjsLoad cjsModuleLoader) (unset func()) {
 	mustSet := func(k string, v interface{}) {
 		if err := rt.Set(k, v); err != nil {
 			panic(fmt.Errorf("failed to set '%s' global object: %w", k, err))
@@ -371,6 +371,7 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, modSys *moduleSystem) (unset f
 		vu:      modSys.vu,
 		modules: modSys,
 		pwd:     b.pwd,
+		cjsLoad: cjsLoad,
 	}
 	mustSet("require", r.require)
 

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/url"
 	"path/filepath"
-	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
@@ -28,7 +27,11 @@ func openImpl(rt *goja.Runtime, fs afero.Fs, basePWD *url.URL, filename string, 
 	// will probably be need for archive execution under windows if always consider '/...' as an
 	// absolute path.
 	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) {
-		filename = filepath.Join(basePWD.Path, filename)
+		pwd, err := getPWDOfRequiringFile(basePWD, rt)
+		if err != nil {
+			return nil, err
+		}
+		filename = filepath.Join(pwd.Path, filename)
 	}
 	filename = filepath.Clean(filename)
 
@@ -84,34 +87,10 @@ type requireImpl struct {
 	vu      modules.VU
 	modules *moduleSystem
 	pwd     *url.URL
+	cjsLoad cjsModuleLoader
 }
 
 func (r *requireImpl) require(specifier string) (*goja.Object, error) {
-	// TODO remove this in the future when we address https://github.com/grafana/k6/issues/2674
-	// This is currently needed as each time require is called we need to record it's new pwd
-	// to be used if a require *or* open is used within the file as they are relative to the
-	// latest call to require.
-	// This is *not* the actual require behaviour defined in commonJS as it is actually always relative
-	// to the file it is in. This is unlikely to be an issue but this code is here to keep backwards
-	// compatibility *for now*.
-	// With native ESM this won't even be possible as `require` might not be called - instead an import
-	// might be used in which case we won't be able to be doing this hack. In that case we either will
-	// need some goja specific helper or to use stack traces as goja_nodejs does.
-	currentPWD := r.pwd
-	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") {
-		defer func() {
-			r.pwd = currentPWD
-		}()
-		// In theory we can give that downwards, but this makes the code more tightly coupled
-		// plus as explained above this will be removed in the future so the code reflects more
-		// closely what will be needed then
-		fileURL, err := loader.Resolve(r.pwd, specifier)
-		if err != nil {
-			return nil, err
-		}
-		r.pwd = loader.Dir(fileURL)
-	}
-
 	if r.vu.State() != nil { // fix
 		return nil, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "require")
 	}
@@ -119,7 +98,7 @@ func (r *requireImpl) require(specifier string) (*goja.Object, error) {
 		return nil, errors.New("require() can't be used with an empty specifier")
 	}
 
-	return r.modules.Require(currentPWD, specifier)
+	return r.modules.Require(r.pwd, specifier, r.cjsLoad)
 }
 
 func generateSourceMapLoader(logger logrus.FieldLogger, filesystems map[string]afero.Fs,

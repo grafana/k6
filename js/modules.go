@@ -3,6 +3,7 @@ package js
 import (
 	"fmt"
 	"net/url"
+	"path"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -33,22 +34,87 @@ func newModuleResolution(goModules map[string]interface{}) *modulesResolution {
 	return &modulesResolution{goModules: goModules, cache: make(map[string]moduleCacheElement)}
 }
 
-func (mr *modulesResolution) setMain(main *loader.SourceData, c *compiler.Compiler) error {
+type moduleSystem struct {
+	vu            modules.VU
+	instanceCache map[module]moduleInstance
+	resolution    *modulesResolution
+}
+
+func newModuleSystem(resolution *modulesResolution, vu modules.VU) *moduleSystem {
+	return &moduleSystem{
+		resolution:    resolution,
+		instanceCache: make(map[module]moduleInstance),
+		vu:            vu,
+	}
+}
+
+func (m *modulesResolution) setMain(main *loader.SourceData, c *compiler.Compiler) error {
 	mod, err := cjsmoduleFromString(main.URL, main.Data, c)
-	mr.cache[main.URL.String()] = moduleCacheElement{mod: mod, err: err}
+	m.cache[main.URL.String()] = moduleCacheElement{mod: mod, err: err}
 	return err
 }
 
-func (mr *modulesResolution) resolveSpecifier(basePWD *url.URL, arg string) (*url.URL, error) {
-	specifier, err := loader.Resolve(basePWD, arg)
+// Require is called when a module/file needs to be loaded by a script
+func (i *moduleSystem) Require(pwd *url.URL, arg string, loadCJS cjsModuleLoader) (*goja.Object, error) {
+	mod, err := i.resolve(pwd, arg, loadCJS)
+	if err != nil {
+		return nil, err
+	}
+	if instance, ok := i.instanceCache[mod]; ok {
+		return instance.exports(), nil
+	}
+
+	instance := mod.Instantiate(i.vu)
+	i.instanceCache[mod] = instance
+	if err = instance.execute(); err != nil {
+		return nil, err
+	}
+
+	return instance.exports(), nil
+}
+
+func (i *moduleSystem) resolve(basePWD *url.URL, arg string, loadCJS cjsModuleLoader) (module, error) {
+	if cached, ok := i.resolution.cache[arg]; ok {
+		return cached.mod, cached.err
+	}
+	switch {
+	case arg == "k6", strings.HasPrefix(arg, "k6/"):
+		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
+		// specially, as they don't exist on the filesystem.
+		mod, err := i.resolution.requireModule(arg)
+		i.resolution.cache[arg] = moduleCacheElement{mod: mod, err: err}
+		return mod, err
+	default:
+		specifier, err := i.resolution.resolveSpecifier(basePWD, i.vu.Runtime(), arg)
+		if err != nil {
+			return nil, err
+		}
+		// try cache with the final specifier
+		if cached, ok := i.resolution.cache[specifier.String()]; ok {
+			return cached.mod, cached.err
+		}
+		// Fall back to loading from the filesystem.
+		mod, err := loadCJS(specifier, arg)
+		i.resolution.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
+		return mod, err
+	}
+}
+
+func (i *modulesResolution) resolveSpecifier(basePWD *url.URL, rt *goja.Runtime, arg string) (*url.URL, error) {
+	pwd, err := getPWDOfRequiringFile(basePWD, rt)
+	if err != nil {
+		return nil, err // TODO wrap
+	}
+
+	specifier, err := i.resolveFile(pwd, arg)
 	if err != nil {
 		return nil, err
 	}
 	return specifier, nil
 }
 
-func (mr *modulesResolution) requireModule(name string) (module, error) {
-	mod, ok := mr.goModules[name]
+func (i *modulesResolution) requireModule(name string) (module, error) {
+	mod, ok := i.goModules[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
@@ -59,64 +125,54 @@ func (mr *modulesResolution) requireModule(name string) (module, error) {
 	return &baseGoModule{mod: mod}, nil
 }
 
-func (mr *modulesResolution) resolve(basePWD *url.URL, arg string, loadCJS cjsModuleLoader) (module, error) {
-	if cached, ok := mr.cache[arg]; ok {
-		return cached.mod, cached.err
-	}
-	switch {
-	case arg == "k6", strings.HasPrefix(arg, "k6/"):
-		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
-		// specially, as they don't exist on the filesystem.
-		mod, err := mr.requireModule(arg)
-		mr.cache[arg] = moduleCacheElement{mod: mod, err: err}
-		return mod, err
-	default:
-		specifier, err := mr.resolveSpecifier(basePWD, arg)
-		if err != nil {
-			return nil, err
-		}
-		// try cache with the final specifier
-		if cached, ok := mr.cache[specifier.String()]; ok {
-			return cached.mod, cached.err
-		}
-		// Fall back to loading from the filesystem.
-		mod, err := loadCJS(specifier, arg)
-		mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
-		return mod, err
-	}
-}
-
-type moduleSystem struct {
-	vu            modules.VU
-	instanceCache map[module]moduleInstance
-	resolution    *modulesResolution
-	cjsLoad       cjsModuleLoader
-}
-
-func newModuleSystem(resolution *modulesResolution, vu modules.VU, cjsLoad cjsModuleLoader) *moduleSystem {
-	return &moduleSystem{
-		resolution:    resolution,
-		instanceCache: make(map[module]moduleInstance),
-		vu:            vu,
-		cjsLoad:       cjsLoad,
-	}
-}
-
-// Require is called when a module/file needs to be loaded by a script
-func (ms *moduleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) {
-	mod, err := ms.resolution.resolve(pwd, arg, ms.cjsLoad)
+func (i *modulesResolution) resolveFile(pwd *url.URL, name string) (*url.URL, error) {
+	// Resolve the file path, push the target directory as pwd to make relative imports work.
+	fileURL, err := loader.Resolve(pwd, name)
 	if err != nil {
 		return nil, err
 	}
-	if instance, ok := ms.instanceCache[mod]; ok {
-		return instance.exports(), nil
+
+	return fileURL, nil
+}
+
+func getCurrentModulePath(rt *goja.Runtime) string {
+	var buf [2]goja.StackFrame
+	frames := rt.CaptureCallStack(2, buf[:0])
+	if len(frames) < 2 {
+		return "."
+	}
+	return frames[1].SrcName()
+}
+
+func getPreviousRequiringFile(rt *goja.Runtime) string {
+	var buf [1000]goja.StackFrame
+	frames := rt.CaptureCallStack(1000, buf[:0])
+
+	for i, frame := range frames[1:] { // first one should be the current require
+		// TODO have this precalculated automatically
+		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
+			// we need to get the one *before* but as we skip the first one the index matches ;)
+			return frames[i].SrcName()
+		}
+	}
+	// hopefully nobody is calling `require` with 1000 big stack :crossedfingers
+	if len(frames) == 1000 {
+		panic("stack too big")
 	}
 
-	instance := mod.Instantiate(ms.vu)
-	ms.instanceCache[mod] = instance
-	if err = instance.execute(); err != nil {
-		return nil, err
-	}
+	// fallback
+	return frames[len(frames)-1].SrcName()
+}
 
-	return instance.exports(), nil
+func getPWDOfRequiringFile(fallback *url.URL, rt *goja.Runtime) (*url.URL, error) {
+	pwd, err := url.Parse(getPreviousRequiringFile(rt))
+	if err != nil {
+		return nil, err // TODO wrap
+	}
+	if pwd.Host == "-" {
+		pwd = fallback
+	} else {
+		pwd.Path = path.Dir(pwd.Path)
+	}
+	return pwd, nil
 }
