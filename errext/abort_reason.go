@@ -14,6 +14,7 @@ const (
 	AbortedByScriptError
 	AbortedByScriptAbort
 	AbortedByTimeout
+	AbortedByOutput
 )
 
 // HasAbortReason is a wrapper around an error with an attached abort reason.

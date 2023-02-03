@@ -436,13 +436,13 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
-	var expectedEngineStopFuncCalled int64
+	var expectedTestStopFuncCalled int64
 	if stopOnError {
-		expectedEngineStopFuncCalled = 1
+		expectedTestStopFuncCalled = 1
 	}
-	var engineStopFuncCalled int64
-	out.engineStopFunc = func(error) {
-		atomic.AddInt64(&engineStopFuncCalled, 1)
+	var TestStopFuncCalled int64
+	out.testStopFunc = func(error) {
+		atomic.AddInt64(&TestStopFuncCalled, 1)
 	}
 	require.NoError(t, err)
 	now := time.Now()
@@ -513,7 +513,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		t.Fatal("sending metrics wasn't stopped")
 	}
 	require.Equal(t, max, count)
-	require.Equal(t, expectedEngineStopFuncCalled, engineStopFuncCalled)
+	require.Equal(t, expectedTestStopFuncCalled, TestStopFuncCalled)
 
 	nBufferSamples := len(out.bufferSamples)
 	nBufferHTTPTrails := len(out.bufferHTTPTrails)
