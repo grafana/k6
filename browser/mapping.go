@@ -24,18 +24,6 @@ import (
 // https://github.com/dop251/goja/issues/469
 type mapping = map[string]any
 
-// wildcards is a list of extra mappings for our API (api/).
-func wildcards() map[string]string {
-	return map[string]string{
-		"Page.query":             "$",
-		"Page.queryAll":          "$$",
-		"Frame.query":            "$",
-		"Frame.queryAll":         "$$",
-		"ElementHandle.query":    "$",
-		"ElementHandle.queryAll": "$$",
-	}
-}
-
 // mapBrowserToGoja maps the browser API to the JS module.
 // The motivation of this mapping was to support $ and $$ wildcard
 // methods.

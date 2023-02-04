@@ -17,6 +17,18 @@ import (
 	k6metrics "go.k6.io/k6/metrics"
 )
 
+// wildcards is a list of extra mappings for our API (api/).
+func wildcards() map[string]string {
+	return map[string]string{
+		"Page.query":             "$",
+		"Page.queryAll":          "$$",
+		"Frame.query":            "$",
+		"Frame.queryAll":         "$$",
+		"ElementHandle.query":    "$",
+		"ElementHandle.queryAll": "$$",
+	}
+}
+
 // TestMappings tests that all the methods of the API (api/) are
 // to the module. This is to ensure that we don't forget to map
 // a new method to the module.
