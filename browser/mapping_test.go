@@ -33,8 +33,9 @@ func wildcards() map[string]string {
 // API component properties as Goja objects.
 func getters() map[string]string {
 	return map[string]string{
-		"Page.getKeyboard": "keyboard",
-		"Page.getMouse":    "mouse",
+		"Page.getKeyboard":    "keyboard",
+		"Page.getMouse":       "mouse",
+		"Page.getTouchscreen": "touchscreen",
 	}
 }
 
@@ -119,8 +120,9 @@ func TestMappings(t *testing.T) {
 			apiInterface: (*api.Page)(nil),
 			mapp: func() mapping {
 				return mapPage(vu.Context(), vu, &common.Page{
-					Keyboard: &common.Keyboard{},
-					Mouse:    &common.Mouse{},
+					Keyboard:    &common.Keyboard{},
+					Mouse:       &common.Mouse{},
+					Touchscreen: &common.Touchscreen{},
 				})
 			},
 		},

@@ -34,7 +34,7 @@ type Page struct {
 
 	Keyboard    *Keyboard
 	Mouse       *Mouse
-	Touchscreen *Touchscreen `js:"touchscreen"` // Public JS API
+	Touchscreen *Touchscreen
 
 	ctx context.Context
 
@@ -544,6 +544,11 @@ func (p *Page) GetKeyboard() api.Keyboard {
 // GetMouse returns the mouse for the page.
 func (p *Page) GetMouse() api.Mouse {
 	return p.Mouse
+}
+
+// GetTouchscreen returns the touchscreen for the page.
+func (p *Page) GetTouchscreen() api.Touchscreen {
+	return p.Touchscreen
 }
 
 // GoBack is not implemented.

@@ -460,6 +460,7 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"tap":                         p.Tap,
 		"textContent":                 p.TextContent,
 		"title":                       p.Title,
+		"touchscreen":                 rt.ToValue(p.GetTouchscreen()).ToObject(rt),
 		"type":                        p.Type,
 		"uncheck":                     p.Uncheck,
 		"unroute":                     p.Unroute,

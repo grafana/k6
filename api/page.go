@@ -29,6 +29,7 @@ type Page interface {
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() Keyboard
 	GetMouse() Mouse
+	GetTouchscreen() Touchscreen
 	GoBack(opts goja.Value) Response
 	GoForward(opts goja.Value) Response
 	Goto(url string, opts goja.Value) (Response, error)
