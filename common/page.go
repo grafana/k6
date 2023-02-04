@@ -23,14 +23,16 @@ import (
 )
 
 // Ensure page implements the EventEmitter, Target and Page interfaces.
-var _ EventEmitter = &Page{}
-var _ api.Page = &Page{}
+var (
+	_ EventEmitter = &Page{}
+	_ api.Page     = &Page{}
+)
 
 // Page stores Page/tab related context.
 type Page struct {
 	BaseEventEmitter
 
-	Keyboard    *Keyboard    `js:"keyboard"`    // Public JS API
+	Keyboard    *Keyboard
 	Mouse       *Mouse       `js:"mouse"`       // Public JS API
 	Touchscreen *Touchscreen `js:"touchscreen"` // Public JS API
 
@@ -532,6 +534,11 @@ func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.
 		p.sessionID(), selector, name)
 
 	return p.MainFrame().GetAttribute(selector, name, opts)
+}
+
+// GetKeyboard returns the keyboard for the page.
+func (p *Page) GetKeyboard() api.Keyboard {
+	return p.Keyboard
 }
 
 // GoBack is not implemented.

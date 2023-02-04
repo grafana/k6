@@ -32,7 +32,9 @@ func wildcards() map[string]string {
 // getters is a list of mappings that return internal
 // API component properties as Goja objects.
 func getters() map[string]string {
-	return map[string]string{}
+	return map[string]string{
+		"Page.getKeyboard": "keyboard",
+	}
 }
 
 // TestMappings tests that all the methods of the API (api/) are
@@ -115,7 +117,9 @@ func TestMappings(t *testing.T) {
 		"page": {
 			apiInterface: (*api.Page)(nil),
 			mapp: func() mapping {
-				return mapPage(vu.Context(), vu, &common.Page{})
+				return mapPage(vu.Context(), vu, &common.Page{
+					Keyboard: &common.Keyboard{},
+				})
 			},
 		},
 		"elementHandle": {

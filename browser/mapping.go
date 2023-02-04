@@ -433,6 +433,7 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"isEnabled":  p.IsEnabled,
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
+		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
 		"locator":    p.Locator,
 		"mainFrame": func() *goja.Object {
 			mf := mapFrame(ctx, vu, p.MainFrame())
