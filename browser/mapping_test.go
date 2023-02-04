@@ -29,6 +29,12 @@ func wildcards() map[string]string {
 	}
 }
 
+// getters is a list of mappings that return internal
+// API component properties as Goja objects.
+func getters() map[string]string {
+	return map[string]string{}
+}
+
 // TestMappings tests that all the methods of the API (api/) are
 // to the module. This is to ensure that we don't forget to map
 // a new method to the module.
@@ -48,6 +54,7 @@ func TestMappings(t *testing.T) {
 			},
 		}
 		wildcards = wildcards()
+		getters   = getters()
 	)
 
 	// testMapping tests that all the methods of an API are mapped
@@ -66,18 +73,19 @@ func TestMappings(t *testing.T) {
 			// so we need to convert the first letter to lowercase.
 			m := toFirstLetterLower(method.Name)
 
-			wm, wok := isWildcard(wildcards, typ.Name(), m)
-			// if the method is a wildcard method, it should not
-			// be mapped to the module. so we should not find it
-			// in the mapped methods.
-			if _, ok := mapped[m]; wok && ok {
+			wgm, wgok := isWildcardOrGetter(wildcards, getters, typ.Name(), m)
+			// if the method is a wildcard or getter method, it should
+			// not be mapped to the module. so we should not find it in
+			// the mapped methods.
+
+			if _, ok := mapped[m]; wgok && ok {
 				t.Errorf("method %s should not be mapped", m)
 			}
 			// change the method name if it is mapped to a wildcard
 			// method. these wildcard methods are not exist on our
 			// API. so we need to use the mapped method instead.
-			if wok {
-				m = wm
+			if wgok {
+				m = wgm
 			}
 			if _, ok := mapped[m]; !ok {
 				t.Errorf("method %s not found", m)
@@ -170,11 +178,17 @@ func toFirstLetterLower(s string) string {
 	}
 }
 
-// isWildcard returns true if the method is a wildcard method and
-// returns the name of the method to be called instead of the original
-// method.
-func isWildcard(wildcards map[string]string, typ, method string) (string, bool) {
+// isWildcardOrGetter returns true if the method is a wildcard or getter method
+// and returns the name of the method to be called instead of the original one.
+func isWildcardOrGetter(wildcards, getters map[string]string, typ, method string) (string, bool) {
 	name := typ + "." + method
-	s, ok := wildcards[name]
-	return s, ok
+
+	if s, ok := wildcards[name]; ok {
+		return s, ok
+	}
+	if s, ok := getters[name]; ok {
+		return s, ok
+	}
+
+	return "", false
 }
