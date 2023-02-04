@@ -28,6 +28,7 @@ type Page interface {
 	Frames() []Frame
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() Keyboard
+	GetMouse() Mouse
 	GoBack(opts goja.Value) Response
 	GoForward(opts goja.Value) Response
 	Goto(url string, opts goja.Value) (Response, error)

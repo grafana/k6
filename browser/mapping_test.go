@@ -34,6 +34,7 @@ func wildcards() map[string]string {
 func getters() map[string]string {
 	return map[string]string{
 		"Page.getKeyboard": "keyboard",
+		"Page.getMouse":    "mouse",
 	}
 }
 
@@ -119,6 +120,7 @@ func TestMappings(t *testing.T) {
 			mapp: func() mapping {
 				return mapPage(vu.Context(), vu, &common.Page{
 					Keyboard: &common.Keyboard{},
+					Mouse:    &common.Mouse{},
 				})
 			},
 		},

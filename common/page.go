@@ -33,7 +33,7 @@ type Page struct {
 	BaseEventEmitter
 
 	Keyboard    *Keyboard
-	Mouse       *Mouse       `js:"mouse"`       // Public JS API
+	Mouse       *Mouse
 	Touchscreen *Touchscreen `js:"touchscreen"` // Public JS API
 
 	ctx context.Context
@@ -539,6 +539,11 @@ func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.
 // GetKeyboard returns the keyboard for the page.
 func (p *Page) GetKeyboard() api.Keyboard {
 	return p.Keyboard
+}
+
+// GetMouse returns the mouse for the page.
+func (p *Page) GetMouse() api.Mouse {
+	return p.Mouse
 }
 
 // GoBack is not implemented.

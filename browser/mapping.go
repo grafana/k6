@@ -439,6 +439,7 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 			mf := mapFrame(ctx, vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
+		"mouse":  rt.ToValue(p.GetMouse()).ToObject(rt),
 		"opener": p.Opener,
 		"pause":  p.Pause,
 		"pdf":    p.Pdf,
