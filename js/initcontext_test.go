@@ -708,3 +708,26 @@ func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
 	_, err = b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
 }
+
+func TestCacheAbsolutePathsNotRelative(t *testing.T) {
+	t.Parallel()
+	fs := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fs, "/a/interesting.js", []byte(`export default "a.interesting"`), 0o644))
+	require.NoError(t, afero.WriteFile(fs, "/a/import.js", []byte(`export { default as default} from "./interesting.js"`), 0o644))
+
+	require.NoError(t, afero.WriteFile(fs, "/b/interesting.js", []byte(`export default "b.interesting"`), 0o644))
+	require.NoError(t, afero.WriteFile(fs, "/b/import.js", []byte(`export { default as default} from "./interesting.js"`), 0o644))
+
+	b, err := getSimpleBundle(t, "/script.js", `
+    import a from "/a/import.js"
+    import b from "/b/import.js"
+    if (a != "a.interesting") { throw `+"`"+`'a' has wrong value "${a}" should be "a.interesting"`+"`"+`}
+
+    if (b != "b.interesting") { throw `+"`"+`'b' has wrong value "${b}" should be "b.interesting"`+"`"+`}
+    export default () => { throw "this shouldn't be ran" }
+`, fs)
+	require.NoError(t, err, "bundle error")
+
+	_, err = b.Instantiate(context.Background(), 0)
+	require.NoError(t, err)
+}
