@@ -24,6 +24,22 @@ type Sink interface {
 	IsEmpty() bool
 }
 
+// NewSinkByType creates a Sink related to the provided Metric's type.
+func NewSinkByType(mt MetricType) Sink {
+	var sink Sink
+	switch mt {
+	case Counter:
+		sink = &CounterSink{}
+	case Gauge:
+		sink = &GaugeSink{}
+	case Trend:
+		sink = &TrendSink{}
+	case Rate:
+		sink = &RateSink{}
+	}
+	return sink
+}
+
 type CounterSink struct {
 	Value float64
 	First time.Time

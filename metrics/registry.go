@@ -94,26 +94,12 @@ func (r *Registry) newMetric(name string, mt MetricType, vt ...ValueType) *Metri
 		valueType = vt[0]
 	}
 
-	var sink Sink
-	switch mt {
-	case Counter:
-		sink = &CounterSink{}
-	case Gauge:
-		sink = &GaugeSink{}
-	case Trend:
-		sink = &TrendSink{}
-	case Rate:
-		sink = &RateSink{}
-	default:
-		return nil
-	}
-
 	return &Metric{
 		registry: r,
 		Name:     name,
 		Type:     mt,
 		Contains: valueType,
-		Sink:     sink,
+		Sink:     NewSinkByType(mt),
 	}
 }
 
