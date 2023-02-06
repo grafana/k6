@@ -46,7 +46,7 @@ type InitContext struct {
 
 	// Cache of loaded programs and files.
 	programs map[string]programWithSource
-	// mege this and the above
+	// merge this and the above
 	k6ModulesCache map[string]goja.Value
 
 	compatibilityMode lib.CompatibilityMode
