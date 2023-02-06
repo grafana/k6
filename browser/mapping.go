@@ -24,18 +24,6 @@ import (
 // https://github.com/dop251/goja/issues/469
 type mapping = map[string]any
 
-// wildcards is a list of extra mappings for our API (api/).
-func wildcards() map[string]string {
-	return map[string]string{
-		"Page.query":             "$",
-		"Page.queryAll":          "$$",
-		"Frame.query":            "$",
-		"Frame.queryAll":         "$$",
-		"ElementHandle.query":    "$",
-		"ElementHandle.queryAll": "$$",
-	}
-}
-
 // mapBrowserToGoja maps the browser API to the JS module.
 // The motivation of this mapping was to support $ and $$ wildcard
 // methods.
@@ -445,11 +433,13 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"isEnabled":  p.IsEnabled,
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
+		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
 		"locator":    p.Locator,
 		"mainFrame": func() *goja.Object {
 			mf := mapFrame(ctx, vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
+		"mouse":  rt.ToValue(p.GetMouse()).ToObject(rt),
 		"opener": p.Opener,
 		"pause":  p.Pause,
 		"pdf":    p.Pdf,
@@ -470,6 +460,7 @@ func mapPage(ctx context.Context, vu k6modules.VU, p api.Page) mapping {
 		"tap":                         p.Tap,
 		"textContent":                 p.TextContent,
 		"title":                       p.Title,
+		"touchscreen":                 rt.ToValue(p.GetTouchscreen()).ToObject(rt),
 		"type":                        p.Type,
 		"uncheck":                     p.Uncheck,
 		"unroute":                     p.Unroute,

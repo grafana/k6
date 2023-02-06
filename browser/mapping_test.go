@@ -17,6 +17,26 @@ import (
 	k6metrics "go.k6.io/k6/metrics"
 )
 
+// customMappings is a list of custom mappings for our API (api/).
+// Some of them are wildcards, such as query to $ mapping; and
+// others are for publicly accessible fields, such as mapping
+// of page.keyboard to Page.getKeyboard.
+func customMappings() map[string]string {
+	return map[string]string{
+		// wildcards
+		"Page.query":             "$",
+		"Page.queryAll":          "$$",
+		"Frame.query":            "$",
+		"Frame.queryAll":         "$$",
+		"ElementHandle.query":    "$",
+		"ElementHandle.queryAll": "$$",
+		// getters
+		"Page.getKeyboard":    "keyboard",
+		"Page.getMouse":       "mouse",
+		"Page.getTouchscreen": "touchscreen",
+	}
+}
+
 // TestMappings tests that all the methods of the API (api/) are
 // to the module. This is to ensure that we don't forget to map
 // a new method to the module.
@@ -35,7 +55,7 @@ func TestMappings(t *testing.T) {
 				Registry: k6metrics.NewRegistry(),
 			},
 		}
-		wildcards = wildcards()
+		customMappings = customMappings()
 	)
 
 	// testMapping tests that all the methods of an API are mapped
@@ -54,18 +74,18 @@ func TestMappings(t *testing.T) {
 			// so we need to convert the first letter to lowercase.
 			m := toFirstLetterLower(method.Name)
 
-			wm, wok := isWildcard(wildcards, typ.Name(), m)
-			// if the method is a wildcard method, it should not
-			// be mapped to the module. so we should not find it
-			// in the mapped methods.
-			if _, ok := mapped[m]; wok && ok {
+			cm, cmok := isCustomMapping(customMappings, typ.Name(), m)
+			// if the method is a custom mapping, it should not be
+			// mapped to the module. so we should not find it in
+			// the mapped methods.
+			if _, ok := mapped[m]; cmok && ok {
 				t.Errorf("method %s should not be mapped", m)
 			}
-			// change the method name if it is mapped to a wildcard
-			// method. these wildcard methods are not exist on our
+			// change the method name if it is mapped to a custom
+			// method. these custom methods are not exist on our
 			// API. so we need to use the mapped method instead.
-			if wok {
-				m = wm
+			if cmok {
+				m = cm
 			}
 			if _, ok := mapped[m]; !ok {
 				t.Errorf("method %s not found", m)
@@ -95,7 +115,11 @@ func TestMappings(t *testing.T) {
 		"page": {
 			apiInterface: (*api.Page)(nil),
 			mapp: func() mapping {
-				return mapPage(vu.Context(), vu, &common.Page{})
+				return mapPage(vu.Context(), vu, &common.Page{
+					Keyboard:    &common.Keyboard{},
+					Mouse:       &common.Mouse{},
+					Touchscreen: &common.Touchscreen{},
+				})
 			},
 		},
 		"elementHandle": {
@@ -158,11 +182,15 @@ func toFirstLetterLower(s string) string {
 	}
 }
 
-// isWildcard returns true if the method is a wildcard method and
-// returns the name of the method to be called instead of the original
-// method.
-func isWildcard(wildcards map[string]string, typ, method string) (string, bool) {
+// isCustomMapping returns true if the method is a custom mapping
+// and returns the name of the method to be called instead of the
+// original one.
+func isCustomMapping(customMappings map[string]string, typ, method string) (string, bool) {
 	name := typ + "." + method
-	s, ok := wildcards[name]
-	return s, ok
+
+	if s, ok := customMappings[name]; ok {
+		return s, ok
+	}
+
+	return "", false
 }
