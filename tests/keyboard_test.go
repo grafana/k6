@@ -5,7 +5,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/keyboardlayout"
 
 	"github.com/stretchr/testify/assert"
@@ -17,9 +16,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("all_keys", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 		layout := keyboardlayout.GetKeyboardLayout("us")
 
 		assert.NotPanics(t, func() {
@@ -31,9 +28,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("backspace", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
 		el := p.Query("input")
@@ -48,9 +43,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("combo", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
 		el := p.Query("input")
@@ -74,9 +67,7 @@ func TestKeyboardPress(t *testing.T) {
 	t.Run("meta", func(t *testing.T) {
 		t.Skip("FIXME") // See https://github.com/grafana/xk6-browser/issues/424
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
 		el := p.Query("input")
@@ -99,9 +90,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("type does not split on +", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
 		el := p.Query("textarea")
@@ -113,9 +102,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("capitalization", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
 		el := p.Query("textarea")
@@ -139,9 +126,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("type not affected by shift", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
 		el := p.Query("textarea")
@@ -156,9 +141,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("newline", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
 		el := p.Query("textarea")
@@ -174,9 +157,7 @@ func TestKeyboardPress(t *testing.T) {
 	// Replicates the test from https://playwright.dev/docs/api/class-keyboard
 	t.Run("selection", func(t *testing.T) {
 		p := tb.NewPage(nil)
-		cp, ok := p.(*common.Page)
-		require.True(t, ok)
-		kb := cp.Keyboard
+		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
 		el := p.Query("input")
