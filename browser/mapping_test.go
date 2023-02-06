@@ -97,25 +97,25 @@ func TestMappings(t *testing.T) {
 		"browserType": {
 			apiInterface: (*api.BrowserType)(nil),
 			mapp: func() mapping {
-				return mapBrowserType(vu.Context(), vu, &chromium.BrowserType{})
+				return mapBrowserType(vu, &chromium.BrowserType{})
 			},
 		},
 		"browser": {
 			apiInterface: (*api.Browser)(nil),
 			mapp: func() mapping {
-				return mapBrowser(vu.Context(), vu, &chromium.Browser{})
+				return mapBrowser(vu, &chromium.Browser{})
 			},
 		},
 		"browserContext": {
 			apiInterface: (*api.BrowserContext)(nil),
 			mapp: func() mapping {
-				return mapBrowserContext(vu.Context(), vu, &common.BrowserContext{})
+				return mapBrowserContext(vu, &common.BrowserContext{})
 			},
 		},
 		"page": {
 			apiInterface: (*api.Page)(nil),
 			mapp: func() mapping {
-				return mapPage(vu.Context(), vu, &common.Page{
+				return mapPage(vu, &common.Page{
 					Keyboard:    &common.Keyboard{},
 					Mouse:       &common.Mouse{},
 					Touchscreen: &common.Touchscreen{},
@@ -125,37 +125,37 @@ func TestMappings(t *testing.T) {
 		"elementHandle": {
 			apiInterface: (*api.ElementHandle)(nil),
 			mapp: func() mapping {
-				return mapElementHandle(vu.Context(), vu, &common.ElementHandle{})
+				return mapElementHandle(vu, &common.ElementHandle{})
 			},
 		},
 		"jsHandle": {
 			apiInterface: (*api.JSHandle)(nil),
 			mapp: func() mapping {
-				return mapJSHandle(vu.Context(), vu, &common.BaseJSHandle{})
+				return mapJSHandle(vu, &common.BaseJSHandle{})
 			},
 		},
 		"frame": {
 			apiInterface: (*api.Frame)(nil),
 			mapp: func() mapping {
-				return mapFrame(vu.Context(), vu, &common.Frame{})
+				return mapFrame(vu, &common.Frame{})
 			},
 		},
 		"mapRequest": {
 			apiInterface: (*api.Request)(nil),
 			mapp: func() mapping {
-				return mapRequest(vu.Context(), vu, &common.Request{})
+				return mapRequest(vu, &common.Request{})
 			},
 		},
 		"mapResponse": {
 			apiInterface: (*api.Response)(nil),
 			mapp: func() mapping {
-				return mapResponse(vu.Context(), vu, &common.Response{})
+				return mapResponse(vu, &common.Response{})
 			},
 		},
 		"mapWorker": {
 			apiInterface: (*api.Worker)(nil),
 			mapp: func() mapping {
-				return mapWorker(vu.Context(), vu, &common.Worker{})
+				return mapWorker(vu, &common.Worker{})
 			},
 		},
 	} {

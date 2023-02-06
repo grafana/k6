@@ -5,7 +5,6 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -43,13 +42,9 @@ func New() *RootModule {
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	// promises and inner objects need the VU object to be
-	// able to use k6-core specific functionality.
-	ctx := k6ext.WithVU(vu.Context(), vu)
-
 	return &ModuleInstance{
 		mod: &JSModule{
-			Chromium: mapBrowserToGoja(ctx, vu),
+			Chromium: mapBrowserToGoja(vu),
 			Devices:  common.GetDevices(),
 			Version:  version,
 		},
