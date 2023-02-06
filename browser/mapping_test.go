@@ -17,22 +17,20 @@ import (
 	k6metrics "go.k6.io/k6/metrics"
 )
 
-// wildcards is a list of extra mappings for our API (api/).
-func wildcards() map[string]string {
+// customMappings is a list of custom mappings for our API (api/).
+// Some of them are wildcards, such as query to $ mapping; and
+// others are for publicly accessible fields, such as mapping
+// of page.keyboard to Page.getKeyboard.
+func customMappings() map[string]string {
 	return map[string]string{
+		// wildcards
 		"Page.query":             "$",
 		"Page.queryAll":          "$$",
 		"Frame.query":            "$",
 		"Frame.queryAll":         "$$",
 		"ElementHandle.query":    "$",
 		"ElementHandle.queryAll": "$$",
-	}
-}
-
-// getters is a list of mappings that return internal
-// API component properties as Goja objects.
-func getters() map[string]string {
-	return map[string]string{
+		// getters
 		"Page.getKeyboard":    "keyboard",
 		"Page.getMouse":       "mouse",
 		"Page.getTouchscreen": "touchscreen",
@@ -57,8 +55,7 @@ func TestMappings(t *testing.T) {
 				Registry: k6metrics.NewRegistry(),
 			},
 		}
-		wildcards = wildcards()
-		getters   = getters()
+		customMappings = customMappings()
 	)
 
 	// testMapping tests that all the methods of an API are mapped
@@ -77,19 +74,18 @@ func TestMappings(t *testing.T) {
 			// so we need to convert the first letter to lowercase.
 			m := toFirstLetterLower(method.Name)
 
-			wgm, wgok := isWildcardOrGetter(wildcards, getters, typ.Name(), m)
-			// if the method is a wildcard or getter method, it should
-			// not be mapped to the module. so we should not find it in
+			cm, cmok := isCustomMapping(customMappings, typ.Name(), m)
+			// if the method is a custom mapping, it should not be
+			// mapped to the module. so we should not find it in
 			// the mapped methods.
-
-			if _, ok := mapped[m]; wgok && ok {
+			if _, ok := mapped[m]; cmok && ok {
 				t.Errorf("method %s should not be mapped", m)
 			}
-			// change the method name if it is mapped to a wildcard
-			// method. these wildcard methods are not exist on our
+			// change the method name if it is mapped to a custom
+			// method. these custom methods are not exist on our
 			// API. so we need to use the mapped method instead.
-			if wgok {
-				m = wgm
+			if cmok {
+				m = cm
 			}
 			if _, ok := mapped[m]; !ok {
 				t.Errorf("method %s not found", m)
@@ -186,15 +182,13 @@ func toFirstLetterLower(s string) string {
 	}
 }
 
-// isWildcardOrGetter returns true if the method is a wildcard or getter method
-// and returns the name of the method to be called instead of the original one.
-func isWildcardOrGetter(wildcards, getters map[string]string, typ, method string) (string, bool) {
+// isCustomMapping returns true if the method is a custom mapping
+// and returns the name of the method to be called instead of the
+// original one.
+func isCustomMapping(customMappings map[string]string, typ, method string) (string, bool) {
 	name := typ + "." + method
 
-	if s, ok := wildcards[name]; ok {
-		return s, ok
-	}
-	if s, ok := getters[name]; ok {
+	if s, ok := customMappings[name]; ok {
 		return s, ok
 	}
 
