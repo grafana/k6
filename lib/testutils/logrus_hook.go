@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"io"
 	"strings"
 	"sync"
 
@@ -58,4 +59,19 @@ func LogContains(logEntries []logrus.Entry, expLevel logrus.Level, expContents s
 		}
 	}
 	return false
+}
+
+// NewMemLogger creates a Logrus logger mocked by SimpleLogrusHook.
+func NewMemLogger(levels ...logrus.Level) (*logrus.Logger, *SimpleLogrusHook) {
+	if len(levels) == 0 {
+		levels = logrus.AllLevels
+	}
+	logger := logrus.New()
+	logger.SetLevel(logrus.InfoLevel)
+	logger.Out = io.Discard
+	hook := &SimpleLogrusHook{
+		HookedLevels: levels,
+	}
+	logger.AddHook(hook)
+	return logger, hook
 }
