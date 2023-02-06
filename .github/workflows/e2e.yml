@@ -7,8 +7,8 @@ on:
       - main
   pull_request:
   schedule:
-    # Daily at 06:00 AM UTC
-    - cron:  '0 6 * * *'
+    # At 06:00 AM UTC from Monday through Friday
+    - cron:  '0 6 * * 1-5'
 
 defaults:
   run:
