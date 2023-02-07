@@ -134,7 +134,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		defer func() {
 			logger.Debug("Generating the end-of-test summary...")
 			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
-				Metrics:         metricsEngine.ObservedMetrics,
+				Metrics:         metricsEngine.ObservedMetrics(),
 				RootGroup:       testRunState.Runner.GetDefaultGroup(),
 				TestRunDuration: executionState.GetCurrentTestRunDuration(),
 				NoColor:         c.gs.Flags.NoColor,
