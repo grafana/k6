@@ -99,7 +99,6 @@ func (r *Registry) newMetric(name string, mt MetricType, vt ...ValueType) *Metri
 		Name:     name,
 		Type:     mt,
 		Contains: valueType,
-		Sink:     NewSinkByType(mt),
 	}
 }
 

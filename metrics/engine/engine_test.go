@@ -22,7 +22,11 @@ func TestNewMetricsEngineWithThresholds(t *testing.T) {
 		Options: lib.Options{
 			Thresholds: map[string]metrics.Thresholds{
 				"metric1": {Thresholds: []*metrics.Threshold{}},
-				"metric2": {Thresholds: []*metrics.Threshold{}},
+				"metric2": {Thresholds: []*metrics.Threshold{
+					{
+						Source: "count>1",
+					},
+				}},
 			},
 		},
 	}
@@ -36,7 +40,7 @@ func TestNewMetricsEngineWithThresholds(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, me)
 
-	assert.Len(t, me.metricsWithThresholds, 2)
+	assert.Len(t, me.metricsWithThresholds, 1)
 }
 
 func TestMetricsEngineGetThresholdMetricOrSubmetricError(t *testing.T) {
@@ -71,7 +75,8 @@ func TestNewMetricsEngineNoThresholds(t *testing.T) {
 
 	trs := &lib.TestRunState{
 		TestPreInitState: &lib.TestPreInitState{
-			Logger: testutils.NewLogger(t),
+			Logger:   testutils.NewLogger(t),
+			Registry: metrics.NewRegistry(),
 		},
 	}
 
@@ -113,18 +118,21 @@ func TestMetricsEngineEvaluateThresholdNoAbort(t *testing.T) {
 			t.Parallel()
 			me := newTestMetricsEngine(t)
 
-			m1, err := me.test.Registry.NewMetric("m1", metrics.Counter)
-			require.NoError(t, err)
-			m2, err := me.test.Registry.NewMetric("m2", metrics.Counter)
-			require.NoError(t, err)
-
 			ths := metrics.NewThresholds([]string{tc.threshold})
 			require.NoError(t, ths.Parse())
-			m1.Thresholds = ths
-			m1.Thresholds.Thresholds[0].AbortOnFail = tc.abortOnFail
+			ths.Thresholds[0].AbortOnFail = tc.abortOnFail
 
-			me.metricsWithThresholds = []*metrics.Metric{m1, m2}
-			m1.Sink.Add(metrics.Sample{Value: 6.0})
+			me.metricsWithThresholds["m1"] = ths
+			me.metricsWithThresholds["m2"] = metrics.Thresholds{}
+
+			csink := &metrics.CounterSink{}
+			csink.Add(metrics.Sample{Value: 6.0})
+			me.trackedMetrics["m1"] = &trackedMetric{
+				sink: csink,
+			}
+			me.trackedMetrics["m2"] = &trackedMetric{
+				sink: &metrics.CounterSink{},
+			}
 
 			breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
 			require.Equal(t, tc.abortOnFail, abort)
@@ -145,10 +153,20 @@ func TestMetricsEngineEvaluateIgnoreEmptySink(t *testing.T) {
 
 	ths := metrics.NewThresholds([]string{"count>5"})
 	require.NoError(t, ths.Parse())
-	m1.Thresholds = ths
-	m1.Thresholds.Thresholds[0].AbortOnFail = true
+	ths.Thresholds[0].AbortOnFail = true
 
-	me.metricsWithThresholds = []*metrics.Metric{m1, m2}
+	me.metricsWithThresholds["m1"] = ths
+	me.metricsWithThresholds["m2"] = metrics.Thresholds{}
+
+	me.trackedMetrics["m1"] = &trackedMetric{
+		Metric: m1,
+		sink:   &metrics.CounterSink{},
+	}
+
+	me.trackedMetrics["m2"] = &trackedMetric{
+		Metric: m2,
+		sink:   &metrics.CounterSink{},
+	}
 
 	breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
 	require.True(t, abort)
@@ -157,6 +175,37 @@ func TestMetricsEngineEvaluateIgnoreEmptySink(t *testing.T) {
 	breached, abort = me.evaluateThresholds(true, zeroTestRunDuration)
 	require.False(t, abort)
 	assert.Empty(t, breached)
+}
+
+func TestMetricsEngineObserveMetricByID(t *testing.T) {
+	t.Parallel()
+
+	me := newTestMetricsEngine(t)
+
+	m1, err := me.test.Registry.NewMetric("m1", metrics.Counter)
+	require.NoError(t, err)
+	m2, err := me.test.Registry.NewMetric("m2", metrics.Counter)
+	require.NoError(t, err)
+
+	ths := metrics.NewThresholds([]string{"count>5"})
+	require.NoError(t, ths.Parse())
+	ths.Thresholds[0].AbortOnFail = true
+
+	me.metricsWithThresholds["m1"] = metrics.Thresholds{}
+	me.metricsWithThresholds["m2"] = ths
+
+	me.trackedMetrics["m1"] = &trackedMetric{
+		Metric: m1,
+	}
+	me.trackedMetrics["m2"] = &trackedMetric{
+		Metric:   m2,
+		observed: true,
+	}
+
+	ometric, found := me.ObservedMetricByID("m2")
+	require.True(t, found)
+	assert.Equal(t, m2, ometric.Metric)
+	assert.Len(t, ometric.Thresholds, 1)
 }
 
 func newTestMetricsEngine(t *testing.T) MetricsEngine {
@@ -168,8 +217,10 @@ func newTestMetricsEngine(t *testing.T) MetricsEngine {
 	}
 
 	return MetricsEngine{
-		logger: trs.Logger,
-		test:   trs,
+		logger:                trs.Logger,
+		test:                  trs,
+		metricsWithThresholds: make(map[string]metrics.Thresholds),
+		trackedMetrics:        make(map[string]*trackedMetric),
 	}
 }
 

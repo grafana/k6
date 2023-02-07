@@ -17,12 +17,8 @@ type Metric struct {
 
 	// TODO: decouple the metrics from the sinks and thresholds... have them
 	// linked, but not in the same struct?
-	Tainted    null.Bool    `json:"tainted"`
-	Thresholds Thresholds   `json:"thresholds"`
 	Submetrics []*Submetric `json:"submetrics"`
 	Sub        *Submetric   `json:"-"`
-	Sink       Sink         `json:"-"`
-	Observed   bool         `json:"-"`
 }
 
 // A Submetric represents a filtered dataset based on a parent metric.
@@ -143,4 +139,13 @@ func ParseMetricName(name string) (string, []string, error) {
 	}
 
 	return name[0:openingTokenPos], tags, nil
+}
+
+// ObservedMetric is a static representation
+// of a tracked metric.
+type ObservedMetric struct {
+	*Metric
+	Sink       Sink
+	Thresholds []Threshold
+	Tainted    null.Bool
 }

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 )
 
@@ -55,17 +56,16 @@ func (oi *outputIngester) flushMetrics() {
 		return
 	}
 
-	oi.metricsEngine.MetricsLock.Lock()
-	defer oi.metricsEngine.MetricsLock.Unlock()
-
-	// TODO: split metric samples in buckets with a *metrics.Metric key; this will
+	// It splits metric samples in buckets with a *metrics.Metric key; this will
 	// allow us to have a per-bucket lock, instead of one global one, and it
 	// will allow us to split apart the metric Name and Type from its Sink and
 	// Observed fields...
 	//
-	// And, to further optimize things, if every metric (and sub-metric) had a
+	// TODO: And, to further optimize things, if every metric (and sub-metric) had a
 	// sequential integer ID, we would be able to use a slice for these buckets
 	// and eliminate the map loopkups altogether!
+
+	samplesByMetric := make(map[*metrics.Metric][]metrics.Sample)
 
 	for _, sampleContainer := range sampleContainers {
 		samples := sampleContainer.GetSamples()
@@ -75,18 +75,31 @@ func (oi *outputIngester) flushMetrics() {
 		}
 
 		for _, sample := range samples {
-			m := sample.Metric               // this should have come from the Registry, no need to look it up
-			oi.metricsEngine.markObserved(m) // mark it as observed so it shows in the end-of-test summary
-			m.Sink.Add(sample)               // finally, add its value to its own sink
+			m := sample.Metric
+			samples := samplesByMetric[m]
+			samples = append(samples, sample)
+			samplesByMetric[m] = samples
 
 			// and also to the same for any submetrics that match the metric sample
 			for _, sm := range m.Submetrics {
 				if !sample.Tags.Contains(sm.Tags) {
 					continue
 				}
-				oi.metricsEngine.markObserved(sm.Metric)
-				sm.Metric.Sink.Add(sample)
+				samples := samplesByMetric[sm.Metric]
+				samples = append(samples, sample)
+				samplesByMetric[sm.Metric] = samples
 			}
 		}
+	}
+
+	for m, samples := range samplesByMetric {
+		om, ok := oi.metricsEngine.trackedMetrics[m.Name]
+		if !ok {
+			// if they are not pre-defined then
+			// it is not required to sink them
+			continue
+		}
+
+		om.AddSamples(samples...)
 	}
 }
