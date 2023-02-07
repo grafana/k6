@@ -1534,11 +1534,12 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	return gv.String(), nil
 }
 
+// Title returns the title of the frame.
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := f.vu.Runtime()
-	return f.Evaluate(rt.ToValue("document.title")).(string)
+	v := f.vu.Runtime().ToValue(`() => document.title`)
+	return gojaValueToString(f.ctx, f.Evaluate(v))
 }
 
 // Type text on the first element found matches the selector.

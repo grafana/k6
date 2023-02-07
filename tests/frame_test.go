@@ -102,3 +102,9 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	result := p.TextContent("#doneDiv", nil)
 	assert.EqualValues(t, "Done!", result)
 }
+
+func TestFrameTitle(t *testing.T) {
+	p := newTestBrowser(t).NewPage(nil)
+	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
+	assert.Equal(t, "Some title", p.MainFrame().Title())
+}
