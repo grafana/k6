@@ -16,7 +16,7 @@ import (
 // https://github.com/k6io/k6/issues/883, since this code is fairly
 // self-contained and easily testable now, without any global dependencies...
 
-var userEnvVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_]*$`)
+var userEnvVarName = regexp.MustCompile(`^[a-zA-Z_][a-zA-Z0-9_-]*$`)
 
 func runtimeOptionFlagSet(includeSysEnv bool) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", 0)
