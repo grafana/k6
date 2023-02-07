@@ -90,8 +90,14 @@ func TestNewMetric(t *testing.T) {
 
 	old, err := metrics.NewRegistry().NewMetric("test_metric", metrics.Trend, metrics.Time)
 	require.NoError(t, err)
-	old.Tainted = null.BoolFrom(true)
-	m := NewMetric(old, 0)
+
+	om := metrics.ObservedMetric{
+		Metric:  old,
+		Sink:    metrics.NewSinkByType(old.Type),
+		Tainted: null.BoolFrom(true),
+	}
+
+	m := NewMetric(om, 0)
 	assert.Equal(t, "test_metric", m.Name)
 	assert.True(t, m.Type.Valid)
 	assert.Equal(t, metrics.Trend, m.Type.Type)

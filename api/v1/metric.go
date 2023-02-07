@@ -63,26 +63,26 @@ type Metric struct {
 }
 
 // NewMetric constructs a new Metric
-func NewMetric(m *metrics.Metric, t time.Duration) Metric {
-	data := Metric{
-		Name:     m.Name,
-		Type:     NullMetricType{m.Type, true},
-		Contains: NullValueType{m.Contains, true},
-		Tainted:  m.Tainted,
+func NewMetric(om metrics.ObservedMetric, t time.Duration) Metric {
+	m := Metric{
+		Name:     om.Name,
+		Type:     NullMetricType{om.Type, true},
+		Contains: NullValueType{om.Contains, true},
+		Tainted:  om.Tainted,
 	}
 
-	switch sink := m.Sink.(type) {
+	switch sink := om.Sink.(type) {
 	case *metrics.CounterSink:
-		data.Sample = map[string]float64{
+		m.Sample = map[string]float64{
 			"count": sink.Value,
 			"rate":  sink.Rate(t),
 		}
 	case *metrics.GaugeSink:
-		data.Sample = map[string]float64{"value": sink.Value}
+		m.Sample = map[string]float64{"value": sink.Value}
 	case *metrics.RateSink:
-		data.Sample = map[string]float64{"rate": sink.Rate()}
+		m.Sample = map[string]float64{"rate": sink.Rate()}
 	case *metrics.TrendSink:
-		data.Sample = map[string]float64{
+		m.Sample = map[string]float64{
 			"min":   sink.Min,
 			"max":   sink.Max,
 			"avg":   sink.Avg,
@@ -92,5 +92,5 @@ func NewMetric(m *metrics.Metric, t time.Duration) Metric {
 		}
 	}
 
-	return data
+	return m
 }
