@@ -71,6 +71,21 @@ func (r *Registry) MustNewMetric(name string, typ MetricType, t ...ValueType) *M
 	return m
 }
 
+// All returns all the registered metrics.
+func (r *Registry) All() []*Metric {
+	r.l.RLock()
+	defer r.l.RUnlock()
+
+	if len(r.metrics) < 1 {
+		return nil
+	}
+	s := make([]*Metric, 0, len(r.metrics))
+	for _, m := range r.metrics {
+		s = append(s, m)
+	}
+	return s
+}
+
 func (r *Registry) newMetric(name string, mt MetricType, vt ...ValueType) *Metric {
 	valueType := Default
 	if len(vt) > 0 {

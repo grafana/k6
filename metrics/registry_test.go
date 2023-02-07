@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -64,4 +65,39 @@ func TestRegistryBranchTagSetRootWith(t *testing.T) {
 	require.NotNil(t, tags)
 
 	assert.Equal(t, raw, tags.Map())
+}
+
+func TestRegistryAll(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Empty", func(t *testing.T) {
+		t.Parallel()
+		r := NewRegistry()
+		assert.Nil(t, r.All())
+	})
+
+	t.Run("MultipleItems", func(t *testing.T) {
+		t.Parallel()
+		r := NewRegistry()
+
+		exp := make([]string, 5)
+		for i := 1; i <= 5; i++ {
+			name := "metric" + strconv.Itoa(i)
+			_, err := r.NewMetric(name, Counter)
+			require.NoError(t, err)
+
+			exp[i-1] = name
+		}
+		metrics := r.All()
+		require.Len(t, metrics, 5)
+
+		names := func(m []*Metric) []string {
+			s := make([]string, len(m))
+			for i := 0; i < len(m); i++ {
+				s[i] = m[i].Name
+			}
+			return s
+		}
+		assert.ElementsMatch(t, exp, names(metrics))
+	})
 }
