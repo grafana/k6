@@ -869,8 +869,10 @@ func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
 
 // URL returns the location of the page.
 func (p *Page) URL() string {
-	rt := p.vu.Runtime()
-	return p.Evaluate(rt.ToValue("document.location.toString()")).(string)
+	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
+
+	v := p.vu.Runtime().ToValue(`() => document.location.toString()`)
+	return gojaValueToString(p.ctx, p.Evaluate(v))
 }
 
 // Video returns information of recorded video.

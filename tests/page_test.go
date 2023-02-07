@@ -656,6 +656,18 @@ func TestPagePress(t *testing.T) {
 	require.Equal(t, "AbC", p.InputValue("#text1", nil))
 }
 
+func TestPageURL(t *testing.T) {
+	b := newTestBrowser(t, withHTTPServer())
+
+	p := b.NewPage(nil)
+	assert.Equal(t, "about:blank", p.URL())
+
+	resp, err := p.Goto(b.URL("/get"), nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+	assert.Regexp(t, "http://.*/get", p.URL())
+}
+
 func assertExceptionContains(t *testing.T, rt *goja.Runtime, fn func(), expErrMsg string) {
 	t.Helper()
 
