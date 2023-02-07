@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/dop251/goja"
@@ -12,6 +13,24 @@ import (
 	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 )
+
+// moduleVU carries module specific VU information.
+//
+// Currently, it is used to carry the VU object to the
+// inner objects and promises.
+type moduleVU struct {
+	k6modules.VU
+}
+
+func (vu moduleVU) Context() context.Context {
+	// promises and inner objects need the VU object to be
+	// able to use k6-core specific functionality.
+	//
+	// We should not cache the context (especially the init
+	// context from the vu that is received from k6 in
+	// NewModuleInstance).
+	return k6ext.WithVU(vu.VU.Context(), vu.VU)
+}
 
 // mapping is a type of mapping between our API (api/) and the JS
 // module. It acts like a bridge and allows adding wildcard methods
@@ -27,7 +46,7 @@ type mapping = map[string]any
 // The motivation of this mapping was to support $ and $$ wildcard
 // methods.
 // See issue #661 for more details.
-func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
+func mapBrowserToGoja(vu moduleVU) *goja.Object {
 	var (
 		rt          = vu.Runtime()
 		obj         = rt.NewObject()
@@ -44,7 +63,7 @@ func mapBrowserToGoja(vu k6modules.VU) *goja.Object {
 }
 
 // mapRequest to the JS module.
-func mapRequest(vu k6modules.VU, r api.Request) mapping {
+func mapRequest(vu moduleVU, r api.Request) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"allHeaders": r.AllHeaders,
@@ -83,7 +102,7 @@ func mapRequest(vu k6modules.VU, r api.Request) mapping {
 }
 
 // mapResponse to the JS module.
-func mapResponse(vu k6modules.VU, r api.Response) mapping {
+func mapResponse(vu moduleVU, r api.Response) mapping {
 	if r == nil {
 		return nil
 	}
@@ -118,7 +137,7 @@ func mapResponse(vu k6modules.VU, r api.Response) mapping {
 }
 
 // mapJSHandle to the JS module.
-func mapJSHandle(vu k6modules.VU, jsh api.JSHandle) mapping {
+func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"asElement": func() *goja.Object {
@@ -156,14 +175,13 @@ func mapJSHandle(vu k6modules.VU, jsh api.JSHandle) mapping {
 // mapElementHandle to the JS module.
 //
 //nolint:funlen
-func mapElementHandle(vu k6modules.VU, eh api.ElementHandle) mapping {
+func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,
 		"check":       eh.Check,
 		"click": func(opts goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (any, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
 				err := eh.Click(opts)
 				return nil, err //nolint:wrapcheck
 			})
@@ -238,7 +256,7 @@ func mapElementHandle(vu k6modules.VU, eh api.ElementHandle) mapping {
 // mapFrame to the JS module.
 //
 //nolint:funlen
-func mapFrame(vu k6modules.VU, f api.Frame) mapping {
+func mapFrame(vu moduleVU, f api.Frame) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"addScriptTag": f.AddScriptTag,
@@ -255,8 +273,7 @@ func mapFrame(vu k6modules.VU, f api.Frame) mapping {
 			return rt.ToValue(mcfs).ToObject(rt)
 		},
 		"click": func(selector string, opts goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (any, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
 				err := f.Click(selector, opts)
 				return nil, err //nolint:wrapcheck
 			})
@@ -278,8 +295,7 @@ func mapFrame(vu k6modules.VU, f api.Frame) mapping {
 		},
 		"getAttribute": f.GetAttribute,
 		"goto": func(url string, opts goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (any, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp, err := f.Goto(url, opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -322,15 +338,13 @@ func mapFrame(vu k6modules.VU, f api.Frame) mapping {
 		"uncheck":       f.Uncheck,
 		"url":           f.URL,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
 				return f.WaitForFunction(pageFunc, opts, args...) //nolint:wrapcheck
 			})
 		},
 		"waitForLoadState": f.WaitForLoadState,
 		"waitForNavigation": func(opts goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
 				resp, err := f.WaitForNavigation(opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -368,7 +382,7 @@ func mapFrame(vu k6modules.VU, f api.Frame) mapping {
 // mapPage to the JS module.
 //
 //nolint:funlen
-func mapPage(vu k6modules.VU, p api.Page) mapping {
+func mapPage(vu moduleVU, p api.Page) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"addInitScript": p.AddInitScript,
@@ -377,8 +391,7 @@ func mapPage(vu k6modules.VU, p api.Page) mapping {
 		"bringToFront":  p.BringToFront,
 		"check":         p.Check,
 		"click": func(selector string, opts goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (any, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
 				err := p.Click(selector, opts)
 				return nil, err //nolint:wrapcheck
 			})
@@ -418,8 +431,7 @@ func mapPage(vu k6modules.VU, p api.Page) mapping {
 		"goBack":       p.GoBack,
 		"goForward":    p.GoForward,
 		"goto": func(url string, opts goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (any, error) {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp, err := p.Goto(url, opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -475,15 +487,13 @@ func mapPage(vu k6modules.VU, p api.Page) mapping {
 		"viewportSize":                p.ViewportSize,
 		"waitForEvent":                p.WaitForEvent,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
 				return p.WaitForFunction(pageFunc, opts, args...) //nolint:wrapcheck
 			})
 		},
 		"waitForLoadState": p.WaitForLoadState,
 		"waitForNavigation": func(opts goja.Value) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
 				resp, err := p.WaitForNavigation(opts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
@@ -525,7 +535,7 @@ func mapPage(vu k6modules.VU, p api.Page) mapping {
 }
 
 // mapWorker to the JS module.
-func mapWorker(vu k6modules.VU, w api.Worker) mapping {
+func mapWorker(vu moduleVU, w api.Worker) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"evaluate": w.Evaluate,
@@ -539,7 +549,7 @@ func mapWorker(vu k6modules.VU, w api.Worker) mapping {
 }
 
 // mapBrowserContext to the JS module.
-func mapBrowserContext(vu k6modules.VU, bc api.BrowserContext) mapping {
+func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies":                  bc.AddCookies,
@@ -587,15 +597,14 @@ func mapBrowserContext(vu k6modules.VU, bc api.BrowserContext) mapping {
 }
 
 // mapBrowser to the JS module.
-func mapBrowser(vu k6modules.VU, b api.Browser) mapping {
+func mapBrowser(vu moduleVU, b api.Browser) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"close":       b.Close,
 		"contexts":    b.Contexts,
 		"isConnected": b.IsConnected,
 		"on": func(event string) *goja.Promise {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			return k6ext.Promise(ctx, func() (result any, reason error) {
+			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
 				return b.On(event) //nolint:wrapcheck
 			})
 		},
@@ -615,7 +624,7 @@ func mapBrowser(vu k6modules.VU, b api.Browser) mapping {
 }
 
 // mapBrowserType to the JS module.
-func mapBrowserType(vu k6modules.VU, bt api.BrowserType) mapping {
+func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"connect":                 bt.Connect,

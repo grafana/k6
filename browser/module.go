@@ -44,7 +44,7 @@ func New() *RootModule {
 func (*RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
 		mod: &JSModule{
-			Chromium: mapBrowserToGoja(vu),
+			Chromium: mapBrowserToGoja(moduleVU{vu}),
 			Devices:  common.GetDevices(),
 			Version:  version,
 		},
