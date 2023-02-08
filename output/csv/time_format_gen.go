@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-const _TimeFormatName = "unixunix_milliunix_microunix_nanorfc3339"
+const _TimeFormatName = "unixunix_milliunix_microunix_nanorfc3339rfc3339_nano"
 
-var _TimeFormatIndex = [...]uint8{0, 4, 14, 24, 33, 40}
+var _TimeFormatIndex = [...]uint8{0, 4, 14, 24, 33, 40, 52}
 
-const _TimeFormatLowerName = "unixunix_milliunix_microunix_nanorfc3339"
+const _TimeFormatLowerName = "unixunix_milliunix_microunix_nanorfc3339rfc3339_nano"
 
 func (i TimeFormat) String() string {
 	if i >= TimeFormat(len(_TimeFormatIndex)-1) {
@@ -29,9 +29,10 @@ func _TimeFormatNoOp() {
 	_ = x[TimeFormatUnixMicro-(2)]
 	_ = x[TimeFormatUnixNano-(3)]
 	_ = x[TimeFormatRFC3339-(4)]
+	_ = x[TimeFormatRFC3339Nano-(5)]
 }
 
-var _TimeFormatValues = []TimeFormat{TimeFormatUnix, TimeFormatUnixMilli, TimeFormatUnixMicro, TimeFormatUnixNano, TimeFormatRFC3339}
+var _TimeFormatValues = []TimeFormat{TimeFormatUnix, TimeFormatUnixMilli, TimeFormatUnixMicro, TimeFormatUnixNano, TimeFormatRFC3339, TimeFormatRFC3339Nano}
 
 var _TimeFormatNameToValueMap = map[string]TimeFormat{
 	_TimeFormatName[0:4]:        TimeFormatUnix,
@@ -44,6 +45,8 @@ var _TimeFormatNameToValueMap = map[string]TimeFormat{
 	_TimeFormatLowerName[24:33]: TimeFormatUnixNano,
 	_TimeFormatName[33:40]:      TimeFormatRFC3339,
 	_TimeFormatLowerName[33:40]: TimeFormatRFC3339,
+	_TimeFormatName[40:52]:      TimeFormatRFC3339Nano,
+	_TimeFormatLowerName[40:52]: TimeFormatRFC3339Nano,
 }
 
 var _TimeFormatNames = []string{
@@ -52,6 +55,7 @@ var _TimeFormatNames = []string{
 	_TimeFormatName[14:24],
 	_TimeFormatName[24:33],
 	_TimeFormatName[33:40],
+	_TimeFormatName[40:52],
 }
 
 // TimeFormatString retrieves an enum value from the enum constants string name.
