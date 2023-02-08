@@ -29,6 +29,7 @@ type TimeFormat uint8
 // valid defined values for TimeFormat
 const (
 	TimeFormatUnix TimeFormat = iota
+	TimeFormatUnixMicro
 	TimeFormatUnixNano
 	TimeFormatRFC3339
 )

@@ -213,6 +213,8 @@ func SampleToRow(sample *metrics.Sample, resTags []string, ignoredTags []string,
 		row[1] = sample.Time.Format(time.RFC3339)
 	case TimeFormatUnix:
 		row[1] = strconv.FormatInt(sample.Time.Unix(), 10)
+	case TimeFormatUnixMicro:
+		row[1] = strconv.FormatInt(sample.Time.UnixMicro(), 10)
 	case TimeFormatUnixNano:
 		row[1] = strconv.FormatInt(sample.Time.UnixNano(), 10)
 	}
