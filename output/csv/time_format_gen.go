@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-const _TimeFormatName = "unixunix_microunix_nanorfc3339"
+const _TimeFormatName = "unixunix_milliunix_microunix_nanorfc3339"
 
-var _TimeFormatIndex = [...]uint8{0, 4, 14, 23, 30}
+var _TimeFormatIndex = [...]uint8{0, 4, 14, 24, 33, 40}
 
-const _TimeFormatLowerName = "unixunix_microunix_nanorfc3339"
+const _TimeFormatLowerName = "unixunix_milliunix_microunix_nanorfc3339"
 
 func (i TimeFormat) String() string {
 	if i >= TimeFormat(len(_TimeFormatIndex)-1) {
@@ -25,29 +25,33 @@ func (i TimeFormat) String() string {
 func _TimeFormatNoOp() {
 	var x [1]struct{}
 	_ = x[TimeFormatUnix-(0)]
-	_ = x[TimeFormatUnixMicro-(1)]
-	_ = x[TimeFormatUnixNano-(2)]
-	_ = x[TimeFormatRFC3339-(3)]
+	_ = x[TimeFormatUnixMilli-(1)]
+	_ = x[TimeFormatUnixMicro-(2)]
+	_ = x[TimeFormatUnixNano-(3)]
+	_ = x[TimeFormatRFC3339-(4)]
 }
 
-var _TimeFormatValues = []TimeFormat{TimeFormatUnix, TimeFormatUnixMicro, TimeFormatUnixNano, TimeFormatRFC3339}
+var _TimeFormatValues = []TimeFormat{TimeFormatUnix, TimeFormatUnixMilli, TimeFormatUnixMicro, TimeFormatUnixNano, TimeFormatRFC3339}
 
 var _TimeFormatNameToValueMap = map[string]TimeFormat{
 	_TimeFormatName[0:4]:        TimeFormatUnix,
 	_TimeFormatLowerName[0:4]:   TimeFormatUnix,
-	_TimeFormatName[4:14]:       TimeFormatUnixMicro,
-	_TimeFormatLowerName[4:14]:  TimeFormatUnixMicro,
-	_TimeFormatName[14:23]:      TimeFormatUnixNano,
-	_TimeFormatLowerName[14:23]: TimeFormatUnixNano,
-	_TimeFormatName[23:30]:      TimeFormatRFC3339,
-	_TimeFormatLowerName[23:30]: TimeFormatRFC3339,
+	_TimeFormatName[4:14]:       TimeFormatUnixMilli,
+	_TimeFormatLowerName[4:14]:  TimeFormatUnixMilli,
+	_TimeFormatName[14:24]:      TimeFormatUnixMicro,
+	_TimeFormatLowerName[14:24]: TimeFormatUnixMicro,
+	_TimeFormatName[24:33]:      TimeFormatUnixNano,
+	_TimeFormatLowerName[24:33]: TimeFormatUnixNano,
+	_TimeFormatName[33:40]:      TimeFormatRFC3339,
+	_TimeFormatLowerName[33:40]: TimeFormatRFC3339,
 }
 
 var _TimeFormatNames = []string{
 	_TimeFormatName[0:4],
 	_TimeFormatName[4:14],
-	_TimeFormatName[14:23],
-	_TimeFormatName[23:30],
+	_TimeFormatName[14:24],
+	_TimeFormatName[24:33],
+	_TimeFormatName[33:40],
 }
 
 // TimeFormatString retrieves an enum value from the enum constants string name.
