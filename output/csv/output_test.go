@@ -137,6 +137,27 @@ func TestSampleToRow(t *testing.T) {
 			ignoredTags: []string{"tag4", "tag6"},
 			timeFormat:  "unix_nano",
 		},
+		{
+			testname: "Two res tags, two ignored, with Unix Micro timestamp",
+			sample: &metrics.Sample{
+				TimeSeries: metrics.TimeSeries{
+					Metric: testMetric,
+					Tags: registry.RootTagSet().WithTagsFromMap(map[string]string{
+						"tag1": "val1",
+						"tag2": "val2",
+						"tag3": "val3",
+						"tag4": "val4",
+						"tag5": "val5",
+						"tag6": "val6",
+					}),
+				},
+				Time:  time.Unix(1562324644, 2125),
+				Value: 1,
+			},
+			resTags:     []string{"tag1", "tag3"},
+			ignoredTags: []string{"tag4", "tag6"},
+			timeFormat:  "unix_micro",
+		},
 	}
 
 	expected := []struct {
@@ -185,6 +206,19 @@ func TestSampleToRow(t *testing.T) {
 			baseRow: []string{
 				"my_metric",
 				"1562324644000000025",
+				"1.000000",
+				"val1",
+				"val3",
+			},
+			extraRow: []string{
+				"tag2=val2",
+				"tag5=val5",
+			},
+		},
+		{
+			baseRow: []string{
+				"my_metric",
+				"1562324644000002",
 				"1.000000",
 				"val1",
 				"val3",
