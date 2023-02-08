@@ -293,7 +293,6 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 		"disable-popup-blocking":          true,
 		"disable-prompt-on-repost":        true,
 		"disable-renderer-backgrounding":  true,
-		"disable-sync":                    true,
 		"force-color-profile":             "srgb",
 		"metrics-recording-only":          true,
 		"no-first-run":                    true,
