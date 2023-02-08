@@ -282,7 +282,6 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 		"disable-background-timer-throttling":                true,
 		"disable-backgrounding-occluded-windows":             true,
 		"disable-breakpad":                                   true,
-		"disable-client-side-phishing-detection":             true,
 		"disable-component-extensions-with-background-pages": true,
 		"disable-default-apps":                               true,
 		"disable-dev-shm-usage":                              true,
