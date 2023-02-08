@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -307,9 +306,6 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 		"headless":                    lopts.Headless,
 		"auto-open-devtools-for-tabs": lopts.Devtools,
 		"window-size":                 fmt.Sprintf("%d,%d", 800, 600),
-	}
-	if runtime.GOOS == "darwin" {
-		f["enable-use-zoom-for-dsf"] = false
 	}
 	if lopts.Headless {
 		f["hide-scrollbars"] = true
