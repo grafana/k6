@@ -22,12 +22,14 @@ type Config struct {
 }
 
 // TimeFormat custom enum type
+//
 //go:generate enumer -type=TimeFormat -transform=snake -trimprefix TimeFormat -output time_format_gen.go
 type TimeFormat uint8
 
 // valid defined values for TimeFormat
 const (
 	TimeFormatUnix TimeFormat = iota
+	TimeFormatUnixNano
 	TimeFormatRFC3339
 )
 
