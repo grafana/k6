@@ -33,6 +33,7 @@ const (
 	TimeFormatUnixMicro
 	TimeFormatUnixNano
 	TimeFormatRFC3339
+	TimeFormatRFC3339Nano
 )
 
 // NewConfig creates a new Config instance with default values for some fields.
