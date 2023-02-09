@@ -241,7 +241,7 @@ func renderMultipleBars(
 // TODO: don't use global variables...
 //
 //nolint:funlen,gocognit
-func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.ProgressBar, logger *logrus.Logger) {
+func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.ProgressBar, logger logrus.FieldLogger) {
 	if gs.Flags.Quiet {
 		return
 	}

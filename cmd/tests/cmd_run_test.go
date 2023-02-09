@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 
@@ -500,9 +501,10 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		export let options = {
 			iterations: 5,
 			thresholds: {
-				"setup_teardown": ["count == 2"],
+				"setup_teardown": ["count == 3"],
 				"iterations": ["count == 5"],
-				"http_reqs": ["count == 7"],
+				"http_reqs": ["count == 8"],
+				"checks": ["rate == 1"]
 			},
 		};
 
@@ -519,13 +521,37 @@ func TestSetupTeardownThresholds(t *testing.T) {
 		};
 	`)
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	cliFlags := []string{"-v", "--log-output=stdout", "--linger"}
+	ts := getSimpleCloudOutputTestState(t, script, cliFlags, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+
+	sendSignal := injectMockSignalNotifier(ts)
+	asyncWaitForStdoutAndRun(t, ts, 20, 500*time.Millisecond, "waiting for Ctrl+C to continue", func() {
+		defer func() {
+			sendSignal <- syscall.SIGINT
+			<-sendSignal
+		}()
+		t.Logf("Linger reached, running teardown again and stopping the test...")
+		req, err := http.NewRequestWithContext(
+			ts.Ctx, http.MethodPost, fmt.Sprintf("http://%s/v1/teardown", ts.Flags.Address), nil,
+		)
+		require.NoError(t, err)
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		body, err := io.ReadAll(resp.Body)
+		assert.NoError(t, err)
+		t.Logf("Response body: %s", body)
+		assert.NoError(t, resp.Body.Close())
+		assert.Equal(t, http.StatusOK, resp.StatusCode)
+	})
+
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdOut := ts.Stdout.String()
-	assert.Contains(t, stdOut, `✓ http_reqs......................: 7`)
+	t.Log(stdOut)
+	assert.Contains(t, stdOut, `✓ checks.........................: 100.00% ✓ 8`)
+	assert.Contains(t, stdOut, `✓ http_reqs......................: 8`)
 	assert.Contains(t, stdOut, `✓ iterations.....................: 5`)
-	assert.Contains(t, stdOut, `✓ setup_teardown.................: 2`)
+	assert.Contains(t, stdOut, `✓ setup_teardown.................: 3`)
 
 	logMsgs := ts.LoggerHook.Drain()
 	for _, msg := range logMsgs {
@@ -533,6 +559,8 @@ func TestSetupTeardownThresholds(t *testing.T) {
 			assert.Failf(t, "unexpected log message", "level %s, msg '%s'", msg.Level, msg.Message)
 		}
 	}
+	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Running thresholds on 4 metrics..."))
+	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Finalizing thresholds..."))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics emission of VUs and VUsMax metrics stopped"))
 	assert.True(t, testutils.LogContains(logMsgs, logrus.DebugLevel, "Metrics processing finished!"))
 }
@@ -569,7 +597,8 @@ func TestThresholdsFailed(t *testing.T) {
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, `some thresholds have failed`))
+	expErr := "thresholds on metrics 'iterations{scenario:sc1}, iterations{scenario:sc2}' have been breached"
+	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
 	assert.Contains(t, stdout, `   ✓ iterations...........: 3`)
@@ -656,12 +685,12 @@ func TestAbortedByUserWithGoodThresholds(t *testing.T) {
 
 	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort)
 
-	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "simple iter 2")
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 30, 300*time.Millisecond, "simple iter 2")
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	logs := ts.LoggerHook.Drain()
-	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `some thresholds have failed`))
+	assert.False(t, testutils.LogContains(logs, logrus.ErrorLevel, `thresholds on metrics`))
 	assert.True(t, testutils.LogContains(logs, logrus.ErrorLevel, `test run was aborted because k6 received a 'interrupt' signal`))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -714,10 +743,8 @@ func asyncWaitForStdoutAndRun(
 	t.Cleanup(wg.Wait) // ensure the test waits for the goroutine to finish
 }
 
-func asyncWaitForStdoutAndStopTestWithInterruptSignal(
-	t *testing.T, ts *GlobalTestState, attempts int, interval time.Duration, expText string,
-) {
-	sendSignal := make(chan struct{})
+func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
+	sendSignal = make(chan os.Signal)
 	ts.GlobalState.SignalNotify = func(c chan<- os.Signal, signals ...os.Signal) {
 		isAbortNotify := false
 		for _, s := range signals {
@@ -730,16 +757,22 @@ func asyncWaitForStdoutAndStopTestWithInterruptSignal(
 			return
 		}
 		go func() {
-			<-sendSignal
-			c <- os.Interrupt
+			sig := <-sendSignal
+			c <- sig
 			close(sendSignal)
 		}()
 	}
 	ts.GlobalState.SignalStop = func(c chan<- os.Signal) { /* noop */ }
+	return sendSignal
+}
 
+func asyncWaitForStdoutAndStopTestWithInterruptSignal(
+	t *testing.T, ts *GlobalTestState, attempts int, interval time.Duration, expText string,
+) {
+	sendSignal := injectMockSignalNotifier(ts)
 	asyncWaitForStdoutAndRun(t, ts, attempts, interval, expText, func() {
 		t.Log("expected stdout text was found, sending interrupt signal...")
-		sendSignal <- struct{}{}
+		sendSignal <- syscall.SIGINT
 		<-sendSignal
 	})
 }
@@ -798,6 +831,8 @@ func TestAbortedByUserWithRestAPI(t *testing.T) {
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=5 tainted=false`)
+	assert.NotContains(t, stdout, `Running thresholds`)
+	assert.NotContains(t, stdout, `Finalizing thresholds`)
 }
 
 func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
@@ -854,7 +889,7 @@ func runTestWithNoLinger(t *testing.T, ts *GlobalTestState) {
 
 func runTestWithLinger(t *testing.T, ts *GlobalTestState) {
 	ts.CmdArgs = append(ts.CmdArgs, "--linger")
-	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "Linger set; waiting for Ctrl+C")
+	asyncWaitForStdoutAndStopTestWithInterruptSignal(t, ts, 15, time.Second, "waiting for Ctrl+C to continue")
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
@@ -945,7 +980,7 @@ func testAbortedByScriptError(t *testing.T, script string, runTest func(*testing
 	t.Log(stdout)
 	assert.Contains(t, stdout, `level=debug msg="Metrics emission of VUs and VUsMax metrics stopped"`)
 	assert.Contains(t, stdout, `level=debug msg="Metrics processing finished!"`)
-	assert.Contains(t, stdout, `level=debug msg="Everything has finished, exiting k6!"`)
+	assert.Contains(t, stdout, `level=debug msg="Everything has finished, exiting k6 with an error!"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=111 run_status=7 tainted=false`)
 	return ts
 }
@@ -985,15 +1020,7 @@ func TestAbortedByTestAbortInNonFirstInitCode(t *testing.T) {
 		export function handleSummary() { return {stdout: '\n\n\nbogus summary\n\n\n'};}
 	`
 
-	t.Run("noLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
-	})
-
-	t.Run("withLinger", func(t *testing.T) {
-		t.Parallel()
-		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
-	})
+	testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 }
 
 func TestAbortedByScriptAbortInVUCode(t *testing.T) {
@@ -1056,7 +1083,6 @@ func TestAbortedByScriptAbortInSetup(t *testing.T) {
 		t.Parallel()
 		testAbortedByScriptTestAbort(t, script, runTestWithNoLinger)
 	})
-
 	t.Run("withLinger", func(t *testing.T) {
 		t.Parallel()
 		testAbortedByScriptTestAbort(t, script, runTestWithLinger)
@@ -1118,6 +1144,7 @@ func TestAbortedByInterruptDuringVUInit(t *testing.T) {
 
 		export default function () {};
 	`
+
 	ts := getSimpleCloudOutputTestState(
 		t, script, nil, cloudapi.RunStatusAbortedUser, cloudapi.ResultStatusPassed, exitcodes.ExternalAbort,
 	)
@@ -1416,7 +1443,7 @@ func TestActiveVUsCount(t *testing.T) {
 		if i < 3 {
 			assert.Equal(t, "Insufficient VUs, reached 10 active VUs and cannot initialize more", logEntry.Message)
 		} else {
-			assert.Equal(t, "No script iterations finished, consider making the test duration longer", logEntry.Message)
+			assert.Equal(t, "No script iterations fully finished, consider making the test duration longer", logEntry.Message)
 		}
 	}
 }
@@ -1685,4 +1712,78 @@ func BenchmarkReadResponseBody(b *testing.B) {
 
 	ts := getSimpleCloudOutputTestState(b, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
+}
+
+func TestBrowserPermissions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		envVarValue      string
+		envVarMsgValue   string
+		expectedExitCode exitcodes.ExitCode
+		expectedError    string
+	}{
+		{
+			name:             "no env var set",
+			envVarValue:      "",
+			expectedExitCode: 107,
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
+		},
+		{
+			name:             "env var set but set to false",
+			envVarValue:      "false",
+			expectedExitCode: 107,
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
+		},
+		{
+			name:             "env var set but set to 09adsu",
+			envVarValue:      "09adsu",
+			expectedExitCode: 107,
+			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
+		},
+		{
+			name:             "with custom message",
+			envVarValue:      "09adsu",
+			envVarMsgValue:   "Try again later",
+			expectedExitCode: 107,
+			expectedError:    "Try again later",
+		},
+		{
+			name:             "env var set and set to true",
+			envVarValue:      "true",
+			expectedExitCode: 0,
+			expectedError:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			script := `
+			import { chromium } from 'k6/experimental/browser';
+
+			export default function() {};
+			`
+
+			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
+			if tt.envVarValue != "" {
+				ts.Env["K6_BROWSER_ENABLED"] = tt.envVarValue
+			}
+			if tt.envVarMsgValue != "" {
+				ts.Env["K6_BROWSER_ENABLED_MSG"] = tt.envVarMsgValue
+			}
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			loglines := ts.LoggerHook.Drain()
+
+			if tt.expectedError == "" {
+				require.Len(t, loglines, 0)
+				return
+			}
+
+			assert.Contains(t, loglines[0].Message, tt.expectedError)
+		})
+	}
 }
