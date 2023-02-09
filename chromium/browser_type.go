@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -282,27 +281,24 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 		"disable-background-timer-throttling":                true,
 		"disable-backgrounding-occluded-windows":             true,
 		"disable-breakpad":                                   true,
-		"disable-client-side-phishing-detection":             true,
 		"disable-component-extensions-with-background-pages": true,
 		"disable-default-apps":                               true,
 		"disable-dev-shm-usage":                              true,
 		"disable-extensions":                                 true,
 		//nolint:lll
-		"disable-features":                 "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame",
-		"disable-hang-monitor":             true,
-		"disable-ipc-flooding-protection":  true,
-		"disable-popup-blocking":           true,
-		"disable-prompt-on-repost":         true,
-		"disable-renderer-backgrounding":   true,
-		"disable-sync":                     true,
-		"force-color-profile":              "srgb",
-		"metrics-recording-only":           true,
-		"no-first-run":                     true,
-		"safebrowsing-disable-auto-update": true,
-		"enable-automation":                true,
-		"password-store":                   "basic",
-		"use-mock-keychain":                true,
-		"no-service-autorun":               true,
+		"disable-features":                "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame",
+		"disable-hang-monitor":            true,
+		"disable-ipc-flooding-protection": true,
+		"disable-popup-blocking":          true,
+		"disable-prompt-on-repost":        true,
+		"disable-renderer-backgrounding":  true,
+		"force-color-profile":             "srgb",
+		"metrics-recording-only":          true,
+		"no-first-run":                    true,
+		"enable-automation":               true,
+		"password-store":                  "basic",
+		"use-mock-keychain":               true,
+		"no-service-autorun":              true,
 
 		"no-startup-window":           true,
 		"no-default-browser-check":    true,
@@ -310,9 +306,6 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 		"headless":                    lopts.Headless,
 		"auto-open-devtools-for-tabs": lopts.Devtools,
 		"window-size":                 fmt.Sprintf("%d,%d", 800, 600),
-	}
-	if runtime.GOOS == "darwin" {
-		f["enable-use-zoom-for-dsf"] = false
 	}
 	if lopts.Headless {
 		f["hide-scrollbars"] = true
