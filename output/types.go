@@ -66,10 +66,10 @@ type WithThresholds interface {
 	SetThresholds(map[string]metrics.Thresholds)
 }
 
-// WithTestRunStop is an output that can stop the Engine mid-test, interrupting
-// the whole test run execution if some internal condition occurs, completely
-// independently from the thresholds. It requires a callback function which
-// expects an error and triggers the Engine to stop.
+// WithTestRunStop is an output that can stop the test run mid-way through,
+// interrupting the whole test run execution if some internal condition occurs,
+// completely independently from the thresholds. It requires a callback function
+// which expects an error and triggers the Engine to stop.
 type WithTestRunStop interface {
 	Output
 	SetTestRunStopCallback(func(error))
