@@ -24,22 +24,22 @@ type moduleCacheElement struct {
 	err error
 }
 
-type modulesResolution struct {
+type moduleResolver struct {
 	cache     map[string]moduleCacheElement
 	goModules map[string]interface{}
 }
 
-func newModuleResolution(goModules map[string]interface{}) *modulesResolution {
-	return &modulesResolution{goModules: goModules, cache: make(map[string]moduleCacheElement)}
+func newModuleResolution(goModules map[string]interface{}) *moduleResolver {
+	return &moduleResolver{goModules: goModules, cache: make(map[string]moduleCacheElement)}
 }
 
-func (mr *modulesResolution) setMain(main *loader.SourceData, c *compiler.Compiler) error {
+func (mr *moduleResolver) setMain(main *loader.SourceData, c *compiler.Compiler) error {
 	mod, err := cjsmoduleFromString(main.URL, main.Data, c)
 	mr.cache[main.URL.String()] = moduleCacheElement{mod: mod, err: err}
 	return err
 }
 
-func (mr *modulesResolution) resolveSpecifier(basePWD *url.URL, arg string) (*url.URL, error) {
+func (mr *moduleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.URL, error) {
 	specifier, err := loader.Resolve(basePWD, arg)
 	if err != nil {
 		return nil, err
@@ -47,7 +47,7 @@ func (mr *modulesResolution) resolveSpecifier(basePWD *url.URL, arg string) (*ur
 	return specifier, nil
 }
 
-func (mr *modulesResolution) requireModule(name string) (module, error) {
+func (mr *moduleResolver) requireModule(name string) (module, error) {
 	mod, ok := mr.goModules[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
@@ -59,7 +59,7 @@ func (mr *modulesResolution) requireModule(name string) (module, error) {
 	return &baseGoModule{mod: mod}, nil
 }
 
-func (mr *modulesResolution) resolve(basePWD *url.URL, arg string, loadCJS cjsModuleLoader) (module, error) {
+func (mr *moduleResolver) resolve(basePWD *url.URL, arg string, loadCJS cjsModuleLoader) (module, error) {
 	if cached, ok := mr.cache[arg]; ok {
 		return cached.mod, cached.err
 	}
@@ -89,13 +89,13 @@ func (mr *modulesResolution) resolve(basePWD *url.URL, arg string, loadCJS cjsMo
 type moduleSystem struct {
 	vu            modules.VU
 	instanceCache map[module]moduleInstance
-	resolution    *modulesResolution
+	resolver      *moduleResolver
 	cjsLoad       cjsModuleLoader
 }
 
-func newModuleSystem(resolution *modulesResolution, vu modules.VU, cjsLoad cjsModuleLoader) *moduleSystem {
+func newModuleSystem(resolution *moduleResolver, vu modules.VU, cjsLoad cjsModuleLoader) *moduleSystem {
 	return &moduleSystem{
-		resolution:    resolution,
+		resolver:      resolution,
 		instanceCache: make(map[module]moduleInstance),
 		vu:            vu,
 		cjsLoad:       cjsLoad,
@@ -104,7 +104,7 @@ func newModuleSystem(resolution *modulesResolution, vu modules.VU, cjsLoad cjsMo
 
 // Require is called when a module/file needs to be loaded by a script
 func (ms *moduleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) {
-	mod, err := ms.resolution.resolve(pwd, arg, ms.cjsLoad)
+	mod, err := ms.resolver.resolve(pwd, arg, ms.cjsLoad)
 	if err != nil {
 		return nil, err
 	}
