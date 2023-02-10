@@ -2,7 +2,6 @@ package chromium
 
 import (
 	"net"
-	"runtime"
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
@@ -32,7 +31,6 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		changeOpts                *common.LaunchOptions
 		changeK6Opts              *k6lib.Options
 		expInitVal, expChangedVal any
-		pre                       func(t *testing.T)
 		post                      func(t *testing.T, flags map[string]any)
 	}{
 		{
@@ -112,17 +110,6 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 			expChangedVal: nil,
 		},
 		{
-			flag:       "enable-use-zoom-for-dsf",
-			expInitVal: false,
-			pre: func(t *testing.T) {
-				t.Helper()
-
-				if runtime.GOOS != "darwin" {
-					t.Skip()
-				}
-			},
-		},
-		{
 			flag:          "headless",
 			expInitVal:    false,
 			changeOpts:    &common.LaunchOptions{Headless: true},
@@ -142,9 +129,6 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		tc := tc
 		t.Run(tc.flag, func(t *testing.T) {
 			t.Parallel()
-			if tc.pre != nil {
-				tc.pre(t)
-			}
 
 			flags, err := prepareFlags(&common.LaunchOptions{}, nil)
 			require.NoError(t, err, "failed to prepare flags")
