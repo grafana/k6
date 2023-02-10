@@ -180,7 +180,7 @@ func (b *Bundle) getExports(logger logrus.FieldLogger, rt *goja.Runtime, updateO
 			}
 			data, err := json.Marshal(v.Export())
 			if err != nil {
-				return err
+				return fmt.Errorf("error parsing script options: %w", err)
 			}
 			dec := json.NewDecoder(bytes.NewReader(data))
 			dec.DisallowUnknownFields()
