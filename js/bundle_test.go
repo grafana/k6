@@ -202,7 +202,7 @@ func TestNewBundle(t *testing.T) {
 				Expr, Error string
 			}{
 				"Array":    {`[]`, "json: cannot unmarshal array into Go value of type lib.Options"},
-				"Function": {`function(){}`, "json: unsupported type: func(goja.FunctionCall) goja.Value"},
+				"Function": {`function(){}`, "error parsing script options: json: unsupported type: func(goja.FunctionCall) goja.Value"},
 			}
 			for name, data := range invalidOptions {
 				t.Run(name, func(t *testing.T) {
