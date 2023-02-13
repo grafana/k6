@@ -15,6 +15,7 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/output"
 
 	"go.k6.io/k6/lib"
@@ -59,7 +60,7 @@ type Output struct {
 	aggregationDone    *sync.WaitGroup
 	stopOutput         chan struct{}
 	outputDone         *sync.WaitGroup
-	engineStopFunc     func(error)
+	testStopFunc       func(error)
 }
 
 // Verify that Output implements the wanted interfaces
@@ -311,6 +312,8 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 			return cloudapi.RunStatusAbortedUser // TODO: have a better value than this?
 		case errext.AbortedByTimeout:
 			return cloudapi.RunStatusAbortedLimit
+		case errext.AbortedByOutput:
+			return cloudapi.RunStatusAbortedSystem
 		case errext.AbortedByThresholdsAfterTestEnd:
 			// The test run finished normally, it wasn't prematurely aborted by
 			// anything while running, but the thresholds failed at the end and
@@ -349,7 +352,7 @@ func (out *Output) SetThresholds(scriptThresholds map[string]metrics.Thresholds)
 
 // SetTestRunStopCallback receives the function that stops the engine on error
 func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
-	out.engineStopFunc = stopFunc
+	out.testStopFunc = stopFunc
 }
 
 // AddMetricSamples receives a set of metric samples. This method is never
@@ -652,8 +655,12 @@ func (out *Output) pushMetrics() {
 		if err != nil {
 			if out.shouldStopSendingMetrics(err) {
 				out.logger.WithError(err).Warn("Stopped sending metrics to cloud due to an error")
+				serr := errext.WithAbortReasonIfNone(
+					errext.WithExitCodeIfNone(err, exitcodes.ExternalAbort),
+					errext.AbortedByOutput,
+				)
 				if out.config.StopOnError.Bool {
-					out.engineStopFunc(err)
+					out.testStopFunc(serr)
 				}
 				close(out.stopSendingMetrics)
 				break
