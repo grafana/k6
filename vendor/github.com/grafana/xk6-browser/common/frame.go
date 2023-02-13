@@ -486,17 +486,15 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 }
 
 // AddScriptTag is not implemented.
-func (f *Frame) AddScriptTag(opts goja.Value) *goja.Promise {
+func (f *Frame) AddScriptTag(opts goja.Value) {
 	k6ext.Panic(f.ctx, "Frame.AddScriptTag() has not been implemented yet")
 	applySlowMo(f.ctx)
-	return nil
 }
 
 // AddStyleTag is not implemented.
-func (f *Frame) AddStyleTag(opts goja.Value) *goja.Promise {
+func (f *Frame) AddStyleTag(opts goja.Value) {
 	k6ext.Panic(f.ctx, "Frame.AddStyleTag() has not been implemented yet")
 	applySlowMo(f.ctx)
-	return nil
 }
 
 // ChildFrames returns a list of child frames.
@@ -1460,9 +1458,8 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 }
 
 // SetInputFiles is not implemented.
-func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) *goja.Promise {
+func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
 	k6ext.Panic(f.ctx, "Frame.setInputFiles(selector, files, opts) has not been implemented yet")
-	return nil
 	// TODO: needs slowMo
 }
 
@@ -1537,11 +1534,12 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	return gv.String(), nil
 }
 
+// Title returns the title of the frame.
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := f.vu.Runtime()
-	return f.Evaluate(rt.ToValue("document.title")).(string)
+	v := f.vu.Runtime().ToValue(`() => document.title`)
+	return gojaValueToString(f.ctx, f.Evaluate(v))
 }
 
 // Type text on the first element found matches the selector.

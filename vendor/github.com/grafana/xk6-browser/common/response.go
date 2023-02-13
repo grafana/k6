@@ -189,10 +189,10 @@ func (r *Response) bodySize() int64 {
 }
 
 // Finished waits for response to finish, return error if request failed.
-func (r *Response) Finished() *goja.Promise {
+func (r *Response) Finished() bool {
 	// TODO: should return nil|Error
 	k6ext.Panic(r.ctx, "Response.finished() has not been implemented yet")
-	return nil
+	return false
 }
 
 // Frame returns the frame within which the response was received.

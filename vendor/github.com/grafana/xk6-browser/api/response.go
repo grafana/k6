@@ -6,7 +6,7 @@ import "github.com/dop251/goja"
 type Response interface {
 	AllHeaders() map[string]string
 	Body() goja.ArrayBuffer
-	Finished() *goja.Promise
+	Finished() bool
 	Frame() Frame
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string
