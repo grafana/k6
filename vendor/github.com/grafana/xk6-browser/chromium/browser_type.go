@@ -63,10 +63,9 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(opts goja.Value) *goja.Promise {
+func (b *BrowserType) Connect(opts goja.Value) {
 	rt := b.vu.Runtime()
 	k6common.Throw(rt, errors.New("BrowserType.connect() has not been implemented yet"))
-	return nil
 }
 
 // ExecutablePath returns the path where the extension expects to find the browser executable.
@@ -205,7 +204,7 @@ func (b *BrowserType) launch(ctx context.Context, opts *common.LaunchOptions) (*
 }
 
 // LaunchPersistentContext launches the browser with persistent storage.
-func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) *goja.Promise {
+func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
 	rt := b.vu.Runtime()
 	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet"))
 	return nil

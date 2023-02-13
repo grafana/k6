@@ -131,7 +131,7 @@ github.com/golang/snappy
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/xk6-browser v0.8.1-0.20230131153655-c347eae1e46a
+# github.com/grafana/xk6-browser v0.8.1-0.20230207135343-cfd6a83dfc42
 ## explicit; go 1.19
 github.com/grafana/xk6-browser/api
 github.com/grafana/xk6-browser/browser
