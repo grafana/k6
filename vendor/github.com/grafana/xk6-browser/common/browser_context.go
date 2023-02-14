@@ -64,9 +64,8 @@ func NewBrowserContext(
 }
 
 // AddCookies is not implemented.
-func (b *BrowserContext) AddCookies(cookies goja.Value) *goja.Promise {
+func (b *BrowserContext) AddCookies(cookies goja.Value) {
 	k6ext.Panic(b.ctx, "BrowserContext.addCookies(cookies) has not been implemented yet")
-	return nil
 }
 
 // AddInitScript adds a script that will be initialized on all new pages.
@@ -143,21 +142,19 @@ func (b *BrowserContext) Close() {
 }
 
 // Cookies is not implemented.
-func (b *BrowserContext) Cookies() *goja.Promise {
+func (b *BrowserContext) Cookies() []any {
 	k6ext.Panic(b.ctx, "BrowserContext.cookies() has not been implemented yet")
 	return nil
 }
 
 // ExposeBinding is not implemented.
-func (b *BrowserContext) ExposeBinding(name string, callback goja.Callable, opts goja.Value) *goja.Promise {
+func (b *BrowserContext) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
 	k6ext.Panic(b.ctx, "BrowserContext.exposeBinding(name, callback, opts) has not been implemented yet")
-	return nil
 }
 
 // ExposeFunction is not implemented.
-func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) *goja.Promise {
+func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
 	k6ext.Panic(b.ctx, "BrowserContext.exposeFunction(name, callback) has not been implemented yet")
-	return nil
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
@@ -206,7 +203,7 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 }
 
 // NewCDPSession returns a new CDP session attached to this target.
-func (b *BrowserContext) NewCDPSession() *goja.Promise {
+func (b *BrowserContext) NewCDPSession() api.CDPSession {
 	k6ext.Panic(b.ctx, "BrowserContext.newCDPSession() has not been implemented yet")
 	return nil
 }
@@ -245,9 +242,8 @@ func (b *BrowserContext) Pages() []api.Page {
 }
 
 // Route is not implemented.
-func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) *goja.Promise {
+func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
 	k6ext.Panic(b.ctx, "BrowserContext.route(url, handler) has not been implemented yet")
-	return nil
 }
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
@@ -265,9 +261,8 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 // SetExtraHTTPHeaders is not implemented.
-func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) *goja.Promise {
+func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
 	k6ext.Panic(b.ctx, "BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet")
-	return nil
 }
 
 // SetGeolocation overrides the geo location of the user.
@@ -320,15 +315,13 @@ func (b *BrowserContext) SetOffline(offline bool) {
 }
 
 // StorageState is not implemented.
-func (b *BrowserContext) StorageState(opts goja.Value) *goja.Promise {
+func (b *BrowserContext) StorageState(opts goja.Value) {
 	k6ext.Panic(b.ctx, "BrowserContext.storageState(opts) has not been implemented yet")
-	return nil
 }
 
 // Unroute is not implemented.
-func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) *goja.Promise {
+func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
 	k6ext.Panic(b.ctx, "BrowserContext.unroute(url, handler) has not been implemented yet")
-	return nil
 }
 
 // WaitForEvent waits for event.

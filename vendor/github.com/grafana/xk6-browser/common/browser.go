@@ -28,7 +28,6 @@ var _ api.Browser = &Browser{}
 
 const (
 	BrowserStateOpen int64 = iota
-	BrowserStateClosing
 	BrowserStateClosed
 )
 
@@ -399,12 +398,6 @@ func (b *Browser) Close() {
 	}()
 
 	b.logger.Debugf("Browser:Close", "")
-	if !atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosing) {
-		// If we're already in a closing state then no need to continue.
-		b.logger.Debugf("Browser:Close", "already in a closing state")
-		return
-	}
-
 	atomic.CompareAndSwapInt64(&b.state, b.state, BrowserStateClosed)
 
 	// Signal to the connection and the process that we're gracefully closing.
