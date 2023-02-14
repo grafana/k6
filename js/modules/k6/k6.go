@@ -207,6 +207,11 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 				exc = err
 			}
 		}
+		booleanVal := val.ToBoolean()
+		if !booleanVal {
+			// A single failure makes the return value false.
+			succ = false
+		}
 
 		// Emit! (But only if we have a valid context.)
 		select {
@@ -221,20 +226,18 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 				Metadata: commonTagsAndMeta.Metadata,
 				Value:    0,
 			}
-			if val.ToBoolean() {
+			if booleanVal {
 				atomic.AddInt64(&check.Passes, 1)
 				sample.Value = 1
 			} else {
 				atomic.AddInt64(&check.Fails, 1)
-
-				// A single failure makes the return value false.
-				succ = false
 			}
+
 			metrics.PushIfNotDone(ctx, state.Samples, sample)
 		}
 
 		if exc != nil {
-			return succ, exc
+			return false, exc
 		}
 	}
 
