@@ -63,6 +63,35 @@ func TestSimpleTestStdin(t *testing.T) {
 	assert.Empty(t, ts.LoggerHook.Drain())
 }
 
+func TestBinaryNameStdout(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+	ts.BinaryName = "customBinaryName"
+	ts.CmdArgs = []string{ts.BinaryName}
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	assert.Contains(t, stdout, fmt.Sprintf("%s [command]", ts.BinaryName))
+	assert.Empty(t, ts.Stderr.Bytes())
+	assert.Empty(t, ts.LoggerHook.Drain())
+}
+
+func TestBinaryNameRunHelpStdout(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+	ts.BinaryName = "customBinaryName"
+	ts.CmdArgs = []string{ts.BinaryName, "help", "run"}
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	assert.Contains(t, stdout, fmt.Sprintf("%s run [flags]", ts.BinaryName))
+	assert.Contains(t, stdout, fmt.Sprintf("%s run -i 10 script.js", ts.BinaryName))
+	assert.Empty(t, ts.Stderr.Bytes())
+	assert.Empty(t, ts.LoggerHook.Drain())
+}
+
 // TODO: Remove this? It doesn't test anything AFAICT...
 func TestStdoutAndStderrAreEmptyWithQuietAndHandleSummary(t *testing.T) {
 	t.Parallel()

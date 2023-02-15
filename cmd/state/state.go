@@ -34,10 +34,11 @@ const defaultConfigFileName = "config.json"
 type GlobalState struct {
 	Ctx context.Context
 
-	FS      afero.Fs
-	Getwd   func() (string, error)
-	CmdArgs []string
-	Env     map[string]string
+	FS         afero.Fs
+	Getwd      func() (string, error)
+	BinaryName string
+	CmdArgs    []string
+	Env        map[string]string
 
 	DefaultFlags, Flags GlobalFlags
 
@@ -93,12 +94,18 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		confDir = ".config"
 	}
 
+	binary, err := os.Executable()
+	if err != nil {
+		binary = "k6"
+	}
+
 	defaultFlags := GetDefaultFlags(confDir)
 
 	return &GlobalState{
 		Ctx:          ctx,
 		FS:           afero.NewOsFs(),
 		Getwd:        os.Getwd,
+		BinaryName:   filepath.Base(binary),
 		CmdArgs:      os.Args,
 		Env:          env,
 		DefaultFlags: defaultFlags,

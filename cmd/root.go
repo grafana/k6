@@ -37,7 +37,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	}
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
-		Use:               "k6",
+		Use:               gs.BinaryName,
 		Short:             "a next-generation load generator",
 		Long:              "\n" + getBanner(gs.Flags.NoColor || !gs.Stdout.IsTTY),
 		SilenceUsage:      true,

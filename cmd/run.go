@@ -12,6 +12,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"text/template"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -356,6 +357,30 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 		gs: gs,
 	}
 
+	var exampleText bytes.Buffer
+	exampleTemplate := template.Must(template.New("").Parse(`
+  # Run a single VU, once.
+  {{.}} run script.js
+  
+  # Run a single VU, 10 times.
+  {{.}} run -i 10 script.js
+  
+  # Run 5 VUs, splitting 10 iterations between them.
+  {{.}} run -u 5 -i 10 script.js
+  
+  # Run 5 VUs for 10s.
+  {{.}} run -u 5 -d 10s script.js
+  
+  # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
+  {{.}} run -u 0 -s 10s:100 -s 60s -s 10s:0
+  
+  # Send metrics to an influxdb server
+  {{.}} run -o influxdb=http://1.2.3.4:8086/k6`))
+
+	if err := exampleTemplate.Execute(&exampleText, gs.BinaryName); err != nil {
+		gs.Logger.WithError(err).Error("Could not parse binary name")
+	}
+
 	runCmd := &cobra.Command{
 		Use:   "run",
 		Short: "Start a load test",
@@ -363,26 +388,9 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 
 This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
-		Example: `
-  # Run a single VU, once.
-  k6 run script.js
-
-  # Run a single VU, 10 times.
-  k6 run -i 10 script.js
-
-  # Run 5 VUs, splitting 10 iterations between them.
-  k6 run -u 5 -i 10 script.js
-
-  # Run 5 VUs for 10s.
-  k6 run -u 5 -d 10s script.js
-
-  # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
-  k6 run -u 0 -s 10s:100 -s 60s -s 10s:0
-
-  # Send metrics to an influxdb server
-  k6 run -o influxdb=http://1.2.3.4:8086/k6`[1:],
-		Args: exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
-		RunE: c.run,
+		Example: exampleText.String()[1:],
+		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+		RunE:    c.run,
 	}
 
 	runCmd.Flags().SortFlags = false
