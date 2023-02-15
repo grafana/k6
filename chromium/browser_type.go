@@ -190,10 +190,6 @@ func (b *BrowserType) launch(
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
 	browserCtx, browserCtxCancel := context.WithCancel(ctx)
-	// attach the browser process ID to the context
-	// so that we can kill it afterward if it lingers
-	// see: k6ext.Panic function.
-	browserCtx = k6ext.WithProcessID(browserCtx, browserProc.Pid())
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
 		browserProc, opts, b.logger)
