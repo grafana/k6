@@ -614,7 +614,10 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
 		"launch": func(opts goja.Value) *goja.Object {
-			b, _ := bt.Launch(opts)
+			b, pid := bt.Launch(opts)
+			// store the pid so we can kill it later on panic.
+			// idea: a later refactoring can move k6ext.Panic here.
+			vu.root.addPid(pid)
 			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},

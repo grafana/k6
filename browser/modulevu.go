@@ -10,10 +10,12 @@ import (
 
 // moduleVU carries module specific VU information.
 //
-// Currently, it is used to carry the VU object to the
-// inner objects and promises.
+// Currently, it is used to carry the VU object to the inner objects and
+// promises.
 type moduleVU struct {
 	k6modules.VU
+
+	root *RootModule
 }
 
 func (vu moduleVU) Context() context.Context {
@@ -24,4 +26,9 @@ func (vu moduleVU) Context() context.Context {
 	// context from the vu that is received from k6 in
 	// NewModuleInstance).
 	return k6ext.WithVU(vu.VU.Context(), vu.VU)
+}
+
+// Pids returns the launched browser process IDs across all VUs.
+func (vu moduleVU) Pids() []int {
+	return vu.root.pids()
 }
