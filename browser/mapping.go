@@ -425,8 +425,13 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
 		"getAttribute": p.GetAttribute,
-		"goBack":       p.GoBack,
-		"goForward":    p.GoForward,
+		"goBack": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				resp := p.GoBack(opts)
+				return mapResponse(vu, resp), nil
+			})
+		},
+		"goForward": p.GoForward,
 		"goto": func(url string, opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp, err := p.Goto(url, opts)
