@@ -8,7 +8,7 @@ import (
 type BrowserType interface {
 	Connect(opts goja.Value)
 	ExecutablePath() string
-	Launch(opts goja.Value) Browser
+	Launch(opts goja.Value) (_ Browser, browserProcessID int)
 	LaunchPersistentContext(userDataDir string, opts goja.Value) Browser
 	Name() string
 }

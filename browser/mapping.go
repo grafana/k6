@@ -614,7 +614,8 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
 		"launch": func(opts goja.Value) *goja.Object {
-			m := mapBrowser(vu, bt.Launch(opts))
+			b, _ := bt.Launch(opts)
+			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},
 	}

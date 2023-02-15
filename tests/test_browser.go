@@ -108,7 +108,8 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
-	b := bt.Launch(rt.ToValue(launchOpts))
+	// This will become useful soon.
+	b, _ := bt.Launch(rt.ToValue(launchOpts))
 	tb.Cleanup(func() {
 		select {
 		case <-vu.Context().Done():
