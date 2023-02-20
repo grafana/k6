@@ -10,7 +10,9 @@ import (
 
 // A Metric defines the shape of a set of data.
 type Metric struct {
-	registry *Registry  `json:"-"`
+	registry *Registry `json:"-"`
+
+	ID       uint64     `json:"-"`
 	Name     string     `json:"name"`
 	Type     MetricType `json:"type"`
 	Contains ValueType  `json:"contains"`

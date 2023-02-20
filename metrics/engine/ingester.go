@@ -4,7 +4,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 )
 
@@ -60,46 +59,28 @@ func (oi *outputIngester) flushMetrics() {
 	// allow us to have a per-bucket lock, instead of one global one, and it
 	// will allow us to split apart the metric Name and Type from its Sink and
 	// Observed fields...
-	//
-	// TODO: And, to further optimize things, if every metric (and sub-metric) had a
-	// sequential integer ID, we would be able to use a slice for these buckets
-	// and eliminate the map loopkups altogether!
-
-	samplesByMetric := make(map[*metrics.Metric][]metrics.Sample)
 
 	for _, sampleContainer := range sampleContainers {
 		samples := sampleContainer.GetSamples()
-
 		if len(samples) == 0 {
 			continue
 		}
 
 		for _, sample := range samples {
-			m := sample.Metric
-			samples := samplesByMetric[m]
-			samples = append(samples, sample)
-			samplesByMetric[m] = samples
+			// Mark it as observed so it shows in the end-of-test summary
+			// and add its value to its own sink.
+			om := oi.metricsEngine.trackedMetrics[sample.Metric.ID]
+			om.AddSamples(sample)
 
 			// and also to the same for any submetrics that match the metric sample
-			for _, sm := range m.Submetrics {
+			for _, sm := range sample.Metric.Submetrics {
 				if !sample.Tags.Contains(sm.Tags) {
 					continue
 				}
-				samples := samplesByMetric[sm.Metric]
-				samples = append(samples, sample)
-				samplesByMetric[sm.Metric] = samples
+
+				om := oi.metricsEngine.trackedMetrics[sm.Metric.ID]
+				om.AddSamples(sample)
 			}
 		}
-	}
-
-	for m, samples := range samplesByMetric {
-		om, ok := oi.metricsEngine.trackedMetrics[m.Name]
-		if !ok {
-			// if they are not pre-defined then
-			// it is not required to sink them
-			continue
-		}
-
-		om.AddSamples(samples...)
 	}
 }

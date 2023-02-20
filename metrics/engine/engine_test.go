@@ -117,22 +117,26 @@ func TestMetricsEngineEvaluateThresholdNoAbort(t *testing.T) {
 		t.Run(tc.threshold, func(t *testing.T) {
 			t.Parallel()
 			me := newTestMetricsEngine(t)
+			m1 := me.test.Registry.MustNewMetric("m1", metrics.Counter)
+			m2 := me.test.Registry.MustNewMetric("m2", metrics.Counter)
 
 			ths := metrics.NewThresholds([]string{tc.threshold})
 			require.NoError(t, ths.Parse())
 			ths.Thresholds[0].AbortOnFail = tc.abortOnFail
 
-			me.metricsWithThresholds["m1"] = ths
-			me.metricsWithThresholds["m2"] = metrics.Thresholds{}
+			me.metricsWithThresholds[1] = ths
+			me.metricsWithThresholds[2] = metrics.Thresholds{}
 
 			csink := &metrics.CounterSink{}
 			csink.Add(metrics.Sample{Value: 6.0})
-			me.trackedMetrics["m1"] = &trackedMetric{
-				sink: csink,
-			}
-			me.trackedMetrics["m2"] = &trackedMetric{
-				sink: &metrics.CounterSink{},
-			}
+			me.trackedMetrics = append(me.trackedMetrics, &trackedMetric{
+				Metric: m1,
+				sink:   csink,
+			})
+			me.trackedMetrics = append(me.trackedMetrics, &trackedMetric{
+				Metric: m2,
+				sink:   &metrics.CounterSink{},
+			})
 
 			breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
 			require.Equal(t, tc.abortOnFail, abort)
@@ -155,18 +159,18 @@ func TestMetricsEngineEvaluateIgnoreEmptySink(t *testing.T) {
 	require.NoError(t, ths.Parse())
 	ths.Thresholds[0].AbortOnFail = true
 
-	me.metricsWithThresholds["m1"] = ths
-	me.metricsWithThresholds["m2"] = metrics.Thresholds{}
+	me.metricsWithThresholds[1] = ths
+	me.metricsWithThresholds[2] = metrics.Thresholds{}
 
-	me.trackedMetrics["m1"] = &trackedMetric{
+	me.trackedMetrics = append(me.trackedMetrics, &trackedMetric{
 		Metric: m1,
 		sink:   &metrics.CounterSink{},
-	}
+	})
 
-	me.trackedMetrics["m2"] = &trackedMetric{
+	me.trackedMetrics = append(me.trackedMetrics, &trackedMetric{
 		Metric: m2,
 		sink:   &metrics.CounterSink{},
-	}
+	})
 
 	breached, abort := me.evaluateThresholds(false, zeroTestRunDuration)
 	require.True(t, abort)
@@ -191,21 +195,32 @@ func TestMetricsEngineObserveMetricByID(t *testing.T) {
 	require.NoError(t, ths.Parse())
 	ths.Thresholds[0].AbortOnFail = true
 
-	me.metricsWithThresholds["m1"] = metrics.Thresholds{}
-	me.metricsWithThresholds["m2"] = ths
+	me.metricsWithThresholds[1] = metrics.Thresholds{}
+	me.metricsWithThresholds[2] = ths
 
-	me.trackedMetrics["m1"] = &trackedMetric{
+	me.trackedMetrics = append(me.trackedMetrics, &trackedMetric{
 		Metric: m1,
-	}
-	me.trackedMetrics["m2"] = &trackedMetric{
+	})
+	me.trackedMetrics = append(me.trackedMetrics, &trackedMetric{
 		Metric:   m2,
 		observed: true,
-	}
+	})
 
 	ometric, found := me.ObservedMetricByID("m2")
 	require.True(t, found)
 	assert.Equal(t, m2, ometric.Metric)
 	assert.Len(t, ometric.Thresholds, 1)
+}
+
+func TestMetricsEngineTrackMetric(t *testing.T) {
+	t.Parallel()
+
+	me := newTestMetricsEngine(t)
+	m := me.test.Registry.MustNewMetric("my_counter", metrics.Counter)
+	me.trackMetric(m)
+	require.Len(t, me.trackedMetrics, 2)
+	assert.Equal(t, m, me.trackedMetrics[1].Metric)
+	assert.IsType(t, &metrics.CounterSink{}, me.trackedMetrics[1].sink)
 }
 
 func newTestMetricsEngine(t *testing.T) MetricsEngine {
@@ -219,8 +234,8 @@ func newTestMetricsEngine(t *testing.T) MetricsEngine {
 	return MetricsEngine{
 		logger:                trs.Logger,
 		test:                  trs,
-		metricsWithThresholds: make(map[string]metrics.Thresholds),
-		trackedMetrics:        make(map[string]*trackedMetric),
+		metricsWithThresholds: make(map[uint64]metrics.Thresholds),
+		trackedMetrics:        []*trackedMetric{nil},
 	}
 }
 

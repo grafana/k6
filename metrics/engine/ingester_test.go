@@ -15,19 +15,16 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	t.Parallel()
 
 	piState := newTestPreInitState(t)
-	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Trend)
-	require.NoError(t, err)
-
 	ingester := outputIngester{
 		logger: piState.Logger,
 		metricsEngine: &MetricsEngine{
-			trackedMetrics: make(map[string]*trackedMetric),
+			trackedMetrics: []*trackedMetric{nil},
 		},
 	}
-	ingester.metricsEngine.trackedMetrics["test_metric"] = &trackedMetric{
-		Metric: testMetric,
-		sink:   &metrics.TrendSink{},
-	}
+
+	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Trend)
+	require.NoError(t, err)
+	ingester.metricsEngine.trackMetric(testMetric)
 
 	require.NoError(t, ingester.Start())
 	ingester.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
@@ -40,7 +37,7 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	ometric := ingester.metricsEngine.trackedMetrics["test_metric"]
+	ometric := ingester.metricsEngine.trackedMetrics[1]
 	require.NotNil(t, ometric)
 	require.NotNil(t, ometric.sink)
 	assert.Equal(t, testMetric, ometric.Metric)
@@ -53,29 +50,25 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	t.Parallel()
 
 	piState := newTestPreInitState(t)
-	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Gauge)
-	require.NoError(t, err)
-
 	me := &MetricsEngine{
 		test: &lib.TestRunState{
 			TestPreInitState: piState,
 		},
 	}
 
-	// it adds the submetric to the parent
+	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Gauge)
+	require.NoError(t, err)
+	require.Equal(t, 1, int(testMetric.ID))
+
+	me.trackMetric(testMetric)
+	require.Len(t, me.trackedMetrics, 2)
+
+	// it attaches the submetric to the parent
 	testSubMetric, err := me.getThresholdMetricOrSubmetric("test_metric{a:1}")
 	require.NoError(t, err)
 
-	me.trackedMetrics = map[string]*trackedMetric{
-		"test_metric": {
-			Metric: testMetric,
-			sink:   metrics.NewSinkByType(testMetric.Type),
-		},
-		"test_metric{a:1}": {
-			Metric: testSubMetric,
-			sink:   metrics.NewSinkByType(testMetric.Type),
-		},
-	}
+	me.trackMetric(testSubMetric)
+	require.Len(t, me.trackedMetrics, 3)
 
 	ingester := outputIngester{
 		logger:        piState.Logger,
@@ -92,17 +85,15 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	require.Len(t, ingester.metricsEngine.trackedMetrics, 2)
-
 	// assert the parent has been observed
-	ometric := ingester.metricsEngine.trackedMetrics["test_metric"]
+	ometric := ingester.metricsEngine.trackedMetrics[1]
 	require.NotNil(t, ometric)
 	require.NotNil(t, ometric.sink)
 	assert.IsType(t, &metrics.GaugeSink{}, ometric.sink)
 	assert.Equal(t, 21.0, ometric.sink.(*metrics.GaugeSink).Value)
 
 	// assert the submetric has been observed
-	ometric = ingester.metricsEngine.trackedMetrics["test_metric{a:1}"]
+	ometric = ingester.metricsEngine.trackedMetrics[2]
 	require.NotNil(t, ometric)
 	require.NotNil(t, ometric.sink)
 	require.NotNil(t, ometric.Metric.Sub)
@@ -119,6 +110,5 @@ func newTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 		Logger:         logger,
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
 	}
 }

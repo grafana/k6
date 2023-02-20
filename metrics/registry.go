@@ -11,6 +11,7 @@ import (
 // Registry is what can create metrics
 type Registry struct {
 	metrics map[string]*Metric
+	ix      uint64
 	l       sync.RWMutex
 
 	rootTagSet *atlas.Node
@@ -94,8 +95,10 @@ func (r *Registry) newMetric(name string, mt MetricType, vt ...ValueType) *Metri
 		valueType = vt[0]
 	}
 
+	r.ix++
 	return &Metric{
 		registry: r,
+		ID:       r.ix,
 		Name:     name,
 		Type:     mt,
 		Contains: valueType,
