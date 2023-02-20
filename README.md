@@ -13,7 +13,6 @@
 </p>
 <p align="center">
     <a href="https://github.com/grafana/xk6-browser/releases">Download</a> ·
-    <a href="https://k6.io/docs/javascript-api/xk6-browser/get-started/installation/">Install</a> ·
     <a href="https://k6.io/docs/javascript-api/k6-x-browser/">Documentation</a> ·
     <a href="https://community.k6.io/c/xk6-browser/14">Community Forum</a>
 </p>
@@ -24,7 +23,9 @@
 
 **xk6-browser** is a [k6](https://k6.io/) extension that supports browser automation through the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP). It adds browser-level APIs to interact with browsers and collect frontend performance metrics as part of your k6 tests.
 
-https://user-images.githubusercontent.com/10811379/200350050-f346931f-6402-487e-bf4d-eff808ac2190.mp4
+https://user-images.githubusercontent.com/10811379/220158567-cdef7ddc-96c5-41d9-854f-a25c5f67e4b3.mp4
+
+**As of [k6 version 0.43.0](https://github.com/grafana/k6/releases/tag/v0.43.0), xk6-browser is now bundled in k6 as an experimental module, and usable without a separate binary or compilation step!**
 
 Special acknowledgment to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and in some regards based on the code of those projects.
 
@@ -40,7 +41,6 @@ See our [project roadmap](ROADMAP.md) for more details.
 ## Get started
 
 - [Getting Started](https://k6.io/docs/javascript-api/xk6-browser/)
-- [Installing xk6-browser](https://k6.io/docs/javascript-api/xk6-browser/get-started/installation/)
 - [Running xk6-browser](https://k6.io/docs/javascript-api/xk6-browser/get-started/running-xk6-browser/)
 - [Browser Metrics](https://k6.io/docs/javascript-api/xk6-browser/get-started/browser-metrics/)
 - [Selecting Elements](https://k6.io/docs/javascript-api/xk6-browser/get-started/selecting-elements/)
