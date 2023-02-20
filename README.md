@@ -23,9 +23,11 @@
 
 **xk6-browser** is a [k6](https://k6.io/) extension that supports browser automation through the [Chrome Devtools Protocol](https://chromedevtools.github.io/devtools-protocol/) (CDP). It adds browser-level APIs to interact with browsers and collect frontend performance metrics as part of your k6 tests.
 
+**As of [k6 version 0.43.0](https://github.com/grafana/k6/releases/tag/v0.43.0), xk6-browser is now bundled in k6 as an experimental module, and usable without a separate binary or compilation step!**
+
+
 https://user-images.githubusercontent.com/10811379/220158567-cdef7ddc-96c5-41d9-854f-a25c5f67e4b3.mp4
 
-**As of [k6 version 0.43.0](https://github.com/grafana/k6/releases/tag/v0.43.0), xk6-browser is now bundled in k6 as an experimental module, and usable without a separate binary or compilation step!**
 
 Special acknowledgment to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and in some regards based on the code of those projects.
 
