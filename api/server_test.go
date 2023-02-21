@@ -56,7 +56,7 @@ func TestPing(t *testing.T) {
 	mux := handlePing(logger)
 
 	rw := httptest.NewRecorder()
-	r := httptest.NewRequest("GET", "/ping", nil)
+	r := httptest.NewRequest(http.MethodGet, "/ping", nil)
 	mux.ServeHTTP(rw, r)
 
 	res := rw.Result()

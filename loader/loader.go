@@ -290,9 +290,9 @@ func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		switch res.StatusCode {
-		case 404:
+		case http.StatusNotFound:
 			return nil, fmt.Errorf("not found: %s", u)
 		default:
 			return nil, fmt.Errorf("wrong status code (%d) for: %s", res.StatusCode, u)

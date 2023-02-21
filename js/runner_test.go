@@ -961,7 +961,7 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 		}),
 		ReadHeaderTimeout: time.Second,
 		ReadTimeout:       time.Second,

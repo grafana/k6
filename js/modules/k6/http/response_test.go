@@ -83,7 +83,7 @@ func myFormHandler(w http.ResponseWriter, r *http.Request) {
 		body = []byte(testGetFormHTML)
 	}
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
 
@@ -91,7 +91,7 @@ func jsonHandler(w http.ResponseWriter, r *http.Request) {
 	body := []byte(jsonData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
 
@@ -99,7 +99,7 @@ func invalidJSONHandler(w http.ResponseWriter, r *http.Request) {
 	body := []byte(invalidJSONData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
-	w.WriteHeader(200)
+	w.WriteHeader(http.StatusOK)
 	_, _ = w.Write(body)
 }
 

@@ -109,7 +109,7 @@ func TestLoad(t *testing.T) {
 	const responseStr = "export function fn() {\r\n    return 1234;\r\n}"
 	tb.Mux.HandleFunc("/raw/something", func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := r.URL.Query()["_k6"]; ok {
-			http.Error(w, "Internal server error", 500)
+			http.Error(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 		_, err := fmt.Fprint(w, responseStr)
@@ -117,7 +117,7 @@ func TestLoad(t *testing.T) {
 	})
 
 	tb.Mux.HandleFunc("/invalid", func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, "Internal server error", 500)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
 	})
 
 	t.Run("Local", func(t *testing.T) {

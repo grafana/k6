@@ -28,7 +28,7 @@ func benchmarkInfluxdb(b *testing.B, t time.Duration) {
 				break
 			}
 		}
-		rw.WriteHeader(204)
+		rw.WriteHeader(http.StatusNoContent)
 	}, func(tb testing.TB, c *Output) {
 		b = tb.(*testing.B)
 		b.ResetTimer()

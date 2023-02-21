@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/http"
 	"net/url"
 	"sort"
 	"strings"
@@ -183,7 +184,7 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 					fprintf(w, "%q", e.Request.URL)
 				}
 
-				if e.Request.Method != "GET" {
+				if e.Request.Method != http.MethodGet {
 					if correlate && e.Request.PostData != nil && strings.Contains(e.Request.PostData.MimeType, "json") {
 						requestMap := map[string]interface{}{}
 

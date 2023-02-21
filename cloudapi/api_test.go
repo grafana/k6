@@ -113,7 +113,7 @@ func TestClientRetry(t *testing.T) {
 		assert.NotEmpty(t, gotK6IdempotencyKey)
 		assert.Equal(t, idempotencyKey, gotK6IdempotencyKey)
 		called++
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
 
@@ -143,7 +143,7 @@ func TestClientRetrySuccessOnSecond(t *testing.T) {
 			fprintf(t, w, `{"reference_id": "1"}`)
 			return
 		}
-		w.WriteHeader(500)
+		w.WriteHeader(http.StatusInternalServerError)
 	}))
 	defer server.Close()
 

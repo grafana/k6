@@ -182,7 +182,7 @@ func TestHTTP2StreamError(t *testing.T) {
 
 	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
 		rw.Header().Set("Content-Length", "100000")
-		rw.WriteHeader(200)
+		rw.WriteHeader(http.StatusOK)
 
 		rw.(http.Flusher).Flush()
 		time.Sleep(time.Millisecond * 2)
@@ -222,7 +222,7 @@ func TestX509HostnameError(t *testing.T) {
 		badHostname: *badHost,
 	})
 	require.NoError(t, err)
-	req, err := http.NewRequestWithContext(context.Background(), "GET", tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tb.Replacer.Replace("https://"+badHostname+":HTTPSBIN_PORT/get"), nil)
 	require.NoError(t, err)
 	res, err := client.Do(req) //nolint:bodyclose
 	require.Nil(t, res)
@@ -243,7 +243,7 @@ func TestX509UnknownAuthorityError(t *testing.T) {
 			DialContext: tb.HTTPTransport.DialContext,
 		},
 	}
-	req, err := http.NewRequestWithContext(context.Background(), "GET", tb.Replacer.Replace("HTTPSBIN_URL/get"), nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, tb.Replacer.Replace("HTTPSBIN_URL/get"), nil)
 	require.NoError(t, err)
 	res, err := client.Do(req) //nolint:bodyclose
 	require.Nil(t, res)
