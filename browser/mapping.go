@@ -119,7 +119,7 @@ func mapResponse(vu moduleVU, r api.Response) mapping {
 		"headerValues": r.HeaderValues,
 		"headers":      r.Headers,
 		"headersArray": r.HeadersArray,
-		"jSON":         r.JSON,
+		"json":         r.JSON,
 		"ok":           r.Ok,
 		"request": func() *goja.Object {
 			mr := mapRequest(vu, r.Request())

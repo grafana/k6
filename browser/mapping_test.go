@@ -177,6 +177,8 @@ func toFirstLetterLower(s string) string {
 		return strings.ToLower(s[:1]) + s[1:]
 	case "URL":
 		return "url"
+	case "JSON":
+		return "json"
 	case "JSONValue":
 		return "jsonValue"
 	}
