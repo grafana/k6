@@ -56,7 +56,7 @@ func (mc *MetricsClient) PushMetric(referenceID string, s []*Sample) error {
 	jsonTime := time.Since(jsonStart)
 
 	// TODO: change the context, maybe to one with a timeout
-	req, err := http.NewRequestWithContext(context.Background(), "POST", url, nil)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, nil)
 	if err != nil {
 		return err
 	}

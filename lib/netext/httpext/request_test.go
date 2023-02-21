@@ -88,7 +88,7 @@ func TestMakeRequestError(t *testing.T) {
 
 	t.Run("bad compression algorithm body", func(t *testing.T) {
 		t.Parallel()
-		req, err := http.NewRequest("GET", "https://wont.be.used", nil)
+		req, err := http.NewRequest(http.MethodGet, "https://wont.be.used", nil)
 
 		require.NoError(t, err)
 		badCompressionType := CompressionType(13)
@@ -125,7 +125,7 @@ func TestMakeRequestError(t *testing.T) {
 			Logger:    logger,
 			Tags:      lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 		}
-		req, _ := http.NewRequest("GET", srv.URL, nil)
+		req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 		preq := &ParsedHTTPRequest{
 			Req:         req,
 			URL:         &URL{u: req.URL},
@@ -178,7 +178,7 @@ func TestResponseStatus(t *testing.T) {
 					BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 					Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 				}
-				req, err := http.NewRequest("GET", server.URL, nil)
+				req, err := http.NewRequest(http.MethodGet, server.URL, nil)
 				require.NoError(t, err)
 
 				preq := &ParsedHTTPRequest{
@@ -236,7 +236,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 	t.Parallel()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Content-Length", "100000")
-		w.WriteHeader(200)
+		w.WriteHeader(http.StatusOK)
 		if f, ok := w.(http.Flusher); ok {
 			f.Flush()
 		}
@@ -260,7 +260,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequest("GET", srv.URL, nil)
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -338,7 +338,7 @@ func TestTrailFailed(t *testing.T) {
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
-			req, _ := http.NewRequest("GET", srv.URL, nil)
+			req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:              req,
 				URL:              &URL{u: req.URL, URL: srv.URL},
@@ -405,7 +405,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
 
-	req, _ := http.NewRequest("GET", "http://"+addr.String(), nil)
+	req, _ := http.NewRequest(http.MethodGet, "http://"+addr.String(), nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: req.URL.String()},
@@ -460,7 +460,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
-	req, _ := http.NewRequest("GET", srv.URL, nil)
+	req, _ := http.NewRequest(http.MethodGet, srv.URL, nil)
 	preq := &ParsedHTTPRequest{
 		Req:              req,
 		URL:              &URL{u: req.URL, URL: srv.URL},
@@ -541,7 +541,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 			assert.InDelta(t, val, 3, 3)
 			return
 		default:
-			req, _ := http.NewRequest("GET", ts.URL, nil)
+			req, _ := http.NewRequest(http.MethodGet, ts.URL, nil)
 			preq := &ParsedHTTPRequest{
 				Req:         req,
 				URL:         &URL{u: req.URL, URL: ts.URL, Name: ts.URL},
