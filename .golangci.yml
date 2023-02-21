@@ -68,7 +68,6 @@ linters:
     - bodyclose
     - contextcheck
     - cyclop
-    - deadcode
     - depguard
     - dogsled
     - dupl
@@ -95,7 +94,6 @@ linters:
     - gosec
     - gosimple
     - govet
-    - ifshort
     - importas
     - ineffassign
     - lll
@@ -117,7 +115,6 @@ linters:
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
-    - structcheck
     - stylecheck
     - tenv
     - tparallel
@@ -126,7 +123,6 @@ linters:
     - unparam
     - unused
     - usestdlibvars
-    - varcheck
     - wastedassign
     - whitespace
   fast: false
