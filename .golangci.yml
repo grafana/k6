@@ -27,6 +27,9 @@ issues:
    - linters:
      - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
      text: "does not use range value in test Run"
+   - linters:
+     - forbidigo
+     text: 'use of `os\.(SyscallError|Signal|Interrupt)` forbidden'
 
 linters-settings:
   nolintlint:
@@ -48,6 +51,13 @@ linters-settings:
   funlen:
     lines: 80
     statements: 60
+  forbidigo:
+    forbid:
+      - '^(fmt\\.Print(|f|ln)|print|println)$'
+      # Forbid everything in os, except os.Signal and os.SyscalError
+      - '^os\.(.*)$(# Using anything except Signal and SyscallError from the os package is forbidden )?'
+      # Forbid everything in syscall except the uppercase constants
+      - '^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?'
 
 linters:
   enable-all: true

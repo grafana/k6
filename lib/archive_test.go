@@ -3,8 +3,8 @@ package lib
 import (
 	"bytes"
 	"fmt"
+	"io/fs"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -85,7 +85,7 @@ func diffFilesystems(t *testing.T, first, second afero.Fs) {
 	diffFilesystemsDir(t, first, second, "/")
 }
 
-func getInfoNames(infos []os.FileInfo) []string {
+func getInfoNames(infos []fs.FileInfo) []string {
 	names := make([]string, len(infos))
 	for i, info := range infos {
 		names[i] = info.Name()

@@ -1,7 +1,8 @@
 package fsext
 
 import (
-	"os"
+	"errors"
+	"io/fs"
 	"path/filepath"
 	"testing"
 
@@ -12,20 +13,20 @@ import (
 func TestTrimAferoPathSeparatorFs(t *testing.T) {
 	t.Parallel()
 	m := afero.NewMemMapFs()
-	fs := NewTrimFilePathSeparatorFs(m)
+	f := NewTrimFilePathSeparatorFs(m)
 	expecteData := []byte("something")
-	err := afero.WriteFile(fs, filepath.FromSlash("/path/to/somewhere"), expecteData, 0o644)
+	err := afero.WriteFile(f, filepath.FromSlash("/path/to/somewhere"), expecteData, 0o644)
 	require.NoError(t, err)
 	data, err := afero.ReadFile(m, "/path/to/somewhere")
 	require.Error(t, err)
-	require.True(t, os.IsNotExist(err))
+	require.True(t, errors.Is(err, fs.ErrNotExist))
 	require.Nil(t, data)
 
 	data, err = afero.ReadFile(m, "path/to/somewhere")
 	require.NoError(t, err)
 	require.Equal(t, expecteData, data)
 
-	err = afero.WriteFile(fs, filepath.FromSlash("path/without/separtor"), expecteData, 0o644)
+	err = afero.WriteFile(f, filepath.FromSlash("path/without/separtor"), expecteData, 0o644)
 	require.Error(t, err)
-	require.True(t, os.IsNotExist(err))
+	require.True(t, errors.Is(err, fs.ErrNotExist))
 }
