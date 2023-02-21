@@ -172,16 +172,19 @@ func toFirstLetterLower(s string) string {
 	// Special cases.
 	// Instead of loading up an acronyms list, just do this.
 	// Good enough for our purposes.
-	switch s {
-	default:
-		return strings.ToLower(s[:1]) + s[1:]
-	case "URL":
-		return "url"
-	case "JSON":
-		return "json"
-	case "JSONValue":
-		return "jsonValue"
+	special := map[string]string{
+		"JSON":      "json",
+		"JSONValue": "jsonValue",
+		"URL":       "url",
 	}
+	if v, ok := special[s]; ok {
+		return v
+	}
+	if s == "" {
+		return ""
+	}
+
+	return strings.ToLower(s[:1]) + s[1:]
 }
 
 // isCustomMapping returns true if the method is a custom mapping
