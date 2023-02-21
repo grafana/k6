@@ -118,7 +118,7 @@ func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archiv
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, requestUrl, &buf)
+	req, err := http.NewRequest(http.MethodPost, requestUrl, &buf) //nolint:noctx
 	if err != nil {
 		return nil, err
 	}
