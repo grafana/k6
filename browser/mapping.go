@@ -616,8 +616,7 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 		"launch": func(opts goja.Value) *goja.Object {
 			b, pid := bt.Launch(opts)
 			// store the pid so we can kill it later on panic.
-			// idea: a later refactoring can move k6ext.Panic here.
-			vu.root.addPid(pid)
+			vu.registerPid(pid)
 			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},

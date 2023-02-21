@@ -33,6 +33,7 @@ func Panic(ctx context.Context, format string, a ...any) {
 	}
 	defer k6common.Throw(rt, fmt.Errorf(format, a...))
 
+	// TODO: Remove this after moving k6ext.Panic into the mapping layer.
 	pidder, ok := GetVU(ctx).(interface {
 		Pids() []int
 	})

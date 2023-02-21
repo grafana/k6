@@ -2,8 +2,6 @@
 package browser
 
 import (
-	"sync"
-
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
@@ -17,8 +15,7 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		muBrowserProcessIDs sync.RWMutex
-		browserProcessIDs   []int
+		pidRegistry *pidRegistry
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -41,7 +38,9 @@ var (
 
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
-	return &RootModule{}
+	return &RootModule{
+		pidRegistry: &pidRegistry{},
+	}
 }
 
 // NewModuleInstance implements the k6modules.Module interface to return
@@ -50,32 +49,13 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
 		mod: &JSModule{
 			Chromium: mapBrowserToGoja(moduleVU{
-				VU:   vu,
-				root: m,
+				VU:          vu,
+				pidRegistry: m.pidRegistry,
 			}),
 			Devices: common.GetDevices(),
 			Version: version,
 		},
 	}
-}
-
-// pids returns the launched browser process IDs.
-func (m *RootModule) pids() []int {
-	m.muBrowserProcessIDs.RLock()
-	defer m.muBrowserProcessIDs.RUnlock()
-
-	pids := make([]int, len(m.browserProcessIDs))
-	copy(pids, m.browserProcessIDs)
-
-	return pids
-}
-
-// addPid keeps track of the launched browser process IDs.
-func (m *RootModule) addPid(pid int) {
-	m.muBrowserProcessIDs.Lock()
-	defer m.muBrowserProcessIDs.Unlock()
-
-	m.browserProcessIDs = append(m.browserProcessIDs, pid)
 }
 
 // Exports returns the exports of the JS module so that it can be used in test
