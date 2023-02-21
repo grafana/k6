@@ -82,6 +82,7 @@ linters:
     - forbidigo
     - forcetypeassert
     - funlen
+    - gocheckcompilerdirectives
     - gochecknoglobals
     - gocognit
     - goconst
@@ -112,6 +113,7 @@ linters:
     - predeclared
     - promlinter
     - revive
+    - reassign
     - rowserrcheck
     - sqlclosecheck
     - staticcheck
@@ -123,6 +125,7 @@ linters:
     - unconvert
     - unparam
     - unused
+    - usestdlibvars
     - varcheck
     - wastedassign
     - whitespace
