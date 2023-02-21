@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/dop251/goja"
@@ -11,26 +10,7 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6common "go.k6.io/k6/js/common"
-	k6modules "go.k6.io/k6/js/modules"
 )
-
-// moduleVU carries module specific VU information.
-//
-// Currently, it is used to carry the VU object to the
-// inner objects and promises.
-type moduleVU struct {
-	k6modules.VU
-}
-
-func (vu moduleVU) Context() context.Context {
-	// promises and inner objects need the VU object to be
-	// able to use k6-core specific functionality.
-	//
-	// We should not cache the context (especially the init
-	// context from the vu that is received from k6 in
-	// NewModuleInstance).
-	return k6ext.WithVU(vu.VU.Context(), vu.VU)
-}
 
 // mapping is a type of mapping between our API (api/) and the JS
 // module. It acts like a bridge and allows adding wildcard methods
@@ -425,8 +405,13 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
 		"getAttribute": p.GetAttribute,
-		"goBack":       p.GoBack,
-		"goForward":    p.GoForward,
+		"goBack": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				resp := p.GoBack(opts)
+				return mapResponse(vu, resp), nil
+			})
+		},
+		"goForward": p.GoForward,
 		"goto": func(url string, opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp, err := p.Goto(url, opts)
@@ -629,7 +614,10 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
 		"launch": func(opts goja.Value) *goja.Object {
-			m := mapBrowser(vu, bt.Launch(opts))
+			b, pid := bt.Launch(opts)
+			// store the pid so we can kill it later on panic.
+			vu.registerPid(pid)
+			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},
 	}

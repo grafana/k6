@@ -32,6 +32,8 @@ type testBrowser struct {
 	vu       *k6test.VU
 	logCache *logCache
 
+	pid int // the browser process ID
+
 	api.Browser
 }
 
@@ -108,7 +110,8 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
-	b := bt.Launch(rt.ToValue(launchOpts))
+	b, pid := bt.Launch(rt.ToValue(launchOpts))
+
 	tb.Cleanup(func() {
 		select {
 		case <-vu.Context().Done():
@@ -126,6 +129,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		vu:       vu,
 		logCache: lc,
 		Browser:  b,
+		pid:      pid,
 	}
 	if enableFileServer {
 		tbr = tbr.withFileServer()

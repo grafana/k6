@@ -5,7 +5,9 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
@@ -175,4 +177,35 @@ func TestBrowserLogIterationID(t *testing.T) {
 	}
 
 	assert.Equal(t, len(tb.logCache.entries), tracedEvts)
+}
+
+func TestMultiBrowserPanic(t *testing.T) {
+	var b1, b2 *testBrowser
+
+	// run it in a test to kick in the Cleanup() in testBrowser.
+	t.Run("browsers", func(t *testing.T) {
+		b1 = newTestBrowser(t)
+		b2 = newTestBrowser(t)
+
+		p1 := b1.NewContext(nil).NewPage()
+		func() {
+			defer func() { _ = recover() }()
+			p1.GoBack(nil)
+		}()
+	})
+
+	// FindProcess only returns alive/dead processes on nixes.
+	// Sending Interrupt on Windows is not implemented.
+	if runtime.GOOS == "windows" {
+		t.Skip("skipping on windows")
+	}
+
+	p1, err := os.FindProcess(b1.pid)
+	require.NoError(t, err, "failed to find process #1")
+	p2, err := os.FindProcess(b2.pid)
+	require.NoError(t, err, "failed to find process #2")
+	err = p1.Signal(syscall.Signal(0))
+	assert.Error(t, err, "process #1 should be dead, but exists")
+	err = p2.Signal(syscall.Signal(0))
+	assert.Error(t, err, "process #2 should be dead, but exists")
 }

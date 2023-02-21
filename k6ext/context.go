@@ -33,17 +33,6 @@ func GetVU(ctx context.Context) k6modules.VU {
 	return nil
 }
 
-// WithProcessID saves the browser process ID to the context.
-func WithProcessID(ctx context.Context, pid int) context.Context {
-	return context.WithValue(ctx, ctxKeyPid, pid)
-}
-
-// GetProcessID returns the browser process ID from the context.
-func GetProcessID(ctx context.Context) int {
-	v, _ := ctx.Value(ctxKeyPid).(int)
-	return v // it will return zero on error
-}
-
 // WithCustomMetrics attaches the CustomK6Metrics object to the context.
 func WithCustomMetrics(ctx context.Context, k6m *CustomMetrics) context.Context {
 	return context.WithValue(ctx, ctxKeyCustomK6Metrics, k6m)

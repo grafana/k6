@@ -33,21 +33,24 @@ func Panic(ctx context.Context, format string, a ...any) {
 	}
 	defer k6common.Throw(rt, fmt.Errorf(format, a...))
 
-	pid := GetProcessID(ctx)
-	if pid == 0 {
-		// this should never happen unless a programmer error
-		panic("no browser process ID in context")
-	}
-	p, err := os.FindProcess(pid)
-	if err != nil {
-		// optimistically return and don't kill the process
+	// TODO: Remove this after moving k6ext.Panic into the mapping layer.
+	pidder, ok := GetVU(ctx).(interface {
+		Pids() []int
+	})
+	if !ok {
+		// we're running in a test, let's skip killing the process.
 		return
 	}
-	// no need to check the error for waiting the process to release
-	// its resources or whether we could kill it as we're already
-	// dying.
-	_ = p.Release()
-	_ = p.Kill()
+	for _, pid := range pidder.Pids() {
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			// optimistically return and don't kill the process
+			return
+		}
+		// no need to check the error for whether we could kill it as
+		// we're already dying.
+		_ = p.Kill()
+	}
 }
 
 // UserFriendlyError maps an internal error to an error that users
