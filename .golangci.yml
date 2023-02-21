@@ -60,36 +60,70 @@ linters-settings:
       - '^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?'
 
 linters:
-  enable-all: true
-  disable:
-  - nlreturn
-  - gci
-  - gochecknoinits
-  - godot
-  - godox
-  - gomodguard
-  - testpackage
-  - wsl
-  - gomnd
-  - goerr113 # most of the errors here are meant for humans
-  - goheader
-  - exhaustivestruct
-  - thelper
-  - gocyclo # replaced by cyclop since it also calculates the package complexity
-  - maligned # replaced by govet 'fieldalignment'
-  - interfacer # deprecated
-  - scopelint # deprecated, replaced by exportloopref
-  - wrapcheck # a little bit too much for k6, maybe after https://github.com/tomarrell/wrapcheck/issues/2 is fixed
-  - golint # this linter is deprecated
-  - varnamelen
-  - ireturn
-  - tagliatelle
-  - exhaustruct
-  - execinquery
-  - maintidx
-  - grouper
-  - decorder
-  - nonamedreturns
-  - nosnakecase
-  - containedctx
+  disable-all: true
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - cyclop
+    - deadcode
+    - depguard
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - gocritic
+    - gofmt
+    - gofumpt
+    - goimports
+    - gomoddirectives
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - ifshort
+    - importas
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - revive
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - structcheck
+    - stylecheck
+    - tenv
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - varcheck
+    - wastedassign
+    - whitespace
   fast: false
