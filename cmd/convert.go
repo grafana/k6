@@ -1,7 +1,9 @@
 package cmd
 
 import (
+	"bytes"
 	"encoding/json"
+	"html/template"
 	"io"
 
 	"github.com/spf13/afero"
@@ -14,6 +16,7 @@ import (
 )
 
 // TODO: split apart like `k6 run` and `k6 archive`?
+//
 //nolint:funlen,gocognit
 func getCmdConvert(gs *state.GlobalState) *cobra.Command {
 	var (
@@ -29,24 +32,32 @@ func getCmdConvert(gs *state.GlobalState) *cobra.Command {
 		only                []string
 		skip                []string
 	)
+
+	var exampleText bytes.Buffer
+	exampleTemplate := template.Must(template.New("").Parse(`
+  # Convert a HAR file to a k6 script.
+  {{.}} convert -O har-session.js session.har
+  
+  # Convert a HAR file to a k6 script creating requests only for the given domain/s.
+  {{.}} convert -O har-session.js --only yourdomain.com,additionaldomain.com session.har
+  
+  # Convert a HAR file. Batching requests together as long as idle time between requests <800ms
+  {{.}} convert --batch-threshold 800 session.har
+  
+  # Run the k6 script.
+  {{.}} run har-session.js`[1:]))
+
+	if err := exampleTemplate.Execute(&exampleText, gs.BinaryName); err != nil {
+		gs.Logger.WithError(err).Error("Error during help example generation")
+	}
+
 	convertCmd := &cobra.Command{
 		Use:        "convert",
 		Short:      "Convert a HAR file to a k6 script",
 		Long:       "Convert a HAR (HTTP Archive) file to a k6 script",
 		Deprecated: "please use har-to-k6 (https://github.com/grafana/har-to-k6) instead.",
-		Example: `
-  # Convert a HAR file to a k6 script.
-  k6 convert -O har-session.js session.har
-
-  # Convert a HAR file to a k6 script creating requests only for the given domain/s.
-  k6 convert -O har-session.js --only yourdomain.com,additionaldomain.com session.har
-
-  # Convert a HAR file. Batching requests together as long as idle time between requests <800ms
-  k6 convert --batch-threshold 800 session.har
-
-  # Run the k6 script.
-  k6 run har-session.js`[1:],
-		Args: cobra.ExactArgs(1),
+		Example:    exampleText.String(),
+		Args:       cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse the HAR file
 			r, err := gs.FS.Open(args[0])
