@@ -168,7 +168,6 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 			return rt.ToValue(m).ToObject(rt)
 		},
 		"jsonValue": jsh.JSONValue,
-		"objectID":  jsh.ObjectID,
 	}
 }
 
@@ -315,8 +314,6 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 		"isEnabled":  f.IsEnabled,
 		"isHidden":   f.IsHidden,
 		"isVisible":  f.IsVisible,
-		"iD":         f.ID,
-		"loaderID":   f.LoaderID,
 		"locator":    f.Locator,
 		"name":       f.Name,
 		"page": func() *goja.Object {

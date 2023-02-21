@@ -34,6 +34,11 @@ func customMappings() map[string]string {
 		"Page.getKeyboard":    "keyboard",
 		"Page.getMouse":       "mouse",
 		"Page.getTouchscreen": "touchscreen",
+		// internal methods
+		"ElementHandle.objectID": "",
+		"Frame.id":               "",
+		"Frame.loaderID":         "",
+		"JSHandle.objectID":      "",
 	}
 }
 
@@ -67,19 +72,27 @@ func TestMappings(t *testing.T) {
 			mapped = tt.mapp()
 		)
 		for i := 0; i < typ.NumMethod(); i++ {
-			method := typ.Method(i)
+			var (
+				method  = typ.Method(i)
+				typName = typ.Name()
+			)
 			require.NotNil(t, method)
 
 			// goja uses methods that starts with lowercase.
 			// so we need to convert the first letter to lowercase.
 			m := toFirstLetterLower(method.Name)
 
-			cm, cmok := isCustomMapping(customMappings, typ.Name(), m)
+			cm, cmok := isCustomMapping(customMappings, typName, m)
 			// if the method is a custom mapping, it should not be
 			// mapped to the module. so we should not find it in
 			// the mapped methods.
 			if _, ok := mapped[m]; cmok && ok {
-				t.Errorf("method %s should not be mapped", m)
+				t.Errorf("method %s should not be mapped for %s", m, typName)
+			}
+			// a custom mapping with an empty string means that
+			// the method should not exist on the API.
+			if cmok && cm == "" {
+				continue
 			}
 			// change the method name if it is mapped to a custom
 			// method. these custom methods are not exist on our
@@ -88,7 +101,7 @@ func TestMappings(t *testing.T) {
 				m = cm
 			}
 			if _, ok := mapped[m]; !ok {
-				t.Errorf("method %s not found", m)
+				t.Errorf("method %s for %s not found", m, typName)
 			}
 		}
 	}
@@ -173,6 +186,7 @@ func toFirstLetterLower(s string) string {
 	// Instead of loading up an acronyms list, just do this.
 	// Good enough for our purposes.
 	special := map[string]string{
+		"ID":        "id",
 		"JSON":      "json",
 		"JSONValue": "jsonValue",
 		"URL":       "url",
