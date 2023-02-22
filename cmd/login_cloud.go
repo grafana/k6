@@ -1,12 +1,10 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"syscall"
-	"text/template"
 
 	"github.com/fatih/color"
 	"github.com/spf13/cobra"
@@ -22,8 +20,7 @@ import (
 //nolint:funlen,gocognit
 func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 	// loginCloudCommand represents the 'login cloud' command
-	var exampleText bytes.Buffer
-	exampleTemplate := template.Must(template.New("").Parse(`
+	exampleText := getExampleText(gs, `
   # Show the stored token.
   {{.}} login cloud -s
   
@@ -31,11 +28,7 @@ func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
   {{.}} login cloud -t YOUR_TOKEN
   
   # Log in with an email/password.
-  {{.}} login cloud`[1:]))
-
-	if err := exampleTemplate.Execute(&exampleText, gs.BinaryName); err != nil {
-		gs.Logger.WithError(err).Error("Error during help example generation")
-	}
+  {{.}} login cloud`[1:])
 
 	loginCloudCommand := &cobra.Command{
 		Use:   "cloud",
@@ -43,7 +36,7 @@ func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 		Long: `Authenticate with Load Impact.
 
 This will set the default token used when just "k6 run -o cloud" is passed.`,
-		Example: exampleText.String(),
+		Example: exampleText,
 		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			currentDiskConf, err := readDiskConfig(gs)

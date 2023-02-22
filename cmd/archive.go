@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"bytes"
-	"text/template"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -77,17 +74,12 @@ func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 		archiveOut: "archive.tar",
 	}
 
-	var exampleText bytes.Buffer
-	exampleTemplate := template.Must(template.New("").Parse(`
+	exampleText := getExampleText(gs, `
   # Archive a test run.
   {{.}} archive -u 10 -d 10s -O myarchive.tar script.js
   
   # Run the resulting archive.
-  {{.}} run myarchive.tar`[1:]))
-
-	if err := exampleTemplate.Execute(&exampleText, gs.BinaryName); err != nil {
-		gs.Logger.WithError(err).Error("Error during help example generation")
-	}
+  {{.}} run myarchive.tar`[1:])
 
 	archiveCmd := &cobra.Command{
 		Use:   "archive",
@@ -95,7 +87,7 @@ func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 		Long: `Create an archive.
 
 An archive is a fully self-contained test run, and can be executed identically elsewhere.`,
-		Example: exampleText.String(),
+		Example: exampleText,
 		Args:    cobra.ExactArgs(1),
 		RunE:    c.run,
 	}

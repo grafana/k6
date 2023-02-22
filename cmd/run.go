@@ -12,7 +12,6 @@ import (
 	"runtime"
 	"strings"
 	"sync"
-	"text/template"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -357,8 +356,7 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 		gs: gs,
 	}
 
-	var exampleText bytes.Buffer
-	exampleTemplate := template.Must(template.New("").Parse(`
+	exampleText := getExampleText(gs, `
   # Run a single VU, once.
   {{.}} run script.js
   
@@ -375,11 +373,7 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
   {{.}} run -u 0 -s 10s:100 -s 60s -s 10s:0
   
   # Send metrics to an influxdb server
-  {{.}} run -o influxdb=http://1.2.3.4:8086/k6`[1:]))
-
-	if err := exampleTemplate.Execute(&exampleText, gs.BinaryName); err != nil {
-		gs.Logger.WithError(err).Error("Error during help example generation")
-	}
+  {{.}} run -o influxdb=http://1.2.3.4:8086/k6`[1:])
 
 	runCmd := &cobra.Command{
 		Use:   "run",
@@ -388,7 +382,7 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 
 This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
-		Example: exampleText.String(),
+		Example: exampleText,
 		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE:    c.run,
 	}

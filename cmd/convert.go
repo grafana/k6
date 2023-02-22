@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"bytes"
 	"encoding/json"
-	"html/template"
 	"io"
 
 	"github.com/spf13/afero"
@@ -33,8 +31,7 @@ func getCmdConvert(gs *state.GlobalState) *cobra.Command {
 		skip                []string
 	)
 
-	var exampleText bytes.Buffer
-	exampleTemplate := template.Must(template.New("").Parse(`
+	exampleText := getExampleText(gs, `
   # Convert a HAR file to a k6 script.
   {{.}} convert -O har-session.js session.har
   
@@ -45,18 +42,14 @@ func getCmdConvert(gs *state.GlobalState) *cobra.Command {
   {{.}} convert --batch-threshold 800 session.har
   
   # Run the k6 script.
-  {{.}} run har-session.js`[1:]))
-
-	if err := exampleTemplate.Execute(&exampleText, gs.BinaryName); err != nil {
-		gs.Logger.WithError(err).Error("Error during help example generation")
-	}
+  {{.}} run har-session.js`[1:])
 
 	convertCmd := &cobra.Command{
 		Use:        "convert",
 		Short:      "Convert a HAR file to a k6 script",
 		Long:       "Convert a HAR (HTTP Archive) file to a k6 script",
 		Deprecated: "please use har-to-k6 (https://github.com/grafana/har-to-k6) instead.",
-		Example:    exampleText.String(),
+		Example:    exampleText,
 		Args:       cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			// Parse the HAR file
