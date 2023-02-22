@@ -394,7 +394,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 // Close shuts down the browser.
 func (b *Browser) Close() {
 	defer func() {
-		if err := b.browserProc.meta.Cleanup(); err != nil {
+		if err := b.browserProc.Cleanup(); err != nil {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
 	}()

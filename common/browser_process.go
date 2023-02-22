@@ -117,6 +117,12 @@ func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
 	p.logger = logger
 }
 
+// Cleanup cleans up the metadata associated with the browser
+// process, mainly the browser data directory.
+func (p *BrowserProcess) Cleanup() error {
+	return p.meta.Cleanup() //nolint:wrapcheck
+}
+
 type command struct {
 	*exec.Cmd
 	done           chan struct{}
