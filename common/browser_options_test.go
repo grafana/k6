@@ -22,10 +22,11 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 	}
 
 	for name, tt := range map[string]struct {
-		opts    map[string]any
-		assert  func(testing.TB, *LaunchOptions)
-		err     string
-		onCloud bool
+		opts            map[string]any
+		assert          func(testing.TB, *LaunchOptions)
+		err             string
+		onCloud         bool
+		isRemoteBrowser bool
 	}{
 		"defaults": {
 			opts: map[string]any{},
@@ -76,6 +77,39 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 					Timeout:           time.Second,
 
 					onCloud: true,
+				}, lo)
+			},
+		},
+		"defaults_remote_browser": {
+			isRemoteBrowser: true,
+			opts: map[string]any{
+				// disallow changing the following opts
+				"args":              []string{"any"},
+				"devtools":          true,
+				"env":               map[string]string{"some": "thing"},
+				"executablePath":    "something else",
+				"headless":          false,
+				"ignoreDefaultArgs": []string{"any"},
+				"proxy":             ProxyOptions{Server: "srv"},
+				// allow changing the following opts
+				"debug":             true,
+				"logCategoryFilter": "...",
+				"slowMo":            time.Second,
+				"timeout":           time.Second,
+			},
+			assert: func(tb testing.TB, lo *LaunchOptions) {
+				tb.Helper()
+				assert.Equal(t, &LaunchOptions{
+					// disallowed:
+					Env:      make(map[string]string),
+					Headless: true,
+					// allowed:
+					Debug:             true,
+					LogCategoryFilter: "...",
+					SlowMo:            time.Second,
+					Timeout:           time.Second,
+
+					isRemoteBrowser: true,
 				}, lo)
 			},
 		},
@@ -260,7 +294,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			t.Parallel()
 			var (
 				vu = k6test.NewVU(t)
-				lo = NewLaunchOptions(tt.onCloud)
+				lo = NewLaunchOptions(tt.onCloud, tt.isRemoteBrowser)
 			)
 			err := lo.Parse(vu.Context(), log.NewNullLogger(), vu.ToGojaValue(tt.opts))
 			if tt.err != "" {
