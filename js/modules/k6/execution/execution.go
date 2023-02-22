@@ -203,6 +203,11 @@ func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
 		"idInTest":            func() interface{} { return vuState.VUIDGlobal },
 		"iterationInInstance": func() interface{} { return vuState.Iteration },
 		"iterationInScenario": func() interface{} {
+			if vuState.GetScenarioVUIter == nil {
+				// hasn't been set yet, no iteration stats available
+				return 0
+			}
+
 			return vuState.GetScenarioVUIter()
 		},
 	}
