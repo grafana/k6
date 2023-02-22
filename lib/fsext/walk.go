@@ -65,7 +65,7 @@ func walk(fileSystem afero.Fs, path string, info fs.FileInfo, walkFn filepath.Wa
 	}
 
 	for _, name := range names {
-		filename := filepath.Join(path, name)
+		filename := JoinFilePath(path, name)
 		fileInfo, err := fileSystem.Stat(filename)
 		if err != nil {
 			if err = walkFn(filename, fileInfo, err); err != nil && err != filepath.SkipDir {

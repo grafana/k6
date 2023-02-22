@@ -102,7 +102,7 @@ func diffFilesystemsDir(t *testing.T, first, second afero.Fs, dirname string) {
 
 	require.ElementsMatch(t, getInfoNames(firstInfos), getInfoNames(secondInfos), "directory: "+dirname)
 	for _, info := range firstInfos {
-		path := filepath.Join(dirname, info.Name())
+		path := fsext.JoinFilePath(dirname, info.Name())
 		if info.IsDir() {
 			diffFilesystemsDir(t, first, second, path)
 			continue
