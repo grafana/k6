@@ -19,8 +19,7 @@ type BrowserProcess struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// The process of the browser, if running locally.
-	process *os.Process
+	meta browserProcessMeta
 
 	// Channels for managing termination.
 	lostConnection             chan struct{}
@@ -29,9 +28,6 @@ type BrowserProcess struct {
 
 	// Browser's WebSocket URL to speak CDP
 	wsURL string
-
-	// The directory where user data for the browser is stored.
-	userDataDir *storage.Dir
 
 	logger *log.Logger
 }
@@ -50,15 +46,16 @@ func NewBrowserProcess(
 		return nil, err
 	}
 
+	meta := newLocalBrowserProcessMeta(cmd.Process, dataDir)
+
 	p := BrowserProcess{
 		ctx:                        ctx,
 		cancel:                     ctxCancel,
-		process:                    cmd.Process,
+		meta:                       meta,
 		lostConnection:             make(chan struct{}),
 		processIsGracefullyClosing: make(chan struct{}),
 		processDone:                cmd.done,
 		wsURL:                      wsURL,
-		userDataDir:                dataDir,
 	}
 
 	go func() {
@@ -110,9 +107,9 @@ func (p *BrowserProcess) WsURL() string {
 	return p.wsURL
 }
 
-// Pid returns the browser process ID.
+// Pid returns the browser process ID, or -1 if this is unknown.
 func (p *BrowserProcess) Pid() int {
-	return p.process.Pid
+	return p.meta.Pid()
 }
 
 // AttachLogger attaches a logger to the browser process.

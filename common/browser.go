@@ -23,8 +23,10 @@ import (
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
-var _ EventEmitter = &Browser{}
-var _ api.Browser = &Browser{}
+var (
+	_ EventEmitter = &Browser{}
+	_ api.Browser  = &Browser{}
+)
 
 const (
 	BrowserStateOpen int64 = iota
@@ -392,7 +394,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 // Close shuts down the browser.
 func (b *Browser) Close() {
 	defer func() {
-		if err := b.browserProc.userDataDir.Cleanup(); err != nil {
+		if err := b.browserProc.meta.Cleanup(); err != nil {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
 	}()
