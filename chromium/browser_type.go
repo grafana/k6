@@ -40,7 +40,6 @@ type BrowserType struct {
 	k6Metrics *k6ext.CustomMetrics
 	execPath  string // path to the Chromium executable
 	randSrc   *rand.Rand
-	logger    *log.Logger
 }
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
@@ -120,16 +119,17 @@ func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID i
 	ctx := b.initContext()
 
 	var err error
-	if b.logger, err = makeLogger(ctx); err != nil {
+	var logger *log.Logger
+	if logger, err = makeLogger(ctx); err != nil {
 		k6ext.Panic(ctx, "setting up logger: %w", err)
 	}
 	launchOpts := common.NewLaunchOptions(k6ext.OnCloud())
-	if err := launchOpts.Parse(ctx, b.logger, opts); err != nil {
+	if err := launchOpts.Parse(ctx, logger, opts); err != nil {
 		k6ext.Panic(ctx, "parsing launch options: %w", err)
 	}
 	ctx = common.WithLaunchOptions(ctx, launchOpts)
 
-	bp, pid, err := b.launch(ctx, launchOpts)
+	bp, pid, err := b.launch(ctx, launchOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -142,13 +142,13 @@ func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID i
 }
 
 func (b *BrowserType) launch(
-	ctx context.Context, opts *common.LaunchOptions,
+	ctx context.Context, opts *common.LaunchOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
-	if err := b.logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
+	if err := logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
 	if opts.Debug {
-		_ = b.logger.SetLevel("debug")
+		_ = logger.SetLevel("debug")
 	}
 
 	envs := make([]string, 0, len(opts.Env))
@@ -168,7 +168,7 @@ func (b *BrowserType) launch(
 	go func(c context.Context) {
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
-				b.logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
+				logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
 			}
 		}()
 		// There's a small chance that this might be called
@@ -179,19 +179,17 @@ func (b *BrowserType) launch(
 		<-c.Done()
 	}(ctx)
 
-	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, b.logger)
+	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
-
-	browserProc.AttachLogger(b.logger)
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
 	browserCtx, browserCtxCancel := context.WithCancel(ctx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
-		browserProc, opts, b.logger)
+		browserProc, opts, logger)
 	if err != nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}

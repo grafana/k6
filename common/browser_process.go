@@ -56,6 +56,7 @@ func NewBrowserProcess(
 		processIsGracefullyClosing: make(chan struct{}),
 		processDone:                cmd.done,
 		wsURL:                      wsURL,
+		logger:                     logger,
 	}
 
 	go func() {
@@ -110,11 +111,6 @@ func (p *BrowserProcess) WsURL() string {
 // Pid returns the browser process ID, or -1 if this is unknown.
 func (p *BrowserProcess) Pid() int {
 	return p.meta.Pid()
-}
-
-// AttachLogger attaches a logger to the browser process.
-func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
-	p.logger = logger
 }
 
 // Cleanup cleans up the metadata associated with the browser
