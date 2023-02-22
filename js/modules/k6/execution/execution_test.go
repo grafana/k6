@@ -406,6 +406,34 @@ func TestScenarioNoAvailableInInitContext(t *testing.T) {
 	}
 }
 
+func TestVUDefaultDetails(t *testing.T) {
+	t.Parallel()
+
+	rt := goja.New()
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			CtxField:     context.Background(),
+			StateField: &lib.State{
+				Options: lib.Options{
+					Paused: null.BoolFrom(true),
+				},
+			},
+		},
+	).(*ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("exec", m.Exports().Default))
+
+	props := []string{"idInInstance", "idInTest", "iterationInInstance", "iterationInScenario"}
+
+	for _, code := range props {
+		prop := fmt.Sprintf("exec.vu.%s", code)
+		res, err := rt.RunString(prop)
+		require.NoError(t, err)
+		require.Equal(t, "0", res.String())
+	}
+}
+
 func TestTagsDynamicObjectGet(t *testing.T) {
 	t.Parallel()
 	rt := goja.New()
