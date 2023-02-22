@@ -38,8 +38,7 @@ type BrowserType struct {
 	vu        k6modules.VU
 	hooks     *common.Hooks
 	k6Metrics *k6ext.CustomMetrics
-	execPath  string       // path to the Chromium executable
-	storage   *storage.Dir // stores temporary data for the extension and user
+	execPath  string // path to the Chromium executable
 	randSrc   *rand.Rand
 	logger    *log.Logger
 }
@@ -54,7 +53,6 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 		vu:        vu,
 		hooks:     common.NewHooks(),
 		k6Metrics: k6m,
-		storage:   &storage.Dir{},
 		randSrc:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
 	}
 
@@ -160,7 +158,7 @@ func (b *BrowserType) launch(
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
-	dataDir := b.storage
+	dataDir := &storage.Dir{}
 	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
