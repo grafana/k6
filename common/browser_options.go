@@ -10,6 +10,20 @@ import (
 	"github.com/grafana/xk6-browser/log"
 )
 
+const (
+	optArgs              = "args"
+	optDebug             = "debug"
+	optDevTools          = "devtools"
+	optEnv               = "env"
+	optExecutablePath    = "executablePath"
+	optHeadless          = "headless"
+	optIgnoreDefaultArgs = "ignoreDefaultArgs"
+	optLogCategoryFilter = "logCategoryFilter"
+	optProxy             = "proxy"
+	optSlowMo            = "slowMo"
+	optTimeout           = "timeout"
+)
+
 // ProxyOptions allows configuring a proxy server.
 type ProxyOptions struct {
 	Server   string
@@ -62,10 +76,10 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 		rt       = k6ext.Runtime(ctx)
 		o        = opts.ToObject(rt)
 		defaults = map[string]any{
-			"env":               l.Env,
-			"headless":          l.Headless,
-			"logCategoryFilter": l.LogCategoryFilter,
-			"timeout":           l.Timeout,
+			optEnv:               l.Env,
+			optHeadless:          l.Headless,
+			optLogCategoryFilter: l.LogCategoryFilter,
+			optTimeout:           l.Timeout,
 		}
 	)
 	for _, k := range o.Keys() {
@@ -82,27 +96,27 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 		}
 		var err error
 		switch k {
-		case "args":
+		case optArgs:
 			err = exportOpt(rt, k, v, &l.Args)
-		case "debug":
+		case optDebug:
 			l.Debug, err = parseBoolOpt(k, v)
-		case "devtools":
+		case optDevTools:
 			l.Devtools, err = parseBoolOpt(k, v)
-		case "env":
+		case optEnv:
 			err = exportOpt(rt, k, v, &l.Env)
-		case "executablePath":
+		case optExecutablePath:
 			l.ExecutablePath, err = parseStrOpt(k, v)
-		case "headless":
+		case optHeadless:
 			l.Headless, err = parseBoolOpt(k, v)
-		case "ignoreDefaultArgs":
+		case optIgnoreDefaultArgs:
 			err = exportOpt(rt, k, v, &l.IgnoreDefaultArgs)
-		case "logCategoryFilter":
+		case optLogCategoryFilter:
 			l.LogCategoryFilter, err = parseStrOpt(k, v)
-		case "proxy":
+		case optProxy:
 			err = exportOpt(rt, k, v, &l.Proxy)
-		case "slowMo":
+		case optSlowMo:
 			l.SlowMo, err = parseTimeOpt(k, v)
-		case "timeout":
+		case optTimeout:
 			l.Timeout, err = parseTimeOpt(k, v)
 		}
 		if err != nil {
@@ -117,5 +131,11 @@ func (l *LaunchOptions) shouldIgnoreOnCloud(opt string) bool {
 	if !l.onCloud {
 		return false
 	}
-	return opt == "devtools" || opt == "executablePath" || opt == "headless"
+	shouldIgnoreOnCloud := map[string]struct{}{
+		optDevTools:       {},
+		optExecutablePath: {},
+		optHeadless:       {},
+	}
+	_, ignore := shouldIgnoreOnCloud[opt]
+	return ignore
 }
