@@ -42,6 +42,41 @@ func mapBrowserToGoja(vu moduleVU) *goja.Object {
 	return obj
 }
 
+// mapLocator API to the JS module.
+func mapLocator(vu moduleVU, lo api.Locator) mapping {
+	return mapping{
+		"click": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				err := lo.Click(opts)
+				return nil, err //nolint:wrapcheck
+			})
+		},
+		"dblclick":      lo.Dblclick,
+		"check":         lo.Check,
+		"uncheck":       lo.Uncheck,
+		"isChecked":     lo.IsChecked,
+		"isEditable":    lo.IsEditable,
+		"isEnabled":     lo.IsEnabled,
+		"isDisabled":    lo.IsDisabled,
+		"isVisible":     lo.IsVisible,
+		"isHidden":      lo.IsHidden,
+		"fill":          lo.Fill,
+		"focus":         lo.Focus,
+		"getAttribute":  lo.GetAttribute,
+		"innerHTML":     lo.InnerHTML,
+		"innerText":     lo.InnerText,
+		"textContent":   lo.TextContent,
+		"inputValue":    lo.InputValue,
+		"selectOption":  lo.SelectOption,
+		"press":         lo.Press,
+		"type":          lo.Type,
+		"hover":         lo.Hover,
+		"tap":           lo.Tap,
+		"dispatchEvent": lo.DispatchEvent,
+		"waitFor":       lo.WaitFor,
+	}
+}
+
 // mapRequest to the JS module.
 func mapRequest(vu moduleVU, r api.Request) mapping {
 	rt := vu.Runtime()
@@ -294,8 +329,11 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 		"isEnabled":  f.IsEnabled,
 		"isHidden":   f.IsHidden,
 		"isVisible":  f.IsVisible,
-		"locator":    f.Locator,
-		"name":       f.Name,
+		"locator": func(selector string, opts goja.Value) *goja.Object {
+			ml := mapLocator(vu, f.Locator(selector, opts))
+			return rt.ToValue(ml).ToObject(rt)
+		},
+		"name": f.Name,
 		"page": func() *goja.Object {
 			mp := mapPage(vu, f.Page())
 			return rt.ToValue(mp).ToObject(rt)
@@ -434,7 +472,10 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
 		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
-		"locator":    p.Locator,
+		"locator": func(selector string, opts goja.Value) *goja.Object {
+			ml := mapLocator(vu, p.Locator(selector, opts))
+			return rt.ToValue(ml).ToObject(rt)
+		},
 		"mainFrame": func() *goja.Object {
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
