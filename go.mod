@@ -9,7 +9,7 @@ require (
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.5
 	github.com/dop251/goja v0.0.0-20230216180835-5937a312edda
-	github.com/fatih/color v1.13.0
+	github.com/fatih/color v1.14.1
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.5.0
