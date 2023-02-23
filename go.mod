@@ -42,7 +42,7 @@ require (
 	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
 	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
 	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
-	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af
+	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.49.0
 	google.golang.org/protobuf v1.28.1
 	gopkg.in/guregu/null.v3 v3.3.0
