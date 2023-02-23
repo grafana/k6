@@ -11,6 +11,8 @@ import (
 
 	"github.com/golang/protobuf/proto"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	protov2 "google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
 
 	"github.com/jhump/protoreflect/codec"
 	"github.com/jhump/protoreflect/desc"
@@ -411,19 +413,20 @@ func (m *Message) GetField(fd *desc.FieldDescriptor) interface{} {
 // The Go type of the returned value, for scalar fields, is the same as protoc
 // would generate for the field (in a non-dynamic message). The table below
 // lists the scalar types and the corresponding Go types.
-//  +-------------------------+-----------+
-//  |       Declared Type     |  Go Type  |
-//  +-------------------------+-----------+
-//  | int32, sint32, sfixed32 | int32     |
-//  | int64, sint64, sfixed64 | int64     |
-//  | uint32, fixed32         | uint32    |
-//  | uint64, fixed64         | uint64    |
-//  | float                   | float32   |
-//  | double                  | double32  |
-//  | bool                    | bool      |
-//  | string                  | string    |
-//  | bytes                   | []byte    |
-//  +-------------------------+-----------+
+//
+//	+-------------------------+-----------+
+//	|       Declared Type     |  Go Type  |
+//	+-------------------------+-----------+
+//	| int32, sint32, sfixed32 | int32     |
+//	| int64, sint64, sfixed64 | int64     |
+//	| uint32, fixed32         | uint32    |
+//	| uint64, fixed64         | uint64    |
+//	| float                   | float32   |
+//	| double                  | double32  |
+//	| bool                    | bool      |
+//	| string                  | string    |
+//	| bytes                   | []byte    |
+//	+-------------------------+-----------+
 //
 // Values for enum fields will always be int32 values. You can use the enum
 // descriptor associated with the field to lookup value names with those values.
@@ -2053,8 +2056,9 @@ func (m *Message) ProtoMessage() {
 
 // ConvertTo converts this dynamic message into the given message. This is
 // shorthand for resetting then merging:
-//   target.Reset()
-//   m.MergeInto(target)
+//
+//	target.Reset()
+//	m.MergeInto(target)
 func (m *Message) ConvertTo(target proto.Message) error {
 	if err := m.checkType(target); err != nil {
 		return err
@@ -2081,8 +2085,9 @@ func (m *Message) ConvertToDeterministic(target proto.Message) error {
 
 // ConvertFrom converts the given message into this dynamic message. This is
 // shorthand for resetting then merging:
-//   m.Reset()
-//   m.MergeFrom(target)
+//
+//	m.Reset()
+//	m.MergeFrom(target)
 func (m *Message) ConvertFrom(target proto.Message) error {
 	if err := m.checkType(target); err != nil {
 		return err
@@ -2553,11 +2558,46 @@ func (m *Message) mergeFrom(pm proto.Message) error {
 		}
 	}
 
+	// unrecognized extensions fields:
+	//   In API v2 of proto, some extensions may NEITHER be included in ExtensionDescs
+	//   above NOR included in unrecognized fields below. These are extensions that use
+	//   a custom extension type (not a generated one -- i.e. not a linked in extension).
+	mr := proto.MessageReflect(pm)
+	var extBytes []byte
+	var retErr error
+	mr.Range(func(fld protoreflect.FieldDescriptor, val protoreflect.Value) bool {
+		if !fld.IsExtension() {
+			// normal field, already processed above
+			return true
+		}
+		if extd, ok := fld.(protoreflect.ExtensionTypeDescriptor); ok {
+			if _, ok := extd.Type().(*proto.ExtensionDesc); ok {
+				// normal known extension, already processed above
+				return true
+			}
+		}
+
+		// marshal the extension to bytes and then handle as unknown field below
+		mr.New()
+		mr.Set(fld, val)
+		extBytes, retErr = protov2.MarshalOptions{}.MarshalAppend(extBytes, mr.Interface())
+		return retErr == nil
+	})
+	if retErr != nil {
+		return retErr
+	}
+
 	// now actually perform the merge
 	for fd, v := range values {
 		if err := mergeField(m, fd, v); err != nil {
 			return err
 		}
+	}
+
+	if len(extBytes) > 0 {
+		// treating unrecognized extensions like unknown fields: best-effort
+		// ignore any error returned: pulling in unknown fields is best-effort
+		_ = m.UnmarshalMerge(extBytes)
 	}
 
 	data := internal.GetUnrecognized(pm)

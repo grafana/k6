@@ -258,20 +258,20 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 // steps omitted).
 //
 // There are a few side effects to not linking the descriptors:
-//   1. No options will be interpreted. Options can refer to extensions or have
-//      message and enum types. Without linking, these extension and type
-//      references are not resolved, so the options may not be interpretable.
-//      So all options will appear in UninterpretedOption fields of the various
-//      descriptor options messages.
-//   2. Type references will not be resolved. This means that the actual type
-//      names in the descriptors may be unqualified and even relative to the
-//      scope in which the type reference appears. This goes for fields that
-//      have message and enum types. It also applies to methods and their
-//      references to request and response message types.
-//   3. Type references are not known. For non-scalar fields, until the type
-//      name is resolved (during linking), it is not known whether the type
-//      refers to a message or an enum. So all fields with such type references
-//      will not have their Type set, only the TypeName.
+//  1. No options will be interpreted. Options can refer to extensions or have
+//     message and enum types. Without linking, these extension and type
+//     references are not resolved, so the options may not be interpretable.
+//     So all options will appear in UninterpretedOption fields of the various
+//     descriptor options messages.
+//  2. Type references will not be resolved. This means that the actual type
+//     names in the descriptors may be unqualified and even relative to the
+//     scope in which the type reference appears. This goes for fields that
+//     have message and enum types. It also applies to methods and their
+//     references to request and response message types.
+//  3. Type references are not known. For non-scalar fields, until the type
+//     name is resolved (during linking), it is not known whether the type
+//     refers to a message or an enum. So all fields with such type references
+//     will not have their Type set, only the TypeName.
 //
 // This method will still validate the syntax of parsed files. If the parser's
 // ValidateUnlinkedFiles field is true, additional checks, beyond syntax will

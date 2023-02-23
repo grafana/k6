@@ -160,7 +160,8 @@ func addAllFiles(src []*FileDescriptor, results *[]*dpb.FileDescriptorProto, see
 // set's *last* file will be the returned descriptor. The set's remaining files must comprise
 // the full set of transitive dependencies of that last file. This is the same format and
 // order used by protoc when emitting a FileDescriptorSet file with an invocation like so:
-//    protoc --descriptor_set_out=./test.protoset --include_imports -I. test.proto
+//
+//	protoc --descriptor_set_out=./test.protoset --include_imports -I. test.proto
 func CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
 	return createFileDescriptorFromSet(fds, nil)
 }
@@ -180,7 +181,8 @@ func createFileDescriptorFromSet(fds *dpb.FileDescriptorSet, r *ImportResolver) 
 // full set of transitive dependencies for all files therein or else a link error will occur
 // and be returned instead of the slice of descriptors. This is the same format used by
 // protoc when a FileDescriptorSet file with an invocation like so:
-//    protoc --descriptor_set_out=./test.protoset --include_imports -I. test.proto
+//
+//	protoc --descriptor_set_out=./test.protoset --include_imports -I. test.proto
 func CreateFileDescriptorsFromSet(fds *dpb.FileDescriptorSet) (map[string]*FileDescriptor, error) {
 	return createFileDescriptorsFromSet(fds, nil)
 }

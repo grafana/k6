@@ -19,13 +19,12 @@
 // following snippet demonstrates how to do this in your server. Do this instead of
 // using the reflection.Register function:
 //
-//    refSvr := reflection.NewServer(reflection.ServerOptions{
-//        Services:           grpcServer,
-//        DescriptorResolver: sourceinfo.GlobalFiles,
-//        ExtensionResolver:  sourceinfo.GlobalFiles,
-//    })
-//    grpc_reflection_v1alpha.RegisterServerReflectionServer(grpcServer, refSvr)
-//
+//	refSvr := reflection.NewServer(reflection.ServerOptions{
+//	    Services:           grpcServer,
+//	    DescriptorResolver: sourceinfo.GlobalFiles,
+//	    ExtensionResolver:  sourceinfo.GlobalFiles,
+//	})
+//	grpc_reflection_v1alpha.RegisterServerReflectionServer(grpcServer, refSvr)
 package sourceinfo
 
 import (

@@ -15,8 +15,7 @@
 // will be used to create other messages or parse extension fields during
 // de-serialization.
 //
-//
-// Field Types
+// # Field Types
 //
 // The types of values expected by setters and returned by getters are the
 // same as protoc generates for scalar fields. For repeated fields, there are
@@ -72,8 +71,7 @@
 // but if the factory is configured with a KnownTypeRegistry, or if the field's
 // type is a well-known type, it will return a zero value generated message.
 //
-//
-// Unrecognized Fields
+// # Unrecognized Fields
 //
 // Unrecognized fields are preserved by the dynamic message when unmarshaling
 // from the standard binary format. If the message's MessageFactory was
@@ -89,21 +87,20 @@
 // it can even happen for non-extension fields! Here's an example scenario where
 // a non-extension field can initially be unknown and become known:
 //
-//   1. A dynamic message is created with a descriptor, A, and then
-//      de-serialized from a stream of bytes. The stream includes an
-//      unrecognized tag T. The message will include tag T in its unrecognized
-//      field set.
-//   2. Another call site retrieves a newer descriptor, A', which includes a
-//      newly added field with tag T.
-//   3. That other call site then uses a FieldDescriptor to access the value of
-//      the new field. This will cause the dynamic message to parse the bytes
-//      for the unknown tag T and store them as a known field.
-//   4. Subsequent operations for tag T, including setting the field using only
-//      tag number or de-serializing a stream that includes tag T, will operate
-//      as if that tag were part of the original descriptor, A.
+//  1. A dynamic message is created with a descriptor, A, and then
+//     de-serialized from a stream of bytes. The stream includes an
+//     unrecognized tag T. The message will include tag T in its unrecognized
+//     field set.
+//  2. Another call site retrieves a newer descriptor, A', which includes a
+//     newly added field with tag T.
+//  3. That other call site then uses a FieldDescriptor to access the value of
+//     the new field. This will cause the dynamic message to parse the bytes
+//     for the unknown tag T and store them as a known field.
+//  4. Subsequent operations for tag T, including setting the field using only
+//     tag number or de-serializing a stream that includes tag T, will operate
+//     as if that tag were part of the original descriptor, A.
 //
-//
-// Compatibility
+// # Compatibility
 //
 // In addition to implementing the proto.Message interface, the included
 // Message type also provides an XXX_MessageName() method, so it can work with
@@ -145,8 +142,7 @@
 // about fields that the dynamic message does not, these unrecognized fields may
 // become known fields in the generated message.
 //
-//
-// Registries
+// # Registries
 //
 // This package also contains a couple of registries, for managing known types
 // and descriptors.

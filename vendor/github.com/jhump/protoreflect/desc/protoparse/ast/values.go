@@ -53,7 +53,7 @@ var _ StringValueNode = (*CompoundStringLiteralNode)(nil)
 
 // StringLiteralNode represents a simple string literal. Example:
 //
-//  "proto2"
+//	"proto2"
 type StringLiteralNode struct {
 	terminalNode
 	// Val is the actual string value that the literal indicates.
@@ -79,7 +79,7 @@ func (n *StringLiteralNode) AsString() string {
 // CompoundStringLiteralNode represents a compound string literal, which is
 // the concatenaton of adjacent string literals. Example:
 //
-//  "this "  "is"   " all one "   "string"
+//	"this "  "is"   " all one "   "string"
 type CompoundStringLiteralNode struct {
 	compositeNode
 	Val string
@@ -392,7 +392,7 @@ func (n *BoolLiteralNode) Value() interface{} {
 // ArrayLiteralNode represents an array literal, which is only allowed inside of
 // a MessageLiteralNode, to indicate values for a repeated field. Example:
 //
-//  ["foo", "bar", "baz"]
+//	["foo", "bar", "baz"]
 type ArrayLiteralNode struct {
 	compositeNode
 	OpenBracket *RuneNode
@@ -458,7 +458,7 @@ func (n *ArrayLiteralNode) Value() interface{} {
 // protobuf text format and can be used for custom options with message types.
 // Example:
 //
-//   { foo:1 foo:2 foo:3 bar:<name:"abc" id:123> }
+//	{ foo:1 foo:2 foo:3 bar:<name:"abc" id:123> }
 type MessageLiteralNode struct {
 	compositeNode
 	Open     *RuneNode // should be '{' or '<'
@@ -526,7 +526,7 @@ func (n *MessageLiteralNode) Value() interface{} {
 // MessageFieldNode represents a single field (name and value) inside of a
 // message literal. Example:
 //
-//   foo:"bar"
+//	foo:"bar"
 type MessageFieldNode struct {
 	compositeNode
 	Name *FieldReferenceNode

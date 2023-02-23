@@ -22,7 +22,7 @@ var _ IdentValueNode = (*CompoundIdentNode)(nil)
 // IdentNode represents a simple, unqualified identifier. These are used to name
 // elements declared in a protobuf file or to refer to elements. Example:
 //
-//  foobar
+//	foobar
 type IdentNode struct {
 	terminalNode
 	Val string
@@ -56,7 +56,7 @@ func (n *IdentNode) ToKeyword() *KeywordNode {
 // dots). If the identifier has a leading dot, then it is a *fully* qualified
 // identifier. Example:
 //
-//  .com.foobar.Baz
+//	.com.foobar.Baz
 type CompoundIdentNode struct {
 	compositeNode
 	// Optional leading dot, indicating that the identifier is fully qualified.
@@ -122,7 +122,7 @@ func (n *CompoundIdentNode) AsIdentifier() Identifier {
 // like identifiers, but they have special meaning in particular contexts.
 // Example:
 //
-//  message
+//	message
 type KeywordNode IdentNode
 
 // NewKeywordNode creates a new *KeywordNode. The given val is the keyword.
