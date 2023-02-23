@@ -285,7 +285,7 @@ go.buf.build/grpc/go/prometheus/prometheus
 ## explicit; go 1.18
 go.uber.org/goleak
 go.uber.org/goleak/internal/stack
-# golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
+# golang.org/x/crypto v0.6.0
 ## explicit; go 1.17
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
