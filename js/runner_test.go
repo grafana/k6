@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"go/build"
+	"io/fs"
 	"io/ioutil"
 	stdlog "log"
 	"math/big"
@@ -18,7 +19,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -961,7 +961,7 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 		}),
 		ReadHeaderTimeout: time.Second,
 		ReadTimeout:       time.Second,
@@ -1474,8 +1474,8 @@ func TestVUDoesOpenUnderV0Condition(t *testing.T) {
 				console.log("hey")
 			}
 		`
-	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
-	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), os.ModePerm))
+	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
+	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
 
 	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
 
@@ -1498,8 +1498,8 @@ func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 				console.log("hey")
 			}
 		`
-	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
-	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), os.ModePerm))
+	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
+	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
 
 	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
 
@@ -1523,7 +1523,7 @@ func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
 				console.log("hey")
 			}
 		`
-	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), os.ModePerm))
+	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
 
 	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
 
@@ -1961,7 +1961,7 @@ func TestInitContextForbidden(t *testing.T) {
 func TestArchiveRunningIntegrity(t *testing.T) {
 	t.Parallel()
 
-	fs := afero.NewMemMapFs()
+	fileSystem := afero.NewMemMapFs()
 	data := `
 			var fput = open("/home/somebody/test.json");
 			exports.options = { setupTimeout: "10s", teardownTimeout: "10s" };
@@ -1974,9 +1974,9 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 				}
 			}
 		`
-	require.NoError(t, afero.WriteFile(fs, "/home/somebody/test.json", []byte(`42`), os.ModePerm))
-	require.NoError(t, afero.WriteFile(fs, "/script.js", []byte(data), os.ModePerm))
-	r1, err := getSimpleRunner(t, "/script.js", data, fs)
+	require.NoError(t, afero.WriteFile(fileSystem, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
+	require.NoError(t, afero.WriteFile(fileSystem, "/script.js", []byte(data), fs.ModePerm))
+	r1, err := getSimpleRunner(t, "/script.js", data, fileSystem)
 	require.NoError(t, err)
 
 	buf := bytes.NewBuffer(nil)
@@ -2019,12 +2019,12 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 
 func TestArchiveNotPanicking(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/non/existent", []byte(`42`), os.ModePerm))
+	fileSystem := afero.NewMemMapFs()
+	require.NoError(t, afero.WriteFile(fileSystem, "/non/existent", []byte(`42`), fs.ModePerm))
 	r1, err := getSimpleRunner(t, "/script.js", `
 			var fput = open("/non/existent");
 			exports.default = function(data) {}
-		`, fs)
+		`, fileSystem)
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()

@@ -58,6 +58,8 @@ type GlobalState struct {
 // global variables and functions from the os package. Anywhere else, things
 // like os.Stdout, os.Stderr, os.Stdin, os.Getenv(), etc. should be removed and
 // the respective properties of globalState used instead.
+//
+//nolint:forbidigo
 func NewGlobalState(ctx context.Context) *GlobalState {
 	isDumbTerm := os.Getenv("TERM") == "dumb"
 	stdoutTTY := !isDumbTerm && (isatty.IsTerminal(os.Stdout.Fd()) || isatty.IsCygwinTerminal(os.Stdout.Fd()))

@@ -42,6 +42,7 @@ type promiseReaction struct {
 	typ         promiseReactionType
 	handler     *jobCallback
 	asyncRunner *asyncRunner
+	asyncCtx    interface{}
 }
 
 var typePromise = reflect.TypeOf((*Promise)(nil))
@@ -150,6 +151,11 @@ func (p *Promise) export(*objectExportCtx) interface{} {
 
 func (p *Promise) addReactions(fulfillReaction *promiseReaction, rejectReaction *promiseReaction) {
 	r := p.val.runtime
+	if tracker := r.asyncContextTracker; tracker != nil {
+		ctx := tracker.Grab()
+		fulfillReaction.asyncCtx = ctx
+		rejectReaction.asyncCtx = ctx
+	}
 	switch p.state {
 	case PromiseStatePending:
 		p.fulfillReactions = append(p.fulfillReactions, fulfillReaction)
@@ -200,12 +206,18 @@ func (r *Runtime) newPromiseReactionJob(reaction *promiseReaction, argument Valu
 				fulfill = true
 			}
 		} else {
+			if tracker := r.asyncContextTracker; tracker != nil {
+				tracker.Resumed(reaction.asyncCtx)
+			}
 			ex := r.vm.try(func() {
 				handlerResult = r.callJobCallback(reaction.handler, _undefined, argument)
 				fulfill = true
 			})
 			if ex != nil {
 				handlerResult = ex.val
+			}
+			if tracker := r.asyncContextTracker; tracker != nil {
+				tracker.Exited()
 			}
 		}
 		if reaction.capability != nil {
@@ -222,7 +234,7 @@ func (r *Runtime) newPromise(proto *Object) *Promise {
 	o := &Object{runtime: r}
 
 	po := &Promise{}
-	po.class = classPromise
+	po.class = classObject
 	po.val = o
 	po.extensible = true
 	o.self = po

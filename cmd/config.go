@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
+	"io/fs"
 	"path/filepath"
 	"strings"
 	"time"
@@ -108,7 +108,7 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 func readDiskConfig(gs *state.GlobalState) (Config, error) {
 	// Try to see if the file exists in the supplied filesystem
 	if _, err := gs.FS.Stat(gs.Flags.ConfigFilePath); err != nil {
-		if os.IsNotExist(err) && gs.Flags.ConfigFilePath == gs.DefaultFlags.ConfigFilePath {
+		if errors.Is(err, fs.ErrNotExist) && gs.Flags.ConfigFilePath == gs.DefaultFlags.ConfigFilePath {
 			// If the file doesn't exist, but it was the default config file (i.e. the user
 			// didn't specify anything), silence the error
 			err = nil

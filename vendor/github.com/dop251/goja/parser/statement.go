@@ -211,11 +211,22 @@ func (self *_parser) parseFunction(declaration, async bool, start file.Idx) *ast
 	}
 	self.expect(token.FUNCTION)
 
+	if self.token == token.MULTIPLY {
+		node.Generator = true
+		self.next()
+	}
+
 	if !declaration {
 		if async != self.scope.allowAwait {
 			self.scope.allowAwait = async
 			defer func() {
 				self.scope.allowAwait = !async
+			}()
+		}
+		if node.Generator != self.scope.allowYield {
+			self.scope.allowYield = node.Generator
+			defer func() {
+				self.scope.allowYield = !node.Generator
 			}()
 		}
 	}
@@ -237,20 +248,27 @@ func (self *_parser) parseFunction(declaration, async bool, start file.Idx) *ast
 				self.scope.allowAwait = !async
 			}()
 		}
+		if node.Generator != self.scope.allowYield {
+			self.scope.allowYield = node.Generator
+			defer func() {
+				self.scope.allowYield = !node.Generator
+			}()
+		}
 	}
 
 	node.ParameterList = self.parseFunctionParameterList()
-	node.Body, node.DeclarationList = self.parseFunctionBlock(async, async)
+	node.Body, node.DeclarationList = self.parseFunctionBlock(async, async, self.scope.allowYield)
 	node.Source = self.slice(node.Idx0(), node.Idx1())
 
 	return node
 }
 
-func (self *_parser) parseFunctionBlock(async, allowAwait bool) (body *ast.BlockStatement, declarationList []*ast.VariableDeclaration) {
+func (self *_parser) parseFunctionBlock(async, allowAwait, allowYield bool) (body *ast.BlockStatement, declarationList []*ast.VariableDeclaration) {
 	self.openScope()
 	self.scope.inFunction = true
 	self.scope.inAsync = async
 	self.scope.allowAwait = allowAwait
+	self.scope.allowYield = allowYield
 	defer self.closeScope()
 	body = self.parseBlockStatement()
 	declarationList = self.scope.declarationList
@@ -259,16 +277,19 @@ func (self *_parser) parseFunctionBlock(async, allowAwait bool) (body *ast.Block
 
 func (self *_parser) parseArrowFunctionBody(async bool) (ast.ConciseBody, []*ast.VariableDeclaration) {
 	if self.token == token.LEFT_BRACE {
-		return self.parseFunctionBlock(async, async)
+		return self.parseFunctionBlock(async, async, false)
 	}
 	if async != self.scope.inAsync || async != self.scope.allowAwait {
 		inAsync := self.scope.inAsync
 		allowAwait := self.scope.allowAwait
 		self.scope.inAsync = async
 		self.scope.allowAwait = async
+		allowYield := self.scope.allowYield
+		self.scope.allowYield = false
 		defer func() {
 			self.scope.inAsync = inAsync
 			self.scope.allowAwait = allowAwait
+			self.scope.allowYield = allowYield
 		}()
 	}
 
@@ -321,7 +342,7 @@ func (self *_parser) parseClass(declaration bool) *ast.ClassLiteral {
 					b := &ast.ClassStaticBlock{
 						Static: start,
 					}
-					b.Block, b.DeclarationList = self.parseFunctionBlock(false, true)
+					b.Block, b.DeclarationList = self.parseFunctionBlock(false, true, false)
 					b.Source = self.slice(b.Block.LeftBrace, b.Block.Idx1())
 					node.Body = append(node.Body, b)
 					continue
@@ -349,6 +370,12 @@ func (self *_parser) parseClass(declaration bool) *ast.ClassLiteral {
 				self.next()
 			}
 		}
+		generator := false
+		if self.token == token.MULTIPLY && (kind == "" || kind == ast.PropertyKindMethod) {
+			generator = true
+			kind = ast.PropertyKindMethod
+			self.next()
+		}
 
 		_, keyName, value, tkn := self.parseObjectPropertyKey()
 		if value == nil {
@@ -373,6 +400,8 @@ func (self *_parser) parseClass(declaration bool) *ast.ClassLiteral {
 						self.error(value.Idx0(), "Class constructor may not be an accessor")
 					} else if async {
 						self.error(value.Idx0(), "Class constructor may not be an async method")
+					} else if generator {
+						self.error(value.Idx0(), "Class constructor may not be a generator")
 					}
 				} else if private {
 					self.error(value.Idx0(), "Class constructor may not be a private method")
@@ -382,7 +411,7 @@ func (self *_parser) parseClass(declaration bool) *ast.ClassLiteral {
 				Idx:      start,
 				Key:      value,
 				Kind:     kind,
-				Body:     self.parseMethodDefinition(methodBodyStart, kind, async),
+				Body:     self.parseMethodDefinition(methodBodyStart, kind, generator, async),
 				Static:   static,
 				Computed: computed,
 			}

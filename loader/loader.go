@@ -5,10 +5,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io/fs"
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 	"regexp"
@@ -185,7 +185,7 @@ func Load(
 	if err == nil {
 		return &SourceData{URL: moduleSpecifier, Data: data}, nil
 	}
-	if !os.IsNotExist(err) {
+	if !errors.Is(err, fs.ErrNotExist) {
 		return nil, err
 	}
 	if scheme == "https" {
@@ -290,9 +290,9 @@ func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {
 	}
 	defer func() { _ = res.Body.Close() }()
 
-	if res.StatusCode != 200 {
+	if res.StatusCode != http.StatusOK {
 		switch res.StatusCode {
-		case 404:
+		case http.StatusNotFound:
 			return nil, fmt.Errorf("not found: %s", u)
 		default:
 			return nil, fmt.Errorf("wrong status code (%d) for: %s", res.StatusCode, u)

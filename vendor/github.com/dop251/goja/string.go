@@ -104,11 +104,11 @@ func (r *Runtime) createStringIterator(s valueString) Value {
 	si := &stringIterObject{
 		reader: &lenientUtf16Decoder{utf16Reader: s.utf16Reader()},
 	}
-	si.class = classStringIterator
+	si.class = classObject
 	si.val = o
 	si.extensible = true
 	o.self = si
-	si.prototype = r.global.StringIteratorPrototype
+	si.prototype = r.getStringIteratorPrototype()
 	si.init()
 
 	return o

@@ -200,7 +200,7 @@ func (r *Runtime) builtin_newMap(args []Value, newTarget *Object) *Object {
 	o := &Object{runtime: r}
 
 	mo := &mapObject{}
-	mo.class = classMap
+	mo.class = classObject
 	mo.val = o
 	mo.extensible = true
 	o.self = mo
@@ -249,11 +249,11 @@ func (r *Runtime) createMapIterator(mapValue Value, kind iterationKind) Value {
 		iter: mapObj.m.newIter(),
 		kind: kind,
 	}
-	mi.class = classMapIterator
+	mi.class = classObject
 	mi.val = o
 	mi.extensible = true
 	o.self = mi
-	mi.prototype = r.global.MapIteratorPrototype
+	mi.prototype = r.getMapIteratorPrototype()
 	mi.init()
 
 	return o
@@ -303,11 +303,21 @@ func (r *Runtime) createMap(val *Object) objectImpl {
 }
 
 func (r *Runtime) createMapIterProto(val *Object) objectImpl {
-	o := newBaseObjectObj(val, r.global.IteratorPrototype, classObject)
+	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
 	o._putProp("next", r.newNativeFunc(r.mapIterProto_next, nil, "next", nil, 0), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classMapIterator), false, false, true))
 
+	return o
+}
+
+func (r *Runtime) getMapIteratorPrototype() *Object {
+	var o *Object
+	if o = r.global.MapIteratorPrototype; o == nil {
+		o = &Object{runtime: r}
+		r.global.MapIteratorPrototype = o
+		o.self = r.createMapIterProto(o)
+	}
 	return o
 }
 

@@ -2,7 +2,7 @@ package fsext
 
 import (
 	"errors"
-	"os"
+	"io/fs"
 	"sync"
 	"time"
 
@@ -73,7 +73,7 @@ func (c *CacheOnReadFs) Open(name string) (afero.File, error) {
 // happens.
 // if CacheOnReadFs is in the opened only mode it should return
 // an error if path wasn't open before
-func (c *CacheOnReadFs) Stat(path string) (os.FileInfo, error) {
+func (c *CacheOnReadFs) Stat(path string) (fs.FileInfo, error) {
 	if err := c.checkOrRemember(path); err != nil {
 		return nil, err
 	}

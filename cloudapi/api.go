@@ -118,7 +118,7 @@ func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archiv
 		return nil, err
 	}
 
-	req, err := http.NewRequest("POST", requestUrl, &buf)
+	req, err := http.NewRequest(http.MethodPost, requestUrl, &buf) //nolint:noctx
 	if err != nil {
 		return nil, err
 	}
@@ -163,7 +163,7 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 
 func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, error) {
 	url := fmt.Sprintf("%s/test-progress/%s", c.baseURL, referenceID)
-	req, err := c.NewRequest("GET", url, nil)
+	req, err := c.NewRequest(http.MethodGet, url, nil)
 	if err != nil {
 		return nil, err
 	}

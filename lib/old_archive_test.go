@@ -3,8 +3,8 @@ package lib
 import (
 	"archive/tar"
 	"bytes"
+	"io/fs"
 	"net/url"
-	"os"
 	"path"
 	"path/filepath"
 	"testing"
@@ -15,11 +15,11 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
+func dumpMemMapFsToBuf(fileSystem afero.Fs) (*bytes.Buffer, error) {
 	b := bytes.NewBuffer(nil)
 	w := tar.NewWriter(b)
-	err := fsext.Walk(fs, afero.FilePathSeparator,
-		filepath.WalkFunc(func(filePath string, info os.FileInfo, err error) error {
+	err := fsext.Walk(fileSystem, afero.FilePathSeparator,
+		filepath.WalkFunc(func(filePath string, info fs.FileInfo, err error) error {
 			if filePath == afero.FilePathSeparator {
 				return nil // skip the root
 			}
@@ -34,7 +34,7 @@ func dumpMemMapFsToBuf(fs afero.Fs) (*bytes.Buffer, error) {
 				})
 			}
 			var data []byte
-			data, err = afero.ReadFile(fs, filePath)
+			data, err = afero.ReadFile(fileSystem, filePath)
 			if err != nil {
 				return err
 			}

@@ -54,7 +54,7 @@ func (r *Runtime) builtin_newWeakSet(args []Value, newTarget *Object) *Object {
 	o := &Object{runtime: r}
 
 	wso := &weakSetObject{}
-	wso.class = classWeakSet
+	wso.class = classObject
 	wso.val = o
 	wso.extensible = true
 	o.self = wso

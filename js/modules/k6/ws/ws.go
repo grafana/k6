@@ -359,7 +359,7 @@ func (s *Socket) SendBinary(message goja.Value) {
 		case goja.IsNull(message), goja.IsUndefined(message):
 			jsType = message.String()
 		default:
-			jsType = message.ToObject(s.rt).ClassName()
+			jsType = message.ToObject(s.rt).Get("constructor").ToObject(s.rt).Get("name").String()
 		}
 		common.Throw(s.rt, fmt.Errorf("expected ArrayBuffer as argument, received: %s", jsType))
 	}

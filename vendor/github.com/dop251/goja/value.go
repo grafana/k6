@@ -1101,7 +1101,7 @@ func (s *Symbol) ExportType() reflect.Type {
 }
 
 func (s *Symbol) baseObject(r *Runtime) *Object {
-	return r.newPrimitiveObject(s, r.global.SymbolPrototype, "Symbol")
+	return r.newPrimitiveObject(s, r.global.SymbolPrototype, classObject)
 }
 
 func (s *Symbol) hash(*maphash.Hash) uint64 {

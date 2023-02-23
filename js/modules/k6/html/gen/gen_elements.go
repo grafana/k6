@@ -54,6 +54,7 @@ const (
 )
 
 // Some common TemplateArgs
+//
 //nolint:lll,gochecknoglobals
 var (
 	// Default return values for urlTemplate functions. Either an empty string or the current URL.
@@ -94,16 +95,18 @@ var (
 // TemplateArgs is a list of values to be interpolated in the template.
 
 // The number of TemplateArgs depends on the template type.
-//   stringTemplate: doesn't use any TemplateArgs
-//   boolTemplate: doesn't use any TemplateArgs
-//   constTemplate: uses 1 Template Arg, the generated function always returns that value
-//   intTemplate: needs 1 TemplateArg, used as the default return value (when the attribute was empty).
-//   urlTemplate: needs 1 TemplateArg, used as the default, either "defaultURLEmpty" or "defaultURLCurrent"
-//   enumTemplate: uses any number or more TemplateArg, the gen'd func always returns one of the values in
-//                 the TemplateArgs. The first item in the list is used as the default when the attribute
-//                 was invalid or unset.
-//   nullableEnumTemplate: similar to the enumTemplate except the default is goja.Undefined and the
-//                         return type is goja.Value
+//
+//	stringTemplate: doesn't use any TemplateArgs
+//	boolTemplate: doesn't use any TemplateArgs
+//	constTemplate: uses 1 Template Arg, the generated function always returns that value
+//	intTemplate: needs 1 TemplateArg, used as the default return value (when the attribute was empty).
+//	urlTemplate: needs 1 TemplateArg, used as the default, either "defaultURLEmpty" or "defaultURLCurrent"
+//	enumTemplate: uses any number or more TemplateArg, the gen'd func always returns one of the values in
+//	              the TemplateArgs. The first item in the list is used as the default when the attribute
+//	              was invalid or unset.
+//	nullableEnumTemplate: similar to the enumTemplate except the default is goja.Undefined and the
+//	                      return type is goja.Value
+//
 //nolint:gochecknoglobals
 var funcDefs = []struct {
 	Elem, Method, Attr string
@@ -345,7 +348,7 @@ func main() {
 		logrus.WithError(err).Fatal("format.Source on generated code failed")
 	}
 
-	f, err := os.Create("elements_gen.go")
+	f, err := os.Create("elements_gen.go") //nolint:forbidigo
 	if err != nil {
 		logrus.WithError(err).Fatal("Unable to create the file 'elements_gen.go'")
 	}
@@ -376,7 +379,7 @@ func selToElement(sel Selection) goja.Value {
 
 	elem := Element{sel.sel.Nodes[0], &sel}
 
-	switch elem.node.Data { 
+	switch elem.node.Data {
 {{- range $elemName, $elemInfo := .ElemInfos }}
 	case {{ $elemName }}TagName:
 		return sel.rt.ToValue({{ buildStruct $elemInfo }})
@@ -387,29 +390,29 @@ func selToElement(sel Selection) goja.Value {
  }
 
 {{ $templateTypes := .TemplateTypes }}
-{{ range $funcDef := .FuncDefs -}} 
+{{ range $funcDef := .FuncDefs -}}
 
 func (e {{$funcDef.Elem}}) {{$funcDef.Method}}() {{ returnType $funcDef.TemplateType }} {
 {{- if eq $funcDef.TemplateType $templateTypes.Int }}
 	return e.attrAsInt("{{ $funcDef.Attr }}", {{ index $funcDef.TemplateArgs 0 }})
 {{- else if eq $funcDef.TemplateType $templateTypes.Enum }}
 	attrVal := e.attrAsString("{{ $funcDef.Attr }}")
-	switch attrVal { 
+	switch attrVal {
 	{{- range $optIdx, $optVal := $funcDef.TemplateArgs }}
 	{{- if ne $optIdx 0 }}
 	case "{{$optVal}}":
 		return attrVal
 	{{- end }}
 	{{- end}}
-	default: 
-		return "{{ index $funcDef.TemplateArgs 0 }}" 
+	default:
+		return "{{ index $funcDef.TemplateArgs 0 }}"
 	}
 {{- else if eq $funcDef.TemplateType $templateTypes.GojaEnum }}
 	attrVal, exists := e.sel.sel.Attr("{{ $funcDef.Attr }}")
 	if !exists {
 		return goja.Undefined()
 	}
-	switch attrVal { 
+	switch attrVal {
 	{{- range $optVal := $funcDef.TemplateArgs }}
 	case "{{$optVal}}":
 		return e.sel.rt.ToValue(attrVal)

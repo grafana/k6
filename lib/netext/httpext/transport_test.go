@@ -41,7 +41,7 @@ func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 	unfRequest := &unfinishedRequest{
 		tracer: &Tracer{},
 		response: &http.Response{
-			StatusCode: 200,
+			StatusCode: http.StatusOK,
 		},
 		request: &http.Request{
 			URL: &url.URL{

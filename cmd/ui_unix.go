@@ -1,5 +1,5 @@
-//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd
-// +build darwin dragonfly freebsd linux netbsd openbsd
+//go:build darwin || dragonfly || freebsd || linux || netbsd || openbsd || zos
+// +build darwin dragonfly freebsd linux netbsd openbsd zos
 
 package cmd
 

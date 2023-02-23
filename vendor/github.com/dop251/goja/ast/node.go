@@ -55,6 +55,12 @@ type (
 		_pattern()
 	}
 
+	YieldExpression struct {
+		Yield    file.Idx
+		Argument Expression
+		Delegate bool
+	}
+
 	AwaitExpression struct {
 		Await    file.Idx
 		Argument Expression
@@ -144,7 +150,7 @@ type (
 
 		DeclarationList []*VariableDeclaration
 
-		Async bool
+		Async, Generator bool
 	}
 
 	ClassLiteral struct {
@@ -300,6 +306,7 @@ type (
 
 func (*ArrayLiteral) _expressionNode()          {}
 func (*AssignExpression) _expressionNode()      {}
+func (*YieldExpression) _expressionNode()       {}
 func (*AwaitExpression) _expressionNode()       {}
 func (*BadExpression) _expressionNode()         {}
 func (*BinaryExpression) _expressionNode()      {}
@@ -634,6 +641,7 @@ type Program struct {
 
 func (self *ArrayLiteral) Idx0() file.Idx          { return self.LeftBracket }
 func (self *ArrayPattern) Idx0() file.Idx          { return self.LeftBracket }
+func (self *YieldExpression) Idx0() file.Idx       { return self.Yield }
 func (self *AwaitExpression) Idx0() file.Idx       { return self.Await }
 func (self *ObjectPattern) Idx0() file.Idx         { return self.LeftBrace }
 func (self *ParameterList) Idx0() file.Idx         { return self.Opening }
@@ -837,6 +845,13 @@ func (self *MethodDefinition) Idx1() file.Idx {
 
 func (self *ClassStaticBlock) Idx1() file.Idx {
 	return self.Block.Idx1()
+}
+
+func (self *YieldExpression) Idx1() file.Idx {
+	if self.Argument != nil {
+		return self.Argument.Idx1()
+	}
+	return self.Yield + 5
 }
 
 func (self *ForDeclaration) Idx1() file.Idx    { return self.Target.Idx1() }

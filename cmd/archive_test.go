@@ -6,9 +6,10 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"io/fs"
 	"io/ioutil"
-	"os"
 	"path/filepath"
+	"syscall"
 	"testing"
 
 	"github.com/spf13/afero"
@@ -155,10 +156,10 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 }
 
 // untar untars a `fileName` file to a `destination` path
-func untar(t *testing.T, fs afero.Fs, fileName string, destination string) error {
+func untar(t *testing.T, fileSystem afero.Fs, fileName string, destination string) error {
 	t.Helper()
 
-	archiveFile, err := afero.ReadFile(fs, fileName)
+	archiveFile, err := afero.ReadFile(fileSystem, fileName)
 	if err != nil {
 		return err
 	}
@@ -184,15 +185,15 @@ func untar(t *testing.T, fs afero.Fs, fileName string, destination string) error
 
 		switch header.Typeflag {
 		case tar.TypeDir:
-			if _, err := fs.Stat(target); err != nil && !os.IsNotExist(err) {
+			if _, err := fileSystem.Stat(target); err != nil && !errors.Is(err, fs.ErrNotExist) {
 				return err
 			}
 
-			if err := fs.MkdirAll(target, 0o755); err != nil {
+			if err := fileSystem.MkdirAll(target, 0o755); err != nil {
 				return err
 			}
 		case tar.TypeReg:
-			f, err := fs.OpenFile(target, os.O_CREATE|os.O_RDWR, os.FileMode(header.Mode))
+			f, err := fileSystem.OpenFile(target, syscall.O_CREAT|syscall.O_RDWR, fs.FileMode(header.Mode))
 			if err != nil {
 				return err
 			}

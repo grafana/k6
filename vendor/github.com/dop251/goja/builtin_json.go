@@ -519,7 +519,7 @@ func (ctx *_builtinJSON_stringifyContext) quote(str valueString) {
 }
 
 func (r *Runtime) initJSON() {
-	JSON := r.newBaseObject(r.global.ObjectPrototype, "JSON")
+	JSON := r.newBaseObject(r.global.ObjectPrototype, classObject)
 	JSON._putProp("parse", r.newNativeFunc(r.builtinJSON_parse, nil, "parse", nil, 2), true, false, true)
 	JSON._putProp("stringify", r.newNativeFunc(r.builtinJSON_stringify, nil, "stringify", nil, 3), true, false, true)
 	JSON._putSym(SymToStringTag, valueProp(asciiString(classJSON), false, false, true))

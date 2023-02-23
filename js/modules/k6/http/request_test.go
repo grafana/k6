@@ -709,7 +709,7 @@ func TestRequest(t *testing.T) {
 						}
 
 						http.SetCookie(w, &cookie)
-						w.WriteHeader(200)
+						w.WriteHeader(http.StatusOK)
 					}))
 					cookieJar, err := cookiejar.New(nil)
 					require.NoError(t, err)
@@ -1720,11 +1720,11 @@ func TestErrorCodes(t *testing.T) {
 
 	// Handple paths with custom logic
 	tb.Mux.HandleFunc("/no-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		w.WriteHeader(302)
+		w.WriteHeader(http.StatusFound)
 	}))
 	tb.Mux.HandleFunc("/bad-location-redirect", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Location", "h\t:/") // \n is forbidden
-		w.WriteHeader(302)
+		w.WriteHeader(http.StatusFound)
 	}))
 
 	testCases := []struct {
@@ -2337,7 +2337,7 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIds ...uint16) (*httptest.Server, *http.Client) {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			w.WriteHeader(200)
+			w.WriteHeader(http.StatusOK)
 		}),
 		ReadHeaderTimeout: time.Second,
 		ReadTimeout:       time.Second,
