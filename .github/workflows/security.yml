@@ -1,0 +1,20 @@
+name: Security
+on:
+  workflow_dispatch:
+  pull_request: { }
+  push:
+    branches: [ "master" ]
+  schedule:
+    - cron: '30 20 * * *'
+jobs:
+  security-sast:
+    uses: razorpay/security-action/.github/workflows/semgrep.yml@master
+    secrets:
+      SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  security-statuscheck:
+    needs: [security-sast]
+    if: always()
+    uses: razorpay/security-action/.github/workflows/status_check.yml@master
+    with:
+      WORKFLOW_RESULT: ${{ needs.security-sast.result == 'success' && needs.security-sast.result != 'cancelled' && needs.security-sast.result != 'failure' }}
