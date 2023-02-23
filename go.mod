@@ -23,7 +23,7 @@ require (
 	github.com/klauspost/compress v1.15.11
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.13
-	github.com/mattn/go-isatty v0.0.16
+	github.com/mattn/go-isatty v0.0.17
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd
 	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
