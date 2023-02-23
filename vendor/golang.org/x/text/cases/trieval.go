@@ -14,19 +14,19 @@ package cases
 //
 // The per-rune values have the following format:
 //
-//   if (exception) {
-//     15..4  unsigned exception index
-//   } else {
-//     15..8  XOR pattern or index to XOR pattern for case mapping
-//            Only 13..8 are used for XOR patterns.
-//         7  inverseFold (fold to upper, not to lower)
-//         6  index: interpret the XOR pattern as an index
-//            or isMid if case mode is cIgnorableUncased.
-//      5..4  CCC: zero (normal or break), above or other
-//   }
-//      3  exception: interpret this value as an exception index
-//         (TODO: is this bit necessary? Probably implied from case mode.)
-//   2..0  case mode
+//	if (exception) {
+//	  15..4  unsigned exception index
+//	} else {
+//	  15..8  XOR pattern or index to XOR pattern for case mapping
+//	         Only 13..8 are used for XOR patterns.
+//	      7  inverseFold (fold to upper, not to lower)
+//	      6  index: interpret the XOR pattern as an index
+//	         or isMid if case mode is cIgnorableUncased.
+//	   5..4  CCC: zero (normal or break), above or other
+//	}
+//	   3  exception: interpret this value as an exception index
+//	      (TODO: is this bit necessary? Probably implied from case mode.)
+//	2..0  case mode
 //
 // For the non-exceptional cases, a rune must be either uncased, lowercase or
 // uppercase. If the rune is cased, the XOR pattern maps either a lowercase
@@ -128,37 +128,40 @@ const (
 // The entry is pointed to by the exception index in an entry. It has the
 // following format:
 //
-// Header
-// byte 0:
-//  7..6  unused
-//  5..4  CCC type (same bits as entry)
-//     3  unused
-//  2..0  length of fold
+// Header:
 //
-// byte 1:
-//   7..6  unused
-//   5..3  length of 1st mapping of case type
-//   2..0  length of 2nd mapping of case type
+//	byte 0:
+//	 7..6  unused
+//	 5..4  CCC type (same bits as entry)
+//	    3  unused
+//	 2..0  length of fold
 //
-//   case     1st    2nd
-//   lower -> upper, title
-//   upper -> lower, title
-//   title -> lower, upper
+//	byte 1:
+//	  7..6  unused
+//	  5..3  length of 1st mapping of case type
+//	  2..0  length of 2nd mapping of case type
+//
+//	  case     1st    2nd
+//	  lower -> upper, title
+//	  upper -> lower, title
+//	  title -> lower, upper
 //
 // Lengths with the value 0x7 indicate no value and implies no change.
 // A length of 0 indicates a mapping to zero-length string.
 //
 // Body bytes:
-//   case folding bytes
-//   lowercase mapping bytes
-//   uppercase mapping bytes
-//   titlecase mapping bytes
-//   closure mapping bytes (for NFKC_Casefold). (TODO)
+//
+//	case folding bytes
+//	lowercase mapping bytes
+//	uppercase mapping bytes
+//	titlecase mapping bytes
+//	closure mapping bytes (for NFKC_Casefold). (TODO)
 //
 // Fallbacks:
-//   missing fold  -> lower
-//   missing title -> upper
-//   all missing   -> original rune
+//
+//	missing fold  -> lower
+//	missing title -> upper
+//	all missing   -> original rune
 //
 // exceptions starts with a dummy byte to enforce that there is no zero index
 // value.
