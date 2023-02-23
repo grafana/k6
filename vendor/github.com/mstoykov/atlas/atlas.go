@@ -42,7 +42,7 @@ func (n *Node) Data() (prev *Node, key string, value string) {
 
 // ValueByKey gets the value of key written in this Node or any of its ancestor.
 func (n *Node) ValueByKey(k string) (string, bool) {
-	if n.root == n {
+	if n.root == n || n.linkKey[0] > k {
 		return "", false
 	}
 	if n.linkKey[0] == k {
@@ -104,10 +104,10 @@ func (n *Node) AddLink(key, value string) *Node {
 // Contains checks that for each key-value pair in the provided Node
 // there will be the same key with the same value in the receiver's Node.
 func (n *Node) Contains(sub *Node) bool {
-	if n == sub {
+	if n == sub || sub.root == sub {
 		return true
 	}
-	if n.root == n {
+	if n.root == n || n.linkKey[0] > sub.linkKey[0] {
 		return false
 	}
 	// TODO: https://github.com/mstoykov/atlas/issues/2
