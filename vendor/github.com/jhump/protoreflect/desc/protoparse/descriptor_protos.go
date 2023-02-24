@@ -203,7 +203,7 @@ func (r *parseResult) asFieldDescriptor(node *ast.FieldNode, maxTag int32, isPro
 		fd.Options = &dpb.FieldOptions{UninterpretedOption: r.asUninterpretedOptions(opts)}
 	}
 	if isProto3 && fd.Label != nil && fd.GetLabel() == dpb.FieldDescriptorProto_LABEL_OPTIONAL {
-		internal.SetProto3Optional(fd)
+		fd.Proto3Optional = proto.Bool(true)
 	}
 	return fd
 }

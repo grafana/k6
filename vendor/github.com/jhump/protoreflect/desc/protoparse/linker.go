@@ -1190,7 +1190,8 @@ func canonicalEnumValueName(enumValueName, enumName string) string {
 // str is returned unchanged.
 //
 // The algorithm is adapted from the protoc source:
-//   https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L922
+//
+//	https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L922
 func removePrefix(str, prefix string) string {
 	j := 0
 	for i, r := range str {
@@ -1227,7 +1228,8 @@ func removePrefix(str, prefix string) string {
 // enumValCamelCase converts the given string to upper-camel-case.
 //
 // The algorithm is adapted from the protoc source:
-//  https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L887
+//
+//	https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L887
 func enumValCamelCase(name string) string {
 	var js []rune
 	nextUpper := true

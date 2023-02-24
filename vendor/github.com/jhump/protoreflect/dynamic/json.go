@@ -60,7 +60,7 @@ var wellKnownTypeNames = map[string]struct{}{
 // This method is convenient shorthand for invoking MarshalJSONPB with a default
 // (zero value) marshaler:
 //
-//    m.MarshalJSONPB(&jsonpb.Marshaler{})
+//	m.MarshalJSONPB(&jsonpb.Marshaler{})
 //
 // So enums are serialized using enum value name strings, and values that are
 // not present (including those with default/zero value for messages defined in
@@ -80,7 +80,7 @@ func (m *Message) MarshalJSON() ([]byte, error) {
 // This method is convenient shorthand for invoking MarshalJSONPB with a default
 // (zero value) marshaler:
 //
-//    m.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  "})
+//	m.MarshalJSONPB(&jsonpb.Marshaler{Indent: "  "})
 //
 // So enums are serialized using enum value name strings, and values that are
 // not present (including those with default/zero value for messages defined in
@@ -497,7 +497,7 @@ func writeJsonString(b *indentBuffer, s string) error {
 // This method is shorthand for invoking UnmarshalJSONPB with a default (zero
 // value) unmarshaler:
 //
-//    m.UnmarshalMergeJSONPB(&jsonpb.Unmarshaler{}, js)
+//	m.UnmarshalMergeJSONPB(&jsonpb.Unmarshaler{}, js)
 //
 // So unknown fields will result in an error, and no provided jsonpb.AnyResolver
 // will be used when parsing google.protobuf.Any messages.

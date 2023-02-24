@@ -1040,7 +1040,7 @@ func (fd *FieldDescriptor) IsRepeated() bool {
 // extensions), will be nested in synthetic oneofs that contain only the single
 // field.
 func (fd *FieldDescriptor) IsProto3Optional() bool {
-	return internal.GetProto3Optional(fd.proto)
+	return fd.proto.GetProto3Optional()
 }
 
 // HasPresence returns true if this field can distinguish when a value is
@@ -1101,19 +1101,20 @@ func (fd *FieldDescriptor) GetEnumType() *EnumDescriptor {
 // Otherwise, it returns the declared default value for the field or a zero value, if no
 // default is declared or if the file is proto3. The type of said return value corresponds
 // to the type of the field:
-//  +-------------------------+-----------+
-//  |       Declared Type     |  Go Type  |
-//  +-------------------------+-----------+
-//  | int32, sint32, sfixed32 | int32     |
-//  | int64, sint64, sfixed64 | int64     |
-//  | uint32, fixed32         | uint32    |
-//  | uint64, fixed64         | uint64    |
-//  | float                   | float32   |
-//  | double                  | double32  |
-//  | bool                    | bool      |
-//  | string                  | string    |
-//  | bytes                   | []byte    |
-//  +-------------------------+-----------+
+//
+//	+-------------------------+-----------+
+//	|       Declared Type     |  Go Type  |
+//	+-------------------------+-----------+
+//	| int32, sint32, sfixed32 | int32     |
+//	| int64, sint64, sfixed64 | int64     |
+//	| uint32, fixed32         | uint32    |
+//	| uint64, fixed64         | uint64    |
+//	| float                   | float32   |
+//	| double                  | double32  |
+//	| bool                    | bool      |
+//	| string                  | string    |
+//	| bytes                   | []byte    |
+//	+-------------------------+-----------+
 func (fd *FieldDescriptor) GetDefaultValue() interface{} {
 	return fd.getDefaultValue()
 }

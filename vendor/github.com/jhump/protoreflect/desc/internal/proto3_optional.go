@@ -3,68 +3,8 @@ package internal
 import (
 	"github.com/golang/protobuf/proto"
 	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/jhump/protoreflect/internal/codec"
-	"reflect"
 	"strings"
-
-	"github.com/jhump/protoreflect/internal"
 )
-
-// NB: We use reflection or unknown fields in case we are linked against an older
-// version of the proto runtime which does not know about the proto3_optional field.
-// We don't require linking with newer version (which would greatly simplify this)
-// because that means pulling in v1.4+ of the protobuf runtime, which has some
-// compatibility issues. (We'll be nice to users and not require they upgrade to
-// that latest runtime to upgrade to newer protoreflect.)
-
-func GetProto3Optional(fd *dpb.FieldDescriptorProto) bool {
-	type newerFieldDesc interface {
-		GetProto3Optional() bool
-	}
-	var pm proto.Message = fd
-	if fd, ok := pm.(newerFieldDesc); ok {
-		return fd.GetProto3Optional()
-	}
-
-	// Field does not exist, so we have to examine unknown fields
-	// (we just silently bail if we have problems parsing them)
-	unk := internal.GetUnrecognized(pm)
-	buf := codec.NewBuffer(unk)
-	for {
-		tag, wt, err := buf.DecodeTagAndWireType()
-		if err != nil {
-			return false
-		}
-		if tag == Field_proto3OptionalTag && wt == proto.WireVarint {
-			v, _ := buf.DecodeVarint()
-			return v != 0
-		}
-		if err := buf.SkipField(wt); err != nil {
-			return false
-		}
-	}
-}
-
-func SetProto3Optional(fd *dpb.FieldDescriptorProto) {
-	rv := reflect.ValueOf(fd).Elem()
-	fld := rv.FieldByName("Proto3Optional")
-	if fld.IsValid() {
-		fld.Set(reflect.ValueOf(proto.Bool(true)))
-		return
-	}
-
-	// Field does not exist, so we have to store as unknown field.
-	var buf codec.Buffer
-	if err := buf.EncodeTagAndWireType(Field_proto3OptionalTag, proto.WireVarint); err != nil {
-		// TODO: panic? log?
-		return
-	}
-	if err := buf.EncodeVarint(1); err != nil {
-		// TODO: panic? log?
-		return
-	}
-	internal.SetUnrecognized(fd, buf.Bytes())
-}
 
 // ProcessProto3OptionalFields adds synthetic oneofs to the given message descriptor
 // for each proto3 optional field. It also updates the fields to have the correct
@@ -73,7 +13,7 @@ func SetProto3Optional(fd *dpb.FieldDescriptorProto) {
 func ProcessProto3OptionalFields(msgd *dpb.DescriptorProto, callback func(*dpb.FieldDescriptorProto, *dpb.OneofDescriptorProto)) {
 	var allNames map[string]struct{}
 	for _, fd := range msgd.Field {
-		if GetProto3Optional(fd) {
+		if fd.GetProto3Optional() {
 			// lazy init the set of all names
 			if allNames == nil {
 				allNames = map[string]struct{}{}
