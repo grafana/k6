@@ -79,6 +79,40 @@ func NewLocalBrowserProcess(
 	return &p, nil
 }
 
+// NewRemoteBrowserProcess returns a new BrowserProcess instance
+// which references a remote browser process.
+func NewRemoteBrowserProcess(
+	ctx context.Context, wsURL string, ctxCancel context.CancelFunc, logger *log.Logger,
+) (*BrowserProcess, error) {
+	p := BrowserProcess{
+		ctx:                        ctx,
+		cancel:                     ctxCancel,
+		meta:                       newRemoteBrowserProcessMeta(),
+		lostConnection:             make(chan struct{}),
+		processIsGracefullyClosing: make(chan struct{}),
+		processDone:                make(chan struct{}),
+		wsURL:                      wsURL,
+		logger:                     logger,
+	}
+
+	go func() {
+		// If we lose connection to the browser and we're not in-progress with clean
+		// browser-initiated termination then cancel the context to clean up.
+		select {
+		case <-p.lostConnection:
+		case <-ctx.Done():
+		}
+
+		select {
+		case <-p.processIsGracefullyClosing:
+		default:
+			p.cancel()
+		}
+	}()
+
+	return &p, nil
+}
+
 func (p *BrowserProcess) didLoseConnection() {
 	close(p.lostConnection)
 }
