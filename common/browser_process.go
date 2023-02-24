@@ -61,20 +61,7 @@ func NewLocalBrowserProcess(
 		logger:                     logger,
 	}
 
-	go func() {
-		// If we lose connection to the browser and we're not in-progress with clean
-		// browser-initiated termination then cancel the context to clean up.
-		select {
-		case <-p.lostConnection:
-		case <-ctx.Done():
-		}
-
-		select {
-		case <-p.processIsGracefullyClosing:
-		default:
-			p.cancel()
-		}
-	}()
+	go p.handleClose(ctx)
 
 	return &p, nil
 }
@@ -95,22 +82,24 @@ func NewRemoteBrowserProcess(
 		logger:                     logger,
 	}
 
-	go func() {
-		// If we lose connection to the browser and we're not in-progress with clean
-		// browser-initiated termination then cancel the context to clean up.
-		select {
-		case <-p.lostConnection:
-		case <-ctx.Done():
-		}
-
-		select {
-		case <-p.processIsGracefullyClosing:
-		default:
-			p.cancel()
-		}
-	}()
+	go p.handleClose(ctx)
 
 	return &p, nil
+}
+
+func (p *BrowserProcess) handleClose(ctx context.Context) {
+	// If we lose connection to the browser and we're not in-progress with clean
+	// browser-initiated termination then cancel the context to clean up.
+	select {
+	case <-p.lostConnection:
+	case <-ctx.Done():
+	}
+
+	select {
+	case <-p.processIsGracefullyClosing:
+	default:
+		p.cancel()
+	}
 }
 
 func (p *BrowserProcess) didLoseConnection() {
