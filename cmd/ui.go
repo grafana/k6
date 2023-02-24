@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
 	"go.k6.io/k6/ui/pb"
 )
@@ -109,11 +110,16 @@ func printExecutionDescription(
 	switch {
 	case outputOverride != "":
 		outputDescriptions = []string{outputOverride}
-	case len(outputs) == 0:
-		outputDescriptions = []string{"-"}
 	default:
 		for _, out := range outputs {
-			outputDescriptions = append(outputDescriptions, out.Description())
+			desc := out.Description()
+			if desc == engine.IngesterDescription {
+				if len(outputs) != 1 {
+					continue
+				}
+				desc = "-"
+			}
+			outputDescriptions = append(outputDescriptions, desc)
 		}
 	}
 
