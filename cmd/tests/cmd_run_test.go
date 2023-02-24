@@ -57,6 +57,7 @@ func TestSimpleTestStdin(t *testing.T) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
+	assert.Contains(t, stdout, "output: -")
 	assert.Contains(t, stdout, "default: 1 iterations for each of 1 VUs")
 	assert.Contains(t, stdout, "1 complete and 0 interrupted iterations")
 	assert.Empty(t, ts.Stderr.Bytes())
@@ -1742,6 +1743,40 @@ func TestBrowserPermissions(t *testing.T) {
 			}
 
 			assert.Contains(t, loglines[0].Message, tt.expectedError)
+		})
+	}
+}
+
+func TestUIRenderOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		outputs   []string
+		expRender string
+	}{
+		{outputs: []string{}, expRender: "output: -\n"},
+		{outputs: []string{"json"}, expRender: "output: json(stdout)\n\n"},
+		{outputs: []string{"json", "csv"}, expRender: "output: json(stdout), csv (file.csv)\n\n"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.expRender, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = []string{"k6", "run"}
+			for _, o := range tc.outputs {
+				ts.CmdArgs = append(ts.CmdArgs, "-o")
+				ts.CmdArgs = append(ts.CmdArgs, o)
+			}
+			ts.CmdArgs = append(ts.CmdArgs, "-")
+			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			stdout := ts.Stdout.String()
+			assert.Contains(t, stdout, tc.expRender)
 		})
 	}
 }
