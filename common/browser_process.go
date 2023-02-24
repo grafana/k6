@@ -32,7 +32,9 @@ type BrowserProcess struct {
 	logger *log.Logger
 }
 
-func NewBrowserProcess(
+// NewLocalBrowserProcess starts a local browser process and
+// returns a new BrowserProcess instance to interact with it.
+func NewLocalBrowserProcess(
 	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
 	ctxCancel context.CancelFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {

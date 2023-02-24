@@ -232,7 +232,7 @@ func (b *BrowserType) allocate(
 		path = b.ExecutablePath()
 	}
 
-	return common.NewBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+	return common.NewLocalBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
 }
 
 // parseArgs parses command-line arguments and returns them.
