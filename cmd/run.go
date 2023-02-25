@@ -307,22 +307,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Init has passed successfully, so unless disabled, make sure we send a
 	// usage report after the context is done.
 	if !conf.NoUsageReport.Bool {
-		backgroundProcesses.Add(2)
-		reportCtx, reportCancel := context.WithCancel(globalCtx)
-		reportDone := make(chan error)
+		backgroundProcesses.Add(1)
 		go func() {
+			defer backgroundProcesses.Done()
+			reportCtx, reportCancel := context.WithTimeout(globalCtx, 3*time.Second)
+			defer reportCancel()
 			logger.Debug("Sending usage report...")
-			reportDone <- reportUsage(reportCtx, execScheduler)
-			close(reportDone)
-			backgroundProcesses.Done()
-		}()
-		go func() {
-			select {
-			case <-reportDone:
-			case <-time.After(3 * time.Second):
+			if rerr := reportUsage(reportCtx, execScheduler); rerr != nil {
+				logger.WithError(rerr).Debug("Error sending usage report")
+			} else {
+				logger.Debug("Usage report sent successfully")
 			}
-			reportCancel()
-			backgroundProcesses.Done()
 		}()
 	}
 
