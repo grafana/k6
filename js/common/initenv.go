@@ -3,6 +3,7 @@ package common
 import (
 	"net/url"
 	"path/filepath"
+	"strings"
 
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
@@ -36,6 +37,9 @@ func (ie *InitEnvironment) GetAbsFilePath(filename string) string {
 	// absolute path.
 	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) {
 		filename = filepath.Join(ie.CWD.Path, filename)
+	}
+	if strings.HasPrefix(filename, `\\`) {
+		filename = filename[1:]
 	}
 	filename = filepath.Clean(filename)
 	if filename[0:1] != afero.FilePathSeparator {

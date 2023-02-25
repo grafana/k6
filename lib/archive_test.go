@@ -35,6 +35,8 @@ func TestNormalizeAndAnonymizePath(t *testing.T) {
 		"D:\\Documents and Settings\\myname\\dir\\myfile.txt": "/D/Documents and Settings/nobody/dir/myfile.txt",
 		"C:\\uSers\\myname\\dir\\myfile.txt":                  "/C/uSers/nobody/dir/myfile.txt",
 		"D:\\doCUMENts aND Settings\\myname\\dir\\myfile.txt": "/D/doCUMENts aND Settings/nobody/dir/myfile.txt",
+		"c:\\test":      "/c/test",
+		"/C:/Users/joe": "/C/Users/nobody",
 	}
 	// TODO: fix this - the issue is that filepath.Clean replaces `/` with whatever the path
 	// separator is on the current OS and as such this gets confused for shared folder on
@@ -102,7 +104,7 @@ func diffFilesystemsDir(t *testing.T, first, second afero.Fs, dirname string) {
 
 	require.ElementsMatch(t, getInfoNames(firstInfos), getInfoNames(secondInfos), "directory: "+dirname)
 	for _, info := range firstInfos {
-		path := filepath.Join(dirname, info.Name())
+		path := filepath.Join(dirname, path.Clean("/"+info.Name()))
 		if info.IsDir() {
 			diffFilesystemsDir(t, first, second, path)
 			continue

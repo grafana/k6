@@ -2,6 +2,7 @@ package fsext
 
 import (
 	"io/fs"
+	"path"
 	"path/filepath"
 	"sort"
 
@@ -46,8 +47,8 @@ func readDirNames(fs afero.Fs, dirname string) ([]string, error) {
 
 // walk recursively descends path, calling walkFn
 // adapted from https://github.com/spf13/afero/blob/master/path.go#L27
-func walk(fileSystem afero.Fs, path string, info fs.FileInfo, walkFn filepath.WalkFunc) error {
-	err := walkFn(path, info, nil)
+func walk(fileSystem afero.Fs, targetPath string, info fs.FileInfo, walkFn filepath.WalkFunc) error {
+	err := walkFn(targetPath, info, nil)
 	if err != nil {
 		if info.IsDir() && err == filepath.SkipDir {
 			return nil
@@ -59,13 +60,13 @@ func walk(fileSystem afero.Fs, path string, info fs.FileInfo, walkFn filepath.Wa
 		return nil
 	}
 
-	names, err := readDirNames(fileSystem, path)
+	names, err := readDirNames(fileSystem, targetPath)
 	if err != nil {
-		return walkFn(path, info, err)
+		return walkFn(targetPath, info, err)
 	}
 
 	for _, name := range names {
-		filename := filepath.Join(path, name)
+		filename := filepath.Join(targetPath, path.Clean("/"+name))
 		fileInfo, err := fileSystem.Stat(filename)
 		if err != nil {
 			if err = walkFn(filename, fileInfo, err); err != nil && err != filepath.SkipDir {
