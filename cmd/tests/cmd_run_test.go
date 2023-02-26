@@ -77,19 +77,47 @@ func TestBinaryNameStdout(t *testing.T) {
 	assert.Empty(t, ts.LoggerHook.Drain())
 }
 
-func TestBinaryNameRunHelpStdout(t *testing.T) {
+func TestBinaryNameHelpStdout(t *testing.T) {
 	t.Parallel()
-
 	ts := NewGlobalTestState(t)
 	ts.BinaryName = "customBinaryName"
-	ts.CmdArgs = []string{ts.BinaryName, "help", "run"}
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	stdout := ts.Stdout.String()
-	assert.Contains(t, stdout, fmt.Sprintf("%s run [flags]", ts.BinaryName))
-	assert.Contains(t, stdout, fmt.Sprintf("%s run -i 10 script.js", ts.BinaryName))
-	assert.Empty(t, ts.Stderr.Bytes())
-	assert.Empty(t, ts.LoggerHook.Drain())
+	tests := []struct {
+		cmdName        string
+		extraCmd       string // For the `login cloud` cmd
+		containsOutput string
+	}{
+		{
+			cmdName:        "archive",
+			containsOutput: fmt.Sprintf("%s archive -u 10 -d 10s -O myarchive.tar script.js", ts.BinaryName),
+		},
+		{
+			cmdName:        "cloud",
+			containsOutput: fmt.Sprintf("%s cloud script.js", ts.BinaryName),
+		},
+		{
+			cmdName:        "convert",
+			containsOutput: fmt.Sprintf("%s convert -O har-session.js session.har", ts.BinaryName),
+		},
+		{
+			cmdName:        "login",
+			extraCmd:       "cloud",
+			containsOutput: fmt.Sprintf("%s login cloud -t YOUR_TOKEN", ts.BinaryName),
+		},
+		{
+			cmdName:        "run",
+			containsOutput: fmt.Sprintf("%s run -i 10 script.js", ts.BinaryName),
+		},
+	}
+
+	for _, tt := range tests {
+		ts.CmdArgs = []string{ts.BinaryName, "help", tt.cmdName, tt.extraCmd}
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		stdout := ts.Stdout.String()
+		assert.Contains(t, stdout, tt.containsOutput)
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Empty(t, ts.LoggerHook.Drain())
+	}
 }
 
 // TODO: Remove this? It doesn't test anything AFAICT...
