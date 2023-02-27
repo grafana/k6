@@ -13,15 +13,6 @@
 - path: gopkg.in/yaml.v3
   minVersion: v3.0.0-20200313102051-9f266ea9e77c
   validUntil: 2029-08-04T16:32:56+03:00
-- path: google.golang.org/genproto
-  minVersion: v0.0.0-20200903010400-9bfcb5116336
-  validUntil: 2029-08-04T17:01:00+03:00
-- path: google.golang.org/protobuf
-  minVersion: v1.25.1-0.20200805231151-a709e31e5d12
-  validUntil: 2029-08-04T17:01:13+03:00
-- path: github.com/golang/protobuf
-  minVersion: v1.4.2
-  validUntil: 2029-08-04T17:01:43+03:00
 - path: github.com/spf13/cobra
   minVersion: v1.4.0
   validUntil: 2049-07-26T17:21:52+03:00
