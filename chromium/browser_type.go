@@ -126,46 +126,6 @@ func (b *BrowserType) link(
 	return p, nil
 }
 
-// ExecutablePath returns the path where the extension expects to find the browser executable.
-func (b *BrowserType) ExecutablePath() (execPath string) {
-	if b.execPath != "" {
-		return b.execPath
-	}
-	defer func() {
-		b.execPath = execPath
-	}()
-
-	for _, path := range [...]string{
-		// Unix-like
-		"headless_shell",
-		"headless-shell",
-		"chromium",
-		"chromium-browser",
-		"google-chrome",
-		"google-chrome-stable",
-		"google-chrome-beta",
-		"google-chrome-unstable",
-		"/usr/bin/google-chrome",
-
-		// Windows
-		"chrome",
-		"chrome.exe", // in case PATHEXT is misconfigured
-		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
-		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
-		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
-
-		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
-		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-	} {
-		if _, err := exec.LookPath(path); err == nil {
-			return path
-		}
-	}
-
-	return ""
-}
-
 func (b *BrowserType) initContext() context.Context {
 	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
@@ -294,6 +254,46 @@ func (b *BrowserType) allocate(
 	}
 
 	return common.NewLocalBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+}
+
+// ExecutablePath returns the path where the extension expects to find the browser executable.
+func (b *BrowserType) ExecutablePath() (execPath string) {
+	if b.execPath != "" {
+		return b.execPath
+	}
+	defer func() {
+		b.execPath = execPath
+	}()
+
+	for _, path := range [...]string{
+		// Unix-like
+		"headless_shell",
+		"headless-shell",
+		"chromium",
+		"chromium-browser",
+		"google-chrome",
+		"google-chrome-stable",
+		"google-chrome-beta",
+		"google-chrome-unstable",
+		"/usr/bin/google-chrome",
+
+		// Windows
+		"chrome",
+		"chrome.exe", // in case PATHEXT is misconfigured
+		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
+		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
+		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
+
+		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+		"/Applications/Chromium.app/Contents/MacOS/Chromium",
+	} {
+		if _, err := exec.LookPath(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
 }
 
 // parseArgs parses command-line arguments and returns them.
