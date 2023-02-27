@@ -22,7 +22,7 @@ type BrowserContext interface {
 	Route(url goja.Value, handler goja.Callable)
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
-	SetExtraHTTPHeaders(headers map[string]string)
+	SetExtraHTTPHeaders(headers map[string]string) error
 	SetGeolocation(geolocation goja.Value)
 	// SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
 	//

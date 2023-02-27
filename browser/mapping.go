@@ -1,12 +1,15 @@
 package browser
 
 import (
+	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6common "go.k6.io/k6/js/common"
@@ -589,13 +592,20 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 		"route":                       bc.Route,
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
-		"setExtraHTTPHeaders":         bc.SetExtraHTTPHeaders,
-		"setGeolocation":              bc.SetGeolocation,
-		"setHTTPCredentials":          bc.SetHTTPCredentials, //nolint:staticcheck
-		"setOffline":                  bc.SetOffline,
-		"storageState":                bc.StorageState,
-		"unroute":                     bc.Unroute,
-		"waitForEvent":                bc.WaitForEvent,
+		"setExtraHTTPHeaders": func(headers map[string]string) *goja.Promise {
+			ctx := vu.Context()
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				err := bc.SetExtraHTTPHeaders(headers)
+				panicIfInternalError(ctx, err)
+				return nil, err //nolint:wrapcheck
+			})
+		},
+		"setGeolocation":     bc.SetGeolocation,
+		"setHTTPCredentials": bc.SetHTTPCredentials, //nolint:staticcheck
+		"setOffline":         bc.SetOffline,
+		"storageState":       bc.StorageState,
+		"unroute":            bc.Unroute,
+		"waitForEvent":       bc.WaitForEvent,
 		"pages": func() *goja.Object {
 			var (
 				mpages []mapping
@@ -661,5 +671,11 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},
+	}
+}
+
+func panicIfInternalError(ctx context.Context, err error) {
+	if errors.Is(err, k6error.ErrInternal) {
+		k6ext.Panic(ctx, err.Error())
 	}
 }

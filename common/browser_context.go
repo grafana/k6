@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -270,8 +271,8 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 // SetExtraHTTPHeaders is not implemented.
-func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
-	k6ext.Panic(b.ctx, "BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet")
+func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) error {
+	return fmt.Errorf("BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet: %w", k6error.ErrInternal)
 }
 
 // SetGeolocation overrides the geo location of the user.
