@@ -9,13 +9,41 @@ This package provides various compression algorithms.
 * [huff0](https://github.com/klauspost/compress/tree/master/huff0) and [FSE](https://github.com/klauspost/compress/tree/master/fse) implementations for raw entropy encoding.
 * [gzhttp](https://github.com/klauspost/compress/tree/master/gzhttp) Provides client and server wrappers for handling gzipped requests efficiently.
 * [pgzip](https://github.com/klauspost/pgzip) is a separate package that provides a very fast parallel gzip implementation.
-* [fuzz package](https://github.com/klauspost/compress-fuzz) for fuzz testing all compressors/decompressors here.
 
 [![Go Reference](https://pkg.go.dev/badge/klauspost/compress.svg)](https://pkg.go.dev/github.com/klauspost/compress?tab=subdirectories)
 [![Go](https://github.com/klauspost/compress/actions/workflows/go.yml/badge.svg)](https://github.com/klauspost/compress/actions/workflows/go.yml)
 [![Sourcegraph Badge](https://sourcegraph.com/github.com/klauspost/compress/-/badge.svg)](https://sourcegraph.com/github.com/klauspost/compress?badge)
 
 # changelog
+
+* Jan 21st, 2023 (v1.15.15)
+	* deflate: Improve level 7-9 by @klauspost in https://github.com/klauspost/compress/pull/739
+	* zstd: Add delta encoding support by @greatroar in https://github.com/klauspost/compress/pull/728
+	* zstd: Various speed improvements by @greatroar https://github.com/klauspost/compress/pull/741 https://github.com/klauspost/compress/pull/734 https://github.com/klauspost/compress/pull/736 https://github.com/klauspost/compress/pull/744 https://github.com/klauspost/compress/pull/743 https://github.com/klauspost/compress/pull/745
+	* gzhttp: Add SuffixETag() and DropETag() options to prevent ETag collisions on compressed responses by @willbicks in https://github.com/klauspost/compress/pull/740
+
+* Jan 3rd, 2023 (v1.15.14)
+
+	* flate: Improve speed in big stateless blocks https://github.com/klauspost/compress/pull/718
+	* zstd: Minor speed tweaks by @greatroar in https://github.com/klauspost/compress/pull/716 https://github.com/klauspost/compress/pull/720
+	* export NoGzipResponseWriter for custom ResponseWriter wrappers by @harshavardhana in https://github.com/klauspost/compress/pull/722
+	* s2: Add example for indexing and existing stream https://github.com/klauspost/compress/pull/723
+
+* Dec 11, 2022 (v1.15.13)
+	* zstd: Add [MaxEncodedSize](https://pkg.go.dev/github.com/klauspost/compress@v1.15.13/zstd#Encoder.MaxEncodedSize) to encoder  https://github.com/klauspost/compress/pull/691
+	* zstd: Various tweaks and improvements https://github.com/klauspost/compress/pull/693 https://github.com/klauspost/compress/pull/695 https://github.com/klauspost/compress/pull/696 https://github.com/klauspost/compress/pull/701 https://github.com/klauspost/compress/pull/702 https://github.com/klauspost/compress/pull/703 https://github.com/klauspost/compress/pull/704 https://github.com/klauspost/compress/pull/705 https://github.com/klauspost/compress/pull/706 https://github.com/klauspost/compress/pull/707 https://github.com/klauspost/compress/pull/708
+
+* Oct 26, 2022 (v1.15.12)
+
+	* zstd: Tweak decoder allocs. https://github.com/klauspost/compress/pull/680
+	* gzhttp: Always delete `HeaderNoCompression` https://github.com/klauspost/compress/pull/683
+
+* Sept 26, 2022 (v1.15.11)
+
+	* flate: Improve level 1-3 compression  https://github.com/klauspost/compress/pull/678
+	* zstd: Improve "best" compression by @nightwolfz in https://github.com/klauspost/compress/pull/677
+	* zstd: Fix+reduce decompression allocations https://github.com/klauspost/compress/pull/668
+	* zstd: Fix non-effective noescape tag https://github.com/klauspost/compress/pull/667
 
 * Sept 16, 2022 (v1.15.10)
 

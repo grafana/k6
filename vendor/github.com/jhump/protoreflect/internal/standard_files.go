@@ -9,7 +9,7 @@ import (
 	"io/ioutil"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // TODO: replace this alias configuration with desc.RegisterImportPath?
@@ -68,7 +68,7 @@ func (e ErrNoSuchFile) Error() string {
 // name cannot be loaded but is a known standard name, an alias will be tried,
 // so the standard files can be loaded even if linked against older "known bad"
 // versions of packages.
-func LoadFileDescriptor(file string) (*dpb.FileDescriptorProto, error) {
+func LoadFileDescriptor(file string) (*descriptorpb.FileDescriptorProto, error) {
 	fdb := proto.FileDescriptor(file)
 	aliased := false
 	if fdb == nil {
@@ -102,12 +102,12 @@ func LoadFileDescriptor(file string) (*dpb.FileDescriptorProto, error) {
 // Registered file descriptors are first "proto encoded" (e.g. binary format
 // for the descriptor protos) and then gzipped. So this function gunzips and
 // then unmarshals into a descriptor proto.
-func DecodeFileDescriptor(element string, fdb []byte) (*dpb.FileDescriptorProto, error) {
+func DecodeFileDescriptor(element string, fdb []byte) (*descriptorpb.FileDescriptorProto, error) {
 	raw, err := decompress(fdb)
 	if err != nil {
 		return nil, fmt.Errorf("failed to decompress %q descriptor: %v", element, err)
 	}
-	fd := dpb.FileDescriptorProto{}
+	fd := descriptorpb.FileDescriptorProto{}
 	if err := proto.Unmarshal(raw, &fd); err != nil {
 		return nil, fmt.Errorf("bad descriptor for %q: %v", element, err)
 	}

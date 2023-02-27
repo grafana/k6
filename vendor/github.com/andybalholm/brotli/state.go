@@ -200,7 +200,6 @@ func decoderStateInit(s *Reader) bool {
 
 	s.block_type_trees = nil
 	s.block_len_trees = nil
-	s.ringbuffer = nil
 	s.ringbuffer_size = 0
 	s.new_ringbuffer_size = 0
 	s.ringbuffer_mask = 0

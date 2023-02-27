@@ -87,6 +87,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 		Ctx:          ctx,
 		FS:           fs,
 		Getwd:        func() (string, error) { return ts.Cwd, nil },
+		BinaryName:   "k6",
 		CmdArgs:      []string{},
 		Env:          map[string]string{"K6_NO_USAGE_REPORT": "true"},
 		DefaultFlags: defaultFlags,

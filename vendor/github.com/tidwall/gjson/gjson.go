@@ -1009,8 +1009,8 @@ func parseObjectPath(path string) (r objectPathResult) {
 							r.piped = true
 						} else {
 							r.path = path[i+1:]
+							r.more = true
 						}
-						r.more = true
 						return
 					} else if path[i] == '|' {
 						r.part = string(epart)

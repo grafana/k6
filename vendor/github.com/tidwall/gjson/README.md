@@ -176,7 +176,7 @@ The `result.Int()` and `result.Uint()` calls are capable of reading all 64 bits,
 
 ```go
 result.Int() int64    // -9223372036854775808 to 9223372036854775807
-result.Uint() int64   // 0 to 18446744073709551615
+result.Uint() uint64   // 0 to 18446744073709551615
 ```
 
 ## Modifiers and path chaining 

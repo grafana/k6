@@ -327,14 +327,16 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 		exitOnRunning: false,
 	}
 
+	exampleText := getExampleText(gs, `
+  {{.}} cloud script.js`[1:])
+
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
 		Long: `Run a test on the cloud.
 
 This will execute the test on the k6 cloud service. Use "k6 login cloud" to authenticate.`,
-		Example: `
-        k6 cloud script.js`[1:],
+		Example: exampleText,
 		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		PreRunE: c.preRun,
 		RunE:    c.run,

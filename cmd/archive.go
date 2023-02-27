@@ -74,20 +74,22 @@ func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 		archiveOut: "archive.tar",
 	}
 
+	exampleText := getExampleText(gs, `
+  # Archive a test run.
+  {{.}} archive -u 10 -d 10s -O myarchive.tar script.js
+  
+  # Run the resulting archive.
+  {{.}} run myarchive.tar`[1:])
+
 	archiveCmd := &cobra.Command{
 		Use:   "archive",
 		Short: "Create an archive",
 		Long: `Create an archive.
 
 An archive is a fully self-contained test run, and can be executed identically elsewhere.`,
-		Example: `
-  # Archive a test run.
-  k6 archive -u 10 -d 10s -O myarchive.tar script.js
-
-  # Run the resulting archive.
-  k6 run myarchive.tar`[1:],
-		Args: cobra.ExactArgs(1),
-		RunE: c.run,
+		Example: exampleText,
+		Args:    cobra.ExactArgs(1),
+		RunE:    c.run,
 	}
 
 	archiveCmd.Flags().SortFlags = false

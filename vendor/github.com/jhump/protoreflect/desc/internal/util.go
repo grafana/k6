@@ -220,7 +220,8 @@ const (
 
 // JsonName returns the default JSON name for a field with the given name.
 // This mirrors the algorithm in protoc:
-//  https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L95
+//
+//	https://github.com/protocolbuffers/protobuf/blob/v21.3/src/google/protobuf/descriptor.cc#L95
 func JsonName(name string) string {
 	var js []rune
 	nextUpper := false
@@ -251,7 +252,8 @@ func InitCap(name string) string {
 // that token and the empty string, e.g. ["foo", ""]. Otherwise, it returns
 // successively shorter prefixes of the package and then the empty string. For
 // example, for a package named "foo.bar.baz" it will return the following list:
-//   ["foo.bar.baz", "foo.bar", "foo", ""]
+//
+//	["foo.bar.baz", "foo.bar", "foo", ""]
 func CreatePrefixList(pkg string) []string {
 	if pkg == "" {
 		return []string{""}

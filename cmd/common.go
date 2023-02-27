@@ -1,9 +1,11 @@
 package cmd
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"syscall"
+	"text/template"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -70,6 +72,17 @@ func printToStdout(gs *state.GlobalState, s string) {
 	if _, err := fmt.Fprint(gs.Stdout, s); err != nil {
 		gs.Logger.Errorf("could not print '%s' to stdout: %s", s, err.Error())
 	}
+}
+
+func getExampleText(gs *state.GlobalState, tpl string) string {
+	var exampleText bytes.Buffer
+	exampleTemplate := template.Must(template.New("").Parse(tpl))
+
+	if err := exampleTemplate.Execute(&exampleText, gs.BinaryName); err != nil {
+		gs.Logger.WithError(err).Error("Error during help example generation")
+	}
+
+	return exampleText.String()
 }
 
 // Trap Interrupts, SIGINTs and SIGTERMs and call the given.

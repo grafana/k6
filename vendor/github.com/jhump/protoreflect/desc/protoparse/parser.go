@@ -1,8 +1,7 @@
 package protoparse
 
 import (
-	"bytes"
-	"errors"
+	"context"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -11,60 +10,20 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/bufbuild/protocompile"
+	ast2 "github.com/bufbuild/protocompile/ast"
+	"github.com/bufbuild/protocompile/options"
+	"github.com/bufbuild/protocompile/parser"
+	"github.com/bufbuild/protocompile/protoutil"
+	"github.com/bufbuild/protocompile/reporter"
+	"github.com/bufbuild/protocompile/sourceinfo"
+	"google.golang.org/protobuf/proto"
+	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/internal"
 	"github.com/jhump/protoreflect/desc/protoparse/ast"
 )
-
-//go:generate goyacc -o proto.y.go -p proto proto.y
-
-func init() {
-	protoErrorVerbose = true
-
-	// fix up the generated "token name" array so that error messages are nicer
-	setTokenName(_STRING_LIT, "string literal")
-	setTokenName(_INT_LIT, "int literal")
-	setTokenName(_FLOAT_LIT, "float literal")
-	setTokenName(_NAME, "identifier")
-	setTokenName(_ERROR, "error")
-	// for keywords, just show the keyword itself wrapped in quotes
-	for str, i := range keywords {
-		setTokenName(i, fmt.Sprintf(`"%s"`, str))
-	}
-}
-
-func setTokenName(token int, text string) {
-	// NB: this is based on logic in generated parse code that translates the
-	// int returned from the lexer into an internal token number.
-	var intern int
-	if token < len(protoTok1) {
-		intern = protoTok1[token]
-	} else {
-		if token >= protoPrivate {
-			if token < protoPrivate+len(protoTok2) {
-				intern = protoTok2[token-protoPrivate]
-			}
-		}
-		if intern == 0 {
-			for i := 0; i+1 < len(protoTok3); i += 2 {
-				if protoTok3[i] == token {
-					intern = protoTok3[i+1]
-					break
-				}
-			}
-		}
-	}
-
-	if intern >= 1 && intern-1 < len(protoToknames) {
-		protoToknames[intern-1] = text
-		return
-	}
-
-	panic(fmt.Sprintf("Unknown token value: %d", token))
-}
 
 // FileAccessor is an abstraction for opening proto source files. It takes the
 // name of the file to open and returns either the input reader or an error.
@@ -120,9 +79,7 @@ type Parser struct {
 
 	// LookupImportProto has the same functionality as LookupImport, however it returns
 	// a FileDescriptorProto instead of a FileDescriptor.
-	//
-	// It is an error to set both LookupImport and LookupImportProto.
-	LookupImportProto func(string) (*dpb.FileDescriptorProto, error)
+	LookupImportProto func(string) (*descriptorpb.FileDescriptorProto, error)
 
 	// Used to create a reader for a given filename, when loading proto source
 	// file contents. If unset, os.Open is used. If ImportPaths is also empty
@@ -182,73 +139,48 @@ type Parser struct {
 // error it returns. If syntax or link errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) {
-	accessor := p.Accessor
-	if accessor == nil {
-		accessor = func(name string) (io.ReadCloser, error) {
-			return os.Open(name)
-		}
+	srcInfoMode := protocompile.SourceInfoNone
+	if p.IncludeSourceCodeInfo {
+		srcInfoMode = protocompile.SourceInfoExtraComments
 	}
-	paths := p.ImportPaths
-	if len(paths) > 0 {
-		acc := accessor
-		accessor = func(name string) (io.ReadCloser, error) {
-			var ret error
-			for _, path := range paths {
-				f, err := acc(filepath.Join(path, name))
-				if err != nil {
-					if ret == nil {
-						ret = err
-					}
-					continue
-				}
-				return f, nil
+	rep := newReporter(p.ErrorReporter, p.WarningReporter)
+	res, srcPosAddr := p.getResolver(filenames)
+
+	if p.InferImportPaths {
+		// we must first compile everything to protos
+		results, err := parseToProtosRecursive(res, filenames, reporter.NewHandler(rep), srcPosAddr)
+		if err != nil {
+			return nil, err
+		}
+		// then we can infer import paths
+		// TODO: if this re-writes one of the names in filenames, lookups below will break
+		results = fixupFilenames(results)
+		resolverFromResults := protocompile.ResolverFunc(func(path string) (protocompile.SearchResult, error) {
+			res, ok := results[path]
+			if !ok {
+				return protocompile.SearchResult{}, os.ErrNotExist
 			}
-			return nil, ret
-		}
+			return protocompile.SearchResult{ParseResult: res}, nil
+		})
+		res = protocompile.CompositeResolver{resolverFromResults, res}
 	}
-	lookupImport, err := p.getLookupImport()
+
+	c := protocompile.Compiler{
+		Resolver:       res,
+		MaxParallelism: 1,
+		SourceInfoMode: srcInfoMode,
+		Reporter:       rep,
+	}
+	results, err := c.Compile(context.Background(), filenames...)
 	if err != nil {
 		return nil, err
 	}
 
-	protos := map[string]*parseResult{}
-	results := &parseResults{
-		resultsByFilename:      protos,
-		recursive:              true,
-		validate:               true,
-		createDescriptorProtos: true,
+	fds := make([]protoreflect.FileDescriptor, len(results))
+	for i := range results {
+		fds[i] = results[i]
 	}
-	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, results, lookupImport)
-	if err := errs.getError(); err != nil {
-		return nil, err
-	}
-	if p.InferImportPaths {
-		// TODO: if this re-writes one of the names in filenames, lookups below will break
-		protos = fixupFilenames(protos)
-	}
-	l := newLinker(results, errs)
-	linkedProtos, err := l.linkFiles()
-	if err != nil {
-		return nil, err
-	}
-	// Now we're done linking, so we can check to see if any imports were unused
-	for _, file := range filenames {
-		l.checkForUnusedImports(file)
-	}
-	if p.IncludeSourceCodeInfo {
-		for name, fd := range linkedProtos {
-			pr := protos[name]
-			fd.AsFileDescriptorProto().SourceCodeInfo = pr.generateSourceCodeInfo()
-			internal.RecomputeSourceInfo(fd)
-		}
-	}
-	fds := make([]*desc.FileDescriptor, len(filenames))
-	for i, name := range filenames {
-		fd := linkedProtos[name]
-		fds[i] = fd
-	}
-	return fds, nil
+	return desc.WrapFiles(fds)
 }
 
 // ParseFilesButDoNotLink parses the named files into descriptor protos. The
@@ -258,20 +190,20 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 // steps omitted).
 //
 // There are a few side effects to not linking the descriptors:
-//   1. No options will be interpreted. Options can refer to extensions or have
-//      message and enum types. Without linking, these extension and type
-//      references are not resolved, so the options may not be interpretable.
-//      So all options will appear in UninterpretedOption fields of the various
-//      descriptor options messages.
-//   2. Type references will not be resolved. This means that the actual type
-//      names in the descriptors may be unqualified and even relative to the
-//      scope in which the type reference appears. This goes for fields that
-//      have message and enum types. It also applies to methods and their
-//      references to request and response message types.
-//   3. Type references are not known. For non-scalar fields, until the type
-//      name is resolved (during linking), it is not known whether the type
-//      refers to a message or an enum. So all fields with such type references
-//      will not have their Type set, only the TypeName.
+//  1. No options will be interpreted. Options can refer to extensions or have
+//     message and enum types. Without linking, these extension and type
+//     references are not resolved, so the options may not be interpretable.
+//     So all options will appear in UninterpretedOption fields of the various
+//     descriptor options messages.
+//  2. Type references will not be resolved. This means that the actual type
+//     names in the descriptors may be unqualified and even relative to the
+//     scope in which the type reference appears. This goes for fields that
+//     have message and enum types. It also applies to methods and their
+//     references to request and response message types.
+//  3. Type references are not known. For non-scalar fields, until the type
+//     name is resolved (during linking), it is not known whether the type
+//     refers to a message or an enum. So all fields with such type references
+//     will not have their Type set, only the TypeName.
 //
 // This method will still validate the syntax of parsed files. If the parser's
 // ValidateUnlinkedFiles field is true, additional checks, beyond syntax will
@@ -282,52 +214,42 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 // ErrorReporter configured and it returns non-nil, parsing will abort with the
 // error it returns. If syntax errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
-func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescriptorProto, error) {
-	accessor := p.Accessor
-	if accessor == nil {
-		accessor = func(name string) (io.ReadCloser, error) {
-			return os.Open(name)
-		}
-	}
-	lookupImport, err := p.getLookupImport()
+func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.FileDescriptorProto, error) {
+	rep := newReporter(p.ErrorReporter, p.WarningReporter)
+	res, _ := p.getResolver(filenames)
+	results, err := parseToProtos(res, filenames, reporter.NewHandler(rep), p.ValidateUnlinkedFiles)
 	if err != nil {
 		return nil, err
 	}
 
-	protos := map[string]*parseResult{}
-	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	results := &parseResults{
-		resultsByFilename:      protos,
-		validate:               p.ValidateUnlinkedFiles,
-		createDescriptorProtos: true,
-	}
-	parseProtoFiles(accessor, filenames, errs, results, lookupImport)
-	if err := errs.getError(); err != nil {
-		return nil, err
-	}
 	if p.InferImportPaths {
-		// TODO: if this re-writes one of the names in filenames, lookups below will break
-		protos = fixupFilenames(protos)
+		resultsMap := make(map[string]parser.Result, len(results))
+		for _, res := range results {
+			resultsMap[res.FileDescriptorProto().GetName()] = res
+		}
+		resultsMap = fixupFilenames(resultsMap)
+		for i := range filenames {
+			results[i] = resultsMap[filenames[i]]
+		}
 	}
-	fds := make([]*dpb.FileDescriptorProto, len(filenames))
-	for i, name := range filenames {
-		pr := protos[name]
-		fd := pr.fd
+
+	protos := make([]*descriptorpb.FileDescriptorProto, len(results))
+	for i, res := range results {
+		protos[i] = res.FileDescriptorProto()
+		var optsIndex options.Index
 		if p.InterpretOptionsInUnlinkedFiles {
-			// parsing options will be best effort
-			pr.lenient = true
-			// we don't want the real error reporter see any errors
-			pr.errs.errReporter = func(err ErrorWithPos) error {
-				return err
+			var err error
+			optsIndex, err = options.InterpretUnlinkedOptions(res)
+			if err != nil {
+				return nil, err
 			}
-			_ = interpretFileOptions(nil, pr, poorFileDescriptorish{FileDescriptorProto: fd})
 		}
 		if p.IncludeSourceCodeInfo {
-			fd.SourceCodeInfo = pr.generateSourceCodeInfo()
+			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex)
 		}
-		fds[i] = fd
 	}
-	return fds, nil
+
+	return protos, nil
 }
 
 // ParseToAST parses the named files into ASTs, or Abstract Syntax Trees. This
@@ -348,54 +270,210 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*dpb.FileDescript
 // error it returns. If syntax errors are encountered but the configured
 // ErrorReporter always returns nil, the parse fails with ErrInvalidSource.
 func (p Parser) ParseToAST(filenames ...string) ([]*ast.FileNode, error) {
+	rep := newReporter(p.ErrorReporter, p.WarningReporter)
+	res, _ := p.getResolver(filenames)
+	asts, _, err := parseToASTs(res, filenames, reporter.NewHandler(rep))
+	if err != nil {
+		return nil, err
+	}
+	results := make([]*ast.FileNode, len(asts))
+	for i := range asts {
+		if asts[i] == nil {
+			// should not be possible but...
+			return nil, fmt.Errorf("resolver did not produce source for %v", filenames[i])
+		}
+		results[i] = convertAST(asts[i])
+	}
+	return results, nil
+}
+
+func parseToAST(res protocompile.Resolver, filename string, rep *reporter.Handler) (*ast2.FileNode, parser.Result, error) {
+	searchResult, err := res.FindFileByPath(filename)
+	if err != nil {
+		_ = rep.HandleError(err)
+		return nil, nil, rep.Error()
+	}
+	switch {
+	case searchResult.ParseResult != nil:
+		return nil, searchResult.ParseResult, nil
+	case searchResult.Proto != nil:
+		return nil, parser.ResultWithoutAST(searchResult.Proto), nil
+	case searchResult.Desc != nil:
+		return nil, parser.ResultWithoutAST(protoutil.ProtoFromFileDescriptor(searchResult.Desc)), nil
+	case searchResult.AST != nil:
+		return searchResult.AST, nil, nil
+	case searchResult.Source != nil:
+		astRoot, err := parser.Parse(filename, searchResult.Source, rep)
+		return astRoot, nil, err
+	default:
+		_ = rep.HandleError(fmt.Errorf("resolver did not produce a result for %v", filename))
+		return nil, nil, rep.Error()
+	}
+}
+
+func parseToASTs(res protocompile.Resolver, filenames []string, rep *reporter.Handler) ([]*ast2.FileNode, []parser.Result, error) {
+	asts := make([]*ast2.FileNode, len(filenames))
+	results := make([]parser.Result, len(filenames))
+	for i := range filenames {
+		asts[i], results[i], _ = parseToAST(res, filenames[i], rep)
+		if rep.ReporterError() != nil {
+			break
+		}
+	}
+	return asts, results, rep.Error()
+}
+
+func parseToProtos(res protocompile.Resolver, filenames []string, rep *reporter.Handler, validate bool) ([]parser.Result, error) {
+	asts, results, err := parseToASTs(res, filenames, rep)
+	if err != nil {
+		return nil, err
+	}
+	for i := range results {
+		if results[i] != nil {
+			continue
+		}
+		var err error
+		results[i], err = parser.ResultFromAST(asts[i], validate, rep)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return results, nil
+}
+
+func parseToProtosRecursive(res protocompile.Resolver, filenames []string, rep *reporter.Handler, srcPosAddr *SourcePos) (map[string]parser.Result, error) {
+	results := make(map[string]parser.Result, len(filenames))
+	for _, filename := range filenames {
+		parseToProtoRecursive(res, filename, rep, srcPosAddr, results)
+	}
+	return results, rep.Error()
+}
+
+func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *reporter.Handler, srcPosAddr *SourcePos, results map[string]parser.Result) {
+	if _, ok := results[filename]; ok {
+		// already processed this one
+		return
+	}
+	results[filename] = nil // placeholder entry
+
+	astRoot, parseResult, _ := parseToAST(res, filename, rep)
+	if rep.ReporterError() != nil {
+		return
+	}
+	if parseResult == nil {
+		parseResult, _ = parser.ResultFromAST(astRoot, true, rep)
+		if rep.ReporterError() != nil {
+			return
+		}
+	}
+	results[filename] = parseResult
+
+	for _, decl := range astRoot.Decls {
+		imp, ok := decl.(*ast2.ImportNode)
+		if !ok {
+			continue
+		}
+		func() {
+			orig := *srcPosAddr
+			*srcPosAddr = astRoot.NodeInfo(imp.Name).Start()
+			defer func() {
+				*srcPosAddr = orig
+			}()
+
+			parseToProtoRecursive(res, imp.Name.AsString(), rep, srcPosAddr, results)
+		}()
+		if rep.ReporterError() != nil {
+			return
+		}
+	}
+}
+
+func newReporter(errRep ErrorReporter, warnRep WarningReporter) reporter.Reporter {
+	if errRep != nil {
+		delegate := errRep
+		errRep = func(err ErrorWithPos) error {
+			if _, ok := err.(ErrorWithSourcePos); !ok {
+				err = toErrorWithSourcePos(err)
+			}
+			return delegate(err)
+		}
+	}
+	if warnRep != nil {
+		delegate := warnRep
+		warnRep = func(err ErrorWithPos) {
+			if _, ok := err.(ErrorWithSourcePos); !ok {
+				err = toErrorWithSourcePos(err)
+			}
+			delegate(err)
+		}
+	}
+	return reporter.NewReporter(errRep, warnRep)
+}
+
+func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *SourcePos) {
+	var srcPos SourcePos
 	accessor := p.Accessor
 	if accessor == nil {
 		accessor = func(name string) (io.ReadCloser, error) {
 			return os.Open(name)
 		}
 	}
-	lookupImport, err := p.getLookupImport()
-	if err != nil {
-		return nil, err
+	sourceResolver := &protocompile.SourceResolver{
+		Accessor: func(filename string) (io.ReadCloser, error) {
+			in, err := accessor(filename)
+			if err != nil {
+				if !strings.Contains(err.Error(), filename) {
+					// errors that don't include the filename that failed are no bueno
+					err = errorWithFilename{filename: filename, underlying: err}
+				}
+				if srcPos.Filename != "" {
+					err = reporter.Error(srcPos, err)
+				}
+			}
+			return in, err
+		},
+		ImportPaths: p.ImportPaths,
 	}
-
-	protos := map[string]*parseResult{}
-	errs := newErrorHandler(p.ErrorReporter, p.WarningReporter)
-	parseProtoFiles(accessor, filenames, errs, &parseResults{resultsByFilename: protos}, lookupImport)
-	if err := errs.getError(); err != nil {
-		return nil, err
-	}
-	ret := make([]*ast.FileNode, 0, len(filenames))
-	for _, name := range filenames {
-		ret = append(ret, protos[name].root)
-	}
-	return ret, nil
-}
-
-func (p Parser) getLookupImport() (func(string) (*dpb.FileDescriptorProto, error), error) {
-	if p.LookupImport != nil && p.LookupImportProto != nil {
-		return nil, ErrLookupImportAndProtoSet
+	var importResolver protocompile.CompositeResolver
+	if p.LookupImport != nil {
+		importResolver = append(importResolver, protocompile.ResolverFunc(func(path string) (protocompile.SearchResult, error) {
+			fd, err := p.LookupImport(path)
+			if err != nil {
+				return protocompile.SearchResult{}, err
+			}
+			return protocompile.SearchResult{Desc: fd.UnwrapFile()}, nil
+		}))
 	}
 	if p.LookupImportProto != nil {
-		return p.LookupImportProto, nil
-	}
-	if p.LookupImport != nil {
-		return func(path string) (*dpb.FileDescriptorProto, error) {
-			value, err := p.LookupImport(path)
-			if value != nil {
-				return value.AsFileDescriptorProto(), err
+		importResolver = append(importResolver, protocompile.ResolverFunc(func(path string) (protocompile.SearchResult, error) {
+			fd, err := p.LookupImportProto(path)
+			if err != nil {
+				return protocompile.SearchResult{}, err
 			}
-			return nil, err
-		}, nil
+			return protocompile.SearchResult{Proto: fd}, nil
+		}))
 	}
-	return nil, nil
+	backupResolver := protocompile.WithStandardImports(importResolver)
+	mustBeSource := make(map[string]struct{}, len(filenames))
+	for _, name := range filenames {
+		mustBeSource[name] = struct{}{}
+	}
+	return protocompile.CompositeResolver{
+		sourceResolver,
+		protocompile.ResolverFunc(func(path string) (protocompile.SearchResult, error) {
+			if _, ok := mustBeSource[path]; ok {
+				return protocompile.SearchResult{}, os.ErrNotExist
+			}
+			return backupResolver.FindFileByPath(path)
+		}),
+	}, &srcPos
 }
 
-func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
+func fixupFilenames(protos map[string]parser.Result) map[string]parser.Result {
 	// In the event that the given filenames (keys in the supplied map) do not
 	// match the actual paths used in 'import' statements in the files, we try
 	// to revise names in the protos so that they will match and be linkable.
-	revisedProtos := map[string]*parseResult{}
+	revisedProtos := map[string]parser.Result{}
 
 	protoPaths := map[string]struct{}{}
 	// TODO: this is O(n^2) but could likely be O(n) with a clever data structure (prefix tree that is indexed backwards?)
@@ -404,7 +482,7 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	for name := range protos {
 		candidatesAvailable[name] = struct{}{}
 		for _, f := range protos {
-			for _, imp := range f.fd.Dependency {
+			for _, imp := range f.FileDescriptorProto().Dependency {
 				if strings.HasSuffix(name, imp) {
 					candidates := importCandidates[imp]
 					if candidates == nil {
@@ -449,7 +527,7 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 				protoPaths[prefix] = struct{}{}
 			}
 			f := protos[best]
-			f.fd.Name = proto.String(imp)
+			f.FileDescriptorProto().Name = proto.String(imp)
 			revisedProtos[imp] = f
 			delete(candidatesAvailable, best)
 		}
@@ -489,7 +567,8 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 		}
 		if imp != "" {
 			f := protos[c]
-			f.fd.Name = proto.String(imp)
+			f.FileDescriptorProto().Name = proto.String(imp)
+			f.FileNode()
 			revisedProtos[imp] = f
 		} else {
 			revisedProtos[c] = protos[c]
@@ -497,351 +576,4 @@ func fixupFilenames(protos map[string]*parseResult) map[string]*parseResult {
 	}
 
 	return revisedProtos
-}
-
-func parseProtoFiles(acc FileAccessor, filenames []string, errs *errorHandler, parsed *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
-	for _, name := range filenames {
-		parseProtoFile(acc, name, nil, errs, parsed, lookupImport)
-		if errs.err != nil {
-			return
-		}
-	}
-}
-
-func parseProtoFile(acc FileAccessor, filename string, importLoc *SourcePos, errs *errorHandler, results *parseResults, lookupImport func(string) (*dpb.FileDescriptorProto, error)) {
-	if results.has(filename) {
-		return
-	}
-	if lookupImport == nil {
-		lookupImport = func(string) (*dpb.FileDescriptorProto, error) {
-			return nil, errors.New("no import lookup function")
-		}
-	}
-	in, err := acc(filename)
-	var result *parseResult
-	if err == nil {
-		// try to parse the bytes accessed
-		func() {
-			defer func() {
-				// if we've already parsed contents, an error
-				// closing need not fail this operation
-				_ = in.Close()
-			}()
-			result = parseProto(filename, in, errs, results.validate, results.createDescriptorProtos)
-		}()
-	} else if d, lookupErr := lookupImport(filename); lookupErr == nil {
-		// This is a user-provided descriptor, which is acting similarly to a
-		// well-known import.
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto), errs: errs}
-	} else if d, ok := standardImports[filename]; ok {
-		// it's a well-known import
-		// (we clone it to make sure we're not sharing state with other
-		//  parsers, which could result in unsafe races if multiple
-		//  parsers are trying to access it concurrently)
-		result = &parseResult{fd: proto.Clone(d).(*dpb.FileDescriptorProto), errs: errs}
-	} else {
-		if !strings.Contains(err.Error(), filename) {
-			// an error message that doesn't indicate the file is awful!
-			// this cannot be %w as this is not compatible with go <= 1.13
-			err = errorWithFilename{
-				underlying: err,
-				filename:   filename,
-			}
-		}
-		// The top-level loop in parseProtoFiles calls this with nil for the top-level files
-		// importLoc is only for imports, otherwise we do not want to return a ErrorWithSourcePos
-		// ErrorWithSourcePos should always have a non-nil SourcePos
-		if importLoc != nil {
-			// associate the error with the import line
-			err = ErrorWithSourcePos{
-				Pos:        importLoc,
-				Underlying: err,
-			}
-		}
-		_ = errs.handleError(err)
-		return
-	}
-
-	results.add(filename, result)
-
-	if errs.err != nil {
-		return // abort
-	}
-
-	if results.recursive {
-		fd := result.fd
-		decl := result.getFileNode(fd)
-		fnode, ok := decl.(*ast.FileNode)
-		if !ok {
-			// no AST for this file? use imports in descriptor
-			for _, dep := range fd.Dependency {
-				parseProtoFile(acc, dep, decl.Start(), errs, results, lookupImport)
-				if errs.getError() != nil {
-					return // abort
-				}
-			}
-			return
-		}
-		// we have an AST; use it so we can report import location in errors
-		for _, decl := range fnode.Decls {
-			if dep, ok := decl.(*ast.ImportNode); ok {
-				parseProtoFile(acc, dep.Name.AsString(), dep.Name.Start(), errs, results, lookupImport)
-				if errs.getError() != nil {
-					return // abort
-				}
-			}
-		}
-	}
-}
-
-type parseResults struct {
-	resultsByFilename map[string]*parseResult
-	filenames         []string
-
-	recursive, validate, createDescriptorProtos bool
-}
-
-func (r *parseResults) has(filename string) bool {
-	_, ok := r.resultsByFilename[filename]
-	return ok
-}
-
-func (r *parseResults) add(filename string, result *parseResult) {
-	r.resultsByFilename[filename] = result
-	r.filenames = append(r.filenames, filename)
-}
-
-type parseResult struct {
-	// handles any errors encountered during parsing, construction of file descriptor,
-	// or validation
-	errs *errorHandler
-
-	// the root of the AST
-	root *ast.FileNode
-	// the parsed file descriptor
-	fd *dpb.FileDescriptorProto
-
-	// if set to true, enables lenient interpretation of options, where
-	// unrecognized options will be left uninterpreted instead of resulting in a
-	// link error
-	lenient bool
-
-	// a map of elements in the descriptor to nodes in the AST
-	// (for extracting position information when validating the descriptor)
-	nodes map[proto.Message]ast.Node
-
-	// a map of uninterpreted option AST nodes to their relative path
-	// in the resulting options message
-	interpretedOptions map[*ast.OptionNode][]int32
-
-	// a map of AST nodes that represent identifiers in ast.FieldReferenceNodes
-	// to their fully-qualified name. The identifiers are for field names in
-	// message literals (in option values) that are extension fields. These names
-	// are resolved during linking and stored here, to be used to interpret options.
-	optionQualifiedNames map[ast.IdentValueNode]string
-}
-
-func (r *parseResult) getFileNode(f *dpb.FileDescriptorProto) ast.FileDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(f.GetName())
-	}
-	return r.nodes[f].(ast.FileDeclNode)
-}
-
-func (r *parseResult) getOptionNode(o *dpb.UninterpretedOption) ast.OptionDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[o].(ast.OptionDeclNode)
-}
-
-func (r *parseResult) getOptionNamePartNode(o *dpb.UninterpretedOption_NamePart) ast.Node {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[o]
-}
-
-func (r *parseResult) getFieldNode(f *dpb.FieldDescriptorProto) ast.FieldDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[f].(ast.FieldDeclNode)
-}
-
-func (r *parseResult) getExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange) ast.RangeDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[e].(ast.RangeDeclNode)
-}
-
-func (r *parseResult) getMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange) ast.RangeDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[rr].(ast.RangeDeclNode)
-}
-
-func (r *parseResult) getEnumNode(e *dpb.EnumDescriptorProto) ast.Node {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[e]
-}
-
-func (r *parseResult) getEnumValueNode(e *dpb.EnumValueDescriptorProto) ast.EnumValueDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[e].(ast.EnumValueDeclNode)
-}
-
-func (r *parseResult) getEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange) ast.RangeDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[rr].(ast.RangeDeclNode)
-}
-
-func (r *parseResult) getMethodNode(m *dpb.MethodDescriptorProto) ast.RPCDeclNode {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[m].(ast.RPCDeclNode)
-}
-
-func (r *parseResult) getNode(m proto.Message) ast.Node {
-	if r.nodes == nil {
-		return ast.NewNoSourceNode(r.fd.GetName())
-	}
-	return r.nodes[m]
-}
-
-func (r *parseResult) putFileNode(f *dpb.FileDescriptorProto, n *ast.FileNode) {
-	r.nodes[f] = n
-}
-
-func (r *parseResult) putOptionNode(o *dpb.UninterpretedOption, n *ast.OptionNode) {
-	r.nodes[o] = n
-}
-
-func (r *parseResult) putOptionNamePartNode(o *dpb.UninterpretedOption_NamePart, n *ast.FieldReferenceNode) {
-	r.nodes[o] = n
-}
-
-func (r *parseResult) putMessageNode(m *dpb.DescriptorProto, n ast.MessageDeclNode) {
-	r.nodes[m] = n
-}
-
-func (r *parseResult) putFieldNode(f *dpb.FieldDescriptorProto, n ast.FieldDeclNode) {
-	r.nodes[f] = n
-}
-
-func (r *parseResult) putOneOfNode(o *dpb.OneofDescriptorProto, n ast.OneOfDeclNode) {
-	r.nodes[o] = n
-}
-
-func (r *parseResult) putExtensionRangeNode(e *dpb.DescriptorProto_ExtensionRange, n *ast.RangeNode) {
-	r.nodes[e] = n
-}
-
-func (r *parseResult) putMessageReservedRangeNode(rr *dpb.DescriptorProto_ReservedRange, n *ast.RangeNode) {
-	r.nodes[rr] = n
-}
-
-func (r *parseResult) putEnumNode(e *dpb.EnumDescriptorProto, n *ast.EnumNode) {
-	r.nodes[e] = n
-}
-
-func (r *parseResult) putEnumValueNode(e *dpb.EnumValueDescriptorProto, n *ast.EnumValueNode) {
-	r.nodes[e] = n
-}
-
-func (r *parseResult) putEnumReservedRangeNode(rr *dpb.EnumDescriptorProto_EnumReservedRange, n *ast.RangeNode) {
-	r.nodes[rr] = n
-}
-
-func (r *parseResult) putServiceNode(s *dpb.ServiceDescriptorProto, n *ast.ServiceNode) {
-	r.nodes[s] = n
-}
-
-func (r *parseResult) putMethodNode(m *dpb.MethodDescriptorProto, n *ast.RPCNode) {
-	r.nodes[m] = n
-}
-
-func parseProto(filename string, r io.Reader, errs *errorHandler, validate, createProtos bool) *parseResult {
-	beforeErrs := errs.errsReported
-	lx := newLexer(r, filename, errs)
-	protoParse(lx)
-	if lx.res == nil || len(lx.res.Children()) == 0 {
-		// nil AST means there was an error that prevented any parsing
-		// or the file was empty; synthesize empty non-nil AST
-		lx.res = ast.NewEmptyFileNode(filename)
-	}
-	if lx.eof != nil {
-		lx.res.FinalComments = lx.eof.LeadingComments()
-		lx.res.FinalWhitespace = lx.eof.LeadingWhitespace()
-	}
-	res := createParseResult(filename, lx.res, errs, createProtos)
-	if validate && errs.err == nil {
-		validateBasic(res, errs.errsReported > beforeErrs)
-	}
-
-	return res
-}
-
-func createParseResult(filename string, file *ast.FileNode, errs *errorHandler, createProtos bool) *parseResult {
-	res := &parseResult{
-		errs:                 errs,
-		root:                 file,
-		nodes:                map[proto.Message]ast.Node{},
-		interpretedOptions:   map[*ast.OptionNode][]int32{},
-		optionQualifiedNames: map[ast.IdentValueNode]string{},
-	}
-	if createProtos {
-		res.createFileDescriptor(filename, file)
-	}
-	return res
-}
-
-func checkTag(pos *SourcePos, v uint64, maxTag int32) error {
-	if v < 1 {
-		return errorWithPos(pos, "tag number %d must be greater than zero", v)
-	} else if v > uint64(maxTag) {
-		return errorWithPos(pos, "tag number %d is higher than max allowed tag number (%d)", v, maxTag)
-	} else if v >= internal.SpecialReservedStart && v <= internal.SpecialReservedEnd {
-		return errorWithPos(pos, "tag number %d is in disallowed reserved range %d-%d", v, internal.SpecialReservedStart, internal.SpecialReservedEnd)
-	}
-	return nil
-}
-
-func writeEscapedBytes(buf *bytes.Buffer, b []byte) {
-	for _, c := range b {
-		switch c {
-		case '\n':
-			buf.WriteString("\\n")
-		case '\r':
-			buf.WriteString("\\r")
-		case '\t':
-			buf.WriteString("\\t")
-		case '"':
-			buf.WriteString("\\\"")
-		case '\'':
-			buf.WriteString("\\'")
-		case '\\':
-			buf.WriteString("\\\\")
-		default:
-			if c >= 0x20 && c <= 0x7f && c != '"' && c != '\\' {
-				// simple printable characters
-				buf.WriteByte(c)
-			} else {
-				// use octal escape for all other values
-				buf.WriteRune('\\')
-				buf.WriteByte('0' + ((c >> 6) & 0x7))
-				buf.WriteByte('0' + ((c >> 3) & 0x7))
-				buf.WriteByte('0' + (c & 0x7))
-			}
-		}
-	}
 }

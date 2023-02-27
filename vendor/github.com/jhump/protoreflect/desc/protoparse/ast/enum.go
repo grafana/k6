@@ -4,7 +4,7 @@ import "fmt"
 
 // EnumNode represents an enum declaration. Example:
 //
-//  enum Foo { BAR = 0; BAZ = 1 }
+//	enum Foo { BAR = 0; BAZ = 1 }
 type EnumNode struct {
 	compositeNode
 	Keyword    *KeywordNode
@@ -20,11 +20,11 @@ func (*EnumNode) msgElement()  {}
 // NewEnumNode creates a new *EnumNode. All arguments must be non-nil. While
 // it is technically allowed for decls to be nil or empty, the resulting node
 // will not be a valid enum, which must have at least one value.
-//  - keyword: The token corresponding to the "enum" keyword.
-//  - name: The token corresponding to the enum's name.
-//  - openBrace: The token corresponding to the "{" rune that starts the body.
-//  - decls: All declarations inside the enum body.
-//  - closeBrace: The token corresponding to the "}" rune that ends the body.
+//   - keyword: The token corresponding to the "enum" keyword.
+//   - name: The token corresponding to the enum's name.
+//   - openBrace: The token corresponding to the "{" rune that starts the body.
+//   - decls: All declarations inside the enum body.
+//   - closeBrace: The token corresponding to the "}" rune that ends the body.
 func NewEnumNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []EnumElement, closeBrace *RuneNode) *EnumNode {
 	if keyword == nil {
 		panic("keyword is nil")
@@ -91,7 +91,7 @@ var _ EnumValueDeclNode = NoSourceNode{}
 
 // EnumNode represents an enum declaration. Example:
 //
-//  UNSET = 0 [deprecated = true];
+//	UNSET = 0 [deprecated = true];
 type EnumValueNode struct {
 	compositeNode
 	Name      *IdentNode
@@ -105,11 +105,11 @@ func (*EnumValueNode) enumElement() {}
 
 // NewEnumValueNode creates a new *EnumValueNode. All arguments must be non-nil
 // except opts which is only non-nil if the declaration included options.
-//  - name: The token corresponding to the enum value's name.
-//  - equals: The token corresponding to the '=' rune after the name.
-//  - number: The token corresponding to the enum value's number.
-//  - opts: Optional set of enum value options.
-//  - semicolon: The token corresponding to the ";" rune that ends the declaration.
+//   - name: The token corresponding to the enum value's name.
+//   - equals: The token corresponding to the '=' rune after the name.
+//   - number: The token corresponding to the enum value's number.
+//   - opts: Optional set of enum value options.
+//   - semicolon: The token corresponding to the ";" rune that ends the declaration.
 func NewEnumValueNode(name *IdentNode, equals *RuneNode, number IntValueNode, opts *CompactOptionsNode, semicolon *RuneNode) *EnumValueNode {
 	if name == nil {
 		panic("name is nil")

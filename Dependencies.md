@@ -15,8 +15,8 @@ For example some dependencies that were in the middle of big updates were skippe
 Through the rest of the development cycle dependencies shouldn't be updated unless:
 1. required for development
 2. a particular bug fix/feature is really important
-	
-	
+
+
 The last part predominantly goes for `golang.org/x/*` and particularly `golang.org/x/net` which usually have updates through the development of Go itself.
 [Goja](https://github.com/dop251/goja) has special considerations as it's heavily used and bug fixes there or new features usually have high impact on k6. Which means that we usually try to update it whenever something new lands there.
 
@@ -37,8 +37,6 @@ List (as of March 2022):
 - github.com/spf13/pflag - similar to above
 - gopkg.in/guregu/null.v3 - no new interesting features and we probably want to drop it in favor of [croconf](https://github.com/grafana/croconf)
 - gopkg.in/yaml.v3 - no new features wanted - actually used directly in only one place to output yaml to stdout.
-- google.golang.org/genproto, google.golang.org/protobuf, github.com/golang/protobuf - get update by `google.golang.org/grpc` when needed
-
 
 ## How to do it
 
@@ -48,7 +46,7 @@ Currently, I will recommend using [modtools](https://github.com/dop251/modtools)
 Running `modtools check --direct-only` will give you a list of packages that aren't frozen (the ones above in the exceptions). Alternatively just running `go get <dependency>` for each direct dependency, which also will tell you if there was an update.
 
 Then take a look at the changelog between the versions.
- 
+
 You can use the command `modtools check --direct-only` provided you, to update it. Run tests and if relevant check that bugs are fixed or any other verification that is appropriate.
 
 Commit dependencies one by one with a message like `Update <dependency> from vX.Y.Z to vX.Y.Z` and a relevant changelog for k6. Sometimes that means "nothing of relevance for k6", sometimes it means a list of bug fixes or new features.

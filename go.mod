@@ -1,15 +1,15 @@
 module go.k6.io/k6
 
-go 1.17
+go 1.19
 
 require (
-	github.com/Azure/go-ntlmssp v0.0.0-20220621081337-cb9428e4ac1e
+	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
-	github.com/PuerkitoBio/goquery v1.8.0
+	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v1.0.4
+	github.com/andybalholm/brotli v1.0.5
 	github.com/dop251/goja v0.0.0-20230216180835-5937a312edda
-	github.com/fatih/color v1.13.0
+	github.com/fatih/color v1.14.1
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/golang/protobuf v1.5.2
 	github.com/gorilla/websocket v1.5.0
@@ -19,13 +19,13 @@ require (
 	github.com/grafana/xk6-timers v0.1.2
 	github.com/grafana/xk6-websockets v0.1.6
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.13.0
-	github.com/klauspost/compress v1.15.11
+	github.com/jhump/protoreflect v1.15.0
+	github.com/klauspost/compress v1.16.0
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.13
-	github.com/mattn/go-isatty v0.0.16
+	github.com/mattn/go-isatty v0.0.17
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
-	github.com/mstoykov/atlas v0.0.0-20220808085829-90340e9998bd
+	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/pmezard/go-difflib v1.0.0
@@ -34,16 +34,16 @@ require (
 	github.com/spf13/afero v1.1.2
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
-	github.com/stretchr/testify v1.8.0
-	github.com/tidwall/gjson v1.14.3
+	github.com/stretchr/testify v1.8.2
+	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/pretty v1.2.1
-	go.uber.org/goleak v1.2.0
-	golang.org/x/crypto v0.0.0-20220926161630-eccd6366d1be
-	golang.org/x/net v0.0.0-20221002022538-bcab6841153b
-	golang.org/x/term v0.0.0-20220919170432-7a66f970e087
-	golang.org/x/time v0.0.0-20220922220347-f3bd1da661af
-	google.golang.org/grpc v1.49.0
-	google.golang.org/protobuf v1.28.1
+	go.uber.org/goleak v1.2.1
+	golang.org/x/crypto v0.6.0
+	golang.org/x/net v0.7.0
+	golang.org/x/term v0.5.0
+	golang.org/x/time v0.3.0
+	google.golang.org/grpc v1.53.0
+	google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -51,7 +51,8 @@ require (
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/cespare/xxhash/v2 v2.1.2 // indirect
+	github.com/bufbuild/protocompile v0.2.1-0.20230123224550-da57cd758c2f // indirect
+	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
@@ -71,8 +72,8 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	go.buf.build/grpc/go/gogo/protobuf v1.4.9 // indirect
 	go.buf.build/grpc/go/prometheus/prometheus v1.4.4 // indirect
-	golang.org/x/lint v0.0.0-20210508222113-6edffad5e616 // indirect
-	golang.org/x/sys v0.0.0-20220928140112-f11e5e49a4ec // indirect
-	golang.org/x/text v0.3.7 // indirect
-	google.golang.org/genproto v0.0.0-20220502173005-c8bf987b8c21 // indirect
+	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde // indirect
+	golang.org/x/sys v0.5.0 // indirect
+	golang.org/x/text v0.7.0 // indirect
+	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 )

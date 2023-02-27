@@ -4,9 +4,10 @@ import "fmt"
 
 // MessageDeclNode is a node in the AST that defines a message type. This
 // includes normal message fields as well as implicit messages:
-//  - *MessageNode
-//  - *GroupNode (the group is a field and inline message type)
-//  - *MapFieldNode (map fields implicitly define a MapEntry message type)
+//   - *MessageNode
+//   - *GroupNode (the group is a field and inline message type)
+//   - *MapFieldNode (map fields implicitly define a MapEntry message type)
+//
 // This also allows NoSourceNode to be used in place of one of the above
 // for some usages.
 type MessageDeclNode interface {
@@ -21,11 +22,11 @@ var _ MessageDeclNode = NoSourceNode{}
 
 // MessageNode represents a message declaration. Example:
 //
-//  message Foo {
-//    string name = 1;
-//    repeated string labels = 2;
-//    bytes extra = 3;
-//  }
+//	message Foo {
+//	  string name = 1;
+//	  repeated string labels = 2;
+//	  bytes extra = 3;
+//	}
 type MessageNode struct {
 	compositeNode
 	Keyword *KeywordNode
@@ -37,11 +38,11 @@ func (*MessageNode) fileElement() {}
 func (*MessageNode) msgElement()  {}
 
 // NewMessageNode creates a new *MessageNode. All arguments must be non-nil.
-//  - keyword: The token corresponding to the "message" keyword.
-//  - name: The token corresponding to the field's name.
-//  - openBrace: The token corresponding to the "{" rune that starts the body.
-//  - decls: All declarations inside the message body.
-//  - closeBrace: The token corresponding to the "}" rune that ends the body.
+//   - keyword: The token corresponding to the "message" keyword.
+//   - name: The token corresponding to the field's name.
+//   - openBrace: The token corresponding to the "{" rune that starts the body.
+//   - decls: All declarations inside the message body.
+//   - closeBrace: The token corresponding to the "}" rune that ends the body.
 func NewMessageNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []MessageElement, closeBrace *RuneNode) *MessageNode {
 	if keyword == nil {
 		panic("keyword is nil")
@@ -121,9 +122,9 @@ var _ MessageElement = (*EmptyDeclNode)(nil)
 
 // ExtendNode represents a declaration of extension fields. Example:
 //
-//  extend google.protobuf.FieldOptions {
-//    bool redacted = 33333;
-//  }
+//	extend google.protobuf.FieldOptions {
+//	  bool redacted = 33333;
+//	}
 type ExtendNode struct {
 	compositeNode
 	Keyword    *KeywordNode
@@ -137,11 +138,11 @@ func (*ExtendNode) fileElement() {}
 func (*ExtendNode) msgElement()  {}
 
 // NewExtendNode creates a new *ExtendNode. All arguments must be non-nil.
-//  - keyword: The token corresponding to the "extend" keyword.
-//  - extendee: The token corresponding to the name of the extended message.
-//  - openBrace: The token corresponding to the "{" rune that starts the body.
-//  - decls: All declarations inside the message body.
-//  - closeBrace: The token corresponding to the "}" rune that ends the body.
+//   - keyword: The token corresponding to the "extend" keyword.
+//   - extendee: The token corresponding to the name of the extended message.
+//   - openBrace: The token corresponding to the "{" rune that starts the body.
+//   - decls: All declarations inside the message body.
+//   - closeBrace: The token corresponding to the "}" rune that ends the body.
 func NewExtendNode(keyword *KeywordNode, extendee IdentValueNode, openBrace *RuneNode, decls []ExtendElement, closeBrace *RuneNode) *ExtendNode {
 	if keyword == nil {
 		panic("keyword is nil")

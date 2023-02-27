@@ -11,6 +11,11 @@ const collectRate = 50 * time.Millisecond
 
 var _ output.Output = &outputIngester{}
 
+// IngesterDescription is a short description for ingester.
+// This variable is used from a function in cmd/ui file for matching this output
+// and print a special text.
+const IngesterDescription = "Internal Metrics Ingester"
+
 // outputIngester implements the output.Output interface and can be used to
 // "feed" the MetricsEngine data from a `k6 run` test run.
 type outputIngester struct {
@@ -23,7 +28,7 @@ type outputIngester struct {
 
 // Description returns a human-readable description of the output.
 func (oi *outputIngester) Description() string {
-	return "engine"
+	return IngesterDescription
 }
 
 // Start the engine by initializing a new output.PeriodicFlusher

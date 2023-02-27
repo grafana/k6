@@ -57,10 +57,68 @@ func TestSimpleTestStdin(t *testing.T) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
+	assert.Contains(t, stdout, "output: -")
 	assert.Contains(t, stdout, "default: 1 iterations for each of 1 VUs")
 	assert.Contains(t, stdout, "1 complete and 0 interrupted iterations")
 	assert.Empty(t, ts.Stderr.Bytes())
 	assert.Empty(t, ts.LoggerHook.Drain())
+}
+
+func TestBinaryNameStdout(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+	ts.BinaryName = "customBinaryName"
+	ts.CmdArgs = []string{ts.BinaryName}
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	assert.Contains(t, stdout, fmt.Sprintf("%s [command]", ts.BinaryName))
+	assert.Empty(t, ts.Stderr.Bytes())
+	assert.Empty(t, ts.LoggerHook.Drain())
+}
+
+func TestBinaryNameHelpStdout(t *testing.T) {
+	t.Parallel()
+	ts := NewGlobalTestState(t)
+	ts.BinaryName = "customBinaryName"
+
+	tests := []struct {
+		cmdName        string
+		extraCmd       string // For the `login cloud` cmd
+		containsOutput string
+	}{
+		{
+			cmdName:        "archive",
+			containsOutput: fmt.Sprintf("%s archive -u 10 -d 10s -O myarchive.tar script.js", ts.BinaryName),
+		},
+		{
+			cmdName:        "cloud",
+			containsOutput: fmt.Sprintf("%s cloud script.js", ts.BinaryName),
+		},
+		{
+			cmdName:        "convert",
+			containsOutput: fmt.Sprintf("%s convert -O har-session.js session.har", ts.BinaryName),
+		},
+		{
+			cmdName:        "login",
+			extraCmd:       "cloud",
+			containsOutput: fmt.Sprintf("%s login cloud -t YOUR_TOKEN", ts.BinaryName),
+		},
+		{
+			cmdName:        "run",
+			containsOutput: fmt.Sprintf("%s run -i 10 script.js", ts.BinaryName),
+		},
+	}
+
+	for _, tt := range tests {
+		ts.CmdArgs = []string{ts.BinaryName, "help", tt.cmdName, tt.extraCmd}
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		stdout := ts.Stdout.String()
+		assert.Contains(t, stdout, tt.containsOutput)
+		assert.Empty(t, ts.Stderr.Bytes())
+		assert.Empty(t, ts.LoggerHook.Drain())
+	}
 }
 
 // TODO: Remove this? It doesn't test anything AFAICT...
@@ -1784,6 +1842,40 @@ func TestBrowserPermissions(t *testing.T) {
 			}
 
 			assert.Contains(t, loglines[0].Message, tt.expectedError)
+		})
+	}
+}
+
+func TestUIRenderOutput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		outputs   []string
+		expRender string
+	}{
+		{outputs: []string{}, expRender: "output: -\n"},
+		{outputs: []string{"json"}, expRender: "output: json(stdout)\n\n"},
+		{outputs: []string{"json", "csv"}, expRender: "output: json(stdout), csv (file.csv)\n\n"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.expRender, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = []string{"k6", "run"}
+			for _, o := range tc.outputs {
+				ts.CmdArgs = append(ts.CmdArgs, "-o")
+				ts.CmdArgs = append(ts.CmdArgs, o)
+			}
+			ts.CmdArgs = append(ts.CmdArgs, "-")
+			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			stdout := ts.Stdout.String()
+			assert.Contains(t, stdout, tc.expRender)
 		})
 	}
 }
