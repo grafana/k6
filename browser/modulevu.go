@@ -25,5 +25,5 @@ func (vu moduleVU) Context() context.Context {
 	// We should not cache the context (especially the init
 	// context from the vu that is received from k6 in
 	// NewModuleInstance).
-	return k6ext.WithVU(vu.VU.Context(), vu.VU)
+	return k6ext.WithVU(vu.VU.Context(), vu)
 }
