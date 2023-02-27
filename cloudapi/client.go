@@ -23,7 +23,7 @@ const (
 	k6IdempotencyKeyHeader = "k6-Idempotency-Key"
 )
 
-// Client handles communication with Load Impact cloud API.
+// Client handles communication with k6 cloud API.
 type Client struct {
 	client  *http.Client
 	token   string
@@ -220,6 +220,7 @@ func shouldAddIdempotencyKey(req *http.Request) bool {
 
 // randomStrHex returns a hex string which can be used
 // for session token id or idempotency key.
+//
 //nolint:gosec
 func randomStrHex() string {
 	// 16 hex characters

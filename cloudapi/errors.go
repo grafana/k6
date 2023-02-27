@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	ErrNotAuthorized    = errors.New("Not allowed to upload result to Load Impact cloud")
-	ErrNotAuthenticated = errors.New("Failed to authenticate with Load Impact cloud")
-	ErrUnknown          = errors.New("An error occurred talking to Load Impact cloud")
+	ErrNotAuthorized    = errors.New("Not allowed to upload result to k6 cloud")
+	ErrNotAuthenticated = errors.New("Failed to authenticate with k6 cloud")
+	ErrUnknown          = errors.New("An error occurred talking to k6 cloud")
 )
 
 // ErrorResponse represents an error cause by talking to the API
