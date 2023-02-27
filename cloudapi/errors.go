@@ -8,9 +8,9 @@ import (
 )
 
 var (
-	errNotAuthorized    = errors.New("not allowed to upload result to k6 cloud")
-	errNotAuthenticated = errors.New("failed to authenticate with k6 cloud")
-	errUnknown          = errors.New("an error occurred talking to k6 cloud")
+	errNotAuthorized    = errors.New("not allowed to upload result to k6 Cloud")
+	errNotAuthenticated = errors.New("failed to authenticate with k6 Cloud")
+	errUnknown          = errors.New("an error occurred communicating with k6 Cloud")
 )
 
 // ErrorResponse represents an error cause by talking to the API

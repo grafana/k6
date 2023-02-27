@@ -28,7 +28,7 @@ import (
 // TestName is the default k6 Cloud test name
 const TestName = "k6 test"
 
-// Output sends result data to the k6 cloud service.
+// Output sends result data to the k6 Cloud service.
 type Output struct {
 	config      cloudapi.Config
 	referenceID string

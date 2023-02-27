@@ -23,7 +23,7 @@ const (
 	k6IdempotencyKeyHeader = "k6-Idempotency-Key"
 )
 
-// Client handles communication with k6 cloud API.
+// Client handles communication with the k6 Cloud API.
 type Client struct {
 	client  *http.Client
 	token   string
