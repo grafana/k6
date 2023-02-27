@@ -171,6 +171,12 @@ func TestMappings(t *testing.T) {
 				return mapWorker(moduleVU{VU: vu}, &common.Worker{})
 			},
 		},
+		"mapLocator": {
+			apiInterface: (*api.Locator)(nil),
+			mapp: func() mapping {
+				return mapLocator(moduleVU{VU: vu}, &common.Locator{})
+			},
+		},
 	} {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
