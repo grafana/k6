@@ -8,7 +8,8 @@ import (
 	"sync"
 
 	"github.com/golang/protobuf/proto"
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 var (
@@ -33,12 +34,16 @@ var (
 // package or when the alternate path is only used from one file (so you don't
 // want the alternate path used when loading every other file), use an
 // ImportResolver instead.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func RegisterImportPath(registerPath, importPath string) {
 	if len(importPath) == 0 {
 		panic("import path cannot be empty")
 	}
-	desc := proto.FileDescriptor(registerPath)
-	if len(desc) == 0 {
+	_, err := protoregistry.GlobalFiles.FindFileByPath(registerPath)
+	if err != nil {
 		panic(fmt.Sprintf("path %q is not a registered proto file", registerPath))
 	}
 	globalImportPathMu.Lock()
@@ -55,6 +60,10 @@ func RegisterImportPath(registerPath, importPath string) {
 // ResolveImport resolves the given import path. If it has been registered as an
 // alternate via RegisterImportPath, the registered path is returned. Otherwise,
 // the given import path is returned unchanged.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func ResolveImport(importPath string) string {
 	importPath = clean(importPath)
 	globalImportPathMu.RLock()
@@ -106,6 +115,10 @@ func ResolveImport(importPath string) string {
 // path then how they are registered, consider using the global
 // RegisterImportPath function, so you don't have to use an ImportResolver for
 // every file that imports it.
+//
+// Note that the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// customizing import paths for descriptor resolution is no longer necessary.
 type ImportResolver struct {
 	children    map[string]*ImportResolver
 	importPaths map[string]string
@@ -231,77 +244,105 @@ func (r *ImportResolver) registerImportPathFrom(registerPath, importPath, source
 // LoadFileDescriptor is the same as the package function of the same name, but
 // any alternate paths configured in this resolver are used when linking the
 // given descriptor proto.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadFileDescriptor(filePath string) (*FileDescriptor, error) {
-	return loadFileDescriptor(filePath, r)
+	return LoadFileDescriptor(filePath)
 }
 
 // LoadMessageDescriptor is the same as the package function of the same name,
 // but any alternate paths configured in this resolver are used when linking
 // files for the returned descriptor.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadMessageDescriptor(msgName string) (*MessageDescriptor, error) {
-	return loadMessageDescriptor(msgName, r)
+	return LoadMessageDescriptor(msgName)
 }
 
 // LoadMessageDescriptorForMessage is the same as the package function of the
 // same name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadMessageDescriptorForMessage(msg proto.Message) (*MessageDescriptor, error) {
-	return loadMessageDescriptorForMessage(msg, r)
+	return LoadMessageDescriptorForMessage(msg)
 }
 
 // LoadMessageDescriptorForType is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadMessageDescriptorForType(msgType reflect.Type) (*MessageDescriptor, error) {
-	return loadMessageDescriptorForType(msgType, r)
+	return LoadMessageDescriptorForType(msgType)
 }
 
 // LoadEnumDescriptorForEnum is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadEnumDescriptorForEnum(enum protoEnum) (*EnumDescriptor, error) {
-	return loadEnumDescriptorForEnum(enum, r)
+	return LoadEnumDescriptorForEnum(enum)
 }
 
 // LoadEnumDescriptorForType is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadEnumDescriptorForType(enumType reflect.Type) (*EnumDescriptor, error) {
-	return loadEnumDescriptorForType(enumType, r)
+	return LoadEnumDescriptorForType(enumType)
 }
 
 // LoadFieldDescriptorForExtension is the same as the package function of the
 // same name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
+//
+// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
+// correct and that descriptors can be linked during package initialization. So
+// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadFieldDescriptorForExtension(ext *proto.ExtensionDesc) (*FieldDescriptor, error) {
-	return loadFieldDescriptorForExtension(ext, r)
+	return LoadFieldDescriptorForExtension(ext)
 }
 
 // CreateFileDescriptor is the same as the package function of the same name,
 // but any alternate paths configured in this resolver are used when linking the
 // given descriptor proto.
-func (r *ImportResolver) CreateFileDescriptor(fdp *dpb.FileDescriptorProto, deps ...*FileDescriptor) (*FileDescriptor, error) {
+func (r *ImportResolver) CreateFileDescriptor(fdp *descriptorpb.FileDescriptorProto, deps ...*FileDescriptor) (*FileDescriptor, error) {
 	return createFileDescriptor(fdp, deps, r)
 }
 
 // CreateFileDescriptors is the same as the package function of the same name,
 // but any alternate paths configured in this resolver are used when linking the
 // given descriptor protos.
-func (r *ImportResolver) CreateFileDescriptors(fds []*dpb.FileDescriptorProto) (map[string]*FileDescriptor, error) {
+func (r *ImportResolver) CreateFileDescriptors(fds []*descriptorpb.FileDescriptorProto) (map[string]*FileDescriptor, error) {
 	return createFileDescriptors(fds, r)
 }
 
 // CreateFileDescriptorFromSet is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking the descriptor protos in the given set.
-func (r *ImportResolver) CreateFileDescriptorFromSet(fds *dpb.FileDescriptorSet) (*FileDescriptor, error) {
+func (r *ImportResolver) CreateFileDescriptorFromSet(fds *descriptorpb.FileDescriptorSet) (*FileDescriptor, error) {
 	return createFileDescriptorFromSet(fds, r)
 }
 
 // CreateFileDescriptorsFromSet is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking the descriptor protos in the given set.
-func (r *ImportResolver) CreateFileDescriptorsFromSet(fds *dpb.FileDescriptorSet) (map[string]*FileDescriptor, error) {
+func (r *ImportResolver) CreateFileDescriptorsFromSet(fds *descriptorpb.FileDescriptorSet) (map[string]*FileDescriptor, error) {
 	return createFileDescriptorsFromSet(fds, r)
 }
 

@@ -26,7 +26,7 @@ type FileNode struct {
 	FinalWhitespace string
 }
 
-// NewFileElement creates a new *FileNode. The syntax parameter is optional. If it
+// NewFileNode creates a new *FileNode. The syntax parameter is optional. If it
 // is absent, it means the file had no syntax declaration.
 //
 // This function panics if the concrete type of any element of decls is not

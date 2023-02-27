@@ -274,8 +274,8 @@ func (x *Struct) GetFields() map[string]*Value {
 
 // `Value` represents a dynamically typed value which can be either
 // null, a number, a string, a boolean, a recursive struct value, or a
-// list of values. A producer of value is expected to set one of that
-// variants, absence of any variant indicates an error.
+// list of values. A producer of value is expected to set one of these
+// variants. Absence of any variant indicates an error.
 //
 // The JSON representation for `Value` is JSON value.
 type Value struct {

@@ -345,6 +345,8 @@ func (p *SourcePath) appendFieldOptions(b []byte) []byte {
 		b = p.appendSingularField(b, "jstype", nil)
 	case 5:
 		b = p.appendSingularField(b, "lazy", nil)
+	case 15:
+		b = p.appendSingularField(b, "unverified_lazy", nil)
 	case 3:
 		b = p.appendSingularField(b, "deprecated", nil)
 	case 10:
