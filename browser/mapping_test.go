@@ -68,14 +68,13 @@ func TestMappings(t *testing.T) {
 	// methods are not mapped.
 	testMapping := func(tt test) {
 		var (
-			typ    = reflect.TypeOf(tt.apiInterface).Elem()
-			mapped = tt.mapp()
+			typ     = reflect.TypeOf(tt.apiInterface).Elem()
+			typName = typ.Name()
+			mapped  = tt.mapp()
+			tested  = make(map[string]bool)
 		)
 		for i := 0; i < typ.NumMethod(); i++ {
-			var (
-				method  = typ.Method(i)
-				typName = typ.Name()
-			)
+			method := typ.Method(i)
 			require.NotNil(t, method)
 
 			// goja uses methods that starts with lowercase.
@@ -102,6 +101,14 @@ func TestMappings(t *testing.T) {
 			}
 			if _, ok := mapped[m]; !ok {
 				t.Errorf("method %s for %s not found", m, typName)
+			}
+			// to detect if a method is redundantly mapped.
+			tested[m] = true
+		}
+		// detect redundant mappings.
+		for m := range mapped {
+			if !tested[m] {
+				t.Errorf("method %s is redundant for %s", m, typName)
 			}
 		}
 	}
