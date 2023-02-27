@@ -58,20 +58,46 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 	return &b
 }
 
-// Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
+func (b *BrowserType) init(
+	opts goja.Value, isRemoteBrowser bool,
+) (context.Context, *common.LaunchOptions, *log.Logger, error) {
 	ctx := b.initContext()
 
-	var err error
-	var logger *log.Logger
-	if logger, err = makeLogger(ctx); err != nil {
-		k6ext.Panic(ctx, "setting up logger: %w", err)
+	logger, err := makeLogger(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error setting up logger: %w", err)
 	}
-	launchOpts := common.NewLaunchOptions(k6ext.OnCloud(), true)
-	if err := launchOpts.Parse(ctx, logger, opts); err != nil {
-		k6ext.Panic(ctx, "parsing launch options: %w", err)
+
+	launchOpts := common.NewLaunchOptions(k6ext.OnCloud(), isRemoteBrowser)
+	if err = launchOpts.Parse(ctx, logger, opts); err != nil {
+		return nil, nil, nil, fmt.Errorf("error parsing launch options: %w", err)
 	}
 	ctx = common.WithLaunchOptions(ctx, launchOpts)
+
+	if err := logger.SetCategoryFilter(launchOpts.LogCategoryFilter); err != nil {
+		return nil, nil, nil, fmt.Errorf("error setting category filter: %w", err)
+	}
+	if launchOpts.Debug {
+		_ = logger.SetLevel("debug")
+	}
+
+	return ctx, launchOpts, logger, nil
+}
+
+func (b *BrowserType) initContext() context.Context {
+	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
+	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
+	ctx = common.WithHooks(ctx, b.hooks)
+	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
+	return ctx
+}
+
+// Connect attaches k6 browser to an existing browser instance.
+func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
+	ctx, launchOpts, logger, err := b.init(opts, true)
+	if err != nil {
+		k6ext.Panic(ctx, "initializing browser type: %w", err)
+	}
 
 	bp, err := b.connect(ctx, wsEndpoint, launchOpts, logger)
 	if err != nil {
@@ -85,14 +111,9 @@ func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
 	return bp
 }
 
-func (b *BrowserType) connect(ctx context.Context, wsURL string, opts *common.LaunchOptions, logger *log.Logger) (*common.Browser, error) {
-	if err := logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
-		return nil, fmt.Errorf("%w", err)
-	}
-	if opts.Debug {
-		_ = logger.SetLevel("debug")
-	}
-
+func (b *BrowserType) connect(
+	ctx context.Context, wsURL string, opts *common.LaunchOptions, logger *log.Logger,
+) (*common.Browser, error) {
 	browserProc, err := b.link(ctx, wsURL, opts, logger)
 	if browserProc == nil {
 		return nil, fmt.Errorf("connecting to browser: %w", err)
@@ -126,29 +147,13 @@ func (b *BrowserType) link(
 	return p, nil
 }
 
-func (b *BrowserType) initContext() context.Context {
-	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
-	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
-	ctx = common.WithHooks(ctx, b.hooks)
-	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
-	return ctx
-}
-
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
 func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID int) {
-	ctx := b.initContext()
-
-	var err error
-	var logger *log.Logger
-	if logger, err = makeLogger(ctx); err != nil {
-		k6ext.Panic(ctx, "setting up logger: %w", err)
+	ctx, launchOpts, logger, err := b.init(opts, false)
+	if err != nil {
+		k6ext.Panic(ctx, "initializing browser type: %w", err)
 	}
-	launchOpts := common.NewLaunchOptions(k6ext.OnCloud(), false)
-	if err := launchOpts.Parse(ctx, logger, opts); err != nil {
-		k6ext.Panic(ctx, "parsing launch options: %w", err)
-	}
-	ctx = common.WithLaunchOptions(ctx, launchOpts)
 
 	bp, pid, err := b.launch(ctx, launchOpts, logger)
 	if err != nil {
@@ -165,13 +170,6 @@ func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID i
 func (b *BrowserType) launch(
 	ctx context.Context, opts *common.LaunchOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
-	if err := logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
-		return nil, 0, fmt.Errorf("%w", err)
-	}
-	if opts.Debug {
-		_ = logger.SetLevel("debug")
-	}
-
 	envs := make([]string, 0, len(opts.Env))
 	for k, v := range opts.Env {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
