@@ -506,3 +506,124 @@ type extensionType struct {
 func (e extensionType) TypeDescriptor() protoreflect.ExtensionTypeDescriptor {
 	return extensionDescriptor{e.ExtensionType.TypeDescriptor()}
 }
+
+type messageType struct {
+	protoreflect.MessageType
+}
+
+func (m messageType) Descriptor() protoreflect.MessageDescriptor {
+	return messageDescriptor{m.MessageType.Descriptor()}
+}
+
+// WrapFile wraps the given file descriptor so that it will include source
+// code info that was registered with this package if the given file was
+// processed with protoc-gen-gosrcinfo. Returns fd without wrapping if fd
+// already contains source code info.
+func WrapFile(fd protoreflect.FileDescriptor) protoreflect.FileDescriptor {
+	if wrapper, ok := fd.(fileDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if fd.SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return fd
+	}
+	return getFile(fd)
+}
+
+// WrapMessage wraps the given message descriptor so that it will include source
+// code info that was registered with this package if the file it is defined in
+// was processed with protoc-gen-gosrcinfo. Returns md without wrapping if md's
+// parent file already contains source code info.
+func WrapMessage(md protoreflect.MessageDescriptor) protoreflect.MessageDescriptor {
+	if wrapper, ok := md.(messageDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if md.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return md
+	}
+	if !canWrap(md) {
+		return md
+	}
+	return messageDescriptor{md}
+}
+
+// WrapEnum wraps the given enum descriptor so that it will include source
+// code info that was registered with this package if the file it is defined in
+// was processed with protoc-gen-gosrcinfo. Returns ed without wrapping if ed's
+// parent file already contains source code info.
+func WrapEnum(ed protoreflect.EnumDescriptor) protoreflect.EnumDescriptor {
+	if wrapper, ok := ed.(enumDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if ed.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return ed
+	}
+	if !canWrap(ed) {
+		return ed
+	}
+	return enumDescriptor{ed}
+}
+
+// WrapService wraps the given service descriptor so that it will include source
+// code info that was registered with this package if the file it is defined in
+// was processed with protoc-gen-gosrcinfo. Returns sd without wrapping if sd's
+// parent file already contains source code info.
+func WrapService(sd protoreflect.ServiceDescriptor) protoreflect.ServiceDescriptor {
+	if wrapper, ok := sd.(serviceDescriptor); ok {
+		// already wrapped
+		return wrapper
+	}
+	if sd.ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return sd
+	}
+	if !canWrap(sd) {
+		return sd
+	}
+	return serviceDescriptor{sd}
+}
+
+// WrapExtensionType wraps the given extension type so that its associated
+// descriptor will include source code info that was registered with this package
+// if the file it is defined in was processed with protoc-gen-gosrcinfo. Returns
+// xt without wrapping if the parent file of xt's descriptor already contains
+// source code info.
+func WrapExtensionType(xt protoreflect.ExtensionType) protoreflect.ExtensionType {
+	if wrapper, ok := xt.(extensionType); ok {
+		// already wrapped
+		return wrapper
+	}
+	if xt.TypeDescriptor().ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return xt
+	}
+	if !canWrap(xt.TypeDescriptor()) {
+		return xt
+	}
+	return extensionType{xt}
+}
+
+// WrapMessageType wraps the given message type so that its associated
+// descriptor will include source code info that was registered with this package
+// if the file it is defined in was processed with protoc-gen-gosrcinfo. Returns
+// mt without wrapping if the parent file of mt's descriptor already contains
+// source code info.
+func WrapMessageType(mt protoreflect.MessageType) protoreflect.MessageType {
+	if wrapper, ok := mt.(messageType); ok {
+		// already wrapped
+		return wrapper
+	}
+	if mt.Descriptor().ParentFile().SourceLocations().Len() > 0 {
+		// no need to wrap since it includes source info already
+		return mt
+	}
+	if !canWrap(mt.Descriptor()) {
+		return mt
+	}
+	return messageType{mt}
+}

@@ -1,16 +1,16 @@
 package internal
 
 import (
-	dpb "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"google.golang.org/protobuf/types/descriptorpb"
 )
 
 // SourceInfoMap is a map of paths in a descriptor to the corresponding source
 // code info.
-type SourceInfoMap map[string][]*dpb.SourceCodeInfo_Location
+type SourceInfoMap map[string][]*descriptorpb.SourceCodeInfo_Location
 
 // Get returns the source code info for the given path. If there are
 // multiple locations for the same path, the first one is returned.
-func (m SourceInfoMap) Get(path []int32) *dpb.SourceCodeInfo_Location {
+func (m SourceInfoMap) Get(path []int32) *descriptorpb.SourceCodeInfo_Location {
 	v := m[asMapKey(path)]
 	if len(v) > 0 {
 		return v[0]
@@ -19,24 +19,24 @@ func (m SourceInfoMap) Get(path []int32) *dpb.SourceCodeInfo_Location {
 }
 
 // GetAll returns all source code info for the given path.
-func (m SourceInfoMap) GetAll(path []int32) []*dpb.SourceCodeInfo_Location {
+func (m SourceInfoMap) GetAll(path []int32) []*descriptorpb.SourceCodeInfo_Location {
 	return m[asMapKey(path)]
 }
 
 // Add stores the given source code info for the given path.
-func (m SourceInfoMap) Add(path []int32, loc *dpb.SourceCodeInfo_Location) {
+func (m SourceInfoMap) Add(path []int32, loc *descriptorpb.SourceCodeInfo_Location) {
 	m[asMapKey(path)] = append(m[asMapKey(path)], loc)
 }
 
 // PutIfAbsent stores the given source code info for the given path only if the
 // given path does not exist in the map. This method returns true when the value
 // is stored, false if the path already exists.
-func (m SourceInfoMap) PutIfAbsent(path []int32, loc *dpb.SourceCodeInfo_Location) bool {
+func (m SourceInfoMap) PutIfAbsent(path []int32, loc *descriptorpb.SourceCodeInfo_Location) bool {
 	k := asMapKey(path)
 	if _, ok := m[k]; ok {
 		return false
 	}
-	m[k] = []*dpb.SourceCodeInfo_Location{loc}
+	m[k] = []*descriptorpb.SourceCodeInfo_Location{loc}
 	return true
 }
 
@@ -63,7 +63,7 @@ func asMapKey(slice []int32) string {
 
 // CreateSourceInfoMap constructs a new SourceInfoMap and populates it with the
 // source code info in the given file descriptor proto.
-func CreateSourceInfoMap(fd *dpb.FileDescriptorProto) SourceInfoMap {
+func CreateSourceInfoMap(fd *descriptorpb.FileDescriptorProto) SourceInfoMap {
 	res := SourceInfoMap{}
 	PopulateSourceInfoMap(fd, res)
 	return res
@@ -71,7 +71,7 @@ func CreateSourceInfoMap(fd *dpb.FileDescriptorProto) SourceInfoMap {
 
 // PopulateSourceInfoMap populates the given SourceInfoMap with information from
 // the given file descriptor.
-func PopulateSourceInfoMap(fd *dpb.FileDescriptorProto, m SourceInfoMap) {
+func PopulateSourceInfoMap(fd *descriptorpb.FileDescriptorProto, m SourceInfoMap) {
 	for _, l := range fd.GetSourceCodeInfo().GetLocation() {
 		m.Add(l.Path, l)
 	}

@@ -37,11 +37,11 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/testdata"
 
-	"github.com/golang/protobuf/proto"
 	"google.golang.org/grpc/reflection"
 )
 
