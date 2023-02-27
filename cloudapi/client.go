@@ -160,7 +160,7 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 
 func checkResponse(r *http.Response) error {
 	if r == nil {
-		return ErrUnknown
+		return errUnknown
 	}
 
 	if c := r.StatusCode; c >= 200 && c <= 299 {
@@ -177,10 +177,10 @@ func checkResponse(r *http.Response) error {
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
 		if r.StatusCode == http.StatusUnauthorized {
-			return ErrNotAuthenticated
+			return errNotAuthenticated
 		}
 		if r.StatusCode == http.StatusForbidden {
-			return ErrNotAuthorized
+			return errNotAuthorized
 		}
 		return fmt.Errorf(
 			"unexpected HTTP error from %s: %d %s",
