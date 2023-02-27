@@ -20,22 +20,24 @@ import (
 //nolint:funlen,gocognit
 func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 	// loginCloudCommand represents the 'login cloud' command
+	exampleText := getExampleText(gs, `
+  # Show the stored token.
+  {{.}} login cloud -s
+  
+  # Store a token.
+  {{.}} login cloud -t YOUR_TOKEN
+  
+  # Log in with an email/password.
+  {{.}} login cloud`[1:])
+
 	loginCloudCommand := &cobra.Command{
 		Use:   "cloud",
 		Short: "Authenticate with Load Impact",
 		Long: `Authenticate with Load Impact.
 
 This will set the default token used when just "k6 run -o cloud" is passed.`,
-		Example: `
-  # Show the stored token.
-  k6 login cloud -s
-
-  # Store a token.
-  k6 login cloud -t YOUR_TOKEN
-
-  # Log in with an email/password.
-  k6 login cloud`[1:],
-		Args: cobra.NoArgs,
+		Example: exampleText,
+		Args:    cobra.NoArgs,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			currentDiskConf, err := readDiskConfig(gs)
 			if err != nil {
