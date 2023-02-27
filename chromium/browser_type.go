@@ -60,9 +60,70 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 
 // Connect attaches k6 browser to an existing browser instance.
 func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
-	rt := b.vu.Runtime()
-	k6common.Throw(rt, errors.New("BrowserType.connect() has not been implemented yet"))
-	return nil
+	ctx := b.initContext()
+
+	var err error
+	var logger *log.Logger
+	if logger, err = makeLogger(ctx); err != nil {
+		k6ext.Panic(ctx, "setting up logger: %w", err)
+	}
+	launchOpts := common.NewLaunchOptions(k6ext.OnCloud(), true)
+	if err := launchOpts.Parse(ctx, logger, opts); err != nil {
+		k6ext.Panic(ctx, "parsing launch options: %w", err)
+	}
+	ctx = common.WithLaunchOptions(ctx, launchOpts)
+
+	bp, err := b.connect(ctx, wsEndpoint, launchOpts, logger)
+	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: launchOpts.Timeout,
+		}
+		k6ext.Panic(ctx, "%w", err)
+	}
+
+	return bp
+}
+
+func (b *BrowserType) connect(ctx context.Context, wsURL string, opts *common.LaunchOptions, logger *log.Logger) (*common.Browser, error) {
+	if err := logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
+		return nil, fmt.Errorf("%w", err)
+	}
+	if opts.Debug {
+		_ = logger.SetLevel("debug")
+	}
+
+	browserProc, err := b.link(ctx, wsURL, opts, logger)
+	if browserProc == nil {
+		return nil, fmt.Errorf("connecting to browser: %w", err)
+	}
+
+	// If this context is cancelled we'll initiate an extension wide
+	// cancellation and shutdown.
+	browserCtx, browserCtxCancel := context.WithCancel(ctx)
+	b.Ctx = browserCtx
+	browser, err := common.NewBrowser(
+		browserCtx, browserCtxCancel, browserProc, opts, logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to browser: %w", err)
+	}
+
+	return browser, nil
+}
+
+func (b *BrowserType) link(
+	ctx context.Context, wsURL string,
+	opts *common.LaunchOptions, logger *log.Logger,
+) (*common.BrowserProcess, error) {
+	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
+	if err != nil {
+		bProcCtxCancel()
+		return nil, err //nolint:wrapcheck
+	}
+
+	return p, nil
 }
 
 // ExecutablePath returns the path where the extension expects to find the browser executable.

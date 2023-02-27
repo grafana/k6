@@ -660,7 +660,11 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"connect":                 bt.Connect,
+		"connect": func(wsEndpoint string, opts goja.Value) *goja.Object {
+			b := bt.Connect(wsEndpoint, opts)
+			m := mapBrowser(vu, b)
+			return rt.ToValue(m).ToObject(rt)
+		},
 		"executablePath":          bt.ExecutablePath,
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
