@@ -526,3 +526,8 @@ func (b *Browser) Version() string {
 	}
 	return product[i+1:]
 }
+
+// WsURL returns the Websocket URL that the browser is listening on for CDP clients.
+func (b *Browser) WsURL() string {
+	return b.browserProc.WsURL()
+}
