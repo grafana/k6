@@ -275,13 +275,12 @@ func TestOptions(t *testing.T) {
 
 			var opts2 Options
 			assert.NoError(t, json.Unmarshal(optsData, &opts2))
-			if assert.Len(t, opts2.TLSAuth, len(opts.TLSAuth)) {
-				for i := 0; i < len(opts2.TLSAuth); i++ {
-					assert.Equal(t, opts.TLSAuth[i].TLSAuthFields, opts2.TLSAuth[i].TLSAuthFields)
-					cert, err := opts2.TLSAuth[i].Certificate()
-					assert.NoError(t, err)
-					assert.NotNil(t, cert)
-				}
+			require.Len(t, opts2.TLSAuth, len(opts.TLSAuth))
+			for i := 0; i < len(opts2.TLSAuth); i++ {
+				assert.Equal(t, opts.TLSAuth[i].TLSAuthFields, opts2.TLSAuth[i].TLSAuthFields)
+				cert, err := opts2.TLSAuth[i].Certificate()
+				assert.NoError(t, err)
+				assert.NotNil(t, cert)
 			}
 		})
 
