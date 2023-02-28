@@ -101,7 +101,7 @@ func newBundle(
 	// TODO use a real context
 	vuImpl := &moduleVUImpl{ctx: context.Background(), runtime: goja.New()}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	instance, err := bundle.instantiate(vuImpl, 0, c)
+	instance, err := bundle.instantiate(vuImpl, 0)
 	if err != nil {
 		return nil, err
 	}
@@ -211,7 +211,7 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New()}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	instance, err := b.instantiate(vuImpl, vuID, b.newCompiler(b.logger))
+	instance, err := b.instantiate(vuImpl, vuID)
 	if err != nil {
 		return nil, err
 	}
@@ -259,7 +259,7 @@ func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 	return c
 }
 
-func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, c *compiler.Compiler) (moduleInstance, error) {
+func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance, error) {
 	rt := vuImpl.runtime
 	err := b.setupJSRuntime(rt, int64(vuID), b.logger)
 	if err != nil {

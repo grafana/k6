@@ -91,7 +91,6 @@ type moduleSystem struct {
 	vu            modules.VU
 	instanceCache map[module]moduleInstance
 	resolver      *moduleResolver
-	cjsLoad       cjsModuleLoader
 }
 
 func newModuleSystem(resolution *moduleResolver, vu modules.VU) *moduleSystem {
