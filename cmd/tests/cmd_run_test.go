@@ -1837,3 +1837,47 @@ func TestUIRenderOutput(t *testing.T) {
 		})
 	}
 }
+
+// TestRunStaticArchives tests that the static archives are working as expected.
+// each archive contains the following files/catalogs:
+// ├── a.js
+// ├── foo
+// │   └── bar.js
+// ├── sample
+// │   └── data.json
+// └── script.js
+// archive was made using binary & platform from the test name
+func TestRunStaticArchives(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		archive string
+	}{
+		{archive: "archive_v0.42.0_linux.tar"},
+		{archive: "archive_v0.42.0_windows.tar"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run("Using "+tc.archive, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+
+			data, err := os.ReadFile(filepath.Join("testdata/archives", tc.archive)) //nolint:forbidigo // it's a test
+			require.NoError(t, err)
+
+			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "archive.tar"), data, 0o644))
+
+			ts.CmdArgs = []string{"k6", "run", "--log-output=stdout", "archive.tar"}
+
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			stdout := ts.Stdout.String()
+			assert.Contains(t, stdout, "called default() from script.js")
+			assert.Contains(t, stdout, "called Bar() from foo/bar.js")
+			assert.Contains(t, stdout, "called A() from a.js")
+			assert.Contains(t, stdout, "extracted john doe from sample/data.json")
+		})
+	}
+}
