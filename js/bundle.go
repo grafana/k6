@@ -79,19 +79,20 @@ func newBundle(
 	}
 
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
-	bundle := Bundle{
+	bundle := &Bundle{
 		Filename:          src.URL,
 		Source:            src.Data,
 		Options:           options,
 		CompatibilityMode: compatMode,
 		callableExports:   make(map[string]struct{}),
-		moduleResolver:    newModuleResolution(getJSModules()),
 		filesystems:       filesystems,
 		pwd:               loader.Dir(src.URL),
 		logger:            piState.Logger,
 		preInitState:      piState,
 	}
 	c := bundle.newCompiler(piState.Logger)
+	bundle.moduleResolver = newModuleResolution(getJSModules(), generateCJSLoad(bundle, c))
+
 	if err = bundle.moduleResolver.setMain(src, c); err != nil {
 		return nil, err
 	}
@@ -110,7 +111,7 @@ func newBundle(
 		return nil, err
 	}
 
-	return &bundle, nil
+	return bundle, nil
 }
 
 // NewBundleFromArchive creates a new bundle from an lib.Archive.
@@ -273,8 +274,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, c *compiler.Comp
 		LookupEnv:   b.preInitState.LookupEnv,
 	}
 
-	cjsLoad := generateCJSLoad(b, c)
-	modSys := newModuleSystem(b.moduleResolver, vuImpl, cjsLoad)
+	modSys := newModuleSystem(b.moduleResolver, vuImpl)
 	unbindInit := b.setInitGlobals(rt, modSys)
 	vuImpl.initEnv = initenv
 	defer func() {
@@ -298,7 +298,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64, c *compiler.Comp
 	err = common.RunWithPanicCatching(b.logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
 			//nolint:shadow,govet // here we shadow err on purpose
-			mod, err := b.moduleResolver.resolve(b.pwd, b.Filename.String(), cjsLoad)
+			mod, err := b.moduleResolver.resolve(b.pwd, b.Filename.String())
 			if err != nil {
 				return err // TODO wrap as this should never happen
 			}

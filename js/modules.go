@@ -27,10 +27,11 @@ type moduleCacheElement struct {
 type moduleResolver struct {
 	cache     map[string]moduleCacheElement
 	goModules map[string]interface{}
+	loadCJS   cjsModuleLoader
 }
 
-func newModuleResolution(goModules map[string]interface{}) *moduleResolver {
-	return &moduleResolver{goModules: goModules, cache: make(map[string]moduleCacheElement)}
+func newModuleResolution(goModules map[string]interface{}, loadCJS cjsModuleLoader) *moduleResolver {
+	return &moduleResolver{goModules: goModules, cache: make(map[string]moduleCacheElement), loadCJS: loadCJS}
 }
 
 func (mr *moduleResolver) setMain(main *loader.SourceData, c *compiler.Compiler) error {
@@ -59,7 +60,7 @@ func (mr *moduleResolver) requireModule(name string) (module, error) {
 	return &baseGoModule{mod: mod}, nil
 }
 
-func (mr *moduleResolver) resolve(basePWD *url.URL, arg string, loadCJS cjsModuleLoader) (module, error) {
+func (mr *moduleResolver) resolve(basePWD *url.URL, arg string) (module, error) {
 	if cached, ok := mr.cache[arg]; ok {
 		return cached.mod, cached.err
 	}
@@ -80,7 +81,7 @@ func (mr *moduleResolver) resolve(basePWD *url.URL, arg string, loadCJS cjsModul
 			return cached.mod, cached.err
 		}
 		// Fall back to loading from the filesystem.
-		mod, err := loadCJS(specifier, arg)
+		mod, err := mr.loadCJS(specifier, arg)
 		mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
 		return mod, err
 	}
@@ -93,18 +94,17 @@ type moduleSystem struct {
 	cjsLoad       cjsModuleLoader
 }
 
-func newModuleSystem(resolution *moduleResolver, vu modules.VU, cjsLoad cjsModuleLoader) *moduleSystem {
+func newModuleSystem(resolution *moduleResolver, vu modules.VU) *moduleSystem {
 	return &moduleSystem{
 		resolver:      resolution,
 		instanceCache: make(map[module]moduleInstance),
 		vu:            vu,
-		cjsLoad:       cjsLoad,
 	}
 }
 
 // Require is called when a module/file needs to be loaded by a script
 func (ms *moduleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) {
-	mod, err := ms.resolver.resolve(pwd, arg, ms.cjsLoad)
+	mod, err := ms.resolver.resolve(pwd, arg)
 	if err != nil {
 		return nil, err
 	}
