@@ -2312,7 +2312,7 @@ type multiFileTestCase struct {
 
 func runMultiFileTestCase(t *testing.T, tc multiFileTestCase, tb *httpmultibin.HTTPMultiBin) {
 	t.Helper()
-	runner, err := getSimpleRunner(t, tc.cwd+"/script.js", tc.script, tc.rtOpts, tc.fses)
+	runner, err := getSimpleRunner(t, strings.TrimRight(tc.cwd, "/")+"/script.js", tc.script, tc.rtOpts, tc.fses)
 	if tc.expInitErr {
 		require.Error(t, err)
 		return
