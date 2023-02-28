@@ -242,11 +242,10 @@ func TestRequest(t *testing.T) {
 				assert.NoError(t, err)
 
 				logEntry := hook.LastEntry()
-				if assert.NotNil(t, logEntry) {
-					assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-					assert.Equal(t, sr("HTTPBIN_URL/redirect/11"), logEntry.Data["url"])
-					assert.Equal(t, "Stopped after 11 redirects and returned the redirection; pass { redirects: n } in request params or set global maxRedirects to silence this", logEntry.Message)
-				}
+				require.NotNil(t, logEntry)
+				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+				assert.Equal(t, sr("HTTPBIN_URL/redirect/11"), logEntry.Data["url"])
+				assert.Equal(t, "Stopped after 11 redirects and returned the redirection; pass { redirects: n } in request params or set global maxRedirects to silence this", logEntry.Message)
 			})
 		})
 		t.Run("requestScopeRedirects", func(t *testing.T) {
@@ -529,11 +528,12 @@ func TestRequest(t *testing.T) {
 			assert.Contains(t, err.Error(), "another error")
 
 			logEntry := hook.LastEntry()
-			if assert.NotNil(t, logEntry) {
-				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				assert.Contains(t, logEntry.Data["error"].(error).Error(), "unsupported protocol scheme")
-				assert.Equal(t, "Request Failed", logEntry.Message)
-			}
+			require.NotNil(t, logEntry)
+			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+			err, ok := logEntry.Data["error"].(error)
+			require.True(t, ok)
+			assert.ErrorContains(t, err, "unsupported protocol scheme")
+			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 	})
 	t.Run("InvalidURL", func(t *testing.T) {

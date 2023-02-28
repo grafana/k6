@@ -167,13 +167,12 @@ func TestAsyncRequestErrors(t *testing.T) {
 			require.ErrorContains(t, err, "another error")
 
 			logEntry := hook.LastEntry()
-			if assert.NotNil(t, logEntry) {
-				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-				err, ok := logEntry.Data["error"].(error)
-				require.True(t, ok)
-				assert.ErrorContains(t, err, "unsupported protocol scheme")
-				assert.Equal(t, "Request Failed", logEntry.Message)
-			}
+			require.NotNil(t, logEntry)
+			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
+			err, ok := logEntry.Data["error"].(error)
+			require.True(t, ok)
+			assert.ErrorContains(t, err, "unsupported protocol scheme")
+			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 	})
 	t.Run("InvalidURL", func(t *testing.T) {
