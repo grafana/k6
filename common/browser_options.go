@@ -46,7 +46,6 @@ type LaunchOptions struct {
 	SlowMo            time.Duration
 	Timeout           time.Duration
 
-	onCloud         bool // some options will be ignored when running in the cloud
 	isRemoteBrowser bool // some options will be ignored if browser is in a remote machine
 }
 
@@ -57,14 +56,24 @@ type LaunchPersistentContextOptions struct {
 }
 
 // NewLaunchOptions returns a new LaunchOptions.
-func NewLaunchOptions(onCloud, isRemoteBrowser bool) *LaunchOptions {
+func NewLaunchOptions() *LaunchOptions {
 	return &LaunchOptions{
 		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
-		onCloud:           onCloud,
-		isRemoteBrowser:   isRemoteBrowser,
+	}
+}
+
+// NewRemoteBrowserLaunchOptions returns a new LaunchOptions
+// for a browser running in a remote machine.
+func NewRemoteBrowserLaunchOptions() *LaunchOptions {
+	return &LaunchOptions{
+		Env:               make(map[string]string),
+		Headless:          true,
+		LogCategoryFilter: ".*",
+		Timeout:           DefaultTimeout,
+		isRemoteBrowser:   true,
 	}
 }
 
@@ -85,8 +94,8 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 		}
 	)
 	for _, k := range o.Keys() {
-		if l.shouldIgnoreOpt(k) {
-			logger.Warnf("LaunchOptions", "setting %s option is disallowed.", k)
+		if l.shouldIgnoreIfBrowserIsRemote(k) {
+			logger.Warnf("LaunchOptions", "setting %s option is disallowed when browser is remote", k)
 			continue
 		}
 		v := o.Get(k)
@@ -129,32 +138,11 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 	return nil
 }
 
-func (l *LaunchOptions) shouldIgnoreOpt(opt string) bool {
-	var ignore bool
-	// TODO: Depending on future browser setup in the cloud it
-	// might be necessary to deprecate the current 'onCloud' ignored
-	// options and only use the ones for 'remote browser'.
-	if l.onCloud {
-		ignore = l.shouldIgnoreOnCloud(opt)
-	} else if l.isRemoteBrowser {
-		ignore = l.shouldIgnoreIfBrowserIsRemote(opt)
-	}
-
-	return ignore
-}
-
-func (l *LaunchOptions) shouldIgnoreOnCloud(opt string) bool {
-	shouldIgnoreOnCloud := map[string]struct{}{
-		optDevTools:       {},
-		optExecutablePath: {},
-		optHeadless:       {},
-	}
-	_, ignore := shouldIgnoreOnCloud[opt]
-
-	return ignore
-}
-
 func (l *LaunchOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
+	if !l.isRemoteBrowser {
+		return false
+	}
+
 	shouldIgnoreIfBrowserIsRemote := map[string]struct{}{
 		optArgs:              {},
 		optDevTools:          {},

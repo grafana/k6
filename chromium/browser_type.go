@@ -68,7 +68,13 @@ func (b *BrowserType) init(
 		return nil, nil, nil, fmt.Errorf("error setting up logger: %w", err)
 	}
 
-	launchOpts := common.NewLaunchOptions(k6ext.OnCloud(), isRemoteBrowser)
+	var launchOpts *common.LaunchOptions
+	if isRemoteBrowser {
+		launchOpts = common.NewRemoteBrowserLaunchOptions()
+	} else {
+		launchOpts = common.NewLaunchOptions()
+	}
+
 	if err = launchOpts.Parse(ctx, logger, opts); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing launch options: %w", err)
 	}

@@ -25,7 +25,6 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 		opts            map[string]any
 		assert          func(testing.TB, *LaunchOptions)
 		err             string
-		onCloud         bool
 		isRemoteBrowser bool
 	}{
 		"defaults": {
@@ -40,44 +39,6 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			assert: func(tb testing.TB, lo *LaunchOptions) {
 				tb.Helper()
 				assert.Equal(t, defaultOptions, lo)
-			},
-		},
-		"defaults_on_cloud": {
-			onCloud: true,
-			opts: map[string]any{
-				// disallow changing the following opts
-				"headless":       false,
-				"devtools":       true,
-				"executablePath": "something else",
-				// allow changing the following opts
-				"args":              []string{"any"},
-				"debug":             true,
-				"env":               map[string]string{"some": "thing"},
-				"ignoreDefaultArgs": []string{"any"},
-				"logCategoryFilter": "...",
-				"proxy":             ProxyOptions{Server: "srv"},
-				"slowMo":            time.Second,
-				"timeout":           time.Second,
-			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
-				tb.Helper()
-				assert.Equal(t, &LaunchOptions{
-					// disallowed:
-					Headless:       true,
-					Devtools:       false,
-					ExecutablePath: "",
-					// allowed:
-					Args:              []string{"any"},
-					Debug:             true,
-					Env:               map[string]string{"some": "thing"},
-					IgnoreDefaultArgs: []string{"any"},
-					LogCategoryFilter: "...",
-					Proxy:             ProxyOptions{Server: "srv"},
-					SlowMo:            time.Second,
-					Timeout:           time.Second,
-
-					onCloud: true,
-				}, lo)
 			},
 		},
 		"defaults_remote_browser": {
@@ -294,8 +255,15 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			t.Parallel()
 			var (
 				vu = k6test.NewVU(t)
-				lo = NewLaunchOptions(tt.onCloud, tt.isRemoteBrowser)
+				lo *LaunchOptions
 			)
+
+			if tt.isRemoteBrowser {
+				lo = NewRemoteBrowserLaunchOptions()
+			} else {
+				lo = NewLaunchOptions()
+			}
+
 			err := lo.Parse(vu.Context(), log.NewNullLogger(), vu.ToGojaValue(tt.opts))
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
