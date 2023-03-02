@@ -10,6 +10,20 @@ import (
 	"github.com/grafana/xk6-browser/log"
 )
 
+const (
+	optArgs              = "args"
+	optDebug             = "debug"
+	optDevTools          = "devtools"
+	optEnv               = "env"
+	optExecutablePath    = "executablePath"
+	optHeadless          = "headless"
+	optIgnoreDefaultArgs = "ignoreDefaultArgs"
+	optLogCategoryFilter = "logCategoryFilter"
+	optProxy             = "proxy"
+	optSlowMo            = "slowMo"
+	optTimeout           = "timeout"
+)
+
 // ProxyOptions allows configuring a proxy server.
 type ProxyOptions struct {
 	Server   string
@@ -32,7 +46,7 @@ type LaunchOptions struct {
 	SlowMo            time.Duration
 	Timeout           time.Duration
 
-	onCloud bool // some options will be ignored when running in the cloud
+	isRemoteBrowser bool // some options will be ignored if browser is in a remote machine
 }
 
 // LaunchPersistentContextOptions stores browser launch options for persistent context.
@@ -42,13 +56,24 @@ type LaunchPersistentContextOptions struct {
 }
 
 // NewLaunchOptions returns a new LaunchOptions.
-func NewLaunchOptions(onCloud bool) *LaunchOptions {
+func NewLaunchOptions() *LaunchOptions {
 	return &LaunchOptions{
 		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
-		onCloud:           onCloud,
+	}
+}
+
+// NewRemoteBrowserLaunchOptions returns a new LaunchOptions
+// for a browser running in a remote machine.
+func NewRemoteBrowserLaunchOptions() *LaunchOptions {
+	return &LaunchOptions{
+		Env:               make(map[string]string),
+		Headless:          true,
+		LogCategoryFilter: ".*",
+		Timeout:           DefaultTimeout,
+		isRemoteBrowser:   true,
 	}
 }
 
@@ -62,15 +87,15 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 		rt       = k6ext.Runtime(ctx)
 		o        = opts.ToObject(rt)
 		defaults = map[string]any{
-			"env":               l.Env,
-			"headless":          l.Headless,
-			"logCategoryFilter": l.LogCategoryFilter,
-			"timeout":           l.Timeout,
+			optEnv:               l.Env,
+			optHeadless:          l.Headless,
+			optLogCategoryFilter: l.LogCategoryFilter,
+			optTimeout:           l.Timeout,
 		}
 	)
 	for _, k := range o.Keys() {
-		if l.shouldIgnoreOnCloud(k) {
-			logger.Warnf("LaunchOptions", "setting %s option is disallowed on cloud.", k)
+		if l.shouldIgnoreIfBrowserIsRemote(k) {
+			logger.Warnf("LaunchOptions", "setting %s option is disallowed when browser is remote", k)
 			continue
 		}
 		v := o.Get(k)
@@ -82,27 +107,27 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 		}
 		var err error
 		switch k {
-		case "args":
+		case optArgs:
 			err = exportOpt(rt, k, v, &l.Args)
-		case "debug":
+		case optDebug:
 			l.Debug, err = parseBoolOpt(k, v)
-		case "devtools":
+		case optDevTools:
 			l.Devtools, err = parseBoolOpt(k, v)
-		case "env":
+		case optEnv:
 			err = exportOpt(rt, k, v, &l.Env)
-		case "executablePath":
+		case optExecutablePath:
 			l.ExecutablePath, err = parseStrOpt(k, v)
-		case "headless":
+		case optHeadless:
 			l.Headless, err = parseBoolOpt(k, v)
-		case "ignoreDefaultArgs":
+		case optIgnoreDefaultArgs:
 			err = exportOpt(rt, k, v, &l.IgnoreDefaultArgs)
-		case "logCategoryFilter":
+		case optLogCategoryFilter:
 			l.LogCategoryFilter, err = parseStrOpt(k, v)
-		case "proxy":
+		case optProxy:
 			err = exportOpt(rt, k, v, &l.Proxy)
-		case "slowMo":
+		case optSlowMo:
 			l.SlowMo, err = parseTimeOpt(k, v)
-		case "timeout":
+		case optTimeout:
 			l.Timeout, err = parseTimeOpt(k, v)
 		}
 		if err != nil {
@@ -113,9 +138,21 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 	return nil
 }
 
-func (l *LaunchOptions) shouldIgnoreOnCloud(opt string) bool {
-	if !l.onCloud {
+func (l *LaunchOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
+	if !l.isRemoteBrowser {
 		return false
 	}
-	return opt == "devtools" || opt == "executablePath" || opt == "headless"
+
+	shouldIgnoreIfBrowserIsRemote := map[string]struct{}{
+		optArgs:              {},
+		optDevTools:          {},
+		optEnv:               {},
+		optExecutablePath:    {},
+		optHeadless:          {},
+		optIgnoreDefaultArgs: {},
+		optProxy:             {},
+	}
+	_, ignore := shouldIgnoreIfBrowserIsRemote[opt]
+
+	return ignore
 }

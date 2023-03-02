@@ -11,6 +11,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 
@@ -32,7 +33,8 @@ type testBrowser struct {
 	vu       *k6test.VU
 	logCache *logCache
 
-	pid int // the browser process ID
+	pid   int // the browser process ID
+	wsURL string
 
 	api.Browser
 }
@@ -110,7 +112,12 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
+
 	b, pid := bt.Launch(rt.ToValue(launchOpts))
+	cb, ok := b.(*common.Browser)
+	if !ok {
+		panic(fmt.Errorf("testBrowser: unexpected browser %T", b))
+	}
 
 	tb.Cleanup(func() {
 		select {
@@ -130,6 +137,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		logCache: lc,
 		Browser:  b,
 		pid:      pid,
+		wsURL:    cb.WsURL(),
 	}
 	if enableFileServer {
 		tbr = tbr.withFileServer()

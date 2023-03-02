@@ -38,10 +38,8 @@ type BrowserType struct {
 	vu        k6modules.VU
 	hooks     *common.Hooks
 	k6Metrics *k6ext.CustomMetrics
-	execPath  string       // path to the Chromium executable
-	storage   *storage.Dir // stores temporary data for the extension and user
+	execPath  string // path to the Chromium executable
 	randSrc   *rand.Rand
-	logger    *log.Logger
 }
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
@@ -54,57 +52,42 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 		vu:        vu,
 		hooks:     common.NewHooks(),
 		k6Metrics: k6m,
-		storage:   &storage.Dir{},
 		randSrc:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
 	}
 
 	return &b
 }
 
-// Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(opts goja.Value) {
-	rt := b.vu.Runtime()
-	k6common.Throw(rt, errors.New("BrowserType.connect() has not been implemented yet"))
-}
+func (b *BrowserType) init(
+	opts goja.Value, isRemoteBrowser bool,
+) (context.Context, *common.LaunchOptions, *log.Logger, error) {
+	ctx := b.initContext()
 
-// ExecutablePath returns the path where the extension expects to find the browser executable.
-func (b *BrowserType) ExecutablePath() (execPath string) {
-	if b.execPath != "" {
-		return b.execPath
-	}
-	defer func() {
-		b.execPath = execPath
-	}()
-
-	for _, path := range [...]string{
-		// Unix-like
-		"headless_shell",
-		"headless-shell",
-		"chromium",
-		"chromium-browser",
-		"google-chrome",
-		"google-chrome-stable",
-		"google-chrome-beta",
-		"google-chrome-unstable",
-		"/usr/bin/google-chrome",
-
-		// Windows
-		"chrome",
-		"chrome.exe", // in case PATHEXT is misconfigured
-		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
-		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
-		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
-
-		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
-		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-	} {
-		if _, err := exec.LookPath(path); err == nil {
-			return path
-		}
+	logger, err := makeLogger(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error setting up logger: %w", err)
 	}
 
-	return ""
+	var launchOpts *common.LaunchOptions
+	if isRemoteBrowser {
+		launchOpts = common.NewRemoteBrowserLaunchOptions()
+	} else {
+		launchOpts = common.NewLaunchOptions()
+	}
+
+	if err = launchOpts.Parse(ctx, logger, opts); err != nil {
+		return nil, nil, nil, fmt.Errorf("error parsing launch options: %w", err)
+	}
+	ctx = common.WithLaunchOptions(ctx, launchOpts)
+
+	if err := logger.SetCategoryFilter(launchOpts.LogCategoryFilter); err != nil {
+		return nil, nil, nil, fmt.Errorf("error setting category filter: %w", err)
+	}
+	if launchOpts.Debug {
+		_ = logger.SetLevel("debug")
+	}
+
+	return ctx, launchOpts, logger, nil
 }
 
 func (b *BrowserType) initContext() context.Context {
@@ -115,22 +98,70 @@ func (b *BrowserType) initContext() context.Context {
 	return ctx
 }
 
+// Connect attaches k6 browser to an existing browser instance.
+func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
+	ctx, launchOpts, logger, err := b.init(opts, true)
+	if err != nil {
+		k6ext.Panic(ctx, "initializing browser type: %w", err)
+	}
+
+	bp, err := b.connect(ctx, wsEndpoint, launchOpts, logger)
+	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: launchOpts.Timeout,
+		}
+		k6ext.Panic(ctx, "%w", err)
+	}
+
+	return bp
+}
+
+func (b *BrowserType) connect(
+	ctx context.Context, wsURL string, opts *common.LaunchOptions, logger *log.Logger,
+) (*common.Browser, error) {
+	browserProc, err := b.link(ctx, wsURL, opts, logger)
+	if browserProc == nil {
+		return nil, fmt.Errorf("connecting to browser: %w", err)
+	}
+
+	// If this context is cancelled we'll initiate an extension wide
+	// cancellation and shutdown.
+	browserCtx, browserCtxCancel := context.WithCancel(ctx)
+	b.Ctx = browserCtx
+	browser, err := common.NewBrowser(
+		browserCtx, browserCtxCancel, browserProc, opts, logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to browser: %w", err)
+	}
+
+	return browser, nil
+}
+
+func (b *BrowserType) link(
+	ctx context.Context, wsURL string,
+	opts *common.LaunchOptions, logger *log.Logger,
+) (*common.BrowserProcess, error) {
+	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
+	if err != nil {
+		bProcCtxCancel()
+		return nil, err //nolint:wrapcheck
+	}
+
+	return p, nil
+}
+
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
 func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID int) {
-	ctx := b.initContext()
-
-	var err error
-	if b.logger, err = makeLogger(ctx); err != nil {
-		k6ext.Panic(ctx, "setting up logger: %w", err)
+	ctx, launchOpts, logger, err := b.init(opts, false)
+	if err != nil {
+		k6ext.Panic(ctx, "initializing browser type: %w", err)
 	}
-	launchOpts := common.NewLaunchOptions(k6ext.OnCloud())
-	if err := launchOpts.Parse(ctx, b.logger, opts); err != nil {
-		k6ext.Panic(ctx, "parsing launch options: %w", err)
-	}
-	ctx = common.WithLaunchOptions(ctx, launchOpts)
 
-	bp, pid, err := b.launch(ctx, launchOpts)
+	bp, pid, err := b.launch(ctx, launchOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -143,15 +174,8 @@ func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID i
 }
 
 func (b *BrowserType) launch(
-	ctx context.Context, opts *common.LaunchOptions,
+	ctx context.Context, opts *common.LaunchOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
-	if err := b.logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
-		return nil, 0, fmt.Errorf("%w", err)
-	}
-	if opts.Debug {
-		_ = b.logger.SetLevel("debug")
-	}
-
 	envs := make([]string, 0, len(opts.Env))
 	for k, v := range opts.Env {
 		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
@@ -160,7 +184,7 @@ func (b *BrowserType) launch(
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
-	dataDir := b.storage
+	dataDir := &storage.Dir{}
 	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
@@ -169,7 +193,7 @@ func (b *BrowserType) launch(
 	go func(c context.Context) {
 		defer func() {
 			if err := dataDir.Cleanup(); err != nil {
-				b.logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
+				logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
 			}
 		}()
 		// There's a small chance that this might be called
@@ -180,19 +204,17 @@ func (b *BrowserType) launch(
 		<-c.Done()
 	}(ctx)
 
-	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, b.logger)
+	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
-
-	browserProc.AttachLogger(b.logger)
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
 	browserCtx, browserCtxCancel := context.WithCancel(ctx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
-		browserProc, opts, b.logger)
+		browserProc, opts, logger)
 	if err != nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -235,7 +257,47 @@ func (b *BrowserType) allocate(
 		path = b.ExecutablePath()
 	}
 
-	return common.NewBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+	return common.NewLocalBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+}
+
+// ExecutablePath returns the path where the extension expects to find the browser executable.
+func (b *BrowserType) ExecutablePath() (execPath string) {
+	if b.execPath != "" {
+		return b.execPath
+	}
+	defer func() {
+		b.execPath = execPath
+	}()
+
+	for _, path := range [...]string{
+		// Unix-like
+		"headless_shell",
+		"headless-shell",
+		"chromium",
+		"chromium-browser",
+		"google-chrome",
+		"google-chrome-stable",
+		"google-chrome-beta",
+		"google-chrome-unstable",
+		"/usr/bin/google-chrome",
+
+		// Windows
+		"chrome",
+		"chrome.exe", // in case PATHEXT is misconfigured
+		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
+		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
+		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
+
+		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
+		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+		"/Applications/Chromium.app/Contents/MacOS/Chromium",
+	} {
+		if _, err := exec.LookPath(path); err == nil {
+			return path
+		}
+	}
+
+	return ""
 }
 
 // parseArgs parses command-line arguments and returns them.

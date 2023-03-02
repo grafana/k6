@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -23,8 +24,10 @@ import (
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
-var _ EventEmitter = &Browser{}
-var _ api.Browser = &Browser{}
+var (
+	_ EventEmitter = &Browser{}
+	_ api.Browser  = &Browser{}
+)
 
 const (
 	BrowserStateOpen int64 = iota
@@ -392,7 +395,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 // Close shuts down the browser.
 func (b *Browser) Close() {
 	defer func() {
-		if err := b.browserProc.userDataDir.Cleanup(); err != nil {
+		if err := b.browserProc.Cleanup(); err != nil {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
 	}()
@@ -408,11 +411,12 @@ func (b *Browser) Close() {
 	b.conn.IgnoreIOErrors()
 	b.browserProc.GracefulClose()
 
-	// Send the Browser.close CDP command, which triggers the browser process to
-	// exit.
-	action := cdpbrowser.Close()
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		if _, ok := err.(*websocket.CloseError); !ok {
+	// If the browser is not being executed remotely, send the Browser.close CDP
+	// command, which triggers the browser process to exit.
+	if !b.launchOpts.isRemoteBrowser {
+		var closeErr *websocket.CloseError
+		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.ctx, b.conn))
+		if err != nil && !errors.As(err, &closeErr) {
 			k6ext.Panic(b.ctx, "closing the browser: %v", err)
 		}
 	}
@@ -523,4 +527,9 @@ func (b *Browser) Version() string {
 		return product
 	}
 	return product[i+1:]
+}
+
+// WsURL returns the Websocket URL that the browser is listening on for CDP clients.
+func (b *Browser) WsURL() string {
+	return b.browserProc.WsURL()
 }
