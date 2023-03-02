@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -410,11 +411,12 @@ func (b *Browser) Close() {
 	b.conn.IgnoreIOErrors()
 	b.browserProc.GracefulClose()
 
-	// Send the Browser.close CDP command, which triggers the browser process to
-	// exit.
-	action := cdpbrowser.Close()
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		if _, ok := err.(*websocket.CloseError); !ok {
+	// If the browser is not being executed remotely, send the Browser.close CDP
+	// command, which triggers the browser process to exit.
+	if !b.launchOpts.isRemoteBrowser {
+		var closeErr *websocket.CloseError
+		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.ctx, b.conn))
+		if err != nil && !errors.As(err, &closeErr) {
 			k6ext.Panic(b.ctx, "closing the browser: %v", err)
 		}
 	}
