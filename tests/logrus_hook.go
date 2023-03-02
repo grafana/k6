@@ -4,6 +4,7 @@ import (
 	"io/ioutil"
 	"strings"
 	"sync"
+	"testing"
 
 	"github.com/sirupsen/logrus"
 )
@@ -28,6 +29,32 @@ func (lc *logCache) Fire(e *logrus.Entry) error {
 	defer lc.mu.Unlock()
 	lc.entries = append(lc.entries, *e)
 	return nil
+}
+
+// assertContains checks if msg is contained in any of the cached logged events
+// and fails the test if it's not. It also prints the cached log messages to
+// help debugging.
+func (lc *logCache) assertContains(tb testing.TB, msg string) {
+	tb.Helper()
+
+	if lc.contains(msg) {
+		return
+	}
+	tb.Errorf("expected log cache to contain %q, but it didn't.", msg)
+	lc.dump(tb)
+}
+
+// dump prints all the cached log messages to the testing.TB.
+func (lc *logCache) dump(tb testing.TB) {
+	tb.Helper()
+
+	lc.mu.RLock()
+	defer lc.mu.RUnlock()
+
+	tb.Log(strings.Repeat("-", 80))
+	for _, e := range lc.entries {
+		tb.Log(e.Message)
+	}
 }
 
 // contains returns true if msg is contained in any of the cached logged events
