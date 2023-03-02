@@ -62,6 +62,9 @@ type Browser struct {
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
 
+	// Used to display a warning when the browser is reclosed.
+	closed bool
+
 	vu k6modules.VU
 
 	logger *log.Logger
@@ -391,6 +394,15 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 // Close shuts down the browser.
 func (b *Browser) Close() {
+	if b.closed {
+		b.logger.Warnf(
+			"Browser:Close",
+			"Please call browser.close only once, and do not use the browser after calling close.",
+		)
+		return
+	}
+	b.closed = true
+
 	defer func() {
 		if err := b.browserProc.userDataDir.Cleanup(); err != nil {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
