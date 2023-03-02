@@ -209,3 +209,13 @@ func TestMultiBrowserPanic(t *testing.T) {
 	err = p2.Signal(syscall.Signal(0))
 	assert.Error(t, err, "process #2 should be dead, but exists")
 }
+
+func TestBrowserMultiClose(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withSkipClose(), withLogCache())
+
+	require.NotPanicsf(t, tb.Close, "first call to browser.close should not panic")
+	require.NotPanicsf(t, tb.Close, "second call to browser.close should not panic")
+	tb.logCache.assertContains(t, "browser.close only once")
+}
