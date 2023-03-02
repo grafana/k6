@@ -23,11 +23,11 @@ func TestURLSkipRequest(t *testing.T) {
 
 	_, err := p.Goto("data:text/html,hello", nil)
 	require.NoError(t, err)
-	assert.True(t, tb.logCache.contains("skipping request handling of data URL"))
+	tb.logCache.assertContains(t, "skipping request handling of data URL")
 
 	_, err = p.Goto("blob:something", nil)
 	require.NoError(t, err)
-	assert.True(t, tb.logCache.contains("skipping request handling of blob URL"))
+	tb.logCache.assertContains(t, "skipping request handling of blob URL")
 }
 
 func TestBlockHostnames(t *testing.T) {
@@ -42,7 +42,7 @@ func TestBlockHostnames(t *testing.T) {
 	res, err := p.Goto("http://host.test/", nil)
 	require.NoError(t, err)
 	require.Nil(t, res)
-	require.True(t, tb.logCache.contains("was interrupted: hostname host.test is in a blocked pattern"))
+	tb.logCache.assertContains(t, "was interrupted: hostname host.test is in a blocked pattern")
 
 	res, err = p.Goto(tb.URL("/get"), nil)
 	require.NoError(t, err)
@@ -60,8 +60,7 @@ func TestBlockIPs(t *testing.T) {
 	res, err := p.Goto("http://10.0.0.1:8000/", nil)
 	require.NoError(t, err)
 	require.Nil(t, res)
-	assert.True(t, tb.logCache.contains(
-		`was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`))
+	tb.logCache.assertContains(t, `was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
 
 	// Ensure other requests go through
 	res, err = p.Goto(tb.URL("/get"), nil)
