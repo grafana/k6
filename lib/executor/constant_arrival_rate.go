@@ -217,7 +217,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 		<-waitOnProgressChannel
 	}()
 
-	vusPool := newActiveVUPool()
+	vusPool := newActiveVUPool(car.executionState)
 	defer func() {
 		// Make sure all VUs aren't executing iterations anymore, for the cancel()
 		// below to deactivate them.
@@ -264,7 +264,7 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	}()
 
 	returnVU := func(u lib.InitializedVU) {
-		car.executionState.ReturnVU(u, true)
+		car.executionState.ReturnVU(u, false)
 		activeVUsWg.Done()
 	}
 
@@ -275,7 +275,6 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 			maxDurationCtx, car.config.BaseConfig, returnVU,
 			car.nextIterationCounters,
 		))
-		car.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 		vusPool.AddVU(maxDurationCtx, activeVU, runIterationBasic)
 		return activeVU
