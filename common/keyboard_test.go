@@ -76,3 +76,11 @@ func TestKeyboardPress(t *testing.T) {
 		assert.Panics(t, func() { k.Press("", nil) })
 	})
 }
+
+func TestKeyDefinitionCode(t *testing.T) {
+	vu := k6test.NewVU(t)
+	k := NewKeyboard(vu.Context(), nil)
+	kd := k.keyDefinitionFromKey("a")
+
+	assert.Equal(t, "KeyA", kd.Code)
+}
