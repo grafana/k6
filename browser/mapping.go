@@ -578,13 +578,18 @@ func mapWorker(vu moduleVU, w api.Worker) mapping {
 func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"addCookies":                  bc.AddCookies,
-		"addInitScript":               bc.AddInitScript,
-		"browser":                     bc.Browser,
-		"clearCookies":                bc.ClearCookies,
-		"clearPermissions":            bc.ClearPermissions,
-		"close":                       bc.Close,
-		"cookies":                     bc.Cookies,
+		"addCookies":       bc.AddCookies,
+		"addInitScript":    bc.AddInitScript,
+		"browser":          bc.Browser,
+		"clearCookies":     bc.ClearCookies,
+		"clearPermissions": bc.ClearPermissions,
+		"close":            bc.Close,
+		"cookies": func() ([]any, error) {
+			cc, err := bc.Cookies()
+			ctx := vu.Context()
+			panicIfFatalError(ctx, err)
+			return cc, err //nolint:wrapcheck
+		},
 		"exposeBinding":               bc.ExposeBinding,
 		"exposeFunction":              bc.ExposeFunction,
 		"grantPermissions":            bc.GrantPermissions,

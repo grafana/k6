@@ -152,9 +152,8 @@ func (b *BrowserContext) Close() {
 }
 
 // Cookies is not implemented.
-func (b *BrowserContext) Cookies() []any {
-	k6ext.Panic(b.ctx, "BrowserContext.cookies() has not been implemented yet")
-	return nil
+func (b *BrowserContext) Cookies() ([]any, error) {
+	return nil, fmt.Errorf("BrowserContext.cookies() has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // ExposeBinding is not implemented.
