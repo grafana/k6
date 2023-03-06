@@ -323,6 +323,30 @@ func TestCheckArray(t *testing.T) {
 	}
 }
 
+func TestCheckContextDone(t *testing.T) {
+	t.Parallel()
+	t.Run("true", func(t *testing.T) {
+		t.Parallel()
+		tc := testCaseRuntime(t)
+
+		tc.testRuntime.CancelContext()
+		err := tc.run(`globalThis.result = k6.check(null, {"name": ()=>{ return true }})`)
+		assert.NoError(t, err)
+		assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)
+		assert.True(t, tc.testRuntime.VU.Runtime().Get("result").ToBoolean())
+	})
+	t.Run("false", func(t *testing.T) {
+		t.Parallel()
+		tc := testCaseRuntime(t)
+
+		tc.testRuntime.CancelContext()
+		err := tc.run(`globalThis.result = k6.check(null, {"name": ()=>{ return false }})`)
+		assert.NoError(t, err)
+		assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)
+		assert.False(t, tc.testRuntime.VU.Runtime().Get("result").ToBoolean())
+	})
+}
+
 func TestCheckLiteral(t *testing.T) {
 	t.Parallel()
 	rt, samples, _ := checkTestRuntime(t)
@@ -500,4 +524,44 @@ func TestCheckTags(t *testing.T) {
 			"b":     "2",
 		}, sample.Tags.Map())
 	}
+}
+
+type testCase struct {
+	samples     chan metrics.SampleContainer
+	testRuntime *modulestest.Runtime
+}
+
+func testCaseRuntime(t testing.TB) *testCase {
+	testRuntime := modulestest.NewRuntime(t)
+	m, ok := New().NewModuleInstance(testRuntime.VU).(*K6)
+	require.True(t, ok)
+	require.NoError(t, testRuntime.VU.RuntimeField.Set("k6", m.Exports().Named))
+
+	registry := metrics.NewRegistry()
+	root, err := lib.NewGroup("", nil)
+	assert.NoError(t, err)
+	samples := make(chan metrics.SampleContainer, 1000)
+	state := &lib.State{
+		Group: root,
+		Options: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		Samples:        samples,
+		Tags:           lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{"group": root.Path})),
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+	}
+	testRuntime.MoveToVUContext(state)
+
+	return &testCase{
+		samples:     samples,
+		testRuntime: testRuntime,
+	}
+}
+
+func (t *testCase) run(script string) error {
+	defer t.testRuntime.EventLoop.WaitOnRegistered()
+	return t.testRuntime.EventLoop.Start(func() (err error) {
+		_, err = t.testRuntime.VU.Runtime().RunString(script)
+		return err
+	})
 }
