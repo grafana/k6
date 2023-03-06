@@ -596,7 +596,7 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 			ctx := vu.Context()
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				err := bc.SetExtraHTTPHeaders(headers)
-				panicIfInternalError(ctx, err)
+				panicIfFatalError(ctx, err)
 				return nil, err //nolint:wrapcheck
 			})
 		},
@@ -678,8 +678,8 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 	}
 }
 
-func panicIfInternalError(ctx context.Context, err error) {
-	if errors.Is(err, k6error.ErrInternal) {
+func panicIfFatalError(ctx context.Context, err error) {
+	if errors.Is(err, k6error.ErrFatal) {
 		k6ext.Panic(ctx, err.Error())
 	}
 }

@@ -272,7 +272,7 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 
 // SetExtraHTTPHeaders is not implemented.
 func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) error {
-	return fmt.Errorf("BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet: %w", k6error.ErrInternal)
+	return fmt.Errorf("BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // SetGeolocation overrides the geo location of the user.
