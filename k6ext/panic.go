@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dop251/goja"
 	k6common "go.k6.io/k6/js/common"
 )
 
@@ -16,10 +17,10 @@ import (
 // browser process from the context and kill it if it still exists.
 // TODO: test.
 func Panic(ctx context.Context, format string, a ...any) {
-	sharedPanic(ctx, format, a...)
+	sharedPanic(ctx, func(rt *goja.Runtime, a ...any) { k6common.Throw(rt, fmt.Errorf(format, a...)) }, a...)
 }
 
-func sharedPanic(ctx context.Context, format string, a ...any) {
+func sharedPanic(ctx context.Context, fail func(rt *goja.Runtime, a ...any), a ...any) {
 	rt := Runtime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error
@@ -35,7 +36,7 @@ func sharedPanic(ctx context.Context, format string, a ...any) {
 			a[len(a)-1] = &UserFriendlyError{Err: err}
 		}
 	}
-	defer k6common.Throw(rt, fmt.Errorf(format, a...))
+	defer fail(rt, a...)
 
 	// TODO: Remove this after moving k6ext.Panic into the mapping layer.
 	pidder, ok := GetVU(ctx).(interface {
