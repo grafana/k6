@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+
 	"go.k6.io/k6/errext"
 	k6common "go.k6.io/k6/js/common"
 )
