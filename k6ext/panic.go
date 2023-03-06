@@ -11,11 +11,15 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
-// Panic will cause a panic with the given error which will shut
-// the application down. Before panicking, it will find the
+// Panic will cause a panic with the given error which will stop
+// the current iteration. Before panicking, it will find the
 // browser process from the context and kill it if it still exists.
 // TODO: test.
 func Panic(ctx context.Context, format string, a ...any) {
+	sharedPanic(ctx, format, a...)
+}
+
+func sharedPanic(ctx context.Context, format string, a ...any) {
 	rt := Runtime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error
