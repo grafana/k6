@@ -680,6 +680,6 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 
 func panicIfFatalError(ctx context.Context, err error) {
 	if errors.Is(err, k6error.ErrFatal) {
-		k6ext.Panic(ctx, err.Error())
+		k6ext.Abort(ctx, err.Error())
 	}
 }

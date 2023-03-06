@@ -9,8 +9,20 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/errext"
 	k6common "go.k6.io/k6/js/common"
 )
+
+// Abort will shutdown the whole test run. This should
+// only be used from the goja mapping layer. It is only
+// to be used when an error will occur in all iterations,
+// so it's permanent.
+func Abort(ctx context.Context, format string, a ...any) {
+	sharedPanic(ctx, func(rt *goja.Runtime, a ...any) {
+		reason := fmt.Errorf(format, a...).Error()
+		rt.Interrupt(&errext.InterruptError{Reason: reason})
+	}, a...)
+}
 
 // Panic will cause a panic with the given error which will stop
 // the current iteration. Before panicking, it will find the
