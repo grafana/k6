@@ -29,7 +29,6 @@ type Bundle struct {
 	Filename *url.URL
 	Source   []byte
 	Options  lib.Options
-	logger   *logrus.Logger
 
 	CompatibilityMode lib.CompatibilityMode // parsed value
 	preInitState      *lib.TestPreInitState
@@ -87,7 +86,6 @@ func newBundle(
 		callableExports:   make(map[string]struct{}),
 		filesystems:       filesystems,
 		pwd:               loader.Dir(src.URL),
-		logger:            piState.Logger,
 		preInitState:      piState,
 	}
 	c := bundle.newCompiler(piState.Logger)
@@ -261,13 +259,13 @@ func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 
 func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance, error) {
 	rt := vuImpl.runtime
-	err := b.setupJSRuntime(rt, int64(vuID), b.logger)
+	err := b.setupJSRuntime(rt, int64(vuID), b.preInitState.Logger)
 	if err != nil {
 		return nil, err
 	}
 
 	initenv := &common.InitEnvironment{
-		Logger:      b.logger,
+		Logger:      b.preInitState.Logger,
 		FileSystems: b.filesystems,
 		CWD:         b.pwd,
 		Registry:    b.preInitState.Registry,
@@ -295,7 +293,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 	}()
 
 	var instance moduleInstance
-	err = common.RunWithPanicCatching(b.logger, rt, func() error {
+	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
 			//nolint:shadow,govet // here we shadow err on purpose
 			mod, err := b.moduleResolver.resolve(b.pwd, b.Filename.String())
@@ -394,12 +392,12 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, modSys *moduleSystem) (unset f
 func generateCJSLoad(b *Bundle, c *compiler.Compiler) cjsModuleLoader {
 	return func(specifier *url.URL, name string) (*cjsModule, error) {
 		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
-			b.logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and won't work if"+
-				" you move the script between machines or run it with `k6 cloud`; if absolute paths are required,"+
-				" import them with the `file://` schema for slightly better compatibility",
+			b.preInitState.Logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and "+
+				"won't work if you move the script between machines or run it with `k6 cloud`; if absolute paths are "+
+				"required, import them with the `file://` schema for slightly better compatibility",
 				name)
 		}
-		d, err := loader.Load(b.logger, b.filesystems, specifier, name)
+		d, err := loader.Load(b.preInitState.Logger, b.filesystems, specifier, name)
 		if err != nil {
 			return nil, err
 		}
