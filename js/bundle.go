@@ -26,9 +26,8 @@ import (
 // A Bundle is a self-contained bundle of scripts and resources.
 // You can use this to produce identical BundleInstance objects.
 type Bundle struct {
-	Filename *url.URL
-	Source   []byte
-	Options  lib.Options
+	sourceData *loader.SourceData
+	Options    lib.Options
 
 	CompatibilityMode lib.CompatibilityMode // parsed value
 	preInitState      *lib.TestPreInitState
@@ -79,8 +78,7 @@ func newBundle(
 
 	// Make a bundle, instantiate it into a throwaway VM to populate caches.
 	bundle := &Bundle{
-		Filename:          src.URL,
-		Source:            src.Data,
+		sourceData:        src,
 		Options:           options,
 		CompatibilityMode: compatMode,
 		callableExports:   make(map[string]struct{}),
@@ -144,8 +142,8 @@ func (b *Bundle) makeArchive() *lib.Archive {
 		Type:              "js",
 		Filesystems:       b.filesystems,
 		Options:           b.Options,
-		FilenameURL:       b.Filename,
-		Data:              b.Source,
+		FilenameURL:       b.sourceData.URL,
+		Data:              b.sourceData.Data,
 		PwdURL:            b.pwd,
 		Env:               make(map[string]string, len(b.preInitState.RuntimeOptions.Env)),
 		CompatibilityMode: b.CompatibilityMode.String(),
@@ -296,7 +294,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
 			//nolint:shadow,govet // here we shadow err on purpose
-			mod, err := b.moduleResolver.resolve(b.pwd, b.Filename.String())
+			mod, err := b.moduleResolver.resolve(b.pwd, b.sourceData.URL.String())
 			if err != nil {
 				return err // TODO wrap as this should never happen
 			}

@@ -123,7 +123,7 @@ func TestNewBundle(t *testing.T) {
 		t.Parallel()
 		b, err := getSimpleBundle(t, "-", `export default function() {};`)
 		require.NoError(t, err)
-		assert.Equal(t, "file://-", b.Filename.String())
+		assert.Equal(t, "file://-", b.sourceData.URL.String())
 		assert.Equal(t, "file:///", b.pwd.String())
 	})
 	t.Run("CompatibilityMode", func(t *testing.T) {
