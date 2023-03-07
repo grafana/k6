@@ -775,4 +775,5 @@ func TestRampingArrivalRateActiveVUs(t *testing.T) {
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 
 	assert.GreaterOrEqual(t, running, int64(5))
+	assert.LessOrEqual(t, running, int64(10))
 }
