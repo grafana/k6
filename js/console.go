@@ -9,7 +9,7 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// console represents a JS console implemented as a logrus.Logger.
+// console represents a JS console implemented as a logrus.FieldLogger.
 type console struct {
 	logger logrus.FieldLogger
 }

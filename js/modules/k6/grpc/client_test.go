@@ -949,9 +949,7 @@ func TestClientInvokeHeadersDeprecated(t *testing.T) {
 
 	registry := metrics.NewRegistry()
 
-	logHook := &testutils.SimpleLogrusHook{
-		HookedLevels: []logrus.Level{logrus.WarnLevel},
-	}
+	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)

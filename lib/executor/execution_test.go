@@ -83,7 +83,7 @@ func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
 	et, err := lib.NewExecutionTuple(nil, nil)
 	require.NoError(t, err)
 	es := lib.NewExecutionState(nil, et, 0, 0)
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)
@@ -100,7 +100,7 @@ func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
 
 func TestExecutionStateGettingVUs(t *testing.T) {
 	t.Parallel()
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel, logrus.DebugLevel}}
+	logHook := testutils.NewLogHook(logrus.WarnLevel, logrus.DebugLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)

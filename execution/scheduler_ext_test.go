@@ -58,7 +58,7 @@ func getTestRunState(
 }
 
 func newTestScheduler(
-	t *testing.T, runner lib.Runner, logger *logrus.Logger, opts lib.Options,
+	t *testing.T, runner lib.Runner, logger logrus.FieldLogger, opts lib.Options,
 ) (ctx context.Context, cancel func(), execScheduler *execution.Scheduler, samples chan metrics.SampleContainer) {
 	if runner == nil {
 		runner = &minirunner.MiniRunner{}
@@ -1083,8 +1083,8 @@ func TestDNSResolver(t *testing.T) {
 				t.Parallel()
 				logger := logrus.New()
 				logger.SetOutput(ioutil.Discard)
-				logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
-				logger.AddHook(&logHook)
+				logHook := testutils.NewLogHook(logrus.WarnLevel)
+				logger.AddHook(logHook)
 
 				registry := metrics.NewRegistry()
 				builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

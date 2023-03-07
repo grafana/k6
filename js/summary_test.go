@@ -671,8 +671,8 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(ioutil.Discard)
-	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.ErrorLevel}}
-	logger.AddHook(&logHook)
+	logHook := testutils.NewLogHook(logrus.ErrorLevel)
+	logger.AddHook(logHook)
 
 	runner, err := getSimpleRunner(t, "/script.js", `
 			exports.default = function() {/* we don't run this, metrics are mocked */};

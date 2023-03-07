@@ -1,7 +1,6 @@
 package testutils
 
 import (
-	"io"
 	"strings"
 	"sync"
 
@@ -48,7 +47,35 @@ func (smh *SimpleLogrusHook) Lines() []string {
 	return lines
 }
 
+// Reset clears the internal entry buffer.
+func (smh *SimpleLogrusHook) Reset() {
+	smh.mutex.Lock()
+	defer smh.mutex.Unlock()
+	smh.messageCache = []logrus.Entry{}
+}
+
+// LastEntry returns the last entry that was logged (or nil, if no messages were
+// logged or remain).
+func (smh *SimpleLogrusHook) LastEntry() *logrus.Entry {
+	smh.mutex.Lock()
+	defer smh.mutex.Unlock()
+	i := len(smh.messageCache) - 1
+	if i < 0 {
+		return nil
+	}
+	return &smh.messageCache[i]
+}
+
 var _ logrus.Hook = &SimpleLogrusHook{}
+
+// NewLogHook creates a new SimpleLogrusHook with the given levels and returns
+// it. If no levels are specified, then logrus.AllLevels will be used.
+func NewLogHook(levels ...logrus.Level) *SimpleLogrusHook {
+	if len(levels) == 0 {
+		levels = logrus.AllLevels
+	}
+	return &SimpleLogrusHook{HookedLevels: levels}
+}
 
 // LogContains is a helper function that checks the provided list of log entries
 // for a message matching the provided level and contents.
@@ -59,19 +86,4 @@ func LogContains(logEntries []logrus.Entry, expLevel logrus.Level, expContents s
 		}
 	}
 	return false
-}
-
-// NewMemLogger creates a Logrus logger mocked by SimpleLogrusHook.
-func NewMemLogger(levels ...logrus.Level) (*logrus.Logger, *SimpleLogrusHook) {
-	if len(levels) == 0 {
-		levels = logrus.AllLevels
-	}
-	logger := logrus.New()
-	logger.SetLevel(logrus.InfoLevel)
-	logger.Out = io.Discard
-	hook := &SimpleLogrusHook{
-		HookedLevels: levels,
-	}
-	logger.AddHook(hook)
-	return logger, hook
 }

@@ -168,10 +168,8 @@ func TestCorruptSourceMap(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	logger.Out = ioutil.Discard
-	hook := testutils.SimpleLogrusHook{
-		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
-	}
-	logger.AddHook(&hook)
+	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
+	logger.AddHook(hook)
 
 	compiler := New(logger)
 	compiler.Options = Options{
@@ -199,10 +197,8 @@ func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	logger.Out = ioutil.Discard
-	hook := testutils.SimpleLogrusHook{
-		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
-	}
-	logger.AddHook(&hook)
+	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
+	logger.AddHook(hook)
 
 	compiler := New(logger)
 	compiler.Options = Options{
@@ -231,10 +227,8 @@ func TestMinimalSourceMap(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	logger.Out = ioutil.Discard
-	hook := testutils.SimpleLogrusHook{
-		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
-	}
-	logger.AddHook(&hook)
+	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
+	logger.AddHook(hook)
 
 	compiler := New(logger)
 	compiler.Options = Options{

@@ -9,7 +9,7 @@ import (
 // TODO(imiric): Consider adding logging tests for 100% pb coverage.
 // Unfortunately the following introduces an import cycle: pb -> lib -> pb
 // func getTestLogger() *logger.Entry {
-// 	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+// 	logHook := testutils.NewLogHook(logrus.WarnLevel)
 // 	testLog := logrus.New()
 // 	testLog.AddHook(logHook)
 // 	testLog.SetOutput(ioutil.Discard)

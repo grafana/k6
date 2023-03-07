@@ -355,19 +355,19 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(gs, `
   # Run a single VU, once.
   {{.}} run script.js
-  
+
   # Run a single VU, 10 times.
   {{.}} run -i 10 script.js
-  
+
   # Run 5 VUs, splitting 10 iterations between them.
   {{.}} run -u 5 -i 10 script.js
-  
+
   # Run 5 VUs for 10s.
   {{.}} run -u 5 -d 10s script.js
-  
+
   # Ramp VUs from 0 to 100 over 10s, stay there for 60s, then 10s down to 0.
   {{.}} run -u 0 -s 10s:100 -s 60s -s 10s:0
-  
+
   # Send metrics to an influxdb server
   {{.}} run -o influxdb=http://1.2.3.4:8086/k6`[1:])
 

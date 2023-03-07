@@ -119,7 +119,7 @@ func TestVUTagsSuccessOverwriteSystemTag(t *testing.T) {
 func TestVUTagsErrorOutOnInvalidValues(t *testing.T) {
 	t.Parallel()
 
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(ioutil.Discard)

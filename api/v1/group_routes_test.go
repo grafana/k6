@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -22,7 +21,6 @@ import (
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 	reg := metrics.NewRegistry()
 	logger := testutils.NewLogger(tb)
-	logger.SetLevel(logrus.DebugLevel)
 	return &lib.TestPreInitState{
 		Logger:         logger,
 		RuntimeOptions: lib.RuntimeOptions{},

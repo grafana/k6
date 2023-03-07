@@ -58,7 +58,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 			fsResolvers = opt
 		case lib.RuntimeOptions:
 			rtOpts = opt
-		case *logrus.Logger:
+		case logrus.FieldLogger:
 			logger = opt
 		default:
 			tb.Fatalf("unknown test option %q", opt)
@@ -82,6 +82,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 	)
 }
 
+// TODO: remove the need for this function, see https://github.com/grafana/k6/issues/2968
 func extractLogger(fl logrus.FieldLogger) *logrus.Logger {
 	switch e := fl.(type) {
 	case *logrus.Entry:
@@ -103,8 +104,7 @@ func TestConsoleLogWithGojaNativeObject(t *testing.T) {
 	err := obj.Set("text", "nativeObject")
 	require.NoError(t, err)
 
-	logger := testutils.NewLogger(t)
-	hook := logtest.NewLocal(logger)
+	logger, hook := testutils.NewLoggerWithHook(t)
 
 	c := newConsole(logger)
 	c.Log(obj)
@@ -160,8 +160,7 @@ func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
 			rt.SetFieldNameMapper(common.FieldNameMapper{})
 			obj := rt.ToValue(tt.in)
 
-			logger := testutils.NewLogger(t)
-			hook := logtest.NewLocal(logger)
+			logger, hook := testutils.NewLoggerWithHook(t)
 
 			c := newConsole(logger)
 			c.Log(obj)
