@@ -264,6 +264,10 @@ func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	}()
 
 	returnVU := func(u lib.InitializedVU) {
+		// Return the VU without decreasing the global active VU counter, which
+		// is done in the goroutine started by activeVUPool.AddVU, whenever the
+		// VU finishes running an iteration. This results in a more accurate
+		// report of VUs that are _actually_ active.
 		car.executionState.ReturnVU(u, false)
 		activeVUsWg.Done()
 	}
