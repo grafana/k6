@@ -32,8 +32,8 @@ func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 
 	loginCloudCommand := &cobra.Command{
 		Use:   "cloud",
-		Short: "Authenticate with Load Impact",
-		Long: `Authenticate with Load Impact.
+		Short: "Authenticate with k6 Cloud",
+		Long: `Authenticate with k6 Cloud",
 
 This will set the default token used when just "k6 run -o cloud" is passed.`,
 		Example: exampleText,

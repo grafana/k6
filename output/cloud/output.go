@@ -25,10 +25,10 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-// TestName is the default Load Impact Cloud test name
+// TestName is the default k6 Cloud test name
 const TestName = "k6 test"
 
-// Output sends result data to the Load Impact cloud service.
+// Output sends result data to the k6 Cloud service.
 type Output struct {
 	config      cloudapi.Config
 	referenceID string

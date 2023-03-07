@@ -10,7 +10,7 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-// Config holds all the necessary data and options for sending metrics to the Load Impact cloud.
+// Config holds all the necessary data and options for sending metrics to the k6 Cloud.
 //
 //nolint:lll
 type Config struct {
