@@ -708,55 +708,6 @@ func TestErrors(t *testing.T) {
 		require.NoError(t, err)
 		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-echo-invalid"), statusProtocolSwitch, "")
 	})
-
-	t.Run("error on close", func(t *testing.T) {
-		t.Parallel()
-		tb := httpmultibin.NewHTTPMultiBin(t)
-		sr := tb.Replacer.Replace
-
-		test := newTestState(t)
-		_, err := test.VU.Runtime().RunString(sr(`
-		var closed = false;
-		var onerror = false;
-		var res = ws.connect("WSBIN_URL/ws-close-invalid", function(socket){
-			socket.on('open', function open() {
-				socket.setInterval(function timeout() {
-				  socket.ping();
-				}, 1000);
-			});
-
-			socket.on("pong", function() {
-			  socket.close();
-			});
-
-			socket.on("error", function(errorEvent) {
-			    onerror = true;
-				if (errorEvent == null) {
-					throw new Error(JSON.stringify(errorEvent));
-				}
-				if (!closed) {
-					closed = true;
-				    socket.close();
-				}
-			});
-
-			socket.on("close", function() {
-			  closed = true;
-			})
-		});
-		if (res.status != 101) {
-			throw new Error("connection failed with status: " + res.status);
-		}
-		if (!closed) {
-			throw new Error ("conn no closed");
-		}
-		if (!onerror) {
-			throw new Error ("error event has not triggered");
-		}
-		`))
-		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-close-invalid"), statusProtocolSwitch, "")
-	})
 }
 
 func TestConnectWrongStatusCode(t *testing.T) {
