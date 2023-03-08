@@ -760,7 +760,8 @@ func TestRampingArrivalRateActiveVUs(t *testing.T) {
 
 	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
 		runMx.Lock()
-		assert.Equal(t, atomic.AddInt64(&running, 1), getCurrActiveVUs())
+		running++
+		assert.Equal(t, running, getCurrActiveVUs())
 		runMx.Unlock()
 		// Block the VU to cause the executor to schedule more
 		<-ctx.Done()
