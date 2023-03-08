@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 type bridgeTestFieldsType struct {
@@ -73,9 +74,8 @@ func TestFieldNameMapper(t *testing.T) {
 			t.Run(field, func(t *testing.T) {
 				t.Parallel()
 				f, ok := data.Typ.FieldByName(field)
-				if assert.True(t, ok, "no such field") {
-					assert.Equal(t, name, (FieldNameMapper{}).FieldName(data.Typ, f))
-				}
+				require.True(t, ok, "no such field")
+				assert.Equal(t, name, (FieldNameMapper{}).FieldName(data.Typ, f))
 			})
 		}
 		for meth, name := range data.Methods {
@@ -84,9 +84,8 @@ func TestFieldNameMapper(t *testing.T) {
 				t.Parallel()
 				m, ok := data.Typ.MethodByName(meth)
 				if name != "" {
-					if assert.True(t, ok, "no such method") {
-						assert.Equal(t, name, (FieldNameMapper{}).MethodName(data.Typ, m))
-					}
+					require.True(t, ok, "no such method")
+					assert.Equal(t, name, (FieldNameMapper{}).MethodName(data.Typ, m))
 				} else {
 					assert.False(t, ok, "exported by accident")
 				}

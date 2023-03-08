@@ -253,7 +253,7 @@ func (r *Runner) newVU(
 	// instead of "Value is not an object: undefined  ..."
 	_ = vu.Runtime.GlobalObject().Set("open",
 		func() {
-			common.Throw(vu.Runtime, errors.New(openCantBeUsedOutsideInitContextMsg))
+			common.Throw(vu.Runtime, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "open"))
 		})
 
 	return vu, nil
@@ -356,7 +356,7 @@ func (r *Runner) GetOptions() lib.Options {
 // IsExecutable returns whether the given name is an exported and
 // executable function in the script.
 func (r *Runner) IsExecutable(name string) bool {
-	_, exists := r.Bundle.exports[name]
+	_, exists := r.Bundle.callableExports[name]
 	return exists
 }
 

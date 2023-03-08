@@ -39,9 +39,8 @@ func TestTagURL(t *testing.T) {
 			tag, err := httpext.NewURL(data.u, data.n)
 			require.NoError(t, err)
 			v, err := rt.RunString("http.url`" + expr + "`")
-			if assert.NoError(t, err) {
-				assert.Equal(t, tag, v.Export())
-			}
+			require.NoError(t, err)
+			assert.Equal(t, tag, v.Export())
 		})
 	}
 }
