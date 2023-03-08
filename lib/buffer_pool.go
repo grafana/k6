@@ -23,12 +23,10 @@ func NewBufferPool() *BufferPool {
 }
 
 // Get return a bytes.Buffer from the pool
+//
+//nolint:forcetypeassert
 func (bp BufferPool) Get() *bytes.Buffer {
-	b, ok := bp.pool.Get().(*bytes.Buffer)
-	if !ok {
-		return bytes.NewBuffer([]byte{})
-	}
-	return b
+	return bp.pool.Get().(*bytes.Buffer)
 }
 
 // Put return the given bytes.Buffer to the pool calling Buffer.Reset() before
