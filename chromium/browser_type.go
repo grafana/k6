@@ -316,12 +316,6 @@ func parseArgs(flags map[string]any) ([]string, error) {
 			return nil, fmt.Errorf(`invalid browser command line flag: "%s=%v"`, name, value)
 		}
 	}
-	if _, ok := flags["no-sandbox"]; !ok && os.Getuid() == 0 {
-		// Running as root, for example in a Linux container. Chromium
-		// needs --no-sandbox when running as root, so make that the
-		// default, unless the user set "no-sandbox": false.
-		args = append(args, "--no-sandbox")
-	}
 	if _, ok := flags["remote-debugging-port"]; !ok {
 		args = append(args, "--remote-debugging-port=0")
 	}
@@ -362,7 +356,6 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 
 		"no-startup-window":           true,
 		"no-default-browser-check":    true,
-		"no-sandbox":                  true,
 		"headless":                    lopts.Headless,
 		"auto-open-devtools-for-tabs": lopts.Devtools,
 		"window-size":                 fmt.Sprintf("%d,%d", 800, 600),
