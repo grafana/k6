@@ -95,8 +95,7 @@ func TestFileHookFromConfigLine(t *testing.T) {
 			}
 
 			res, err := FileHookFromConfigLine(
-				context.Background(), afero.NewMemMapFs(), getCwd, logrus.New(), test.line, make(chan struct{}),
-			)
+				afero.NewMemMapFs(), getCwd, logrus.New(), test.line)
 
 			if test.err {
 				require.Error(t, err)
@@ -128,12 +127,11 @@ func TestFileHookFire(t *testing.T) {
 		w:        nc,
 		bw:       bufio.NewWriter(nc),
 		levels:   logrus.AllLevels,
-		done:     make(chan struct{}),
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
 
-	hook.loglines = hook.loop(ctx)
+	go hook.Listen(ctx)
 
 	logger := logrus.New()
 	logger.AddHook(hook)

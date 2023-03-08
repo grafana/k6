@@ -1,7 +1,6 @@
 package log
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"testing"
@@ -22,7 +21,6 @@ func TestSyslogFromConfigLine(t *testing.T) {
 		{
 			line: "loki", // default settings
 			res: lokiHook{
-				ctx:           context.Background(),
 				addr:          "http://127.0.0.1:3100/loki/api/v1/push",
 				limit:         100,
 				pushPeriod:    time.Second * 1,
@@ -35,7 +33,6 @@ func TestSyslogFromConfigLine(t *testing.T) {
 		{
 			line: "loki=somewhere:1233,label.something=else,label.foo=bar,limit=32,level=info,allowedLabels=[something],pushPeriod=5m32s,msgMaxSize=1231",
 			res: lokiHook{
-				ctx:           context.Background(),
 				addr:          "somewhere:1233",
 				limit:         32,
 				pushPeriod:    time.Minute*5 + time.Second*32,
@@ -74,16 +71,15 @@ func TestSyslogFromConfigLine(t *testing.T) {
 		t.Run(test.line, func(t *testing.T) {
 			// no parallel because this is way too fast and parallel will only slow it down
 
-			res, err := LokiFromConfigLine(context.Background(), nil, test.line, make(chan struct{}))
-
+			res, err := LokiFromConfigLine(nil, test.line)
 			if test.err {
 				require.Error(t, err)
 				return
 			}
 			require.NoError(t, err)
+
 			test.res.client = res.(*lokiHook).client
 			test.res.ch = res.(*lokiHook).ch
-			test.res.lokiStopped = res.(*lokiHook).lokiStopped
 			require.Equal(t, &test.res, res)
 		})
 	}
