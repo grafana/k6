@@ -262,17 +262,16 @@ func TestSessionTimeout(t *testing.T) {
 	test := newTestState(t)
 	_, err := test.VU.Runtime().RunString(sr(`
 		var start = new Date().getTime();
-		var ellapsed = new Date().getTime() - start;
+		var elapsed = new Date().getTime() - start;
 		var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 			socket.setTimeout(function () {
-				ellapsed = new Date().getTime() - start;
+				elapsed = new Date().getTime() - start;
 				socket.close();
 			}, 500);
 		});
-		if (ellapsed > 3000 || ellapsed < 500) {
-			throw new Error ("setTimeout occurred after " + ellapsed + "ms, expected 500<T<3000");
-		}
-		`))
+		if (elapsed > 3000 || elapsed < 500) {
+			throw new Error ("setTimeout occurred after " + elapsed + "ms, expected 500<T<3000")
+		}`))
 	require.NoError(t, err)
 }
 
@@ -390,7 +389,7 @@ func TestSessionClose(t *testing.T) {
 		name     string
 		endpoint string
 	}{
-		{"server_close_ok", "/ws-echo"},
+		{"server_close_ok", "/ws-close"},
 		// Ensure we correctly handle invalid WS server
 		// implementations that close the connection prematurely
 		// without sending a close control frame first.
@@ -718,18 +717,20 @@ func TestErrors(t *testing.T) {
 		test := newTestState(t)
 		_, err := test.VU.Runtime().RunString(sr(`
 		var closed = false;
-		var res = ws.connect("WSBIN_URL/ws-close", function(socket){
+		var onerror = false;
+		var res = ws.connect("WSBIN_URL/ws-close-invalid", function(socket){
 			socket.on('open', function open() {
 				socket.setInterval(function timeout() {
 				  socket.ping();
 				}, 1000);
 			});
 
-			socket.on("ping", function() {
-				socket.close();
+			socket.on("pong", function() {
+			  socket.close();
 			});
 
 			socket.on("error", function(errorEvent) {
+			    onerror = true;
 				if (errorEvent == null) {
 					throw new Error(JSON.stringify(errorEvent));
 				}
@@ -738,10 +739,23 @@ func TestErrors(t *testing.T) {
 				    socket.close();
 				}
 			});
+
+			socket.on("close", function() {
+			  closed = true;
+			})
 		});
+		if (res.status != 101) {
+			throw new Error("connection failed with status: " + res.status);
+		}
+		if (!closed) {
+			throw new Error ("conn no closed");
+		}
+		if (!onerror) {
+			throw new Error ("error event has not triggered");
+		}
 		`))
 		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-close"), statusProtocolSwitch, "")
+		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSBIN_URL/ws-close-invalid"), statusProtocolSwitch, "")
 	})
 }
 
@@ -821,13 +835,13 @@ func TestTLSConfig(t *testing.T) {
 		}
 
 		_, err := test.VU.Runtime().RunString(sr(`
-		var res = ws.connect("WSSBIN_URL/ws-close", function(socket){
+		var res = ws.connect("WSSBIN_URL/ws-echo", function(socket){
 			socket.close()
 		});
 		if (res.status != 101) { throw new Error("TLS connection failed with status: " + res.status); }
 		`))
 		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSSBIN_URL/ws-close"), statusProtocolSwitch, "")
+		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 	})
 
 	t.Run("custom certificates", func(t *testing.T) {
@@ -839,7 +853,7 @@ func TestTLSConfig(t *testing.T) {
 		test.VU.StateField.TLSConfig = tb.TLSClientConfig
 
 		_, err := test.VU.Runtime().RunString(sr(`
-			var res = ws.connect("WSSBIN_URL/ws-close", function(socket){
+			var res = ws.connect("WSSBIN_URL/ws-echo", function(socket){
 				socket.close()
 			});
 			if (res.status != 101) {
@@ -847,7 +861,7 @@ func TestTLSConfig(t *testing.T) {
 			}
 		`))
 		require.NoError(t, err)
-		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSSBIN_URL/ws-close"), statusProtocolSwitch, "")
+		assertSessionMetricsEmitted(t, metrics.GetBufferedSamples(test.samples), "", sr("WSSBIN_URL/ws-echo"), statusProtocolSwitch, "")
 	})
 }
 
@@ -1263,6 +1277,7 @@ func TestWSConnectDisableThrowErrorOption(t *testing.T) {
 		if (res == null && res.error == null) {
 			throw new Error("res.error is expected to be not null");
 		}
+
 		`)
 	require.NoError(t, err)
 	entries := logHook.Drain()
