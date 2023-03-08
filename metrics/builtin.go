@@ -13,6 +13,7 @@ const (
 	HTTPReqsName              = "http_reqs"
 	HTTPReqFailedName         = "http_req_failed"
 	HTTPReqDurationName       = "http_req_duration"
+	HTTPReqResolveName        = "http_req_resolve"
 	HTTPReqBlockedName        = "http_req_blocked"
 	HTTPReqConnectingName     = "http_req_connecting"
 	HTTPReqTLSHandshakingName = "http_req_tls_handshaking"
@@ -49,6 +50,7 @@ type BuiltinMetrics struct {
 	HTTPReqs              *Metric
 	HTTPReqFailed         *Metric
 	HTTPReqDuration       *Metric
+	HTTPReqResolve        *Metric
 	HTTPReqBlocked        *Metric
 	HTTPReqConnecting     *Metric
 	HTTPReqTLSHandshaking *Metric
@@ -87,6 +89,7 @@ func RegisterBuiltinMetrics(registry *Registry) *BuiltinMetrics {
 		HTTPReqs:              registry.MustNewMetric(HTTPReqsName, Counter),
 		HTTPReqFailed:         registry.MustNewMetric(HTTPReqFailedName, Rate),
 		HTTPReqDuration:       registry.MustNewMetric(HTTPReqDurationName, Trend, Time),
+		HTTPReqResolve:        registry.MustNewMetric(HTTPReqResolveName, Trend, Time),
 		HTTPReqBlocked:        registry.MustNewMetric(HTTPReqBlockedName, Trend, Time),
 		HTTPReqConnecting:     registry.MustNewMetric(HTTPReqConnectingName, Trend, Time),
 		HTTPReqTLSHandshaking: registry.MustNewMetric(HTTPReqTLSHandshakingName, Trend, Time),

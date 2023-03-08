@@ -78,6 +78,10 @@ func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Runner, e
 	return NewFromBundle(piState, bundle)
 }
 
+func lookupIP(ctx context.Context, host string) ([]net.IP, error) {
+	return net.DefaultResolver.LookupIP(ctx, "ip", host)
+}
+
 // NewFromBundle returns a new Runner from the provided Bundle
 func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 	defaultGroup, err := lib.NewGroup("", nil)
@@ -97,8 +101,8 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 		},
 		console: newConsole(piState.Logger),
 		Resolver: netext.NewResolver(
-			net.LookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
-		ActualResolver: net.LookupIP,
+			lookupIP, 0, defDNS.Select.DNSSelect, defDNS.Policy.DNSPolicy),
+		ActualResolver: lookupIP,
 	}
 
 	err = r.SetOptions(r.Bundle.Options)

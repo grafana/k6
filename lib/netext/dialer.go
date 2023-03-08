@@ -57,7 +57,7 @@ func (b BlockedHostError) Error() string {
 
 // DialContext wraps the net.Dialer.DialContext and handles the k6 specifics
 func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn, error) {
-	dialAddr, err := d.getDialAddr(addr)
+	dialAddr, err := d.getDialAddr(ctx, addr)
 	if err != nil {
 		return nil, err
 	}
@@ -133,8 +133,8 @@ func (d *Dialer) GetTrail(
 	}
 }
 
-func (d *Dialer) getDialAddr(addr string) (string, error) {
-	remote, err := d.findRemote(addr)
+func (d *Dialer) getDialAddr(ctx context.Context, addr string) (string, error) {
+	remote, err := d.findRemote(ctx, addr)
 	if err != nil {
 		return "", err
 	}
@@ -148,7 +148,7 @@ func (d *Dialer) getDialAddr(addr string) (string, error) {
 	return remote.String(), nil
 }
 
-func (d *Dialer) findRemote(addr string) (*types.Host, error) {
+func (d *Dialer) findRemote(ctx context.Context, addr string) (*types.Host, error) {
 	host, port, err := net.SplitHostPort(addr)
 	if err != nil {
 		return nil, err
@@ -172,7 +172,7 @@ func (d *Dialer) findRemote(addr string) (*types.Host, error) {
 		return types.NewHost(ip, port)
 	}
 
-	ip, err = d.Resolver.LookupIP(host)
+	ip, err = d.Resolver.LookupIP(ctx, host)
 	if err != nil {
 		return nil, err
 	}

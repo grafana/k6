@@ -1,6 +1,7 @@
 package netext
 
 import (
+	"context"
 	"math/rand"
 	"net"
 	"sync"
@@ -10,11 +11,11 @@ import (
 )
 
 // MultiResolver returns all IP addresses for the given host.
-type MultiResolver func(host string) ([]net.IP, error)
+type MultiResolver func(ctx context.Context, host string) ([]net.IP, error)
 
 // Resolver is an interface that returns DNS information about a given host.
 type Resolver interface {
-	LookupIP(host string) (net.IP, error)
+	LookupIP(ctx context.Context, host string) (net.IP, error)
 }
 
 type resolver struct {
@@ -66,8 +67,8 @@ func NewResolver(
 
 // LookupIP returns a single IP resolved for host, selected according to the
 // configured select and policy options.
-func (r *resolver) LookupIP(host string) (net.IP, error) {
-	ips, err := r.resolve(host)
+func (r *resolver) LookupIP(ctx context.Context, host string) (net.IP, error) {
+	ips, err := r.resolve(ctx, host)
 	if err != nil {
 		return nil, err
 	}
@@ -80,7 +81,7 @@ func (r *resolver) LookupIP(host string) (net.IP, error) {
 // configured select and policy options. Results are cached per host and will be
 // refreshed if the last lookup time exceeds the configured TTL (not the TTL
 // returned in the DNS record).
-func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
+func (r *cacheResolver) LookupIP(ctx context.Context, host string) (net.IP, error) {
 	r.cm.Lock()
 
 	var ips []net.IP
@@ -90,7 +91,7 @@ func (r *cacheResolver) LookupIP(host string) (net.IP, error) {
 	} else {
 		r.cm.Unlock() // The lookup could take some time, so unlock momentarily.
 		var err error
-		ips, err = r.resolve(host)
+		ips, err = r.resolve(ctx, host)
 		if err != nil {
 			return nil, err
 		}

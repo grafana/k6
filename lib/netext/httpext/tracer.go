@@ -22,6 +22,7 @@ type Trail struct {
 	// Total request duration, excluding DNS lookup and connect time.
 	Duration time.Duration
 
+	Resolve        time.Duration // DNS lookup.
 	Blocked        time.Duration // Waiting to acquire a connection.
 	Connecting     time.Duration // Connecting to remote host.
 	TLSHandshaking time.Duration // Executing TLS handshake.
@@ -63,6 +64,15 @@ func (tr *Trail) SaveSamples(builtinMetrics *metrics.BuiltinMetrics, ctm *metric
 			Time:     tr.EndTime,
 			Metadata: ctm.Metadata,
 			Value:    metrics.D(tr.Duration),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.HTTPReqResolve,
+				Tags:   ctm.Tags,
+			},
+			Time:     tr.EndTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(tr.Resolve),
 		},
 		{
 			TimeSeries: metrics.TimeSeries{
@@ -146,6 +156,8 @@ var _ metrics.ConnectedSampleContainer = &Trail{}
 // Cheers, love, the cavalry's here.
 type Tracer struct {
 	getConn              int64
+	dnsStart             int64
+	dnsDone              int64
 	connectStart         int64
 	connectDone          int64
 	tlsHandshakeStart    int64
@@ -162,6 +174,8 @@ type Tracer struct {
 func (t *Tracer) Trace() *httptrace.ClientTrace {
 	return &httptrace.ClientTrace{
 		GetConn:              t.GetConn,
+		DNSStart:             t.DnsStart,
+		DNSDone:              t.DnsDone,
 		ConnectStart:         t.ConnectStart,
 		ConnectDone:          t.ConnectDone,
 		TLSHandshakeStart:    t.TLSHandshakeStart,
@@ -170,6 +184,14 @@ func (t *Tracer) Trace() *httptrace.ClientTrace {
 		WroteRequest:         t.WroteRequest,
 		GotFirstResponseByte: t.GotFirstResponseByte,
 	}
+}
+
+func (t *Tracer) Start() {
+	t.start = now()
+}
+
+func (t *Tracer) End() {
+	t.end = now()
 }
 
 func now() int64 {
@@ -186,6 +208,16 @@ func now() int64 {
 // If it's called, it will be called before all other hooks.
 func (t *Tracer) GetConn(hostPort string) {
 	t.getConn = now()
+}
+
+// DnsStart is called when a DNS lookup begins.
+func (t *Tracer) DnsStart(_ httptrace.DNSStartInfo) {
+	t.dnsStart = now()
+}
+
+// DnsDone is called when a DNS lookup ends.
+func (t *Tracer) DnsDone(_ httptrace.DNSDoneInfo) {
+	t.dnsDone = now()
 }
 
 // ConnectStart is called when a new connection's Dial begins.
@@ -329,6 +361,8 @@ func (t *Tracer) Done() *Trail {
 	// already returned our result and we've called Done(). This happens
 	// mostly for cancelled requests, but we have to use atomics here as
 	// well (or use global Tracer locking) so we can avoid data races.
+	dnsStart := atomic.LoadInt64(&t.dnsStart)
+	dnsDone := atomic.LoadInt64(&t.dnsDone)
 	connectStart := atomic.LoadInt64(&t.connectStart)
 	connectDone := atomic.LoadInt64(&t.connectDone)
 	tlsHandshakeStart := atomic.LoadInt64(&t.tlsHandshakeStart)
@@ -337,6 +371,9 @@ func (t *Tracer) Done() *Trail {
 	wroteRequest := atomic.LoadInt64(&t.wroteRequest)
 	gotFirstResponseByte := atomic.LoadInt64(&t.gotFirstResponseByte)
 
+	if dnsStart != 0 && dnsDone != 0 {
+		trail.Resolve = time.Duration(dnsDone - dnsStart)
+	}
 	if connectDone != 0 && connectStart != 0 {
 		trail.Connecting = time.Duration(connectDone - connectStart)
 	}
