@@ -734,3 +734,47 @@ func TestRampingArrivalRateCornerCase(t *testing.T) {
 
 	require.False(t, config.HasWork(et))
 }
+
+func TestRampingArrivalRateActiveVUs(t *testing.T) {
+	t.Parallel()
+
+	config := &RampingArrivalRateConfig{
+		BaseConfig: BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+		TimeUnit:   types.NullDurationFrom(time.Second),
+		StartRate:  null.IntFrom(10),
+		Stages: []Stage{
+			{
+				Duration: types.NullDurationFrom(950 * time.Millisecond),
+				Target:   null.IntFrom(20),
+			},
+		},
+		PreAllocatedVUs: null.IntFrom(5),
+		MaxVUs:          null.IntFrom(10),
+	}
+
+	var (
+		running          int64
+		getCurrActiveVUs func() int64
+		runMx            sync.Mutex
+	)
+
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		runMx.Lock()
+		running++
+		assert.Equal(t, running, getCurrActiveVUs())
+		runMx.Unlock()
+		// Block the VU to cause the executor to schedule more
+		<-ctx.Done()
+		return nil
+	})
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
+	getCurrActiveVUs = test.state.GetCurrentlyActiveVUsCount
+
+	engineOut := make(chan metrics.SampleContainer, 1000)
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
+
+	assert.GreaterOrEqual(t, running, int64(5))
+	assert.LessOrEqual(t, running, int64(10))
+}

@@ -354,3 +354,42 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 		})
 	}
 }
+
+func TestConstantArrivalRateActiveVUs(t *testing.T) {
+	t.Parallel()
+
+	config := &ConstantArrivalRateConfig{
+		BaseConfig:      BaseConfig{GracefulStop: types.NullDurationFrom(0 * time.Second)},
+		TimeUnit:        types.NullDurationFrom(time.Second),
+		Rate:            null.IntFrom(10),
+		Duration:        types.NullDurationFrom(950 * time.Millisecond),
+		PreAllocatedVUs: null.IntFrom(5),
+		MaxVUs:          null.IntFrom(10),
+	}
+
+	var (
+		running          int64
+		getCurrActiveVUs func() int64
+		runMx            sync.Mutex
+	)
+
+	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+		runMx.Lock()
+		running++
+		assert.Equal(t, running, getCurrActiveVUs())
+		runMx.Unlock()
+		// Block the VU to cause the executor to schedule more
+		<-ctx.Done()
+		return nil
+	})
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, config)
+	defer test.cancel()
+
+	getCurrActiveVUs = test.state.GetCurrentlyActiveVUsCount
+
+	engineOut := make(chan metrics.SampleContainer, 1000)
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
+
+	assert.GreaterOrEqual(t, running, int64(5))
+	assert.LessOrEqual(t, running, int64(10))
+}

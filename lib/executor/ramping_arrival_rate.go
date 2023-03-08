@@ -325,7 +325,7 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	waitOnProgressChannel := make(chan struct{})
 	startTime, maxDurationCtx, regDurationCtx, cancel := getDurationContexts(parentCtx, duration, gracefulStop)
 
-	vusPool := newActiveVUPool()
+	vusPool := newActiveVUPool(varr.executionState)
 
 	defer func() {
 		// Make sure all VUs aren't executing iterations anymore, for the cancel()
@@ -382,7 +382,11 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 	}()
 
 	returnVU := func(u lib.InitializedVU) {
-		varr.executionState.ReturnVU(u, true)
+		// Return the VU without decreasing the global active VU counter, which
+		// is done in the goroutine started by activeVUPool.AddVU, whenever the
+		// VU finishes running an iteration. This results in a more accurate
+		// report of VUs that are _actually_ active.
+		varr.executionState.ReturnVU(u, false)
 		activeVUsWg.Done()
 	}
 
@@ -394,7 +398,6 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 			getVUActivationParams(
 				maxDurationCtx, varr.config.BaseConfig, returnVU,
 				varr.nextIterationCounters))
-		varr.executionState.ModCurrentlyActiveVUsCount(+1)
 		atomic.AddUint64(&activeVUsCount, 1)
 
 		vusPool.AddVU(maxDurationCtx, activeVU, runIterationBasic)
@@ -494,13 +497,15 @@ func (varr RampingArrivalRate) Run(parentCtx context.Context, out chan<- metrics
 type activeVUPool struct {
 	iterations chan struct{}
 	running    uint64
+	execState  *lib.ExecutionState
 	wg         sync.WaitGroup
 }
 
 // newActiveVUPool returns an activeVUPool.
-func newActiveVUPool() *activeVUPool {
+func newActiveVUPool(es *lib.ExecutionState) *activeVUPool {
 	return &activeVUPool{
 		iterations: make(chan struct{}),
+		execState:  es,
 	}
 }
 
@@ -521,8 +526,10 @@ func (p *activeVUPool) Running() uint64 {
 	return atomic.LoadUint64(&p.running)
 }
 
-// AddVU adds the active VU to the pool of VUs for handling the incoming requests.
-// When a new request is accepted the runfn function is executed.
+// AddVU adds the active VU to the pool of VUs for handling the incoming
+// requests. When a new request is accepted the runfn function is executed. This
+// is also when we change the global active VUs counter, since it results in a
+// more accurate report of VUs that are _actually_ active.
 func (p *activeVUPool) AddVU(ctx context.Context, avu lib.ActiveVU, runfn func(context.Context, lib.ActiveVU) bool) {
 	p.wg.Add(1)
 	ch := make(chan struct{})
@@ -532,7 +539,9 @@ func (p *activeVUPool) AddVU(ctx context.Context, avu lib.ActiveVU, runfn func(c
 		close(ch)
 		for range p.iterations {
 			atomic.AddUint64(&p.running, uint64(1))
+			p.execState.ModCurrentlyActiveVUsCount(+1)
 			runfn(ctx, avu)
+			p.execState.ModCurrentlyActiveVUsCount(-1)
 			atomic.AddUint64(&p.running, ^uint64(0))
 		}
 	}()
