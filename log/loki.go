@@ -16,23 +16,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// lokiHook is a Logrus hook for flushing to Loki.
 type lokiHook struct {
-	ctx            context.Context
 	fallbackLogger logrus.FieldLogger
-	lokiStopped    chan<- struct{}
-
-	addr          string
-	labels        [][2]string
-	ch            chan *logrus.Entry
-	limit         int
-	msgMaxSize    int
-	levels        []logrus.Level
-	allowedLabels []string
-	pushPeriod    time.Duration
-	client        *http.Client
-	profile       bool
-	droppedLabels map[string]string
-	droppedMsg    string
+	addr           string
+	labels         [][2]string
+	ch             chan *logrus.Entry
+	limit          int
+	msgMaxSize     int
+	levels         []logrus.Level
+	allowedLabels  []string
+	pushPeriod     time.Duration
+	client         *http.Client
+	profile        bool
+	droppedLabels  map[string]string
+	droppedMsg     string
 }
 
 func getDefaultLoki() *lokiHook {
@@ -48,16 +46,11 @@ func getDefaultLoki() *lokiHook {
 	}
 }
 
-// LokiFromConfigLine returns a new logrus.Hook that pushes logrus.Entrys to loki and is configured
-// through the provided line
-//nolint:funlen
-func LokiFromConfigLine(
-	ctx context.Context, fallbackLogger logrus.FieldLogger, line string, ch chan<- struct{},
-) (logrus.Hook, error) {
+// LokiFromConfigLine returns a new logrus.Hook
+// that pushes logrus.Entrys to loki and is configured
+// through the provided line.
+func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHook, error) {
 	h := getDefaultLoki()
-
-	h.ctx = ctx
-	h.lokiStopped = ch
 	h.fallbackLogger = fallbackLogger
 
 	if line != "loki" {
@@ -71,6 +64,7 @@ func LokiFromConfigLine(
 			return nil, err
 		}
 	}
+
 	h.droppedLabels = make(map[string]string, 2+len(h.labels))
 	h.droppedLabels["level"] = logrus.WarnLevel.String()
 	for _, params := range h.labels {
@@ -78,11 +72,7 @@ func LokiFromConfigLine(
 	}
 
 	h.droppedMsg = h.filterLabels(h.droppedLabels, h.droppedMsg)
-
 	h.client = &http.Client{Timeout: h.pushPeriod}
-
-	go h.loop()
-
 	return h, nil
 }
 
@@ -112,7 +102,7 @@ func (h *lokiHook) parseArgs(line string) error {
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki limit as a number %w", err)
 			}
-			if !(h.limit > 0) {
+			if h.limit < 1 {
 				return fmt.Errorf("loki limit needs to be a positive number, is %d", h.limit)
 			}
 		case "msgMaxSize":
@@ -120,7 +110,7 @@ func (h *lokiHook) parseArgs(line string) error {
 			if err != nil {
 				return fmt.Errorf("couldn't parse the loki msgMaxSize as a number %w", err)
 			}
-			if !(h.msgMaxSize > 0) {
+			if h.msgMaxSize < 1 {
 				return fmt.Errorf("loki msgMaxSize needs to be a positive number, is %d", h.msgMaxSize)
 			}
 		case "level":
@@ -145,10 +135,13 @@ func (h *lokiHook) parseArgs(line string) error {
 	return nil
 }
 
-// fill one of two equally sized slices with entries and then push it while filling the other one
+// Listen fills one of two equally sized slices
+// with entries and then push it while filling the other one.
+//
 // TODO benchmark this
+//
 //nolint:funlen
-func (h *lokiHook) loop() {
+func (h *lokiHook) Listen(ctx context.Context) {
 	var (
 		msgs       = make([]tmpMsg, h.limit)
 		msgsToPush = make([]tmpMsg, h.limit)
@@ -162,8 +155,6 @@ func (h *lokiHook) loop() {
 	defer close(pushCh)
 
 	go func() {
-		defer close(h.lokiStopped)
-
 		oldLogs := make([]tmpMsg, 0, h.limit*2)
 		for ch := range pushCh {
 			msgsToPush, msgs = msgs, msgsToPush
@@ -254,12 +245,11 @@ func (h *lokiHook) loop() {
 			pushCh <- ch
 			ch <- t.Add(-(h.pushPeriod / 2)).UnixNano()
 			<-ch
-		case <-h.ctx.Done():
+		case <-ctx.Done():
 			ch := make(chan int64)
 			pushCh <- ch
 			ch <- time.Now().Add(time.Second).UnixNano()
 			<-ch
-
 			return
 		}
 	}
@@ -307,7 +297,7 @@ func sortAndSplitMsgs(msgs []tmpMsg, cutOff int64) int {
 	})
 
 	cutOffIndex := sort.Search(len(msgs), func(i int) bool {
-		return !(msgs[i].t < cutOff)
+		return msgs[i].t >= cutOff
 	})
 
 	return cutOffIndex
@@ -398,31 +388,33 @@ type tmpMsg struct {
 	msg    string
 }
 
+// Fire implements logrus.Hook.
 func (h *lokiHook) Fire(entry *logrus.Entry) error {
 	h.ch <- entry
 
 	return nil
 }
 
+// Levels implements logrus.Hook.
 func (h *lokiHook) Levels() []logrus.Level {
 	return h.levels
 }
 
 /*
-{
-  "streams": [
-    {
-      "stream": {
-        "label1": "value1"
-        "label2": "value2"
-      },
-      "values": [ // the nanoseconds need to be in order
-          [ "<unix epoch in nanoseconds>", "<log line>" ],
-          [ "<unix epoch in nanoseconds>", "<log line>" ]
-      ]
-    }
-  ]
-}
+	{
+	  "streams": [
+	    {
+	      "stream": {
+	        "label1": "value1"
+	        "label2": "value2"
+	      },
+	      "values": [ // the nanoseconds need to be in order
+	          [ "<unix epoch in nanoseconds>", "<log line>" ],
+	          [ "<unix epoch in nanoseconds>", "<log line>" ]
+	      ]
+	    }
+	  ]
+	}
 */
 type lokiPushMessage struct {
 	Streams []*stream `json:"streams"`

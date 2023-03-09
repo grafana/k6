@@ -4,10 +4,11 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	stdlog "log"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -20,20 +21,22 @@ import (
 	"go.k6.io/k6/log"
 )
 
-const waitRemoteLoggerTimeout = time.Second * 5
+const waitLoggerCloseTimeout = time.Second * 5
 
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
 	globalState *state.GlobalState
 
 	cmd            *cobra.Command
-	loggerStopped  <-chan struct{}
+	stopLoggersCh  chan struct{}
+	loggersWg      sync.WaitGroup
 	loggerIsRemote bool
 }
 
 func newRootCommand(gs *state.GlobalState) *rootCommand {
 	c := &rootCommand{
-		globalState: gs,
+		globalState:   gs,
+		stopLoggersCh: make(chan struct{}),
 	}
 	// the base command when called without any subcommands.
 	rootCmd := &cobra.Command{
@@ -66,37 +69,31 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 }
 
 func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
-	var err error
-
-	c.loggerStopped, err = c.setupLoggers()
+	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err
 	}
-	select {
-	case <-c.loggerStopped:
-	default:
-		c.loggerIsRemote = true
-	}
-
-	stdlog.SetOutput(c.globalState.Logger.Writer())
 	c.globalState.Logger.Debugf("k6 version: v%s", consts.FullVersion())
 	return nil
 }
 
 func (c *rootCommand) execute() {
 	ctx, cancel := context.WithCancel(c.globalState.Ctx)
-	defer cancel()
 	c.globalState.Ctx = ctx
+
+	exitCode := -1
+	defer func() {
+		cancel()
+		c.stopLoggers()
+		c.globalState.OSExit(exitCode)
+	}()
 
 	err := c.cmd.Execute()
 	if err == nil {
-		cancel()
-		c.waitRemoteLogger()
-		// TODO: explicitly call c.globalState.osExit(0), for simpler tests and clarity?
+		exitCode = 0
 		return
 	}
 
-	exitCode := -1
 	var ecerr errext.HasExitCode
 	if errors.As(err, &ecerr) {
 		exitCode = int(ecerr.ExitCode())
@@ -117,11 +114,7 @@ func (c *rootCommand) execute() {
 	c.globalState.Logger.WithFields(fields).Error(errText)
 	if c.loggerIsRemote {
 		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
-		cancel()
-		c.waitRemoteLogger()
 	}
-
-	c.globalState.OSExit(exitCode)
 }
 
 // Execute adds all child commands to the root command sets flags appropriately.
@@ -138,13 +131,17 @@ func ExecuteWithGlobalState(gs *state.GlobalState) {
 	newRootCommand(gs).execute()
 }
 
-func (c *rootCommand) waitRemoteLogger() {
-	if c.loggerIsRemote {
-		select {
-		case <-c.loggerStopped:
-		case <-time.After(waitRemoteLoggerTimeout):
-			c.globalState.FallbackLogger.Errorf("Remote logger didn't stop in %s", waitRemoteLoggerTimeout)
-		}
+func (c *rootCommand) stopLoggers() {
+	done := make(chan struct{})
+	go func() {
+		c.loggersWg.Wait()
+		close(done)
+	}()
+	close(c.stopLoggersCh)
+	select {
+	case <-done:
+	case <-time.After(waitLoggerCloseTimeout):
+		c.globalState.FallbackLogger.Errorf("The logger didn't stop in %s", waitLoggerCloseTimeout)
 	}
 }
 
@@ -201,13 +198,15 @@ func (f RawFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 // The returned channel will be closed when the logger has finished flushing and pushing logs after
 // the provided context is closed. It is closed if the logger isn't buffering and sending messages
 // Asynchronously
-func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
-	ch := make(chan struct{})
-	close(ch)
-
+func (c *rootCommand) setupLoggers(stop <-chan struct{}) error {
 	if c.globalState.Flags.Verbose {
 		c.globalState.Logger.SetLevel(logrus.DebugLevel)
 	}
+
+	var (
+		hook log.AsyncHook
+		err  error
+	)
 
 	loggerForceColors := false // disable color by default
 	switch line := c.globalState.Flags.LogOutput; {
@@ -218,33 +217,24 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		loggerForceColors = !c.globalState.Flags.NoColor && c.globalState.Stdout.IsTTY
 		c.globalState.Logger.SetOutput(c.globalState.Stdout)
 	case line == "none":
-		c.globalState.Logger.SetOutput(ioutil.Discard)
-
+		c.globalState.Logger.SetOutput(io.Discard)
 	case strings.HasPrefix(line, "loki"):
-		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
-		hook, err := log.LokiFromConfigLine(c.globalState.Ctx, c.globalState.FallbackLogger, line, ch)
+		c.loggerIsRemote = true
+		hook, err = log.LokiFromConfigLine(c.globalState.FallbackLogger, line)
 		if err != nil {
-			return nil, err
+			return err
 		}
-		c.globalState.Logger.AddHook(hook)
-		c.globalState.Logger.SetOutput(ioutil.Discard) // don't output to anywhere else
 		c.globalState.Flags.LogFormat = "raw"
-
 	case strings.HasPrefix(line, "file"):
-		ch = make(chan struct{}) // TODO: refactor, get it from the constructor
-		hook, err := log.FileHookFromConfigLine(
-			c.globalState.Ctx, c.globalState.FS, c.globalState.Getwd,
-			c.globalState.FallbackLogger, line, ch,
+		hook, err = log.FileHookFromConfigLine(
+			c.globalState.FS, c.globalState.Getwd,
+			c.globalState.FallbackLogger, line,
 		)
 		if err != nil {
-			return nil, err
+			return err
 		}
-
-		c.globalState.Logger.AddHook(hook)
-		c.globalState.Logger.SetOutput(ioutil.Discard)
-
 	default:
-		return nil, fmt.Errorf("unsupported log output '%s'", line)
+		return fmt.Errorf("unsupported log output '%s'", line)
 	}
 
 	switch c.globalState.Flags.LogFormat {
@@ -260,5 +250,36 @@ func (c *rootCommand) setupLoggers() (<-chan struct{}, error) {
 		})
 		c.globalState.Logger.Debug("Logger format: TEXT")
 	}
-	return ch, nil
+
+	cancel := func() {} // noop as default
+	if hook != nil {
+		ctx := context.Background()
+		ctx, cancel = context.WithCancel(ctx)
+		c.setLoggerHook(ctx, hook)
+	}
+
+	// Sometimes the Go runtime uses the standard log output to
+	// log some messages directly.
+	// It does when an invalid char is found in a Cookie.
+	// Check for details https://github.com/grafana/k6/issues/711#issue-341414887
+	w := c.globalState.Logger.Writer()
+	stdlog.SetOutput(w)
+	c.loggersWg.Add(1)
+	go func() {
+		<-stop
+		cancel()
+		_ = w.Close()
+		c.loggersWg.Done()
+	}()
+	return nil
+}
+
+func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
+	c.loggersWg.Add(1)
+	go func() {
+		h.Listen(ctx)
+		c.loggersWg.Done()
+	}()
+	c.globalState.Logger.AddHook(h)
+	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
 }

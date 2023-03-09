@@ -1,4 +1,3 @@
-// Package log implements various logrus hooks.
 package log
 
 import (
@@ -28,36 +27,30 @@ type fileHook struct {
 	w              io.WriteCloser
 	bw             *bufio.Writer
 	levels         []logrus.Level
-	done           chan struct{}
 }
 
 // FileHookFromConfigLine returns new fileHook hook.
 func FileHookFromConfigLine(
-	ctx context.Context, fs afero.Fs, getCwd func() (string, error),
-	fallbackLogger logrus.FieldLogger, line string, done chan struct{},
-) (logrus.Hook, error) {
+	fs afero.Fs, getCwd func() (string, error),
+	fallbackLogger logrus.FieldLogger, line string,
+) (AsyncHook, error) {
 	hook := &fileHook{
 		fs:             fs,
 		fallbackLogger: fallbackLogger,
 		levels:         logrus.AllLevels,
-		done:           done,
+		loglines:       make(chan []byte, fileHookBufferSize),
 	}
 
 	parts := strings.SplitN(line, "=", 2)
 	if parts[0] != "file" {
 		return nil, fmt.Errorf("logfile configuration should be in the form `file=path-to-local-file` but is `%s`", line)
 	}
-
 	if err := hook.parseArgs(line); err != nil {
 		return nil, err
 	}
-
 	if err := hook.openFile(getCwd); err != nil {
 		return nil, err
 	}
-
-	hook.loglines = hook.loop(ctx)
-
 	return hook, nil
 }
 
@@ -113,32 +106,26 @@ func (h *fileHook) openFile(getCwd func() (string, error)) error {
 	return nil
 }
 
-func (h *fileHook) loop(ctx context.Context) chan []byte {
-	loglines := make(chan []byte, fileHookBufferSize)
-
-	go func() {
-		defer close(h.done)
-		for {
-			select {
-			case entry := <-loglines:
-				if _, err := h.bw.Write(entry); err != nil {
-					h.fallbackLogger.Errorf("failed to write a log message to a logfile: %w", err)
-				}
-			case <-ctx.Done():
-				if err := h.bw.Flush(); err != nil {
-					h.fallbackLogger.Errorf("failed to flush buffer: %w", err)
-				}
-
-				if err := h.w.Close(); err != nil {
-					h.fallbackLogger.Errorf("failed to close logfile: %w", err)
-				}
-
-				return
+// Listen waits for log lines to flush.
+func (h *fileHook) Listen(ctx context.Context) {
+	for {
+		select {
+		case entry := <-h.loglines:
+			if _, err := h.bw.Write(entry); err != nil {
+				h.fallbackLogger.Errorf("failed to write a log message to a logfile: %w", err)
 			}
-		}
-	}()
+		case <-ctx.Done():
+			if err := h.bw.Flush(); err != nil {
+				h.fallbackLogger.Errorf("failed to flush buffer: %w", err)
+			}
 
-	return loglines
+			if err := h.w.Close(); err != nil {
+				h.fallbackLogger.Errorf("failed to close logfile: %w", err)
+			}
+
+			return
+		}
+	}
 }
 
 // Fire writes the log file to defined path.

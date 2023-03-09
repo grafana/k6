@@ -88,40 +88,73 @@ type jsonBody struct {
 	Compression string      `json:"compression"`
 }
 
-func getWebsocketHandler(echo bool, closePrematurely bool) http.Handler {
+// autocloseHandler handles requests just opening
+// then closing the connection without waiting for the client input.
+// It simulates the server-side closing operation.
+func autocloseHandler(t testing.TB) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		require.NoError(t, err)
+
+		err = conn.WriteControl(
+			websocket.CloseMessage,
+			websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""),
+			time.Now().Add(time.Second))
+		require.NoError(t, err)
+
+		err = conn.Close()
+		require.NoError(t, err)
+	})
+}
+
+// echoHandler handles requests proxying the same request input to the client.
+// If closePrematurely is false then it waits for the client's request to close the connection.
+// If closePrematurely is true then it closes the connection in a brutally
+// without respecting the protocol.
+func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{}).Upgrade(w, req, w.Header())
+		require.NoError(t, err)
+
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		messageType, r, e := conn.NextReader()
+		if e != nil {
+			return
+		}
+		var wc io.WriteCloser
+		wc, err = conn.NextWriter(messageType)
 		if err != nil {
 			return
 		}
-		if echo {
-			messageType, r, e := conn.NextReader()
-			if e != nil {
-				return
-			}
-			var wc io.WriteCloser
-			wc, err = conn.NextWriter(messageType)
-			if err != nil {
-				return
-			}
-			if _, err = io.Copy(wc, r); err != nil {
-				return
-			}
-			if err = wc.Close(); err != nil {
-				return
-			}
+		if _, err = io.Copy(wc, r); err != nil {
+			return
 		}
+		if err = wc.Close(); err != nil {
+			return
+		}
+
 		// closePrematurely=true mimics an invalid WS server that doesn't
 		// send a close control frame before closing the connection.
 		if !closePrematurely {
-			closeMsg := websocket.FormatCloseMessage(websocket.CloseNormalClosure, "")
-			_ = conn.WriteControl(websocket.CloseMessage, closeMsg, time.Now().Add(time.Second))
-			// Wait for response control frame
-			<-time.After(time.Second)
-		}
-		err = conn.Close()
-		if err != nil {
-			return
+			// Closing is delegated to the client,
+			// it waits the control message for closing.
+			closeReceived := make(chan struct{})
+			defaultCloseHandler := conn.CloseHandler()
+			conn.SetCloseHandler(func(code int, text string) error {
+				close(closeReceived)
+				return defaultCloseHandler(code, text)
+			})
+
+			for {
+				_, _, e := conn.ReadMessage()
+				if e != nil {
+					break
+				}
+			}
+			<-closeReceived
 		}
 	})
 }
@@ -256,10 +289,10 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Create a http.ServeMux and set the httpbin handler as the default
 	mux := http.NewServeMux()
 	mux.Handle("/brotli", getEncodedHandler(t, "br"))
-	mux.Handle("/ws-echo", getWebsocketHandler(true, false))
-	mux.Handle("/ws-echo-invalid", getWebsocketHandler(true, true))
-	mux.Handle("/ws-close", getWebsocketHandler(false, false))
-	mux.Handle("/ws-close-invalid", getWebsocketHandler(false, true))
+	mux.Handle("/ws-echo", echoHandler(t, false))
+	mux.Handle("/ws-echo-invalid", echoHandler(t, true))
+	mux.Handle("/ws-close", autocloseHandler(t))
+	mux.Handle("/ws-close-invalid", echoHandler(t, true))
 	mux.Handle("/zstd", getEncodedHandler(t, "zstd"))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())

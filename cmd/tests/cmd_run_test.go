@@ -1716,11 +1716,9 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 	t.Parallel()
 
 	ts := NewGlobalTestState(t)
+	ts.Env["K6_PROMETHEUS_RW_SERVER_URL"] = "http://a-fake-url-for-fail"
 	ts.CmdArgs = []string{"k6", "run", "--out", "experimental-prometheus-rw", "-"}
-	ts.Stdin = bytes.NewBufferString(`
-		import exec from 'k6/execution';
-		export default function () {};
-	`)
+	ts.Stdin = bytes.NewBufferString(`export default function () {};`)
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 	ts.OutMutex.Lock()
@@ -1878,6 +1876,29 @@ func TestRunStaticArchives(t *testing.T) {
 			assert.Contains(t, stdout, "called Bar() from foo/bar.js")
 			assert.Contains(t, stdout, "called A() from a.js")
 			assert.Contains(t, stdout, "extracted john doe from sample/data.json")
+		})
+	}
+}
+
+func TestBadLogOutput(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]string{
+		"NotExist":      "badout",
+		"FileBadConfig": "file=,levels=bad",
+		"LokiBadConfig": "loki=,levels=bad",
+	}
+
+	for name, tc := range cases {
+		name := name
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			ts := NewGlobalTestState(t)
+			ts.CmdArgs = []string{"k6", "run", "--log-output", tc, "-"}
+			ts.Stdin = bytes.NewBufferString(`export default function () {};`)
+			ts.ExpectedExitCode = -1
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
 		})
 	}
 }
