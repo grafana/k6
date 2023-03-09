@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_PROMETHEUS",
-      "label": "prometheus-in-docker",
+      "label": "prometheus",
       "description": "",
       "type": "datasource",
       "pluginId": "prometheus",
@@ -21,7 +21,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.3.2"
+      "version": "9.4.3"
     },
     {
       "type": "datasource",
@@ -106,7 +106,7 @@
         "content": "# Apdex\n\n[Apdex](https://en.wikipedia.org/wiki/Apdex) (_Application Performance Index_) allows us to monitor end-user satisfaction. \nIt is an open industry standard that estimates the end user’s satisfaction level on an application’s response time through a score between 0 and 1.\n\nThe Apdex score is calculated based on your required SLA (_Service-Level Agreement_) where you can define a response time threshold of T seconds, where all responses handled in T or less seconds satisfy the end user.",
         "mode": "markdown"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "type": "text"
     },
     {
@@ -216,7 +216,7 @@
         },
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -225,7 +225,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(histogram_fraction($T, $T*4, (k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}) + (histogram_fraction(0, $T, (k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})/2))/\n\n\nhistogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "(histogram_fraction($T, $T*4, ($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}) + (histogram_fraction(0, $T, ($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})/2))/\n\n\nhistogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\"})",
           "hide": false,
           "instant": true,
           "legendFormat": "{{name}}",
@@ -348,7 +348,7 @@
         },
         "textMode": "value_and_name"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -356,25 +356,11 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "(histogram_fraction($T, $T*4, (k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}) + (histogram_fraction(0, $T, (k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})/2))/\n\n\nhistogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\"})",
+          "expr": "(histogram_fraction($T, $T*4, ($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}) + (histogram_fraction(0, $T, ($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})/2))/\n\n\nhistogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\"})",
           "hide": false,
           "legendFormat": "{{name}}",
           "range": true,
           "refId": "A"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "editorMode": "code",
-          "exemplar": false,
-          "expr": "",
-          "hide": false,
-          "instant": true,
-          "legendFormat": "__auto",
-          "range": false,
-          "refId": "B"
         }
       ],
       "transformations": [],
@@ -431,7 +417,7 @@
         },
         "showUnfilled": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -440,7 +426,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "histogram_fraction(0, $T, (k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})>0",
+          "expr": "histogram_fraction(0, $T, ($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})>0",
           "hide": false,
           "instant": true,
           "legendFormat": "{{name}}",
@@ -508,7 +494,7 @@
         },
         "showUnfilled": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -517,7 +503,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "histogram_fraction($T, $T*4, (k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})>0",
+          "expr": "histogram_fraction($T, $T*4, ($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})>0",
           "hide": false,
           "instant": true,
           "legendFormat": "{{name}}",
@@ -585,7 +571,7 @@
         },
         "showUnfilled": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -594,7 +580,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "histogram_fraction($T*4, 9999999, (k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})>0",
+          "expr": "histogram_fraction($T*4, 9999999, ($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"}))*histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"true\"})>0",
           "hide": false,
           "instant": true,
           "legendFormat": "{{name}}",
@@ -608,7 +594,7 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "histogram_count(k6_http_req_duration_seconds{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"false\"})>0",
+          "expr": "histogram_count($metrics{testid=~\"$testid\", name=~\"$url\",scenario=~\"$scenario\",expected_response=\"false\"})>0",
           "hide": false,
           "instant": true,
           "legendFormat": "{{name}}",
@@ -627,7 +613,8 @@
     }
   ],
   "refresh": "5s",
-  "schemaVersion": 37,
+  "revision": 1,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [
     "prometheus",
@@ -638,8 +625,8 @@
       {
         "current": {
           "selected": false,
-          "text": "prometheus-in-docker",
-          "value": "prometheus-in-docker"
+          "text": "prometheus",
+          "value": "prometheus"
         },
         "hide": 0,
         "includeAll": false,
@@ -735,28 +722,28 @@
       {
         "current": {
           "selected": false,
-          "text": "0.3",
-          "value": "0.3"
+          "text": "0.1",
+          "value": "0.1"
         },
         "hide": 0,
         "label": " [T]arget time (seconds) Apdex",
         "name": "T",
         "options": [
           {
-            "selected": true,
+            "selected": false,
             "text": "0.3",
             "value": "0.3"
           }
         ],
-        "query": "0.3",
+        "query": "0.1",
         "skipUrlSync": false,
         "type": "textbox"
       },
       {
         "current": {
           "selected": false,
-          "text": "k6_http_req_waiting_seconds",
-          "value": "k6_http_req_waiting_seconds"
+          "text": "k6_http_req_duration_seconds",
+          "value": "k6_http_req_duration_seconds"
         },
         "description": "Metrics for apdex",
         "hide": 0,
@@ -765,12 +752,12 @@
         "name": "metrics",
         "options": [
           {
-            "selected": true,
+            "selected": false,
             "text": "k6_http_req_waiting_seconds",
             "value": "k6_http_req_waiting_seconds"
           },
           {
-            "selected": false,
+            "selected": true,
             "text": "k6_http_req_duration_seconds",
             "value": "k6_http_req_duration_seconds"
           }
@@ -782,13 +769,13 @@
     ]
   },
   "time": {
-    "from": "now-5m",
+    "from": "now-1h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "Apdex Overview",
   "uid": "01npcT44d",
-  "version": 3,
+  "version": 2,
   "weekStart": ""
 }
