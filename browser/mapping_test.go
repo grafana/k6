@@ -117,7 +117,7 @@ func TestMappings(t *testing.T) {
 		"browserType": {
 			apiInterface: (*api.BrowserType)(nil),
 			mapp: func() mapping {
-				return mapBrowserType(moduleVU{VU: vu}, &chromium.BrowserType{})
+				return mapBrowserType(moduleVU{VU: vu}, &chromium.BrowserType{}, "", false)
 			},
 		},
 		"browser": {
