@@ -245,20 +245,22 @@ func (c Config) Apply(cfg Config) Config {
 // the provided external map. Used for options.ext.cloud settings.
 // Returning warning if options.ext.loadimpact is in use. Temporary solution whilst in deprecating
 func MergeFromExternal(val json.RawMessage, conf *Config) error {
-	// TODO: Important! Separate configs and fix the whole 2 configs mess!
-	tmpConfig := Config{}
-	if err := json.Unmarshal(val, &tmpConfig); err != nil {
-		return err
-	}
-	// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
-	if tmpConfig.ProjectID.Valid {
-		conf.ProjectID = tmpConfig.ProjectID
-	}
-	if tmpConfig.Name.Valid {
-		conf.Name = tmpConfig.Name
-	}
-	if tmpConfig.Token.Valid {
-		conf.Token = tmpConfig.Token
+	if val != nil {
+		// TODO: Important! Separate configs and fix the whole 2 configs mess!
+		tmpConfig := Config{}
+		if err := json.Unmarshal(val, &tmpConfig); err != nil {
+			return err
+		}
+		// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
+		if tmpConfig.ProjectID.Valid {
+			conf.ProjectID = tmpConfig.ProjectID
+		}
+		if tmpConfig.Name.Valid {
+			conf.Name = tmpConfig.Name
+		}
+		if tmpConfig.Token.Valid {
+			conf.Token = tmpConfig.Token
+		}
 	}
 	return nil
 }
@@ -279,20 +281,20 @@ func GetConsolidatedConfig(
 	}
 
 	// TODO: Temporarily support options.ext.loadimpact settings, plans to remove support for this in the future
-	val, ok := external["loadimpact"]
 	var warn error
-	if ok {
-		warn = errors.New("`options.ext.loadimpact` is a deprecated field. Please switch to `options.ext.cloud`")
-	} else {
+	var val json.RawMessage
+	var ok bool
+	if cloud != nil {
 		val = cloud
+	} else if val, ok = external["loadimpact"]; ok {
+		warn = errors.New("`options.ext.loadimpact` is a deprecated field. Please switch to `options.ext.cloud`")
 	}
 
-	if val != nil {
-		err := MergeFromExternal(val, &result)
-		if err != nil {
-			return result, warn, err
-		}
+	err := MergeFromExternal(val, &result)
+	if err != nil {
+		return result, warn, err
 	}
+
 	envConfig := Config{}
 	if err := envconfig.Process("", &envConfig, func(key string) (string, bool) {
 		v, ok := env[key]
