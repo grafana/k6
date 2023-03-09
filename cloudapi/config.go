@@ -2,6 +2,7 @@ package cloudapi
 
 import (
 	"encoding/json"
+	"errors"
 	"time"
 
 	"gopkg.in/guregu/null.v3"
@@ -241,24 +242,23 @@ func (c Config) Apply(cfg Config) Config {
 }
 
 // MergeFromExternal merges three fields from the JSON in a loadimpact key of
-// the provided external map. Used for options.ext.loadimpact settings.
-func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error {
-	if val, ok := external["loadimpact"]; ok {
-		// TODO: Important! Separate configs and fix the whole 2 configs mess!
-		tmpConfig := Config{}
-		if err := json.Unmarshal(val, &tmpConfig); err != nil {
-			return err
-		}
-		// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
-		if tmpConfig.ProjectID.Valid {
-			conf.ProjectID = tmpConfig.ProjectID
-		}
-		if tmpConfig.Name.Valid {
-			conf.Name = tmpConfig.Name
-		}
-		if tmpConfig.Token.Valid {
-			conf.Token = tmpConfig.Token
-		}
+// the provided external map. Used for options.ext.cloud settings.
+// Returning warning if options.ext.loadimpact is in use. Temporary solution whilst in deprecating
+func MergeFromExternal(val json.RawMessage, conf *Config) error {
+	// TODO: Important! Separate configs and fix the whole 2 configs mess!
+	tmpConfig := Config{}
+	if err := json.Unmarshal(val, &tmpConfig); err != nil {
+		return err
+	}
+	// Only take out the ProjectID, Name and Token from the options.ext.loadimpact map:
+	if tmpConfig.ProjectID.Valid {
+		conf.ProjectID = tmpConfig.ProjectID
+	}
+	if tmpConfig.Name.Valid {
+		conf.Name = tmpConfig.Name
+	}
+	if tmpConfig.Token.Valid {
+		conf.Token = tmpConfig.Token
 	}
 	return nil
 }
@@ -266,27 +266,40 @@ func MergeFromExternal(external map[string]json.RawMessage, conf *Config) error 
 // GetConsolidatedConfig combines the default config values with the JSON config
 // values and environment variables and returns the final result.
 func GetConsolidatedConfig(
-	jsonRawConf json.RawMessage, env map[string]string, configArg string, external map[string]json.RawMessage,
-) (Config, error) {
+	jsonRawConf json.RawMessage, env map[string]string, configArg string, cloud json.RawMessage,
+	external map[string]json.RawMessage,
+) (Config, error, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf := Config{}
 		if err := json.Unmarshal(jsonRawConf, &jsonConf); err != nil {
-			return result, err
+			return result, nil, err
 		}
 		result = result.Apply(jsonConf)
 	}
-	if err := MergeFromExternal(external, &result); err != nil {
-		return result, err
+
+	// TODO: Temporarily support options.ext.loadimpact settings, plans to remove support for this in the future
+	val, ok := external["loadimpact"]
+	var warn error
+	if ok {
+		warn = errors.New("`options.ext.loadimpact` is a deprecated field. Please switch to `options.ext.cloud`")
+	} else {
+		val = cloud
 	}
 
+	if val != nil {
+		err := MergeFromExternal(val, &result)
+		if err != nil {
+			return result, warn, err
+		}
+	}
 	envConfig := Config{}
 	if err := envconfig.Process("", &envConfig, func(key string) (string, bool) {
 		v, ok := env[key]
 		return v, ok
 	}); err != nil {
 		// TODO: get rid of envconfig and actually use the env parameter...
-		return result, err
+		return result, nil, err
 	}
 	result = result.Apply(envConfig)
 
@@ -294,5 +307,5 @@ func GetConsolidatedConfig(
 		result.Name = null.StringFrom(configArg)
 	}
 
-	return result, nil
+	return result, warn, nil
 }

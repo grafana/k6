@@ -57,17 +57,26 @@ func TestConfigApply(t *testing.T) {
 
 func TestGetConsolidatedConfig(t *testing.T) {
 	t.Parallel()
-	config, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil)
+	config, warn, err := GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", nil, nil)
 	require.NoError(t, err)
+	require.NoError(t, warn)
 	require.Equal(t, config.Token.String, "jsonraw")
 
-	config, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "",
-		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
+	config, warn, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "", json.RawMessage(`{"token":"ext"}`), nil)
 	require.NoError(t, err)
+	require.NoError(t, warn)
 	require.Equal(t, config.Token.String, "ext")
 
-	config, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), map[string]string{"K6_CLOUD_TOKEN": "envvalue"}, "",
-		map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
+	// TODO: Temporarily support options.ext.loadimpact settings, plans to remove support for this in the future field
+	config, warn, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), nil, "",
+		nil, map[string]json.RawMessage{"loadimpact": json.RawMessage(`{"token":"ext"}`)})
 	require.NoError(t, err)
+	require.Error(t, warn)
+	require.Equal(t, config.Token.String, "ext")
+
+	config, warn, err = GetConsolidatedConfig(json.RawMessage(`{"token":"jsonraw"}`), map[string]string{"K6_CLOUD_TOKEN": "envvalue"}, "",
+		json.RawMessage(`{"token":"ext"}`), nil)
+	require.NoError(t, err)
+	require.NoError(t, warn)
 	require.Equal(t, config.Token.String, "envvalue")
 }

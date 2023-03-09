@@ -303,6 +303,10 @@ type Options struct {
 	// Can't be set through env vars.
 	External map[string]json.RawMessage `json:"ext" ignored:"true"`
 
+	// These values are for third party collectors' benefit.
+	// Can't be set through env vars.
+	Cloud json.RawMessage `json:"cloud,omitempty" ignored:"true"`
+
 	// Summary trend stats for trend metrics (response times) in CLI output
 	SummaryTrendStats []string `json:"summaryTrendStats" envconfig:"K6_SUMMARY_TREND_STATS"`
 

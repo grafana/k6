@@ -113,10 +113,14 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Cloud config
-	cloudConfig, err := cloudapi.GetConsolidatedConfig(
-		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.External)
+	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud, arc.Options.External)
 	if err != nil {
 		return err
+	}
+	// TODO: Temporarily support options.ext.loadimpact settings, plans to remove support for this in the future
+	if warn != nil {
+		modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, fmt.Sprintf("Warning: %s", warn.Error())))
 	}
 	if !cloudConfig.Token.Valid {
 		return errors.New("Not logged in, please use `k6 login cloud`.") //nolint:golint,revive,stylecheck

@@ -613,7 +613,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 	logMsgs := ts.LoggerHook.Drain()
 	for _, msg := range logMsgs {
-		if msg.Level != logrus.DebugLevel {
+		if (msg.Level != logrus.DebugLevel) && (msg.Level != logrus.WarnLevel) {
 			assert.Failf(t, "unexpected log message", "level %s, msg '%s'", msg.Level, msg.Message)
 		}
 	}

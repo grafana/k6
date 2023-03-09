@@ -77,17 +77,19 @@ func New(params output.Params) (output.Output, error) {
 
 // New creates a new cloud output.
 func newOutput(params output.Params) (*Output, error) {
-	conf, err := cloudapi.GetConsolidatedConfig(
-		params.JSONConfig, params.Environment, params.ConfigArgument, params.ScriptOptions.External)
+	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
+	conf, warn, err := cloudapi.GetConsolidatedConfig(
+		params.JSONConfig, params.Environment, params.ConfigArgument, params.ScriptOptions.Cloud, params.ScriptOptions.External)
 	if err != nil {
 		return nil, err
+	}
+	if warn != nil {
+		logger.Warn(warn.Error())
 	}
 
 	if err := validateRequiredSystemTags(params.ScriptOptions.SystemTags); err != nil {
 		return nil, err
 	}
-
-	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
 
 	if !conf.Name.Valid || conf.Name.String == "" {
 		scriptPath := params.ScriptPath.String()
