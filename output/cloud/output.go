@@ -79,7 +79,8 @@ func New(params output.Params) (output.Output, error) {
 func newOutput(params output.Params) (*Output, error) {
 	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
-		params.JSONConfig, params.Environment, params.ConfigArgument, params.ScriptOptions.Cloud, params.ScriptOptions.External)
+		params.JSONConfig, params.Environment, params.ConfigArgument, params.ScriptOptions.Cloud,
+		params.ScriptOptions.External)
 	if err != nil {
 		return nil, err
 	}
