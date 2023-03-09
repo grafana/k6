@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_PROMETHEUS",
-      "label": "prometheus-in-docker",
+      "label": "prometheus",
       "description": "",
       "type": "datasource",
       "pluginId": "prometheus",
@@ -12,16 +12,10 @@
   "__elements": {},
   "__requires": [
     {
-      "type": "panel",
-      "id": "gauge",
-      "name": "Gauge",
-      "version": ""
-    },
-    {
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.3.2"
+      "version": "9.4.3"
     },
     {
       "type": "datasource",
@@ -31,14 +25,8 @@
     },
     {
       "type": "panel",
-      "id": "stat",
-      "name": "Stat",
-      "version": ""
-    },
-    {
-      "type": "panel",
-      "id": "timeseries",
-      "name": "Time series",
+      "id": "table",
+      "name": "Table",
       "version": ""
     }
   ],
@@ -68,6 +56,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
+  "id": null,
   "links": [],
   "liveNow": true,
   "panels": [
@@ -83,7 +72,9 @@
           },
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "filterable": true,
             "inspect": false
           },
@@ -254,6 +245,7 @@
       "interval": "5s",
       "options": {
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -263,7 +255,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.2.4",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -502,7 +494,8 @@
     }
   ],
   "refresh": "",
-  "schemaVersion": 37,
+  "revision": 1,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [
     "prometheus",
@@ -513,16 +506,16 @@
       {
         "current": {
           "selected": false,
-          "text": "prometheus-in-docker",
-          "value": "prometheus-in-docker"
+          "text": "prometheus",
+          "value": "prometheus"
         },
         "hide": 0,
         "includeAll": false,
+        "label": "DS_PROMETHEUS",
         "multi": false,
         "name": "DS_PROMETHEUS",
         "options": [],
         "query": "prometheus",
-        "queryValue": "",
         "refresh": 1,
         "regex": "",
         "skipUrlSync": false,
@@ -538,6 +531,6 @@
   "timezone": "",
   "title": "Tests List",
   "uid": "UoYDJHJhk",
-  "version": 1,
+  "version": 4,
   "weekStart": ""
 }
