@@ -2,8 +2,6 @@
 
 [k6](https://github.com/grafana/k6) extension for publishing test-run metrics to Prometheus via Remote Write endpoint.
 
-> :warning: Not to be confused with [Prometheus Remote Write **client** extension](https://github.com/grafana/xk6-client-prometheus-remote) which is for load testing _Prometheus_ itself.
-
 > :bookmark: As of k6 v0.42.0, this extension is available within k6 as an _experimental module_.
 > This means that the extension has entered the process of being fully merged into the core of k6 and does not require a special build with xk6 to utilize this feature.
 >
@@ -11,6 +9,8 @@
 >
 
 There are many options for remote-write compatible agents, the official list can be found [here](https://prometheus.io/docs/operating/integrations/). The exact details of how metrics will be processed or stored depends on the underlying agent used.
+
+> :warning: Not to be confused with [Prometheus Remote Write **client** extension](https://github.com/grafana/xk6-client-prometheus-remote) which is for load testing _Prometheus_ itself.
 
 ### Usage
 
@@ -30,6 +30,6 @@ Check [the documentation](https://k6.io/docs/results-output/real-time/prometheus
 
 [<img src="./images/prometheus-dashboard-k6-test-result.png" width="500"/>](./images/prometheus-dashboard-k6-test-result.png)
 
-Pre-built Grafana dashboards are available. Check the [dashboard guide](https://k6.io/docs/results-output/real-time/prometheus-remote-write/#time-series-visualization) for details.
+Pre-built Grafana dashboards are available. Check the [dashboard guide](https://k6.io/docs/results-output/real-time/prometheus-remote-write/#time-series-visualization) how to import and use it from the source code or directly from [Grafana.com](https://grafana.com/grafana/dashboards/18030-test-result).
 
 >Note: The dashboards work with the Native Histogram mapping so it is required to enable it.
