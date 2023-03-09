@@ -2,7 +2,7 @@
   "__inputs": [
     {
       "name": "DS_PROMETHEUS",
-      "label": "prometheus-in-docker",
+      "label": "prometheus",
       "description": "",
       "type": "datasource",
       "pluginId": "prometheus",
@@ -15,7 +15,7 @@
       "type": "grafana",
       "id": "grafana",
       "name": "Grafana",
-      "version": "9.3.2"
+      "version": "9.4.3"
     },
     {
       "type": "datasource",
@@ -93,6 +93,151 @@
       "fieldConfig": {
         "defaults": {
           "color": {
+            "mode": "thresholds"
+          },
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "testid"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "null",
+                      "result": {
+                        "index": 0,
+                        "text": "without testid"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "id": 119,
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 4,
+        "showHeader": true
+      },
+      "pluginVersion": "9.4.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "k6_http_reqs_total{testid=~\"$testid\", name=~\"$url\"}",
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "A"
+        }
+      ],
+      "title": "Tests in this Time Range",
+      "transformations": [
+        {
+          "id": "joinByLabels",
+          "options": {
+            "value": "expected_response"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Value": true,
+              "method": true,
+              "proto": true,
+              "scenario": true,
+              "status": true,
+              "tls_version": true,
+              "true": true,
+              "url": true
+            },
+            "indexByName": {
+              "method": 2,
+              "name": 1,
+              "proto": 3,
+              "scenario": 4,
+              "status": 5,
+              "testid": 0,
+              "tls_version": 6,
+              "true": 8,
+              "url": 7
+            },
+            "renameByName": {}
+          }
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "name": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "testid": {
+                "aggregations": [],
+                "operation": "groupby"
+              }
+            }
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "color": {
             "fixedColor": "text",
             "mode": "palette-classic"
           },
@@ -127,7 +272,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": " - "
+              "options": " -"
             },
             "properties": [
               {
@@ -142,10 +287,9 @@
         "h": 5,
         "w": 4,
         "x": 0,
-        "y": 1
+        "y": 6
       },
       "id": 49,
-      "interval": "1s",
       "options": {
         "colorMode": "background",
         "graphMode": "none",
@@ -159,7 +303,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -173,7 +317,7 @@
           "hide": false,
           "instant": false,
           "interval": "",
-          "legendFormat": "{{testid}} - ",
+          "legendFormat": "{{testid}} -",
           "range": true,
           "refId": "A"
         }
@@ -238,7 +382,7 @@
         "h": 5,
         "w": 4,
         "x": 4,
-        "y": 1
+        "y": 6
       },
       "id": 71,
       "interval": "1s",
@@ -255,7 +399,7 @@
         "text": {},
         "textMode": "value_and_name"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -335,10 +479,10 @@
         "h": 5,
         "w": 4,
         "x": 8,
-        "y": 1
+        "y": 6
       },
       "id": 51,
-      "interval": "5s",
+      "interval": "1s",
       "options": {
         "colorMode": "background",
         "graphMode": "none",
@@ -354,16 +498,16 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
             "type": "prometheus",
             "uid": "${DS_PROMETHEUS}"
           },
-          "editorMode": "code",
+          "editorMode": "builder",
           "exemplar": false,
-          "expr": "sum by(testid) (irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval]))",
+          "expr": "sum by(testid) (deriv(k6_http_reqs_total{testid=~\"$testid\"}[$__range]))",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -434,10 +578,9 @@
         "h": 5,
         "w": 4,
         "x": 12,
-        "y": 1
+        "y": 6
       },
       "id": 52,
-      "interval": "5",
       "options": {
         "colorMode": "background",
         "graphMode": "none",
@@ -445,7 +588,7 @@
         "orientation": "auto",
         "reduceOptions": {
           "calcs": [
-            "lastNotNull"
+            "max"
           ],
           "fields": "",
           "values": false
@@ -453,7 +596,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -462,7 +605,7 @@
           },
           "editorMode": "builder",
           "exemplar": false,
-          "expr": "histogram_quantile(0.95, sum by(testid) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(testid) (rate($metrics{testid=~\"$testid\"}[$__rate_interval]))) ",
           "format": "time_series",
           "hide": false,
           "instant": false,
@@ -534,7 +677,7 @@
         "h": 5,
         "w": 4,
         "x": 16,
-        "y": 1
+        "y": 6
       },
       "id": 63,
       "options": {
@@ -552,7 +695,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -632,7 +775,7 @@
         "h": 5,
         "w": 4,
         "x": 20,
-        "y": 1
+        "y": 6
       },
       "id": 64,
       "options": {
@@ -650,7 +793,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -927,7 +1070,7 @@
         "h": 13,
         "w": 24,
         "x": 0,
-        "y": 6
+        "y": 11
       },
       "id": 14,
       "interval": "5",
@@ -1004,9 +1147,9 @@
           },
           "editorMode": "code",
           "exemplar": false,
-          "expr": "(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval]))) ",
+          "expr": "(histogram_sum(rate($metrics{testid=~\"$testid\"}[$__rate_interval]))\n/\nhistogram_count(rate($metrics{testid=~\"$testid\"}[$__rate_interval]))) ",
           "hide": false,
-          "legendFormat": "Response  Time (avg)  - {{testid}} - {{scenario}} - {{name}}",
+          "legendFormat": "Response  Time (avg)  - {{testid}}",
           "range": true,
           "refId": "C"
         }
@@ -1070,7 +1213,7 @@
         "h": 5,
         "w": 4,
         "x": 0,
-        "y": 19
+        "y": 24
       },
       "id": 85,
       "interval": "1s",
@@ -1089,7 +1232,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -1198,7 +1341,7 @@
         "h": 10,
         "w": 9,
         "x": 4,
-        "y": 19
+        "y": 24
       },
       "id": 18,
       "interval": "5s",
@@ -1351,7 +1494,7 @@
         "h": 10,
         "w": 11,
         "x": 13,
-        "y": 19
+        "y": 24
       },
       "id": 78,
       "interval": "5",
@@ -1370,7 +1513,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -1467,7 +1610,7 @@
         "h": 5,
         "w": 4,
         "x": 0,
-        "y": 24
+        "y": 29
       },
       "id": 92,
       "interval": "1s",
@@ -1486,7 +1629,7 @@
         "text": {},
         "textMode": "auto"
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -1520,7 +1663,9 @@
           },
           "custom": {
             "align": "center",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "filterable": true,
             "inspect": false
           },
@@ -1556,8 +1701,11 @@
             },
             "properties": [
               {
-                "id": "custom.displayMode",
-                "value": "color-background-solid"
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
               },
               {
                 "id": "color",
@@ -1596,12 +1744,13 @@
         "h": 7,
         "w": 13,
         "x": 0,
-        "y": 29
+        "y": 34
       },
       "id": 104,
       "interval": "1",
       "options": {
         "footer": {
+          "countRows": false,
           "enablePagination": true,
           "fields": "",
           "reducer": [
@@ -1609,10 +1758,11 @@
           ],
           "show": false
         },
+        "frameIndex": 2,
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -1623,7 +1773,7 @@
           "exemplar": false,
           "expr": "k6_checks_rate{testid=~\"$testid\"}",
           "format": "table",
-          "instant": true,
+          "instant": false,
           "range": true,
           "refId": "A"
         }
@@ -1741,7 +1891,9 @@
         "defaults": {
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false
           },
           "mappings": [],
@@ -1802,12 +1954,13 @@
         "h": 7,
         "w": 11,
         "x": 13,
-        "y": 29
+        "y": 34
       },
       "id": 107,
       "interval": "1",
       "options": {
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -1823,7 +1976,7 @@
           }
         ]
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "title": "Thresholds WIP",
       "transformations": [
         {
@@ -1928,7 +2081,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 36
+        "y": 41
       },
       "id": 32,
       "panels": [],
@@ -1956,7 +2109,9 @@
           },
           "custom": {
             "align": "center",
-            "displayMode": "color-text",
+            "cellOptions": {
+              "type": "color-text"
+            },
             "filterable": true,
             "inspect": false
           },
@@ -1980,8 +2135,11 @@
             },
             "properties": [
               {
-                "id": "custom.displayMode",
-                "value": "color-background-solid"
+                "id": "custom.cellOptions",
+                "value": {
+                  "mode": "basic",
+                  "type": "color-background"
+                }
               },
               {
                 "id": "unit",
@@ -2471,12 +2629,13 @@
         "h": 9,
         "w": 24,
         "x": 0,
-        "y": 37
+        "y": 42
       },
       "id": 43,
       "interval": "1",
       "options": {
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -2487,7 +2646,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -2511,7 +2670,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0, sum by(name) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0, sum by(name) (rate($metrics{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "legendFormat": "",
@@ -2524,7 +2683,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.5, sum by(name) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.5, sum by(name) (rate($metrics{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "legendFormat": "",
@@ -2537,7 +2696,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(name) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(name) (rate($metrics{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "legendFormat": "",
@@ -2550,7 +2709,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(1, sum by(name) (rate(k6_http_req_duration_seconds{testid=~\"$testid\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(1, sum by(name) (rate($metrics{testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "legendFormat": "",
@@ -2744,7 +2903,7 @@
         "h": 11,
         "w": 24,
         "x": 0,
-        "y": 46
+        "y": 51
       },
       "id": 41,
       "interval": "1s",
@@ -2886,7 +3045,9 @@
         "defaults": {
           "custom": {
             "align": "auto",
-            "displayMode": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
             "inspect": false
           },
           "mappings": [
@@ -2980,12 +3141,13 @@
         "h": 7,
         "w": 24,
         "x": 0,
-        "y": 57
+        "y": 62
       },
       "id": 54,
       "interval": "5s",
       "options": {
         "footer": {
+          "countRows": false,
           "fields": "",
           "reducer": [
             "sum"
@@ -2995,7 +3157,7 @@
         "frameIndex": 1,
         "showHeader": true
       },
-      "pluginVersion": "9.3.2",
+      "pluginVersion": "9.4.3",
       "targets": [
         {
           "datasource": {
@@ -3003,7 +3165,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "histogram_quantile(0.95, sum by(testid)(rate(k6_http_req_duration_seconds{scenario=~\"$scenario\", expected_response=\"true\", testid=~\"$testid\"}[$__rate_interval])))",
+          "expr": "histogram_quantile(0.95, sum by(testid)(rate($metrics{scenario=~\"$scenario\", expected_response=\"true\", testid=~\"$testid\"}[$__rate_interval])))",
           "format": "table",
           "hide": false,
           "legendFormat": "",
@@ -3166,6 +3328,13 @@
                   "options": {}
                 },
                 "fieldName": "Request Count"
+              },
+              {
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                },
+                "fieldName": "P95 Response Time(AVG)"
               }
             ],
             "match": "any",
@@ -3176,7 +3345,7 @@
       "type": "table"
     },
     {
-      "collapsed": true,
+      "collapsed": false,
       "datasource": {
         "uid": "${DS_PROMETHEUS}"
       },
@@ -3184,638 +3353,10 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 64
+        "y": 69
       },
       "id": 35,
-      "panels": [
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "fieldConfig": {
-            "defaults": {
-              "custom": {
-                "align": "auto",
-                "displayMode": "auto",
-                "inspect": false
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  },
-                  {
-                    "color": "red",
-                    "value": 80
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Request Count"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "none"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "P95 Response Time(AVG)"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "s"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "RPS(AVG)"
-                },
-                "properties": [
-                  {
-                    "id": "unit",
-                    "value": "reqps"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "TestID"
-                },
-                "properties": [
-                  {
-                    "id": "mappings",
-                    "value": [
-                      {
-                        "options": {
-                          "match": "empty",
-                          "result": {
-                            "index": 0,
-                            "text": "without testid"
-                          }
-                        },
-                        "type": "special"
-                      }
-                    ]
-                  }
-                ]
-              }
-            ]
-          },
-          "gridPos": {
-            "h": 7,
-            "w": 24,
-            "x": 0,
-            "y": 65
-          },
-          "id": 116,
-          "interval": "5s",
-          "options": {
-            "footer": {
-              "fields": "",
-              "reducer": [
-                "sum"
-              ],
-              "show": false
-            },
-            "frameIndex": 1,
-            "showHeader": true
-          },
-          "pluginVersion": "9.3.2",
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "expr": "histogram_quantile(0.95, sum by(testid)(rate(k6_http_req_duration_seconds{scenario=~\"$scenario\", expected_response=\"true\", testid=~\"$testid\"}[$__rate_interval])))",
-              "format": "table",
-              "hide": false,
-              "legendFormat": "",
-              "range": true,
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "expr": "sum by(scenario) (max(k6_http_reqs_total{testid=~\"$testid\", scenario=~\"$scenario\"}))",
-              "format": "table",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "E"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "expr": "avg by(scenario) (sum(irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval])))",
-              "format": "table",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "C"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "expr": "sum by(scenario) (k6_iterations_total{testid=~\"$testid\",scenario=~\"$scenario\"})",
-              "format": "table",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "D"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "expr": "sum by(scenario) ( k6_http_reqs_total{testid=~\"$testid\",scenario=~\"$scenario\",expected_response=\"false\"})\n",
-              "format": "table",
-              "hide": false,
-              "legendFormat": "__auto",
-              "range": true,
-              "refId": "B"
-            }
-          ],
-          "title": "Scenarios",
-          "transformations": [
-            {
-              "id": "merge",
-              "options": {}
-            },
-            {
-              "id": "groupBy",
-              "options": {
-                "fields": {
-                  "Value": {
-                    "aggregations": [
-                      "lastNotNull"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Value #A": {
-                    "aggregations": [
-                      "lastNotNull"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Value #B": {
-                    "aggregations": [
-                      "lastNotNull"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Value #C": {
-                    "aggregations": [
-                      "lastNotNull"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Value #D": {
-                    "aggregations": [
-                      "lastNotNull"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Value #E": {
-                    "aggregations": [
-                      "lastNotNull"
-                    ],
-                    "operation": "aggregate"
-                  },
-                  "Value #F": {
-                    "aggregations": []
-                  },
-                  "expected_response": {
-                    "aggregations": [],
-                    "operation": "groupby"
-                  },
-                  "scenario": {
-                    "aggregations": [],
-                    "operation": "groupby"
-                  },
-                  "test_type": {
-                    "aggregations": []
-                  },
-                  "testid": {
-                    "aggregations": [],
-                    "operation": "groupby"
-                  }
-                }
-              }
-            },
-            {
-              "id": "organize",
-              "options": {
-                "excludeByName": {},
-                "indexByName": {
-                  "Value #A (lastNotNull)": 5,
-                  "Value #B (lastNotNull)": 4,
-                  "Value #C (lastNotNull)": 6,
-                  "Value #D (lastNotNull)": 2,
-                  "Value #E (lastNotNull)": 3,
-                  "scenario": 1,
-                  "testid": 0
-                },
-                "renameByName": {
-                  "Value #A (lastNotNull)": "P95 Response Time(AVG)",
-                  "Value #B (lastNotNull)": "Failed Request Count",
-                  "Value #C (lastNotNull)": "RPS(AVG)",
-                  "Value #C (max)": "RPS(AVG)",
-                  "Value #D (lastNotNull)": "Iterations",
-                  "Value #E (lastNotNull)": "Request Count",
-                  "Value (lastNotNull)": "Failed Request",
-                  "scenario": "Scenario",
-                  "testid": "TestID"
-                }
-              }
-            },
-            {
-              "id": "filterByValue",
-              "options": {
-                "filters": [
-                  {
-                    "config": {
-                      "id": "isNull",
-                      "options": {}
-                    },
-                    "fieldName": "Request Count"
-                  }
-                ],
-                "match": "all",
-                "type": "exclude"
-              }
-            }
-          ],
-          "type": "table"
-        },
-        {
-          "datasource": {
-            "type": "prometheus",
-            "uid": "${DS_PROMETHEUS}"
-          },
-          "description": "",
-          "fieldConfig": {
-            "defaults": {
-              "color": {
-                "mode": "palette-classic"
-              },
-              "custom": {
-                "axisCenteredZero": false,
-                "axisColorMode": "text",
-                "axisGridShow": false,
-                "axisLabel": "",
-                "axisPlacement": "auto",
-                "barAlignment": 0,
-                "drawStyle": "line",
-                "fillOpacity": 0,
-                "gradientMode": "none",
-                "hideFrom": {
-                  "legend": false,
-                  "tooltip": false,
-                  "viz": false
-                },
-                "lineInterpolation": "linear",
-                "lineStyle": {
-                  "fill": "solid"
-                },
-                "lineWidth": 1,
-                "pointSize": 5,
-                "scaleDistribution": {
-                  "type": "linear"
-                },
-                "showPoints": "auto",
-                "spanNulls": false,
-                "stacking": {
-                  "group": "A",
-                  "mode": "none"
-                },
-                "thresholdsStyle": {
-                  "mode": "off"
-                }
-              },
-              "mappings": [],
-              "thresholds": {
-                "mode": "absolute",
-                "steps": [
-                  {
-                    "color": "green"
-                  }
-                ]
-              }
-            },
-            "overrides": [
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Response  Time (avg)  - "
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Response Time (avg) - without testid"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "A"
-                },
-                "properties": [
-                  {
-                    "id": "custom.axisPlacement",
-                    "value": "left"
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "mode": "fixed"
-                    }
-                  },
-                  {
-                    "id": "custom.axisLabel",
-                    "value": "VUs"
-                  },
-                  {
-                    "id": "custom.scaleDistribution",
-                    "value": {
-                      "log": 10,
-                      "type": "log"
-                    }
-                  },
-                  {
-                    "id": "custom.showPoints",
-                    "value": "never"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "B"
-                },
-                "properties": [
-                  {
-                    "id": "custom.lineStyle",
-                    "value": {
-                      "dash": [
-                        10,
-                        10
-                      ],
-                      "fill": "dash"
-                    }
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "orange",
-                      "mode": "fixed"
-                    }
-                  },
-                  {
-                    "id": "custom.axisLabel",
-                    "value": "RPS"
-                  },
-                  {
-                    "id": "custom.lineWidth",
-                    "value": 3
-                  },
-                  {
-                    "id": "custom.lineInterpolation",
-                    "value": "smooth"
-                  },
-                  {
-                    "id": "decimals",
-                    "value": 0
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "D"
-                },
-                "properties": [
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "red",
-                      "mode": "fixed"
-                    }
-                  },
-                  {
-                    "id": "custom.lineWidth",
-                    "value": 5
-                  },
-                  {
-                    "id": "custom.lineInterpolation",
-                    "value": "smooth"
-                  },
-                  {
-                    "id": "custom.axisPlacement",
-                    "value": "hidden"
-                  },
-                  {
-                    "id": "decimals",
-                    "value": 0
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byFrameRefID",
-                  "options": "C"
-                },
-                "properties": [
-                  {
-                    "id": "custom.axisPlacement",
-                    "value": "right"
-                  },
-                  {
-                    "id": "color",
-                    "value": {
-                      "fixedColor": "green",
-                      "mode": "fixed"
-                    }
-                  },
-                  {
-                    "id": "unit",
-                    "value": "s"
-                  },
-                  {
-                    "id": "custom.fillOpacity",
-                    "value": 18
-                  },
-                  {
-                    "id": "custom.lineInterpolation",
-                    "value": "smooth"
-                  },
-                  {
-                    "id": "custom.axisLabel",
-                    "value": "Response Time"
-                  },
-                  {
-                    "id": "decimals",
-                    "value": 2
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Active VUs   - "
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Active VUs - without testid"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Requests Rate   - "
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Requests Rate - without testid"
-                  }
-                ]
-              },
-              {
-                "matcher": {
-                  "id": "byName",
-                  "options": "Failed Requests Rate  - "
-                },
-                "properties": [
-                  {
-                    "id": "displayName",
-                    "value": "Failed Requests Rate - without testid"
-                  }
-                ]
-              }
-            ]
-          },
-          "gridPos": {
-            "h": 13,
-            "w": 24,
-            "x": 0,
-            "y": 72
-          },
-          "id": 117,
-          "interval": "5",
-          "options": {
-            "legend": {
-              "calcs": [
-                "min",
-                "mean",
-                "max",
-                "lastNotNull"
-              ],
-              "displayMode": "table",
-              "placement": "bottom",
-              "showLegend": true
-            },
-            "timezones": [
-              "browser"
-            ],
-            "tooltip": {
-              "mode": "multi",
-              "sort": "none"
-            }
-          },
-          "targets": [
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "builder",
-              "exemplar": false,
-              "expr": "k6_vus{testid=~\"$testid\"}",
-              "hide": false,
-              "instant": false,
-              "interval": "",
-              "legendFormat": "Active VUs   - {{testid}}",
-              "range": true,
-              "refId": "A"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "exemplar": true,
-              "expr": "sum by(testid) (rate(k6_http_reqs_total{testid=~\"$testid\",scenario=~\"$scenario\"}[$__rate_interval]))",
-              "format": "time_series",
-              "hide": false,
-              "instant": false,
-              "interval": "",
-              "legendFormat": "Requests Rate   - {{testid}}",
-              "range": true,
-              "refId": "B"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "exemplar": false,
-              "expr": "avg by(testid) (sum by(testid) (rate(k6_http_reqs_total{testid=~\"$testid\",scenario=~\"$scenario\", expected_response=\"false\"}[$__rate_interval])))",
-              "hide": false,
-              "instant": false,
-              "legendFormat": "Failed Requests Rate  - {{testid}}",
-              "range": true,
-              "refId": "D"
-            },
-            {
-              "datasource": {
-                "type": "prometheus",
-                "uid": "${DS_PROMETHEUS}"
-              },
-              "editorMode": "code",
-              "exemplar": false,
-              "expr": "(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\",scenario=~\"$scenario\"}[$__rate_interval]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\",scenario=~\"$scenario\"}[$__rate_interval]))) ",
-              "hide": false,
-              "legendFormat": "Response  Time (avg)  - {{testid}} - {{scenario}} - {{name}}",
-              "range": true,
-              "refId": "C"
-            }
-          ],
-          "type": "timeseries"
-        }
-      ],
+      "panels": [],
       "repeat": "scenario",
       "repeatDirection": "h",
       "targets": [
@@ -3829,10 +3370,650 @@
       ],
       "title": "Scenario level metrics $testid $scenario",
       "type": "row"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "inspect": false
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Request Count"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "P95 Response Time(AVG)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "s"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "RPS(AVG)"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "reqps"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "TestID"
+            },
+            "properties": [
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "options": {
+                      "match": "empty",
+                      "result": {
+                        "index": 0,
+                        "text": "without testid"
+                      }
+                    },
+                    "type": "special"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 7,
+        "w": 24,
+        "x": 0,
+        "y": 70
+      },
+      "id": 116,
+      "interval": "5s",
+      "options": {
+        "footer": {
+          "countRows": false,
+          "fields": "",
+          "reducer": [
+            "sum"
+          ],
+          "show": false
+        },
+        "frameIndex": 1,
+        "showHeader": true
+      },
+      "pluginVersion": "9.4.3",
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "histogram_quantile(0.95, sum by(testid)(rate($metrics{scenario=~\"$scenario\", expected_response=\"true\", testid=~\"$testid\"}[$__rate_interval])))",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by(scenario) (max(k6_http_reqs_total{testid=~\"$testid\", scenario=~\"$scenario\"}))",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "E"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "avg by(scenario) (sum(irate(k6_http_reqs_total{testid=~\"$testid\"}[$__rate_interval])))",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "C"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by(scenario) (k6_iterations_total{testid=~\"$testid\",scenario=~\"$scenario\"})",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "expr": "sum by(scenario) ( k6_http_reqs_total{testid=~\"$testid\",scenario=~\"$scenario\",expected_response=\"false\"})\n",
+          "format": "table",
+          "hide": false,
+          "legendFormat": "__auto",
+          "range": true,
+          "refId": "B"
+        }
+      ],
+      "title": "Scenarios",
+      "transformations": [
+        {
+          "id": "merge",
+          "options": {}
+        },
+        {
+          "id": "groupBy",
+          "options": {
+            "fields": {
+              "Value": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #A": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #B": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #C": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #D": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #E": {
+                "aggregations": [
+                  "lastNotNull"
+                ],
+                "operation": "aggregate"
+              },
+              "Value #F": {
+                "aggregations": []
+              },
+              "expected_response": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "scenario": {
+                "aggregations": [],
+                "operation": "groupby"
+              },
+              "test_type": {
+                "aggregations": []
+              },
+              "testid": {
+                "aggregations": [],
+                "operation": "groupby"
+              }
+            }
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {},
+            "indexByName": {
+              "Value #A (lastNotNull)": 5,
+              "Value #B (lastNotNull)": 4,
+              "Value #C (lastNotNull)": 6,
+              "Value #D (lastNotNull)": 2,
+              "Value #E (lastNotNull)": 3,
+              "scenario": 1,
+              "testid": 0
+            },
+            "renameByName": {
+              "Value #A (lastNotNull)": "P95 Response Time(AVG)",
+              "Value #B (lastNotNull)": "Failed Request Count",
+              "Value #C (lastNotNull)": "RPS(AVG)",
+              "Value #C (max)": "RPS(AVG)",
+              "Value #D (lastNotNull)": "Iterations",
+              "Value #E (lastNotNull)": "Request Count",
+              "Value (lastNotNull)": "Failed Request",
+              "scenario": "Scenario",
+              "testid": "TestID"
+            }
+          }
+        },
+        {
+          "id": "filterByValue",
+          "options": {
+            "filters": [
+              {
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                },
+                "fieldName": "Request Count"
+              },
+              {
+                "config": {
+                  "id": "isNull",
+                  "options": {}
+                },
+                "fieldName": "P95 Response Time(AVG)"
+              }
+            ],
+            "match": "any",
+            "type": "exclude"
+          }
+        }
+      ],
+      "type": "table"
+    },
+    {
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${DS_PROMETHEUS}"
+      },
+      "description": "",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisCenteredZero": false,
+            "axisColorMode": "text",
+            "axisGridShow": false,
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "type": "linear"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              }
+            ]
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Response  Time (avg)  - "
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Response Time (avg) - without testid"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "A"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "left"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "VUs"
+              },
+              {
+                "id": "custom.scaleDistribution",
+                "value": {
+                  "log": 10,
+                  "type": "log"
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "dash": [
+                    10,
+                    10
+                  ],
+                  "fill": "dash"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "orange",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "RPS"
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 3
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "smooth"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "D"
+            },
+            "properties": [
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "red",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "custom.lineWidth",
+                "value": 5
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "smooth"
+              },
+              {
+                "id": "custom.axisPlacement",
+                "value": "hidden"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "C"
+            },
+            "properties": [
+              {
+                "id": "custom.axisPlacement",
+                "value": "right"
+              },
+              {
+                "id": "color",
+                "value": {
+                  "fixedColor": "green",
+                  "mode": "fixed"
+                }
+              },
+              {
+                "id": "unit",
+                "value": "s"
+              },
+              {
+                "id": "custom.fillOpacity",
+                "value": 18
+              },
+              {
+                "id": "custom.lineInterpolation",
+                "value": "smooth"
+              },
+              {
+                "id": "custom.axisLabel",
+                "value": "Response Time"
+              },
+              {
+                "id": "decimals",
+                "value": 2
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Active VUs   - "
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Active VUs - without testid"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Requests Rate   - "
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Requests Rate - without testid"
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Failed Requests Rate  - "
+            },
+            "properties": [
+              {
+                "id": "displayName",
+                "value": "Failed Requests Rate - without testid"
+              }
+            ]
+          }
+        ]
+      },
+      "gridPos": {
+        "h": 13,
+        "w": 24,
+        "x": 0,
+        "y": 77
+      },
+      "id": 117,
+      "interval": "5",
+      "options": {
+        "legend": {
+          "calcs": [
+            "min",
+            "mean",
+            "max",
+            "lastNotNull"
+          ],
+          "displayMode": "table",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "timezones": [
+          "browser"
+        ],
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "builder",
+          "exemplar": false,
+          "expr": "k6_vus{testid=~\"$testid\"}",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Active VUs   - {{testid}}",
+          "range": true,
+          "refId": "A"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "exemplar": true,
+          "expr": "sum by(testid) (rate(k6_http_reqs_total{testid=~\"$testid\",scenario=~\"$scenario\"}[$__rate_interval]))",
+          "format": "time_series",
+          "hide": false,
+          "instant": false,
+          "interval": "",
+          "legendFormat": "Requests Rate   - {{testid}}",
+          "range": true,
+          "refId": "B"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "avg by(testid) (sum by(testid) (rate(k6_http_reqs_total{testid=~\"$testid\",scenario=~\"$scenario\", expected_response=\"false\"}[$__rate_interval])))",
+          "hide": false,
+          "instant": false,
+          "legendFormat": "Failed Requests Rate  - {{testid}}",
+          "range": true,
+          "refId": "D"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${DS_PROMETHEUS}"
+          },
+          "editorMode": "code",
+          "exemplar": false,
+          "expr": "(histogram_sum(rate(k6_http_req_duration_seconds{testid=~\"$testid\",scenario=~\"$scenario\"}[$__rate_interval]))\n/\nhistogram_count(rate(k6_http_req_duration_seconds{testid=~\"$testid\",scenario=~\"$scenario\"}[$__rate_interval]))) ",
+          "hide": false,
+          "legendFormat": "Response  Time (avg)  - {{testid}}",
+          "range": true,
+          "refId": "C"
+        }
+      ],
+      "type": "timeseries"
     }
   ],
-  "refresh": "10s",
-  "schemaVersion": 37,
+  "refresh": "",
+  "revision": 1,
+  "schemaVersion": 38,
   "style": "dark",
   "tags": [
     "prometheus",
@@ -3842,9 +4023,9 @@
     "list": [
       {
         "current": {
-          "selected": true,
-          "text": "prometheus-in-docker",
-          "value": "prometheus-in-docker"
+          "selected": false,
+          "text": "prometheus",
+          "value": "prometheus"
         },
         "hide": 0,
         "includeAll": false,
@@ -3961,6 +4142,7 @@
           }
         ],
         "query": "k6_http_req_waiting_seconds, k6_http_req_duration_seconds",
+        "queryValue": "",
         "skipUrlSync": false,
         "type": "custom"
       }
@@ -3974,6 +4156,6 @@
   "timezone": "",
   "title": "Test Result",
   "uid": "01npcT44k",
-  "version": 1,
+  "version": 8,
   "weekStart": ""
 }
