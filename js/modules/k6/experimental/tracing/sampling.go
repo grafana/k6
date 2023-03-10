@@ -4,7 +4,7 @@ import (
 	"math/rand"
 )
 
-// Sampler is an interface defining probabilistic sampling strategies.
+// Sampler is an interface defining a sampling strategy.
 type Sampler interface {
 	// ShouldSample returns true if the trace should be sampled
 	// false otherwise.
@@ -23,7 +23,18 @@ type ProbabilisticSampler struct {
 }
 
 // NewProbabilisticSampler returns a new ProbablisticSampler with the provided sampling rate.
+//
+// Note that the sampling rate is a percentage value within 0.0 <= samplingRate <= 1.0 bounds.
+// If the provided sampling rate is outside of this range, it will be clamped to the closest
+// bound.
 func NewProbabilisticSampler(samplingRate float64) *ProbabilisticSampler {
+	// Ensure that the sampling rate is within the 0.0 <= samplingRate <= 1.0 bounds.
+	if samplingRate < 0.0 {
+		samplingRate = 0.0
+	} else if samplingRate > 1.0 {
+		samplingRate = 1.0
+	}
+
 	return &ProbabilisticSampler{samplingRate: samplingRate}
 }
 

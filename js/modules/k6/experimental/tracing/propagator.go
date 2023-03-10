@@ -57,13 +57,6 @@ func (p *W3CPropagator) Propagate(traceID string) (http.Header, error) {
 	}, nil
 }
 
-// Ensures that W3CPropagator implements the Propagator and
-// SampledPropagator interface
-var (
-	_ Propagator = &W3CPropagator{}
-	_ Sampler    = &W3CPropagator{}
-)
-
 const (
 	// JaegerPropagatorName is the name of the Jaeger trace context propagator
 	JaegerPropagatorName = "jaeger"
@@ -90,10 +83,6 @@ type JaegerPropagator struct {
 }
 
 // NewJaegerPropagator returns a new JaegerPropagator with the given sampler.
-//
-// Note that we allocate the propagator on the heap to ensure we conform
-// to the Sampler interface, as the [Sampler.SetSamplingRate]
-// method has a pointer receiver.
 func NewJaegerPropagator(s Sampler) *JaegerPropagator {
 	return &JaegerPropagator{
 		Sampler: s,
@@ -120,9 +109,16 @@ func pick[T any](decision bool, lhs, rhs T) T {
 	return rhs
 }
 
-// Ensure the JaegerPropagator implements the Propagator and
-// SampledPropagator interface
 var (
+	// Ensures that W3CPropagator implements the Propagator interface
+	_ Propagator = &W3CPropagator{}
+
+	// Ensures that W3CPropagator implements the Sampler interface
+	_ Sampler = &W3CPropagator{}
+
+	// Ensures the JaegerPropagator implements the Propagator interface
 	_ Propagator = &JaegerPropagator{}
-	_ Sampler    = &JaegerPropagator{}
+
+	// Ensures the JaegerPropagator implements the Sampler interface
+	_ Sampler = &JaegerPropagator{}
 )
