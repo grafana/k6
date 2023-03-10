@@ -4,7 +4,10 @@ import (
 	"crypto"
 	"fmt"
 	"hash"
+	"reflect"
 	"strings"
+
+	"github.com/dop251/goja"
 )
 
 // Algorithm represents
@@ -12,39 +15,10 @@ type Algorithm struct {
 	Name AlgorithmIdentifier `json:"name"`
 }
 
-// Ensure AesKeyGenParams implements the From interface.
-var _ From[map[string]interface{}, Algorithm] = Algorithm{}
-
-// From implements the From interface for Algorithm, and initializes the
-// Algorithm instance from a map[string]interface{}.
-func (a Algorithm) From(dict map[string]interface{}) (Algorithm, error) {
-	algorithm := Algorithm{}
-	nameFound := false
-
-	for key, value := range dict {
-		if strings.EqualFold(key, "name") {
-			name, ok := value.(string)
-			if !ok {
-				return Algorithm{}, NewError(0, NotSupportedError, "algorithm name is not a string")
-			}
-
-			name = strings.ToUpper(name)
-
-			if !IsAlgorithm(name) && !IsHashAlgorithm(name) {
-				return Algorithm{}, NewError(0, NotSupportedError, "algorithm name is not supported")
-			}
-
-			algorithm.Name = name
-			nameFound = true
-			break
-		}
-	}
-
-	if !nameFound {
-		return Algorithm{}, NewError(0, NotSupportedError, "algorithm name is not found")
-	}
-
-	return algorithm, nil
+// NormalizedName returns the normalized algorithm identifier.
+// It implements the NormalizedIdentifier interface.
+func (a Algorithm) NormalizedName() AlgorithmIdentifier {
+	return a.Name
 }
 
 // AlgorithmIdentifier represents the name of an algorithm.
@@ -160,45 +134,47 @@ func Hasher(algorithm HashAlgorithmIdentifier) (func() hash.Hash, error) {
 	return nil, NewError(0, ImplementationError, fmt.Sprintf("unsupported hash algorithm: %s", algorithm))
 }
 
+// NormalizedAlgorithm represents a normalized algorithm.
+type NormalizedAlgorithm interface {
+	NormalizedName() AlgorithmIdentifier
+}
+
 // normalize algorithm
 // normalizeAlgorithm(algorithm: string | Algorithm, op: string):
 
 // NormalizeAlgorithm normalizes the given algorithm following the algorithm described in the WebCrypto [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
-func NormalizeAlgorithm(algorithm interface{}, op OperationIdentifier) (interface{}, error) {
-	// var initialAlg AlgorithmIdentifier
-	var initialAlg map[string]interface{}
-
-	switch alg := algorithm.(type) {
-	case string:
-		return NormalizeAlgorithm(map[string]interface{}{"name": alg}, op)
-	case map[string]interface{}:
-		// FIXME: this should call the NewAlgorithmFrom method instead
-		if _, ok := alg["name"]; !ok {
-			return Algorithm{}, NewError(0, SyntaxError, "algorithm name is not found")
-		}
-
-		if _, ok := alg["name"].(string); !ok {
-			return Algorithm{}, NewError(0, SyntaxError, "algorithm name is not a string")
-		}
-
-		initialAlg = alg
-	default:
-		return Algorithm{}, NewError(0, ImplementationError, "unsupported algorithm type")
-	}
-
+func NormalizeAlgorithm(rt *goja.Runtime, algorithm goja.Value, op OperationIdentifier) (NormalizedAlgorithm, error) {
 	// 1.
 	registeredAlgorithms, ok := supportedAlgorithms[op]
 	if !ok {
 		return Algorithm{}, NewError(0, ImplementationError, fmt.Sprintf("unsupported operation: %s", op))
 	}
 
-	// 2. 3. 4.
-	algName, ok := initialAlg["name"].(string)
-	if !ok {
-		return Algorithm{}, NewError(0, SyntaxError, "algorithm name is not a string")
+	// 2.
+	var initialAlg Algorithm
+	switch algorithm.ExportType().Kind() {
+	case reflect.String:
+		obj := rt.NewObject()
+		err := obj.Set("name", algorithm.Export())
+		if err != nil {
+			// 3.
+			return Algorithm{}, NewError(0, ImplementationError, "unable to convert the string argument to an object")
+		}
+		return NormalizeAlgorithm(rt, obj, op)
+	case reflect.Map, reflect.Struct:
+		err := rt.ExportTo(algorithm, &initialAlg)
+		if err != nil {
+			// 3.
+			return Algorithm{}, NewError(0, SyntaxError, "algorithm object is not a valid algorithm")
+		}
+	default:
+		return Algorithm{}, NewError(0, SyntaxError, "unsupported algorithm type")
 	}
+
+	// 4.
+	algName := initialAlg.Name
 
 	// 5.
 	var desiredType string
@@ -222,7 +198,6 @@ func NormalizeAlgorithm(algorithm interface{}, op OperationIdentifier) (interfac
 	}
 
 	// 6.
-	// FIXME: handle this case in later versions
 	err := NewError(0, ImplementationError, fmt.Sprintf("unsupported algorithm type: %s", desiredType))
 	return Algorithm{}, err
 }
