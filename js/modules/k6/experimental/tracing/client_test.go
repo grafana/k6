@@ -153,7 +153,9 @@ type tracingClientTestCase struct {
 
 func newTestCase(t *testing.T) *tracingClientTestCase {
 	testSetup := modulestest.NewRuntime(t)
-	client := Client{vu: testSetup.VU}
+	// Here we provide the client with a fixed seed to ensure that the
+	// generated trace IDs random part is deterministic.
+	client := Client{vu: testSetup.VU, randSource: rand.New(rand.NewSource(0))} //nolint:gosec
 	traceContextHeader := http.Header{}
 	traceContextHeader.Add(traceparentHeaderName, testTraceID)
 
