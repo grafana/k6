@@ -1,7 +1,6 @@
 package tracing
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
@@ -51,18 +50,6 @@ type TraceID struct {
 	// trace-id. The `rand.Reader` should be your default pick. But
 	// you can replace it with a different source for testing purposes.
 	randSource io.Reader
-}
-
-// NewTraceID produces a new TraceID with the given prefix, code and time.
-//
-// It sets the traceID randomness source to the `rand.Reader` as a default.
-func NewTraceID(prefix int16, code int8, t time.Time, randSource io.Reader) TraceID {
-	return TraceID{
-		Prefix:     prefix,
-		Code:       code,
-		Time:       t,
-		randSource: rand.Reader,
-	}
 }
 
 // Encode encodes the TraceID into a hex string.
