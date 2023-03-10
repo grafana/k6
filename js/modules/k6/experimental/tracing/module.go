@@ -4,6 +4,8 @@ package tracing
 import (
 	"errors"
 	"fmt"
+	"math/rand"
+	"time"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
@@ -18,6 +20,9 @@ type (
 	// ModuleInstance represents an instance of the JS module.
 	ModuleInstance struct {
 		vu modules.VU
+
+		// random is a random number generator used by the module.
+		random *rand.Rand
 
 		// Client holds the module's default tracing client.
 		*Client
@@ -40,6 +45,12 @@ func New() *RootModule {
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	return &ModuleInstance{
 		vu: vu,
+
+		// Seed the random number generator with the current time.
+		// This ensures that any call to rand.Intn() will return
+		// less-deterministic results.
+		//nolint:gosec // we don't need cryptographic randomness here
+		random: rand.New(rand.NewSource(time.Now().UTC().UnixNano())),
 	}
 }
 
@@ -66,8 +77,8 @@ func (mi *ModuleInstance) newClient(cc goja.ConstructorCall) *goja.Object {
 		common.Throw(rt, errors.New("Client constructor expects a single configuration object as argument; none given"))
 	}
 
-	var opts options
-	if err := rt.ExportTo(cc.Arguments[0], &opts); err != nil {
+	opts, err := newOptions(rt, cc.Arguments[0])
+	if err != nil {
 		common.Throw(rt, fmt.Errorf("unable to parse options object; reason: %w", err))
 	}
 
