@@ -305,7 +305,8 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input id="special">`, nil)
-	el := p.Query("#special")
+	el, err := p.Query("#special")
+	require.NoError(t, err)
 
 	wants := []string{
 		"test@k6.io",

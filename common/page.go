@@ -675,13 +675,15 @@ func (p *Page) Press(selector string, key string, opts goja.Value) {
 	p.MainFrame().Press(selector, key, opts)
 }
 
-func (p *Page) Query(selector string) api.ElementHandle {
+// Query returns the first element matching the specified selector.
+func (p *Page) Query(selector string) (api.ElementHandle, error) {
 	p.logger.Debugf("Page:Query", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.frameManager.MainFrame().Query(selector)
 }
 
-func (p *Page) QueryAll(selector string) []api.ElementHandle {
+// QueryAll returns all elements matching the specified selector.
+func (p *Page) QueryAll(selector string) ([]api.ElementHandle, error) {
 	p.logger.Debugf("Page:QueryAll", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.frameManager.MainFrame().QueryAll(selector)

@@ -27,8 +27,8 @@ type ElementHandle interface {
 	IsVisible() bool
 	OwnerFrame() Frame
 	Press(key string, opts goja.Value)
-	Query(selector string) ElementHandle
-	QueryAll(selector string) []ElementHandle
+	Query(selector string) (ElementHandle, error)
+	QueryAll(selector string) ([]ElementHandle, error)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
 	ScrollIntoViewIfNeeded(opts goja.Value)
 	SelectOption(values goja.Value, opts goja.Value) []string

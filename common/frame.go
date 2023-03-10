@@ -1304,32 +1304,25 @@ func (f *Frame) Name() string {
 
 // Query runs a selector query against the document tree, returning the first matching element or
 // "null" if no match is found.
-func (f *Frame) Query(selector string) api.ElementHandle {
+func (f *Frame) Query(selector string) (api.ElementHandle, error) {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
 	if err != nil {
 		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
-	value := document.Query(selector)
-	if value != nil {
-		return value
-	}
-	return nil
+	return document.Query(selector)
 }
 
-func (f *Frame) QueryAll(selector string) []api.ElementHandle {
+// QueryAll runs a selector query against the document tree, returning all matching elements.
+func (f *Frame) QueryAll(selector string) ([]api.ElementHandle, error) {
 	f.log.Debugf("Frame:QueryAll", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
 	if err != nil {
 		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
-	value := document.QueryAll(selector)
-	if value != nil {
-		return value
-	}
-	return nil
+	return document.QueryAll(selector)
 }
 
 // Page returns page that owns frame.

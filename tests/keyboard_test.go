@@ -31,7 +31,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
-		el := p.Query("input")
+		el, err := p.Query("input")
+		require.NoError(t, err)
 		p.Focus("input", nil)
 
 		kb.Type("Hello World!", nil)
@@ -46,7 +47,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
-		el := p.Query("input")
+		el, err := p.Query("input")
+		require.NoError(t, err)
 		p.Focus("input", nil)
 
 		kb.Press("Shift++", nil)
@@ -70,7 +72,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
-		el := p.Query("input")
+		el, err := p.Query("input")
+		require.NoError(t, err)
 		p.Focus("input", nil)
 
 		kb.Press("Shift+KeyA", nil)
@@ -93,7 +96,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
-		el := p.Query("textarea")
+		el, err := p.Query("textarea")
+		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
 		kb.Type("L+m+KeyN", nil)
@@ -105,7 +109,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
-		el := p.Query("textarea")
+		el, err := p.Query("textarea")
+		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
 		kb.Press("C", nil)
@@ -129,7 +134,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
-		el := p.Query("textarea")
+		el, err := p.Query("textarea")
+		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
 		kb.Down("Shift")
@@ -144,7 +150,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<textarea>`, nil)
-		el := p.Query("textarea")
+		el, err := p.Query("textarea")
+		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
 		kb.Type("Hello", nil)
@@ -160,7 +167,8 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 
 		p.SetContent(`<input>`, nil)
-		el := p.Query("input")
+		el, err := p.Query("input")
+		require.NoError(t, err)
 		p.Focus("input", nil)
 
 		kb.Type("Hello World!", nil)

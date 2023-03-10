@@ -51,8 +51,8 @@ type Page interface {
 	Pause()
 	Pdf(opts goja.Value) []byte
 	Press(selector string, key string, opts goja.Value)
-	Query(selector string) ElementHandle
-	QueryAll(selector string) []ElementHandle
+	Query(selector string) (ElementHandle, error)
+	QueryAll(selector string) ([]ElementHandle, error)
 	Reload(opts goja.Value) Response
 	Route(url goja.Value, handler goja.Callable)
 	Screenshot(opts goja.Value) goja.ArrayBuffer

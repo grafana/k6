@@ -35,8 +35,8 @@ type Frame interface {
 	// Locator creates and returns a new locator for this frame.
 	Locator(selector string, opts goja.Value) Locator
 	Name() string
-	Query(selector string) ElementHandle
-	QueryAll(selector string) []ElementHandle
+	Query(selector string) (ElementHandle, error)
+	QueryAll(selector string) ([]ElementHandle, error)
 	Page() Page
 	ParentFrame() Frame
 	Press(selector string, key string, opts goja.Value)

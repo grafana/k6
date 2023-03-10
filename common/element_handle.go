@@ -1023,7 +1023,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
-func (h *ElementHandle) Query(selector string) api.ElementHandle {
+func (h *ElementHandle) Query(selector string) (api.ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
@@ -1039,35 +1039,35 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 	}
 	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
 	if err != nil {
-		k6ext.Panic(h.ctx, "querying selector %q: %w", selector, err)
+		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
 	if result == nil {
-		return nil
+		return nil, fmt.Errorf("querying selector %q", selector)
+	}
+	handle, ok := result.(api.JSHandle)
+	if !ok {
+		return nil, fmt.Errorf("querying selector %q, wrong type %T", selector, result)
+	}
+	element := handle.AsElement()
+	if element == nil {
+		handle.Dispose()
+		return nil, fmt.Errorf("querying selector %q", selector)
 	}
 
-	var (
-		handle  = result.(api.JSHandle)
-		element = handle.AsElement()
-	)
-	applySlowMo(h.ctx)
-	if element != nil {
-		return element
-	}
-	handle.Dispose()
-	return nil
+	return element, nil
 }
 
 // QueryAll queries element subtree for matching elements.
 // If no element matches the selector, the return value resolves to "null".
-func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
+func (h *ElementHandle) QueryAll(selector string) ([]api.ElementHandle, error) {
 	defer applySlowMo(h.ctx)
 
 	handles, err := h.queryAll(selector, h.evalWithScript)
 	if err != nil {
-		k6ext.Panic(h.ctx, "querying all selector %q: %w", selector, err)
+		return nil, fmt.Errorf("querying all selector %q: %w", selector, err)
 	}
 
-	return handles
+	return handles, nil
 }
 
 func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementHandle, error) {

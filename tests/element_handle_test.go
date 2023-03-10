@@ -58,8 +58,8 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
-	element := p.Query("div")
-
+	element, err := p.Query("div")
+	require.NoError(t, err)
 	require.Nil(t, element.BoundingBox())
 }
 
@@ -72,7 +72,10 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 			<rect id="theRect" x="30" y="50" width="200" height="300"></rect>
 		</svg>
 	`, nil)
-	element := p.Query("#therect")
+
+	element, err := p.Query("#therect")
+	require.NoError(t, err)
+
 	bbox := element.BoundingBox()
 	pageFn := `e => {
         const rect = e.getBoundingClientRect();
@@ -81,7 +84,7 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 	var r api.Rect
 	webBbox := p.Evaluate(tb.toGojaValue(pageFn), tb.toGojaValue(element))
 	wb, _ := webBbox.(goja.Value)
-	err := tb.runtime().ExportTo(wb, &r)
+	err = tb.runtime().ExportTo(wb, &r)
 	require.NoError(t, err)
 
 	require.EqualValues(t, bbox, &r)
@@ -93,8 +96,10 @@ func TestElementHandleClick(t *testing.T) {
 
 	p.SetContent(htmlInputButton, nil)
 
-	button := p.Query("button")
-	err := button.Click(tb.toGojaValue(struct {
+	button, err := p.Query("button")
+	require.NoError(t, err)
+
+	err = button.Click(tb.toGojaValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		// FIX: this is just a workaround because navigation is never triggered
@@ -116,8 +121,10 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	// Remove all nodes
 	p.Evaluate(tb.toGojaValue("() => delete window['Node']"))
 
-	button := p.Query("button")
-	err := button.Click(tb.toGojaValue(struct {
+	button, err := p.Query("button")
+	require.NoError(t, err)
+
+	err = button.Click(tb.toGojaValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		// FIX: this is just a workaround because navigation is never triggered
@@ -135,12 +142,13 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	p := tb.NewPage(nil)
 
 	p.SetContent(htmlInputButton, nil)
-	button := p.Query("button")
+	button, err := p.Query("button")
+	require.NoError(t, err)
 
 	// Detach node to panic when clicked
 	p.Evaluate(tb.toGojaValue("button => button.remove()"), tb.toGojaValue(button))
 
-	err := button.Click(tb.toGojaValue(struct {
+	err = button.Click(tb.toGojaValue(struct {
 		NoWaitAfter bool `js:"noWaitAfter"`
 	}{
 		// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
@@ -209,7 +217,9 @@ func TestElementHandleGetAttribute(t *testing.T) {
 		<a id="dark-mode-toggle-X" href="https://somewhere">Dark</a>
 	`, nil)
 
-	el := p.Query("#dark-mode-toggle-X")
+	el, err := p.Query("#dark-mode-toggle-X")
+	require.NoError(t, err)
+
 	got := el.GetAttribute("href").String()
 	assert.Equal(t, want, got)
 }
@@ -223,17 +233,23 @@ func TestElementHandleInputValue(t *testing.T) {
 		<textarea>hello3</textarea>
     	`, nil)
 
-	element := p.Query("input")
+	element, err := p.Query("input")
+	require.NoError(t, err)
+
 	value := element.InputValue(nil)
 	element.Dispose()
 	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
 
-	element = p.Query("select")
+	element, err = p.Query("select")
+	require.NoError(t, err)
+
 	value = element.InputValue(nil)
 	element.Dispose()
 	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
 
-	element = p.Query("textarea")
+	element, err = p.Query("textarea")
+	require.NoError(t, err)
+
 	value = element.InputValue(nil)
 	element.Dispose()
 	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
@@ -243,12 +259,15 @@ func TestElementHandleIsChecked(t *testing.T) {
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input type="checkbox" checked>`, nil)
-	element := p.Query("input")
+	element, err := p.Query("input")
+	require.NoError(t, err)
+
 	assert.True(t, element.IsChecked(), "expected checkbox to be checked")
 	element.Dispose()
 
 	p.SetContent(`<input type="checkbox">`, nil)
-	element = p.Query("input")
+	element, err = p.Query("input")
+	require.NoError(t, err)
 	assert.False(t, element.IsChecked(), "expected checkbox to be unchecked")
 	element.Dispose()
 }
@@ -268,13 +287,24 @@ func TestElementHandleQueryAll(t *testing.T) {
   	`, nil)
 
 	t.Run("element_handle", func(t *testing.T) {
-		assert.Equal(t, wantLiLen, len(p.Query("#aul").QueryAll(query)))
+		el, err := p.Query("#aul")
+		require.NoError(t, err)
+
+		els, err := el.QueryAll(query)
+		require.NoError(t, err)
+
+		assert.Equal(t, wantLiLen, len(els))
 	})
 	t.Run("page", func(t *testing.T) {
-		assert.Equal(t, wantLiLen, len(p.QueryAll(query)))
+		els, err := p.QueryAll(query)
+		require.NoError(t, err)
+
+		assert.Equal(t, wantLiLen, len(els))
 	})
 	t.Run("frame", func(t *testing.T) {
-		assert.Equal(t, wantLiLen, len(p.MainFrame().QueryAll(query)))
+		els, err := p.MainFrame().QueryAll(query)
+		require.NoError(t, err)
+		assert.Equal(t, wantLiLen, len(els))
 	})
 }
 
@@ -304,7 +334,9 @@ func TestElementHandleScreenshot(t *testing.T) {
 		}
     	`))
 
-	elem := p.Query("div")
+	elem, err := p.Query("div")
+	require.NoError(t, err)
+
 	buf := elem.Screenshot(nil)
 
 	reader := bytes.NewReader(buf.Bytes())
@@ -329,7 +361,9 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 	p := tb.NewPage(nil)
 	p.SetContent(`<div class="root"></div>`, nil)
 
-	root := p.Query(".root")
+	root, err := p.Query(".root")
+	require.NoError(t, err)
+
 	p.Evaluate(tb.toGojaValue(`
         () => {
 		setTimeout(() => {
@@ -357,7 +391,8 @@ func TestElementHandlePress(t *testing.T) {
 
 	p.SetContent(`<input>`, nil)
 
-	el := p.Query("input")
+	el, err := p.Query("input")
+	require.NoError(t, err)
 
 	el.Press("Shift+KeyA", nil)
 	el.Press("KeyB", nil)

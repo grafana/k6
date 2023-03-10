@@ -245,21 +245,25 @@ func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 			return rt.ToValue(ehm).ToObject(rt)
 		},
 	}
-	maps["$"] = func(selector string) *goja.Object {
-		eh := eh.Query(selector)
+	maps["$"] = func(selector string) (mapping, error) {
+		eh, err := eh.Query(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
 		ehm := mapElementHandle(vu, eh)
-		return rt.ToValue(ehm).ToObject(rt)
+		return ehm, nil
 	}
-	maps["$$"] = func(selector string) *goja.Object {
-		var (
-			mehs []mapping
-			ehs  = eh.QueryAll(selector)
-		)
+	maps["$$"] = func(selector string) ([]mapping, error) {
+		ehs, err := eh.QueryAll(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+		var mehs []mapping
 		for _, eh := range ehs {
 			ehm := mapElementHandle(vu, eh)
 			mehs = append(mehs, ehm)
 		}
-		return rt.ToValue(mehs).ToObject(rt)
+		return mehs, nil
 	}
 
 	jsHandleMap := mapJSHandle(vu, eh)
@@ -377,21 +381,25 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 		},
 		"waitForTimeout": f.WaitForTimeout,
 	}
-	maps["$"] = func(selector string) *goja.Object {
-		eh := f.Query(selector)
+	maps["$"] = func(selector string) (mapping, error) {
+		eh, err := f.Query(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
 		ehm := mapElementHandle(vu, eh)
-		return rt.ToValue(ehm).ToObject(rt)
+		return ehm, nil
 	}
-	maps["$$"] = func(selector string) *goja.Object {
-		var (
-			mehs []mapping
-			ehs  = f.QueryAll(selector)
-		)
+	maps["$$"] = func(selector string) ([]mapping, error) {
+		ehs, err := f.QueryAll(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+		var mehs []mapping
 		for _, eh := range ehs {
 			ehm := mapElementHandle(vu, eh)
 			mehs = append(mehs, ehm)
 		}
-		return rt.ToValue(mehs).ToObject(rt)
+		return mehs, nil
 	}
 
 	return maps
@@ -540,21 +548,25 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 			return rt.ToValue(mws).ToObject(rt)
 		},
 	}
-	maps["$"] = func(selector string) *goja.Object {
-		eh := p.Query(selector)
+	maps["$"] = func(selector string) (mapping, error) {
+		eh, err := p.Query(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
 		ehm := mapElementHandle(vu, eh)
-		return rt.ToValue(ehm).ToObject(rt)
+		return ehm, nil
 	}
-	maps["$$"] = func(selector string) *goja.Object {
-		var (
-			mehs []mapping
-			ehs  = p.QueryAll(selector)
-		)
+	maps["$$"] = func(selector string) ([]mapping, error) {
+		ehs, err := p.QueryAll(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+		var mehs []mapping
 		for _, eh := range ehs {
 			ehm := mapElementHandle(vu, eh)
 			mehs = append(mehs, ehm)
 		}
-		return rt.ToValue(mehs).ToObject(rt)
+		return mehs, nil
 	}
 
 	return maps
