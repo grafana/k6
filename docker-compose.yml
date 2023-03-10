@@ -16,7 +16,7 @@ services:
       - INFLUXDB_DB=k6
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:9.3.8
     networks:
       - grafana
     ports:
