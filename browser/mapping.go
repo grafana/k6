@@ -230,10 +230,12 @@ func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 		"isEnabled":     eh.IsEnabled,
 		"isHidden":      eh.IsHidden,
 		"isVisible":     eh.IsVisible,
-		"ownerFrame": func() *goja.Object {
-			f := eh.OwnerFrame()
-			mf := mapFrame(vu, f)
-			return rt.ToValue(mf).ToObject(rt)
+		"ownerFrame": func() (mapping, error) {
+			f, err := eh.OwnerFrame()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapFrame(vu, f), nil
 		},
 		"press":                  eh.Press,
 		"screenshot":             eh.Screenshot,

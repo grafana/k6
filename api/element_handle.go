@@ -25,7 +25,7 @@ type ElementHandle interface {
 	IsEnabled() bool
 	IsHidden() bool
 	IsVisible() bool
-	OwnerFrame() Frame
+	OwnerFrame() (Frame, error)
 	Press(key string, opts goja.Value)
 	Query(selector string) (ElementHandle, error)
 	QueryAll(selector string) ([]ElementHandle, error)

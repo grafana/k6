@@ -970,7 +970,7 @@ func (h *ElementHandle) IsVisible() bool {
 }
 
 // OwnerFrame returns the frame containing this element.
-func (h *ElementHandle) OwnerFrame() api.Frame {
+func (h *ElementHandle) OwnerFrame() (api.Frame, error) {
 	fn := `
 		(node, injected) => {
 			return injected.getDocumentElement(node);
@@ -982,28 +982,31 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 	}
 	res, err := h.evalWithScript(h.ctx, opts, fn)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting document element: %w", err)
+		return nil, fmt.Errorf("getting document element: %w", err)
 	}
 	if res == nil {
-		return nil
+		return nil, errors.New("getting document element: nil document")
 	}
 
-	documentHandle := res.(*ElementHandle)
+	documentHandle, ok := res.(*ElementHandle)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type while getting document element: %T", res)
+	}
 	defer documentHandle.Dispose()
 	if documentHandle.remoteObject.ObjectID == "" {
-		return nil
+		return nil, err
 	}
 
 	var node *cdp.Node
 	action := dom.DescribeNode().WithObjectID(documentHandle.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6ext.Panic(h.ctx, "getting node in frame: %w", err)
+		return nil, fmt.Errorf("getting node in frame: %w", err)
 	}
 	if node == nil || node.FrameID == "" {
-		return nil
+		return nil, fmt.Errorf("no frame found for node: %w", err)
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID)
+	return h.frame.manager.getFrameByID(node.FrameID), nil
 }
 
 func (h *ElementHandle) Press(key string, opts goja.Value) {
