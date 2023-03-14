@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6error"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/log"
@@ -71,7 +72,7 @@ func (w *Worker) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 // EvaluateHandle evaluates a page function in the context of the web worker and returns a JS handle.
 func (w *Worker) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	// TODO: implement
-	return nil, nil
+	return nil, fmt.Errorf("Worker.EvaluateHandle has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // URL returns the URL of the web worker.

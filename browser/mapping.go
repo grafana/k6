@@ -602,6 +602,7 @@ func mapWorker(vu moduleVU, w api.Worker) mapping {
 		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
 			h, err := w.EvaluateHandle(pageFunc, args...)
 			if err != nil {
+				panicIfFatalError(vu.Context(), err)
 				return nil, err //nolint:wrapcheck
 			}
 			return mapJSHandle(vu, h), nil
