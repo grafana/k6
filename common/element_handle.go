@@ -1094,10 +1094,14 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementH
 		return nil, fmt.Errorf("getting element handle for selector %q: %w", selector, ErrJSHandleInvalid)
 	}
 	defer handles.Dispose()
-	var (
-		props = handles.GetProperties()
-		els   = make([]api.ElementHandle, 0, len(props))
-	)
+
+	props, err := handles.GetProperties()
+	if err != nil {
+		// GetProperties has a rich error already, so we don't need to wrap it.
+		return nil, err //nolint:wrapcheck
+	}
+
+	els := make([]api.ElementHandle, 0, len(props))
 	for _, prop := range props {
 		if el := prop.AsElement(); el != nil {
 			els = append(els, el)

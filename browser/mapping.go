@@ -171,12 +171,17 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 			}
 			return mapJSHandle(vu, h), nil
 		},
-		"getProperties": func() *goja.Object {
+		"getProperties": func() (mapping, error) {
+			props, err := jsh.GetProperties()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+
 			dst := make(map[string]any)
-			for k, v := range jsh.GetProperties() {
+			for k, v := range props {
 				dst[k] = mapJSHandle(vu, v)
 			}
-			return rt.ToValue(dst).ToObject(rt)
+			return dst, nil
 		},
 		"getProperty": func(propertyName string) *goja.Object {
 			var (

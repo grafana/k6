@@ -23,7 +23,9 @@ func TestJSHandleGetProperties(t *testing.T) {
 	`))
 	require.NoError(t, err, "expected no error when evaluating handle")
 
-	props := handle.GetProperties()
+	props, err := handle.GetProperties()
+	require.NoError(t, err, "expected no error when getting properties")
+
 	value := props["prop1"].JSONValue().String()
 	assert.Equal(t, value, "one", `expected property value of "one", got %q`, value)
 }

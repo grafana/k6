@@ -108,10 +108,10 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (
 }
 
 // GetProperties retreives the JS handle's properties.
-func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
+func (h *BaseJSHandle) GetProperties() (map[string]api.JSHandle, error) {
 	handles, err := h.getProperties()
 	if err != nil {
-		k6ext.Panic(h.ctx, "getProperties: %w", err)
+		return nil, err
 	}
 
 	jsHandles := make(map[string]api.JSHandle, len(handles))
@@ -119,7 +119,7 @@ func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 		jsHandles[k] = v
 	}
 
-	return jsHandles
+	return jsHandles, nil
 }
 
 // getProperties is like GetProperties, but does not panic.
