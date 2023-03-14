@@ -216,7 +216,10 @@ func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api
 		b.toGojaValue(url))
 	require.NoError(b.t, err)
 
-	return h.AsElement().ContentFrame()
+	f, err := h.AsElement().ContentFrame()
+	require.NoError(b.t, err)
+
+	return f
 }
 
 // runtime returns a VU runtime.

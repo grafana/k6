@@ -9,7 +9,7 @@ type ElementHandle interface {
 	BoundingBox() *Rect
 	Check(opts goja.Value)
 	Click(opts goja.Value) error
-	ContentFrame() Frame
+	ContentFrame() (Frame, error)
 	Dblclick(opts goja.Value)
 	DispatchEvent(typ string, props goja.Value)
 	Fill(value string, opts goja.Value)

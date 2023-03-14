@@ -755,20 +755,21 @@ func (h *ElementHandle) Click(opts goja.Value) error {
 	return nil
 }
 
-func (h *ElementHandle) ContentFrame() api.Frame {
+// ContentFrame returns the frame that contains this element.
+func (h *ElementHandle) ContentFrame() (api.Frame, error) {
 	var (
 		node *cdp.Node
 		err  error
 	)
 	action := dom.DescribeNode().WithObjectID(h.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6ext.Panic(h.ctx, "getting remote node %q: %w", h.remoteObject.ObjectID, err)
+		return nil, fmt.Errorf("getting remote node %q: %w", h.remoteObject.ObjectID, err)
 	}
 	if node == nil || node.FrameID == "" {
-		return nil
+		return nil, fmt.Errorf("element is not an iframe")
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID)
+	return h.frame.manager.getFrameByID(node.FrameID), nil
 }
 
 func (h *ElementHandle) Dblclick(opts goja.Value) {

@@ -208,10 +208,12 @@ func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 				return nil, err //nolint:wrapcheck
 			})
 		},
-		"contentFrame": func() *goja.Object {
-			f := eh.ContentFrame()
-			mf := mapFrame(vu, f)
-			return rt.ToValue(mf).ToObject(rt)
+		"contentFrame": func() (mapping, error) {
+			f, err := eh.ContentFrame()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapFrame(vu, f), nil
 		},
 		"dblclick":      eh.Dblclick,
 		"dispatchEvent": eh.DispatchEvent,
