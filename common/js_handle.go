@@ -101,14 +101,10 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
+func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
-	res, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
-	if err != nil {
-		k6ext.Panic(h.ctx, "%w", err)
-	}
-	return res
+	return h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 }
 
 // GetProperties retreives the JS handle's properties.

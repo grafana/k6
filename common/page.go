@@ -490,7 +490,8 @@ func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	return p.MainFrame().Evaluate(pageFunc, args...)
 }
 
-func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
+// EvaluateHandle runs JS code within the execution context of the main frame of the page.
+func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
 	return p.MainFrame().EvaluateHandle(pageFunc, args...)

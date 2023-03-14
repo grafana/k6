@@ -13,7 +13,7 @@ type Frame interface {
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	Evaluate(pageFunc goja.Value, args ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) JSHandle
+	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
 	FrameElement() ElementHandle

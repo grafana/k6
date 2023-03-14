@@ -742,7 +742,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle) {
+func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -758,11 +758,13 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
-		k6ext.Panic(f.ctx, "evaluating handle: %w", err)
+		// EvalHandle has a rich error, nolinting.
+		return nil, err //nolint:wrapcheck
 	}
 
 	applySlowMo(f.ctx)
-	return handle
+
+	return handle, nil
 }
 
 // Fill fills out the first element found that matches the selector.

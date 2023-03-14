@@ -164,12 +164,12 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 		},
 		"dispose":  jsh.Dispose,
 		"evaluate": jsh.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
-			var (
-				h = jsh.EvaluateHandle(pageFunc, args...)
-				m = mapJSHandle(vu, h)
-			)
-			return rt.ToValue(m).ToObject(rt)
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
+			h, err := jsh.EvaluateHandle(pageFunc, args...)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, h), nil
 		},
 		"getProperties": func() *goja.Object {
 			dst := make(map[string]any)
@@ -303,10 +303,12 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 		"dblclick":      f.Dblclick,
 		"dispatchEvent": f.DispatchEvent,
 		"evaluate":      f.Evaluate,
-		"evaluateHandle": func(pageFunction goja.Value, args ...goja.Value) *goja.Object {
-			jsh := f.EvaluateHandle(pageFunction, args...)
-			ehm := mapJSHandle(vu, jsh)
-			return rt.ToValue(ehm).ToObject(rt)
+		"evaluateHandle": func(pageFunction goja.Value, args ...goja.Value) (mapping, error) {
+			jsh, err := f.EvaluateHandle(pageFunction, args...)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, jsh), nil
 		},
 		"fill":  f.Fill,
 		"focus": f.Focus,
@@ -431,12 +433,12 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
 		"evaluate":                p.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
-			var (
-				jsh = p.EvaluateHandle(pageFunc, args...)
-				m   = mapJSHandle(vu, jsh)
-			)
-			return rt.ToValue(m).ToObject(rt)
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
+			jsh, err := p.EvaluateHandle(pageFunc, args...)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, jsh), nil
 		},
 		"exposeBinding":  p.ExposeBinding,
 		"exposeFunction": p.ExposeFunction,
@@ -574,13 +576,14 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 
 // mapWorker to the JS module.
 func mapWorker(vu moduleVU, w api.Worker) mapping {
-	rt := vu.Runtime()
 	return mapping{
 		"evaluate": w.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
-			h := w.EvaluateHandle(pageFunc, args...)
-			m := mapJSHandle(vu, h)
-			return rt.ToValue(m).ToObject(rt)
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
+			h, err := w.EvaluateHandle(pageFunc, args...)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, h), nil
 		},
 		"url": w.URL(),
 	}
