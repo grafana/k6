@@ -198,7 +198,6 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 //
 //nolint:funlen
 func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
-	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,
 		"check":       eh.Check,
@@ -248,10 +247,12 @@ func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 		"type":                   eh.Type,
 		"uncheck":                eh.Uncheck,
 		"waitForElementState":    eh.WaitForElementState,
-		"waitForSelector": func(selector string, opts goja.Value) *goja.Object {
-			eh := eh.WaitForSelector(selector, opts)
-			ehm := mapElementHandle(vu, eh)
-			return rt.ToValue(ehm).ToObject(rt)
+		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
+			eh, err := eh.WaitForSelector(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, eh), nil
 		},
 	}
 	maps["$"] = func(selector string) (mapping, error) {
@@ -385,10 +386,12 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 				return mapResponse(vu, resp), nil
 			})
 		},
-		"waitForSelector": func(selector string, opts goja.Value) *goja.Object {
-			eh := f.WaitForSelector(selector, opts)
-			ehm := mapElementHandle(vu, eh)
-			return rt.ToValue(ehm).ToObject(rt)
+		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
+			eh, err := f.WaitForSelector(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, eh), nil
 		},
 		"waitForTimeout": f.WaitForTimeout,
 	}
@@ -548,8 +551,14 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 		},
 		"waitForRequest":  p.WaitForRequest,
 		"waitForResponse": p.WaitForResponse,
-		"waitForSelector": p.WaitForSelector,
-		"waitForTimeout":  p.WaitForTimeout,
+		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
+			eh, err := p.WaitForSelector(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, eh), nil
+		},
+		"waitForTimeout": p.WaitForTimeout,
 		"workers": func() *goja.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {

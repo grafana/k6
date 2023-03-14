@@ -935,7 +935,7 @@ func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+func (p *Page) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
 		p.sessionID(), p.session.TargetID(), p.targetID, selector)

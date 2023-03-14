@@ -1821,16 +1821,17 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+func (f *Frame) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing wait for selector %q options: %w", selector, err)
+		return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
 	}
 	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
 	if err != nil {
-		k6ext.Panic(f.ctx, "waiting for selector %q: %w", selector, err)
+		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}
-	return handle
+
+	return handle, nil
 }
 
 // WaitForTimeout waits the specified amount of milliseconds.

@@ -78,7 +78,7 @@ type Page interface {
 	WaitForNavigation(opts goja.Value) (Response, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) Request
 	WaitForResponse(urlOrPredicate, opts goja.Value) Response
-	WaitForSelector(selector string, opts goja.Value) ElementHandle
+	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []Worker
 }

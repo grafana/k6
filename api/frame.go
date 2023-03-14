@@ -52,6 +52,6 @@ type Frame interface {
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (Response, error)
-	WaitForSelector(selector string, opts goja.Value) ElementHandle
+	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
 	WaitForTimeout(timeout int64)
 }

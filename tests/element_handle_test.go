@@ -375,10 +375,10 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 			}, 100);
 		}
 	`))
-	element := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
+	element, err := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
-
+	require.NoError(t, err)
 	require.NotNil(t, element, "expected element to have been found after wait")
 
 	element.Dispose()

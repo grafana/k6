@@ -39,5 +39,5 @@ type ElementHandle interface {
 	Type(text string, opts goja.Value)
 	Uncheck(opts goja.Value)
 	WaitForElementState(state string, opts goja.Value)
-	WaitForSelector(selector string, opts goja.Value) ElementHandle
+	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
 }

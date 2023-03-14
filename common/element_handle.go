@@ -1308,18 +1308,19 @@ func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
 	}
 }
 
-func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+// WaitForSelector waits for the selector to appear in the DOM.
+func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing waitForSelector %q options: %w", selector, err)
+		return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)
 	}
 
 	handle, err := h.waitForSelector(h.ctx, selector, parsedOpts)
 	if err != nil {
-		k6ext.Panic(h.ctx, "waiting for selector %q: %w", selector, err)
+		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}
 
-	return handle
+	return handle, nil
 }
 
 // evalWithScript evaluates the given js code in the scope of this ElementHandle and returns the result.
