@@ -16,7 +16,7 @@ type Frame interface {
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	FrameElement() ElementHandle
+	FrameElement() (ElementHandle, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	Goto(url string, opts goja.Value) (Response, error)
 	Hover(selector string, opts goja.Value)

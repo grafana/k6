@@ -55,7 +55,11 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	y := math.Min(quad[1], math.Min(quad[3], math.Min(quad[5], quad[7])))
 	width := math.Max(quad[0], math.Max(quad[2], math.Max(quad[4], quad[6]))) - x
 	height := math.Max(quad[1], math.Max(quad[3], math.Max(quad[5], quad[7]))) - y
-	position := h.frame.position()
+
+	position, err := h.frame.position()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
@@ -63,10 +67,11 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
 	frame := h.ownerFrame(apiCtx)
 	if frame != nil && frame.parentFrame != nil {
-		var (
-			el          = h.frame.FrameElement()
-			element, ok = el.(*ElementHandle)
-		)
+		el, err := h.frame.FrameElement()
+		if err != nil {
+			return false, err
+		}
+		element, ok := el.(*ElementHandle)
 		if !ok {
 			return false, fmt.Errorf("unexpected type %T", el)
 		}

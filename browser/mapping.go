@@ -322,9 +322,12 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 		},
 		"fill":  f.Fill,
 		"focus": f.Focus,
-		"frameElement": func() *goja.Object {
-			eh := mapElementHandle(vu, f.FrameElement())
-			return rt.ToValue(eh).ToObject(rt)
+		"frameElement": func() (mapping, error) {
+			fe, err := f.FrameElement()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, fe), nil
 		},
 		"getAttribute": f.GetAttribute,
 		"goto": func(url string, opts goja.Value) *goja.Promise {

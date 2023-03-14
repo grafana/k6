@@ -358,17 +358,22 @@ func (f *Frame) onLoadingStopped() {
 	//       website never stops performing network requests.
 }
 
-func (f *Frame) position() *Position {
+func (f *Frame) position() (*Position, error) {
 	frame := f.manager.getFrameByID(cdp.FrameID(f.page.targetID))
 	if frame == nil {
-		return nil
+		return nil, fmt.Errorf("could not find frame with id %s", f.page.targetID)
 	}
 	if frame == f.page.frameManager.MainFrame() {
-		return &Position{X: 0, Y: 0}
+		return &Position{X: 0, Y: 0}, nil
 	}
-	element := frame.FrameElement()
+	element, err := frame.FrameElement()
+	if err != nil {
+		return nil, err
+	}
+
 	box := element.BoundingBox()
-	return &Position{X: box.X, Y: box.Y}
+
+	return &Position{X: box.X, Y: box.Y}, nil
 }
 
 func (f *Frame) removeChildFrame(child *Frame) {
@@ -826,14 +831,15 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 	return nil
 }
 
-func (f *Frame) FrameElement() api.ElementHandle {
+// FrameElement returns the element handle for the frame.
+func (f *Frame) FrameElement() (api.ElementHandle, error) {
 	f.log.Debugf("Frame:FrameElement", "fid:%s furl:%q", f.ID(), f.URL())
 
 	element, err := f.page.getFrameElement(f)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting frame element: %w", err)
+		return nil, fmt.Errorf("getting frame element: %w", err)
 	}
-	return element
+	return element, nil
 }
 
 // GetAttribute of the first element found that matches the selector.
