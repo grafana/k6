@@ -187,7 +187,9 @@ func TestMultiBrowserPanic(t *testing.T) {
 		b1 = newTestBrowser(t)
 		b2 = newTestBrowser(t)
 
-		p1 := b1.NewContext(nil).NewPage()
+		p1, err := b1.NewContext(nil).NewPage()
+		require.NoError(t, err, "failed to create page #1")
+
 		func() {
 			defer func() { _ = recover() }()
 			p1.GoBack(nil)

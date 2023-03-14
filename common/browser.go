@@ -497,7 +497,7 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 }
 
 // NewPage creates a new tab in the browser window.
-func (b *Browser) NewPage(opts goja.Value) api.Page {
+func (b *Browser) NewPage(opts goja.Value) (api.Page, error) {
 	browserCtx := b.NewContext(opts)
 	return browserCtx.NewPage()
 }

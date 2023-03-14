@@ -662,10 +662,12 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 
 			return rt.ToValue(mpages).ToObject(rt)
 		},
-		"newPage": func() *goja.Object {
-			page := bc.NewPage()
-			m := mapPage(vu, page)
-			return rt.ToValue(m).ToObject(rt)
+		"newPage": func() (mapping, error) {
+			page, err := bc.NewPage()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapPage(vu, page), nil
 		},
 	}
 }
@@ -689,10 +691,12 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 			m := mapBrowserContext(vu, bctx)
 			return rt.ToValue(m).ToObject(rt)
 		},
-		"newPage": func(opts goja.Value) *goja.Object {
-			page := b.NewPage(opts)
-			m := mapPage(vu, page)
-			return rt.ToValue(m).ToObject(rt)
+		"newPage": func(opts goja.Value) (mapping, error) {
+			page, err := b.NewPage(opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapPage(vu, page), nil
 		},
 	}
 }
