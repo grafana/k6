@@ -79,7 +79,7 @@ func TestBasicAuth(t *testing.T) {
 	auth := func(tb testing.TB, user, pass string) api.Response {
 		tb.Helper()
 
-		p := browser.NewContext(
+		bc := browser.NewContext(
 			browser.toGojaValue(struct {
 				HttpCredentials *common.Credentials `js:"httpCredentials"` //nolint:revive
 			}{
@@ -87,8 +87,9 @@ func TestBasicAuth(t *testing.T) {
 					Username: user,
 					Password: pass,
 				},
-			})).
-			NewPage()
+			}))
+		p, err := bc.NewPage()
+		require.NoError(t, err)
 
 		opts := browser.toGojaValue(struct {
 			WaitUntil string `js:"waitUntil"`

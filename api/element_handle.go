@@ -9,7 +9,7 @@ type ElementHandle interface {
 	BoundingBox() *Rect
 	Check(opts goja.Value)
 	Click(opts goja.Value) error
-	ContentFrame() Frame
+	ContentFrame() (Frame, error)
 	Dblclick(opts goja.Value)
 	DispatchEvent(typ string, props goja.Value)
 	Fill(value string, opts goja.Value)
@@ -25,7 +25,7 @@ type ElementHandle interface {
 	IsEnabled() bool
 	IsHidden() bool
 	IsVisible() bool
-	OwnerFrame() Frame
+	OwnerFrame() (Frame, error)
 	Press(key string, opts goja.Value)
 	Query(selector string) (ElementHandle, error)
 	QueryAll(selector string) ([]ElementHandle, error)
@@ -39,5 +39,5 @@ type ElementHandle interface {
 	Type(text string, opts goja.Value)
 	Uncheck(opts goja.Value)
 	WaitForElementState(state string, opts goja.Value)
-	WaitForSelector(selector string, opts goja.Value) ElementHandle
+	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
 }

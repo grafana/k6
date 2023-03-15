@@ -490,10 +490,15 @@ func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	return p.MainFrame().Evaluate(pageFunc, args...)
 }
 
-func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
+// EvaluateHandle runs JS code within the execution context of the main frame of the page.
+func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
-	return p.MainFrame().EvaluateHandle(pageFunc, args...)
+	h, err := p.MainFrame().EvaluateHandle(pageFunc, args...)
+	if err != nil {
+		return nil, fmt.Errorf("evaluating handle for page: %w", err)
+	}
+	return h, nil
 }
 
 // ExposeBinding is not implemented.
@@ -934,7 +939,7 @@ func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+func (p *Page) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
 		p.sessionID(), p.session.TargetID(), p.targetID, selector)

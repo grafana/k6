@@ -146,6 +146,17 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	return tbr
 }
 
+// NewPage is a wrapper around api.Browser.NewPage that fails the test if an
+// error occurs. Added this helper to avoid boilerplate code in tests.
+func (b *testBrowser) NewPage(opts goja.Value) api.Page {
+	b.t.Helper()
+
+	p, err := b.Browser.NewPage(opts)
+	require.NoError(b.t, err)
+
+	return p
+}
+
 // withHandler adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
 func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *testBrowser {
@@ -210,12 +221,16 @@ func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api
 	}
 	`
 
-	return page.EvaluateHandle(
+	h, err := page.EvaluateHandle(
 		b.toGojaValue(pageFn),
 		b.toGojaValue(frameID),
-		b.toGojaValue(url)).
-		AsElement().
-		ContentFrame()
+		b.toGojaValue(url))
+	require.NoError(b.t, err)
+
+	f, err := h.AsElement().ContentFrame()
+	require.NoError(b.t, err)
+
+	return f
 }
 
 // runtime returns a VU runtime.

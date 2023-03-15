@@ -13,10 +13,10 @@ type Frame interface {
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	Evaluate(pageFunc goja.Value, args ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) JSHandle
+	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	FrameElement() ElementHandle
+	FrameElement() (ElementHandle, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	Goto(url string, opts goja.Value) (Response, error)
 	Hover(selector string, opts goja.Value)
@@ -52,6 +52,6 @@ type Frame interface {
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (Response, error)
-	WaitForSelector(selector string, opts goja.Value) ElementHandle
+	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
 	WaitForTimeout(timeout int64)
 }

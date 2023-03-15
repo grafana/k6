@@ -169,7 +169,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	)
 
 	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewContext(
+	bc := tb.NewContext(
 		tb.toGojaValue(struct {
 			Viewport common.Viewport `js:"viewport"`
 		}{
@@ -178,7 +178,9 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 				Height: 240,
 			},
 		}),
-	).NewPage()
+	)
+	p, err := bc.NewPage()
+	require.NoError(t, err)
 
 	clickResult := func() string {
 		const cmd = `
@@ -199,7 +201,9 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 
 func TestElementHandleNonClickable(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
-	p := tb.NewContext(nil).NewPage()
+
+	p, err := tb.NewContext(nil).NewPage()
+	require.NoError(t, err)
 
 	resp, err := p.Goto(tb.staticURL("/non_clickable.html"), nil)
 	require.NotNil(t, resp)
@@ -375,10 +379,10 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 			}, 100);
 		}
 	`))
-	element := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
+	element, err := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
-
+	require.NoError(t, err)
 	require.NotNil(t, element, "expected element to have been found after wait")
 
 	element.Dispose()

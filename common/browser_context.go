@@ -218,12 +218,12 @@ func (b *BrowserContext) NewCDPSession() api.CDPSession {
 }
 
 // NewPage creates a new page inside this browser context.
-func (b *BrowserContext) NewPage() api.Page {
+func (b *BrowserContext) NewPage() (api.Page, error) {
 	b.logger.Debugf("BrowserContext:NewPage", "bctxid:%v", b.id)
 
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
-		k6ext.Panic(b.ctx, "newPageInContext: %w", err)
+		return nil, fmt.Errorf("creating new page in browser context: %w", err)
 	}
 
 	var (
@@ -238,7 +238,7 @@ func (b *BrowserContext) NewPage() api.Page {
 	}
 	b.logger.Debugf("BrowserContext:NewPage:return", "bctxid:%v ptid:%s", bctxid, ptid)
 
-	return p
+	return p, nil
 }
 
 // Pages returns a list of pages inside this browser context.

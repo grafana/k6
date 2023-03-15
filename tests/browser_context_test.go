@@ -34,7 +34,9 @@ func TestBrowserContextAddCookies(t *testing.T) {
 
 		bc.AddCookies(cookies)
 
-		p := bc.NewPage()
+		p, err := bc.NewPage()
+		require.NoError(t, err)
+
 		_, err = p.Goto(
 			tb.staticURL("add_cookies.html"),
 			tb.toGojaValue(struct {

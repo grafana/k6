@@ -56,7 +56,8 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 		},
 	}))
 	t.Cleanup(bctx.Close)
-	p := bctx.NewPage()
+	p, err := bctx.NewPage()
+	require.NoError(t, err)
 
 	viewportSize := p.ViewportSize()
 	assert.Equal(t, float64(800), viewportSize["width"])
@@ -73,9 +74,10 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 		},
 	}))
 	t.Cleanup(bctx.Close)
-	p := bctx.NewPage()
+	p, err := bctx.NewPage()
+	require.NoError(t, err)
 
-	err := tb.awaitWithTimeout(time.Second*5, func() error {
+	err = tb.awaitWithTimeout(time.Second*5, func() error {
 		resp, err := p.Goto(tb.URL("/get"), nil)
 		if err != nil {
 			return err

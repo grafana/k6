@@ -8,7 +8,7 @@ type Browser interface {
 	Contexts() []BrowserContext
 	IsConnected() bool
 	NewContext(opts goja.Value) BrowserContext
-	NewPage(opts goja.Value) Page
+	NewPage(opts goja.Value) (Page, error)
 	On(string) (bool, error)
 	UserAgent() string
 	Version() string

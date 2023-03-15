@@ -85,6 +85,16 @@ func TestPageEvaluate(t *testing.T) {
 		assert.Equal(t, "test", gotVal.Export())
 	})
 
+	t.Run("ok/void_func", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		h, err := p.EvaluateHandle(tb.toGojaValue(`() => console.log("hello")`))
+		assert.Nil(t, h, "expected nil handle")
+		assert.Error(t, err)
+	})
+
 	t.Run("err", func(t *testing.T) {
 		t.Parallel()
 

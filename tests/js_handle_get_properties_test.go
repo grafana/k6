@@ -5,13 +5,14 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestJSHandleGetProperties(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	handle := p.EvaluateHandle(tb.toGojaValue(`
+	handle, err := p.EvaluateHandle(tb.toGojaValue(`
 	() => {
 		return {
 			prop1: "one",
@@ -20,8 +21,11 @@ func TestJSHandleGetProperties(t *testing.T) {
 		};
 	}
 	`))
+	require.NoError(t, err, "expected no error when evaluating handle")
 
-	props := handle.GetProperties()
+	props, err := handle.GetProperties()
+	require.NoError(t, err, "expected no error when getting properties")
+
 	value := props["prop1"].JSONValue().String()
 	assert.Equal(t, value, "one", `expected property value of "one", got %q`, value)
 }

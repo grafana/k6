@@ -19,7 +19,7 @@ type Page interface {
 	EmulateMedia(opts goja.Value)
 	EmulateVisionDeficiency(typ string)
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) JSHandle
+	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (JSHandle, error)
 	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
 	ExposeFunction(name string, callback goja.Callable)
 	Fill(selector string, value string, opts goja.Value)
@@ -78,7 +78,7 @@ type Page interface {
 	WaitForNavigation(opts goja.Value) (Response, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) Request
 	WaitForResponse(urlOrPredicate, opts goja.Value) Response
-	WaitForSelector(selector string, opts goja.Value) ElementHandle
+	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []Worker
 }
