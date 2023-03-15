@@ -319,10 +319,10 @@ func (e *ExecutionContext) EvalHandle(
 	}
 	res, err := e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
 	if err != nil {
-		return nil, fmt.Errorf("evaluating handle: %w", err)
+		return nil, err
 	}
 	if res == nil {
-		return nil, fmt.Errorf("evaluating handle: result is nil")
+		return nil, errors.New("nil result")
 	}
 
 	return res.(api.JSHandle), nil

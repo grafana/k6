@@ -757,14 +757,13 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	{
 		ec := f.executionContexts[mainWorld]
 		if ec == nil {
-			k6ext.Panic(f.ctx, "evaluating handle: execution context %q not found", mainWorld)
+			k6ext.Panic(f.ctx, "evaluating handle for frame: execution context %q not found", mainWorld)
 		}
 		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
-		// EvalHandle has a rich error, nolinting.
-		return nil, err //nolint:wrapcheck
+		return nil, fmt.Errorf("evaluating handle for frame: %w", err)
 	}
 
 	applySlowMo(f.ctx)

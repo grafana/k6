@@ -494,7 +494,11 @@ func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
-	return p.MainFrame().EvaluateHandle(pageFunc, args...)
+	h, err := p.MainFrame().EvaluateHandle(pageFunc, args...)
+	if err != nil {
+		return nil, fmt.Errorf("evaluating handle for page: %w", err)
+	}
+	return h, nil
 }
 
 // ExposeBinding is not implemented.

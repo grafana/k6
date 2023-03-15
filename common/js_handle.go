@@ -104,7 +104,13 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
-	return h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
+
+	eh, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
+	if err != nil {
+		return nil, fmt.Errorf("evaluating handle for element: %w", err)
+	}
+
+	return eh, nil
 }
 
 // GetProperties retreives the JS handle's properties.
