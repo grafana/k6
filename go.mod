@@ -28,7 +28,6 @@ require (
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
-	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/pmezard/go-difflib v1.0.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.0

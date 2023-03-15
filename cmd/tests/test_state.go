@@ -35,20 +35,20 @@ type GlobalTestState struct {
 
 // NewGlobalTestState returns an initialized GlobalTestState, mocking all
 // GlobalState fields for use in tests.
-func NewGlobalTestState(t *testing.T) *GlobalTestState {
+func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	ctx, cancel := context.WithCancel(context.Background())
-	t.Cleanup(cancel)
+	tb.Cleanup(cancel)
 
 	fs := &afero.MemMapFs{}
 	cwd := "/test/" // TODO: Make this relative to the test?
 	if runtime.GOOS == "windows" {
 		cwd = "c:\\test\\"
 	}
-	require.NoError(t, fs.MkdirAll(cwd, 0o755))
+	require.NoError(tb, fs.MkdirAll(cwd, 0o755))
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
-	logger.Out = testutils.NewTestOutput(t)
+	logger.Out = testutils.NewTestOutput(tb)
 	hook := &testutils.SimpleLogrusHook{HookedLevels: logrus.AllLevels}
 	logger.AddHook(hook)
 
@@ -64,14 +64,14 @@ func NewGlobalTestState(t *testing.T) *GlobalTestState {
 	defaultOsExitHandle := func(exitCode int) {
 		cancel()
 		osExitCalled = true
-		assert.Equal(t, ts.ExpectedExitCode, exitCode)
+		assert.Equal(tb, ts.ExpectedExitCode, exitCode)
 	}
 
-	t.Cleanup(func() {
+	tb.Cleanup(func() {
 		if ts.ExpectedExitCode > 0 {
 			// Ensure that, if we expected to receive an error, our `os.Exit()` mock
 			// function was actually called.
-			assert.Truef(t,
+			assert.Truef(tb,
 				osExitCalled,
 				"expected exit code %d, but the os.Exit() mock was not called",
 				ts.ExpectedExitCode,
@@ -81,7 +81,7 @@ func NewGlobalTestState(t *testing.T) *GlobalTestState {
 
 	outMutex := &sync.Mutex{}
 	defaultFlags := state.GetDefaultFlags(".config")
-	defaultFlags.Address = getFreeBindAddr(t)
+	defaultFlags.Address = getFreeBindAddr(tb)
 
 	ts.GlobalState = &state.GlobalState{
 		Ctx:          ctx,
@@ -108,7 +108,7 @@ func NewGlobalTestState(t *testing.T) *GlobalTestState {
 		SignalNotify:   signal.Notify,
 		SignalStop:     signal.Stop,
 		Logger:         logger,
-		FallbackLogger: testutils.NewLogger(t).WithField("fallback", true),
+		FallbackLogger: testutils.NewLogger(tb).WithField("fallback", true),
 	}
 
 	return ts
@@ -116,7 +116,7 @@ func NewGlobalTestState(t *testing.T) *GlobalTestState {
 
 var portRangeStart uint64 = 6565 //nolint:gochecknoglobals
 
-func getFreeBindAddr(t *testing.T) string {
+func getFreeBindAddr(tb testing.TB) string {
 	for i := 0; i < 100; i++ {
 		port := atomic.AddUint64(&portRangeStart, 1)
 		addr := net.JoinHostPort("localhost", strconv.FormatUint(port, 10))
@@ -126,11 +126,11 @@ func getFreeBindAddr(t *testing.T) string {
 			continue // port was busy for some reason
 		}
 		defer func() {
-			assert.NoError(t, listener.Close())
+			assert.NoError(tb, listener.Close())
 		}()
 		return addr
 	}
 
-	t.Fatal("could not get a free port")
+	tb.Fatal("could not get a free port")
 	return ""
 }

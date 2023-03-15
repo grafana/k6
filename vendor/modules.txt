@@ -226,9 +226,6 @@ github.com/mstoykov/k6-taskqueue-lib/taskqueue
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 ## explicit
 github.com/nu7hatch/gouuid
-# github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
-## explicit; go 1.12
-github.com/oxtoacart/bpool
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib

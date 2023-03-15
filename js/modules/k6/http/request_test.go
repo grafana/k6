@@ -32,7 +32,6 @@ import (
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
 	"github.com/mccutchen/go-httpbin/httpbin"
-	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -147,13 +146,13 @@ func newTestCase(t testing.TB) *httpTestCase {
 	samples := make(chan metrics.SampleContainer, 1000)
 
 	state := &lib.State{
-		Options:   options,
-		Logger:    logger,
-		Group:     root,
-		TLSConfig: tb.TLSClientConfig,
-		Transport: tb.HTTPTransport,
-		BPool:     bpool.NewBufferPool(1),
-		Samples:   samples,
+		Options:    options,
+		Logger:     logger,
+		Group:      root,
+		TLSConfig:  tb.TLSClientConfig,
+		Transport:  tb.HTTPTransport,
+		BufferPool: lib.NewBufferPool(),
+		Samples:    samples,
 		Tags: lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{
 			"group": root.Path,
 		})),
@@ -1973,7 +1972,7 @@ func BenchmarkHandlingOfResponseBodies(b *testing.B) {
 	rt := ts.runtime.VU.Runtime()
 	state := ts.runtime.VU.State()
 
-	state.BPool = bpool.NewBufferPool(100)
+	state.BufferPool = lib.NewBufferPool()
 
 	go func() {
 		ctxDone := tb.Context.Done()

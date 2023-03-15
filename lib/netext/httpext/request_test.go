@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/mccutchen/go-httpbin/httpbin"
-	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -256,7 +255,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 		Transport:      srv.Client().Transport,
 		Samples:        samples,
 		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		BufferPool:     lib.NewBufferPool(),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
@@ -334,7 +333,7 @@ func TestTrailFailed(t *testing.T) {
 				Transport:      srv.Client().Transport,
 				Samples:        samples,
 				Logger:         logger,
-				BPool:          bpool.NewBufferPool(2),
+				BufferPool:     lib.NewBufferPool(),
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 			}
@@ -400,7 +399,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 		},
 		Samples:        samples,
 		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		BufferPool:     lib.NewBufferPool(),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
@@ -456,7 +455,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 		Transport:      srv.Client().Transport,
 		Samples:        samples,
 		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		BufferPool:     lib.NewBufferPool(),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}
@@ -526,7 +525,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 		Transport:      ts.Client().Transport,
 		Samples:        samples,
 		Logger:         logger,
-		BPool:          bpool.NewBufferPool(100),
+		BufferPool:     lib.NewBufferPool(),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
 	}

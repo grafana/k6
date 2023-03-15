@@ -12,7 +12,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/oxtoacart/bpool"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
@@ -366,7 +365,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 			)).DialContext,
 		},
-		BPool:          bpool.NewBufferPool(1),
+		BufferPool:     lib.NewBufferPool(),
 		Samples:        make(chan metrics.SampleContainer, 500),
 		BuiltinMetrics: builtinMetrics,
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
@@ -513,7 +512,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 			)).DialContext,
 		},
-		BPool:          bpool.NewBufferPool(1),
+		BufferPool:     lib.NewBufferPool(),
 		Samples:        make(chan metrics.SampleContainer, 500),
 		BuiltinMetrics: builtinMetrics,
 		Tags:           lib.NewVUStateTags(registry.RootTagSet()),

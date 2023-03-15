@@ -227,13 +227,13 @@ func TestWrongEnvVarIterations(t *testing.T) {
 	assert.Empty(t, ts.LoggerHook.Drain())
 }
 
-func getSingleFileTestState(t *testing.T, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
+func getSingleFileTestState(tb testing.TB, script string, cliFlags []string, expExitCode exitcodes.ExitCode) *GlobalTestState {
 	if cliFlags == nil {
 		cliFlags = []string{"-v", "--log-output=stdout"}
 	}
 
-	ts := NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
+	ts := NewGlobalTestState(tb)
+	require.NoError(tb, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), []byte(script), 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "run"}, cliFlags...), "test.js")
 	ts.ExpectedExitCode = int(expExitCode)
 
@@ -463,12 +463,12 @@ func TestSubMetricThresholdNoData(t *testing.T) {
      two..................: 42`)
 }
 
-func getTestServer(t *testing.T, routes map[string]http.Handler) *httptest.Server {
+func getTestServer(tb testing.TB, routes map[string]http.Handler) *httptest.Server {
 	mux := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		for methodAndRoute, handler := range routes {
 			methodRouteTuple := strings.SplitN(methodAndRoute, " ", 2)
 			regex, err := regexp.Compile(methodRouteTuple[1])
-			require.NoError(t, err)
+			require.NoError(tb, err)
 
 			if req.Method == methodRouteTuple[0] && regex.Match([]byte(req.URL.String())) {
 				handler.ServeHTTP(resp, req)
@@ -483,46 +483,46 @@ func getTestServer(t *testing.T, routes map[string]http.Handler) *httptest.Serve
 }
 
 func getCloudTestEndChecker(
-	t *testing.T, testRunID int,
+	tb testing.TB, testRunID int,
 	testStart http.Handler, expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus,
 ) *httptest.Server {
 	testFinished := false
 
 	if testStart == nil {
-		testStart = cloudTestStartSimple(t, testRunID)
+		testStart = cloudTestStartSimple(tb, testRunID)
 	}
 
-	srv := getTestServer(t, map[string]http.Handler{
+	srv := getTestServer(tb, map[string]http.Handler{
 		"POST ^/v1/tests$": testStart,
 		fmt.Sprintf("POST ^/v1/tests/%d$", testRunID): http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-			require.NotNil(t, req.Body)
+			require.NotNil(tb, req.Body)
 			buf := &bytes.Buffer{}
 			_, err := io.Copy(buf, req.Body)
-			require.NoError(t, err)
-			require.NoError(t, req.Body.Close())
+			require.NoError(tb, err)
+			require.NoError(tb, req.Body.Close())
 
 			body := buf.Bytes()
-			require.True(t, gjson.ValidBytes(body))
+			require.True(tb, gjson.ValidBytes(body))
 
 			runStatus := gjson.GetBytes(body, "run_status")
-			require.True(t, runStatus.Exists()) // important to check, since run_status can be 0
+			require.True(tb, runStatus.Exists()) // important to check, since run_status can be 0
 			assert.Equalf(
-				t, expRunStatus, cloudapi.RunStatus(runStatus.Int()),
+				tb, expRunStatus, cloudapi.RunStatus(runStatus.Int()),
 				"received wrong run_status value",
 			)
 
 			resultStatus := gjson.GetBytes(body, "result_status")
-			require.True(t, resultStatus.Exists())
+			require.True(tb, resultStatus.Exists())
 			assert.Equalf(
-				t, expResultStatus, cloudapi.ResultStatus(resultStatus.Int()),
+				tb, expResultStatus, cloudapi.ResultStatus(resultStatus.Int()),
 				"received wrong result_status value",
 			)
 			testFinished = true
 		}),
 	})
 
-	t.Cleanup(func() {
-		assert.Truef(t, testFinished, "expected test to have called the cloud API endpoint to finish the test")
+	tb.Cleanup(func() {
+		assert.Truef(tb, testFinished, "expected test to have called the cloud API endpoint to finish the test")
 		srv.Close()
 	})
 
@@ -530,7 +530,7 @@ func getCloudTestEndChecker(
 }
 
 func getSimpleCloudOutputTestState(
-	t *testing.T, script string, cliFlags []string,
+	tb testing.TB, script string, cliFlags []string,
 	expRunStatus cloudapi.RunStatus, expResultStatus cloudapi.ResultStatus, expExitCode exitcodes.ExitCode,
 ) *GlobalTestState {
 	if cliFlags == nil {
@@ -538,8 +538,8 @@ func getSimpleCloudOutputTestState(
 	}
 	cliFlags = append(cliFlags, "--out", "cloud")
 
-	srv := getCloudTestEndChecker(t, 111, nil, expRunStatus, expResultStatus)
-	ts := getSingleFileTestState(t, script, cliFlags, expExitCode)
+	srv := getCloudTestEndChecker(tb, 111, nil, expRunStatus, expResultStatus)
+	ts := getSingleFileTestState(tb, script, cliFlags, expExitCode)
 	ts.Env["K6_CLOUD_HOST"] = srv.URL
 	return ts
 }
@@ -1726,6 +1726,48 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 	ts.OutMutex.Unlock()
 
 	assert.Contains(t, stdout, "output: Prometheus remote write")
+}
+
+func BenchmarkReadResponseBody(b *testing.B) {
+	httpSrv := httpmultibin.NewHTTPMultiBin(b)
+
+	script := httpSrv.Replacer.Replace(`
+		import http from "k6/http";
+		import { check, sleep } from "k6";
+
+		let statusCheck = { "status is 200": (r) => r.status === 200 }
+
+		export let options = {
+			duration: '10s',
+			vus: 10
+		};
+		
+		export default function () {
+			let bytes = randomIntBetween(100 * 1024, 5 * 1024 * 1024)
+
+			let response = http.get(http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `)
+			check(response, statusCheck)
+
+			let responses = http.batch([
+										["GET", http.url` + "`HTTPBIN_IP_URL/stream-bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/stream-bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/bytes/${bytes}`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/gzip`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/deflate`" + `],
+										["GET", http.url` + "`HTTPBIN_IP_URL/image/jpeg`" + `],
+									]);
+			responses.forEach(res => check(res, statusCheck))
+			sleep(0.1)
+		};
+		
+		function randomIntBetween(min, max) {
+			return Math.floor(Math.random() * (max - min + 1) + min);
+		}
+	`)
+
+	ts := getSimpleCloudOutputTestState(b, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
 func TestBrowserPermissions(t *testing.T) {
