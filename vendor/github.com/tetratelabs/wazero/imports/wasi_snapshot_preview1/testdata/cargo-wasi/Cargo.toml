@@ -1,0 +1,11 @@
+[package]
+name = "wasi"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "wasi"
+path = "wasi.rs"
+
+[dependencies]
+libc = "0.2"
