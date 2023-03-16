@@ -8,10 +8,9 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/mailru/easyjson v0.7.7
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
-	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.2
-	go.k6.io/k6 v0.43.1
+	go.k6.io/k6 v0.43.2-0.20230315144817-12f5dd846338
 	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 	gopkg.in/guregu/null.v3 v3.3.0

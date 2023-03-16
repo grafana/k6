@@ -12,7 +12,6 @@ import (
 	k6metrics "go.k6.io/k6/metrics"
 
 	"github.com/dop251/goja"
-	"github.com/oxtoacart/bpool"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 )
@@ -75,7 +74,7 @@ func NewVU(tb testing.TB) *VU {
 		},
 		Logger:         k6testutils.NewLogger(tb),
 		Group:          root,
-		BPool:          bpool.NewBufferPool(1),
+		BufferPool:     k6lib.NewBufferPool(),
 		Samples:        samples,
 		Tags:           k6lib.NewVUStateTags(tags.With("group", root.Path)),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
