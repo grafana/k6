@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"strings"
 	"time"
 
@@ -133,6 +134,12 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 		tcred = insecure.NewCredentials()
 	}
 	opts = append(opts, grpc.WithTransportCredentials(tcred))
+
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return false, err
+	}
+	opts = append(opts, grpc.WithAuthority(host))
 
 	if ua := state.Options.UserAgent; ua.Valid {
 		opts = append(opts, grpc.WithUserAgent(ua.ValueOrZero()))
