@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"net/url"
 	"runtime"
+	"strings"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
@@ -81,6 +82,15 @@ func newBundle(
 		CompatibilityMode: compatMode,
 		Strict:            true,
 		SourceMapLoader:   generateSourceMapLoader(piState.Logger, filesystems),
+	}
+	if strings.HasSuffix(src.URL.String(), ".wasm") {
+		code = `
+		import wasm from 'k6/wasm';
+		const mod = wasm.instantiate('` + src.URL.String() + `');
+		export const setup = () => mod.exports.setup ? mod.exports.setup() : undefined;
+		export default (arg) => mod.exports.default ? mod.exports.default(arg) : undefined;
+		export const teardown = (arg) => mod.exports.teardown ? mod.exports.teardown(arg) : undefined;
+		`
 	}
 	pgm, _, err := c.Compile(code, src.URL.String(), false)
 	if err != nil {
