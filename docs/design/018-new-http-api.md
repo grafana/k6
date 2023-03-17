@@ -72,6 +72,233 @@ In general, the design of the API should follow these guidelines:
   We've historically had many issues with this ([#878](https://github.com/grafana/k6/issues/878), [#1185](https://github.com/grafana/k6/issues/1185)), resulting in confusion for users, and we want to avoid it in the new API. Even though we want to have sane defaults for most behavior, instead of guessing what the user wants, all behavior should be explicitly configured by the user. In cases where some behavior is ambiguous, the API should raise an error indicating so.
 
 
+#### Sockets
+
+A Socket represents the file or network socket over which client/server or peer communication happens.
+
+It can be of three types:
+- `tcp`: a stream-oriented network socket using the Transmission Control Protocol.
+- `udp`: a message-oriented network socket using the User Datagram Protocol.
+- `ipc`: a mechanism for communicating between processes on the same machine, typically using files.
+
+The Socket state can either be _active_—meaning connected for a TCP socket, bound for a UDP socket, or open for an IPC socket—, or _inactive_—meaning disconnected, unbound, or closed, respectively.
+
+##### Example
+
+- TCP:
+```javascript
+import { dialTCP } from 'k6/x/net';
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const socket = await dialTCP('192.168.1.1:80', {
+                            // default      | possible values
+    ipVersion: 0,           // 0            | 4 (IPv4), 6 (IPv6), 0 (both)
+    keepAlive: true,        // false        |
+    lookup: null,           // dns.lookup() |
+    proxy: 'myproxy:3030',  // ''           |
+  });
+  console.log(socket.active); // true
+
+  // Writing directly to the socket.
+  // Requires TextEncoder implementation, otherwise typed arrays can be used as well.
+  await socket.write(new TextEncoder().encode('GET / HTTP/1.1\r\n\r\n'));
+
+  // And reading...
+  socket.on('data', (data) => {
+    console.log(`received ${data}`);
+    socket.close();
+  });
+}
+```
+
+- UDP:
+```javascript
+import { dialUDP } from 'k6/x/net';
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const socket = new dialUDP('192.168.1.1:9090');
+
+  await socket.write(new TextEncoder().encode('GET / HTTP/1.1\r\n\r\n'));
+}
+```
+
+- IPC:
+```javascript
+import { open } from 'k6/x/file';
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const file = await open('/tmp/unix.sock');
+
+  // The HTTP client supports communicating over a Unix socket.
+  // Otherwise it can also be read from and written to directly.
+  const client = new Client({
+    socket: file,
+  });
+  await client.get('http://127.0.0.1/get');
+}
+```
+
+#### Client
+
+An HTTP Client is used to communicate with an HTTP server.
+
+##### Examples
+
+- Using a client with default transport settings, and making a GET request:
+```javascript
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const client = new Client();
+  const response = await client.get('https://httpbin.test.k6.io/get');
+  const jsonData = await response.json();
+  console.log(jsonData);
+}
+```
+
+- Passing a socket with custom transport settings, some HTTP options, and making a POST request:
+```javascript
+import { dialTCP } from 'k6/x/net';
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const socket = await dialTCP('10.0.0.10:80, { keepAlive: true });
+  const client = new Client({
+    socket: socket,
+    proxy: 'https://myproxy',
+    version: 1.1,                     // force a specific HTTP version
+    headers: { 'User-Agent': 'k6' },  // set some global headers
+  });
+  await client.post('http://10.0.0.10/post', {
+    json: { name: 'k6' }, // automatically adds 'Content-Type: application/json' header
+  });
+}
+```
+
+- A tentative HTTP/3 example:
+```javascript
+import { dialUDP } from 'k6/x/net';
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const socket = new dialUDP('192.168.1.1:9090');
+
+  const client = new Client({
+    socket: socket,
+    version: 3,      // A UDP socket would imply HTTP/3, but this makes it explicit.
+  });
+  await client.get('https://httpbin.test.k6.io/get');
+}
+```
+
+
+#### Host name resolution
+
+Host names can be resolved to IP addresses in several ways:
+
+- Via a static lookup map defined in the script.
+- Via the operating system's facilities (`/etc/hosts`, `/etc/resolv.conf`, etc.).
+- By querying specific DNS servers.
+
+When connecting to an address using a host name, the resolution can be controlled via the `lookup` function passed to the socket constructor. By default, the mechanism provided by the operating system is used (`dns.lookup()`).
+
+For example:
+```javascript
+import { dialTCP } from 'k6/x/net';
+import dns from 'k6/x/net/dns';
+
+const hosts = {
+  'hostA': '10.0.0.10',
+  'hostB': '10.0.0.11',
+};
+
+export default async function () {
+  const socket = await dialTCP('myhost', {
+    lookup: async hostname => {
+      // Return either the IP from the static map, or do an OS lookup,
+      // or fallback to making a DNS query to specific servers.
+      return hosts[hostname] || await dns.lookup(hostname) ||
+        await dns.resolve(hostname, {
+          rrtype: 'A',
+          servers: ['1.1.1.1:53', '8.8.8.8:53'],
+        });
+    },
+  });
+}
+```
+
+#### Requests and responses
+
+HTTP requests can be created declaratively, and sent only when needed. This allows reusing request data to send many similar requests.
+
+For example:
+```javascript
+import { Client, Request } from 'k6/x/net/http';
+
+export default async function () {
+  const client = new Client({
+    headers: { 'User-Agent': 'k6' },  // set some global headers
+  });
+  const request = new Request('https://httpbin.test.k6.io/get', {
+    // These will be merged with the Client options.
+    headers: { 'Case-Sensitive-Header': 'somevalue' },
+  });
+  const response = await client.get(request, {
+    // These will override any options for this specific submission.
+    headers: { 'Case-Sensitive-Header': 'anothervalue' },
+  });
+  const jsonData = await response.json();
+  console.log(jsonData);
+}
+```
+
+
+#### Data streaming
+
+The [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) allows streaming data that is received or sent over the network, or read from or written to the local filesystem. This enables more efficient usage of memory, as only chunks of it need to be allocated at once.
+
+This is a separate project from the HTTP API, tracked in [issue #2978](https://github.com/grafana/k6/issues/2978), and involves changes in other parts of k6. Certain HTTP API functionality, however, depends on this API being available.
+
+An example inspired by [Deno](https://deno.land/manual/examples/fetch_data#files-and-streams) of how this might work in k6:
+```javascript
+import { open } from 'k6/x/file';
+import { Client } from 'k6/x/net/http';
+
+// Will need supporting await in init context
+const file = await open('./logo.svg');  // by default assumes 'read'
+
+export default async function () {
+  const client = new Client();
+  await client.post('https://httpbin.test.k6.io/post', { body: file.readable });
+}
+```
+
+
+#### Fetch API
+
+The [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) is a convenience wrapper over existing Client, Socket and other low-level interfaces, with the benefit of being easy to use, and having sane defaults. It's a quick way to fire off some HTTP requests and get some responses, without worrying about advanced configuration.
+
+The implementation in k6 differs slightly from the web API, but we've tried to make it familiar to use wherever possible.
+
+Example:
+```
+import { fetch } from 'k6/x/net/http';
+
+export default async function () {
+  await fetch('https://httpbin.test.k6.io/get');
+  await fetch('https://httpbin.test.k6.io/post', {
+    // Supports the same options as Client.request()
+    method: 'POST',
+    headers: { 'User-Agent': 'k6' },
+    json: { name: 'k6' },
+  });
+}
+```
+
+
 ### Implementation
 
 Trying to solve all `new-http` issues with a single large and glorious change wouldn't be reasonable, so improvements will undoubtedly need to be done gradually, in several phases, and over several k6 development cycles.
@@ -154,85 +381,6 @@ At this point the extension should be relatively featureful and stable to be use
 
 As the final phase, we should add deprecation warnings when `k6/http` is used, and point users to the new API.
 Eventually, months down the line, we can consider replacing `k6/http` altogether with the new module.
-
-
-### Examples
-
-- `basic-get.js`:
-  ```javascript
-  import { fetch } from 'k6/x/net/http';
-
-  export default async function () {
-    // Creates a new default Client internally.
-    const response = await fetch('https://httpbin.test.k6.io/get');
-    const jsonData = await response.json();
-    console.log(jsonData);
-  }
-  ```
-
-- `basic-post.js`:
-  ```javascript
-  import { fetch } from 'k6/x/net/http';
-
-  export default async function () {
-    await fetch('https://httpbin.test.k6.io/post', {
-      method: 'POST',
-      json: { name: 'k6' }, // automatically adds 'Content-Type: application/json' header
-    });
-  }
-  ```
-
-- `basic-get-request.js`:
-  ```javascript
-  import { fetch, Request } from 'k6/x/net/http';
-
-  export default async function () {
-    const request = new Request('https://httpbin.test.k6.io/get', {
-      headers: { 'Case-Sensitive-Header': 'somevalue' },
-      // Other options that can also be passed directly to fetch()
-    });
-    const response = await fetch(request, {
-      // Some options that will merge with or override the options specified
-      // in the Request.
-    });
-    const jsonData = await response.json();
-    console.log(jsonData);
-  }
-  ```
-
-- `advanced-get.js`:
-  ```javascript
-  import { Client } from 'k6/x/net/http';
-
-  const client = new Client({
-    proxy: 'https://myproxy',
-    forceHTTP1: true,
-    dns: { ... },
-    // other transport options: h2c, TLS, etc.
-  });
-
-  export default async function () {
-    const response = await client.get('https://httpbin.test.k6.io/get');
-    const jsonData = await response.json();
-    console.log(jsonData);
-  }
-  ```
-
-- `advanced-post-streaming.js`:
-  ```javascript
-  import { File } from 'k6/x/file';
-  import { fetch } from 'k6/x/net/http';
-
-  // Will need supporting await in init context
-  const file = await File.open('./logo.svg');  // by default assumes 'read'
-
-  export default async function () {
-    await fetch('https://httpbin.test.k6.io/post', {
-      method: 'POST',
-      body: file.readable,
-    });
-  }
-  ```
 
 
 ## Potential risks
