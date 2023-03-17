@@ -66,8 +66,8 @@ func sharedPanic(ctx context.Context, failFunc func(rt *goja.Runtime, a ...any),
 	for _, pid := range pidder.Pids() {
 		p, err := os.FindProcess(pid)
 		if err != nil {
-			// optimistically return and don't kill the process
-			return
+			// optimistically skip and don't kill the process
+			continue
 		}
 		// no need to check the error for whether we could kill it as
 		// we're already dying.
