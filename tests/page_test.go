@@ -680,12 +680,31 @@ func TestPageURL(t *testing.T) {
 }
 
 func TestPageClose(t *testing.T) {
-	b := newTestBrowser(t, withHTTPServer())
+	t.Parallel()
 
-	p := b.NewPage(nil)
+	t.Run("page_from_browser", func(t *testing.T) {
+		t.Parallel()
 
-	err := p.Close(nil)
-	assert.NoError(t, err)
+		b := newTestBrowser(t, withHTTPServer())
+
+		p := b.NewPage(nil)
+
+		err := p.Close(nil)
+		assert.NoError(t, err)
+	})
+
+	t.Run("page_from_browserContext", func(t *testing.T) {
+		t.Parallel()
+
+		b := newTestBrowser(t, withHTTPServer())
+
+		c := b.NewContext(nil)
+		p, err := c.NewPage()
+		require.NoError(t, err)
+
+		err = p.Close(nil)
+		assert.NoError(t, err)
+	})
 }
 
 func assertExceptionContains(t *testing.T, rt *goja.Runtime, fn func(), expErrMsg string) {
