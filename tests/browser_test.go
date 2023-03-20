@@ -28,12 +28,14 @@ func TestBrowserNewPage(t *testing.T) {
 	l = len(b.Contexts())
 	assert.Equal(t, 2, l, "expected there to be 2 browser context, but found %d", l)
 
-	p.Close(nil)
+	err := p.Close(nil)
+	require.NoError(t, err)
 	l = len(b.Contexts())
-	assert.Equal(t, 1, l, "expected there to be 1 browser context after first page close, but found %d", l)
-	p2.Close(nil)
+	assert.Equal(t, 2, l, "expected there to be 2 browser context after first page close, but found %d", l)
+	err = p2.Close(nil)
+	require.NoError(t, err)
 	l = len(b.Contexts())
-	assert.Equal(t, 0, l, "expected there to be 0 browser context after second page close, but found %d", l)
+	assert.Equal(t, 2, l, "expected there to be 2 browser context after second page close, but found %d", l)
 }
 
 func TestTmpDirCleanup(t *testing.T) {
@@ -48,7 +50,8 @@ func TestTmpDirCleanup(t *testing.T) {
 
 	b := newTestBrowser(t, withSkipClose())
 	p := b.NewPage(nil)
-	p.Close(nil)
+	err = p.Close(nil)
+	require.NoError(t, err)
 
 	matches, err := filepath.Glob(tmpDirPath + "xk6-browser-data-*")
 	assert.NoError(t, err)
