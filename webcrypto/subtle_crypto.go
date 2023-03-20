@@ -178,7 +178,7 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 	copy(bytesCopy, bytes)
 
 	// 3.
-	alg, err := NormalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
+	normalized, err := normalizeAlgorithm(rt, algorithm)
 	if err != nil {
 		// "if an error occurred, return a Promise rejected with NormalizedAlgorithm"
 		reject(err)
@@ -189,7 +189,7 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 	go func() {
 		var hash hash.Hash
 
-		switch alg.NormalizedName() {
+		switch normalized.Name {
 		case Sha1:
 			hash = crypto.SHA1.New()
 		case Sha256:
@@ -200,7 +200,7 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 			hash = crypto.SHA512.New()
 		default:
 			// 7.
-			reject(NotSupportedError)
+			reject(NewError(0, NotSupportedError, "unsupported algorithm: "+normalized.Name))
 			return
 		}
 
