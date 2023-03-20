@@ -679,6 +679,15 @@ func TestPageURL(t *testing.T) {
 	assert.Regexp(t, "http://.*/get", p.URL())
 }
 
+func TestPageClose(t *testing.T) {
+	b := newTestBrowser(t, withHTTPServer())
+
+	p := b.NewPage(nil)
+
+	err := p.Close(nil)
+	assert.NoError(t, err)
+}
+
 func assertExceptionContains(t *testing.T, rt *goja.Runtime, fn func(), expErrMsg string) {
 	t.Helper()
 
