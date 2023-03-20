@@ -439,9 +439,7 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 				return nil, err //nolint:wrapcheck
 			})
 		},
-		"close": func(opts goja.Value) error {
-			return p.Close(opts) //nolint:wrapcheck
-		},
+		"close":                   p.Close,
 		"content":                 p.Content,
 		"context":                 p.Context,
 		"dblclick":                p.Dblclick,
