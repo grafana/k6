@@ -10,7 +10,7 @@ type Page interface {
 	BringToFront()
 	Check(selector string, opts goja.Value)
 	Click(selector string, opts goja.Value) error
-	Close(opts goja.Value)
+	Close(opts goja.Value) error
 	Content() string
 	Context() BrowserContext
 	Dblclick(selector string, opts goja.Value)

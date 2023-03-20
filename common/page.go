@@ -401,10 +401,27 @@ func (p *Page) Click(selector string, opts goja.Value) error {
 }
 
 // Close closes the page.
-func (p *Page) Close(opts goja.Value) {
+func (p *Page) Close(opts goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 
-	p.browserCtx.Close()
+	action := target.CloseTarget(p.targetID)
+	err := action.Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		// When a close target command is sent to the browser via CDP,
+		// the browser will start to cleanup and the first thing it
+		// will do is return a target.EventDetachedFromTarget, which in
+		// our implementation will close the connection associated to
+		// this session, which can result in the context being closed
+		// while we're waiting for the response to come back from the
+		// browser for this current command (it's racey).
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
+
+		return fmt.Errorf("closing a page: %w", err)
+	}
+
+	return nil
 }
 
 // Content returns the HTML content of the page.
