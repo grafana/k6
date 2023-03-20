@@ -410,10 +410,12 @@ func (p *Page) Close(opts goja.Value) error {
 		// When a close target command is sent to the browser via CDP,
 		// the browser will start to cleanup and the first thing it
 		// will do is return a target.EventDetachedFromTarget, which in
-		// our implementation will close the connection associated to
-		// this session, which can result in the context being closed
-		// while we're waiting for the response to come back from the
-		// browser for this current command (it's racey).
+		// our implementation will close the session connection (this
+		// does not close the CDP websocket, just removes the session
+		// so no other CDP calls can be made with the session ID).
+		// This can result in the session's context being closed while
+		// we're waiting for the response to come back from the browser
+		// for this current command (it's racey).
 		if errors.Is(err, context.Canceled) {
 			return nil
 		}
