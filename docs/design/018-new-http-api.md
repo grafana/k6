@@ -128,18 +128,19 @@ export default async function () {
 
 - IPC:
 ```javascript
-import { open } from 'k6/x/file';
+import { dialIPC } from 'k6/x/net;
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const file = await open('/tmp/unix.sock');
+  const socket = await dialIPC('/tmp/unix.sock');
+
+  console.log(socket.file.path); // /tmp/unix.sock
 
   // The HTTP client supports communicating over a Unix socket.
-  // Otherwise it can also be read from and written to directly.
   const client = new Client({
-    socket: file,
+    socket: socket,
   });
-  await client.get('http://127.0.0.1/get');
+  await client.get('http://unix/get');
 }
 ```
 
