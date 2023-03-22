@@ -152,8 +152,8 @@ func (mi *ModuleInstance) instrumentHTTP(options options) {
 	mustSetHTTPMethod("head", httpModuleObj, mi.Client.Head)
 	mustSetHTTPMethod("options", httpModuleObj, mi.Client.Options)
 	mustSetHTTPMethod("patch", httpModuleObj, mi.Client.Patch)
-	mustSetHTTPMethod("post", httpModuleObj, mi.Client.Patch)
-	mustSetHTTPMethod("put", httpModuleObj, mi.Client.Patch)
+	mustSetHTTPMethod("post", httpModuleObj, mi.Client.Post)
+	mustSetHTTPMethod("put", httpModuleObj, mi.Client.Put)
 	mustSetHTTPMethod("request", httpModuleObj, mi.Client.Request)
 	mustSetHTTPMethod("asyncRequest", httpModuleObj, mi.Client.AsyncRequest)
 }
