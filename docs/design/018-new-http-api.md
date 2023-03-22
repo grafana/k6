@@ -109,6 +109,8 @@ export default async function () {
     console.log(`received ${data}`);
     socket.close();
   });
+
+  await socket.done();
 }
 ```
 
