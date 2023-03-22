@@ -51,9 +51,9 @@ In general, the design of the API should follow these guidelines:
 
   One source of inspiration is the Go `net/http` package, which the k6 team is already familiar with. Based on this, our JS API could have similar entities:
 
-  - `Dialer`: a low-level interface for configuring TCP/IP options, such as TCP timeouts, keep-alive duration, DNS, and IP version preferences.
+  - `Dialer`: a low-level interface for configuring TCP/IP options, such as TCP timeout and keep-alive, TLS settings, DNS resolution, IP version preference, etc.
 
-  - `Transport`: interface for configuring HTTP connection options, such as proxies, TLS, HTTP version preferences, etc.
+  - `Transport`: interface for configuring HTTP connection options, such as proxies, HTTP version preferences, etc.
 
     It enables advanced behaviors like intercepting requests before they're sent to the server.
 
