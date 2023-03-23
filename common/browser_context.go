@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -63,6 +64,8 @@ func NewBrowserContext(
 	if opts != nil && len(opts.Permissions) > 0 {
 		b.GrantPermissions(opts.Permissions, nil)
 	}
+
+	b.evaluateOnNewDocumentSources = append(b.evaluateOnNewDocumentSources, js.WebVitalIIFEScript)
 
 	return &b
 }
