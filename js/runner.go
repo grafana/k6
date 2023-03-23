@@ -557,7 +557,23 @@ func (r *Runner) runPart(
 		// otherwise we have timeouted
 		return v, newTimeoutError(name, r.getTimeoutFor(name))
 	}
+
 	return v, err
+}
+
+// unPromisify gets the result of v if it is a promise, otherwise returns v
+func unPromisify(v goja.Value) goja.Value {
+	if !isNullish(v) {
+		if p, ok := v.Export().(*goja.Promise); ok {
+			return p.Result()
+		}
+	}
+
+	return v
+}
+
+func isNullish(v goja.Value) bool {
+	return v == nil || goja.IsUndefined(v) || goja.IsNull(v)
 }
 
 // getTimeoutFor returns the timeout duration for given special script function.
@@ -825,6 +841,8 @@ func (u *VU) runFn(
 	u.state.Samples <- u.Dialer.GetTrail(
 		startTime, endTime, isFullIteration,
 		isDefault, u.state.Tags.GetCurrentValues(), u.Runner.preInitState.BuiltinMetrics)
+
+	v = unPromisify(v)
 
 	return v, isFullIteration, endTime.Sub(startTime), err
 }
