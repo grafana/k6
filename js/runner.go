@@ -567,7 +567,7 @@ var gojaPromiseType = reflect.TypeOf((*goja.Promise)(nil))
 
 // unPromisify gets the result of v if it is a promise, otherwise returns v
 func unPromisify(v goja.Value) goja.Value {
-	if !isNullish(v) {
+	if !common.IsNullish(v) {
 		if v.ExportType() == gojaPromiseType {
 			p, ok := v.Export().(*goja.Promise)
 			if !ok {
@@ -578,10 +578,6 @@ func unPromisify(v goja.Value) goja.Value {
 	}
 
 	return v
-}
-
-func isNullish(v goja.Value) bool {
-	return v == nil || goja.IsUndefined(v) || goja.IsNull(v)
 }
 
 // getTimeoutFor returns the timeout duration for given special script function.

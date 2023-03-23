@@ -89,7 +89,7 @@ func (mi *K6) RandomSeed(seed int64) {
 }
 
 func isAsyncFunction(rt *goja.Runtime, val goja.Value) bool {
-	if isNullish(val) {
+	if common.IsNullish(val) {
 		return false
 	}
 	return val.ToObject(rt).Get("constructor").ToObject(rt).Get("name").String() == "AsyncFunction"
@@ -102,7 +102,7 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 		return nil, ErrGroupInInitContext
 	}
 
-	if isNullish(val) {
+	if common.IsNullish(val) {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
 	fn, ok := goja.AssertFunction(val)
@@ -152,10 +152,6 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 	})
 
 	return ret, err
-}
-
-func isNullish(val goja.Value) bool {
-	return val == nil || goja.IsNull(val) || goja.IsUndefined(val)
 }
 
 // Check will emit check metrics for the provided checks.

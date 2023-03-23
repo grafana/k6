@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 )
 
 // options are the options that can be passed to the
@@ -37,7 +38,7 @@ func newOptions(rt *goja.Runtime, from goja.Value) (options, error) {
 	}
 
 	fromSamplingValue := from.ToObject(rt).Get("sampling")
-	if fromSamplingValue == nil || isNullish(fromSamplingValue) {
+	if fromSamplingValue == nil || common.IsNullish(fromSamplingValue) {
 		opts.Sampling = defaultSamplingRate
 	}
 

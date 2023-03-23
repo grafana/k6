@@ -85,3 +85,8 @@ func RunWithPanicCatching(logger logrus.FieldLogger, rt *goja.Runtime, fn func()
 
 	return fn()
 }
+
+// IsNullish checks if the given value is nullish, i.e. nil, undefined or null.
+func IsNullish(v goja.Value) bool {
+	return v == nil || goja.IsUndefined(v) || goja.IsNull(v)
+}

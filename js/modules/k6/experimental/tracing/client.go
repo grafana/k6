@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	httpmodule "go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/metrics"
@@ -242,7 +243,7 @@ func (c *Client) instrumentArguments(traceContext http.Header, args ...goja.Valu
 		// We received both a body and a params argument. In the
 		// event params would be nullish, we'll instantiate
 		// a new object.
-		if isNullish(args[1]) {
+		if common.IsNullish(args[1]) {
 			paramsObj = rt.NewObject()
 			args[1] = paramsObj
 		} else {
@@ -259,7 +260,7 @@ func (c *Client) instrumentArguments(traceContext http.Header, args ...goja.Valu
 	headersObj := rt.NewObject()
 
 	headersValue := paramsObj.Get("headers")
-	if !isNullish(headersValue) {
+	if !common.IsNullish(headersValue) {
 		headersObj = headersValue.ToObject(rt)
 	}
 
