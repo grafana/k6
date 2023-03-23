@@ -121,6 +121,16 @@ func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) error 
 	return nil
 }
 
+func (b *BrowserContext) applyAllInitScripts(p *Page) error {
+	for _, source := range b.evaluateOnNewDocumentSources {
+		if err := p.evaluateOnNewDocument(source); err != nil {
+			return fmt.Errorf("adding init script to browser context: %w", err)
+		}
+	}
+
+	return nil
+}
+
 // Browser returns the browser instance that this browser context belongs to.
 func (b *BrowserContext) Browser() api.Browser {
 	return b.browser

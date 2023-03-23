@@ -135,6 +135,10 @@ func NewPage(
 		return nil, fmt.Errorf("internal error while auto attaching to browser pages: %w", err)
 	}
 
+	if err := bctx.applyAllInitScripts(&p); err != nil {
+		return nil, fmt.Errorf("internal error while applying init scripts to page: %w", err)
+	}
+
 	return &p, nil
 }
 
