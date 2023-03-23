@@ -67,9 +67,13 @@ func NewBrowserContext(
 
 	rt := b.vu.Runtime()
 	wv := rt.ToValue(js.WebVitalIIFEScript)
+	wvi := rt.ToValue(js.WebVitalInitScript)
 
 	if err := b.AddInitScript(wv, nil); err != nil {
 		return nil, fmt.Errorf("adding web vital script to new browser context: %w", err)
+	}
+	if err := b.AddInitScript(wvi, nil); err != nil {
+		return nil, fmt.Errorf("adding web vital init script to new browser context: %w", err)
 	}
 
 	return &b, nil

@@ -10,3 +10,10 @@ import (
 //
 //go:embed web_vital_iife.js
 var WebVitalIIFEScript string
+
+// WebVitalInitScript uses WebVitalIIFEScript
+// and applies it to the current website that
+// this init script is used against.
+//
+//go:embed web_vital_init.js
+var WebVitalInitScript string
