@@ -7,7 +7,7 @@ import (
 // BrowserContext is the public interface of a CDP browser context.
 type BrowserContext interface {
 	AddCookies(cookies goja.Value)
-	AddInitScript(script goja.Value, arg goja.Value)
+	AddInitScript(script goja.Value, arg goja.Value) error
 	Browser() Browser
 	ClearCookies()
 	ClearPermissions()

@@ -168,8 +168,8 @@ func (p *Page) didCrash() {
 	p.emit(EventPageCrash, p)
 }
 
-func (p *Page) evaluateOnNewDocument(source string) {
-	// TODO: implement
+func (p *Page) evaluateOnNewDocument(source string) error {
+	return nil
 }
 
 func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
