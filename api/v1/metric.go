@@ -74,18 +74,18 @@ func NewMetric(m *metrics.Metric, t time.Duration) Metric {
 	switch sink := m.Sink.(type) {
 	case *metrics.CounterSink:
 		data.Sample = map[string]float64{
-			"count": sink.Value,
+			"count": sink.LastValue(),
 			"rate":  sink.Rate(t),
 		}
 	case *metrics.GaugeSink:
-		data.Sample = map[string]float64{"value": sink.Value}
+		data.Sample = map[string]float64{"value": sink.LastValue()}
 	case *metrics.RateSink:
 		data.Sample = map[string]float64{"rate": sink.Rate()}
 	case *metrics.TrendSink:
 		data.Sample = map[string]float64{
-			"min":   sink.Min,
-			"max":   sink.Max,
-			"avg":   sink.Avg,
+			"min":   sink.Min(),
+			"max":   sink.Max(),
+			"avg":   sink.Avg(),
 			"med":   sink.P(0.5),
 			"p(90)": sink.P(0.90),
 			"p(95)": sink.P(0.95),

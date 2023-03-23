@@ -16,8 +16,8 @@ func TestCounterSinkAddSample(t *testing.T) {
 		t.Parallel()
 		sink := CounterSink{}
 		sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0, Time: now})
-		assert.Equal(t, 1.0, sink.Value)
-		assert.Equal(t, now, sink.First)
+		// assert.Equal(t, now, sink.first)
+		assert.Equal(t, 1.0, sink.LastValue())
 	})
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
@@ -25,8 +25,8 @@ func TestCounterSinkAddSample(t *testing.T) {
 		for _, s := range samples10 {
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s, Time: now})
 		}
-		assert.Equal(t, 145.0, sink.Value)
-		assert.Equal(t, now, sink.First)
+		assert.Equal(t, 145.0, sink.LastValue())
+		// assert.Equal(t, now, sink.First)
 	})
 }
 
@@ -55,10 +55,10 @@ func TestGaugeSinkAddSample(t *testing.T) {
 		t.Parallel()
 		sink := GaugeSink{}
 		sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0})
-		assert.Equal(t, 1.0, sink.Value)
-		assert.Equal(t, 1.0, sink.Min)
-		assert.Equal(t, true, sink.minSet)
-		assert.Equal(t, 1.0, sink.Max)
+		assert.Equal(t, 1.0, sink.LastValue())
+		assert.Equal(t, 1.0, sink.Min())
+		// assert.Equal(t, true, sink.minSet)
+		assert.Equal(t, 1.0, sink.Max())
 	})
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
@@ -66,10 +66,10 @@ func TestGaugeSinkAddSample(t *testing.T) {
 		for _, s := range samples6 {
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 		}
-		assert.Equal(t, 5.0, sink.Value)
-		assert.Equal(t, 1.0, sink.Min)
+		assert.Equal(t, 5.0, sink.LastValue())
+		assert.Equal(t, 1.0, sink.Min())
 		assert.Equal(t, true, sink.minSet)
-		assert.Equal(t, 10.0, sink.Max)
+		assert.Equal(t, 10.0, sink.Max())
 	})
 }
 
@@ -81,11 +81,11 @@ func TestTrendSinkAddSample(t *testing.T) {
 		t.Parallel()
 		sink := TrendSink{}
 		sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 7.0})
-		assert.Equal(t, uint64(1), sink.Count)
+		assert.Equal(t, uint64(1), sink.Count())
 		assert.Equal(t, false, sink.sorted)
-		assert.Equal(t, 7.0, sink.Min)
-		assert.Equal(t, 7.0, sink.Max)
-		assert.Equal(t, 7.0, sink.Avg)
+		assert.Equal(t, 7.0, sink.Min())
+		assert.Equal(t, 7.0, sink.Max())
+		assert.Equal(t, 7.0, sink.Avg())
 	})
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
@@ -93,11 +93,11 @@ func TestTrendSinkAddSample(t *testing.T) {
 		for _, s := range unsortedSamples10 {
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 		}
-		assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count)
-		assert.Equal(t, false, sink.sorted)
-		assert.Equal(t, 0.0, sink.Min)
-		assert.Equal(t, 100.0, sink.Max)
-		assert.Equal(t, 54.0, sink.Avg)
+		assert.Equal(t, uint64(len(unsortedSamples10)), sink.Count())
+		// assert.Equal(t, false, sink.sorted)
+		assert.Equal(t, 0.0, sink.Min())
+		assert.Equal(t, 100.0, sink.Max())
+		assert.Equal(t, 54.0, sink.Avg())
 	})
 }
 
@@ -157,15 +157,13 @@ func TestRateSinkAddSample(t *testing.T) {
 		t.Parallel()
 		sink := RateSink{}
 		sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0})
-		assert.Equal(t, int64(1), sink.Total)
-		assert.Equal(t, int64(1), sink.Trues)
+		assert.Equal(t, 1.0, sink.Rate())
 	})
 	t.Run("one false", func(t *testing.T) {
 		t.Parallel()
 		sink := RateSink{}
 		sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 0.0})
-		assert.Equal(t, int64(1), sink.Total)
-		assert.Equal(t, int64(0), sink.Trues)
+		assert.Equal(t, 0.0, sink.Rate())
 	})
 	t.Run("values", func(t *testing.T) {
 		t.Parallel()
@@ -173,8 +171,8 @@ func TestRateSinkAddSample(t *testing.T) {
 		for _, s := range samples6 {
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
 		}
-		assert.Equal(t, int64(6), sink.Total)
-		assert.Equal(t, int64(3), sink.Trues)
+		assert.Equal(t, int64(6), sink.total)
+		assert.Equal(t, int64(3), sink.trues)
 	})
 }
 

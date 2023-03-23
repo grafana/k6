@@ -14,6 +14,7 @@ import (
 )
 
 // Copied from https://github.com/k6io/jslib.k6.io/tree/master/lib/k6-summary
+//
 //go:embed summary.js
 var jslibSummaryCode string //nolint:gochecknoglobals
 
@@ -32,24 +33,20 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 		switch sink := sink.(type) {
 		case *metrics.CounterSink:
 			result = map[string]float64{
-				"count": sink.Value,
+				"count": sink.LastValue(),
 			}
-			rate := 0.0
-			if t > 0 {
-				rate = sink.Rate(t)
-			}
-			result["rate"] = rate
+			result["rate"] = sink.Rate(t)
 		case *metrics.GaugeSink:
 			result = map[string]float64{
-				"value": sink.Value,
-				"min":   sink.Min,
-				"max":   sink.Max,
+				"value": sink.LastValue(),
+				"min":   sink.Min(),
+				"max":   sink.Max(),
 			}
 		case *metrics.RateSink:
 			result = map[string]float64{
 				"rate":   sink.Rate(),
-				"passes": float64(sink.Trues),
-				"fails":  float64(sink.Total - sink.Trues),
+				"passes": float64(sink.NotZero()),
+				"fails":  float64(sink.Count() - sink.NotZero()),
 			}
 		case *metrics.TrendSink:
 			result = make(map[string]float64, len(summaryTrendStats))

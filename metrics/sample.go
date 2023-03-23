@@ -140,11 +140,11 @@ func PushIfNotDone(ctx context.Context, output chan<- SampleContainer, sample Sa
 // the summary output and then returns a map of the corresponding resolvers.
 func GetResolversForTrendColumns(trendColumns []string) (map[string]func(s *TrendSink) float64, error) {
 	staticResolvers := map[string]func(s *TrendSink) float64{
-		"avg":   func(s *TrendSink) float64 { return s.Avg },
-		"min":   func(s *TrendSink) float64 { return s.Min },
+		"avg":   func(s *TrendSink) float64 { return s.Avg() },
+		"min":   func(s *TrendSink) float64 { return s.Min() },
 		"med":   func(s *TrendSink) float64 { return s.P(0.5) },
-		"max":   func(s *TrendSink) float64 { return s.Max },
-		"count": func(s *TrendSink) float64 { return float64(s.Count) },
+		"max":   func(s *TrendSink) float64 { return s.Max() },
+		"count": func(s *TrendSink) float64 { return float64(s.Count()) },
 	}
 	dynamicResolver := func(percentile float64) func(s *TrendSink) float64 {
 		return func(s *TrendSink) float64 {

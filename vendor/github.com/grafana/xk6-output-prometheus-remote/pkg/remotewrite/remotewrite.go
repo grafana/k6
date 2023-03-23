@@ -170,7 +170,7 @@ func (o *Output) setTrendStatsResolver(trendStats []string) error {
 	// it adds it specifically
 	if hasSum {
 		resolvers["sum"] = func(t *metrics.TrendSink) float64 {
-			return t.Sum
+			return t.Sum()
 		}
 	}
 	o.trendStatsResolver = make(TrendStatsResolver, len(resolvers))
@@ -329,12 +329,12 @@ func (swm seriesWithMeasure) MapPrompb() []*prompb.TimeSeries {
 	switch swm.Metric.Type {
 	case metrics.Counter:
 		ts := mapMonoSeries(swm.TimeSeries, "total", swm.Latest)
-		ts.Samples[0].Value = swm.Measure.(*metrics.CounterSink).Value
+		ts.Samples[0].Value = swm.Measure.(*metrics.CounterSink).LastValue()
 		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Gauge:
 		ts := mapMonoSeries(swm.TimeSeries, "", swm.Latest)
-		ts.Samples[0].Value = swm.Measure.(*metrics.GaugeSink).Value
+		ts.Samples[0].Value = swm.Measure.(*metrics.GaugeSink).LastValue()
 		newts = []*prompb.TimeSeries{&ts}
 
 	case metrics.Rate:
