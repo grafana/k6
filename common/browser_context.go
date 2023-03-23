@@ -88,7 +88,7 @@ func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) {
 	rt := b.vu.Runtime()
 
 	source := ""
-	if script != nil && !goja.IsUndefined(script) && !goja.IsNull(script) {
+	if gojaValueExists(script) {
 		switch script.ExportType() {
 		case reflect.TypeOf(string("")):
 			source = script.String()
