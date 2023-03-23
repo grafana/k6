@@ -169,7 +169,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	)
 
 	tb := newTestBrowser(t, withFileServer())
-	bc := tb.NewContext(
+	bc, err := tb.NewContext(
 		tb.toGojaValue(struct {
 			Viewport common.Viewport `js:"viewport"`
 		}{
@@ -179,6 +179,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 			},
 		}),
 	)
+	require.NoError(t, err)
 	p, err := bc.NewPage()
 	require.NoError(t, err)
 
@@ -202,7 +203,9 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 func TestElementHandleNonClickable(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
 
-	p, err := tb.NewContext(nil).NewPage()
+	bctx, err := tb.NewContext(nil)
+	require.NoError(t, err)
+	p, err := bctx.NewPage()
 	require.NoError(t, err)
 
 	resp, err := p.Goto(tb.staticURL("/non_clickable.html"), nil)

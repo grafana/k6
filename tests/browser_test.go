@@ -190,7 +190,9 @@ func TestMultiBrowserPanic(t *testing.T) {
 		b1 = newTestBrowser(t)
 		b2 = newTestBrowser(t)
 
-		p1, err := b1.NewContext(nil).NewPage()
+		bctx, err := b1.NewContext(nil)
+		require.NoError(t, err)
+		p1, err := bctx.NewPage()
 		require.NoError(t, err, "failed to create page #1")
 
 		func() {

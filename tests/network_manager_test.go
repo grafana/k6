@@ -79,7 +79,7 @@ func TestBasicAuth(t *testing.T) {
 	auth := func(tb testing.TB, user, pass string) api.Response {
 		tb.Helper()
 
-		bc := browser.NewContext(
+		bc, err := browser.NewContext(
 			browser.toGojaValue(struct {
 				HttpCredentials *common.Credentials `js:"httpCredentials"` //nolint:revive
 			}{
@@ -88,6 +88,7 @@ func TestBasicAuth(t *testing.T) {
 					Password: pass,
 				},
 			}))
+		require.NoError(t, err)
 		p, err := bc.NewPage()
 		require.NoError(t, err)
 

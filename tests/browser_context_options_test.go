@@ -47,7 +47,7 @@ func TestBrowserContextOptionsDefaultViewport(t *testing.T) {
 
 func TestBrowserContextOptionsSetViewport(t *testing.T) {
 	tb := newTestBrowser(t)
-	bctx := tb.NewContext(tb.toGojaValue(struct {
+	bctx, err := tb.NewContext(tb.toGojaValue(struct {
 		Viewport common.Viewport `js:"viewport"`
 	}{
 		Viewport: common.Viewport{
@@ -55,6 +55,7 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 			Height: 600,
 		},
 	}))
+	require.NoError(t, err)
 	t.Cleanup(bctx.Close)
 	p, err := bctx.NewPage()
 	require.NoError(t, err)
@@ -66,13 +67,14 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 
 func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 	tb := newTestBrowser(t, withHTTPServer())
-	bctx := tb.NewContext(tb.toGojaValue(struct {
+	bctx, err := tb.NewContext(tb.toGojaValue(struct {
 		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
 	}{
 		ExtraHTTPHeaders: map[string]string{
 			"Some-Header": "Some-Value",
 		},
 	}))
+	require.NoError(t, err)
 	t.Cleanup(bctx.Close)
 	p, err := bctx.NewPage()
 	require.NoError(t, err)

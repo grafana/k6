@@ -121,7 +121,10 @@ func (b *Browser) connect() error {
 	b.conn = conn
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
-	b.defaultContext = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
+	b.defaultContext, err = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
+	if err != nil {
+		return fmt.Errorf("browser connect: %w", err)
+	}
 
 	return b.initEvents()
 }
@@ -475,7 +478,7 @@ func (b *Browser) IsConnected() bool {
 }
 
 // NewContext creates a new incognito-like browser context.
-func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
+func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
@@ -490,15 +493,22 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 
 	b.contextsMu.Lock()
 	defer b.contextsMu.Unlock()
-	browserCtx := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	if err != nil {
+		return nil, fmt.Errorf("new context: %w", err)
+	}
 	b.contexts[browserContextID] = browserCtx
 
-	return browserCtx
+	return browserCtx, nil
 }
 
 // NewPage creates a new tab in the browser window.
 func (b *Browser) NewPage(opts goja.Value) (api.Page, error) {
-	browserCtx := b.NewContext(opts)
+	browserCtx, err := b.NewContext(opts)
+	if err != nil {
+		return nil, fmt.Errorf("new page: %w", err)
+	}
+
 	return browserCtx.NewPage()
 }
 

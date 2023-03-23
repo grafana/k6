@@ -49,7 +49,7 @@ type BrowserContext struct {
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(
 	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *log.Logger,
-) *BrowserContext {
+) (*BrowserContext, error) {
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -67,7 +67,7 @@ func NewBrowserContext(
 
 	b.evaluateOnNewDocumentSources = append(b.evaluateOnNewDocumentSources, js.WebVitalIIFEScript)
 
-	return &b
+	return &b, nil
 }
 
 // AddCookies adds cookies into this browser context.

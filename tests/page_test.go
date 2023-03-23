@@ -698,7 +698,8 @@ func TestPageClose(t *testing.T) {
 
 		b := newTestBrowser(t, withHTTPServer())
 
-		c := b.NewContext(nil)
+		c, err := b.NewContext(nil)
+		require.NoError(t, err)
 		p, err := c.NewPage()
 		require.NoError(t, err)
 

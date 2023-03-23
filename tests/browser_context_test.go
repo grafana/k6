@@ -20,7 +20,8 @@ func TestBrowserContextAddCookies(t *testing.T) {
 		testCookieName := "test_cookie_name"
 		testCookieValue := "test_cookie_value"
 
-		bc := tb.NewContext(nil)
+		bc, err := tb.NewContext(nil)
+		require.NoError(t, err)
 		cookies, err := tb.runJavaScript(`
 			[
 				{
@@ -178,7 +179,8 @@ func TestBrowserContextAddCookies(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			bc := tb.NewContext(nil)
+			bc, err := tb.NewContext(nil)
+			require.NoError(t, err)
 
 			if tt.shouldPanic {
 				assert.Panics(t, func() { bc.AddCookies(cookies) })
