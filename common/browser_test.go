@@ -11,6 +11,8 @@ import (
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 	"github.com/grafana/xk6-browser/log"
 )
 
@@ -27,6 +29,8 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		b := newBrowser(ctx, cancel, nil, NewLaunchOptions(), logger)
 		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
 		var err error
+		vu := k6test.NewVU(t)
+		ctx = k6ext.WithVU(ctx, vu)
 		b.contexts[id], err = NewBrowserContext(ctx, b, id, nil, nil)
 		require.NoError(t, err)
 		return &testCase{

@@ -65,7 +65,12 @@ func NewBrowserContext(
 		b.GrantPermissions(opts.Permissions, nil)
 	}
 
-	b.evaluateOnNewDocumentSources = append(b.evaluateOnNewDocumentSources, js.WebVitalIIFEScript)
+	rt := b.vu.Runtime()
+	wv := rt.ToValue(js.WebVitalIIFEScript)
+
+	if err := b.AddInitScript(wv, nil); err != nil {
+		return nil, fmt.Errorf("adding web vital script to new browser context: %w", err)
+	}
 
 	return &b, nil
 }
