@@ -10,6 +10,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/cookiejar"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -561,10 +562,17 @@ func (r *Runner) runPart(
 	return v, err
 }
 
+//nolint:gochecknoglobals
+var gojaPromiseType = reflect.TypeOf((*goja.Promise)(nil))
+
 // unPromisify gets the result of v if it is a promise, otherwise returns v
 func unPromisify(v goja.Value) goja.Value {
 	if !isNullish(v) {
-		if p, ok := v.Export().(*goja.Promise); ok {
+		if v.ExportType() == gojaPromiseType {
+			p, ok := v.Export().(*goja.Promise)
+			if !ok {
+				panic("Something that was promise did not export to a promise; this shouldn't happen")
+			}
 			return p.Result()
 		}
 	}
