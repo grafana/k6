@@ -542,6 +542,26 @@ func TestSetupDataNoReturn(t *testing.T) {
 	};`)
 }
 
+func TestSetupDataPromise(t *testing.T) {
+	t.Parallel()
+	testSetupDataHelper(t, `
+	exports.options = { setupTimeout: "1s", teardownTimeout: "1s" };
+	exports.setup = async function() {
+        return await Promise.resolve({"data": "correct"})
+    }
+	exports.default = function(data) {
+		if (data.data !== "correct") {
+			throw new Error("default: wrong data: " + JSON.stringify(data))
+		}
+	};
+
+	exports.teardown = function(data) {
+		if (data.data !== "correct") {
+			throw new Error("teardown: wrong data: " + JSON.stringify(data))
+		}
+	};`)
+}
+
 func TestRunnerIntegrationImports(t *testing.T) {
 	t.Parallel()
 	t.Run("Modules", func(t *testing.T) {

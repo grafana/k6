@@ -619,6 +619,29 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
 }
 
+func TestRawHandleSummaryPromise(t *testing.T) {
+	t.Parallel()
+	runner, err := getSimpleRunner(
+		t, "/script.js",
+		`
+		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.default = function() { /* we don't run this, metrics are mocked */ };
+		exports.handleSummary = async function(data) {
+            return await Promise.resolve({'dataWithSetup.json': JSON.stringify(data)});
+		};
+		`,
+	)
+	require.NoError(t, err)
+	runner.SetSetupData([]byte("5"))
+
+	summary := createTestSummary(t)
+	result, err := runner.HandleSummary(context.Background(), summary)
+	require.NoError(t, err)
+	dataWithSetup, err := ioutil.ReadAll(result["dataWithSetup.json"])
+	require.NoError(t, err)
+	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
+}
+
 func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 	t.Parallel()
 	testCases := []string{"{}", `"foo"`, "null", "undefined", "123"}
