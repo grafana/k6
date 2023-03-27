@@ -372,15 +372,57 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 //     `ALGORITHM` is the name of the algorithm.
 //   - for PBKDF2: pass the string "PBKDF2"
 //   - for HKDF: pass the string "HKDF"
+//
+// TODO @oleiade: implement support for JWK format
 func (sc *SubtleCrypto) ImportKey(
 	format KeyFormat,
-	keyData []byte,
+	keyData goja.Value,
 	algorithm goja.Value,
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) *goja.Promise {
-	// TODO: implementation
-	return nil
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	keyBytes, err := exportArrayBuffer(rt, keyData)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 3.
+	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierImportKey)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 5.
+	go func() {
+		switch normalized.Name {
+		case AESCbc, AESCtr, AESGcm:
+			// 8.
+			result, err := importAESKey(format, normalized, keyBytes, keyUsages)
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			// 9.
+			if (result.Type == SecretCryptoKeyType || result.Type == PrivateCryptoKeyType) && len(keyUsages) == 0 {
+				reject(NewError(0, SyntaxError, "the keyUsages argument must contain at least one valid usage for the algorithm"))
+				return
+			}
+
+			// 10. 11.
+			result.Extractable = extractable
+			result.Usages = keyUsages
+
+			resolve(result)
+		}
+	}()
+
+	return promise
 }
 
 // ExportKey exports a key: that is, it takes as input a CryptoKey object and gives

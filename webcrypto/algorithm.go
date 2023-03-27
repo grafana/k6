@@ -176,11 +176,9 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		isSha512 := algorithmName == Sha512
 		return isSha1 || isSha256 || isSha384 || isSha512
 	case OperationIdentifierGenerateKey:
-		isAesCbc := algorithmName == AESCbc
-		isAesCtr := algorithmName == AESCtr
-		isAesGcm := algorithmName == AESGcm
-		isAesKw := algorithmName == AESKw
 		return isAesCbc || isAesCtr || isAesGcm || isAesKw
+	case OperationIdentifierExportKey, OperationIdentifierImportKey:
+		return isAesCbc || isAesCtr || isAesGcm
 	default:
 		return false
 	}

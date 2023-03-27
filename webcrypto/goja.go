@@ -2,6 +2,33 @@ package webcrypto
 
 import "github.com/dop251/goja"
 
+// exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
+// and returns the underlying byte slice.
+func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
+	if isNullish(v) {
+		return nil, NewError(0, TypeError, "data is null or undefined")
+	}
+
+	asObject := v.ToObject(rt)
+
+	var ab goja.ArrayBuffer
+	var ok bool
+
+	if IsTypedArray(rt, v) {
+		ab, ok = asObject.Get("buffer").Export().(goja.ArrayBuffer)
+		if !ok {
+			return nil, NewError(0, TypeError, "TypedArray.buffer is not an ArrayBuffer")
+		}
+	} else {
+		ab, ok = asObject.Export().(goja.ArrayBuffer)
+		if !ok {
+			return nil, NewError(0, OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
+		}
+	}
+
+	return ab.Bytes(), nil
+}
+
 // IsInstanceOf returns true if the given value is an instance of the given constructor
 // This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
 func IsInstanceOf(rt *goja.Runtime, v goja.Value, instanceOf ...JSType) bool {
@@ -81,6 +108,12 @@ const (
 	// BigUint64ArrayConstructor is the name of the BigUint64ArrayConstructor constructor
 	BigUint64ArrayConstructor = "BigUint64Array"
 )
+
+// IsNullish checks if the given value is nullish, i.e. nil, undefined or null.
+// FIXME @oleiade: this declaration can be removed once the k6 version including it is released
+func isNullish(v goja.Value) bool {
+	return v == nil || goja.IsUndefined(v) || goja.IsNull(v)
+}
 
 // makeHandledPromise will create a promise and return its resolve and reject methods,
 // wrapped in such a way that it will block the eventloop from exiting before they are
