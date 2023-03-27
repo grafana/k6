@@ -31,7 +31,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PEDF09670F151C95C"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -225,7 +225,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "k6_http_reqs_total",
@@ -237,7 +237,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum(k6_http_reqs_total{})",
@@ -250,7 +250,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_seconds{expected_response=\"true\"}[$__range])))",
@@ -263,7 +263,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum(irate(k6_http_reqs_total{}[$__range]))",
@@ -276,7 +276,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum (k6_http_reqs_total{expected_response=\"false\"})",
