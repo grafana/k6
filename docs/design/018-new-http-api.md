@@ -21,7 +21,14 @@ The list of issues with the current API is too long to mention in this document,
 
 ### Design
 
-In general, the design of the API should follow these guidelines:
+HTTP is an application-layer protocol that is built upon lower level transport protocols, such as TCP, UDP, or local IPC mechanisms in most operating systems. It's also closely related to the DNS protocol, which all browsers use when resolving a host name before establishing an HTTP connection. As such, we can't implement a flexible and modern HTTP API without exposing APIs for these lower level protocols. In fact, some user requested functionality would be difficult, if not impossible, without access to these APIs (e.g. issues [#1393](https://github.com/grafana/k6/issues/1393), [#1098](https://github.com/grafana/k6/issues/1098), [#2510](https://github.com/grafana/k6/issues/2510), [#857](https://github.com/grafana/k6/issues/857), [#2366](https://github.com/grafana/k6/issues/2366)).
+
+In this sense, we propose designing the HTTP API in such a way that it's built _on top_ of these lower level APIs. By making our networking namespace composable in this way, we open the door for other application-layer protocols to be implemented using the same low level primitives. For example, WebSockets could be implemented on top of the TCP API, gRPC on top of the HTTP/2 API, and so on.
+
+This approach also follows other modern JavaScript runtimes such as Node and Deno, which ensures we're building a familiar and extensible API, instead of a purpose-built library just for HTTP and unique to k6.
+
+
+With that said, the design of the API should follow these guidelines:
 
 - It should be familiar to users of HTTP APIs from other JS runtimes, and easy for new users to pick up.
 
