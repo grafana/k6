@@ -397,9 +397,63 @@ func (sc *SubtleCrypto) ImportKey(
 //
 // The `format` parameter identifies the format of the key data.
 // The `key` parameter is the key to export, as a CryptoKey object.
+//
+// TODO @oleiade: implement support for JWK format
 func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promise {
-	// TODO
-	return nil
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	var algorithm Algorithm
+	algValue := key.ToObject(rt).Get("algorithm")
+	if err := rt.ExportTo(algValue, &algorithm); err != nil {
+		reject(NewError(0, SyntaxError, "key is not a valid CryptoKey"))
+		return promise
+	}
+
+	ck, ok := key.Export().(*CryptoKey)
+	if !ok {
+		reject(NewError(0, ImplementationError, "unable to extract CryptoKey"))
+		return promise
+	}
+
+	keyAlgorithmName := key.ToObject(rt).Get("algorithm").ToObject(rt).Get("name").String()
+	if algorithm.Name != keyAlgorithmName {
+		reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+		return promise
+	}
+
+	go func() {
+		// 5.
+		if !isRegisteredAlgorithm(algorithm.Name, OperationIdentifierExportKey) {
+			reject(NewError(0, NotSupportedError, "unsupported algorithm "+algorithm.Name))
+			return
+		}
+
+		// 6.
+		if !ck.Extractable {
+			reject(NewError(0, InvalidAccessError, "the key is not extractable"))
+			return
+		}
+
+		var result []byte
+		var err error
+
+		switch keyAlgorithmName {
+		case AESCbc, AESCtr, AESGcm:
+			result, err = exportAESKey(ck, format)
+			if err != nil {
+				reject(err)
+				return
+			}
+		default:
+			reject(NewError(0, NotSupportedError, "unsupported algorithm "+keyAlgorithmName))
+			return
+		}
+
+		resolve(rt.NewArrayBuffer(result))
+	}()
+
+	return promise
 }
 
 // WrapKey  "wraps" a key.

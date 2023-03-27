@@ -163,6 +163,11 @@ func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) 
 //
 // [algorithm normalization]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
 func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
+	isAesCbc := algorithmName == AESCbc
+	isAesCtr := algorithmName == AESCtr
+	isAesGcm := algorithmName == AESGcm
+	isAesKw := algorithmName == AESKw
+
 	switch forOperation {
 	case OperationIdentifierDigest:
 		isSha1 := algorithmName == Sha1

@@ -79,3 +79,30 @@ type AesKeyAlgorithm struct {
 
 	Length int64 `json:"length"`
 }
+
+// exportAESKey exports an AES key to its raw representation.
+//
+// TODO @oleiade: support JWK format.
+func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
+	if !key.Extractable {
+		return nil, NewError(0, InvalidAccessError, "the key is not extractable")
+	}
+
+	// 1.
+	if key.handle == nil {
+		return nil, NewError(0, OperationError, "the key is not valid, no data")
+	}
+
+	switch format {
+	case RawKeyFormat:
+		handle, ok := key.handle.([]byte)
+		if !ok {
+			return nil, NewError(0, ImplementationError, "exporting key data's bytes failed")
+		}
+
+		return handle, nil
+	default:
+		// FIXME: note that we do not support JWK format, yet.
+		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+	}
+}
