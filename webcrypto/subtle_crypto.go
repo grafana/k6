@@ -178,7 +178,7 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 	copy(bytesCopy, bytes)
 
 	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm)
+	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
 	if err != nil {
 		// "if an error occurred, return a Promise rejected with NormalizedAlgorithm"
 		reject(err)
@@ -234,8 +234,51 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
 func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyUsages []CryptoKeyUsage) *goja.Promise {
-	// TODO: implementation
-	return nil
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	normalized, err := normalizeAlgorithm(sc.vu.Runtime(), algorithm, OperationIdentifierGenerateKey)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// We extract the length attribute from the algorithm object, as it's not
+	// part of the normalized algorithm, and as accessing the runtime from the
+	// callback below could lead to a race condition.
+	algorithmLength := algorithm.ToObject(sc.vu.Runtime()).Get("length").ToInteger()
+
+	go func() {
+		switch normalized.Name {
+		case AESCbc, AESCtr, AESGcm, AESKw:
+			params := &AesKeyGenParams{
+				Algorithm: normalized,
+				Length:    algorithmLength,
+			}
+
+			cryptoKey, err := params.GenerateKey(extractable, keyUsages)
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			// 8.
+			isSecretKey := cryptoKey.Type == SecretCryptoKeyType
+			isPrivateKey := cryptoKey.Type == PrivateCryptoKeyType
+			isUsagesEmpty := len(cryptoKey.Usages) == 0
+			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+				reject(NewError(0, SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
+				return
+			}
+
+			resolve(cryptoKey)
+			return
+		default:
+			reject(NewError(0, NotSupportedError, "unsupported algorithm: "+normalized.Name))
+			return
+		}
+	}()
+
+	return promise
 }
 
 // DeriveKey can be used to derive a secret key from a master key.
