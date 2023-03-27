@@ -8,6 +8,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -273,6 +274,69 @@ func (fs *FrameSession) onEventBindingCalled(event *cdpruntime.EventBindingCalle
 	fs.logger.Debugf("FrameSessions:onEventBindingCalled",
 		"sid:%v tid:%v name:%s payload:%s",
 		fs.session.ID(), fs.targetID, event.Name, event.Payload)
+
+	err := fs.parseAndEmitWebVitalMetric(event.Payload)
+	if err != nil {
+		fs.logger.Errorf("FrameSession:onEventBindingCalled", "failed to emit web vital metric: %v", err)
+	}
+}
+
+func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
+	fs.logger.Debugf("FrameSession:parseAndEmitWebVitalMetric", "object:%s", object)
+
+	wv := struct {
+		ID             string
+		Name           string
+		Value          json.Number
+		Rating         string
+		Delta          json.Number
+		NumEntries     json.Number
+		NavigationType string
+		URL            string
+	}{}
+
+	if err := json.Unmarshal([]byte(object), &wv); err != nil {
+		return fmt.Errorf("json couldn't be parsed: '%w'", err)
+	}
+
+	metric, ok := fs.k6Metrics.WebVitals[wv.Name]
+	if !ok {
+		return fmt.Errorf("metric not registered '%v'", wv.Name)
+	}
+
+	metricRating, ok := fs.k6Metrics.WebVitals[k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating)]
+	if !ok {
+		return fmt.Errorf("metric not registered '%v'", k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating))
+	}
+
+	value, err := wv.Value.Float64()
+	if err != nil {
+		return fmt.Errorf("value couldn't be parsed '%v'", wv.Value)
+	}
+
+	state := fs.vu.State()
+	tags := state.Tags.GetCurrentValues().Tags
+	if state.Options.SystemTags.Has(k6metrics.TagURL) {
+		tags = tags.With("url", wv.URL)
+	}
+
+	now := time.Now()
+	k6metrics.PushIfNotDone(fs.ctx, state.Samples, k6metrics.ConnectedSamples{
+		Samples: []k6metrics.Sample{
+			{
+				TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
+				Value:      value,
+				Time:       now,
+			},
+			{
+				TimeSeries: k6metrics.TimeSeries{Metric: metricRating, Tags: tags},
+				Value:      1,
+				Time:       now,
+			},
+		},
+	})
+
+	return nil
 }
 
 func (fs *FrameSession) onEventJavascriptDialogOpening(event *cdppage.EventJavascriptDialogOpening) {
