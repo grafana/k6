@@ -35,7 +35,7 @@ type SubtleCrypto struct {
 // The `key` parameter should be a `CryptoKey` to be used for encryption.
 //
 // The `data` parameter should contain the data to be encryption.
-func (sc *SubtleCrypto) Encrypt(algorithm goja.Value, key CryptoKey[[]byte], data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Encrypt(algorithm goja.Value, key goja.Value, data []byte) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -60,7 +60,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm goja.Value, key CryptoKey[[]byte], dat
 // The `key` parameter should be a `CryptoKey` to be used for decryption.
 //
 // The `data` parameter should contain the data to be decrypted.
-func (sc *SubtleCrypto) Decrypt(algorithm goja.Value, key CryptoKey[[]byte], data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Decrypt(algorithm goja.Value, key goja.Value, data []byte) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -85,7 +85,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm goja.Value, key CryptoKey[[]byte], dat
 // `algorithm` identifies a public-key cryptosystem, this is the private key.
 //
 // The `data` parameter should contain the data to be signed.
-func (sc *SubtleCrypto) Sign(algorithm goja.Value, key CryptoKey[[]byte], data []byte) *goja.Promise {
+func (sc *SubtleCrypto) Sign(algorithm goja.Value, key goja.Value, data []byte) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -115,7 +115,7 @@ func (sc *SubtleCrypto) Sign(algorithm goja.Value, key CryptoKey[[]byte], data [
 // The `data` parameter should contain the original signed data.
 func (sc *SubtleCrypto) Verify(
 	algorithm goja.Value,
-	key CryptoKey[[]byte],
+	key goja.Value,
 	signature []byte,
 	data []byte,
 ) *goja.Promise {
@@ -271,7 +271,7 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
 func (sc *SubtleCrypto) DeriveKey(
 	algorithm goja.Value,
-	baseKey CryptoKey[[]byte],
+	baseKey goja.Value,
 	derivedKeyAlgorithm goja.Value,
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
@@ -306,7 +306,7 @@ func (sc *SubtleCrypto) DeriveKey(
 // using `SubtleCrypto.ImportKey`.
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
-func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey CryptoKey[[]byte], length int) *goja.Promise {
+func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, length int) *goja.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -354,7 +354,7 @@ func (sc *SubtleCrypto) ImportKey(
 //
 // The `format` parameter identifies the format of the key data.
 // The `key` parameter is the key to export, as a CryptoKey object.
-func (sc *SubtleCrypto) ExportKey(format KeyFormat, key CryptoKey[[]byte]) *goja.Promise {
+func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promise {
 	// TODO
 	return nil
 }
@@ -388,8 +388,8 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key CryptoKey[[]byte]) *goja
 //   - for the AES-KW algorithm, pass the string "AES-KW", or an object of the form `{ name: "AES-KW" }`
 func (sc *SubtleCrypto) WrapKey(
 	format KeyFormat,
-	key CryptoKey[[]byte],
-	wrappingKey CryptoKey[[]byte],
+	key goja.Value,
+	wrappingKey goja.Value,
 	wrapAlgorithm goja.Value,
 ) *goja.Promise {
 	// TODO: implementation
@@ -442,7 +442,7 @@ func (sc *SubtleCrypto) WrapKey(
 func (sc *SubtleCrypto) UnwrapKey(
 	format KeyFormat,
 	wrappedKey []byte,
-	unwrappingKey CryptoKey[[]byte],
+	unwrappingKey goja.Value,
 	unwrapAlgo goja.Value,
 	unwrappedKeyAlgo goja.Value,
 	extractable bool,

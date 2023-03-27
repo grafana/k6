@@ -58,7 +58,7 @@ func newTestSetup(t testing.TB) testSetup {
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Tags:           lib.NewTagMap(nil),
+		Tags:           lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 	}
 
 	vu := &modulestest.VU{

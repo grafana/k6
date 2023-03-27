@@ -153,16 +153,6 @@ type ECKeyImportParams struct {
 	NamedCurve EllipticCurveKind
 }
 
-// ECDHKeyDeriveParams represents the object that should be passed as the algorithm
-// parameter into `SubtleCrypto.DeriveKey`, when using the ECDH algorithm.
-type ECDHKeyDeriveParams[Handle []byte] struct {
-	// Name should be set to AlgorithmKindEcdh.
-	Name AlgorithmIdentifier
-
-	// Public holds (a CryptoKey) the public key of the other party.
-	Public CryptoKey[Handle]
-}
-
 // HKDFParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.DeriveKey`, when using the HKDF algorithm.
 type HKDFParams struct {

@@ -40,7 +40,7 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		Crypto: &Crypto{
 			vu:        vu,
 			Subtle:    &SubtleCrypto{vu: vu},
-			CryptoKey: &CryptoKey[[]byte]{},
+			CryptoKey: &CryptoKey{},
 		},
 	}
 }
