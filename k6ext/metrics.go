@@ -19,7 +19,6 @@ const (
 type CustomMetrics struct {
 	BrowserDOMContentLoaded     *k6metrics.Metric
 	BrowserFirstPaint           *k6metrics.Metric
-	BrowserFirstContentfulPaint *k6metrics.Metric
 	BrowserFirstMeaningfulPaint *k6metrics.Metric
 	BrowserLoaded               *k6metrics.Metric
 
@@ -60,8 +59,6 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 			"browser_dom_content_loaded", k6metrics.Trend, k6metrics.Time),
 		BrowserFirstPaint: registry.MustNewMetric(
 			"browser_first_paint", k6metrics.Trend, k6metrics.Time),
-		BrowserFirstContentfulPaint: registry.MustNewMetric(
-			"browser_first_contentful_paint", k6metrics.Trend, k6metrics.Time),
 		BrowserFirstMeaningfulPaint: registry.MustNewMetric(
 			"browser_first_meaningful_paint", k6metrics.Trend, k6metrics.Time),
 		BrowserLoaded: registry.MustNewMetric(

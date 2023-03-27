@@ -808,7 +808,6 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		"load":                 fs.k6Metrics.BrowserLoaded,
 		"DOMContentLoaded":     fs.k6Metrics.BrowserDOMContentLoaded,
 		"firstPaint":           fs.k6Metrics.BrowserFirstPaint,
-		"firstContentfulPaint": fs.k6Metrics.BrowserFirstContentfulPaint,
 		"firstMeaningfulPaint": fs.k6Metrics.BrowserFirstMeaningfulPaint,
 	}
 
