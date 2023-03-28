@@ -9,7 +9,7 @@ function print(metric) {
     navigationType: metric.navigationType,
     url: window.location.href,
   }
-  window.sendWebVitalMetric(JSON.stringify(m))
+  window.k6browserSendWebVitalMetric(JSON.stringify(m))
 }
 
 async function load() {

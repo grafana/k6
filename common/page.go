@@ -24,7 +24,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-const webVitalBinding = "sendWebVitalMetric"
+const webVitalBinding = "k6browserSendWebVitalMetric"
 
 // Ensure page implements the EventEmitter, Target and Page interfaces.
 var (
