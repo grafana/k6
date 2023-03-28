@@ -296,22 +296,22 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	}{}
 
 	if err := json.Unmarshal([]byte(object), &wv); err != nil {
-		return fmt.Errorf("json couldn't be parsed: '%w'", err)
+		return fmt.Errorf("json couldn't be parsed: %w", err)
 	}
 
 	metric, ok := fs.k6Metrics.WebVitals[wv.Name]
 	if !ok {
-		return fmt.Errorf("metric not registered '%v'", wv.Name)
+		return fmt.Errorf("metric not registered %q", wv.Name)
 	}
 
 	metricRating, ok := fs.k6Metrics.WebVitals[k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating)]
 	if !ok {
-		return fmt.Errorf("metric not registered '%v'", k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating))
+		return fmt.Errorf("metric not registered %q", k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating))
 	}
 
 	value, err := wv.Value.Float64()
 	if err != nil {
-		return fmt.Errorf("value couldn't be parsed '%v'", wv.Value)
+		return fmt.Errorf("value couldn't be parsed %q", wv.Value)
 	}
 
 	state := fs.vu.State()
