@@ -32,7 +32,6 @@ The current state of the project is that it is an experimental module of the Web
 | `crypto.subtle.wrapKey()`                                                     | ❌        |                                                          |
 | `crypto.subtle.unwrapKey()`                                                   | ❌        |                                                          |
 
-
 ### APIs and algorithms with limited support
 
 - **AES-KW**: in the current state of things, this module does not support the AES-KW (JSON Key Wrap) algorithm. The reason for it is that the Go standard library does not support it. We are looking into alternatives, but for now, this is a limitation of the module.
@@ -40,9 +39,13 @@ The current state of the project is that it is an experimental module of the Web
 
 ## Contributing
 
-Contributions are welcome!
+Contributions are welcome! If the module is missing a feature you need, or if you find a bug, please open an issue or a pull request. If you are not sure about something, feel free to open an issue and ask.
 
 ### Practices
+
+The [WebCrypto API specification](https://www.w3.org/TR/WebCryptoAPI) is quite large, and it is not always easy to understand what is going on. To help with that, we have adopted a few practices that we hope will make it easier for contributors to understand the codebase.
+
+#### Algorithm steps numbered comments
 
 Contributors will likely notice that the codebase is annotated with comments of the form `// {some number}.`. Those comments are used to track the progress of the implementation of the specification and to ensure the correctness of the implementation of the algorithms. The numbers are the section numbers of the specification. For example, the comment `// 8.` in the `SubtleCrypto.GenerateKey` function refers to [step 8 of the `generateKey` algorithm from the specification](https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-generateKey).
 
