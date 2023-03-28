@@ -51,11 +51,21 @@ func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
 	return n
 }
 
+// WithSamplesListener is used to indicate we want to use a bidirectional channel
+// so that the test can read the metrics being emitted to the channel.
+type WithSamplesListener chan k6metrics.SampleContainer
+
 // NewVU returns a mock k6 VU.
-func NewVU(tb testing.TB) *VU {
+func NewVU(tb testing.TB, opts ...any) *VU {
 	tb.Helper()
 
 	samples := make(chan k6metrics.SampleContainer, 1000)
+	for _, opt := range opts {
+		switch opt := opt.(type) { //nolint:gocritic
+		case WithSamplesListener:
+			samples = opt
+		}
+	}
 
 	root, err := k6lib.NewGroup("", nil)
 	require.NoError(tb, err)

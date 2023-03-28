@@ -55,6 +55,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		enableFileServer   = false
 		enableLogCache     = false
 		skipClose          = false
+		samples            = make(chan k6metrics.SampleContainer, 1000)
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -71,10 +72,12 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 			ctx = opt
 		case skipCloseOption:
 			skipClose = true
+		case withSamplesListener:
+			samples = opt
 		}
 	}
 
-	vu := setupHTTPTestModuleInstance(tb)
+	vu := setupHTTPTestModuleInstance(tb, samples)
 
 	if ctx == nil {
 		dummyCtx, cancel := context.WithCancel(vu.Context())
@@ -470,11 +473,15 @@ func withSkipClose() skipCloseOption {
 	return struct{}{}
 }
 
-func setupHTTPTestModuleInstance(tb testing.TB) *k6test.VU {
+// withSamplesListener is used to indicate we want to use a bidirectional channel
+// so that the test can read the metrics being emitted to the channel.
+type withSamplesListener chan k6metrics.SampleContainer
+
+func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleContainer) *k6test.VU {
 	tb.Helper()
 
 	var (
-		vu   = k6test.NewVU(tb)
+		vu   = k6test.NewVU(tb, k6test.WithSamplesListener(samples))
 		root = k6http.New()
 	)
 
