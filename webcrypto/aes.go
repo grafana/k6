@@ -79,3 +79,75 @@ type AesKeyAlgorithm struct {
 
 	Length int64 `json:"length"`
 }
+
+// exportAESKey exports an AES key to its raw representation.
+//
+// TODO @oleiade: support JWK format.
+func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
+	if !key.Extractable {
+		return nil, NewError(0, InvalidAccessError, "the key is not extractable")
+	}
+
+	// 1.
+	if key.handle == nil {
+		return nil, NewError(0, OperationError, "the key is not valid, no data")
+	}
+
+	switch format {
+	case RawKeyFormat:
+		handle, ok := key.handle.([]byte)
+		if !ok {
+			return nil, NewError(0, ImplementationError, "exporting key data's bytes failed")
+		}
+
+		return handle, nil
+	default:
+		// FIXME: note that we do not support JWK format, yet.
+		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+	}
+}
+
+// importAESKey imports an AES key from its raw representation, and returns a CryptoKey.
+//
+// TODO @oleiade: support JWK format.
+func importAESKey(
+	format KeyFormat,
+	algorithm Algorithm,
+	data []byte,
+	keyUsages []CryptoKeyUsage,
+) (*CryptoKey, error) {
+	for _, usage := range keyUsages {
+		switch usage {
+		case EncryptCryptoKeyUsage, DecryptCryptoKeyUsage, WrapKeyCryptoKeyUsage, UnwrapKeyCryptoKeyUsage:
+			continue
+		default:
+			return nil, NewError(0, SyntaxError, "invalid key usage: "+usage)
+		}
+	}
+
+	switch format {
+	case RawKeyFormat:
+		var (
+			has128Bits = len(data) == 16
+			has192Bits = len(data) == 24
+			has256Bits = len(data) == 32
+		)
+
+		if !has128Bits && !has192Bits && !has256Bits {
+			return nil, NewError(0, DataError, "invalid key length")
+		}
+	default:
+		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+	}
+
+	key := &CryptoKey{
+		Algorithm: AesKeyAlgorithm{
+			Algorithm: algorithm,
+			Length:    int64(len(data) * 8),
+		},
+		Type:   SecretCryptoKeyType,
+		handle: data,
+	}
+
+	return key, nil
+}

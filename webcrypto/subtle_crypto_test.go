@@ -71,6 +71,26 @@ func TestSubtleCryptoGenerateKey(t *testing.T) {
 	})
 }
 
+func TestSubtleCryptoImportExportKey(t *testing.T) {
+	t.Parallel()
+
+	t.Run("symmetric", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newTestSetup(t)
+		err := ts.rt.GlobalObject().Set("CryptoKey", CryptoKey{})
+		require.NoError(t, err)
+
+		gotScriptErr := ts.ev.Start(func() error {
+			err := executeTestScripts(ts.rt, "./tests/import_export", "symmetric.js")
+
+			return err
+		})
+
+		assert.NoError(t, gotScriptErr)
+	})
+}
+
 func executeTestScripts(rt *goja.Runtime, base string, scripts ...string) error {
 	for _, script := range scripts {
 		program, err := CompileFile(base, script)
