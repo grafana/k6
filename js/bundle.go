@@ -18,6 +18,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
@@ -37,7 +38,7 @@ type Bundle struct {
 	pwd         *url.URL
 
 	callableExports map[string]struct{}
-	moduleResolver  *moduleResolver
+	ModuleResolver  *modules.ModuleResolver
 }
 
 // TODO: this is to be removed once this is not a warning and it can be moved to the registry
@@ -65,18 +66,18 @@ type BundleInstance struct {
 	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
 	env map[string]string
 
-	mainModuleInstance moduleInstance
-	moduleVUImpl       *moduleVUImpl
+	mainModuleExports *goja.Object
+	moduleVUImpl      *moduleVUImpl
 }
 
 func (bi *BundleInstance) getCallableExport(name string) goja.Callable {
-	fn, ok := goja.AssertFunction(bi.mainModuleInstance.exports().Get(name))
+	fn, ok := goja.AssertFunction(bi.getExported(name))
 	_ = ok // TODO maybe return it
 	return fn
 }
 
 func (bi *BundleInstance) getExported(name string) goja.Value {
-	return bi.mainModuleInstance.exports().ToObject(bi.Runtime).Get(name)
+	return bi.mainModuleExports.Get(name)
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
@@ -106,9 +107,9 @@ func newBundle(
 		preInitState:      piState,
 	}
 	c := bundle.newCompiler(piState.Logger)
-	bundle.moduleResolver = newModuleResolution(getJSModules(), generateCJSLoad(bundle, c))
+	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateCJSLoad(bundle, c))
 
-	if err = bundle.moduleResolver.setMain(src, c); err != nil {
+	if err = bundle.ModuleResolver.SetMain(src, c); err != nil {
 		return nil, err
 	}
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
@@ -116,12 +117,12 @@ func newBundle(
 	// TODO use a real context
 	vuImpl := &moduleVUImpl{ctx: context.Background(), runtime: goja.New()}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	instance, err := bundle.instantiate(vuImpl, 0)
+	exports, err := bundle.instantiate(vuImpl, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	err = bundle.populateExports(piState.Logger, updateOptions, instance)
+	err = bundle.populateExports(updateOptions, exports)
 	if err != nil {
 		return nil, err
 	}
@@ -180,11 +181,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 }
 
 // populateExports validates and extracts exported objects
-func (b *Bundle) populateExports(logger logrus.FieldLogger, updateOptions bool, instance moduleInstance) error {
-	exports := instance.exports()
-	if exports == nil {
-		return errors.New("exports must be an object")
-	}
+func (b *Bundle) populateExports(updateOptions bool, exports *goja.Object) error {
 	for _, k := range exports.Keys() {
 		v := exports.Get(k)
 		if _, ok := goja.AssertFunction(v); ok && k != consts.Options {
@@ -206,7 +203,7 @@ func (b *Bundle) populateExports(logger logrus.FieldLogger, updateOptions bool, 
 				if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
 					return uerr
 				}
-				logger.WithError(err).Warn("There were unknown fields in the options exported in the script")
+				b.preInitState.Logger.WithError(err).Warn("There were unknown fields in the options exported in the script")
 			}
 		case consts.SetupFn:
 			return errors.New("exported 'setup' must be a function")
@@ -228,25 +225,23 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New()}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	instance, err := b.instantiate(vuImpl, vuID)
+	exports, err := b.instantiate(vuImpl, vuID)
 	if err != nil {
 		return nil, err
 	}
 
 	bi := &BundleInstance{
-		Runtime:            vuImpl.runtime,
-		env:                b.preInitState.RuntimeOptions.Env,
-		moduleVUImpl:       vuImpl,
-		mainModuleInstance: instance,
+		Runtime:           vuImpl.runtime,
+		env:               b.preInitState.RuntimeOptions.Env,
+		moduleVUImpl:      vuImpl,
+		mainModuleExports: exports,
 	}
 
 	// Grab any exported functions that could be executed. These were
 	// already pre-validated in cmd.validateScenarioConfig(), just get them here.
-	exports := instance.exports()
-
 	jsOptions := exports.Get(consts.Options)
 	var jsOptionsObj *goja.Object
-	if jsOptions == nil || goja.IsNull(jsOptions) || goja.IsUndefined(jsOptions) {
+	if common.IsNullish(jsOptions) {
 		jsOptionsObj = vuImpl.runtime.NewObject()
 		err := exports.Set(consts.Options, jsOptionsObj)
 		if err != nil {
@@ -276,7 +271,7 @@ func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 	return c
 }
 
-func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance, error) {
+func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, error) {
 	rt := vuImpl.runtime
 	err := b.setupJSRuntime(rt, int64(vuID), b.preInitState.Logger)
 	if err != nil {
@@ -289,8 +284,8 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 		CWD:              b.pwd,
 	}
 
-	modSys := newModuleSystem(b.moduleResolver, vuImpl)
-	unbindInit := b.setInitGlobals(rt, modSys)
+	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
+	unbindInit := b.setInitGlobals(rt, vuImpl, modSys)
 	vuImpl.initEnv = initenv
 	defer func() {
 		unbindInit()
@@ -309,16 +304,13 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 		close(initDone)
 	}()
 
-	var instance moduleInstance
+	var exportsV goja.Value
 	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
-			//nolint:govet // here we shadow err on purpose
-			mod, err := b.moduleResolver.resolve(b.pwd, b.sourceData.URL.String())
-			if err != nil {
-				return err // TODO wrap as this should never happen
-			}
-			instance = mod.Instantiate(vuImpl)
-			return instance.execute()
+			//nolint:shadow,govet // here we shadow err on purpose
+			var err error
+			exportsV, err = modSys.RunMain()
+			return err
 		})
 	})
 
@@ -331,7 +323,12 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 		}
 		return nil, err
 	}
-	if exports := instance.exports(); exports == nil {
+	if common.IsNullish(exportsV) {
+		return nil, errors.New("exports must not be set to null or undefined")
+	}
+	exports := exportsV.ToObject(vuImpl.runtime)
+
+	if exports == nil {
 		return nil, errors.New("exports must be an object")
 	}
 
@@ -343,7 +340,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 
 	rt.SetRandSource(common.NewRandSource())
 
-	return instance, nil
+	return exports, nil
 }
 
 func (b *Bundle) setupJSRuntime(rt *goja.Runtime, vuID int64, logger logrus.FieldLogger) error {
@@ -376,21 +373,36 @@ func (b *Bundle) setupJSRuntime(rt *goja.Runtime, vuID int64, logger logrus.Fiel
 	return nil
 }
 
-func (b *Bundle) setInitGlobals(rt *goja.Runtime, modSys *moduleSystem) (unset func()) {
+// this exists only to make the check in the init context.
+type requireImpl struct {
+	inInitContext func() bool
+	internal      *modules.LegacyRequireImpl
+}
+
+func (r *requireImpl) require(specifier string) (*goja.Object, error) {
+	if !r.inInitContext() {
+		return nil, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "require")
+	}
+	return r.internal.Require(specifier)
+}
+
+func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modules.ModuleSystem) (unset func()) {
 	mustSet := func(k string, v interface{}) {
 		if err := rt.Set(k, v); err != nil {
 			panic(fmt.Errorf("failed to set '%s' global object: %w", k, err))
 		}
 	}
-	r := requireImpl{
-		vu:      modSys.vu,
-		modules: modSys,
-		pwd:     b.pwd,
+
+	impl := requireImpl{
+		inInitContext: func() bool { return vu.state == nil },
+		internal:      modules.NewLegacyRequireImpl(vu, modSys, *b.pwd),
 	}
-	mustSet("require", r.require)
+
+	mustSet("require", impl.require)
 
 	mustSet("open", func(filename string, args ...string) (goja.Value, error) {
-		if modSys.vu.State() != nil { // fix
+		// TODO fix in stack traces
+		if vu.state != nil {
 			return nil, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "open")
 		}
 
@@ -398,16 +410,18 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, modSys *moduleSystem) (unset f
 			return nil, errors.New("open() can't be used with an empty filename")
 		}
 		// This uses the pwd from the requireImpl
-		return openImpl(rt, b.filesystems["file"], r.pwd, filename, args...)
+		pwd := impl.internal.CurrentlyRequiredModule()
+		return openImpl(rt, b.filesystems["file"], &pwd, filename, args...)
 	})
+
 	return func() {
 		mustSet("require", goja.Undefined())
 		mustSet("open", goja.Undefined())
 	}
 }
 
-func generateCJSLoad(b *Bundle, c *compiler.Compiler) cjsModuleLoader {
-	return func(specifier *url.URL, name string) (*cjsModule, error) {
+func generateCJSLoad(b *Bundle, c *compiler.Compiler) modules.CJSModuleLoader {
+	return func(specifier *url.URL, name string) (*modules.CJSModule, error) {
 		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
 			b.preInitState.Logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and "+
 				"won't work if you move the script between machines or run it with `k6 cloud`; if absolute paths are "+
@@ -418,6 +432,6 @@ func generateCJSLoad(b *Bundle, c *compiler.Compiler) cjsModuleLoader {
 		if err != nil {
 			return nil, err
 		}
-		return cjsmoduleFromString(specifier, d.Data, c)
+		return modules.CJSModuleFromString(specifier, d.Data, c)
 	}
 }

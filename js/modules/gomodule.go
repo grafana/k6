@@ -1,8 +1,7 @@
-package js
+package modules
 
 import (
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/modules"
 )
 
 // baseGoModule is a go module that does not implement modules.Module interface
@@ -13,13 +12,13 @@ type baseGoModule struct {
 
 var _ module = &baseGoModule{}
 
-func (b *baseGoModule) Instantiate(vu modules.VU) moduleInstance {
+func (b *baseGoModule) instantiate(vu VU) moduleInstance {
 	return &baseGoModuleInstance{mod: b.mod, vu: vu}
 }
 
 type baseGoModuleInstance struct {
 	mod      interface{}
-	vu       modules.VU
+	vu       VU
 	exportsO *goja.Object // this is so we only initialize the exports once per instance
 }
 
@@ -36,21 +35,21 @@ func (b *baseGoModuleInstance) exports() *goja.Object {
 	return b.exportsO
 }
 
-// goModule is a go module which implements modules.Module
+// goModule is a go module which implements Module
 type goModule struct {
-	modules.Module
+	Module
 }
 
 var _ module = &goModule{}
 
-func (g *goModule) Instantiate(vu modules.VU) moduleInstance {
+func (g *goModule) instantiate(vu VU) moduleInstance {
 	return &goModuleInstance{vu: vu, module: g}
 }
 
 type goModuleInstance struct {
-	modules.Instance
+	Instance
 	module   *goModule
-	vu       modules.VU
+	vu       VU
 	exportsO *goja.Object // this is so we only initialize the exports once per instance
 }
 
@@ -69,7 +68,7 @@ func (gi *goModuleInstance) exports() *goja.Object {
 	return gi.exportsO
 }
 
-func toESModuleExports(exp modules.Exports) interface{} {
+func toESModuleExports(exp Exports) interface{} {
 	if exp.Named == nil {
 		return exp.Default
 	}

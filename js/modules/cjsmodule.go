@@ -1,29 +1,30 @@
-package js
+package modules
 
 import (
 	"fmt"
 	"net/url"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/modules"
 )
 
-// cjsModule represents a commonJS module
-type cjsModule struct {
+// CJSModule represents a commonJS module
+// TODO: this likely should not be export
+type CJSModule struct {
 	prg *goja.Program
 	url *url.URL
 }
 
-var _ module = &cjsModule{}
+var _ module = &CJSModule{}
 
 type cjsModuleInstance struct {
-	mod       *cjsModule
+	mod       *CJSModule
 	moduleObj *goja.Object
-	vu        modules.VU
+	vu        VU
 }
 
-func (c *cjsModule) Instantiate(vu modules.VU) moduleInstance {
+func (c *CJSModule) instantiate(vu VU) moduleInstance {
 	return &cjsModuleInstance{vu: vu, mod: c}
 }
 
@@ -53,18 +54,24 @@ func (c *cjsModuleInstance) execute() error {
 
 func (c *cjsModuleInstance) exports() *goja.Object {
 	exportsV := c.moduleObj.Get("exports")
-	if goja.IsNull(exportsV) || goja.IsUndefined(exportsV) {
+	if common.IsNullish(exportsV) {
 		return nil
 	}
 	return exportsV.ToObject(c.vu.Runtime())
 }
 
-type cjsModuleLoader func(specifier *url.URL, name string) (*cjsModule, error)
+// CJSModuleLoader is a type alias for a function that returns new cjsModule
+type CJSModuleLoader func(specifier *url.URL, name string) (*CJSModule, error)
 
-func cjsmoduleFromString(fileURL *url.URL, data []byte, c *compiler.Compiler) (*cjsModule, error) {
+// CJSModuleFromString is a helper function which returns CJSModule given the argument it has.
+// It is mostly a wrapper around compiler.Compiler@Compile
+//
+// TODO: extract this to not make this package dependant on compilers.
+// this is potentially mute point after ESM when the compiler will likely get mostly dropped.
+func CJSModuleFromString(fileURL *url.URL, data []byte, c *compiler.Compiler) (*CJSModule, error) {
 	pgm, _, err := c.Compile(string(data), fileURL.String(), false)
 	if err != nil {
 		return nil, err
 	}
-	return &cjsModule{prg: pgm, url: fileURL}, nil
+	return &CJSModule{prg: pgm, url: fileURL}, nil
 }
