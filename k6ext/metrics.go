@@ -40,6 +40,8 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 
 	for k, v := range wvs {
 		t := k6metrics.Time
+		// CLS is not a time based measurement, it is a score,
+		// so use the default metric type for CLS.
 		if k == webVitalCLS {
 			t = k6metrics.Default
 		}
