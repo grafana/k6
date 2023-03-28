@@ -12,18 +12,14 @@ function print(metric) {
   window.k6browserSendWebVitalMetric(JSON.stringify(m))
 }
 
-async function load() {
-  let {
-    onCLS, onFID, onLCP, onFCP, onINP, onTTFB
-  } = await import('https://unpkg.com/web-vitals@3?module');
+function load() {
+  webVitals.onCLS(print);
+  webVitals.onFID(print);
+  webVitals.onLCP(print);
 
-  onCLS(print);
-  onFID(print);
-  onLCP(print);
-
-  onFCP(print);
-  onINP(print);
-  onTTFB(print);
+  webVitals.onFCP(print);
+  webVitals.onINP(print);
+  webVitals.onTTFB(print);
 }
 
 load();
