@@ -38,6 +38,25 @@ func newTestSetup(t testing.TB) testSetup {
 	rt := goja.New()
 	rt.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
 
+	// We compile the Web Platform testharness script into a goja.Program
+	harnessProgram, err := CompileFile("./tests/util", "testharness.js")
+	require.NoError(t, err)
+
+	// We execute the harness script in the goja runtime
+	// in order to make the Web Platform assertion functions available
+	// to the tests.
+	_, err = rt.RunProgram(harnessProgram)
+	require.NoError(t, err)
+
+	// We compile the Web Platform helpers script into a goja.Program
+	helpersProgram, err := CompileFile("./tests/util", "helpers.js")
+	require.NoError(t, err)
+	// We execute the helpers script in the goja runtime
+	// in order to make the Web Platform helpers available
+	// to the tests.
+	_, err = rt.RunProgram(helpersProgram)
+	require.NoError(t, err)
+
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
 
@@ -58,7 +77,7 @@ func newTestSetup(t testing.TB) testSetup {
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Tags:           lib.NewTagMap(nil),
+		Tags:           lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 	}
 
 	vu := &modulestest.VU{

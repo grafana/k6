@@ -198,7 +198,7 @@ Object.keys(sourceData).forEach((size) => {
         );
       },
       (err) => {
-        if (!err.error().startsWith("NotSupportedError")) {
+        if (!err.name.startsWith("NotSupportedError")) {
           throw (
             "digest() should have thrown a NotSupportedError for " +
             badName +

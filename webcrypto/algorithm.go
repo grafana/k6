@@ -1,9 +1,6 @@
 package webcrypto
 
 import (
-	"crypto"
-	"fmt"
-	"hash"
 	"reflect"
 	"strings"
 
@@ -13,12 +10,6 @@ import (
 // Algorithm represents
 type Algorithm struct {
 	Name AlgorithmIdentifier `json:"name"`
-}
-
-// NormalizedName returns the normalized algorithm identifier.
-// It implements the NormalizedIdentifier interface.
-func (a Algorithm) NormalizedName() AlgorithmIdentifier {
-	return a.Name
 }
 
 // AlgorithmIdentifier represents the name of an algorithm.
@@ -62,42 +53,6 @@ const (
 	ECDH = "ECDH"
 )
 
-// NormalizeAlgorithmName returns the normalized algorithm name.
-//
-// As the algorithm name is case-insensitive, we normalize it to
-// our internal representation.
-func NormalizeAlgorithmName(name string) AlgorithmIdentifier {
-	algorithms := [...]AlgorithmIdentifier{
-		// RSA
-		RSASsaPkcs1v15,
-		RSAPss,
-		RSAOaep,
-
-		// HMAC
-		HMAC,
-
-		// AES
-		AESCtr,
-		AESCbc,
-		AESGcm,
-		AESKw,
-
-		// ECDSA
-		ECDSA,
-
-		// ECDH
-		ECDH,
-	}
-
-	for _, alg := range algorithms {
-		if strings.EqualFold(name, alg) {
-			return alg
-		}
-	}
-
-	return name
-}
-
 // HashAlgorithmIdentifier represents the name of a hash algorithm.
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
@@ -117,167 +72,6 @@ const (
 	// Sha512 represents the SHA-512 algorithm.
 	Sha512 = "SHA-512"
 )
-
-// Hasher returns the appropriate hash.Hash for the given algorithm.
-func Hasher(algorithm HashAlgorithmIdentifier) (func() hash.Hash, error) {
-	switch algorithm {
-	case Sha1:
-		return crypto.SHA1.New, nil
-	case Sha256:
-		return crypto.SHA256.New, nil
-	case Sha384:
-		return crypto.SHA384.New, nil
-	case Sha512:
-		return crypto.SHA512.New, nil
-	}
-
-	return nil, NewError(0, ImplementationError, fmt.Sprintf("unsupported hash algorithm: %s", algorithm))
-}
-
-// NormalizedAlgorithm represents a normalized algorithm.
-type NormalizedAlgorithm interface {
-	NormalizedName() AlgorithmIdentifier
-}
-
-// normalize algorithm
-// normalizeAlgorithm(algorithm: string | Algorithm, op: string):
-
-// NormalizeAlgorithm normalizes the given algorithm following the algorithm described in the WebCrypto [specification].
-//
-// [specification]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
-func NormalizeAlgorithm(rt *goja.Runtime, algorithm goja.Value, op OperationIdentifier) (NormalizedAlgorithm, error) {
-	// 1.
-	registeredAlgorithms, ok := supportedAlgorithms[op]
-	if !ok {
-		return Algorithm{}, NewError(0, ImplementationError, fmt.Sprintf("unsupported operation: %s", op))
-	}
-
-	// 2.
-	var initialAlg Algorithm
-	switch algorithm.ExportType().Kind() {
-	case reflect.String:
-		obj := rt.NewObject()
-		err := obj.Set("name", algorithm.Export())
-		if err != nil {
-			// 3.
-			return Algorithm{}, NewError(0, ImplementationError, "unable to convert the string argument to an object")
-		}
-		return NormalizeAlgorithm(rt, obj, op)
-	case reflect.Map, reflect.Struct:
-		err := rt.ExportTo(algorithm, &initialAlg)
-		if err != nil {
-			// 3.
-			return Algorithm{}, NewError(0, SyntaxError, "algorithm object is not a valid algorithm")
-		}
-	default:
-		return Algorithm{}, NewError(0, SyntaxError, "unsupported algorithm type")
-	}
-
-	// 4.
-	algName := initialAlg.Name
-
-	// 5.
-	var desiredType string
-	algNameRegistered := false
-	for key, value := range registeredAlgorithms {
-		if strings.EqualFold(key, algName) {
-			algName = key
-			desiredType = value
-			algNameRegistered = true
-			break
-		}
-	}
-
-	if !algNameRegistered {
-		return Algorithm{}, NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm name: %s", algName))
-	}
-
-	// No further operation is needed if the algorithm does not have a desired type.
-	if desiredType == "" {
-		return Algorithm{Name: algName}, nil
-	}
-
-	// 6.
-	err := NewError(0, ImplementationError, fmt.Sprintf("unsupported algorithm type: %s", desiredType))
-	return Algorithm{}, err
-}
-
-// As defined by the [specification]
-// [specification]: https://w3c.github.io/webcrypto/#algorithm-normalization-internal
-//
-//nolint:gochecknoglobals
-var supportedAlgorithms = map[OperationIdentifier]map[AlgorithmIdentifier]string{
-	OperationIdentifierDigest: {
-		Sha1:   "",
-		Sha256: "",
-		Sha384: "",
-		Sha512: "",
-	},
-	OperationIdentifierGenerateKey: {
-		RSASsaPkcs1v15: "RsaHashedKeyGenParams",
-		RSAPss:         "RsaHashedKeyGenParams",
-		RSAOaep:        "RsaHashedKeyGenParams",
-		ECDSA:          "EcKeyGenParams",
-		ECDH:           "EcKeyGenParams",
-		HMAC:           "HmacKeyGenParams",
-		AESCtr:         "AesKeyGenParams",
-		AESCbc:         "AesKeyGenParams",
-		AESGcm:         "AesKeyGenParams",
-		AESKw:          "AesKeyGenParams",
-	},
-}
-
-// IsAlgorithm returns true if the given algorithm is supported by the library.
-func IsAlgorithm(algorithm string) bool {
-	algorithms := [...]AlgorithmIdentifier{
-		// RSA
-		RSASsaPkcs1v15,
-		RSAPss,
-		RSAOaep,
-
-		// HMAC
-		HMAC,
-
-		// AES
-		AESCtr,
-		AESCbc,
-		AESGcm,
-		AESKw,
-
-		// ECDSA
-		ECDSA,
-
-		// ECDH
-		ECDH,
-	}
-
-	for _, alg := range algorithms {
-		if strings.EqualFold(alg, algorithm) {
-			return true
-		}
-	}
-
-	return false
-}
-
-// IsHashAlgorithm returns true if the given cryptographic hash algorithm
-// name is valid and supported by the library.
-func IsHashAlgorithm(algorithm string) bool {
-	algorithms := [...]HashAlgorithmIdentifier{
-		Sha1,
-		Sha256,
-		Sha384,
-		Sha512,
-	}
-
-	for _, alg := range algorithms {
-		if strings.EqualFold(alg, algorithm) {
-			return true
-		}
-	}
-
-	return false
-}
 
 // OperationIdentifier represents the name of an operation.
 //
@@ -322,3 +116,67 @@ const (
 	// OperationIdentifierDigest represents the digest operation.
 	OperationIdentifierDigest OperationIdentifier = "digest"
 )
+
+// normalizeAlgorithm normalizes the given algorithm following the
+// algorithm described in the WebCrypto [specification].
+//
+// [specification]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
+func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) (Algorithm, error) {
+	var algorithm Algorithm
+
+	// "if alg is an instance of a DOMString: return the result of the running the
+	// normalize algorithm, with the `alg` set to a new Algorithm object whose name
+	// attribute is set to alg, and with the op set to op."
+	if v.ExportType().Kind() == reflect.String {
+		algorithmString, ok := v.Export().(string)
+		if !ok {
+			return Algorithm{}, NewError(0, ImplementationError, "algorithm cannot be interpreted as a string")
+		}
+
+		algorithmObject := rt.NewObject()
+		if err := algorithmObject.Set("name", algorithmString); err != nil {
+			return Algorithm{}, NewError(0, ImplementationError, "unable to transform algorithm string into an object")
+		}
+
+		return normalizeAlgorithm(rt, algorithmObject, op)
+	}
+
+	if err := rt.ExportTo(v, &algorithm); err != nil {
+		return Algorithm{}, NewError(0, SyntaxError, "algorithm cannot be interpreted as a string or an object")
+	}
+
+	// Algorithm identifers are always upper cased.
+	// A registered algorithm provided in lower case format, should
+	// be considered valid.
+	algorithm.Name = strings.ToUpper(algorithm.Name)
+
+	if !isRegisteredAlgorithm(algorithm.Name, op) {
+		return Algorithm{}, NewError(0, NotSupportedError, "unsupported algorithm: "+algorithm.Name)
+	}
+
+	return algorithm, nil
+}
+
+// isRegisteredAlgorithm returns true if the given algorithm name is registered
+// for the given operation. As per steps 1. and 5. of the WebCrypto specification's
+// "[algorithm normalization]" algorithm.
+//
+// [algorithm normalization]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
+func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
+	switch forOperation {
+	case OperationIdentifierDigest:
+		isSha1 := algorithmName == Sha1
+		isSha256 := algorithmName == Sha256
+		isSha384 := algorithmName == Sha384
+		isSha512 := algorithmName == Sha512
+		return isSha1 || isSha256 || isSha384 || isSha512
+	case OperationIdentifierGenerateKey:
+		isAesCbc := algorithmName == AESCbc
+		isAesCtr := algorithmName == AESCtr
+		isAesGcm := algorithmName == AESGcm
+		isAesKw := algorithmName == AESKw
+		return isAesCbc || isAesCtr || isAesGcm || isAesKw
+	default:
+		return false
+	}
+}

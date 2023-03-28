@@ -1,34 +1,27 @@
 package webcrypto
 
-import (
-	"crypto"
-
-	"github.com/dop251/goja"
-)
-
 // CryptoKeyPair represents a key pair for an asymmetric cryptography algorithm, also known as
 // a public-key algorithm.
 //
 // The Private, and Public generic type parameters define the underlying type holding the private,
 // and public key, respectively.
-type CryptoKeyPair[Private, Public KeyHandle] struct {
+type CryptoKeyPair struct {
 	// PrivateKey holds the private key. For encryption and decryption algorithms,
 	// this key is used to decrypt. For signing and verification algorithms it is used to sign.
-	PrivateKey CryptoKey[Private] `json:"privateKey"`
+	PrivateKey CryptoKey `json:"privateKey"`
 
 	// PublicKey holds the public key. For encryption and decryption algorithms,
 	// this key is used to encrypt. For signing and verification algorithms it is used to verify.
-	PublicKey CryptoKey[Public] `json:"publicKey"`
+	PublicKey CryptoKey `json:"publicKey"`
 }
 
 // CryptoKey represents a cryptographic key obtained from one of the SubtleCrypto
 // methods `SubtleCrypto.generateKey`, `SubtleCrypto.DeriveKey`, `SubtleCrypto.ImportKey`,
 // or `SubtleCrypto.UnwrapKey`.
-type CryptoKey[H KeyHandle] struct {
+type CryptoKey struct {
 	// Type holds the type of the key.
 	Type CryptoKeyType `json:"type"`
 
-	// FIXME: should be private?
 	// Extractable indicates whether or not the key may be extracted
 	// using `SubtleCrypto.ExportKey` or `SubtleCrypto.WrapKey`.
 	//
@@ -37,43 +30,19 @@ type CryptoKey[H KeyHandle] struct {
 	// `SubtleCrypto.exportKey` and `SubtleCrypto.wrapKey` will fail.
 	Extractable bool `json:"extractable"`
 
-	// FIXME: should be private?
-	// Algorithm holds the algorithm for which this key can be used
-	// and any associated extra parameters.
-	//
-	// The value of this property is an object that is specific to the
-	// algorithm used to generate the key. Possible values should be castable
-	// to the following types:
-	//   - AESKeyGenParams
-	//   - RSAHashedKeyGenParams
-	//   - ECKeyGenParams
-	//   - HMACKeyGenParams
-	Algorithm interface{} `json:"algorithm"`
+	// By the time we access the Algorithm field of CryptoKey, we
+	// generally already know what type of algorithm it is, and are
+	// really looking to access the specific attributes of that algorithm.
+	// Thus, the generic parameter type helps us manipulate the
+	// `CryptoKey` type without having to cast the `Algorithm` field.
+	Algorithm any `json:"algorithm"`
 
-	// FIXME: should be private?
-	// Usages indicates what can be done with the key.
+	// Usages holds the key usages for which this key can be used.
 	Usages []CryptoKeyUsage `json:"usages"`
 
 	// handle is an internal slot, holding the underlying key data.
 	// See [specification](https://www.w3.org/TR/WebCryptoAPI/#dfnReturnLink-0).
-	//nolint:unused
-	handle H
-}
-
-// KeyGenerator is an interface that represents a cryptographic key generator.
-type KeyGenerator interface {
-	GenerateKey(rt *goja.Runtime, extractable bool, keyUsages []CryptoKeyUsage) (goja.Value, error)
-}
-
-// KeyHandle represents the underlying type of a key data handle.
-type KeyHandle interface {
-	[]byte | crypto.PrivateKey | crypto.PublicKey
-}
-
-// KeyAlgorithm specifies the algorithm for a key.
-type KeyAlgorithm struct {
-	// Name of the algorithm.
-	Name AlgorithmIdentifier `json:"name"`
+	handle any
 }
 
 // CryptoKeyType represents the type of a key.
