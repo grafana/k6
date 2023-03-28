@@ -67,6 +67,7 @@ func (me *MetricsEngine) CreateIngester() output.Output {
 	me.outputIngester = &outputIngester{
 		logger:        me.logger.WithField("component", "metrics-engine-ingester"),
 		metricsEngine: me,
+		cardinality:   newCardinalityControl(),
 	}
 	return me.outputIngester
 }
