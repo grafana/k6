@@ -211,12 +211,45 @@ func (acp *AesCbcParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 }
 
 // Decrypt decrypts the given ciphertext using the AES-CBC algorithm, and returns the plaintext.
-// It implements the WebCryptoAPI `decrypt` method's [specification] for the AES-CBC algorithm.
+// Implements the WebCryptoAPI's `decrypt` method's [specification] for the AES-CBC algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-cbc
 func (acp *AesCbcParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
-	// TODO @oleiade: implement this
-	return nil, nil
+	// 1.
+	if len(acp.Iv) != aes.BlockSize {
+		return nil, NewError(0, OperationError, "iv length is invalid, should be 16 bytes")
+	}
+
+	keyHandle, ok := key.handle.([]byte)
+	if !ok {
+		return nil, NewError(0, OperationError, "invalid key handle")
+	}
+
+	// 2.
+	block, err := aes.NewCipher(keyHandle)
+	if err != nil {
+		return nil, NewError(0, OperationError, "could not create AES cipher")
+	}
+
+	paddedPlainText := make([]byte, len(ciphertext))
+	cbc := cipher.NewCBCDecrypter(block, acp.Iv)
+	cbc.CryptBlocks(paddedPlainText, ciphertext)
+
+	// 3.
+	p := paddedPlainText[len(paddedPlainText)-1]
+	if p == 0 || p > aes.BlockSize {
+		return nil, NewError(0, OperationError, "invalid padding")
+	}
+
+	// 4.
+	if !bytes.HasSuffix(paddedPlainText, bytes.Repeat([]byte{p}, int(p))) {
+		return nil, NewError(0, OperationError, "invalid padding")
+	}
+
+	// 5.
+	plaintext := paddedPlainText[:len(paddedPlainText)-int(p)]
+
+	return plaintext, nil
 }
 
 // Ensure that AesCbcParams implements the EncryptDecrypter interface.
@@ -284,12 +317,36 @@ func (acp *AesCtrParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 }
 
 // Decrypt decrypts the given ciphertext using the AES-CTR algorithm, and returns the plaintext.
-// It implements the WebCryptoAPI `decrypt` method's [specification] for the AES-CTR algorithm.
+// Implements the WebCryptoAPI's `decrypt` method's [specification] for the AES-CTR algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-ctr
 func (acp *AesCtrParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
-	// TODO @oleiade: implement this
-	return nil, nil
+	// 1.
+	if len(acp.Counter) != aes.BlockSize {
+		return nil, NewError(0, OperationError, "counter length is invalid, should be 16 bytes")
+	}
+
+	// 2.
+	if acp.Length <= 0 || acp.Length > 128 {
+		return nil, NewError(0, OperationError, "invalid length, should be within 1 <= length <= 128 bounds")
+	}
+
+	keyHandle, ok := key.handle.([]byte)
+	if !ok {
+		return nil, NewError(0, OperationError, "invalid key handle")
+	}
+
+	// 3.
+	block, err := aes.NewCipher(keyHandle)
+	if err != nil {
+		return nil, NewError(0, OperationError, "could not create AES cipher")
+	}
+
+	plaintext := make([]byte, len(ciphertext))
+	stream := cipher.NewCTR(block, acp.Counter)
+	stream.XORKeyStream(plaintext, ciphertext)
+
+	return plaintext, nil
 }
 
 // Ensure that AesCtrParams implements the EncryptDecrypter interface.
@@ -301,7 +358,6 @@ var _ EncryptDecrypter = &AesCtrParams{}
 // As defined in the [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-params
-// FIXME: How do we ensure that tagLength defaults to 128 in the context of usage within k6?
 type AesGcmParams struct {
 	Algorithm
 
@@ -423,10 +479,65 @@ func (agp *AesGcmParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm
 func (agp *AesGcmParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
-	// TODO @oleiade: implement this method
-	return nil, nil
-}
+	// 1.
+	var tagLength int
+	if agp.TagLength == 0 {
+		tagLength = 128
+	} else {
+		switch agp.TagLength {
+		case 96, 104, 112, 120, 128:
+			tagLength = agp.TagLength
+		case 32, 64:
+			// Go's AES GCM implementation does not support 32 or 64 bit tag lengths.
+			return nil, NewError(0, OperationError, "invalid tag length, should be within 96 <= length <= 128 bounds")
+		default:
+			return nil, NewError(0, OperationError, "invalid tag length, accepted values are 96, 104, 112, 120, 128")
+		}
+	}
 
+	// 2.
+	// Note that we multiply the length of the ciphertext by 8, in order
+	// to get the length in bits.
+	if len(ciphertext)*8 < tagLength {
+		return nil, NewError(0, OperationError, "ciphertext is too short")
+	}
+
+	// 3.
+	if len(agp.Iv) < 1 || uint64(len(agp.Iv)) > maxAesGcmIvLength {
+		return nil, NewError(0, OperationError, "iv length is too long")
+	}
+
+	// 4.
+	if agp.AdditionalData != nil && uint64(len(agp.AdditionalData)) > maxAesGcmAdditionalDataLength {
+		return nil, NewError(0, OperationError, "additional data is too long")
+	}
+
+	// 5. 6. are not necessary as Go's AES GCM implementation perform those steps for us
+
+	keyHandle, ok := key.handle.([]byte)
+	if !ok {
+		return nil, NewError(0, OperationError, "invalid key handle")
+	}
+
+	// 7. 8.
+	block, err := aes.NewCipher(keyHandle)
+	if err != nil {
+		return nil, NewError(0, OperationError, "could not create AES cipher")
+	}
+
+	gcm, err := cipher.NewGCMWithTagSize(block, tagLength/8)
+	if err != nil {
+		return nil, NewError(0, OperationError, "could not create GCM cipher")
+	}
+
+	// The Golang AES GCM cipher only supports a Nonce/Iv length of 12 bytes,
+	plaintext, err := gcm.Open(nil, agp.Iv, ciphertext, agp.AdditionalData)
+	if err != nil {
+		return nil, NewError(0, OperationError, "could not decrypt ciphertext")
+	}
+
+	return plaintext, nil
+}
 
 // maxAesGcmPlaintextLength holds the value (2 ^ 39) - 256 as specified in
 // The [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
@@ -439,6 +550,12 @@ const maxAesGcmPlaintextLength int = 549755813632
 //
 // [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
 const maxAesGcmAdditionalDataLength uint64 = 18446744073709551615
+
+// maxAesGcmIvLength holds the value 2 ^ 64 - 1 as specified in
+// the [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
+//
+// [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
+const maxAesGcmIvLength uint64 = 18446744073709551615
 
 var (
 	// ErrInvalidBlockSize is returned when the given block size is invalid.

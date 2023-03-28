@@ -128,9 +128,74 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 // The `key` parameter should be a `CryptoKey` to be used for decryption.
 //
 // The `data` parameter should contain the data to be decrypted.
-func (sc *SubtleCrypto) Decrypt(algorithm goja.Value, key goja.Value, data []byte) *goja.Promise {
-	// TODO: implementation
-	return nil
+func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	// 2.
+	// We obtain a copy of the key data, because we might need to modify it.
+	ciphertext, err := exportArrayBuffer(rt, data)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 3.
+	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDecrypt)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	var ck CryptoKey
+	if err = rt.ExportTo(key, &ck); err != nil {
+		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		return promise
+	}
+
+	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 8.
+	if normalized.Name != keyAlgorithmNameValue.String() {
+		reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+		return promise
+	}
+
+	decrypter, err := newEncryptDecrypter(rt, normalized, algorithm)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	go func() {
+		// 9.
+		for !containsUsage(ck.Usages, DecryptCryptoKeyUsage) {
+			reject(NewError(0, InvalidAccessError, "key does not contain the 'decrypt' usage"))
+			return
+		}
+
+		var plaintext []byte
+
+		switch normalized.Name {
+		case AESCbc, AESCtr, AESGcm:
+			// 10.
+			plaintext, err = decrypter.Decrypt(ciphertext, ck)
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			resolve(rt.NewArrayBuffer(plaintext))
+		default:
+			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
+		}
+	}()
+
+	return promise
 }
 
 // Sign generates a digital signature.
