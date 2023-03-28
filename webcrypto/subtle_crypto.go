@@ -3,6 +3,7 @@ package webcrypto
 import (
 	"crypto"
 	"errors"
+	"fmt"
 	"hash"
 
 	"github.com/dop251/goja"
@@ -35,9 +36,76 @@ type SubtleCrypto struct {
 // The `key` parameter should be a `CryptoKey` to be used for encryption.
 //
 // The `data` parameter should contain the data to be encryption.
-func (sc *SubtleCrypto) Encrypt(algorithm goja.Value, key goja.Value, data []byte) *goja.Promise {
-	// TODO: implementation
-	return nil
+func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	// 2.
+	// We obtain a copy of the key data, because we might need to modify it.
+	plaintext, err := exportArrayBuffer(rt, data)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 3.
+	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierEncrypt)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	var ck CryptoKey
+	if err = rt.ExportTo(key, &ck); err != nil {
+		reject(NewError(0, TypeError, "key argument does hold not a valid CryptoKey object"))
+		return promise
+	}
+
+	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 8.
+	if normalized.Name != keyAlgorithmNameValue.String() {
+		reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+		return promise
+	}
+
+	encrypter, err := newEncryptDecrypter(rt, normalized, algorithm)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	go func() {
+		// 9.
+		for !containsUsage(ck.Usages, EncryptCryptoKeyUsage) {
+			reject(NewError(0, InvalidAccessError, "key does not contain the 'encrypt' usage"))
+			return
+		}
+
+		var ciphertext []byte
+
+		switch normalized.Name {
+		case AESCbc, AESCtr, AESGcm:
+			// 10.
+			ciphertext, err = encrypter.Encrypt(plaintext, ck)
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			resolve(rt.NewArrayBuffer(ciphertext))
+			return
+		default:
+			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
+			return
+		}
+	}()
+
+	return promise
 }
 
 // Decrypt decrypts some encrypted data.

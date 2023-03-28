@@ -1,6 +1,11 @@
 package webcrypto
 
-import "github.com/dop251/goja"
+import (
+	"fmt"
+	"strings"
+
+	"github.com/dop251/goja"
+)
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
 // and returns the underlying byte slice.
@@ -27,6 +32,41 @@ func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
 	}
 
 	return ab.Bytes(), nil
+}
+
+// traverseObject traverses the given object using the given fields and returns the value
+// at the end of the traversal. It assumes that all the traversed fields are Objects.
+func traverseObject(rt *goja.Runtime, src goja.Value, fields ...string) (goja.Value, error) {
+	if isNullish(src) {
+		return nil, NewError(0, TypeError, "Object is null or undefined")
+	}
+
+	obj := src.ToObject(rt)
+	if isNullish(obj) {
+		return nil, NewError(0, TypeError, "Object is null or undefined")
+	}
+
+	for idx, field := range fields {
+		src = obj.Get(field)
+		if isNullish(src) {
+			return nil, NewError(
+				0,
+				TypeError,
+				fmt.Sprintf("field %s is null or undefined", strings.Join(fields[:idx+1], ".")),
+			)
+		}
+
+		obj = src.ToObject(rt)
+		if isNullish(obj) {
+			return nil, NewError(
+				0,
+				TypeError,
+				fmt.Sprintf("field %s is not an Object", strings.Join(fields[:idx+1], ".")),
+			)
+		}
+	}
+
+	return src, nil
 }
 
 // IsInstanceOf returns true if the given value is an instance of the given constructor
