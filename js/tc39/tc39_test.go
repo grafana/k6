@@ -8,7 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"os"
 	"path"
 	"runtime"
@@ -281,7 +281,7 @@ func parseTC39File(name string) (*tc39Meta, string, error) {
 	}
 	defer f.Close() //nolint:errcheck,gosec
 
-	b, err := ioutil.ReadAll(f)
+	b, err := io.ReadAll(f)
 	if err != nil {
 		return nil, "", err
 	}
@@ -550,7 +550,7 @@ func (ctx *tc39TestCtx) init() {
 	ctx.prgCache = make(map[string]*goja.Program)
 	ctx.errors = make(map[string]string)
 
-	b, err := ioutil.ReadFile("./breaking_test_errors.json")
+	b, err := os.ReadFile("./breaking_test_errors.json")
 	if err != nil {
 		panic(err)
 	}
@@ -577,7 +577,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*goja.Program, error) {
 		}
 		defer f.Close() //nolint:gosec,errcheck
 
-		b, err := ioutil.ReadAll(f)
+		b, err := io.ReadAll(f)
 		if err != nil {
 			return nil, err
 		}
@@ -648,7 +648,7 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 }
 
 func (ctx *tc39TestCtx) runTC39Tests(name string) {
-	files, err := ioutil.ReadDir(path.Join(ctx.base, name))
+	files, err := os.ReadDir(path.Join(ctx.base, name))
 	if err != nil {
 		ctx.t.Fatal(err)
 	}
