@@ -1,6 +1,7 @@
 package engine
 
 import (
+	"strconv"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -23,6 +24,7 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 		metricsEngine: &MetricsEngine{
 			ObservedMetrics: make(map[string]*metrics.Metric),
 		},
+		cardinality: newCardinalityControl(),
 	}
 	require.NoError(t, ingester.Start())
 	ingester.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
@@ -67,6 +69,7 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	ingester := outputIngester{
 		logger:        piState.Logger,
 		metricsEngine: me,
+		cardinality:   newCardinalityControl(),
 	}
 	require.NoError(t, ingester.Start())
 	ingester.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
@@ -94,6 +97,103 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	require.NotNil(t, metric.Sub)
 	assert.EqualValues(t, map[string]string{"a": "1"}, metric.Sub.Tags.Map())
 	assert.IsType(t, &metrics.GaugeSink{}, metric.Sink)
+}
+
+func TestOutputFlushMetricsTimeSeriesWarning(t *testing.T) {
+	t.Parallel()
+
+	piState := newTestPreInitState(t)
+	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Gauge)
+	require.NoError(t, err)
+
+	logger, hook := testutils.NewMemLogger()
+	ingester := outputIngester{
+		logger: logger,
+		metricsEngine: &MetricsEngine{
+			ObservedMetrics: make(map[string]*metrics.Metric),
+		},
+		cardinality: newCardinalityControl(),
+	}
+	ingester.cardinality.timeSeriesLimit = 2 // mock the limit
+
+	require.NoError(t, ingester.Start())
+	for i := 0; i < 3; i++ {
+		ingester.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: testMetric,
+				Tags: piState.Registry.RootTagSet().WithTagsFromMap(
+					map[string]string{"a": "1", "b": strconv.Itoa(i)}),
+			},
+			Value: 21,
+		}})
+	}
+	require.NoError(t, ingester.Stop())
+
+	// to keep things simple the internal limit is not passed to the message
+	// the code uses directly the global constant limit
+	expLine := "generated metrics with 3 unique time series, " +
+		"which is higher than the suggested limit of 100000"
+	assert.True(t, testutils.LogContains(hook.Drain(), logrus.WarnLevel, expLine))
+}
+
+func TestCardinalityControlAdd(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	m1, err := registry.NewMetric("metric1", metrics.Counter)
+	require.NoError(t, err)
+
+	m2, err := registry.NewMetric("metric2", metrics.Counter)
+	require.NoError(t, err)
+
+	tags := registry.RootTagSet().With("k", "v")
+
+	cc := newCardinalityControl()
+	// the first iteration adds two new time series
+	// the second does not change the count
+	// because the time series have been already seen before
+	for i := 0; i < 2; i++ {
+		cc.Add(metrics.TimeSeries{
+			Metric: m1,
+			Tags:   tags,
+		})
+		cc.Add(metrics.TimeSeries{
+			Metric: m2,
+			Tags:   tags,
+		})
+		assert.Equal(t, 2, len(cc.seen))
+	}
+}
+
+func TestCardinalityControlLimitHit(t *testing.T) {
+	t.Parallel()
+
+	registry := metrics.NewRegistry()
+	m1, err := registry.NewMetric("metric1", metrics.Counter)
+	require.NoError(t, err)
+
+	cc := newCardinalityControl()
+	cc.timeSeriesLimit = 1
+
+	cc.Add(metrics.TimeSeries{
+		Metric: m1,
+		Tags:   registry.RootTagSet().With("k", "1"),
+	})
+	assert.False(t, cc.LimitHit())
+
+	// the same time series should not impact the counter
+	cc.Add(metrics.TimeSeries{
+		Metric: m1,
+		Tags:   registry.RootTagSet().With("k", "1"),
+	})
+	assert.False(t, cc.LimitHit())
+
+	cc.Add(metrics.TimeSeries{
+		Metric: m1,
+		Tags:   registry.RootTagSet().With("k", "2"),
+	})
+	assert.True(t, cc.LimitHit())
+	assert.Equal(t, 2, cc.timeSeriesLimit, "the limit is expected to be raised")
 }
 
 func newTestPreInitState(tb testing.TB) *lib.TestPreInitState {
