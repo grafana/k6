@@ -44,6 +44,6 @@ Contributions are welcome!
 
 ### Practices
 
-Contributors will likely notice that the codebase is annotated with comments of the form `// {some number}.`. Those comments are used to track the progress of the implementation of the specification. The numbers are the section numbers of the specification. For example, the comment `// 8.` in the `SubtleCrypto.GenerateKey` function refers to the [step 8 of the `generateKey` algorithm from the specification](https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-generateKey).
+Contributors will likely notice that the codebase is annotated with comments of the form `// {some number}.`. Those comments are used to track the progress of the implementation of the specification and to ensure the correctness of the implementation of the algorithms. The numbers are the section numbers of the specification. For example, the comment `// 8.` in the `SubtleCrypto.GenerateKey` function refers to [step 8 of the `generateKey` algorithm from the specification](https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-generateKey).
 
 Following this convention allows us to document why certain operations are made in a certain way, and to track the progress of the implementation. We do not always add them, but we try to do so when it makes sense, and encourage contributors to do the same.
