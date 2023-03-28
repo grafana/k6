@@ -1,4 +1,4 @@
-// Package modules defines interfaces to be implemented by js modules to be imported by k6.
+// Package modules defines interfaces used for developing k6's JavaScript modules.
 package modules
 
 import (
