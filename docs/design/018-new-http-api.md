@@ -42,7 +42,7 @@ With that said, the design of the API should follow these guidelines:
   - The [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API), a [WHATWG standard](https://streams.spec.whatwg.org/) supported by most modern browsers.
     [Deno's implementation](https://deno.land/manual@v1.30.3/examples/fetch_data#files-and-streams) is a good reference to follow.
 
-    There's a related, but very old [proposal](https://github.com/grafana/k6/issues/592) before the Streams API was standardized, so we shouldn't use it, but it's clear there's community interest in such an API.
+    The work to implement it is tracked in [issue #2978](https://github.com/grafana/k6/issues/2978).
 
     Streaming files both from disk to RAM to the network, and from network to RAM and possibly disk, would also partly solve our [performance and memory issues with loading large files](https://github.com/grafana/k6/issues/2311).
 
