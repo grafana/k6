@@ -179,6 +179,8 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		return isAesCbc || isAesCtr || isAesGcm || isAesKw
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesCbc || isAesCtr || isAesGcm
+	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
+		return isAesCbc || isAesCtr || isAesGcm
 	default:
 		return false
 	}

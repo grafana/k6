@@ -91,6 +91,65 @@ func TestSubtleCryptoImportExportKey(t *testing.T) {
 	})
 }
 
+func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
+	t.Parallel()
+
+	t.Run("AES CBC", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newTestSetup(t)
+
+		gotScriptErr := ts.ev.Start(func() error {
+			err := executeTestScripts(ts.rt, "./tests/encrypt_decrypt", "aes_cbc_vectors.js", "aes.js")
+			require.NoError(t, err)
+
+			_, err = ts.rt.RunString(`run_test()`)
+
+			return err
+		})
+
+		assert.NoError(t, gotScriptErr)
+	})
+
+	t.Run("AES CTR", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newTestSetup(t)
+
+		gotScriptErr := ts.ev.Start(func() error {
+			err := executeTestScripts(ts.rt, "./tests/encrypt_decrypt", "aes_ctr_vectors.js", "aes.js")
+			require.NoError(t, err)
+
+			_, err = ts.rt.RunString(`run_test()`)
+
+			return err
+		})
+
+		assert.NoError(t, gotScriptErr)
+	})
+
+	// Note @oleiade: although the specification targets support
+	// for various iv sizes, go AES GCM cipher only supports 96bits.
+	// Thus, alghought the official WebPlatform test suite contains
+	// vectors for various iv sizes, we only test the 96bits one.
+	t.Run("AES GCM 96bits iv", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newTestSetup(t)
+
+		gotScriptErr := ts.ev.Start(func() error {
+			err := executeTestScripts(ts.rt, "./tests/encrypt_decrypt", "aes_gcm_96_iv_fixtures.js", "aes_gcm_vectors.js", "aes.js")
+			require.NoError(t, err)
+
+			_, err = ts.rt.RunString(`run_test()`)
+
+			return err
+		})
+
+		assert.NoError(t, gotScriptErr)
+	})
+}
+
 func executeTestScripts(rt *goja.Runtime, base string, scripts ...string) error {
 	for _, script := range scripts {
 		program, err := CompileFile(base, script)
