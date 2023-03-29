@@ -388,7 +388,7 @@ At this point the extension should be relatively featureful and stable to be use
 #### Phase 6: deprecate `k6/http`
 
 As the final phase, we should add deprecation warnings when `k6/http` is used, and point users to the new API.
-Eventually, months down the line, we can consider replacing `k6/http` altogether with the new module.
+We'll have to maintain both `k6/http` and `k6/net/http` for likely years to come, though any new development will happen in `k6/net/http`, and `k6/http` would only receive bug and security fixes.
 
 
 ## Potential risks
