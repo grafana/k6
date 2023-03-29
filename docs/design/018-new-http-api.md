@@ -88,7 +88,6 @@ The Socket state can either be _active_—meaning connected for a TCP socket, bo
 - TCP:
 ```javascript
 import { dialTCP } from 'k6/x/net';
-import { Client } from 'k6/x/net/http';
 
 export default async function () {
   const socket = await dialTCP('192.168.1.1:80', {
@@ -117,7 +116,6 @@ export default async function () {
 - UDP:
 ```javascript
 import { dialUDP } from 'k6/x/net';
-import { Client } from 'k6/x/net/http';
 
 export default async function () {
   const socket = new dialUDP('192.168.1.1:9090');
@@ -128,7 +126,7 @@ export default async function () {
 
 - IPC:
 ```javascript
-import { dialIPC } from 'k6/x/net;
+import { dialIPC } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
@@ -168,7 +166,7 @@ import { dialTCP } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const socket = await dialTCP('10.0.0.10:80, { keepAlive: true });
+  const socket = await dialTCP('10.0.0.10:80', { keepAlive: true });
   const client = new Client({
     socket: socket,
     proxy: 'https://myproxy',
@@ -287,7 +285,7 @@ The [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) is a
 The implementation in k6 differs slightly from the web API, but we've tried to make it familiar to use wherever possible.
 
 Example:
-```
+```javascript
 import { fetch } from 'k6/x/net/http';
 
 export default async function () {
