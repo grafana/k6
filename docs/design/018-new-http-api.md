@@ -341,12 +341,15 @@ With this in mind, we propose the following phases:
 - We won't yet try to solve performance/memory issues of the current API, or implement major new features like data streaming.
 
 
-#### Phase 2: work on major issues
+#### Phase 2: work on major issues, merge into k6 core as experimental module
 
 **Goals**:
 
 - Work should be started on some of the most impactful issues from the current API.
   Issues like high memory usage when uploading files ([#2311](https://github.com/grafana/k6/issues/2311)), and data streaming ([#592](https://github.com/grafana/k6/issues/592)), are good candidates to focus on first.
+
+- At the end of this phase the API should resolve major limitations of `k6/http`, and it would be a good time to merge it into k6 core as an experimental module (`k6/experimental/net/http`).
+  This would make it available to more users, including in the k6 Cloud.
 
 
 #### Phase 3: work on leftover issues
@@ -374,21 +377,16 @@ With this in mind, we propose the following phases:
   Small changes will be inevitable, but there should be no discussion about the overall design.
 
 
-#### Phase 5: merge into k6-core, more testing
+#### Phase 5: more testing, deprecating old API
 
 At this point the extension should be relatively featureful and stable to be useful to all k6 users.
 
 **Goals**:
 
-- Merge the extension into k6 core, and make it available to k6 Cloud users.
-
 - Continue to gather and address feedback from users, thorough testing and polishing.
 
-
-#### Phase 6: deprecate `k6/http`
-
-As the final phase, we should add deprecation warnings when `k6/http` is used, and point users to the new API.
-We'll have to maintain both `k6/http` and `k6/net/http` for likely years to come, though any new development will happen in `k6/net/http`, and `k6/http` would only receive bug and security fixes.
+- As the final step, we should add deprecation warnings when `k6/http` is used, and point users to the new API. We can also consider promoting the API from experimental to a main module under `k6/net/http`.
+  We'll have to maintain both `k6/http` and `k6/net/http` for likely years to come, though any new development will happen in `k6/net/http`, and `k6/http` would only receive bug and security fixes.
 
 
 ## Potential risks
