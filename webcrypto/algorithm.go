@@ -170,7 +170,7 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		// FIXME: the presence of the hash algorithm here is for HMAC support and should be handled separately
 		return isAesAlgorithm(algorithmName) || isHashAlgorithm(algorithmName) || algorithmName == HMAC
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
-		return isAesAlgorithm(algorithmName)
+		return isAesAlgorithm(algorithmName) || algorithmName == HMAC
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName)
 	default:

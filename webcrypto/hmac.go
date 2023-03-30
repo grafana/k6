@@ -163,3 +163,25 @@ type HmacKeyAlgorithm struct {
 	// Length represents he length (in bits) of the key.
 	Length int64 `json:"length"`
 }
+
+func exportHmacKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
+	// 1.
+	if ck.handle == nil {
+		return nil, NewError(0, OperationError, "key data is not accesible")
+	}
+
+	// 2.
+	bits, ok := ck.handle.([]byte)
+	if !ok {
+		return nil, NewError(0, OperationError, "key underlying data is not of the correct type")
+	}
+
+	// 4.
+	switch format {
+	case RawKeyFormat:
+		return bits, nil
+	default:
+		// FIXME: note that we do not support JWK format, yet #37.
+		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+	}
+}

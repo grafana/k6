@@ -610,6 +610,12 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 				reject(err)
 				return
 			}
+		case HMAC:
+			result, err = exportHmacKey(ck, format)
+			if err != nil {
+				reject(err)
+				return
+			}
 		default:
 			reject(NewError(0, NotSupportedError, "unsupported algorithm "+keyAlgorithmName))
 			return
