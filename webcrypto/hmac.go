@@ -1,6 +1,11 @@
 package webcrypto
 
 import (
+	"crypto/rand"
+	"crypto/sha1" //nolint:gosec
+	"crypto/sha256"
+	"crypto/sha512"
+
 	"github.com/dop251/goja"
 	"gopkg.in/guregu/null.v3"
 )
@@ -69,4 +74,92 @@ func newHmacKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 		Hash:      normalizedHash,
 		Length:    length,
 	}, nil
+}
+
+// GenerateKey generates a new HMAC key.
+func (hkgp *HmacKeyGenParams) GenerateKey(
+	extractable bool,
+	keyUsages []CryptoKeyUsage,
+) (*CryptoKey, error) {
+	// 1.
+	for _, usage := range keyUsages {
+		switch usage {
+		case SignCryptoKeyUsage, VerifyCryptoKeyUsage:
+			continue
+		default:
+			return nil, NewError(0, SyntaxError, "invalid key usage: "+usage)
+		}
+	}
+
+	// 2.
+	// We extract the length attribute from the algorithm object, as it's not
+	// part of the normalized algorithm, and as accessing the runtime from the
+	// callback below could lead to a race condition.
+	if !hkgp.Length.Valid {
+		switch hkgp.Hash.Name {
+		case Sha1:
+			hkgp.Length = null.IntFrom(sha1.BlockSize * 8)
+		case Sha256:
+			hkgp.Length = null.IntFrom(sha256.BlockSize * 8)
+		case Sha384:
+			hkgp.Length = null.IntFrom(sha512.BlockSize * 8)
+		case Sha512:
+			hkgp.Length = null.IntFrom(sha512.BlockSize * 8)
+		default:
+			// This case should never happen, as the normalization algorithm
+			// should have thrown an error if the hash algorithm is invalid.
+			return nil, NewError(0, ImplementationError, "invalid hash algorithm: "+hkgp.Hash.Name)
+		}
+	}
+
+	if hkgp.Length.Int64 == 0 {
+		return nil, NewError(0, OperationError, "algorithm's length cannot be 0")
+	}
+
+	// 3.
+	randomKey := make([]byte, hkgp.Length.Int64/8)
+	if _, err := rand.Read(randomKey); err != nil {
+		// 4.
+		return nil, NewError(0, OperationError, "failed to generate random key; reason:  "+err.Error())
+	}
+
+	// 5.
+	key := &CryptoKey{Type: SecretCryptoKeyType, handle: randomKey}
+
+	// 6.
+	algorithm := HmacKeyAlgorithm{}
+
+	// 7.
+	algorithm.Name = HMAC
+	algorithm.Length = hkgp.Length.Int64
+
+	// 8.
+	hash := KeyAlgorithm{}
+
+	// 9.
+	hash.Name = hkgp.Hash.Name
+
+	// 10.
+	algorithm.Hash = hash
+
+	// 11. 12. 13.
+	key.Algorithm = algorithm
+	key.Extractable = extractable
+	key.Usages = keyUsages
+
+	return key, nil
+}
+
+// Ensure that HmacKeyGenParams implements the KeyGenerator interface.
+var _ KeyGenerator = &HmacKeyGenParams{}
+
+// HmacKeyAlgorithm represents the algorithm of an HMAC key.
+type HmacKeyAlgorithm struct {
+	KeyAlgorithm
+
+	// Hash represents the inner hash function to use.
+	Hash KeyAlgorithm `json:"hash"`
+
+	// Length represents he length (in bits) of the key.
+	Length int64 `json:"length"`
 }

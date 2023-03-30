@@ -1,5 +1,9 @@
 package webcrypto
 
+import (
+	"github.com/dop251/goja"
+)
+
 // CryptoKeyPair represents a key pair for an asymmetric cryptography algorithm, also known as
 // a public-key algorithm.
 //
@@ -96,6 +100,11 @@ const (
 	// UnwrapKeyCryptoKeyUsage indicates that the key may be used to unwrap another key.
 	UnwrapKeyCryptoKeyUsage CryptoKeyUsage = "unwrapKey"
 )
+
+// KeyAlgorithm represents the algorithm used to generate a cryptographic key.
+type KeyAlgorithm struct {
+	Algorithm
+}
 
 // KeyGenerator is the interface implemented by the algorithms used to generate
 // cryptographic keys.
