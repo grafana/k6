@@ -306,6 +306,90 @@ export default async function () {
 }
 ```
 
+#### Events
+
+The new HTTP API will emit events which scripts can subscribe to, in order to implement advanced functionality.
+
+For example, a `requestToBeSent` event is emitted when the request was processed by k6, and just before it is sent to the server. This allows changing the request body or headers, or introducing artificial delays.
+
+```javascript
+import { sleep } from 'k6';
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const client = new Client();
+  client.on('requestToBeSent', event => {
+    console.log(event.type);    // 'requestToBeSent'
+    const request = event.data;
+    request.headers['Cookie'] = 'somecookie=somevalue;'  // overwrites all previously set cookies
+    request.body += ' world!';  // the final body will be 'Hello world!'
+    sleep(Math.random() * 5);   // random delay up to 5s
+  });
+
+  await client.post('https://httpbin.test.k6.io/post', { body: 'Hello' });
+}
+```
+
+Similarly, a `responseReceived` event is emitted when a response is received from the server, but before it's been fully processed by k6. This can be useful to alter the response in some way, or edit the metrics emitted by k6.
+
+For example:
+
+```javascript
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const client = new Client();
+  let requestID;  // used to correlate a specific response with the request that initiated it
+
+  client.on('requestToBeSent', event => {
+    const request = event.data;
+    if (!requestID && request.url == 'https://httpbin.test.k6.io/get?name=k6'
+        && request.method == 'GET') {
+      // The request ID is a UUIDv4 string that uniquely identifies a single request.
+      // This is a contrived check and example, but you can imagine that in a complex
+      // script there would be many similar requests.
+      requestID = request.id;
+    }
+  });
+
+  client.on('responseReceived', event => {
+    const response = event.data;
+    if (requestID && response.request.id == requestID) {
+      // Change the request duration metric to any value
+      response.metrics['http_req_duration'].value = 3.1415;
+      // Consider the request successful regardless of its response
+      response.metrics['http_req_failed'].value = false;
+      // Or drop a single metric
+      delete response.metrics['http_req_duration'];
+      // Or drop all metrics
+      response.metrics = {};
+    }
+  });
+
+  await client.get('https://httpbin.test.k6.io/get', { query: { name: 'k6' } });
+}
+```
+
+Event handlers can also be attached directly to a single request/response cycle. This avoids having to correlate responses with requests as done above.
+
+```javascript
+import { Client } from 'k6/x/net/http';
+
+export default async function () {
+  const client = new Client();
+  await client.get('https://httpbin.test.k6.io/get', {
+    eventHandlers: {
+      'responseReceived': event => {
+        const response = event.data;
+        // ...
+      }
+    }
+  });
+}
+```
+
+**TODO**: List other possible event types, and their use cases.
+
 
 ### Implementation
 
