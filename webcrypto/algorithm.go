@@ -163,25 +163,25 @@ func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) 
 //
 // [algorithm normalization]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
 func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
-	isAesCbc := algorithmName == AESCbc
-	isAesCtr := algorithmName == AESCtr
-	isAesGcm := algorithmName == AESGcm
-	isAesKw := algorithmName == AESKw
-
 	switch forOperation {
 	case OperationIdentifierDigest:
-		isSha1 := algorithmName == Sha1
-		isSha256 := algorithmName == Sha256
-		isSha384 := algorithmName == Sha384
-		isSha512 := algorithmName == Sha512
-		return isSha1 || isSha256 || isSha384 || isSha512
+		return isHashAlgorithm(algorithmName)
 	case OperationIdentifierGenerateKey:
-		return isAesCbc || isAesCtr || isAesGcm || isAesKw
+		// FIXME: the presence of the hash algorithm here is for HMAC support and should be handled separately
+		return isAesAlgorithm(algorithmName) || isHashAlgorithm(algorithmName) || algorithmName == HMAC
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
-		return isAesCbc || isAesCtr || isAesGcm
+		return isAesAlgorithm(algorithmName)
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
-		return isAesCbc || isAesCtr || isAesGcm
+		return isAesAlgorithm(algorithmName)
 	default:
 		return false
 	}
+}
+
+func isAesAlgorithm(algorithmName string) bool {
+	return algorithmName == AESCbc || algorithmName == AESCtr || algorithmName == AESGcm || algorithmName == AESKw
+}
+
+func isHashAlgorithm(algorithmName string) bool {
+	return algorithmName == Sha1 || algorithmName == Sha256 || algorithmName == Sha384 || algorithmName == Sha512
 }
