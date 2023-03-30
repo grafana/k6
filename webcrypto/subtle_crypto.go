@@ -507,11 +507,14 @@ func (sc *SubtleCrypto) ImportKey(
 	rt := sc.vu.Runtime()
 	promise, resolve, reject := sc.makeHandledPromise()
 
-	keyBytes, err := exportArrayBuffer(rt, keyData)
+	// 2.
+	ab, err := exportArrayBuffer(rt, keyData)
 	if err != nil {
 		reject(err)
 		return promise
 	}
+	keyBytes := make([]byte, len(ab))
+	copy(keyBytes, ab)
 
 	// 3.
 	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierImportKey)
@@ -520,29 +523,38 @@ func (sc *SubtleCrypto) ImportKey(
 		return promise
 	}
 
+	ki, err := newKeyImporter(rt, normalized, algorithm)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
 	// 5.
 	go func() {
-		switch normalized.Name {
-		case AESCbc, AESCtr, AESGcm:
-			// 8.
-			result, err := importAESKey(format, normalized, keyBytes, keyUsages)
-			if err != nil {
-				reject(err)
-				return
-			}
-
-			// 9.
-			if (result.Type == SecretCryptoKeyType || result.Type == PrivateCryptoKeyType) && len(keyUsages) == 0 {
-				reject(NewError(0, SyntaxError, "the keyUsages argument must contain at least one valid usage for the algorithm"))
-				return
-			}
-
-			// 10. 11.
-			result.Extractable = extractable
-			result.Usages = keyUsages
-
-			resolve(result)
+		// 8.
+		result, err := ki.ImportKey(format, keyBytes, keyUsages)
+		if err != nil {
+			reject(err)
+			return
 		}
+
+		// 9.
+		isSecretKey := result.Type == SecretCryptoKeyType
+		isPrivateKey := result.Type == PrivateCryptoKeyType
+		isUsagesEmpty := len(keyUsages) == 0
+		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+			reject(NewError(0, SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
+			return
+		}
+
+		// 10.
+		result.Extractable = extractable
+
+		// 11.
+		result.Usages = keyUsages
+
+		// 12.
+		resolve(result)
 	}()
 
 	return promise
