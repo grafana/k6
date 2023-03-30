@@ -97,6 +97,30 @@ const (
 	UnwrapKeyCryptoKeyUsage CryptoKeyUsage = "unwrapKey"
 )
 
+// KeyGenerator is the interface implemented by the algorithms used to generate
+// cryptographic keys.
+type KeyGenerator interface {
+	GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
+}
+
+func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) (KeyGenerator, error) {
+	var kg KeyGenerator
+	var err error
+
+	switch normalized.Name {
+	case AESCbc, AESCtr, AESGcm, AESKw:
+		kg, err = newAesKeyGenParams(rt, normalized, params)
+	case HMAC:
+		kg, err = newHmacKeyGenParams(rt, normalized, params)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return kg, nil
+}
+
 // UsageIntersection returns the intersection of two slices of CryptoKeyUsage.
 //
 // It implements the algorithm described in the [specification] to

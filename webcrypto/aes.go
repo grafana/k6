@@ -6,6 +6,8 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
+
+	"github.com/dop251/goja"
 )
 
 // AesKeyGenParams represents the object that should be passed as
@@ -21,7 +23,32 @@ type AesKeyGenParams struct {
 	Length int64 `json:"length"`
 }
 
-// GenerateKey generates a new AES key.
+// newAesKeyGenParams creates a new AesKeyGenParams object, from the
+// normalized algorithm, and the algorithm parameters.
+//
+// It handles the logic involved in handling the `length` attribute,
+// which is not part of the normalized algorithm.
+func newAesKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*AesKeyGenParams, error) {
+	// We extract the length attribute from the params object, as it's not
+	// part of the normalized algorithm, and as accessing the runtime from the
+	// callback below could lead to a race condition.
+	algorithmLengthValue, err := traverseObject(rt, params, "length")
+	if err != nil {
+		return nil, NewError(0, SyntaxError, "could not get length from algorithm parameter")
+	}
+
+	algorithmLength := algorithmLengthValue.ToInteger()
+
+	return &AesKeyGenParams{
+		Algorithm: normalized,
+		Length:    algorithmLength,
+	}, nil
+}
+
+// GenerateKey generates a new AES key, according to the algorithm
+// described in the specification.
+//
+// [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-keygen-params
 func (akgp *AesKeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
@@ -74,6 +101,9 @@ func (akgp *AesKeyGenParams) GenerateKey(
 	// 12.
 	return &key, nil
 }
+
+// Ensure that AesKeyGenParams implements the KeyGenerator interface.
+var _ KeyGenerator = &AesKeyGenParams{}
 
 // AesKeyAlgorithm is the algorithm for AES keys as defined in the [specification].
 //
