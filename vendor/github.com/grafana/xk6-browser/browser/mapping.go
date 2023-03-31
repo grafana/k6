@@ -2,35 +2,18 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6common "go.k6.io/k6/js/common"
-	k6modules "go.k6.io/k6/js/modules"
 )
-
-// moduleVU carries module specific VU information.
-//
-// Currently, it is used to carry the VU object to the
-// inner objects and promises.
-type moduleVU struct {
-	k6modules.VU
-}
-
-func (vu moduleVU) Context() context.Context {
-	// promises and inner objects need the VU object to be
-	// able to use k6-core specific functionality.
-	//
-	// We should not cache the context (especially the init
-	// context from the vu that is received from k6 in
-	// NewModuleInstance).
-	return k6ext.WithVU(vu.VU.Context(), vu.VU)
-}
 
 // mapping is a type of mapping between our API (api/) and the JS
 // module. It acts like a bridge and allows adding wildcard methods
@@ -60,6 +43,41 @@ func mapBrowserToGoja(vu moduleVU) *goja.Object {
 	}
 
 	return obj
+}
+
+// mapLocator API to the JS module.
+func mapLocator(vu moduleVU, lo api.Locator) mapping {
+	return mapping{
+		"click": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				err := lo.Click(opts)
+				return nil, err //nolint:wrapcheck
+			})
+		},
+		"dblclick":      lo.Dblclick,
+		"check":         lo.Check,
+		"uncheck":       lo.Uncheck,
+		"isChecked":     lo.IsChecked,
+		"isEditable":    lo.IsEditable,
+		"isEnabled":     lo.IsEnabled,
+		"isDisabled":    lo.IsDisabled,
+		"isVisible":     lo.IsVisible,
+		"isHidden":      lo.IsHidden,
+		"fill":          lo.Fill,
+		"focus":         lo.Focus,
+		"getAttribute":  lo.GetAttribute,
+		"innerHTML":     lo.InnerHTML,
+		"innerText":     lo.InnerText,
+		"textContent":   lo.TextContent,
+		"inputValue":    lo.InputValue,
+		"selectOption":  lo.SelectOption,
+		"press":         lo.Press,
+		"type":          lo.Type,
+		"hover":         lo.Hover,
+		"tap":           lo.Tap,
+		"dispatchEvent": lo.DispatchEvent,
+		"waitFor":       lo.WaitFor,
+	}
 }
 
 // mapRequest to the JS module.
@@ -119,7 +137,7 @@ func mapResponse(vu moduleVU, r api.Response) mapping {
 		"headerValues": r.HeaderValues,
 		"headers":      r.Headers,
 		"headersArray": r.HeadersArray,
-		"jSON":         r.JSON,
+		"json":         r.JSON,
 		"ok":           r.Ok,
 		"request": func() *goja.Object {
 			mr := mapRequest(vu, r.Request())
@@ -146,19 +164,24 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 		},
 		"dispose":  jsh.Dispose,
 		"evaluate": jsh.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
-			var (
-				h = jsh.EvaluateHandle(pageFunc, args...)
-				m = mapJSHandle(vu, h)
-			)
-			return rt.ToValue(m).ToObject(rt)
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
+			h, err := jsh.EvaluateHandle(pageFunc, args...)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, h), nil
 		},
-		"getProperties": func() *goja.Object {
+		"getProperties": func() (mapping, error) {
+			props, err := jsh.GetProperties()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+
 			dst := make(map[string]any)
-			for k, v := range jsh.GetProperties() {
+			for k, v := range props {
 				dst[k] = mapJSHandle(vu, v)
 			}
-			return rt.ToValue(dst).ToObject(rt)
+			return dst, nil
 		},
 		"getProperty": func(propertyName string) *goja.Object {
 			var (
@@ -168,7 +191,6 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 			return rt.ToValue(m).ToObject(rt)
 		},
 		"jsonValue": jsh.JSONValue,
-		"objectID":  jsh.ObjectID,
 	}
 }
 
@@ -176,7 +198,6 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
 //
 //nolint:funlen
 func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
-	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,
 		"check":       eh.Check,
@@ -186,10 +207,12 @@ func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 				return nil, err //nolint:wrapcheck
 			})
 		},
-		"contentFrame": func() *goja.Object {
-			f := eh.ContentFrame()
-			mf := mapFrame(vu, f)
-			return rt.ToValue(mf).ToObject(rt)
+		"contentFrame": func() (mapping, error) {
+			f, err := eh.ContentFrame()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapFrame(vu, f), nil
 		},
 		"dblclick":      eh.Dblclick,
 		"dispatchEvent": eh.DispatchEvent,
@@ -206,10 +229,12 @@ func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 		"isEnabled":     eh.IsEnabled,
 		"isHidden":      eh.IsHidden,
 		"isVisible":     eh.IsVisible,
-		"ownerFrame": func() *goja.Object {
-			f := eh.OwnerFrame()
-			mf := mapFrame(vu, f)
-			return rt.ToValue(mf).ToObject(rt)
+		"ownerFrame": func() (mapping, error) {
+			f, err := eh.OwnerFrame()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapFrame(vu, f), nil
 		},
 		"press":                  eh.Press,
 		"screenshot":             eh.Screenshot,
@@ -222,27 +247,33 @@ func mapElementHandle(vu moduleVU, eh api.ElementHandle) mapping {
 		"type":                   eh.Type,
 		"uncheck":                eh.Uncheck,
 		"waitForElementState":    eh.WaitForElementState,
-		"waitForSelector": func(selector string, opts goja.Value) *goja.Object {
-			eh := eh.WaitForSelector(selector, opts)
-			ehm := mapElementHandle(vu, eh)
-			return rt.ToValue(ehm).ToObject(rt)
+		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
+			eh, err := eh.WaitForSelector(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, eh), nil
 		},
 	}
-	maps["$"] = func(selector string) *goja.Object {
-		eh := eh.Query(selector)
+	maps["$"] = func(selector string) (mapping, error) {
+		eh, err := eh.Query(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
 		ehm := mapElementHandle(vu, eh)
-		return rt.ToValue(ehm).ToObject(rt)
+		return ehm, nil
 	}
-	maps["$$"] = func(selector string) *goja.Object {
-		var (
-			mehs []mapping
-			ehs  = eh.QueryAll(selector)
-		)
+	maps["$$"] = func(selector string) ([]mapping, error) {
+		ehs, err := eh.QueryAll(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+		var mehs []mapping
 		for _, eh := range ehs {
 			ehm := mapElementHandle(vu, eh)
 			mehs = append(mehs, ehm)
 		}
-		return rt.ToValue(mehs).ToObject(rt)
+		return mehs, nil
 	}
 
 	jsHandleMap := mapJSHandle(vu, eh)
@@ -282,16 +313,21 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 		"dblclick":      f.Dblclick,
 		"dispatchEvent": f.DispatchEvent,
 		"evaluate":      f.Evaluate,
-		"evaluateHandle": func(pageFunction goja.Value, args ...goja.Value) *goja.Object {
-			jsh := f.EvaluateHandle(pageFunction, args...)
-			ehm := mapJSHandle(vu, jsh)
-			return rt.ToValue(ehm).ToObject(rt)
+		"evaluateHandle": func(pageFunction goja.Value, args ...goja.Value) (mapping, error) {
+			jsh, err := f.EvaluateHandle(pageFunction, args...)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, jsh), nil
 		},
 		"fill":  f.Fill,
 		"focus": f.Focus,
-		"frameElement": func() *goja.Object {
-			eh := mapElementHandle(vu, f.FrameElement())
-			return rt.ToValue(eh).ToObject(rt)
+		"frameElement": func() (mapping, error) {
+			fe, err := f.FrameElement()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, fe), nil
 		},
 		"getAttribute": f.GetAttribute,
 		"goto": func(url string, opts goja.Value) *goja.Promise {
@@ -315,10 +351,11 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 		"isEnabled":  f.IsEnabled,
 		"isHidden":   f.IsHidden,
 		"isVisible":  f.IsVisible,
-		"iD":         f.ID,
-		"loaderID":   f.LoaderID,
-		"locator":    f.Locator,
-		"name":       f.Name,
+		"locator": func(selector string, opts goja.Value) *goja.Object {
+			ml := mapLocator(vu, f.Locator(selector, opts))
+			return rt.ToValue(ml).ToObject(rt)
+		},
+		"name": f.Name,
 		"page": func() *goja.Object {
 			mp := mapPage(vu, f.Page())
 			return rt.ToValue(mp).ToObject(rt)
@@ -352,28 +389,34 @@ func mapFrame(vu moduleVU, f api.Frame) mapping {
 				return mapResponse(vu, resp), nil
 			})
 		},
-		"waitForSelector": func(selector string, opts goja.Value) *goja.Object {
-			eh := f.WaitForSelector(selector, opts)
-			ehm := mapElementHandle(vu, eh)
-			return rt.ToValue(ehm).ToObject(rt)
+		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
+			eh, err := f.WaitForSelector(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, eh), nil
 		},
 		"waitForTimeout": f.WaitForTimeout,
 	}
-	maps["$"] = func(selector string) *goja.Object {
-		eh := f.Query(selector)
+	maps["$"] = func(selector string) (mapping, error) {
+		eh, err := f.Query(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
 		ehm := mapElementHandle(vu, eh)
-		return rt.ToValue(ehm).ToObject(rt)
+		return ehm, nil
 	}
-	maps["$$"] = func(selector string) *goja.Object {
-		var (
-			mehs []mapping
-			ehs  = f.QueryAll(selector)
-		)
+	maps["$$"] = func(selector string) ([]mapping, error) {
+		ehs, err := f.QueryAll(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+		var mehs []mapping
 		for _, eh := range ehs {
 			ehm := mapElementHandle(vu, eh)
 			mehs = append(mehs, ehm)
 		}
-		return rt.ToValue(mehs).ToObject(rt)
+		return mehs, nil
 	}
 
 	return maps
@@ -405,12 +448,12 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
 		"evaluate":                p.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
-			var (
-				jsh = p.EvaluateHandle(pageFunc, args...)
-				m   = mapJSHandle(vu, jsh)
-			)
-			return rt.ToValue(m).ToObject(rt)
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
+			jsh, err := p.EvaluateHandle(pageFunc, args...)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, jsh), nil
 		},
 		"exposeBinding":  p.ExposeBinding,
 		"exposeFunction": p.ExposeFunction,
@@ -428,8 +471,13 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
 		"getAttribute": p.GetAttribute,
-		"goBack":       p.GoBack,
-		"goForward":    p.GoForward,
+		"goBack": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				resp := p.GoBack(opts)
+				return mapResponse(vu, resp), nil
+			})
+		},
+		"goForward": p.GoForward,
 		"goto": func(url string, opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp, err := p.Goto(url, opts)
@@ -452,7 +500,10 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
 		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
-		"locator":    p.Locator,
+		"locator": func(selector string, opts goja.Value) *goja.Object {
+			ml := mapLocator(vu, p.Locator(selector, opts))
+			return rt.ToValue(ml).ToObject(rt)
+		},
 		"mainFrame": func() *goja.Object {
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
@@ -503,8 +554,14 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 		},
 		"waitForRequest":  p.WaitForRequest,
 		"waitForResponse": p.WaitForResponse,
-		"waitForSelector": p.WaitForSelector,
-		"waitForTimeout":  p.WaitForTimeout,
+		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
+			eh, err := p.WaitForSelector(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapElementHandle(vu, eh), nil
+		},
+		"waitForTimeout": p.WaitForTimeout,
 		"workers": func() *goja.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {
@@ -514,21 +571,25 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 			return rt.ToValue(mws).ToObject(rt)
 		},
 	}
-	maps["$"] = func(selector string) *goja.Object {
-		eh := p.Query(selector)
+	maps["$"] = func(selector string) (mapping, error) {
+		eh, err := p.Query(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
 		ehm := mapElementHandle(vu, eh)
-		return rt.ToValue(ehm).ToObject(rt)
+		return ehm, nil
 	}
-	maps["$$"] = func(selector string) *goja.Object {
-		var (
-			mehs []mapping
-			ehs  = p.QueryAll(selector)
-		)
+	maps["$$"] = func(selector string) ([]mapping, error) {
+		ehs, err := p.QueryAll(selector)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+		var mehs []mapping
 		for _, eh := range ehs {
 			ehm := mapElementHandle(vu, eh)
 			mehs = append(mehs, ehm)
 		}
-		return rt.ToValue(mehs).ToObject(rt)
+		return mehs, nil
 	}
 
 	return maps
@@ -536,13 +597,15 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 
 // mapWorker to the JS module.
 func mapWorker(vu moduleVU, w api.Worker) mapping {
-	rt := vu.Runtime()
 	return mapping{
 		"evaluate": w.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) *goja.Object {
-			h := w.EvaluateHandle(pageFunc, args...)
-			m := mapJSHandle(vu, h)
-			return rt.ToValue(m).ToObject(rt)
+		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
+			h, err := w.EvaluateHandle(pageFunc, args...)
+			if err != nil {
+				panicIfFatalError(vu.Context(), err)
+				return nil, err //nolint:wrapcheck
+			}
+			return mapJSHandle(vu, h), nil
 		},
 		"url": w.URL(),
 	}
@@ -552,13 +615,18 @@ func mapWorker(vu moduleVU, w api.Worker) mapping {
 func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"addCookies":                  bc.AddCookies,
-		"addInitScript":               bc.AddInitScript,
-		"browser":                     bc.Browser,
-		"clearCookies":                bc.ClearCookies,
-		"clearPermissions":            bc.ClearPermissions,
-		"close":                       bc.Close,
-		"cookies":                     bc.Cookies,
+		"addCookies":       bc.AddCookies,
+		"addInitScript":    bc.AddInitScript,
+		"browser":          bc.Browser,
+		"clearCookies":     bc.ClearCookies,
+		"clearPermissions": bc.ClearPermissions,
+		"close":            bc.Close,
+		"cookies": func() ([]any, error) {
+			cc, err := bc.Cookies()
+			ctx := vu.Context()
+			panicIfFatalError(ctx, err)
+			return cc, err //nolint:wrapcheck
+		},
 		"exposeBinding":               bc.ExposeBinding,
 		"exposeFunction":              bc.ExposeFunction,
 		"grantPermissions":            bc.GrantPermissions,
@@ -566,13 +634,20 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 		"route":                       bc.Route,
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
-		"setExtraHTTPHeaders":         bc.SetExtraHTTPHeaders,
-		"setGeolocation":              bc.SetGeolocation,
-		"setHTTPCredentials":          bc.SetHTTPCredentials, //nolint:staticcheck
-		"setOffline":                  bc.SetOffline,
-		"storageState":                bc.StorageState,
-		"unroute":                     bc.Unroute,
-		"waitForEvent":                bc.WaitForEvent,
+		"setExtraHTTPHeaders": func(headers map[string]string) *goja.Promise {
+			ctx := vu.Context()
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				err := bc.SetExtraHTTPHeaders(headers)
+				panicIfFatalError(ctx, err)
+				return nil, err //nolint:wrapcheck
+			})
+		},
+		"setGeolocation":     bc.SetGeolocation,
+		"setHTTPCredentials": bc.SetHTTPCredentials, //nolint:staticcheck
+		"setOffline":         bc.SetOffline,
+		"storageState":       bc.StorageState,
+		"unroute":            bc.Unroute,
+		"waitForEvent":       bc.WaitForEvent,
 		"pages": func() *goja.Object {
 			var (
 				mpages []mapping
@@ -588,10 +663,12 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 
 			return rt.ToValue(mpages).ToObject(rt)
 		},
-		"newPage": func() *goja.Object {
-			page := bc.NewPage()
-			m := mapPage(vu, page)
-			return rt.ToValue(m).ToObject(rt)
+		"newPage": func() (mapping, error) {
+			page, err := bc.NewPage()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapPage(vu, page), nil
 		},
 	}
 }
@@ -610,15 +687,20 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 		},
 		"userAgent": b.UserAgent,
 		"version":   b.Version,
-		"newContext": func(opts goja.Value) *goja.Object {
-			bctx := b.NewContext(opts)
+		"newContext": func(opts goja.Value) (*goja.Object, error) {
+			bctx, err := b.NewContext(opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
 			m := mapBrowserContext(vu, bctx)
-			return rt.ToValue(m).ToObject(rt)
+			return rt.ToValue(m).ToObject(rt), nil
 		},
-		"newPage": func(opts goja.Value) *goja.Object {
-			page := b.NewPage(opts)
-			m := mapPage(vu, page)
-			return rt.ToValue(m).ToObject(rt)
+		"newPage": func(opts goja.Value) (mapping, error) {
+			page, err := b.NewPage(opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			return mapPage(vu, page), nil
 		},
 	}
 }
@@ -627,13 +709,26 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"connect":                 bt.Connect,
+		"connect": func(wsEndpoint string, opts goja.Value) *goja.Object {
+			b := bt.Connect(wsEndpoint, opts)
+			m := mapBrowser(vu, b)
+			return rt.ToValue(m).ToObject(rt)
+		},
 		"executablePath":          bt.ExecutablePath,
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
 		"launch": func(opts goja.Value) *goja.Object {
-			m := mapBrowser(vu, bt.Launch(opts))
+			b, pid := bt.Launch(opts)
+			// store the pid so we can kill it later on panic.
+			vu.registerPid(pid)
+			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},
+	}
+}
+
+func panicIfFatalError(ctx context.Context, err error) {
+	if errors.Is(err, k6error.ErrFatal) {
+		k6ext.Abort(ctx, err.Error())
 	}
 }

@@ -19,8 +19,7 @@ type BrowserProcess struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// The process of the browser, if running locally.
-	process *os.Process
+	meta browserProcessMeta
 
 	// Channels for managing termination.
 	lostConnection             chan struct{}
@@ -30,13 +29,12 @@ type BrowserProcess struct {
 	// Browser's WebSocket URL to speak CDP
 	wsURL string
 
-	// The directory where user data for the browser is stored.
-	userDataDir *storage.Dir
-
 	logger *log.Logger
 }
 
-func NewBrowserProcess(
+// NewLocalBrowserProcess starts a local browser process and
+// returns a new BrowserProcess instance to interact with it.
+func NewLocalBrowserProcess(
 	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
 	ctxCancel context.CancelFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {
@@ -50,33 +48,58 @@ func NewBrowserProcess(
 		return nil, err
 	}
 
+	meta := newLocalBrowserProcessMeta(cmd.Process, dataDir)
+
 	p := BrowserProcess{
 		ctx:                        ctx,
 		cancel:                     ctxCancel,
-		process:                    cmd.Process,
+		meta:                       meta,
 		lostConnection:             make(chan struct{}),
 		processIsGracefullyClosing: make(chan struct{}),
 		processDone:                cmd.done,
 		wsURL:                      wsURL,
-		userDataDir:                dataDir,
+		logger:                     logger,
 	}
 
-	go func() {
-		// If we lose connection to the browser and we're not in-progress with clean
-		// browser-initiated termination then cancel the context to clean up.
-		select {
-		case <-p.lostConnection:
-		case <-ctx.Done():
-		}
-
-		select {
-		case <-p.processIsGracefullyClosing:
-		default:
-			p.cancel()
-		}
-	}()
+	go p.handleClose(ctx)
 
 	return &p, nil
+}
+
+// NewRemoteBrowserProcess returns a new BrowserProcess instance
+// which references a remote browser process.
+func NewRemoteBrowserProcess(
+	ctx context.Context, wsURL string, ctxCancel context.CancelFunc, logger *log.Logger,
+) (*BrowserProcess, error) {
+	p := BrowserProcess{
+		ctx:                        ctx,
+		cancel:                     ctxCancel,
+		meta:                       newRemoteBrowserProcessMeta(),
+		lostConnection:             make(chan struct{}),
+		processIsGracefullyClosing: make(chan struct{}),
+		processDone:                make(chan struct{}),
+		wsURL:                      wsURL,
+		logger:                     logger,
+	}
+
+	go p.handleClose(ctx)
+
+	return &p, nil
+}
+
+func (p *BrowserProcess) handleClose(ctx context.Context) {
+	// If we lose connection to the browser and we're not in-progress with clean
+	// browser-initiated termination then cancel the context to clean up.
+	select {
+	case <-p.lostConnection:
+	case <-ctx.Done():
+	}
+
+	select {
+	case <-p.processIsGracefullyClosing:
+	default:
+		p.cancel()
+	}
 }
 
 func (p *BrowserProcess) didLoseConnection() {
@@ -110,14 +133,15 @@ func (p *BrowserProcess) WsURL() string {
 	return p.wsURL
 }
 
-// Pid returns the browser process ID.
+// Pid returns the browser process ID, or -1 if this is unknown.
 func (p *BrowserProcess) Pid() int {
-	return p.process.Pid
+	return p.meta.Pid()
 }
 
-// AttachLogger attaches a logger to the browser process.
-func (p *BrowserProcess) AttachLogger(logger *log.Logger) {
-	p.logger = logger
+// Cleanup cleans up the metadata associated with the browser
+// process, mainly the browser data directory.
+func (p *BrowserProcess) Cleanup() error {
+	return p.meta.Cleanup() //nolint:wrapcheck
 }
 
 type command struct {

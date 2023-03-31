@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
@@ -23,8 +24,10 @@ import (
 )
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
-var _ EventEmitter = &Browser{}
-var _ api.Browser = &Browser{}
+var (
+	_ EventEmitter = &Browser{}
+	_ api.Browser  = &Browser{}
+)
 
 const (
 	BrowserStateOpen int64 = iota
@@ -61,6 +64,9 @@ type Browser struct {
 
 	sessionIDtoTargetIDMu sync.RWMutex
 	sessionIDtoTargetID   map[target.SessionID]target.ID
+
+	// Used to display a warning when the browser is reclosed.
+	closed bool
 
 	vu k6modules.VU
 
@@ -115,7 +121,10 @@ func (b *Browser) connect() error {
 	b.conn = conn
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
-	b.defaultContext = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
+	b.defaultContext, err = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
+	if err != nil {
+		return fmt.Errorf("browser connect: %w", err)
+	}
 
 	return b.initEvents()
 }
@@ -391,8 +400,17 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 // Close shuts down the browser.
 func (b *Browser) Close() {
+	if b.closed {
+		b.logger.Warnf(
+			"Browser:Close",
+			"Please call browser.close only once, and do not use the browser after calling close.",
+		)
+		return
+	}
+	b.closed = true
+
 	defer func() {
-		if err := b.browserProc.userDataDir.Cleanup(); err != nil {
+		if err := b.browserProc.Cleanup(); err != nil {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
 	}()
@@ -408,11 +426,12 @@ func (b *Browser) Close() {
 	b.conn.IgnoreIOErrors()
 	b.browserProc.GracefulClose()
 
-	// Send the Browser.close CDP command, which triggers the browser process to
-	// exit.
-	action := cdpbrowser.Close()
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.conn)); err != nil {
-		if _, ok := err.(*websocket.CloseError); !ok {
+	// If the browser is not being executed remotely, send the Browser.close CDP
+	// command, which triggers the browser process to exit.
+	if !b.launchOpts.isRemoteBrowser {
+		var closeErr *websocket.CloseError
+		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.ctx, b.conn))
+		if err != nil && !errors.As(err, &closeErr) {
 			k6ext.Panic(b.ctx, "closing the browser: %v", err)
 		}
 	}
@@ -459,7 +478,7 @@ func (b *Browser) IsConnected() bool {
 }
 
 // NewContext creates a new incognito-like browser context.
-func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
+func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
@@ -474,15 +493,22 @@ func (b *Browser) NewContext(opts goja.Value) api.BrowserContext {
 
 	b.contextsMu.Lock()
 	defer b.contextsMu.Unlock()
-	browserCtx := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	if err != nil {
+		return nil, fmt.Errorf("new context: %w", err)
+	}
 	b.contexts[browserContextID] = browserCtx
 
-	return browserCtx
+	return browserCtx, nil
 }
 
 // NewPage creates a new tab in the browser window.
-func (b *Browser) NewPage(opts goja.Value) api.Page {
-	browserCtx := b.NewContext(opts)
+func (b *Browser) NewPage(opts goja.Value) (api.Page, error) {
+	browserCtx, err := b.NewContext(opts)
+	if err != nil {
+		return nil, fmt.Errorf("new page: %w", err)
+	}
+
 	return browserCtx.NewPage()
 }
 
@@ -523,4 +549,9 @@ func (b *Browser) Version() string {
 		return product
 	}
 	return product[i+1:]
+}
+
+// WsURL returns the Websocket URL that the browser is listening on for CDP clients.
+func (b *Browser) WsURL() string {
+	return b.browserProc.WsURL()
 }

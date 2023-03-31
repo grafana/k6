@@ -17,10 +17,14 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
+	"github.com/chromedp/cdproto/page"
 	cdppage "github.com/chromedp/cdproto/page"
+	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 )
+
+const webVitalBinding = "k6browserSendWebVitalMetric"
 
 // Ensure page implements the EventEmitter, Target and Page interfaces.
 var (
@@ -134,6 +138,15 @@ func NewPage(
 		return nil, fmt.Errorf("internal error while auto attaching to browser pages: %w", err)
 	}
 
+	add := runtime.AddBinding(webVitalBinding)
+	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+		return nil, fmt.Errorf("internal error while adding binding to page: %w", err)
+	}
+
+	if err := bctx.applyAllInitScripts(&p); err != nil {
+		return nil, fmt.Errorf("internal error while applying init scripts to page: %w", err)
+	}
+
 	return &p, nil
 }
 
@@ -168,8 +181,16 @@ func (p *Page) didCrash() {
 	p.emit(EventPageCrash, p)
 }
 
-func (p *Page) evaluateOnNewDocument(source string) {
-	// TODO: implement
+func (p *Page) evaluateOnNewDocument(source string) error {
+	p.logger.Debugf("Page:evaluateOnNewDocument", "sid:%v", p.sessionID())
+
+	action := page.AddScriptToEvaluateOnNewDocument(source)
+	_, err := action.Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		return fmt.Errorf("evaluating script on document: %w", err)
+	}
+
+	return nil
 }
 
 func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
@@ -401,10 +422,34 @@ func (p *Page) Click(selector string, opts goja.Value) error {
 }
 
 // Close closes the page.
-func (p *Page) Close(opts goja.Value) {
+func (p *Page) Close(opts goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 
-	p.browserCtx.Close()
+	add := runtime.RemoveBinding(webVitalBinding)
+	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+		return fmt.Errorf("internal error while removing binding from page: %w", err)
+	}
+
+	action := target.CloseTarget(p.targetID)
+	err := action.Do(cdp.WithExecutor(p.ctx, p.session))
+	if err != nil {
+		// When a close target command is sent to the browser via CDP,
+		// the browser will start to cleanup and the first thing it
+		// will do is return a target.EventDetachedFromTarget, which in
+		// our implementation will close the session connection (this
+		// does not close the CDP websocket, just removes the session
+		// so no other CDP calls can be made with the session ID).
+		// This can result in the session's context being closed while
+		// we're waiting for the response to come back from the browser
+		// for this current command (it's racey).
+		if errors.Is(err, context.Canceled) {
+			return nil
+		}
+
+		return fmt.Errorf("closing a page: %w", err)
+	}
+
+	return nil
 }
 
 // Content returns the HTML content of the page.
@@ -490,10 +535,15 @@ func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	return p.MainFrame().Evaluate(pageFunc, args...)
 }
 
-func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
+// EvaluateHandle runs JS code within the execution context of the main frame of the page.
+func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
-	return p.MainFrame().EvaluateHandle(pageFunc, args...)
+	h, err := p.MainFrame().EvaluateHandle(pageFunc, args...)
+	if err != nil {
+		return nil, fmt.Errorf("evaluating handle for page: %w", err)
+	}
+	return h, nil
 }
 
 // ExposeBinding is not implemented.
@@ -675,13 +725,15 @@ func (p *Page) Press(selector string, key string, opts goja.Value) {
 	p.MainFrame().Press(selector, key, opts)
 }
 
-func (p *Page) Query(selector string) api.ElementHandle {
+// Query returns the first element matching the specified selector.
+func (p *Page) Query(selector string) (api.ElementHandle, error) {
 	p.logger.Debugf("Page:Query", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.frameManager.MainFrame().Query(selector)
 }
 
-func (p *Page) QueryAll(selector string) []api.ElementHandle {
+// QueryAll returns all elements matching the specified selector.
+func (p *Page) QueryAll(selector string) ([]api.ElementHandle, error) {
 	p.logger.Debugf("Page:QueryAll", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.frameManager.MainFrame().QueryAll(selector)
@@ -932,7 +984,7 @@ func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (p *Page) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+func (p *Page) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
 		p.sessionID(), p.session.TargetID(), p.targetID, selector)

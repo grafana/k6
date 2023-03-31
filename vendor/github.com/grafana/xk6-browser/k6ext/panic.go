@@ -8,14 +8,36 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dop251/goja"
+
+	"go.k6.io/k6/errext"
 	k6common "go.k6.io/k6/js/common"
 )
 
-// Panic will cause a panic with the given error which will shut
-// the application down. Before panicking, it will find the
+// Abort will shutdown the whole test run. This should
+// only be used from the goja mapping layer. It is only
+// to be used when an error will occur in all iterations,
+// so it's permanent.
+func Abort(ctx context.Context, format string, a ...any) {
+	failFunc := func(rt *goja.Runtime, a ...any) {
+		reason := fmt.Errorf(format, a...).Error()
+		rt.Interrupt(&errext.InterruptError{Reason: reason})
+	}
+	sharedPanic(ctx, failFunc, a...)
+}
+
+// Panic will cause a panic with the given error which will stop
+// the current iteration. Before panicking, it will find the
 // browser process from the context and kill it if it still exists.
 // TODO: test.
 func Panic(ctx context.Context, format string, a ...any) {
+	failFunc := func(rt *goja.Runtime, a ...any) {
+		k6common.Throw(rt, fmt.Errorf(format, a...))
+	}
+	sharedPanic(ctx, failFunc, a...)
+}
+
+func sharedPanic(ctx context.Context, failFunc func(rt *goja.Runtime, a ...any), a ...any) {
 	rt := Runtime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error
@@ -31,23 +53,26 @@ func Panic(ctx context.Context, format string, a ...any) {
 			a[len(a)-1] = &UserFriendlyError{Err: err}
 		}
 	}
-	defer k6common.Throw(rt, fmt.Errorf(format, a...))
+	defer failFunc(rt, a...)
 
-	pid := GetProcessID(ctx)
-	if pid == 0 {
-		// this should never happen unless a programmer error
-		panic("no browser process ID in context")
-	}
-	p, err := os.FindProcess(pid)
-	if err != nil {
-		// optimistically return and don't kill the process
+	// TODO: Remove this after moving k6ext.Panic into the mapping layer.
+	pidder, ok := GetVU(ctx).(interface {
+		Pids() []int
+	})
+	if !ok {
+		// we're running in a test, let's skip killing the process.
 		return
 	}
-	// no need to check the error for waiting the process to release
-	// its resources or whether we could kill it as we're already
-	// dying.
-	_ = p.Release()
-	_ = p.Kill()
+	for _, pid := range pidder.Pids() {
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			// optimistically skip and don't kill the process
+			continue
+		}
+		// no need to check the error for whether we could kill it as
+		// we're already dying.
+		_ = p.Kill()
+	}
 }
 
 // UserFriendlyError maps an internal error to an error that users

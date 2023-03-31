@@ -7,22 +7,22 @@ import (
 // BrowserContext is the public interface of a CDP browser context.
 type BrowserContext interface {
 	AddCookies(cookies goja.Value)
-	AddInitScript(script goja.Value, arg goja.Value)
+	AddInitScript(script goja.Value, arg goja.Value) error
 	Browser() Browser
 	ClearCookies()
 	ClearPermissions()
 	Close()
-	Cookies() []any // TODO: make it []Cookie later on
+	Cookies() ([]any, error) // TODO: make it []Cookie later on
 	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
 	ExposeFunction(name string, callback goja.Callable)
 	GrantPermissions(permissions []string, opts goja.Value)
 	NewCDPSession() CDPSession
-	NewPage() Page
+	NewPage() (Page, error)
 	Pages() []Page
 	Route(url goja.Value, handler goja.Callable)
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
-	SetExtraHTTPHeaders(headers map[string]string)
+	SetExtraHTTPHeaders(headers map[string]string) error
 	SetGeolocation(geolocation goja.Value)
 	// SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
 	//

@@ -321,6 +321,10 @@ func (e *ExecutionContext) EvalHandle(
 	if err != nil {
 		return nil, err
 	}
+	if res == nil {
+		return nil, errors.New("nil result")
+	}
+
 	return res.(api.JSHandle), nil
 }
 

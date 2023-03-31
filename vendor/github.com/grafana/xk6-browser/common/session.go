@@ -113,10 +113,6 @@ func (s *Session) readLoop() {
 // Execute implements the cdp.Executor interface.
 func (s *Session) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
 	s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
-	// Certain methods aren't available to the user directly.
-	if method == target.CommandCloseTarget {
-		return errors.New("to close the target, cancel its context")
-	}
 	if s.crashed {
 		s.logger.Debugf("Session:Execute:return", "sid:%v tid:%v method:%q crashed", s.id, s.targetID, method)
 		return ErrTargetCrashed
@@ -173,10 +169,6 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 
 func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
 	s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
-	// Certain methods aren't available to the user directly.
-	if method == target.CommandCloseTarget {
-		return errors.New("to close the target, cancel its context")
-	}
 	if s.crashed {
 		s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q, ErrTargetCrashed", s.id, s.targetID, method)
 		return ErrTargetCrashed

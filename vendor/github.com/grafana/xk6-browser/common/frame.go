@@ -358,17 +358,22 @@ func (f *Frame) onLoadingStopped() {
 	//       website never stops performing network requests.
 }
 
-func (f *Frame) position() *Position {
+func (f *Frame) position() (*Position, error) {
 	frame := f.manager.getFrameByID(cdp.FrameID(f.page.targetID))
 	if frame == nil {
-		return nil
+		return nil, fmt.Errorf("could not find frame with id %s", f.page.targetID)
 	}
 	if frame == f.page.frameManager.MainFrame() {
-		return &Position{X: 0, Y: 0}
+		return &Position{X: 0, Y: 0}, nil
 	}
-	element := frame.FrameElement()
+	element, err := frame.FrameElement()
+	if err != nil {
+		return nil, err
+	}
+
 	box := element.BoundingBox()
-	return &Position{X: box.X, Y: box.Y}
+
+	return &Position{X: box.X, Y: box.Y}, nil
 }
 
 func (f *Frame) removeChildFrame(child *Frame) {
@@ -742,7 +747,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle) {
+func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -752,17 +757,18 @@ func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle 
 	{
 		ec := f.executionContexts[mainWorld]
 		if ec == nil {
-			k6ext.Panic(f.ctx, "evaluating handle: execution context %q not found", mainWorld)
+			k6ext.Panic(f.ctx, "evaluating handle for frame: execution context %q not found", mainWorld)
 		}
 		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
 	}
 	f.executionContextMu.RUnlock()
 	if err != nil {
-		k6ext.Panic(f.ctx, "evaluating handle: %w", err)
+		return nil, fmt.Errorf("evaluating handle for frame: %w", err)
 	}
 
 	applySlowMo(f.ctx)
-	return handle
+
+	return handle, nil
 }
 
 // Fill fills out the first element found that matches the selector.
@@ -824,14 +830,15 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 	return nil
 }
 
-func (f *Frame) FrameElement() api.ElementHandle {
+// FrameElement returns the element handle for the frame.
+func (f *Frame) FrameElement() (api.ElementHandle, error) {
 	f.log.Debugf("Frame:FrameElement", "fid:%s furl:%q", f.ID(), f.URL())
 
 	element, err := f.page.getFrameElement(f)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting frame element: %w", err)
+		return nil, fmt.Errorf("getting frame element: %w", err)
 	}
-	return element
+	return element, nil
 }
 
 // GetAttribute of the first element found that matches the selector.
@@ -1304,32 +1311,25 @@ func (f *Frame) Name() string {
 
 // Query runs a selector query against the document tree, returning the first matching element or
 // "null" if no match is found.
-func (f *Frame) Query(selector string) api.ElementHandle {
+func (f *Frame) Query(selector string) (api.ElementHandle, error) {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
 	if err != nil {
 		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
-	value := document.Query(selector)
-	if value != nil {
-		return value
-	}
-	return nil
+	return document.Query(selector)
 }
 
-func (f *Frame) QueryAll(selector string) []api.ElementHandle {
+// QueryAll runs a selector query against the document tree, returning all matching elements.
+func (f *Frame) QueryAll(selector string) ([]api.ElementHandle, error) {
 	f.log.Debugf("Frame:QueryAll", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
 	if err != nil {
 		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
-	value := document.QueryAll(selector)
-	if value != nil {
-		return value
-	}
-	return nil
+	return document.QueryAll(selector)
 }
 
 // Page returns page that owns frame.
@@ -1826,16 +1826,17 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (f *Frame) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+func (f *Frame) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing wait for selector %q options: %w", selector, err)
+		return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
 	}
 	handle, err := f.waitForSelectorRetry(selector, parsedOpts, maxRetry)
 	if err != nil {
-		k6ext.Panic(f.ctx, "waiting for selector %q: %w", selector, err)
+		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}
-	return handle
+
+	return handle, nil
 }
 
 // WaitForTimeout waits the specified amount of milliseconds.

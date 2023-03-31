@@ -182,6 +182,7 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 	}
 
 	var keyDef keyboardlayout.KeyDefinition
+	keyDef.Code = srcKeyDef.Code
 	if srcKeyDef.Key != "" {
 		keyDef.Key = srcKeyDef.Key
 	}
@@ -193,9 +194,6 @@ func (k *Keyboard) keyDefinitionFromKey(key keyboardlayout.KeyInput) keyboardlay
 	}
 	if srcKeyDef.KeyCode != 0 {
 		keyDef.KeyCode = srcKeyDef.KeyCode
-	}
-	if key != "" {
-		keyDef.Code = string(key)
 	}
 	if srcKeyDef.Location != 0 {
 		keyDef.Location = srcKeyDef.Location
