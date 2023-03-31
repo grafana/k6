@@ -375,40 +375,30 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 		return promise
 	}
 
-	// We extract the length attribute from the algorithm object, as it's not
-	// part of the normalized algorithm, and as accessing the runtime from the
-	// callback below could lead to a race condition.
-	algorithmLength := algorithm.ToObject(sc.vu.Runtime()).Get("length").ToInteger()
+	keyGenerator, err := newKeyGenerator(sc.vu.Runtime(), normalized, algorithm)
+	if err != nil {
+		reject(err)
+		return promise
+	}
 
 	go func() {
-		switch normalized.Name {
-		case AESCbc, AESCtr, AESGcm, AESKw:
-			params := &AesKeyGenParams{
-				Algorithm: normalized,
-				Length:    algorithmLength,
-			}
-
-			cryptoKey, err := params.GenerateKey(extractable, keyUsages)
-			if err != nil {
-				reject(err)
-				return
-			}
-
-			// 8.
-			isSecretKey := cryptoKey.Type == SecretCryptoKeyType
-			isPrivateKey := cryptoKey.Type == PrivateCryptoKeyType
-			isUsagesEmpty := len(cryptoKey.Usages) == 0
-			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-				reject(NewError(0, SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
-				return
-			}
-
-			resolve(cryptoKey)
-			return
-		default:
-			reject(NewError(0, NotSupportedError, "unsupported algorithm: "+normalized.Name))
+		// 7.
+		result, err := keyGenerator.GenerateKey(extractable, keyUsages)
+		if err != nil {
+			reject(err)
 			return
 		}
+
+		// 8.
+		isSecretKey := result.Type == SecretCryptoKeyType
+		isPrivateKey := result.Type == PrivateCryptoKeyType
+		isUsagesEmpty := len(result.Usages) == 0
+		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+			reject(NewError(0, SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
+			return
+		}
+
+		resolve(result)
 	}()
 
 	return promise

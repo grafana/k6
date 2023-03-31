@@ -107,27 +107,6 @@ type HMACSignatureParams struct {
 	Name AlgorithmIdentifier
 }
 
-// HMACKeyGenParams represents the object that should be passed as the algorithm parameter
-// into `SubtleCrypto.GenerateKey`, when generating an HMAC key.
-type HMACKeyGenParams struct {
-	// Name should be set to AlgorithmKindHmac.
-	Name AlgorithmIdentifier
-
-	// FIXME: SHA-1 should be supported here
-	// Hash represents the name of the digest function to use. You can
-	// use any of the following: [Sha256], [Sha384],
-	// or [Sha512].
-	Hash AlgorithmIdentifier
-
-	// FIXME: what's the default value?
-	// Length holds (a Number) the length of the key, in bits.
-	// If this is omitted, the length of the key is equal to the block size
-	// of the hash function you have chosen.
-	// Unless you have a good reason to use a different length, omit
-	// use the default.
-	Length int
-}
-
 // HMACImportParams represents the object that should be passed as the
 // algorithm parameter into `SubtleCrypto.ImportKey` or `SubtleCrypto.UnwrapKey`, when
 // generating a key for the HMAC algorithm.

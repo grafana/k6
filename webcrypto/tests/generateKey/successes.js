@@ -28,9 +28,9 @@ function run_test(algorithmNames, slowTest) {
         {name: "AES-CBC",  resultType: CryptoKey, usages: ["encrypt", "decrypt", "wrapKey", "unwrapKey"], mandatoryUsages: []},
         {name: "AES-GCM",  resultType: CryptoKey, usages: ["encrypt", "decrypt", "wrapKey", "unwrapKey"], mandatoryUsages: []},
         {name: "AES-KW",   resultType: CryptoKey, usages: ["wrapKey", "unwrapKey"], mandatoryUsages: []},
+        {name: "HMAC",     resultType: "CryptoKey", usages: ["sign", "verify"], mandatoryUsages: []},
         
-        // TODO @oleiade: reactivate testVectors for HMAC, RSA, ECDSA and ECDH as support for them is added
-        // {name: "HMAC",     resultType: "CryptoKey", usages: ["sign", "verify"], mandatoryUsages: []},
+        // TODO @oleiade: reactivate testVectors for RSA, ECDSA and ECDH as support for them is added
         // {name: "RSASSA-PKCS1-v1_5", resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
         // {name: "RSA-PSS",  resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
         // {name: "RSA-OAEP", resultType: "CryptoKeyPair", usages: ["encrypt", "decrypt", "wrapKey", "unwrapKey"], mandatoryUsages: ["decrypt", "unwrapKey"]},
@@ -77,7 +77,7 @@ function run_test(algorithmNames, slowTest) {
                     assert_goodCryptoKey(result, algorithm, extractable, usages, "secret");
                 }
             }, function(err) {
-                assert_unreached("Threw an unexpected error: " + err.toString());
+                assert_unreached("Threw an unexpected error: " + JSON.stringify(err) + " -- " + JSON.stringify(algorithm));
             });
     }
 

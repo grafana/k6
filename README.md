@@ -17,20 +17,41 @@ The current state of the project is that it is an experimental module of the Web
 
 #### SubtleCrypto
 
-| API                                                                           | Supported | Notes                                                    |
-| :---------------------------------------------------------------------------- | :-------- | :------------------------------------------------------- |
-| `crypto.subtle.digest(algorithm)`                                             | ✅        | **complete**                                             |
-| `crypto.subtle.generateKey(algorithm, extractable, keyUsages)`                | ✅        | **limited to** AES-CBC, AES-GCM, and AES-CTR algorithms. |
-| `crypto.subtle.importKey(format, keyData, algorithm, extractable, keyUsages)` | ✅        | **limited to** AES-CBC, AES-GCM, and AES-CTR algorithms. |
-| `crypto.subtle.exportKey(format, key)`                                        | ✅        | **limited to** AES-CBC, AES-GCM, and AES-CTR algorithms. |
-| `crypto.subtle.encrypt(algorithm, key, data)`                                 | ✅        | **limited to** AES-CBC, AES-GCM, and AES-CTR algorithms. |
-| `crypto.subtle.decrypt(algorithm, key, data)`                                 | ✅        | **limited to** AES-CBC, AES-GCM, and AES-CTR algorithms. |
-| `crypto.subtle.deriveBits()`                                                  | ❌        |                                                          |
-| `crypto.subtle.deriveKey()`                                                   | ❌        |                                                          |
-| `crypto.subtle.sign()`                                                        | ❌        |                                                          |
-| `crypto.subtle.verify()`                                                      | ❌        |                                                          |
-| `crypto.subtle.wrapKey()`                                                     | ❌        |                                                          |
-| `crypto.subtle.unwrapKey()`                                                   | ❌        |                                                          |
+
+##### Encryption/Decryption
+
+| API                       | AES-CBC | AES-GCM | AES-CTR | RSA-OAEP |
+| :------------------------ | :------ | :------ | :------ | :------- |
+| `crypto.subtle.encrypt()` | ✅      | ✅      | ✅      | ❌       |
+| `crypto.subtle.decrypt()` | ✅      | ✅      | ✅      | ❌       |
+
+##### Signature
+
+| API                      | HMAC | ECDSA | RSASSA-PKCS1-v1_5 | RSA-PSS |
+| :----------------------- | :--- | :---- | :---------------- | :------ |
+| `crypto.subtle.sign()`   | ❌   | ❌    | ❌                | ❌      |
+| `crypto.subtle.verify()` | ❌   | ❌    | ❌                | ❌      |
+
+##### Key generation, import and export
+
+| API                           | AES-CBC | AES-GCM | AES-CTR | AES-KW | HMAC | ECDSA | ECDH | RSASSA-PKCS1-v1_5 | RSA-PSS | RSA-OAEP |
+| :---------------------------- | :------ | :------ | :------ | :----- | :--- | :---- | :--- | :---------------- | :------ | :------- |
+| `crypto.subtle.generateKey()` | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ❌   | ❌                | ❌      | ❌       |
+| `crypto.subtle.importKey()`   | ✅      | ✅      | ✅      | ❌     | ❌   | ❌    | ❌   | ❌                | ❌      | ❌       |
+| `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ❌   | ❌    | ❌   | ❌                | ❌      | ❌       |
+
+##### Key derivation
+
+| API                          | ECDH | HKDF | PBKDF2 |
+| :--------------------------- | :--- | :--- | :----- |
+| `crypto.subtle.deriveKey()`  | ❌   | ❌   | ❌     |
+| `crypto.subtle.deriveBits()` | ❌   | ❌   | ❌     |
+
+##### Key wrapping
+
+| API                         | AES-CBC | AES-GCM | AES-CTR | AES-KW | RSA-OAEP |
+| :-------------------------- | :------ | :------ | :------ | :----- | :------- |
+| `crypto.subtle.unwrapKey()` | ❌      | ❌      | ❌      | ❌     | ❌       |
 
 ### APIs and algorithms with limited support
 
