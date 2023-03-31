@@ -368,6 +368,7 @@ func TestNewBundle(t *testing.T) {
 		t.Run("TLSCipherSuites", func(t *testing.T) {
 			t.Parallel()
 			for suiteName, suiteID := range lib.SupportedTLSCipherSuites {
+				suiteName, suiteID := suiteName, suiteID
 				t.Run(suiteName, func(t *testing.T) {
 					t.Parallel()
 					script := `
@@ -674,6 +675,7 @@ func TestOpen(t *testing.T) {
 	logger := testutils.NewLogger(t)
 
 	for name, fsInit := range fss {
+		name, fsInit := name, fsInit
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			for _, tCase := range testCases {

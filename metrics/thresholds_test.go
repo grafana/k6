@@ -603,6 +603,7 @@ func TestThresholdsRunAll(t *testing.T) {
 	}
 
 	for name, data := range testdata {
+		name, data := name, data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 

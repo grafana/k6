@@ -28,6 +28,7 @@ func TestParseURL(t *testing.T) {
 		"?payload_size=a":  {Config{}, "strconv.Atoi: parsing \"a\": invalid syntax"},
 	}
 	for str, data := range testdata {
+		str, data := str, data
 		t.Run(str, func(t *testing.T) {
 			t.Parallel()
 			config, err := ParseURL(str)

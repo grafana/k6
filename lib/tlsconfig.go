@@ -5,6 +5,7 @@ import "crypto/tls"
 // From https://golang.org/pkg/crypto/tls/#pkg-constants
 
 // SupportedTLSVersions is string-to-constant map of available TLS versions.
+//
 //nolint:gochecknoglobals
 var SupportedTLSVersions = map[string]TLSVersion{
 	"tls1.0": tls.VersionTLS10,
@@ -14,6 +15,7 @@ var SupportedTLSVersions = map[string]TLSVersion{
 }
 
 // SupportedTLSVersionsToString is constant-to-string map of available TLS versions.
+//
 //nolint:gochecknoglobals
 var SupportedTLSVersionsToString = map[TLSVersion]string{
 	tls.VersionTLS10: "tls1.0",
@@ -23,6 +25,7 @@ var SupportedTLSVersionsToString = map[TLSVersion]string{
 }
 
 // SupportedTLSCipherSuites is string-to-constant map of available TLS cipher suites.
+//
 //nolint:gochecknoglobals
 var SupportedTLSCipherSuites = map[string]uint16{
 	// TLS 1.0 - 1.2 cipher suites.
@@ -56,6 +59,7 @@ var SupportedTLSCipherSuites = map[string]uint16{
 }
 
 // SupportedTLSCipherSuitesToString is constant-to-string map of available TLS cipher suites.
+//
 //nolint:gochecknoglobals
 var SupportedTLSCipherSuitesToString = map[uint16]string{
 	tls.TLS_RSA_WITH_RC4_128_SHA:                "TLS_RSA_WITH_RC4_128_SHA",

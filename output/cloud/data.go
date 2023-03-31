@@ -26,6 +26,7 @@ func toMicroSecond(t time.Time) int64 {
 }
 
 // Sample is the generic struct that contains all types of data that we send to the cloud.
+//
 //easyjson:json
 type Sample struct {
 	Type   string      `json:"type"`
@@ -68,6 +69,7 @@ func (ct *Sample) UnmarshalJSON(p []byte) error {
 }
 
 // SampleDataSingle is used in all simple un-aggregated single-value samples.
+//
 //easyjson:json
 type SampleDataSingle struct {
 	Time  int64              `json:"time,string"`
@@ -79,6 +81,7 @@ type SampleDataSingle struct {
 // SampleDataMap is used by samples that contain multiple values, currently
 // that's only iteration metrics (`iter_li_all`) and unaggregated HTTP
 // requests (`http_req_li_all`).
+//
 //easyjson:json
 type SampleDataMap struct {
 	Time   int64              `json:"time,string"`
@@ -125,6 +128,7 @@ func NewSampleFromTrail(trail *httpext.Trail) *Sample {
 }
 
 // SampleDataAggregatedHTTPReqs is used in aggregated samples for HTTP requests.
+//
 //easyjson:json
 type SampleDataAggregatedHTTPReqs struct {
 	Time   int64           `json:"time,string"`

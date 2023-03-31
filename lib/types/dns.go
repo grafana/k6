@@ -33,6 +33,7 @@ func DefaultDNSConfig() DNSConfig {
 }
 
 // DNSPolicy specifies the preference for handling IP versions in DNS resolutions.
+//
 //go:generate enumer -type=DNSPolicy -trimprefix DNS -output dns_policy_gen.go
 type DNSPolicy uint8
 
@@ -102,6 +103,7 @@ func (d NullDNSPolicy) MarshalJSON() ([]byte, error) {
 
 // DNSSelect is the strategy to use when picking a single IP if more than one
 // is returned for a host name.
+//
 //go:generate enumer -type=DNSSelect -trimprefix DNS -output dns_select_gen.go
 type DNSSelect uint8
 

@@ -152,6 +152,7 @@ func errorCodeForNetOpError(err *net.OpError) (errCode, string) {
 }
 
 // errorCodeForError returns the errorCode and a specific error message for given error.
+//
 //nolint:errorlint
 func errorCodeForError(err error) (errCode, string) {
 	// We explicitly check for `Unwrap()` in the default switch branch, but
