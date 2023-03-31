@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/modulestest"
@@ -126,10 +125,6 @@ func TestAsyncRequestErrors(t *testing.T) {
 		t.Run("unsupported protocol", func(t *testing.T) {
 			t.Parallel()
 			ts := newTestCase(t)
-			state := ts.runtime.VU.State()
-
-			hook := logtest.NewLocal(state.Logger)
-			defer hook.Reset()
 
 			err := runOnEventLoop(ts.runtime, `
             try {
@@ -146,17 +141,13 @@ func TestAsyncRequestErrors(t *testing.T) {
 			require.Nil(t, exceptionThrown)
 			assert.Contains(t, promiseRejected.ToString(), "unsupported protocol scheme")
 
-			logEntry := hook.LastEntry()
+			logEntry := ts.hook.LastEntry()
 			assert.Nil(t, logEntry)
 		})
 
 		t.Run("throw=false", func(t *testing.T) {
 			t.Parallel()
 			ts := newTestCase(t)
-			state := ts.runtime.VU.State()
-			hook := logtest.NewLocal(state.Logger)
-			defer hook.Reset()
-
 			err := runOnEventLoop(ts.runtime, `
 				var res = await http.asyncRequest("GET", "some://example.com", null, { throw: false });
 				if (res.error.search('unsupported protocol scheme "some"')  == -1) {
@@ -166,7 +157,7 @@ func TestAsyncRequestErrors(t *testing.T) {
 			`)
 			require.ErrorContains(t, err, "another error")
 
-			logEntry := hook.LastEntry()
+			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
 			err, ok := logEntry.Data["error"].(error)
@@ -208,9 +199,6 @@ func TestAsyncRequestErrors(t *testing.T) {
 			state.Options.Throw.Bool = false
 			defer func() { state.Options.Throw.Bool = true }()
 
-			hook := logtest.NewLocal(state.Logger)
-			defer hook.Reset()
-
 			js := `
                 var r = await http.asyncRequest("GET", "https:// test.k6.io");
                 globalThis.ret = {error: r.error, error_code: r.error_code};
@@ -226,7 +214,7 @@ func TestAsyncRequestErrors(t *testing.T) {
 			require.Equal(t, int64(1020), retobj["error_code"])
 			require.Equal(t, expErr, retobj["error"])
 
-			logEntry := hook.LastEntry()
+			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
 			err, ok = logEntry.Data["error"].(error)
@@ -243,9 +231,6 @@ func TestAsyncRequestErrors(t *testing.T) {
 			state.Options.Throw.Bool = false
 			defer func() { state.Options.Throw.Bool = true }()
 
-			hook := logtest.NewLocal(state.Logger)
-			defer hook.Reset()
-
 			js := `
                 var r = await http.asyncRequest("GET", "https:// test.k6.io");
                 r.html();
@@ -258,7 +243,7 @@ func TestAsyncRequestErrors(t *testing.T) {
 			assert.Nil(t, ret)
 			assert.Contains(t, err.Error(), "unexpected end of JSON input")
 
-			logEntry := hook.LastEntry()
+			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
 			err, ok := logEntry.Data["error"].(error)

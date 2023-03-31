@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

@@ -64,8 +64,8 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(ioutil.Discard)
-	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
-	logger.AddHook(&logHook)
+	logHook := testutils.NewLogHook(logrus.InfoLevel)
+	logger.AddHook(logHook)
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -177,8 +177,8 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(ioutil.Discard)
-	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
-	logger.AddHook(&logHook)
+	logHook := testutils.NewLogHook(logrus.InfoLevel)
+	logger.AddHook(logHook)
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -259,8 +259,8 @@ func TestSharedIterationsStable(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetOutput(ioutil.Discard)
-	logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
-	logger.AddHook(&logHook)
+	logHook := testutils.NewLogHook(logrus.InfoLevel)
+	logger.AddHook(logHook)
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -394,8 +394,8 @@ func TestExecutionInfoAll(t *testing.T) {
 
 			logger := logrus.New()
 			logger.SetOutput(ioutil.Discard)
-			logHook := testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.InfoLevel}}
-			logger.AddHook(&logHook)
+			logHook := testutils.NewLogHook(logrus.InfoLevel)
+			logger.AddHook(logHook)
 
 			registry := metrics.NewRegistry()
 			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

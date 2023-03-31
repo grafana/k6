@@ -136,7 +136,7 @@ func TestMetrics(t *testing.T) {
 					mii.StateField = state
 					logger := logrus.New()
 					logger.Out = ioutil.Discard
-					test.hook = &testutils.SimpleLogrusHook{HookedLevels: logrus.AllLevels}
+					test.hook = testutils.NewLogHook()
 					logger.AddHook(test.hook)
 					state.Logger = logger
 

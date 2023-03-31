@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
@@ -440,7 +441,13 @@ func (r *Runner) SetOptions(opts lib.Options) error {
 	// TODO: validate that all exec values are either nil or valid exported methods (or HTTP requests in the future)
 
 	if opts.ConsoleOutput.Valid {
-		c, err := newFileConsole(opts.ConsoleOutput.String, r.preInitState.Logger.Formatter)
+		// TODO: fix logger hack, see https://github.com/grafana/k6/issues/2958
+		// and https://github.com/grafana/k6/issues/2968
+		var formatter logrus.Formatter = &logrus.JSONFormatter{}
+		if l, ok := r.preInitState.Logger.(*logrus.Logger); ok { //nolint: forbidigo
+			formatter = l.Formatter
+		}
+		c, err := newFileConsole(opts.ConsoleOutput.String, formatter)
 		if err != nil {
 			return err
 		}

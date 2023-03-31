@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/metrics"
@@ -80,9 +79,6 @@ func TestBatchError(t *testing.T) {
 			state.Options.Throw.Bool = tc.throw
 			defer func() { state.Options.Throw.Bool = oldThrow }()
 
-			hook := logtest.NewLocal(state.Logger)
-			defer hook.Reset()
-
 			ret, err := rt.RunString(fmt.Sprintf(`
 						(function(){
 							var r = http.batch(%s);
@@ -104,7 +100,7 @@ func TestBatchError(t *testing.T) {
 				require.Equal(t, int64(1020), retobj["error_code"])
 				require.Equal(t, invalidURLerr, retobj["error"])
 
-				logEntry := hook.LastEntry()
+				logEntry := ts.hook.LastEntry()
 				require.NotNil(t, logEntry)
 				assert.Equal(t, logrus.WarnLevel, logEntry.Level)
 				e, ok := logEntry.Data["error"].(error)
@@ -144,9 +140,6 @@ func TestBatchErrorNoPanic(t *testing.T) {
 			state.Options.Throw.Bool = false
 			defer func() { state.Options.Throw.Bool = oldThrow }()
 
-			hook := logtest.NewLocal(state.Logger)
-			defer hook.Reset()
-
 			ret, err := rt.RunString(fmt.Sprintf(`
 						(function(){
 							var r = http.batch(%s);
@@ -160,7 +153,7 @@ func TestBatchErrorNoPanic(t *testing.T) {
 			require.Error(t, err)
 			assert.Nil(t, ret)
 			assert.Contains(t, err.Error(), "unexpected end of JSON input")
-			logEntry := hook.LastEntry()
+			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
 			e, ok := logEntry.Data["error"].(error)

@@ -7,7 +7,6 @@ import (
 	"io"
 	"io/fs"
 	"io/ioutil"
-	"log"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -318,7 +317,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			}
 
 			if tc.expStdoutNotContains != "" {
-				log.Println(ts.Stdout.String())
+				t.Log(ts.Stdout.String())
 				assert.NotContains(t, ts.Stdout.String(), tc.expStdoutNotContains)
 			}
 		})

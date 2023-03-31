@@ -27,7 +27,7 @@ func TestVUHandleRace(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+	logHook := testutils.NewLogHook(logrus.DebugLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(testutils.NewTestOutput(t))
@@ -116,7 +116,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+	logHook := testutils.NewLogHook(logrus.DebugLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(testutils.NewTestOutput(t))
@@ -225,7 +225,7 @@ func TestVUHandleSimple(t *testing.T) {
 
 	t.Run("start before gracefulStop finishes", func(t *testing.T) {
 		t.Parallel()
-		logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+		logHook := testutils.NewLogHook(logrus.DebugLevel)
 		testLog := logrus.New()
 		testLog.AddHook(logHook)
 		testLog.SetOutput(testutils.NewTestOutput(t))
@@ -265,7 +265,7 @@ func TestVUHandleSimple(t *testing.T) {
 
 	t.Run("start after gracefulStop finishes", func(t *testing.T) {
 		t.Parallel()
-		logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+		logHook := testutils.NewLogHook(logrus.DebugLevel)
 		testLog := logrus.New()
 		testLog.AddHook(logHook)
 		testLog.SetOutput(testutils.NewTestOutput(t))
@@ -306,7 +306,7 @@ func TestVUHandleSimple(t *testing.T) {
 
 	t.Run("start after hardStop", func(t *testing.T) {
 		t.Parallel()
-		logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+		logHook := testutils.NewLogHook(logrus.DebugLevel)
 		testLog := logrus.New()
 		testLog.AddHook(logHook)
 		testLog.SetOutput(testutils.NewTestOutput(t))
@@ -347,7 +347,7 @@ func TestVUHandleSimple(t *testing.T) {
 }
 
 func BenchmarkVUHandleIterations(b *testing.B) {
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.DebugLevel}}
+	logHook := testutils.NewLogHook(logrus.DebugLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	// testLog.Level = logrus.DebugLevel

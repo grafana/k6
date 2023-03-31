@@ -31,7 +31,7 @@ import (
 
 const isWindows = runtime.GOOS == "windows"
 
-func getTestPreInitState(tb testing.TB, logger *logrus.Logger, rtOpts *lib.RuntimeOptions) *lib.TestPreInitState {
+func getTestPreInitState(tb testing.TB, logger logrus.FieldLogger, rtOpts *lib.RuntimeOptions) *lib.TestPreInitState {
 	if logger == nil {
 		logger = testutils.NewLogger(tb)
 	}
@@ -50,14 +50,14 @@ func getTestPreInitState(tb testing.TB, logger *logrus.Logger, rtOpts *lib.Runti
 func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) (*Bundle, error) {
 	fs := afero.NewMemMapFs()
 	var rtOpts *lib.RuntimeOptions
-	var logger *logrus.Logger
+	var logger logrus.FieldLogger
 	for _, o := range opts {
 		switch opt := o.(type) {
 		case afero.Fs:
 			fs = opt
 		case lib.RuntimeOptions:
 			rtOpts = &opt
-		case *logrus.Logger:
+		case logrus.FieldLogger:
 			logger = opt
 		default:
 			tb.Fatalf("unknown test option %q", opt)
@@ -435,10 +435,10 @@ func TestNewBundle(t *testing.T) {
 			logger := logrus.New()
 			logger.SetLevel(logrus.InfoLevel)
 			logger.Out = ioutil.Discard
-			hook := testutils.SimpleLogrusHook{
-				HookedLevels: []logrus.Level{logrus.WarnLevel, logrus.InfoLevel, logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel},
-			}
-			logger.AddHook(&hook)
+			hook := testutils.NewLogHook(
+				logrus.WarnLevel, logrus.InfoLevel, logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel,
+			)
+			logger.AddHook(hook)
 
 			_, err := getSimpleBundle(t, "/script.js", `
 				export let options = {

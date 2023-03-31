@@ -106,7 +106,7 @@ func TestOutputFlushMetricsTimeSeriesWarning(t *testing.T) {
 	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Gauge)
 	require.NoError(t, err)
 
-	logger, hook := testutils.NewMemLogger()
+	logger, hook := testutils.NewLoggerWithHook(nil)
 	ingester := outputIngester{
 		logger: logger,
 		metricsEngine: &MetricsEngine{
@@ -199,7 +199,6 @@ func TestCardinalityControlLimitHit(t *testing.T) {
 func newTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 	reg := metrics.NewRegistry()
 	logger := testutils.NewLogger(tb)
-	logger.SetLevel(logrus.DebugLevel)
 	return &lib.TestPreInitState{
 		Logger:         logger,
 		RuntimeOptions: lib.RuntimeOptions{},

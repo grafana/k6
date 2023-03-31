@@ -49,7 +49,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
 	logger.Out = testutils.NewTestOutput(tb)
-	hook := &testutils.SimpleLogrusHook{HookedLevels: logrus.AllLevels}
+	hook := testutils.NewLogHook()
 	logger.AddHook(hook)
 
 	ts := &GlobalTestState{

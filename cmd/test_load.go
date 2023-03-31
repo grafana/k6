@@ -248,7 +248,7 @@ func loadAndConfigureTest(
 }
 
 // loadSystemCertPool attempts to load system certificates.
-func loadSystemCertPool(logger *logrus.Logger) {
+func loadSystemCertPool(logger logrus.FieldLogger) {
 	if _, err := x509.SystemCertPool(); err != nil {
 		logger.WithError(err).Warning("Unable to load system cert pool")
 	}

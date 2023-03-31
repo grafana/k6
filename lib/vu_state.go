@@ -33,9 +33,8 @@ type State struct {
 	Options        Options
 	BuiltinMetrics *metrics.BuiltinMetrics
 
-	// Logger. Avoid using the global logger.
-	// TODO: change to logrus.FieldLogger when there is time to fix all the tests
-	Logger *logrus.Logger
+	// Logger instance for every VU.
+	Logger logrus.FieldLogger
 
 	// Current group; all emitted metrics are tagged with this.
 	Group *Group

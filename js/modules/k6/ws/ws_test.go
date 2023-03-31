@@ -1191,7 +1191,7 @@ func TestCookieJar(t *testing.T) {
 
 func TestWSConnectEnableThrowErrorOption(t *testing.T) {
 	t.Parallel()
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(io.Discard)
@@ -1211,7 +1211,7 @@ func TestWSConnectEnableThrowErrorOption(t *testing.T) {
 
 func TestWSConnectDisableThrowErrorOption(t *testing.T) {
 	t.Parallel()
-	logHook := &testutils.SimpleLogrusHook{HookedLevels: []logrus.Level{logrus.WarnLevel}}
+	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(io.Discard)
