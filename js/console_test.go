@@ -322,13 +322,16 @@ func TestFileConsole(t *testing.T) {
 		preExistingText = "Prexisting file\n"
 	)
 	for name, level := range levels {
+		name, level := name, level
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			for args, result := range argsets {
+				args, result := args, result
 				t.Run(args, func(t *testing.T) {
 					t.Parallel()
 					// whether the file is existed before logging
 					for msg, deleteFile := range preExisting {
+						msg, deleteFile := msg, deleteFile
 						t.Run(msg, func(t *testing.T) {
 							t.Parallel()
 							f, err := ioutil.TempFile("", "")
