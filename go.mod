@@ -7,7 +7,7 @@ require (
 	github.com/google/uuid v1.1.2
 	github.com/stretchr/testify v1.8.0
 	go.k6.io/k6 v0.43.1
-	gopkg.in/guregu/null.v3 v3.5.0
+	gopkg.in/guregu/null.v3 v3.3.0
 )
 
 require (
