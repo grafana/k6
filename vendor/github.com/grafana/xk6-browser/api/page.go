@@ -10,7 +10,7 @@ type Page interface {
 	BringToFront()
 	Check(selector string, opts goja.Value)
 	Click(selector string, opts goja.Value) error
-	Close(opts goja.Value)
+	Close(opts goja.Value) error
 	Content() string
 	Context() BrowserContext
 	Dblclick(selector string, opts goja.Value)
@@ -19,7 +19,7 @@ type Page interface {
 	EmulateMedia(opts goja.Value)
 	EmulateVisionDeficiency(typ string)
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) JSHandle
+	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (JSHandle, error)
 	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
 	ExposeFunction(name string, callback goja.Callable)
 	Fill(selector string, value string, opts goja.Value)
@@ -51,8 +51,8 @@ type Page interface {
 	Pause()
 	Pdf(opts goja.Value) []byte
 	Press(selector string, key string, opts goja.Value)
-	Query(selector string) ElementHandle
-	QueryAll(selector string) []ElementHandle
+	Query(selector string) (ElementHandle, error)
+	QueryAll(selector string) ([]ElementHandle, error)
 	Reload(opts goja.Value) Response
 	Route(url goja.Value, handler goja.Callable)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
@@ -78,7 +78,7 @@ type Page interface {
 	WaitForNavigation(opts goja.Value) (Response, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) Request
 	WaitForResponse(urlOrPredicate, opts goja.Value) Response
-	WaitForSelector(selector string, opts goja.Value) ElementHandle
+	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []Worker
 }

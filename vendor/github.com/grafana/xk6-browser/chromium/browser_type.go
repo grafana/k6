@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -39,10 +38,8 @@ type BrowserType struct {
 	vu        k6modules.VU
 	hooks     *common.Hooks
 	k6Metrics *k6ext.CustomMetrics
-	execPath  string       // path to the Chromium executable
-	storage   *storage.Dir // stores temporary data for the extension and user
+	execPath  string // path to the Chromium executable
 	randSrc   *rand.Rand
-	logger    *log.Logger
 }
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
@@ -55,17 +52,212 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 		vu:        vu,
 		hooks:     common.NewHooks(),
 		k6Metrics: k6m,
-		storage:   &storage.Dir{},
 		randSrc:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
 	}
 
 	return &b
 }
 
+func (b *BrowserType) init(
+	opts goja.Value, isRemoteBrowser bool,
+) (context.Context, *common.LaunchOptions, *log.Logger, error) {
+	ctx := b.initContext()
+
+	logger, err := makeLogger(ctx)
+	if err != nil {
+		return nil, nil, nil, fmt.Errorf("error setting up logger: %w", err)
+	}
+
+	var launchOpts *common.LaunchOptions
+	if isRemoteBrowser {
+		launchOpts = common.NewRemoteBrowserLaunchOptions()
+	} else {
+		launchOpts = common.NewLaunchOptions()
+	}
+
+	if err = launchOpts.Parse(ctx, logger, opts); err != nil {
+		return nil, nil, nil, fmt.Errorf("error parsing launch options: %w", err)
+	}
+	ctx = common.WithLaunchOptions(ctx, launchOpts)
+
+	if err := logger.SetCategoryFilter(launchOpts.LogCategoryFilter); err != nil {
+		return nil, nil, nil, fmt.Errorf("error setting category filter: %w", err)
+	}
+	if launchOpts.Debug {
+		_ = logger.SetLevel("debug")
+	}
+
+	return ctx, launchOpts, logger, nil
+}
+
+func (b *BrowserType) initContext() context.Context {
+	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
+	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
+	ctx = common.WithHooks(ctx, b.hooks)
+	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
+	return ctx
+}
+
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(opts goja.Value) {
+func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
+	ctx, launchOpts, logger, err := b.init(opts, true)
+	if err != nil {
+		k6ext.Panic(ctx, "initializing browser type: %w", err)
+	}
+
+	bp, err := b.connect(ctx, wsEndpoint, launchOpts, logger)
+	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: launchOpts.Timeout,
+		}
+		k6ext.Panic(ctx, "%w", err)
+	}
+
+	return bp
+}
+
+func (b *BrowserType) connect(
+	ctx context.Context, wsURL string, opts *common.LaunchOptions, logger *log.Logger,
+) (*common.Browser, error) {
+	browserProc, err := b.link(ctx, wsURL, opts, logger)
+	if browserProc == nil {
+		return nil, fmt.Errorf("connecting to browser: %w", err)
+	}
+
+	// If this context is cancelled we'll initiate an extension wide
+	// cancellation and shutdown.
+	browserCtx, browserCtxCancel := context.WithCancel(ctx)
+	b.Ctx = browserCtx
+	browser, err := common.NewBrowser(
+		browserCtx, browserCtxCancel, browserProc, opts, logger,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("connecting to browser: %w", err)
+	}
+
+	return browser, nil
+}
+
+func (b *BrowserType) link(
+	ctx context.Context, wsURL string,
+	opts *common.LaunchOptions, logger *log.Logger,
+) (*common.BrowserProcess, error) {
+	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
+	if err != nil {
+		bProcCtxCancel()
+		return nil, err //nolint:wrapcheck
+	}
+
+	return p, nil
+}
+
+// Launch allocates a new Chrome browser process and returns a new api.Browser value,
+// which can be used for controlling the Chrome browser.
+func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID int) {
+	ctx, launchOpts, logger, err := b.init(opts, false)
+	if err != nil {
+		k6ext.Panic(ctx, "initializing browser type: %w", err)
+	}
+
+	bp, pid, err := b.launch(ctx, launchOpts, logger)
+	if err != nil {
+		err = &k6ext.UserFriendlyError{
+			Err:     err,
+			Timeout: launchOpts.Timeout,
+		}
+		k6ext.Panic(ctx, "%w", err)
+	}
+
+	return bp, pid
+}
+
+func (b *BrowserType) launch(
+	ctx context.Context, opts *common.LaunchOptions, logger *log.Logger,
+) (_ *common.Browser, pid int, _ error) {
+	envs := make([]string, 0, len(opts.Env))
+	for k, v := range opts.Env {
+		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
+	}
+	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
+	if err != nil {
+		return nil, 0, fmt.Errorf("%w", err)
+	}
+	dataDir := &storage.Dir{}
+	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
+		return nil, 0, fmt.Errorf("%w", err)
+	}
+	flags["user-data-dir"] = dataDir.Dir
+
+	go func(c context.Context) {
+		defer func() {
+			if err := dataDir.Cleanup(); err != nil {
+				logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
+			}
+		}()
+		// There's a small chance that this might be called
+		// if the context is closed by the k6 runtime. To
+		// guarantee the cleanup we would need to orchestrate
+		// it correctly which https://github.com/grafana/k6/issues/2432
+		// will enable once it's complete.
+		<-c.Done()
+	}(ctx)
+
+	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, logger)
+	if browserProc == nil {
+		return nil, 0, fmt.Errorf("launching browser: %w", err)
+	}
+
+	// If this context is cancelled we'll initiate an extension wide
+	// cancellation and shutdown.
+	browserCtx, browserCtxCancel := context.WithCancel(ctx)
+	b.Ctx = browserCtx
+	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
+		browserProc, opts, logger)
+	if err != nil {
+		return nil, 0, fmt.Errorf("launching browser: %w", err)
+	}
+
+	return browser, browserProc.Pid(), nil
+}
+
+// LaunchPersistentContext launches the browser with persistent storage.
+func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
 	rt := b.vu.Runtime()
-	k6common.Throw(rt, errors.New("BrowserType.connect() has not been implemented yet"))
+	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet"))
+	return nil
+}
+
+// Name returns the name of this browser type.
+func (b *BrowserType) Name() string {
+	return "chromium"
+}
+
+// allocate starts a new Chromium browser process and returns it.
+func (b *BrowserType) allocate(
+	ctx context.Context, opts *common.LaunchOptions,
+	flags map[string]any, env []string, dataDir *storage.Dir,
+	logger *log.Logger,
+) (_ *common.BrowserProcess, rerr error) {
+	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	defer func() {
+		if rerr != nil {
+			bProcCtxCancel()
+		}
+	}()
+
+	args, err := parseArgs(flags)
+	if err != nil {
+		return nil, err
+	}
+
+	path := opts.ExecutablePath
+	if path == "" {
+		path = b.ExecutablePath()
+	}
+
+	return common.NewLocalBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
 }
 
 // ExecutablePath returns the path where the extension expects to find the browser executable.
@@ -108,139 +300,6 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 	return ""
 }
 
-func (b *BrowserType) initContext() context.Context {
-	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
-	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
-	ctx = common.WithHooks(ctx, b.hooks)
-	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
-	return ctx
-}
-
-// Launch allocates a new Chrome browser process and returns a new api.Browser value,
-// which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch(opts goja.Value) api.Browser {
-	ctx := b.initContext()
-
-	var err error
-	if b.logger, err = makeLogger(ctx); err != nil {
-		k6ext.Panic(ctx, "setting up logger: %w", err)
-	}
-	launchOpts := common.NewLaunchOptions(k6ext.OnCloud())
-	if err := launchOpts.Parse(ctx, b.logger, opts); err != nil {
-		k6ext.Panic(ctx, "parsing launch options: %w", err)
-	}
-	ctx = common.WithLaunchOptions(ctx, launchOpts)
-
-	bp, err := b.launch(ctx, launchOpts)
-	if err != nil {
-		err = &k6ext.UserFriendlyError{
-			Err:     err,
-			Timeout: launchOpts.Timeout,
-		}
-		k6ext.Panic(ctx, "%w", err)
-	}
-
-	return bp
-}
-
-func (b *BrowserType) launch(ctx context.Context, opts *common.LaunchOptions) (*common.Browser, error) {
-	if err := b.logger.SetCategoryFilter(opts.LogCategoryFilter); err != nil {
-		return nil, fmt.Errorf("%w", err)
-	}
-	if opts.Debug {
-		_ = b.logger.SetLevel("debug")
-	}
-
-	envs := make([]string, 0, len(opts.Env))
-	for k, v := range opts.Env {
-		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-	}
-	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
-	if err != nil {
-		return nil, fmt.Errorf("%w", err)
-	}
-	dataDir := b.storage
-	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
-		return nil, fmt.Errorf("%w", err)
-	}
-	flags["user-data-dir"] = dataDir.Dir
-
-	go func(c context.Context) {
-		defer func() {
-			if err := dataDir.Cleanup(); err != nil {
-				b.logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
-			}
-		}()
-		// There's a small chance that this might be called
-		// if the context is closed by the k6 runtime. To
-		// guarantee the cleanup we would need to orchestrate
-		// it correctly which https://github.com/grafana/k6/issues/2432
-		// will enable once it's complete.
-		<-c.Done()
-	}(ctx)
-
-	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, b.logger)
-	if browserProc == nil {
-		return nil, fmt.Errorf("launching browser: %w", err)
-	}
-
-	browserProc.AttachLogger(b.logger)
-
-	// If this context is cancelled we'll initiate an extension wide
-	// cancellation and shutdown.
-	browserCtx, browserCtxCancel := context.WithCancel(ctx)
-	// attach the browser process ID to the context
-	// so that we can kill it afterward if it lingers
-	// see: k6ext.Panic function.
-	browserCtx = k6ext.WithProcessID(browserCtx, browserProc.Pid())
-	b.Ctx = browserCtx
-	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
-		browserProc, opts, b.logger)
-	if err != nil {
-		return nil, fmt.Errorf("launching browser: %w", err)
-	}
-
-	return browser, nil
-}
-
-// LaunchPersistentContext launches the browser with persistent storage.
-func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
-	rt := b.vu.Runtime()
-	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet"))
-	return nil
-}
-
-// Name returns the name of this browser type.
-func (b *BrowserType) Name() string {
-	return "chromium"
-}
-
-// allocate starts a new Chromium browser process and returns it.
-func (b *BrowserType) allocate(
-	ctx context.Context, opts *common.LaunchOptions,
-	flags map[string]any, env []string, dataDir *storage.Dir,
-	logger *log.Logger,
-) (_ *common.BrowserProcess, rerr error) {
-	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
-	defer func() {
-		if rerr != nil {
-			bProcCtxCancel()
-		}
-	}()
-
-	args, err := parseArgs(flags)
-	if err != nil {
-		return nil, err
-	}
-
-	path := opts.ExecutablePath
-	if path == "" {
-		path = b.ExecutablePath()
-	}
-
-	return common.NewBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
-}
-
 // parseArgs parses command-line arguments and returns them.
 func parseArgs(flags map[string]any) ([]string, error) {
 	// Build command line args list
@@ -256,12 +315,6 @@ func parseArgs(flags map[string]any) ([]string, error) {
 		default:
 			return nil, fmt.Errorf(`invalid browser command line flag: "%s=%v"`, name, value)
 		}
-	}
-	if _, ok := flags["no-sandbox"]; !ok && os.Getuid() == 0 {
-		// Running as root, for example in a Linux container. Chromium
-		// needs --no-sandbox when running as root, so make that the
-		// default, unless the user set "no-sandbox": false.
-		args = append(args, "--no-sandbox")
 	}
 	if _, ok := flags["remote-debugging-port"]; !ok {
 		args = append(args, "--remote-debugging-port=0")
@@ -282,37 +335,30 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 		"disable-background-timer-throttling":                true,
 		"disable-backgrounding-occluded-windows":             true,
 		"disable-breakpad":                                   true,
-		"disable-client-side-phishing-detection":             true,
 		"disable-component-extensions-with-background-pages": true,
 		"disable-default-apps":                               true,
 		"disable-dev-shm-usage":                              true,
 		"disable-extensions":                                 true,
 		//nolint:lll
-		"disable-features":                 "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame",
-		"disable-hang-monitor":             true,
-		"disable-ipc-flooding-protection":  true,
-		"disable-popup-blocking":           true,
-		"disable-prompt-on-repost":         true,
-		"disable-renderer-backgrounding":   true,
-		"disable-sync":                     true,
-		"force-color-profile":              "srgb",
-		"metrics-recording-only":           true,
-		"no-first-run":                     true,
-		"safebrowsing-disable-auto-update": true,
-		"enable-automation":                true,
-		"password-store":                   "basic",
-		"use-mock-keychain":                true,
-		"no-service-autorun":               true,
+		"disable-features":                "ImprovedCookieControls,LazyFrameLoading,GlobalMediaControls,DestroyProfileOnBrowserClose,MediaRouter,AcceptCHFrame",
+		"disable-hang-monitor":            true,
+		"disable-ipc-flooding-protection": true,
+		"disable-popup-blocking":          true,
+		"disable-prompt-on-repost":        true,
+		"disable-renderer-backgrounding":  true,
+		"force-color-profile":             "srgb",
+		"metrics-recording-only":          true,
+		"no-first-run":                    true,
+		"enable-automation":               true,
+		"password-store":                  "basic",
+		"use-mock-keychain":               true,
+		"no-service-autorun":              true,
 
 		"no-startup-window":           true,
 		"no-default-browser-check":    true,
-		"no-sandbox":                  true,
 		"headless":                    lopts.Headless,
 		"auto-open-devtools-for-tabs": lopts.Devtools,
 		"window-size":                 fmt.Sprintf("%d,%d", 800, 600),
-	}
-	if runtime.GOOS == "darwin" {
-		f["enable-use-zoom-for-dsf"] = false
 	}
 	if lopts.Headless {
 		f["hide-scrollbars"] = true

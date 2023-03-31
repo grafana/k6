@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common/js"
+	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -14,14 +16,17 @@ import (
 
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 )
 
 // Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces.
-var _ EventEmitter = &BrowserContext{}
-var _ api.BrowserContext = &BrowserContext{}
+var (
+	_ EventEmitter       = &BrowserContext{}
+	_ api.BrowserContext = &BrowserContext{}
+)
 
 // BrowserContext stores context information for a single independent browser session.
 // A newly launched browser instance contains a default browser context.
@@ -44,7 +49,7 @@ type BrowserContext struct {
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(
 	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *log.Logger,
-) *BrowserContext {
+) (*BrowserContext, error) {
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -60,22 +65,39 @@ func NewBrowserContext(
 		b.GrantPermissions(opts.Permissions, nil)
 	}
 
-	return &b
+	rt := b.vu.Runtime()
+	wv := rt.ToValue(js.WebVitalIIFEScript)
+	wvi := rt.ToValue(js.WebVitalInitScript)
+
+	if err := b.AddInitScript(wv, nil); err != nil {
+		return nil, fmt.Errorf("adding web vital script to new browser context: %w", err)
+	}
+	if err := b.AddInitScript(wvi, nil); err != nil {
+		return nil, fmt.Errorf("adding web vital init script to new browser context: %w", err)
+	}
+
+	return &b, nil
 }
 
-// AddCookies is not implemented.
+// AddCookies adds cookies into this browser context.
+// All pages within this context will have these cookies installed.
 func (b *BrowserContext) AddCookies(cookies goja.Value) {
-	k6ext.Panic(b.ctx, "BrowserContext.addCookies(cookies) has not been implemented yet")
+	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
+
+	err := b.addCookies(cookies)
+	if err != nil {
+		k6ext.Panic(b.ctx, "adding cookies: %w", err)
+	}
 }
 
 // AddInitScript adds a script that will be initialized on all new pages.
-func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) {
+func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) error {
 	b.logger.Debugf("BrowserContext:AddInitScript", "bctxid:%v", b.id)
 
 	rt := b.vu.Runtime()
 
 	source := ""
-	if script != nil && !goja.IsUndefined(script) && !goja.IsNull(script) {
+	if gojaValueExists(script) {
 		switch script.ExportType() {
 		case reflect.TypeOf(string("")):
 			source = script.String()
@@ -100,8 +122,22 @@ func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) {
 	b.evaluateOnNewDocumentSources = append(b.evaluateOnNewDocumentSources, source)
 
 	for _, p := range b.browser.getPages() {
-		p.evaluateOnNewDocument(source)
+		if err := p.evaluateOnNewDocument(source); err != nil {
+			return fmt.Errorf("adding init script to browser context: %w", err)
+		}
 	}
+
+	return nil
+}
+
+func (b *BrowserContext) applyAllInitScripts(p *Page) error {
+	for _, source := range b.evaluateOnNewDocumentSources {
+		if err := p.evaluateOnNewDocument(source); err != nil {
+			return fmt.Errorf("adding init script to browser context: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // Browser returns the browser instance that this browser context belongs to.
@@ -142,9 +178,8 @@ func (b *BrowserContext) Close() {
 }
 
 // Cookies is not implemented.
-func (b *BrowserContext) Cookies() []any {
-	k6ext.Panic(b.ctx, "BrowserContext.cookies() has not been implemented yet")
-	return nil
+func (b *BrowserContext) Cookies() ([]any, error) {
+	return nil, fmt.Errorf("BrowserContext.cookies() has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // ExposeBinding is not implemented.
@@ -209,12 +244,12 @@ func (b *BrowserContext) NewCDPSession() api.CDPSession {
 }
 
 // NewPage creates a new page inside this browser context.
-func (b *BrowserContext) NewPage() api.Page {
+func (b *BrowserContext) NewPage() (api.Page, error) {
 	b.logger.Debugf("BrowserContext:NewPage", "bctxid:%v", b.id)
 
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
-		k6ext.Panic(b.ctx, "newPageInContext: %w", err)
+		return nil, fmt.Errorf("creating new page in browser context: %w", err)
 	}
 
 	var (
@@ -229,7 +264,7 @@ func (b *BrowserContext) NewPage() api.Page {
 	}
 	b.logger.Debugf("BrowserContext:NewPage:return", "bctxid:%v ptid:%s", bctxid, ptid)
 
-	return p
+	return p, nil
 }
 
 // Pages returns a list of pages inside this browser context.
@@ -261,8 +296,8 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 // SetExtraHTTPHeaders is not implemented.
-func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) {
-	k6ext.Panic(b.ctx, "BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet")
+func (b *BrowserContext) SetExtraHTTPHeaders(headers map[string]string) error {
+	return fmt.Errorf("BrowserContext.setExtraHTTPHeaders(headers) has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // SetGeolocation overrides the geo location of the user.
@@ -426,4 +461,50 @@ func (b *BrowserContext) runWaitForEventHandler(
 
 func (b *BrowserContext) getSession(id target.SessionID) *Session {
 	return b.browser.conn.getSession(id)
+}
+
+func (b *BrowserContext) addCookies(cookies goja.Value) error {
+	var cookieParams []network.CookieParam
+	if !gojaValueExists(cookies) {
+		return Error("cookies value is not set")
+	}
+
+	rt := b.vu.Runtime()
+	err := rt.ExportTo(cookies, &cookieParams)
+	if err != nil {
+		return fmt.Errorf("unable to export cookies value to cookieParams. %w", err)
+	}
+
+	// Create new array of pointers to items in cookieParams
+	var cookieParamsPointers []*network.CookieParam
+	for i := 0; i < len(cookieParams); i++ {
+		cookieParam := cookieParams[i]
+
+		if cookieParam.Name == "" {
+			return fmt.Errorf("cookie name is not set. %#v", cookieParam)
+		}
+
+		if cookieParam.Value == "" {
+			return fmt.Errorf("cookie value is not set. %#v", cookieParam)
+		}
+
+		// if URL is not set, both Domain and Path must be provided
+		if cookieParam.URL == "" {
+			if cookieParam.Domain == "" || cookieParam.Path == "" {
+				return fmt.Errorf(
+					"if cookie url is not provided, both domain and path must be specified. %#v",
+					cookieParam,
+				)
+			}
+		}
+
+		cookieParamsPointers = append(cookieParamsPointers, &cookieParam)
+	}
+
+	action := storage.SetCookies(cookieParamsPointers).WithBrowserContextID(b.id)
+	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		return fmt.Errorf("unable to execute SetCookies action: %w", err)
+	}
+
+	return nil
 }

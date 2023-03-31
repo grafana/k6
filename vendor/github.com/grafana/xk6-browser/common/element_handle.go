@@ -55,7 +55,11 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 	y := math.Min(quad[1], math.Min(quad[3], math.Min(quad[5], quad[7])))
 	width := math.Max(quad[0], math.Max(quad[2], math.Max(quad[4], quad[6]))) - x
 	height := math.Max(quad[1], math.Max(quad[3], math.Max(quad[5], quad[7]))) - y
-	position := h.frame.position()
+
+	position, err := h.frame.position()
+	if err != nil {
+		return nil, err
+	}
 
 	return &Rect{X: x + position.X, Y: y + position.Y, Width: width, Height: height}, nil
 }
@@ -63,10 +67,11 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
 	frame := h.ownerFrame(apiCtx)
 	if frame != nil && frame.parentFrame != nil {
-		var (
-			el          = h.frame.FrameElement()
-			element, ok = el.(*ElementHandle)
-		)
+		el, err := h.frame.FrameElement()
+		if err != nil {
+			return false, err
+		}
+		element, ok := el.(*ElementHandle)
 		if !ok {
 			return false, fmt.Errorf("unexpected type %T", el)
 		}
@@ -755,20 +760,21 @@ func (h *ElementHandle) Click(opts goja.Value) error {
 	return nil
 }
 
-func (h *ElementHandle) ContentFrame() api.Frame {
+// ContentFrame returns the frame that contains this element.
+func (h *ElementHandle) ContentFrame() (api.Frame, error) {
 	var (
 		node *cdp.Node
 		err  error
 	)
 	action := dom.DescribeNode().WithObjectID(h.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6ext.Panic(h.ctx, "getting remote node %q: %w", h.remoteObject.ObjectID, err)
+		return nil, fmt.Errorf("getting remote node %q: %w", h.remoteObject.ObjectID, err)
 	}
 	if node == nil || node.FrameID == "" {
-		return nil
+		return nil, fmt.Errorf("element is not an iframe")
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID)
+	return h.frame.manager.getFrameByID(node.FrameID), nil
 }
 
 func (h *ElementHandle) Dblclick(opts goja.Value) {
@@ -969,7 +975,7 @@ func (h *ElementHandle) IsVisible() bool {
 }
 
 // OwnerFrame returns the frame containing this element.
-func (h *ElementHandle) OwnerFrame() api.Frame {
+func (h *ElementHandle) OwnerFrame() (api.Frame, error) {
 	fn := `
 		(node, injected) => {
 			return injected.getDocumentElement(node);
@@ -981,28 +987,31 @@ func (h *ElementHandle) OwnerFrame() api.Frame {
 	}
 	res, err := h.evalWithScript(h.ctx, opts, fn)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting document element: %w", err)
+		return nil, fmt.Errorf("getting document element: %w", err)
 	}
 	if res == nil {
-		return nil
+		return nil, errors.New("getting document element: nil document")
 	}
 
-	documentHandle := res.(*ElementHandle)
+	documentHandle, ok := res.(*ElementHandle)
+	if !ok {
+		return nil, fmt.Errorf("unexpected result type while getting document element: %T", res)
+	}
 	defer documentHandle.Dispose()
 	if documentHandle.remoteObject.ObjectID == "" {
-		return nil
+		return nil, err
 	}
 
 	var node *cdp.Node
 	action := dom.DescribeNode().WithObjectID(documentHandle.remoteObject.ObjectID)
 	if node, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-		k6ext.Panic(h.ctx, "getting node in frame: %w", err)
+		return nil, fmt.Errorf("getting node in frame: %w", err)
 	}
 	if node == nil || node.FrameID == "" {
-		return nil
+		return nil, fmt.Errorf("no frame found for node: %w", err)
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID)
+	return h.frame.manager.getFrameByID(node.FrameID), nil
 }
 
 func (h *ElementHandle) Press(key string, opts goja.Value) {
@@ -1023,7 +1032,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
-func (h *ElementHandle) Query(selector string) api.ElementHandle {
+func (h *ElementHandle) Query(selector string) (api.ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
@@ -1039,35 +1048,35 @@ func (h *ElementHandle) Query(selector string) api.ElementHandle {
 	}
 	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
 	if err != nil {
-		k6ext.Panic(h.ctx, "querying selector %q: %w", selector, err)
+		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
 	if result == nil {
-		return nil
+		return nil, fmt.Errorf("querying selector %q", selector)
+	}
+	handle, ok := result.(api.JSHandle)
+	if !ok {
+		return nil, fmt.Errorf("querying selector %q, wrong type %T", selector, result)
+	}
+	element := handle.AsElement()
+	if element == nil {
+		handle.Dispose()
+		return nil, fmt.Errorf("querying selector %q", selector)
 	}
 
-	var (
-		handle  = result.(api.JSHandle)
-		element = handle.AsElement()
-	)
-	applySlowMo(h.ctx)
-	if element != nil {
-		return element
-	}
-	handle.Dispose()
-	return nil
+	return element, nil
 }
 
 // QueryAll queries element subtree for matching elements.
 // If no element matches the selector, the return value resolves to "null".
-func (h *ElementHandle) QueryAll(selector string) []api.ElementHandle {
+func (h *ElementHandle) QueryAll(selector string) ([]api.ElementHandle, error) {
 	defer applySlowMo(h.ctx)
 
 	handles, err := h.queryAll(selector, h.evalWithScript)
 	if err != nil {
-		k6ext.Panic(h.ctx, "querying all selector %q: %w", selector, err)
+		return nil, fmt.Errorf("querying all selector %q: %w", selector, err)
 	}
 
-	return handles
+	return handles, nil
 }
 
 func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementHandle, error) {
@@ -1094,10 +1103,14 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]api.ElementH
 		return nil, fmt.Errorf("getting element handle for selector %q: %w", selector, ErrJSHandleInvalid)
 	}
 	defer handles.Dispose()
-	var (
-		props = handles.GetProperties()
-		els   = make([]api.ElementHandle, 0, len(props))
-	)
+
+	props, err := handles.GetProperties()
+	if err != nil {
+		// GetProperties has a rich error already, so we don't need to wrap it.
+		return nil, err //nolint:wrapcheck
+	}
+
+	els := make([]api.ElementHandle, 0, len(props))
 	for _, prop := range props {
 		if el := prop.AsElement(); el != nil {
 			els = append(els, el)
@@ -1300,18 +1313,19 @@ func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
 	}
 }
 
-func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) api.ElementHandle {
+// WaitForSelector waits for the selector to appear in the DOM.
+func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing waitForSelector %q options: %w", selector, err)
+		return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)
 	}
 
 	handle, err := h.waitForSelector(h.ctx, selector, parsedOpts)
 	if err != nil {
-		k6ext.Panic(h.ctx, "waiting for selector %q: %w", selector, err)
+		return nil, fmt.Errorf("waiting for selector %q: %w", selector, err)
 	}
 
-	return handle
+	return handle, nil
 }
 
 // evalWithScript evaluates the given js code in the scope of this ElementHandle and returns the result.

@@ -101,21 +101,23 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) api.JSHandle {
+func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
 	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
-	res, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
+
+	eh, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {
-		k6ext.Panic(h.ctx, "%w", err)
+		return nil, fmt.Errorf("evaluating handle for element: %w", err)
 	}
-	return res
+
+	return eh, nil
 }
 
 // GetProperties retreives the JS handle's properties.
-func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
+func (h *BaseJSHandle) GetProperties() (map[string]api.JSHandle, error) {
 	handles, err := h.getProperties()
 	if err != nil {
-		k6ext.Panic(h.ctx, "getProperties: %w", err)
+		return nil, err
 	}
 
 	jsHandles := make(map[string]api.JSHandle, len(handles))
@@ -123,7 +125,7 @@ func (h *BaseJSHandle) GetProperties() map[string]api.JSHandle {
 		jsHandles[k] = v
 	}
 
-	return jsHandles
+	return jsHandles, nil
 }
 
 // getProperties is like GetProperties, but does not panic.

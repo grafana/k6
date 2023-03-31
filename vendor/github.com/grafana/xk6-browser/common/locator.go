@@ -31,21 +31,20 @@ func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *
 }
 
 // Click on an element using locator's selector with strict mode on.
-func (l *Locator) Click(opts goja.Value) {
+func (l *Locator) Click(opts goja.Value) error {
 	l.log.Debugf("Locator:Click", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameClickOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing click options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing click options: %w", err)
 	}
-	if err = l.click(copts); err != nil {
-		err = fmt.Errorf("clicking on %q: %w", l.selector, err)
-		return
+	if err := l.click(copts); err != nil {
+		return fmt.Errorf("clicking on %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 // click is like Click but takes parsed options and neither throws an
