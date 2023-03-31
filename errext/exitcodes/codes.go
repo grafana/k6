@@ -20,4 +20,5 @@ const (
 	CannotStartRESTAPI       ExitCode = 106
 	ScriptException          ExitCode = 107
 	ScriptAborted            ExitCode = 108
+	GoPanic                  ExitCode = 109
 )

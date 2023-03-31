@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	stdlog "log"
+	"runtime/debug"
 	"strconv"
 	"strings"
 	"sync"
@@ -17,6 +18,7 @@ import (
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/log"
 )
@@ -86,6 +88,17 @@ func (c *rootCommand) execute() {
 		cancel()
 		c.stopLoggers()
 		c.globalState.OSExit(exitCode)
+	}()
+
+	defer func() {
+		if r := recover(); r != nil {
+			exitCode = int(exitcodes.GoPanic)
+			err := fmt.Errorf("unexpected k6 panic: %s\n%s", r, debug.Stack())
+			if c.loggerIsRemote {
+				c.globalState.FallbackLogger.Error(err)
+			}
+			c.globalState.Logger.Error(err)
+		}
 	}()
 
 	err := c.cmd.Execute()
