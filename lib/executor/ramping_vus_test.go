@@ -251,14 +251,14 @@ func TestRampingVUsGracefulRampDown(t *testing.T) {
 // This test aims to check whether the ramping VU executor interrupts
 // hanging/remaining VUs after the graceful rampdown period finishes.
 //
-//                   Rampdown         Graceful Rampdown
-//                   Stage (40ms)     (+30ms)
-//                   [               ][              ]
-//         t 0---5---10---20---30---40---50---60---70
-//     VU1       *..................................✔ (40+30=70ms)
-//     VU2           *...................X            (20+30=50ms)
+//	              Rampdown         Graceful Rampdown
+//	              Stage (40ms)     (+30ms)
+//	              [               ][              ]
+//	    t 0---5---10---20---30---40---50---60---70
+//	VU1       *..................................✔ (40+30=70ms)
+//	VU2           *...................X            (20+30=50ms)
 //
-//     ✔=Finishes,X=Interrupted,.=Sleeps
+//	✔=Finishes,X=Interrupted,.=Sleeps
 func TestRampingVUsHandleRemainingVUs(t *testing.T) {
 	t.Parallel()
 

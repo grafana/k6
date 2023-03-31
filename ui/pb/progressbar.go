@@ -193,13 +193,13 @@ func (pbr ProgressBarRender) String() string {
 // its methods to return the final output. A struct is returned over a
 // plain string to allow dynamic padding and positioning of elements
 // depending on other elements on the screen.
-// - maxLeft defines the maximum character length of the left-side
-//   text. Characters exceeding this length will be replaced with a
-//   single ellipsis. Passing <=0 disables this.
-// - widthDelta changes the progress bar width the specified amount of
-//   characters. E.g. passing -2 would shorten the width by 2 chars.
-//   If the resulting width is lower than minWidth, progress will be
-//   rendered as a percentage instead of a filling bar.
+//   - maxLeft defines the maximum character length of the left-side
+//     text. Characters exceeding this length will be replaced with a
+//     single ellipsis. Passing <=0 disables this.
+//   - widthDelta changes the progress bar width the specified amount of
+//     characters. E.g. passing -2 would shorten the width by 2 chars.
+//     If the resulting width is lower than minWidth, progress will be
+//     rendered as a percentage instead of a filling bar.
 func (pb *ProgressBar) Render(maxLeft, widthDelta int) ProgressBarRender {
 	pb.mutex.RLock()
 	defer pb.mutex.RUnlock()

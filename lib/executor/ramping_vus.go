@@ -106,63 +106,63 @@ func (vlvc RampingVUsConfig) Validate() []error {
 // 2 equal segments (i.e. execution segments "0:0.5" and "0.5:1"). The original
 // execution steps would look something like this:
 //
-// VUs  ^
-//    10|          *
-//     9|         ***
-//     8|        *****
-//     7|       *******
-//     6|      *********
-//     5|     ***********
-//     4|    *************
-//     3|   ***************
-//     2|  *****************
-//     1| *******************
-//     0------------------------> time(s)
-//       01234567890123456789012   (t%10)
-//       00000000001111111111222   (t/10)
+//	VUs  ^
+//	   10|          *
+//	    9|         ***
+//	    8|        *****
+//	    7|       *******
+//	    6|      *********
+//	    5|     ***********
+//	    4|    *************
+//	    3|   ***************
+//	    2|  *****************
+//	    1| *******************
+//	    0------------------------> time(s)
+//	      01234567890123456789012   (t%10)
+//	      00000000001111111111222   (t/10)
 //
 // The chart for one of the execution segments would look like this:
 //
-// VUs  ^
-//     5|         XXX
-//     4|       XXXXXXX
-//     3|     XXXXXXXXXXX
-//     2|   XXXXXXXXXXXXXXX
-//     1| XXXXXXXXXXXXXXXXXXX
-//     0------------------------> time(s)
-//       01234567890123456789012   (t%10)
-//       00000000001111111111222   (t/10)
+//	VUs  ^
+//	    5|         XXX
+//	    4|       XXXXXXX
+//	    3|     XXXXXXXXXXX
+//	    2|   XXXXXXXXXXXXXXX
+//	    1| XXXXXXXXXXXXXXXXXXX
+//	    0------------------------> time(s)
+//	      01234567890123456789012   (t%10)
+//	      00000000001111111111222   (t/10)
 //
 // And the chart for the other execution segment would look like this:
 //
-// VUs  ^
-//     5|          Y
-//     4|        YYYYY
-//     3|      YYYYYYYYY
-//     2|    YYYYYYYYYYYYY
-//     1|  YYYYYYYYYYYYYYYYY
-//     0------------------------> time(s)
-//       01234567890123456789012   (t%10)
-//       00000000001111111111222   (t/10)
+//	VUs  ^
+//	    5|          Y
+//	    4|        YYYYY
+//	    3|      YYYYYYYYY
+//	    2|    YYYYYYYYYYYYY
+//	    1|  YYYYYYYYYYYYYYYYY
+//	    0------------------------> time(s)
+//	      01234567890123456789012   (t%10)
+//	      00000000001111111111222   (t/10)
 //
 // Notice the time offsets and the slower ramping up and down. All of that is
 // because the sum of the two execution segments has to produce exactly the
 // original shape, as if the test ran on a single machine:
 //
-// VUs  ^
-//    10|          Y
-//     9|         XXX
-//     8|        YYYYY
-//     7|       XXXXXXX
-//     6|      YYYYYYYYY
-//     5|     XXXXXXXXXXX
-//     4|    YYYYYYYYYYYYY
-//     3|   XXXXXXXXXXXXXXX
-//     2|  YYYYYYYYYYYYYYYYY
-//     1| XXXXXXXXXXXXXXXXXXX
-//     0------------------------> time(s)
-//       01234567890123456789012   (t%10)
-//       00000000001111111111222   (t/10)
+//	VUs  ^
+//	   10|          Y
+//	    9|         XXX
+//	    8|        YYYYY
+//	    7|       XXXXXXX
+//	    6|      YYYYYYYYY
+//	    5|     XXXXXXXXXXX
+//	    4|    YYYYYYYYYYYYY
+//	    3|   XXXXXXXXXXXXXXX
+//	    2|  YYYYYYYYYYYYYYYYY
+//	    1| XXXXXXXXXXXXXXXXXXX
+//	    0------------------------> time(s)
+//	      01234567890123456789012   (t%10)
+//	      00000000001111111111222   (t/10)
 //
 // More information: https://github.com/k6io/k6/issues/997#issuecomment-484416866
 func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEnd bool) []lib.ExecutionStep {
@@ -273,18 +273,17 @@ func (vlvc RampingVUsConfig) precalculateTheRequiredSteps(et *lib.ExecutionTuple
 // iterations), where stars represent actively scheduled VUs and dots are used
 // for VUs that are potentially finishing up iterations:
 //
-//
-//      ^
-//      |
-// VUs 6|  *..............................
-//     5| ***.......*..............................
-//     4|*****.....***.....**..............................
-//     3|******...*****...***..............................
-//     2|*******.*******.****..............................
-//     1|***********************..............................
-//     0--------------------------------------------------------> time(s)
-//       012345678901234567890123456789012345678901234567890123   (t%10)
-//       000000000011111111112222222222333333333344444444445555   (t/10)
+//	VUs ^
+//	    |
+//	   6|  *..............................
+//	   5| ***.......*..............................
+//	   4|*****.....***.....**..............................
+//	   3|******...*****...***..............................
+//	   2|*******.*******.****..............................
+//	   1|***********************..............................
+//	   0--------------------------------------------------------> time(s)
+//	     012345678901234567890123456789012345678901234567890123   (t%10)
+//	     000000000011111111112222222222333333333344444444445555   (t/10)
 //
 // We start with 4 VUs, scale to 6, scale down to 1, scale up to 5, scale down
 // to 1 again, scale up to 4, back to 1, and finally back down to 0. If our
@@ -425,10 +424,10 @@ func (vlvc RampingVUsConfig) reserveVUsForGracefulRampDowns( //nolint:funlen
 //   - gracefulStop can be less than gracefulRampDown and can cut the graceful
 //     ramp-down periods of the last VUs short.
 //   - gracefulRampDown can be more than gracefulStop:
-//     - If the user manually ramped down VUs at the end of the test (i.e. the
-//       last stage's target is 0), then this will have no effect.
-//     - If the last stage's target is more than 0, the VUs at the end of the
-//       executor's life will have more time to finish their last iterations.
+//   - If the user manually ramped down VUs at the end of the test (i.e. the
+//     last stage's target is 0), then this will have no effect.
+//   - If the last stage's target is more than 0, the VUs at the end of the
+//     executor's life will have more time to finish their last iterations.
 func (vlvc RampingVUsConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	steps := vlvc.getRawExecutionSteps(et, false)
 

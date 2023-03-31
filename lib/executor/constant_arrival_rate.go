@@ -190,6 +190,7 @@ func (car *ConstantArrivalRate) Init(ctx context.Context) error {
 // time should iteration X begin) different, but keep everything else the same.
 // This will allow us to implement https://github.com/k6io/k6/issues/1386
 // and things like all of the TODOs below in one place only.
+//
 //nolint:funlen,cyclop
 func (car ConstantArrivalRate) Run(parentCtx context.Context, out chan<- metrics.SampleContainer) (err error) {
 	gracefulStop := car.config.GetGracefulStop()

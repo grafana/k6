@@ -127,17 +127,17 @@ func getIterationRunner(
 // only the regular duration.
 //
 // In either case, the usage of these contexts should be like this:
-//  - As long as the regDurationCtx isn't done, new iterations can be started.
-//  - After regDurationCtx is done, no new iterations should be started; every
-//    VU that finishes an iteration from now on can be returned to the buffer
-//    pool in the ExecutionState struct.
-//  - After maxDurationCtx is done, any VUs with iterations will be
-//    interrupted by the context's closing and will be returned to the buffer.
-//  - If you want to interrupt the execution of all VUs prematurely (e.g. there
-//    was an error or something like that), trigger maxDurationCancel().
-//  - If the whole test is aborted, the parent context will be cancelled, so
-//    that will also cancel these contexts, thus the "general abort" case is
-//    handled transparently.
+//   - As long as the regDurationCtx isn't done, new iterations can be started.
+//   - After regDurationCtx is done, no new iterations should be started; every
+//     VU that finishes an iteration from now on can be returned to the buffer
+//     pool in the ExecutionState struct.
+//   - After maxDurationCtx is done, any VUs with iterations will be
+//     interrupted by the context's closing and will be returned to the buffer.
+//   - If you want to interrupt the execution of all VUs prematurely (e.g. there
+//     was an error or something like that), trigger maxDurationCancel().
+//   - If the whole test is aborted, the parent context will be cancelled, so
+//     that will also cancel these contexts, thus the "general abort" case is
+//     handled transparently.
 func getDurationContexts(parentCtx context.Context, regularDuration, gracefulStop time.Duration) (
 	startTime time.Time, maxDurationCtx, regDurationCtx context.Context, maxDurationCancel func(),
 ) {

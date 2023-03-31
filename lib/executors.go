@@ -16,6 +16,7 @@ import (
 )
 
 // TODO: remove globals and use some type of explicit dependency injection?
+//
 //nolint:gochecknoglobals
 var (
 	executorConfigTypesMutex   sync.RWMutex
