@@ -31,8 +31,10 @@ func NewRuntime(t testing.TB) *Runtime {
 	}
 	vu.RuntimeField.SetFieldNameMapper(common.FieldNameMapper{})
 	vu.InitEnvField = &common.InitEnvironment{
-		Logger:   testutils.NewLogger(t),
-		Registry: metrics.NewRegistry(),
+		TestPreInitState: &lib.TestPreInitState{
+			Logger:   testutils.NewLogger(t),
+			Registry: metrics.NewRegistry(),
+		},
 	}
 
 	eventloop := eventloop.New(vu)
