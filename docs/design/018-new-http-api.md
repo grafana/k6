@@ -94,10 +94,10 @@ The Socket state can either be _active_—meaning connected for a TCP socket, bo
 
 - TCP:
 ```javascript
-import { dialTCP } from 'k6/x/net';
+import { TCP } from 'k6/x/net';
 
 export default async function () {
-  const socket = await dialTCP('192.168.1.1:80', {
+  const socket = await TCP.open('192.168.1.1:80', {
                             // default      | possible values
     ipVersion: 0,           // 0            | 4 (IPv4), 6 (IPv6), 0 (both)
     keepAlive: true,        // false        |
@@ -122,10 +122,10 @@ export default async function () {
 
 - UDP:
 ```javascript
-import { dialUDP } from 'k6/x/net';
+import { UDP } from 'k6/x/net';
 
 export default async function () {
-  const socket = new dialUDP('192.168.1.1:9090');
+  const socket = new UDP.open('192.168.1.1:9090');
 
   await socket.write(new TextEncoder().encode('GET / HTTP/1.1\r\n\r\n'));
 }
@@ -133,11 +133,11 @@ export default async function () {
 
 - IPC:
 ```javascript
-import { dialIPC } from 'k6/x/net';
+import { IPC } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const socket = await dialIPC('/tmp/unix.sock');
+  const socket = await IPC.open('/tmp/unix.sock');
 
   console.log(socket.file.path); // /tmp/unix.sock
 
@@ -169,11 +169,11 @@ export default async function () {
 
 - Passing a socket with custom transport settings, some HTTP options, and making a POST request:
 ```javascript
-import { dialTCP } from 'k6/x/net';
+import { TCP } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const socket = await dialTCP('10.0.0.10:80', { keepAlive: true });
+  const socket = await TCP.open('10.0.0.10:80', { keepAlive: true });
   const client = new Client({
     socket: socket,
     proxy: 'https://myproxy',
@@ -188,11 +188,11 @@ export default async function () {
 
 - A tentative HTTP/3 example:
 ```javascript
-import { dialUDP } from 'k6/x/net';
+import { UDP } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const socket = new dialUDP('192.168.1.1:9090');
+  const socket = new UDP.open('192.168.1.1:9090');
 
   const client = new Client({
     socket: socket,
@@ -215,7 +215,7 @@ When connecting to an address using a host name, the resolution can be controlle
 
 For example:
 ```javascript
-import { dialTCP } from 'k6/x/net';
+import { TCP } from 'k6/x/net';
 import dns from 'k6/x/net/dns';
 
 const hosts = {
@@ -224,7 +224,7 @@ const hosts = {
 };
 
 export default async function () {
-  const socket = await dialTCP('myhost', {
+  const socket = await TCP.open('myhost', {
     lookup: async hostname => {
       // Return either the IP from the static map, or do an OS lookup,
       // or fallback to making a DNS query to specific servers.
