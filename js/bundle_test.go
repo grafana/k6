@@ -201,8 +201,8 @@ func TestNewBundle(t *testing.T) {
 			invalidOptions := map[string]struct {
 				Expr, Error string
 			}{
-				"Array":    {`[]`, "json: cannot unmarshal array into Go value of type lib.Options"},
-				"Function": {`function(){}`, "error parsing script options: json: unsupported type: func(goja.FunctionCall) goja.Value"},
+				"Array":    {`[]`, "the exported script options should be a JS object"},
+				"Function": {`function(){}`, "the exported script options should be a JS object"},
 			}
 			for name, data := range invalidOptions {
 				t.Run(name, func(t *testing.T) {
@@ -453,8 +453,7 @@ func TestNewBundle(t *testing.T) {
 			entries := hook.Drain()
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.WarnLevel, entries[0].Level)
-			assert.Contains(t, entries[0].Message, "There were unknown fields")
-			assert.Contains(t, entries[0].Data["error"].(error).Error(), "unknown field \"something\"")
+			assert.Contains(t, entries[0].Message, "'something' is used in the exported script options, but it's not a valid k6 option")
 		})
 	})
 }

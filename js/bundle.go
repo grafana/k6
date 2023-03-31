@@ -1,14 +1,15 @@
 package js
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"net/url"
 	"path/filepath"
+	"reflect"
 	"runtime"
+	"sort"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
@@ -102,7 +103,7 @@ func newBundle(
 		return nil, err
 	}
 
-	err = bundle.populateExports(piState.Logger, updateOptions, instance)
+	err = bundle.populateExports(updateOptions, instance)
 	if err != nil {
 		return nil, err
 	}
@@ -159,7 +160,7 @@ func (b *Bundle) makeArchive() *lib.Archive {
 }
 
 // populateExports validates and extracts exported objects
-func (b *Bundle) populateExports(logger logrus.FieldLogger, updateOptions bool, instance moduleInstance) error {
+func (b *Bundle) populateExports(updateOptions bool, instance moduleInstance) error {
 	exports := instance.exports()
 	if exports == nil {
 		return errors.New("exports must be an object")
@@ -175,17 +176,8 @@ func (b *Bundle) populateExports(logger logrus.FieldLogger, updateOptions bool, 
 			if !updateOptions {
 				continue
 			}
-			data, err := json.Marshal(v.Export())
-			if err != nil {
-				return fmt.Errorf("error parsing script options: %w", err)
-			}
-			dec := json.NewDecoder(bytes.NewReader(data))
-			dec.DisallowUnknownFields()
-			if err := dec.Decode(&b.Options); err != nil {
-				if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
-					return uerr
-				}
-				logger.WithError(err).Warn("There were unknown fields in the options exported in the script")
+			if err := b.updateOptions(v); err != nil {
+				return err
 			}
 		case consts.SetupFn:
 			return errors.New("exported 'setup' must be a function")
@@ -196,6 +188,66 @@ func (b *Bundle) populateExports(logger logrus.FieldLogger, updateOptions bool, 
 
 	if len(b.callableExports) == 0 {
 		return errors.New("no exported functions in script")
+	}
+
+	return nil
+}
+
+// TODO: something cleaner than this, with far less reflection magic...
+func (b *Bundle) updateOptions(jsVal goja.Value) (err error) {
+	if common.IsNullish(jsVal) {
+		return nil // no options were exported, nothing to update
+	}
+
+	if jsVal.ExportType().Kind() != reflect.Map {
+		return fmt.Errorf("the exported script options should be a JS object")
+	}
+
+	// TODO: maybe work with the *goja.Object directly, if we can pass the
+	// runtime shomehow to call jsVal.ToObject(rt)?
+	expOptions, isMap := jsVal.Export().(map[string]interface{})
+	if !isMap {
+		return fmt.Errorf("the exported script options should be a JS object with string keys")
+	}
+
+	keys := make([]string, 0, len(expOptions))
+	for k := range expOptions {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	optionsJSONFields := lib.GetStructFieldsByTagKey(&b.Options, "json")
+
+	var errs []error
+	for _, k := range keys {
+		opt, ok := optionsJSONFields[k]
+		if !ok {
+			// TODO: make this an error
+			b.preInitState.Logger.Warnf("'%s' is used in the exported script options, but it's not a valid k6 option", k)
+			continue
+		}
+
+		// TODO: have a way to work with these values without having to go through JSON?
+		optJSON, err := json.Marshal(expOptions[k])
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error extracting '%s': %w", k, err))
+			continue
+		}
+
+		switch v := opt.(type) {
+		case lib.JSONUnmarshalerWithPreInitState:
+			err = v.UnmarshalJSONWithPIState(b.preInitState, optJSON)
+		case json.Unmarshaler:
+			err = v.UnmarshalJSON(optJSON)
+		default:
+			err = json.Unmarshal(optJSON, opt) // fingers crossed...
+		}
+		if err != nil {
+			errs = append(errs, fmt.Errorf("error parsing '%s': %w", k, err))
+		}
+	}
+	if len(errs) > 0 {
+		return fmt.Errorf("there were errors with the exported script options: %w", errors.Join(errs...))
 	}
 
 	return nil

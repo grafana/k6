@@ -563,3 +563,35 @@ func (o Options) ForEachSpecified(structTag string, callback func(key string, va
 		}
 	}
 }
+
+// JSONUnmarshalerWithPreInitState can be implemented by types that require
+// stateful unmarshalling of JSON values.
+type JSONUnmarshalerWithPreInitState interface {
+	UnmarshalJSONWithPIState(*TestPreInitState, []byte) error
+}
+
+// GetStructFieldsByTagKey returns a map with pointers to all of the struct
+// fields. The keys of that map are the confugured struct tag values for the
+// given structTagKey (e.g. "json").
+func GetStructFieldsByTagKey(val interface{}, structTagKey string) map[string]interface{} {
+	structPType := reflect.TypeOf(val)
+	if structPType.Kind() != reflect.Pointer {
+		panic(fmt.Errorf("GetStructFieldsByTagKey() expects a pointer, but was given %s", structPType.Kind()))
+	}
+	structPVal := reflect.ValueOf(val)
+
+	structType := structPType.Elem()
+	structVal := structPVal.Elem()
+	res := map[string]interface{}{}
+	for i := 0; i < structType.NumField(); i++ {
+		fieldType := structType.Field(i)
+		fieldVal := structVal.Field(i)
+
+		key, ok := fieldType.Tag.Lookup(structTagKey)
+		if !ok {
+			continue
+		}
+		res[key] = fieldVal.Addr().Interface()
+	}
+	return res
+}
