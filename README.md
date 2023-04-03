@@ -29,8 +29,8 @@ The current state of the project is that it is an experimental module of the Web
 
 | API                      | HMAC | ECDSA | RSASSA-PKCS1-v1_5 | RSA-PSS |
 | :----------------------- | :--- | :---- | :---------------- | :------ |
-| `crypto.subtle.sign()`   | ❌   | ❌    | ❌                | ❌      |
-| `crypto.subtle.verify()` | ❌   | ❌    | ❌                | ❌      |
+| `crypto.subtle.sign()`   | ✅   | ❌    | ❌                | ❌      |
+| `crypto.subtle.verify()` | ✅   | ❌    | ❌                | ❌      |
 
 ##### Key generation, import and export
 
