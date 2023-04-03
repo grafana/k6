@@ -3,6 +3,7 @@ package eventloop_test
 import (
 	"errors"
 	"fmt"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -78,19 +79,20 @@ func TestEventLoopWaitOnRegistered(t *testing.T) {
 	took := time.Since(start)
 	loop.WaitOnRegistered()
 	took2 := time.Since(start)
-	require.Equal(t, 1, ran)
+	require.Equal(t, 2, ran)
 	require.Greater(t, time.Millisecond*50, took)
 	require.Less(t, time.Second, took2)
 	require.Greater(t, time.Second+time.Millisecond*100, took2)
 }
 
-func TestEventLoopReuse(t *testing.T) {
+func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
 	t.Parallel()
 	sleepTime := time.Millisecond * 500
 	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
+	var called int64
 	f := func() error {
 		for i := 0; i < 100; i++ {
-			bad := i == 17
+			bad := i == 99
 			r := loop.RegisterCallback()
 
 			go func() {
@@ -101,13 +103,15 @@ func TestEventLoopReuse(t *testing.T) {
 					if bad {
 						return errors.New("something")
 					}
-					panic("this should never execute")
+					atomic.AddInt64(&called, 1)
+					return nil
 				})
 			}()
 		}
 		return fmt.Errorf("expected")
 	}
 	for i := 0; i < 3; i++ {
+		called = 0
 		start := time.Now()
 		require.Error(t, loop.Start(f))
 		took := time.Since(start)
@@ -116,6 +120,7 @@ func TestEventLoopReuse(t *testing.T) {
 		require.Greater(t, time.Millisecond*50, took)
 		require.Less(t, sleepTime, took2)
 		require.Greater(t, sleepTime+time.Millisecond*100, took2)
+		require.EqualValues(t, called, 99)
 	}
 }
 
