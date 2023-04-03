@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/dop251/goja/unistring"
 )
@@ -330,6 +331,8 @@ type vm struct {
 	interruptLock sync.Mutex
 
 	curAsyncRunner *asyncRunner
+
+	profTracker *profTracker
 }
 
 type instruction interface {
@@ -555,8 +558,20 @@ func (vm *vm) halted() bool {
 }
 
 func (vm *vm) run() {
+	if vm.profTracker != nil && !vm.runWithProfiler() {
+		return
+	}
+	count := 0
 	interrupted := false
 	for {
+		if count == 0 {
+			if atomic.LoadInt32(&globalProfiler.enabled) == 1 && !vm.runWithProfiler() {
+				return
+			}
+			count = 100
+		} else {
+			count--
+		}
 		if interrupted = atomic.LoadUint32(&vm.interrupted) != 0; interrupted {
 			break
 		}
@@ -576,6 +591,42 @@ func (vm *vm) run() {
 		vm.interruptLock.Unlock()
 		panic(v)
 	}
+}
+
+func (vm *vm) runWithProfiler() bool {
+	pt := vm.profTracker
+	if pt == nil {
+		pt = globalProfiler.p.registerVm()
+		vm.profTracker = pt
+		defer func() {
+			atomic.StoreInt32(&vm.profTracker.finished, 1)
+			vm.profTracker = nil
+		}()
+	}
+	interrupted := false
+	for {
+		if interrupted = atomic.LoadUint32(&vm.interrupted) != 0; interrupted {
+			return true
+		}
+		pc := vm.pc
+		if pc < 0 || pc >= len(vm.prg.code) {
+			break
+		}
+		vm.prg.code[pc].exec(vm)
+		req := atomic.LoadInt32(&pt.req)
+		if req == profReqStop {
+			return true
+		}
+		if req == profReqDoSample {
+			pt.stop = time.Now()
+
+			pt.numFrames = len(vm.r.CaptureCallStack(len(pt.frames), pt.frames[:0]))
+			pt.frames[0].pc = pc
+			atomic.StoreInt32(&pt.req, profReqSampleReady)
+		}
+	}
+
+	return false
 }
 
 func (vm *vm) Interrupt(v interface{}) {
