@@ -150,6 +150,27 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 	})
 }
 
+func TestSubtleCryptoSignVerify(t *testing.T) {
+	t.Parallel()
+
+	t.Run("HMAC", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newTestSetup(t)
+
+		gotScriptErr := ts.ev.Start(func() error {
+			err := executeTestScripts(ts.rt, "./tests/sign_verify", "hmac_vectors.js", "hmac.js")
+			require.NoError(t, err)
+
+			_, err = ts.rt.RunString(`run_test()`)
+
+			return err
+		})
+
+		assert.NoError(t, gotScriptErr)
+	})
+}
+
 func executeTestScripts(rt *goja.Runtime, base string, scripts ...string) error {
 	for _, script := range scripts {
 		program, err := CompileFile(base, script)
