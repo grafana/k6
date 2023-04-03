@@ -1679,7 +1679,8 @@ Nil is converted to null.
 
 func(FunctionCall) Value is treated as a native JavaScript function. This increases performance because there are no
 automatic argument and return value type conversions (which involves reflect). Attempting to use
-the function as a constructor will result in a TypeError.
+the function as a constructor will result in a TypeError. Note: implementations must not retain and use references
+to FunctionCall.Arguments after the function returns.
 
 func(FunctionCall, *Runtime) Value is treated as above, except the *Runtime is also passed as a parameter.
 
