@@ -320,24 +320,16 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 
 	// 6.
 	go func() {
-		var hash hash.Hash
-
-		switch normalized.Name {
-		case Sha1:
-			hash = crypto.SHA1.New()
-		case Sha256:
-			hash = crypto.SHA256.New()
-		case Sha384:
-			hash = crypto.SHA384.New()
-		case Sha512:
-			hash = crypto.SHA512.New()
-		default:
+		// 6.
+		hashFn, ok := getHashFn(normalized.Name)
+		if !ok {
 			// 7.
 			reject(NewError(0, NotSupportedError, "unsupported algorithm: "+normalized.Name))
 			return
 		}
 
 		// 8.
+		hash := hashFn()
 		hash.Write(bytes)
 		digest := hash.Sum(nil)
 
