@@ -96,7 +96,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	v := chromium.NewBrowserType(vu)
 	bt, ok := v.(*chromium.BrowserType)
 	if !ok {
-		panic(fmt.Errorf("testBrowser: unexpected browser type %T", v))
+		tb.Fatalf("testBrowser: unexpected browser type %T", v)
 	}
 	vu.MoveToVUContext()
 	// enable the HTTP test server only when necessary
@@ -119,7 +119,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	b, pid := bt.Launch(rt.ToValue(launchOpts))
 	cb, ok := b.(*common.Browser)
 	if !ok {
-		panic(fmt.Errorf("testBrowser: unexpected browser %T", b))
+		tb.Fatalf("testBrowser: unexpected browser %T", b)
 	}
 
 	tb.Cleanup(func() {
