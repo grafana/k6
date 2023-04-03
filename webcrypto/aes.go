@@ -141,7 +141,7 @@ func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
 	}
 }
 
-// AesImportParams is an internal placeholder struct for AES import parameters.
+// aesImportParams is an internal placeholder struct for AES import parameters.
 // Although not described by the specification, we define it to be able to implement
 // our internal KeyImporter interface.
 type aesImportParams struct {
