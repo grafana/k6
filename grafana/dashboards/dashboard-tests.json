@@ -1,4 +1,47 @@
 {
+  "__inputs": [
+    {
+      "name": "DS_PROMETHEUS",
+      "label": "prometheus-in-docker",
+      "description": "",
+      "type": "datasource",
+      "pluginId": "prometheus",
+      "pluginName": "Prometheus"
+    }
+  ],
+  "__elements": {},
+  "__requires": [
+    {
+      "type": "panel",
+      "id": "gauge",
+      "name": "Gauge",
+      "version": ""
+    },
+    {
+      "type": "grafana",
+      "id": "grafana",
+      "name": "Grafana",
+      "version": "9.3.2"
+    },
+    {
+      "type": "datasource",
+      "id": "prometheus",
+      "name": "Prometheus",
+      "version": "1.0.0"
+    },
+    {
+      "type": "panel",
+      "id": "stat",
+      "name": "Stat",
+      "version": ""
+    },
+    {
+      "type": "panel",
+      "id": "timeseries",
+      "name": "Time series",
+      "version": ""
+    }
+  ],
   "annotations": {
     "list": [
       {
@@ -31,7 +74,7 @@
     {
       "datasource": {
         "type": "prometheus",
-        "uid": "PEDF09670F151C95C"
+        "uid": "${DS_PROMETHEUS}"
       },
       "fieldConfig": {
         "defaults": {
@@ -225,7 +268,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "k6_http_reqs_total",
@@ -237,7 +280,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum(k6_http_reqs_total{})",
@@ -250,7 +293,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "histogram_quantile(0.95, sum(rate(k6_http_req_duration_seconds{expected_response=\"true\"}[$__range])))",
@@ -263,7 +306,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum(irate(k6_http_reqs_total{}[$__range]))",
@@ -276,7 +319,7 @@
         {
           "datasource": {
             "type": "prometheus",
-            "uid": "PEDF09670F151C95C"
+            "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
           "expr": "sum (k6_http_reqs_total{expected_response=\"false\"})",
@@ -466,7 +509,26 @@
     "k6"
   ],
   "templating": {
-    "list": []
+    "list": [
+      {
+        "current": {
+          "selected": false,
+          "text": "prometheus-in-docker",
+          "value": "prometheus-in-docker"
+        },
+        "hide": 0,
+        "includeAll": false,
+        "multi": false,
+        "name": "DS_PROMETHEUS",
+        "options": [],
+        "query": "prometheus",
+        "queryValue": "",
+        "refresh": 1,
+        "regex": "",
+        "skipUrlSync": false,
+        "type": "datasource"
+      }
+    ]
   },
   "time": {
     "from": "now-15m",
