@@ -150,6 +150,12 @@ func (e *EventLoop) popAll() (queue []func() error, awaiting bool) {
 	return
 }
 
+func (e *EventLoop) putInfront(queue []func() error) {
+	e.lock.Lock()
+	e.queue = append(queue, e.queue...)
+	e.lock.Unlock()
+}
+
 // Start will run the event loop until it's empty and there are no uninvoked registered callbacks
 // or a queued function returns an error. The provided firstCallback will be the first thing executed.
 // After Start returns the event loop can be reused as long as waitOnRegistered is called.
@@ -167,8 +173,10 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 			continue
 		}
 
-		for _, f := range queue {
+		for i, f := range queue {
 			if err := f(); err != nil {
+				e.putInfront(queue[i+1:])
+
 				return err
 			}
 		}
@@ -191,12 +199,25 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 }
 
 // WaitOnRegistered waits on all registered callbacks so we know nothing is still doing work.
+// This does call back the callbacks and more can be queued over time.
+// A different mechanism needs to be used to tell the users that the event loop has errored out or winding down for a
+// different reason.
 func (e *EventLoop) WaitOnRegistered() {
 	for {
-		_, awaiting := e.popAll()
-		if !awaiting {
-			return
+		queue, awaiting := e.popAll()
+		if len(queue) == 0 {
+			if !awaiting {
+				return
+			}
+			<-e.wakeupCh
+			continue
 		}
-		<-e.wakeupCh
+
+		for _, f := range queue {
+			if err := f(); err != nil {
+				// TODO figure out if we should buffer all errors happening or send them on a channel
+				continue
+			}
+		}
 	}
 }
