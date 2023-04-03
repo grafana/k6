@@ -9,8 +9,6 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 )
 
-const version = "0.8.1"
-
 type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
@@ -53,7 +51,6 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 				pidRegistry: m.PidRegistry,
 			}),
 			Devices: common.GetDevices(),
-			Version: version,
 		},
 	}
 }
