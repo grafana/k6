@@ -108,7 +108,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	)
 
 	if enableLogCache {
-		lc = attachLogCache(state.Logger)
+		lc = attachLogCache(tb, state.Logger)
 	}
 	if enableHTTPMultiBin {
 		testServer = k6httpmultibin.NewHTTPMultiBin(tb)

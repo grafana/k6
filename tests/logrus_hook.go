@@ -74,10 +74,21 @@ var _ logrus.Hook = &logCache{}
 
 // attachLogCache sets logger to DebugLevel, attaches a LogCache hook and
 // returns it.
-func attachLogCache(logger *logrus.Logger) *logCache {
+func attachLogCache(tb testing.TB, fl logrus.FieldLogger) *logCache {
+	tb.Helper()
+
+	var ok bool
+	var logger *logrus.Logger
+	if logger, ok = fl.(*logrus.Logger); !ok {
+		// TODO: Fix this to always work with logrus.FieldLoger.
+		// See: https://github.com/grafana/xk6-browser/issues/818
+		tb.Fatalf("logCache: unexpected logger type: %T", fl)
+	}
+
 	lc := &logCache{HookedLevels: []logrus.Level{logrus.DebugLevel, logrus.WarnLevel}}
 	logger.SetLevel(logrus.DebugLevel)
 	logger.AddHook(lc)
 	logger.SetOutput(ioutil.Discard)
+
 	return lc
 }
