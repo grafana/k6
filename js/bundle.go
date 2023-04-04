@@ -223,11 +223,11 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 	// already pre-validated in cmd.validateScenarioConfig(), just get them here.
 	exports := instance.exports()
 
-	jsOptions := exports.Get("options")
+	jsOptions := exports.Get(consts.Options)
 	var jsOptionsObj *goja.Object
 	if jsOptions == nil || goja.IsNull(jsOptions) || goja.IsUndefined(jsOptions) {
 		jsOptionsObj = vuImpl.runtime.NewObject()
-		err := exports.Set("options", jsOptionsObj)
+		err := exports.Set(consts.Options, jsOptionsObj)
 		if err != nil {
 			return nil, fmt.Errorf("couldn't set exported options with merged values: %w", err)
 		}
@@ -263,11 +263,9 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 	}
 
 	initenv := &common.InitEnvironment{
-		Logger:      b.preInitState.Logger,
-		FileSystems: b.filesystems,
-		CWD:         b.pwd,
-		Registry:    b.preInitState.Registry,
-		LookupEnv:   b.preInitState.LookupEnv,
+		TestPreInitState: b.preInitState,
+		FileSystems:      b.filesystems,
+		CWD:              b.pwd,
 	}
 
 	modSys := newModuleSystem(b.moduleResolver, vuImpl)
@@ -293,7 +291,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (moduleInstance,
 	var instance moduleInstance
 	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
-			//nolint:shadow,govet // here we shadow err on purpose
+			//nolint:govet // here we shadow err on purpose
 			mod, err := b.moduleResolver.resolve(b.pwd, b.sourceData.URL.String())
 			if err != nil {
 				return err // TODO wrap as this should never happen

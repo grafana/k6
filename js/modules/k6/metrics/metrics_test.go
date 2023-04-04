@@ -105,8 +105,10 @@ func TestMetrics(t *testing.T) {
 					registry := metrics.NewRegistry()
 					mii := &modulestest.VU{
 						RuntimeField: test.rt,
-						InitEnvField: &common.InitEnvironment{Registry: registry},
-						CtxField:     context.Background(),
+						InitEnvField: &common.InitEnvironment{
+							TestPreInitState: &lib.TestPreInitState{Registry: registry},
+						},
+						CtxField: context.Background(),
 					}
 					m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
 					require.True(t, ok)
@@ -172,7 +174,7 @@ func TestMetricGetName(t *testing.T) {
 
 	mii := &modulestest.VU{
 		RuntimeField: rt,
-		InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		InitEnvField: &common.InitEnvironment{TestPreInitState: &lib.TestPreInitState{Registry: metrics.NewRegistry()}},
 		CtxField:     context.Background(),
 	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
@@ -200,7 +202,7 @@ func TestMetricDuplicates(t *testing.T) {
 
 	mii := &modulestest.VU{
 		RuntimeField: rt,
-		InitEnvField: &common.InitEnvironment{Registry: metrics.NewRegistry()},
+		InitEnvField: &common.InitEnvironment{TestPreInitState: &lib.TestPreInitState{Registry: metrics.NewRegistry()}},
 		CtxField:     context.Background(),
 	}
 	m, ok := New().NewModuleInstance(mii).(*ModuleInstance)
