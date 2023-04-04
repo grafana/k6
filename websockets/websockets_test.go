@@ -952,7 +952,7 @@ func TestSystemTags(t *testing.T) {
 				ws.onopen = () => {
 					ws.send("test")
 				}
-				ws.onmesage = (data) => {
+				ws.onmessage = (data) => {
 					if (!data=="test") {
 						throw new Error ("echo'd data doesn't match our message!");
 					}
