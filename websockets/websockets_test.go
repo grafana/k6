@@ -38,7 +38,9 @@ func assertSessionMetricsEmitted(
 	seenSessionDuration := false
 	seenConnecting := false
 
+	require.NotEmpty(t, sampleContainers)
 	for _, sampleContainer := range sampleContainers {
+		require.NotEmpty(t, sampleContainer.GetSamples())
 		for _, sample := range sampleContainer.GetSamples() {
 			tags := sample.Tags.Map()
 			if tags["url"] == url {
@@ -60,6 +62,23 @@ func assertSessionMetricsEmitted(
 	assert.True(t, seenConnecting, "url %s didn't emit Connecting", url)
 	assert.True(t, seenSessions, "url %s didn't emit Sessions", url)
 	assert.True(t, seenSessionDuration, "url %s didn't emit SessionDuration", url)
+}
+
+// also copied from k6/ws
+func assertMetricEmittedCount(t *testing.T, metricName string, sampleContainers []metrics.SampleContainer, url string, count int) {
+	t.Helper()
+	actualCount := 0
+
+	for _, sampleContainer := range sampleContainers {
+		for _, sample := range sampleContainer.GetSamples() {
+			surl, ok := sample.Tags.Get("url")
+			assert.True(t, ok)
+			if surl == url && sample.Metric.Name == metricName {
+				actualCount++
+			}
+		}
+	}
+	assert.Equal(t, count, actualCount, "url %s emitted %s %d times, expected was %d times", url, metricName, actualCount, count)
 }
 
 type testState struct {
@@ -952,12 +971,13 @@ func TestSystemTags(t *testing.T) {
 				ws.onopen = () => {
 					ws.send("test")
 				}
-				ws.onmessage = (data) => {
-					if (!data=="test") {
+				ws.onmessage = (event) => {
+					if (event.data != "test") {
 						throw new Error ("echo'd data doesn't match our message!");
 					}
 					ws.close()
-				}
+	 			}
+                ws.onerror = (e) => { throw JSON.stringify(e) }
 			`))
 				return runErr
 			})
@@ -997,6 +1017,7 @@ func TestCustomTags(t *testing.T) {
       ws.send("something")
       ws.close()
     }
+    ws.onerror = (e) => { throw JSON.stringify(e) }
 	`))
 		return err
 	})
@@ -1037,13 +1058,15 @@ func TestCompressionSession(t *testing.T) {
 			"compression": "deflate"
 		}
 		var ws = new WebSocket("WSBIN_URL/ws-compression", null, params)
-		ws.onmessage = (data) => {
-			if (data != "` + text + `"){
-				throw new Error("wrong message received from server: ", data)
+
+		ws.onmessage = (event) => {
+			if (event.data != "` + text + `"){
+				throw new Error("wrong message received from server: ", event.data)
 			}
 
 			ws.close()
 		}
+
 		`))
 		return runErr
 	})
@@ -1051,7 +1074,9 @@ func TestCompressionSession(t *testing.T) {
 	require.NoError(t, err)
 
 	samples := metrics.GetBufferedSamples(ts.samples)
-	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-compression"), http.StatusSwitchingProtocols, "")
+	url := sr("WSBIN_URL/ws-compression")
+	assertSessionMetricsEmitted(t, samples, "", url, http.StatusSwitchingProtocols, "")
+	assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samples, url, 1)
 
 	assert.Len(t, ts.errors, 0)
 }
@@ -1071,9 +1096,9 @@ func TestServerWithoutCompression(t *testing.T) {
 			"compression": "deflate"
 		}
 		var ws = new WebSocket("WSBIN_URL/ws-compression", null, params)
-		ws.onmessage = (data) => {
-			if (data != "` + text + `"){
-				throw new Error("wrong message received from server: ", data)
+		ws.onmessage = (event) => {
+			if (event.data != "` + text + `"){
+				throw new Error("wrong message received from server: ", event.data)
 			}
 
 			ws.close()
@@ -1085,7 +1110,9 @@ func TestServerWithoutCompression(t *testing.T) {
 	require.NoError(t, err)
 
 	samples := metrics.GetBufferedSamples(ts.samples)
-	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-compression"), http.StatusSwitchingProtocols, "")
+	url := sr("WSBIN_URL/ws-compression")
+	assertSessionMetricsEmitted(t, samples, "", url, http.StatusSwitchingProtocols, "")
+	assertMetricEmittedCount(t, metrics.WSMessagesReceivedName, samples, url, 1)
 
 	assert.Len(t, ts.errors, 0)
 }
@@ -1183,6 +1210,7 @@ func TestSessionPing(t *testing.T) {
 				call("from onpong")
 				ws.close()
 			}
+             ws.onerror = (e) => { throw JSON.stringify(e) }
 		`))
 		return runErr
 	})
@@ -1208,6 +1236,7 @@ func TestSessionPingAdd(t *testing.T) {
 				ws.ping()
 			})
 
+             ws.onerror = (e) => { throw JSON.stringify(e) }
 			 ws.addEventListener("pong", () => {
 				call("from onpong")
 				ws.close()

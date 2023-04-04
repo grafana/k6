@@ -326,8 +326,6 @@ const writeWait = 10 * time.Second
 
 //nolint:funlen,gocognit,cyclop
 func (w *webSocket) loop() {
-	readDataChan := make(chan *message)
-
 	// Pass ping/pong events through the main control loop
 	pingChan := make(chan string)
 	pongChan := make(chan string)
@@ -379,42 +377,28 @@ func (w *webSocket) loop() {
 	}()
 	// Wraps a couple of channels around conn.ReadMessage
 	go func() { // copied from k6/ws
-		defer close(readDataChan)
 		for {
 			messageType, data, err := w.conn.ReadMessage()
 			if err != nil {
 				if !websocket.IsUnexpectedCloseError(
 					err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+					w.tq.Queue(func() error {
+						return w.connectionClosedWithError(nil)
+					})
 					return
 				}
-				/*
-					code := websocket.CloseGoingAway
-					if e, ok := err.(*websocket.CloseError); ok {
-						code = e.Code
-					}
-					select {
-					case readCloseChan <- code:
-					case <-w.done:
-					}
-				*/
 				w.tq.Queue(func() error {
 					_ = w.conn.Close() // TODO fix this
-					// fmt.Println("read message", err)
-					err = w.connectionClosedWithError(err)
-					return err
+					return w.connectionClosedWithError(err)
 				})
 				return
 			}
 
-			select {
-			case readDataChan <- &message{
+			w.queueMessage(&message{
 				mtype: messageType,
 				data:  data,
 				t:     time.Now(),
-			}:
-			case <-w.done:
-				return
-			}
+			})
 		}
 	}()
 
@@ -520,69 +504,6 @@ func (w *webSocket) loop() {
 				return w.callEventListeners(events.PONG)
 			})
 
-		case msg, ok := <-readDataChan:
-			if !ok {
-				return
-			}
-			// fmt.Println("got message")
-			w.tq.Queue(func() error {
-				// fmt.Println("message being processed in state", w.readyState)
-				if w.readyState != OPEN {
-					return nil // TODO maybe still emit
-				}
-				// TODO maybe emit after all the listeners have fired and skip it if defaultPrevent was called?!?
-				metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
-					TimeSeries: metrics.TimeSeries{
-						Metric: w.builtinMetrics.WSMessagesReceived,
-						Tags:   w.tagsAndMeta.Tags,
-					},
-					Time:     msg.t,
-					Metadata: w.tagsAndMeta.Metadata,
-					Value:    1,
-				})
-
-				rt := w.vu.Runtime()
-				ev := w.newEvent(events.MESSAGE, msg.t)
-
-				if msg.mtype == websocket.BinaryMessage {
-					// TODO this technically could be BLOB , but we don't support that
-					ab := rt.NewArrayBuffer(msg.data)
-					must(rt, ev.DefineDataProperty("data", rt.ToValue(ab), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
-				} else {
-					must(
-						rt,
-						ev.DefineDataProperty("data", rt.ToValue(string(msg.data)), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
-					)
-				}
-				must(
-					rt,
-					ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
-				)
-
-				for _, messageListener := range w.eventListeners.all(events.MESSAGE) {
-					if _, err := messageListener(ev); err != nil {
-						// fmt.Println("message listener err", err)
-						_ = w.conn.Close()                   // TODO log it?
-						_ = w.connectionClosedWithError(err) // TODO log it?
-						return err
-					}
-				}
-				return nil
-			})
-
-			/* TODO
-			case readErr := <-readErrChan:
-				 socket.handleEvent("error", rt.ToValue(readErr))
-
-			case code := <-readCloseChan:
-				_ = socket.closeConnection(code)
-
-			case scheduledFn := <-socket.scheduled:
-				if _, err := scheduledFn(goja.Undefined()); err != nil {
-					_ = socket.closeConnection(websocket.CloseGoingAway)
-					return nil, err
-				}
-			*/
 		case <-ctxDone:
 			// VU is shutting down during an interrupt
 			// socket events will not be forwarded to the VU
@@ -593,6 +514,51 @@ func (w *webSocket) loop() {
 			return
 		}
 	}
+}
+
+func (w *webSocket) queueMessage(msg *message) {
+	w.tq.Queue(func() error {
+		if w.readyState != OPEN {
+			return nil // TODO maybe still emit
+		}
+		// TODO maybe emit after all the listeners have fired and skip it if defaultPrevent was called?!?
+		metrics.PushIfNotDone(w.vu.Context(), w.vu.State().Samples, metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: w.builtinMetrics.WSMessagesReceived,
+				Tags:   w.tagsAndMeta.Tags,
+			},
+			Time:     msg.t,
+			Metadata: w.tagsAndMeta.Metadata,
+			Value:    1,
+		})
+
+		rt := w.vu.Runtime()
+		ev := w.newEvent(events.MESSAGE, msg.t)
+
+		if msg.mtype == websocket.BinaryMessage {
+			// TODO this technically could be BLOB , but we don't support that
+			ab := rt.NewArrayBuffer(msg.data)
+			must(rt, ev.DefineDataProperty("data", rt.ToValue(ab), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		} else {
+			must(
+				rt,
+				ev.DefineDataProperty("data", rt.ToValue(string(msg.data)), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
+			)
+		}
+		must(
+			rt,
+			ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
+		)
+
+		for _, messageListener := range w.eventListeners.all(events.MESSAGE) {
+			if _, err := messageListener(ev); err != nil {
+				_ = w.conn.Close()                   // TODO log it?
+				_ = w.connectionClosedWithError(err) // TODO log it?
+				return err
+			}
+		}
+		return nil
+	})
 }
 
 func (w *webSocket) send(msg goja.Value) {
