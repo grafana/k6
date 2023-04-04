@@ -14,6 +14,7 @@ import (
 
 	k6common "go.k6.io/k6/js/common"
 	k6modulestest "go.k6.io/k6/js/modulestest"
+	k6lib "go.k6.io/k6/lib"
 	k6metrics "go.k6.io/k6/metrics"
 )
 
@@ -57,7 +58,9 @@ func TestMappings(t *testing.T) {
 		vu = &k6modulestest.VU{
 			RuntimeField: goja.New(),
 			InitEnvField: &k6common.InitEnvironment{
-				Registry: k6metrics.NewRegistry(),
+				TestPreInitState: &k6lib.TestPreInitState{
+					Registry: k6metrics.NewRegistry(),
+				},
 			},
 		}
 		customMappings = customMappings()

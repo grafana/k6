@@ -10,7 +10,7 @@ require (
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/sirupsen/logrus v1.9.0
 	github.com/stretchr/testify v1.8.2
-	go.k6.io/k6 v0.43.2-0.20230331123120-988f2f6b5f6c
+	go.k6.io/k6 v0.43.2-0.20230404074422-e40265226b89
 	golang.org/x/net v0.7.0
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
 	gopkg.in/guregu/null.v3 v3.3.0
