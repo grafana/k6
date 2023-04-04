@@ -1,4 +1,4 @@
-# v1.47.3
+# v1.51.2
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   deadline: 5m
@@ -27,8 +27,14 @@ issues:
    - linters:
      - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
      text: "does not use range value in test Run"
+   - linters:
+     - forbidigo
+     text: 'use of `os\.(SyscallError|Signal|Interrupt)` forbidden'
 
 linters-settings:
+  nolintlint:
+    # Disable to ensure that nolint directives don't have a leading space. Default is true.
+    allow-leading-space: false
   exhaustive:
     default-signifies-exhaustive: true
   govet:
@@ -45,37 +51,79 @@ linters-settings:
   funlen:
     lines: 80
     statements: 60
+  forbidigo:
+    forbid:
+      - '^(fmt\\.Print(|f|ln)|print|println)$'
+      # Forbid everything in os, except os.Signal and os.SyscalError
+      - '^os\.(.*)$(# Using anything except Signal and SyscallError from the os package is forbidden )?'
+      # Forbid everything in syscall except the uppercase constants
+      - '^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?'
+      - '^logrus\.Logger$'
 
 linters:
-  enable-all: true
-  disable:
-  - nlreturn
-  - gci
-  - gochecknoinits
-  - godot
-  - godox
-  - gomodguard
-  - testpackage
-  - wsl
-  - gomnd
-  - goerr113 # most of the errors here are meant for humans
-  - goheader
-  - exhaustivestruct
-  - thelper
-  - gocyclo # replaced by cyclop since it also calculates the package complexity
-  - maligned # replaced by govet 'fieldalignment'
-  - interfacer # deprecated
-  - scopelint # deprecated, replaced by exportloopref
-  - wrapcheck # a little bit too much for k6, maybe after https://github.com/tomarrell/wrapcheck/issues/2 is fixed
-  - golint # this linter is deprecated
-  - varnamelen
-  - ireturn
-  - tagliatelle
-  - exhaustruct
-  - execinquery
-  - maintidx
-  - grouper
-  - decorder
-  - nonamedreturns
-  - nosnakecase
+  disable-all: true
+  enable:
+    - asasalint
+    - asciicheck
+    - bidichk
+    - bodyclose
+    - contextcheck
+    - cyclop
+    - depguard
+    - dogsled
+    - dupl
+    - durationcheck
+    - errcheck
+    - errchkjson
+    - errname
+    - errorlint
+    - exhaustive
+    - exportloopref
+    - forbidigo
+    - forcetypeassert
+    - funlen
+    - gocheckcompilerdirectives
+    - gochecknoglobals
+    - gocognit
+    - goconst
+    - gocritic
+    - gofmt
+    - gofumpt
+    - goimports
+    - gomoddirectives
+    - goprintffuncname
+    - gosec
+    - gosimple
+    - govet
+    - importas
+    - ineffassign
+    - lll
+    - makezero
+    - misspell
+    - nakedret
+    - nestif
+    - nilerr
+    - nilnil
+    - noctx
+    - nolintlint
+    - nosprintfhostport
+    - paralleltest
+    - prealloc
+    - predeclared
+    - promlinter
+    - revive
+    - reassign
+    - rowserrcheck
+    - sqlclosecheck
+    - staticcheck
+    - stylecheck
+    - tenv
+    - tparallel
+    - typecheck
+    - unconvert
+    - unparam
+    - unused
+    - usestdlibvars
+    - wastedassign
+    - whitespace
   fast: false
