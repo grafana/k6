@@ -297,6 +297,26 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 }
 
+// attachNewPage registers the page as an active page and attaches the sessionID with the targetID.
+func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) {
+	targetPage := ev.TargetInfo
+
+	// Register the page as an active page.
+	b.pagesMu.Lock()
+	b.logger.Debugf("Browser:onAttachedToTarget:addTarget", "sid:%v tid:%v pageType:%s",
+		ev.SessionID, targetPage.TargetID, targetPage.Type)
+	b.pages[targetPage.TargetID] = p
+	b.pagesMu.Unlock()
+
+	// Attach the sessionID with the targetID so we can communicate with the
+	// page later.
+	b.sessionIDtoTargetIDMu.Lock()
+	b.logger.Debugf("Browser:onAttachedToTarget:addSession", "sid:%v tid:%v pageType:%s",
+		ev.SessionID, targetPage.TargetID, targetPage.Type)
+	b.sessionIDtoTargetID[ev.SessionID] = targetPage.TargetID
+	b.sessionIDtoTargetIDMu.Unlock()
+}
+
 // isAttachedPageValid returns true if the attached page is valid and should be
 // added to the browser's pages. It returns false if the attached page is not
 // valid and should be ignored.
