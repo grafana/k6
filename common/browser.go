@@ -221,12 +221,13 @@ func (b *Browser) initEvents() error {
 }
 
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
-	targetPage := ev.TargetInfo
+	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
+		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID)
 
-	browserCtx := b.getDefaultBrowserContextOrByID(targetPage.BrowserContextID)
-
-	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t",
-		ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx == nil)
+	var (
+		targetPage = ev.TargetInfo
+		browserCtx = b.getDefaultBrowserContextOrByID(targetPage.BrowserContextID)
+	)
 
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
 	isDevTools := strings.HasPrefix(targetPage.URL, "devtools://devtools")
