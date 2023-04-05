@@ -1,10 +1,9 @@
 package webcrypto
 
 import (
-	"crypto"
+	"crypto/hmac"
 	"errors"
 	"fmt"
-	"hash"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
@@ -218,9 +217,84 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 // `algorithm` identifies a public-key cryptosystem, this is the private key.
 //
 // The `data` parameter should contain the data to be signed.
-func (sc *SubtleCrypto) Sign(algorithm goja.Value, key goja.Value, data []byte) *goja.Promise {
-	// TODO: implementation
-	return nil
+func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	// 2.
+	// We obtain a copy of the key data, because we might need to modify it.
+	dataToSign, err := exportArrayBuffer(rt, data)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 3.
+	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierSign)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	var ck CryptoKey
+	if err = rt.ExportTo(key, &ck); err != nil {
+		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		return promise
+	}
+
+	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	go func() {
+		// 8.
+		if normalized.Name != keyAlgorithmNameValue.String() {
+			reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+			return
+		}
+
+		// 9.
+		for !ck.ContainsUsage(SignCryptoKeyUsage) {
+			reject(NewError(0, InvalidAccessError, "key does not contain the 'sign' usage"))
+			return
+		}
+
+		// 10.
+		switch normalized.Name {
+		case HMAC:
+			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key algorithm does not describe a HMAC key"))
+				return
+			}
+
+			keyHandle, ok := ck.handle.([]byte)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key handle is of incorrect type"))
+				return
+			}
+
+			hashFn, ok := getHashFn(keyAlgorithm.Hash.Name)
+			if !ok {
+				reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported key hash algorithm %q", keyAlgorithm.Hash.Name)))
+				return
+			}
+
+			hasher := hmac.New(hashFn, keyHandle)
+			hasher.Write(dataToSign)
+
+			// 10.
+			mac := hasher.Sum(nil)
+
+			resolve(rt.NewArrayBuffer(mac))
+		default:
+			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
+		}
+	}()
+
+	return promise
 }
 
 // Verify verifies a digital signature.
