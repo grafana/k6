@@ -229,13 +229,9 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		browserCtx = b.getDefaultBrowserContextOrByID(targetPage.BrowserContextID)
 	)
 
-	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
-	isDevTools := strings.HasPrefix(targetPage.URL, "devtools://devtools")
-	if targetPage.Type == "browser" || targetPage.Type == "other" || isDevTools {
-		b.logger.Debugf("Browser:onAttachedToTarget:return", "sid:%v tid:%v (devtools)", ev.SessionID, targetPage.TargetID)
-		return
+	if !b.isAttachedPageValid(ev, browserCtx) {
+		return // Ignore this page.
 	}
-
 	session := b.conn.getSession(ev.SessionID)
 	if session == nil {
 		b.logger.Warnf("Browser:onAttachedToTarget",
@@ -334,10 +330,6 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.sessionIDtoTargetIDMu.Unlock()
 
 		browserCtx.emit(EventBrowserContextPage, p)
-	default:
-		b.logger.Warnf(
-			"Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t, unknown target type: %q",
-			ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx == nil, targetPage.Type)
 	}
 }
 
