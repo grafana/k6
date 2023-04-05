@@ -119,7 +119,7 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		readyState:     CONNECTING,
 		builtinMetrics: r.vu.State().BuiltinMetrics,
 		done:           make(chan struct{}),
-		writeQueueCh:   make(chan message, 10),
+		writeQueueCh:   make(chan message),
 		eventListeners: newEventListeners(),
 		obj:            rt.NewObject(),
 		tagsAndMeta:    params.tagsAndMeta,
