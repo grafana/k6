@@ -256,32 +256,11 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	switch targetPage.Type {
 	case "background_page":
 		p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, nil, false, b.logger)
+		if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
+			return // Ignore this page.
+		}
 		if err != nil {
-			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() // b.conn.isConnected()
-			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
-				// If we're no longer connected to browser, then ignore WebSocket errors
-				b.logger.Debugf("Browser:onAttachedToTarget:background_page:return", "sid:%v tid:%v websocket err:%v",
-					ev.SessionID, targetPage.TargetID, err)
-				return
-			}
-			select {
-			case <-b.ctx.Done():
-				b.logger.Debugf("Browser:onAttachedToTarget:background_page:return:<-ctx.Done",
-					"sid:%v tid:%v err:%v",
-					ev.SessionID, targetPage.TargetID, b.ctx.Err())
-				return // ignore
-			default:
-			}
-			// Another VU or instance closed the page, and the session is closed.
-			// This can happen if the page is closed before the attachedToTarget
-			// event is handled.
-			if session.Closed() {
-				b.logger.Debugf("Browser:onAttachedToTarget:return:session.Done",
-					"session closed: sid:%v tid:%v pageType:%s err:%v",
-					ev.SessionID, targetPage.TargetID, targetPage.Type, err)
-				return
-			}
-			k6ext.Panic(b.ctx, "creating a new background page: %w", err)
+			k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
 		}
 
 		b.pagesMu.Lock()
@@ -297,31 +276,11 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, targetPage.TargetID, opener == nil)
 
 		p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, opener, true, b.logger)
+		if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
+			return // Ignore this page.
+		}
 		if err != nil {
-			isRunning := atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() // b.conn.isConnected()
-			if _, ok := err.(*websocket.CloseError); !ok && !isRunning {
-				// If we're no longer connected to browser, then ignore WebSocket errors
-				b.logger.Debugf("Browser:onAttachedToTarget:page:return", "sid:%v tid:%v websocket err:", ev.SessionID, targetPage.TargetID)
-				return
-			}
-			select {
-			case <-b.ctx.Done():
-				b.logger.Debugf("Browser:onAttachedToTarget:page:return:<-ctx.Done",
-					"sid:%v tid:%v err:%v",
-					ev.SessionID, targetPage.TargetID, b.ctx.Err())
-				return // ignore
-			default:
-			}
-			// Another VU or instance closed the page, and the session is closed.
-			// This can happen if the page is closed before the attachedToTarget
-			// event is handled.
-			if session.Closed() {
-				b.logger.Debugf("Browser:onAttachedToTarget:return:session.Done",
-					"session closed: sid:%v tid:%v pageType:%s err:%v",
-					ev.SessionID, targetPage.TargetID, targetPage.Type, err)
-				return
-			}
-			k6ext.Panic(b.ctx, "creating a new page: %w", err)
+			k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
 		}
 
 		b.pagesMu.Lock()
