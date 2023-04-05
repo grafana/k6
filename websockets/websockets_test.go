@@ -1,6 +1,7 @@
 package websockets
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"net/http/cookiejar"
@@ -1250,4 +1251,101 @@ func TestSessionPingAdd(t *testing.T) {
 	samplesBuf := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samplesBuf, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
 	assert.Equal(t, []string{"from onpong"}, ts.callRecorder.Recorded())
+}
+
+func TestLockingUpWithAThrow(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sr := tb.Replacer.Replace
+
+	ts := newTestState(t)
+	go destroySamples(ctx, ts.samples)
+	ts.vu.CtxField = ctx
+	require.NoError(t, ts.vu.RuntimeField.Set("l", fmt.Println))
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+        let a = 0;
+        const connections = 1000;
+        async function s() {
+			let ws = new WebSocket("WSBIN_URL/ws-echo")
+			ws.addEventListener("open", () => {
+				ws.ping()
+                a++
+			})
+
+			ws.addEventListener("pong", () => {
+                // l("pong")
+				ws.ping()
+                if (a == connections){
+                a++
+                    ws.close()
+                }
+			})
+
+            ws.addEventListener("close", () =>{
+                throw "s";
+            })
+        }
+        [...Array(connections)].forEach(_ => s())
+		`))
+		return runErr
+	})
+
+	cancel()
+	assert.ErrorContains(t, err, "s at <eval>")
+	ts.ev.WaitOnRegistered()
+}
+
+func TestLockingUpWithAJustGeneralCancel(t *testing.T) {
+	t.Parallel()
+	tb := httpmultibin.NewHTTPMultiBin(t)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	sr := tb.Replacer.Replace
+
+	ts := newTestState(t)
+	defer func() {
+		close(ts.samples)
+	}()
+	go destroySamples(ctx, ts.samples)
+	ts.vu.CtxField = ctx
+	require.NoError(t, ts.vu.RuntimeField.Set("cancel", cancel))
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+        let a = 0;
+        const connections = 1000;
+        async function s() {
+			var ws = new WebSocket("WSBIN_URL/ws-echo")
+			ws.addEventListener("open", () => {
+				ws.ping()
+			})
+
+			ws.addEventListener("pong", () => {
+				ws.ping()
+                a++
+                if (a == connections){
+                    cancel()
+                }
+			})
+        }
+        [...Array(connections)].forEach(_ => s())
+		`))
+		return runErr
+	})
+
+	cancel()
+	assert.NoError(t, err)
+	ts.ev.WaitOnRegistered()
+}
+
+func destroySamples(ctx context.Context, c <-chan metrics.SampleContainer) {
+	for {
+		select {
+		case <-c:
+		case <-ctx.Done():
+			return
+		}
+	}
 }

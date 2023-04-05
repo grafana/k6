@@ -7,7 +7,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/stretchr/testify v1.8.2
-	go.k6.io/k6 v0.43.2-0.20230309162744-333a3d1ed383
+	go.k6.io/k6 v0.43.2-0.20230404142020-8d6f222a7511
 	go.uber.org/goleak v1.2.1
 	gopkg.in/guregu/null.v3 v3.3.0
 )
@@ -33,7 +33,6 @@ require (
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d // indirect
 	github.com/onsi/ginkgo v1.16.5 // indirect
 	github.com/onsi/gomega v1.18.1 // indirect
-	github.com/oxtoacart/bpool v0.0.0-20190530202638-03653db5a59c // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
 	github.com/sirupsen/logrus v1.9.0 // indirect

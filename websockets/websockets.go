@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"net/url"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -104,10 +105,8 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 
 	// TODO implement protocols
 	registerCallback := func() func(func() error) {
-		// fmt.Println("RegisterCallback called")
 		callback := r.vu.RegisterCallback()
 		return func(f func() error) {
-			// fmt.Println("callback called")
 			callback(f)
 			// fmt.Println("callback ended")
 		}
@@ -324,7 +323,7 @@ func (w *webSocket) emitConnectionMetrics(ctx context.Context, start time.Time, 
 
 const writeWait = 10 * time.Second
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,gocognit
 func (w *webSocket) loop() {
 	// Pass ping/pong events through the main control loop
 	pingChan := make(chan string)
@@ -336,6 +335,7 @@ func (w *webSocket) loop() {
 	// readErrChan := make(chan error)
 	samplesOutput := w.vu.State().Samples
 	ctx := w.vu.Context()
+	wg := new(sync.WaitGroup)
 
 	defer func() {
 		now := time.Now()
@@ -350,33 +350,14 @@ func (w *webSocket) loop() {
 			Metadata: w.tagsAndMeta.Metadata,
 			Value:    duration,
 		})
-		ch := make(chan struct{})
-		w.tq.Queue(func() error {
-			defer close(ch)
-			return w.connectionClosedWithError(nil)
-		})
-		select {
-		case <-ch:
-		case <-ctx.Done():
-			// unfortunately it is really possible that k6 has been winding down the VU and the above code
-			// to close the connection will just never be called as the event loop no longer executes the callbacks.
-			// This ultimately needs a separate signal for when the eventloop will not execute anything after this.
-			// To try to prevent leaking goroutines here we will try to figure out if we need to close the `done`
-			// channel and wait a bit and close it if it isn't. This might be better off with more mutexes
-			timer := time.NewTimer(time.Millisecond * 250)
-			select {
-			case <-w.done:
-				// everything is fine
-			case <-timer.C:
-				close(w.done) // hopefully this means we won't double close
-			}
-			timer.Stop()
-		}
 		_ = w.conn.Close()
+		wg.Wait()
 		w.tq.Close()
 	}()
+	wg.Add(1)
 	// Wraps a couple of channels around conn.ReadMessage
 	go func() { // copied from k6/ws
+		defer wg.Done()
 		for {
 			messageType, data, err := w.conn.ReadMessage()
 			if err != nil {
@@ -402,9 +383,13 @@ func (w *webSocket) loop() {
 		}
 	}()
 
+	wg.Add(1)
 	go func() {
+		defer wg.Done()
+		wg.Add(1)
 		writeChannel := make(chan message)
 		go func() {
+			defer wg.Done()
 			for {
 				select {
 				case msg, ok := <-writeChannel:
@@ -464,14 +449,9 @@ func (w *webSocket) loop() {
 				}
 				select {
 				case msg = <-w.writeQueueCh:
-					select {
-					case writeChannel <- msg:
-					default:
-						queue = append(queue, msg)
-					}
+					queue = append(queue, msg)
 				case wch <- msg:
 					queue = queue[:copy(queue, queue[1:])]
-
 				case <-w.done:
 					return
 				}
@@ -481,6 +461,13 @@ func (w *webSocket) loop() {
 	ctxDone := ctx.Done()
 	for {
 		select {
+		case <-ctxDone:
+			// VU is shutting down during an interrupt
+			// socket events will not be forwarded to the VU
+			w.queueClose()
+			ctxDone = nil // this is to block this branch and get through w.done
+		case <-w.done:
+			return
 		case pingData := <-pingChan:
 
 			// Handle pings received from the server
@@ -503,15 +490,6 @@ func (w *webSocket) loop() {
 
 				return w.callEventListeners(events.PONG)
 			})
-
-		case <-ctxDone:
-			// VU is shutting down during an interrupt
-			// socket events will not be forwarded to the VU
-			w.queueClose()
-			ctxDone = nil // this is to block this branch and get through w.done
-
-		case <-w.done:
-			return
 		}
 	}
 }
