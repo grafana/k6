@@ -361,6 +361,44 @@ func (b *Browser) isAttachedPageValid(ev *target.EventAttachedToTarget, browserC
 	return true
 }
 
+// isPageAttachmentErrorIgnorable returns true if the error is ignorable.
+func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarget, session *Session, err error) bool {
+	targetPage := ev.TargetInfo
+
+	// If we're no longer connected to browser, then ignore WebSocket errors.
+	// This can happen when the browser is closed while the page is being attached.
+	var (
+		isRunning = atomic.LoadInt64(&b.state) == BrowserStateOpen && b.IsConnected() // b.conn.isConnected()
+		wsErr     *websocket.CloseError
+	)
+	if !errors.As(err, &wsErr) && !isRunning {
+		// If we're no longer connected to browser, then ignore WebSocket errors
+		b.logger.Debugf("Browser:onAttachedToTarget:return", "sid:%v tid:%v pageType:%s websocket err:%v",
+			ev.SessionID, targetPage.TargetID, targetPage.Type, err)
+		return true
+	}
+	// No need to register the page if the test run is over.
+	select {
+	case <-b.ctx.Done():
+		b.logger.Debugf("Browser:onAttachedToTarget:return:<-ctx.Done",
+			"sid:%v tid:%v pageType:%s err:%v",
+			ev.SessionID, targetPage.TargetID, targetPage.Type, b.ctx.Err())
+		return true
+	default:
+	}
+	// Another VU or instance closed the page, and the session is closed.
+	// This can happen if the page is closed before the attachedToTarget
+	// event is handled.
+	if session.Closed() {
+		b.logger.Debugf("Browser:onAttachedToTarget:return:session.Done",
+			"session closed: sid:%v tid:%v pageType:%s err:%v",
+			ev.SessionID, targetPage.TargetID, targetPage.Type, err)
+		return true
+	}
+
+	return false // cannot ignore
+}
+
 // onDetachedFromTarget event can be issued multiple times per target if multiple
 // sessions have been attached to it. So we'll remove the page only once.
 func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
