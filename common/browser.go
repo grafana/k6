@@ -240,6 +240,19 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		return // ignore
 	}
 
+	var (
+		isPage = targetPage.Type == "page"
+		opener *Page
+	)
+	// Opener is nil for the initial page.
+	if isPage {
+		b.pagesMu.RLock()
+		if t, ok := b.pages[targetPage.OpenerID]; ok {
+			opener = t
+		}
+		b.pagesMu.RUnlock()
+	}
+
 	switch targetPage.Type {
 	case "background_page":
 		p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, nil, false, b.logger)
@@ -281,14 +294,6 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		b.sessionIDtoTargetID[ev.SessionID] = targetPage.TargetID
 		b.sessionIDtoTargetIDMu.Unlock()
 	case "page":
-		// Opener is nil for the initial page
-		var opener *Page
-		b.pagesMu.RLock()
-		if t, ok := b.pages[targetPage.OpenerID]; ok {
-			opener = t
-		}
-		b.pagesMu.RUnlock()
-
 		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, targetPage.TargetID, opener == nil)
 
 		p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, opener, true, b.logger)
