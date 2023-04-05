@@ -144,6 +144,18 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	return nil
 }
 
+// getDefaultBrowserContextOrByID returns the BrowserContext for the given page ID.
+// If the browser context is not found, the default BrowserContext is returned.
+func (b *Browser) getDefaultBrowserContextOrByID(id cdp.BrowserContextID) *BrowserContext {
+	b.contextsMu.RLock()
+	defer b.contextsMu.RUnlock()
+	browserCtx := b.defaultContext
+	if bctx, ok := b.contexts[id]; ok {
+		browserCtx = bctx
+	}
+	return browserCtx
+}
+
 func (b *Browser) getPages() []*Page {
 	b.pagesMu.RLock()
 	defer b.pagesMu.RUnlock()
