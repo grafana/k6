@@ -8,7 +8,7 @@ import (
 )
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
-// and returns the underlying byte slice.
+// and returns a copy of the underlying byte slice.
 func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
 	if isNullish(v) {
 		return nil, NewError(0, TypeError, "data is null or undefined")
@@ -31,7 +31,15 @@ func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
 		}
 	}
 
-	return ab.Bytes(), nil
+	// Copy the underlying byte slice to avoid the caller modifying it.
+	// Ensures this step complies with the expactations of the
+	// specification: "Let [...] be the result of getting a copy of the
+	// bytes held by the [...] parameter"
+	bytes := ab.Bytes()
+	bytesCopy := make([]byte, len(bytes))
+	copy(bytesCopy, bytes)
+
+	return bytesCopy, nil
 }
 
 // traverseObject traverses the given object using the given fields and returns the value
