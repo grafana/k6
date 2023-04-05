@@ -176,8 +176,8 @@ github.com/grafana/xk6-redis v0.1.1 h1:rvWnLanRB2qzDwuY6NMBe6PXei3wJ3kjYvfCwRJ+q
 github.com/grafana/xk6-redis v0.1.1/go.mod h1:z7el1Tz8advY+ex419KfLbENzSQYgaA2lQYwMlt9yMM=
 github.com/grafana/xk6-timers v0.1.2 h1:YVM6hPDgvy4SkdZQpd+/r9M0kDi1g+QdbSxW5ClfwDk=
 github.com/grafana/xk6-timers v0.1.2/go.mod h1:XHmDIXAKe30NJMXrxKIKMFXx98etsCl0jBYktjsSURc=
-github.com/grafana/xk6-websockets v0.1.6 h1:WeVXiNWjOous82jldyHzNmBSS8XygMPkqVp0GgXMhEA=
-github.com/grafana/xk6-websockets v0.1.6/go.mod h1:rqb9U/KERxR3CUL1k8bSAJLn1eHjNHQXvIhxXaAFKpI=
+github.com/grafana/xk6-websockets v0.2.0 h1:oZcq4lm/p/Tc94ZMMNeYDML0DjU39jasC6kTyc6iF+8=
+github.com/grafana/xk6-websockets v0.2.0/go.mod h1:4SaWAP+ZVHoWn8oOcq6m38lDLjEWikAWDZhJi5XZ1ms=
 github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
 github.com/hashicorp/golang-lru v0.5.1/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
 github.com/ianlancetaylor/demangle v0.0.0-20181102032728-5e5cf60278f6/go.mod h1:aSSvb/t6k1mPoxDqO4vJh6VOCGPwU4O0C2/Eqndh1Sc=
