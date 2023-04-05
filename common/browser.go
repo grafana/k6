@@ -223,13 +223,7 @@ func (b *Browser) initEvents() error {
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	targetPage := ev.TargetInfo
 
-	b.contextsMu.RLock()
-	browserCtx := b.defaultContext
-	bctx, ok := b.contexts[targetPage.BrowserContextID]
-	if ok {
-		browserCtx = bctx
-	}
-	b.contextsMu.RUnlock()
+	browserCtx := b.getDefaultBrowserContextOrByID(targetPage.BrowserContextID)
 
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t",
 		ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx == nil)
