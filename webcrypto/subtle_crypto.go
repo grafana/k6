@@ -1,10 +1,9 @@
 package webcrypto
 
 import (
-	"crypto"
+	"crypto/hmac"
 	"errors"
 	"fmt"
-	"hash"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
@@ -81,7 +80,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	go func() {
 		// 9.
-		for !containsUsage(ck.Usages, EncryptCryptoKeyUsage) {
+		if !ck.ContainsUsage(EncryptCryptoKeyUsage) {
 			reject(NewError(0, InvalidAccessError, "key does not contain the 'encrypt' usage"))
 			return
 		}
@@ -173,7 +172,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	go func() {
 		// 9.
-		for !containsUsage(ck.Usages, DecryptCryptoKeyUsage) {
+		if !ck.ContainsUsage(DecryptCryptoKeyUsage) {
 			reject(NewError(0, InvalidAccessError, "key does not contain the 'decrypt' usage"))
 			return
 		}
@@ -218,9 +217,84 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 // `algorithm` identifies a public-key cryptosystem, this is the private key.
 //
 // The `data` parameter should contain the data to be signed.
-func (sc *SubtleCrypto) Sign(algorithm goja.Value, key goja.Value, data []byte) *goja.Promise {
-	// TODO: implementation
-	return nil
+func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	// 2.
+	// We obtain a copy of the key data, because we might need to modify it.
+	dataToSign, err := exportArrayBuffer(rt, data)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 3.
+	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierSign)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	var ck CryptoKey
+	if err = rt.ExportTo(key, &ck); err != nil {
+		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		return promise
+	}
+
+	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	go func() {
+		// 8.
+		if normalized.Name != keyAlgorithmNameValue.String() {
+			reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+			return
+		}
+
+		// 9.
+		for !ck.ContainsUsage(SignCryptoKeyUsage) {
+			reject(NewError(0, InvalidAccessError, "key does not contain the 'sign' usage"))
+			return
+		}
+
+		// 10.
+		switch normalized.Name {
+		case HMAC:
+			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key algorithm does not describe a HMAC key"))
+				return
+			}
+
+			keyHandle, ok := ck.handle.([]byte)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key handle is of incorrect type"))
+				return
+			}
+
+			hashFn, err := keyAlgorithm.HashFn()
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			hasher := hmac.New(hashFn, keyHandle)
+			hasher.Write(dataToSign)
+
+			// 10.
+			mac := hasher.Sum(nil)
+
+			resolve(rt.NewArrayBuffer(mac))
+		default:
+			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
+		}
+	}()
+
+	return promise
 }
 
 // Verify verifies a digital signature.
@@ -246,14 +320,86 @@ func (sc *SubtleCrypto) Sign(algorithm goja.Value, key goja.Value, data []byte) 
 // The `signature` parameter should contain the signature to be verified.
 //
 // The `data` parameter should contain the original signed data.
-func (sc *SubtleCrypto) Verify(
-	algorithm goja.Value,
-	key goja.Value,
-	signature []byte,
-	data []byte,
-) *goja.Promise {
-	// TODO: implementation
-	return nil
+func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja.Promise {
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	// 2.
+	signatureData, err := exportArrayBuffer(sc.vu.Runtime(), signature)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 3.
+	signedData, err := exportArrayBuffer(sc.vu.Runtime(), data)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 4.
+	normalizedAlgorithm, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierVerify)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	var ck CryptoKey
+	if err = rt.ExportTo(key, &ck); err != nil {
+		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		return promise
+	}
+
+	keyAlgorithmNameValue, err := traverseObject(rt, key, "algorithm", "name")
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	go func() {
+		// 9.
+		if normalizedAlgorithm.Name != keyAlgorithmNameValue.String() {
+			reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+			return
+		}
+
+		// 10.
+		for !ck.ContainsUsage(VerifyCryptoKeyUsage) {
+			reject(NewError(0, InvalidAccessError, "key does not contain the 'sign' usage"))
+			return
+		}
+
+		switch normalizedAlgorithm.Name {
+		case HMAC:
+			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key algorithm does not describe a HMAC key"))
+				return
+			}
+
+			keyHandle, ok := ck.handle.([]byte)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key handle is of incorrect type"))
+				return
+			}
+
+			hashFn, err := keyAlgorithm.HashFn()
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			hasher := hmac.New(hashFn, keyHandle)
+			hasher.Write(signedData)
+
+			resolve(hmac.Equal(signatureData, hasher.Sum(nil)))
+		default:
+			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalizedAlgorithm.Name)))
+		}
+	}()
+
+	return promise
 }
 
 // Digest generates a digest of the given data.
@@ -320,24 +466,16 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 
 	// 6.
 	go func() {
-		var hash hash.Hash
-
-		switch normalized.Name {
-		case Sha1:
-			hash = crypto.SHA1.New()
-		case Sha256:
-			hash = crypto.SHA256.New()
-		case Sha384:
-			hash = crypto.SHA384.New()
-		case Sha512:
-			hash = crypto.SHA512.New()
-		default:
+		// 6.
+		hashFn, ok := getHashFn(normalized.Name)
+		if !ok {
 			// 7.
 			reject(NewError(0, NotSupportedError, "unsupported algorithm: "+normalized.Name))
 			return
 		}
 
 		// 8.
+		hash := hashFn()
 		hash.Write(bytes)
 		digest := hash.Sum(nil)
 

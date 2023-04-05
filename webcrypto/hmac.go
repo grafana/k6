@@ -5,6 +5,8 @@ import (
 	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
 	"crypto/sha512"
+	"fmt"
+	"hash"
 
 	"github.com/dop251/goja"
 	"gopkg.in/guregu/null.v3"
@@ -184,6 +186,16 @@ func exportHmacKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 		// FIXME: note that we do not support JWK format, yet #37.
 		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
 	}
+}
+
+// HashFn returns the hash function to use for the HMAC key.
+func (hka *HmacKeyAlgorithm) HashFn() (func() hash.Hash, error) {
+	hashFn, ok := getHashFn(hka.Hash.Name)
+	if !ok {
+		return nil, NewError(0, NotSupportedError, fmt.Sprintf("unsupported key hash algorithm %q", hka.Hash.Name))
+	}
+
+	return hashFn, nil
 }
 
 // HmacImportParams represents the object that should be passed as the algorithm parameter

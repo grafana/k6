@@ -56,6 +56,18 @@ function assert_true(actual, description) {
 }
 
 /**
+ * Assert that ``actual`` is strictly false
+ *
+ * @param {Any} actual - Value that is asserted to be false
+ * @param {string} [description] - Description of the condition being tested
+ */
+function assert_false(actual, description) {
+    if (actual) {
+        throw `assert_true ${description} expected false got ${actual}`;
+    }
+}
+
+/**
  * Assert that ``expected`` is an array and ``actual`` is one of the members.
  * This is implemented using ``indexOf``, so doesn't handle NaN or ±0 correctly.
  *
@@ -77,6 +89,5 @@ function assert_in_array(actual, expected, description) {
  * @param {string} [description] - Description of the condition being tested.
  */
 function assert_unreached(description) {
-    // throw `assert_unreached ${description} Reached unreachable code`
     throw `reached unreachable code, reason: ${description}`
 }
