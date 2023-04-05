@@ -130,6 +130,30 @@ func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) 
 	return kg, nil
 }
 
+// KeyImporter is the interface implemented by the parameters used to import
+// cryptographic keys.
+type KeyImporter interface {
+	ImportKey(format KeyFormat, keyData []byte, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
+}
+
+func newKeyImporter(rt *goja.Runtime, normalized Algorithm, params goja.Value) (KeyImporter, error) {
+	var ki KeyImporter
+	var err error
+
+	switch normalized.Name {
+	case AESCbc, AESCtr, AESGcm, AESKw:
+		ki = newAesImportParams(normalized)
+	case HMAC:
+		ki, err = newHmacImportParams(rt, normalized, params)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	return ki, nil
+}
+
 // UsageIntersection returns the intersection of two slices of CryptoKeyUsage.
 //
 // It implements the algorithm described in the [specification] to

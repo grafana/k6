@@ -28,6 +28,11 @@ var testVectors = [
     {name: "AES-CTR",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw"]},
     {name: "AES-CBC",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw"]},
     {name: "AES-GCM",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw"]},
+    {name: "HMAC", hash: "SHA-1",   legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
+    {name: "HMAC", hash: "SHA-256", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
+    {name: "HMAC", hash: "SHA-384", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
+    {name: "HMAC", hash: "SHA-512", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
+
 
     // FIXME: uncomment when other symmetric algorithms, and jwk formats, are supported
     // Plus, replace the above entries with their commented-out versions.
@@ -93,11 +98,10 @@ function testFormat(format, algorithm, keyData, keySize, usages, extractable) {
                 assert_true(equalJwk(keyData, result), "Round trip works");
             }
         }, function(err) {
-            assert_unreached("Threw an unexpected error 1: " + err.toString());
+            assert_unreached("Threw an unexpected error: " + err.toString());
         });
     }, function(err) {
-        throw format + " - " + JSON.stringify(algorithm) + " - " + keyData.length + " - " + keySize + " - " + usages + " - " + extractable + " - " + err.toString();
-        assert_unreached("Threw an unexpected error 2: " + err.toString());
+        assert_unreached("Threw an unexpected error: " + err.toString());
     });
 }
 

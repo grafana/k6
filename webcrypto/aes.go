@@ -141,13 +141,26 @@ func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
 	}
 }
 
-// importAESKey imports an AES key from its raw representation, and returns a CryptoKey.
+// aesImportParams is an internal placeholder struct for AES import parameters.
+// Although not described by the specification, we define it to be able to implement
+// our internal KeyImporter interface.
+type aesImportParams struct {
+	Algorithm
+}
+
+func newAesImportParams(normalized Algorithm) *aesImportParams {
+	return &aesImportParams{
+		Algorithm: normalized,
+	}
+}
+
+// ImportKey imports an AES key from its raw representation.
+// It implements the KeyImporter interface.
 //
-// TODO @oleiade: support JWK format.
-func importAESKey(
+// TODO @oleiade: support JWK format #37
+func (aip *aesImportParams) ImportKey(
 	format KeyFormat,
-	algorithm Algorithm,
-	data []byte,
+	keyData []byte,
 	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	for _, usage := range keyUsages {
@@ -162,9 +175,9 @@ func importAESKey(
 	switch format {
 	case RawKeyFormat:
 		var (
-			has128Bits = len(data) == 16
-			has192Bits = len(data) == 24
-			has256Bits = len(data) == 32
+			has128Bits = len(keyData) == 16
+			has192Bits = len(keyData) == 24
+			has256Bits = len(keyData) == 32
 		)
 
 		if !has128Bits && !has192Bits && !has256Bits {
@@ -176,15 +189,18 @@ func importAESKey(
 
 	key := &CryptoKey{
 		Algorithm: AesKeyAlgorithm{
-			Algorithm: algorithm,
-			Length:    int64(len(data) * 8),
+			Algorithm: aip.Algorithm,
+			Length:    int64(len(keyData) * 8),
 		},
 		Type:   SecretCryptoKeyType,
-		handle: data,
+		handle: keyData,
 	}
 
 	return key, nil
 }
+
+// Ensure that aesImportParams implements the KeyImporter interface.
+var _ KeyImporter = &aesImportParams{}
 
 // AesCbcParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
