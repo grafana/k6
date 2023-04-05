@@ -263,15 +263,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
 		}
 
-		b.pagesMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addTid", "sid:%v tid:%v", ev.SessionID, targetPage.TargetID)
-		b.pages[targetPage.TargetID] = p
-		b.pagesMu.Unlock()
-
-		b.sessionIDtoTargetIDMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:background_page:addSid", "sid:%v tid:%v", ev.SessionID, targetPage.TargetID)
-		b.sessionIDtoTargetID[ev.SessionID] = targetPage.TargetID
-		b.sessionIDtoTargetIDMu.Unlock()
+		b.attachNewPage(p, ev) // Register the page as an active page.
 	case "page":
 		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, targetPage.TargetID, opener == nil)
 
@@ -283,15 +275,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 			k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
 		}
 
-		b.pagesMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:page:addTarget", "sid:%v tid:%v", ev.SessionID, targetPage.TargetID)
-		b.pages[targetPage.TargetID] = p
-		b.pagesMu.Unlock()
-
-		b.sessionIDtoTargetIDMu.Lock()
-		b.logger.Debugf("Browser:onAttachedToTarget:page:sidToTid", "sid:%v tid:%v", ev.SessionID, targetPage.TargetID)
-		b.sessionIDtoTargetID[ev.SessionID] = targetPage.TargetID
-		b.sessionIDtoTargetIDMu.Unlock()
+		b.attachNewPage(p, ev) // Register the page as an active page.
 
 		browserCtx.emit(EventBrowserContextPage, p)
 	}
