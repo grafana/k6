@@ -81,7 +81,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	go func() {
 		// 9.
-		for !containsUsage(ck.Usages, EncryptCryptoKeyUsage) {
+		if !ck.ContainsUsage(EncryptCryptoKeyUsage) {
 			reject(NewError(0, InvalidAccessError, "key does not contain the 'encrypt' usage"))
 			return
 		}
@@ -173,7 +173,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	go func() {
 		// 9.
-		for !containsUsage(ck.Usages, DecryptCryptoKeyUsage) {
+		if !ck.ContainsUsage(DecryptCryptoKeyUsage) {
 			reject(NewError(0, InvalidAccessError, "key does not contain the 'decrypt' usage"))
 			return
 		}

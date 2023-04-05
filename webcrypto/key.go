@@ -49,6 +49,11 @@ type CryptoKey struct {
 	handle any
 }
 
+// ContainsUsage returns true if the key contains the specified usage.
+func (ck *CryptoKey) ContainsUsage(usage CryptoKeyUsage) bool {
+	return contains(ck.Usages, usage)
+}
+
 // CryptoKeyType represents the type of a key.
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
@@ -166,7 +171,7 @@ func UsageIntersection(a, b []CryptoKeyUsage) []CryptoKeyUsage {
 	for _, usage := range a {
 		// Note that the intersection algorithm is case-sensitive.
 		// It is also expected to return the occurrence in the a slice "as-is".
-		if containsUsage(b, usage) && !containsUsage(intersection, usage) {
+		if contains(b, usage) && !contains(intersection, usage) {
 			intersection = append(intersection, usage)
 		}
 	}
@@ -174,9 +179,9 @@ func UsageIntersection(a, b []CryptoKeyUsage) []CryptoKeyUsage {
 	return intersection
 }
 
-func containsUsage(usages []CryptoKeyUsage, usage CryptoKeyUsage) bool {
-	for _, u := range usages {
-		if u == usage {
+func contains[T comparable](container []T, element T) bool {
+	for _, e := range container {
+		if e == element {
 			return true
 		}
 	}
