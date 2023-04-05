@@ -573,6 +573,8 @@ func (w *webSocket) send(msg goja.Value) {
 
 // Ping sends a ping message over the websocket.
 func (w *webSocket) ping() {
+	w.assertStateOpen()
+
 	pingID := strconv.Itoa(w.sendPings.counter)
 
 	w.writeQueueCh <- message{

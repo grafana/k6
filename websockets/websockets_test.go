@@ -1266,29 +1266,26 @@ func TestLockingUpWithAThrow(t *testing.T) {
 	require.NoError(t, ts.vu.RuntimeField.Set("l", fmt.Println))
 	err := ts.ev.Start(func() error {
 		_, runErr := ts.rt.RunString(sr(`
-        let a = 0;
-        const connections = 1000;
-        async function s() {
+		let a = 0;
+		const connections = 1000;
+		async function s() {
 			let ws = new WebSocket("WSBIN_URL/ws-echo")
 			ws.addEventListener("open", () => {
 				ws.ping()
-                a++
+				a++
 			})
 
 			ws.addEventListener("pong", () => {
-                // l("pong")
+				// l("pong")
 				ws.ping()
-                if (a == connections){
-                a++
-                    ws.close()
-                }
+				if (a == connections){
+					a++
+					ws.close()
+					throw "s";
+				}
 			})
-
-            ws.addEventListener("close", () =>{
-                throw "s";
-            })
-        }
-        [...Array(connections)].forEach(_ => s())
+		}
+		[...Array(connections)].forEach(_ => s())
 		`))
 		return runErr
 	})
@@ -1314,23 +1311,25 @@ func TestLockingUpWithAJustGeneralCancel(t *testing.T) {
 	require.NoError(t, ts.vu.RuntimeField.Set("cancel", cancel))
 	err := ts.ev.Start(func() error {
 		_, runErr := ts.rt.RunString(sr(`
-        let a = 0;
-        const connections = 1000;
-        async function s() {
+		let a = 0;
+		const connections = 1000;
+		async function s() {
 			var ws = new WebSocket("WSBIN_URL/ws-echo")
 			ws.addEventListener("open", () => {
 				ws.ping()
 			})
 
 			ws.addEventListener("pong", () => {
-				ws.ping()
-                a++
-                if (a == connections){
-                    cancel()
-                }
+				try{
+					ws.ping() // this will
+				} catch(e) {}
+				a++
+				if (a == connections){
+					cancel()
+				}
 			})
-        }
-        [...Array(connections)].forEach(_ => s())
+		}
+		[...Array(connections)].forEach(_ => s())
 		`))
 		return runErr
 	})
