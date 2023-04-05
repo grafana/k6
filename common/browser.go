@@ -255,8 +255,17 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, targetPage.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6ext.Panic(b.ctx, "creating a new background page: %w", err)
 			}
+			// Another VU or instance closed the page, and the session is closed.
+			// This can happen if the page is closed before the attachedToTarget
+			// event is handled.
+			if session.Closed() {
+				b.logger.Debugf("Browser:onAttachedToTarget:return:session.Done",
+					"session closed: sid:%v tid:%v pageType:%s err:%v",
+					ev.SessionID, targetPage.TargetID, targetPage.Type, err)
+				return
+			}
+			k6ext.Panic(b.ctx, "creating a new background page: %w", err)
 		}
 
 		b.pagesMu.Lock()
@@ -294,8 +303,17 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 					ev.SessionID, targetPage.TargetID, b.ctx.Err())
 				return // ignore
 			default:
-				k6ext.Panic(b.ctx, "creating a new page: %w", err)
 			}
+			// Another VU or instance closed the page, and the session is closed.
+			// This can happen if the page is closed before the attachedToTarget
+			// event is handled.
+			if session.Closed() {
+				b.logger.Debugf("Browser:onAttachedToTarget:return:session.Done",
+					"session closed: sid:%v tid:%v pageType:%s err:%v",
+					ev.SessionID, targetPage.TargetID, targetPage.Type, err)
+				return
+			}
+			k6ext.Panic(b.ctx, "creating a new page: %w", err)
 		}
 
 		b.pagesMu.Lock()
