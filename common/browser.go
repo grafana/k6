@@ -220,6 +220,7 @@ func (b *Browser) initEvents() error {
 	return nil
 }
 
+// onAttachedToTarget is called when a new page is attached to the browser.
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
 		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID)
@@ -252,31 +253,17 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 		}
 		b.pagesMu.RUnlock()
 	}
-
-	switch targetPage.Type {
-	case "background_page":
-		p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, nil, false, b.logger)
-		if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
-			return // Ignore this page.
-		}
-		if err != nil {
-			k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
-		}
-
-		b.attachNewPage(p, ev) // Register the page as an active page.
-	case "page":
-		b.logger.Debugf("Browser:onAttachedToTarget:page", "sid:%v tid:%v opener nil:%t", ev.SessionID, targetPage.TargetID, opener == nil)
-
-		p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, opener, true, b.logger)
-		if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
-			return // Ignore this page.
-		}
-		if err != nil {
-			k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
-		}
-
-		b.attachNewPage(p, ev) // Register the page as an active page.
-
+	p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
+	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
+		return // Ignore this page.
+	}
+	if err != nil {
+		k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
+	}
+	b.attachNewPage(p, ev) // Register the page as an active page.
+	// Emit the page event only for pages, not for background pages.
+	// Background pages are created by extensions.
+	if isPage {
 		browserCtx.emit(EventBrowserContextPage, p)
 	}
 }
