@@ -173,7 +173,7 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		return isAesAlgorithm(algorithmName) || algorithmName == HMAC
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName)
-	case OperationIdentifierSign:
+	case OperationIdentifierSign, OperationIdentifierVerify:
 		return algorithmName == HMAC
 	default:
 		return false

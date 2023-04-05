@@ -276,9 +276,9 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 				return
 			}
 
-			hashFn, ok := getHashFn(keyAlgorithm.Hash.Name)
-			if !ok {
-				reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported key hash algorithm %q", keyAlgorithm.Hash.Name)))
+			hashFn, err := keyAlgorithm.HashFn()
+			if err != nil {
+				reject(err)
 				return
 			}
 
@@ -320,14 +320,86 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 // The `signature` parameter should contain the signature to be verified.
 //
 // The `data` parameter should contain the original signed data.
-func (sc *SubtleCrypto) Verify(
-	algorithm goja.Value,
-	key goja.Value,
-	signature []byte,
-	data []byte,
-) *goja.Promise {
-	// TODO: implementation
-	return nil
+func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja.Promise {
+	rt := sc.vu.Runtime()
+	promise, resolve, reject := sc.makeHandledPromise()
+
+	// 2.
+	signatureData, err := exportArrayBuffer(sc.vu.Runtime(), signature)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 3.
+	signedData, err := exportArrayBuffer(sc.vu.Runtime(), data)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	// 4.
+	normalizedAlgorithm, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierVerify)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	var ck CryptoKey
+	if err = rt.ExportTo(key, &ck); err != nil {
+		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		return promise
+	}
+
+	keyAlgorithmNameValue, err := traverseObject(rt, key, "algorithm", "name")
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	go func() {
+		// 9.
+		if normalizedAlgorithm.Name != keyAlgorithmNameValue.String() {
+			reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+			return
+		}
+
+		// 10.
+		for !ck.ContainsUsage(VerifyCryptoKeyUsage) {
+			reject(NewError(0, InvalidAccessError, "key does not contain the 'sign' usage"))
+			return
+		}
+
+		switch normalizedAlgorithm.Name {
+		case HMAC:
+			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key algorithm does not describe a HMAC key"))
+				return
+			}
+
+			keyHandle, ok := ck.handle.([]byte)
+			if !ok {
+				reject(NewError(0, InvalidAccessError, "key handle is of incorrect type"))
+				return
+			}
+
+			hashFn, err := keyAlgorithm.HashFn()
+			if err != nil {
+				reject(err)
+				return
+			}
+
+			hasher := hmac.New(hashFn, keyHandle)
+			hasher.Write(signedData)
+
+			resolve(hmac.Equal(signatureData, hasher.Sum(nil)))
+		default:
+			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalizedAlgorithm.Name)))
+		}
+	}()
+
+	return promise
 }
 
 // Digest generates a digest of the given data.
