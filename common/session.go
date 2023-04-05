@@ -212,3 +212,13 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 func (s *Session) Done() <-chan struct{} {
 	return s.done
 }
+
+// Closed returns true if this session is closed.
+func (s *Session) Closed() bool {
+	select {
+	case <-s.done:
+		return true
+	default:
+		return false
+	}
+}
