@@ -226,3 +226,27 @@ func TestBrowserMultiClose(t *testing.T) {
 	require.NotPanicsf(t, tb.Close, "second call to browser.close should not panic")
 	tb.logCache.assertContains(t, "browser.close only once")
 }
+
+func TestMultiConnectToSingleBrowser(t *testing.T) {
+	tb := newTestBrowser(t, withSkipClose())
+	defer tb.Close()
+
+	b1 := tb.browserType.Connect(tb.wsURL, nil)
+	bctx1, err := b1.NewContext(nil)
+	require.NoError(t, err)
+	p1, err := bctx1.NewPage()
+	require.NoError(t, err, "failed to create page #1")
+
+	b2 := tb.browserType.Connect(tb.wsURL, nil)
+	bctx2, err := b2.NewContext(nil)
+	require.NoError(t, err)
+
+	err = p1.Close(nil)
+	require.NoError(t, err, "failed to close page #1")
+	bctx1.Close()
+
+	p2, err := bctx2.NewPage()
+	require.NoError(t, err, "failed to create page #2")
+	err = p2.Close(nil)
+	require.NoError(t, err, "failed to close page #2")
+}
