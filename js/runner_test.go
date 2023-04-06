@@ -859,25 +859,29 @@ func TestVUIntegrationGroups(t *testing.T) {
 
 func TestVUIntegrationMetrics(t *testing.T) {
 	t.Parallel()
-	r1, err := getSimpleRunner(t, "/script.js", `
+	testdata := make(map[string]*Runner, 2)
+	{
+		r1, err := getSimpleRunner(t, "/script.js", `
 		var group = require("k6").group;
 		var Trend = require("k6/metrics").Trend;
 		var myMetric = new Trend("my_metric");
 		exports.default = function() { myMetric.add(5); }
 		`)
-	require.NoError(t, err)
+		require.NoError(t, err)
+		testdata["Source"] = r1
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, r1.MakeArchive())
-	require.NoError(t, err)
+		registry := metrics.NewRegistry()
+		builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+		r2, err := NewFromArchive(
+			&lib.TestPreInitState{
+				Logger:         testutils.NewLogger(t),
+				BuiltinMetrics: builtinMetrics,
+				Registry:       registry,
+			}, r1.MakeArchive())
+		require.NoError(t, err)
+		testdata["Archive"] = r2
+	}
 
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
 	for name, r := range testdata {
 		r := r
 		t.Run(name, func(t *testing.T) {
@@ -894,6 +898,7 @@ func TestVUIntegrationMetrics(t *testing.T) {
 			err = activeVU.RunOnce()
 			require.NoError(t, err)
 			sampleCount := 0
+			builtinMetrics := r.preInitState.BuiltinMetrics
 			for i, sampleC := range metrics.GetBufferedSamples(samples) {
 				for j, s := range sampleC.GetSamples() {
 					sampleCount++
@@ -904,14 +909,14 @@ func TestVUIntegrationMetrics(t *testing.T) {
 						assert.Equal(t, metrics.Trend, s.Metric.Type)
 					case 1:
 						assert.Equal(t, 0.0, s.Value)
-						assert.Equal(t, builtinMetrics.DataSent, s.Metric, "`data_sent` sample is before `data_received` and `iteration_duration`")
+						assert.Same(t, builtinMetrics.DataSent, s.Metric, "`data_sent` sample is before `data_received` and `iteration_duration`")
 					case 2:
 						assert.Equal(t, 0.0, s.Value)
-						assert.Equal(t, builtinMetrics.DataReceived, s.Metric, "`data_received` sample is after `data_received`")
+						assert.Same(t, builtinMetrics.DataReceived, s.Metric, "`data_received` sample is after `data_received`")
 					case 3:
-						assert.Equal(t, builtinMetrics.IterationDuration, s.Metric, "`iteration-duration` sample is after `data_received`")
+						assert.Same(t, builtinMetrics.IterationDuration, s.Metric, "`iteration-duration` sample is after `data_received`")
 					case 4:
-						assert.Equal(t, builtinMetrics.Iterations, s.Metric, "`iterations` sample is after `iteration_duration`")
+						assert.Same(t, builtinMetrics.Iterations, s.Metric, "`iterations` sample is after `iteration_duration`")
 						assert.Equal(t, float64(1), s.Value)
 					}
 				}
