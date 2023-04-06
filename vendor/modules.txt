@@ -138,6 +138,9 @@ github.com/golang/snappy
 # github.com/google/pprof v0.0.0-20230207041349-798e818bf904
 ## explicit; go 1.19
 github.com/google/pprof/profile
+# github.com/google/uuid v1.3.0
+## explicit
+github.com/google/uuid
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
@@ -164,6 +167,9 @@ github.com/grafana/xk6-redis/redis
 # github.com/grafana/xk6-timers v0.1.2
 ## explicit; go 1.17
 github.com/grafana/xk6-timers/timers
+# github.com/grafana/xk6-webcrypto v0.1.0
+## explicit; go 1.19
+github.com/grafana/xk6-webcrypto/webcrypto
 # github.com/grafana/xk6-websockets v0.2.0
 ## explicit; go 1.18
 github.com/grafana/xk6-websockets/websockets
