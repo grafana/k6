@@ -273,17 +273,17 @@ func (b *Browser) attachNewPage(p *Page, ev *target.EventAttachedToTarget) {
 	targetPage := ev.TargetInfo
 
 	// Register the page as an active page.
-	b.pagesMu.Lock()
-	b.logger.Debugf("Browser:onAttachedToTarget:addTarget", "sid:%v tid:%v pageType:%s",
+	b.logger.Debugf("Browser:attachNewPage:addTarget", "sid:%v tid:%v pageType:%s",
 		ev.SessionID, targetPage.TargetID, targetPage.Type)
+	b.pagesMu.Lock()
 	b.pages[targetPage.TargetID] = p
 	b.pagesMu.Unlock()
 
 	// Attach the sessionID with the targetID so we can communicate with the
 	// page later.
-	b.sessionIDtoTargetIDMu.Lock()
-	b.logger.Debugf("Browser:onAttachedToTarget:addSession", "sid:%v tid:%v pageType:%s",
+	b.logger.Debugf("Browser:attachNewPage:addSession", "sid:%v tid:%v pageType:%s",
 		ev.SessionID, targetPage.TargetID, targetPage.Type)
+	b.sessionIDtoTargetIDMu.Lock()
 	b.sessionIDtoTargetID[ev.SessionID] = targetPage.TargetID
 	b.sessionIDtoTargetIDMu.Unlock()
 }
@@ -297,13 +297,13 @@ func (b *Browser) isAttachedPageValid(ev *target.EventAttachedToTarget, browserC
 	// We're not interested in the top-level browser target, other targets or DevTools targets right now.
 	isDevTools := strings.HasPrefix(targetPage.URL, "devtools://devtools")
 	if targetPage.Type == "browser" || targetPage.Type == "other" || isDevTools {
-		b.logger.Debugf("Browser:onAttachedToTarget:return", "sid:%v tid:%v (devtools)", ev.SessionID, targetPage.TargetID)
+		b.logger.Debugf("Browser:isAttachedPageValid:return", "sid:%v tid:%v (devtools)", ev.SessionID, targetPage.TargetID)
 		return false
 	}
 	pageType := targetPage.Type
 	if pageType != "page" && pageType != "background_page" {
 		b.logger.Warnf(
-			"Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v bctx nil:%t, unknown target type: %q",
+			"Browser:isAttachedPageValid", "sid:%v tid:%v bctxid:%v bctx nil:%t, unknown target type: %q",
 			ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx == nil, targetPage.Type)
 		return false
 	}
@@ -323,14 +323,15 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 	)
 	if !errors.As(err, &wsErr) && !isRunning {
 		// If we're no longer connected to browser, then ignore WebSocket errors
-		b.logger.Debugf("Browser:onAttachedToTarget:return", "sid:%v tid:%v pageType:%s websocket err:%v",
+		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return",
+			"sid:%v tid:%v pageType:%s websocket err:%v",
 			ev.SessionID, targetPage.TargetID, targetPage.Type, err)
 		return true
 	}
 	// No need to register the page if the test run is over.
 	select {
 	case <-b.ctx.Done():
-		b.logger.Debugf("Browser:onAttachedToTarget:return:<-ctx.Done",
+		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:<-ctx.Done",
 			"sid:%v tid:%v pageType:%s err:%v",
 			ev.SessionID, targetPage.TargetID, targetPage.Type, b.ctx.Err())
 		return true
@@ -340,7 +341,7 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 	// This can happen if the page is closed before the attachedToTarget
 	// event is handled.
 	if session.Closed() {
-		b.logger.Debugf("Browser:onAttachedToTarget:return:session.Done",
+		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:session.Done",
 			"session closed: sid:%v tid:%v pageType:%s err:%v",
 			ev.SessionID, targetPage.TargetID, targetPage.Type, err)
 		return true
