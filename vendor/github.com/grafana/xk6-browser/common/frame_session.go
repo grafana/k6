@@ -805,10 +805,9 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 	}
 
 	eventToMetric := map[string]*k6metrics.Metric{
-		"load":                 fs.k6Metrics.BrowserLoaded,
-		"DOMContentLoaded":     fs.k6Metrics.BrowserDOMContentLoaded,
-		"firstPaint":           fs.k6Metrics.BrowserFirstPaint,
-		"firstContentfulPaint": fs.k6Metrics.BrowserFirstContentfulPaint,
+		"load":             fs.k6Metrics.BrowserLoaded,
+		"DOMContentLoaded": fs.k6Metrics.BrowserDOMContentLoaded,
+		"firstPaint":       fs.k6Metrics.BrowserFirstPaint,
 	}
 
 	if m, ok := eventToMetric[event.Name]; ok {
