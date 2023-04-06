@@ -36,6 +36,8 @@ type testBrowser struct {
 	pid   int // the browser process ID
 	wsURL string
 
+	browserType api.BrowserType
+
 	api.Browser
 }
 
@@ -133,14 +135,15 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	})
 
 	tbr := &testBrowser{
-		t:        tb,
-		ctx:      bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
-		http:     testServer,
-		vu:       vu,
-		logCache: lc,
-		Browser:  b,
-		pid:      pid,
-		wsURL:    cb.WsURL(),
+		t:           tb,
+		ctx:         bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
+		http:        testServer,
+		vu:          vu,
+		logCache:    lc,
+		Browser:     b,
+		browserType: bt,
+		pid:         pid,
+		wsURL:       cb.WsURL(),
 	}
 	if enableFileServer {
 		tbr = tbr.withFileServer()
