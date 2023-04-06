@@ -18,7 +18,7 @@ import (
 
 	"github.com/grafana/xk6-redis/redis"
 	"github.com/grafana/xk6-timers/timers"
-	webcrypto "github.com/grafana/xk6-webcrypto/webcrypto"
+	"github.com/grafana/xk6-webcrypto/webcrypto"
 	expws "github.com/grafana/xk6-websockets/websockets"
 )
 
