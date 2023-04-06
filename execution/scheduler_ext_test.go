@@ -154,11 +154,11 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 
 			stopEmission, err := execScheduler.Init(ctx, samples)
 			require.NoError(t, err)
-			defer stopEmission()
 
 			go func() {
+				defer close(done)
+				defer stopEmission()
 				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
-				close(done)
 			}()
 			for {
 				select {
@@ -271,11 +271,11 @@ func TestSchedulerRunEnv(t *testing.T) {
 
 			stopEmission, err := execScheduler.Init(ctx, samples)
 			require.NoError(t, err)
-			defer stopEmission()
 
 			go func() {
+				defer close(done)
+				defer stopEmission()
 				assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
-				close(done)
 			}()
 			for {
 				select {
@@ -344,11 +344,11 @@ func TestSchedulerSystemTags(t *testing.T) {
 
 	stopEmission, err := execScheduler.Init(ctx, samples)
 	require.NoError(t, err)
-	defer stopEmission()
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
+		defer stopEmission()
 		require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 	}()
 
@@ -481,10 +481,10 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 
 			stopEmission, err := execScheduler.Init(ctx, samples)
 			require.NoError(t, err)
-			defer stopEmission()
 
 			go func() {
 				defer close(done)
+				defer stopEmission()
 				require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 			}()
 			var gotTrailTag, gotNetTrailTag bool
@@ -1202,11 +1202,11 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 
 	stopEmission, err := execScheduler.Init(ctx, samples)
 	require.NoError(t, err)
-	defer stopEmission()
 
 	go func() {
+		defer close(done)
+		defer stopEmission()
 		assert.NoError(t, execScheduler.Run(ctx, ctx, samples))
-		close(done)
 	}()
 
 	expectIn := func(from, to time.Duration, expected metrics.SampleContainer) {
