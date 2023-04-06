@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 
 	"github.com/dop251/goja"
 
@@ -31,11 +32,14 @@ type mapping = map[string]any
 // See issue #661 for more details.
 func mapBrowserToGoja(vu moduleVU) *goja.Object {
 	var (
-		rt          = vu.Runtime()
-		obj         = rt.NewObject()
-		browserType = chromium.NewBrowserType(vu)
+		rt  = vu.Runtime()
+		obj = rt.NewObject()
+		// TODO: Use k6 LookupEnv instead of OS package methods.
+		// See https://github.com/grafana/xk6-browser/issues/822.
+		wsURL, isRemoteBrowser = k6ext.IsRemoteBrowser(os.LookupEnv)
+		browserType            = chromium.NewBrowserType(vu)
 	)
-	for k, v := range mapBrowserType(vu, browserType) {
+	for k, v := range mapBrowserType(vu, browserType, wsURL, isRemoteBrowser) {
 		err := obj.Set(k, rt.ToValue(v))
 		if err != nil {
 			k6common.Throw(rt, fmt.Errorf("mapping: %w", err))
@@ -706,7 +710,7 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 }
 
 // mapBrowserType to the JS module.
-func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
+func mapBrowserType(vu moduleVU, bt api.BrowserType, wsURL string, isRemoteBrowser bool) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"connect": func(wsEndpoint string, opts goja.Value) *goja.Object {
@@ -718,6 +722,14 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType) mapping {
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
 		"launch": func(opts goja.Value) *goja.Object {
+			// If browser is remote, transition from launch
+			// to connect and avoid storing the browser pid
+			// as we have no access to it.
+			if isRemoteBrowser {
+				m := mapBrowser(vu, bt.Connect(wsURL, opts))
+				return rt.ToValue(m).ToObject(rt)
+			}
+
 			b, pid := bt.Launch(opts)
 			// store the pid so we can kill it later on panic.
 			vu.registerPid(pid)
