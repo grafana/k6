@@ -2,8 +2,6 @@ package common
 
 import (
 	"encoding/json"
-	"errors"
-	"fmt"
 	"math"
 	"testing"
 
@@ -260,77 +258,6 @@ func TestParseRemoteObject(t *testing.T) {
 			} else {
 				assert.NoError(t, err)
 			}
-		})
-	}
-}
-
-func TestMultierror(t *testing.T) {
-	t.Parallel()
-
-	var (
-		mockErr1 = errors.New("mockErr1")
-		mockErr2 = errors.New("mockErr2")
-		mockErr3 = errors.New("mockErr3")
-
-		mockMultiErr = &multiError{
-			Errors: []error{mockErr1},
-		}
-		mockWrappedMultiErr = fmt.Errorf("%w", mockMultiErr)
-	)
-
-	tests := []struct {
-		name    string
-		initial error
-		errs    []error
-		exp     []error
-		expStr  string
-	}{
-		{
-			name:    "initial error is nil",
-			initial: nil,
-			errs:    []error{mockErr1},
-			exp:     []error{mockErr1},
-			expStr:  mockErr1.Error(),
-		},
-		{
-			name:    "initial error is std error",
-			initial: mockErr1,
-			errs:    []error{mockErr2, mockErr3},
-			exp:     []error{mockErr1, mockErr2, mockErr3},
-			expStr: fmt.Sprintf(
-				"3 errors occurred:\n\t* %s\n\t* %s\n\t* %s\n",
-				mockErr1, mockErr2, mockErr3),
-		},
-		{
-			name:    "initial error is multiError",
-			initial: mockMultiErr,
-			errs:    []error{mockErr3},
-			exp:     []error{mockErr1, mockErr3},
-			expStr: fmt.Sprintf(
-				"2 errors occurred:\n\t* %s\n\t* %s\n",
-				mockErr1, mockErr3),
-		},
-		{
-			name:    "initial error is wrapped multiError",
-			initial: mockWrappedMultiErr,
-			errs:    []error{mockErr3, mockErr2},
-			exp:     []error{mockWrappedMultiErr, mockErr3, mockErr2},
-			expStr: fmt.Sprintf(
-				"3 errors occurred:\n\t* %s\n\t* %s\n\t* %s\n",
-				mockWrappedMultiErr, mockErr3, mockErr2),
-		},
-	}
-
-	for _, tc := range tests {
-		tc := tc
-		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			err := multierror(tc.initial, tc.errs...)
-			var me *multiError
-			assert.True(t, errors.As(err, &me))
-			assert.Equal(t, tc.exp, me.Errors)
-			assert.Equal(t, tc.expStr, me.Error())
 		})
 	}
 }
