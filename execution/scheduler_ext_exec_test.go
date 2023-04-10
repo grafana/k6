@@ -3,7 +3,7 @@ package execution_test
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"testing"
 	"time"
@@ -63,7 +63,7 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 `)
 
 	logger := logrus.New()
-	logger.SetOutput(ioutil.Discard)
+	logger.SetOutput(io.Discard)
 	logHook := testutils.NewLogHook(logrus.InfoLevel)
 	logger.AddHook(logHook)
 
@@ -176,7 +176,7 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 `)
 
 	logger := logrus.New()
-	logger.SetOutput(ioutil.Discard)
+	logger.SetOutput(io.Discard)
 	logHook := testutils.NewLogHook(logrus.InfoLevel)
 	logger.AddHook(logHook)
 
@@ -258,7 +258,7 @@ func TestSharedIterationsStable(t *testing.T) {
 `)
 
 	logger := logrus.New()
-	logger.SetOutput(ioutil.Discard)
+	logger.SetOutput(io.Discard)
 	logHook := testutils.NewLogHook(logrus.InfoLevel)
 	logger.AddHook(logHook)
 
@@ -393,7 +393,7 @@ func TestExecutionInfoAll(t *testing.T) {
 			t.Parallel()
 
 			logger := logrus.New()
-			logger.SetOutput(ioutil.Discard)
+			logger.SetOutput(io.Discard)
 			logHook := testutils.NewLogHook(logrus.InfoLevel)
 			logger.AddHook(logHook)
 

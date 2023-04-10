@@ -2,7 +2,7 @@ package compiler
 
 import (
 	"errors"
-	"io/ioutil"
+	"io"
 	"strings"
 	"testing"
 
@@ -167,7 +167,7 @@ func TestCorruptSourceMap(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
 	logger.AddHook(hook)
 
@@ -196,7 +196,7 @@ func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
 	logger.AddHook(hook)
 
@@ -226,7 +226,7 @@ func TestMinimalSourceMap(t *testing.T) {
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
 	logger.AddHook(hook)
 

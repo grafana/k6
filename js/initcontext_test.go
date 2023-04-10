@@ -3,7 +3,7 @@ package js
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -347,7 +347,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -494,7 +494,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)

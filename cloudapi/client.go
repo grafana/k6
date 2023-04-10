@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"time"
@@ -76,7 +75,7 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 
 func (c *Client) Do(req *http.Request, v interface{}) error {
 	if req.Body != nil && req.GetBody == nil {
-		originalBody, err := ioutil.ReadAll(req.Body)
+		originalBody, err := io.ReadAll(req.Body)
 		if err != nil {
 			return err
 		}
@@ -85,7 +84,7 @@ func (c *Client) Do(req *http.Request, v interface{}) error {
 		}
 
 		req.GetBody = func() (io.ReadCloser, error) {
-			return ioutil.NopCloser(bytes.NewReader(originalBody)), nil
+			return io.NopCloser(bytes.NewReader(originalBody)), nil
 		}
 		req.Body, _ = req.GetBody()
 	}
@@ -167,7 +166,7 @@ func checkResponse(r *http.Response) error {
 		return nil
 	}
 
-	data, err := ioutil.ReadAll(r.Body)
+	data, err := io.ReadAll(r.Body)
 	if err != nil {
 		return err
 	}

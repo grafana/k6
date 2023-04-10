@@ -5,7 +5,7 @@ import (
 	"compress/gzip"
 	"encoding/csv"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"sort"
 	"strings"
 	"testing"
@@ -337,7 +337,7 @@ func readCompressedFile(fileName string, fs afero.Fs) string {
 		return err.Error()
 	}
 
-	csvbytes, err := ioutil.ReadAll(gzf)
+	csvbytes, err := io.ReadAll(gzf)
 	if err != nil {
 		return err.Error()
 	}

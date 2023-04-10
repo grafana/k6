@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -196,7 +196,7 @@ func TestHTTP2StreamError(t *testing.T) {
 	res, err := client.Get(tb.Replacer.Replace("HTTP2BIN_URL/tsr")) //nolint:noctx
 	require.NotNil(t, res)
 	require.NoError(t, err)
-	_, err = ioutil.ReadAll(res.Body)
+	_, err = io.ReadAll(res.Body)
 	_ = res.Body.Close()
 	require.Error(t, err)
 

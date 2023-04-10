@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net/http"
 	"net/http/httptest"
@@ -63,7 +62,7 @@ func tagEqual(expected, got json.RawMessage) bool {
 
 func getSampleChecker(t *testing.T, expSamples <-chan []Sample) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		assert.NoError(t, err)
 		receivedSamples := []Sample{}
 		assert.NoError(t, json.Unmarshal(body, &receivedSamples))
@@ -333,7 +332,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID),
 		func(_ http.ResponseWriter, r *http.Request) {
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
 			assert.NoError(t, err)
 			receivedSamples := []Sample{}
 			assert.NoError(t, json.Unmarshal(body, &receivedSamples))
@@ -398,7 +397,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		body, err := ioutil.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
 		require.NoError(t, err)
 		data := &cloudapi.TestRun{}
 		err = json.Unmarshal(body, &data)
@@ -468,7 +467,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 				_, _ = w.Write(data)
 				return
 			}
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
 			assert.NoError(t, err)
 			receivedSamples := []Sample{}
 			assert.NoError(t, json.Unmarshal(body, &receivedSamples))
@@ -675,7 +674,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		body, err := ioutil.ReadAll(req.Body)
+		body, err := io.ReadAll(req.Body)
 		require.NoError(t, err)
 		data := &cloudapi.TestRun{}
 		err = json.Unmarshal(body, &data)
@@ -712,7 +711,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID),
 		func(_ http.ResponseWriter, r *http.Request) {
-			body, err := ioutil.ReadAll(r.Body)
+			body, err := io.ReadAll(r.Body)
 			assert.NoError(t, err)
 
 			receivedSamples := []Sample{}

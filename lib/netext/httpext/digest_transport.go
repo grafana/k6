@@ -1,7 +1,7 @@
 package httpext
 
 import (
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	digest "github.com/Soontao/goHttpDigestClient"
@@ -36,7 +36,7 @@ func (t digestTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 		return noAuthResponse, err
 	}
 
-	respBody, err := ioutil.ReadAll(noAuthResponse.Body)
+	respBody, err := io.ReadAll(noAuthResponse.Body)
 	if err != nil {
 		return nil, err
 	}

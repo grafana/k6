@@ -2,7 +2,7 @@ package js
 
 import (
 	"context"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -49,7 +49,7 @@ exports.default = function() {
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	hook := testutils.NewLogHook(
 		logrus.InfoLevel, logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel,
 	)

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/rand"
 	"net"
 	"net/http"
@@ -123,7 +122,7 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 			res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), ct)))
 			require.NoError(t, err)
 
-			_, err = io.Copy(ioutil.Discard, res.Body)
+			_, err = io.Copy(io.Discard, res.Body)
 			assert.NoError(t, err)
 			assert.NoError(t, res.Body.Close())
 			if runtime.GOOS == "windows" {
@@ -211,7 +210,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 		tracer := &Tracer{}
 		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 		require.NoError(t, err)
-		_, err = io.Copy(ioutil.Discard, res.Body)
+		_, err = io.Copy(io.Discard, res.Body)
 		assert.NoError(t, err)
 		assert.NoError(t, res.Body.Close())
 		tracer.Done()
@@ -224,7 +223,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 		tracer := &Tracer{}
 		res, err := transport.RoundTrip(req.WithContext(httptrace.WithClientTrace(context.Background(), tracer.Trace())))
 		require.NoError(t, err)
-		_, err = io.Copy(ioutil.Discard, res.Body)
+		_, err = io.Copy(io.Discard, res.Body)
 		assert.NoError(t, err)
 		assert.NoError(t, res.Body.Close())
 		trail := tracer.Done()

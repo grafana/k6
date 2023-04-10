@@ -14,7 +14,6 @@ import (
 	"encoding/pem"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"math/big"
 	"net"
 	"net/http"
@@ -274,7 +273,7 @@ func TestRequest(t *testing.T) {
 		t.Run("post body", func(t *testing.T) {
 			tb.Mux.HandleFunc("/post-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 				require.Equal(t, r.Method, "POST")
-				_, _ = io.Copy(ioutil.Discard, r.Body)
+				_, _ = io.Copy(io.Discard, r.Body)
 				http.Redirect(w, r, sr("HTTPBIN_URL/post"), http.StatusPermanentRedirect)
 			}))
 			_, err := rt.RunString(sr(`
@@ -1565,7 +1564,7 @@ func TestResponseTypes(t *testing.T) {
 		assert.Equal(t, textLen, n)
 	}))
 	tb.Mux.HandleFunc("/compare-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		assert.Equal(t, text, string(body))
 	}))
@@ -1581,7 +1580,7 @@ func TestResponseTypes(t *testing.T) {
 		assert.Equal(t, binaryLen, n)
 	}))
 	tb.Mux.HandleFunc("/compare-bin", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		assert.True(t, bytes.Equal(binary, body))
 	}))
@@ -2228,7 +2227,7 @@ func TestDigestAuthWithBody(t *testing.T) {
 
 	tb.Mux.HandleFunc("/digest-auth-with-post/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, "POST", r.Method)
-		body, err := ioutil.ReadAll(r.Body)
+		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		require.Equal(t, "super secret body", string(body))
 		httpbin.New().DigestAuth(w, r) // this doesn't read the body

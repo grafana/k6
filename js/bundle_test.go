@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -435,7 +436,7 @@ func TestNewBundle(t *testing.T) {
 			t.Parallel()
 			logger := logrus.New()
 			logger.SetLevel(logrus.InfoLevel)
-			logger.Out = ioutil.Discard
+			logger.Out = io.Discard
 			hook := testutils.NewLogHook(
 				logrus.WarnLevel, logrus.InfoLevel, logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel,
 			)

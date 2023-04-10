@@ -5,7 +5,7 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"testing"
 	"time"
@@ -122,7 +122,7 @@ func TestVUTagsErrorOutOnInvalidValues(t *testing.T) {
 	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
-	testLog.SetOutput(ioutil.Discard)
+	testLog.SetOutput(io.Discard)
 
 	cases := []string{
 		"null",

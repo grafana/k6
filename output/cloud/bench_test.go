@@ -6,7 +6,6 @@ import (
 	json "encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/url"
 	"testing"
@@ -111,7 +110,7 @@ func BenchmarkMetricMarshalWriter(b *testing.B) {
 				b.StopTimer()
 				s := generateSamples(registry, count)
 				b.StartTimer()
-				n, err := easyjson.MarshalToWriter(samples(s), ioutil.Discard)
+				n, err := easyjson.MarshalToWriter(samples(s), io.Discard)
 				require.NoError(b, err)
 				b.SetBytes(int64(n))
 			}
@@ -287,7 +286,7 @@ func BenchmarkHTTPPush(b *testing.B) {
 	}))
 	tb.Mux.HandleFunc("/v1/metrics/fake",
 		func(w http.ResponseWriter, r *http.Request) {
-			_, err := io.Copy(ioutil.Discard, r.Body)
+			_, err := io.Copy(io.Discard, r.Body)
 			assert.NoError(b, err)
 		},
 	)

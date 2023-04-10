@@ -5,7 +5,6 @@ import (
 	"context"
 	"errors"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -67,7 +66,7 @@ func TestCompressionBodyError(t *testing.T) {
 	algos := []CompressionType{CompressionTypeGzip}
 	t.Run("bad read body", func(t *testing.T) {
 		t.Parallel()
-		_, _, err := compressBody(algos, ioutil.NopCloser(badReadBody()))
+		_, _, err := compressBody(algos, io.NopCloser(badReadBody()))
 		require.Error(t, err)
 		require.Equal(t, err.Error(), badReadMsg)
 	})

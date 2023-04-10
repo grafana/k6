@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 
 	"go.k6.io/k6/errext"
@@ -37,7 +37,7 @@ func getFirstExternallyControlledExecutor(execScheduler *execution.Scheduler) (*
 func handlePatchStatus(cs *ControlSurface, rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
 
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		apiError(rw, "Couldn't read request", err.Error(), http.StatusBadRequest)
 		return

@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	"net/url"
 	"path"
 	"path/filepath"
@@ -127,7 +126,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			continue
 		}
 
-		data, err := ioutil.ReadAll(r)
+		data, err := io.ReadAll(r)
 		if err != nil {
 			return nil, err
 		}

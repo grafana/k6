@@ -5,7 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
-	"io/ioutil"
+	"io"
 	"net/url"
 	"os"
 	"runtime"
@@ -952,7 +952,7 @@ func TestClientInvokeHeadersDeprecated(t *testing.T) {
 	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
-	testLog.SetOutput(ioutil.Discard)
+	testLog.SetOutput(io.Discard)
 
 	rt := goja.New()
 	c := Client{

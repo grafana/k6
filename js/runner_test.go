@@ -11,6 +11,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"go/build"
+	"io"
 	"io/fs"
 	"io/ioutil"
 	stdlog "log"
@@ -1784,7 +1785,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			_, _ = fmt.Fprintf(w, "ok")
 		}),
-		ErrorLog: stdlog.New(ioutil.Discard, "", 0),
+		ErrorLog: stdlog.New(io.Discard, "", 0),
 	}
 	go func() { _ = srv.Serve(listener) }()
 	t.Cleanup(func() { _ = listener.Close() })
@@ -2287,7 +2288,7 @@ func TestVUPanic(t *testing.T) {
 
 			logger := logrus.New()
 			logger.SetLevel(logrus.InfoLevel)
-			logger.Out = ioutil.Discard
+			logger.Out = io.Discard
 			hook := testutils.NewLogHook(
 				logrus.InfoLevel, logrus.ErrorLevel, logrus.FatalLevel, logrus.PanicLevel,
 			)

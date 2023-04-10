@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"path/filepath"
 
@@ -19,7 +18,7 @@ func ReadSource(
 	logger logrus.FieldLogger, src, pwd string, filesystems map[string]afero.Fs, stdin io.Reader,
 ) (*SourceData, error) {
 	if src == "-" {
-		data, err := ioutil.ReadAll(stdin)
+		data, err := io.ReadAll(stdin)
 		if err != nil {
 			return nil, err
 		}

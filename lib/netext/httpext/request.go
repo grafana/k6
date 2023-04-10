@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net"
 	"net/http"
 	"net/http/cookiejar"
@@ -126,7 +125,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		respReq.Body = preq.Body.String()
 
 		if len(preq.Compressions) > 0 {
-			compressedBody, contentEncoding, err := compressBody(preq.Compressions, ioutil.NopCloser(preq.Body))
+			compressedBody, contentEncoding, err := compressBody(preq.Compressions, io.NopCloser(preq.Body))
 			if err != nil {
 				return nil, err
 			}
@@ -148,7 +147,7 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		preq.Req.GetBody = func() (io.ReadCloser, error) {
 			//  using `Bytes()` should reuse the same buffer and as such help with the memory usage. We
 			//  should not be writing to it any way so there shouldn't be way to corrupt it (?)
-			return ioutil.NopCloser(bytes.NewBuffer(preq.Body.Bytes())), nil
+			return io.NopCloser(bytes.NewBuffer(preq.Body.Bytes())), nil
 		}
 		// as per the documentation using GetBody still requires setting the Body.
 		preq.Req.Body, _ = preq.Req.GetBody()
