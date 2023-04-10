@@ -3,6 +3,7 @@ package js
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"net/url"
 	"os"
@@ -219,7 +220,7 @@ func TestConsoleLog(t *testing.T) {
 
 			logger := extractLogger(vu.(*ActiveVU).Console.logger)
 
-			logger.Out = ioutil.Discard
+			logger.Out = io.Discard
 			logger.Level = logrus.DebugLevel
 			hook := logtest.NewLocal(logger)
 
@@ -277,7 +278,7 @@ func TestConsoleLevels(t *testing.T) {
 
 					logger := extractLogger(vu.(*ActiveVU).Console.logger)
 
-					logger.Out = ioutil.Discard
+					logger.Out = io.Discard
 					logger.Level = logrus.DebugLevel
 					hook := logtest.NewLocal(logger)
 
@@ -406,7 +407,7 @@ func TestFileConsole(t *testing.T) {
 							f, err = os.Open(logFilename) //nolint:gosec
 							require.NoError(t, err)
 
-							fileContent, err := ioutil.ReadAll(f)
+							fileContent, err := io.ReadAll(f)
 							require.NoError(t, err)
 
 							expectedStr := entryStr

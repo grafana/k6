@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"sort"
 	"strconv"
@@ -329,7 +328,7 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 		return err
 	}
 	req.GetBody = func() (io.ReadCloser, error) {
-		return ioutil.NopCloser(bytes.NewBuffer(body)), nil
+		return io.NopCloser(bytes.NewBuffer(body)), nil
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -338,11 +337,11 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 
 	if res != nil {
 		if res.StatusCode >= 400 {
-			r, _ := ioutil.ReadAll(res.Body) // maybe limit it to something like the first 1000 characters?
+			r, _ := io.ReadAll(res.Body) // maybe limit it to something like the first 1000 characters?
 
 			return fmt.Errorf("got %d from loki: %s", res.StatusCode, string(r))
 		}
-		_, _ = io.Copy(ioutil.Discard, res.Body)
+		_, _ = io.Copy(io.Discard, res.Body)
 		_ = res.Body.Close()
 	}
 

@@ -58,7 +58,7 @@ func getFiles(t *testing.T, fileSystem afero.Fs) map[string]*bytes.Buffer {
 }
 
 func assertEqual(t *testing.T, exp string, actual io.Reader) {
-	act, err := ioutil.ReadAll(actual)
+	act, err := io.ReadAll(actual)
 	require.NoError(t, err)
 	assert.Equal(t, []byte(exp), act)
 }

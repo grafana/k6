@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 	"time"
 
@@ -68,7 +68,7 @@ func TestTextSummary(t *testing.T) {
 			require.Len(t, result, 1)
 			stdout := result["stdout"]
 			require.NotNil(t, stdout)
-			summaryOut, err := ioutil.ReadAll(stdout)
+			summaryOut, err := io.ReadAll(stdout)
 			require.NoError(t, err)
 			assert.Equal(t, "\n"+tc.expected+"\n", string(summaryOut))
 		})
@@ -123,7 +123,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	stdout := result["stdout"]
 	require.NotNil(t, stdout)
 
-	summaryOut, err := ioutil.ReadAll(stdout)
+	summaryOut, err := io.ReadAll(stdout)
 	require.NoError(t, err)
 
 	expected := "     my_parent........: 11 11/s\n" +
@@ -312,11 +312,11 @@ func TestOldJSONExport(t *testing.T) {
 
 	require.Len(t, result, 2)
 	require.NotNil(t, result["stdout"])
-	textSummary, err := ioutil.ReadAll(result["stdout"])
+	textSummary, err := io.ReadAll(result["stdout"])
 	require.NoError(t, err)
 	assert.Contains(t, string(textSummary), checksOut+countOut)
 	require.NotNil(t, result["result.json"])
-	jsonExport, err := ioutil.ReadAll(result["result.json"])
+	jsonExport, err := io.ReadAll(result["result.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedOldJSONExportResult, string(jsonExport))
 }
@@ -584,11 +584,11 @@ func TestRawHandleSummaryData(t *testing.T) {
 	require.Nil(t, result["stdout"])
 
 	require.NotNil(t, result["old-export.json"])
-	oldExport, err := ioutil.ReadAll(result["old-export.json"])
+	oldExport, err := io.ReadAll(result["old-export.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedOldJSONExportResult, string(oldExport))
 	require.NotNil(t, result["rawdata.json"])
-	newRawData, err := ioutil.ReadAll(result["rawdata.json"])
+	newRawData, err := io.ReadAll(result["rawdata.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedHandleSummaryRawData, string(newRawData))
 }
@@ -614,7 +614,7 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	summary := createTestSummary(t)
 	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
-	dataWithSetup, err := ioutil.ReadAll(result["dataWithSetup.json"])
+	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
 }
@@ -637,7 +637,7 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	summary := createTestSummary(t)
 	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
-	dataWithSetup, err := ioutil.ReadAll(result["dataWithSetup.json"])
+	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedHandleSummaryDataWithSetup, string(dataWithSetup))
 }
@@ -670,7 +670,7 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	t.Parallel()
 
 	logger := logrus.New()
-	logger.SetOutput(ioutil.Discard)
+	logger.SetOutput(io.Discard)
 	logHook := testutils.NewLogHook(logrus.ErrorLevel)
 	logger.AddHook(logHook)
 
@@ -690,7 +690,7 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 
 	require.Len(t, result, 1)
 	require.NotNil(t, result["stdout"])
-	textSummary, err := ioutil.ReadAll(result["stdout"])
+	textSummary, err := io.ReadAll(result["stdout"])
 	require.NoError(t, err)
 	assert.Contains(t, string(textSummary), checksOut+countOut)
 

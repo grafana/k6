@@ -6,7 +6,6 @@ import (
 	"compress/zlib"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"strings"
 
@@ -126,7 +125,7 @@ func readResponseBody(
 	}
 
 	if respType == ResponseTypeNone {
-		_, err := io.Copy(ioutil.Discard, resp.Body)
+		_, err := io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
 		if err != nil {
 			respErr = err
@@ -137,7 +136,7 @@ func readResponseBody(
 	rc := &readCloser{resp.Body}
 	// Ensure that the entire response body is read and closed, e.g. in case of decoding errors
 	defer func(respBody io.ReadCloser) {
-		_, _ = io.Copy(ioutil.Discard, respBody)
+		_, _ = io.Copy(io.Discard, respBody)
 		_ = respBody.Close()
 	}(resp.Body)
 

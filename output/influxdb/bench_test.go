@@ -2,7 +2,6 @@ package influxdb
 
 import (
 	"io"
-	"io/ioutil"
 	"net/http"
 	"testing"
 	"time"
@@ -23,7 +22,7 @@ func benchmarkInfluxdb(b *testing.B, t time.Duration) {
 	testOutputCycle(b, func(rw http.ResponseWriter, r *http.Request) {
 		for {
 			time.Sleep(t)
-			m, _ := io.CopyN(ioutil.Discard, r.Body, 1<<18) // read 1/4 mb a time
+			m, _ := io.CopyN(io.Discard, r.Body, 1<<18) // read 1/4 mb a time
 			if m == 0 {
 				break
 			}

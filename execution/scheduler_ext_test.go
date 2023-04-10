@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net"
 	"net/url"
 	"reflect"
@@ -1082,7 +1082,7 @@ func TestDNSResolver(t *testing.T) {
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
 				logger := logrus.New()
-				logger.SetOutput(ioutil.Discard)
+				logger.SetOutput(io.Discard)
 				logHook := testutils.NewLogHook(logrus.WarnLevel)
 				logger.AddHook(logHook)
 

@@ -3,7 +3,7 @@ package metrics
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -137,7 +137,7 @@ func TestMetrics(t *testing.T) {
 					})
 					mii.StateField = state
 					logger := logrus.New()
-					logger.Out = ioutil.Discard
+					logger.Out = io.Discard
 					test.hook = testutils.NewLogHook()
 					logger.AddHook(test.hook)
 					state.Logger = logger

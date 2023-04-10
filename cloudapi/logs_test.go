@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"net/url"
 	"strconv"
@@ -91,7 +91,7 @@ func TestMSGLog(t *testing.T) {
 	}
 
 	logger := logrus.New()
-	logger.Out = ioutil.Discard
+	logger.Out = io.Discard
 	hook := testutils.NewLogHook()
 	logger.AddHook(hook)
 	expectMsg.Log(logger)
@@ -249,7 +249,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 		})
 
 		logger := logrus.New()
-		logger.Out = ioutil.Discard
+		logger.Out = io.Discard
 		hook := testutils.NewLogHook()
 		logger.AddHook(hook)
 
@@ -321,7 +321,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 		})
 
 		logger := logrus.New()
-		logger.Out = ioutil.Discard
+		logger.Out = io.Discard
 		hook := testutils.NewLogHook()
 		logger.AddHook(hook)
 
@@ -389,7 +389,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 		})
 
 		logger := logrus.New()
-		logger.Out = ioutil.Discard
+		logger.Out = io.Discard
 		hook := testutils.NewLogHook()
 		logger.AddHook(hook)
 

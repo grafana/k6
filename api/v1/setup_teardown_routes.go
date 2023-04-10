@@ -2,7 +2,7 @@ package v1
 
 import (
 	"encoding/json"
-	"io/ioutil"
+	"io"
 	"net/http"
 )
 
@@ -42,7 +42,7 @@ func handleGetSetupData(cs *ControlSurface, rw http.ResponseWriter, _ *http.Requ
 
 // handleSetSetupData just parses the JSON request body and sets the result as setup data for the runner
 func handleSetSetupData(cs *ControlSurface, rw http.ResponseWriter, r *http.Request) {
-	body, err := ioutil.ReadAll(r.Body)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
 		apiError(rw, "Error reading request body", err.Error(), http.StatusBadRequest)
 		return

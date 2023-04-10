@@ -3,7 +3,7 @@ package executor
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"math/rand"
 	"sync"
 	"testing"
@@ -86,7 +86,7 @@ func TestExecutionStateGettingVUsWhenNonAreAvailable(t *testing.T) {
 	logHook := testutils.NewLogHook(logrus.WarnLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
-	testLog.SetOutput(ioutil.Discard)
+	testLog.SetOutput(io.Discard)
 	vu, err := es.GetPlannedVU(logrus.NewEntry(testLog), true)
 	require.Nil(t, vu)
 	require.Error(t, err)
@@ -103,7 +103,7 @@ func TestExecutionStateGettingVUs(t *testing.T) {
 	logHook := testutils.NewLogHook(logrus.WarnLevel, logrus.DebugLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
-	testLog.SetOutput(ioutil.Discard)
+	testLog.SetOutput(io.Discard)
 	logEntry := logrus.NewEntry(testLog)
 
 	et, err := lib.NewExecutionTuple(nil, nil)
