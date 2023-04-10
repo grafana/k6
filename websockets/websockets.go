@@ -400,7 +400,6 @@ func (w *webSocket) loop() {
 					if err != nil {
 						w.tq.Queue(func() error {
 							_ = w.conn.Close() // TODO fix
-							// fmt.Println("write channel", err)
 							closeErr := w.connectionClosedWithError(err)
 							return closeErr
 						})
@@ -621,7 +620,6 @@ func (w *webSocket) close(code int, reason string) {
 	if code == 0 {
 		code = websocket.CloseNormalClosure
 	}
-	// fmt.Println("in Close")
 	w.writeQueueCh <- message{
 		mtype: websocket.CloseMessage,
 		data:  websocket.FormatCloseMessage(code, reason),
@@ -631,7 +629,6 @@ func (w *webSocket) close(code int, reason string) {
 
 func (w *webSocket) queueClose() {
 	w.tq.Queue(func() error {
-		// fmt.Println("in close")
 		w.close(websocket.CloseNormalClosure, "")
 		return nil
 	})
@@ -652,9 +649,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 	if w.readyState == CLOSED {
 		return nil
 	}
-	// fmt.Println(w.url, "closing")
 	w.readyState = CLOSED
-	// fmt.Println("closing w.done")
 	close(w.done)
 
 	if err != nil {
