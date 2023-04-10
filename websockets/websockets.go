@@ -114,10 +114,7 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		eventListeners: newEventListeners(),
 		obj:            rt.NewObject(),
 		tagsAndMeta:    params.tagsAndMeta,
-		sendPings: ping{
-			timestamps: make(map[string]time.Time),
-			counter:    0,
-		},
+		sendPings:      ping{timestamps: make(map[string]time.Time)},
 	}
 
 	// Maybe have this after the goroutine below ?!?
@@ -321,34 +318,27 @@ func (w *webSocket) loop() {
 	w.conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
 	w.conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
-	// readCloseChan := make(chan int)
-	// readErrChan := make(chan error)
 	ctx := w.vu.Context()
 	wg := new(sync.WaitGroup)
 
 	defer func() {
-		now := time.Now()
-		duration := metrics.D(time.Since(w.started))
-
 		metrics.PushIfNotDone(ctx, w.vu.State().Samples, metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: w.builtinMetrics.WSSessionDuration,
 				Tags:   w.tagsAndMeta.Tags,
 			},
-			Time:     now,
+			Time:     time.Now(),
 			Metadata: w.tagsAndMeta.Metadata,
-			Value:    duration,
+			Value:    metrics.D(time.Since(w.started)),
 		})
 		_ = w.conn.Close()
 		wg.Wait()
 		w.tq.Close()
 	}()
-	wg.Add(1)
-	// Wraps a couple of channels around conn.ReadMessage
+	wg.Add(2)
 	go w.readPump(wg)
-
-	wg.Add(1)
 	go w.writePump(wg)
+
 	ctxDone := ctx.Done()
 	for {
 		select {
