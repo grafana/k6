@@ -103,19 +103,10 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		common.Throw(rt, err)
 	}
 
-	// TODO implement protocols
-	registerCallback := func() func(func() error) {
-		callback := r.vu.RegisterCallback()
-		return func(f func() error) {
-			callback(f)
-			// fmt.Println("callback ended")
-		}
-	}
-
 	w := &webSocket{
 		vu:             r.vu,
 		url:            url,
-		tq:             taskqueue.New(registerCallback),
+		tq:             taskqueue.New(r.vu.RegisterCallback),
 		readyState:     CONNECTING,
 		builtinMetrics: r.vu.State().BuiltinMetrics,
 		done:           make(chan struct{}),
