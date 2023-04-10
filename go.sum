@@ -169,6 +169,8 @@ github.com/google/pprof v0.0.0-20200708004538-1a94d8640e99/go.mod h1:ZgVRPoUq/hf
 github.com/google/pprof v0.0.0-20230207041349-798e818bf904 h1:4/hN5RUoecvl+RmJRE2YxKWtnnQls6rQjjW5oV7qg2U=
 github.com/google/pprof v0.0.0-20230207041349-798e818bf904/go.mod h1:uglQLonpP8qtYCYyzA+8c/9qtqgA3qsXGYqCPKARAFg=
 github.com/google/renameio v0.1.0/go.mod h1:KWCgfxg9yswjAJkECMjeO8J8rahYeXnNhOm40UhjYkI=
+github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
+github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+vpHVxEJEs9eg=
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
@@ -181,6 +183,8 @@ github.com/grafana/xk6-redis v0.1.1 h1:rvWnLanRB2qzDwuY6NMBe6PXei3wJ3kjYvfCwRJ+q
 github.com/grafana/xk6-redis v0.1.1/go.mod h1:z7el1Tz8advY+ex419KfLbENzSQYgaA2lQYwMlt9yMM=
 github.com/grafana/xk6-timers v0.1.2 h1:YVM6hPDgvy4SkdZQpd+/r9M0kDi1g+QdbSxW5ClfwDk=
 github.com/grafana/xk6-timers v0.1.2/go.mod h1:XHmDIXAKe30NJMXrxKIKMFXx98etsCl0jBYktjsSURc=
+github.com/grafana/xk6-webcrypto v0.1.0 h1:StrQZkUi4vo3bAMmBUHvIQ8P+zNKCH3AwN22TZdDwHs=
+github.com/grafana/xk6-webcrypto v0.1.0/go.mod h1:JKxlKj03+zI6Bf/PUuXxrx4lJraBZx9UOrX4mtqB5+E=
 github.com/grafana/xk6-websockets v0.2.0 h1:oZcq4lm/p/Tc94ZMMNeYDML0DjU39jasC6kTyc6iF+8=
 github.com/grafana/xk6-websockets v0.2.0/go.mod h1:4SaWAP+ZVHoWn8oOcq6m38lDLjEWikAWDZhJi5XZ1ms=
 github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=
@@ -247,7 +251,7 @@ github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d h1:VhgPp6v9qf9Agr/
 github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d/go.mod h1:YUTz3bUH2ZwIWBy3CJBeOBEugqcmXREj14T+iG/4k4U=
 github.com/nxadm/tail v1.4.8 h1:nPr65rt6Y5JFSKQO7qToXr7pePgD6Gwiw05lkbyAQTE=
 github.com/onsi/ginkgo v1.16.5 h1:8xi0RTUf59SOSfEtZMvwTvXYMzG4gV23XVHOZiXNtnE=
-github.com/onsi/gomega v1.18.1 h1:M1GfJqGRrBrrGGsbxzV5dqM2U2ApXefZCQpkukxYRLE=
+github.com/onsi/gomega v1.20.2 h1:8uQq0zMgLEfa0vRrrBgaJF2gyW9Da9BmfGV+OyUzfkY=
 github.com/pkg/errors v0.8.0/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.8.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=
 github.com/pkg/errors v0.9.1/go.mod h1:bwawxfHBFNV+L2hUp1rHADufV3IMtnDRdf1r5NINEl0=

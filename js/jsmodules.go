@@ -18,6 +18,7 @@ import (
 
 	"github.com/grafana/xk6-redis/redis"
 	"github.com/grafana/xk6-timers/timers"
+	"github.com/grafana/xk6-webcrypto/webcrypto"
 	expws "github.com/grafana/xk6-websockets/websockets"
 )
 
@@ -30,6 +31,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/encoding":                encoding.New(),
 		"k6/execution":               execution.New(),
 		"k6/experimental/redis":      redis.New(),
+		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
 		"k6/experimental/timers":     timers.New(),
 		"k6/experimental/tracing":    tracing.New(),
