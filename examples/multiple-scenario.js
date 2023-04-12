@@ -17,7 +17,6 @@ export const options = {
     },
   },
   thresholds: {
-    browser_dom_content_loaded: ['p(90) < 1000'],
     webvital_first_contentful_paint: ['max < 1000'],
     checks: ["rate==1.0"]
   }
