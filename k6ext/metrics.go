@@ -17,8 +17,6 @@ const (
 
 // CustomMetrics are the custom k6 metrics used by xk6-browser.
 type CustomMetrics struct {
-	BrowserFirstPaint *k6metrics.Metric
-
 	WebVitals map[string]*k6metrics.Metric
 }
 
@@ -54,8 +52,6 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 	}
 
 	return &CustomMetrics{
-		BrowserFirstPaint: registry.MustNewMetric(
-			"browser_first_paint", k6metrics.Trend, k6metrics.Time),
 		WebVitals: webVitals,
 	}
 }

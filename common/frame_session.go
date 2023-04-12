@@ -804,9 +804,7 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventNetworkIdle)
 	}
 
-	eventToMetric := map[string]*k6metrics.Metric{
-		"firstPaint": fs.k6Metrics.BrowserFirstPaint,
-	}
+	eventToMetric := map[string]*k6metrics.Metric{}
 
 	if m, ok := eventToMetric[event.Name]; ok {
 		frame.emitMetric(m, event.Timestamp.Time())
