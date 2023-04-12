@@ -793,9 +793,6 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 	}
 
 	switch event.Name {
-	case "init", "commit":
-		frame.initTime = event.Timestamp.Time()
-		return
 	case "load":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventLoad)
 	case "DOMContentLoaded":

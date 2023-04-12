@@ -49,7 +49,6 @@ type Frame struct {
 	url          string
 	detached     bool
 	vu           k6modules.VU
-	initTime     time.Time
 
 	// A life cycle event is only considered triggered for a frame if the entire
 	// frame subtree has also had the life cycle event triggered.
