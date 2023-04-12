@@ -12,7 +12,6 @@ import (
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
-	k6metrics "go.k6.io/k6/metrics"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
@@ -233,36 +232,6 @@ func (f *Frame) cachedDocumentHandle() (*ElementHandle, bool) {
 	defer f.executionContextMu.RUnlock()
 
 	return f.documentHandle, f.documentHandle != nil
-}
-
-func (f *Frame) emitMetric(m *k6metrics.Metric, t time.Time) {
-	value := k6metrics.D(t.Sub(f.initTime))
-	f.log.Debugf("Frame:emitMetric", "fid:%s furl:%q m:%s init:%q t:%q v:%f",
-		f.ID(), f.URL(), m.Name, f.initTime, t, value)
-
-	if f.initTime.IsZero() {
-		// Internal race condition: we haven't processed the init/commit event
-		// yet, so the value will be wrong and emitting the metric would skew
-		// the results (i.e. the value would be in the order of years). Choose
-		// the lesser of 2 wrongs for now and ignore it instead.
-		// See https://github.com/grafana/xk6-browser/discussions/142#discussioncomment-2416943
-		return
-	}
-
-	state := f.vu.State()
-	tags := state.Tags.GetCurrentValues().Tags
-	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = tags.With("url", f.URL())
-	}
-	k6metrics.PushIfNotDone(f.ctx, state.Samples, k6metrics.ConnectedSamples{
-		Samples: []k6metrics.Sample{
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: m, Tags: tags},
-				Value:      value,
-				Time:       time.Now(),
-			},
-		},
-	})
 }
 
 func (f *Frame) newDocumentHandle() (*ElementHandle, error) {

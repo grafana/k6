@@ -803,12 +803,6 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 	case "networkIdle":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventNetworkIdle)
 	}
-
-	eventToMetric := map[string]*k6metrics.Metric{}
-
-	if m, ok := eventToMetric[event.Name]; ok {
-		frame.emitMetric(m, event.Timestamp.Time())
-	}
 }
 
 func (fs *FrameSession) onPageNavigatedWithinDocument(event *cdppage.EventNavigatedWithinDocument) {
