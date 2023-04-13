@@ -22,6 +22,28 @@ const traceparentHeaderName string = "Traceparent"
 // testTraceID is a valid trace ID used in tests.
 const testTraceID string = "00-4bf92f3577b34da6a3ce929d0e0e4736-00f067aa0ba902b7-00"
 
+// testMetadataTraceIDRandomness is the randomness part of the test trace ID encoded
+// as hexadecimal.
+//
+// It is used to test the randomness of the trace ID. As we use a fixed time
+// as the test setup's randomness source, we can can assert that the randomness
+// part of the trace ID is the same.
+//
+// Although the randomness part doesn't have a fixed size. We can assume that
+// it will be 4 bytes, as the Go time.Time is encoded as nanoseconds, and
+// the trace ID is encoded as 8 bytes.
+const testMetadataTraceIDRandomness string = "0194fdc2"
+
+// testTracePrefix is the prefix of the test trace ID encoded as hexadecimal.
+// It is equivalent to the first 2 bytes of the trace ID, which is always
+// set to `k6Prefix` in the context of tests.
+const testTracePrefix string = "dc07"
+
+// testTraceCode is the code of the test trace ID encoded as hexadecimal.
+// It is equivalent to the third byte of the trace ID, which is always set to `k6CloudCode`
+// in the context of tests.
+const testTraceCode string = "18"
+
 func TestClientInstrumentArguments(t *testing.T) {
 	t.Parallel()
 
@@ -161,6 +183,10 @@ func TestClientInstrumentedCall(t *testing.T) {
 		gotMetadataTraceID, gotTraceIDKey := testCase.client.vu.State().Tags.GetCurrentValues().Metadata["trace_id"]
 		assert.True(t, gotTraceIDKey)
 		assert.NotEmpty(t, gotMetadataTraceID)
+		assert.Equal(t, testTracePrefix, gotMetadataTraceID[:len(testTracePrefix)])
+		assert.Equal(t, testTraceCode, gotMetadataTraceID[len(testTracePrefix):len(testTracePrefix)+len(testTraceCode)])
+		assert.Equal(t, testMetadataTraceIDRandomness, gotMetadataTraceID[len(gotMetadataTraceID)-len(testMetadataTraceIDRandomness):])
+
 		return nil
 	}
 
@@ -217,7 +243,9 @@ func TestCallingInstrumentedRequestEmitsTraceIdMetadata(t *testing.T) {
 		require.Equal(t, expected, hasTraceID)
 
 		if expectedTraceID != "" {
-			require.Equal(t, expectedTraceID, gotTraceID)
+			assert.Equal(t, testTracePrefix, gotTraceID[:len(testTracePrefix)])
+			assert.Equal(t, testTraceCode, gotTraceID[len(testTracePrefix):len(testTracePrefix)+len(testTraceCode)])
+			assert.Equal(t, testMetadataTraceIDRandomness, gotTraceID[len(gotTraceID)-len(testMetadataTraceIDRandomness):])
 		}
 	})
 	require.NoError(t, err)
