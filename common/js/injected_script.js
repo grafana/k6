@@ -893,7 +893,7 @@ class InjectedScript {
         case "visible":
           return visible ? element : continuePolling;
         case "hidden":
-          return !visible ? undefined : continuePolling;
+          return !visible ? element : continuePolling;
       }
     };
 
