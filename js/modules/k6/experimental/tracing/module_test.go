@@ -64,10 +64,9 @@ func newTestSetup(t *testing.T) testSetup {
 	rt := ts.VU.Runtime()
 	require.NoError(t, rt.Set("instrumentHTTP", m.Exports().Named["instrumentHTTP"]))
 
+	export := http.New().NewModuleInstance(ts.VU).Exports().Default
 	require.NoError(t, rt.Set("require", func(module string) *goja.Object {
 		require.Equal(t, "k6/http", module)
-		export := http.New().NewModuleInstance(ts.VU).Exports().Default
-
 		return rt.ToValue(export).ToObject(rt)
 	}))
 

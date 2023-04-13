@@ -1,10 +1,10 @@
 package tracing
 
 import (
-	"crypto/rand"
 	"encoding/binary"
 	"encoding/hex"
 	"fmt"
+	"io"
 	"time"
 )
 
@@ -45,6 +45,11 @@ type TraceID struct {
 	// When encoded, it should be in a format occupying the last 8 bytes of
 	// the trace-id, and should ideally be encoded as nanoseconds.
 	Time time.Time
+
+	// randSource holds the randomness source to use when encoding the
+	// trace-id. The `rand.Reader` should be your default pick. But
+	// you can replace it with a different source for testing purposes.
+	randSource io.Reader
 }
 
 // Encode encodes the TraceID into a hex string.
@@ -76,7 +81,7 @@ func (t TraceID) Encode() (string, error) {
 	// of available bytes left after writing the prefix, code and timestamp (index n)
 	// is filled with random bytes.
 	randomness := make([]byte, 16-n)
-	err := binary.Read(rand.Reader, binary.BigEndian, randomness)
+	err := binary.Read(t.randSource, binary.BigEndian, randomness)
 	if err != nil {
 		return "", fmt.Errorf("failed to read random bytes from os; reason: %w", err)
 	}
