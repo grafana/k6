@@ -393,6 +393,8 @@ export default async function () {
 
 Trying to solve all `new-http` issues with a single large and glorious change wouldn't be reasonable, so improvements will undoubtedly need to be done gradually, in several phases, and over several k6 development cycles.
 
+Note that the implementation process described below is not finalized, and will go through several changes during development.
+
 With this in mind, we propose the following phases:
 
 #### Phase 1: create initial k6 extension
