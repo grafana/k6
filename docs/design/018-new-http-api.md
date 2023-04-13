@@ -313,7 +313,6 @@ The new HTTP API will emit events which scripts can subscribe to, in order to im
 For example, a `requestToBeSent` event is emitted when the request was processed by k6, and just before it is sent to the server. This allows changing the request body or headers, or introducing artificial delays.
 
 ```javascript
-import { sleep } from 'k6';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
@@ -323,7 +322,6 @@ export default async function () {
     const request = event.data;
     request.headers['Cookie'] = 'somecookie=somevalue;'  // overwrites all previously set cookies
     request.body += ' world!';  // the final body will be 'Hello world!'
-    sleep(Math.random() * 5);   // random delay up to 5s
   });
 
   await client.post('https://httpbin.test.k6.io/post', { body: 'Hello' });
