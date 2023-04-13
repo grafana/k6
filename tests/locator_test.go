@@ -17,6 +17,12 @@ import (
 // Note:
 // We skip adding t.Parallel to subtests because goja or our code might race.
 
+type jsFrameWaitForSelectorOpts struct {
+	jsFrameBaseOpts
+
+	State string
+}
+
 func TestLocator(t *testing.T) {
 	t.Parallel()
 
@@ -176,6 +182,33 @@ func TestLocator(t *testing.T) {
 			"WaitFor state:visible", func(tb *testBrowser, p api.Page) {
 				opts := tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
 				require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(opts) })
+			},
+		},
+		{
+			"WaitFor state:attached", func(tb *testBrowser, p api.Page) {
+				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
+					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
+					State:           "attached",
+				})
+				require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(opts) })
+			},
+		},
+		{
+			"WaitFor state:hidden", func(tb *testBrowser, p api.Page) {
+				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
+					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
+					State:           "hidden",
+				})
+				require.NotPanics(t, func() { p.Locator("#inputHiddenText", nil).WaitFor(opts) })
+			},
+		},
+		{
+			"WaitFor state:detached", func(tb *testBrowser, p api.Page) {
+				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
+					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
+					State:           "detached",
+				})
+				require.NotPanics(t, func() { p.Locator("#nonExistingElement", nil).WaitFor(opts) })
 			},
 		},
 	}
