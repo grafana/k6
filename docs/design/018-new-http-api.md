@@ -402,22 +402,16 @@ With this in mind, we propose the following phases:
 **Goals**:
 
 - Implement a barebones async API that serves as a proof-of-concept for what the final developer experience will look and feel like.
-  The code should be in a state that allows it to be easily extended.
 
-  By barebones, we mean:
+  By barebones, we mean that there must be a `Client` interface with only one method: `request()`, which will work similarly to the current `http.asyncRequest()`. Only `GET` and `POST` methods must be supported.
 
-  - The `Client` interface with only one method: `request()`, which will work similarly to the current `http.asyncRequest()`.
+  The code must be in a state that allows it to be easily extended. Take into account the other design goals of this document, even if they're not ready to be implemented.
 
-    For the initial PoC, it's fine if only `GET` and `POST` methods are supported.
+- This initial API must solve at least one minor, but concrete, issue of the current API. It should fix something that's currently not possible and doesn't have a good workaround.
 
-    It's not required to make `Dialer` and `Transport` fully configurable at this point, but they should use sane defaults, and it should be clear how the configuration will be done.
+  Addressing [#761](https://github.com/grafana/k6/issues/761) would be a good first step.
 
-- This initial API should solve a minor, but concrete, issue of current API. It should fix something that's currently not possible and doesn't have a good workaround.
-
-  Good candidates: [#936](https://github.com/grafana/k6/issues/936), [#970](https://github.com/grafana/k6/issues/970).
-
-- Features like configuring options globally, or per VU or request, should be implemented.
-  Deprecating the `httpx` library should be possible after this phase.
+  As an optional stretch goal, once we settle on the API to configure the transport layer, [#936](https://github.com/grafana/k6/issues/936) and [#970](https://github.com/grafana/k6/issues/970) are good issues to tackle next.
 
 
 **Non-goals**:
