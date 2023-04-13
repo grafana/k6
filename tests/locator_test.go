@@ -173,9 +173,9 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"WaitFor", func(tb *testBrowser, p api.Page) {
-				timeout := tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
-				require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(timeout) })
+			"WaitFor state:visible", func(tb *testBrowser, p api.Page) {
+				opts := tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
+				require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(opts) })
 			},
 		},
 	}
