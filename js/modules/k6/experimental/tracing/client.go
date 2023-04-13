@@ -228,25 +228,18 @@ func (c *Client) instrumentedCall(call func(args ...goja.Value) error, args ...g
 }
 
 func (c *Client) generateTraceContext() (http.Header, string, error) {
-	traceID := TraceID{
-		Prefix:     k6Prefix,
-		Code:       k6CloudCode,
-		Time:       time.Now(),
-		randSource: c.randSource,
-	}
-
-	encodedTraceID, err := traceID.Encode()
+	traceID, err := newTraceID(k6Prefix, k6CloudCode, time.Now(), c.randSource)
 	if err != nil {
-		return http.Header{}, "", fmt.Errorf("failed to encode the generated trace ID; reason: %w", err)
+		return http.Header{}, "", fmt.Errorf("failed to generate trace ID; reason: %w", err)
 	}
 
 	// Produce a trace header in the format defined by the configured propagator.
-	traceContextHeader, err := c.propagator.Propagate(encodedTraceID)
+	traceContextHeader, err := c.propagator.Propagate(traceID)
 	if err != nil {
 		return http.Header{}, "", fmt.Errorf("failed to propagate trace ID; reason: %w", err)
 	}
 
-	return traceContextHeader, encodedTraceID, nil
+	return traceContextHeader, traceID, nil
 }
 
 // instrumentArguments: expects args to be in the format expected by the
