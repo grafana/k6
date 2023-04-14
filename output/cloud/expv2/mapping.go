@@ -87,6 +87,8 @@ func addBucketToTimeSeriesProto(
 			TotalCount:   uint32(r.Total),
 		})
 	case metrics.Trend:
+		h := sink.(*histogram) //nolint: forcetypeassert
+		h.trimzeros()
 		samples := timeSeries.GetTrendHdrSamples()
 		samples.Values = append(samples.Values, &pbcloud.TrendHdrValue{
 			Time: timestamppb.New(time),
