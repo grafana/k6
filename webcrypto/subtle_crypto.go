@@ -433,28 +433,11 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 	}
 
 	// 2.
-	// Cast the data to a Goja Object, and, as we're now sure it's
-	// either an ArrayBuffer, or a view on an ArrayBuffer, we can
-	// get the underlying ArrayBuffer by exporting its buffer property
-	// to a Goja ArrayBuffer, and then getting its underlying Go slice
-	// by calling the `Bytes()` method.
-	//
-	// Doing so conviniently also copies the underlying buffer, which
-	// is required by the specification.
-	// See https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-digest
-	asObject := data.ToObject(rt)
-	arrayBuffer, ok := asObject.Get("buffer").Export().(goja.ArrayBuffer)
-	if !ok {
-		reject(errors.New("could not get ArrayBuffer from data"))
+	bytes, err := exportArrayBuffer(rt, data)
+	if err != nil {
+		reject(err)
 		return promise
 	}
-
-	bytes := arrayBuffer.Bytes()
-
-	// The specification explicitly requires us to copy the underlying
-	// bytes held by the array buffer
-	bytesCopy := make([]byte, len(bytes))
-	copy(bytesCopy, bytes)
 
 	// 3.
 	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
