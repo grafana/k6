@@ -111,7 +111,7 @@ export default async function () {
   await socket.write(new TextEncoder().encode('GET / HTTP/1.1\r\n\r\n'));
 
   // And reading...
-  socket.on('data', (data) => {
+  socket.on('data', data => {
     console.log(`received ${data}`);
     socket.close();
   });
@@ -125,9 +125,9 @@ export default async function () {
 import { UDP } from 'k6/x/net';
 
 export default async function () {
-  const socket = new UDP.open('192.168.1.1:9090');
-
+  const socket = await UDP.open('192.168.1.1:9090');
   await socket.write(new TextEncoder().encode('GET / HTTP/1.1\r\n\r\n'));
+  socket.close();
 }
 ```
 
@@ -137,15 +137,17 @@ import { IPC } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const socket = await IPC.open('/tmp/unix.sock');
-
-  console.log(socket.file.path); // /tmp/unix.sock
-
   // The HTTP client supports communicating over a Unix socket.
   const client = new Client({
-    socket: socket,
+    dial: async () => {
+      return await IPC.open('/tmp/unix.sock');
+    },
   });
   await client.get('http://unix/get');
+
+  console.log(client.socket.file.path); // /tmp/unix.sock
+
+  client.socket.close();
 }
 ```
 
@@ -167,17 +169,17 @@ export default async function () {
 }
 ```
 
-- Passing a socket with custom transport settings, some HTTP options, and making a POST request:
+- Creating a client with custom transport settings, some HTTP options, and making a POST request:
 ```javascript
 import { TCP } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const socket = await TCP.open('10.0.0.10:80', { keepAlive: true });
   const client = new Client({
-    socket: socket,
+    dial: async address => {
+      return await TCP.open(address, { keepAlive: true });
+    },
     proxy: 'https://myproxy',
-    version: 1.1,                     // force a specific HTTP version
     headers: { 'User-Agent': 'k6' },  // set some global headers
   });
   await client.post('http://10.0.0.10/post', {
@@ -186,20 +188,42 @@ export default async function () {
 }
 ```
 
-- A tentative HTTP/3 example:
+- Configuring TLS with a custom CA certificate and forcing HTTP/2:
 ```javascript
-import { UDP } from 'k6/x/net';
+import { TCP } from 'k6/x/net';
+import { Client } from 'k6/x/net/http';
+import { open } from 'k6/x/file';
+
+const caCert = await open('./custom_cacert.pem');
+
+export default async function () {
+  const client = new Client({
+    dial: async address => {
+      return await TCP.open(address, {
+        tls: {
+          alpn: ['h2'],
+          caCerts: [caCert],
+        }
+      });
+    },
+  });
+  await client.get('https://10.0.0.10/');
+}
+```
+
+- Forcing unencrypted HTTP/2 (h2c):
+```javascript
+import { TCP } from 'k6/x/net';
 import { Client } from 'k6/x/net/http';
 
 export default async function () {
-  const socket = new UDP.open('192.168.1.1:9090');
-
   const client = new Client({
-    socket: socket,
-    version: 3,      // A UDP socket would imply HTTP/3, but this makes it explicit.
+    dial: async address => {
+      return await TCP.open(address, { tls: false });
+    },
+    version: [2],
   });
-  await client.get('https://httpbin.test.k6.io/get');
-}
+  await client.get('http://10.0.0.10/');
 ```
 
 
