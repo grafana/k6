@@ -26,7 +26,6 @@ func TestNewMetric(t *testing.T) {
 			r := NewRegistry()
 			m := r.newMetric("my_metric", data.Type)
 			assert.Equal(t, "my_metric", m.Name)
-			assert.IsType(t, data.SinkType, m.Sink)
 		})
 	}
 }

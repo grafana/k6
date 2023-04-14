@@ -21,6 +21,28 @@ import (
 
 const thresholdsRate = 2 * time.Second
 
+type trackedMetric struct {
+	*metrics.Metric
+
+	sink     metrics.Sink
+	observed bool
+	tainted  bool
+	m        sync.Mutex
+}
+
+func (om *trackedMetric) AddSamples(samples ...metrics.Sample) {
+	om.m.Lock()
+	defer om.m.Unlock()
+
+	for _, s := range samples {
+		om.sink.Add(s)
+	}
+
+	if !om.observed {
+		om.observed = true
+	}
+}
+
 // MetricsEngine is the internal metrics engine that k6 uses to keep track of
 // aggregated metric sample values. They are used to generate the end-of-test
 // summary and to evaluate the test thresholds.
@@ -29,33 +51,44 @@ type MetricsEngine struct {
 	test           *lib.TestRunState
 	outputIngester *outputIngester
 
-	// These can be both top-level metrics or sub-metrics
-	metricsWithThresholds []*metrics.Metric
+	// they can be both top-level metrics or sub-metrics
+	//
+	// TODO: remove the tracked map using the sequence number
+	metricsWithThresholds map[uint64]metrics.Thresholds
+	trackedMetrics        []*trackedMetric
 
 	breachedThresholdsCount uint32
-
-	// TODO: completely refactor:
-	//   - make these private, add a method to export the raw data
-	//   - do not use an unnecessary map for the observed metrics
-	//   - have one lock per metric instead of a a global one, when
-	//     the metrics are decoupled from their types
-	MetricsLock     sync.Mutex
-	ObservedMetrics map[string]*metrics.Metric
 }
 
 // NewMetricsEngine creates a new metrics Engine with the given parameters.
 func NewMetricsEngine(runState *lib.TestRunState) (*MetricsEngine, error) {
 	me := &MetricsEngine{
-		test:            runState,
-		logger:          runState.Logger.WithField("component", "metrics-engine"),
-		ObservedMetrics: make(map[string]*metrics.Metric),
+		test:                  runState,
+		logger:                runState.Logger.WithField("component", "metrics-engine"),
+		metricsWithThresholds: make(map[uint64]metrics.Thresholds),
 	}
 
-	if !(me.test.RuntimeOptions.NoSummary.Bool && me.test.RuntimeOptions.NoThresholds.Bool) {
-		err := me.initSubMetricsAndThresholds()
-		if err != nil {
-			return nil, err
-		}
+	if me.test.RuntimeOptions.NoSummary.Bool &&
+		me.test.RuntimeOptions.NoThresholds.Bool {
+		return me, nil
+	}
+
+	// It adds all the registered metrics as tracked
+	// the custom metrics are also added because they have
+	// been seen and registered during the initEnv run
+	// that must run before this constructor is called.
+	registered := me.test.Registry.All()
+	me.trackedMetrics = make([]*trackedMetric, len(registered)+1)
+	for _, mreg := range registered {
+		me.trackMetric(mreg)
+	}
+
+	// It adds register and tracks all the metrics defined by the thresholds.
+	// They are also marked as observed because
+	// the summary wants them also if they didn't receive any sample.
+	err := me.initSubMetricsAndThresholds()
+	if err != nil {
+		return nil, err
 	}
 
 	return me, nil
@@ -94,11 +127,6 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 		return nil, err
 	}
 
-	if sm.Metric.Observed {
-		// Do not repeat warnings for the same sub-metrics
-		return sm.Metric, nil
-	}
-
 	if _, ok := sm.Tags.Get("vu"); ok {
 		me.logger.Warnf(
 			"The high-cardinality 'vu' metric tag was made non-indexable in k6 v0.41.0, so thresholds"+
@@ -118,13 +146,6 @@ func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Me
 	return sm.Metric, nil
 }
 
-func (me *MetricsEngine) markObserved(metric *metrics.Metric) {
-	if !metric.Observed {
-		metric.Observed = true
-		me.ObservedMetrics[metric.Name] = metric
-	}
-}
-
 func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 	for metricName, thresholds := range me.test.Options.Thresholds {
 		metric, err := me.getThresholdMetricOrSubmetric(metricName)
@@ -140,28 +161,58 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 			return fmt.Errorf("invalid metric '%s' in threshold definitions: %w", metricName, err)
 		}
 
-		metric.Thresholds = thresholds
-		me.metricsWithThresholds = append(me.metricsWithThresholds, metric)
+		if len(thresholds.Thresholds) > 0 {
+			me.metricsWithThresholds[metric.ID] = thresholds
+		}
 
 		// Mark the metric (and the parent metric, if we're dealing with a
 		// submetric) as observed, so they are shown in the end-of-test summary,
-		// even if they don't have any metric samples during the test run
-		me.markObserved(metric)
+		// even if they don't have any metric samples during the test run.
+		me.trackMetric(metric)
+		me.trackedMetrics[metric.ID].observed = true
+
 		if metric.Sub != nil {
-			me.markObserved(metric.Sub.Parent)
+			me.trackMetric(metric.Sub.Parent)
+			me.trackedMetrics[metric.Sub.Parent.ID].observed = true
 		}
 	}
 
 	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
 	// lands and there is a better way to enable a metric with tag
 	if me.test.Options.SystemTags.Has(metrics.TagExpectedResponse) {
-		_, err := me.getThresholdMetricOrSubmetric("http_req_duration{expected_response:true}")
+		expResMetric, err := me.getThresholdMetricOrSubmetric("http_req_duration{expected_response:true}")
 		if err != nil {
 			return err // shouldn't happen, but ¯\_(ツ)_/¯
 		}
+		me.trackMetric(expResMetric)
 	}
 
+	// TODO: the trackedMetrics slice is fixed now
+	// to be optimal we could shrink the slice cap
+
 	return nil
+}
+
+func (me *MetricsEngine) trackMetric(m *metrics.Metric) {
+	tm := &trackedMetric{
+		Metric: m,
+		sink:   metrics.NewSinkByType(m.Type),
+	}
+
+	if me.trackedMetrics == nil {
+		// the Metric ID starts from one
+		// so it skips the zero-th position
+		// to simplify the access operations.
+		me.trackedMetrics = []*trackedMetric{nil}
+	}
+
+	if m.ID >= uint64(len(me.trackedMetrics)) {
+		// expand the slice
+		me.trackedMetrics = append(me.trackedMetrics, tm)
+		return
+	}
+
+	me.trackedMetrics[m.ID] = tm
 }
 
 // StartThresholdCalculations spins up a new goroutine to crunch thresholds and
@@ -227,40 +278,120 @@ func (me *MetricsEngine) evaluateThresholds(
 	ignoreEmptySinks bool,
 	getCurrentTestRunDuration func() time.Duration,
 ) (breachedThresholds []string, shouldAbort bool) {
-	me.MetricsLock.Lock()
-	defer me.MetricsLock.Unlock()
-
 	t := getCurrentTestRunDuration()
 
-	me.logger.Debugf("Running thresholds on %d metrics...", len(me.metricsWithThresholds))
-	for _, m := range me.metricsWithThresholds {
+	computeThresholds := func(tm *trackedMetric, ths metrics.Thresholds) {
+		tm.m.Lock()
+		defer tm.m.Unlock()
+
 		// If either the metric has no thresholds defined, or its sinks
 		// are empty, let's ignore its thresholds execution at this point.
-		if len(m.Thresholds.Thresholds) == 0 || (ignoreEmptySinks && m.Sink.IsEmpty()) {
-			continue
+		if len(ths.Thresholds) == 0 || (ignoreEmptySinks && tm.sink.IsEmpty()) {
+			return
 		}
-		m.Tainted = null.BoolFrom(false)
+		tm.tainted = false
 
-		succ, err := m.Thresholds.Run(m.Sink, t)
+		succ, err := ths.Run(tm.sink, t)
 		if err != nil {
-			me.logger.WithField("metric_name", m.Name).WithError(err).Error("Threshold error")
-			continue
+			me.logger.WithField("metric_name", tm.Name).WithError(err).Error("Threshold error")
+			return
 		}
 		if succ {
-			continue // threshold passed
+			return // threshold passed
 		}
-		breachedThresholds = append(breachedThresholds, m.Name)
-		m.Tainted = null.BoolFrom(true)
-		if m.Thresholds.Abort {
+		breachedThresholds = append(breachedThresholds, tm.Name)
+		tm.tainted = true
+		if ths.Abort {
 			shouldAbort = true
 		}
 	}
+
+	me.logger.Debugf("Running thresholds on %d metrics...", len(me.metricsWithThresholds))
+	for mid, ths := range me.metricsWithThresholds {
+		tracked := me.trackedMetrics[mid]
+		computeThresholds(tracked, ths)
+	}
+
 	if len(breachedThresholds) > 0 {
 		sort.Strings(breachedThresholds)
 		me.logger.Debugf("Thresholds on %d metrics breached: %v", len(breachedThresholds), breachedThresholds)
 	}
 	atomic.StoreUint32(&me.breachedThresholdsCount, uint32(len(breachedThresholds)))
 	return breachedThresholds, shouldAbort
+}
+
+// ObservedMetrics returns all observed metrics.
+func (me *MetricsEngine) ObservedMetrics() map[string]metrics.ObservedMetric {
+	ometrics := make(map[string]metrics.ObservedMetric, len(me.trackedMetrics))
+
+	// it skips the first item as it is nil by definition
+	for i := 1; i < len(me.trackedMetrics); i++ {
+		tm := me.trackedMetrics[i]
+		tm.m.Lock()
+		if !tm.observed {
+			tm.m.Unlock()
+			continue
+		}
+		ometrics[tm.Name] = me.trackedToObserved(tm)
+		tm.m.Unlock()
+	}
+	return ometrics
+}
+
+// ObservedMetricByID returns the observed metric by the provided id.
+func (me *MetricsEngine) ObservedMetricByID(id string) (metrics.ObservedMetric, bool) {
+	m := me.test.Registry.Get(id)
+	if m == nil {
+		return metrics.ObservedMetric{}, false
+	}
+
+	tm := me.trackedMetrics[m.ID]
+	tm.m.Lock()
+	defer tm.m.Unlock()
+
+	if !tm.observed {
+		return metrics.ObservedMetric{}, false
+	}
+	return me.trackedToObserved(tm), true
+}
+
+// trackedToObserved executes a memory safe copy to adapt from
+// a dynamic tracked metric to a static observed metric.
+func (me *MetricsEngine) trackedToObserved(tm *trackedMetric) metrics.ObservedMetric {
+	var sink metrics.Sink
+	switch sinktyp := tm.sink.(type) {
+	case *metrics.CounterSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	case *metrics.GaugeSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	case *metrics.RateSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	case *metrics.TrendSink:
+		sinkCopy := *sinktyp
+		sink = &sinkCopy
+	}
+
+	om := metrics.ObservedMetric{
+		Metric:  tm.Metric,
+		Sink:    sink,
+		Tainted: null.BoolFrom(tm.tainted), // TODO: if null it's required then add to trackedMetric
+	}
+
+	definedThs, ok := me.metricsWithThresholds[tm.ID]
+	if !ok || len(definedThs.Thresholds) < 1 {
+		return om
+	}
+
+	ths := make([]metrics.Threshold, 0, len(definedThs.Thresholds))
+	for _, th := range definedThs.Thresholds {
+		ths = append(ths, *th)
+	}
+
+	om.Thresholds = ths
+	return om
 }
 
 // GetMetricsWithBreachedThresholdsCount returns the number of metrics for which

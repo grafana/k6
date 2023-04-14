@@ -65,37 +65,31 @@ func (oi *outputIngester) flushMetrics() {
 		return
 	}
 
-	oi.metricsEngine.MetricsLock.Lock()
-	defer oi.metricsEngine.MetricsLock.Unlock()
-
-	// TODO: split metric samples in buckets with a *metrics.Metric key; this will
+	// It splits metric samples in buckets with a *metrics.Metric key; this will
 	// allow us to have a per-bucket lock, instead of one global one, and it
 	// will allow us to split apart the metric Name and Type from its Sink and
 	// Observed fields...
-	//
-	// And, to further optimize things, if every metric (and sub-metric) had a
-	// sequential integer ID, we would be able to use a slice for these buckets
-	// and eliminate the map loopkups altogether!
 
 	for _, sampleContainer := range sampleContainers {
 		samples := sampleContainer.GetSamples()
-
 		if len(samples) == 0 {
 			continue
 		}
 
 		for _, sample := range samples {
-			m := sample.Metric               // this should have come from the Registry, no need to look it up
-			oi.metricsEngine.markObserved(m) // mark it as observed so it shows in the end-of-test summary
-			m.Sink.Add(sample)               // finally, add its value to its own sink
+			// Mark it as observed so it shows in the end-of-test summary
+			// and add its value to its own sink.
+			om := oi.metricsEngine.trackedMetrics[sample.Metric.ID]
+			om.AddSamples(sample)
 
 			// and also to the same for any submetrics that match the metric sample
-			for _, sm := range m.Submetrics {
+			for _, sm := range sample.Metric.Submetrics {
 				if !sample.Tags.Contains(sm.Tags) {
 					continue
 				}
-				oi.metricsEngine.markObserved(sm.Metric)
-				sm.Metric.Sink.Add(sample)
+
+				om := oi.metricsEngine.trackedMetrics[sm.Metric.ID]
+				om.AddSamples(sample)
 			}
 
 			oi.cardinality.Add(sample.TimeSeries)

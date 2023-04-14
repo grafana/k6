@@ -32,20 +32,26 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 	return func(sink metrics.Sink, t time.Duration) (result map[string]float64) {
 		switch sink := sink.(type) {
 		case *metrics.CounterSink:
-			result = sink.Format(t)
+			result = map[string]float64{
+				"count": sink.Value,
+			}
 			rate := 0.0
 			if t > 0 {
-				rate = sink.Value / (float64(t) / float64(time.Second))
+				rate = sink.Rate(t)
 			}
 			result["rate"] = rate
 		case *metrics.GaugeSink:
-			result = sink.Format(t)
-			result["min"] = sink.Min
-			result["max"] = sink.Max
+			result = map[string]float64{
+				"value": sink.Value,
+				"min":   sink.Min,
+				"max":   sink.Max,
+			}
 		case *metrics.RateSink:
-			result = sink.Format(t)
-			result["passes"] = float64(sink.Trues)
-			result["fails"] = float64(sink.Total - sink.Trues)
+			result = map[string]float64{
+				"rate":   sink.Rate(),
+				"passes": float64(sink.Trues),
+				"fails":  float64(sink.Total - sink.Trues),
+			}
 		case *metrics.TrendSink:
 			result = make(map[string]float64, len(summaryTrendStats))
 			for _, col := range summaryTrendStats {
@@ -84,17 +90,19 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData 
 			"values":   getMetricValues(m.Sink, data.TestRunDuration),
 		}
 
-		if len(m.Thresholds.Thresholds) > 0 {
+		if len(m.Thresholds) > 0 {
 			thresholds := make(map[string]interface{})
-			for _, threshold := range m.Thresholds.Thresholds {
+			for _, threshold := range m.Thresholds {
 				thresholds[threshold.Source] = map[string]interface{}{
 					"ok": !threshold.LastFailed,
 				}
 			}
 			metricData["thresholds"] = thresholds
 		}
+
 		metricsData[name] = metricData
 	}
+
 	m["metrics"] = metricsData
 
 	var setupDataI interface{}

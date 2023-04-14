@@ -16,16 +16,18 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	t.Parallel()
 
 	piState := newTestPreInitState(t)
-	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Trend)
-	require.NoError(t, err)
-
 	ingester := outputIngester{
 		logger: piState.Logger,
 		metricsEngine: &MetricsEngine{
-			ObservedMetrics: make(map[string]*metrics.Metric),
+			trackedMetrics: []*trackedMetric{nil},
 		},
 		cardinality: newCardinalityControl(),
 	}
+
+	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Trend)
+	require.NoError(t, err)
+	ingester.metricsEngine.trackMetric(testMetric)
+
 	require.NoError(t, ingester.Start())
 	ingester.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		TimeSeries: metrics.TimeSeries{Metric: testMetric},
@@ -37,13 +39,12 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	require.Len(t, ingester.metricsEngine.ObservedMetrics, 1)
-	metric := ingester.metricsEngine.ObservedMetrics["test_metric"]
-	require.NotNil(t, metric)
-	require.NotNil(t, metric.Sink)
-	assert.Equal(t, testMetric, metric)
+	ometric := ingester.metricsEngine.trackedMetrics[1]
+	require.NotNil(t, ometric)
+	require.NotNil(t, ometric.sink)
+	assert.Equal(t, testMetric, ometric.Metric)
 
-	sink := metric.Sink.(*metrics.TrendSink) //nolint:forcetypeassert
+	sink := ometric.sink.(*metrics.TrendSink) //nolint:forcetypeassert
 	assert.Equal(t, 42.0, sink.Sum)
 }
 
@@ -51,20 +52,25 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	t.Parallel()
 
 	piState := newTestPreInitState(t)
-	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Gauge)
-	require.NoError(t, err)
-
 	me := &MetricsEngine{
 		test: &lib.TestRunState{
 			TestPreInitState: piState,
 		},
-		ObservedMetrics: make(map[string]*metrics.Metric),
 	}
-	_, err = me.getThresholdMetricOrSubmetric("test_metric{a:1}")
+
+	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Gauge)
+	require.NoError(t, err)
+	require.Equal(t, 1, int(testMetric.ID))
+
+	me.trackMetric(testMetric)
+	require.Len(t, me.trackedMetrics, 2)
+
+	// it attaches the submetric to the parent
+	testSubMetric, err := me.getThresholdMetricOrSubmetric("test_metric{a:1}")
 	require.NoError(t, err)
 
-	// assert that observed metrics is empty before to start
-	require.Empty(t, me.ObservedMetrics)
+	me.trackMetric(testSubMetric)
+	require.Len(t, me.trackedMetrics, 3)
 
 	ingester := outputIngester{
 		logger:        piState.Logger,
@@ -82,21 +88,21 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	}})
 	require.NoError(t, ingester.Stop())
 
-	require.Len(t, ingester.metricsEngine.ObservedMetrics, 2)
-
 	// assert the parent has been observed
-	metric := ingester.metricsEngine.ObservedMetrics["test_metric"]
-	require.NotNil(t, metric)
-	require.NotNil(t, metric.Sink)
-	assert.IsType(t, &metrics.GaugeSink{}, metric.Sink)
+	ometric := ingester.metricsEngine.trackedMetrics[1]
+	require.NotNil(t, ometric)
+	require.NotNil(t, ometric.sink)
+	assert.IsType(t, &metrics.GaugeSink{}, ometric.sink)
+	assert.Equal(t, 21.0, ometric.sink.(*metrics.GaugeSink).Value)
 
 	// assert the submetric has been observed
-	metric = ingester.metricsEngine.ObservedMetrics["test_metric{a:1}"]
-	require.NotNil(t, metric)
-	require.NotNil(t, metric.Sink)
-	require.NotNil(t, metric.Sub)
-	assert.EqualValues(t, map[string]string{"a": "1"}, metric.Sub.Tags.Map())
-	assert.IsType(t, &metrics.GaugeSink{}, metric.Sink)
+	ometric = ingester.metricsEngine.trackedMetrics[2]
+	require.NotNil(t, ometric)
+	require.NotNil(t, ometric.sink)
+	require.NotNil(t, ometric.Metric.Sub)
+	assert.EqualValues(t, map[string]string{"a": "1"}, ometric.Metric.Sub.Tags.Map())
+	assert.IsType(t, &metrics.GaugeSink{}, ometric.sink)
+	assert.Equal(t, 21.0, ometric.sink.(*metrics.GaugeSink).Value)
 }
 
 func TestOutputFlushMetricsTimeSeriesWarning(t *testing.T) {
@@ -203,6 +209,5 @@ func newTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 		Logger:         logger,
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
 	}
 }

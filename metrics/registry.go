@@ -11,6 +11,7 @@ import (
 // Registry is what can create metrics
 type Registry struct {
 	metrics map[string]*Metric
+	ix      uint64
 	l       sync.RWMutex
 
 	rootTagSet *atlas.Node
@@ -71,32 +72,36 @@ func (r *Registry) MustNewMetric(name string, typ MetricType, t ...ValueType) *M
 	return m
 }
 
+// All returns all the metrics registered.
+//
+// TODO: add a unit test
+func (r *Registry) All() []*Metric {
+	r.l.RLock()
+	defer r.l.RUnlock()
+
+	if len(r.metrics) < 1 {
+		return nil
+	}
+	s := make([]*Metric, 0, len(r.metrics))
+	for _, m := range r.metrics {
+		s = append(s, m)
+	}
+	return s
+}
+
 func (r *Registry) newMetric(name string, mt MetricType, vt ...ValueType) *Metric {
 	valueType := Default
 	if len(vt) > 0 {
 		valueType = vt[0]
 	}
 
-	var sink Sink
-	switch mt {
-	case Counter:
-		sink = &CounterSink{}
-	case Gauge:
-		sink = &GaugeSink{}
-	case Trend:
-		sink = &TrendSink{}
-	case Rate:
-		sink = &RateSink{}
-	default:
-		return nil
-	}
-
+	r.ix++
 	return &Metric{
 		registry: r,
+		ID:       r.ix,
 		Name:     name,
 		Type:     mt,
 		Contains: valueType,
-		Sink:     sink,
 	}
 }
 
