@@ -130,19 +130,19 @@ func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) 
 	if v.ExportType().Kind() == reflect.String {
 		algorithmString, ok := v.Export().(string)
 		if !ok {
-			return Algorithm{}, NewError(0, ImplementationError, "algorithm cannot be interpreted as a string")
+			return Algorithm{}, NewError(ImplementationError, "algorithm cannot be interpreted as a string")
 		}
 
 		algorithmObject := rt.NewObject()
 		if err := algorithmObject.Set("name", algorithmString); err != nil {
-			return Algorithm{}, NewError(0, ImplementationError, "unable to transform algorithm string into an object")
+			return Algorithm{}, NewError(ImplementationError, "unable to transform algorithm string into an object")
 		}
 
 		return normalizeAlgorithm(rt, algorithmObject, op)
 	}
 
 	if err := rt.ExportTo(v, &algorithm); err != nil {
-		return Algorithm{}, NewError(0, SyntaxError, "algorithm cannot be interpreted as a string or an object")
+		return Algorithm{}, NewError(SyntaxError, "algorithm cannot be interpreted as a string or an object")
 	}
 
 	// Algorithm identifers are always upper cased.
@@ -151,7 +151,7 @@ func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) 
 	algorithm.Name = strings.ToUpper(algorithm.Name)
 
 	if !isRegisteredAlgorithm(algorithm.Name, op) {
-		return Algorithm{}, NewError(0, NotSupportedError, "unsupported algorithm: "+algorithm.Name)
+		return Algorithm{}, NewError(NotSupportedError, "unsupported algorithm: "+algorithm.Name)
 	}
 
 	return algorithm, nil

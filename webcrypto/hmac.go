@@ -45,7 +45,7 @@ func newHmacKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 	// and throw an error if it's not present.
 	hashValue, err := traverseObject(rt, params, "hash")
 	if err != nil {
-		return nil, NewError(0, SyntaxError, "could not get hash from algorithm parameter")
+		return nil, NewError(SyntaxError, "could not get hash from algorithm parameter")
 	}
 
 	// Although the specification doesn't explicitly ask us to do so, we
@@ -89,7 +89,7 @@ func (hkgp *HmacKeyGenParams) GenerateKey(
 		case SignCryptoKeyUsage, VerifyCryptoKeyUsage:
 			continue
 		default:
-			return nil, NewError(0, SyntaxError, "invalid key usage: "+usage)
+			return nil, NewError(SyntaxError, "invalid key usage: "+usage)
 		}
 	}
 
@@ -110,19 +110,19 @@ func (hkgp *HmacKeyGenParams) GenerateKey(
 		default:
 			// This case should never happen, as the normalization algorithm
 			// should have thrown an error if the hash algorithm is invalid.
-			return nil, NewError(0, ImplementationError, "invalid hash algorithm: "+hkgp.Hash.Name)
+			return nil, NewError(ImplementationError, "invalid hash algorithm: "+hkgp.Hash.Name)
 		}
 	}
 
 	if hkgp.Length.Int64 == 0 {
-		return nil, NewError(0, OperationError, "algorithm's length cannot be 0")
+		return nil, NewError(OperationError, "algorithm's length cannot be 0")
 	}
 
 	// 3.
 	randomKey := make([]byte, hkgp.Length.Int64/8)
 	if _, err := rand.Read(randomKey); err != nil {
 		// 4.
-		return nil, NewError(0, OperationError, "failed to generate random key; reason:  "+err.Error())
+		return nil, NewError(OperationError, "failed to generate random key; reason:  "+err.Error())
 	}
 
 	// 5.
@@ -169,13 +169,13 @@ type HmacKeyAlgorithm struct {
 func exportHmacKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 	// 1.
 	if ck.handle == nil {
-		return nil, NewError(0, OperationError, "key data is not accesible")
+		return nil, NewError(OperationError, "key data is not accesible")
 	}
 
 	// 2.
 	bits, ok := ck.handle.([]byte)
 	if !ok {
-		return nil, NewError(0, OperationError, "key underlying data is not of the correct type")
+		return nil, NewError(OperationError, "key underlying data is not of the correct type")
 	}
 
 	// 4.
@@ -184,7 +184,7 @@ func exportHmacKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 		return bits, nil
 	default:
 		// FIXME: note that we do not support JWK format, yet #37.
-		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
 }
 
@@ -192,7 +192,7 @@ func exportHmacKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 func (hka *HmacKeyAlgorithm) HashFn() (func() hash.Hash, error) {
 	hashFn, ok := getHashFn(hka.Hash.Name)
 	if !ok {
-		return nil, NewError(0, NotSupportedError, fmt.Sprintf("unsupported key hash algorithm %q", hka.Hash.Name))
+		return nil, NewError(NotSupportedError, fmt.Sprintf("unsupported key hash algorithm %q", hka.Hash.Name))
 	}
 
 	return hashFn, nil
@@ -224,7 +224,7 @@ func newHmacImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 	// and throw an error if it's not present.
 	hashValue, err := traverseObject(rt, params, "hash")
 	if err != nil {
-		return nil, NewError(0, SyntaxError, "could not get hash from algorithm parameter")
+		return nil, NewError(SyntaxError, "could not get hash from algorithm parameter")
 	}
 
 	// Although the specification doesn't explicitly ask us to do so, we
@@ -269,7 +269,7 @@ func (hip *HmacImportParams) ImportKey(
 		case SignCryptoKeyUsage, VerifyCryptoKeyUsage:
 			continue
 		default:
-			return nil, NewError(0, SyntaxError, "invalid key usage: "+usage)
+			return nil, NewError(SyntaxError, "invalid key usage: "+usage)
 		}
 	}
 
@@ -281,23 +281,23 @@ func (hip *HmacImportParams) ImportKey(
 	case RawKeyFormat:
 		hash = KeyAlgorithm{Algorithm{Name: hip.Hash.Name}}
 	default:
-		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
 
 	// 5. 6.
 	length := int64(len(keyData) * 8)
 	if length == 0 {
-		return nil, NewError(0, DataError, "key length cannot be 0")
+		return nil, NewError(DataError, "key length cannot be 0")
 	}
 
 	// 7.
 	if hip.Length.Valid {
 		if hip.Length.Int64 > length {
-			return nil, NewError(0, DataError, "key length cannot be greater than the length of the imported data")
+			return nil, NewError(DataError, "key length cannot be greater than the length of the imported data")
 		}
 
 		if hip.Length.Int64 < length {
-			return nil, NewError(0, DataError, "key length cannot be less than the length of the imported data")
+			return nil, NewError(DataError, "key length cannot be less than the length of the imported data")
 		}
 
 		length = hip.Length.Int64
