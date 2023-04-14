@@ -98,20 +98,23 @@ func (hkgp *HMACKeyGenParams) GenerateKey(
 	// part of the normalized algorithm, and as accessing the runtime from the
 	// callback below could lead to a race condition.
 	if !hkgp.Length.Valid {
+		var length bitLength
 		switch hkgp.Hash.Name {
 		case SHA1:
-			hkgp.Length = null.IntFrom(sha1.BlockSize * 8)
+			length = byteLength(sha1.BlockSize).asBitLength()
 		case SHA256:
-			hkgp.Length = null.IntFrom(sha256.BlockSize * 8)
+			length = byteLength(sha256.BlockSize).asBitLength()
 		case SHA384:
-			hkgp.Length = null.IntFrom(sha512.BlockSize * 8)
+			length = byteLength(sha512.BlockSize).asBitLength()
 		case SHA512:
-			hkgp.Length = null.IntFrom(sha512.BlockSize * 8)
+			length = byteLength(sha512.BlockSize).asBitLength()
 		default:
 			// This case should never happen, as the normalization algorithm
 			// should have thrown an error if the hash algorithm is invalid.
 			return nil, NewError(ImplementationError, "invalid hash algorithm: "+hkgp.Hash.Name)
 		}
+
+		hkgp.Length = null.IntFrom(int64(length))
 	}
 
 	if hkgp.Length.Int64 == 0 {
@@ -119,7 +122,7 @@ func (hkgp *HMACKeyGenParams) GenerateKey(
 	}
 
 	// 3.
-	randomKey := make([]byte, hkgp.Length.Int64/8)
+	randomKey := make([]byte, bitLength(hkgp.Length.Int64).asByteLength())
 	if _, err := rand.Read(randomKey); err != nil {
 		// 4.
 		return nil, NewError(OperationError, "failed to generate random key; reason:  "+err.Error())
@@ -285,28 +288,20 @@ func (hip *HMACImportParams) ImportKey(
 	}
 
 	// 5. 6.
-	length := int64(len(keyData) * 8)
+	length := byteLength(len(keyData)).asBitLength()
 	if length == 0 {
 		return nil, NewError(DataError, "key length cannot be 0")
 	}
 
 	// 7.
-	if hip.Length.Valid {
-		if hip.Length.Int64 > length {
-			return nil, NewError(DataError, "key length cannot be greater than the length of the imported data")
-		}
-
-		if hip.Length.Int64 < length {
-			return nil, NewError(DataError, "key length cannot be less than the length of the imported data")
-		}
-
-		length = hip.Length.Int64
+	if hip.Length.Valid && hip.Length.Int64 != int64(length) {
+		return nil, NewError(DataError, "key length cannot be different from the length of the imported data")
 	}
 
 	// 8.
 	key := CryptoKey{
 		Type:   SecretCryptoKeyType,
-		handle: keyData[:length/8],
+		handle: keyData[:length.asByteLength()],
 	}
 
 	// 9.
@@ -316,7 +311,7 @@ func (hip *HMACImportParams) ImportKey(
 	algorithm.Name = HMAC
 
 	// 11.
-	algorithm.Length = length
+	algorithm.Length = int64(length)
 
 	// 12.
 	algorithm.Hash = hash
