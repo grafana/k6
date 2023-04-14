@@ -32,20 +32,22 @@ func metricValueGetter(summaryTrendStats []string) func(metrics.Sink, time.Durat
 	return func(sink metrics.Sink, t time.Duration) (result map[string]float64) {
 		switch sink := sink.(type) {
 		case *metrics.CounterSink:
-			result = sink.Format(t)
-			rate := 0.0
-			if t > 0 {
-				rate = sink.Value / (float64(t) / float64(time.Second))
+			result = map[string]float64{
+				"count": sink.LastValue(),
 			}
-			result["rate"] = rate
+			result["rate"] = sink.Rate(t)
 		case *metrics.GaugeSink:
-			result = sink.Format(t)
-			result["min"] = sink.Min
-			result["max"] = sink.Max
+			result = map[string]float64{
+				"value": sink.LastValue(),
+				"min":   sink.Min(),
+				"max":   sink.Max(),
+			}
 		case *metrics.RateSink:
-			result = sink.Format(t)
-			result["passes"] = float64(sink.Trues)
-			result["fails"] = float64(sink.Total - sink.Trues)
+			result = map[string]float64{
+				"rate":   sink.Rate(),
+				"passes": float64(sink.NotZero()),
+				"fails":  float64(sink.Count() - sink.NotZero()),
+			}
 		case *metrics.TrendSink:
 			result = make(map[string]float64, len(summaryTrendStats))
 			for _, col := range summaryTrendStats {

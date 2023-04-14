@@ -180,14 +180,14 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 	// For more details, see https://github.com/grafana/k6/issues/2320
 	switch sinkImpl := sink.(type) {
 	case *CounterSink:
-		ts.sinked["count"] = sinkImpl.Value
-		ts.sinked["rate"] = sinkImpl.Value / (float64(duration) / float64(time.Second))
+		ts.sinked["count"] = sinkImpl.LastValue()
+		ts.sinked["rate"] = sinkImpl.Rate(duration)
 	case *GaugeSink:
-		ts.sinked["value"] = sinkImpl.Value
+		ts.sinked["value"] = sinkImpl.LastValue()
 	case *TrendSink:
-		ts.sinked["min"] = sinkImpl.Min
-		ts.sinked["max"] = sinkImpl.Max
-		ts.sinked["avg"] = sinkImpl.Avg
+		ts.sinked["min"] = sinkImpl.Min()
+		ts.sinked["max"] = sinkImpl.Max()
+		ts.sinked["avg"] = sinkImpl.Avg()
 		ts.sinked["med"] = sinkImpl.P(0.5)
 
 		// Parse the percentile thresholds and insert them in
@@ -203,8 +203,12 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 	case *RateSink:
 		// We want to avoid division by zero, which
 		// would lead to [#2520](https://github.com/grafana/k6/issues/2520)
-		if sinkImpl.Total > 0 {
-			ts.sinked["rate"] = float64(sinkImpl.Trues) / float64(sinkImpl.Total)
+		rate := sinkImpl.Rate()
+		// TODO: we handled zero division in the Rate method
+		// do we need to skip the zero value??
+		// in this way, there isn't any key for rate
+		if rate > 0 {
+			ts.sinked["rate"] = rate
 		}
 	case DummySink:
 		for k, v := range sinkImpl {
