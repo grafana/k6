@@ -12,9 +12,9 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
-// HmacKeyGenParams represents the object that should be passed as the algorithm parameter
+// HMACKeyGenParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.GenerateKey`, when generating an HMAC key.
-type HmacKeyGenParams struct {
+type HMACKeyGenParams struct {
 	Algorithm
 
 	// Hash represents the name of the digest function to use. You can
@@ -30,7 +30,7 @@ type HmacKeyGenParams struct {
 	Length null.Int `json:"length"`
 }
 
-// newHmacKeyGenParams creates a new HmacKeyGenParams object, from the normalized
+// newHMACKeyGenParams creates a new HMACKeyGenParams object, from the normalized
 // algorithm, and the params parameters passed by the user.
 //
 // It handles the logic of extracting the hash algorithm from the params object,
@@ -39,7 +39,7 @@ type HmacKeyGenParams struct {
 // not present as described in the hmac `generateKey` [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#hmac-operations
-func newHmacKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*HmacKeyGenParams, error) {
+func newHMACKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*HMACKeyGenParams, error) {
 	// The specification doesn't explicitly tell us what to do if the
 	// hash field is not present, but we assume it's a mandatory field
 	// and throw an error if it's not present.
@@ -71,7 +71,7 @@ func newHmacKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 		length = null.IntFrom(algorithmLengthValue.ToInteger())
 	}
 
-	return &HmacKeyGenParams{
+	return &HMACKeyGenParams{
 		Algorithm: normalized,
 		Hash:      normalizedHash,
 		Length:    length,
@@ -79,7 +79,7 @@ func newHmacKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 }
 
 // GenerateKey generates a new HMAC key.
-func (hkgp *HmacKeyGenParams) GenerateKey(
+func (hkgp *HMACKeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
@@ -129,7 +129,7 @@ func (hkgp *HmacKeyGenParams) GenerateKey(
 	key := &CryptoKey{Type: SecretCryptoKeyType, handle: randomKey}
 
 	// 6.
-	algorithm := HmacKeyAlgorithm{}
+	algorithm := HMACKeyAlgorithm{}
 
 	// 7.
 	algorithm.Name = HMAC
@@ -152,11 +152,11 @@ func (hkgp *HmacKeyGenParams) GenerateKey(
 	return key, nil
 }
 
-// Ensure that HmacKeyGenParams implements the KeyGenerator interface.
-var _ KeyGenerator = &HmacKeyGenParams{}
+// Ensure that HMACKeyGenParams implements the KeyGenerator interface.
+var _ KeyGenerator = &HMACKeyGenParams{}
 
-// HmacKeyAlgorithm represents the algorithm of an HMAC key.
-type HmacKeyAlgorithm struct {
+// HMACKeyAlgorithm represents the algorithm of an HMAC key.
+type HMACKeyAlgorithm struct {
 	KeyAlgorithm
 
 	// Hash represents the inner hash function to use.
@@ -166,7 +166,7 @@ type HmacKeyAlgorithm struct {
 	Length int64 `json:"length"`
 }
 
-func exportHmacKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
+func exportHMACKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 	// 1.
 	if ck.handle == nil {
 		return nil, NewError(OperationError, "key data is not accesible")
@@ -189,7 +189,7 @@ func exportHmacKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 }
 
 // HashFn returns the hash function to use for the HMAC key.
-func (hka *HmacKeyAlgorithm) HashFn() (func() hash.Hash, error) {
+func (hka *HMACKeyAlgorithm) HashFn() (func() hash.Hash, error) {
 	hashFn, ok := getHashFn(hka.Hash.Name)
 	if !ok {
 		return nil, NewError(NotSupportedError, fmt.Sprintf("unsupported key hash algorithm %q", hka.Hash.Name))
@@ -198,9 +198,9 @@ func (hka *HmacKeyAlgorithm) HashFn() (func() hash.Hash, error) {
 	return hashFn, nil
 }
 
-// HmacImportParams represents the object that should be passed as the algorithm parameter
+// HMACImportParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.GenerateKey`, when generating an HMAC key.
-type HmacImportParams struct {
+type HMACImportParams struct {
 	Algorithm
 
 	// Hash represents the name of the digest function to use. You can
@@ -216,9 +216,9 @@ type HmacImportParams struct {
 	Length null.Int `json:"length"`
 }
 
-// newHmacImportParams creates a new HmacImportParams object from the given
+// newHMACImportParams creates a new HMACImportParams object from the given
 // algorithm and params objects.
-func newHmacImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*HmacImportParams, error) {
+func newHMACImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*HMACImportParams, error) {
 	// The specification doesn't explicitly tell us what to do if the
 	// hash field is not present, but we assume it's a mandatory field
 	// and throw an error if it's not present.
@@ -250,7 +250,7 @@ func newHmacImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 		length = null.IntFrom(algorithmLengthValue.ToInteger())
 	}
 
-	return &HmacImportParams{
+	return &HMACImportParams{
 		Algorithm: normalized,
 		Hash:      normalizedHash,
 		Length:    length,
@@ -258,7 +258,7 @@ func newHmacImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 }
 
 // ImportKey imports a key from raw key data. It implements the KeyImporter interface.
-func (hip *HmacImportParams) ImportKey(
+func (hip *HMACImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
 	keyUsages []CryptoKeyUsage,
@@ -310,7 +310,7 @@ func (hip *HmacImportParams) ImportKey(
 	}
 
 	// 9.
-	algorithm := HmacKeyAlgorithm{}
+	algorithm := HMACKeyAlgorithm{}
 
 	// 10.
 	algorithm.Name = HMAC
@@ -327,5 +327,5 @@ func (hip *HmacImportParams) ImportKey(
 	return &key, nil
 }
 
-// Ensure that HmacImportParams implements the KeyImporter interface.
-var _ KeyImporter = &HmacImportParams{}
+// Ensure that HMACImportParams implements the KeyImporter interface.
+var _ KeyImporter = &HMACImportParams{}

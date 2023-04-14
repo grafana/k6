@@ -95,17 +95,6 @@ type HMACSignatureParams struct {
 	Name AlgorithmIdentifier
 }
 
-// HMACImportParams represents the object that should be passed as the
-// algorithm parameter into `SubtleCrypto.ImportKey` or `SubtleCrypto.UnwrapKey`, when
-// generating a key for the HMAC algorithm.
-type HMACImportParams struct {
-	// Name should be set to AlgorithmKindHmac.
-	Name AlgorithmIdentifier
-
-	// Hash represents the name of the digest function to use.
-	Hash AlgorithmIdentifier
-}
-
 // PBKDF2Params represents the object that should be passed as the algorithm
 // parameter into `SubtleCrypto.DeriveKey`, when using the PBKDF2 algorithm.
 type PBKDF2Params struct {
