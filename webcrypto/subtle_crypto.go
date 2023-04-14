@@ -56,7 +56,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	var ck CryptoKey
 	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(0, TypeError, "key argument does hold not a valid CryptoKey object"))
+		reject(NewError(TypeError, "key argument does hold not a valid CryptoKey object"))
 		return promise
 	}
 
@@ -68,7 +68,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	// 8.
 	if normalized.Name != keyAlgorithmNameValue.String() {
-		reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
 		return promise
 	}
 
@@ -81,7 +81,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 	go func() {
 		// 9.
 		if !ck.ContainsUsage(EncryptCryptoKeyUsage) {
-			reject(NewError(0, InvalidAccessError, "key does not contain the 'encrypt' usage"))
+			reject(NewError(InvalidAccessError, "key does not contain the 'encrypt' usage"))
 			return
 		}
 
@@ -99,7 +99,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 			resolve(rt.NewArrayBuffer(ciphertext))
 			return
 		default:
-			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
+			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
 			return
 		}
 	}()
@@ -148,7 +148,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	var ck CryptoKey
 	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
 		return promise
 	}
 
@@ -160,7 +160,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	// 8.
 	if normalized.Name != keyAlgorithmNameValue.String() {
-		reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
 		return promise
 	}
 
@@ -173,7 +173,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 	go func() {
 		// 9.
 		if !ck.ContainsUsage(DecryptCryptoKeyUsage) {
-			reject(NewError(0, InvalidAccessError, "key does not contain the 'decrypt' usage"))
+			reject(NewError(InvalidAccessError, "key does not contain the 'decrypt' usage"))
 			return
 		}
 
@@ -190,7 +190,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 			resolve(rt.NewArrayBuffer(plaintext))
 		default:
-			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
+			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
 		}
 	}()
 
@@ -238,7 +238,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 
 	var ck CryptoKey
 	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
 		return promise
 	}
 
@@ -251,13 +251,13 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 	go func() {
 		// 8.
 		if normalized.Name != keyAlgorithmNameValue.String() {
-			reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+			reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
 			return
 		}
 
 		// 9.
 		for !ck.ContainsUsage(SignCryptoKeyUsage) {
-			reject(NewError(0, InvalidAccessError, "key does not contain the 'sign' usage"))
+			reject(NewError(InvalidAccessError, "key does not contain the 'sign' usage"))
 			return
 		}
 
@@ -266,13 +266,13 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 		case HMAC:
 			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
 			if !ok {
-				reject(NewError(0, InvalidAccessError, "key algorithm does not describe a HMAC key"))
+				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
 				return
 			}
 
 			keyHandle, ok := ck.handle.([]byte)
 			if !ok {
-				reject(NewError(0, InvalidAccessError, "key handle is of incorrect type"))
+				reject(NewError(InvalidAccessError, "key handle is of incorrect type"))
 				return
 			}
 
@@ -290,7 +290,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 
 			resolve(rt.NewArrayBuffer(mac))
 		default:
-			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
+			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
 		}
 	}()
 
@@ -347,7 +347,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 
 	var ck CryptoKey
 	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(0, InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
+		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
 		return promise
 	}
 
@@ -360,13 +360,13 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 	go func() {
 		// 9.
 		if normalizedAlgorithm.Name != keyAlgorithmNameValue.String() {
-			reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+			reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
 			return
 		}
 
 		// 10.
 		for !ck.ContainsUsage(VerifyCryptoKeyUsage) {
-			reject(NewError(0, InvalidAccessError, "key does not contain the 'sign' usage"))
+			reject(NewError(InvalidAccessError, "key does not contain the 'sign' usage"))
 			return
 		}
 
@@ -374,13 +374,13 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 		case HMAC:
 			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
 			if !ok {
-				reject(NewError(0, InvalidAccessError, "key algorithm does not describe a HMAC key"))
+				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
 				return
 			}
 
 			keyHandle, ok := ck.handle.([]byte)
 			if !ok {
-				reject(NewError(0, InvalidAccessError, "key handle is of incorrect type"))
+				reject(NewError(InvalidAccessError, "key handle is of incorrect type"))
 				return
 			}
 
@@ -395,7 +395,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 
 			resolve(hmac.Equal(signatureData, hasher.Sum(nil)))
 		default:
-			reject(NewError(0, NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalizedAlgorithm.Name)))
+			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalizedAlgorithm.Name)))
 		}
 	}()
 
@@ -453,7 +453,7 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 		hashFn, ok := getHashFn(normalized.Name)
 		if !ok {
 			// 7.
-			reject(NewError(0, NotSupportedError, "unsupported algorithm: "+normalized.Name))
+			reject(NewError(NotSupportedError, "unsupported algorithm: "+normalized.Name))
 			return
 		}
 
@@ -515,7 +515,7 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 		isPrivateKey := result.Type == PrivateCryptoKeyType
 		isUsagesEmpty := len(result.Usages) == 0
 		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-			reject(NewError(0, SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
+			reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
 			return
 		}
 
@@ -664,7 +664,7 @@ func (sc *SubtleCrypto) ImportKey(
 		isPrivateKey := result.Type == PrivateCryptoKeyType
 		isUsagesEmpty := len(keyUsages) == 0
 		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-			reject(NewError(0, SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
+			reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
 			return
 		}
 
@@ -704,32 +704,32 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 	var algorithm Algorithm
 	algValue := key.ToObject(rt).Get("algorithm")
 	if err := rt.ExportTo(algValue, &algorithm); err != nil {
-		reject(NewError(0, SyntaxError, "key is not a valid CryptoKey"))
+		reject(NewError(SyntaxError, "key is not a valid CryptoKey"))
 		return promise
 	}
 
 	ck, ok := key.Export().(*CryptoKey)
 	if !ok {
-		reject(NewError(0, ImplementationError, "unable to extract CryptoKey"))
+		reject(NewError(ImplementationError, "unable to extract CryptoKey"))
 		return promise
 	}
 
 	keyAlgorithmName := key.ToObject(rt).Get("algorithm").ToObject(rt).Get("name").String()
 	if algorithm.Name != keyAlgorithmName {
-		reject(NewError(0, InvalidAccessError, "algorithm name does not match key algorithm name"))
+		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
 		return promise
 	}
 
 	go func() {
 		// 5.
 		if !isRegisteredAlgorithm(algorithm.Name, OperationIdentifierExportKey) {
-			reject(NewError(0, NotSupportedError, "unsupported algorithm "+algorithm.Name))
+			reject(NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name))
 			return
 		}
 
 		// 6.
 		if !ck.Extractable {
-			reject(NewError(0, InvalidAccessError, "the key is not extractable"))
+			reject(NewError(InvalidAccessError, "the key is not extractable"))
 			return
 		}
 
@@ -750,7 +750,7 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 				return
 			}
 		default:
-			reject(NewError(0, NotSupportedError, "unsupported algorithm "+keyAlgorithmName))
+			reject(NewError(NotSupportedError, "unsupported algorithm "+keyAlgorithmName))
 			return
 		}
 

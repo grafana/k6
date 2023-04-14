@@ -34,7 +34,7 @@ func newAesKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Valu
 	// callback below could lead to a race condition.
 	algorithmLengthValue, err := traverseObject(rt, params, "length")
 	if err != nil {
-		return nil, NewError(0, SyntaxError, "could not get length from algorithm parameter")
+		return nil, NewError(SyntaxError, "could not get length from algorithm parameter")
 	}
 
 	algorithmLength := algorithmLengthValue.ToInteger()
@@ -65,20 +65,20 @@ func (akgp *AesKeyGenParams) GenerateKey(
 				continue
 			}
 
-			return nil, NewError(0, SyntaxError, "invalid key usage")
+			return nil, NewError(SyntaxError, "invalid key usage")
 		default:
-			return nil, NewError(0, SyntaxError, "invalid key usage")
+			return nil, NewError(SyntaxError, "invalid key usage")
 		}
 	}
 
 	if akgp.Length != 128 && akgp.Length != 192 && akgp.Length != 256 {
-		return nil, NewError(0, OperationError, "invalid key length")
+		return nil, NewError(OperationError, "invalid key length")
 	}
 
 	randomKey := make([]byte, akgp.Length/8)
 	if _, err := rand.Read(randomKey); err != nil {
 		// 4.
-		return nil, NewError(0, OperationError, "could not generate random key")
+		return nil, NewError(OperationError, "could not generate random key")
 	}
 
 	// 5. 6. 7. 8. 9.
@@ -119,25 +119,25 @@ type AesKeyAlgorithm struct {
 // TODO @oleiade: support JWK format.
 func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
 	if !key.Extractable {
-		return nil, NewError(0, InvalidAccessError, "the key is not extractable")
+		return nil, NewError(InvalidAccessError, "the key is not extractable")
 	}
 
 	// 1.
 	if key.handle == nil {
-		return nil, NewError(0, OperationError, "the key is not valid, no data")
+		return nil, NewError(OperationError, "the key is not valid, no data")
 	}
 
 	switch format {
 	case RawKeyFormat:
 		handle, ok := key.handle.([]byte)
 		if !ok {
-			return nil, NewError(0, ImplementationError, "exporting key data's bytes failed")
+			return nil, NewError(ImplementationError, "exporting key data's bytes failed")
 		}
 
 		return handle, nil
 	default:
 		// FIXME: note that we do not support JWK format, yet.
-		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
 }
 
@@ -168,7 +168,7 @@ func (aip *aesImportParams) ImportKey(
 		case EncryptCryptoKeyUsage, DecryptCryptoKeyUsage, WrapKeyCryptoKeyUsage, UnwrapKeyCryptoKeyUsage:
 			continue
 		default:
-			return nil, NewError(0, SyntaxError, "invalid key usage: "+usage)
+			return nil, NewError(SyntaxError, "invalid key usage: "+usage)
 		}
 	}
 
@@ -181,10 +181,10 @@ func (aip *aesImportParams) ImportKey(
 		)
 
 		if !has128Bits && !has192Bits && !has256Bits {
-			return nil, NewError(0, DataError, "invalid key length")
+			return nil, NewError(DataError, "invalid key length")
 		}
 	default:
-		return nil, NewError(0, NotSupportedError, "unsupported key format "+format)
+		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
 
 	key := &CryptoKey{
@@ -229,24 +229,24 @@ func (acp *AesCbcParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 	// 1.
 	// Note that aes.BlockSize stands for the `k` variable as per the specification.
 	if len(acp.Iv) != aes.BlockSize {
-		return nil, NewError(0, OperationError, "iv length is not 16 bytes")
+		return nil, NewError(OperationError, "iv length is not 16 bytes")
 	}
 
 	// 2.
 	paddedPlainText, err := pKCS7Pad(plaintext, aes.BlockSize)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not pad plaintext")
+		return nil, NewError(OperationError, "could not pad plaintext")
 	}
 
 	keyHandle, ok := key.handle.([]byte)
 	if !ok {
-		return nil, NewError(0, ImplementationError, "could not get key handle")
+		return nil, NewError(ImplementationError, "could not get key handle")
 	}
 
 	// 3.
 	block, err := aes.NewCipher(keyHandle)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not create cipher")
+		return nil, NewError(OperationError, "could not create cipher")
 	}
 
 	ciphertext := make([]byte, len(paddedPlainText))
@@ -263,18 +263,18 @@ func (acp *AesCbcParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 func (acp *AesCbcParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	if len(acp.Iv) != aes.BlockSize {
-		return nil, NewError(0, OperationError, "iv length is invalid, should be 16 bytes")
+		return nil, NewError(OperationError, "iv length is invalid, should be 16 bytes")
 	}
 
 	keyHandle, ok := key.handle.([]byte)
 	if !ok {
-		return nil, NewError(0, OperationError, "invalid key handle")
+		return nil, NewError(OperationError, "invalid key handle")
 	}
 
 	// 2.
 	block, err := aes.NewCipher(keyHandle)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not create AES cipher")
+		return nil, NewError(OperationError, "could not create AES cipher")
 	}
 
 	paddedPlainText := make([]byte, len(ciphertext))
@@ -284,12 +284,12 @@ func (acp *AesCbcParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	// 3.
 	p := paddedPlainText[len(paddedPlainText)-1]
 	if p == 0 || p > aes.BlockSize {
-		return nil, NewError(0, OperationError, "invalid padding")
+		return nil, NewError(OperationError, "invalid padding")
 	}
 
 	// 4.
 	if !bytes.HasSuffix(paddedPlainText, bytes.Repeat([]byte{p}, int(p))) {
-		return nil, NewError(0, OperationError, "invalid padding")
+		return nil, NewError(OperationError, "invalid padding")
 	}
 
 	// 5.
@@ -336,23 +336,23 @@ func (acp *AesCtrParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 	// 1.
 	// Note that aes.BlockSize stands for the `k` variable as per the specification.
 	if len(acp.Counter) != aes.BlockSize {
-		return nil, NewError(0, OperationError, "counter length is not 16 bytes")
+		return nil, NewError(OperationError, "counter length is not 16 bytes")
 	}
 
 	// 2.
 	if acp.Length <= 0 || acp.Length > 128 {
-		return nil, NewError(0, OperationError, "invalid counter length, out of the 0 < x < 128 bounds")
+		return nil, NewError(OperationError, "invalid counter length, out of the 0 < x < 128 bounds")
 	}
 
 	keyHandle, ok := key.handle.([]byte)
 	if !ok {
-		return nil, NewError(0, ImplementationError, "could not get key handle")
+		return nil, NewError(ImplementationError, "could not get key handle")
 	}
 
 	// 3.
 	block, err := aes.NewCipher(keyHandle)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not create cipher")
+		return nil, NewError(OperationError, "could not create cipher")
 	}
 
 	ciphertext := make([]byte, len(plaintext))
@@ -369,23 +369,23 @@ func (acp *AesCtrParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 func (acp *AesCtrParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	if len(acp.Counter) != aes.BlockSize {
-		return nil, NewError(0, OperationError, "counter length is invalid, should be 16 bytes")
+		return nil, NewError(OperationError, "counter length is invalid, should be 16 bytes")
 	}
 
 	// 2.
 	if acp.Length <= 0 || acp.Length > 128 {
-		return nil, NewError(0, OperationError, "invalid length, should be within 1 <= length <= 128 bounds")
+		return nil, NewError(OperationError, "invalid length, should be within 1 <= length <= 128 bounds")
 	}
 
 	keyHandle, ok := key.handle.([]byte)
 	if !ok {
-		return nil, NewError(0, OperationError, "invalid key handle")
+		return nil, NewError(OperationError, "invalid key handle")
 	}
 
 	// 3.
 	block, err := aes.NewCipher(keyHandle)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not create AES cipher")
+		return nil, NewError(OperationError, "could not create AES cipher")
 	}
 
 	plaintext := make([]byte, len(ciphertext))
@@ -455,7 +455,7 @@ func (agp *AesGcmParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 	// As described in section 8 of AES-GCM [NIST SP800-38D].
 	// [NIST SP800-38D] https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
 	if len(plaintext) > maxAesGcmPlaintextLength {
-		return nil, NewError(0, OperationError, "plaintext length is too long")
+		return nil, NewError(OperationError, "plaintext length is too long")
 	}
 
 	// 2.
@@ -466,14 +466,14 @@ func (agp *AesGcmParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 	// but go only supports 12 bytes IVs. We therefore are diverging from the
 	// spec here, and have adjusted the test suite accordingly.
 	if len(agp.Iv) != 12 {
-		return nil, NewError(0, NotSupportedError, "only 12 bytes long iv are supported")
+		return nil, NewError(NotSupportedError, "only 12 bytes long iv are supported")
 	}
 
 	// 3.
 	// As described in section 8 of AES-GCM [NIST SP800-38D].
 	// [NIST SP800-38D] https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
 	if agp.AdditionalData != nil && (uint64(len(agp.AdditionalData)) > maxAesGcmAdditionalDataLength) {
-		return nil, NewError(0, OperationError, "additional data length is too long")
+		return nil, NewError(OperationError, "additional data length is too long")
 	}
 
 	// 4.
@@ -486,32 +486,32 @@ func (agp *AesGcmParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 			tagLength = agp.TagLength
 		case 32, 64:
 			// Go's GCM implementation does not support 32 or 64 bit tag lengths.
-			return nil, NewError(0, NotSupportedError, "tag length 32 and 64 are not supported")
+			return nil, NewError(NotSupportedError, "tag length 32 and 64 are not supported")
 		default:
-			return nil, NewError(0, OperationError, "invalid tag length, should be one of 96, 104, 112, 120, 128")
+			return nil, NewError(OperationError, "invalid tag length, should be one of 96, 104, 112, 120, 128")
 		}
 	}
 
 	keyHandle, ok := key.handle.([]byte)
 	if !ok {
-		return nil, NewError(0, ImplementationError, "could not get key data")
+		return nil, NewError(ImplementationError, "could not get key data")
 	}
 
 	// 6.
 	block, err := aes.NewCipher(keyHandle)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not create cipher")
+		return nil, NewError(OperationError, "could not create cipher")
 	}
 
 	gcm, err := cipher.NewGCMWithTagSize(block, tagLength/8)
 	if err != nil {
-		return nil, NewError(0, ImplementationError, "could not create cipher")
+		return nil, NewError(ImplementationError, "could not create cipher")
 	}
 
 	// The Golang AES GCM cipher only supports a Nonce/Iv length of 12 bytes,
 	// as opposed to the looser requirements of the Web Crypto API spec.
 	if len(agp.Iv) != gcm.NonceSize() {
-		return nil, NewError(0, NotSupportedError, "only 12 bytes long iv are supported")
+		return nil, NewError(NotSupportedError, "only 12 bytes long iv are supported")
 	}
 
 	// 7. 8.
@@ -535,9 +535,9 @@ func (agp *AesGcmParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 			tagLength = agp.TagLength
 		case 32, 64:
 			// Go's AES GCM implementation does not support 32 or 64 bit tag lengths.
-			return nil, NewError(0, OperationError, "invalid tag length, should be within 96 <= length <= 128 bounds")
+			return nil, NewError(OperationError, "invalid tag length, should be within 96 <= length <= 128 bounds")
 		default:
-			return nil, NewError(0, OperationError, "invalid tag length, accepted values are 96, 104, 112, 120, 128")
+			return nil, NewError(OperationError, "invalid tag length, accepted values are 96, 104, 112, 120, 128")
 		}
 	}
 
@@ -545,41 +545,41 @@ func (agp *AesGcmParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	// Note that we multiply the length of the ciphertext by 8, in order
 	// to get the length in bits.
 	if len(ciphertext)*8 < tagLength {
-		return nil, NewError(0, OperationError, "ciphertext is too short")
+		return nil, NewError(OperationError, "ciphertext is too short")
 	}
 
 	// 3.
 	if len(agp.Iv) < 1 || uint64(len(agp.Iv)) > maxAesGcmIvLength {
-		return nil, NewError(0, OperationError, "iv length is too long")
+		return nil, NewError(OperationError, "iv length is too long")
 	}
 
 	// 4.
 	if agp.AdditionalData != nil && uint64(len(agp.AdditionalData)) > maxAesGcmAdditionalDataLength {
-		return nil, NewError(0, OperationError, "additional data is too long")
+		return nil, NewError(OperationError, "additional data is too long")
 	}
 
 	// 5. 6. are not necessary as Go's AES GCM implementation perform those steps for us
 
 	keyHandle, ok := key.handle.([]byte)
 	if !ok {
-		return nil, NewError(0, OperationError, "invalid key handle")
+		return nil, NewError(OperationError, "invalid key handle")
 	}
 
 	// 7. 8.
 	block, err := aes.NewCipher(keyHandle)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not create AES cipher")
+		return nil, NewError(OperationError, "could not create AES cipher")
 	}
 
 	gcm, err := cipher.NewGCMWithTagSize(block, tagLength/8)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not create GCM cipher")
+		return nil, NewError(OperationError, "could not create GCM cipher")
 	}
 
 	// The Golang AES GCM cipher only supports a Nonce/Iv length of 12 bytes,
 	plaintext, err := gcm.Open(nil, agp.Iv, ciphertext, agp.AdditionalData)
 	if err != nil {
-		return nil, NewError(0, OperationError, "could not decrypt ciphertext")
+		return nil, NewError(OperationError, "could not decrypt ciphertext")
 	}
 
 	return plaintext, nil
