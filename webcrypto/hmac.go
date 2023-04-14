@@ -99,13 +99,13 @@ func (hkgp *HMACKeyGenParams) GenerateKey(
 	// callback below could lead to a race condition.
 	if !hkgp.Length.Valid {
 		switch hkgp.Hash.Name {
-		case Sha1:
+		case SHA1:
 			hkgp.Length = null.IntFrom(sha1.BlockSize * 8)
-		case Sha256:
+		case SHA256:
 			hkgp.Length = null.IntFrom(sha256.BlockSize * 8)
-		case Sha384:
+		case SHA384:
 			hkgp.Length = null.IntFrom(sha512.BlockSize * 8)
-		case Sha512:
+		case SHA512:
 			hkgp.Length = null.IntFrom(sha512.BlockSize * 8)
 		default:
 			// This case should never happen, as the normalization algorithm

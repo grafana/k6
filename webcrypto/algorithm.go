@@ -60,17 +60,17 @@ const (
 type HashAlgorithmIdentifier = AlgorithmIdentifier
 
 const (
-	// Sha1 represents the SHA-1 algorithm.
-	Sha1 HashAlgorithmIdentifier = "SHA-1"
+	// SHA1 represents the SHA-1 algorithm.
+	SHA1 HashAlgorithmIdentifier = "SHA-1"
 
-	// Sha256 represents the SHA-256 algorithm.
-	Sha256 = "SHA-256"
+	// SHA256 represents the SHA-256 algorithm.
+	SHA256 = "SHA-256"
 
-	// Sha384 represents the SHA-384 algorithm.
-	Sha384 = "SHA-384"
+	// SHA384 represents the SHA-384 algorithm.
+	SHA384 = "SHA-384"
 
-	// Sha512 represents the SHA-512 algorithm.
-	Sha512 = "SHA-512"
+	// SHA512 represents the SHA-512 algorithm.
+	SHA512 = "SHA-512"
 )
 
 // OperationIdentifier represents the name of an operation.
@@ -185,5 +185,5 @@ func isAesAlgorithm(algorithmName string) bool {
 }
 
 func isHashAlgorithm(algorithmName string) bool {
-	return algorithmName == Sha1 || algorithmName == Sha256 || algorithmName == Sha384 || algorithmName == Sha512
+	return algorithmName == SHA1 || algorithmName == SHA256 || algorithmName == SHA384 || algorithmName == SHA512
 }
