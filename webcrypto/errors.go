@@ -44,9 +44,6 @@ const (
 // Error represents a custom error emitted by the
 // Web Crypto API.
 type Error struct {
-	// Code is one of the legacy error code constants, or 0 if none match.
-	Code int `json:"code"`
-
 	// Name contains one of the strings associated with an error name.
 	Name string `json:"name"`
 
@@ -60,9 +57,8 @@ func (e *Error) Error() string {
 }
 
 // NewError returns a new WebCryptoError with the given name and message.
-func NewError(code int, name, message string) *Error {
+func NewError(name, message string) *Error {
 	return &Error{
-		Code:    code,
 		Name:    name,
 		Message: message,
 	}
