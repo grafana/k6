@@ -10,18 +10,6 @@ type From[Input, Output any] interface {
 	From(Input) (Output, error)
 }
 
-// AESKeyGenParams represents the object that should be passed as
-// the algorithm parameter into `SubtleCrypto.generateKey`, when generating
-// an AES key: that is, when the algorithm is identified as any
-// of AES-CBC, AES-CTR, AES-GCM, or AES-KW.
-type AESKeyGenParams struct {
-	// Name should be set to `AES-CBC`, `AES-CTR`, `AES-GCM`, or `AES-KW`.
-	Name AlgorithmIdentifier
-
-	// Length holds (a Number) the length of the key, in bits.
-	Length int
-}
-
 // AESKwParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
 // `SubtleCrypto.UnwrapKey`, when using the AES-KW algorithm.

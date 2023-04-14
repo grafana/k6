@@ -38,13 +38,13 @@ func newEncryptDecrypter(
 
 	switch algorithm.Name {
 	case AESCbc:
-		ed = new(AesCbcParams)
+		ed = new(AESCBCParams)
 		paramsObjectName = "AesCbcParams"
 	case AESCtr:
-		ed = new(AesCtrParams)
+		ed = new(AESCTRParams)
 		paramsObjectName = "AesCtrParams"
 	case AESGcm:
-		ed = new(AesGcmParams)
+		ed = new(AESGCMParams)
 		paramsObjectName = "AesGcmParams"
 	default:
 		return nil, NewError(NotSupportedError, "unsupported algorithm")
