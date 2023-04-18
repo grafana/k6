@@ -80,18 +80,22 @@ type TrendSink struct {
 func (t *TrendSink) IsEmpty() bool { return t.Count == 0 }
 
 func (t *TrendSink) Add(s Sample) {
+	if t.Count == 0 {
+		t.Max, t.Min = s.Value, s.Value
+	} else {
+		if s.Value > t.Max {
+			t.Max = s.Value
+		}
+		if s.Value < t.Min {
+			t.Min = s.Value
+		}
+	}
+
 	t.Values = append(t.Values, s.Value)
 	t.sorted = false
 	t.Count += 1
 	t.Sum += s.Value
 	t.Avg = t.Sum / float64(t.Count)
-
-	if s.Value > t.Max {
-		t.Max = s.Value
-	}
-	if s.Value < t.Min || t.Count == 1 {
-		t.Min = s.Value
-	}
 }
 
 // P calculates the given percentile from sink values.
