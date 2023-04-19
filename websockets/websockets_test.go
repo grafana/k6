@@ -490,7 +490,6 @@ func TestTwoTalking(t *testing.T) {
 				return
 			}
 		}
-		// fmt.Println(path, "ending")
 	})
 
 	err := ts.ev.Start(func() error {
@@ -1263,7 +1262,6 @@ func TestLockingUpWithAThrow(t *testing.T) {
 	ts := newTestState(t)
 	go destroySamples(ctx, ts.samples)
 	ts.vu.CtxField = ctx
-	require.NoError(t, ts.vu.RuntimeField.Set("l", fmt.Println))
 	err := ts.ev.Start(func() error {
 		_, runErr := ts.rt.RunString(sr(`
 		let a = 0;
@@ -1276,7 +1274,6 @@ func TestLockingUpWithAThrow(t *testing.T) {
 			})
 
 			ws.addEventListener("pong", () => {
-				// l("pong")
 				ws.ping()
 				if (a == connections){
 					a++
