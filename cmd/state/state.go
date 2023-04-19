@@ -11,8 +11,8 @@ import (
 	"github.com/mattn/go-colorable"
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/ui/console"
 )
 
@@ -34,7 +34,7 @@ const defaultConfigFileName = "config.json"
 type GlobalState struct {
 	Ctx context.Context
 
-	FS         afero.Fs
+	FS         fsext.Fs
 	Getwd      func() (string, error)
 	BinaryName string
 	CmdArgs    []string
@@ -105,7 +105,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 	return &GlobalState{
 		Ctx:          ctx,
-		FS:           afero.NewOsFs(),
+		FS:           fsext.NewOsFs(),
 		Getwd:        os.Getwd,
 		BinaryName:   filepath.Base(binary),
 		CmdArgs:      os.Args,

@@ -10,7 +10,6 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -53,15 +52,15 @@ func TestNormalizeAndAnonymizePath(t *testing.T) {
 	}
 }
 
-func makeMemMapFs(t *testing.T, input map[string][]byte) afero.Fs {
-	fs := afero.NewMemMapFs()
+func makeMemMapFs(t *testing.T, input map[string][]byte) fsext.Fs {
+	fs := fsext.NewMemMapFs()
 	for path, data := range input {
-		require.NoError(t, afero.WriteFile(fs, path, data, 0o644))
+		require.NoError(t, fsext.WriteFile(fs, path, data, 0o644))
 	}
 	return fs
 }
 
-func getMapKeys(m map[string]afero.Fs) []string {
+func getMapKeys(m map[string]fsext.Fs) []string {
 	keys := make([]string, 0, len(m))
 	for key := range m {
 		keys = append(keys, key)
@@ -70,18 +69,16 @@ func getMapKeys(m map[string]afero.Fs) []string {
 	return keys
 }
 
-func diffMapFilesystems(t *testing.T, first, second map[string]afero.Fs) bool {
+func diffMapFilesystems(t *testing.T, first, second map[string]fsext.Fs) {
 	require.ElementsMatch(t, getMapKeys(first), getMapKeys(second),
 		"fs map keys don't match %s, %s", getMapKeys(first), getMapKeys(second))
 	for key, fs := range first {
 		secondFs := second[key]
 		diffFilesystems(t, fs, secondFs)
 	}
-
-	return true
 }
 
-func diffFilesystems(t *testing.T, first, second afero.Fs) {
+func diffFilesystems(t *testing.T, first, second fsext.Fs) {
 	diffFilesystemsDir(t, first, second, "/")
 }
 
@@ -93,11 +90,11 @@ func getInfoNames(infos []fs.FileInfo) []string {
 	return names
 }
 
-func diffFilesystemsDir(t *testing.T, first, second afero.Fs, dirname string) {
-	firstInfos, err := afero.ReadDir(first, dirname)
+func diffFilesystemsDir(t *testing.T, first, second fsext.Fs, dirname string) {
+	firstInfos, err := fsext.ReadDir(first, dirname)
 	require.NoError(t, err, dirname)
 
-	secondInfos, err := afero.ReadDir(first, dirname)
+	secondInfos, err := fsext.ReadDir(first, dirname)
 	require.NoError(t, err, dirname)
 
 	require.ElementsMatch(t, getInfoNames(firstInfos), getInfoNames(secondInfos), "directory: "+dirname)
@@ -107,10 +104,10 @@ func diffFilesystemsDir(t *testing.T, first, second afero.Fs, dirname string) {
 			diffFilesystemsDir(t, first, second, path)
 			continue
 		}
-		firstData, err := afero.ReadFile(first, path)
+		firstData, err := fsext.ReadFile(first, path)
 		require.NoError(t, err, path)
 
-		secondData, err := afero.ReadFile(second, path)
+		secondData, err := fsext.ReadFile(second, path)
 		require.NoError(t, err, path)
 
 		assert.Equal(t, firstData, secondData, path)
@@ -131,7 +128,7 @@ func TestArchiveReadWrite(t *testing.T) {
 			FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
 			Data:        []byte(`// a contents`),
 			PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
-			Filesystems: map[string]afero.Fs{
+			Filesystems: map[string]fsext.Fs{
 				"file": makeMemMapFs(t, map[string][]byte{
 					"/path/to/a.js":      []byte(`// a contents`),
 					"/path/to/b.js":      []byte(`// b contents`),
@@ -183,7 +180,7 @@ func TestArchiveReadWrite(t *testing.T) {
 				K6Version:   consts.Version,
 				Data:        []byte(`// a contents`),
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.Pwd},
-				Filesystems: map[string]afero.Fs{
+				Filesystems: map[string]fsext.Fs{
 					"file": makeMemMapFs(t, map[string][]byte{
 						fmt.Sprintf("%s/a.js", entry.Pwd):      []byte(`// a contents`),
 						fmt.Sprintf("%s/b.js", entry.Pwd):      []byte(`// b contents`),
@@ -207,7 +204,7 @@ func TestArchiveReadWrite(t *testing.T) {
 				Data:        []byte(`// a contents`),
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.PwdNormAnon},
 
-				Filesystems: map[string]afero.Fs{
+				Filesystems: map[string]fsext.Fs{
 					"file": makeMemMapFs(t, map[string][]byte{
 						fmt.Sprintf("%s/a.js", entry.PwdNormAnon):      []byte(`// a contents`),
 						fmt.Sprintf("%s/b.js", entry.PwdNormAnon):      []byte(`// b contents`),
@@ -253,11 +250,11 @@ func TestArchiveJSONEscape(t *testing.T) {
 
 func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 	t.Parallel()
-	base := afero.NewMemMapFs()
-	cached := afero.NewMemMapFs()
+	base := fsext.NewMemMapFs()
+	cached := fsext.NewMemMapFs()
 	// we specifically have different contents in both places
-	require.NoError(t, afero.WriteFile(base, "/wrong", []byte(`ooops`), 0o644))
-	require.NoError(t, afero.WriteFile(cached, "/correct", []byte(`test`), 0o644))
+	require.NoError(t, fsext.WriteFile(base, "/wrong", []byte(`ooops`), 0o644))
+	require.NoError(t, fsext.WriteFile(cached, "/correct", []byte(`test`), 0o644))
 
 	arc := &Archive{
 		Type:        "js",
@@ -265,7 +262,7 @@ func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 		K6Version:   consts.Version,
 		Data:        []byte(`test`),
 		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
-		Filesystems: map[string]afero.Fs{
+		Filesystems: map[string]fsext.Fs{
 			"file": fsext.NewCacheOnReadFs(base, cached, 0),
 		},
 	}
@@ -276,11 +273,11 @@ func TestUsingCacheFromCacheOnReadFs(t *testing.T) {
 	newArc, err := ReadArchive(buf)
 	require.NoError(t, err)
 
-	data, err := afero.ReadFile(newArc.Filesystems["file"], "/correct")
+	data, err := fsext.ReadFile(newArc.Filesystems["file"], "/correct")
 	require.NoError(t, err)
 	require.Equal(t, string(data), "test")
 
-	data, err = afero.ReadFile(newArc.Filesystems["file"], "/wrong")
+	data, err = fsext.ReadFile(newArc.Filesystems["file"], "/wrong")
 	require.Error(t, err)
 	require.Nil(t, data)
 }
@@ -305,8 +302,8 @@ func TestArchiveWithDataNotInFS(t *testing.T) {
 
 func TestMalformedMetadata(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/metadata.json", []byte("{,}"), 0o644))
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/metadata.json", []byte("{,}"), 0o644))
 	b, err := dumpMemMapFsToBuf(fs)
 	require.NoError(t, err)
 	_, err = ReadArchive(b)
@@ -337,7 +334,7 @@ func TestStrangePaths(t *testing.T) {
 			FilenameURL: &url.URL{Scheme: "file", Path: pathToChange},
 			Data:        []byte(`// ` + pathToChange + ` contents`),
 			PwdURL:      &url.URL{Scheme: "file", Path: path.Dir(pathToChange)},
-			Filesystems: map[string]afero.Fs{
+			Filesystems: map[string]fsext.Fs{
 				"file": makeMemMapFs(t, otherMap),
 			},
 		}
@@ -358,16 +355,16 @@ func TestStrangePaths(t *testing.T) {
 
 		assert.Equal(t, arc1, arc2, pathToChange)
 
-		arc1Filesystems["https"] = afero.NewMemMapFs()
+		arc1Filesystems["https"] = fsext.NewMemMapFs()
 		diffMapFilesystems(t, arc1Filesystems, arc2Filesystems)
 	}
 }
 
 func TestStdinArchive(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	// we specifically have different contents in both places
-	require.NoError(t, afero.WriteFile(fs, "/-", []byte(`test`), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/-", []byte(`test`), 0o644))
 
 	arc := &Archive{
 		Type:        "js",
@@ -375,7 +372,7 @@ func TestStdinArchive(t *testing.T) {
 		K6Version:   consts.Version,
 		Data:        []byte(`test`),
 		PwdURL:      &url.URL{Scheme: "file", Path: "/"},
-		Filesystems: map[string]afero.Fs{
+		Filesystems: map[string]fsext.Fs{
 			"file": fs,
 		},
 	}
@@ -386,7 +383,7 @@ func TestStdinArchive(t *testing.T) {
 	newArc, err := ReadArchive(buf)
 	require.NoError(t, err)
 
-	data, err := afero.ReadFile(newArc.Filesystems["file"], "/-")
+	data, err := fsext.ReadFile(newArc.Filesystems["file"], "/-")
 	require.NoError(t, err)
 	require.Equal(t, string(data), "test")
 }

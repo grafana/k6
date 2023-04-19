@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -14,6 +13,7 @@ import (
 	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 )
@@ -109,10 +109,10 @@ type file struct {
 	filepath, contents string
 }
 
-func getFS(files []file) afero.Fs {
-	fs := afero.NewMemMapFs()
+func getFS(files []file) fsext.Fs {
+	fs := fsext.NewMemMapFs()
 	for _, f := range files {
-		must(afero.WriteFile(fs, f.filepath, []byte(f.contents), 0o644)) // modes don't matter in the afero.MemMapFs
+		must(fsext.WriteFile(fs, f.filepath, []byte(f.contents), 0o644)) // modes don't matter in the afero.MemMapFs
 	}
 	return fs
 }
@@ -121,7 +121,7 @@ type opts struct {
 	cli    []string
 	env    []string
 	runner *lib.Options
-	fs     afero.Fs
+	fs     fsext.Fs
 	cmds   []string
 }
 
@@ -145,7 +145,7 @@ type configConsolidationTestCase struct {
 
 func getConfigConsolidationTestCases() []configConsolidationTestCase {
 	defaultFlags := state.GetDefaultFlags(".config")
-	defaultConfig := func(jsonConfig string) afero.Fs {
+	defaultConfig := func(jsonConfig string) fsext.Fs {
 		return getFS([]file{{defaultFlags.ConfigFilePath, jsonConfig}})
 	}
 	I := null.IntFrom // shortcut for "Valid" (i.e. user-specified) ints

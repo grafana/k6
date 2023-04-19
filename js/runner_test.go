@@ -27,7 +27,6 @@ import (
 
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
@@ -599,9 +598,9 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			name, data := name, data
 			t.Run(name, func(t *testing.T) {
 				t.Parallel()
-				fs := afero.NewMemMapFs()
+				fs := fsext.NewMemMapFs()
 				require.NoError(t, fs.MkdirAll("/path/to", 0o755))
-				require.NoError(t, afero.WriteFile(fs, "/path/to/lib.js", []byte(`exports.default = "hi!";`), 0o644))
+				require.NoError(t, fsext.WriteFile(fs, "/path/to/lib.js", []byte(`exports.default = "hi!";`), 0o644))
 				r1, err := getSimpleRunner(t, data.filename, fmt.Sprintf(`
 					var hi = require("%s").default;
 					exports.default = function() {
@@ -1491,7 +1490,7 @@ func TestVUIntegrationOpenFunctionErrorWhenSneaky(t *testing.T) {
 func TestVUDoesOpenUnderV0Condition(t *testing.T) {
 	t.Parallel()
 
-	baseFS := afero.NewMemMapFs()
+	baseFS := fsext.NewMemMapFs()
 	data := `
 			if (__VU == 0) {
 				let data = open("/home/somebody/test.json");
@@ -1500,10 +1499,10 @@ func TestVUDoesOpenUnderV0Condition(t *testing.T) {
 				console.log("hey")
 			}
 		`
-	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
-	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
 
-	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
+	fs := fsext.NewCacheOnReadFs(baseFS, fsext.NewMemMapFs(), 0)
 
 	r, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
@@ -1515,7 +1514,7 @@ func TestVUDoesOpenUnderV0Condition(t *testing.T) {
 func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 	t.Parallel()
 
-	baseFS := afero.NewMemMapFs()
+	baseFS := fsext.NewMemMapFs()
 	data := `
 			if (__VU > 0) {
 				let data = open("/home/somebody/test.json");
@@ -1524,10 +1523,10 @@ func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 				console.log("hey")
 			}
 		`
-	require.NoError(t, afero.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
-	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
 
-	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
+	fs := fsext.NewCacheOnReadFs(baseFS, fsext.NewMemMapFs(), 0)
 
 	r, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
@@ -1540,7 +1539,7 @@ func TestVUDoesNotOpenUnderConditions(t *testing.T) {
 func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
 	t.Parallel()
 
-	baseFS := afero.NewMemMapFs()
+	baseFS := fsext.NewMemMapFs()
 	data := `
 			if (__VU == 1) {
 				let data = open("/home/nobody");
@@ -1549,9 +1548,9 @@ func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
 				console.log("hey")
 			}
 		`
-	require.NoError(t, afero.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
 
-	fs := fsext.NewCacheOnReadFs(baseFS, afero.NewMemMapFs(), 0)
+	fs := fsext.NewCacheOnReadFs(baseFS, fsext.NewMemMapFs(), 0)
 
 	r, err := getSimpleRunner(t, "/script.js", data, fs)
 	require.NoError(t, err)
@@ -1987,7 +1986,7 @@ func TestInitContextForbidden(t *testing.T) {
 func TestArchiveRunningIntegrity(t *testing.T) {
 	t.Parallel()
 
-	fileSystem := afero.NewMemMapFs()
+	fileSystem := fsext.NewMemMapFs()
 	data := `
 			var fput = open("/home/somebody/test.json");
 			exports.options = { setupTimeout: "10s", teardownTimeout: "10s" };
@@ -2000,8 +1999,8 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 				}
 			}
 		`
-	require.NoError(t, afero.WriteFile(fileSystem, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
-	require.NoError(t, afero.WriteFile(fileSystem, "/script.js", []byte(data), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(fileSystem, "/home/somebody/test.json", []byte(`42`), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(fileSystem, "/script.js", []byte(data), fs.ModePerm))
 	r1, err := getSimpleRunner(t, "/script.js", data, fileSystem)
 	require.NoError(t, err)
 
@@ -2045,8 +2044,8 @@ func TestArchiveRunningIntegrity(t *testing.T) {
 
 func TestArchiveNotPanicking(t *testing.T) {
 	t.Parallel()
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/non/existent", []byte(`42`), fs.ModePerm))
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/non/existent", []byte(`42`), fs.ModePerm))
 	r1, err := getSimpleRunner(t, "/script.js", `
 			var fput = open("/non/existent");
 			exports.default = function(data) {}
@@ -2054,7 +2053,7 @@ func TestArchiveNotPanicking(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	arc.Filesystems = map[string]afero.Fs{"file": afero.NewMemMapFs()}
+	arc.Filesystems = map[string]fsext.Fs{"file": fsext.NewMemMapFs()}
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	r2, err := NewFromArchive(
@@ -2327,7 +2326,7 @@ func TestVUPanic(t *testing.T) {
 }
 
 type multiFileTestCase struct {
-	fses       map[string]afero.Fs
+	fses       map[string]fsext.Fs
 	rtOpts     lib.RuntimeOptions
 	cwd        string
 	script     string
@@ -2408,17 +2407,17 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 		}, nil
 	}
 
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	protoFile, err := ioutil.ReadFile("../vendor/google.golang.org/grpc/test/grpc_testing/test.proto")
 	require.NoError(t, err)
-	require.NoError(t, afero.WriteFile(fs, "/path/to/service.proto", protoFile, 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/path/to/same-dir.proto", []byte(
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/service.proto", protoFile, 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/same-dir.proto", []byte(
 		`syntax = "proto3";package whatever;import "service.proto";`,
 	), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/path/subdir.proto", []byte(
+	require.NoError(t, fsext.WriteFile(fs, "/path/subdir.proto", []byte(
 		`syntax = "proto3";package whatever;import "to/service.proto";`,
 	), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/path/to/abs.proto", []byte(
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/abs.proto", []byte(
 		`syntax = "proto3";package whatever;import "/path/to/service.proto";`,
 	), 0o644))
 
@@ -2443,7 +2442,7 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 		`, loadCode))
 
 		return multiFileTestCase{
-			fses:    map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
+			fses:    map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()},
 			rtOpts:  lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
 			samples: make(chan metrics.SampleContainer, 100),
 			cwd:     cwd, expInitErr: expInitErr, expVUErr: expVUErr, script: script,

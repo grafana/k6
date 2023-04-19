@@ -4,13 +4,13 @@ import (
 	"encoding/json"
 	"io"
 
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/converter/har"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 )
 
 // TODO: split apart like `k6 run` and `k6 archive`?
@@ -34,13 +34,13 @@ func getCmdConvert(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(gs, `
   # Convert a HAR file to a k6 script.
   {{.}} convert -O har-session.js session.har
-  
+
   # Convert a HAR file to a k6 script creating requests only for the given domain/s.
   {{.}} convert -O har-session.js --only yourdomain.com,additionaldomain.com session.har
-  
+
   # Convert a HAR file. Batching requests together as long as idle time between requests <800ms
   {{.}} convert --batch-threshold 800 session.har
-  
+
   # Run the k6 script.
   {{.}} run har-session.js`[1:])
 
@@ -69,7 +69,7 @@ func getCmdConvert(gs *state.GlobalState) *cobra.Command {
 			options := lib.Options{MaxRedirects: null.IntFrom(0)}
 
 			if optionsFilePath != "" {
-				optionsFileContents, readErr := afero.ReadFile(gs.FS, optionsFilePath)
+				optionsFileContents, readErr := fsext.ReadFile(gs.FS, optionsFilePath)
 				if readErr != nil {
 					return readErr
 				}

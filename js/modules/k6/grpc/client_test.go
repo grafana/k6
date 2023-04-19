@@ -17,7 +17,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
@@ -73,12 +72,12 @@ func TestClient(t *testing.T) {
 
 		cwd, err := os.Getwd()
 		require.NoError(t, err)
-		fs := afero.NewOsFs()
+		fs := fsext.NewOsFs()
 		if isWindows {
 			fs = fsext.NewTrimFilePathSeparatorFs(fs)
 		}
 		testRuntime.VU.InitEnvField.CWD = &url.URL{Path: cwd}
-		testRuntime.VU.InitEnvField.FileSystems = map[string]afero.Fs{"file": fs}
+		testRuntime.VU.InitEnvField.FileSystems = map[string]fsext.Fs{"file": fs}
 
 		return testState{
 			Runtime: testRuntime,

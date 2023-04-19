@@ -9,7 +9,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/fsext"
@@ -22,7 +21,7 @@ const cantBeUsedOutsideInitContextMsg = `the "%s" function is only available in 
 // openImpl implements openImpl() in the init context and will read and return the
 // contents of a file. If the second argument is "b" it returns an ArrayBuffer
 // instance, otherwise a string representation.
-func openImpl(rt *goja.Runtime, fs afero.Fs, basePWD *url.URL, filename string, args ...string) (goja.Value, error) {
+func openImpl(rt *goja.Runtime, fs fsext.Fs, basePWD *url.URL, filename string, args ...string) (goja.Value, error) {
 	// Here IsAbs should be enough but unfortunately it doesn't handle absolute paths starting from
 	// the current drive on windows like `\users\noname\...`. Also it makes it more easy to test and
 	// will probably be need for archive execution under windows if always consider '/...' as an
@@ -32,8 +31,8 @@ func openImpl(rt *goja.Runtime, fs afero.Fs, basePWD *url.URL, filename string, 
 	}
 	filename = filepath.Clean(filename)
 
-	if filename[0:1] != afero.FilePathSeparator {
-		filename = afero.FilePathSeparator + filename
+	if filename[0:1] != fsext.FilePathSeparator {
+		filename = fsext.FilePathSeparator + filename
 	}
 
 	data, err := readFile(fs, filename)
@@ -48,7 +47,7 @@ func openImpl(rt *goja.Runtime, fs afero.Fs, basePWD *url.URL, filename string, 
 	return rt.ToValue(string(data)), nil
 }
 
-func readFile(fileSystem afero.Fs, filename string) (data []byte, err error) {
+func readFile(fileSystem fsext.Fs, filename string) (data []byte, err error) {
 	defer func() {
 		if errors.Is(err, fsext.ErrPathNeverRequestedBefore) {
 			// loading different files per VU is not supported, so all files should are going
@@ -60,18 +59,18 @@ func readFile(fileSystem afero.Fs, filename string) (data []byte, err error) {
 		}
 	}()
 
-	// Workaround for https://github.com/spf13/afero/issues/201
-	if isDir, err := afero.IsDir(fileSystem, filename); err != nil {
+	// Workaround for https://github.com/spf13/fsext/issues/201
+	if isDir, err := fsext.IsDir(fileSystem, filename); err != nil {
 		return nil, err
 	} else if isDir {
 		return nil, fmt.Errorf("open() can't be used with directories, path: %q", filename)
 	}
 
-	return afero.ReadFile(fileSystem, filename)
+	return fsext.ReadFile(fileSystem, filename)
 }
 
 // allowOnlyOpenedFiles enables seen only files
-func allowOnlyOpenedFiles(fs afero.Fs) {
+func allowOnlyOpenedFiles(fs fsext.Fs) {
 	alreadyOpenedFS, ok := fs.(fsext.OnlyCachedEnabler)
 	if !ok {
 		return
@@ -122,7 +121,7 @@ func (r *requireImpl) require(specifier string) (*goja.Object, error) {
 	return r.modules.Require(currentPWD, specifier)
 }
 
-func generateSourceMapLoader(logger logrus.FieldLogger, filesystems map[string]afero.Fs,
+func generateSourceMapLoader(logger logrus.FieldLogger, filesystems map[string]fsext.Fs,
 ) func(path string) ([]byte, error) {
 	return func(path string) ([]byte, error) {
 		u, err := url.Parse(path)

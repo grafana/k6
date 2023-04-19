@@ -12,7 +12,7 @@ import (
 	"syscall"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
+	"go.k6.io/k6/lib/fsext"
 )
 
 // fileHookBufferSize is a default size for the fileHook's loglines channel.
@@ -20,7 +20,7 @@ const fileHookBufferSize = 100
 
 // fileHook is a hook to handle writing to local files.
 type fileHook struct {
-	fs             afero.Fs
+	fs             fsext.Fs
 	fallbackLogger logrus.FieldLogger
 	loglines       chan []byte
 	path           string
@@ -31,7 +31,7 @@ type fileHook struct {
 
 // FileHookFromConfigLine returns new fileHook hook.
 func FileHookFromConfigLine(
-	fs afero.Fs, getCwd func() (string, error),
+	fs fsext.Fs, getCwd func() (string, error),
 	fallbackLogger logrus.FieldLogger, line string,
 ) (AsyncHook, error) {
 	hook := &fileHook{

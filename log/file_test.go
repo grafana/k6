@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/lib/fsext"
 )
 
 type nopCloser struct {
@@ -95,7 +95,7 @@ func TestFileHookFromConfigLine(t *testing.T) {
 			}
 
 			res, err := FileHookFromConfigLine(
-				afero.NewMemMapFs(), getCwd, logrus.New(), test.line)
+				fsext.NewMemMapFs(), getCwd, logrus.New(), test.line)
 
 			if test.err {
 				require.Error(t, err)

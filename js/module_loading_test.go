@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
@@ -58,16 +58,16 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 		cData := data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			fileSystem := afero.NewMemMapFs()
-			require.NoError(t, afero.WriteFile(fileSystem, "/C.js", []byte(cData), fs.ModePerm))
+			fileSystem := fsext.NewMemMapFs()
+			require.NoError(t, fsext.WriteFile(fileSystem, "/C.js", []byte(cData), fs.ModePerm))
 
-			require.NoError(t, afero.WriteFile(fileSystem, "/A.js", []byte(`
+			require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(`
 		import { C } from "./C.js";
 		export function A() {
 			return C();
 		}
 	`), fs.ModePerm))
-			require.NoError(t, afero.WriteFile(fileSystem, "/B.js", []byte(`
+			require.NoError(t, fsext.WriteFile(fileSystem, "/B.js", []byte(`
 		var  c = require("./C.js");
 		export function B() {
 			return c.C();
@@ -121,8 +121,8 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 
 func TestLoadExportsIsUsableInModule(t *testing.T) {
 	t.Parallel()
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/A.js", []byte(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(`
 		export function A() {
 			return "A";
 		}
@@ -179,8 +179,8 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 	// inside script that is imported
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/A.js", []byte(tb.Replacer.Replace(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(tb.Replacer.Replace(`
 		import http from "k6/http";
 		export function A() {
 			return http.get("HTTPBIN_URL/get");
@@ -229,8 +229,8 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 
 func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 	t.Parallel()
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/A.js", []byte(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(`
 		var globalVar = 0;
 		export function A() {
 			globalVar += 1
@@ -290,8 +290,8 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 func TestLoadCycle(t *testing.T) {
 	t.Parallel()
 	// This is mostly the example from https://hacks.mozilla.org/2018/03/es-modules-a-cartoon-deep-dive/
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/counter.js", []byte(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/counter.js", []byte(`
 			let main = require("./main.js");
 			exports.count = 5;
 			export function a() {
@@ -299,7 +299,7 @@ func TestLoadCycle(t *testing.T) {
 			}
 	`), fs.ModePerm))
 
-	require.NoError(t, afero.WriteFile(fileSystem, "/main.js", []byte(`
+	require.NoError(t, fsext.WriteFile(fileSystem, "/main.js", []byte(`
 			let counter = require("./counter.js");
 			let count = counter.count;
 			let a = counter.a;
@@ -316,7 +316,7 @@ func TestLoadCycle(t *testing.T) {
 				}
 			}
 	`), fs.ModePerm))
-	data, err := afero.ReadFile(fileSystem, "/main.js")
+	data, err := fsext.ReadFile(fileSystem, "/main.js")
 	require.NoError(t, err)
 	r1, err := getSimpleRunner(t, "/main.js", string(data), fileSystem, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
 	require.NoError(t, err)
@@ -353,8 +353,8 @@ func TestLoadCycleBinding(t *testing.T) {
 	t.Parallel()
 	// This is mostly the example from
 	// http://2ality.com/2015/07/es6-module-exports.html#why-export-bindings
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/a.js", []byte(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/a.js", []byte(`
 		import {bar} from './b.js';
 		export function foo(a) {
 				if (a !== undefined) {
@@ -364,7 +364,7 @@ func TestLoadCycleBinding(t *testing.T) {
 		}
 	`), fs.ModePerm))
 
-	require.NoError(t, afero.WriteFile(fileSystem, "/b.js", []byte(`
+	require.NoError(t, fsext.WriteFile(fileSystem, "/b.js", []byte(`
 		import {foo} from './a.js';
 		export function bar(a) {
 				if (a !== undefined) {
@@ -420,8 +420,8 @@ func TestLoadCycleBinding(t *testing.T) {
 
 func TestBrowserified(t *testing.T) {
 	t.Parallel()
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/browserified.js", []byte(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/browserified.js", []byte(`
 		(function(f){if(typeof exports==="object"&&typeof module!=="undefined"){module.exports=f()}else if(typeof define==="function"&&define.amd){define([],f)}else{var g;if(typeof window!=="undefined"){g=window}else if(typeof global!=="undefined"){g=global}else if(typeof self!=="undefined"){g=self}else{g=this}g.npmlibs = f()}})(function(){var define,module,exports;return (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
 		module.exports.A = function () {
 			return "a";
@@ -491,7 +491,7 @@ func TestBrowserified(t *testing.T) {
 
 func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 	t.Parallel()
-	fileSystem := afero.NewMemMapFs()
+	fileSystem := fsext.NewMemMapFs()
 	data := `var b;
 			try {
 				b = eval("require('buffer')");
@@ -503,7 +503,7 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 					throw new Error("wrong b "+ JSON.stringify(b));
 				}
 			}`
-	require.NoError(t, afero.WriteFile(fileSystem, "/script.js", []byte(data), 0o644))
+	require.NoError(t, fsext.WriteFile(fileSystem, "/script.js", []byte(data), 0o644))
 	r1, err := getSimpleRunner(t, "/script.js", data, fileSystem)
 	require.NoError(t, err)
 
@@ -542,10 +542,10 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 	t.Parallel()
 
-	fileSystem := afero.NewMemMapFs()
+	fileSystem := fsext.NewMemMapFs()
 	data := `exports.default = function() {}
 //# sourceMappingURL=test.min.js.map`
-	require.NoError(t, afero.WriteFile(fileSystem, "/script.js", []byte(data), 0o644))
+	require.NoError(t, fsext.WriteFile(fileSystem, "/script.js", []byte(data), 0o644))
 	r1, err := getSimpleRunner(t, "/script.js", data, fileSystem)
 	require.NoError(t, err)
 
@@ -584,8 +584,8 @@ func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 
 func TestOptionsAreGloballyReadable(t *testing.T) {
 	t.Parallel()
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/A.js", []byte(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(`
         export function A() {
         // we can technically get a field set from outside of js this way
             return options.someField;
@@ -643,8 +643,8 @@ func TestOptionsAreGloballyReadable(t *testing.T) {
 
 func TestOptionsAreNotGloballyWritable(t *testing.T) {
 	t.Parallel()
-	fileSystem := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fileSystem, "/A.js", []byte(`
+	fileSystem := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(`
     export function A() {
         // this requires that this is defined
         options.minIterationDuration = "1h"

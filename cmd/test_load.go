@@ -11,7 +11,6 @@ import (
 	"syscall"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.k6.io/k6/cmd/state"
@@ -19,6 +18,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
 )
@@ -34,8 +34,8 @@ type loadedTest struct {
 	sourceRootPath string // contains the raw string the user supplied
 	pwd            string
 	source         *loader.SourceData
-	fs             afero.Fs
-	fileSystems    map[string]afero.Fs
+	fs             fsext.Fs
+	fileSystems    map[string]fsext.Fs
 	preInitState   *lib.TestPreInitState
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
@@ -159,7 +159,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 
 // readSource is a small wrapper around loader.ReadSource returning
 // result of the load and filesystems map
-func readSource(gs *state.GlobalState, filename string) (*loader.SourceData, map[string]afero.Fs, string, error) {
+func readSource(gs *state.GlobalState, filename string) (*loader.SourceData, map[string]fsext.Fs, string, error) {
 	pwd, err := gs.Getwd()
 	if err != nil {
 		return nil, nil, "", err

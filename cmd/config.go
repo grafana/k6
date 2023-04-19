@@ -11,7 +11,6 @@ import (
 
 	"github.com/mstoykov/envconfig"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
@@ -20,6 +19,7 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 )
@@ -116,7 +116,7 @@ func readDiskConfig(gs *state.GlobalState) (Config, error) {
 		return Config{}, err
 	}
 
-	data, err := afero.ReadFile(gs.FS, gs.Flags.ConfigFilePath)
+	data, err := fsext.ReadFile(gs.FS, gs.Flags.ConfigFilePath)
 	if err != nil {
 		return Config{}, fmt.Errorf("couldn't load the configuration from %q: %w", gs.Flags.ConfigFilePath, err)
 	}
@@ -140,7 +140,7 @@ func writeDiskConfig(gs *state.GlobalState, conf Config) error {
 		return err
 	}
 
-	return afero.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, 0o644)
+	return fsext.WriteFile(gs.FS, gs.Flags.ConfigFilePath, data, 0o644)
 }
 
 // Reads configuration variables from the environment.

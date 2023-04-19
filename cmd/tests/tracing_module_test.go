@@ -9,10 +9,10 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/metrics"
 )
@@ -56,7 +56,7 @@ func TestTracingModuleClient(t *testing.T) {
 
 	assert.Equal(t, int64(9), atomic.LoadInt64(&gotRequests))
 
-	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
 	assertHasTraceIDMetadata(t, jsonResults, 9, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
@@ -148,7 +148,7 @@ func TestTracingModuleClient_HundredPercentSampling(t *testing.T) {
 	assert.Equal(t, int64(100), atomic.LoadInt64(&gotSampleFlags))
 	assert.Equal(t, int64(100), atomic.LoadInt64(&gotRequests))
 
-	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
 	assertHasTraceIDMetadata(t, jsonResults, 100, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
@@ -240,7 +240,7 @@ func TestTracingInstrumentHTTP_W3C(t *testing.T) {
 
 	assert.Equal(t, int64(9), atomic.LoadInt64(&gotRequests))
 
-	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
 	assertHasTraceIDMetadata(t, jsonResults, 9, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
@@ -284,7 +284,7 @@ func TestTracingInstrumentHTTP_Jaeger(t *testing.T) {
 
 	assert.Equal(t, int64(8), atomic.LoadInt64(&gotRequests))
 
-	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
 	assertHasTraceIDMetadata(t, jsonResults, 8, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
@@ -335,7 +335,7 @@ func TestTracingInstrumentHTTP_FillsParams(t *testing.T) {
 
 	assert.Equal(t, int64(8), atomic.LoadInt64(&gotRequests))
 
-	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
 	assertHasTraceIDMetadata(t, jsonResults, 8, tb.Replacer.Replace("HTTPBIN_IP_URL/tracing"))
@@ -359,7 +359,7 @@ func TestTracingInstrummentHTTP_SupportsMultipleTestScripts(t *testing.T) {
 		import tracing from "k6/experimental/tracing";
 
 		import { iShouldBeInstrumented } from "./imported.js";
-		
+
 		tracing.instrumentHTTP({
 			propagator: "w3c",
 		})
@@ -378,15 +378,15 @@ func TestTracingInstrummentHTTP_SupportsMultipleTestScripts(t *testing.T) {
 	`)
 
 	ts := NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "main.js"), []byte(mainScript), 0o644))
-	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "imported.js"), []byte(importedScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "main.js"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "imported.js"), []byte(importedScript), 0o644))
 
 	ts.CmdArgs = []string{"k6", "run", "--out", "json=results.json", "main.js"}
 	ts.ExpectedExitCode = 0
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	jsonResults, err := afero.ReadFile(ts.FS, "results.json")
+	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 
 	assert.Equal(t, int64(1), atomic.LoadInt64(&gotRequests))

@@ -12,10 +12,10 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/ui/console"
 )
@@ -39,7 +39,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	ctx, cancel := context.WithCancel(context.Background())
 	tb.Cleanup(cancel)
 
-	fs := &afero.MemMapFs{}
+	fs := fsext.NewMemMapFs()
 	cwd := "/test/" // TODO: Make this relative to the test?
 	if runtime.GOOS == "windows" {
 		cwd = "c:\\test\\"

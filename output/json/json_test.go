@@ -8,10 +8,10 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -137,7 +137,7 @@ func TestJsonOutputFileError(t *testing.T) {
 	t.Parallel()
 
 	stdout := new(bytes.Buffer)
-	fs := afero.NewReadOnlyFs(afero.NewMemMapFs())
+	fs := fsext.NewReadOnlyFs(fsext.NewMemMapFs())
 	out, err := New(output.Params{
 		Logger:         testutils.NewLogger(t),
 		StdOut:         stdout,
@@ -152,7 +152,7 @@ func TestJsonOutputFile(t *testing.T) {
 	t.Parallel()
 
 	stdout := new(bytes.Buffer)
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	out, err := New(output.Params{
 		Logger:         testutils.NewLogger(t),
 		StdOut:         stdout,
@@ -180,7 +180,7 @@ func TestJsonOutputFileGzipped(t *testing.T) {
 	t.Parallel()
 
 	stdout := new(bytes.Buffer)
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	out, err := New(output.Params{
 		Logger:         testutils.NewLogger(t),
 		StdOut:         stdout,

@@ -8,14 +8,13 @@ import (
 	"path/filepath"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 
 	"go.k6.io/k6/lib/fsext"
 )
 
 // ReadSource Reads a source file from any supported destination.
 func ReadSource(
-	logger logrus.FieldLogger, src, pwd string, filesystems map[string]afero.Fs, stdin io.Reader,
+	logger logrus.FieldLogger, src, pwd string, filesystems map[string]fsext.Fs, stdin io.Reader,
 ) (*SourceData, error) {
 	if src == "-" {
 		data, err := io.ReadAll(stdin)
@@ -23,7 +22,8 @@ func ReadSource(
 			return nil, err
 		}
 		// TODO: don't do it in this way ...
-		err = afero.WriteFile(filesystems["file"].(fsext.CacheLayerGetter).GetCachingFs(), "/-", data, 0o644)
+		//nolint:forcetypeassert
+		err = fsext.WriteFile(filesystems["file"].(fsext.CacheLayerGetter).GetCachingFs(), "/-", data, 0o644)
 		if err != nil {
 			return nil, fmt.Errorf("caching data read from -: %w", err)
 		}
@@ -37,8 +37,8 @@ func ReadSource(
 	}
 	// All paths should start with a / in all fses. This is mostly for windows where it will start
 	// with a volume name : C:\something.js
-	srcLocalPath = filepath.Clean(afero.FilePathSeparator + srcLocalPath)
-	if ok, _ := afero.Exists(filesystems["file"], srcLocalPath); ok {
+	srcLocalPath = filepath.Clean(fsext.FilePathSeparator + srcLocalPath)
+	if ok, _ := fsext.Exists(filesystems["file"], srcLocalPath); ok {
 		// there is file on the local disk ... lets use it :)
 		return Load(logger, filesystems, &url.URL{Scheme: "file", Path: filepath.ToSlash(srcLocalPath)}, src)
 	}

@@ -16,7 +16,6 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
@@ -28,6 +27,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
@@ -422,7 +422,7 @@ func reportUsage(ctx context.Context, execScheduler *execution.Scheduler) error 
 	return err
 }
 
-func handleSummaryResult(fs afero.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {
+func handleSummaryResult(fs fsext.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {
 	var errs []error
 
 	getWriter := func(path string) (io.Writer, error) {

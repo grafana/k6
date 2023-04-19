@@ -5,8 +5,8 @@ import (
 	"path"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/output"
 )
@@ -17,7 +17,7 @@ func BenchmarkFlushMetrics(b *testing.B) {
 	out, err := New(output.Params{
 		Logger:         testutils.NewLogger(b),
 		StdOut:         stdout,
-		FS:             afero.NewOsFs(),
+		FS:             fsext.NewOsFs(),
 		ConfigArgument: path.Join(dir, "test.gz"),
 	})
 	require.NoError(b, err)

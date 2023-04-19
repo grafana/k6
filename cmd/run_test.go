@@ -13,7 +13,6 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,20 +37,20 @@ func (fw mockWriter) Write(p []byte) (n int, err error) {
 
 var _ io.Writer = mockWriter{}
 
-func getFiles(t *testing.T, fileSystem afero.Fs) map[string]*bytes.Buffer {
+func getFiles(t *testing.T, fileSystem fsext.Fs) map[string]*bytes.Buffer {
 	result := map[string]*bytes.Buffer{}
 	walkFn := func(filePath string, _ fs.FileInfo, err error) error {
 		if filePath == "/" || filePath == "\\" {
 			return nil
 		}
 		require.NoError(t, err)
-		contents, err := afero.ReadFile(fileSystem, filePath)
+		contents, err := fsext.ReadFile(fileSystem, filePath)
 		require.NoError(t, err)
 		result[filePath] = bytes.NewBuffer(contents)
 		return nil
 	}
 
-	err := fsext.Walk(fileSystem, afero.FilePathSeparator, filepath.WalkFunc(walkFn))
+	err := fsext.Walk(fileSystem, fsext.FilePathSeparator, filepath.WalkFunc(walkFn))
 	require.NoError(t, err)
 
 	return result
@@ -64,9 +63,9 @@ func assertEqual(t *testing.T, exp string, actual io.Reader) {
 }
 
 func initVars() (
-	content map[string]io.Reader, stdout *bytes.Buffer, stderr *bytes.Buffer, fs afero.Fs,
+	content map[string]io.Reader, stdout *bytes.Buffer, stderr *bytes.Buffer, fs fsext.Fs,
 ) {
-	return map[string]io.Reader{}, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), afero.NewMemMapFs()
+	return map[string]io.Reader{}, bytes.NewBuffer([]byte{}), bytes.NewBuffer([]byte{}), fsext.NewMemMapFs()
 }
 
 func TestHandleSummaryResultSimple(t *testing.T) {
@@ -201,7 +200,7 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
 			ts.ExpectedExitCode = int(tc.expExitCode)
@@ -256,7 +255,7 @@ func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
 			ts.ExpectedExitCode = int(tc.expExitCode)
@@ -306,7 +305,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 
 			ts.CmdArgs = []string{"k6", "run", tc.testFilename}
 			ts.ExpectedExitCode = int(tc.expExitCode)

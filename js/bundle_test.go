@@ -16,7 +16,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -49,12 +48,12 @@ func getTestPreInitState(tb testing.TB, logger logrus.FieldLogger, rtOpts *lib.R
 }
 
 func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) (*Bundle, error) {
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	var rtOpts *lib.RuntimeOptions
 	var logger logrus.FieldLogger
 	for _, o := range opts {
 		switch opt := o.(type) {
-		case afero.Fs:
+		case fsext.Fs:
 			fs = opt
 		case lib.RuntimeOptions:
 			rtOpts = &opt
@@ -71,7 +70,7 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
 		},
-		map[string]afero.Fs{"file": fs, "https": afero.NewMemMapFs()},
+		map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()},
 	)
 }
 
@@ -652,20 +651,20 @@ func TestOpen(t *testing.T) {
 			isError:  true,
 		},
 	}
-	fss := map[string]func() (afero.Fs, string, func()){
-		"MemMapFS": func() (afero.Fs, string, func()) {
-			fs := afero.NewMemMapFs()
+	fss := map[string]func() (fsext.Fs, string, func()){
+		"MemMapFS": func() (fsext.Fs, string, func()) {
+			fs := fsext.NewMemMapFs()
 			require.NoError(t, fs.MkdirAll("/path/to", 0o755))
-			require.NoError(t, afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0o644))
+			require.NoError(t, fsext.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0o644))
 			return fs, "", func() {}
 		},
-		"OsFS": func() (afero.Fs, string, func()) {
+		"OsFS": func() (fsext.Fs, string, func()) {
 			prefix, err := ioutil.TempDir("", "k6_open_test")
 			require.NoError(t, err)
-			fs := afero.NewOsFs()
+			fs := fsext.NewOsFs()
 			filePath := filepath.Join(prefix, "/path/to/file.txt")
 			require.NoError(t, fs.MkdirAll(filepath.Join(prefix, "/path/to"), 0o755))
-			require.NoError(t, afero.WriteFile(fs, filePath, []byte(`hi`), 0o644))
+			require.NoError(t, fsext.WriteFile(fs, filePath, []byte(`hi`), 0o644))
 			if isWindows {
 				fs = fsext.NewTrimFilePathSeparatorFs(fs)
 			}
@@ -686,7 +685,7 @@ func TestOpen(t *testing.T) {
 					t.Parallel()
 					fs, prefix, cleanUp := fsInit()
 					defer cleanUp()
-					fs = afero.NewReadOnlyFs(fs)
+					fs = fsext.NewReadOnlyFs(fs)
 					openPath := tCase.openPath
 					// if fullpath prepend prefix
 					if openPath != "" && (openPath[0] == '/' || openPath[0] == '\\') {
@@ -896,10 +895,10 @@ func TestBundleMakeArchive(t *testing.T) {
 		tc := tc
 		t.Run(tc.cm.String(), func(t *testing.T) {
 			t.Parallel()
-			fs := afero.NewMemMapFs()
+			fs := fsext.NewMemMapFs()
 			_ = fs.MkdirAll("/path/to", 0o755)
-			_ = afero.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0o644)
-			_ = afero.WriteFile(fs, "/path/to/exclaim.js", []byte(tc.exclaim), 0o644)
+			_ = fsext.WriteFile(fs, "/path/to/file.txt", []byte(`hi`), 0o644)
+			_ = fsext.WriteFile(fs, "/path/to/exclaim.js", []byte(tc.exclaim), 0o644)
 
 			rtOpts := lib.RuntimeOptions{CompatibilityMode: null.StringFrom(tc.cm.String())}
 			b, err := getSimpleBundle(t, "/path/to/script.js", tc.script, fs, rtOpts)
@@ -913,11 +912,11 @@ func TestBundleMakeArchive(t *testing.T) {
 			assert.Equal(t, tc.script, string(arc.Data))
 			assert.Equal(t, "file:///path/to/", arc.PwdURL.String())
 
-			exclaimData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
+			exclaimData, err := fsext.ReadFile(arc.Filesystems["file"], "/path/to/exclaim.js")
 			require.NoError(t, err)
 			assert.Equal(t, tc.exclaim, string(exclaimData))
 
-			fileData, err := afero.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
+			fileData, err := fsext.ReadFile(arc.Filesystems["file"], "/path/to/file.txt")
 			require.NoError(t, err)
 			assert.Equal(t, `hi`, string(fileData))
 			assert.Equal(t, consts.Version, arc.K6Version)

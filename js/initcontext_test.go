@@ -13,12 +13,12 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
@@ -90,16 +90,16 @@ func TestRequire(t *testing.T) {
 		})
 		t.Run("Invalid", func(t *testing.T) {
 			t.Parallel()
-			fs := afero.NewMemMapFs()
-			require.NoError(t, afero.WriteFile(fs, "/file.js", []byte{0x00}, 0o755))
+			fs := fsext.NewMemMapFs()
+			require.NoError(t, fsext.WriteFile(fs, "/file.js", []byte{0x00}, 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "SyntaxError: file:///file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
 		})
 		t.Run("Error", func(t *testing.T) {
 			t.Parallel()
-			fs := afero.NewMemMapFs()
-			require.NoError(t, afero.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
+			fs := fsext.NewMemMapFs()
+			require.NoError(t, fsext.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			assert.EqualError(t, err,
 				"Error: aaaa\n\tat file:///file.js:2:7(3)\n\tat go.k6.io/k6/js.(*requireImpl).require-fm (native)\n\tat file:///script.js:1:0(15)\n")
@@ -146,7 +146,7 @@ func TestRequire(t *testing.T) {
 					}
 					t.Run(name, func(t *testing.T) {
 						t.Parallel()
-						fs := afero.NewMemMapFs()
+						fs := fsext.NewMemMapFs()
 
 						jsLib := `export default function() { return 12345; }`
 						if constName != "" {
@@ -157,11 +157,11 @@ func TestRequire(t *testing.T) {
 
 							constsrc := `export let c = 12345;`
 							require.NoError(t, fs.MkdirAll(filepath.Dir(constPath), 0o755))
-							require.NoError(t, afero.WriteFile(fs, constPath, []byte(constsrc), 0o644))
+							require.NoError(t, fsext.WriteFile(fs, constPath, []byte(constsrc), 0o644))
 						}
 
 						require.NoError(t, fs.MkdirAll(filepath.Dir(data.LibPath), 0o755))
-						require.NoError(t, afero.WriteFile(fs, data.LibPath, []byte(jsLib), 0o644))
+						require.NoError(t, fsext.WriteFile(fs, data.LibPath, []byte(jsLib), 0o644))
 
 						data := fmt.Sprintf(`
 								import fn from "%s";
@@ -180,9 +180,9 @@ func TestRequire(t *testing.T) {
 
 		t.Run("Isolation", func(t *testing.T) {
 			t.Parallel()
-			fs := afero.NewMemMapFs()
-			require.NoError(t, afero.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0o644))
-			require.NoError(t, afero.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0o644))
+			fs := fsext.NewMemMapFs()
+			require.NoError(t, fsext.WriteFile(fs, "/a.js", []byte(`const myvar = "a";`), 0o644))
+			require.NoError(t, fsext.WriteFile(fs, "/b.js", []byte(`const myvar = "b";`), 0o644))
 			data := `
 				import "./a.js";
 				import "./b.js";
@@ -204,9 +204,9 @@ func TestRequire(t *testing.T) {
 
 func createAndReadFile(t *testing.T, file string, content []byte, expectedLength int, binary string) (*BundleInstance, error) {
 	t.Helper()
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	require.NoError(t, fs.MkdirAll("/path/to", 0o755))
-	require.NoError(t, afero.WriteFile(fs, "/path/to/"+file, content, 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/"+file, content, 0o644))
 
 	data := fmt.Sprintf(`
 		let binArg = "%s";
@@ -286,7 +286,7 @@ func TestInitContextOpen(t *testing.T) {
 	t.Run("Directory", func(t *testing.T) {
 		t.Parallel()
 		path := filepath.FromSlash("/some/dir")
-		fs := afero.NewMemMapFs()
+		fs := fsext.NewMemMapFs()
 		require.NoError(t, fs.MkdirAll(path, 0o755))
 		_, err := getSimpleBundle(t, "/script.js", `open("/some/dir"); export default function() {}`, fs)
 		require.Error(t, err)
@@ -320,9 +320,9 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	defer srv.Close()
 
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	require.NoError(t, fs.MkdirAll("/path/to", 0o755))
-	require.NoError(t, afero.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/file.bin", []byte("hi!"), 0o644))
 
 	b, err := getSimpleBundle(t, "/path/to/script.js",
 		fmt.Sprintf(`
@@ -413,10 +413,10 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 	srv := httptest.NewServer(http.HandlerFunc(h))
 	defer srv.Close()
 
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	require.NoError(t, fs.MkdirAll("/path/to", 0o755))
-	require.NoError(t, afero.WriteFile(fs, "/path/to/file1.bin", []byte("file1"), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/path/to/file2.bin", []byte("file2"), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/file1.bin", []byte("file1"), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/file2.bin", []byte("file2"), 0o644))
 
 	b, err := getSimpleBundle(t, "/path/to/script.js",
 		fmt.Sprintf(`
@@ -546,8 +546,8 @@ func Test__VU(t *testing.T) {
 
 func TestSourceMaps(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/module1.js", []byte(`
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/module1.js", []byte(`
 export function f2(){
     throw "exception in line 2"
     console.log("in f2")
@@ -580,13 +580,13 @@ export default function(){
 
 func TestSourceMapsExternal(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	// This example is created through the template-typescript
-	require.NoError(t, afero.WriteFile(fs, "/test1.js", []byte(`
+	require.NoError(t, fsext.WriteFile(fs, "/test1.js", []byte(`
 (()=>{"use strict";var e={};(()=>{var o=e;Object.defineProperty(o,"__esModule",{value:!0}),o.default=function(){!function(e){throw"cool is cool"}()}})();var o=exports;for(var r in e)o[r]=e[r];e.__esModule&&Object.defineProperty(o,"__esModule",{value:!0})})();
 //# sourceMappingURL=test1.js.map
 `[1:]), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/test1.js.map", []byte(`
+	require.NoError(t, fsext.WriteFile(fs, "/test1.js.map", []byte(`
 {"version":3,"sources":["webpack:///./test1.ts"],"names":["s","coolThrow"],"mappings":"2FAGA,sBAHA,SAAmBA,GACf,KAAM,eAGNC,K","file":"test1.js","sourcesContent":["function coolThrow(s: string) {\n    throw \"cool \"+ s\n}\nexport default () => {\n    coolThrow(\"is cool\")\n};\n"],"sourceRoot":""}
 `[1:]), 0o644))
 	data := `
@@ -610,14 +610,14 @@ export default function () {
 
 func TestSourceMapsExternalExtented(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	// This example is created through the template-typescript
 	// but was exported to use import/export syntax so it has to go through babel
-	require.NoError(t, afero.WriteFile(fs, "/test1.js", []byte(`
+	require.NoError(t, fsext.WriteFile(fs, "/test1.js", []byte(`
 var o={d:(e,r)=>{for(var t in r)o.o(r,t)&&!o.o(e,t)&&Object.defineProperty(e,t,{enumerable:!0,get:r[t]})},o:(o,e)=>Object.prototype.hasOwnProperty.call(o,e)},e={};o.d(e,{Z:()=>r});const r=()=>{!function(o){throw"cool is cool"}()};var t=e.Z;export{t as default};
 //# sourceMappingURL=test1.js.map
 `[1:]), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/test1.js.map", []byte(`
+	require.NoError(t, fsext.WriteFile(fs, "/test1.js.map", []byte(`
 {"version":3,"sources":["webpack:///webpack/bootstrap","webpack:///webpack/runtime/define property getters","webpack:///webpack/runtime/hasOwnProperty shorthand","webpack:///./test1.ts"],"names":["__webpack_require__","exports","definition","key","o","Object","defineProperty","enumerable","get","obj","prop","prototype","hasOwnProperty","call","s","coolThrow"],"mappings":"AACA,IAAIA,EAAsB,CCA1B,EAAwB,CAACC,EAASC,KACjC,IAAI,IAAIC,KAAOD,EACXF,EAAoBI,EAAEF,EAAYC,KAASH,EAAoBI,EAAEH,EAASE,IAC5EE,OAAOC,eAAeL,EAASE,EAAK,CAAEI,YAAY,EAAMC,IAAKN,EAAWC,MCJ3E,EAAwB,CAACM,EAAKC,IAAUL,OAAOM,UAAUC,eAAeC,KAAKJ,EAAKC,I,sBCGlF,cAHA,SAAmBI,GACf,KAAM,eAGNC,I","file":"test1.js","sourcesContent":["// The require scope\nvar __webpack_require__ = {};\n\n","// define getter functions for harmony exports\n__webpack_require__.d = (exports, definition) => {\n\tfor(var key in definition) {\n\t\tif(__webpack_require__.o(definition, key) && !__webpack_require__.o(exports, key)) {\n\t\t\tObject.defineProperty(exports, key, { enumerable: true, get: definition[key] });\n\t\t}\n\t}\n};","__webpack_require__.o = (obj, prop) => (Object.prototype.hasOwnProperty.call(obj, prop))","function coolThrow(s: string) {\n    throw \"cool \"+ s\n}\nexport default () => {\n    coolThrow(\"is cool\")\n};\n"],"sourceRoot":""}
 `[1:]), 0o644))
 	data := `
@@ -643,10 +643,10 @@ export default function () {
 
 func TestSourceMapsExternalExtentedInlined(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	// This example is created through the template-typescript
 	// but was exported to use import/export syntax so it has to go through babel
-	require.NoError(t, afero.WriteFile(fs, "/test1.js", []byte(`
+	require.NoError(t, fsext.WriteFile(fs, "/test1.js", []byte(`
 var o={d:(e,r)=>{for(var t in r)o.o(r,t)&&!o.o(e,t)&&Object.defineProperty(e,t,{enumerable:!0,get:r[t]})},o:(o,e)=>Object.prototype.hasOwnProperty.call(o,e)},e={};o.d(e,{Z:()=>r});const r=()=>{!function(o){throw"cool is cool"}()};var t=e.Z;export{t as default};
 //# sourceMappingURL=data:application/json;charset=utf-8;base64,eyJ2ZXJzaW9uIjozLCJzb3VyY2VzIjpbIndlYnBhY2s6Ly8vd2VicGFjay9ib290c3RyYXAiLCJ3ZWJwYWNrOi8vL3dlYnBhY2svcnVudGltZS9kZWZpbmUgcHJvcGVydHkgZ2V0dGVycyIsIndlYnBhY2s6Ly8vd2VicGFjay9ydW50aW1lL2hhc093blByb3BlcnR5IHNob3J0aGFuZCIsIndlYnBhY2s6Ly8vLi90ZXN0MS50cyJdLCJuYW1lcyI6WyJfX3dlYnBhY2tfcmVxdWlyZV9fIiwiZXhwb3J0cyIsImRlZmluaXRpb24iLCJrZXkiLCJvIiwiT2JqZWN0IiwiZGVmaW5lUHJvcGVydHkiLCJlbnVtZXJhYmxlIiwiZ2V0Iiwib2JqIiwicHJvcCIsInByb3RvdHlwZSIsImhhc093blByb3BlcnR5IiwiY2FsbCIsInMiLCJjb29sVGhyb3ciXSwibWFwcGluZ3MiOiJBQUNBLElBQUlBLEVBQXNCLENDQTFCLEVBQXdCLENBQUNDLEVBQVNDLEtBQ2pDLElBQUksSUFBSUMsS0FBT0QsRUFDWEYsRUFBb0JJLEVBQUVGLEVBQVlDLEtBQVNILEVBQW9CSSxFQUFFSCxFQUFTRSxJQUM1RUUsT0FBT0MsZUFBZUwsRUFBU0UsRUFBSyxDQUFFSSxZQUFZLEVBQU1DLElBQUtOLEVBQVdDLE1DSjNFLEVBQXdCLENBQUNNLEVBQUtDLElBQVVMLE9BQU9NLFVBQVVDLGVBQWVDLEtBQUtKLEVBQUtDLEksc0JDR2xGLGNBSEEsU0FBbUJJLEdBQ2YsS0FBTSxlQUdOQyxJIiwiZmlsZSI6InRlc3QxLmpzIiwic291cmNlc0NvbnRlbnQiOlsiLy8gVGhlIHJlcXVpcmUgc2NvcGVcbnZhciBfX3dlYnBhY2tfcmVxdWlyZV9fID0ge307XG5cbiIsIi8vIGRlZmluZSBnZXR0ZXIgZnVuY3Rpb25zIGZvciBoYXJtb255IGV4cG9ydHNcbl9fd2VicGFja19yZXF1aXJlX18uZCA9IChleHBvcnRzLCBkZWZpbml0aW9uKSA9PiB7XG5cdGZvcih2YXIga2V5IGluIGRlZmluaXRpb24pIHtcblx0XHRpZihfX3dlYnBhY2tfcmVxdWlyZV9fLm8oZGVmaW5pdGlvbiwga2V5KSAmJiAhX193ZWJwYWNrX3JlcXVpcmVfXy5vKGV4cG9ydHMsIGtleSkpIHtcblx0XHRcdE9iamVjdC5kZWZpbmVQcm9wZXJ0eShleHBvcnRzLCBrZXksIHsgZW51bWVyYWJsZTogdHJ1ZSwgZ2V0OiBkZWZpbml0aW9uW2tleV0gfSk7XG5cdFx0fVxuXHR9XG59OyIsIl9fd2VicGFja19yZXF1aXJlX18ubyA9IChvYmosIHByb3ApID0+IChPYmplY3QucHJvdG90eXBlLmhhc093blByb3BlcnR5LmNhbGwob2JqLCBwcm9wKSkiLCJmdW5jdGlvbiBjb29sVGhyb3coczogc3RyaW5nKSB7XG4gICAgdGhyb3cgXCJjb29sIFwiKyBzXG59XG5leHBvcnQgZGVmYXVsdCAoKSA9PiB7XG4gICAgY29vbFRocm93KFwiaXMgY29vbFwiKVxufTtcbiJdLCJzb3VyY2VSb290IjoiIn0=
 `[1:]), 0o644))
@@ -673,9 +673,9 @@ export default function () {
 
 func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/notk6.js", []byte(`export default {group}; function group() {}`), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/instrument.js", []byte(`
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/notk6.js", []byte(`export default {group}; function group() {}`), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/instrument.js", []byte(`
     import k6 from "k6";
     k6.newKey = 5;
     k6.group = 3;
@@ -703,12 +703,12 @@ func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
 
 func TestCacheAbsolutePathsNotRelative(t *testing.T) {
 	t.Parallel()
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/a/interesting.js", []byte(`export default "a.interesting"`), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/a/import.js", []byte(`export { default as default} from "./interesting.js"`), 0o644))
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/a/interesting.js", []byte(`export default "a.interesting"`), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/a/import.js", []byte(`export { default as default} from "./interesting.js"`), 0o644))
 
-	require.NoError(t, afero.WriteFile(fs, "/b/interesting.js", []byte(`export default "b.interesting"`), 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/b/import.js", []byte(`export { default as default} from "./interesting.js"`), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/b/interesting.js", []byte(`export default "b.interesting"`), 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/b/import.js", []byte(`export { default as default} from "./interesting.js"`), 0o644))
 
 	b, err := getSimpleBundle(t, "/script.js", `
     import a from "/a/import.js"
