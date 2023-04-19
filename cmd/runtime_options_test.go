@@ -6,13 +6,13 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
 )
@@ -56,15 +56,15 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 	}
 	fmt.Fprint(jsCode, "}")
 
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/script.js", jsCode.Bytes(), 0o644))
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/script.js", jsCode.Bytes(), 0o644))
 
 	ts := tests.NewGlobalTestState(t) // TODO: move upwards, make this into an almost full integration test
 	registry := metrics.NewRegistry()
 	test := &loadedTest{
 		sourceRootPath: "script.js",
 		source:         &loader.SourceData{Data: jsCode.Bytes(), URL: &url.URL{Path: "/script.js", Scheme: "file"}},
-		fileSystems:    map[string]afero.Fs{"file": fs},
+		fileSystems:    map[string]fsext.Fs{"file": fs},
 		preInitState: &lib.TestPreInitState{
 			Logger:         ts.Logger,
 			RuntimeOptions: rtOpts,
@@ -83,7 +83,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 		return &loadedTest{
 			sourceRootPath: "script.tar",
 			source:         &loader.SourceData{Data: archiveBuf.Bytes(), URL: &url.URL{Path: "/script.tar", Scheme: "file"}},
-			fileSystems:    map[string]afero.Fs{"file": fs},
+			fileSystems:    map[string]fsext.Fs{"file": fs},
 			preInitState: &lib.TestPreInitState{
 				Logger:         ts.Logger,
 				RuntimeOptions: rtOpts,

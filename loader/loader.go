@@ -16,7 +16,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
+	"go.k6.io/k6/lib/fsext"
 )
 
 // SourceData wraps a source file; data and filename.
@@ -149,11 +149,11 @@ func Dir(old *url.URL) *url.URL {
 	return old.ResolveReference(&url.URL{Path: "./"})
 }
 
-// Load loads the provided moduleSpecifier from the given filesystems which are map of afero.Fs
+// Load loads the provided moduleSpecifier from the given filesystems which are map of fsext.Fs
 // for a given scheme which is they key of the map. If the scheme is https then a request will
 // be made if the files is not found in the map and written to the map.
 func Load(
-	logger logrus.FieldLogger, filesystems map[string]afero.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string,
+	logger logrus.FieldLogger, filesystems map[string]fsext.Fs, moduleSpecifier *url.URL, originalModuleSpecifier string,
 ) (*SourceData, error) {
 	logger.WithFields(
 		logrus.Fields{
@@ -164,7 +164,7 @@ func Load(
 	var pathOnFs string
 	switch {
 	case moduleSpecifier.Opaque != "": // This is loader
-		pathOnFs = filepath.Join(afero.FilePathSeparator, moduleSpecifier.Opaque)
+		pathOnFs = filepath.Join(fsext.FilePathSeparator, moduleSpecifier.Opaque)
 	case moduleSpecifier.Scheme == "":
 		pathOnFs = path.Clean(moduleSpecifier.String())
 	default:
@@ -180,7 +180,7 @@ func Load(
 		return nil, err
 	}
 
-	data, err := afero.ReadFile(filesystems[scheme], pathOnFs)
+	data, err := fsext.ReadFile(filesystems[scheme], pathOnFs)
 
 	if err == nil {
 		return &SourceData{URL: moduleSpecifier, Data: data}, nil
@@ -210,9 +210,9 @@ func Load(
 		result, err = loadRemoteURL(logger, finalModuleSpecifierURL)
 		if err == nil {
 			result.URL = moduleSpecifier
-			// TODO maybe make an afero.Fs which makes request directly and than use CacheOnReadFs
+			// TODO maybe make an fsext.Fs which makes request directly and than use CacheOnReadFs
 			// on top of as with the `file` scheme fs
-			_ = afero.WriteFile(filesystems[scheme], pathOnFs, result.Data, 0o644)
+			_ = fsext.WriteFile(filesystems[scheme], pathOnFs, result.Data, 0o644)
 			return result, nil
 		}
 

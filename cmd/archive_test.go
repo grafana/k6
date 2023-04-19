@@ -12,10 +12,10 @@ import (
 	"syscall"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib/fsext"
 )
 
 func TestArchiveThresholds(t *testing.T) {
@@ -81,7 +81,7 @@ func TestArchiveThresholds(t *testing.T) {
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, testCase.testFilename), testScript, 0o644))
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, testCase.testFilename), testScript, 0o644))
 			ts.CmdArgs = []string{"k6", "archive", testCase.testFilename}
 			if testCase.noThresholds {
 				ts.CmdArgs = append(ts.CmdArgs, "--no-thresholds")
@@ -102,7 +102,7 @@ func TestArchiveContainsEnv(t *testing.T) {
 	fileName := "script.js"
 	testScript := []byte(`export default function () {}`)
 	ts := tests.NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
 
 	// when we do archiving and passing the `--env` flags
 	ts.CmdArgs = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", fileName}
@@ -110,7 +110,7 @@ func TestArchiveContainsEnv(t *testing.T) {
 	newRootCommand(ts.GlobalState).execute()
 	require.NoError(t, untar(t, ts.FS, "archive.tar", "tmp/"))
 
-	data, err := afero.ReadFile(ts.FS, "tmp/metadata.json")
+	data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
 	require.NoError(t, err)
 
 	metadata := struct {
@@ -135,7 +135,7 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 	fileName := "script.js"
 	testScript := []byte(`export default function () {}`)
 	ts := tests.NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
 
 	// when we do archiving and passing the `--env` flags altogether with `--exclude-env-vars` flag
 	ts.CmdArgs = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", "--exclude-env-vars", fileName}
@@ -143,7 +143,7 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 	newRootCommand(ts.GlobalState).execute()
 	require.NoError(t, untar(t, ts.FS, "archive.tar", "tmp/"))
 
-	data, err := afero.ReadFile(ts.FS, "tmp/metadata.json")
+	data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
 	require.NoError(t, err)
 
 	metadata := struct {
@@ -156,10 +156,10 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 }
 
 // untar untars a `fileName` file to a `destination` path
-func untar(t *testing.T, fileSystem afero.Fs, fileName string, destination string) error {
+func untar(t *testing.T, fileSystem fsext.Fs, fileName string, destination string) error {
 	t.Helper()
 
-	archiveFile, err := afero.ReadFile(fileSystem, fileName)
+	archiveFile, err := fsext.ReadFile(fileSystem, fileName)
 	if err != nil {
 		return err
 	}

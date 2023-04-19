@@ -5,10 +5,10 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 )
 
@@ -32,7 +32,7 @@ func TestGithub(t *testing.T) {
 	require.Equal(t, path, resolvedURL.Opaque)
 	t.Run("not cached", func(t *testing.T) {
 		t.Parallel()
-		data, err := Load(logger, map[string]afero.Fs{"https": afero.NewMemMapFs()}, resolvedURL, path)
+		data, err := Load(logger, map[string]fsext.Fs{"https": fsext.NewMemMapFs()}, resolvedURL, path)
 		require.NoError(t, err)
 		assert.Equal(t, data.URL, resolvedURL)
 		assert.Equal(t, path, data.URL.String())
@@ -41,13 +41,13 @@ func TestGithub(t *testing.T) {
 
 	t.Run("cached", func(t *testing.T) {
 		t.Parallel()
-		fs := afero.NewMemMapFs()
+		fs := fsext.NewMemMapFs()
 		testData := []byte("test data")
 
-		err := afero.WriteFile(fs, "/github.com/github/gitignore/Go.gitignore", testData, 0o644)
+		err := fsext.WriteFile(fs, "/github.com/github/gitignore/Go.gitignore", testData, 0o644)
 		require.NoError(t, err)
 
-		data, err := Load(logger, map[string]afero.Fs{"https": fs}, resolvedURL, path)
+		data, err := Load(logger, map[string]fsext.Fs{"https": fs}, resolvedURL, path)
 		require.NoError(t, err)
 		assert.Equal(t, path, data.URL.String())
 		assert.Equal(t, data.Data, testData)

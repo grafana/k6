@@ -11,11 +11,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -317,8 +317,8 @@ func TestSampleToRow(t *testing.T) {
 	}
 }
 
-func readUnCompressedFile(fileName string, fs afero.Fs) string {
-	csvbytes, err := afero.ReadFile(fs, fileName)
+func readUnCompressedFile(fileName string, fs fsext.Fs) string {
+	csvbytes, err := fsext.ReadFile(fs, fileName)
 	if err != nil {
 		return err.Error()
 	}
@@ -326,7 +326,7 @@ func readUnCompressedFile(fileName string, fs afero.Fs) string {
 	return fmt.Sprintf("%s", csvbytes)
 }
 
-func readCompressedFile(fileName string, fs afero.Fs) string {
+func readCompressedFile(fileName string, fs fsext.Fs) string {
 	file, err := fs.Open(fileName)
 	if err != nil {
 		return err.Error()
@@ -355,7 +355,7 @@ func TestRun(t *testing.T) {
 	testData := []struct {
 		samples        []metrics.SampleContainer
 		fileName       string
-		fileReaderFunc func(fileName string, fs afero.Fs) string
+		fileReaderFunc func(fileName string, fs fsext.Fs) string
 		timeFormat     string
 		outputContent  string
 	}{
@@ -475,7 +475,7 @@ func TestRun(t *testing.T) {
 		data := data
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			mem := afero.NewMemMapFs()
+			mem := fsext.NewMemMapFs()
 			env := make(map[string]string)
 			if data.timeFormat != "" {
 				env["K6_CSV_TIME_FORMAT"] = data.timeFormat

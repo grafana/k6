@@ -12,7 +12,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
@@ -20,6 +19,7 @@ import (
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 )
 
@@ -32,7 +32,7 @@ type Bundle struct {
 	CompatibilityMode lib.CompatibilityMode // parsed value
 	preInitState      *lib.TestPreInitState
 
-	filesystems map[string]afero.Fs
+	filesystems map[string]fsext.Fs
 	pwd         *url.URL
 
 	callableExports map[string]struct{}
@@ -62,13 +62,13 @@ func (bi *BundleInstance) getExported(name string) goja.Value {
 
 // NewBundle creates a new bundle from a source file and a filesystem.
 func NewBundle(
-	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs,
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
 ) (*Bundle, error) {
 	return newBundle(piState, src, filesystems, lib.Options{}, true)
 }
 
 func newBundle(
-	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs,
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
 	options lib.Options, updateOptions bool, // TODO: try to figure out a way to not need both
 ) (*Bundle, error) {
 	compatMode, err := lib.ValidateCompatibilityMode(piState.RuntimeOptions.CompatibilityMode.String)

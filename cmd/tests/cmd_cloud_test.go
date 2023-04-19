@@ -8,11 +8,11 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd"
+	"go.k6.io/k6/lib/fsext"
 )
 
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
@@ -72,7 +72,7 @@ func getSimpleCloudTestState(
 	srv := getMockCloud(t, 123, archiveUpload, progressCallback)
 
 	ts := NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), script, 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.js"), script, 0o644))
 	ts.CmdArgs = append(append([]string{"k6", "cloud"}, cliFlags...), "test.js")
 	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
 	ts.Env["K6_CLOUD_HOST"] = srv.URL

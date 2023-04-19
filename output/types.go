@@ -9,9 +9,9 @@ import (
 	"net/url"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/metrics"
 )
 
@@ -25,7 +25,7 @@ type Params struct {
 	Environment    map[string]string
 	StdOut         io.Writer
 	StdErr         io.Writer
-	FS             afero.Fs
+	FS             fsext.Fs
 	ScriptPath     *url.URL
 	ScriptOptions  lib.Options
 	RuntimeOptions lib.RuntimeOptions

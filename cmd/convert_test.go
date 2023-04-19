@@ -6,10 +6,10 @@ import (
 	"testing"
 
 	"github.com/pmezard/go-difflib/difflib"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/tests"
+	"go.k6.io/k6/lib/fsext"
 )
 
 const testHAR = `
@@ -109,7 +109,7 @@ func TestConvertCmdCorrelate(t *testing.T) {
 	require.NoError(t, err)
 
 	ts := tests.NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, "correlate.har", har, 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, "correlate.har", har, 0o644))
 	ts.CmdArgs = []string{
 		"k6", "convert", "--output=result.js", "--correlate=true", "--no-batch=true",
 		"--enable-status-code-checks=true", "--return-on-failed-check=true", "correlate.har",
@@ -117,7 +117,7 @@ func TestConvertCmdCorrelate(t *testing.T) {
 
 	newRootCommand(ts.GlobalState).execute()
 
-	result, err := afero.ReadFile(ts.FS, "result.js")
+	result, err := fsext.ReadFile(ts.FS, "result.js")
 	require.NoError(t, err)
 
 	// Sanitizing to avoid windows problems with carriage returns
@@ -144,7 +144,7 @@ func TestConvertCmdCorrelate(t *testing.T) {
 func TestConvertCmdStdout(t *testing.T) {
 	t.Parallel()
 	ts := tests.NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, "stdout.har", []byte(testHAR), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, "stdout.har", []byte(testHAR), 0o644))
 	ts.CmdArgs = []string{"k6", "convert", "stdout.har"}
 
 	newRootCommand(ts.GlobalState).execute()
@@ -155,12 +155,12 @@ func TestConvertCmdOutputFile(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
-	require.NoError(t, afero.WriteFile(ts.FS, "output.har", []byte(testHAR), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, "output.har", []byte(testHAR), 0o644))
 	ts.CmdArgs = []string{"k6", "convert", "--output", "result.js", "output.har"}
 
 	newRootCommand(ts.GlobalState).execute()
 
-	output, err := afero.ReadFile(ts.FS, "result.js")
+	output, err := fsext.ReadFile(ts.FS, "result.js")
 	assert.NoError(t, err)
 	assert.Equal(t, testHARConvertResult, string(output))
 }

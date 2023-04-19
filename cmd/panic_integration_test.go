@@ -7,12 +7,12 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 )
 
@@ -86,7 +86,7 @@ func TestRunScriptPanicsErrorsAndAbort(t *testing.T) {
 
 			testFilename := "script.js"
 			ts := tests.NewGlobalTestState(t)
-			require.NoError(t, afero.WriteFile(ts.FS, filepath.Join(ts.Cwd, testFilename), []byte(tc.testScript), 0o644))
+			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, testFilename), []byte(tc.testScript), 0o644))
 			ts.CmdArgs = []string{"k6", "run", testFilename}
 
 			ts.ExpectedExitCode = int(exitcodes.ScriptAborted)

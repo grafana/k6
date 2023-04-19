@@ -12,13 +12,13 @@ import (
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
@@ -49,13 +49,13 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 	var (
 		rtOpts      = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
 		logger      = testutils.NewLogger(tb)
-		fsResolvers = map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": afero.NewMemMapFs()}
+		fsResolvers = map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fsext.NewMemMapFs()}
 	)
 	for _, o := range opts {
 		switch opt := o.(type) {
-		case afero.Fs:
+		case fsext.Fs:
 			fsResolvers["file"] = opt
-		case map[string]afero.Fs:
+		case map[string]fsext.Fs:
 			fsResolvers = opt
 		case lib.RuntimeOptions:
 			rtOpts = opt

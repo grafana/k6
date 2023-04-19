@@ -18,7 +18,6 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
@@ -28,6 +27,7 @@ import (
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
@@ -61,7 +61,7 @@ type Runner struct {
 }
 
 // New returns a new Runner for the provided source
-func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]afero.Fs) (*Runner, error) {
+func New(piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs) (*Runner, error) {
 	bundle, err := NewBundle(piState, src, filesystems)
 	if err != nil {
 		return nil, err

@@ -9,18 +9,17 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/fsext"
 )
 
-func dumpMemMapFsToBuf(fileSystem afero.Fs) (*bytes.Buffer, error) {
+func dumpMemMapFsToBuf(fileSystem fsext.Fs) (*bytes.Buffer, error) {
 	b := bytes.NewBuffer(nil)
 	w := tar.NewWriter(b)
-	err := fsext.Walk(fileSystem, afero.FilePathSeparator,
+	err := fsext.Walk(fileSystem, fsext.FilePathSeparator,
 		filepath.WalkFunc(func(filePath string, info fs.FileInfo, err error) error {
-			if filePath == afero.FilePathSeparator {
+			if filePath == fsext.FilePathSeparator {
 				return nil // skip the root
 			}
 			if err != nil {
@@ -34,7 +33,7 @@ func dumpMemMapFsToBuf(fileSystem afero.Fs) (*bytes.Buffer, error) {
 				})
 			}
 			var data []byte
-			data, err = afero.ReadFile(fileSystem, filePath)
+			data, err = fsext.ReadFile(fileSystem, filePath)
 			if err != nil {
 				return err
 			}
@@ -94,7 +93,7 @@ func TestOldArchive(t *testing.T) {
 			buf, err := dumpMemMapFsToBuf(fs)
 			require.NoError(t, err)
 
-			expectedFilesystems := map[string]afero.Fs{
+			expectedFilesystems := map[string]fsext.Fs{
 				"file": makeMemMapFs(t, map[string][]byte{
 					"/C:/something/path":  []byte(`windows file`),
 					"/absolulte/path":     []byte(`unix file`),

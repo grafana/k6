@@ -15,8 +15,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spf13/afero"
-
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 )
@@ -37,7 +35,7 @@ func NormalizeAndAnonymizePath(path string) string {
 	return homeDirRE.ReplaceAllString(p, `$1/$2/nobody`)
 }
 
-func newNormalizedFs(fs afero.Fs) afero.Fs {
+func newNormalizedFs(fs fsext.Fs) fsext.Fs {
 	return fsext.NewChangePathFs(fs, fsext.ChangePathFunc(func(name string) (string, error) {
 		return NormalizeAndAnonymizePath(name), nil
 	}))
@@ -62,7 +60,7 @@ type Archive struct {
 	Pwd    string   `json:"pwd"` // only for json
 	PwdURL *url.URL `json:"-"`
 
-	Filesystems map[string]afero.Fs `json:"-"`
+	Filesystems map[string]fsext.Fs `json:"-"`
 
 	// Environment variables
 	Env map[string]string `json:"env"`
@@ -73,10 +71,10 @@ type Archive struct {
 	Goos      string `json:"goos"`
 }
 
-func (arc *Archive) getFs(name string) afero.Fs {
+func (arc *Archive) getFs(name string) fsext.Fs {
 	fs, ok := arc.Filesystems[name]
 	if !ok {
-		fs = afero.NewMemMapFs()
+		fs = fsext.NewMemMapFs()
 		if name == "file" {
 			fs = newNormalizedFs(fs)
 		}
@@ -110,7 +108,7 @@ func (arc *Archive) loadMetadataJSON(data []byte) (err error) {
 // ReadArchive reads an archive created by Archive.Write from a reader.
 func ReadArchive(in io.Reader) (*Archive, error) {
 	r := tar.NewReader(in)
-	arc := &Archive{Filesystems: make(map[string]afero.Fs, 2)}
+	arc := &Archive{Filesystems: make(map[string]fsext.Fs, 2)}
 	// initialize both fses
 	_ = arc.getFs("https")
 	_ = arc.getFs("file")
@@ -163,7 +161,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 		case "https", "file":
 			fileSystem := arc.getFs(pfx)
 			name = filepath.FromSlash(name)
-			err = afero.WriteFile(fileSystem, name, data, fs.FileMode(hdr.Mode))
+			err = fsext.WriteFile(fileSystem, name, data, fs.FileMode(hdr.Mode))
 			if err != nil {
 				return nil, err
 			}
@@ -181,7 +179,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = afero.WriteFile(arc.getFs(scheme), pathOnFs, arc.Data, 0o644) // TODO fix the mode ?
+	err = fsext.WriteFile(arc.getFs(scheme), pathOnFs, arc.Data, 0o644) // TODO fix the mode ?
 	if err != nil {
 		return nil, err
 	}
@@ -293,11 +291,11 @@ func (arc *Archive) Write(out io.Writer) error {
 			}
 
 			paths = append(paths, normalizedPath)
-			files[normalizedPath], err = afero.ReadFile(filesystem, filePath)
+			files[normalizedPath], err = fsext.ReadFile(filesystem, filePath)
 			return err
 		})
 
-		if err = fsext.Walk(filesystem, afero.FilePathSeparator, walkFunc); err != nil {
+		if err = fsext.Walk(filesystem, fsext.FilePathSeparator, walkFunc); err != nil {
 			return err
 		}
 		if len(files) == 0 {

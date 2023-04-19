@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/sirupsen/logrus"
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/fsext"
@@ -38,15 +37,15 @@ func TestReadSourceSTDINCache(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	data := []byte(`test contents`)
 	r := bytes.NewReader(data)
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	sourceData, err := ReadSource(logger, "-", "/path/to/pwd",
-		map[string]afero.Fs{"file": fsext.NewCacheOnReadFs(nil, fs, 0)}, r)
+		map[string]fsext.Fs{"file": fsext.NewCacheOnReadFs(nil, fs, 0)}, r)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
 		URL:  &url.URL{Scheme: "file", Path: "/-"},
 		Data: data,
 	}, sourceData)
-	fileData, err := afero.ReadFile(fs, "/-")
+	fileData, err := fsext.ReadFile(fs, "/-")
 	require.NoError(t, err)
 	require.Equal(t, data, fileData)
 }
@@ -56,9 +55,9 @@ func TestReadSourceRelative(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	data := []byte(`test contents`)
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/path/to/somewhere/script.js", data, 0o644))
-	sourceData, err := ReadSource(logger, "../somewhere/script.js", "/path/to/pwd", map[string]afero.Fs{"file": fs}, nil)
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/path/to/somewhere/script.js", data, 0o644))
+	sourceData, err := ReadSource(logger, "../somewhere/script.js", "/path/to/pwd", map[string]fsext.Fs{"file": fs}, nil)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
 		URL:  &url.URL{Scheme: "file", Path: "/path/to/somewhere/script.js"},
@@ -72,10 +71,10 @@ func TestReadSourceAbsolute(t *testing.T) {
 	logger.SetOutput(testutils.NewTestOutput(t))
 	data := []byte(`test contents`)
 	r := bytes.NewReader(data)
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/a/b", data, 0o644))
-	require.NoError(t, afero.WriteFile(fs, "/c/a/b", []byte("wrong"), 0o644))
-	sourceData, err := ReadSource(logger, "/a/b", "/c", map[string]afero.Fs{"file": fs}, r)
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/a/b", data, 0o644))
+	require.NoError(t, fsext.WriteFile(fs, "/c/a/b", []byte("wrong"), 0o644))
+	sourceData, err := ReadSource(logger, "/a/b", "/c", map[string]fsext.Fs{"file": fs}, r)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
 		URL:  &url.URL{Scheme: "file", Path: "/a/b"},
@@ -88,10 +87,10 @@ func TestReadSourceHttps(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	data := []byte(`test contents`)
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/github.com/something", data, 0o644))
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/github.com/something", data, 0o644))
 	sourceData, err := ReadSource(logger, "https://github.com/something", "/c",
-		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": fs}, nil)
+		map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fs}, nil)
 	require.NoError(t, err)
 	require.Equal(t, &SourceData{
 		URL:  &url.URL{Scheme: "https", Host: "github.com", Path: "/something"},
@@ -104,10 +103,10 @@ func TestReadSourceHttpError(t *testing.T) {
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	data := []byte(`test contents`)
-	fs := afero.NewMemMapFs()
-	require.NoError(t, afero.WriteFile(fs, "/github.com/something", data, 0o644))
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/github.com/something", data, 0o644))
 	_, err := ReadSource(logger, "http://github.com/something", "/c",
-		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": fs}, nil)
+		map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fs}, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `only supported schemes for imports are file and https`)
 }
@@ -116,9 +115,9 @@ func TestReadSourceMissingFileError(t *testing.T) {
 	t.Parallel()
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 	_, err := ReadSource(logger, "some file with spaces.js", "/c",
-		map[string]afero.Fs{"file": afero.NewMemMapFs(), "https": fs}, nil)
+		map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fs}, nil)
 	require.Error(t, err)
 	require.Contains(t, err.Error(), `The moduleSpecifier "some file with spaces.js" couldn't be found on local disk.`)
 }
