@@ -264,7 +264,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 		// 10.
 		switch normalized.Name {
 		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
+			keyAlgorithm, ok := ck.Algorithm.(HMACKeyAlgorithm)
 			if !ok {
 				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
 				return
@@ -372,7 +372,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 
 		switch normalizedAlgorithm.Name {
 		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(HmacKeyAlgorithm)
+			keyAlgorithm, ok := ck.Algorithm.(HMACKeyAlgorithm)
 			if !ok {
 				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
 				return
@@ -744,7 +744,7 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 				return
 			}
 		case HMAC:
-			result, err = exportHmacKey(ck, format)
+			result, err = exportHMACKey(ck, format)
 			if err != nil {
 				reject(err)
 				return

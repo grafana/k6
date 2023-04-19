@@ -10,25 +10,25 @@ import (
 	"github.com/dop251/goja"
 )
 
-// AesKeyGenParams represents the object that should be passed as
+// AESKeyGenParams represents the object that should be passed as
 // the algorithm parameter into `SubtleCrypto.generateKey`, when generating
 // an AES key: that is, when the algorithm is identified as any
 // of AES-CBC, AES-CTR, AES-GCM, or AES-KW.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-keygen-params
-type AesKeyGenParams struct {
+type AESKeyGenParams struct {
 	Algorithm
 
 	// The length, in bits, of the key.
 	Length int64 `json:"length"`
 }
 
-// newAesKeyGenParams creates a new AesKeyGenParams object, from the
+// newAESKeyGenParams creates a new AESKeyGenParams object, from the
 // normalized algorithm, and the algorithm parameters.
 //
 // It handles the logic involved in handling the `length` attribute,
 // which is not part of the normalized algorithm.
-func newAesKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*AesKeyGenParams, error) {
+func newAESKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*AESKeyGenParams, error) {
 	// We extract the length attribute from the params object, as it's not
 	// part of the normalized algorithm, and as accessing the runtime from the
 	// callback below could lead to a race condition.
@@ -39,7 +39,7 @@ func newAesKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Valu
 
 	algorithmLength := algorithmLengthValue.ToInteger()
 
-	return &AesKeyGenParams{
+	return &AESKeyGenParams{
 		Algorithm: normalized,
 		Length:    algorithmLength,
 	}, nil
@@ -49,7 +49,7 @@ func newAesKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Valu
 // described in the specification.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-keygen-params
-func (akgp *AesKeyGenParams) GenerateKey(
+func (akgp *AESKeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
@@ -84,7 +84,7 @@ func (akgp *AesKeyGenParams) GenerateKey(
 	// 5. 6. 7. 8. 9.
 	key := CryptoKey{}
 	key.Type = SecretCryptoKeyType
-	key.Algorithm = AesKeyAlgorithm{
+	key.Algorithm = AESKeyAlgorithm{
 		Algorithm: akgp.Algorithm,
 		Length:    akgp.Length,
 	}
@@ -102,13 +102,13 @@ func (akgp *AesKeyGenParams) GenerateKey(
 	return &key, nil
 }
 
-// Ensure that AesKeyGenParams implements the KeyGenerator interface.
-var _ KeyGenerator = &AesKeyGenParams{}
+// Ensure that AESKeyGenParams implements the KeyGenerator interface.
+var _ KeyGenerator = &AESKeyGenParams{}
 
-// AesKeyAlgorithm is the algorithm for AES keys as defined in the [specification].
+// AESKeyAlgorithm is the algorithm for AES keys as defined in the [specification].
 //
-// [specification]: https://www.w3.org/TR/WebCryptoAPI/#dfn-AesKeyAlgorithm
-type AesKeyAlgorithm struct {
+// [specification]: https://www.w3.org/TR/WebCryptoAPI/#dfn-AESKeyAlgorithm
+type AESKeyAlgorithm struct {
 	Algorithm
 
 	Length int64 `json:"length"`
@@ -141,15 +141,15 @@ func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
 	}
 }
 
-// aesImportParams is an internal placeholder struct for AES import parameters.
+// AESImportParams is an internal placeholder struct for AES import parameters.
 // Although not described by the specification, we define it to be able to implement
 // our internal KeyImporter interface.
-type aesImportParams struct {
+type AESImportParams struct {
 	Algorithm
 }
 
-func newAesImportParams(normalized Algorithm) *aesImportParams {
-	return &aesImportParams{
+func newAESImportParams(normalized Algorithm) *AESImportParams {
+	return &AESImportParams{
 		Algorithm: normalized,
 	}
 }
@@ -158,7 +158,7 @@ func newAesImportParams(normalized Algorithm) *aesImportParams {
 // It implements the KeyImporter interface.
 //
 // TODO @oleiade: support JWK format #37
-func (aip *aesImportParams) ImportKey(
+func (aip *AESImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
 	keyUsages []CryptoKeyUsage,
@@ -188,7 +188,7 @@ func (aip *aesImportParams) ImportKey(
 	}
 
 	key := &CryptoKey{
-		Algorithm: AesKeyAlgorithm{
+		Algorithm: AESKeyAlgorithm{
 			Algorithm: aip.Algorithm,
 			Length:    int64(len(keyData) * 8),
 		},
@@ -199,17 +199,17 @@ func (aip *aesImportParams) ImportKey(
 	return key, nil
 }
 
-// Ensure that aesImportParams implements the KeyImporter interface.
-var _ KeyImporter = &aesImportParams{}
+// Ensure that AESImportParams implements the KeyImporter interface.
+var _ KeyImporter = &AESImportParams{}
 
-// AesCbcParams represents the object that should be passed as the algorithm parameter
+// AESCBCParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
 // `SubtleCrypto.UnwrapKey`, when using the AES-CBC algorithm.
 //
 // As defined in the [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-cbc-params
-type AesCbcParams struct {
+type AESCBCParams struct {
 	Algorithm
 
 	// Name should be set to AES-CBC.
@@ -225,7 +225,7 @@ type AesCbcParams struct {
 // Implements the WebCryptoAPI `encrypt` method's [specification] for the AES-CBC algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-cbc
-func (acp *AesCbcParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
+func (acp *AESCBCParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	// Note that aes.BlockSize stands for the `k` variable as per the specification.
 	if len(acp.Iv) != aes.BlockSize {
@@ -260,7 +260,7 @@ func (acp *AesCbcParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 // Implements the WebCryptoAPI's `decrypt` method's [specification] for the AES-CBC algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-cbc
-func (acp *AesCbcParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
+func (acp *AESCBCParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	if len(acp.Iv) != aes.BlockSize {
 		return nil, NewError(OperationError, "iv length is invalid, should be 16 bytes")
@@ -298,17 +298,17 @@ func (acp *AesCbcParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	return plaintext, nil
 }
 
-// Ensure that AesCbcParams implements the EncryptDecrypter interface.
-var _ EncryptDecrypter = &AesCbcParams{}
+// Ensure that AESCBCParams implements the EncryptDecrypter interface.
+var _ EncryptDecrypter = &AESCBCParams{}
 
-// AesCtrParams represents the object that should be passed as the algorithm parameter
+// AESCTRParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
 // `SubtleCrypto.UnwrapKey`, when using the AES-CTR algorithm.
 //
 // As defined in the [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-ctr-params
-type AesCtrParams struct {
+type AESCTRParams struct {
 	Algorithm
 
 	// Counter holds (an ArrayBuffer, a TypedArray, or a DataView) the initial value of the counter block.
@@ -332,7 +332,7 @@ type AesCtrParams struct {
 // Implements the WebCryptoAPI's `encrypt` method's [specification] for the AES-CTR algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-ctr
-func (acp *AesCtrParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
+func (acp *AESCTRParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	// Note that aes.BlockSize stands for the `k` variable as per the specification.
 	if len(acp.Counter) != aes.BlockSize {
@@ -366,7 +366,7 @@ func (acp *AesCtrParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 // Implements the WebCryptoAPI's `decrypt` method's [specification] for the AES-CTR algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-ctr
-func (acp *AesCtrParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
+func (acp *AESCTRParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	if len(acp.Counter) != aes.BlockSize {
 		return nil, NewError(OperationError, "counter length is invalid, should be 16 bytes")
@@ -395,16 +395,16 @@ func (acp *AesCtrParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	return plaintext, nil
 }
 
-// Ensure that AesCtrParams implements the EncryptDecrypter interface.
-var _ EncryptDecrypter = &AesCtrParams{}
+// Ensure that AESCTRParams implements the EncryptDecrypter interface.
+var _ EncryptDecrypter = &AESCTRParams{}
 
-// AesGcmParams represents the object that should be passed as the algorithm parameter
+// AESGCMParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
 // `SubtleCrypto.UnwrapKey`, when using the AES-GCM algorithm.
 // As defined in the [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-params
-type AesGcmParams struct {
+type AESGCMParams struct {
 	Algorithm
 
 	// Iv holds (an ArrayBuffer, a TypedArray, or a DataView) with the initialization vector.
@@ -450,11 +450,11 @@ type AesGcmParams struct {
 // Implements the WebCryptoAPI's `encrypt` method's [specification] for the AES-GCM algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm
-func (agp *AesGcmParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
+func (agp *AESGCMParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	// As described in section 8 of AES-GCM [NIST SP800-38D].
 	// [NIST SP800-38D] https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
-	if len(plaintext) > maxAesGcmPlaintextLength {
+	if len(plaintext) > maxAESGCMPlaintextLength {
 		return nil, NewError(OperationError, "plaintext length is too long")
 	}
 
@@ -472,7 +472,7 @@ func (agp *AesGcmParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 	// 3.
 	// As described in section 8 of AES-GCM [NIST SP800-38D].
 	// [NIST SP800-38D] https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
-	if agp.AdditionalData != nil && (uint64(len(agp.AdditionalData)) > maxAesGcmAdditionalDataLength) {
+	if agp.AdditionalData != nil && (uint64(len(agp.AdditionalData)) > maxAESGcmAdditionalDataLength) {
 		return nil, NewError(OperationError, "additional data length is too long")
 	}
 
@@ -524,7 +524,7 @@ func (agp *AesGcmParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 // Implements the WebCryptoAPI's `decrypt` method's [specification] for the AES-GCM algorithm.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm
-func (agp *AesGcmParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
+func (agp *AESGCMParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
 	var tagLength int
 	if agp.TagLength == 0 {
@@ -549,12 +549,12 @@ func (agp *AesGcmParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	}
 
 	// 3.
-	if len(agp.Iv) < 1 || uint64(len(agp.Iv)) > maxAesGcmIvLength {
+	if len(agp.Iv) < 1 || uint64(len(agp.Iv)) > maxAESGcmIvLength {
 		return nil, NewError(OperationError, "iv length is too long")
 	}
 
 	// 4.
-	if agp.AdditionalData != nil && uint64(len(agp.AdditionalData)) > maxAesGcmAdditionalDataLength {
+	if agp.AdditionalData != nil && uint64(len(agp.AdditionalData)) > maxAESGcmAdditionalDataLength {
 		return nil, NewError(OperationError, "additional data is too long")
 	}
 
@@ -585,23 +585,23 @@ func (agp *AesGcmParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	return plaintext, nil
 }
 
-// maxAesGcmPlaintextLength holds the value (2 ^ 39) - 256 as specified in
+// maxAESGCMPlaintextLength holds the value (2 ^ 39) - 256 as specified in
 // The [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
 //
 // [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
-const maxAesGcmPlaintextLength int = 549755813632
+const maxAESGCMPlaintextLength int = 549755813632
 
-// maxAesGcmAdditionalDataLength holds the value 2 ^ 64 - 1 as specified in
+// maxAESGcmAdditionalDataLength holds the value 2 ^ 64 - 1 as specified in
 // the [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
 //
 // [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
-const maxAesGcmAdditionalDataLength uint64 = 18446744073709551615
+const maxAESGcmAdditionalDataLength uint64 = 18446744073709551615
 
-// maxAesGcmIvLength holds the value 2 ^ 64 - 1 as specified in
+// maxAESGcmIvLength holds the value 2 ^ 64 - 1 as specified in
 // the [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
 //
 // [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
-const maxAesGcmIvLength uint64 = 18446744073709551615
+const maxAESGcmIvLength uint64 = 18446744073709551615
 
 var (
 	// ErrInvalidBlockSize is returned when the given block size is invalid.
