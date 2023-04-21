@@ -155,8 +155,8 @@ func TestParseRemoteObject(t *testing.T) {
 	testCases := []struct {
 		name     string
 		preview  *runtime.ObjectPreview
-		value    string
-		expected map[string]any
+		value    easyjson.RawMessage
+		expected any
 		expErr   string
 	}{
 		{
