@@ -90,7 +90,7 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 
 // StartCloudTestRun starts a cloud test run, i.e. `k6 cloud script.js`.
 func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
-	requestUrl := fmt.Sprintf("%s/archive-upload", c.baseURL)
+	requestURL := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
 	var buf bytes.Buffer
 	mp := multipart.NewWriter(&buf)
@@ -110,15 +110,15 @@ func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archiv
 		return nil, err
 	}
 
-	if err := arc.Write(fw); err != nil {
+	if err = arc.Write(fw); err != nil {
 		return nil, err
 	}
 
-	if err := mp.Close(); err != nil {
+	if err = mp.Close(); err != nil {
 		return nil, err
 	}
 
-	req, err := http.NewRequest(http.MethodPost, requestUrl, &buf) //nolint:noctx
+	req, err := http.NewRequest(http.MethodPost, requestURL, &buf) //nolint:noctx
 	if err != nil {
 		return nil, err
 	}
