@@ -490,6 +490,18 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	return handle, nil
 }
 
+func (f *Frame) waitFor(selector string, opts *FrameWaitForSelectorOptions) error {
+	f.log.Debugf("Frame:waitFor", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	document, err := f.document()
+	if err != nil {
+		return err
+	}
+
+	_, err = document.waitForSelector(f.ctx, selector, opts)
+	return err
+}
+
 // AddScriptTag is not implemented.
 func (f *Frame) AddScriptTag(opts goja.Value) {
 	k6ext.Panic(f.ctx, "Frame.AddScriptTag() has not been implemented yet")
