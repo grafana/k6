@@ -20,7 +20,7 @@ type AESKeyGenParams struct {
 	Algorithm
 
 	// The length, in bits, of the key.
-	Length int64 `json:"length"`
+	Length bitLength `json:"length"`
 }
 
 // newAESKeyGenParams creates a new AESKeyGenParams object, from the
@@ -41,7 +41,7 @@ func newAESKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Valu
 
 	return &AESKeyGenParams{
 		Algorithm: normalized,
-		Length:    algorithmLength,
+		Length:    bitLength(algorithmLength),
 	}, nil
 }
 
@@ -75,7 +75,7 @@ func (akgp *AESKeyGenParams) GenerateKey(
 		return nil, NewError(OperationError, "invalid key length")
 	}
 
-	randomKey := make([]byte, akgp.Length/8)
+	randomKey := make([]byte, akgp.Length.asByteLength())
 	if _, err := rand.Read(randomKey); err != nil {
 		// 4.
 		return nil, NewError(OperationError, "could not generate random key")
@@ -86,7 +86,7 @@ func (akgp *AESKeyGenParams) GenerateKey(
 	key.Type = SecretCryptoKeyType
 	key.Algorithm = AESKeyAlgorithm{
 		Algorithm: akgp.Algorithm,
-		Length:    akgp.Length,
+		Length:    int64(akgp.Length),
 	}
 
 	// 10.
@@ -190,7 +190,7 @@ func (aip *AESImportParams) ImportKey(
 	key := &CryptoKey{
 		Algorithm: AESKeyAlgorithm{
 			Algorithm: aip.Algorithm,
-			Length:    int64(len(keyData) * 8),
+			Length:    int64(byteLength(len(keyData)).asBitLength()),
 		},
 		Type:   SecretCryptoKeyType,
 		handle: keyData,
@@ -443,7 +443,7 @@ type AESGCMParams struct {
 	// in some applications: Appendix C of the specification provides additional guidance here.
 	//
 	// tagLength is optional and defaults to 128 if it is not specified.
-	TagLength int `json:"tagLength"`
+	TagLength bitLength `json:"tagLength"`
 }
 
 // Encrypt encrypts the given plaintext using the AES-GCM algorithm, and returns the ciphertext.
@@ -477,7 +477,7 @@ func (agp *AESGCMParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 	}
 
 	// 4.
-	var tagLength int
+	var tagLength bitLength
 	if agp.TagLength == 0 {
 		tagLength = 128
 	} else {
@@ -503,7 +503,7 @@ func (agp *AESGCMParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 		return nil, NewError(OperationError, "could not create cipher")
 	}
 
-	gcm, err := cipher.NewGCMWithTagSize(block, tagLength/8)
+	gcm, err := cipher.NewGCMWithTagSize(block, int(tagLength.asByteLength()))
 	if err != nil {
 		return nil, NewError(ImplementationError, "could not create cipher")
 	}
@@ -526,7 +526,7 @@ func (agp *AESGCMParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm
 func (agp *AESGCMParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
 	// 1.
-	var tagLength int
+	var tagLength bitLength
 	if agp.TagLength == 0 {
 		tagLength = 128
 	} else {
@@ -544,7 +544,7 @@ func (agp *AESGCMParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 	// 2.
 	// Note that we multiply the length of the ciphertext by 8, in order
 	// to get the length in bits.
-	if len(ciphertext)*8 < tagLength {
+	if byteLength(len(ciphertext)).asBitLength() < tagLength {
 		return nil, NewError(OperationError, "ciphertext is too short")
 	}
 
@@ -571,7 +571,7 @@ func (agp *AESGCMParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 		return nil, NewError(OperationError, "could not create AES cipher")
 	}
 
-	gcm, err := cipher.NewGCMWithTagSize(block, tagLength/8)
+	gcm, err := cipher.NewGCMWithTagSize(block, int(tagLength.asByteLength()))
 	if err != nil {
 		return nil, NewError(OperationError, "could not create GCM cipher")
 	}
