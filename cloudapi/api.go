@@ -90,17 +90,34 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 
 // StartCloudTestRun starts a cloud test run, i.e. `k6 cloud script.js`.
 func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
+	fields := [][2]string{{"name", name}}
+
+	if projectID != 0 {
+		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
+	}
+
+	return c.uploadArchive(fields, arc)
+}
+
+// UploadTestOnly uploads a test run to the cloud without actually starting it.
+func (c *Client) UploadTestOnly(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
+	fields := [][2]string{{"name", name}, {"upload_only", "true"}}
+
+	if projectID != 0 {
+		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
+	}
+
+	return c.uploadArchive(fields, arc)
+}
+
+func (c *Client) uploadArchive(fields [][2]string, arc *lib.Archive) (*CreateTestRunResponse, error) {
 	requestURL := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
 	var buf bytes.Buffer
 	mp := multipart.NewWriter(&buf)
 
-	if err := mp.WriteField("name", name); err != nil {
-		return nil, err
-	}
-
-	if projectID != 0 {
-		if err := mp.WriteField("project_id", strconv.FormatInt(projectID, 10)); err != nil {
+	for _, field := range fields {
+		if err := mp.WriteField(field[0], field[1]); err != nil {
 			return nil, err
 		}
 	}

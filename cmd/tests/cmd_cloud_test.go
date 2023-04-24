@@ -143,6 +143,26 @@ func TestCloudExitOnRunning(t *testing.T) {
 	assert.Contains(t, stdout, `test status: Running`)
 }
 
+func TestCloudUploadOnly(t *testing.T) {
+	t.Parallel()
+
+	cs := func() cloudapi.TestProgressResponse {
+		return cloudapi.TestProgressResponse{
+			RunStatusText: "Archived",
+			RunStatus:     cloudapi.RunStatusArchived,
+		}
+	}
+
+	ts := getSimpleCloudTestState(t, nil, []string{"--upload-only", "--log-output=stdout"}, nil, cs)
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.Contains(t, stdout, `execution: cloud`)
+	assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
+	assert.Contains(t, stdout, `test status: Archived`)
+}
+
 func TestCloudWithConfigOverride(t *testing.T) {
 	t.Parallel()
 

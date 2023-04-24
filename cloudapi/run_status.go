@@ -18,4 +18,5 @@ const (
 	RunStatusAbortedScriptError RunStatus = 7
 	RunStatusAbortedThreshold   RunStatus = 8
 	RunStatusAbortedLimit       RunStatus = 9
+	RunStatusArchived           RunStatus = 10
 )
