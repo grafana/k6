@@ -92,7 +92,7 @@ func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, err
 	}
 
 	for _, p := range op.Properties {
-		val, err := parseRemoteObjectValue(p.Type, p.Value, p.ValuePreview)
+		val, err := parseRemoteObjectValue(p.Type, p.Subtype, p.Value, p.ValuePreview)
 		if err != nil {
 			result = multierror(result, &objectPropertyParseError{err, p.Name})
 			continue
@@ -104,7 +104,9 @@ func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, err
 }
 
 //nolint:cyclop
-func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.ObjectPreview) (any, error) {
+func parseRemoteObjectValue(
+	t cdpruntime.Type, st cdpruntime.Subtype, val string, op *cdpruntime.ObjectPreview,
+) (any, error) {
 	switch t {
 	case cdpruntime.TypeAccessor:
 		return "accessor", nil
@@ -128,6 +130,9 @@ func parseRemoteObjectValue(t cdpruntime.Type, val string, op *cdpruntime.Object
 		}
 		if val == "Object" {
 			return val, nil
+		}
+		if st == "null" {
+			return "null", nil
 		}
 	case cdpruntime.TypeUndefined:
 		return "undefined", nil
@@ -159,7 +164,7 @@ func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
 
 func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	if obj.UnserializableValue == "" {
-		return parseRemoteObjectValue(obj.Type, string(obj.Value), obj.Preview)
+		return parseRemoteObjectValue(obj.Type, obj.Subtype, string(obj.Value), obj.Preview)
 	}
 
 	switch obj.UnserializableValue.String() {

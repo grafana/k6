@@ -154,9 +154,10 @@ func TestParseRemoteObject(t *testing.T) {
 
 	testCases := []struct {
 		name     string
+		subtype  string
 		preview  *runtime.ObjectPreview
-		value    string
-		expected map[string]any
+		value    easyjson.RawMessage
+		expected any
 		expErr   string
 	}{
 		{
@@ -214,6 +215,12 @@ func TestParseRemoteObject(t *testing.T) {
 			expected: map[string]any{},
 			expErr:   "parsing object property",
 		},
+		{
+			name:     "null",
+			subtype:  "null",
+			value:    nil,
+			expected: "null",
+		},
 	}
 
 	for _, tc := range testCases {
@@ -222,6 +229,7 @@ func TestParseRemoteObject(t *testing.T) {
 			t.Parallel()
 			remoteObject := &runtime.RemoteObject{
 				Type:     "object",
+				Subtype:  runtime.Subtype(tc.subtype),
 				ObjectID: runtime.RemoteObjectID("object_id_0123456789"),
 				Preview:  tc.preview,
 				Value:    easyjson.RawMessage(tc.value),
