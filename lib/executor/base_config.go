@@ -20,6 +20,12 @@ var DefaultGracefulStopValue = 30 * time.Second //nolint:gochecknoglobals
 var executorNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`) //nolint:gochecknoglobals
 const executorNameErr = "the executor name should contain only numbers, latin letters, underscores, and dashes"
 
+// ScenarioOptions are options specific to a scenario. These include k6 browser
+// options, which are validated by the browser module, and not by k6 core.
+type ScenarioOptions struct {
+	Browser map[string]any `json:"browser"`
+}
+
 // BaseConfig contains the common config fields for all executors
 type BaseConfig struct {
 	Name         string             `json:"-"` // set via the JS object key
@@ -29,6 +35,7 @@ type BaseConfig struct {
 	Env          map[string]string  `json:"env"`
 	Exec         null.String        `json:"exec"` // function name, externally validated
 	Tags         map[string]string  `json:"tags"`
+	Options      ScenarioOptions    `json:"options"`
 
 	// TODO: future extensions like distribution, others?
 }
