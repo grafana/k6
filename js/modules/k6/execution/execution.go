@@ -216,11 +216,34 @@ func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
 	if err != nil {
 		return o, err
 	}
-
-	err = o.Set("tags", rt.NewDynamicObject(&tagsDynamicObject{
+	tagsDynamicObject := rt.NewDynamicObject(&tagsDynamicObject{
 		runtime: rt,
 		state:   vuState,
-	}))
+	})
+	err = o.Set("tags", tagsDynamicObject)
+
+	if err != nil {
+		return o, err
+	}
+	metrics, err := newInfoObj(rt, map[string]func() interface{}{
+		"tags": func() interface{} { return tagsDynamicObject },
+		"metadata": func() interface{} {
+			return rt.NewDynamicObject(&metadataDynamicObject{
+				runtime: rt,
+				state:   vuState,
+			})
+		},
+	})
+	if err != nil {
+		return o, err
+	}
+
+	err = o.Set("metrics", metrics)
+
+	if err != nil {
+		return o, err
+	}
+
 	return o, err
 }
 
@@ -311,9 +334,6 @@ func (o *tagsDynamicObject) Get(key string) goja.Value {
 	if tag, ok := tcv.Tags.Get(key); ok {
 		return o.runtime.ToValue(tag)
 	}
-	if metadatum, ok := tcv.Metadata[key]; ok {
-		return o.runtime.ToValue(metadatum)
-	}
 	return nil
 }
 
@@ -323,7 +343,7 @@ func (o *tagsDynamicObject) Get(key string) goja.Value {
 func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
 	var err error
 	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-		err = common.ApplyCustomUserTag(o.runtime, tagsAndMeta, key, val)
+		err = common.ApplyCustomUserTag(tagsAndMeta, key, val)
 		if err != nil {
 			panic(o.runtime.NewTypeError(err.Error()))
 		}
@@ -335,9 +355,6 @@ func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
 func (o *tagsDynamicObject) Has(key string) bool {
 	ctv := o.state.Tags.GetCurrentValues()
 	if _, ok := ctv.Tags.Get(key); ok {
-		return true
-	}
-	if _, ok := ctv.Metadata[key]; ok {
 		return true
 	}
 	return false
@@ -362,6 +379,61 @@ func (o *tagsDynamicObject) Keys() []string {
 	for k := range tagsMap {
 		keys = append(keys, k)
 	}
+	return keys
+}
+
+type metadataDynamicObject struct {
+	runtime *goja.Runtime
+	state   *lib.State
+}
+
+// Get a property value for the key. May return nil if the property does not exist.
+func (o *metadataDynamicObject) Get(key string) goja.Value {
+	tcv := o.state.Tags.GetCurrentValues()
+	if metadatum, ok := tcv.Metadata[key]; ok {
+		return o.runtime.ToValue(metadatum)
+	}
+	return nil
+}
+
+// Set a property value for the key. It returns true if succeed. String, Boolean
+// and Number types are implicitly converted to the goja's relative string
+// representation. An exception is raised in case a denied type is provided.
+func (o *metadataDynamicObject) Set(key string, val goja.Value) bool {
+	var err error
+	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		err = common.ApplyCustomUserMetadata(tagsAndMeta, key, val)
+		if err != nil {
+			panic(o.runtime.NewTypeError(err.Error()))
+		}
+	})
+	return true
+}
+
+// Has returns true if the property exists.
+func (o *metadataDynamicObject) Has(key string) bool {
+	ctv := o.state.Tags.GetCurrentValues()
+	if _, ok := ctv.Metadata[key]; ok {
+		return true
+	}
+	return false
+}
+
+// Delete deletes the property for the key. It returns true on success (note,
+// that includes missing property).
+func (o *metadataDynamicObject) Delete(key string) bool {
+	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
+		tagsAndMeta.DeleteMetadata(key)
+	})
+	return true
+}
+
+// Keys returns a slice with all existing property keys. The order is not
+// deterministic.
+func (o *metadataDynamicObject) Keys() []string {
+	ctv := o.state.Tags.GetCurrentValues()
+
+	keys := make([]string, 0, len(ctv.Metadata))
 	for k := range ctv.Metadata {
 		keys = append(keys, k)
 	}
