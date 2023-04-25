@@ -401,6 +401,20 @@ var configMapTestCases = []configMapTestCase{
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 20, "maxVUs": 50, "stages": [{"duration": "5m", "target": 10}], "timeUnit": "-1s"}}`, exp{validationError: true}},
 	{`{"varrival": {"executor": "ramping-arrival-rate", "preAllocatedVUs": 30, "maxVUs": 20, "stages": [{"duration": "5m", "target": 10}]}}`, exp{validationError: true}},
 	// TODO: more tests of mixed executors and execution plans
+
+	// scenario options
+	{
+		`{"ui": {"executor": "shared-iterations", "iterations": 22, "vus": 12, "maxDuration": "100s", "options": {"browser": {"someBrowserOption": true}}}}`,
+		exp{custom: func(t *testing.T, cm lib.ScenarioConfigs) {
+			require.Empty(t, cm["ui"].Validate())
+			siCfg, ok := cm["ui"].(SharedIterationsConfig)
+			require.True(t, ok)
+			require.NotEmpty(t, siCfg.Options.Browser)
+			assert.EqualValues(t, true, siCfg.Options.Browser["someBrowserOption"])
+		}},
+	},
+	// only the "browser" scenario option is supported
+	{`{"ui": {"executor": "shared-iterations", "iterations": 22, "vus": 12, "maxDuration": "100s", "options": {"unsupported": {}}}}`, exp{parseError: true}},
 }
 
 func TestConfigMapParsingAndValidation(t *testing.T) {
