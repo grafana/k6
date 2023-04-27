@@ -13,7 +13,6 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.1
-	github.com/grafana/sobek v0.0.0-20240626131919-5be1e93c7efc
 	github.com/grafana/xk6-browser v1.6.1-0.20240701105714-29f6ef3049fe
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-prometheus-remote v0.4.0
@@ -75,6 +74,7 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
+	github.com/grafana/sobek v0.0.0-20240708142253-1d1dbd360a51
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
