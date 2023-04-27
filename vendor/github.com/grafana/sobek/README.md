@@ -12,7 +12,7 @@ This project is a fork of [goja](https://github.com/dop251/goja).
 
 This project was largely inspired by [otto](https://github.com/robertkrimen/otto).
 
-The minimum required Go version is 1.20.
+The minimum required Go version is 1.21.
 
 Features
 --------
