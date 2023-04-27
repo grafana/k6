@@ -107,7 +107,7 @@ func newBundle(
 		preInitState:      piState,
 	}
 	c := bundle.newCompiler(piState.Logger)
-	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateCJSLoad(bundle, c))
+	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateFileLoad(bundle), c)
 
 	if err = bundle.ModuleResolver.SetMain(src, c); err != nil {
 		return nil, err
@@ -420,8 +420,8 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modu
 	}
 }
 
-func generateCJSLoad(b *Bundle, c *compiler.Compiler) modules.CJSModuleLoader {
-	return func(specifier *url.URL, name string) (*modules.CJSModule, error) {
+func generateFileLoad(b *Bundle) modules.FileLoader {
+	return func(specifier *url.URL, name string) ([]byte, error) {
 		if filepath.IsAbs(name) && runtime.GOOS == "windows" {
 			b.preInitState.Logger.Warnf("'%s' was imported with an absolute path - this won't be cross-platform and "+
 				"won't work if you move the script between machines or run it with `k6 cloud`; if absolute paths are "+
@@ -432,6 +432,6 @@ func generateCJSLoad(b *Bundle, c *compiler.Compiler) modules.CJSModuleLoader {
 		if err != nil {
 			return nil, err
 		}
-		return modules.CJSModuleFromString(specifier, d.Data, c)
+		return d.Data, nil
 	}
 }

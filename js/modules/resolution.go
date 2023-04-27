@@ -10,6 +10,9 @@ import (
 	"go.k6.io/k6/loader"
 )
 
+// FileLoader is a type alias for a function that returns the contents of the referenced file.
+type FileLoader func(specifier *url.URL, name string) ([]byte, error)
+
 type module interface {
 	instantiate(vu VU) moduleInstance
 }
@@ -27,7 +30,8 @@ type moduleCacheElement struct {
 type ModuleResolver struct {
 	cache     map[string]moduleCacheElement
 	goModules map[string]interface{}
-	loadCJS   CJSModuleLoader
+	loadCJS   FileLoader
+	compiler  *compiler.Compiler
 
 	// TODO: figure out a way to not have to have this
 	mainpwd       *url.URL
@@ -37,8 +41,13 @@ type ModuleResolver struct {
 // NewModuleResolver returns a new module resolution instance that will resolve.
 // goModules is map of import file to a go module
 // loadCJS is used to load commonjs files
-func NewModuleResolver(goModules map[string]interface{}, loadCJS CJSModuleLoader) *ModuleResolver {
-	return &ModuleResolver{goModules: goModules, cache: make(map[string]moduleCacheElement), loadCJS: loadCJS}
+func NewModuleResolver(goModules map[string]interface{}, loadCJS FileLoader, c *compiler.Compiler) *ModuleResolver {
+	return &ModuleResolver{
+		goModules: goModules,
+		cache:     make(map[string]moduleCacheElement),
+		loadCJS:   loadCJS,
+		compiler:  c,
+	}
 }
 
 // SetMain sets what is the main module/script for this resolver
@@ -46,7 +55,7 @@ func NewModuleResolver(goModules map[string]interface{}, loadCJS CJSModuleLoader
 func (mr *ModuleResolver) SetMain(main *loader.SourceData, c *compiler.Compiler) error {
 	mr.mainSpecifier = main.URL.String()
 	mr.mainpwd = main.URL.ResolveReference(&url.URL{Path: "../"}) // TODO: fix
-	mod, err := CJSModuleFromString(main.URL, main.Data, c)
+	mod, err := cjsModuleFromString(main.URL, main.Data, c)
 	mr.cache[main.URL.String()] = moduleCacheElement{mod: mod, err: err}
 	return err
 }
@@ -91,9 +100,16 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 		if cached, ok := mr.cache[specifier.String()]; ok {
 			return cached.mod, cached.err
 		}
-		// Fall back to loading from the filesystem.
-		mod, err := mr.loadCJS(specifier, arg)
+
+		// Fall back to loading
+		data, err := mr.loadCJS(specifier, arg)
+		if err != nil {
+			mr.cache[specifier.String()] = moduleCacheElement{err: err}
+			return nil, err
+		}
+		mod, err := cjsModuleFromString(specifier, data, mr.compiler)
 		mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
+
 		return mod, err
 	}
 }
