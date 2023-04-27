@@ -3,11 +3,14 @@ package modulestest
 
 import (
 	"context"
+	"net/url"
 	"testing"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
+	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
@@ -54,4 +57,15 @@ func NewRuntime(t testing.TB) *Runtime {
 func (r *Runtime) MoveToVUContext(state *lib.State) {
 	r.VU.InitEnvField = nil
 	r.VU.StateField = state
+}
+
+// SetupModuleSystem sets up the modules system for the current Runtime.
+// See [modules.NewModuleResolver] for the meaning of the parameters.
+func (r *Runtime) SetupModuleSystem(
+	goModules map[string]interface{}, loader modules.FileLoader, c *compiler.Compiler,
+) error {
+	mr := modules.NewModuleResolver(goModules, loader, c)
+	ms := modules.NewModuleSystem(mr, r.VU)
+	impl := modules.NewLegacyRequireImpl(r.VU, ms, url.URL{})
+	return r.VU.RuntimeField.Set("require", impl.Require)
 }
