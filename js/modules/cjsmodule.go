@@ -9,22 +9,21 @@ import (
 	"go.k6.io/k6/js/compiler"
 )
 
-// CJSModule represents a commonJS module
-// TODO: this likely should not be export
-type CJSModule struct {
+// cjsModule represents a commonJS module
+type cjsModule struct {
 	prg *goja.Program
 	url *url.URL
 }
 
-var _ module = &CJSModule{}
+var _ module = &cjsModule{}
 
 type cjsModuleInstance struct {
-	mod       *CJSModule
+	mod       *cjsModule
 	moduleObj *goja.Object
 	vu        VU
 }
 
-func (c *CJSModule) instantiate(vu VU) moduleInstance {
+func (c *cjsModule) instantiate(vu VU) moduleInstance {
 	return &cjsModuleInstance{vu: vu, mod: c}
 }
 
@@ -60,18 +59,15 @@ func (c *cjsModuleInstance) exports() *goja.Object {
 	return exportsV.ToObject(c.vu.Runtime())
 }
 
-// CJSModuleLoader is a type alias for a function that returns new cjsModule
-type CJSModuleLoader func(specifier *url.URL, name string) (*CJSModule, error)
-
-// CJSModuleFromString is a helper function which returns CJSModule given the argument it has.
+// cjsModuleFromString is a helper function which returns CJSModule given the argument it has.
 // It is mostly a wrapper around compiler.Compiler@Compile
 //
 // TODO: extract this to not make this package dependant on compilers.
-// this is potentially mute point after ESM when the compiler will likely get mostly dropped.
-func CJSModuleFromString(fileURL *url.URL, data []byte, c *compiler.Compiler) (*CJSModule, error) {
+// this is potentially a moot point after ESM when the compiler will likely get mostly dropped.
+func cjsModuleFromString(fileURL *url.URL, data []byte, c *compiler.Compiler) (*cjsModule, error) {
 	pgm, _, err := c.Compile(string(data), fileURL.String(), false)
 	if err != nil {
 		return nil, err
 	}
-	return &CJSModule{prg: pgm, url: fileURL}, nil
+	return &cjsModule{prg: pgm, url: fileURL}, nil
 }
