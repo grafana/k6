@@ -32,10 +32,6 @@ type ModuleResolver struct {
 	goModules map[string]interface{}
 	loadCJS   FileLoader
 	compiler  *compiler.Compiler
-
-	// TODO: figure out a way to not have to have this
-	mainpwd       *url.URL
-	mainSpecifier string
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -48,16 +44,6 @@ func NewModuleResolver(goModules map[string]interface{}, loadCJS FileLoader, c *
 		loadCJS:   loadCJS,
 		compiler:  c,
 	}
-}
-
-// SetMain sets what is the main module/script for this resolver
-// TODO: this likely will change with ESM support
-func (mr *ModuleResolver) SetMain(main *loader.SourceData, c *compiler.Compiler) error {
-	mr.mainSpecifier = main.URL.String()
-	mr.mainpwd = main.URL.ResolveReference(&url.URL{Path: "../"}) // TODO: fix
-	mod, err := cjsModuleFromString(main.URL, main.Data, c)
-	mr.cache[main.URL.String()] = moduleCacheElement{mod: mod, err: err}
-	return err
 }
 
 func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.URL, error) {
@@ -78,6 +64,21 @@ func (mr *ModuleResolver) requireModule(name string) (module, error) {
 	}
 
 	return &baseGoModule{mod: mod}, nil
+}
+
+func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byte) (module, error) {
+	specifier, err := mr.resolveSpecifier(basePWD, arg)
+	if err != nil {
+		return nil, err
+	}
+	// try cache with the final specifier
+	if cached, ok := mr.cache[specifier.String()]; ok {
+		return cached.mod, cached.err
+	}
+
+	mod, err := cjsModuleFromString(specifier, data, mr.compiler)
+	mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
+	return mod, err
 }
 
 func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) {
@@ -149,18 +150,17 @@ func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) 
 	return instance.exports(), nil
 }
 
-// RunMain runs the main module and returns it exports
+// RunSourceData runs the provided sourceData and adds it to the cache.
+// If a module with the same specifier as the source is already cached
+// it will be used instead of reevaluating the source from the provided SourceData.
+//
 // TODO: this API will likely change as native ESM support will likely not let us have the exports
 // as one big goja.Value that we can manipulate
-func (ms *ModuleSystem) RunMain() (goja.Value, error) {
-	mod, err := ms.resolver.resolve(ms.resolver.mainpwd, ms.resolver.mainSpecifier)
-	if err != nil {
+func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (goja.Value, error) {
+	specifier := source.URL.String()
+	pwd := source.URL.JoinPath("../")
+	if _, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data); err != nil {
 		return nil, err // TODO wrap as this should never happen
 	}
-	instance := mod.instantiate(ms.vu)
-	err = instance.execute()
-	if err != nil {
-		return nil, err
-	}
-	return instance.exports(), err
+	return ms.Require(pwd, specifier)
 }
