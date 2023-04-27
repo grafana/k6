@@ -284,23 +284,16 @@ func (r *Runtime) object_freeze(call FunctionCall) Value {
 		obj.self.preventExtensions(true)
 
 		for item, next := obj.self.iterateKeys()(); next != nil; item, next = next() {
-			if prop, ok := item.value.(*valueProperty); ok {
-				prop.configurable = false
-				if !prop.accessor {
-					prop.writable = false
-				}
-			} else {
-				prop := obj.getOwnProp(item.name)
-				descr := PropertyDescriptor{
-					Configurable: FLAG_FALSE,
-				}
-				if prop, ok := prop.(*valueProperty); ok && prop.accessor {
-					// no-op
-				} else {
-					descr.Writable = FLAG_FALSE
-				}
-				obj.defineOwnProperty(item.name, descr, true)
+			prop := obj.getOwnProp(item.name)
+			descr := PropertyDescriptor{
+				Configurable: FLAG_FALSE,
 			}
+			if prop, ok := prop.(*valueProperty); ok && prop.accessor {
+				// no-op
+			} else {
+				descr.Writable = FLAG_FALSE
+			}
+			obj.defineOwnProperty(item.name, descr, true)
 		}
 		return obj
 	} else {

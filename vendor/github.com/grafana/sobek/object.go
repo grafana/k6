@@ -1452,14 +1452,8 @@ func (o *Object) getOwnProp(p Value) Value {
 }
 
 func (o *Object) hasOwnProperty(p Value) bool {
-	switch p := p.(type) {
-	case valueInt:
-		return o.self.hasOwnPropertyIdx(p)
-	case *Symbol:
-		return o.self.hasOwnPropertySym(p)
-	default:
-		return o.self.hasOwnPropertyStr(p.string())
-	}
+	// https: // 262.ecma-international.org/12.0/#sec-hasownproperty
+	return o.getOwnProp(p) != nil
 }
 
 func (o *Object) hasProperty(p Value) bool {
