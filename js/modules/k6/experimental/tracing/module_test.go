@@ -3,9 +3,9 @@ package tracing
 import (
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
@@ -59,16 +59,14 @@ type testSetup struct {
 
 func newTestSetup(t *testing.T) testSetup {
 	ts := modulestest.NewRuntime(t)
-	m := new(RootModule).NewModuleInstance(ts.VU)
+	err := ts.SetupModuleSystem(map[string]interface{}{
+		"k6/http":                 http.New(),
+		"k6/experimental/tracing": new(RootModule),
+	}, nil, compiler.New(ts.VU.InitEnvField.Logger))
+	require.NoError(t, err)
 
-	rt := ts.VU.Runtime()
-	require.NoError(t, rt.Set("instrumentHTTP", m.Exports().Named["instrumentHTTP"]))
-
-	export := http.New().NewModuleInstance(ts.VU).Exports().Default
-	require.NoError(t, rt.Set("require", func(module string) *goja.Object {
-		require.Equal(t, "k6/http", module)
-		return rt.ToValue(export).ToObject(rt)
-	}))
+	_, err = ts.VU.Runtime().RunString("var instrumentHTTP = require('k6/experimental/tracing').instrumentHTTP")
+	require.NoError(t, err)
 
 	return testSetup{
 		t:           t,
