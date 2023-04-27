@@ -109,9 +109,6 @@ func newBundle(
 	c := bundle.newCompiler(piState.Logger)
 	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateFileLoad(bundle), c)
 
-	if err = bundle.ModuleResolver.SetMain(src, c); err != nil {
-		return nil, err
-	}
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	// TODO use a real context
@@ -309,7 +306,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 		return vuImpl.eventLoop.Start(func() error {
 			//nolint:shadow,govet // here we shadow err on purpose
 			var err error
-			exportsV, err = modSys.RunMain()
+			exportsV, err = modSys.RunSourceData(b.sourceData)
 			return err
 		})
 	})
