@@ -1,0 +1,24 @@
+name: 'Auto assign maintainer to issue'
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  assign-user:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            const assignees = ['mstoykov', 'imiric, 'codebien', 'olegbespalov', 'oleiade'];
+            const assigneeCount = 1;
+
+            github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              assignees: assignees.sort(() => 0.5 - Math.random()).slice(0, assigneeCount),
+            });
