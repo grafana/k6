@@ -16,6 +16,11 @@ jobs:
             const assignees = ['mstoykov', 'imiric, 'codebien', 'olegbespalov', 'oleiade'];
             const assigneeCount = 1;
 
+            // Do not automatically assign users if someone was already assigned or it was opened by a maintainer
+            if (context.payload.issue.assignees.length > 0 || assignees.contains(context.payload.issue.user.login)) {
+              return;
+            }
+
             github.rest.issues.addAssignees({
               owner: context.repo.owner,
               repo: context.repo.repo,
