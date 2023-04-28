@@ -41,7 +41,7 @@ func setupTagsExecEnv(t *testing.T) *modulestest.Runtime {
 	return testRuntime
 }
 
-func TestVUTagMetadatasGet(t *testing.T) {
+func TestVUTagsMetadatasGet(t *testing.T) {
 	t.Parallel()
 
 	for prop, propType := range tagsAndMetricsPropertyNames {
@@ -67,7 +67,7 @@ func TestVUTagMetadatasGet(t *testing.T) {
 	}
 }
 
-func TestVUTagMetadasJSONEncoding(t *testing.T) {
+func TestVUTagsMetadatasJSONEncoding(t *testing.T) {
 	t.Parallel()
 
 	for prop, propType := range tagsAndMetricsPropertyNames {
@@ -131,7 +131,7 @@ func TestVUTagMetadatasSetSuccessAccetedTypes(t *testing.T) {
 	}
 }
 
-func TestVUTagMetadatasSuccessOverwriteSystemTag(t *testing.T) {
+func TestVUTagsMetadatasSuccessOverwriteSystemTag(t *testing.T) {
 	t.Parallel()
 
 	tenv := setupTagsExecEnv(t)
