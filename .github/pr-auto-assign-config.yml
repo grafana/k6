@@ -3,7 +3,6 @@ addAssignees: false
 useAssigneeGroups: false
 numberOfReviewers: 2
 reviewers:
-  - na--
   - mstoykov
   - codebien
   - oleiade
