@@ -31,6 +31,7 @@ const TestName = "k6 test"
 
 // Output sends result data to the k6 Cloud service.
 type Output struct {
+	logger      logrus.FieldLogger
 	config      cloudapi.Config
 	referenceID string
 
@@ -42,9 +43,6 @@ type Output struct {
 	bufferMutex      sync.Mutex
 	bufferHTTPTrails []*httpext.Trail
 	bufferSamples    []*Sample
-
-	logger logrus.FieldLogger
-	opts   lib.Options
 
 	// TODO: optimize this
 	//
@@ -126,7 +124,6 @@ func newOutput(params output.Params) (*Output, error) {
 		client:        NewMetricsClient(apiClient, logger, conf.Host.String, conf.NoCompress.Bool),
 		executionPlan: params.ExecutionPlan,
 		duration:      int64(duration / time.Second),
-		opts:          params.ScriptOptions,
 		aggrBuckets:   map[int64]aggregationBucket{},
 		logger:        logger,
 
