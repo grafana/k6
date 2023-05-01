@@ -147,7 +147,7 @@ jobs:
             --bootstrap --use
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID .
+            -t $DOCKER_IMAGE_ID . --load
       - name: Check
         run: |
             docker run $DOCKER_IMAGE_ID version
