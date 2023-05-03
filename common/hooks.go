@@ -30,7 +30,7 @@ func applySlowMo(ctx context.Context) {
 }
 
 func defaultSlowMo(ctx context.Context) {
-	sm := GetLaunchOptions(ctx).SlowMo
+	sm := GetBrowserOptions(ctx).SlowMo
 	if sm <= 0 {
 		return
 	}

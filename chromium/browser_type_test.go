@@ -28,36 +28,36 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 
 	testCases := []struct {
 		flag                      string
-		changeOpts                *common.LaunchOptions
+		changeOpts                *common.BrowserOptions
 		changeK6Opts              *k6lib.Options
 		expInitVal, expChangedVal any
 		post                      func(t *testing.T, flags map[string]any)
 	}{
 		{
 			flag:       "hide-scrollbars",
-			changeOpts: &common.LaunchOptions{IgnoreDefaultArgs: []string{"hide-scrollbars"}, Headless: true},
+			changeOpts: &common.BrowserOptions{IgnoreDefaultArgs: []string{"hide-scrollbars"}, Headless: true},
 		},
 		{
 			flag:          "hide-scrollbars",
-			changeOpts:    &common.LaunchOptions{Headless: true},
+			changeOpts:    &common.BrowserOptions{Headless: true},
 			expChangedVal: true,
 		},
 		{
 			flag:          "browser-arg",
 			expInitVal:    nil,
-			changeOpts:    &common.LaunchOptions{Args: []string{"browser-arg=value"}},
+			changeOpts:    &common.BrowserOptions{Args: []string{"browser-arg=value"}},
 			expChangedVal: "value",
 		},
 		{
 			flag:          "browser-arg-flag",
 			expInitVal:    nil,
-			changeOpts:    &common.LaunchOptions{Args: []string{"browser-arg-flag"}},
+			changeOpts:    &common.BrowserOptions{Args: []string{"browser-arg-flag"}},
 			expChangedVal: "",
 		},
 		{
 			flag:       "browser-arg-trim-double-quote",
 			expInitVal: nil,
-			changeOpts: &common.LaunchOptions{Args: []string{
+			changeOpts: &common.BrowserOptions{Args: []string{
 				`   browser-arg-trim-double-quote =  "value  "  `,
 			}},
 			expChangedVal: "value  ",
@@ -65,7 +65,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		{
 			flag:       "browser-arg-trim-single-quote",
 			expInitVal: nil,
-			changeOpts: &common.LaunchOptions{Args: []string{
+			changeOpts: &common.BrowserOptions{Args: []string{
 				`   browser-arg-trim-single-quote=' value '`,
 			}},
 			expChangedVal: " value ",
@@ -73,7 +73,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		{
 			flag:       "browser-args",
 			expInitVal: nil,
-			changeOpts: &common.LaunchOptions{Args: []string{
+			changeOpts: &common.BrowserOptions{Args: []string{
 				"browser-arg1='value1", "browser-arg2=''value2''", "browser-flag",
 			}},
 			post: func(t *testing.T, flags map[string]any) {
@@ -87,7 +87,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		{
 			flag:       "host-resolver-rules",
 			expInitVal: nil,
-			changeOpts: &common.LaunchOptions{Args: []string{
+			changeOpts: &common.BrowserOptions{Args: []string{
 				`host-resolver-rules="MAP * www.example.com, EXCLUDE *.youtube.*"`,
 			}},
 			changeK6Opts: &k6lib.Options{
@@ -99,14 +99,14 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		{
 			flag:          "host-resolver-rules",
 			expInitVal:    nil,
-			changeOpts:    &common.LaunchOptions{},
+			changeOpts:    &common.BrowserOptions{},
 			changeK6Opts:  &k6lib.Options{},
 			expChangedVal: nil,
 		},
 		{
 			flag:          "headless",
 			expInitVal:    false,
-			changeOpts:    &common.LaunchOptions{Headless: true},
+			changeOpts:    &common.BrowserOptions{Headless: true},
 			expChangedVal: true,
 			post: func(t *testing.T, flags map[string]any) {
 				t.Helper()
@@ -124,7 +124,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		t.Run(tc.flag, func(t *testing.T) {
 			t.Parallel()
 
-			flags, err := prepareFlags(&common.LaunchOptions{}, nil)
+			flags, err := prepareFlags(&common.BrowserOptions{}, nil)
 			require.NoError(t, err, "failed to prepare flags")
 
 			if tc.expInitVal != nil {

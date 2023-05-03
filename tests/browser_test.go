@@ -146,7 +146,7 @@ func TestBrowserCrashErr(t *testing.T) {
 	t.Parallel()
 
 	assertExceptionContains(t, goja.New(), func() {
-		lopts := defaultLaunchOpts()
+		lopts := defaultBrowserOpts()
 		lopts.Args = []any{"remote-debugging-port=99999"}
 
 		newTestBrowser(t, lopts)

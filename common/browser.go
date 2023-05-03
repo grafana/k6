@@ -44,7 +44,7 @@ type Browser struct {
 	state int64
 
 	browserProc *BrowserProcess
-	launchOpts  *LaunchOptions
+	browserOpts *BrowserOptions
 
 	// Connection to the browser to talk CDP protocol.
 	// A *Connection is saved to this field, see: connect().
@@ -78,10 +78,10 @@ func NewBrowser(
 	ctx context.Context,
 	cancel context.CancelFunc,
 	browserProc *BrowserProcess,
-	launchOpts *LaunchOptions,
+	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) (*Browser, error) {
-	b := newBrowser(ctx, cancel, browserProc, launchOpts, logger)
+	b := newBrowser(ctx, cancel, browserProc, browserOpts, logger)
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
@@ -93,7 +93,7 @@ func newBrowser(
 	ctx context.Context,
 	cancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
-	launchOpts *LaunchOptions,
+	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) *Browser {
 	return &Browser{
@@ -102,7 +102,7 @@ func newBrowser(
 		cancelFn:            cancelFn,
 		state:               int64(BrowserStateOpen),
 		browserProc:         browserProc,
-		launchOpts:          launchOpts,
+		browserOpts:         browserOpts,
 		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
@@ -384,7 +384,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		return nil, fmt.Errorf("missing browser context: %s", id)
 	}
 
-	ctx, cancel := context.WithTimeout(b.ctx, b.launchOpts.Timeout)
+	ctx, cancel := context.WithTimeout(b.ctx, b.browserOpts.Timeout)
 	defer cancel()
 
 	// buffer of one is for sending the target ID whether an event handler
@@ -425,7 +425,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	case <-ctx.Done():
 		err = &k6ext.UserFriendlyError{
 			Err:     ctx.Err(),
-			Timeout: b.launchOpts.Timeout,
+			Timeout: b.browserOpts.Timeout,
 		}
 		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, err)
 	}
@@ -462,7 +462,7 @@ func (b *Browser) Close() {
 
 	// If the browser is not being executed remotely, send the Browser.close CDP
 	// command, which triggers the browser process to exit.
-	if !b.launchOpts.isRemoteBrowser {
+	if !b.browserOpts.isRemoteBrowser {
 		var closeErr *websocket.CloseError
 		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.ctx, b.conn))
 		if err != nil && !errors.As(err, &closeErr) {

@@ -21,8 +21,8 @@ const (
 	optTimeout           = "timeout"
 )
 
-// LaunchOptions stores browser launch options.
-type LaunchOptions struct {
+// BrowserOptions stores browser options.
+type BrowserOptions struct {
 	Args              []string
 	Debug             bool
 	ExecutablePath    string
@@ -37,23 +37,24 @@ type LaunchOptions struct {
 
 // LaunchPersistentContextOptions stores browser launch options for persistent context.
 type LaunchPersistentContextOptions struct {
-	LaunchOptions
+	BrowserOptions
 	BrowserContextOptions
 }
 
-// NewLaunchOptions returns a new LaunchOptions.
-func NewLaunchOptions() *LaunchOptions {
-	return &LaunchOptions{
+// NewLocalBrowserOptions returns a new BrowserOptions
+// for a browser launched in the local machine.
+func NewLocalBrowserOptions() *BrowserOptions {
+	return &BrowserOptions{
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
 	}
 }
 
-// NewRemoteBrowserLaunchOptions returns a new LaunchOptions
+// NewRemoteBrowserOptions returns a new BrowserOptions
 // for a browser running in a remote machine.
-func NewRemoteBrowserLaunchOptions() *LaunchOptions {
-	return &LaunchOptions{
+func NewRemoteBrowserOptions() *BrowserOptions {
+	return &BrowserOptions{
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
@@ -61,8 +62,8 @@ func NewRemoteBrowserLaunchOptions() *LaunchOptions {
 	}
 }
 
-// Parse parses launch options from a JS object.
-func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja.Value) error { //nolint:cyclop
+// Parse parses browser options from a JS object.
+func (bo *BrowserOptions) Parse(ctx context.Context, logger *log.Logger, opts goja.Value) error { //nolint:cyclop
 	// when opts is nil, we just return the default options without error.
 	if !gojaValueExists(opts) {
 		return nil
@@ -71,41 +72,41 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 		rt       = k6ext.Runtime(ctx)
 		o        = opts.ToObject(rt)
 		defaults = map[string]any{
-			optHeadless:          l.Headless,
-			optLogCategoryFilter: l.LogCategoryFilter,
-			optTimeout:           l.Timeout,
+			optHeadless:          bo.Headless,
+			optLogCategoryFilter: bo.LogCategoryFilter,
+			optTimeout:           bo.Timeout,
 		}
 	)
 	for _, k := range o.Keys() {
-		if l.shouldIgnoreIfBrowserIsRemote(k) {
-			logger.Warnf("LaunchOptions", "setting %s option is disallowed when browser is remote", k)
+		if bo.shouldIgnoreIfBrowserIsRemote(k) {
+			logger.Warnf("BrowserOptions", "setting %s option is disallowed when browser is remote", k)
 			continue
 		}
 		v := o.Get(k)
 		if v.Export() == nil {
 			if dv, ok := defaults[k]; ok {
-				logger.Warnf("LaunchOptions", "%s was null and set to its default: %v", k, dv)
+				logger.Warnf("BrowserOptions", "%s was null and set to its default: %v", k, dv)
 			}
 			continue
 		}
 		var err error
 		switch k {
 		case optArgs:
-			err = exportOpt(rt, k, v, &l.Args)
+			err = exportOpt(rt, k, v, &bo.Args)
 		case optDebug:
-			l.Debug, err = parseBoolOpt(k, v)
+			bo.Debug, err = parseBoolOpt(k, v)
 		case optExecutablePath:
-			l.ExecutablePath, err = parseStrOpt(k, v)
+			bo.ExecutablePath, err = parseStrOpt(k, v)
 		case optHeadless:
-			l.Headless, err = parseBoolOpt(k, v)
+			bo.Headless, err = parseBoolOpt(k, v)
 		case optIgnoreDefaultArgs:
-			err = exportOpt(rt, k, v, &l.IgnoreDefaultArgs)
+			err = exportOpt(rt, k, v, &bo.IgnoreDefaultArgs)
 		case optLogCategoryFilter:
-			l.LogCategoryFilter, err = parseStrOpt(k, v)
+			bo.LogCategoryFilter, err = parseStrOpt(k, v)
 		case optSlowMo:
-			l.SlowMo, err = parseTimeOpt(k, v)
+			bo.SlowMo, err = parseTimeOpt(k, v)
 		case optTimeout:
-			l.Timeout, err = parseTimeOpt(k, v)
+			bo.Timeout, err = parseTimeOpt(k, v)
 		}
 		if err != nil {
 			return err
@@ -115,8 +116,8 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 	return nil
 }
 
-func (l *LaunchOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
-	if !l.isRemoteBrowser {
+func (bo *BrowserOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
+	if !bo.isRemoteBrowser {
 		return false
 	}
 

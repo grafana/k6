@@ -45,14 +45,14 @@ type testBrowser struct {
 // It automatically closes it when `t` returns.
 //
 // opts provides a way to customize the newTestBrowser.
-// see: withLaunchOptions for an example.
+// see: withBrowserOptions for an example.
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
 	// set default options and then customize them
 	var (
 		ctx                context.Context
-		launchOpts         = defaultLaunchOpts()
+		browserOpts        = defaultBrowserOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
 		enableLogCache     = false
@@ -61,8 +61,8 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case withLaunchOptions:
-			launchOpts = opt
+		case withBrowserOptions:
+			browserOpts = opt
 		case httpServerOption:
 			enableHTTPMultiBin = true
 		case fileServerOption:
@@ -118,7 +118,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.Transport = testServer.HTTPTransport
 	}
 
-	b, pid := bt.Launch(rt.ToValue(launchOpts))
+	b, pid := bt.Launch(rt.ToValue(browserOpts))
 	cb, ok := b.(*common.Browser)
 	if !ok {
 		tb.Fatalf("testBrowser: unexpected browser %T", b)
@@ -136,7 +136,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	tbr := &testBrowser{
 		t:           tb,
-		ctx:         bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
+		ctx:         bt.Ctx, // This context has the additional wrapping of common.WithBrowserOptions
 		http:        testServer,
 		vu:          vu,
 		logCache:    lc,
@@ -382,9 +382,9 @@ func (t testPromise) then(resolve any, reject ...any) testPromise {
 	return t.tb.promise(p)
 }
 
-// launchOptions provides a way to customize browser type
-// launch options in tests.
-type launchOptions struct {
+// browserOptions provides a way to customize browser
+// options in tests.
+type browserOptions struct {
 	Args     []any  `js:"args"`
 	Debug    bool   `js:"debug"`
 	Headless bool   `js:"headless"`
@@ -392,26 +392,26 @@ type launchOptions struct {
 	Timeout  string `js:"timeout"`
 }
 
-// withLaunchOptions is a helper for increasing readability
-// in tests while customizing the browser type launch options.
+// withBrowserOptions is a helper for increasing readability
+// in tests while customizing the browser options.
 //
 // example:
 //
-//	b := TestBrowser(t, withLaunchOptions{
+//	b := TestBrowser(t, withBrowserOptions{
 //	    SlowMo:  "100s",
 //	    Timeout: "30s",
 //	})
-type withLaunchOptions = launchOptions
+type withBrowserOptions = browserOptions
 
-// defaultLaunchOptions returns defaults for browser type launch options.
+// defaultBrowserOpts returns defaults for browser options.
 // TestBrowser uses this for launching a browser type by default.
-func defaultLaunchOpts() launchOptions {
+func defaultBrowserOpts() browserOptions {
 	headless := true
 	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
 		headless, _ = strconv.ParseBool(v)
 	}
 
-	return launchOptions{
+	return browserOptions{
 		Headless: headless,
 		SlowMo:   "0s",
 		Timeout:  "30s",

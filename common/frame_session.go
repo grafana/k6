@@ -1076,7 +1076,7 @@ func (fs *FrameSession) updateViewport() error {
 	// add an inset to viewport depending on the operating system.
 	// this won't add an inset if we're running in headless mode.
 	viewport.calculateInset(
-		fs.page.browserCtx.browser.launchOpts.Headless,
+		fs.page.browserCtx.browser.browserOpts.Headless,
 		runtime.GOOS,
 	)
 	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{

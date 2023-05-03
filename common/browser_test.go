@@ -26,7 +26,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 	newTestCase := func(id cdp.BrowserContextID) *testCase {
 		ctx, cancel := context.WithCancel(context.Background())
 		logger := log.NewNullLogger()
-		b := newBrowser(ctx, cancel, nil, NewLaunchOptions(), logger)
+		b := newBrowser(ctx, cancel, nil, NewLocalBrowserOptions(), logger)
 		// set a new browser context in the browser with `id`, so that newPageInContext can find it.
 		var err error
 		vu := k6test.NewVU(t)
@@ -129,7 +129,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		// set a lower timeout for catching the timeout error.
 		const timeout = 100 * time.Millisecond
 		// set the timeout for the browser value.
-		tc.b.launchOpts.Timeout = timeout
+		tc.b.browserOpts.Timeout = timeout
 		tc.b.conn = fakeConn{
 			execute: func(context.Context, string, easyjson.Marshaler, easyjson.Unmarshaler) error {
 				// executor takes more time than the timeout.

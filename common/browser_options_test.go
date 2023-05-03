@@ -11,10 +11,10 @@ import (
 	"github.com/grafana/xk6-browser/log"
 )
 
-func TestBrowserLaunchOptionsParse(t *testing.T) {
+func TestBrowserOptionsParse(t *testing.T) {
 	t.Parallel()
 
-	defaultOptions := &LaunchOptions{
+	defaultOptions := &BrowserOptions{
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
@@ -22,20 +22,20 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 
 	for name, tt := range map[string]struct {
 		opts            map[string]any
-		assert          func(testing.TB, *LaunchOptions)
+		assert          func(testing.TB, *BrowserOptions)
 		err             string
 		isRemoteBrowser bool
 	}{
 		"defaults": {
 			opts: map[string]any{},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, defaultOptions, lo)
 			},
 		},
 		"defaults_nil": { // providing nil option returns default options
 			opts: nil,
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, defaultOptions, lo)
 			},
@@ -54,9 +54,9 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 				"slowMo":            time.Second,
 				"timeout":           time.Second,
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
-				assert.Equal(t, &LaunchOptions{
+				assert.Equal(t, &BrowserOptions{
 					// disallowed:
 					Headless: true,
 					// allowed:
@@ -75,9 +75,9 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 				"logCategoryFilter": nil,
 				"timeout":           nil,
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
-				assert.Equal(tb, &LaunchOptions{
+				assert.Equal(tb, &BrowserOptions{
 					Headless:          true,
 					LogCategoryFilter: ".*",
 					Timeout:           DefaultTimeout,
@@ -88,7 +88,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				"args": []any{"browser-arg1='value1", "browser-arg2=value2", "browser-flag"},
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				require.Len(tb, lo.Args, 3)
 				assert.Equal(tb, "browser-arg1='value1", lo.Args[0])
@@ -104,7 +104,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 		},
 		"debug": {
 			opts: map[string]any{"debug": true},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.True(t, lo.Debug)
 			},
@@ -117,7 +117,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				"executablePath": "cmd/somewhere",
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, "cmd/somewhere", lo.ExecutablePath)
 			},
@@ -130,7 +130,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				"headless": false,
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.False(t, lo.Headless)
 			},
@@ -143,7 +143,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				"ignoreDefaultArgs": []string{"--hide-scrollbars", "--hide-something"},
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Len(t, lo.IgnoreDefaultArgs, 2)
 				assert.Equal(t, "--hide-scrollbars", lo.IgnoreDefaultArgs[0])
@@ -158,7 +158,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				"logCategoryFilter": "**",
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, "**", lo.LogCategoryFilter)
 			},
@@ -171,7 +171,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				"slowMo": "5s",
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, 5*time.Second, lo.SlowMo)
 			},
@@ -184,7 +184,7 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				"timeout": "10s",
 			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
+			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, 10*time.Second, lo.Timeout)
 			},
@@ -199,13 +199,13 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			t.Parallel()
 			var (
 				vu = k6test.NewVU(t)
-				lo *LaunchOptions
+				lo *BrowserOptions
 			)
 
 			if tt.isRemoteBrowser {
-				lo = NewRemoteBrowserLaunchOptions()
+				lo = NewRemoteBrowserOptions()
 			} else {
-				lo = NewLaunchOptions()
+				lo = NewLocalBrowserOptions()
 			}
 
 			err := lo.Parse(vu.Context(), log.NewNullLogger(), vu.ToGojaValue(tt.opts))
