@@ -48,7 +48,6 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 				"executablePath":    "something else",
 				"headless":          false,
 				"ignoreDefaultArgs": []string{"any"},
-				"proxy":             ProxyOptions{Server: "srv"},
 				// allow changing the following opts
 				"debug":             true,
 				"logCategoryFilter": "...",
@@ -167,29 +166,6 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 		"logCategoryFilter_err": {
 			opts: map[string]any{"logCategoryFilter": 1},
 			err:  "logCategoryFilter should be a string",
-		},
-		"proxy": {
-			opts: map[string]any{
-				"proxy": ProxyOptions{
-					Server:   "serverVal",
-					Bypass:   "bypassVal",
-					Username: "usernameVal",
-					Password: "passwordVal",
-				},
-			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
-				tb.Helper()
-				assert.Equal(t, ProxyOptions{
-					Server:   "serverVal",
-					Bypass:   "bypassVal",
-					Username: "usernameVal",
-					Password: "passwordVal",
-				}, lo.Proxy)
-			},
-		},
-		"proxy_err": {
-			opts: map[string]any{"proxy": 1},
-			err:  "proxy should be an object",
 		},
 		"slowMo": {
 			opts: map[string]any{

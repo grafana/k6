@@ -17,18 +17,9 @@ const (
 	optHeadless          = "headless"
 	optIgnoreDefaultArgs = "ignoreDefaultArgs"
 	optLogCategoryFilter = "logCategoryFilter"
-	optProxy             = "proxy"
 	optSlowMo            = "slowMo"
 	optTimeout           = "timeout"
 )
-
-// ProxyOptions allows configuring a proxy server.
-type ProxyOptions struct {
-	Server   string
-	Bypass   string
-	Username string
-	Password string
-}
 
 // LaunchOptions stores browser launch options.
 type LaunchOptions struct {
@@ -38,7 +29,6 @@ type LaunchOptions struct {
 	Headless          bool
 	IgnoreDefaultArgs []string
 	LogCategoryFilter string
-	Proxy             ProxyOptions
 	SlowMo            time.Duration
 	Timeout           time.Duration
 
@@ -112,8 +102,6 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 			err = exportOpt(rt, k, v, &l.IgnoreDefaultArgs)
 		case optLogCategoryFilter:
 			l.LogCategoryFilter, err = parseStrOpt(k, v)
-		case optProxy:
-			err = exportOpt(rt, k, v, &l.Proxy)
 		case optSlowMo:
 			l.SlowMo, err = parseTimeOpt(k, v)
 		case optTimeout:
@@ -137,7 +125,6 @@ func (l *LaunchOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
 		optExecutablePath:    {},
 		optHeadless:          {},
 		optIgnoreDefaultArgs: {},
-		optProxy:             {},
 	}
 	_, ignore := shouldIgnoreIfBrowserIsRemote[opt]
 
