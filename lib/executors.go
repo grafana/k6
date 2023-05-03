@@ -80,6 +80,7 @@ type ExecutorConfig interface {
 	// execution, including any extensions caused by waiting for iterations to
 	// finish with graceful stops or ramp-downs.
 	GetExecutionRequirements(*ExecutionTuple) []ExecutionStep
+	GetScenarioOptions() *ScenarioOptions
 
 	// Return a human-readable description of the executor
 	GetDescription(*ExecutionTuple) string
@@ -88,6 +89,12 @@ type ExecutorConfig interface {
 
 	// HasWork reports whether there is any work for the executor to do with a given segment.
 	HasWork(*ExecutionTuple) bool
+}
+
+// ScenarioOptions are options specific to a scenario. These include k6 browser
+// options, which are validated by the browser module, and not by k6 core.
+type ScenarioOptions struct {
+	Browser map[string]any `json:"browser"`
 }
 
 // ScenarioState holds runtime scenario information returned by the k6/execution
