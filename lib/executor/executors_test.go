@@ -1,8 +1,10 @@
 package executor
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/url"
 	"testing"
 	"time"
 
@@ -11,6 +13,8 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -443,4 +447,74 @@ func TestConfigMapParsingAndValidation(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Test that the executor configuration is properly written into an archive, and
+// then read back. The reason this test is not in lib/archive_test.go is to avoid
+// an import cycle (lib -> lib/executor -> lib), since we need to import a
+// lib.ExecutorConfig implementation.
+func TestArchiveRoundTripExecutorConfig(t *testing.T) {
+	t.Parallel()
+
+	execCfg := ConstantVUsConfig{
+		BaseConfig: BaseConfig{
+			Name:         "const-vus",
+			Type:         "constant-vus",
+			StartTime:    types.NullDurationFrom(10 * time.Second),
+			GracefulStop: types.NullDurationFrom(30 * time.Second),
+			Env: map[string]string{
+				"FOO": "bar",
+			},
+			Exec: null.StringFrom("default"),
+			Tags: map[string]string{
+				"tagkey": "tagvalue",
+			},
+			Options: lib.ScenarioOptions{
+				Browser: map[string]any{
+					"someOption": "someValue",
+				},
+			},
+		},
+		VUs:      null.IntFrom(50),
+		Duration: types.NullDurationFrom(10 * time.Minute),
+	}
+	arc1 := &lib.Archive{
+		Type:      "js",
+		K6Version: consts.Version,
+		Options: lib.Options{
+			Scenarios: map[string]lib.ExecutorConfig{
+				"const-vus": execCfg,
+			},
+		},
+		FilenameURL: &url.URL{Scheme: "file", Path: "/path/to/a.js"},
+		Data:        []byte(`// a contents`),
+		PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
+		Filesystems: map[string]fsext.Fs{
+			"file": makeMemMapFs(t, map[string][]byte{
+				"/path/to/a.js": []byte(`// a contents`),
+			}),
+		},
+	}
+
+	buf := bytes.NewBuffer(nil)
+	require.NoError(t, arc1.Write(buf))
+
+	arc2, err := lib.ReadArchive(buf)
+	require.NoError(t, err)
+
+	scenario, ok := arc2.Options.Scenarios["const-vus"]
+	require.True(t, ok, "scenario const-vus not found in archive options")
+	execCfg2, ok := scenario.(ConstantVUsConfig)
+	require.True(t, ok)
+
+	assert.EqualValues(t, execCfg, execCfg2)
+}
+
+// copied from lib/archive_test.go
+func makeMemMapFs(t *testing.T, input map[string][]byte) fsext.Fs {
+	fs := fsext.NewMemMapFs()
+	for path, data := range input {
+		require.NoError(t, fsext.WriteFile(fs, path, data, 0o644))
+	}
+	return fs
 }
