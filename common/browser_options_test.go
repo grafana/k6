@@ -46,7 +46,6 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 			opts: map[string]any{
 				// disallow changing the following opts
 				"args":              []string{"any"},
-				"devtools":          true,
 				"env":               map[string]string{"some": "thing"},
 				"executablePath":    "something else",
 				"headless":          false,
@@ -119,19 +118,6 @@ func TestBrowserLaunchOptionsParse(t *testing.T) {
 		"debug_err": {
 			opts: map[string]any{"debug": "true"},
 			err:  "debug should be a boolean",
-		},
-		"devtools": {
-			opts: map[string]any{
-				"devtools": true,
-			},
-			assert: func(tb testing.TB, lo *LaunchOptions) {
-				tb.Helper()
-				assert.True(t, lo.Devtools)
-			},
-		},
-		"devtools_err": {
-			opts: map[string]any{"devtools": "true"},
-			err:  "devtools should be a boolean",
 		},
 		"env": {
 			opts: map[string]any{

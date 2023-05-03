@@ -34,12 +34,6 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 		post                      func(t *testing.T, flags map[string]any)
 	}{
 		{
-			flag:          "auto-open-devtools-for-tabs",
-			expInitVal:    false,
-			changeOpts:    &common.LaunchOptions{Devtools: true},
-			expChangedVal: true,
-		},
-		{
 			flag:       "hide-scrollbars",
 			changeOpts: &common.LaunchOptions{IgnoreDefaultArgs: []string{"hide-scrollbars"}, Headless: true},
 		},
