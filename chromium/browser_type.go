@@ -176,10 +176,6 @@ func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID i
 func (b *BrowserType) launch(
 	ctx context.Context, opts *common.LaunchOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
-	envs := make([]string, 0, len(opts.Env))
-	for k, v := range opts.Env {
-		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-	}
 	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
@@ -204,7 +200,7 @@ func (b *BrowserType) launch(
 		<-c.Done()
 	}(ctx)
 
-	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, logger)
+	browserProc, err := b.allocate(ctx, opts, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -237,7 +233,7 @@ func (b *BrowserType) Name() string {
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
 	ctx context.Context, opts *common.LaunchOptions,
-	flags map[string]any, env []string, dataDir *storage.Dir,
+	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
 	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
@@ -257,7 +253,7 @@ func (b *BrowserType) allocate(
 		path = b.ExecutablePath()
 	}
 
-	return common.NewLocalBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
 }
 
 // ExecutablePath returns the path where the extension expects to find the browser executable.

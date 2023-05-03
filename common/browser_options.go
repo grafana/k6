@@ -13,7 +13,6 @@ import (
 const (
 	optArgs              = "args"
 	optDebug             = "debug"
-	optEnv               = "env"
 	optExecutablePath    = "executablePath"
 	optHeadless          = "headless"
 	optIgnoreDefaultArgs = "ignoreDefaultArgs"
@@ -35,7 +34,6 @@ type ProxyOptions struct {
 type LaunchOptions struct {
 	Args              []string
 	Debug             bool
-	Env               map[string]string
 	ExecutablePath    string
 	Headless          bool
 	IgnoreDefaultArgs []string
@@ -56,7 +54,6 @@ type LaunchPersistentContextOptions struct {
 // NewLaunchOptions returns a new LaunchOptions.
 func NewLaunchOptions() *LaunchOptions {
 	return &LaunchOptions{
-		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
@@ -67,7 +64,6 @@ func NewLaunchOptions() *LaunchOptions {
 // for a browser running in a remote machine.
 func NewRemoteBrowserLaunchOptions() *LaunchOptions {
 	return &LaunchOptions{
-		Env:               make(map[string]string),
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
@@ -85,7 +81,6 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 		rt       = k6ext.Runtime(ctx)
 		o        = opts.ToObject(rt)
 		defaults = map[string]any{
-			optEnv:               l.Env,
 			optHeadless:          l.Headless,
 			optLogCategoryFilter: l.LogCategoryFilter,
 			optTimeout:           l.Timeout,
@@ -109,8 +104,6 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 			err = exportOpt(rt, k, v, &l.Args)
 		case optDebug:
 			l.Debug, err = parseBoolOpt(k, v)
-		case optEnv:
-			err = exportOpt(rt, k, v, &l.Env)
 		case optExecutablePath:
 			l.ExecutablePath, err = parseStrOpt(k, v)
 		case optHeadless:
@@ -141,7 +134,6 @@ func (l *LaunchOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
 
 	shouldIgnoreIfBrowserIsRemote := map[string]struct{}{
 		optArgs:              {},
-		optEnv:               {},
 		optExecutablePath:    {},
 		optHeadless:          {},
 		optIgnoreDefaultArgs: {},
