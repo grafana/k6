@@ -1,0 +1,8 @@
+tags
+*.pprof
+*.fasthttp.gz
+*.fasthttp.br
+.idea
+.vscode
+.DS_Store
+vendor/

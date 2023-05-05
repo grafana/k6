@@ -17,7 +17,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"

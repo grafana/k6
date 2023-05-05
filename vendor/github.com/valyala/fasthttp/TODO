@@ -1,0 +1,4 @@
+- SessionClient with referer and cookies support.
+- ProxyHandler similar to FSHandler.
+- WebSockets. See https://tools.ietf.org/html/rfc6455 .
+- HTTP/2.0. See https://tools.ietf.org/html/rfc7540 .

@@ -18,7 +18,7 @@ import (
 	"time"
 
 	"github.com/andybalholm/brotli"
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
 	"github.com/klauspost/compress/zstd"
 	"github.com/mccutchen/go-httpbin/httpbin"
 	"github.com/stretchr/testify/require"

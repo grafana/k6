@@ -12,7 +12,7 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"github.com/fasthttp/websocket"
 	"github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
 )
