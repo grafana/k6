@@ -211,7 +211,7 @@ func TestOptionsTestFull(t *testing.T) {
 							Tags: map[string]string{
 								"tagkey": "tagvalue",
 							},
-							Options: lib.ScenarioOptions{
+							Options: &lib.ScenarioOptions{
 								Browser: map[string]any{
 									"someOption": true,
 								},
