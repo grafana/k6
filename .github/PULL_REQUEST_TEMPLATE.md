@@ -3,6 +3,6 @@
 Please describe your pull request
 
 ### Checklist
-- [ ] Written unit tests for the changes
+- [ ] Written tests for the changes
 - [ ] Update relevant k6 documentation (if relevant)
 - [ ] Generate TS definition for the changes (if relevant)
