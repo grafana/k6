@@ -4,6 +4,7 @@ import (
 	"context"
 
 	k6modules "go.k6.io/k6/js/modules"
+	k6lib "go.k6.io/k6/lib"
 
 	"github.com/dop251/goja"
 )
@@ -50,4 +51,17 @@ func GetCustomMetrics(ctx context.Context) *CustomMetrics {
 // Runtime is a convenience function for getting a k6 VU runtime.
 func Runtime(ctx context.Context) *goja.Runtime {
 	return GetVU(ctx).Runtime()
+}
+
+// GetScenarioOpts returns the browser options and environment variables associated
+// with the given context.
+func GetScenarioOpts(ctx context.Context, vu k6modules.VU) map[string]any {
+	ss := k6lib.GetScenarioState(ctx)
+	if ss == nil {
+		return nil
+	}
+	if so := vu.State().Options.Scenarios[ss.Name].GetScenarioOptions(); so != nil {
+		return so.Browser
+	}
+	return nil
 }
