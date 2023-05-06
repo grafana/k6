@@ -2,26 +2,36 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/lib/types"
 
-	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/log"
+
+	"go.k6.io/k6/lib/types"
 )
 
 const (
-	optArgs              = "args"
-	optDebug             = "debug"
-	optExecutablePath    = "executablePath"
-	optHeadless          = "headless"
-	optIgnoreDefaultArgs = "ignoreDefaultArgs"
-	optLogCategoryFilter = "logCategoryFilter"
-	optSlowMo            = "slowMo"
-	optTimeout           = "timeout"
+	// Script variables.
+
+	optType = "type"
+
+	// ENV variables.
+
+	optArgs              = "K6_BROWSER_ARGS"
+	optDebug             = "K6_BROWSER_DEBUG"
+	optExecutablePath    = "K6_BROWSER_EXECUTABLE_PATH"
+	optHeadless          = "K6_BROWSER_HEADLESS"
+	optIgnoreDefaultArgs = "K6_BROWSER_IGNORE_DEFAULT_ARGS"
+	optLogCategoryFilter = "K6_BROWSER_LOG_CATEGORY_FILTER"
+	optSlowMo            = "K6_BROWSER_SLOWMO"
+	optTimeout           = "K6_BROWSER_TIMEOUT"
 )
 
 // BrowserOptions stores browser options.
@@ -60,50 +70,60 @@ func NewRemoteBrowserOptions() *BrowserOptions {
 }
 
 // Parse parses browser options from a JS object.
-func (bo *BrowserOptions) Parse(ctx context.Context, logger *log.Logger, opts goja.Value) error { //nolint:cyclop
-	// when opts is nil, we just return the default options without error.
-	if !gojaValueExists(opts) {
-		return nil
+func (bo *BrowserOptions) Parse( //nolint:cyclop
+	ctx context.Context, logger *log.Logger, opts map[string]any, envLookup env.LookupFunc,
+) error {
+	// Parse opts
+	bt, ok := opts[optType]
+	// Only 'chromium' is supported by now, so return error
+	// if type option is not set, or if it's set and its value
+	// is different than 'chromium'
+	if !ok {
+		return errors.New("browser type option must be set")
 	}
-	var (
-		rt       = k6ext.Runtime(ctx)
-		o        = opts.ToObject(rt)
-		defaults = map[string]any{
-			optHeadless:          bo.Headless,
-			optLogCategoryFilter: bo.LogCategoryFilter,
-			optTimeout:           bo.Timeout,
-		}
-	)
-	for _, k := range o.Keys() {
-		if bo.shouldIgnoreIfBrowserIsRemote(k) {
-			logger.Warnf("BrowserOptions", "setting %s option is disallowed when browser is remote", k)
+	if bt != "chromium" {
+		return fmt.Errorf("unsupported browser type: %s", bt)
+	}
+
+	// Parse env
+	envOpts := [...]string{
+		optArgs,
+		optDebug,
+		optExecutablePath,
+		optHeadless,
+		optIgnoreDefaultArgs,
+		optLogCategoryFilter,
+		optSlowMo,
+		optTimeout,
+	}
+
+	for _, e := range envOpts {
+		ev, ok := envLookup(e)
+		if !ok || ev == "" {
 			continue
 		}
-		v := o.Get(k)
-		if v.Export() == nil {
-			if dv, ok := defaults[k]; ok {
-				logger.Warnf("BrowserOptions", "%s was null and set to its default: %v", k, dv)
-			}
+		if bo.shouldIgnoreIfBrowserIsRemote(e) {
+			logger.Warnf("BrowserOptions", "setting %s option is disallowed when browser is remote", e)
 			continue
 		}
 		var err error
-		switch k {
+		switch e {
 		case optArgs:
-			err = exportOpt(rt, k, v, &bo.Args)
+			bo.Args = parseListOpt(ev)
 		case optDebug:
-			bo.Debug, err = parseBoolOpt(k, v)
+			bo.Debug, err = parseBoolOpt(e, ev)
 		case optExecutablePath:
-			bo.ExecutablePath, err = parseStrOpt(k, v)
+			bo.ExecutablePath = ev
 		case optHeadless:
-			bo.Headless, err = parseBoolOpt(k, v)
+			bo.Headless, err = parseBoolOpt(e, ev)
 		case optIgnoreDefaultArgs:
-			err = exportOpt(rt, k, v, &bo.IgnoreDefaultArgs)
+			bo.IgnoreDefaultArgs = parseListOpt(ev)
 		case optLogCategoryFilter:
-			bo.LogCategoryFilter, err = parseStrOpt(k, v)
+			bo.LogCategoryFilter = ev
 		case optSlowMo:
-			bo.SlowMo, err = parseTimeOpt(k, v)
+			bo.SlowMo, err = parseTimeOpt(e, ev)
 		case optTimeout:
-			bo.Timeout, err = parseTimeOpt(k, v)
+			bo.Timeout, err = parseTimeOpt(e, ev)
 		}
 		if err != nil {
 			return err
@@ -129,11 +149,12 @@ func (bo *BrowserOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
 	return ignore
 }
 
-func parseBoolOpt(key string, val goja.Value) (b bool, err error) {
-	if val.ExportType().Kind() != reflect.Bool {
-		return false, fmt.Errorf("%s should be a boolean", key)
+func parseBoolOpt(k, v string) (bool, error) {
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("%s should be a boolean", k)
 	}
-	b, _ = val.Export().(bool)
+
 	return b, nil
 }
 
@@ -144,11 +165,25 @@ func parseStrOpt(key string, val goja.Value) (s string, err error) {
 	return val.String(), nil
 }
 
-func parseTimeOpt(key string, val goja.Value) (t time.Duration, err error) {
-	if t, err = types.GetDurationValue(val.String()); err != nil {
-		return time.Duration(0), fmt.Errorf("%s should be a time duration value: %w", key, err)
+func parseTimeOpt(k, v string) (time.Duration, error) {
+	t, err := types.GetDurationValue(v)
+	if err != nil {
+		return time.Duration(0), fmt.Errorf("%s should be a time duration value: %w", k, err)
 	}
-	return
+
+	return t, nil
+}
+
+func parseListOpt(v string) []string {
+	elems := strings.Split(v, ",")
+	// If last element is a void string,
+	// because value contained an ending comma,
+	// remove it
+	if elems[len(elems)-1] == "" {
+		elems = elems[:len(elems)-1]
+	}
+
+	return elems
 }
 
 // exportOpt exports src to dst and dynamically returns an error

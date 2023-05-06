@@ -75,7 +75,8 @@ func (b *BrowserType) init(
 		browserOpts = common.NewLocalBrowserOptions()
 	}
 
-	if err = browserOpts.Parse(ctx, logger, nil); err != nil {
+	opts := k6ext.GetScenarioOpts(b.vu.Context(), b.vu)
+	if err = browserOpts.Parse(ctx, logger, opts, os.LookupEnv); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing browser options: %w", err)
 	}
 	ctx = common.WithBrowserOptions(ctx, browserOpts)

@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 	"github.com/grafana/xk6-browser/log"
 )
@@ -20,39 +21,63 @@ func TestBrowserOptionsParse(t *testing.T) {
 		Timeout:           DefaultTimeout,
 	}
 
+	noopEnvLookuper := func(string) (string, bool) {
+		return "", false
+	}
+
 	for name, tt := range map[string]struct {
 		opts            map[string]any
+		envLookupper    env.LookupFunc
 		assert          func(testing.TB, *BrowserOptions)
 		err             string
 		isRemoteBrowser bool
 	}{
 		"defaults": {
-			opts: map[string]any{},
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: noopEnvLookuper,
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, defaultOptions, lo)
 			},
 		},
 		"defaults_nil": { // providing nil option returns default options
-			opts: nil,
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: noopEnvLookuper,
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, defaultOptions, lo)
 			},
 		},
 		"defaults_remote_browser": {
-			isRemoteBrowser: true,
 			opts: map[string]any{
+				"type": "chromium",
+			},
+			isRemoteBrowser: true,
+			envLookupper: func(k string) (string, bool) {
+				switch k {
 				// disallow changing the following opts
-				"args":              []string{"any"},
-				"executablePath":    "something else",
-				"headless":          false,
-				"ignoreDefaultArgs": []string{"any"},
+				case optArgs:
+					return "any", true
+				case optExecutablePath:
+					return "something else", true
+				case optHeadless:
+					return "false", true
+				case optIgnoreDefaultArgs:
+					return "any", true
 				// allow changing the following opts
-				"debug":             true,
-				"logCategoryFilter": "...",
-				"slowMo":            time.Second,
-				"timeout":           time.Second,
+				case optDebug:
+					return "true", true
+				case optLogCategoryFilter:
+					return "...", true
+				case optTimeout:
+					return "1s", true
+				default:
+					return "", false
+				}
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
@@ -62,7 +87,6 @@ func TestBrowserOptionsParse(t *testing.T) {
 					// allowed:
 					Debug:             true,
 					LogCategoryFilter: "...",
-					SlowMo:            time.Second,
 					Timeout:           time.Second,
 
 					isRemoteBrowser: true,
@@ -71,9 +95,10 @@ func TestBrowserOptionsParse(t *testing.T) {
 		},
 		"nulls": { // don't override the defaults on `null`
 			opts: map[string]any{
-				"headless":          nil,
-				"logCategoryFilter": nil,
-				"timeout":           nil,
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				return "", true
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
@@ -86,7 +111,13 @@ func TestBrowserOptionsParse(t *testing.T) {
 		},
 		"args": {
 			opts: map[string]any{
-				"args": []any{"browser-arg1='value1", "browser-arg2=value2", "browser-flag"},
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optArgs {
+					return "browser-arg1='value1,browser-arg2=value2,browser-flag", true
+				}
+				return "", false
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
@@ -96,39 +127,57 @@ func TestBrowserOptionsParse(t *testing.T) {
 				assert.Equal(tb, "browser-flag", lo.Args[2])
 			},
 		},
-		"args_err": {
-			opts: map[string]any{
-				"args": 1,
-			},
-			err: "args should be an array of strings",
-		},
 		"debug": {
-			opts: map[string]any{"debug": true},
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optDebug {
+					return "true", true
+				}
+				return "", false
+			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.True(t, lo.Debug)
 			},
 		},
 		"debug_err": {
-			opts: map[string]any{"debug": "true"},
-			err:  "debug should be a boolean",
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optDebug {
+					return "non-boolean", true
+				}
+				return "", false
+			},
+			err: "K6_BROWSER_DEBUG should be a boolean",
 		},
 		"executablePath": {
 			opts: map[string]any{
-				"executablePath": "cmd/somewhere",
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optExecutablePath {
+					return "cmd/somewhere", true
+				}
+				return "", false
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, "cmd/somewhere", lo.ExecutablePath)
 			},
 		},
-		"executablePath_err": {
-			opts: map[string]any{"executablePath": 1},
-			err:  "executablePath should be a string",
-		},
 		"headless": {
 			opts: map[string]any{
-				"headless": false,
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optHeadless {
+					return "false", true
+				}
+				return "", false
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
@@ -136,12 +185,26 @@ func TestBrowserOptionsParse(t *testing.T) {
 			},
 		},
 		"headless_err": {
-			opts: map[string]any{"headless": "true"},
-			err:  "headless should be a boolean",
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optHeadless {
+					return "non-boolean", true
+				}
+				return "", false
+			},
+			err: "K6_BROWSER_HEADLESS should be a boolean",
 		},
 		"ignoreDefaultArgs": {
 			opts: map[string]any{
-				"ignoreDefaultArgs": []string{"--hide-scrollbars", "--hide-something"},
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optIgnoreDefaultArgs {
+					return "--hide-scrollbars,--hide-something", true
+				}
+				return "", false
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
@@ -150,39 +213,30 @@ func TestBrowserOptionsParse(t *testing.T) {
 				assert.Equal(t, "--hide-something", lo.IgnoreDefaultArgs[1])
 			},
 		},
-		"ignoreDefaultArgs_err": {
-			opts: map[string]any{"ignoreDefaultArgs": "ABC"},
-			err:  "ignoreDefaultArgs should be an array of strings",
-		},
 		"logCategoryFilter": {
 			opts: map[string]any{
-				"logCategoryFilter": "**",
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optLogCategoryFilter {
+					return "**", true
+				}
+				return "", false
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, "**", lo.LogCategoryFilter)
 			},
 		},
-		"logCategoryFilter_err": {
-			opts: map[string]any{"logCategoryFilter": 1},
-			err:  "logCategoryFilter should be a string",
-		},
-		"slowMo": {
-			opts: map[string]any{
-				"slowMo": "5s",
-			},
-			assert: func(tb testing.TB, lo *BrowserOptions) {
-				tb.Helper()
-				assert.Equal(t, 5*time.Second, lo.SlowMo)
-			},
-		},
-		"slowMo_err": {
-			opts: map[string]any{"slowMo": "ABC"},
-			err:  "slowMo should be a time duration value",
-		},
 		"timeout": {
 			opts: map[string]any{
-				"timeout": "10s",
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optTimeout {
+					return "10s", true
+				}
+				return "", false
 			},
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
@@ -190,8 +244,16 @@ func TestBrowserOptionsParse(t *testing.T) {
 			},
 		},
 		"timeout_err": {
-			opts: map[string]any{"timeout": "ABC"},
-			err:  "timeout should be a time duration value",
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: func(k string) (string, bool) {
+				if k == optTimeout {
+					return "ABC", true
+				}
+				return "", false
+			},
+			err: "K6_BROWSER_TIMEOUT should be a time duration value",
 		},
 	} {
 		tt := tt
@@ -208,7 +270,7 @@ func TestBrowserOptionsParse(t *testing.T) {
 				lo = NewLocalBrowserOptions()
 			}
 
-			err := lo.Parse(vu.Context(), log.NewNullLogger(), vu.ToGojaValue(tt.opts))
+			err := lo.Parse(vu.Context(), log.NewNullLogger(), tt.opts, tt.envLookupper)
 			if tt.err != "" {
 				require.ErrorContains(t, err, tt.err)
 			} else {
