@@ -715,7 +715,7 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType, wsURL string, isRemoteBrows
 	rt := vu.Runtime()
 	return mapping{
 		"connect": func(wsEndpoint string, opts goja.Value) *goja.Object {
-			b := bt.Connect(wsEndpoint, opts)
+			b := bt.Connect(wsEndpoint)
 			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},
@@ -727,11 +727,11 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType, wsURL string, isRemoteBrows
 			// to connect and avoid storing the browser pid
 			// as we have no access to it.
 			if isRemoteBrowser {
-				m := mapBrowser(vu, bt.Connect(wsURL, opts))
+				m := mapBrowser(vu, bt.Connect(wsURL))
 				return rt.ToValue(m).ToObject(rt)
 			}
 
-			b, pid := bt.Launch(opts)
+			b, pid := bt.Launch()
 			// store the pid so we can kill it later on panic.
 			vu.registerPid(pid)
 			m := mapBrowser(vu, b)

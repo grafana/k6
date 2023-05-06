@@ -105,7 +105,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	var (
 		testServer *k6httpmultibin.HTTPMultiBin
 		state      = vu.StateField
-		rt         = vu.RuntimeField
 		lc         *logCache
 	)
 
@@ -118,7 +117,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.Transport = testServer.HTTPTransport
 	}
 
-	b, pid := bt.Launch(rt.ToValue(browserOpts))
+	b, pid := bt.Launch()
 	cb, ok := b.(*common.Browser)
 	if !ok {
 		tb.Fatalf("testBrowser: unexpected browser %T", b)

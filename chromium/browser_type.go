@@ -59,7 +59,7 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 }
 
 func (b *BrowserType) init(
-	opts goja.Value, isRemoteBrowser bool,
+	isRemoteBrowser bool,
 ) (context.Context, *common.BrowserOptions, *log.Logger, error) {
 	ctx := b.initContext()
 
@@ -75,7 +75,7 @@ func (b *BrowserType) init(
 		browserOpts = common.NewLocalBrowserOptions()
 	}
 
-	if err = browserOpts.Parse(ctx, logger, opts); err != nil {
+	if err = browserOpts.Parse(ctx, logger, nil); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing browser options: %w", err)
 	}
 	ctx = common.WithBrowserOptions(ctx, browserOpts)
@@ -99,8 +99,8 @@ func (b *BrowserType) initContext() context.Context {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
-	ctx, browserOpts, logger, err := b.init(opts, true)
+func (b *BrowserType) Connect(wsEndpoint string) api.Browser {
+	ctx, browserOpts, logger, err := b.init(true)
 	if err != nil {
 		k6ext.Panic(ctx, "initializing browser type: %w", err)
 	}
@@ -154,8 +154,8 @@ func (b *BrowserType) link(
 
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID int) {
-	ctx, browserOpts, logger, err := b.init(opts, false)
+func (b *BrowserType) Launch() (_ api.Browser, browserProcessID int) {
+	ctx, browserOpts, logger, err := b.init(false)
 	if err != nil {
 		k6ext.Panic(ctx, "initializing browser type: %w", err)
 	}
