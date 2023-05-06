@@ -348,7 +348,7 @@ func (o Options) Apply(opts Options) Options {
 	}
 
 	// Specifying duration, iterations, stages, or execution in a "higher" config tier
-	// will overwrite all of the the previous execution settings (if any) from any
+	// will overwrite all of the previous execution settings (if any) from any
 	// "lower" config tiers
 	// Still, if more than one of those options is simultaneously specified in the same
 	// config tier, they will be preserved, so the validation after we've consolidated
