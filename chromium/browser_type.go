@@ -15,6 +15,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 	"github.com/grafana/xk6-browser/storage"
@@ -34,12 +35,13 @@ var _ api.BrowserType = &BrowserType{}
 type BrowserType struct {
 	// FIXME: This is only exported because testBrowser needs it. Contexts
 	// shouldn't be stored on structs if we can avoid it.
-	Ctx       context.Context
-	vu        k6modules.VU
-	hooks     *common.Hooks
-	k6Metrics *k6ext.CustomMetrics
-	execPath  string // path to the Chromium executable
-	randSrc   *rand.Rand
+	Ctx          context.Context
+	vu           k6modules.VU
+	hooks        *common.Hooks
+	k6Metrics    *k6ext.CustomMetrics
+	execPath     string // path to the Chromium executable
+	randSrc      *rand.Rand
+	envLookupper env.LookupFunc
 }
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
@@ -49,10 +51,11 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 	// otherwise it will return nil.
 	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
 	b := BrowserType{
-		vu:        vu,
-		hooks:     common.NewHooks(),
-		k6Metrics: k6m,
-		randSrc:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
+		vu:           vu,
+		hooks:        common.NewHooks(),
+		k6Metrics:    k6m,
+		randSrc:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
+		envLookupper: os.LookupEnv,
 	}
 
 	return &b
@@ -76,7 +79,7 @@ func (b *BrowserType) init(
 	}
 
 	opts := k6ext.GetScenarioOpts(b.vu.Context(), b.vu)
-	if err = browserOpts.Parse(ctx, logger, opts, os.LookupEnv); err != nil {
+	if err = browserOpts.Parse(ctx, logger, opts, b.envLookupper); err != nil {
 		return nil, nil, nil, fmt.Errorf("error parsing browser options: %w", err)
 	}
 	ctx = common.WithBrowserOptions(ctx, browserOpts)
@@ -294,6 +297,11 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 	}
 
 	return ""
+}
+
+// SetEnvLookupper sets the environment variable lookupper function.
+func (b *BrowserType) SetEnvLookupper(envLookupper env.LookupFunc) {
+	b.envLookupper = envLookupper
 }
 
 // parseArgs parses command-line arguments and returns them.
