@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 
@@ -116,6 +118,8 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
+
+	bt.SetEnvLookupper(setupEnvLookupper(tb, browserOpts))
 
 	b, pid := bt.Launch()
 	cb, ok := b.(*common.Browser)
@@ -493,4 +497,31 @@ func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleCon
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
 
 	return vu
+}
+
+func setupEnvLookupper(tb testing.TB, opts browserOptions) env.LookupFunc {
+	tb.Helper()
+
+	return func(key string) (string, bool) {
+		switch key {
+		case "K6_BROWSER_ARGS":
+			if len(opts.Args) != 0 {
+				return strings.Join(opts.Args, ","), true
+			}
+		case "K6_BROWSER_DEBUG":
+			return strconv.FormatBool(opts.Debug), true
+		case "K6_BROWSER_HEADLESS":
+			return strconv.FormatBool(opts.Headless), true
+		case "K6_BROWSER_SLOWMO":
+			if opts.SlowMo != "" {
+				return opts.SlowMo, true
+			}
+		case "K6_BROWSER_TIMEOUT":
+			if opts.Timeout != "" {
+				return opts.Timeout, true
+			}
+		}
+
+		return "", false
+	}
 }
