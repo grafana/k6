@@ -11,7 +11,7 @@ func TestIsRemoteBrowser(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		envLookup      envLookupper
+		envLookup      LookupFunc
 		expIsRemote    bool
 		expValidWSURLs []string
 	}{

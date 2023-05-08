@@ -6,7 +6,8 @@ import (
 	"strings"
 )
 
-type envLookupper func(key string) (string, bool)
+// LookupFunc defines a function to look up a key from the environment.
+type LookupFunc func(key string) (string, bool)
 
 // IsRemoteBrowser returns true and the corresponding CDP
 // WS URL if this one is set through the K6_BROWSER_WS_URL
@@ -15,7 +16,7 @@ type envLookupper func(key string) (string, bool)
 // URLs, this method returns a randomly chosen URL from the list
 // so connections are done in a round-robin fashion for all the
 // entries in the list.
-func IsRemoteBrowser(envLookup envLookupper) (wsURL string, isRemote bool) {
+func IsRemoteBrowser(envLookup LookupFunc) (wsURL string, isRemote bool) {
 	wsURL, isRemote = envLookup("K6_BROWSER_WS_URL")
 	if !isRemote {
 		return "", false
