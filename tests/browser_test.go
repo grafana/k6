@@ -147,7 +147,7 @@ func TestBrowserCrashErr(t *testing.T) {
 
 	assertExceptionContains(t, goja.New(), func() {
 		lopts := defaultBrowserOpts()
-		lopts.Args = []any{"remote-debugging-port=99999"}
+		lopts.Args = []string{"remote-debugging-port=99999"}
 
 		newTestBrowser(t, lopts)
 	}, "launching browser: Invalid devtools server port")

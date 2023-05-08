@@ -385,11 +385,11 @@ func (t testPromise) then(resolve any, reject ...any) testPromise {
 // browserOptions provides a way to customize browser
 // options in tests.
 type browserOptions struct {
-	Args     []any  `js:"args"`
-	Debug    bool   `js:"debug"`
-	Headless bool   `js:"headless"`
-	SlowMo   string `js:"slowMo"`
-	Timeout  string `js:"timeout"`
+	Args     []string `js:"args"`
+	Debug    bool     `js:"debug"`
+	Headless bool     `js:"headless"`
+	SlowMo   string   `js:"slowMo"`
+	Timeout  string   `js:"timeout"`
 }
 
 // withBrowserOptions is a helper for increasing readability
