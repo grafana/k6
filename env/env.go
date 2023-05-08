@@ -1,4 +1,4 @@
-package k6ext
+package env
 
 import (
 	"crypto/rand"
