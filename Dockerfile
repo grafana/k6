@@ -15,7 +15,8 @@ RUN go build -a -trimpath -ldflags "-s -w -X go.k6.io/k6/lib/consts.VersionDetai
 
 # Runtime stage
 FROM alpine:3.17
-RUN apk add --no-cache ca-certificates=~20220614 && \
+# hadolint ignore=DL3018
+RUN apk add --no-cache ca-certificates && \
     adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
 
