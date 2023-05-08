@@ -235,7 +235,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 	session := b.conn.getSession(ev.SessionID)
 	if session == nil {
-		b.logger.Warnf("Browser:onAttachedToTarget",
+		b.logger.Debugf("Browser:onAttachedToTarget",
 			"session closed before attachToTarget is handled. sid:%v tid:%v",
 			ev.SessionID, targetPage.TargetID)
 		return // ignore
