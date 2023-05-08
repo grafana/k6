@@ -800,3 +800,49 @@ func TestNewOutputClientTimeout(t *testing.T) {
 	err = out.client.PushMetric("testmetric", nil)
 	assert.True(t, os.IsTimeout(err))
 }
+
+func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/tests":
+			fmt.Fprintf(w, `{
+"reference_id": "cloud-create-test",
+"config": {
+	"metricPushInterval": "10ms",
+	"aggregationPeriod": "30ms"
+}
+}`)
+		case "/v1/tests/cloud-create-test":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "not expected path", http.StatusInternalServerError)
+		}
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	defer ts.Close()
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST":               ts.URL,
+			"K6_CLOUD_AGGREGATION_PERIOD": "30s",
+		},
+		ScriptOptions: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+
+	assert.Equal(t, types.NullDurationFrom(10*time.Millisecond), out.config.MetricPushInterval)
+	assert.Equal(t, types.NullDurationFrom(30*time.Millisecond), out.config.AggregationPeriod)
+
+	// Assert that it overwrites only the provided values
+	expTimeout := types.NewNullDuration(60*time.Second, false)
+	assert.Equal(t, expTimeout, out.config.Timeout)
+
+	require.NoError(t, out.StopWithTestError(nil))
+}
