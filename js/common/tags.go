@@ -20,7 +20,7 @@ func ApplyCustomUserTags(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, key
 	keyValuesObj := keyValues.ToObject(rt)
 
 	for _, key := range keyValuesObj.Keys() {
-		if err := ApplyCustomUserTag(rt, tagsAndMeta, key, keyValuesObj.Get(key)); err != nil {
+		if err := ApplyCustomUserTag(tagsAndMeta, key, keyValuesObj.Get(key)); err != nil {
 			return err
 		}
 	}
@@ -29,8 +29,8 @@ func ApplyCustomUserTags(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, key
 }
 
 // ApplyCustomUserTag modifies the given metrics.TagsAndMeta object with the
-// given custom tag or metadata and theirs value.
-func ApplyCustomUserTag(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, key string, val goja.Value) error {
+// given custom tag and theirs value.
+func ApplyCustomUserTag(tagsAndMeta *metrics.TagsAndMeta, key string, val goja.Value) error {
 	kind := reflect.Invalid
 	if typ := val.ExportType(); typ != nil {
 		kind = typ.Kind()
@@ -50,6 +50,33 @@ func ApplyCustomUserTag(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, key 
 		return fmt.Errorf(
 			"invalid value for metric tag '%s': "+
 				"only String, Boolean and Number types are accepted as a metric tag values",
+			key,
+		)
+	}
+}
+
+// ApplyCustomUserMetadata modifies the given metrics.TagsAndMeta object with the
+// given custom metadata and their value.
+func ApplyCustomUserMetadata(tagsAndMeta *metrics.TagsAndMeta, key string, val goja.Value) error {
+	kind := reflect.Invalid
+	if typ := val.ExportType(); typ != nil {
+		kind = typ.Kind()
+	}
+
+	switch kind {
+	case
+		reflect.String,
+		reflect.Bool,
+		reflect.Int64,
+		reflect.Float64:
+
+		tagsAndMeta.SetMetadata(key, val.String())
+		return nil
+
+	default:
+		return fmt.Errorf(
+			"invalid value for metric metadata '%s': "+
+				"only String, Boolean and Number types are accepted as a metric metadata value",
 			key,
 		)
 	}
