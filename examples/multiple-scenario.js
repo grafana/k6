@@ -7,6 +7,11 @@ export const options = {
       exec: 'messages',
       vus: 2,
       duration: '2s',
+      options: {
+        browser: {
+            type: 'chromium',
+        },
+      },
     },
     news: {
       executor: 'per-vu-iterations',
@@ -14,6 +19,11 @@ export const options = {
       vus: 2,
       iterations: 4,
       maxDuration: '5s',
+      options: {
+        browser: {
+            type: 'chromium',
+        },
+      },
     },
   },
   thresholds: {
@@ -23,9 +33,7 @@ export const options = {
 }
 
 export async function messages() {
-  const browser = chromium.launch({
-    headless: __ENV.XK6_HEADLESS ? true : false,
-  });
+  const browser = chromium.launch();
   const page = browser.newPage();
 
   try {
@@ -37,9 +45,7 @@ export async function messages() {
 }
 
 export async function news() {
-  const browser = chromium.launch({
-    headless: __ENV.XK6_HEADLESS ? true : false,
-  });
+  const browser = chromium.launch();
   const page = browser.newPage();
 
   try {

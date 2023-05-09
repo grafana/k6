@@ -1,7 +1,18 @@
 import exec from 'k6/execution';
 import { chromium } from 'k6/x/browser';
 
-export const options = {}
+export const options = {
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      options: {
+        browser: {
+            type: 'chromium',
+        },
+      },
+    },
+  }
+}
 
 export default function() {
   try {
