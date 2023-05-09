@@ -1,3 +1,4 @@
+// Package cloud implements an Output that flushes to the k6 Cloud platform.
 package cloud
 
 import (
@@ -579,7 +580,7 @@ func (out *Output) shouldStopSendingMetrics(err error) bool {
 		return false
 	}
 
-	if errResp, ok := err.(cloudapi.ErrorResponse); ok && errResp.Response != nil {
+	if errResp, ok := err.(cloudapi.ErrorResponse); ok && errResp.Response != nil { //nolint:errorlint
 		return errResp.Response.StatusCode == http.StatusForbidden && errResp.Code == 4
 	}
 

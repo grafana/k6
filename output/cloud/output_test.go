@@ -139,7 +139,11 @@ func TestCloudOutput(t *testing.T) {
 	}
 
 	for tcNum, minSamples := range []int{60, 75, 100} {
-		t.Run(fmt.Sprintf("tc%d_minSamples%d", tcNum, minSamples), getTestRunner(minSamples))
+		tcNum, minSamples := tcNum, minSamples
+		t.Run(fmt.Sprintf("tc%d_minSamples%d", tcNum, minSamples), func(t *testing.T) {
+			t.Parallel()
+			getTestRunner(minSamples)
+		})
 	}
 }
 
@@ -223,7 +227,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	smallSkew := 0.02
 
 	trails := []metrics.SampleContainer{}
-	durations := make([]time.Duration, len(trails))
+	durations := make([]time.Duration, 0, len(trails))
 	for i := int64(0); i < out.config.AggregationMinSamples.Int64; i++ {
 		similarTrail := skewTrail(r, simpleTrail, 1.0, 1.0+smallSkew)
 		trails = append(trails, &similarTrail)
@@ -322,6 +326,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	for j := time.Duration(1); j <= 200; j++ {
 		container := make([]metrics.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
+			//nolint:durationcheck
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
 				Connecting:     i % 200 * 200 * time.Millisecond,
@@ -429,6 +434,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	for j := time.Duration(1); j <= 200; j++ {
 		container := make([]metrics.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
+			//nolint:durationcheck
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
 				Connecting:     i % 200 * 200 * time.Millisecond,
@@ -681,6 +687,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 
 func TestNewName(t *testing.T) {
 	t.Parallel()
+
 	mustParse := func(u string) *url.URL {
 		result, err := url.Parse(u)
 		require.NoError(t, err)
@@ -715,6 +722,7 @@ func TestNewName(t *testing.T) {
 		testCase := testCase
 
 		t.Run(testCase.url.String(), func(t *testing.T) {
+			t.Parallel()
 			out, err := newOutput(output.Params{
 				Logger: testutils.NewLogger(t),
 				ScriptOptions: lib.Options{
@@ -730,6 +738,7 @@ func TestNewName(t *testing.T) {
 }
 
 func TestPublishMetric(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		g, err := gzip.NewReader(r.Body)
 
@@ -798,7 +807,8 @@ func TestNewOutputClientTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	err = out.client.PushMetric("testmetric", nil)
-	assert.True(t, os.IsTimeout(err))
+	require.Error(t, err)
+	assert.True(t, os.IsTimeout(err)) //nolint:forbidigo
 }
 
 func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
