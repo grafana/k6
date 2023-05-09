@@ -120,7 +120,7 @@ func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
 func (b *BrowserType) connect(
 	ctx context.Context, wsURL string, opts *common.LaunchOptions, logger *log.Logger,
 ) (*common.Browser, error) {
-	browserProc, err := b.link(ctx, wsURL, opts, logger)
+	browserProc, err := b.link(ctx, wsURL, logger)
 	if browserProc == nil {
 		return nil, fmt.Errorf("connecting to browser: %w", err)
 	}
@@ -140,10 +140,9 @@ func (b *BrowserType) connect(
 }
 
 func (b *BrowserType) link(
-	ctx context.Context, wsURL string,
-	opts *common.LaunchOptions, logger *log.Logger,
+	ctx context.Context, wsURL string, logger *log.Logger,
 ) (*common.BrowserProcess, error) {
-	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
 	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
 	if err != nil {
 		bProcCtxCancel()
@@ -236,7 +235,7 @@ func (b *BrowserType) allocate(
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
-	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
 	defer func() {
 		if rerr != nil {
 			bProcCtxCancel()
