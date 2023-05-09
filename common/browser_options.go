@@ -27,7 +27,6 @@ const (
 	optHeadless          = "K6_BROWSER_HEADLESS"
 	optIgnoreDefaultArgs = "K6_BROWSER_IGNORE_DEFAULT_ARGS"
 	optLogCategoryFilter = "K6_BROWSER_LOG_CATEGORY_FILTER"
-	optSlowMo            = "K6_BROWSER_SLOWMO"
 	optTimeout           = "K6_BROWSER_TIMEOUT"
 )
 
@@ -39,8 +38,10 @@ type BrowserOptions struct {
 	Headless          bool
 	IgnoreDefaultArgs []string
 	LogCategoryFilter string
-	SlowMo            time.Duration
-	Timeout           time.Duration
+	// TODO: Do not expose slowMo option by now.
+	// See https://github.com/grafana/xk6-browser/issues/857.
+	SlowMo  time.Duration
+	Timeout time.Duration
 
 	isRemoteBrowser bool // some options will be ignored if browser is in a remote machine
 }
@@ -90,7 +91,6 @@ func (bo *BrowserOptions) Parse( //nolint:cyclop
 		optHeadless,
 		optIgnoreDefaultArgs,
 		optLogCategoryFilter,
-		optSlowMo,
 		optTimeout,
 	}
 
@@ -117,8 +117,6 @@ func (bo *BrowserOptions) Parse( //nolint:cyclop
 			bo.IgnoreDefaultArgs = parseListOpt(ev)
 		case optLogCategoryFilter:
 			bo.LogCategoryFilter = ev
-		case optSlowMo:
-			bo.SlowMo, err = parseTimeOpt(e, ev)
 		case optTimeout:
 			bo.Timeout, err = parseTimeOpt(e, ev)
 		}

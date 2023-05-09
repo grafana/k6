@@ -395,7 +395,6 @@ type browserOptions struct {
 	Args     []string `js:"args"`
 	Debug    bool     `js:"debug"`
 	Headless bool     `js:"headless"`
-	SlowMo   string   `js:"slowMo"`
 	Timeout  string   `js:"timeout"`
 }
 
@@ -420,7 +419,6 @@ func defaultBrowserOpts() browserOptions {
 
 	return browserOptions{
 		Headless: headless,
-		SlowMo:   "0s",
 		Timeout:  "30s",
 	}
 }
@@ -512,10 +510,6 @@ func setupEnvLookupper(tb testing.TB, opts browserOptions) env.LookupFunc {
 			return strconv.FormatBool(opts.Debug), true
 		case "K6_BROWSER_HEADLESS":
 			return strconv.FormatBool(opts.Headless), true
-		case "K6_BROWSER_SLOWMO":
-			if opts.SlowMo != "" {
-				return opts.SlowMo, true
-			}
 		case "K6_BROWSER_TIMEOUT":
 			if opts.Timeout != "" {
 				return opts.Timeout, true
