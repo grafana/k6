@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/xk6-browser/log"
 )
 
-func TestBrowserOptionsParse(t *testing.T) {
+func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 	t.Parallel()
 
 	defaultOptions := &BrowserOptions{
@@ -254,6 +254,27 @@ func TestBrowserOptionsParse(t *testing.T) {
 				return "", false
 			},
 			err: "K6_BROWSER_TIMEOUT should be a time duration value",
+		},
+		"browser_type": {
+			opts: map[string]any{
+				"type": "chromium",
+			},
+			envLookupper: noopEnvLookuper,
+			assert: func(tb testing.TB, lo *BrowserOptions) {
+				tb.Helper()
+				// Noop, just expect no error
+			},
+		},
+		"browser_type_err": {
+			opts: map[string]any{
+				"type": "mybrowsertype",
+			},
+			envLookupper: noopEnvLookuper,
+			err:          "unsupported browser type: mybrowsertype",
+		},
+		"browser_type_unset_err": {
+			envLookupper: noopEnvLookuper,
+			err:          "browser type option must be set",
 		},
 	} {
 		tt := tt
