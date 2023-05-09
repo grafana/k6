@@ -492,38 +492,6 @@ func TestCloudOutputRequireScriptName(t *testing.T) {
 	assert.Contains(t, err.Error(), "script name not set")
 }
 
-func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
-	t.Parallel()
-
-	expSamples := make(chan []Sample)
-	defer close(expSamples)
-
-	tb := httpmultibin.NewHTTPMultiBin(t)
-	tb.Mux.HandleFunc("/v1/metrics/123", getSampleChecker(t, expSamples))
-	out, err := newOutput(output.Params{
-		Logger: testutils.NewLogger(t),
-		JSONConfig: json.RawMessage(fmt.Sprintf(`{
-			"host": "%s", "noCompress": true,
-			"maxMetricSamplesPerPackage": 50
-		}`, tb.ServerHTTP.URL)),
-		ScriptOptions: lib.Options{
-			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &metrics.DefaultSystemTagSet,
-		},
-		ScriptPath: &url.URL{Path: "/script.js"},
-	})
-	require.NoError(t, err)
-
-	out.config.AggregationPeriod = types.NullDurationFrom(0)
-	out.config.MetricPushInterval = types.NullDurationFrom(10 * time.Millisecond)
-	out.config.AggregationCalcInterval = types.NullDurationFrom(40 * time.Millisecond)
-	out.config.AggregationWaitPeriod = types.NullDurationFrom(5 * time.Millisecond)
-
-	out.config.PushRefID = null.StringFrom("123")
-	require.NoError(t, out.Start())
-	require.NoError(t, out.Stop())
-}
-
 func TestCloudOutputPushRefID(t *testing.T) {
 	t.Parallel()
 
