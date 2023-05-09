@@ -220,8 +220,10 @@ func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
 		runtime: rt,
 		state:   vuState,
 	})
-	err = o.Set("tags", tagsDynamicObject)
 
+	// This is kept for backwards compatibility reasons, but should be deprecated,
+	// since tags are also accessible via vu.metrics.tags.
+	err = o.Set("tags", tagsDynamicObject)
 	if err != nil {
 		return o, err
 	}
@@ -396,7 +398,7 @@ func (o *metadataDynamicObject) Get(key string) goja.Value {
 	return nil
 }
 
-// Set a property value for the key. It returns true if succeed. String, Boolean
+// Set a property value for the key. It returns true if successful. String, Boolean
 // and Number types are implicitly converted to the goja's relative string
 // representation. An exception is raised in case a denied type is provided.
 func (o *metadataDynamicObject) Set(key string, val goja.Value) bool {

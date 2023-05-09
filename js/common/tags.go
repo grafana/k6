@@ -56,7 +56,7 @@ func ApplyCustomUserTag(tagsAndMeta *metrics.TagsAndMeta, key string, val goja.V
 }
 
 // ApplyCustomUserMetadata modifies the given metrics.TagsAndMeta object with the
-// given custom metadata and theirs value.
+// given custom metadata and their value.
 func ApplyCustomUserMetadata(tagsAndMeta *metrics.TagsAndMeta, key string, val goja.Value) error {
 	kind := reflect.Invalid
 	if typ := val.ExportType(); typ != nil {
@@ -76,7 +76,7 @@ func ApplyCustomUserMetadata(tagsAndMeta *metrics.TagsAndMeta, key string, val g
 	default:
 		return fmt.Errorf(
 			"invalid value for metric metadata '%s': "+
-				"only String, Boolean and Number types are accepted as a metric metadata values",
+				"only String, Boolean and Number types are accepted as a metric metadata value",
 			key,
 		)
 	}

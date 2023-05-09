@@ -95,7 +95,7 @@ func TestVUTagsMetadatasJSONEncoding(t *testing.T) {
 	}
 }
 
-func TestVUTagMetadatasSetSuccessAccetedTypes(t *testing.T) {
+func TestVUTagMetadatasSetSuccessAcceptedTypes(t *testing.T) {
 	t.Parallel()
 
 	// bool and numbers are implicitly converted into string
