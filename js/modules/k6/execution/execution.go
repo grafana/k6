@@ -343,10 +343,8 @@ func (o *tagsDynamicObject) Get(key string) goja.Value {
 // and Number types are implicitly converted to the goja's relative string
 // representation. An exception is raised in case a denied type is provided.
 func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
-	var err error
 	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-		err = common.ApplyCustomUserTag(tagsAndMeta, key, val)
-		if err != nil {
+		if err := common.ApplyCustomUserTag(tagsAndMeta, key, val); err != nil {
 			panic(o.runtime.NewTypeError(err.Error()))
 		}
 	})
@@ -402,10 +400,8 @@ func (o *metadataDynamicObject) Get(key string) goja.Value {
 // and Number types are implicitly converted to the goja's relative string
 // representation. An exception is raised in case a denied type is provided.
 func (o *metadataDynamicObject) Set(key string, val goja.Value) bool {
-	var err error
 	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-		err = common.ApplyCustomUserMetadata(tagsAndMeta, key, val)
-		if err != nil {
+		if err := common.ApplyCustomUserMetadata(tagsAndMeta, key, val); err != nil {
 			panic(o.runtime.NewTypeError(err.Error()))
 		}
 	})
