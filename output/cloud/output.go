@@ -209,6 +209,25 @@ func (out *Output) Start() error {
 	return nil
 }
 
+// Description returns the URL with the test run results.
+func (out *Output) Description() string {
+	return fmt.Sprintf("cloud (%s)", cloudapi.URLForResults(out.referenceID, out.config))
+}
+
+// SetThresholds receives the thresholds before the output is Start()-ed.
+func (out *Output) SetThresholds(scriptThresholds map[string]metrics.Thresholds) {
+	thresholds := make(map[string][]*metrics.Threshold)
+	for name, t := range scriptThresholds {
+		thresholds[name] = append(thresholds[name], t.Thresholds...)
+	}
+	out.thresholds = thresholds
+}
+
+// SetTestRunStopCallback receives the function that stops the engine on error
+func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
+	out.testStopFunc = stopFunc
+}
+
 func (out *Output) startBackgroundProcesses() {
 	aggregationPeriod := out.config.AggregationPeriod.TimeDuration()
 	// If enabled, start periodically aggregating the collected HTTP trails
@@ -285,9 +304,31 @@ func (out *Output) StopWithTestError(testErr error) error {
 	return err
 }
 
-// Description returns the URL with the test run results.
-func (out *Output) Description() string {
-	return fmt.Sprintf("cloud (%s)", cloudapi.URLForResults(out.referenceID, out.config))
+func (out *Output) testFinished(testErr error) error {
+	if out.referenceID == "" || out.config.PushRefID.Valid {
+		return nil
+	}
+
+	testTainted := false
+	thresholdResults := make(cloudapi.ThresholdResult)
+	for name, thresholds := range out.thresholds {
+		thresholdResults[name] = make(map[string]bool)
+		for _, t := range thresholds {
+			thresholdResults[name][t.Source] = t.LastFailed
+			if t.LastFailed {
+				testTainted = true
+			}
+		}
+	}
+
+	runStatus := out.getRunStatus(testErr)
+	out.logger.WithFields(logrus.Fields{
+		"ref":        out.referenceID,
+		"tainted":    testTainted,
+		"run_status": runStatus,
+	}).Debug("Sending test finished")
+
+	return out.client.TestFinished(out.referenceID, thresholdResults, testTainted, runStatus)
 }
 
 // getRunStatus determines the run status of the test based on the error.
@@ -337,20 +378,6 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 	// By default, the catch-all error is "aborted by system", but let's log that
 	out.logger.WithError(testErr).Debug("unknown test error classified as 'aborted by system'")
 	return cloudapi.RunStatusAbortedSystem
-}
-
-// SetThresholds receives the thresholds before the output is Start()-ed.
-func (out *Output) SetThresholds(scriptThresholds map[string]metrics.Thresholds) {
-	thresholds := make(map[string][]*metrics.Threshold)
-	for name, t := range scriptThresholds {
-		thresholds[name] = append(thresholds[name], t.Thresholds...)
-	}
-	out.thresholds = thresholds
-}
-
-// SetTestRunStopCallback receives the function that stops the engine on error
-func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
-	out.testStopFunc = stopFunc
 }
 
 // AddMetricSamples receives a set of metric samples. This method is never
@@ -679,33 +706,6 @@ func (out *Output) pushMetrics() {
 		"samples": count,
 		"t":       time.Since(start),
 	}).Debug("Pushing metrics to cloud finished")
-}
-
-func (out *Output) testFinished(testErr error) error {
-	if out.referenceID == "" || out.config.PushRefID.Valid {
-		return nil
-	}
-
-	testTainted := false
-	thresholdResults := make(cloudapi.ThresholdResult)
-	for name, thresholds := range out.thresholds {
-		thresholdResults[name] = make(map[string]bool)
-		for _, t := range thresholds {
-			thresholdResults[name][t.Source] = t.LastFailed
-			if t.LastFailed {
-				testTainted = true
-			}
-		}
-	}
-
-	runStatus := out.getRunStatus(testErr)
-	out.logger.WithFields(logrus.Fields{
-		"ref":        out.referenceID,
-		"tainted":    testTainted,
-		"run_status": runStatus,
-	}).Debug("Sending test finished")
-
-	return out.client.TestFinished(out.referenceID, thresholdResults, testTainted, runStatus)
 }
 
 const expectedGzipRatio = 6 // based on test it is around 6.8, but we don't need to be that accurate
