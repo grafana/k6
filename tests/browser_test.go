@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -104,16 +103,15 @@ func TestBrowserOn(t *testing.T) {
 		t.Parallel()
 
 		var (
-			ctx, cancel = context.WithCancel(context.Background())
-			b           = newTestBrowser(t, ctx)
-			rt          = b.vu.Runtime()
-			log         []string
+			b   = newTestBrowser(t)
+			rt  = b.vu.Runtime()
+			log []string
 		)
 
 		require.NoError(t, rt.Set("b", b.Browser))
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		time.AfterFunc(100*time.Millisecond, cancel)
+		time.AfterFunc(100*time.Millisecond, b.Cancel)
 		_, err := b.runJavaScript(script, "disconnected")
 		assert.ErrorContains(t, err, "browser.on promise rejected: context canceled")
 	})

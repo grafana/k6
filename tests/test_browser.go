@@ -41,6 +41,8 @@ type testBrowser struct {
 	browserType api.BrowserType
 
 	api.Browser
+
+	cancel context.CancelFunc
 }
 
 // newTestBrowser configures and launches a new chrome browser.
@@ -53,7 +55,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	// set default options and then customize them
 	var (
-		ctx                context.Context
 		browserOpts        = defaultBrowserOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
@@ -72,8 +73,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 			enableHTTPMultiBin = true
 		case logCacheOption:
 			enableLogCache = true
-		case withContext:
-			ctx = opt
 		case skipCloseOption:
 			skipClose = true
 		case withSamplesListener:
@@ -83,15 +82,9 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	vu := setupHTTPTestModuleInstance(tb, samples)
 
-	if ctx == nil {
-		dummyCtx, cancel := context.WithCancel(vu.Context())
-		tb.Cleanup(cancel)
-		vu.CtxField = dummyCtx
-	} else {
-		// Attach the mock VU to the passed context
-		ctx = k6ext.WithVU(ctx, vu)
-		vu.CtxField = ctx
-	}
+	dummyCtx, cancel := context.WithCancel(vu.Context())
+	tb.Cleanup(cancel)
+	vu.CtxField = dummyCtx
 
 	registry := k6metrics.NewRegistry()
 	k6m := k6ext.RegisterCustomMetrics(registry)
@@ -147,6 +140,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		browserType: bt,
 		pid:         pid,
 		wsURL:       cb.WsURL(),
+		cancel:      cancel,
 	}
 	if enableFileServer {
 		tbr = tbr.withFileServer()
@@ -213,6 +207,16 @@ func (b *testBrowser) staticURL(path string) string {
 	b.t.Helper()
 
 	return b.URL("/" + testBrowserStaticDir + "/" + path)
+}
+
+// Context returns the testBrowser context.
+func (b *testBrowser) Context() context.Context {
+	return b.ctx
+}
+
+// Cancel cancels the testBrowser context.
+func (b *testBrowser) Cancel() {
+	b.cancel()
 }
 
 // attachFrame attaches the frame to the page and returns it.
@@ -449,10 +453,6 @@ type fileServerOption struct{}
 func withFileServer() fileServerOption {
 	return struct{}{}
 }
-
-// withContext is used to detect whether to use a custom context in the test
-// browser.
-type withContext = context.Context
 
 // logCacheOption is used to detect whether to enable the log cache.
 type logCacheOption struct{}
