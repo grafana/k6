@@ -24,6 +24,7 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/lib/testutils"
@@ -156,7 +157,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	registry := metrics.NewRegistry()
 
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	out, err := newOutput(output.Params{
+	out, err := newTestOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
@@ -175,8 +176,8 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	})
 	require.NoError(t, err)
 
+	out.SetReferenceID("123")
 	require.NoError(t, out.Start())
-	require.Equal(t, "123", out.referenceID)
 
 	now := time.Now()
 	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "name"}
@@ -278,7 +279,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	t.Parallel()
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	out, err := newOutput(output.Params{
+	out, err := newTestOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, tb.ServerHTTP.URL)),
 		ScriptOptions: lib.Options{
@@ -288,7 +289,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
 	require.NoError(t, err)
-	out.config.PushRefID = null.StringFrom("12")
+	out.SetReferenceID("12")
 
 	maxMetricSamplesPerPackage := 20
 	out.config.MaxMetricSamplesPerPackage = null.IntFrom(int64(maxMetricSamplesPerPackage))
@@ -366,7 +367,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	out, err := newOutput(output.Params{
+	out, err := newTestOutput(output.Params{
 		Logger: testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
 			"host": "%s", "noCompress": true,
@@ -420,7 +421,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		assert.NoError(t, json.Unmarshal(body, &receivedSamples))
 	})
 
-	out.config.PushRefID = null.StringFrom("12")
+	out.SetReferenceID("12")
 	require.NoError(t, out.Start())
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
@@ -478,20 +479,6 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	}
 }
 
-func TestCloudOutputRequireScriptName(t *testing.T) {
-	t.Parallel()
-	_, err := newOutput(output.Params{
-		Logger: testutils.NewLogger(t),
-		ScriptOptions: lib.Options{
-			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &metrics.DefaultSystemTagSet,
-		},
-		ScriptPath: &url.URL{Path: ""},
-	})
-	require.Error(t, err)
-	assert.Contains(t, err.Error(), "script name not set")
-}
-
 func TestCloudOutputPushRefID(t *testing.T) {
 	t.Parallel()
 
@@ -509,7 +496,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	tb.Mux.HandleFunc("/v1/tests/333", failHandler)
 	tb.Mux.HandleFunc("/v1/metrics/333", getSampleChecker(t, expSamples))
 
-	out, err := newOutput(output.Params{
+	out, err := newTestOutput(output.Params{
 		Logger: testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
 			"host": "%s", "noCompress": true,
@@ -525,9 +512,8 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	assert.Equal(t, "333", out.config.PushRefID.String)
+	out.SetReferenceID("333")
 	require.NoError(t, out.Start())
-	assert.Equal(t, "333", out.referenceID)
 
 	now := time.Now()
 	tags := registry.RootTagSet().WithTagsFromMap(map[string]string{"test": "mest", "a": "b"})
@@ -566,7 +552,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	t.Parallel()
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	out, err := newOutput(output.Params{
+	out, err := newTestOutput(output.Params{
 		Logger: testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
 			"host": "%s", "noCompress": true,
@@ -608,7 +594,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		m.Unlock()
 	})
 
-	out.config.PushRefID = null.StringFrom("123")
+	out.SetReferenceID("123")
 	require.NoError(t, out.Start())
 
 	now := time.Now()
@@ -653,58 +639,6 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	require.True(t, gotIterations)
 }
 
-func TestNewName(t *testing.T) {
-	t.Parallel()
-
-	mustParse := func(u string) *url.URL {
-		result, err := url.Parse(u)
-		require.NoError(t, err)
-		return result
-	}
-
-	cases := []struct {
-		url      *url.URL
-		expected string
-	}{
-		{
-			url: &url.URL{
-				Opaque: "go.k6.io/k6/samples/http_get.js",
-			},
-			expected: "http_get.js",
-		},
-		{
-			url:      mustParse("http://go.k6.io/k6/samples/http_get.js"),
-			expected: "http_get.js",
-		},
-		{
-			url:      mustParse("file://home/user/k6/samples/http_get.js"),
-			expected: "http_get.js",
-		},
-		{
-			url:      mustParse("file://C:/home/user/k6/samples/http_get.js"),
-			expected: "http_get.js",
-		},
-	}
-
-	for _, testCase := range cases {
-		testCase := testCase
-
-		t.Run(testCase.url.String(), func(t *testing.T) {
-			t.Parallel()
-			out, err := newOutput(output.Params{
-				Logger: testutils.NewLogger(t),
-				ScriptOptions: lib.Options{
-					Duration:   types.NullDurationFrom(1 * time.Second),
-					SystemTags: &metrics.DefaultSystemTagSet,
-				},
-				ScriptPath: testCase.url,
-			})
-			require.NoError(t, err)
-			require.Equal(t, out.config.Name.String, testCase.expected)
-		})
-	}
-}
-
 func TestPublishMetric(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -730,7 +664,7 @@ func TestPublishMetric(t *testing.T) {
 	}))
 	defer server.Close()
 
-	out, err := newOutput(output.Params{
+	out, err := newTestOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": false}`, server.URL)),
 		ScriptOptions: lib.Options{
@@ -763,7 +697,7 @@ func TestNewOutputClientTimeout(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	out, err := newOutput(output.Params{
+	out, err := newTestOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s",  "timeout": "2ms"}`, ts.URL)),
 		ScriptOptions: lib.Options{
@@ -775,52 +709,19 @@ func TestNewOutputClientTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	err = out.client.PushMetric("testmetric", nil)
-	require.Error(t, err)
 	assert.True(t, os.IsTimeout(err)) //nolint:forbidigo
 }
 
-func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
-	t.Parallel()
-
-	handler := func(w http.ResponseWriter, r *http.Request) {
-		switch r.URL.Path {
-		case "/v1/tests":
-			fmt.Fprintf(w, `{
-"reference_id": "cloud-create-test",
-"config": {
-	"metricPushInterval": "10ms",
-	"aggregationPeriod": "30ms"
-}
-}`)
-		case "/v1/tests/cloud-create-test":
-			w.WriteHeader(http.StatusOK)
-		default:
-			http.Error(w, "not expected path", http.StatusInternalServerError)
-		}
+func newTestOutput(params output.Params) (*Output, error) {
+	conf, err := cloudapi.GetConsolidatedConfig(
+		params.JSONConfig, params.Environment, params.ConfigArgument, params.ScriptOptions.External)
+	if err != nil {
+		return nil, err
 	}
-	ts := httptest.NewServer(http.HandlerFunc(handler))
-	defer ts.Close()
 
-	out, err := newOutput(output.Params{
-		Logger: testutils.NewLogger(t),
-		Environment: map[string]string{
-			"K6_CLOUD_HOST":               ts.URL,
-			"K6_CLOUD_AGGREGATION_PERIOD": "30s",
-		},
-		ScriptOptions: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
-		},
-		ScriptPath: &url.URL{Path: "/script.js"},
-	})
-	require.NoError(t, err)
-	require.NoError(t, out.Start())
+	apiClient := cloudapi.NewClient(
+		params.Logger, conf.Token.String, conf.Host.String,
+		consts.Version, conf.Timeout.TimeDuration())
 
-	assert.Equal(t, types.NullDurationFrom(10*time.Millisecond), out.config.MetricPushInterval)
-	assert.Equal(t, types.NullDurationFrom(30*time.Millisecond), out.config.AggregationPeriod)
-
-	// Assert that it overwrites only the provided values
-	expTimeout := types.NewNullDuration(60*time.Second, false)
-	assert.Equal(t, expTimeout, out.config.Timeout)
-
-	require.NoError(t, out.StopWithTestError(nil))
+	return New(params.Logger, conf, apiClient)
 }

@@ -1,20 +1,78 @@
+// Package cloud implements an Output that flushes to the k6 Cloud platform
+// using the version1 of the protocol flushing a json-based payload.
 package cloud
 
 import (
 	"net/http"
+	"sync"
 	"time"
 
 	easyjson "github.com/mailru/easyjson"
 	"github.com/sirupsen/logrus"
+
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
 )
 
-func (out *Output) startBackgroundProcesses() {
+// Output sends result data to the k6 Cloud service.
+type Output struct {
+	logger logrus.FieldLogger
+	config cloudapi.Config
+
+	referenceID string
+	client      *MetricsClient
+
+	bufferMutex      sync.Mutex
+	bufferHTTPTrails []*httpext.Trail
+	bufferSamples    []*Sample
+
+	// TODO: optimize this
+	//
+	// Since the real-time metrics refactoring (https://github.com/k6io/k6/pull/678),
+	// we should no longer have to handle metrics that have times long in the past. So instead of a
+	// map, we can probably use a simple slice (or even an array!) as a ring buffer to store the
+	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod
+	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
+	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
+	aggrBuckets map[int64]aggregationBucket
+
+	stopSendingMetrics chan struct{}
+	stopAggregation    chan struct{}
+	aggregationDone    *sync.WaitGroup
+	stopOutput         chan struct{}
+	outputDone         *sync.WaitGroup
+	testStopFunc       func(error)
+}
+
+// New creates a new Cloud output version 1.
+func New(logger logrus.FieldLogger, conf cloudapi.Config, testAPIClient *cloudapi.Client) (*Output, error) {
+	return &Output{
+		config:      conf,
+		client:      NewMetricsClient(testAPIClient, logger, conf.Host.String, conf.NoCompress.Bool),
+		aggrBuckets: map[int64]aggregationBucket{},
+		logger:      logger,
+
+		stopSendingMetrics: make(chan struct{}),
+		stopAggregation:    make(chan struct{}),
+		aggregationDone:    &sync.WaitGroup{},
+		stopOutput:         make(chan struct{}),
+		outputDone:         &sync.WaitGroup{},
+	}, nil
+}
+
+// SetReferenceID sets the passed Reference ID.
+func (out *Output) SetReferenceID(id string) {
+	out.referenceID = id
+}
+
+// Start starts the Output, it starts the background goroutines
+// for aggregating and flushing the collected metrics samples.
+func (out *Output) Start() error {
 	aggregationPeriod := out.config.AggregationPeriod.TimeDuration()
 	// If enabled, start periodically aggregating the collected HTTP trails
 	if aggregationPeriod > 0 {
@@ -60,6 +118,27 @@ func (out *Output) startBackgroundProcesses() {
 			}
 		}
 	}()
+
+	return nil
+}
+
+// StopWithTestError gracefully stops all metric emission from the output: when
+// all metric samples are emitted, it makes a cloud API call to finish the test
+// run. If testErr was specified, it extracts the RunStatus from it.
+func (out *Output) StopWithTestError(testErr error) error {
+	out.logger.Debug("Stopping the cloud output...")
+	close(out.stopAggregation)
+	out.aggregationDone.Wait() // could be a no-op, if we have never started the aggregation
+	out.logger.Debug("Aggregation stopped, stopping metric emission...")
+	close(out.stopOutput)
+	out.outputDone.Wait()
+	out.logger.Debug("Metric emission stopped, calling cloud API...")
+	return nil
+}
+
+// SetTestRunStopCallback receives the function that stops the engine on error
+func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
+	out.testStopFunc = stopFunc
 }
 
 // AddMetricSamples receives a set of metric samples. This method is never

@@ -6,27 +6,43 @@ import (
 	"fmt"
 	"path/filepath"
 	"strings"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"gopkg.in/guregu/null.v3"
-
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext"
-	"go.k6.io/k6/output"
-
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/output"
+	cloudv1 "go.k6.io/k6/output/cloud/v1"
+	"gopkg.in/guregu/null.v3"
 )
 
 // TestName is the default k6 Cloud test name
 const TestName = "k6 test"
 
+// versionedOutput represents an output implementing
+// metrics samples aggregation and flushing to the
+// Cloud remote service.
+//
+// It mainly differs from output.Output
+// because it does not define Stop (that is deprecated)
+// and Description.
+type versionedOutput interface {
+	Start() error
+	StopWithTestError(testRunErr error) error
+
+	SetTestRunStopCallback(func(error))
+	SetReferenceID(id string)
+
+	AddMetricSamples(samples []metrics.SampleContainer)
+}
+
 // Output sends result data to the k6 Cloud service.
 type Output struct {
+	versionedOutput
+
 	logger      logrus.FieldLogger
 	config      cloudapi.Config
 	referenceID string
@@ -34,28 +50,9 @@ type Output struct {
 	executionPlan []lib.ExecutionStep
 	duration      int64 // in seconds
 	thresholds    map[string][]*metrics.Threshold
-	client        *MetricsClient
 
-	bufferMutex      sync.Mutex
-	bufferHTTPTrails []*httpext.Trail
-	bufferSamples    []*Sample
-
-	// TODO: optimize this
-	//
-	// Since the real-time metrics refactoring (https://github.com/k6io/k6/pull/678),
-	// we should no longer have to handle metrics that have times long in the past. So instead of a
-	// map, we can probably use a simple slice (or even an array!) as a ring buffer to store the
-	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod
-	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
-	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
-	aggrBuckets map[int64]aggregationBucket
-
-	stopSendingMetrics chan struct{}
-	stopAggregation    chan struct{}
-	aggregationDone    *sync.WaitGroup
-	stopOutput         chan struct{}
-	outputDone         *sync.WaitGroup
-	testStopFunc       func(error)
+	client       *cloudapi.Client
+	testStopFunc func(error)
 }
 
 // Verify that Output implements the wanted interfaces
@@ -117,17 +114,10 @@ func newOutput(params output.Params) (*Output, error) {
 
 	return &Output{
 		config:        conf,
-		client:        NewMetricsClient(apiClient, logger, conf.Host.String, conf.NoCompress.Bool),
+		client:        apiClient,
 		executionPlan: params.ExecutionPlan,
 		duration:      int64(duration / time.Second),
-		aggrBuckets:   map[int64]aggregationBucket{},
 		logger:        logger,
-
-		stopSendingMetrics: make(chan struct{}),
-		stopAggregation:    make(chan struct{}),
-		aggregationDone:    &sync.WaitGroup{},
-		stopOutput:         make(chan struct{}),
-		outputDone:         &sync.WaitGroup{},
 	}, nil
 }
 
@@ -160,12 +150,10 @@ func (out *Output) Start() error {
 	if out.config.PushRefID.Valid {
 		out.referenceID = out.config.PushRefID.String
 		out.logger.WithField("referenceId", out.referenceID).Debug("directly pushing metrics without init")
-		out.startBackgroundProcesses()
-		return nil
+		return out.startVersionedOutput()
 	}
 
 	thresholds := make(map[string][]string)
-
 	for name, t := range out.thresholds {
 		for _, threshold := range t {
 			thresholds[name] = append(thresholds[name], threshold.Source)
@@ -194,7 +182,10 @@ func (out *Output) Start() error {
 		out.config = out.config.Apply(*response.ConfigOverride)
 	}
 
-	out.startBackgroundProcesses()
+	err = out.startVersionedOutput()
+	if err != nil {
+		return fmt.Errorf("the Gateway Output failed to start a versioned output: %w", err)
+	}
 
 	out.logger.WithFields(logrus.Fields{
 		"name":        out.config.Name,
@@ -236,20 +227,21 @@ func (out *Output) Stop() error {
 // all metric samples are emitted, it makes a cloud API call to finish the test
 // run. If testErr was specified, it extracts the RunStatus from it.
 func (out *Output) StopWithTestError(testErr error) error {
-	out.logger.Debug("Stopping the cloud output...")
-	close(out.stopAggregation)
-	out.aggregationDone.Wait() // could be a no-op, if we have never started the aggregation
-	out.logger.Debug("Aggregation stopped, stopping metric emission...")
-	close(out.stopOutput)
-	out.outputDone.Wait()
+	err := out.versionedOutput.StopWithTestError(testErr)
+	if err != nil {
+		out.logger.WithError(err).Error("An error occurred stopping the output")
+		// it doesn't return here because
+		// it is required to notify the Cloud backend before return
+	}
+
 	out.logger.Debug("Metric emission stopped, calling cloud API...")
-	err := out.testFinished(testErr)
+	err = out.testFinished(testErr)
 	if err != nil {
 		out.logger.WithFields(logrus.Fields{"error": err}).Warn("Failed to send test finished to the cloud")
-	} else {
-		out.logger.Debug("Cloud output successfully stopped!")
+		return err
 	}
-	return err
+	out.logger.Debug("Cloud output successfully stopped!")
+	return nil
 }
 
 func (out *Output) testFinished(testErr error) error {
@@ -326,4 +318,20 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 	// By default, the catch-all error is "aborted by system", but let's log that
 	out.logger.WithError(testErr).Debug("unknown test error classified as 'aborted by system'")
 	return cloudapi.RunStatusAbortedSystem
+}
+
+func (out *Output) startVersionedOutput() error {
+	if out.referenceID == "" {
+		return fmt.Errorf("ReferenceID is required")
+	}
+
+	var err error
+	out.versionedOutput, err = cloudv1.New(out.logger, out.config, out.client)
+	if err != nil {
+		return err
+	}
+
+	out.versionedOutput.SetReferenceID(out.referenceID)
+	out.versionedOutput.SetTestRunStopCallback(out.testStopFunc)
+	return out.versionedOutput.Start()
 }
