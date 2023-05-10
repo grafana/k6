@@ -271,7 +271,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 		},
 	}
 
-	require.NoError(t, out.Stop())
+	require.NoError(t, out.StopWithTestError(nil))
 }
 
 func TestCloudOutputMaxPerPacket(t *testing.T) {
@@ -344,7 +344,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 		out.AddMetricSamples(container)
 	}
 
-	require.NoError(t, out.Stop())
+	require.NoError(t, out.StopWithTestError(nil))
 	assert.True(t, gotTheLimit)
 }
 
@@ -452,7 +452,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		out.AddMetricSamples(container)
 	}
 
-	require.NoError(t, out.Stop())
+	require.NoError(t, out.StopWithTestError(nil))
 
 	select {
 	case <-out.stopSendingMetrics:
@@ -559,7 +559,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 		t.Error("test timeout")
 	}
 
-	require.NoError(t, out.Stop())
+	require.NoError(t, out.StopWithTestError(nil))
 }
 
 func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
@@ -649,7 +649,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	}
 
 	out.AddMetricSamples([]metrics.SampleContainer{&simpleNetTrail})
-	require.NoError(t, out.Stop())
+	require.NoError(t, out.StopWithTestError(nil))
 	require.True(t, gotIterations)
 }
 
