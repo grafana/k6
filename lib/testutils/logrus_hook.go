@@ -87,3 +87,15 @@ func LogContains(logEntries []logrus.Entry, expLevel logrus.Level, expContents s
 	}
 	return false
 }
+
+// FilterEntries is a helper function that checks the provided list of log entries
+// for a messages matching the provided level and contents and returns an array with only them.
+func FilterEntries(logEntries []logrus.Entry, expLevel logrus.Level, expContents string) []logrus.Entry {
+	filtered := make([]logrus.Entry, 0)
+	for _, entry := range logEntries {
+		if entry.Level == expLevel && strings.Contains(entry.Message, expContents) {
+			filtered = append(filtered, entry)
+		}
+	}
+	return filtered
+}
