@@ -40,8 +40,8 @@ require (
 	github.com/tidwall/pretty v1.2.1
 	go.uber.org/goleak v1.2.1
 	golang.org/x/crypto v0.6.0
-	golang.org/x/net v0.7.0
-	golang.org/x/term v0.5.0
+	golang.org/x/net v0.10.0
+	golang.org/x/term v0.8.0
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.53.0
 	google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
@@ -76,7 +76,7 @@ require (
 	go.buf.build/grpc/go/gogo/protobuf v1.4.9 // indirect
 	go.buf.build/grpc/go/prometheus/prometheus v1.4.4 // indirect
 	golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde // indirect
-	golang.org/x/sys v0.5.0 // indirect
-	golang.org/x/text v0.7.0 // indirect
+	golang.org/x/sys v0.8.0 // indirect
+	golang.org/x/text v0.9.0 // indirect
 	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
 )
