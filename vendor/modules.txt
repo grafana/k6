@@ -311,7 +311,7 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sync v0.0.0-20220819030929-7fc1605a5dde
+# golang.org/x/sync v0.2.0
 ## explicit
 golang.org/x/sync/semaphore
 # golang.org/x/sys v0.8.0
