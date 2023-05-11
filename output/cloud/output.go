@@ -1,3 +1,4 @@
+// Package cloud implements an Output that flushes to the k6 Cloud platform.
 package cloud
 
 import (
@@ -30,6 +31,7 @@ const TestName = "k6 test"
 
 // Output sends result data to the k6 Cloud service.
 type Output struct {
+	logger      logrus.FieldLogger
 	config      cloudapi.Config
 	referenceID string
 
@@ -41,9 +43,6 @@ type Output struct {
 	bufferMutex      sync.Mutex
 	bufferHTTPTrails []*httpext.Trail
 	bufferSamples    []*Sample
-
-	logger logrus.FieldLogger
-	opts   lib.Options
 
 	// TODO: optimize this
 	//
@@ -125,7 +124,6 @@ func newOutput(params output.Params) (*Output, error) {
 		client:        NewMetricsClient(apiClient, logger, conf.Host.String, conf.NoCompress.Bool),
 		executionPlan: params.ExecutionPlan,
 		duration:      int64(duration / time.Second),
-		opts:          params.ScriptOptions,
 		aggrBuckets:   map[int64]aggregationBucket{},
 		logger:        logger,
 
@@ -574,12 +572,21 @@ func (out *Output) flushHTTPTrails() {
 	out.bufferSamples = append(out.bufferSamples, newSamples...)
 }
 
+// shouldStopSendingMetrics returns true if the output should interrupt the metric flush.
+//
+// note: The actual test execution should continues,
+// since for local k6 run tests the end-of-test summary (or any other outputs) will still work,
+// but the cloud output doesn't send any more metrics.
+// Instead, if cloudapi.Config.StopOnError is enabled
+// the cloud output should stop the whole test run too.
+// This logic should be handled by the caller.
 func (out *Output) shouldStopSendingMetrics(err error) bool {
 	if err == nil {
 		return false
 	}
-
-	if errResp, ok := err.(cloudapi.ErrorResponse); ok && errResp.Response != nil {
+	if errResp, ok := err.(cloudapi.ErrorResponse); ok && errResp.Response != nil { //nolint:errorlint
+		// The Cloud service returns the error code 4 when it doesn't accept any more metrics.
+		// So, when k6 sees that, the cloud output just stops prematurely.
 		return errResp.Response.StatusCode == http.StatusForbidden && errResp.Code == 4
 	}
 

@@ -194,6 +194,7 @@ func TestSampleMarshaling(t *testing.T) {
 }
 
 func TestMetricAggregation(t *testing.T) {
+	t.Parallel()
 	m := AggregatedMetric{}
 	m.Add(1 * time.Second)
 	m.Add(1 * time.Second)
@@ -220,7 +221,7 @@ func TestMetricAggregation(t *testing.T) {
 func getDurations(r *rand.Rand, count int, min, multiplier float64) durations {
 	data := make(durations, count)
 	for j := 0; j < count; j++ {
-		data[j] = time.Duration(min + r.Float64()*multiplier) //nolint:gosec
+		data[j] = time.Duration(min + r.Float64()*multiplier)
 	}
 	return data
 }
@@ -263,9 +264,8 @@ func BenchmarkDurationBounds(b *testing.B) {
 	}
 }
 
+//nolint:paralleltest
 func TestQuickSelectAndBounds(t *testing.T) {
-	t.Parallel()
-
 	seed := time.Now().UnixNano()
 	r := rand.New(rand.NewSource(seed)) //nolint:gosec
 	t.Logf("Random source seeded with %d\n", seed)

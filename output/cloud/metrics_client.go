@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -64,7 +65,11 @@ func (mc *MetricsClient) PushMetric(referenceID string, s []*Sample) error {
 	var additionalFields logrus.Fields
 
 	if !mc.noCompress {
-		buf := mc.pushBufferPool.Get().(*bytes.Buffer)
+		buf, ok := mc.pushBufferPool.Get().(*bytes.Buffer)
+		if !ok {
+			return errors.New("failed to convert a buffer pool item " +
+				"into the expected type bytes Buffer for gzip compression operation")
+		}
 		buf.Reset()
 		defer mc.pushBufferPool.Put(buf)
 		unzippedSize := len(b)

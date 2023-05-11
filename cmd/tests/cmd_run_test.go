@@ -1676,17 +1676,33 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 	assert.Contains(t, stdout, "iterations...........: 1")
 }
 
-func TestRunWithCloudOutputMoreOverrides(t *testing.T) {
+func TestRunWithCloudOutputCustomConfigAndOverrides(t *testing.T) {
 	t.Parallel()
 
-	ts := getSingleFileTestState(
-		t, "export default function () {};",
-		[]string{"-v", "--log-output=stdout", "--out=cloud"}, 0,
-	)
+	script := `
+export const options = {
+  ext: {
+    loadimpact: {
+      name: 'Hello k6 Cloud!',
+      projectID: 123456,
+    },
+  },
+};
+
+export default function() {};`
+
+	ts := getSingleFileTestState(t, script, []string{"-v", "--log-output=stdout", "--out=cloud"}, 0)
 
 	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		b, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+
+		bjs := string(b)
+		assert.Contains(t, bjs, `"name":"Hello k6 Cloud!"`)
+		assert.Contains(t, bjs, `"project_id":123456`)
+
 		resp.WriteHeader(http.StatusOK)
-		_, err := fmt.Fprint(resp, `{
+		_, err = fmt.Fprint(resp, `{
 			"reference_id": "1337",
 			"config": {
 				"webAppURL": "https://bogus.url",

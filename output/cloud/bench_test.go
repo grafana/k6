@@ -262,6 +262,7 @@ func generateSamples(registry *metrics.Registry, count int) []*Sample {
 }
 
 func generateHTTPExtTrail(now time.Time, i time.Duration, tags *metrics.TagSet) *httpext.Trail {
+	//nolint:durationcheck
 	return &httpext.Trail{
 		Blocked:        i % 200 * 100 * time.Millisecond,
 		Connecting:     i % 200 * 200 * time.Millisecond,

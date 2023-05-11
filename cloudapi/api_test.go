@@ -24,18 +24,23 @@ func fprintf(t *testing.T, w io.Writer, format string, a ...interface{}) int {
 func TestCreateTestRun(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		b, err := io.ReadAll(r.Body)
+		require.NoError(t, err)
+
+		exp := `{"name":"test","vus":0,"thresholds":null,"duration":0}`
+		assert.JSONEq(t, exp, string(b))
+
 		fprintf(t, w, `{"reference_id": "1", "config": {"aggregationPeriod": "2s"}}`)
 	}))
 	defer server.Close()
 
 	client := NewClient(testutils.NewLogger(t), "token", server.URL, "1.0", 1*time.Second)
 
-	tr := &TestRun{
+	resp, err := client.CreateTestRun(&TestRun{
 		Name: "test",
-	}
-	resp, err := client.CreateTestRun(tr)
+	})
+	assert.NoError(t, err)
 
-	assert.Nil(t, err)
 	assert.Equal(t, resp.ReferenceID, "1")
 	assert.NotNil(t, resp.ConfigOverride)
 	assert.True(t, resp.ConfigOverride.AggregationPeriod.Valid)

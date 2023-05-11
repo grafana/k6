@@ -20,6 +20,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib"
@@ -138,7 +139,11 @@ func TestCloudOutput(t *testing.T) {
 	}
 
 	for tcNum, minSamples := range []int{60, 75, 100} {
-		t.Run(fmt.Sprintf("tc%d_minSamples%d", tcNum, minSamples), getTestRunner(minSamples))
+		tcNum, minSamples := tcNum, minSamples
+		t.Run(fmt.Sprintf("tc%d_minSamples%d", tcNum, minSamples), func(t *testing.T) {
+			t.Parallel()
+			getTestRunner(minSamples)
+		})
 	}
 }
 
@@ -148,21 +153,8 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	t.Logf("Random source seeded with %d\n", seed)
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := fmt.Fprintf(w, `{
-			"reference_id": "123",
-			"config": {
-				"metricPushInterval": "10ms",
-				"aggregationPeriod": "30ms",
-				"aggregationCalcInterval": "40ms",
-				"aggregationWaitPeriod": "5ms",
-				"aggregationMinSamples": %d
-			}
-		}`, minSamples)
-		require.NoError(t, err)
-	}))
-
 	registry := metrics.NewRegistry()
+
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
@@ -171,26 +163,20 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 			Duration:   types.NullDurationFrom(1 * time.Second),
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
+		Environment: map[string]string{
+			"K6_CLOUD_PUSH_REF_ID":               "123",
+			"K6_CLOUD_METRIC_PUSH_INTERVAL":      "10ms",
+			"K6_CLOUD_AGGREGATION_PERIOD":        "30ms",
+			"K6_CLOUD_AGGREGATION_CALC_INTERVAL": "40ms",
+			"K6_CLOUD_AGGREGATION_WAIT_PERIOD":   "5ms",
+			"K6_CLOUD_AGGREGATION_MIN_SAMPLES":   strconv.Itoa(minSamples),
+		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
 	require.NoError(t, err)
 
-	assert.True(t, out.config.Host.Valid)
-	assert.Equal(t, tb.ServerHTTP.URL, out.config.Host.String)
-	assert.True(t, out.config.NoCompress.Valid)
-	assert.True(t, out.config.NoCompress.Bool)
-	assert.False(t, out.config.MetricPushInterval.Valid)
-	assert.False(t, out.config.AggregationPeriod.Valid)
-	assert.False(t, out.config.AggregationWaitPeriod.Valid)
-
 	require.NoError(t, out.Start())
-	assert.Equal(t, "123", out.referenceID)
-	assert.True(t, out.config.MetricPushInterval.Valid)
-	assert.Equal(t, types.Duration(10*time.Millisecond), out.config.MetricPushInterval.Duration)
-	assert.True(t, out.config.AggregationPeriod.Valid)
-	assert.Equal(t, types.Duration(30*time.Millisecond), out.config.AggregationPeriod.Duration)
-	assert.True(t, out.config.AggregationWaitPeriod.Valid)
-	assert.Equal(t, types.Duration(5*time.Millisecond), out.config.AggregationWaitPeriod.Duration)
+	require.Equal(t, "123", out.referenceID)
 
 	now := time.Now()
 	tagMap := map[string]string{"test": "mest", "a": "b", "name": "name", "url": "name"}
@@ -199,9 +185,6 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	expSamples := make(chan []Sample)
 	defer close(expSamples)
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID), getSampleChecker(t, expSamples))
-	tb.Mux.HandleFunc(fmt.Sprintf("/v1/tests/%s", out.referenceID), func(rw http.ResponseWriter, _ *http.Request) {
-		rw.WriteHeader(http.StatusOK) // silence a test warning
-	})
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
@@ -244,7 +227,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	smallSkew := 0.02
 
 	trails := []metrics.SampleContainer{}
-	durations := make([]time.Duration, len(trails))
+	durations := make([]time.Duration, 0, len(trails))
 	for i := int64(0); i < out.config.AggregationMinSamples.Int64; i++ {
 		similarTrail := skewTrail(r, simpleTrail, 1.0, 1.0+smallSkew)
 		trails = append(trails, &similarTrail)
@@ -294,26 +277,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 func TestCloudOutputMaxPerPacket(t *testing.T) {
 	t.Parallel()
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	maxMetricSamplesPerPackage := 20
-	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := fmt.Fprintf(w, `{
-			"reference_id": "12",
-			"config": {
-				"metricPushInterval": "200ms",
-				"aggregationPeriod": "100ms",
-				"maxMetricSamplesPerPackage": %d,
-				"aggregationCalcInterval": "100ms",
-				"aggregationWaitPeriod": "100ms"
-			}
-		}`, maxMetricSamplesPerPackage)
-		require.NoError(t, err)
-	}))
-	tb.Mux.HandleFunc("/v1/tests/12", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-
 	out, err := newOutput(output.Params{
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s", "noCompress": true}`, tb.ServerHTTP.URL)),
@@ -324,12 +288,16 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
 	require.NoError(t, err)
-	require.NoError(t, err)
+	out.config.PushRefID = null.StringFrom("12")
+
+	maxMetricSamplesPerPackage := 20
+	out.config.MaxMetricSamplesPerPackage = null.IntFrom(int64(maxMetricSamplesPerPackage))
+
 	now := time.Now()
+	registry := metrics.NewRegistry()
 	tags := registry.RootTagSet().WithTagsFromMap(map[string]string{"test": "mest", "a": "b"})
 	gotTheLimit := false
 	var m sync.Mutex
-
 	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID),
 		func(_ http.ResponseWriter, r *http.Request) {
 			body, err := io.ReadAll(r.Body)
@@ -346,6 +314,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 
 	require.NoError(t, out.Start())
 
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: builtinMetrics.VUs,
@@ -357,6 +326,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	for j := time.Duration(1); j <= 200; j++ {
 		container := make([]metrics.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
+			//nolint:durationcheck
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
 				Connecting:     i % 200 * 200 * time.Millisecond,
@@ -375,7 +345,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	}
 
 	require.NoError(t, out.Stop())
-	require.True(t, gotTheLimit)
+	assert.True(t, gotTheLimit)
 }
 
 func TestCloudOutputStopSendingMetric(t *testing.T) {
@@ -396,28 +366,6 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	builtinMetrics := metrics.RegisterBuiltinMetrics(metrics.NewRegistry())
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		body, err := io.ReadAll(req.Body)
-		require.NoError(t, err)
-		data := &cloudapi.TestRun{}
-		err = json.Unmarshal(body, &data)
-		require.NoError(t, err)
-		assert.Equal(t, "my-custom-name", data.Name)
-
-		_, err = fmt.Fprint(resp, `{
-			"reference_id": "12",
-			"config": {
-				"metricPushInterval": "200ms",
-				"aggregationPeriod": "100ms",
-				"maxMetricSamplesPerPackage": 20,
-				"aggregationCalcInterval": "100ms",
-				"aggregationWaitPeriod": "100ms"
-			}
-		}`)
-		require.NoError(t, err)
-	}))
-	tb.Mux.HandleFunc("/v1/tests/12", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
@@ -449,30 +397,30 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 
 	count := 1
 	max := 5
-	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID),
-		func(w http.ResponseWriter, r *http.Request) {
-			count++
-			if count == max {
-				type payload struct {
-					Error cloudapi.ErrorResponse `json:"error"`
-				}
-				res := &payload{}
-				res.Error = cloudapi.ErrorResponse{Code: 4}
-				w.Header().Set("Content-Type", "application/json")
-				data, err := json.Marshal(res)
-				if err != nil {
-					t.Fatal(err)
-				}
-				w.WriteHeader(http.StatusForbidden)
-				_, _ = w.Write(data)
-				return
+	tb.Mux.HandleFunc("/v1/metrics/12", func(w http.ResponseWriter, r *http.Request) {
+		count++
+		if count == max {
+			type payload struct {
+				Error cloudapi.ErrorResponse `json:"error"`
 			}
-			body, err := io.ReadAll(r.Body)
-			assert.NoError(t, err)
-			receivedSamples := []Sample{}
-			assert.NoError(t, json.Unmarshal(body, &receivedSamples))
-		})
+			res := &payload{}
+			res.Error = cloudapi.ErrorResponse{Code: 4}
+			w.Header().Set("Content-Type", "application/json")
+			data, err := json.Marshal(res)
+			if err != nil {
+				t.Fatal(err)
+			}
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write(data)
+			return
+		}
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
+		receivedSamples := []Sample{}
+		assert.NoError(t, json.Unmarshal(body, &receivedSamples))
+	})
 
+	out.config.PushRefID = null.StringFrom("12")
 	require.NoError(t, out.Start())
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
@@ -486,6 +434,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 	for j := time.Duration(1); j <= 200; j++ {
 		container := make([]metrics.SampleContainer, 0, 500)
 		for i := time.Duration(1); i <= 50; i++ {
+			//nolint:durationcheck
 			container = append(container, &httpext.Trail{
 				Blocked:        i % 200 * 100 * time.Millisecond,
 				Connecting:     i % 200 * 200 * time.Millisecond,
@@ -541,61 +490,6 @@ func TestCloudOutputRequireScriptName(t *testing.T) {
 	})
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "script name not set")
-}
-
-func TestCloudOutputAggregationPeriodZeroNoBlock(t *testing.T) {
-	t.Parallel()
-	tb := httpmultibin.NewHTTPMultiBin(t)
-	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		_, err := fmt.Fprintf(w, `{
-			"reference_id": "123",
-			"config": {
-				"metricPushInterval": "10ms",
-				"aggregationPeriod": "0ms",
-				"aggregationCalcInterval": "40ms",
-				"aggregationWaitPeriod": "5ms"
-			}
-		}`)
-		require.NoError(t, err)
-	}))
-	tb.Mux.HandleFunc("/v1/tests/123", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-
-	out, err := newOutput(output.Params{
-		Logger: testutils.NewLogger(t),
-		JSONConfig: json.RawMessage(fmt.Sprintf(`{
-			"host": "%s", "noCompress": true,
-			"maxMetricSamplesPerPackage": 50
-		}`, tb.ServerHTTP.URL)),
-		ScriptOptions: lib.Options{
-			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &metrics.DefaultSystemTagSet,
-		},
-		ScriptPath: &url.URL{Path: "/script.js"},
-	})
-	require.NoError(t, err)
-
-	assert.True(t, out.config.Host.Valid)
-	assert.Equal(t, tb.ServerHTTP.URL, out.config.Host.String)
-	assert.True(t, out.config.NoCompress.Valid)
-	assert.True(t, out.config.NoCompress.Bool)
-	assert.False(t, out.config.MetricPushInterval.Valid)
-	assert.False(t, out.config.AggregationPeriod.Valid)
-	assert.False(t, out.config.AggregationWaitPeriod.Valid)
-
-	require.NoError(t, out.Start())
-	assert.Equal(t, "123", out.referenceID)
-	assert.True(t, out.config.MetricPushInterval.Valid)
-	assert.Equal(t, types.Duration(10*time.Millisecond), out.config.MetricPushInterval.Duration)
-	assert.True(t, out.config.AggregationPeriod.Valid)
-	assert.Equal(t, types.Duration(0), out.config.AggregationPeriod.Duration)
-	assert.True(t, out.config.AggregationWaitPeriod.Valid)
-	assert.Equal(t, types.Duration(5*time.Millisecond), out.config.AggregationWaitPeriod.Duration)
-
-	expSamples := make(chan []Sample)
-	defer close(expSamples)
-	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID), getSampleChecker(t, expSamples))
-
-	require.NoError(t, out.Stop())
 }
 
 func TestCloudOutputPushRefID(t *testing.T) {
@@ -670,22 +564,8 @@ func TestCloudOutputPushRefID(t *testing.T) {
 
 func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 	t.Parallel()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+
 	tb := httpmultibin.NewHTTPMultiBin(t)
-	tb.Mux.HandleFunc("/v1/tests", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
-		body, err := io.ReadAll(req.Body)
-		require.NoError(t, err)
-		data := &cloudapi.TestRun{}
-		err = json.Unmarshal(body, &data)
-		require.NoError(t, err)
-		assert.Equal(t, "script.js", data.Name)
-
-		_, err = fmt.Fprintf(resp, `{"reference_id": "123"}`)
-		require.NoError(t, err)
-	}))
-	tb.Mux.HandleFunc("/v1/tests/123", func(rw http.ResponseWriter, _ *http.Request) { rw.WriteHeader(http.StatusOK) })
-
 	out, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{
@@ -709,29 +589,31 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		"iterations":         1,
 	}
 
-	tb.Mux.HandleFunc(fmt.Sprintf("/v1/metrics/%s", out.referenceID),
-		func(_ http.ResponseWriter, r *http.Request) {
-			body, err := io.ReadAll(r.Body)
-			assert.NoError(t, err)
+	tb.Mux.HandleFunc("/v1/metrics/123", func(_ http.ResponseWriter, r *http.Request) {
+		body, err := io.ReadAll(r.Body)
+		assert.NoError(t, err)
 
-			receivedSamples := []Sample{}
-			assert.NoError(t, json.Unmarshal(body, &receivedSamples))
+		receivedSamples := []Sample{}
+		assert.NoError(t, json.Unmarshal(body, &receivedSamples))
 
-			assert.Len(t, receivedSamples, 1)
-			assert.Equal(t, "iter_li_all", receivedSamples[0].Metric)
-			assert.Equal(t, DataTypeMap, receivedSamples[0].Type)
-			data, ok := receivedSamples[0].Data.(*SampleDataMap)
-			assert.True(t, ok)
-			assert.Equal(t, expValues, data.Values)
+		assert.Len(t, receivedSamples, 1)
+		assert.Equal(t, "iter_li_all", receivedSamples[0].Metric)
+		assert.Equal(t, DataTypeMap, receivedSamples[0].Type)
+		data, ok := receivedSamples[0].Data.(*SampleDataMap)
+		assert.True(t, ok)
+		assert.Equal(t, expValues, data.Values)
 
-			m.Lock()
-			gotIterations = true
-			m.Unlock()
-		})
+		m.Lock()
+		gotIterations = true
+		m.Unlock()
+	})
 
+	out.config.PushRefID = null.StringFrom("123")
 	require.NoError(t, out.Start())
 
 	now := time.Now()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
 	simpleNetTrail := netext.NetTrail{
 		BytesRead:     100,
 		BytesWritten:  200,
@@ -773,6 +655,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 
 func TestNewName(t *testing.T) {
 	t.Parallel()
+
 	mustParse := func(u string) *url.URL {
 		result, err := url.Parse(u)
 		require.NoError(t, err)
@@ -807,6 +690,7 @@ func TestNewName(t *testing.T) {
 		testCase := testCase
 
 		t.Run(testCase.url.String(), func(t *testing.T) {
+			t.Parallel()
 			out, err := newOutput(output.Params{
 				Logger: testutils.NewLogger(t),
 				ScriptOptions: lib.Options{
@@ -822,6 +706,7 @@ func TestNewName(t *testing.T) {
 }
 
 func TestPublishMetric(t *testing.T) {
+	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		g, err := gzip.NewReader(r.Body)
 
@@ -868,14 +753,13 @@ func TestPublishMetric(t *testing.T) {
 		},
 	}
 	err = out.client.PushMetric("1", samples)
-
-	assert.Nil(t, err)
+	assert.NoError(t, err)
 }
 
 func TestNewOutputClientTimeout(t *testing.T) {
 	t.Parallel()
 	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
-		time.Sleep(5 * time.Millisecond)
+		time.Sleep(100 * time.Millisecond)
 	}))
 	defer ts.Close()
 
@@ -883,7 +767,7 @@ func TestNewOutputClientTimeout(t *testing.T) {
 		Logger:     testutils.NewLogger(t),
 		JSONConfig: json.RawMessage(fmt.Sprintf(`{"host": "%s",  "timeout": "2ms"}`, ts.URL)),
 		ScriptOptions: lib.Options{
-			Duration:   types.NullDurationFrom(1 * time.Second),
+			Duration:   types.NullDurationFrom(50 * time.Millisecond),
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "script.js"},
@@ -891,5 +775,52 @@ func TestNewOutputClientTimeout(t *testing.T) {
 	require.NoError(t, err)
 
 	err = out.client.PushMetric("testmetric", nil)
-	assert.True(t, os.IsTimeout(err))
+	require.Error(t, err)
+	assert.True(t, os.IsTimeout(err)) //nolint:forbidigo
+}
+
+func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/tests":
+			fmt.Fprintf(w, `{
+"reference_id": "cloud-create-test",
+"config": {
+	"metricPushInterval": "10ms",
+	"aggregationPeriod": "30ms"
+}
+}`)
+		case "/v1/tests/cloud-create-test":
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "not expected path", http.StatusInternalServerError)
+		}
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	defer ts.Close()
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST":               ts.URL,
+			"K6_CLOUD_AGGREGATION_PERIOD": "30s",
+		},
+		ScriptOptions: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+
+	assert.Equal(t, types.NullDurationFrom(10*time.Millisecond), out.config.MetricPushInterval)
+	assert.Equal(t, types.NullDurationFrom(30*time.Millisecond), out.config.AggregationPeriod)
+
+	// Assert that it overwrites only the provided values
+	expTimeout := types.NewNullDuration(60*time.Second, false)
+	assert.Equal(t, expTimeout, out.config.Timeout)
+
+	require.NoError(t, out.StopWithTestError(nil))
 }
