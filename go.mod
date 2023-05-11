@@ -39,7 +39,7 @@ require (
 	github.com/tidwall/gjson v1.14.4
 	github.com/tidwall/pretty v1.2.1
 	go.uber.org/goleak v1.2.1
-	golang.org/x/crypto v0.6.0
+	golang.org/x/crypto v0.9.0
 	golang.org/x/net v0.10.0
 	golang.org/x/term v0.8.0
 	golang.org/x/time v0.3.0
