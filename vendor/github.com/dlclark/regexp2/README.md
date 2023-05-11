@@ -92,6 +92,66 @@ if isMatch, _ := re.MatchString(`Something to match`); isMatch {
 
 This feature is a work in progress and I'm open to ideas for more things to put here (maybe more relaxed character escaping rules?).
 
+## Catastrophic Backtracking and Timeouts
+
+`regexp2` supports features that can lead to catastrophic backtracking.
+`Regexp.MatchTimeout` can be set to to limit the impact of such behavior; the
+match will fail with an error after approximately MatchTimeout. No timeout
+checks are done by default.
+
+Timeout checking is not free. The current timeout checking implementation starts
+a background worker that updates a clock value approximately once every 100
+milliseconds. The matching code compares this value against the precomputed
+deadline for the match. The performance impact is as follows.
+
+1.  A match with a timeout runs almost as fast as a match without a timeout.
+2.  If any live matches have a timeout, there will be a background CPU load
+    (`~0.15%` currently on a modern machine). This load will remain constant
+    regardless of the number of matches done including matches done in parallel.
+3.  If no live matches are using a timeout, the background load will remain
+    until the longest deadline (match timeout + the time when the match started)
+    is reached. E.g., if you set a timeout of one minute the load will persist
+    for approximately a minute even if the match finishes quickly.
+
+See [PR #58](https://github.com/dlclark/regexp2/pull/58) for more details and 
+alternatives considered.
+
+## Goroutine leak error
+If you're using a library during unit tests (e.g. https://github.com/uber-go/goleak) that validates all goroutines are exited then you'll likely get an error if you or any of your dependencies use regex's with a MatchTimeout. 
+To remedy the problem you'll need to tell the unit test to wait until the backgroup timeout goroutine is exited.
+
+```go
+func TestSomething(t *testing.T) {
+    defer goleak.VerifyNone(t)
+    defer regexp2.StopTimeoutClock()
+
+    // ... test
+}
+
+//or
+
+func TestMain(m *testing.M) {
+    // setup
+    // ...
+
+    // run 
+    m.Run()
+
+    //tear down
+    regexp2.StopTimeoutClock()
+    goleak.VerifyNone(t)
+}
+```
+
+This will add ~100ms runtime to each test (or TestMain). If that's too much time you can set the clock cycle rate of the timeout goroutine in an init function in a test file. `regexp2.SetTimeoutCheckPeriod` isn't threadsafe so it must be setup before starting any regex's with Timeouts.
+
+```go
+func init() {
+	//speed up testing by making the timeout clock 1ms
+	regexp2.SetTimeoutCheckPeriod(time.Millisecond)
+}
+```
+
 ## ECMAScript compatibility mode
 In this mode the engine provides compatibility with the [regex engine](https://tc39.es/ecma262/multipage/text-processing.html#sec-regexp-regular-expression-objects) described in the ECMAScript specification.
 
