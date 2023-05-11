@@ -718,10 +718,7 @@ func (o *Object) ToNumber() Value {
 }
 
 func (o *Object) SameAs(other Value) bool {
-	if other, ok := other.(*Object); ok {
-		return o == other
-	}
-	return false
+	return o.StrictEquals(other)
 }
 
 func (o *Object) Equals(other Value) bool {
@@ -741,7 +738,7 @@ func (o *Object) Equals(other Value) bool {
 
 func (o *Object) StrictEquals(other Value) bool {
 	if other, ok := other.(*Object); ok {
-		return o == other || o.self.equal(other.self)
+		return o == other || o != nil && other != nil && o.self.equal(other.self)
 	}
 	return false
 }
