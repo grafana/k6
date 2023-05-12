@@ -10,7 +10,9 @@ RUN CGO_ENABLED=0 go install go.k6.io/xk6/cmd/xk6@latest  \
 
 # Create image for running k6 with output for Prometheus Remote Write
 FROM alpine:3.17
-RUN apk add --no-cache ca-certificates=~20220614 && \
+
+# hadolint ignore=DL3018
+RUN apk add --no-cache ca-certificates && \
     adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /tmp/k6 /usr/bin/k6
 
