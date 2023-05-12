@@ -127,3 +127,23 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 
 	require.NoError(t, out.StopWithTestError(nil))
 }
+
+func TestOutputStartVersionError(t *testing.T) {
+	t.Parallel()
+	o, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		ScriptOptions: lib.Options{
+			Duration:   types.NullDurationFrom(1 * time.Second),
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		Environment: map[string]string{
+			"K6_CLOUD_API_VERSION": "3",
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+	})
+	require.NoError(t, err)
+
+	o.referenceID = "123"
+	err = o.startVersionedOutput()
+	require.ErrorContains(t, err, "v3 is an unexpected version")
+}
