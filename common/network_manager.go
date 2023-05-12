@@ -178,6 +178,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		fromCache, fromPreCache, fromSvcWrk bool
 		url                                 = req.url.String()
 		wallTime                            = time.Now()
+		failed                              float64
 	)
 	if resp != nil {
 		status = resp.status
@@ -189,6 +190,11 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		fromSvcWrk = resp.fromServiceWorker
 		wallTime = resp.wallTime
 		url = resp.url
+		// Assuming that a failure is when status
+		// is between 200 and 399 (inclusive).
+		if status < 200 || status > 399 {
+			failed = 1
+		}
 	} else {
 		m.logger.Debugf("NetworkManager:emitResponseMetrics",
 			"response is nil url:%s method:%s", req.url, req.method)
@@ -256,6 +262,11 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqReceiving, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
+					Time:       wallTime,
+				},
+				{
+					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqFailed, Tags: tags},
+					Value:      failed,
 					Time:       wallTime,
 				},
 			},

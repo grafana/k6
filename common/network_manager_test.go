@@ -291,7 +291,7 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 			n = vu.AssertSamples(func(s k6metrics.Sample) {
 				assert.Equalf(t, tt.wantRes.wt, s.Time, "timing skew in %s", s.Metric.Name)
 			})
-			assert.Equalf(t, 7, n, "should emit 7 response metrics")
+			assert.Equalf(t, 8, n, "should emit 8 response metrics")
 		})
 	}
 }
