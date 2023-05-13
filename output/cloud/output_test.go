@@ -162,7 +162,11 @@ func TestOutputStartVersionedOutputV2(t *testing.T) {
 		logger:      testutils.NewLogger(t),
 		referenceID: "123",
 		config: cloudapi.Config{
-			APIVersion: null.IntFrom(2),
+			APIVersion:            null.IntFrom(2),
+			AggregationWaitPeriod: types.NullDurationFrom(1 * time.Second),
+			// Here, we are enabling but silencing the related async ops
+			AggregationPeriod:  types.NullDurationFrom(1 * time.Hour),
+			MetricPushInterval: types.NullDurationFrom(1 * time.Hour),
 		},
 	}
 
@@ -180,7 +184,7 @@ func TestOutputStartVersionedOutputV1(t *testing.T) {
 		referenceID: "123",
 		config: cloudapi.Config{
 			APIVersion: null.IntFrom(1),
-			// Here, we are mostly silencing the flushing op
+			// Here, we are enabling but silencing the related async op
 			MetricPushInterval: types.NullDurationFrom(1 * time.Hour),
 		},
 	}
