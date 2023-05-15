@@ -2,6 +2,7 @@ package metrics
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"sort"
 	"time"
@@ -19,6 +20,28 @@ type Sink interface {
 	Add(s Sample)                              // Add a sample to the sink.
 	Format(t time.Duration) map[string]float64 // Data for thresholds.
 	IsEmpty() bool                             // Check if the Sink is empty.
+}
+
+// NewSink creates the related Sink for
+// the provided MetricType.
+func NewSink(mt MetricType) Sink {
+	var sink Sink
+	switch mt {
+	case Counter:
+		sink = &CounterSink{}
+	case Gauge:
+		sink = &GaugeSink{}
+	case Trend:
+		sink = &TrendSink{}
+	case Rate:
+		sink = &RateSink{}
+	default:
+		// Should not be possible to create
+		// an invalid metric type except for specific
+		// and controlled tests
+		panic(fmt.Sprintf("MetricType %q is not supported", mt))
+	}
+	return sink
 }
 
 type CounterSink struct {
