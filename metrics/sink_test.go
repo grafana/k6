@@ -9,6 +9,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNewSink(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		sink interface{}
+		mt   MetricType
+	}{
+		{mt: Counter, sink: &CounterSink{}},
+		{mt: Gauge, sink: &GaugeSink{}},
+		{mt: Rate, sink: &RateSink{}},
+		{mt: Trend, sink: &TrendSink{}},
+	}
+	for _, tc := range tests {
+		assert.Equal(t, tc.sink, NewSink(tc.mt))
+	}
+}
+
+func TestNewSinkInvalidMetricType(t *testing.T) {
+	t.Parallel()
+	assert.Panics(t, func() { NewSink(MetricType(6)) })
+}
+
 func TestCounterSink(t *testing.T) {
 	samples10 := []float64{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 100.0}
 	now := time.Now()
