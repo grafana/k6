@@ -230,8 +230,7 @@ func (out *Output) StopWithTestError(testErr error) error {
 	err := out.versionedOutput.StopWithTestError(testErr)
 	if err != nil {
 		out.logger.WithError(err).Error("An error occurred stopping the output")
-		// it doesn't return here because
-		// it is required to notify the Cloud backend before return
+		// to notify the cloud backend we have no return here
 	}
 
 	out.logger.Debug("Metric emission stopped, calling cloud API...")
@@ -322,7 +321,7 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 
 func (out *Output) startVersionedOutput() error {
 	if out.referenceID == "" {
-		return fmt.Errorf("ReferenceID is required")
+		return errors.New("ReferenceID is required")
 	}
 
 	var err error
