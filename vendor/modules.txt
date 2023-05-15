@@ -156,7 +156,7 @@ github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
-# github.com/grafana/xk6-output-prometheus-remote v0.2.0
+# github.com/grafana/xk6-output-prometheus-remote v0.2.1
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
