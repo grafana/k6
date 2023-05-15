@@ -1,7 +1,9 @@
 package cloud
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -10,11 +12,14 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
+	"gopkg.in/guregu/null.v3"
 )
 
 func TestNewOutputNameResolution(t *testing.T) {
@@ -147,3 +152,157 @@ func TestOutputStartVersionError(t *testing.T) {
 	err = o.startVersionedOutput()
 	require.ErrorContains(t, err, "v3 is an unexpected version")
 }
+
+func TestOutputStartWithReferenceID(t *testing.T) {
+	t.Parallel()
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		// no calls are expected to the cloud service when
+		// the reference ID is passed
+		t.Error("got unexpected call")
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	defer ts.Close()
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST":        ts.URL,
+			"K6_CLOUD_PUSH_REF_ID": "my-passed-id",
+		},
+		ScriptOptions: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+	})
+	require.NoError(t, err)
+	require.NoError(t, out.Start())
+	require.NoError(t, out.Stop())
+}
+
+func TestCloudOutputDescription(t *testing.T) {
+	t.Parallel()
+
+	t.Run("WithTestRunDetails", func(t *testing.T) {
+		t.Parallel()
+		o := Output{referenceID: "74"}
+		o.config.TestRunDetails = null.StringFrom("my-custom-string")
+		assert.Equal(t, "cloud (my-custom-string)", o.Description())
+	})
+	t.Run("WithWebAppURL", func(t *testing.T) {
+		t.Parallel()
+		o := Output{referenceID: "74"}
+		o.config.WebAppURL = null.StringFrom("mywebappurl.com")
+		assert.Equal(t, "cloud (mywebappurl.com/runs/74)", o.Description())
+	})
+}
+
+func TestOutputStopWithTestError(t *testing.T) {
+	t.Parallel()
+
+	done := make(chan struct{}, 1)
+	defer close(done)
+
+	handler := func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/v1/tests/test-ref-id-1234":
+			b, err := io.ReadAll(r.Body)
+			require.NoError(t, err)
+
+			// aborted by system status
+			expB := `{"result_status":0, "run_status":6, "thresholds":{}}`
+			require.JSONEq(t, expB, string(b))
+
+			done <- struct{}{}
+			w.WriteHeader(http.StatusOK)
+		default:
+			http.Error(w, "not expected path", http.StatusInternalServerError)
+		}
+	}
+	ts := httptest.NewServer(http.HandlerFunc(handler))
+	defer ts.Close()
+
+	out, err := newOutput(output.Params{
+		Logger: testutils.NewLogger(t),
+		Environment: map[string]string{
+			"K6_CLOUD_HOST": ts.URL,
+		},
+		ScriptOptions: lib.Options{
+			SystemTags: &metrics.DefaultSystemTagSet,
+		},
+		ScriptPath: &url.URL{Path: "/script.js"},
+	})
+	require.NoError(t, err)
+
+	out.referenceID = "test-ref-id-1234"
+	out.versionedOutput = versionedOutputMock{
+		callback: func() {}, // noop
+	}
+
+	fakeErr := errors.New("this is my error")
+	require.NoError(t, out.StopWithTestError(fakeErr))
+
+	select {
+	case <-time.After(1 * time.Second):
+		t.Error("timed out")
+	case <-done:
+		return
+	}
+}
+
+func TestOutputGetStatusRun(t *testing.T) {
+	t.Parallel()
+
+	t.Run("Success", func(t *testing.T) {
+		t.Parallel()
+		o := Output{}
+		assert.Equal(t, cloudapi.RunStatusFinished, o.getRunStatus(nil))
+	})
+	t.Run("WithErrorNoAbortReason", func(t *testing.T) {
+		t.Parallel()
+		o := Output{logger: testutils.NewLogger(t)}
+		assert.Equal(t, cloudapi.RunStatusAbortedSystem, o.getRunStatus(errors.New("my-error")))
+	})
+	t.Run("WithAbortReason", func(t *testing.T) {
+		t.Parallel()
+		o := Output{}
+		errWithReason := errext.WithAbortReasonIfNone(
+			errors.New("my-original-error"),
+			errext.AbortedByOutput,
+		)
+		assert.Equal(t, cloudapi.RunStatusAbortedSystem, o.getRunStatus(errWithReason))
+	})
+}
+
+func TestOutputProxyAddMetricsSamples(t *testing.T) {
+	t.Parallel()
+
+	called := false
+	o := &Output{
+		versionedOutput: versionedOutputMock{
+			callback: func() {
+				called = true
+			},
+		},
+	}
+	o.AddMetricSamples([]metrics.SampleContainer{})
+	assert.True(t, called)
+}
+
+type versionedOutputMock struct {
+	callback func()
+}
+
+func (o versionedOutputMock) Start() error {
+	o.callback()
+	return nil
+}
+
+func (o versionedOutputMock) StopWithTestError(testRunErr error) error {
+	o.callback()
+	return nil
+}
+
+func (o versionedOutputMock) SetTestRunStopCallback(_ func(error))               { o.callback() }
+func (o versionedOutputMock) SetReferenceID(id string)                           { o.callback() }
+func (o versionedOutputMock) AddMetricSamples(samples []metrics.SampleContainer) { o.callback() }
