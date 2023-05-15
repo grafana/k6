@@ -44,10 +44,10 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 
 	vu.MoveToVUContext()
 
-	require.NoError(t, rt.Set("chromium", jsMod.Chromium))
+	require.NoError(t, rt.Set("browser", jsMod.Browser))
 	_, err := rt.RunString(`
-		const b = chromium.launch();
-		b.close();
+		const p = browser.newPage();
+		p.close();
 	`)
 	require.NoError(t, err)
 

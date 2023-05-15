@@ -24,9 +24,9 @@ type (
 
 	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
-		Chromium *goja.Object
-		Devices  map[string]common.Device
-		Version  string
+		Browser *goja.Object
+		Devices map[string]common.Device
+		Version string
 	}
 
 	// ModuleInstance represents an instance of the JS module.
@@ -67,7 +67,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 
 	return &ModuleInstance{
 		mod: &JSModule{
-			Chromium: mapBrowserToGoja(moduleVU{
+			Browser: mapBrowserToGoja(moduleVU{
 				VU:             vu,
 				pidRegistry:    m.PidRegistry,
 				remoteRegistry: m.remoteRegistry,

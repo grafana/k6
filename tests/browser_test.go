@@ -151,10 +151,10 @@ func TestBrowserCrashErr(t *testing.T) {
 	vu.MoveToVUContext()
 	t.Setenv("K6_BROWSER_ARGS", "remote-debugging-port=99999")
 
-	require.NoError(t, rt.Set("chromium", jsMod.Chromium))
+	require.NoError(t, rt.Set("browser", jsMod.Browser))
 	_, err := rt.RunString(`
-		const b = chromium.launch();
-		b.close();
+		const p = browser.newPage();
+		p.close();
 	`)
 	assert.ErrorContains(t, err, "launching browser: Invalid devtools server port")
 }

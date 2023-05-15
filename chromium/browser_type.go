@@ -27,9 +27,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure BrowserType implements the api.BrowserType interface.
-var _ api.BrowserType = &BrowserType{}
-
 // BrowserType provides methods to launch a Chrome browser instance or connect to an existing one.
 // It's the entry point for interacting with the browser.
 type BrowserType struct {
@@ -46,7 +43,7 @@ type BrowserType struct {
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
 // the goja runtime, and returns a new Chrome browser type.
-func NewBrowserType(vu k6modules.VU) api.BrowserType {
+func NewBrowserType(vu k6modules.VU) *BrowserType {
 	// NOTE: vu.InitEnv() *must* be called from the script init scope,
 	// otherwise it will return nil.
 	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)

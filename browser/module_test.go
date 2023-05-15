@@ -31,6 +31,6 @@ func TestModuleNew(t *testing.T) {
 	m, ok := New().NewModuleInstance(vu).(*ModuleInstance)
 	require.True(t, ok, "NewModuleInstance should return a ModuleInstance")
 	require.NotNil(t, m.mod, "Module should be set")
-	require.NotNil(t, m.mod.Chromium, "Chromium should be set")
+	require.NotNil(t, m.mod.Browser, "Browser should be set")
 	require.NotNil(t, m.mod.Devices, "Devices should be set")
 }

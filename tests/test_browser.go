@@ -38,7 +38,7 @@ type testBrowser struct {
 	pid   int // the browser process ID
 	wsURL string
 
-	browserType api.BrowserType
+	browserType *chromium.BrowserType
 
 	api.Browser
 
@@ -90,11 +90,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	k6m := k6ext.RegisterCustomMetrics(registry)
 	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
 
-	v := chromium.NewBrowserType(vu)
-	bt, ok := v.(*chromium.BrowserType)
-	if !ok {
-		tb.Fatalf("testBrowser: unexpected browser type %T", v)
-	}
+	bt := chromium.NewBrowserType(vu)
 	vu.MoveToVUContext()
 	// enable the HTTP test server only when necessary
 	var (

@@ -117,16 +117,10 @@ func TestMappings(t *testing.T) {
 	}
 
 	for name, tt := range map[string]test{
-		"browserType": {
-			apiInterface: (*api.BrowserType)(nil),
-			mapp: func() mapping {
-				return mapBrowserType(moduleVU{VU: vu}, &chromium.BrowserType{}, "", false)
-			},
-		},
 		"browser": {
 			apiInterface: (*api.Browser)(nil),
 			mapp: func() mapping {
-				return mapBrowser(moduleVU{VU: vu}, &chromium.Browser{})
+				return mapBrowser(moduleVU{VU: vu}, &chromium.Browser{}, "", false)
 			},
 		},
 		"browserContext": {
