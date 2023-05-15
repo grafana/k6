@@ -17,7 +17,7 @@ export const options = {
     },
   },
   thresholds: {
-    webvital_first_contentful_paint: ['max < 1000'],
+    browser_web_vital_fcp: ['max < 1000'],
     checks: ["rate==1.0"]
   }
 }

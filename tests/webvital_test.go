@@ -20,16 +20,16 @@ func TestWebVitalMetric(t *testing.T) {
 		browser  = newTestBrowser(t, withFileServer(), withSamplesListener(samples))
 		page     = browser.NewPage(nil)
 		expected = map[string]bool{
-			"webvital_time_to_first_byte":           false,
-			"webvital_time_to_first_byte_good":      false,
-			"webvital_first_contentful_paint":       false,
-			"webvital_first_contentful_paint_good":  false,
-			"webvital_largest_content_paint":        false,
-			"webvital_largest_content_paint_good":   false,
-			"webvital_first_input_delay":            false,
-			"webvital_first_input_delay_good":       false,
-			"webvital_cumulative_layout_shift":      false,
-			"webvital_cumulative_layout_shift_good": false,
+			"browser_web_vital_ttfb":      false,
+			"browser_web_vital_ttfb_good": false,
+			"browser_web_vital_fcp":       false,
+			"browser_web_vital_fcp_good":  false,
+			"browser_web_vital_lcp":       false,
+			"browser_web_vital_lcp_good":  false,
+			"browser_web_vital_fid":       false,
+			"browser_web_vital_fid_good":  false,
+			"browser_web_vital_cls":       false,
+			"browser_web_vital_cls_good":  false,
 		}
 	)
 
