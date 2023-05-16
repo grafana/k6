@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
+	cloudv2 "go.k6.io/k6/output/cloud/expv2"
 	cloudv1 "go.k6.io/k6/output/cloud/v1"
 	"gopkg.in/guregu/null.v3"
 )
@@ -152,6 +153,24 @@ func TestOutputStartVersionError(t *testing.T) {
 	o.referenceID = "123"
 	err = o.startVersionedOutput()
 	require.ErrorContains(t, err, "v99 is an unexpected version")
+}
+
+func TestOutputStartVersionedOutputV2(t *testing.T) {
+	t.Parallel()
+
+	o := Output{
+		logger:      testutils.NewLogger(t),
+		referenceID: "123",
+		config: cloudapi.Config{
+			APIVersion: null.IntFrom(2),
+		},
+	}
+
+	err := o.startVersionedOutput()
+	require.NoError(t, err)
+
+	_, ok := o.versionedOutput.(*cloudv2.Output)
+	assert.True(t, ok)
 }
 
 func TestOutputStartVersionedOutputV1(t *testing.T) {
