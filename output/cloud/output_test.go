@@ -220,8 +220,7 @@ func TestCloudOutputDescription(t *testing.T) {
 func TestOutputStopWithTestError(t *testing.T) {
 	t.Parallel()
 
-	done := make(chan struct{}, 1)
-	defer close(done)
+	done := make(chan struct{})
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
@@ -234,7 +233,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 			require.JSONEq(t, expB, string(b))
 
 			w.WriteHeader(http.StatusOK)
-			done <- struct{}{}
+			close(done)
 		default:
 			http.Error(w, "not expected path", http.StatusInternalServerError)
 		}
@@ -272,7 +271,6 @@ func TestOutputStopWithTestError(t *testing.T) {
 	case <-time.After(1 * time.Second):
 		t.Error("timed out")
 	case <-done:
-		return
 	}
 }
 
