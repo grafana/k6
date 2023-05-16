@@ -13,6 +13,13 @@ const (
 	webVitalCLS  = "CLS"
 	webVitalINP  = "INP"
 	webVitalFCP  = "FCP"
+
+	fidName  = "browser_web_vital_fid"
+	ttfbName = "browser_web_vital_ttfb"
+	lcpName  = "browser_web_vital_lcp"
+	clsName  = "browser_web_vital_cls"
+	inpName  = "browser_web_vital_inp"
+	fcpName  = "browser_web_vital_fcp"
 )
 
 // CustomMetrics are the custom k6 metrics used by xk6-browser.
@@ -24,12 +31,12 @@ type CustomMetrics struct {
 // VU Registry and returns our internal struct pointer.
 func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 	wvs := map[string]string{
-		webVitalFID:  "browser_web_vital_fid",  // first input delay
-		webVitalTTFB: "browser_web_vital_ttfb", // time to first byte
-		webVitalLCP:  "browser_web_vital_lcp",  // largest content paint
-		webVitalCLS:  "browser_web_vital_cls",  // cumulative layout shift
-		webVitalINP:  "browser_web_vital_inp",  // interaction to next paint
-		webVitalFCP:  "browser_web_vital_fcp",  // first contentful paint
+		webVitalFID:  fidName,  // first input delay
+		webVitalTTFB: ttfbName, // time to first byte
+		webVitalLCP:  lcpName,  // largest content paint
+		webVitalCLS:  clsName,  // cumulative layout shift
+		webVitalINP:  inpName,  // interaction to next paint
+		webVitalFCP:  fcpName,  // first contentful paint
 	}
 	webVitals := make(map[string]*k6metrics.Metric)
 
