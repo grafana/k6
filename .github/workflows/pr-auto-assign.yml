@@ -8,7 +8,7 @@ permissions:
 
 jobs:
   add-reviews:
-    if: ${{ join(github.event.pull_request.requested_reviewers.*.login, ',') == '' && github.event.pull_request.draft != "True" }}
+    if: ${{ join(github.event.pull_request.requested_reviewers.*.login, ',') == '' && github.event.pull_request.draft == false }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/github-script@v6
