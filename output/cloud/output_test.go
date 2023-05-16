@@ -213,8 +213,8 @@ func TestOutputStopWithTestError(t *testing.T) {
 			expB := `{"result_status":0, "run_status":6, "thresholds":{}}`
 			require.JSONEq(t, expB, string(b))
 
-			done <- struct{}{}
 			w.WriteHeader(http.StatusOK)
+			done <- struct{}{}
 		default:
 			http.Error(w, "not expected path", http.StatusInternalServerError)
 		}
@@ -234,13 +234,19 @@ func TestOutputStopWithTestError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	calledStopFn := false
 	out.referenceID = "test-ref-id-1234"
 	out.versionedOutput = versionedOutputMock{
-		callback: func() {}, // noop
+		callback: func(fn string) {
+			if fn == "StopWithTestError" {
+				calledStopFn = true
+			}
+		},
 	}
 
 	fakeErr := errors.New("this is my error")
 	require.NoError(t, out.StopWithTestError(fakeErr))
+	assert.True(t, calledStopFn)
 
 	select {
 	case <-time.After(1 * time.Second):
@@ -274,13 +280,16 @@ func TestOutputGetStatusRun(t *testing.T) {
 	})
 }
 
-func TestOutputProxyAddMetricsSamples(t *testing.T) {
+func TestOutputProxyAddMetricSamples(t *testing.T) {
 	t.Parallel()
 
 	called := false
 	o := &Output{
 		versionedOutput: versionedOutputMock{
-			callback: func() {
+			callback: func(fn string) {
+				if fn != "AddMetricSamples" {
+					return
+				}
 				called = true
 			},
 		},
@@ -290,19 +299,27 @@ func TestOutputProxyAddMetricsSamples(t *testing.T) {
 }
 
 type versionedOutputMock struct {
-	callback func()
+	callback func(name string)
 }
 
 func (o versionedOutputMock) Start() error {
-	o.callback()
+	o.callback("Start")
 	return nil
 }
 
 func (o versionedOutputMock) StopWithTestError(testRunErr error) error {
-	o.callback()
+	o.callback("StopWithTestError")
 	return nil
 }
 
-func (o versionedOutputMock) SetTestRunStopCallback(_ func(error))               { o.callback() }
-func (o versionedOutputMock) SetReferenceID(id string)                           { o.callback() }
-func (o versionedOutputMock) AddMetricSamples(samples []metrics.SampleContainer) { o.callback() }
+func (o versionedOutputMock) SetTestRunStopCallback(_ func(error)) {
+	o.callback("SetTestRunStopCallback")
+}
+
+func (o versionedOutputMock) SetReferenceID(id string) {
+	o.callback("SetReferenceID")
+}
+
+func (o versionedOutputMock) AddMetricSamples(samples []metrics.SampleContainer) {
+	o.callback("AddMetricSamples")
+}
