@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
+	cloudv1 "go.k6.io/k6/output/cloud/v1"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -151,6 +152,25 @@ func TestOutputStartVersionError(t *testing.T) {
 	o.referenceID = "123"
 	err = o.startVersionedOutput()
 	require.ErrorContains(t, err, "v99 is an unexpected version")
+}
+
+func TestOutputStartVersionedOutputV1(t *testing.T) {
+	t.Parallel()
+
+	o := Output{
+		referenceID: "123",
+		config: cloudapi.Config{
+			APIVersion: null.IntFrom(1),
+			// Here, we are mostly silencing the flushing op
+			MetricPushInterval: types.NullDurationFrom(1 * time.Hour),
+		},
+	}
+
+	err := o.startVersionedOutput()
+	require.NoError(t, err)
+
+	_, ok := o.versionedOutput.(*cloudv1.Output)
+	assert.True(t, ok)
 }
 
 func TestOutputStartWithReferenceID(t *testing.T) {
