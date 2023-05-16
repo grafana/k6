@@ -142,7 +142,7 @@ func TestOutputStartVersionError(t *testing.T) {
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Environment: map[string]string{
-			"K6_CLOUD_API_VERSION": "3",
+			"K6_CLOUD_API_VERSION": "99",
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
@@ -150,7 +150,7 @@ func TestOutputStartVersionError(t *testing.T) {
 
 	o.referenceID = "123"
 	err = o.startVersionedOutput()
-	require.ErrorContains(t, err, "v3 is an unexpected version")
+	require.ErrorContains(t, err, "v99 is an unexpected version")
 }
 
 func TestOutputStartWithReferenceID(t *testing.T) {
