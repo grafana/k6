@@ -39,6 +39,14 @@ type versionedOutput interface {
 	AddMetricSamples(samples []metrics.SampleContainer)
 }
 
+type apiVersion int64
+
+const (
+	apiVersionUndefined apiVersion = iota
+	apiVersion1
+	// apiVersion2 // TODO: add version 2
+)
+
 // Output sends result data to the k6 Cloud service.
 type Output struct {
 	versionedOutput
@@ -159,12 +167,11 @@ func (out *Output) Start() error {
 			thresholds[name] = append(thresholds[name], threshold.Source)
 		}
 	}
-	maxVUs := lib.GetMaxPossibleVUs(out.executionPlan)
 
 	testRun := &cloudapi.TestRun{
 		Name:       out.config.Name.String,
 		ProjectID:  out.config.ProjectID.Int64,
-		VUsMax:     int64(maxVUs),
+		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)),
 		Thresholds: thresholds,
 		Duration:   out.duration,
 	}
@@ -323,9 +330,14 @@ func (out *Output) startVersionedOutput() error {
 	if out.referenceID == "" {
 		return errors.New("ReferenceID is required")
 	}
-
 	var err error
-	out.versionedOutput, err = cloudv1.New(out.logger, out.config, out.client)
+	switch out.config.APIVersion.Int64 {
+	case int64(apiVersion1):
+		out.versionedOutput, err = cloudv1.New(out.logger, out.config, out.client)
+	default:
+		err = fmt.Errorf("v%d is an unexpected version", out.config.APIVersion.Int64)
+	}
+
 	if err != nil {
 		return err
 	}
