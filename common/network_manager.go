@@ -34,14 +34,15 @@ var _ EventEmitter = &NetworkManager{}
 type NetworkManager struct {
 	BaseEventEmitter
 
-	ctx          context.Context
-	logger       *log.Logger
-	session      session
-	parent       *NetworkManager
-	frameManager *FrameManager
-	credentials  *Credentials
-	resolver     k6netext.Resolver
-	vu           k6modules.VU
+	ctx           context.Context
+	logger        *log.Logger
+	session       session
+	parent        *NetworkManager
+	frameManager  *FrameManager
+	credentials   *Credentials
+	resolver      k6netext.Resolver
+	vu            k6modules.VU
+	customMetrics *k6ext.CustomMetrics
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
@@ -59,7 +60,7 @@ type NetworkManager struct {
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
-	ctx context.Context, s session, fm *FrameManager, parent *NetworkManager,
+	ctx context.Context, customMetrics *k6ext.CustomMetrics, s session, fm *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
 	vu := k6ext.GetVU(ctx)
 	state := vu.State()
@@ -80,6 +81,7 @@ func NewNetworkManager(
 		frameManager:     fm,
 		resolver:         resolver,
 		vu:               vu,
+		customMetrics:    customMetrics,
 		reqIDToRequest:   make(map[network.RequestID]*Request),
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),

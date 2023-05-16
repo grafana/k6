@@ -76,6 +76,8 @@ func NewFrameSession(
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
+	k6Metrics := k6ext.GetCustomMetrics(ctx)
+
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              s,
@@ -89,7 +91,7 @@ func NewFrameSession(
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		vu:                   k6ext.GetVU(ctx),
-		k6Metrics:            k6ext.GetCustomMetrics(ctx),
+		k6Metrics:            k6Metrics,
 		logger:               l,
 		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
@@ -98,7 +100,7 @@ func NewFrameSession(
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
 	}
-	fs.networkManager, err = NewNetworkManager(ctx, s, fs.manager, parentNM)
+	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM)
 	if err != nil {
 		l.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
 			s.ID(), tid, err)
