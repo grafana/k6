@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -18,7 +19,7 @@ func TestBrowserTypeConnect(t *testing.T) {
 	bt := chromium.NewBrowserType(vu)
 	vu.MoveToVUContext()
 
-	b, err := bt.Connect(tb.wsURL)
+	b, err := bt.Connect(context.Background(), tb.wsURL)
 	require.NoError(t, err)
 	_, err = b.NewPage(nil)
 	require.NoError(t, err)
