@@ -16,7 +16,7 @@
 // of unary/streaming requests/responses.
 syntax = "proto3";
 
-option go_package = "google.golang.org/grpc/test/grpc_testing";
+option go_package = "./grpc_testing";
 
 package grpc.testing;
 
@@ -70,7 +70,7 @@ message SimpleResponse {
   // The user the request came from, for verifying authentication was
   // successful when the client expected it.
   string username = 2;
-  
+
   // OAuth scope.
   string oauth_scope = 3;
 }

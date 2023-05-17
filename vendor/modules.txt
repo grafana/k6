@@ -396,7 +396,6 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-google.golang.org/grpc/test/grpc_testing
 # google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
