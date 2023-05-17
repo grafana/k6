@@ -158,7 +158,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
-				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataSent, Tags: tags},
+				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataSent, Tags: tags},
 				Value:      float64(req.Size().Total()),
 				Time:       req.wallTime,
 			},

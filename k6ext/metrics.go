@@ -20,11 +20,15 @@ const (
 	clsName  = "browser_web_vital_cls"
 	inpName  = "browser_web_vital_inp"
 	fcpName  = "browser_web_vital_fcp"
+
+	browserDataSentName = "browser_data_sent"
 )
 
 // CustomMetrics are the custom k6 metrics used by xk6-browser.
 type CustomMetrics struct {
 	WebVitals map[string]*k6metrics.Metric
+
+	BrowserDataSent *k6metrics.Metric
 }
 
 // RegisterCustomMetrics creates and registers our custom metrics with the k6
@@ -59,7 +63,8 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 	}
 
 	return &CustomMetrics{
-		WebVitals: webVitals,
+		WebVitals:       webVitals,
+		BrowserDataSent: registry.MustNewMetric(browserDataSentName, k6metrics.Counter, k6metrics.Data),
 	}
 }
 

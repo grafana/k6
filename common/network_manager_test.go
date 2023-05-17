@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 	"github.com/grafana/xk6-browser/log"
 
@@ -260,9 +261,12 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
+			registry := k6metrics.NewRegistry()
+			k6m := k6ext.RegisterCustomMetrics(registry)
+
 			var (
 				vu = k6test.NewVU(t)
-				nm = &NetworkManager{ctx: vu.Context(), vu: vu}
+				nm = &NetworkManager{ctx: vu.Context(), vu: vu, customMetrics: k6m}
 			)
 			vu.MoveToVUContext()
 
