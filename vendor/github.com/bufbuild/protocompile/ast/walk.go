@@ -240,26 +240,14 @@ func VisitChildren(n CompositeNode, v Visitor) error {
 // the runtime type of the argument.
 //
 // It consists of a number of functions, each of which matches a
-// concrete Node type. It also includes functions for sub-interfaces
-// of Node and the Node interface itself, to be used as broader
-// "catch all" functions.
+// concrete Node type.
 //
-// To use a visitor, provide a function for the node types of
-// interest and pass visitor.Visit as the function to a Walk operation.
-// When a node is traversed, the corresponding function field of
-// the visitor is invoked, if not nil. If the function for a node's
-// concrete type is nil/absent but the function for an interface it
-// implements is present, that interface visit function will be used
-// instead. If no matching function is present, the traversal will
-// continue. If a matching function is present, it will be invoked
-// and its response determines how the traversal proceeds.
+// Most visitor implementations will either embed NoOpVisitor (so as
+// not to have to implement *all* of the methods) or will be instances
+// of SimpleVisitor.
 //
-// Every visit function returns (bool, *Visitor). If the bool returned
-// is false, the visited node's descendants are skipped. Otherwise,
-// traversal will continue into the node's children. If the returned
-// visitor is nil, the current visitor will continue to be used. But
-// if a non-nil visitor is returned, it will be used to visit the
-// node's children.
+// Visitors can be supplied to a Walk operation or passed to a call
+// to Visit or VisitChildren.
 type Visitor interface {
 	// VisitFileNode is invoked when visiting a *FileNode in the AST.
 	VisitFileNode(*FileNode) error
@@ -513,7 +501,7 @@ func (n NoOpVisitor) VisitEmptyDeclNode(_ *EmptyDeclNode) error {
 // Visit* method of the Visitor interface), it also has function fields that
 // accept interface types. So a visitor can, for example, easily treat all
 // ValueNodes uniformly by providing a non-nil value for DoVisitValueNode
-// instead of having to supply values for the various Do*Node methods
+// instead of having to supply values for the various DoVisit*Node methods
 // corresponding to all types that implement ValueNode.
 //
 // The most specific function provided that matches a given node is the one that
@@ -527,9 +515,10 @@ func (n NoOpVisitor) VisitEmptyDeclNode(_ *EmptyDeclNode) error {
 // In this case, the DoVisitIntValueNode function is considered more specific
 // than DoVisitFloatValueNode, so will be preferred if present.
 //
-// Similarly, *MapFieldNode implements both FieldDeclNode and MessageDeclNode.
-// In this case, the DoVisitFieldDeclNode function is considered more specific
-// than DoVisitMessageDeclNode, so will be preferred if present.
+// Similarly, *MapFieldNode and *GroupNode implement both FieldDeclNode and
+// MessageDeclNode. In this case, the DoVisitFieldDeclNode function is
+// treated as more specific than DoVisitMessageDeclNode, so will be preferred
+// if both are present.
 type SimpleVisitor struct {
 	DoVisitFileNode                  func(*FileNode) error
 	DoVisitSyntaxNode                func(*SyntaxNode) error
@@ -593,8 +582,8 @@ func (b *SimpleVisitor) visitInterface(node Node) error {
 		if b.DoVisitFieldDeclNode != nil {
 			return b.DoVisitFieldDeclNode(n)
 		}
-		// *MapFieldNode implements both FieldDeclNode and MessageDeclNode,
-		// so handle other case here
+		// *MapFieldNode and *GroupNode both implement both FieldDeclNode and
+		// MessageDeclNode, so handle other case here
 		if fn, ok := n.(MessageDeclNode); ok && b.DoVisitMessageDeclNode != nil {
 			return b.DoVisitMessageDeclNode(fn)
 		}

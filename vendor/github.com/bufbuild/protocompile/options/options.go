@@ -64,6 +64,7 @@ type file interface {
 	parser.Result
 	ResolveEnumType(protoreflect.FullName) protoreflect.EnumDescriptor
 	ResolveMessageType(protoreflect.FullName) protoreflect.MessageDescriptor
+	ResolveOptionsType(protoreflect.FullName) protoreflect.MessageDescriptor
 	ResolveExtension(protoreflect.FullName) protoreflect.ExtensionTypeDescriptor
 	ResolveMessageLiteralExtensionName(ast.IdentValueNode) string
 }
@@ -77,6 +78,10 @@ func (n noResolveFile) ResolveEnumType(name protoreflect.FullName) protoreflect.
 }
 
 func (n noResolveFile) ResolveMessageType(name protoreflect.FullName) protoreflect.MessageDescriptor {
+	return nil
+}
+
+func (n noResolveFile) ResolveOptionsType(name protoreflect.FullName) protoreflect.MessageDescriptor {
 	return nil
 }
 
@@ -344,11 +349,11 @@ func (interp *interpreter) processDefaultOption(scope string, fqn string, fld *d
 	var v interface{}
 	if fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_ENUM {
 		ed := interp.file.ResolveEnumType(protoreflect.FullName(fld.GetTypeName()))
-		ev, err := interp.enumFieldValue(mc, ed, val)
+		_, name, err := interp.enumFieldValue(mc, ed, val, false)
 		if err != nil {
 			return -1, interp.reporter.HandleError(err)
 		}
-		v = string(ev.Name())
+		v = string(name)
 	} else {
 		v, err = interp.scalarFieldValue(mc, fld.GetType(), val, false)
 		if err != nil {
@@ -684,7 +689,7 @@ func (interp *interpreter) interpretOptions(fqn string, element, opts proto.Mess
 	optsFqn := string(optsDesc.FullName())
 	var msg protoreflect.Message
 	// see if the parse included an override copy for these options
-	if md := interp.file.ResolveMessageType(protoreflect.FullName(optsFqn)); md != nil {
+	if md := interp.file.ResolveOptionsType(protoreflect.FullName(optsFqn)); md != nil {
 		dm := dynamicpb.NewMessage(md)
 		if err := cloneInto(dm, opts, nil); err != nil {
 			node := interp.file.Node(element)
@@ -779,6 +784,9 @@ func (interp *interpreter) interpretOptions(fqn string, element, opts proto.Mess
 	return nil, nil
 }
 
+// isKnownField returns true if the given option is for a known field of the
+// given options message descriptor and will be serialized using the expected
+// wire type for that known field.
 func isKnownField(desc protoreflect.MessageDescriptor, opt *interpretedOption) bool {
 	var num int32
 	if len(opt.pathPrefix) > 0 {
@@ -786,7 +794,56 @@ func isKnownField(desc protoreflect.MessageDescriptor, opt *interpretedOption) b
 	} else {
 		num = opt.number
 	}
-	return desc.Fields().ByNumber(protoreflect.FieldNumber(num)) != nil
+	fd := desc.Fields().ByNumber(protoreflect.FieldNumber(num))
+	if fd == nil {
+		return false
+	}
+
+	// Before the full wire type check, we do a quick check that will usually pass
+	// and allow us to short-circuit the logic below.
+	if fd.IsList() == opt.repeated && fd.Kind() == opt.kind {
+		return true
+	}
+
+	// We figure out the wire type this interpreted field will use when serialized.
+	var wireType protowire.Type
+	switch {
+	case len(opt.pathPrefix) > 0:
+		// If path prefix exists, this field is nested inside a message.
+		// And messages use bytes wire type.
+		wireType = protowire.BytesType
+	case opt.repeated && opt.packed && canPack(opt.kind):
+		// Packed repeated numeric scalars use bytes wire type.
+		wireType = protowire.BytesType
+	default:
+		wireType = wireTypeForKind(opt.kind)
+	}
+
+	// And then we see if the wire type we just determined is compatible with
+	// the field descriptor we found.
+	if fd.IsList() && canPack(fd.Kind()) && wireType == protowire.BytesType {
+		// Even if fd.IsPacked() is false, bytes type is still accepted for
+		// repeated scalar numerics, so that changing a repeated field from
+		// packed to not-packed (or vice versa) is a compatible change.
+		return true
+	}
+	return wireType == wireTypeForKind(fd.Kind())
+}
+
+func wireTypeForKind(kind protoreflect.Kind) protowire.Type {
+	switch kind {
+	case protoreflect.StringKind, protoreflect.BytesKind, protoreflect.MessageKind:
+		return protowire.BytesType
+	case protoreflect.GroupKind:
+		return protowire.StartGroupType
+	case protoreflect.Fixed32Kind, protoreflect.Sfixed32Kind, protoreflect.FloatKind:
+		return protowire.Fixed32Type
+	case protoreflect.Fixed64Kind, protoreflect.Sfixed64Kind, protoreflect.DoubleKind:
+		return protowire.Fixed64Type
+	default:
+		// everything else uses varint
+		return protowire.VarintType
+	}
 }
 
 func cloneInto(dest proto.Message, src proto.Message, res linker.Resolver) error {
@@ -1191,11 +1248,11 @@ func (interp *interpreter) fieldValue(mc *internal.MessageContext, fld protorefl
 	k := fld.Kind()
 	switch k {
 	case protoreflect.EnumKind:
-		evd, err := interp.enumFieldValue(mc, fld.Enum(), val)
+		num, _, err := interp.enumFieldValue(mc, fld.Enum(), val, insideMsgLiteral)
 		if err != nil {
 			return interpretedFieldValue{}, err
 		}
-		return interpretedFieldValue{val: protoreflect.ValueOfEnum(evd.Number())}, nil
+		return interpretedFieldValue{val: protoreflect.ValueOfEnum(num)}, nil
 
 	case protoreflect.MessageKind, protoreflect.GroupKind:
 		v := val.Value()
@@ -1216,16 +1273,45 @@ func (interp *interpreter) fieldValue(mc *internal.MessageContext, fld protorefl
 
 // enumFieldValue resolves the given AST node val as an enum value descriptor. If the given
 // value is not a valid identifier, an error is returned instead.
-func (interp *interpreter) enumFieldValue(mc *internal.MessageContext, ed protoreflect.EnumDescriptor, val ast.ValueNode) (protoreflect.EnumValueDescriptor, error) {
+func (interp *interpreter) enumFieldValue(mc *internal.MessageContext, ed protoreflect.EnumDescriptor, val ast.ValueNode, allowNumber bool) (protoreflect.EnumNumber, protoreflect.Name, error) {
 	v := val.Value()
-	if id, ok := v.(ast.Identifier); ok {
-		ev := ed.Values().ByName(protoreflect.Name(id))
+	var num protoreflect.EnumNumber
+	switch v := v.(type) {
+	case ast.Identifier:
+		name := protoreflect.Name(v)
+		ev := ed.Values().ByName(name)
 		if ev == nil {
-			return nil, reporter.Errorf(interp.nodeInfo(val).Start(), "%venum %s has no value named %s", mc, ed.FullName(), id)
+			return 0, "", reporter.Errorf(interp.nodeInfo(val).Start(), "%venum %s has no value named %s", mc, ed.FullName(), v)
 		}
-		return ev, nil
+		return ev.Number(), name, nil
+	case int64:
+		if !allowNumber {
+			return 0, "", reporter.Errorf(interp.nodeInfo(val).Start(), "%vexpecting enum name, got %s", mc, valueKind(v))
+		}
+		if v > math.MaxInt32 || v < math.MinInt32 {
+			return 0, "", reporter.Errorf(interp.nodeInfo(val).Start(), "%vvalue %d is out of range for an enum", mc, v)
+		}
+		num = protoreflect.EnumNumber(v)
+	case uint64:
+		if !allowNumber {
+			return 0, "", reporter.Errorf(interp.nodeInfo(val).Start(), "%vexpecting enum name, got %s", mc, valueKind(v))
+		}
+		if v > math.MaxInt32 {
+			return 0, "", reporter.Errorf(interp.nodeInfo(val).Start(), "%vvalue %d is out of range for an enum", mc, v)
+		}
+		num = protoreflect.EnumNumber(v)
+	default:
+		return 0, "", reporter.Errorf(interp.nodeInfo(val).Start(), "%vexpecting enum, got %s", mc, valueKind(v))
 	}
-	return nil, reporter.Errorf(interp.nodeInfo(val).Start(), "%vexpecting enum, got %s", mc, valueKind(v))
+	ev := ed.Values().ByNumber(num)
+	if ev != nil {
+		return num, ev.Name(), nil
+	}
+	if ed.Syntax() != protoreflect.Proto3 {
+		return 0, "", reporter.Errorf(interp.nodeInfo(val).Start(), "%vclosed enum %s has no value with number %d", mc, ed.FullName(), num)
+	}
+	// unknown value, but enum is open, so we allow it and return blank name
+	return num, "", nil
 }
 
 // scalarFieldValue resolves the given AST node val as a value whose type is assignable to a

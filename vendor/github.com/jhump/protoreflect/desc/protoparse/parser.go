@@ -12,11 +12,13 @@ import (
 
 	"github.com/bufbuild/protocompile"
 	ast2 "github.com/bufbuild/protocompile/ast"
+	"github.com/bufbuild/protocompile/linker"
 	"github.com/bufbuild/protocompile/options"
 	"github.com/bufbuild/protocompile/parser"
 	"github.com/bufbuild/protocompile/protoutil"
 	"github.com/bufbuild/protocompile/reporter"
 	"github.com/bufbuild/protocompile/sourceinfo"
+	"github.com/bufbuild/protocompile/walk"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
@@ -160,7 +162,7 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 			if !ok {
 				return protocompile.SearchResult{}, os.ErrNotExist
 			}
-			return protocompile.SearchResult{ParseResult: res}, nil
+			return protocompile.SearchResult{ParseResult: noCloneParseResult{res}}, nil
 		})
 		res = protocompile.CompositeResolver{resolverFromResults, res}
 	}
@@ -177,10 +179,26 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	fds := make([]protoreflect.FileDescriptor, len(results))
-	for i := range results {
+	for i, res := range results {
+		if linkRes, ok := res.(linker.Result); ok {
+			removeDynamicExtensions(linkRes.FileDescriptorProto())
+		}
 		fds[i] = results[i]
 	}
 	return desc.WrapFiles(fds)
+}
+
+type noCloneParseResult struct {
+	parser.Result
+}
+
+func (r noCloneParseResult) Clone() parser.Result {
+	// protocompile will clone parser.Result to make sure it can't be shared
+	// with other compilation operations (which would not be thread-safe).
+	// However, this parse result cannot be shared with another compile
+	// operation. That means the clone is unnecessary; so we skip it, to avoid
+	// the associated performance costs.
+	return r.Result
 }
 
 // ParseFilesButDoNotLink parses the named files into descriptor protos. The
@@ -243,6 +261,7 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.Fil
 			if err != nil {
 				return nil, err
 			}
+			removeDynamicExtensions(protos[i])
 		}
 		if p.IncludeSourceCodeInfo {
 			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex)
@@ -576,4 +595,86 @@ func fixupFilenames(protos map[string]parser.Result) map[string]parser.Result {
 	}
 
 	return revisedProtos
+}
+
+func removeDynamicExtensions(fd *descriptorpb.FileDescriptorProto) {
+	// protocompile returns descriptors with dynamic extension fields for custom options.
+	// But protoparse only used known custom options and everything else defined in the
+	// sources would be stored as unrecognized fields. So to bridge the difference in
+	// behavior, we need to remove custom options from the given file and add them back
+	// via serializing-then-de-serializing them back into the options messages. That way,
+	// statically known options will be properly typed and others will be unrecognized.
+	//
+	// This is best effort. So if an error occurs, we'll still return a result, but it
+	// may include a dynamic extension.
+	fd.Options = removeDynamicExtensionsFromOptions(fd.Options)
+	_ = walk.DescriptorProtos(fd, func(_ protoreflect.FullName, msg proto.Message) error {
+		switch msg := msg.(type) {
+		case *descriptorpb.DescriptorProto:
+			msg.Options = removeDynamicExtensionsFromOptions(msg.Options)
+			for _, extr := range msg.ExtensionRange {
+				extr.Options = removeDynamicExtensionsFromOptions(extr.Options)
+			}
+		case *descriptorpb.FieldDescriptorProto:
+			msg.Options = removeDynamicExtensionsFromOptions(msg.Options)
+		case *descriptorpb.OneofDescriptorProto:
+			msg.Options = removeDynamicExtensionsFromOptions(msg.Options)
+		case *descriptorpb.EnumDescriptorProto:
+			msg.Options = removeDynamicExtensionsFromOptions(msg.Options)
+		case *descriptorpb.EnumValueDescriptorProto:
+			msg.Options = removeDynamicExtensionsFromOptions(msg.Options)
+		case *descriptorpb.ServiceDescriptorProto:
+			msg.Options = removeDynamicExtensionsFromOptions(msg.Options)
+		case *descriptorpb.MethodDescriptorProto:
+			msg.Options = removeDynamicExtensionsFromOptions(msg.Options)
+		}
+		return nil
+	})
+}
+
+type ptrMsg[T any] interface {
+	*T
+	proto.Message
+}
+
+type fieldValue struct {
+	fd  protoreflect.FieldDescriptor
+	val protoreflect.Value
+}
+
+func removeDynamicExtensionsFromOptions[O ptrMsg[T], T any](opts O) O {
+	if opts == nil {
+		return nil
+	}
+	var dynamicExtensions []fieldValue
+	opts.ProtoReflect().Range(func(fd protoreflect.FieldDescriptor, val protoreflect.Value) bool {
+		if fd.IsExtension() {
+			dynamicExtensions = append(dynamicExtensions, fieldValue{fd: fd, val: val})
+		}
+		return true
+	})
+
+	// serialize only these custom options
+	optsWithOnlyDyn := opts.ProtoReflect().Type().New()
+	for _, fv := range dynamicExtensions {
+		optsWithOnlyDyn.Set(fv.fd, fv.val)
+	}
+	data, err := proto.MarshalOptions{AllowPartial: true}.Marshal(optsWithOnlyDyn.Interface())
+	if err != nil {
+		// oh, well... can't fix this one
+		return opts
+	}
+
+	// and then replace values by clearing these custom options and deserializing
+	optsClone := proto.Clone(opts).ProtoReflect()
+	for _, fv := range dynamicExtensions {
+		optsClone.Clear(fv.fd)
+	}
+	err = proto.UnmarshalOptions{AllowPartial: true, Merge: true}.Unmarshal(data, optsClone.Interface())
+	if err != nil {
+		// bummer, can't fix this one
+		return opts
+	}
+
+	return optsClone.Interface().(O)
 }

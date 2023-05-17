@@ -20,7 +20,7 @@ require (
 	github.com/grafana/xk6-webcrypto v0.1.0
 	github.com/grafana/xk6-websockets v0.2.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.15.0
+	github.com/jhump/protoreflect v1.15.1
 	github.com/klauspost/compress v1.16.5
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.13
@@ -52,7 +52,7 @@ require (
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bufbuild/protocompile v0.2.1-0.20230123224550-da57cd758c2f // indirect
+	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect

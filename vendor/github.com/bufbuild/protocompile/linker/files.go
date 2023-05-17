@@ -28,7 +28,7 @@ import (
 
 // File is like a super-powered protoreflect.FileDescriptor. It includes helpful
 // methods for looking up elements in the descriptor and can be used to create a
-// resolver for all in the file's transitive closure of dependencies. (See
+// resolver for all of the file's transitive closure of dependencies. (See
 // ResolverFromFile.)
 type File interface {
 	protoreflect.FileDescriptor
@@ -88,6 +88,8 @@ func newFile(f protoreflect.FileDescriptor, deps Files) (File, error) {
 // NewFileRecursive recursively converts a protoreflect.FileDescriptor to a File.
 // If f has any dependencies/imports, they are converted, too, including any and
 // all transitive dependencies.
+//
+// If f already implements File, it is returned unchanged.
 func NewFileRecursive(f protoreflect.FileDescriptor) (File, error) {
 	if asFile, ok := f.(File); ok {
 		return asFile, nil
@@ -185,10 +187,16 @@ type Resolver interface {
 	protoregistry.ExtensionTypeResolver
 }
 
-// ResolverFromFile returns a Resolver that uses the given file plus its full
-// set of transitive dependencies as the source of descriptors. If a given query
-// cannot be answered with these files, the query will fail with a
-// protoregistry.NotFound error.
+// ResolverFromFile returns a Resolver that uses the given file plus all of its
+// imports as the source of descriptors. If a given query cannot be answered with
+// these files, the query will fail with a protoregistry.NotFound error. This
+// does not recursively search the entire transitive closure; it only searches
+// the given file and its immediate dependencies. This is useful for resolving
+// elements visible to the file.
+//
+// If the given file is the result of a call to Link, then all dependencies
+// provided in the call to Link are searched (which could actually include more
+// than just the file's direct imports).
 //
 // Note that this function does not compute any additional indexes for efficient
 // search, so queries generally take linear time, O(n) where n is the number of

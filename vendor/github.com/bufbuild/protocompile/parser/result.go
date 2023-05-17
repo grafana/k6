@@ -62,6 +62,11 @@ func ResultFromAST(file *ast.FileNode, validate bool, handler *reporter.Handler)
 	if validate {
 		validateBasic(r, handler)
 	}
+	// Now that we're done validating, we can set any missing labels to optional
+	// (we leave them absent in first pass if label was missing in source, so we
+	// can do validation on presence of label, but final descriptors are expected
+	// to always have them present).
+	fillInMissingLabels(r.proto)
 	return r, handler.Error()
 }
 
@@ -918,3 +923,6 @@ func (r *result) putServiceNode(s *descriptorpb.ServiceDescriptorProto, n *ast.S
 func (r *result) putMethodNode(m *descriptorpb.MethodDescriptorProto, n *ast.RPCNode) {
 	r.nodes[m] = n
 }
+
+// NB: If we ever add other put*Node methods, to index other kinds of elements in the descriptor
+//     proto hierarchy, we need to update the index recreation logic in clone.go, too.
