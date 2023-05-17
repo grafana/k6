@@ -114,6 +114,12 @@ type Result interface {
 	// message that is available in this file. If no such element is available
 	// or if the named element is not a message, nil is returned.
 	ResolveMessageType(protoreflect.FullName) protoreflect.MessageDescriptor
+	// ResolveOptionsType returns a message descriptor for the given options
+	// type. This is like ResolveMessageType but searches the result's entire
+	// set of transitive dependencies without regard for visibility. If no
+	// such element is available or if the named element is not a message, nil
+	// is returned.
+	ResolveOptionsType(protoreflect.FullName) protoreflect.MessageDescriptor
 	// ResolveExtension returns an extension descriptor for the given named
 	// extension that is available in this file. If no such element is available
 	// or if the named element is not an extension, nil is returned.

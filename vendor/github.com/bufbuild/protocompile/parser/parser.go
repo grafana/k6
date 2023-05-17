@@ -77,6 +77,19 @@ func setTokenName(token int, text string) {
 // supplies the source code. The given handler is used to report errors and
 // warnings encountered while parsing. If any errors are reported, this function
 // returns a non-nil error.
+//
+// If the error returned is due to a syntax error in the source, then a non-nil
+// AST is also returned. If the handler chooses to not abort the parse (e.g. the
+// underlying error reporter returns nil instead of an error), the parser will
+// attempt to recover and keep going. This allows multiple syntax errors to be
+// reported in a single pass. And it also means that more of the AST can be
+// populated (erroneous productions around the syntax error will of course be
+// absent).
+//
+// The degree to which the parser can recover from errors and populate the AST
+// depends on the nature of the syntax error and if there are any tokens after the
+// syntax error that can help the parser recover. This error recovery and partial
+// AST production is best effort.
 func Parse(filename string, r io.Reader, handler *reporter.Handler) (*ast.FileNode, error) {
 	lx, err := newLexer(r, filename, handler)
 	if err != nil {

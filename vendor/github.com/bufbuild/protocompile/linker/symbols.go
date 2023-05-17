@@ -28,6 +28,8 @@ import (
 	"github.com/bufbuild/protocompile/walk"
 )
 
+const unknownFilePath = "<unknown file>"
+
 // Symbols is a symbol table that maps names for all program elements to their
 // location in source. It also tracks extension tag numbers. This can be used
 // to enforce uniqueness for symbol names and tag numbers across many files and
@@ -121,7 +123,7 @@ func (s *Symbols) importFileWithExtensions(pkg *packageSymbols, fd protoreflect.
 		}
 		pos := sourcePositionForNumber(fld)
 		extendee := fld.ContainingMessage()
-		if err := s.AddExtension(extendee.ParentFile().Package(), extendee.FullName(), fld.Number(), pos, handler); err != nil {
+		if err := s.AddExtension(packageFor(extendee), extendee.FullName(), fld.Number(), pos, handler); err != nil {
 			return err
 		}
 		return nil
@@ -294,9 +296,13 @@ func sourcePositionForPackage(fd protoreflect.FileDescriptor) ast.SourcePos {
 }
 
 func sourcePositionFor(d protoreflect.Descriptor) ast.SourcePos {
+	file := d.ParentFile()
+	if file == nil {
+		return ast.UnknownPos(unknownFilePath)
+	}
 	path, ok := computePath(d)
 	if !ok {
-		return ast.UnknownPos(d.ParentFile().Path())
+		return ast.UnknownPos(file.Path())
 	}
 	namePath := path
 	switch d.(type) {
@@ -318,36 +324,40 @@ func sourcePositionFor(d protoreflect.Descriptor) ast.SourcePos {
 		// NB: shouldn't really happen, but just in case fall back to path to
 		// descriptor, sans name field
 	}
-	loc := d.ParentFile().SourceLocations().ByPath(namePath)
+	loc := file.SourceLocations().ByPath(namePath)
 	if isZeroLoc(loc) {
-		loc = d.ParentFile().SourceLocations().ByPath(path)
+		loc = file.SourceLocations().ByPath(path)
 		if isZeroLoc(loc) {
-			return ast.UnknownPos(d.ParentFile().Path())
+			return ast.UnknownPos(file.Path())
 		}
 	}
 	return ast.SourcePos{
-		Filename: d.ParentFile().Path(),
+		Filename: file.Path(),
 		Line:     loc.StartLine,
 		Col:      loc.StartColumn,
 	}
 }
 
 func sourcePositionForNumber(fd protoreflect.FieldDescriptor) ast.SourcePos {
+	file := fd.ParentFile()
+	if file == nil {
+		return ast.UnknownPos(unknownFilePath)
+	}
 	path, ok := computePath(fd)
 	if !ok {
-		return ast.UnknownPos(fd.ParentFile().Path())
+		return ast.UnknownPos(file.Path())
 	}
 	numberPath := path
 	numberPath = append(numberPath, internal.FieldNumberTag)
-	loc := fd.ParentFile().SourceLocations().ByPath(numberPath)
+	loc := file.SourceLocations().ByPath(numberPath)
 	if isZeroLoc(loc) {
-		loc = fd.ParentFile().SourceLocations().ByPath(path)
+		loc = file.SourceLocations().ByPath(path)
 		if isZeroLoc(loc) {
-			return ast.UnknownPos(fd.ParentFile().Path())
+			return ast.UnknownPos(file.Path())
 		}
 	}
 	return ast.SourcePos{
-		Filename: fd.ParentFile().Path(),
+		Filename: file.Path(),
 		Line:     loc.StartLine,
 		Col:      loc.StartColumn,
 	}
@@ -401,7 +411,7 @@ func (s *Symbols) importResultWithExtensions(pkg *packageSymbols, r *result, han
 		node := r.FieldNode(fd.FieldDescriptorProto())
 		pos := file.NodeInfo(node.FieldTag()).Start()
 		extendee := fd.ContainingMessage()
-		if err := s.AddExtension(extendee.ParentFile().Package(), extendee.FullName(), fd.Number(), pos, handler); err != nil {
+		if err := s.AddExtension(packageFor(extendee), extendee.FullName(), fd.Number(), pos, handler); err != nil {
 			return err
 		}
 

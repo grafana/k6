@@ -447,11 +447,6 @@ func validateField(res *result, isProto3 bool, name protoreflect.FullName, fld *
 		}
 	}
 
-	// finally, set any missing label to optional
-	if fld.Label == nil {
-		fld.Label = descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
-	}
-
 	return nil
 }
 
@@ -474,4 +469,31 @@ func (r tagRanges) Less(i, j int) bool {
 
 func (r tagRanges) Swap(i, j int) {
 	r[i], r[j] = r[j], r[i]
+}
+
+func fillInMissingLabels(fd *descriptorpb.FileDescriptorProto) {
+	for _, md := range fd.MessageType {
+		fillInMissingLabelsInMsg(md)
+	}
+	for _, extd := range fd.Extension {
+		fillInMissingLabel(extd)
+	}
+}
+
+func fillInMissingLabelsInMsg(md *descriptorpb.DescriptorProto) {
+	for _, fld := range md.Field {
+		fillInMissingLabel(fld)
+	}
+	for _, nmd := range md.NestedType {
+		fillInMissingLabelsInMsg(nmd)
+	}
+	for _, extd := range md.Extension {
+		fillInMissingLabel(extd)
+	}
+}
+
+func fillInMissingLabel(fld *descriptorpb.FieldDescriptorProto) {
+	if fld.Label == nil {
+		fld.Label = descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL.Enum()
+	}
 }

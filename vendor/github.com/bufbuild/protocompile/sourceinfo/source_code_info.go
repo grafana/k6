@@ -651,17 +651,8 @@ func (sci *sourceCodeInfo) maybeDonate(prevInfo ast.NodeInfo, info ast.NodeInfo,
 		// nothing to donate
 		return ast.EmptyComments, nil
 	}
-	if !sci.extraComments {
-		// Mirroring protoc for now: if tokens on the same line, attribution
-		// is ambiguous so drop everything.
-		// This condition can be dropped (and we can stop dropping comments)
-		// once this PR is released:
-		//   https://github.com/protocolbuffers/protobuf/pull/10660
-		if prevInfo.End().Line == info.Start().Line {
-			return ast.EmptyComments, nil
-		}
-	}
-	if lead[0].Index(0).Start().Line > prevInfo.End().Line+1 {
+	firstCommentPos := lead[0].Index(0)
+	if firstCommentPos.Start().Line > prevInfo.End().Line+1 {
 		// first comment is detached from previous token, so can't be a trailing comment
 		return ast.EmptyComments, lead
 	}
@@ -671,16 +662,26 @@ func (sci *sourceCodeInfo) maybeDonate(prevInfo ast.NodeInfo, info ast.NodeInfo,
 	}
 	// there is only one element in lead
 	comment := lead[0]
-	if comment.Index(comment.Len()-1).End().Line < info.Start().Line-1 {
+	lastCommentPos := comment.Index(comment.Len() - 1)
+	if lastCommentPos.End().Line < info.Start().Line-1 {
 		// there is a blank line between the comments and subsequent token, so
 		// we can donate the comment to previous token
 		return comment, nil
 	}
-	if txt := info.RawText(); len(txt) == 1 && strings.ContainsAny(txt, "}]),;") {
-		// token is a symbol for the end of a scope, which doesn't need a leading comment
+	if txt := info.RawText(); txt == "" || (len(txt) == 1 && strings.ContainsAny(txt, "}]),;")) {
+		// token is a symbol for the end of a scope or EOF, which doesn't need a leading comment
+		if !sci.extraComments && txt != "" &&
+			firstCommentPos.Start().Line == prevInfo.End().Line &&
+			lastCommentPos.End().Line == info.Start().Line {
+			// protoc does not donate if prev and next token are on the same line since it's
+			// ambiguous which one should get the comment; so we mirror that here
+			return ast.EmptyComments, lead
+		}
+		// But with extra comments, we always donate in this situation in order to capture
+		// more comments. Because otherwise, these comments are lost since these symbols
+		// don't map to a location in source code info.
 		return comment, nil
 	}
-
 	// cannot donate
 	return ast.EmptyComments, lead
 }
@@ -697,14 +698,6 @@ func (sci *sourceCodeInfo) maybeAttach(prevInfo ast.NodeInfo, info ast.NodeInfo,
 		attachedToPrevious := comment.Index(0).Start().Line == prevInfo.End().Line
 		attachedToNext := comment.Index(comment.Len()-1).End().Line == info.Start().Line
 		if attachedToPrevious && attachedToNext {
-			if !sci.extraComments {
-				// Mirroring protoc for now: if comment starts on line of previous token
-				// and ends on line of next, attribution is ambiguous so drop everything.
-				// This condition can be dropped (and we can stop dropping comments)
-				// once this PR is released:
-				//   https://github.com/protocolbuffers/protobuf/pull/10660
-				return nil, ast.EmptyComments
-			}
 			// Since attachment is ambiguous, leave it detached.
 			return lead, ast.EmptyComments
 		}
@@ -787,9 +780,10 @@ func (sci *sourceCodeInfo) combineComments(comments comments) string {
 			for _, l := range lines {
 				if first {
 					first = false
-				} else {
-					buf.WriteByte('\n')
+					buf.WriteString(l)
+					continue
 				}
+				buf.WriteByte('\n')
 
 				// strip a prefix of whitespace followed by '*'
 				j := 0
@@ -805,7 +799,7 @@ func (sci *sourceCodeInfo) combineComments(comments comments) string {
 				case l[j] == '*':
 					l = l[j+1:]
 				case j > 0:
-					l = " " + l[j:]
+					l = l[j:]
 				}
 
 				buf.WriteString(l)
