@@ -32,8 +32,8 @@ import (
 	"go.k6.io/k6/lib/netext/grpcext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_testing"
 	grpcanytesting "go.k6.io/k6/lib/testutils/httpmultibin/grpc_any_testing"
+	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/metrics"
 )
 
