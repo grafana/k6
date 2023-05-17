@@ -2,6 +2,8 @@
 package browser
 
 import (
+	"os"
+
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
@@ -13,7 +15,8 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		PidRegistry *pidRegistry
+		PidRegistry    *pidRegistry
+		remoteRegistry *remoteRegistry
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -37,7 +40,8 @@ var (
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
 	return &RootModule{
-		PidRegistry: &pidRegistry{},
+		PidRegistry:    &pidRegistry{},
+		remoteRegistry: newRemoteRegistry(os.LookupEnv),
 	}
 }
 
@@ -47,8 +51,9 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
 		mod: &JSModule{
 			Chromium: mapBrowserToGoja(moduleVU{
-				VU:          vu,
-				pidRegistry: m.PidRegistry,
+				VU:             vu,
+				pidRegistry:    m.PidRegistry,
+				remoteRegistry: m.remoteRegistry,
 			}),
 			Devices: common.GetDevices(),
 		},
