@@ -36,6 +36,8 @@ type rootCommand struct {
 }
 
 func newRootCommand(gs *state.GlobalState) *rootCommand {
+
+	//linter error
 	c := &rootCommand{
 		globalState:   gs,
 		stopLoggersCh: make(chan struct{}),
