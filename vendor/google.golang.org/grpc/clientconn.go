@@ -146,8 +146,18 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 	cc.safeConfigSelector.UpdateConfigSelector(&defaultConfigSelector{nil})
 	cc.ctx, cc.cancel = context.WithCancel(context.Background())
 
-	for _, opt := range extraDialOptions {
-		opt.apply(&cc.dopts)
+	disableGlobalOpts := false
+	for _, opt := range opts {
+		if _, ok := opt.(*disableGlobalDialOptions); ok {
+			disableGlobalOpts = true
+			break
+		}
+	}
+
+	if !disableGlobalOpts {
+		for _, opt := range globalDialOptions {
+			opt.apply(&cc.dopts)
+		}
 	}
 
 	for _, opt := range opts {
@@ -234,19 +244,6 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 		}
 	}()
 
-	scSet := false
-	if cc.dopts.scChan != nil {
-		// Try to get an initial service config.
-		select {
-		case sc, ok := <-cc.dopts.scChan:
-			if ok {
-				cc.sc = &sc
-				cc.safeConfigSelector.UpdateConfigSelector(&defaultConfigSelector{&sc})
-				scSet = true
-			}
-		default:
-		}
-	}
 	if cc.dopts.bs == nil {
 		cc.dopts.bs = backoff.DefaultExponential
 	}
@@ -262,7 +259,7 @@ func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *
 	}
 	channelz.Infof(logger, cc.channelzID, "Channel authority set to %q", cc.authority)
 
-	if cc.dopts.scChan != nil && !scSet {
+	if cc.dopts.scChan != nil {
 		// Blocking wait for the initial service config.
 		select {
 		case sc, ok := <-cc.dopts.scChan:
@@ -1103,7 +1100,11 @@ func (ac *addrConn) updateConnectivityState(s connectivity.State, lastErr error)
 		return
 	}
 	ac.state = s
-	channelz.Infof(logger, ac.channelzID, "Subchannel Connectivity change to %v", s)
+	if lastErr == nil {
+		channelz.Infof(logger, ac.channelzID, "Subchannel Connectivity change to %v", s)
+	} else {
+		channelz.Infof(logger, ac.channelzID, "Subchannel Connectivity change to %v, last error: %s", s, lastErr)
+	}
 	ac.cc.handleSubConnStateChange(ac.acbw, s, lastErr)
 }
 
@@ -1527,6 +1528,9 @@ func (c *channelzChannel) ChannelzMetric() *channelz.ChannelInternalMetric {
 // referenced by users.
 var ErrClientConnTimeout = errors.New("grpc: timed out when dialing")
 
+// getResolver finds the scheme in the cc's resolvers or the global registry.
+// scheme should always be lowercase (typically by virtue of url.Parse()
+// performing proper RFC3986 behavior).
 func (cc *ClientConn) getResolver(scheme string) resolver.Builder {
 	for _, rb := range cc.dopts.resolvers {
 		if scheme == rb.Scheme() {
