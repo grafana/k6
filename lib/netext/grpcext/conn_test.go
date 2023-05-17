@@ -259,9 +259,17 @@ func (m *getServiceFileDescriptorMock) Recv() (*reflectpb.ServerReflectionRespon
 }
 
 func methodFromProto(method string) protoreflect.MethodDescriptor {
+	path := "any-path"
 	parser := protoparse.Parser{
 		InferImportPaths: false,
 		Accessor: protoparse.FileAccessor(func(filename string) (io.ReadCloser, error) {
+			// a small hack to make sure we are parsing the right file
+			// otherwise the parser will try to parse "google/protobuf/descriptor.proto"
+			// with exactly the same name as the one we are trying to parse for testing
+			if filename != path {
+				return nil, nil
+			}
+
 			b := `
 syntax = "proto3";
 
@@ -290,7 +298,7 @@ message Empty {
 		}),
 	}
 
-	fds, err := parser.ParseFiles("any-path")
+	fds, err := parser.ParseFiles(path)
 	if err != nil {
 		panic(err)
 	}
