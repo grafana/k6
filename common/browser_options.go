@@ -35,12 +35,6 @@ type BrowserOptions struct {
 	isRemoteBrowser bool // some options will be ignored if browser is in a remote machine
 }
 
-// LaunchPersistentContextOptions stores browser launch options for persistent context.
-type LaunchPersistentContextOptions struct {
-	BrowserOptions
-	BrowserContextOptions
-}
-
 // NewLocalBrowserOptions returns a new BrowserOptions
 // for a browser launched in the local machine.
 func NewLocalBrowserOptions() *BrowserOptions {
