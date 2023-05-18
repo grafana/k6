@@ -2,7 +2,6 @@ package tests
 
 import (
 	"bytes"
-	"context"
 	_ "embed"
 	"encoding/json"
 	"fmt"
@@ -645,10 +644,10 @@ func TestPageWaitForLoadState(t *testing.T) {
 
 // See: The issue #187 for details.
 func TestPageWaitForNavigationErrOnCtxDone(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	p := newTestBrowser(t, ctx).NewPage(nil)
-	go cancel()
-	<-ctx.Done()
+	b := newTestBrowser(t)
+	p := b.NewPage(nil)
+	go b.Cancel()
+	<-b.Context().Done()
 	_, err := p.WaitForNavigation(nil)
 	require.ErrorContains(t, err, "canceled")
 }

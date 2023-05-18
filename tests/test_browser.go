@@ -6,12 +6,14 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 
@@ -39,20 +41,21 @@ type testBrowser struct {
 	browserType api.BrowserType
 
 	api.Browser
+
+	cancel context.CancelFunc
 }
 
 // newTestBrowser configures and launches a new chrome browser.
 // It automatically closes it when `t` returns.
 //
 // opts provides a way to customize the newTestBrowser.
-// see: withLaunchOptions for an example.
+// see: withBrowserOptions for an example.
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
 	// set default options and then customize them
 	var (
-		ctx                context.Context
-		launchOpts         = defaultLaunchOpts()
+		browserOpts        = defaultBrowserOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
 		enableLogCache     = false
@@ -61,8 +64,8 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case withLaunchOptions:
-			launchOpts = opt
+		case withBrowserOptions:
+			browserOpts = opt
 		case httpServerOption:
 			enableHTTPMultiBin = true
 		case fileServerOption:
@@ -70,8 +73,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 			enableHTTPMultiBin = true
 		case logCacheOption:
 			enableLogCache = true
-		case withContext:
-			ctx = opt
 		case skipCloseOption:
 			skipClose = true
 		case withSamplesListener:
@@ -81,15 +82,9 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	vu := setupHTTPTestModuleInstance(tb, samples)
 
-	if ctx == nil {
-		dummyCtx, cancel := context.WithCancel(vu.Context())
-		tb.Cleanup(cancel)
-		vu.CtxField = dummyCtx
-	} else {
-		// Attach the mock VU to the passed context
-		ctx = k6ext.WithVU(ctx, vu)
-		vu.CtxField = ctx
-	}
+	dummyCtx, cancel := context.WithCancel(vu.Context())
+	tb.Cleanup(cancel)
+	vu.CtxField = dummyCtx
 
 	registry := k6metrics.NewRegistry()
 	k6m := k6ext.RegisterCustomMetrics(registry)
@@ -105,7 +100,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	var (
 		testServer *k6httpmultibin.HTTPMultiBin
 		state      = vu.StateField
-		rt         = vu.RuntimeField
 		lc         *logCache
 	)
 
@@ -118,7 +112,9 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.Transport = testServer.HTTPTransport
 	}
 
-	b, pid := bt.Launch(rt.ToValue(launchOpts))
+	bt.SetEnvLookupper(setupEnvLookupper(tb, browserOpts))
+
+	b, pid := bt.Launch()
 	cb, ok := b.(*common.Browser)
 	if !ok {
 		tb.Fatalf("testBrowser: unexpected browser %T", b)
@@ -136,7 +132,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	tbr := &testBrowser{
 		t:           tb,
-		ctx:         bt.Ctx, // This context has the additional wrapping of common.WithLaunchOptions
+		ctx:         bt.Ctx, // This context has the additional wrapping of common.WithBrowserOptions
 		http:        testServer,
 		vu:          vu,
 		logCache:    lc,
@@ -144,6 +140,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		browserType: bt,
 		pid:         pid,
 		wsURL:       cb.WsURL(),
+		cancel:      cancel,
 	}
 	if enableFileServer {
 		tbr = tbr.withFileServer()
@@ -210,6 +207,16 @@ func (b *testBrowser) staticURL(path string) string {
 	b.t.Helper()
 
 	return b.URL("/" + testBrowserStaticDir + "/" + path)
+}
+
+// Context returns the testBrowser context.
+func (b *testBrowser) Context() context.Context {
+	return b.ctx
+}
+
+// Cancel cancels the testBrowser context.
+func (b *testBrowser) Cancel() {
+	b.cancel()
 }
 
 // attachFrame attaches the frame to the page and returns it.
@@ -382,38 +389,36 @@ func (t testPromise) then(resolve any, reject ...any) testPromise {
 	return t.tb.promise(p)
 }
 
-// launchOptions provides a way to customize browser type
-// launch options in tests.
-type launchOptions struct {
-	Args     []any  `js:"args"`
-	Debug    bool   `js:"debug"`
-	Headless bool   `js:"headless"`
-	SlowMo   string `js:"slowMo"`
-	Timeout  string `js:"timeout"`
+// browserOptions provides a way to customize browser
+// options in tests.
+type browserOptions struct {
+	Args     []string `js:"args"`
+	Debug    bool     `js:"debug"`
+	Headless bool     `js:"headless"`
+	Timeout  string   `js:"timeout"`
 }
 
-// withLaunchOptions is a helper for increasing readability
-// in tests while customizing the browser type launch options.
+// withBrowserOptions is a helper for increasing readability
+// in tests while customizing the browser options.
 //
 // example:
 //
-//	b := TestBrowser(t, withLaunchOptions{
+//	b := TestBrowser(t, withBrowserOptions{
 //	    SlowMo:  "100s",
 //	    Timeout: "30s",
 //	})
-type withLaunchOptions = launchOptions
+type withBrowserOptions = browserOptions
 
-// defaultLaunchOptions returns defaults for browser type launch options.
+// defaultBrowserOpts returns defaults for browser options.
 // TestBrowser uses this for launching a browser type by default.
-func defaultLaunchOpts() launchOptions {
+func defaultBrowserOpts() browserOptions {
 	headless := true
 	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
 		headless, _ = strconv.ParseBool(v)
 	}
 
-	return launchOptions{
+	return browserOptions{
 		Headless: headless,
-		SlowMo:   "0s",
 		Timeout:  "30s",
 	}
 }
@@ -446,10 +451,6 @@ type fileServerOption struct{}
 func withFileServer() fileServerOption {
 	return struct{}{}
 }
-
-// withContext is used to detect whether to use a custom context in the test
-// browser.
-type withContext = context.Context
 
 // logCacheOption is used to detect whether to enable the log cache.
 type logCacheOption struct{}
@@ -494,4 +495,27 @@ func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleCon
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
 
 	return vu
+}
+
+func setupEnvLookupper(tb testing.TB, opts browserOptions) env.LookupFunc {
+	tb.Helper()
+
+	return func(key string) (string, bool) {
+		switch key {
+		case "K6_BROWSER_ARGS":
+			if len(opts.Args) != 0 {
+				return strings.Join(opts.Args, ","), true
+			}
+		case "K6_BROWSER_DEBUG":
+			return strconv.FormatBool(opts.Debug), true
+		case "K6_BROWSER_HEADLESS":
+			return strconv.FormatBool(opts.Headless), true
+		case "K6_BROWSER_TIMEOUT":
+			if opts.Timeout != "" {
+				return opts.Timeout, true
+			}
+		}
+
+		return "", false
+	}
 }

@@ -84,7 +84,7 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 
 	t.Parallel()
 
-	opts := defaultLaunchOpts()
+	opts := defaultBrowserOpts()
 	opts.Headless = false
 	tb := newTestBrowser(t, withFileServer(), opts)
 	p := tb.NewPage(nil)

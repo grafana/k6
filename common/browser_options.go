@@ -2,58 +2,64 @@ package common
 
 import (
 	"context"
+	"errors"
+	"fmt"
+	"strconv"
+	"strings"
 	"time"
 
-	"github.com/dop251/goja"
-
-	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/log"
+
+	"go.k6.io/k6/lib/types"
 )
 
 const (
-	optArgs              = "args"
-	optDebug             = "debug"
-	optExecutablePath    = "executablePath"
-	optHeadless          = "headless"
-	optIgnoreDefaultArgs = "ignoreDefaultArgs"
-	optLogCategoryFilter = "logCategoryFilter"
-	optSlowMo            = "slowMo"
-	optTimeout           = "timeout"
+	// Script variables.
+
+	optType = "type"
+
+	// ENV variables.
+
+	optArgs              = "K6_BROWSER_ARGS"
+	optDebug             = "K6_BROWSER_DEBUG"
+	optExecutablePath    = "K6_BROWSER_EXECUTABLE_PATH"
+	optHeadless          = "K6_BROWSER_HEADLESS"
+	optIgnoreDefaultArgs = "K6_BROWSER_IGNORE_DEFAULT_ARGS"
+	optLogCategoryFilter = "K6_BROWSER_LOG_CATEGORY_FILTER"
+	optTimeout           = "K6_BROWSER_TIMEOUT"
 )
 
-// LaunchOptions stores browser launch options.
-type LaunchOptions struct {
+// BrowserOptions stores browser options.
+type BrowserOptions struct {
 	Args              []string
 	Debug             bool
 	ExecutablePath    string
 	Headless          bool
 	IgnoreDefaultArgs []string
 	LogCategoryFilter string
-	SlowMo            time.Duration
-	Timeout           time.Duration
+	// TODO: Do not expose slowMo option by now.
+	// See https://github.com/grafana/xk6-browser/issues/857.
+	SlowMo  time.Duration
+	Timeout time.Duration
 
 	isRemoteBrowser bool // some options will be ignored if browser is in a remote machine
 }
 
-// LaunchPersistentContextOptions stores browser launch options for persistent context.
-type LaunchPersistentContextOptions struct {
-	LaunchOptions
-	BrowserContextOptions
-}
-
-// NewLaunchOptions returns a new LaunchOptions.
-func NewLaunchOptions() *LaunchOptions {
-	return &LaunchOptions{
+// NewLocalBrowserOptions returns a new BrowserOptions
+// for a browser launched in the local machine.
+func NewLocalBrowserOptions() *BrowserOptions {
+	return &BrowserOptions{
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
 	}
 }
 
-// NewRemoteBrowserLaunchOptions returns a new LaunchOptions
+// NewRemoteBrowserOptions returns a new BrowserOptions
 // for a browser running in a remote machine.
-func NewRemoteBrowserLaunchOptions() *LaunchOptions {
-	return &LaunchOptions{
+func NewRemoteBrowserOptions() *BrowserOptions {
+	return &BrowserOptions{
 		Headless:          true,
 		LogCategoryFilter: ".*",
 		Timeout:           DefaultTimeout,
@@ -61,51 +67,58 @@ func NewRemoteBrowserLaunchOptions() *LaunchOptions {
 	}
 }
 
-// Parse parses launch options from a JS object.
-func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja.Value) error { //nolint:cyclop
-	// when opts is nil, we just return the default options without error.
-	if !gojaValueExists(opts) {
-		return nil
+// Parse parses browser options from a JS object.
+func (bo *BrowserOptions) Parse( //nolint:cyclop
+	ctx context.Context, logger *log.Logger, opts map[string]any, envLookup env.LookupFunc,
+) error {
+	// Parse opts
+	bt, ok := opts[optType]
+	// Only 'chromium' is supported by now, so return error
+	// if type option is not set, or if it's set and its value
+	// is different than 'chromium'
+	if !ok {
+		return errors.New("browser type option must be set")
 	}
-	var (
-		rt       = k6ext.Runtime(ctx)
-		o        = opts.ToObject(rt)
-		defaults = map[string]any{
-			optHeadless:          l.Headless,
-			optLogCategoryFilter: l.LogCategoryFilter,
-			optTimeout:           l.Timeout,
-		}
-	)
-	for _, k := range o.Keys() {
-		if l.shouldIgnoreIfBrowserIsRemote(k) {
-			logger.Warnf("LaunchOptions", "setting %s option is disallowed when browser is remote", k)
+	if bt != "chromium" {
+		return fmt.Errorf("unsupported browser type: %s", bt)
+	}
+
+	// Parse env
+	envOpts := [...]string{
+		optArgs,
+		optDebug,
+		optExecutablePath,
+		optHeadless,
+		optIgnoreDefaultArgs,
+		optLogCategoryFilter,
+		optTimeout,
+	}
+
+	for _, e := range envOpts {
+		ev, ok := envLookup(e)
+		if !ok || ev == "" {
 			continue
 		}
-		v := o.Get(k)
-		if v.Export() == nil {
-			if dv, ok := defaults[k]; ok {
-				logger.Warnf("LaunchOptions", "%s was null and set to its default: %v", k, dv)
-			}
+		if bo.shouldIgnoreIfBrowserIsRemote(e) {
+			logger.Warnf("BrowserOptions", "setting %s option is disallowed when browser is remote", e)
 			continue
 		}
 		var err error
-		switch k {
+		switch e {
 		case optArgs:
-			err = exportOpt(rt, k, v, &l.Args)
+			bo.Args = parseListOpt(ev)
 		case optDebug:
-			l.Debug, err = parseBoolOpt(k, v)
+			bo.Debug, err = parseBoolOpt(e, ev)
 		case optExecutablePath:
-			l.ExecutablePath, err = parseStrOpt(k, v)
+			bo.ExecutablePath = ev
 		case optHeadless:
-			l.Headless, err = parseBoolOpt(k, v)
+			bo.Headless, err = parseBoolOpt(e, ev)
 		case optIgnoreDefaultArgs:
-			err = exportOpt(rt, k, v, &l.IgnoreDefaultArgs)
+			bo.IgnoreDefaultArgs = parseListOpt(ev)
 		case optLogCategoryFilter:
-			l.LogCategoryFilter, err = parseStrOpt(k, v)
-		case optSlowMo:
-			l.SlowMo, err = parseTimeOpt(k, v)
+			bo.LogCategoryFilter = ev
 		case optTimeout:
-			l.Timeout, err = parseTimeOpt(k, v)
+			bo.Timeout, err = parseTimeOpt(e, ev)
 		}
 		if err != nil {
 			return err
@@ -115,8 +128,8 @@ func (l *LaunchOptions) Parse(ctx context.Context, logger *log.Logger, opts goja
 	return nil
 }
 
-func (l *LaunchOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
-	if !l.isRemoteBrowser {
+func (bo *BrowserOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
+	if !bo.isRemoteBrowser {
 		return false
 	}
 
@@ -129,4 +142,34 @@ func (l *LaunchOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
 	_, ignore := shouldIgnoreIfBrowserIsRemote[opt]
 
 	return ignore
+}
+
+func parseBoolOpt(k, v string) (bool, error) {
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return false, fmt.Errorf("%s should be a boolean", k)
+	}
+
+	return b, nil
+}
+
+func parseTimeOpt(k, v string) (time.Duration, error) {
+	t, err := types.GetDurationValue(v)
+	if err != nil {
+		return time.Duration(0), fmt.Errorf("%s should be a time duration value: %w", k, err)
+	}
+
+	return t, nil
+}
+
+func parseListOpt(v string) []string {
+	elems := strings.Split(v, ",")
+	// If last element is a void string,
+	// because value contained an ending comma,
+	// remove it
+	if elems[len(elems)-1] == "" {
+		elems = elems[:len(elems)-1]
+	}
+
+	return elems
 }

@@ -2,15 +2,23 @@ import { check, sleep } from 'k6';
 import { chromium, devices } from 'k6/x/browser';
 
 export const options = {
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      options: {
+        browser: {
+            type: 'chromium',
+        },
+      },
+    },
+  },
   thresholds: {
     checks: ["rate==1.0"]
   }
 }
 
 export default async function() {
-  const browser = chromium.launch({
-    headless: __ENV.XK6_HEADLESS ? true : false,
-  });
+  const browser = chromium.launch();
 
   const device = devices['iPhone X'];
   // The spread operator is currently unsupported by k6's Babel, so use

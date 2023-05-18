@@ -2,35 +2,36 @@ import { check } from 'k6';
 import { chromium } from 'k6/x/browser';
 
 export const options = {
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      options: {
+        browser: {
+            type: 'chromium',
+        },
+      },
+    },
+  },
   thresholds: {
     checks: ["rate==1.0"]
   }
 }
 
 export default async function() {
-  const browser = chromium.launch({
-    headless: __ENV.XK6_HEADLESS ? true : false,
-    ignoreDefaultArgs: ['--hide-scrollbars']
-  });
+  const browser = chromium.launch();
   const context = browser.newContext();
   const page = context.newPage();
 
   try {
     await page.goto('https://test.k6.io/', { waitUntil: 'load' });
-    const dimensions = page.evaluate(() => {
-      const obj = {
-        width: document.documentElement.clientWidth,
-        height: document.documentElement.clientHeight,
-        deviceScaleFactor: window.devicePixelRatio
-      };
-      console.log(obj); // tests #120
-      return obj;
-    });
-
-    check(dimensions, {
-      'width': d => d.width === 1265,
-      'height': d => d.height === 720,
-      'scale': d => d.deviceScaleFactor === 1,
+    
+    const result = page.evaluate(([x, y]) => {
+      return Promise.resolve(x * y);
+    }, [5, 5]);
+    console.log(result); // tests #120
+    
+    check(result, {
+      'result is 25': (result) => result == 25,
     });
   } finally {
     page.close();

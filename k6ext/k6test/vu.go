@@ -3,17 +3,18 @@ package k6test
 import (
 	"testing"
 
+	"github.com/dop251/goja"
+	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
+	k6executor "go.k6.io/k6/lib/executor"
 	k6testutils "go.k6.io/k6/lib/testutils"
 	k6metrics "go.k6.io/k6/metrics"
-
-	"github.com/dop251/goja"
-	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
 )
 
 // VU is a k6 VU instance.
@@ -81,6 +82,17 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 			Batch:        null.IntFrom(20),
 			BatchPerHost: null.IntFrom(20),
 			// HTTPDebug:    null.StringFrom("full"),
+			Scenarios: k6lib.ScenarioConfigs{
+				"default": &TestExecutor{
+					BaseConfig: k6executor.BaseConfig{
+						Options: &k6lib.ScenarioOptions{
+							Browser: map[string]any{
+								"type": "chromium",
+							},
+						},
+					},
+				},
+			},
 		},
 		Logger:         k6testutils.NewLogger(tb),
 		Group:          root,
@@ -91,6 +103,7 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	}
 
 	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)
+	ctx = k6lib.WithScenarioState(ctx, &k6lib.ScenarioState{Name: "default"})
 	testRT.VU.CtxField = ctx
 
 	return &VU{VU: testRT.VU, Loop: testRT.EventLoop, toBeState: state, samples: samples}

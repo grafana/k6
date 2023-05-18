@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -104,16 +103,15 @@ func TestBrowserOn(t *testing.T) {
 		t.Parallel()
 
 		var (
-			ctx, cancel = context.WithCancel(context.Background())
-			b           = newTestBrowser(t, ctx)
-			rt          = b.vu.Runtime()
-			log         []string
+			b   = newTestBrowser(t)
+			rt  = b.vu.Runtime()
+			log []string
 		)
 
 		require.NoError(t, rt.Set("b", b.Browser))
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		time.AfterFunc(100*time.Millisecond, cancel)
+		time.AfterFunc(100*time.Millisecond, b.Cancel)
 		_, err := b.runJavaScript(script, "disconnected")
 		assert.ErrorContains(t, err, "browser.on promise rejected: context canceled")
 	})
@@ -146,8 +144,8 @@ func TestBrowserCrashErr(t *testing.T) {
 	t.Parallel()
 
 	assertExceptionContains(t, goja.New(), func() {
-		lopts := defaultLaunchOpts()
-		lopts.Args = []any{"remote-debugging-port=99999"}
+		lopts := defaultBrowserOpts()
+		lopts.Args = []string{"remote-debugging-port=99999"}
 
 		newTestBrowser(t, lopts)
 	}, "launching browser: Invalid devtools server port")
@@ -231,13 +229,13 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 	tb := newTestBrowser(t, withSkipClose())
 	defer tb.Close()
 
-	b1 := tb.browserType.Connect(tb.wsURL, nil)
+	b1 := tb.browserType.Connect(tb.wsURL)
 	bctx1, err := b1.NewContext(nil)
 	require.NoError(t, err)
 	p1, err := bctx1.NewPage()
 	require.NoError(t, err, "failed to create page #1")
 
-	b2 := tb.browserType.Connect(tb.wsURL, nil)
+	b2 := tb.browserType.Connect(tb.wsURL)
 	bctx2, err := b2.NewContext(nil)
 	require.NoError(t, err)
 

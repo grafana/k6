@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
-func TestLaunchOptionsSlowMo(t *testing.T) {
+func TestBrowserOptionsSlowMo(t *testing.T) {
 	t.Parallel()
 
 	if testing.Short() {

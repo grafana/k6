@@ -368,7 +368,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		isCallable  bool
 		predicateFn goja.Callable
 		// TODO: Find out whether * time.Second is necessary.
-		timeout = b.browser.launchOpts.Timeout * time.Second //nolint:durationcheck
+		timeout = b.browser.browserOpts.Timeout * time.Second //nolint:durationcheck
 	)
 	if gojaValueExists(optsOrPredicate) {
 		switch optsOrPredicate.ExportType() {
