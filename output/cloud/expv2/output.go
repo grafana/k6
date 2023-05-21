@@ -5,6 +5,7 @@ package expv2
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net/http"
 	"sync"
 	"time"
@@ -22,14 +23,12 @@ import (
 type Output struct {
 	output.SampleBuffer
 
-	logger       logrus.FieldLogger
-	config       cloudapi.Config
-	referenceID  string
-	testStopFunc func(error)
+	logger      logrus.FieldLogger
+	config      cloudapi.Config
+	referenceID string
 
-	// TODO: replace with the real impl
-	metricsFlusher noopFlusher
-	collector      *collector
+	collector *collector
+	flushing  *metricsFlusher
 
 	// wg tracks background goroutines
 	wg sync.WaitGroup
@@ -38,7 +37,8 @@ type Output struct {
 	stop chan struct{}
 
 	// abort signal to interrupt immediately all background goroutines
-	abort chan struct{}
+	abort        chan struct{}
+	testStopFunc func(error)
 }
 
 // New creates a new cloud output.
@@ -73,11 +73,18 @@ func (o *Output) Start() error {
 		o.config.AggregationPeriod.TimeDuration(),
 		o.config.AggregationWaitPeriod.TimeDuration())
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
-	o.metricsFlusher = noopFlusher{
-		referenceID: o.referenceID,
-		bq:          &o.collector.bq,
+
+	mc, err := newMetricsClient(o.logger, o.config.Host.String, o.config.Token.String)
+	if err != nil {
+		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
+	}
+	o.flushing = &metricsFlusher{
+		referenceID:                o.referenceID,
+		bq:                         &o.collector.bq,
+		client:                     mc,
+		aggregationPeriodInSeconds: uint32(o.config.AggregationPeriod.TimeDuration().Seconds()),
 	}
 
 	o.periodicInvoke(o.config.MetricPushInterval.TimeDuration(), o.flushMetrics)
@@ -173,7 +180,7 @@ func (o *Output) flushMetrics() {
 	ctx, cancel := context.WithTimeout(context.Background(), o.config.MetricPushInterval.TimeDuration())
 	defer cancel()
 
-	err := o.metricsFlusher.Flush(ctx)
+	err := o.flushing.Flush(ctx)
 	if err != nil {
 		o.handleFlushError(err)
 		return

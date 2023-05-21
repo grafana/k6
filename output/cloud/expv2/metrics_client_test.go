@@ -52,7 +52,7 @@ func TestMetricsClientPush(t *testing.T) {
 	mc.httpClient = ts.Client()
 
 	mset := pbcloud.MetricSet{}
-	err = mc.Push(context.TODO(), "test-ref-id", &mset)
+	err = mc.push(context.TODO(), "test-ref-id", &mset)
 	<-done
 	require.NoError(t, err)
 	assert.Equal(t, 1, reqs)
@@ -71,7 +71,7 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	require.NoError(t, err)
 	mc.httpClient = ts.Client()
 
-	err = mc.Push(context.TODO(), "test-ref-id", nil)
+	err = mc.push(context.TODO(), "test-ref-id", nil)
 	assert.ErrorContains(t, err, "500 Internal Server Error")
 }
 
@@ -91,7 +91,7 @@ func TestMetricsClientPushError(t *testing.T) {
 		},
 	}
 
-	err := mc.Push(context.TODO(), "test-ref-id", nil)
+	err := mc.push(context.TODO(), "test-ref-id", nil)
 	assert.ErrorContains(t, err, "fake generated error")
 }
 
@@ -119,6 +119,6 @@ func TestMetricsClientPushStructuredError(t *testing.T) {
 		},
 	}
 
-	err := mc.Push(context.TODO(), "test-ref-id", nil)
+	err := mc.push(context.TODO(), "test-ref-id", nil)
 	assert.Equal(t, exp, err)
 }
