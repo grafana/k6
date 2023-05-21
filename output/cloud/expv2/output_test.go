@@ -57,6 +57,8 @@ func TestOutputSetTestRunStopCallback(t *testing.T) {
 func TestOutputCollectSamples(t *testing.T) {
 	t.Parallel()
 	o, err := New(testutils.NewLogger(t), cloudapi.Config{
+		Host:                  null.StringFrom("flush-is-disabled"),
+		Token:                 null.StringFrom("a-fake-token"),
 		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
 		// Manually control and trigger the various steps
 		// instead to be time dependent
@@ -266,7 +268,8 @@ func TestOutputStopWithTestError(t *testing.T) {
 	t.Parallel()
 
 	config := cloudapi.NewConfig()
-	config.Host = null.StringFrom("") // flush not expected
+	config.Host = null.StringFrom("host-is-required-but-flush-isnot-expected")
+	config.Token = null.StringFrom("token-is-required")
 	config.AggregationPeriod = types.NullDurationFrom(1 * time.Hour)
 
 	o, err := New(testutils.NewLogger(t), config)

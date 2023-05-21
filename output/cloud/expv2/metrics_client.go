@@ -58,7 +58,7 @@ func newMetricsClient(logger logrus.FieldLogger, host string, token string) (*me
 }
 
 // Push pushes the provided metrics the given test run.
-func (mc *metricsClient) Push(ctx context.Context, referenceID string, samples *pbcloud.MetricSet) error {
+func (mc *metricsClient) push(ctx context.Context, referenceID string, samples *pbcloud.MetricSet) error {
 	if referenceID == "" {
 		return errors.New("TestRunID of the test is required")
 	}
