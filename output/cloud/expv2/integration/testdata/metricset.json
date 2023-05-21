@@ -119,7 +119,17 @@
           "trendHdrSamples": {
             "values": [
               {
-                "time": "2023-05-01T04:00:00Z"
+                "time": "2023-05-01T04:00:00Z",
+                "count": 1,
+                "counters": [
+                  1
+                ],
+                "lowerCounterIndex": 6,
+                "maxValue": 6,
+                "minResolution": 1,
+                "minValue": 6,
+                "significantDigits": 2,
+                "sum": 6
               }
             ]
           }
