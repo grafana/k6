@@ -2,6 +2,7 @@ package expv2
 
 import (
 	"errors"
+	"net/http"
 	"testing"
 	"time"
 
@@ -113,4 +114,84 @@ func TestOutputCollectSamples(t *testing.T) {
 
 	expTime := time.Date(2023, time.May, 1, 1, 1, 15, 0, time.UTC)
 	assert.Equal(t, expTime, buckets[0].Time)
+}
+
+func TestOutputHandleFlushError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name                    string
+		err                     error
+		abort                   bool
+		expStopMetricCollection bool
+		expAborted              bool
+	}{
+		{
+			name:                    "no stop on generic errors",
+			err:                     errors.New("a fake unknown error"),
+			abort:                   true,
+			expStopMetricCollection: false,
+			expAborted:              false,
+		},
+		{
+			name: "error code equals 4 but no abort",
+			err: cloudapi.ErrorResponse{
+				Response: &http.Response{StatusCode: http.StatusForbidden},
+				Code:     4,
+			},
+			abort:                   false,
+			expStopMetricCollection: true,
+			expAborted:              false,
+		},
+		{
+			name: "error code equals 4 and abort",
+			err: cloudapi.ErrorResponse{
+				Response: &http.Response{StatusCode: http.StatusForbidden},
+				Code:     4,
+			},
+			abort:                   true,
+			expStopMetricCollection: true,
+			expAborted:              true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			stopFuncCalled := false
+			stopMetricCollection := false
+
+			o := Output{
+				logger: testutils.NewLogger(t),
+				testStopFunc: func(error) {
+					stopFuncCalled = true
+				},
+				stopMetricsCollection: make(chan struct{}),
+			}
+			o.config.StopOnError = null.BoolFrom(tc.abort)
+
+			done := make(chan struct{})
+			stopped := make(chan struct{})
+
+			go func() {
+				defer close(stopped)
+
+				<-done
+				select {
+				case <-o.stopMetricsCollection:
+					stopMetricCollection = true
+				default:
+				}
+			}()
+
+			o.handleFlushError(tc.err)
+			close(done)
+			<-stopped
+
+			assert.Equal(t, tc.expStopMetricCollection, stopMetricCollection)
+			assert.Equal(t, tc.expAborted, stopFuncCalled)
+		})
+	}
 }

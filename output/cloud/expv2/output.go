@@ -4,6 +4,7 @@ package expv2
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"time"
 
@@ -114,6 +115,7 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 	// queue.
 	select {
 	case <-o.stopMetricsCollection:
+		// TODO: unit test this case
 		return
 	default:
 	}
@@ -151,42 +153,44 @@ func (o *Output) flushMetrics() {
 
 	err := o.metricsFlusher.Flush(ctx)
 	if err != nil {
-		o.logger.WithError(err).Error("Failed to push metrics to the cloud")
-
-		if o.shouldStopSendingMetrics(err) {
-			o.logger.WithError(err).Warn("Interrupt sending metrics to cloud due to an error")
-			serr := errext.WithAbortReasonIfNone(
-				errext.WithExitCodeIfNone(err, exitcodes.ExternalAbort),
-				errext.AbortedByOutput,
-			)
-			if o.config.StopOnError.Bool {
-				o.testStopFunc(serr)
-			}
-			close(o.stopMetricsCollection)
-		}
+		o.handleFlushError(err)
 		return
 	}
 
 	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered samples to the cloud")
 }
 
-// shouldStopSendingMetrics returns true if the output should interrupt the metric flush.
+// handleFlushError handles errors generated from the flushing operation.
+// It may interrupts the metric collection or invokes abort of the test.
 //
-// note: The actual test execution should continues,
-// since for local k6 run tests the end-of-test summary (or any other outputs) will still work,
+// note: The actual test execution should continue, since for local k6 run tests
+// the end-of-test summary (or any other outputs) will still work,
 // but the cloud output doesn't send any more metrics.
-// Instead, if cloudapi.Config.StopOnError is enabled
-// the cloud output should stop the whole test run too.
-// This logic should be handled by the caller.
-func (o *Output) shouldStopSendingMetrics(err error) bool {
-	if err == nil {
-		return false
-	}
-	if errResp, ok := err.(cloudapi.ErrorResponse); ok && errResp.Response != nil { //nolint:errorlint
-		// The Cloud service returns the error code 4 when it doesn't accept any more metrics.
-		// So, when k6 sees that, the cloud output just stops prematurely.
-		return errResp.Response.StatusCode == http.StatusForbidden && errResp.Code == 4
+// Instead, if cloudapi.Config.StopOnError is enabled the cloud output should
+// stop the whole test run too. This logic should be handled by the caller.
+func (o *Output) handleFlushError(err error) {
+	o.logger.WithError(err).Error("Failed to push metrics to the cloud")
+
+	var errResp cloudapi.ErrorResponse
+	if !errors.As(err, &errResp) || errResp.Response == nil {
+		return
 	}
 
-	return false
+	// The Cloud service returns the error code 4 when it doesn't accept any more metrics.
+	// So, when k6 sees that, the cloud output just stops prematurely.
+	if errResp.Response.StatusCode != http.StatusForbidden || errResp.Code != 4 {
+		return
+	}
+
+	o.logger.WithError(err).Warn("Interrupt sending metrics to cloud due to an error")
+	close(o.stopMetricsCollection)
+
+	if o.config.StopOnError.Bool {
+		serr := errext.WithAbortReasonIfNone(
+			errext.WithExitCodeIfNone(err, exitcodes.ExternalAbort),
+			errext.AbortedByOutput,
+		)
+
+		o.testStopFunc(serr)
+	}
 }
