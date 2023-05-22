@@ -88,14 +88,11 @@ func addBucketToTimeSeriesProto(
 		})
 	case metrics.Trend:
 		h := sink.(*histogram) //nolint: forcetypeassert
-		h.trimzeros()
 		samples := timeSeries.GetTrendHdrSamples()
-		samples.Values = append(samples.Values, &pbcloud.TrendHdrValue{
-			Time: timestamppb.New(time),
-			// TODO: implement the histogram
-		})
+		samples.Values = append(samples.Values, histogramAsProto(h, time))
 	default:
 		panic(fmt.Sprintf("MetricType %q is not supported", mt))
+
 	}
 }
 
