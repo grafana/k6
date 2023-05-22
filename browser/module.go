@@ -54,7 +54,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 			Chromium: mapBrowserToGoja(moduleVU{
 				VU:             vu,
 				pidRegistry:    m.PidRegistry,
-				remoteRegistry: m.remoteRegistry,
+				RemoteRegistry: m.remoteRegistry,
 			}),
 			Devices: common.GetDevices(),
 		},

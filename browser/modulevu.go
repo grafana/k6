@@ -17,7 +17,7 @@ type moduleVU struct {
 	k6modules.VU
 
 	*pidRegistry
-	remoteRegistry *registry.RemoteRegistry
+	*registry.RemoteRegistry
 }
 
 func (vu moduleVU) Context() context.Context {

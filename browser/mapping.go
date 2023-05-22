@@ -35,7 +35,7 @@ func mapBrowserToGoja(vu moduleVU) *goja.Object {
 		obj = rt.NewObject()
 		// TODO: Use k6 LookupEnv instead of OS package methods.
 		// See https://github.com/grafana/xk6-browser/issues/822.
-		wsURL, isRemoteBrowser = vu.remoteRegistry.IsRemoteBrowser()
+		wsURL, isRemoteBrowser = vu.IsRemoteBrowser()
 		browserType            = chromium.NewBrowserType(vu)
 	)
 	for k, v := range mapBrowserType(vu, browserType, wsURL, isRemoteBrowser) {
