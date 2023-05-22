@@ -731,7 +731,7 @@ func mapBrowserType(vu moduleVU, bt api.BrowserType, wsURL string, isRemoteBrows
 
 			b, pid := bt.Launch()
 			// store the pid so we can kill it later on panic.
-			vu.registerPid(pid)
+			vu.RegisterPid(pid)
 			m := mapBrowser(vu, b)
 			return rt.ToValue(m).ToObject(rt)
 		},

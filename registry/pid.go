@@ -1,15 +1,15 @@
-package browser
+package registry
 
 import "sync"
 
-// pidRegistry keeps track of the launched browser process IDs.
-type pidRegistry struct {
+// PidRegistry keeps track of the launched browser process IDs.
+type PidRegistry struct {
 	mu  sync.RWMutex
 	ids []int
 }
 
-// registerPid registers the launched browser process ID.
-func (r *pidRegistry) registerPid(pid int) {
+// RegisterPid registers the launched browser process ID.
+func (r *PidRegistry) RegisterPid(pid int) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -17,7 +17,7 @@ func (r *pidRegistry) registerPid(pid int) {
 }
 
 // Pids returns the launched browser process IDs.
-func (r *pidRegistry) Pids() []int {
+func (r *PidRegistry) Pids() []int {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
