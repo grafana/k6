@@ -14,9 +14,13 @@ runs:
       env: #TODO: remove after https://github.com/actions/runner/issues/2473 is fixed
         GITHUB_ACTION_REF: ${{ github.action_ref || github.head_ref }}
       run: |
-        RulesURL="https://raw.githubusercontent.com/grafana/k6/${{ env.GITHUB_ACTION_REF }}/.golangci.yml"
-        echo "Downloading ${RulesURL}..."
-        curl --silent --show-error --fail --no-location "${RulesURL}" --output "${{ github.action_path }}/.golangci.yml"
+        branch="master"
+        if [ "${{ github.event.pull_request.head.repo.full_name }}" = "grafana/k6" ]; then
+            branch="${{ env.GITHUB_ACTION_REF }}"
+        fi
+        rules_url="https://raw.githubusercontent.com/grafana/k6/${branch}/.golangci.yml"
+        echo "Downloading '${rules_url}' ..."
+        curl --silent --show-error --fail --no-location "${rules_url}" --output "${{ github.action_path }}/.golangci.yml"
 
         echo "GolangCIVersion=$(head -n 1 "${{ github.action_path }}/.golangci.yml" | tr -d '# ')" >> "${GITHUB_OUTPUT}"
       id: getenv
