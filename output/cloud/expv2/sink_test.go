@@ -13,10 +13,12 @@ func TestNewSink(t *testing.T) {
 		mt  metrics.MetricType
 		exp any
 	}{
-		{metrics.Counter, &metrics.CounterSink{}},
+		{metrics.Counter, &counter{}},
+		{metrics.Gauge, &gauge{}},
+		{metrics.Rate, &rate{}},
 		{metrics.Trend, &histogram{}},
 	}
 	for _, tc := range tests {
-		assert.Equal(t, tc.exp, newSink(tc.mt))
+		assert.Equal(t, tc.exp, newMetricValue(tc.mt))
 	}
 }

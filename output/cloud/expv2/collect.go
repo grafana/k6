@@ -12,7 +12,7 @@ type timeBucket struct {
 	// TODO: for performance reasons, use directly a unix time here
 	// so we can avoid time->unix->time
 	Time  time.Time
-	Sinks map[metrics.TimeSeries]metrics.Sink
+	Sinks map[metrics.TimeSeries]metricValue
 }
 
 // bucketQ is a queue for buffering the aggregated metrics
@@ -56,15 +56,12 @@ type collector struct {
 	aggregationPeriod time.Duration
 	waitPeriod        time.Duration
 
-	// We should no longer have to handle metrics that have times long in the past.
-	// So, instead of a map, we can probably use a simple slice (or even an array!)
-	// as a ring buffer to store the aggregation buckets.
-	// This should save us a some time, since it would make the lookups and
-	// WaitPeriod checks basically O(1).
-	// And even if for some reason there are occasional metrics with past times
-	// that don't fit in the chosen ring buffer size, we could just send them
-	// along to the buffer unaggregated.
-	timeBuckets map[int64]map[metrics.TimeSeries]metrics.Sink
+	// we should no longer have to handle metrics that have times long in the past. So instead of a
+	// map, we can probably use a simple slice (or even an array!) as a ring buffer to store the
+	// aggregation buckets. This should save us a some time, since it would make the lookups and WaitPeriod
+	// checks basically O(1). And even if for some reason there are occasional metrics with past times that
+	// don't fit in the chosen ring buffer size, we could just send them along to the buffer unaggregated
+	timeBuckets map[int64]map[metrics.TimeSeries]metricValue
 }
 
 func newCollector(aggrPeriod, waitPeriod time.Duration) (*collector, error) {
@@ -80,7 +77,7 @@ func newCollector(aggrPeriod, waitPeriod time.Duration) (*collector, error) {
 	return &collector{
 		bq:                bucketQ{},
 		nowFunc:           time.Now,
-		timeBuckets:       make(map[int64]map[metrics.TimeSeries]metrics.Sink),
+		timeBuckets:       make(map[int64]map[metrics.TimeSeries]metricValue),
 		aggregationPeriod: aggrPeriod,
 		waitPeriod:        waitPeriod,
 	}, nil
@@ -111,21 +108,18 @@ func (c *collector) collectSample(s metrics.Sample) {
 	// Get or create a time bucket
 	bucket, ok := c.timeBuckets[bucketID]
 	if !ok {
-		bucket = make(map[metrics.TimeSeries]metrics.Sink)
+		bucket = make(map[metrics.TimeSeries]metricValue)
 		c.timeBuckets[bucketID] = bucket
 	}
 
 	// Get or create the bucket's sinks map per time series
 	sink, ok := bucket[s.TimeSeries]
 	if !ok {
-		sink = newSink(s.Metric.Type)
+		sink = newMetricValue(s.Metric.Type)
 		bucket[s.TimeSeries] = sink
 	}
 
-	// TODO: we may consider to just pass
-	// the single value instead of the entire
-	// sample and save some memory
-	sink.Add(s)
+	sink.Add(s.Value)
 }
 
 func (c *collector) expiredBuckets() []timeBucket {

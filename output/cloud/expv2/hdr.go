@@ -5,7 +5,6 @@ import (
 	"math/bits"
 	"time"
 
-	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -265,14 +264,6 @@ func resolveBucketIndex(val float64) uint32 {
 	return (nkdiff << k) + (upscaled >> nkdiff)
 }
 
-func (h *histogram) IsEmpty() bool {
-	return h.Count == 0
-}
-
-func (h *histogram) Add(s metrics.Sample) {
-	h.addToBucket(s.Value)
-}
-
-func (h *histogram) Format(time.Duration) map[string]float64 {
-	panic("output/cloud/expv2/histogram.Format is not expected to be called")
+func (h *histogram) Add(v float64) {
+	h.addToBucket(v)
 }

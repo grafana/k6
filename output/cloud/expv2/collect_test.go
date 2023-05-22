@@ -22,7 +22,7 @@ func TestCollectorCollectSample(t *testing.T) {
 	c := collector{
 		aggregationPeriod: 3 * time.Second,
 		waitPeriod:        1 * time.Second,
-		timeBuckets:       make(map[int64]map[metrics.TimeSeries]metrics.Sink),
+		timeBuckets:       make(map[int64]map[metrics.TimeSeries]metricValue),
 		nowFunc: func() time.Time {
 			return time.Unix(31, 0)
 		},
@@ -55,7 +55,7 @@ func TestCollectorCollectSampleAggregateNumbers(t *testing.T) {
 	c := collector{
 		aggregationPeriod: 3 * time.Second,
 		waitPeriod:        1 * time.Second,
-		timeBuckets:       make(map[int64]map[metrics.TimeSeries]metrics.Sink),
+		timeBuckets:       make(map[int64]map[metrics.TimeSeries]metricValue),
 		nowFunc: func() time.Time {
 			return time.Unix(31, 0)
 		},
@@ -83,9 +83,9 @@ func TestCollectorCollectSampleAggregateNumbers(t *testing.T) {
 	assert.Contains(t, c.timeBuckets, int64(3))
 	assert.Contains(t, c.timeBuckets, int64(4))
 
-	sink, ok := c.timeBuckets[4][ts].(*metrics.CounterSink)
+	sink, ok := c.timeBuckets[4][ts].(*counter)
 	require.True(t, ok)
-	assert.Equal(t, 7.0, sink.Value)
+	assert.Equal(t, 7.0, sink.Sum)
 }
 
 func TestDropExpiringDelay(t *testing.T) {
@@ -105,7 +105,7 @@ func TestCollectorExpiredBucketsNoExipired(t *testing.T) {
 		nowFunc: func() time.Time {
 			return time.Unix(10, 0)
 		},
-		timeBuckets: map[int64]map[metrics.TimeSeries]metrics.Sink{
+		timeBuckets: map[int64]map[metrics.TimeSeries]metricValue{
 			6: {},
 		},
 	}
@@ -134,10 +134,10 @@ func TestCollectorExpiredBuckets(t *testing.T) {
 		nowFunc: func() time.Time {
 			return time.Unix(10, 0)
 		},
-		timeBuckets: map[int64]map[metrics.TimeSeries]metrics.Sink{
+		timeBuckets: map[int64]map[metrics.TimeSeries]metricValue{
 			3: {
-				ts1: &metrics.CounterSink{Value: 10},
-				ts2: &metrics.CounterSink{Value: 4},
+				ts1: &counter{Sum: 10},
+				ts2: &counter{Sum: 4},
 			},
 		},
 	}
@@ -145,10 +145,12 @@ func TestCollectorExpiredBuckets(t *testing.T) {
 	require.Len(t, expired, 1)
 
 	assert.NotZero(t, expired[0].Time)
-	assert.Equal(t, expired[0].Sinks, map[metrics.TimeSeries]metrics.Sink{
-		ts1: &metrics.CounterSink{Value: 10},
-		ts2: &metrics.CounterSink{Value: 4},
-	})
+
+	exp := map[metrics.TimeSeries]metricValue{
+		ts1: &counter{Sum: 10},
+		ts2: &counter{Sum: 4},
+	}
+	assert.Equal(t, exp, expired[0].Sinks)
 }
 
 func TestCollectorExpiredBucketsCutoff(t *testing.T) {
@@ -160,7 +162,7 @@ func TestCollectorExpiredBucketsCutoff(t *testing.T) {
 		nowFunc: func() time.Time {
 			return time.Unix(10, 0)
 		},
-		timeBuckets: map[int64]map[metrics.TimeSeries]metrics.Sink{
+		timeBuckets: map[int64]map[metrics.TimeSeries]metricValue{
 			3: {},
 			6: {},
 			9: {},
@@ -249,9 +251,9 @@ func TestBucketQPopAll(t *testing.T) {
 func TestBucketQPushPopConcurrency(t *testing.T) {
 	t.Parallel()
 	var (
-		counter = 0
-		bq      = bucketQ{}
-		sink    = metrics.NewSink(metrics.Counter)
+		count = 0
+		bq    = bucketQ{}
+		sink  = &counter{}
 
 		stop = time.After(100 * time.Millisecond)
 		pop  = make(chan struct{}, 10)
@@ -278,17 +280,17 @@ func TestBucketQPushPopConcurrency(t *testing.T) {
 			close(done)
 			return
 		default:
-			counter++
+			count++
 			bq.Push([]timeBucket{
 				{
 					Time: now,
-					Sinks: map[metrics.TimeSeries]metrics.Sink{
+					Sinks: map[metrics.TimeSeries]metricValue{
 						{}: sink,
 					},
 				},
 			})
 
-			if counter%5 == 0 { // a fixed-arbitrary flush rate
+			if count%5 == 0 { // a fixed-arbitrary flush rate
 				pop <- struct{}{}
 			}
 		}
