@@ -72,11 +72,12 @@ func TestIsRemoteBrowser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			wsURL, isRemote := IsRemoteBrowser(tc.envLookup)
+			rr := NewRemoteRegistry(tc.envLookup)
+			wsURL, isRemote := rr.IsRemoteBrowser()
 
 			require.Equal(t, tc.expIsRemote, isRemote)
 			if isRemote {
-				require.Equal(t, tc.expValidWSURLs, wsURL)
+				require.Contains(t, tc.expValidWSURLs, wsURL)
 			}
 		})
 	}
