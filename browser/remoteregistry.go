@@ -5,6 +5,7 @@ import (
 	"math/big"
 
 	"github.com/grafana/xk6-browser/env"
+	"github.com/grafana/xk6-browser/registry"
 )
 
 type remoteRegistry struct {
@@ -14,7 +15,7 @@ type remoteRegistry struct {
 
 func newRemoteRegistry(envLookup env.LookupFunc) *remoteRegistry {
 	r := &remoteRegistry{}
-	r.wsURLs, r.isRemoteBrowser = env.IsRemoteBrowser(envLookup)
+	r.wsURLs, r.isRemoteBrowser = registry.IsRemoteBrowser(envLookup)
 	return r
 }
 

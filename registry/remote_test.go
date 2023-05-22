@@ -1,9 +1,11 @@
-package env
+package registry
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/env"
 )
 
 func TestIsRemoteBrowser(t *testing.T) {
@@ -11,7 +13,7 @@ func TestIsRemoteBrowser(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		envLookup      LookupFunc
+		envLookup      env.LookupFunc
 		expIsRemote    bool
 		expValidWSURLs []string
 	}{
