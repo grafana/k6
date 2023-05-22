@@ -1,8 +1,6 @@
 package env
 
 import (
-	"crypto/rand"
-	"math/big"
 	"strings"
 )
 
@@ -10,19 +8,18 @@ import (
 type LookupFunc func(key string) (string, bool)
 
 // IsRemoteBrowser returns true and the corresponding CDP
-// WS URL if this one is set through the K6_BROWSER_WS_URL
-// environment variable. Otherwise returns false.
-// If K6_BROWSER_WS_URL is set as a comma separated list of
-// URLs, this method returns a randomly chosen URL from the list
-// so connections are done in a round-robin fashion for all the
-// entries in the list.
-func IsRemoteBrowser(envLookup LookupFunc) (wsURL string, isRemote bool) {
-	wsURL, isRemote = envLookup("K6_BROWSER_WS_URL")
+// WS URLs when set through the K6_BROWSER_WS_URL environment
+// variable. Otherwise returns false and nil.
+//
+// K6_BROWSER_WS_URL can be defined as a single WS URL or a
+// comma separated list of URLs.
+func IsRemoteBrowser(envLookup LookupFunc) ([]string, bool) {
+	wsURL, isRemote := envLookup("K6_BROWSER_WS_URL")
 	if !isRemote {
-		return "", false
+		return nil, false
 	}
 	if !strings.ContainsRune(wsURL, ',') {
-		return wsURL, isRemote
+		return []string{wsURL}, isRemote
 	}
 
 	// If last parts element is a void string,
@@ -33,9 +30,5 @@ func IsRemoteBrowser(envLookup LookupFunc) (wsURL string, isRemote bool) {
 		parts = parts[:len(parts)-1]
 	}
 
-	// Choose a random WS URL from the provided list
-	i, _ := rand.Int(rand.Reader, big.NewInt(int64(len(parts))))
-	wsURL = parts[i.Int64()]
-
-	return wsURL, isRemote
+	return parts, isRemote
 }

@@ -1,9 +1,11 @@
-package env
+package browser
 
 import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/env"
 )
 
 func TestIsRemoteBrowser(t *testing.T) {
@@ -11,7 +13,7 @@ func TestIsRemoteBrowser(t *testing.T) {
 
 	testCases := []struct {
 		name           string
-		envLookup      LookupFunc
+		envLookup      env.LookupFunc
 		expIsRemote    bool
 		expValidWSURLs []string
 	}{
@@ -70,11 +72,12 @@ func TestIsRemoteBrowser(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			wsURL, isRemote := IsRemoteBrowser(tc.envLookup)
+			rr := newRemoteRegistry(tc.envLookup)
+			wsURL, isRemote := rr.IsRemoteBrowser()
 
 			require.Equal(t, tc.expIsRemote, isRemote)
 			if isRemote {
-				require.Equal(t, tc.expValidWSURLs, wsURL)
+				require.Contains(t, tc.expValidWSURLs, wsURL)
 			}
 		})
 	}
