@@ -7,7 +7,6 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/registry"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -17,7 +16,7 @@ type (
 	// instances for each VU.
 	RootModule struct {
 		PidRegistry    *pidRegistry
-		remoteRegistry *registry.RemoteRegistry
+		remoteRegistry *remoteRegistry
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -42,7 +41,7 @@ var (
 func New() *RootModule {
 	return &RootModule{
 		PidRegistry:    &pidRegistry{},
-		remoteRegistry: registry.NewRemoteRegistry(os.LookupEnv),
+		remoteRegistry: newRemoteRegistry(os.LookupEnv),
 	}
 }
 
@@ -54,7 +53,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 			Chromium: mapBrowserToGoja(moduleVU{
 				VU:             vu,
 				pidRegistry:    m.PidRegistry,
-				RemoteRegistry: m.remoteRegistry,
+				remoteRegistry: m.remoteRegistry,
 			}),
 			Devices: common.GetDevices(),
 		},

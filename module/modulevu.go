@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/registry"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -17,7 +16,7 @@ type moduleVU struct {
 	k6modules.VU
 
 	*pidRegistry
-	*registry.RemoteRegistry
+	*remoteRegistry
 }
 
 func (vu moduleVU) Context() context.Context {
