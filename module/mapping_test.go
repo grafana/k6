@@ -1,4 +1,4 @@
-package browser
+package module
 
 import (
 	"reflect"

@@ -1,4 +1,4 @@
-package browser
+package module
 
 import (
 	"context"
@@ -28,7 +28,7 @@ func TestModuleNew(t *testing.T) {
 		},
 		CtxField: context.Background(),
 	}
-	m, ok := New().NewModuleInstance(vu).(*ModuleInstance)
+	m, ok := New().NewModuleInstance(vu).(*JSModuleInstance)
 	require.True(t, ok, "NewModuleInstance should return a ModuleInstance")
 	require.NotNil(t, m.mod, "Module should be set")
 	require.NotNil(t, m.mod.Chromium, "Chromium should be set")
