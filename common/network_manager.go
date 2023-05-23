@@ -239,7 +239,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
 			Samples: []k6metrics.Sample{
 				{
-					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqConnecting, Tags: tags},
+					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqConnecting, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
 					Time:       wallTime,
 				},
