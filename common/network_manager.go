@@ -244,7 +244,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 					Time:       wallTime,
 				},
 				{
-					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking, Tags: tags},
+					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqTLSHandshaking, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
 					Time:       wallTime,
 				},
