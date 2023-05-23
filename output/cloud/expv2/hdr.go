@@ -86,18 +86,8 @@ type histogram struct {
 // doesn't make any sense in this way.
 // It aggregates calling addToBucket time-to-time so
 // trimzeros has to be called at the end of the process.
-func newHistogram(values []float64) histogram {
-	h := histogram{}
-	if len(values) < 1 {
-		return h
-	}
-
-	for i := 0; i < len(values); i++ {
-		h.addToBucket(values[i])
-	}
-
-	h.trimzeros()
-	return h
+func newHistogram() histogram {
+	return histogram{}
 }
 
 // addToBucket increments the counter of the bucket
@@ -105,12 +95,6 @@ func newHistogram(values []float64) histogram {
 // If the value is lower or higher than the trackable limits
 // then it is counted into specific buckets.
 // All the stats are also updated accordingly.
-//
-// TODO: add the test case in units doing
-// addToBucket + trimzeros + addToBucket
-// so calling addToBucket after trimzeros was called.
-// We don't expect to have this case but the current API
-// would support it so we need to make sure it works or refactor.
 func (h *histogram) addToBucket(v float64) {
 	if h.Count == 0 {
 		h.Max, h.Min = v, v
@@ -136,62 +120,70 @@ func (h *histogram) addToBucket(v float64) {
 	}
 
 	index := resolveBucketIndex(v)
+
 	blen := uint32(len(h.Buckets))
 	if blen == 0 {
 		h.FirstNotZeroBucket = index
 		h.LastNotZeroBucket = index
+		h.Buckets = make([]uint32, 1, 32)
 	} else {
 		if index < h.FirstNotZeroBucket {
+			h.growLeft(index)
 			h.FirstNotZeroBucket = index
 		}
 		if index > h.LastNotZeroBucket {
+			h.growRight(index)
 			h.LastNotZeroBucket = index
 		}
 	}
 
-	if index >= blen {
-		h.grow(index)
-	}
-	h.Buckets[index]++
+	h.Buckets[index-h.FirstNotZeroBucket]++
 }
 
-// grow expands the buckets slice
-// with zeros up to the required index
-func (h *histogram) grow(index uint32) {
-	i := int(index)
-	if len(h.Buckets)-1 > i {
+func (h *histogram) growLeft(index uint32) {
+	if h.FirstNotZeroBucket <= index {
+		panic("buckets is already contains the requested index")
+	}
+
+	newLen := (h.FirstNotZeroBucket - index) + uint32(len(h.Buckets))
+
+	// there is enough capacity in the undrelying array
+	// reuse it slicing without allocate a new array
+	if uint32(cap(h.Buckets)) >= newLen {
+		upIndex := len(h.Buckets) - 1
+		h.Buckets = h.Buckets[:newLen]
+		h.Buckets = append(h.Buckets[upIndex+1:], h.Buckets[:upIndex+1]...)
+		return
+	}
+
+	// there isn't enough capacity, allocate a new slice
+	// able to contain the new size
+
+	newBuckets := make([]uint32, newLen)
+	copy(newBuckets[h.FirstNotZeroBucket-index:], h.Buckets)
+	h.Buckets = newBuckets
+}
+
+// growRight expands the buckets slice
+// with zeros up to the required index.
+// If it array has enough capacity then it reuses it without allocate.
+func (h *histogram) growRight(index uint32) {
+	if h.LastNotZeroBucket >= index {
 		panic("buckets is already bigger than requested index")
 	}
-	if cap(h.Buckets) > i {
+
+	newLen := index - h.FirstNotZeroBucket + 1
+
+	if uint32(cap(h.Buckets)) > newLen {
 		// See https://go.dev/ref/spec#Slice_expressions
 		// "For slices, the upper index bound is
 		// the slice capacity cap(a) rather than the length"
-		h.Buckets = h.Buckets[:index+1]
+		h.Buckets = h.Buckets[:newLen]
 	} else {
-		length := i + 1
-		// let's make two times larger of
-		// the current request
-		newBuckets := make([]uint32, length, (len(h.Buckets)+length)*2)
+		newBuckets := make([]uint32, newLen)
 		copy(newBuckets, h.Buckets)
 		h.Buckets = newBuckets
 	}
-}
-
-// trimzeros removes all buckets that have a zero value
-// from the begin and from the end until
-// the first not zero bucket.
-func (h *histogram) trimzeros() {
-	if h.Count < 1 || len(h.Buckets) < 1 {
-		return
-	}
-
-	// all the counters are set to zero, we can remove all
-	if h.FirstNotZeroBucket == 0 && h.LastNotZeroBucket == 0 {
-		h.Buckets = []uint32{}
-		return
-	}
-
-	h.Buckets = h.Buckets[h.FirstNotZeroBucket : h.LastNotZeroBucket+1]
 }
 
 // histogramAsProto converts the histogram into the equivalent Protobuf version.
