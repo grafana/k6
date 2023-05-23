@@ -47,6 +47,7 @@ func TestWebVitalMetric(t *testing.T) {
 			}
 			if count == len(expected) {
 				cancel()
+				break
 			}
 		}
 	}()
