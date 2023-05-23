@@ -28,6 +28,7 @@ const (
 	browserHTTPReqConnectingName     = "browser_http_req_connecting"
 	browserHTTPReqTLSHandshakingName = "browser_http_req_tls_handshaking"
 	browserHTTPReqSendingName        = "browser_http_req_sending"
+	browserHTTPReqReceivingName      = "browser_http_req_receiving"
 )
 
 // CustomMetrics are the custom k6 metrics used by xk6-browser.
@@ -41,6 +42,7 @@ type CustomMetrics struct {
 	BrowserHTTPReqConnecting     *k6metrics.Metric
 	BrowserHTTPReqTLSHandshaking *k6metrics.Metric
 	BrowserHTTPReqSending        *k6metrics.Metric
+	BrowserHTTPReqReceiving      *k6metrics.Metric
 }
 
 // RegisterCustomMetrics creates and registers our custom metrics with the k6
@@ -84,6 +86,7 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 		BrowserHTTPReqConnecting:     registry.MustNewMetric(browserHTTPReqConnectingName, k6metrics.Trend, k6metrics.Time),
 		BrowserHTTPReqTLSHandshaking: registry.MustNewMetric(browserHTTPReqTLSHandshakingName, k6metrics.Trend, k6metrics.Time),
 		BrowserHTTPReqSending:        registry.MustNewMetric(browserHTTPReqSendingName, k6metrics.Trend, k6metrics.Time),
+		BrowserHTTPReqReceiving:      registry.MustNewMetric(browserHTTPReqReceivingName, k6metrics.Trend, k6metrics.Time),
 	}
 }
 
