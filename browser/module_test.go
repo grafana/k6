@@ -28,7 +28,7 @@ func TestModuleNew(t *testing.T) {
 		},
 		CtxField: context.Background(),
 	}
-	m, ok := New().NewModuleInstance(vu).(*JSModuleInstance)
+	m, ok := New().NewModuleInstance(vu).(*ModuleInstance)
 	require.True(t, ok, "NewModuleInstance should return a ModuleInstance")
 	require.NotNil(t, m.mod, "Module should be set")
 	require.NotNil(t, m.mod.Chromium, "Chromium should be set")

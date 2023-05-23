@@ -26,15 +26,15 @@ type (
 		Version  string
 	}
 
-	// JSModuleInstance represents an instance of the JS module.
-	JSModuleInstance struct {
+	// ModuleInstance represents an instance of the JS module.
+	ModuleInstance struct {
 		mod *JSModule
 	}
 )
 
 var (
 	_ k6modules.Module   = &RootModule{}
-	_ k6modules.Instance = &JSModuleInstance{}
+	_ k6modules.Instance = &ModuleInstance{}
 )
 
 // New returns a pointer to a new RootModule instance.
@@ -48,7 +48,7 @@ func New() *RootModule {
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	return &JSModuleInstance{
+	return &ModuleInstance{
 		mod: &JSModule{
 			Chromium: mapBrowserToGoja(moduleVU{
 				VU:             vu,
@@ -62,6 +62,6 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 
 // Exports returns the exports of the JS module so that it can be used in test
 // scripts.
-func (mi *JSModuleInstance) Exports() k6modules.Exports {
+func (mi *ModuleInstance) Exports() k6modules.Exports {
 	return k6modules.Exports{Default: mi.mod}
 }
