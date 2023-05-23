@@ -21,16 +21,18 @@ const (
 	inpName  = "browser_web_vital_inp"
 	fcpName  = "browser_web_vital_fcp"
 
-	browserDataSentName = "browser_data_sent"
-	browserHTTPReqsName = "browser_http_reqs"
+	browserDataSentName        = "browser_data_sent"
+	browserHTTPReqsName        = "browser_http_reqs"
+	browserHTTPReqDurationName = "browser_http_req_duration"
 )
 
 // CustomMetrics are the custom k6 metrics used by xk6-browser.
 type CustomMetrics struct {
 	WebVitals map[string]*k6metrics.Metric
 
-	BrowserDataSent *k6metrics.Metric
-	BrowserHTTPReqs *k6metrics.Metric
+	BrowserDataSent        *k6metrics.Metric
+	BrowserHTTPReqs        *k6metrics.Metric
+	BrowserHTTPReqDuration *k6metrics.Metric
 }
 
 // RegisterCustomMetrics creates and registers our custom metrics with the k6
@@ -65,9 +67,10 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 	}
 
 	return &CustomMetrics{
-		WebVitals:       webVitals,
-		BrowserDataSent: registry.MustNewMetric(browserDataSentName, k6metrics.Counter, k6metrics.Data),
-		BrowserHTTPReqs: registry.MustNewMetric(browserHTTPReqsName, k6metrics.Counter),
+		WebVitals:              webVitals,
+		BrowserDataSent:        registry.MustNewMetric(browserDataSentName, k6metrics.Counter, k6metrics.Data),
+		BrowserHTTPReqs:        registry.MustNewMetric(browserHTTPReqsName, k6metrics.Counter),
+		BrowserHTTPReqDuration: registry.MustNewMetric(browserHTTPReqDurationName, k6metrics.Trend, k6metrics.Time),
 	}
 }
 
