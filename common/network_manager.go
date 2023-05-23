@@ -228,7 +228,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 				Time:       wallTime,
 			},
 			{
-				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataReceived, Tags: tags},
+				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataReceived, Tags: tags},
 				Value:      float64(bodySize),
 				Time:       wallTime,
 			},
