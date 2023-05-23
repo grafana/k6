@@ -16,7 +16,7 @@ import (
 type moduleVU struct {
 	k6modules.VU
 
-	*registry.PidRegistry
+	*pidRegistry
 	*registry.RemoteRegistry
 }
 
