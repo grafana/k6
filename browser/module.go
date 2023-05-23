@@ -1,5 +1,5 @@
-// Package module provides an entry point to the browser module.
-package module
+// Package browser provides an entry point to the browser module.
+package browser
 
 import (
 	"os"

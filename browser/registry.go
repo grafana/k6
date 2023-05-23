@@ -1,4 +1,4 @@
-package module
+package browser
 
 import (
 	"crypto/rand"
