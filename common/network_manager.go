@@ -249,7 +249,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 					Time:       wallTime,
 				},
 				{
-					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqSending, Tags: tags},
+					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqSending, Tags: tags},
 					Value:      k6metrics.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
 					Time:       wallTime,
 				},
