@@ -18,8 +18,10 @@ func TestBrowserTypeConnect(t *testing.T) {
 	bt := chromium.NewBrowserType(vu)
 	vu.MoveToVUContext()
 
-	b := bt.Connect(tb.wsURL)
-	b.NewPage(nil)
+	b, err := bt.Connect(tb.wsURL)
+	require.NoError(t, err)
+	_, err = b.NewPage(nil)
+	require.NoError(t, err)
 }
 
 func TestBrowserTypeLaunchToConnect(t *testing.T) {

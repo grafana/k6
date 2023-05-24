@@ -114,7 +114,10 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	bt.SetEnvLookupper(setupEnvLookupper(tb, browserOpts))
 
-	b, pid := bt.Launch()
+	b, pid, err := bt.Launch()
+	if err != nil {
+		tb.Fatalf("testBrowser: %v", err)
+	}
 	cb, ok := b.(*common.Browser)
 	if !ok {
 		tb.Fatalf("testBrowser: unexpected browser %T", b)

@@ -103,10 +103,10 @@ func (b *BrowserType) initContext() context.Context {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(wsEndpoint string) api.Browser {
+func (b *BrowserType) Connect(wsEndpoint string) (api.Browser, error) {
 	ctx, browserOpts, logger, err := b.init(true)
 	if err != nil {
-		k6ext.Panic(ctx, "initializing browser type: %w", err)
+		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
 
 	bp, err := b.connect(ctx, wsEndpoint, browserOpts, logger)
@@ -115,10 +115,10 @@ func (b *BrowserType) Connect(wsEndpoint string) api.Browser {
 			Err:     err,
 			Timeout: browserOpts.Timeout,
 		}
-		k6ext.Panic(ctx, "%w", err)
+		return nil, fmt.Errorf("%w", err)
 	}
 
-	return bp
+	return bp, nil
 }
 
 func (b *BrowserType) connect(
@@ -158,10 +158,10 @@ func (b *BrowserType) link(
 
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch() (_ api.Browser, browserProcessID int) {
+func (b *BrowserType) Launch() (_ api.Browser, browserProcessID int, _ error) {
 	ctx, browserOpts, logger, err := b.init(false)
 	if err != nil {
-		k6ext.Panic(ctx, "initializing browser type: %w", err)
+		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}
 
 	bp, pid, err := b.launch(ctx, browserOpts, logger)
@@ -170,10 +170,10 @@ func (b *BrowserType) Launch() (_ api.Browser, browserProcessID int) {
 			Err:     err,
 			Timeout: browserOpts.Timeout,
 		}
-		k6ext.Panic(ctx, "%w", err)
+		return nil, 0, fmt.Errorf("%w", err)
 	}
 
-	return bp, pid
+	return bp, pid, nil
 }
 
 func (b *BrowserType) launch(

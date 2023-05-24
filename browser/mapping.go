@@ -712,28 +712,39 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 func mapBrowserType(vu moduleVU, bt api.BrowserType, wsURL string, isRemoteBrowser bool) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"connect": func(wsEndpoint string, opts goja.Value) *goja.Object {
-			b := bt.Connect(wsEndpoint)
+		"connect": func(wsEndpoint string, opts goja.Value) (*goja.Object, error) {
+			b, err := bt.Connect(wsEndpoint)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
 			m := mapBrowser(vu, b)
-			return rt.ToValue(m).ToObject(rt)
+			return rt.ToValue(m).ToObject(rt), nil
 		},
 		"executablePath":          bt.ExecutablePath,
 		"launchPersistentContext": bt.LaunchPersistentContext,
 		"name":                    bt.Name,
-		"launch": func(opts goja.Value) *goja.Object {
+		"launch": func(opts goja.Value) (*goja.Object, error) {
 			// If browser is remote, transition from launch
 			// to connect and avoid storing the browser pid
 			// as we have no access to it.
 			if isRemoteBrowser {
-				m := mapBrowser(vu, bt.Connect(wsURL))
-				return rt.ToValue(m).ToObject(rt)
+				b, err := bt.Connect(wsURL)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				m := mapBrowser(vu, b)
+				return rt.ToValue(m).ToObject(rt), nil
 			}
 
-			b, pid := bt.Launch()
+			b, pid, err := bt.Launch()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
 			// store the pid so we can kill it later on panic.
 			vu.registerPid(pid)
 			m := mapBrowser(vu, b)
-			return rt.ToValue(m).ToObject(rt)
+
+			return rt.ToValue(m).ToObject(rt), nil
 		},
 	}
 }
