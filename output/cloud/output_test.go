@@ -20,7 +20,6 @@ import (
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	cloudv2 "go.k6.io/k6/output/cloud/expv2"
-	cloudv1 "go.k6.io/k6/output/cloud/v1"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -99,7 +98,7 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 "reference_id": "12345",
 "config": {
 	"metricPushInterval": "10ms",
-	"aggregationPeriod": "1s"
+	"aggregationPeriod": "40s"
 }
 }`)
 		case "/v1/tests/12345":
@@ -126,7 +125,7 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 	require.NoError(t, out.Start())
 
 	assert.Equal(t, types.NullDurationFrom(10*time.Millisecond), out.config.MetricPushInterval)
-	assert.Equal(t, types.NullDurationFrom(1*time.Second), out.config.AggregationPeriod)
+	assert.Equal(t, types.NullDurationFrom(40*time.Second), out.config.AggregationPeriod)
 
 	// Assert that it overwrites only the provided values
 	expTimeout := types.NewNullDuration(60*time.Second, false)
@@ -182,23 +181,18 @@ func TestOutputStartVersionedOutputV2(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func TestOutputStartVersionedOutputV1(t *testing.T) {
+func TestOutputStartVersionedOutputV1Error(t *testing.T) {
 	t.Parallel()
 
 	o := Output{
 		testRunID: "123",
 		config: cloudapi.Config{
 			APIVersion: null.IntFrom(1),
-			// Here, we are enabling but silencing the related async op
-			MetricPushInterval: types.NullDurationFrom(1 * time.Hour),
 		},
 	}
 
 	err := o.startVersionedOutput()
-	require.NoError(t, err)
-
-	_, ok := o.versionedOutput.(*cloudv1.Output)
-	assert.True(t, ok)
+	assert.ErrorContains(t, err, "not supported anymore")
 }
 
 func TestOutputStartWithTestRunID(t *testing.T) {
