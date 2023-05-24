@@ -106,3 +106,56 @@ func TestIsRemoteBrowser(t *testing.T) {
 		})
 	}
 }
+
+func TestIsRemoteBrowserWithScenarios(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name           string
+		envLookup      env.LookupFunc
+		expIsRemote    bool
+		expValidWSURLs []string
+	}{
+		{
+			name: "multiple scenarios",
+			envLookup: func(key string) (string, bool) {
+				json := `[
+					{
+						"id": "one",
+						"browsers": [
+							{ "handle": "ws://1..." },
+							{ "handle": "ws://2..." }
+						]
+					},
+					{
+						"id": "two",
+						"browsers": [
+							{ "handle": "ws://3..." }
+						]
+					}
+				]`
+
+				return json, true
+			},
+			expIsRemote:    true,
+			expValidWSURLs: []string{"ws://1...", "ws://2...", "ws://3..."},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			rr, err := newRemoteRegistryFromScenarios(tc.envLookup)
+			assert.NoError(t, err)
+			wsURL, isRemote := rr.isRemoteBrowser()
+
+			require.Equal(t, tc.expIsRemote, isRemote)
+			if isRemote {
+				require.Contains(t, tc.expValidWSURLs, wsURL)
+			}
+		})
+	}
+}

@@ -2,6 +2,8 @@ package browser
 
 import (
 	"crypto/rand"
+	"encoding/json"
+	"fmt"
 	"math/big"
 	"strings"
 	"sync"
@@ -73,6 +75,41 @@ func newRemoteRegistry(envLookup env.LookupFunc) *remoteRegistry {
 	r.wsURLs = parts
 
 	return r
+}
+
+// newRemoteRegistry will create a new RemoteRegistry. This will
+// parse the K6_BROWSER_WS_URL env var to retrieve the defined
+// list of WS URLs from the scenarios object.
+//
+// TODO: Name will change at the end of the PR.
+func newRemoteRegistryFromScenarios(envLookup env.LookupFunc) (*remoteRegistry, error) {
+	r := &remoteRegistry{}
+
+	scenariosJSON, isRemote := envLookup("K6_BROWSER_WS_URL")
+	if !isRemote {
+		return r, nil
+	}
+
+	var scenarios []struct {
+		ID       string `json:"id"`
+		Browsers []struct {
+			Handle string `json:"handle"`
+		} `json:"browsers"`
+	}
+
+	err := json.Unmarshal([]byte(scenariosJSON), &scenarios)
+	if err != nil {
+		return nil, fmt.Errorf("parsing K6_BROWSER_WS_URL: %w", err)
+	}
+
+	for _, s := range scenarios {
+		for _, b := range s.Browsers {
+			r.wsURLs = append(r.wsURLs, b.Handle)
+			r.isRemote = true
+		}
+	}
+
+	return r, nil
 }
 
 // isRemoteBrowser returns a WS URL and true when a WS URL is defined,
