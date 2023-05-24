@@ -24,7 +24,6 @@ import (
 	"google.golang.org/grpc/metadata"
 	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
-	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/modulestest"
@@ -34,6 +33,7 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	grpcanytesting "go.k6.io/k6/lib/testutils/httpmultibin/grpc_any_testing"
+	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/metrics"
 )
 
@@ -151,7 +151,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 			var client = new grpc.Client();
-			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+			client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 				val: []MethodInfo{{MethodInfo: grpc.MethodInfo{Name: "EmptyCall", IsClientStream: false, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/EmptyCall"}, {MethodInfo: grpc.MethodInfo{Name: "UnaryCall", IsClientStream: false, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/UnaryCall"}, {MethodInfo: grpc.MethodInfo{Name: "StreamingOutputCall", IsClientStream: false, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/StreamingOutputCall"}, {MethodInfo: grpc.MethodInfo{Name: "StreamingInputCall", IsClientStream: true, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/StreamingInputCall"}, {MethodInfo: grpc.MethodInfo{Name: "FullDuplexCall", IsClientStream: true, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/FullDuplexCall"}, {MethodInfo: grpc.MethodInfo{Name: "HalfDuplexCall", IsClientStream: true, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/HalfDuplexCall"}},
 			},
 		},
@@ -192,7 +192,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 			var client = new grpc.Client();
-			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");
+			client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");
 			client.connect();`,
 				err: "connecting to a gRPC server in the init context is not supported",
 			},
@@ -202,7 +202,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 			var client = new grpc.Client();
-			client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");
+			client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");
 			var err = client.invoke();
 			throw new Error(err)`,
 				err: "invoking RPC methods in the init context is not supported",
@@ -213,7 +213,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");
 				client.invoke("grpc.testing.TestService/EmptyCall", {})`,
 				err: "invoking RPC methods in the init context is not supported",
 			},
@@ -222,7 +222,7 @@ func TestClient(t *testing.T) {
 			name: "UnknownConnectParam",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", { name: "k6" });`,
 				err:  `unknown connect param: "name"`,
@@ -233,7 +233,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", { timeout: "k6" });`,
@@ -244,35 +244,35 @@ func TestClient(t *testing.T) {
 			name: "ConnectStringTimeout",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { timeout: "1h3s" });`},
 		},
 		{
 			name: "ConnectIntegerTimeout",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { timeout: 3000 });`},
 		},
 		{
 			name: "ConnectFloatTimeout",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { timeout: 3456.3 });`},
 		},
 		{
 			name: "Connect",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR");`},
 		},
 		{
 			name: "InvokeNotFound",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
@@ -284,7 +284,7 @@ func TestClient(t *testing.T) {
 			name: "InvokeInvalidParam",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
@@ -296,7 +296,7 @@ func TestClient(t *testing.T) {
 			name: "InvokeNilRequest",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
@@ -308,7 +308,7 @@ func TestClient(t *testing.T) {
 			name: "InvokeInvalidTimeoutType",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
@@ -320,7 +320,7 @@ func TestClient(t *testing.T) {
 			name: "InvokeInvalidTimeout",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
@@ -332,7 +332,7 @@ func TestClient(t *testing.T) {
 			name: "InvokeStringTimeout",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
@@ -343,7 +343,7 @@ func TestClient(t *testing.T) {
 			name: "InvokeFloatTimeout",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: `
 				client.connect("GRPCBIN_ADDR");
@@ -355,7 +355,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			vuString: codeBlock{
 				code: `
@@ -367,7 +367,7 @@ func TestClient(t *testing.T) {
 			name: "Invoke",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`},
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 					return &grpc_testing.Empty{}, nil
@@ -439,7 +439,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.UnaryCallFunc = func(_ context.Context, req *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
@@ -461,7 +461,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
@@ -486,7 +486,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.UnaryCallFunc = func(context.Context, *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
@@ -513,7 +513,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
@@ -541,7 +541,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
@@ -571,7 +571,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
@@ -608,7 +608,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			vuString: codeBlock{
 				code: `client.load()`,
@@ -718,7 +718,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.UnaryCallFunc = func(_ context.Context, req *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
@@ -769,7 +769,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				tb.GRPCStub.UnaryCallFunc = func(context.Context, *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
@@ -792,7 +792,7 @@ func TestClient(t *testing.T) {
 			initString: codeBlock{
 				code: `
 				var client = new grpc.Client();
-				client.load([], "../../../../vendor/google.golang.org/grpc/test/grpc_testing/test.proto");`,
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
 			},
 			vuString: codeBlock{
 				code: `

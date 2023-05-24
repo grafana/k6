@@ -26,10 +26,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	grpctest "google.golang.org/grpc/test/grpc_testing"
 
 	"go.k6.io/k6/lib/netext"
 	grpcanytesting "go.k6.io/k6/lib/testutils/httpmultibin/grpc_any_testing"
+	grpctest "go.k6.io/k6/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/lib/types"
 )
 

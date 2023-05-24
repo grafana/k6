@@ -37,6 +37,15 @@ func (r *result) ResolveMessageType(name protoreflect.FullName) protoreflect.Mes
 	return nil
 }
 
+func (r *result) ResolveOptionsType(name protoreflect.FullName) protoreflect.MessageDescriptor {
+	d, _ := ResolverFromFile(r).FindDescriptorByName(name)
+	md, _ := d.(protoreflect.MessageDescriptor)
+	if md != nil && md.ParentFile() != nil {
+		r.markUsed(md.ParentFile().Path())
+	}
+	return md
+}
+
 func (r *result) ResolveEnumType(name protoreflect.FullName) protoreflect.EnumDescriptor {
 	d := r.resolveElement(name)
 	if ed, ok := d.(protoreflect.EnumDescriptor); ok {
@@ -326,7 +335,10 @@ func resolveFieldTypes(f *fldDescriptor, handler *reporter.Handler, s *Symbols, 
 			return handler.HandleErrorf(file.NodeInfo(node.FieldExtendee()).Start(), "extendee is invalid: %s is %s, not a message", dsc.FullName(), descriptorTypeWithArticle(dsc))
 		}
 		f.extendee = extd
-		fld.Extendee = proto.String("." + string(dsc.FullName()))
+		extendeeName := "." + string(dsc.FullName())
+		if fld.GetExtendee() != extendeeName {
+			fld.Extendee = proto.String(extendeeName)
+		}
 		// make sure the tag number is in range
 		found := false
 		tag := protoreflect.FieldNumber(fld.GetNumber())
@@ -343,7 +355,7 @@ func resolveFieldTypes(f *fldDescriptor, handler *reporter.Handler, s *Symbols, 
 			}
 		} else {
 			// make sure tag is not a duplicate
-			if err := s.AddExtension(dsc.ParentFile().Package(), dsc.FullName(), tag, file.NodeInfo(node.FieldTag()).Start(), handler); err != nil {
+			if err := s.AddExtension(packageFor(dsc), dsc.FullName(), tag, file.NodeInfo(node.FieldTag()).Start(), handler); err != nil {
 				return err
 			}
 		}
@@ -394,27 +406,47 @@ func resolveFieldTypes(f *fldDescriptor, handler *reporter.Handler, s *Symbols, 
 				return handler.HandleErrorf(file.NodeInfo(node.FieldType()).Start(), "%s: %s is a synthetic map entry and may not be referenced explicitly", scope, dsc.FullName())
 			}
 		}
-		fld.TypeName = proto.String("." + string(dsc.FullName()))
-		// if type was tentatively unset, we now know it's actually a message
+		typeName := "." + string(dsc.FullName())
+		if fld.GetTypeName() != typeName {
+			fld.TypeName = proto.String(typeName)
+		}
 		if fld.Type == nil {
+			// if type was tentatively unset, we now know it's actually a message
 			fld.Type = descriptorpb.FieldDescriptorProto_TYPE_MESSAGE.Enum()
+		} else if fld.GetType() != descriptorpb.FieldDescriptorProto_TYPE_MESSAGE && fld.GetType() != descriptorpb.FieldDescriptorProto_TYPE_GROUP {
+			return handler.HandleErrorf(file.NodeInfo(node.FieldType()).Start(), "%s: descriptor proto indicates type %v but should be %v", scope, fld.GetType(), descriptorpb.FieldDescriptorProto_TYPE_MESSAGE)
 		}
 		f.msgType = dsc
 	case protoreflect.EnumDescriptor:
 		proto3 := r.Syntax() == protoreflect.Proto3
-		enumIsProto3 := dsc.ParentFile().Syntax() == protoreflect.Proto3
+		enumIsProto3 := dsc.Syntax() == protoreflect.Proto3
 		if fld.GetExtendee() == "" && proto3 && !enumIsProto3 {
 			// fields in a proto3 message cannot refer to proto2 enums
 			return handler.HandleErrorf(file.NodeInfo(node.FieldType()).Start(), "%s: cannot use proto2 enum %s in a proto3 message", scope, fld.GetTypeName())
 		}
-		fld.TypeName = proto.String("." + string(dsc.FullName()))
-		// the type was tentatively unset, but now we know it's actually an enum
-		fld.Type = descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum()
+		typeName := "." + string(dsc.FullName())
+		if fld.GetTypeName() != typeName {
+			fld.TypeName = proto.String(typeName)
+		}
+		if fld.Type == nil {
+			// the type was tentatively unset, but now we know it's actually an enum
+			fld.Type = descriptorpb.FieldDescriptorProto_TYPE_ENUM.Enum()
+		} else if fld.GetType() != descriptorpb.FieldDescriptorProto_TYPE_ENUM {
+			return handler.HandleErrorf(file.NodeInfo(node.FieldType()).Start(), "%s: descriptor proto indicates type %v but should be %v", scope, fld.GetType(), descriptorpb.FieldDescriptorProto_TYPE_ENUM)
+		}
 		f.enumType = dsc
 	default:
 		return handler.HandleErrorf(file.NodeInfo(node.FieldType()).Start(), "%s: invalid type: %s is %s, not a message or enum", scope, dsc.FullName(), descriptorTypeWithArticle(dsc))
 	}
 	return nil
+}
+
+func packageFor(dsc protoreflect.Descriptor) protoreflect.FullName {
+	if dsc.ParentFile() != nil {
+		return dsc.ParentFile().Package()
+	}
+	// Can't access package? Make a best effort guess.
+	return dsc.FullName().Parent()
 }
 
 func isValidMap(mapField protoreflect.FieldDescriptor, mapEntry protoreflect.MessageDescriptor) bool {
@@ -444,7 +476,10 @@ func resolveMethodTypes(m *mtdDescriptor, handler *reporter.Handler, scopes []sc
 			return err
 		}
 	} else {
-		mtd.InputType = proto.String("." + string(dsc.FullName()))
+		typeName := "." + string(dsc.FullName())
+		if mtd.GetInputType() != typeName {
+			mtd.InputType = proto.String(typeName)
+		}
 		m.inputType = msg
 	}
 
@@ -463,7 +498,10 @@ func resolveMethodTypes(m *mtdDescriptor, handler *reporter.Handler, scopes []sc
 			return err
 		}
 	} else {
-		mtd.OutputType = proto.String("." + string(dsc.FullName()))
+		typeName := "." + string(dsc.FullName())
+		if mtd.GetOutputType() != typeName {
+			mtd.OutputType = proto.String(typeName)
+		}
 		m.outputType = msg
 	}
 

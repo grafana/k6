@@ -19,7 +19,7 @@ github.com/andybalholm/cascadia
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/bufbuild/protocompile v0.2.1-0.20230123224550-da57cd758c2f
+# github.com/bufbuild/protocompile v0.4.0
 ## explicit; go 1.18
 github.com/bufbuild/protocompile
 github.com/bufbuild/protocompile/ast
@@ -124,7 +124,7 @@ github.com/go-redis/redis/v8/internal/util
 ## explicit
 github.com/go-sourcemap/sourcemap
 github.com/go-sourcemap/sourcemap/internal/base64vlq
-# github.com/golang/protobuf v1.5.2
+# github.com/golang/protobuf v1.5.3
 ## explicit; go 1.9
 github.com/golang/protobuf/jsonpb
 github.com/golang/protobuf/proto
@@ -182,7 +182,7 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.15.0
+# github.com/jhump/protoreflect v1.15.1
 ## explicit; go 1.18
 github.com/jhump/protoreflect/desc
 github.com/jhump/protoreflect/desc/internal
@@ -341,10 +341,10 @@ golang.org/x/text/unicode/rangetable
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
-# google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f
+# google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.53.0
+# google.golang.org/grpc v1.55.0
 ## explicit; go 1.17
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -396,8 +396,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-google.golang.org/grpc/test/grpc_testing
-# google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
+# google.golang.org/protobuf v1.30.0
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext

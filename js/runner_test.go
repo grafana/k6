@@ -30,7 +30,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/time/rate"
-	"google.golang.org/grpc/test/grpc_testing"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/errext"
@@ -44,6 +43,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
+	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_testing"
 	"go.k6.io/k6/lib/testutils/mockoutput"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
@@ -2408,7 +2408,7 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 	}
 
 	fs := fsext.NewMemMapFs()
-	protoFile, err := ioutil.ReadFile("../vendor/google.golang.org/grpc/test/grpc_testing/test.proto")
+	protoFile, err := ioutil.ReadFile("../lib/testutils/httpmultibin/grpc_testing/test.proto")
 	require.NoError(t, err)
 	require.NoError(t, fsext.WriteFile(fs, "/path/to/service.proto", protoFile, 0o644))
 	require.NoError(t, fsext.WriteFile(fs, "/path/to/same-dir.proto", []byte(

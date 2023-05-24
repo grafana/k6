@@ -51,9 +51,9 @@ import (
 //  10. Send out the CL for review and submit it.
 const (
 	Major      = 1
-	Minor      = 28
-	Patch      = 1
-	PreRelease = "devel"
+	Minor      = 30
+	Patch      = 0
+	PreRelease = ""
 )
 
 // String formats the version string for this module in semver format.

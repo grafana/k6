@@ -11,7 +11,7 @@ require (
 	github.com/dop251/goja v0.0.0-20230427124612-428fc442ff5f
 	github.com/fatih/color v1.15.0
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
-	github.com/golang/protobuf v1.5.2
+	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-browser v0.9.0
 	github.com/grafana/xk6-output-prometheus-remote v0.2.1
@@ -20,7 +20,7 @@ require (
 	github.com/grafana/xk6-webcrypto v0.1.0
 	github.com/grafana/xk6-websockets v0.2.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
-	github.com/jhump/protoreflect v1.15.0
+	github.com/jhump/protoreflect v1.15.1
 	github.com/klauspost/compress v1.16.5
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.13
@@ -43,8 +43,8 @@ require (
 	golang.org/x/net v0.10.0
 	golang.org/x/term v0.8.0
 	golang.org/x/time v0.3.0
-	google.golang.org/grpc v1.53.0
-	google.golang.org/protobuf v1.28.2-0.20220831092852-f930b1dc76e8
+	google.golang.org/grpc v1.55.0
+	google.golang.org/protobuf v1.30.0
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
@@ -52,7 +52,7 @@ require (
 require (
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bufbuild/protocompile v0.2.1-0.20230123224550-da57cd758c2f // indirect
+	github.com/bufbuild/protocompile v0.4.0 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
@@ -78,5 +78,5 @@ require (
 	golang.org/x/sync v0.2.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect
-	google.golang.org/genproto v0.0.0-20230110181048-76db0878b65f // indirect
+	google.golang.org/genproto v0.0.0-20230306155012-7f2fa6fef1f4 // indirect
 )
