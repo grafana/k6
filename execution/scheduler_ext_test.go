@@ -1099,7 +1099,7 @@ func TestDNSResolver(t *testing.T) {
 					}, nil)
 				require.NoError(t, err)
 
-				mr := mockresolver.New(nil, net.LookupIP)
+				mr := mockresolver.New(nil)
 				runner.ActualResolver = mr.LookupIPAll
 
 				ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, tc.opts)

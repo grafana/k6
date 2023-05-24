@@ -26,7 +26,7 @@ func TestResolver(t *testing.T) {
 			net.ParseIP("2001:db8::11"),
 			net.ParseIP("2001:db8::12"),
 		},
-	}, nil)
+	})
 
 	t.Run("LookupIP", func(t *testing.T) {
 		t.Parallel()

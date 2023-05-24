@@ -9,17 +9,16 @@ import (
 // MockResolver implements netext.Resolver, and allows changing the host
 // mapping at runtime.
 type MockResolver struct {
-	m        sync.RWMutex
-	hosts    map[string][]net.IP
-	fallback func(host string) ([]net.IP, error)
+	m     sync.RWMutex
+	hosts map[string][]net.IP
 }
 
 // New returns a new MockResolver.
-func New(hosts map[string][]net.IP, fallback func(host string) ([]net.IP, error)) *MockResolver {
+func New(hosts map[string][]net.IP) *MockResolver {
 	if hosts == nil {
 		hosts = make(map[string][]net.IP)
 	}
-	return &MockResolver{hosts: hosts, fallback: fallback}
+	return &MockResolver{hosts: hosts}
 }
 
 // LookupIP returns the first IP mapped for host.
@@ -39,9 +38,6 @@ func (r *MockResolver) LookupIPAll(host string) ([]net.IP, error) {
 	defer r.m.RUnlock()
 	if ips, ok := r.hosts[host]; ok {
 		return ips, nil
-	}
-	if r.fallback != nil {
-		return r.fallback(host)
 	}
 	return nil, fmt.Errorf("lookup %s: no such host", host)
 }
