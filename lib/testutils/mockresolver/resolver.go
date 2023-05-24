@@ -9,8 +9,9 @@ import (
 // MockResolver implements netext.Resolver, and allows changing the host
 // mapping at runtime.
 type MockResolver struct {
-	m     sync.RWMutex
-	hosts map[string][]net.IP
+	m           sync.RWMutex
+	hosts       map[string][]net.IP
+	ResolveHook func(host string, result []net.IP)
 }
 
 // New returns a new MockResolver.
@@ -33,7 +34,12 @@ func (r *MockResolver) LookupIP(host string) (net.IP, error) {
 
 // LookupIPAll returns all IPs mapped for host. It mimics the net.LookupIP
 // signature so that it can be used to mock netext.LookupIP in tests.
-func (r *MockResolver) LookupIPAll(host string) ([]net.IP, error) {
+func (r *MockResolver) LookupIPAll(host string) (ips []net.IP, err error) {
+	defer func() {
+		if r.ResolveHook != nil {
+			r.ResolveHook(host, ips)
+		}
+	}()
 	r.m.RLock()
 	defer r.m.RUnlock()
 	if ips, ok := r.hosts[host]; ok {
