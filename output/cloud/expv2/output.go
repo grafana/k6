@@ -31,7 +31,7 @@ type Output struct {
 	metricsFlusher noopFlusher
 	collector      *collector
 
-	stopMetricsCollection chan struct{}
+	stopSamplesCollection chan struct{}
 
 	wg   sync.WaitGroup
 	stop chan struct{}
@@ -42,7 +42,7 @@ func New(logger logrus.FieldLogger, conf cloudapi.Config) (*Output, error) {
 	return &Output{
 		config:                conf,
 		logger:                logger.WithFields(logrus.Fields{"output": "cloudv2"}),
-		stopMetricsCollection: make(chan struct{}),
+		stopSamplesCollection: make(chan struct{}),
 		stop:                  make(chan struct{}),
 	}, nil
 }
@@ -107,7 +107,7 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 	// evaluate to do something smarter, maybe having a lock-free
 	// queue.
 	select {
-	case <-o.stopMetricsCollection:
+	case <-o.stopSamplesCollection:
 		return
 	default:
 	}
@@ -136,7 +136,7 @@ func (o *Output) periodicInvoke(d time.Duration, callback func()) {
 			callback()
 		case <-o.stop:
 			return
-		case <-o.stopMetricsCollection:
+		case <-o.stopSamplesCollection:
 			return
 		}
 	}
@@ -192,7 +192,7 @@ func (o *Output) handleFlushError(err error) {
 	}
 
 	o.logger.WithError(err).Warn("Interrupt sending metrics to cloud due to an error")
-	close(o.stopMetricsCollection)
+	close(o.stopSamplesCollection)
 
 	if o.config.StopOnError.Bool {
 		serr := errext.WithAbortReasonIfNone(

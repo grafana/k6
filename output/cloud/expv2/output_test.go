@@ -166,7 +166,7 @@ func TestOutputHandleFlushError(t *testing.T) {
 				testStopFunc: func(error) {
 					stopFuncCalled = true
 				},
-				stopMetricsCollection: make(chan struct{}),
+				stopSamplesCollection: make(chan struct{}),
 			}
 			o.config.StopOnError = null.BoolFrom(tc.abort)
 
@@ -178,7 +178,7 @@ func TestOutputHandleFlushError(t *testing.T) {
 
 				<-done
 				select {
-				case <-o.stopMetricsCollection:
+				case <-o.stopSamplesCollection:
 					stopMetricCollection = true
 				default:
 				}
@@ -199,7 +199,7 @@ func TestOutputAddMetricSamples(t *testing.T) {
 
 	stopSamples := make(chan struct{})
 	o := Output{
-		stopMetricsCollection: stopSamples,
+		stopSamplesCollection: stopSamples,
 	}
 	require.Empty(t, o.GetBufferedSamples())
 
