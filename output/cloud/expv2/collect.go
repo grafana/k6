@@ -9,6 +9,8 @@ import (
 )
 
 type timeBucket struct {
+	// TODO: for performance reasons, use directly a unix time here
+	// so we can avoid time->unix->time
 	Time  time.Time
 	Sinks map[metrics.TimeSeries]metrics.Sink
 }
@@ -157,10 +159,8 @@ func (c *collector) bucketID(t time.Time) int64 {
 }
 
 func (c *collector) timeFromBucketID(id int64) time.Time {
-	return time.Unix(0,
-		// it uses the center of the bucket as time
-		(id*int64(c.aggregationPeriod))+int64(c.aggregationPeriod/2),
-	).Truncate(time.Microsecond).UTC()
+	return time.Unix(0, id*int64(c.aggregationPeriod)).
+		Truncate(time.Microsecond).UTC()
 }
 
 func (c *collector) bucketCutoffID() int64 {

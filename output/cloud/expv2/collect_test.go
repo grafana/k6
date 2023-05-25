@@ -172,7 +172,7 @@ func TestCollectorExpiredBucketsCutoff(t *testing.T) {
 	assert.NotContains(t, c.timeBuckets, 3)
 
 	require.Len(t, expired, 1)
-	expDateTime := time.Unix(10, int64(500*time.Millisecond)).UTC()
+	expDateTime := time.Unix(9, 0).UTC()
 	assert.Equal(t, expDateTime, expired[0].Time)
 }
 
@@ -202,8 +202,8 @@ func TestCollectorTimeFromBucketID(t *testing.T) {
 
 	c := collector{aggregationPeriod: 3 * time.Second}
 
-	// exp = Time(bucketID * 3s + (3s/2)) = Time(49 * 3s + (1.5s))
-	exp := time.Date(1970, time.January, 1, 0, 2, 28, int(500*time.Millisecond), time.UTC)
+	// exp = TimeFromUnix(bucketID * aggregationPeriod) = Time(49 * 3s)
+	exp := time.Date(1970, time.January, 1, 0, 2, 27, 0, time.UTC)
 	assert.Equal(t, exp, c.timeFromBucketID(49))
 }
 
