@@ -55,20 +55,17 @@ func TestOutputSetTestRunStopCallback(t *testing.T) {
 func TestOutputCollectSamples(t *testing.T) {
 	t.Parallel()
 	o, err := New(testutils.NewLogger(t), cloudapi.Config{
-		AggregationPeriod:     types.NewNullDuration(3*time.Second, true),
 		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
-		MetricPushInterval:    types.NewNullDuration(10*time.Second, true),
+		// Manually control and trigger the various steps
+		// instead to be time dependent
+		AggregationPeriod:  types.NewNullDuration(1*time.Hour, true),
+		MetricPushInterval: types.NewNullDuration(1*time.Hour, true),
 	})
 	require.NoError(t, err)
 	require.NoError(t, o.Start())
-
-	// Manually control and trigger the various steps
-	// instead to be time dependent
-	o.periodicFlusher.Stop()
-
-	o.periodicCollector.Stop()
 	require.Empty(t, o.collector.bq.PopAll())
 
+	o.collector.aggregationPeriod = 3 * time.Second
 	o.collector.nowFunc = func() time.Time {
 		// the cut off will be set to (22-1)
 		return time.Date(2023, time.May, 1, 1, 1, 20, 0, time.UTC)
@@ -107,6 +104,7 @@ func TestOutputCollectSamples(t *testing.T) {
 	buckets := o.collector.bq.PopAll()
 	require.Len(t, buckets, 1)
 	require.Contains(t, buckets[0].Sinks, ts)
+	require.Len(t, buckets[0].Sinks, 1)
 
 	counter, ok := buckets[0].Sinks[ts].(*metrics.CounterSink)
 	require.True(t, ok)
