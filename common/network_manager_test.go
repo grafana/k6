@@ -58,7 +58,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 			net.ParseIP("2001:db8::11"),
 			net.ParseIP("2001:db8::12"),
 		},
-	}, nil)
+	})
 
 	vu := k6test.NewVU(t)
 	vu.MoveToVUContext()
