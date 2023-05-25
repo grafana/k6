@@ -108,7 +108,6 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 	// queue.
 	select {
 	case <-o.stopMetricsCollection:
-		// TODO: unit test this case
 		return
 	default:
 	}

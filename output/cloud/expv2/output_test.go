@@ -193,3 +193,26 @@ func TestOutputHandleFlushError(t *testing.T) {
 		})
 	}
 }
+
+func TestOutputAddMetricSamples(t *testing.T) {
+	t.Parallel()
+
+	stopSamples := make(chan struct{})
+	o := Output{
+		stopMetricsCollection: stopSamples,
+	}
+	require.Empty(t, o.GetBufferedSamples())
+
+	s := metrics.Sample{}
+	o.AddMetricSamples([]metrics.SampleContainer{
+		metrics.Samples([]metrics.Sample{s}),
+	})
+	require.Len(t, o.GetBufferedSamples(), 1)
+
+	// Not accept samples anymore when the chan is closed
+	close(stopSamples)
+	o.AddMetricSamples([]metrics.SampleContainer{
+		metrics.Samples([]metrics.Sample{s}),
+	})
+	require.Empty(t, o.GetBufferedSamples())
+}
