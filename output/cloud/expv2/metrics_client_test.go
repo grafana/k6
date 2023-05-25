@@ -12,6 +12,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 )
@@ -92,4 +93,32 @@ func TestMetricsClientPushError(t *testing.T) {
 
 	err := mc.Push(context.TODO(), "test-ref-id", nil)
 	assert.ErrorContains(t, err, "fake generated error")
+}
+
+func TestMetricsClientPushStructuredError(t *testing.T) {
+	t.Parallel()
+
+	exp := cloudapi.ErrorResponse{Code: 1, Message: "test message"}
+
+	httpClientMock := func(_ *http.Request) (*http.Response, error) {
+		b := `{"error":{"code":1,"message":"test message"}}`
+		r := &http.Response{
+			StatusCode: http.StatusBadRequest,
+			Body:       io.NopCloser(bytes.NewBuffer([]byte(b))),
+		}
+		exp.Response = r
+		return r, nil
+	}
+
+	mc := MetricsClient{
+		httpClient: httpDoerFunc(httpClientMock),
+		pushBufferPool: sync.Pool{
+			New: func() interface{} {
+				return &bytes.Buffer{}
+			},
+		},
+	}
+
+	err := mc.Push(context.TODO(), "test-ref-id", nil)
+	assert.Equal(t, exp, err)
 }

@@ -13,6 +13,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 )
@@ -98,8 +99,9 @@ func (mc *MetricsClient) Push(ctx context.Context, referenceID string, samples *
 	defer func() {
 		_ = resp.Body.Close()
 	}()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("response got an unexpected status code: %s", resp.Status)
+
+	if err := cloudapi.CheckResponse(resp); err != nil {
+		return err
 	}
 	mc.logger.WithField("t", time.Since(start)).WithField("size", len(b)).
 		Debug("Pushed the collected metrics to the Cloud service")
