@@ -191,7 +191,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		wallTime = resp.wallTime
 		url = resp.url
 		// Assuming that a failure is when status
-		// is between 200 and 399 (inclusive).
+		// is not between 200 and 399 (inclusive).
 		if status < 200 || status > 399 {
 			failed = 1
 		}
