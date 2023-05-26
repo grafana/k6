@@ -144,7 +144,7 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 		return false, err
 	}
 
-	if err = checkResponse(resp); err != nil {
+	if err = CheckResponse(resp); err != nil {
 		return false, err
 	}
 
@@ -157,7 +157,10 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 	return false, err
 }
 
-func checkResponse(r *http.Response) error {
+// CheckResponse checks the parsed response.
+// It returns nil if the code is in the successful range,
+// otherwise it tries to parse the body and return a parsed error.
+func CheckResponse(r *http.Response) error {
 	if r == nil {
 		return errUnknown
 	}

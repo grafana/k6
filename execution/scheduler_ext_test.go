@@ -8,7 +8,6 @@ import (
 	"net"
 	"net/url"
 	"reflect"
-	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -1025,8 +1024,8 @@ func TestSchedulerIsRunning(t *testing.T) {
 	assert.NoError(t, <-err)
 }
 
-// TestDNSResolver checks the DNS resolution behavior at the Scheduler level.
-func TestDNSResolver(t *testing.T) {
+// TestDNSResolverCache checks the DNS resolution behavior at the Scheduler level.
+func TestDNSResolverCache(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 	sr := tb.Replacer.Replace
@@ -1045,96 +1044,97 @@ func TestDNSResolver(t *testing.T) {
 			sleep(0.7);  // somewhat uneven multiple of 0.5 to minimize races with asserts
 		}`)
 
-	t.Run("cache", func(t *testing.T) {
-		t.Parallel()
-		testCases := map[string]struct {
-			opts          lib.Options
-			expLogEntries int
-		}{
-			"default": { // IPs are cached for 5m
-				lib.Options{DNS: types.DefaultDNSConfig()}, 0,
-			},
-			"0": { // cache is disabled, every request does a DNS lookup
-				lib.Options{DNS: types.DNSConfig{
-					TTL:    null.StringFrom("0"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
-					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
-				}}, 5,
-			},
-			"1000": { // cache IPs for 1s, check that unitless values are interpreted as ms
-				lib.Options{DNS: types.DNSConfig{
-					TTL:    null.StringFrom("1000"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
-					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
-				}}, 4,
-			},
-			"3s": {
-				lib.Options{DNS: types.DNSConfig{
-					TTL:    null.StringFrom("3s"),
-					Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
-					Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
-				}}, 3,
-			},
-		}
+	testCases := map[string]struct {
+		opts lib.Options
+		// Amount of expected resolutions after the IP change.
+		// This will demonstrate how the cache is being used, depending on the
+		// configured TTL.
+		expNewResolutions uint32
+	}{
+		"default": {
+			// IPs are cached for 5m, so no new resolution attempts will be made.
+			opts:              lib.Options{DNS: types.DefaultDNSConfig()},
+			expNewResolutions: 0,
+		},
+		"0ok": {
+			// The cache is disabled, so every request does a DNS lookup.
+			opts: lib.Options{DNS: types.DNSConfig{
+				TTL:    null.StringFrom("0"),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+			}},
+			expNewResolutions: 7,
+		},
+		"1700": {
+			// IPs are cached for 1.7s.
+			// This also checks that unitless values are interpreted as ms.
+			opts: lib.Options{DNS: types.DNSConfig{
+				TTL:    null.StringFrom("1700"),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+			}},
+			expNewResolutions: 2,
+		},
+		"3s": {
+			opts: lib.Options{DNS: types.DNSConfig{
+				TTL:    null.StringFrom("3s"),
+				Select: types.NullDNSSelect{DNSSelect: types.DNSfirst, Valid: true},
+				Policy: types.NullDNSPolicy{DNSPolicy: types.DNSpreferIPv4, Valid: false},
+			}},
+			expNewResolutions: 1,
+		},
+	}
 
-		for name, tc := range testCases {
-			tc := tc
-			t.Run(name, func(t *testing.T) {
-				t.Parallel()
-				logger := logrus.New()
-				logger.SetOutput(io.Discard)
-				logHook := testutils.NewLogHook(logrus.WarnLevel)
-				logger.AddHook(logHook)
+	for name, tc := range testCases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			logger := logrus.New()
+			logger.SetOutput(io.Discard)
+			logHook := testutils.NewLogHook(logrus.WarnLevel)
+			logger.AddHook(logHook)
 
-				registry := metrics.NewRegistry()
-				builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-				runner, err := js.New(
-					&lib.TestPreInitState{
-						Logger:         logger,
-						BuiltinMetrics: builtinMetrics,
-						Registry:       registry,
-					},
-					&loader.SourceData{
-						URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
-					}, nil)
-				require.NoError(t, err)
+			registry := metrics.NewRegistry()
+			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+			runner, err := js.New(
+				&lib.TestPreInitState{
+					Logger:         logger,
+					BuiltinMetrics: builtinMetrics,
+					Registry:       registry,
+				},
+				&loader.SourceData{
+					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
+				}, nil)
+			require.NoError(t, err)
 
-				mr := mockresolver.New(nil, net.LookupIP)
-				runner.ActualResolver = mr.LookupIPAll
-
-				ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, tc.opts)
-				defer cancel()
-
-				mr.Set("myhost", sr("HTTPBIN_IP"))
-				time.AfterFunc(1700*time.Millisecond, func() {
+			mr := mockresolver.New(map[string][]net.IP{"myhost": {net.ParseIP(sr("HTTPBIN_IP"))}})
+			var newResolutions uint32
+			resolveHook := func(host string, result []net.IP) {
+				require.Len(t, result, 1)
+				if result[0].String() == "127.0.0.1" {
 					mr.Set("myhost", "127.0.0.254")
-				})
-				defer mr.Unset("myhost")
-
-				errCh := make(chan error, 1)
-				go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
-
-				select {
-				case err := <-errCh:
-					require.NoError(t, err)
-					entries := logHook.Drain()
-					require.Len(t, entries, tc.expLogEntries)
-					for _, entry := range entries {
-						require.IsType(t, &url.Error{}, entry.Data["error"])
-						err, ok := entry.Data["error"].(*url.Error)
-						assert.True(t, ok)
-						errMsg := err.Error()
-						contains := strings.Contains(errMsg, "connection refused") ||
-							strings.Contains(errMsg, "request timeout") ||
-							strings.Contains(errMsg, "dial: i/o timeout")
-						assert.Truef(t, contains, "expected error to contain one of the list of messages")
-					}
-				case <-time.After(10 * time.Second):
-					t.Fatal("timed out")
+				} else {
+					atomic.AddUint32(&newResolutions, 1)
 				}
-			})
-		}
-	})
+			}
+			mr.ResolveHook = resolveHook
+			runner.ActualResolver = mr.LookupIPAll
+
+			ctx, cancel, execScheduler, samples := newTestScheduler(t, runner, logger, tc.opts)
+			defer cancel()
+
+			errCh := make(chan error, 1)
+			go func() { errCh <- execScheduler.Run(ctx, ctx, samples) }()
+
+			select {
+			case err := <-errCh:
+				require.NoError(t, err)
+				assert.Equal(t, tc.expNewResolutions, atomic.LoadUint32(&newResolutions))
+			case <-time.After(10 * time.Second):
+				t.Fatal("timed out")
+			}
+		})
+	}
 }
 
 func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {

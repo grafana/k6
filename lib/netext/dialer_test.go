@@ -145,6 +145,6 @@ func newResolver() *mockresolver.MockResolver {
 			"example-resolver.com":           {net.ParseIP("1.2.3.4")},
 			"example-deny-resolver.com":      {net.ParseIP("8.9.10.11")},
 			"example-ipv6-deny-resolver.com": {net.ParseIP("::1")},
-		}, nil,
+		},
 	)
 }

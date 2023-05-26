@@ -1,0 +1,143 @@
+syntax = "proto3";
+
+package metrics;
+
+option go_package = "go.k6.io/k6/output/cloud/expv2/pbcloud";
+
+import "google/protobuf/timestamp.proto";
+
+// The type of a Metric.
+enum MetricType {
+  // Metric of type METRICTYPE_UNSPECIFIED declared, but not allowed.
+  // See: https://protobuf.dev/programming-guides/dos-donts/#do-include-an-unspecified-value-in-an-enum.
+  METRIC_TYPE_UNSPECIFIED = 0;
+  METRIC_TYPE_COUNTER = 1;
+  METRIC_TYPE_GAUGE = 2;
+  METRIC_TYPE_RATE = 3;
+  METRIC_TYPE_TREND = 4;
+}
+
+// MetricSet is the top-level container type
+// that is encoded and sent over the wire.
+message MetricSet {
+  // Required.
+  repeated Metric metrics = 1;
+}
+
+message Metric {
+  // Required.
+  string name = 1;
+
+  // Required.
+  // Can't be of type MetricType.METRICTYPE_UNSPECIFIED (which is zero value).
+  MetricType type = 2;
+
+  // Optional.
+  repeated TimeSeries time_series = 3;
+}
+
+// Label is a name-value pair.
+message Label {
+  // Required.
+  string name = 1;
+
+  // Required.
+  string value = 2;
+}
+
+// TimeSeries is a single metric with a unique set of labels..
+message TimeSeries {
+  // Required.
+  //
+  // At minimum two labels should be present:
+  // - name: "__name__", value: "metric name this time series belongs to/is contained within",
+  // - name: "test_run_id", value: "cloud test run ID this time series belongs to".
+  repeated Label labels = 1;
+
+  // time bucket size in seconds
+  uint32 aggregation_period = 2;
+
+  // Required.
+  oneof samples {
+    CounterSamples counter_samples = 3;
+    GaugeSamples gauge_samples = 4;
+    RateSamples rate_samples = 5;
+    TrendHdrSamples trend_hdr_samples = 6;
+  }
+}
+
+message CounterSamples {
+  // Required.
+  repeated CounterValue values = 1;
+}
+
+message GaugeSamples {
+  // Required.
+  repeated GaugeValue values = 1;
+}
+
+message RateSamples {
+  // Required.
+  repeated RateValue values = 1;
+}
+
+message TrendHdrSamples {
+  // Required.
+  repeated TrendHdrValue values = 1;
+}
+
+message CounterValue {
+  // Required.
+  google.protobuf.Timestamp time = 1;
+
+  double value = 2;
+}
+
+message GaugeValue {
+  // Required.
+  google.protobuf.Timestamp time = 1;
+
+  // last observed value
+  double last = 2;
+  // count of observations
+  uint32 count = 3;
+  // min, max, and average of observed values
+  double min = 4;
+  double max = 5;
+  double avg = 6;
+}
+
+message RateValue {
+  // Required.
+  google.protobuf.Timestamp time = 1;
+
+  uint32 nonzero_count = 2;
+  uint32 total_count = 3;
+}
+
+message TrendHdrValue {
+  // Required.
+  google.protobuf.Timestamp time = 1;
+
+  // histogram parameter - value multiplier aka smallest value, default = 1.0
+  double min_resolution = 2;
+  // histogram parameter - number of significant digits used to calculate buckets formula,
+  // default = 2
+  uint32 significant_digits = 3;
+
+  // buckets
+  repeated uint32 counters = 4;
+  // index of first bucket in `counters`
+  uint32 lower_counter_index = 5;
+  // sum of observations
+  double sum = 6;
+  // count of observations
+  uint32 count = 7;
+  // smallest and largest observed value
+  double min_value = 8;
+  double max_value = 9;
+
+  // counters for zero- and infinity-buckets
+  optional uint32 extra_low_values_counter = 10;
+  optional uint32 extra_high_values_counter = 11;
+}
