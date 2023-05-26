@@ -145,4 +145,17 @@ func TestIsRemoteBrowser(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("K6_INSTANCE_SCENARIOS should override K6_BROWSER_WS_URL", func(t *testing.T) {
+		t.Setenv("K6_BROWSER_WS_URL", "WS_URL_1")
+		t.Setenv("K6_INSTANCE_SCENARIOS", `[{"id": "one","browsers": [{ "handle": "WS_URL_2" }]}]`)
+
+		rr, err := newRemoteRegistry(os.LookupEnv)
+		assert.NoError(t, err)
+
+		wsURL, isRemote := rr.isRemoteBrowser()
+
+		require.Equal(t, true, isRemote)
+		require.Equal(t, "WS_URL_2", wsURL)
+	})
 }
