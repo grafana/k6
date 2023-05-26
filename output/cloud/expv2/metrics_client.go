@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/golang/snappy"
+	"github.com/klauspost/compress/snappy"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/protobuf/proto"
 
@@ -22,10 +22,10 @@ type httpDoer interface {
 	Do(*http.Request) (*http.Response, error)
 }
 
-// MetricsClient is a Protobuf over HTTP client for sending
+// metricsClient is a Protobuf over HTTP client for sending
 // the collected metrics from the Cloud output
 // to the remote service.
-type MetricsClient struct {
+type metricsClient struct {
 	httpClient httpDoer
 	logger     logrus.FieldLogger
 	token      string
@@ -35,15 +35,15 @@ type MetricsClient struct {
 	baseURL        string
 }
 
-// NewMetricsClient creates and initializes a new MetricsClient.
-func NewMetricsClient(logger logrus.FieldLogger, host string, token string) (*MetricsClient, error) {
+// newMetricsClient creates and initializes a new MetricsClient.
+func newMetricsClient(logger logrus.FieldLogger, host string, token string) (*metricsClient, error) {
 	if host == "" {
 		return nil, errors.New("host is required")
 	}
 	if token == "" {
 		return nil, errors.New("token is required")
 	}
-	return &MetricsClient{
+	return &metricsClient{
 		httpClient: &http.Client{Timeout: 5 * time.Second},
 		logger:     logger,
 		baseURL:    host + "/v2/metrics/",
@@ -58,7 +58,7 @@ func NewMetricsClient(logger logrus.FieldLogger, host string, token string) (*Me
 }
 
 // Push pushes the provided metrics the given test run.
-func (mc *MetricsClient) Push(ctx context.Context, referenceID string, samples *pbcloud.MetricSet) error {
+func (mc *metricsClient) Push(ctx context.Context, referenceID string, samples *pbcloud.MetricSet) error {
 	if referenceID == "" {
 		return errors.New("TestRunID of the test is required")
 	}
@@ -69,19 +69,11 @@ func (mc *MetricsClient) Push(ctx context.Context, referenceID string, samples *
 		return err
 	}
 
-	buf, _ := mc.pushBufferPool.Get().(*bytes.Buffer)
-	buf.Reset()
-	defer mc.pushBufferPool.Put(buf)
-
-	_, err = buf.Write(b)
-	if err != nil {
-		return err
-	}
 	// TODO: it is always the same
 	// we don't expect to share this client across different refID
 	// with a bit of effort we can find a way to just allocate once
 	url := mc.baseURL + referenceID
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, buf)
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewReader(b))
 	if err != nil {
 		return err
 	}
@@ -119,6 +111,10 @@ func newRequestBody(data *pbcloud.MetricSet) ([]byte, error) {
 		return nil, fmt.Errorf("the Protobuf message is too large to be handled from the Cloud processor; "+
 			"size: %d, limit: 100 KB", len(b))
 	}
+	// TODO: use the framing format
+	// https://github.com/google/snappy/blob/main/framing_format.txt
+	// It can be done replacing the encode with
+	// https://pkg.go.dev/github.com/klauspost/compress/snappy#NewBufferedWriter
 	if snappy.MaxEncodedLen(len(b)) < 0 {
 		return nil, fmt.Errorf("the Protobuf message is too large to be handled by Snappy encoder; "+
 			"size: %d, limit: %d", len(b), 0xffffffff)

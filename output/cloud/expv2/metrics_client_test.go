@@ -47,7 +47,7 @@ func TestMetricsClientPush(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(h))
 	defer ts.Close()
 
-	mc, err := NewMetricsClient(testutils.NewLogger(t), ts.URL, "fake-token")
+	mc, err := newMetricsClient(testutils.NewLogger(t), ts.URL, "fake-token")
 	require.NoError(t, err)
 	mc.httpClient = ts.Client()
 
@@ -67,7 +67,7 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(h))
 	defer ts.Close()
 
-	mc, err := NewMetricsClient(nil, ts.URL, "fake-token")
+	mc, err := newMetricsClient(nil, ts.URL, "fake-token")
 	require.NoError(t, err)
 	mc.httpClient = ts.Client()
 
@@ -82,7 +82,7 @@ func TestMetricsClientPushError(t *testing.T) {
 		return nil, fmt.Errorf("fake generated error")
 	}
 
-	mc := MetricsClient{
+	mc := metricsClient{
 		httpClient: httpDoerFunc(httpClientMock),
 		pushBufferPool: sync.Pool{
 			New: func() interface{} {
@@ -110,7 +110,7 @@ func TestMetricsClientPushStructuredError(t *testing.T) {
 		return r, nil
 	}
 
-	mc := MetricsClient{
+	mc := metricsClient{
 		httpClient: httpDoerFunc(httpClientMock),
 		pushBufferPool: sync.Pool{
 			New: func() interface{} {
