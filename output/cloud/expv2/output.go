@@ -143,7 +143,6 @@ func (o *Output) periodicInvoke(d time.Duration, callback func()) {
 			case <-t.C:
 				callback()
 			case <-o.stop:
-				return
 			case <-o.stopSamplesCollection:
 				return
 			}
