@@ -112,8 +112,15 @@ func checkForScenarios(envLookup env.LookupFunc) (bool, []string, error) {
 	var wsURLs []string
 	for _, s := range scenarios {
 		for _, b := range s.Browsers {
+			if b.Handle == "" {
+				continue
+			}
 			wsURLs = append(wsURLs, b.Handle)
 		}
+	}
+
+	if len(wsURLs) == 0 {
+		return false, wsURLs, nil
 	}
 
 	return true, wsURLs, nil

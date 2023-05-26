@@ -102,6 +102,20 @@ func TestIsRemoteBrowser(t *testing.T) {
 			envVarValue: `[{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]},
 			{"id": "two","browsers": [{"handle": "WS_URL_3"}, {"handle": "WS_URL_4"}]}]`,
 		},
+		{
+			name:           "read scenarios without any ws urls",
+			expIsRemote:    false,
+			expValidWSURLs: []string{""},
+			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarValue:    `[{"id": "one","browsers": [{}]}]`,
+		},
+		{
+			name:           "read scenarios without any browser objects",
+			expIsRemote:    false,
+			expValidWSURLs: []string{""},
+			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarValue:    `[{"id": "one"}]`,
+		},
 	}
 
 	for _, tc := range testCases {
