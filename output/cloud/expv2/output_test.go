@@ -257,8 +257,7 @@ func TestOutputPeriodicInvoke(t *testing.T) {
 		}
 	}
 	o := Output{stop: stop}
-	o.wg.Add(1)
-	go o.periodicInvoke(time.Duration(1), cb) // loop
+	o.periodicInvoke(time.Duration(1), cb) // loop
 	<-stop
 	assert.Greater(t, atomic.LoadUint64(&called), uint64(1))
 }

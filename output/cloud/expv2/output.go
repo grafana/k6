@@ -76,9 +76,8 @@ func (o *Output) Start() error {
 		bq:          &o.collector.bq,
 	}
 
-	o.wg.Add(2)
-	go o.periodicInvoke(o.config.MetricPushInterval.TimeDuration(), o.flushMetrics)
-	go o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
+	o.periodicInvoke(o.config.MetricPushInterval.TimeDuration(), o.flushMetrics)
+	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
 	o.logger.Debug("Started!")
 	return nil
@@ -133,20 +132,23 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 }
 
 func (o *Output) periodicInvoke(d time.Duration, callback func()) {
-	defer o.wg.Done()
+	o.wg.Add(1)
+	go func() {
+		defer o.wg.Done()
 
-	t := time.NewTicker(d)
-	defer t.Stop()
-	for {
-		select {
-		case <-t.C:
-			callback()
-		case <-o.stop:
-			return
-		case <-o.stopSamplesCollection:
-			return
+		t := time.NewTicker(d)
+		defer t.Stop()
+		for {
+			select {
+			case <-t.C:
+				callback()
+			case <-o.stop:
+				return
+			case <-o.stopSamplesCollection:
+				return
+			}
 		}
-	}
+	}()
 }
 
 func (o *Output) collectSamples() {
