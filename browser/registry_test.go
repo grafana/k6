@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"os"
 	"sync"
 	"testing"
 
@@ -33,70 +34,60 @@ func TestPidRegistry(t *testing.T) {
 }
 
 func TestIsRemoteBrowser(t *testing.T) {
-	t.Parallel()
-
 	testCases := []struct {
 		name           string
-		envLookup      env.LookupFunc
 		expIsRemote    bool
 		expValidWSURLs []string
+		envVarName     string
+		envVarValue    string
 	}{
 		{
-			name: "browser is not remote",
-			envLookup: func(key string) (string, bool) {
-				return "", false
-			},
+			name:        "browser is not remote",
 			expIsRemote: false,
+			envVarName:  "FOO",
+			envVarValue: "BAR",
 		},
 		{
-			name: "single WS URL",
-			envLookup: func(key string) (string, bool) {
-				return "WS_URL", true
-			},
+			name:           "single WS URL",
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL"},
+			envVarName:     "K6_BROWSER_WS_URL",
+			envVarValue:    "WS_URL",
 		},
 		{
-			name: "multiple WS URL",
-			envLookup: func(key string) (string, bool) {
-				return "WS_URL_1,WS_URL_2,WS_URL_3", true
-			},
+			name:           "multiple WS URL",
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2", "WS_URL_3"},
+			envVarName:     "K6_BROWSER_WS_URL",
+			envVarValue:    "WS_URL_1,WS_URL_2,WS_URL_3",
 		},
 		{
-			name: "ending comma is handled",
-			envLookup: func(key string) (string, bool) {
-				return "WS_URL_1,WS_URL_2,", true
-			},
+			name:           "ending comma is handled",
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
+			envVarName:     "K6_BROWSER_WS_URL",
+			envVarValue:    "WS_URL_1,WS_URL_2,",
 		},
 		{
-			name: "void string does not panic",
-			envLookup: func(key string) (string, bool) {
-				return "", true
-			},
+			name:           "void string does not panic",
 			expIsRemote:    true,
 			expValidWSURLs: []string{""},
+			envVarName:     "K6_BROWSER_WS_URL",
+			envVarValue:    "",
 		},
 		{
-			name: "comma does not panic",
-			envLookup: func(key string) (string, bool) {
-				return ",", true
-			},
+			name:           "comma does not panic",
 			expIsRemote:    true,
 			expValidWSURLs: []string{""},
+			envVarName:     "K6_BROWSER_WS_URL",
+			envVarValue:    ",",
 		},
 	}
 
 	for _, tc := range testCases {
-		tc := tc
-
 		t.Run(tc.name, func(t *testing.T) {
-			t.Parallel()
-
-			rr := newRemoteRegistry(tc.envLookup)
+			t.Setenv(tc.envVarName, tc.envVarValue)
+			rr := newRemoteRegistry(os.LookupEnv)
 			wsURL, isRemote := rr.isRemoteBrowser()
 
 			require.Equal(t, tc.expIsRemote, isRemote)
