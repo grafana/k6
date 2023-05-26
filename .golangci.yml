@@ -10,7 +10,7 @@ issues:
   max-same-issues: 0
 
   # We want to try and improve the comments in the k6 codebase, so individual
-  # non-golint items from the default exclusion list will gradually be addded
+  # non-golint items from the default exclusion list will gradually be added
   # to the exclude-rules below
   exclude-use-default: false
 
@@ -25,8 +25,8 @@ issues:
        - funlen
        - lll
    - linters:
-     - paralleltest # false positive: https://github.com/kunwardeep/paralleltest/issues/8.
-     text: "does not use range value in test Run"
+     - staticcheck # Tracked in https://github.com/grafana/xk6-grpc/issues/14
+     text: "The entire proto file grpc/reflection/v1alpha/reflection.proto is marked as deprecated."
    - linters:
      - forbidigo
      text: 'use of `os\.(SyscallError|Signal|Interrupt)` forbidden'
