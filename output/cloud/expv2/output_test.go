@@ -200,6 +200,7 @@ func TestOutputHandleFlushError(t *testing.T) {
 // when it is called doesn't stuck
 func TestOutputHandleFlushErrorMultipleTimes(t *testing.T) {
 	t.Parallel()
+
 	var stopFuncCalled int
 	o := Output{
 		logger:                testutils.NewLogger(t),
