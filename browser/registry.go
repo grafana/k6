@@ -77,6 +77,27 @@ func newRemoteRegistry(envLookup env.LookupFunc) *remoteRegistry {
 	return r
 }
 
+func checkForBrowserWSURLs(envLookup env.LookupFunc) (bool, []string) {
+	wsURL, isRemote := envLookup("K6_BROWSER_WS_URL")
+	if !isRemote {
+		return false, nil
+	}
+
+	if !strings.ContainsRune(wsURL, ',') {
+		return true, []string{wsURL}
+	}
+
+	// If last parts element is a void string,
+	// because WS URL contained an ending comma,
+	// remove it
+	parts := strings.Split(wsURL, ",")
+	if parts[len(parts)-1] == "" {
+		parts = parts[:len(parts)-1]
+	}
+
+	return true, parts
+}
+
 // newRemoteRegistry will create a new RemoteRegistry. This will
 // parse the K6_BROWSER_WS_URL env var to retrieve the defined
 // list of WS URLs from the scenarios object.
