@@ -85,7 +85,7 @@ func newRemoteRegistry(envLookup env.LookupFunc) *remoteRegistry {
 func newRemoteRegistryFromScenarios(envLookup env.LookupFunc) (*remoteRegistry, error) {
 	r := &remoteRegistry{}
 
-	scenariosJSON, isRemote := envLookup("K6_BROWSER_WS_URL")
+	scenariosJSON, isRemote := envLookup("K6_INSTANCE_SCENARIOS")
 	if !isRemote {
 		return r, nil
 	}
@@ -99,7 +99,7 @@ func newRemoteRegistryFromScenarios(envLookup env.LookupFunc) (*remoteRegistry, 
 
 	err := json.Unmarshal([]byte(scenariosJSON), &scenarios)
 	if err != nil {
-		return nil, fmt.Errorf("parsing K6_BROWSER_WS_URL: %w", err)
+		return nil, fmt.Errorf("parsing K6_INSTANCE_SCENARIOS: %w", err)
 	}
 
 	for _, s := range scenarios {
