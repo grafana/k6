@@ -52,27 +52,7 @@ type remoteRegistry struct {
 func newRemoteRegistry(envLookup env.LookupFunc) *remoteRegistry {
 	r := &remoteRegistry{}
 
-	wsURL, isRemote := envLookup("K6_BROWSER_WS_URL")
-	if !isRemote {
-		return r
-	}
-
-	if !strings.ContainsRune(wsURL, ',') {
-		r.isRemote = true
-		r.wsURLs = []string{wsURL}
-		return r
-	}
-
-	// If last parts element is a void string,
-	// because WS URL contained an ending comma,
-	// remove it
-	parts := strings.Split(wsURL, ",")
-	if parts[len(parts)-1] == "" {
-		parts = parts[:len(parts)-1]
-	}
-
-	r.isRemote = true
-	r.wsURLs = parts
+	r.isRemote, r.wsURLs = checkForBrowserWSURLs(envLookup)
 
 	return r
 }
