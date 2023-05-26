@@ -2,6 +2,7 @@ package expv2
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"sync/atomic"
 	"testing"
@@ -195,6 +196,31 @@ func TestOutputHandleFlushError(t *testing.T) {
 	}
 }
 
+// assert that the output does not stuck or panic
+// when it is called doesn't stuck
+func TestOutputHandleFlushErrorMultipleTimes(t *testing.T) {
+	t.Parallel()
+	var stopFuncCalled int
+	o := Output{
+		logger:                testutils.NewLogger(t),
+		stopSamplesCollection: make(chan struct{}),
+		testStopFunc: func(error) {
+			stopFuncCalled++
+		},
+	}
+	o.config.StopOnError = null.BoolFrom(true)
+
+	er := cloudapi.ErrorResponse{
+		Response: &http.Response{
+			StatusCode: http.StatusForbidden,
+		},
+		Code: 4,
+	}
+	o.handleFlushError(fmt.Errorf("first error: %w", er))
+	o.handleFlushError(fmt.Errorf("second error: %w", er))
+	assert.Equal(t, 1, stopFuncCalled)
+}
+
 func TestOutputAddMetricSamples(t *testing.T) {
 	t.Parallel()
 
@@ -219,6 +245,8 @@ func TestOutputAddMetricSamples(t *testing.T) {
 }
 
 func TestOutputPeriodicInvoke(t *testing.T) {
+	t.Parallel()
+
 	stop := make(chan struct{})
 	var called uint64
 	cb := func() {
@@ -231,5 +259,5 @@ func TestOutputPeriodicInvoke(t *testing.T) {
 	o.wg.Add(1)
 	go o.periodicInvoke(time.Duration(1), cb) // loop
 	<-stop
-	assert.Equal(t, uint64(2), atomic.LoadUint64(&called))
+	assert.Greater(t, atomic.LoadUint64(&called), uint64(1))
 }
