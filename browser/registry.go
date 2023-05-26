@@ -78,17 +78,12 @@ func checkForBrowserWSURLs(envLookup env.LookupFunc) (bool, []string) {
 	return true, parts
 }
 
-// newRemoteRegistry will create a new RemoteRegistry. This will
-// parse the K6_BROWSER_WS_URL env var to retrieve the defined
-// list of WS URLs from the scenarios object.
-//
-// TODO: Name will change at the end of the PR.
-func newRemoteRegistryFromScenarios(envLookup env.LookupFunc) (*remoteRegistry, error) {
-	r := &remoteRegistry{}
-
+// checkForScenarios will parse the K6_INSTANCE_SCENARIOS env var if
+// it has been defined.
+func checkForScenarios(envLookup env.LookupFunc) (bool, []string, error) {
 	scenariosJSON, isRemote := envLookup("K6_INSTANCE_SCENARIOS")
 	if !isRemote {
-		return r, nil
+		return false, nil, nil
 	}
 
 	var scenarios []struct {
@@ -100,17 +95,17 @@ func newRemoteRegistryFromScenarios(envLookup env.LookupFunc) (*remoteRegistry, 
 
 	err := json.Unmarshal([]byte(scenariosJSON), &scenarios)
 	if err != nil {
-		return nil, fmt.Errorf("parsing K6_INSTANCE_SCENARIOS: %w", err)
+		return false, nil, fmt.Errorf("parsing K6_INSTANCE_SCENARIOS: %w", err)
 	}
 
+	var wsURLs []string
 	for _, s := range scenarios {
 		for _, b := range s.Browsers {
-			r.wsURLs = append(r.wsURLs, b.Handle)
-			r.isRemote = true
+			wsURLs = append(wsURLs, b.Handle)
 		}
 	}
 
-	return r, nil
+	return true, wsURLs, nil
 }
 
 // isRemoteBrowser returns a WS URL and true when a WS URL is defined,

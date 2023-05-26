@@ -107,7 +107,7 @@ func TestIsRemoteBrowser(t *testing.T) {
 	}
 }
 
-func TestIsRemoteBrowserWithScenarios(t *testing.T) {
+func TestCheckForScenarios(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -148,13 +148,12 @@ func TestIsRemoteBrowserWithScenarios(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			rr, err := newRemoteRegistryFromScenarios(tc.envLookup)
+			isRemote, wsURLs, err := checkForScenarios(tc.envLookup)
 			assert.NoError(t, err)
-			wsURL, isRemote := rr.isRemoteBrowser()
 
 			require.Equal(t, tc.expIsRemote, isRemote)
 			if isRemote {
-				require.Contains(t, tc.expValidWSURLs, wsURL)
+				require.Equal(t, tc.expValidWSURLs, wsURLs)
 			}
 		})
 	}
