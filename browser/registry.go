@@ -52,6 +52,17 @@ type remoteRegistry struct {
 func newRemoteRegistry(envLookup env.LookupFunc) *remoteRegistry {
 	r := &remoteRegistry{}
 
+	isRemote, wsURLs, err := checkForScenarios(envLookup)
+	if err != nil {
+		// TODO: Return error
+		return nil
+	}
+	if isRemote {
+		r.isRemote = isRemote
+		r.wsURLs = wsURLs
+		return r
+	}
+
 	r.isRemote, r.wsURLs = checkForBrowserWSURLs(envLookup)
 
 	return r

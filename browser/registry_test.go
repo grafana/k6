@@ -82,6 +82,28 @@ func TestIsRemoteBrowser(t *testing.T) {
 			envVarName:     "K6_BROWSER_WS_URL",
 			envVarValue:    ",",
 		},
+		{
+			name:           "read a single scenario with a single ws url",
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL_1"},
+			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarValue:    `[{"id": "one","browsers": [{ "handle": "WS_URL_1" }]}]`,
+		},
+		{
+			name:           "read a single scenario with a two ws urls",
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
+			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarValue:    `[{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]}]`,
+		},
+		{
+			name:           "read two scenarios with multiple ws urls",
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2", "WS_URL_3", "WS_URL_4"},
+			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarValue: `[{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]},
+			{"id": "two","browsers": [{"handle": "WS_URL_3"}, {"handle": "WS_URL_4"}]}]`,
+		},
 	}
 
 	for _, tc := range testCases {
