@@ -2,6 +2,7 @@
 package browser
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/dop251/goja"
@@ -39,9 +40,14 @@ var (
 
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
+	rr, err := newRemoteRegistry(os.LookupEnv)
+	if err != nil {
+		panic(fmt.Sprintf("failed to create remote registry: %v", err.Error()))
+	}
+
 	return &RootModule{
 		PidRegistry:    &pidRegistry{},
-		remoteRegistry: newRemoteRegistry(os.LookupEnv),
+		remoteRegistry: rr,
 	}
 }
 

@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"errors"
 	"os"
 	"sync"
 	"testing"
@@ -38,6 +39,7 @@ func TestIsRemoteBrowser(t *testing.T) {
 		expValidWSURLs []string
 		envVarName     string
 		envVarValue    string
+		expErr         error
 	}{
 		{
 			name:        "browser is not remote",
@@ -116,12 +118,25 @@ func TestIsRemoteBrowser(t *testing.T) {
 			envVarName:     "K6_INSTANCE_SCENARIOS",
 			envVarValue:    `[{"id": "one"}]`,
 		},
+		{
+			name:        "read empty scenarios",
+			expErr:      errors.New("parsing K6_INSTANCE_SCENARIOS: unexpected end of JSON input"),
+			envVarName:  "K6_INSTANCE_SCENARIOS",
+			envVarValue: ``,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv(tc.envVarName, tc.envVarValue)
-			rr := newRemoteRegistry(os.LookupEnv)
+
+			rr, err := newRemoteRegistry(os.LookupEnv)
+			if tc.expErr != nil {
+				assert.Error(t, tc.expErr, err)
+				return
+			}
+			assert.NoError(t, err)
+
 			wsURL, isRemote := rr.isRemoteBrowser()
 
 			require.Equal(t, tc.expIsRemote, isRemote)

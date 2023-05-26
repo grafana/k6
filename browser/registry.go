@@ -49,23 +49,22 @@ type remoteRegistry struct {
 //
 // K6_BROWSER_WS_URL can be defined as a single WS URL or a
 // comma separated list of URLs.
-func newRemoteRegistry(envLookup env.LookupFunc) *remoteRegistry {
+func newRemoteRegistry(envLookup env.LookupFunc) (*remoteRegistry, error) {
 	r := &remoteRegistry{}
 
 	isRemote, wsURLs, err := checkForScenarios(envLookup)
 	if err != nil {
-		// TODO: Return error
-		return nil
+		return nil, err
 	}
 	if isRemote {
 		r.isRemote = isRemote
 		r.wsURLs = wsURLs
-		return r
+		return r, nil
 	}
 
 	r.isRemote, r.wsURLs = checkForBrowserWSURLs(envLookup)
 
-	return r
+	return r, nil
 }
 
 func checkForBrowserWSURLs(envLookup env.LookupFunc) (bool, []string) {
