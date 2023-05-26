@@ -87,8 +87,16 @@ func (o *Output) Start() error {
 // StopWithTestError gracefully stops all metric emission from the output.
 func (o *Output) StopWithTestError(testErr error) error {
 	o.logger.Debug("Stopping...")
+	defer o.logger.Debug("Stopped!")
+
 	close(o.stop)
 	o.wg.Wait()
+
+	select {
+	case <-o.stopSamplesCollection:
+		return nil
+	default:
+	}
 
 	// Drain the SampleBuffer and force the aggregation for flushing
 	// all the queued samples even if they haven't yet passed the
@@ -97,7 +105,6 @@ func (o *Output) StopWithTestError(testErr error) error {
 	o.collector.CollectSamples(nil)
 	o.flushMetrics()
 
-	o.logger.Debug("Stopped!")
 	return nil
 }
 
@@ -128,7 +135,7 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 func (o *Output) periodicInvoke(d time.Duration, callback func()) {
 	defer o.wg.Done()
 
-	t := time.NewTimer(d)
+	t := time.NewTicker(d)
 	defer t.Stop()
 	for {
 		select {
@@ -192,7 +199,15 @@ func (o *Output) handleFlushError(err error) {
 	}
 
 	o.logger.WithError(err).Warn("Interrupt sending metrics to cloud due to an error")
-	close(o.stopSamplesCollection)
+
+	// Do not close multiple times (that would panic) in the case
+	// we hit this multiple times and/or concurrently
+	select {
+	case <-o.stopSamplesCollection:
+		return
+	default:
+		close(o.stopSamplesCollection)
+	}
 
 	if o.config.StopOnError.Bool {
 		serr := errext.WithAbortReasonIfNone(

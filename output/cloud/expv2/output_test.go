@@ -3,6 +3,7 @@ package expv2
 import (
 	"errors"
 	"net/http"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -215,4 +216,20 @@ func TestOutputAddMetricSamples(t *testing.T) {
 		metrics.Samples([]metrics.Sample{s}),
 	})
 	require.Empty(t, o.GetBufferedSamples())
+}
+
+func TestOutputPeriodicInvoke(t *testing.T) {
+	stop := make(chan struct{})
+	var called uint64
+	cb := func() {
+		updated := atomic.AddUint64(&called, 1)
+		if updated == 2 {
+			close(stop)
+		}
+	}
+	o := Output{stop: stop}
+	o.wg.Add(1)
+	go o.periodicInvoke(time.Duration(1), cb) // loop
+	<-stop
+	assert.Equal(t, uint64(2), atomic.LoadUint64(&called))
 }
