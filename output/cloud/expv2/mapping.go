@@ -2,7 +2,6 @@ package expv2
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/mstoykov/atlas"
 	"go.k6.io/k6/metrics"
@@ -51,7 +50,7 @@ func mapMetricTypeProto(mt metrics.MetricType) pbcloud.MetricType {
 func addBucketToTimeSeriesProto(
 	timeSeries *pbcloud.TimeSeries,
 	mt metrics.MetricType,
-	time time.Time,
+	time int64,
 	value metricValue,
 ) {
 	if timeSeries.Samples == nil {
@@ -62,13 +61,13 @@ func addBucketToTimeSeriesProto(
 	case *counter:
 		samples := timeSeries.GetCounterSamples()
 		samples.Values = append(samples.Values, &pbcloud.CounterValue{
-			Time:  timestamppb.New(time),
+			Time:  timestampAsProto(time),
 			Value: typedMetricValue.Sum,
 		})
 	case *gauge:
 		samples := timeSeries.GetGaugeSamples()
 		samples.Values = append(samples.Values, &pbcloud.GaugeValue{
-			Time:  timestamppb.New(time),
+			Time:  timestampAsProto(time),
 			Last:  typedMetricValue.Last,
 			Min:   typedMetricValue.Max,
 			Max:   typedMetricValue.Min,
@@ -78,7 +77,7 @@ func addBucketToTimeSeriesProto(
 	case *rate:
 		samples := timeSeries.GetRateSamples()
 		samples.Values = append(samples.Values, &pbcloud.RateValue{
-			Time:         timestamppb.New(time),
+			Time:         timestampAsProto(time),
 			NonzeroCount: typedMetricValue.NonZeroCount,
 			TotalCount:   typedMetricValue.Total,
 		})
@@ -109,5 +108,18 @@ func initTimeSeriesSamples(timeSeries *pbcloud.TimeSeries, mt metrics.MetricType
 		timeSeries.Samples = &pbcloud.TimeSeries_TrendHdrSamples{
 			TrendHdrSamples: &pbcloud.TrendHdrSamples{},
 		}
+	}
+}
+
+func timestampAsProto(unixnano int64) *timestamppb.Timestamp {
+	sec := unixnano / 1e9
+	return &timestamppb.Timestamp{
+		Seconds: sec,
+		// sub-second precision for aggregation is not expected
+		// so we don't waste cpu-time computing nanos.
+		//
+		// In the case this assumption is changed then enable them
+		// by int32(unixnano - (sec * 1e9))
+		Nanos: 0,
 	}
 }

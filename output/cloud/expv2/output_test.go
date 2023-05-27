@@ -114,7 +114,7 @@ func TestOutputCollectSamples(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 5.0, counter.Sum)
 
-	expTime := time.Date(2023, time.May, 1, 1, 1, 15, 0, time.UTC)
+	expTime := time.Date(2023, time.May, 1, 1, 1, 15, 0, time.UTC).UnixNano()
 	assert.Equal(t, expTime, buckets[0].Time)
 }
 
