@@ -31,19 +31,23 @@ type Output struct {
 	metricsFlusher noopFlusher
 	collector      *collector
 
-	stopSamplesCollection chan struct{}
+	// wg tracks background goroutines
+	wg sync.WaitGroup
 
-	wg   sync.WaitGroup
+	// stop signal to graceful stop
 	stop chan struct{}
+
+	// abort signal to interrupt immediately all background goroutines
+	abort chan struct{}
 }
 
 // New creates a new cloud output.
 func New(logger logrus.FieldLogger, conf cloudapi.Config) (*Output, error) {
 	return &Output{
-		config:                conf,
-		logger:                logger.WithFields(logrus.Fields{"output": "cloudv2"}),
-		stopSamplesCollection: make(chan struct{}),
-		stop:                  make(chan struct{}),
+		config: conf,
+		logger: logger.WithFields(logrus.Fields{"output": "cloudv2"}),
+		abort:  make(chan struct{}),
+		stop:   make(chan struct{}),
 	}, nil
 }
 
@@ -92,7 +96,7 @@ func (o *Output) StopWithTestError(testErr error) error {
 	o.wg.Wait()
 
 	select {
-	case <-o.stopSamplesCollection:
+	case <-o.abort:
 		return nil
 	default:
 	}
@@ -113,7 +117,7 @@ func (o *Output) AddMetricSamples(s []metrics.SampleContainer) {
 	// evaluate to do something smarter, maybe having a lock-free
 	// queue.
 	select {
-	case <-o.stopSamplesCollection:
+	case <-o.abort:
 		return
 	default:
 	}
@@ -143,7 +147,7 @@ func (o *Output) periodicInvoke(d time.Duration, callback func()) {
 			case <-t.C:
 				callback()
 			case <-o.stop:
-			case <-o.stopSamplesCollection:
+			case <-o.abort:
 				return
 			}
 		}
@@ -204,10 +208,10 @@ func (o *Output) handleFlushError(err error) {
 	// Do not close multiple times (that would panic) in the case
 	// we hit this multiple times and/or concurrently
 	select {
-	case <-o.stopSamplesCollection:
+	case <-o.abort:
 		return
 	default:
-		close(o.stopSamplesCollection)
+		close(o.abort)
 	}
 
 	if o.config.StopOnError.Bool {
