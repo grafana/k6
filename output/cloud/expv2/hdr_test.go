@@ -41,6 +41,7 @@ func TestValueBacket(t *testing.T) {
 func TestNewHistogramWithSimpleValue(t *testing.T) {
 	t.Parallel()
 
+	// Add a lower bucket index within slice capacity
 	res := newHistogram()
 	res.addToBucket(8)
 	res.addToBucket(5)
@@ -56,9 +57,9 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 		Sum:                13,
 		Count:              2,
 	}
-
 	require.Equal(t, exp, res)
 
+	// Add a higher bucket index within slice capacity
 	res = newHistogram()
 	res.addToBucket(100)
 	res.addToBucket(101)
@@ -74,7 +75,9 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 		Sum:                201,
 		Count:              2,
 	}
+	require.Equal(t, exp, res)
 
+	// Same case but reversed test check
 	res = newHistogram()
 	res.addToBucket(101)
 	res.addToBucket(100)
@@ -92,6 +95,7 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 	}
 	assert.Equal(t, exp, res)
 
+	// One more complex case with lower index and more than two indexes
 	res = newHistogram()
 	res.addToBucket(8)
 	res.addToBucket(9)

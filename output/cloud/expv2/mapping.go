@@ -92,7 +92,6 @@ func addBucketToTimeSeriesProto(
 		samples.Values = append(samples.Values, histogramAsProto(h, time))
 	default:
 		panic(fmt.Sprintf("MetricType %q is not supported", mt))
-
 	}
 }
 

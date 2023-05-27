@@ -82,19 +82,14 @@ type histogram struct {
 
 // newHistogram creates an histogram of the provided values.
 //
-// TODO: after the aggregation layer probably this constructor
-// doesn't make any sense in this way.
-// It aggregates calling addToBucket time-to-time so
-// trimzeros has to be called at the end of the process.
+// TODO: it isn't really useful so we may consider to drop it.
 func newHistogram() histogram {
 	return histogram{}
 }
 
-// addToBucket increments the counter of the bucket
-// releated to the provided value.
+// addToBucket increments the counter of the bucket of the provided value.
 // If the value is lower or higher than the trackable limits
-// then it is counted into specific buckets.
-// All the stats are also updated accordingly.
+// then it is counted into specific buckets. All the stats are also updated accordingly.
 func (h *histogram) addToBucket(v float64) {
 	if h.Count == 0 {
 		h.Max, h.Min = v, v
@@ -217,11 +212,22 @@ func resolveBucketIndex(val float64) uint32 {
 		return 0
 	}
 
+	// We upscale to the next integer to ensure that each sample falls
+	// within a specific bucket, even when the value is fractional.
+	// This avoids under-representing the distribution in the histogram.
 	upscaled := uint32(math.Ceil(val))
 
-	// k is a power of 2 closest to 10^precision_points
-	// At the moment the precision_points is a fixed value set to 2.
+	// In histograms, bucket boundaries are usually defined as multiples of powers of 2,
+	// allowing for efficient computation of bucket indexes.
 	//
+	// We define k=7 in our case, because it allows for sufficient granularity in the
+	// distribution (2^7=128 primary buckets of which each can be further
+	// subdivided if needed).
+	//
+	// k is the constant balancing factor between granularity and
+	// computational efficiency.
+	//
+	// In our case:
 	// i.e 2^7  = 128  ~  100 = 10^2
 	//     2^10 = 1024 ~ 1000 = 10^3
 	// f(x) = 3*x + 1 - empiric formula that works for us
@@ -233,6 +239,11 @@ func resolveBucketIndex(val float64) uint32 {
 		return upscaled
 	}
 
+	// `nkdiff` helps us find the right bucket for `upscaled`. It does so by determining the
+	// index for the "major" bucket (a set of values within a power of two range) and then
+	// the "sub" bucket within that major bucket. This system provides us with a fine level
+	// of granularity within a computationally efficient bucketing system. The result is a
+	// histogram that provides a detailed representation of the distribution of values.
 	//
 	// Here we use some math to get simple formula
 	// derivation:
