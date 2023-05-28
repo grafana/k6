@@ -147,6 +147,7 @@ func (o *Output) periodicInvoke(d time.Duration, callback func()) {
 			case <-t.C:
 				callback()
 			case <-o.stop:
+				return
 			case <-o.abort:
 				return
 			}
@@ -220,6 +221,8 @@ func (o *Output) handleFlushError(err error) {
 			errext.AbortedByOutput,
 		)
 
-		o.testStopFunc(serr)
+		if o.testStopFunc != nil {
+			o.testStopFunc(serr)
+		}
 	}
 }

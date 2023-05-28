@@ -261,3 +261,17 @@ func TestOutputPeriodicInvoke(t *testing.T) {
 	<-stop
 	assert.Greater(t, atomic.LoadUint64(&called), uint64(1))
 }
+
+func TestOutputStopWithTestError(t *testing.T) {
+	t.Parallel()
+
+	config := cloudapi.NewConfig()
+	config.Host = null.StringFrom("") // flush not expected
+	config.AggregationPeriod = types.NullDurationFrom(1 * time.Hour)
+
+	o, err := New(testutils.NewLogger(t), config)
+	require.NoError(t, err)
+
+	require.NoError(t, o.Start())
+	require.NoError(t, o.StopWithTestError(errors.New("an error")))
+}
