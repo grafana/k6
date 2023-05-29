@@ -7,10 +7,12 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"strconv"
 	"sync"
 	"time"
 
 	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/cloudapi/insights"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/metrics"
@@ -18,6 +20,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 )
+
+type RequestMetadatasCollector interface {
+	CollectRequestMetadatas([]metrics.SampleContainer)
+	PopAll() insights.RequestMetadatas
+}
 
 type flusher interface {
 	flush(context.Context) error
@@ -34,6 +41,9 @@ type Output struct {
 
 	collector *collector
 	flushing  flusher
+
+	requestMetadatasCollector RequestMetadatasCollector
+	requestMetadatasFlusher   Flusher
 
 	// wg tracks background goroutines
 	wg sync.WaitGroup
@@ -74,6 +84,7 @@ func (o *Output) SetTestRunStopCallback(stopFunc func(error)) {
 // for metric samples and send them to the cloud.
 func (o *Output) Start() error {
 	o.logger.Debug("Starting...")
+	defer o.logger.Debug("Started!")
 
 	var err error
 	o.collector, err = newCollector(
@@ -100,12 +111,45 @@ func (o *Output) Start() error {
 	o.runFlushWorkers()
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
+	if o.tracingEnabled() {
+		testRunID, err := strconv.ParseInt(o.referenceID, 10, 64)
+		if err != nil {
+			return err
+		}
+		o.requestMetadatasCollector = newRequestMetadatasCollector(testRunID)
+
+		insightsClientConfig := insights.ClientConfig{
+			IngesterHost: o.config.TracesHost.ValueOrZero(),
+			AuthConfig: insights.ClientAuthConfig{
+				Enabled:                  true,
+				TestRunID:                testRunID,
+				Token:                    o.config.Token.ValueOrZero(),
+				RequireTransportSecurity: false,
+			},
+			TLSConfig: insights.ClientTLSConfig{
+				Insecure: false,
+			},
+		}
+		insightsClient := insights.NewClient(insightsClientConfig)
+
+		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+		defer cancel()
+		if err := insightsClient.Dial(ctx); err != nil {
+			return err
+		}
+
+		o.requestMetadatasFlusher = newTracesFlusher(insightsClient, o.requestMetadatasCollector)
+
+		o.periodicInvoke(o.config.TracesPushInterval.TimeDuration(), o.flushRequestMetadatas)
+	}
+
 	o.logger.WithField("config", printableConfig(o.config)).Debug("Started!")
+
 	return nil
 }
 
 // StopWithTestError gracefully stops all metric emission from the output.
-func (o *Output) StopWithTestError(testErr error) error {
+func (o *Output) StopWithTestError(_ error) error {
 	o.logger.Debug("Stopping...")
 	defer o.logger.Debug("Stopped!")
 
@@ -124,6 +168,11 @@ func (o *Output) StopWithTestError(testErr error) error {
 	o.collector.DropExpiringDelay()
 	o.collectSamples()
 	o.flushMetrics()
+
+	// Flush all the remaining request metadatas.
+	if o.tracingEnabled() {
+		o.flushRequestMetadatas()
+	}
 
 	return nil
 }
@@ -201,8 +250,9 @@ func (o *Output) collectSamples() {
 	samples := o.GetBufferedSamples()
 	o.collector.CollectSamples(samples)
 
-	// TODO: other operations with the samples containers
-	// e.g. flushing the Metadata as tracing samples
+	if o.tracingEnabled() {
+		o.requestMetadatasCollector.CollectRequestMetadatas(samples)
+	}
 }
 
 // flushMetrics receives a set of metric samples.
@@ -216,6 +266,21 @@ func (o *Output) flushMetrics() {
 	}
 
 	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered samples to the cloud")
+}
+
+// flushRequestMetadatas periodically flushes traces collected in RequestMetadatasCollector using Flusher.
+func (o *Output) flushRequestMetadatas() {
+	start := time.Now()
+
+	ctx, cancel := context.WithTimeout(context.Background(), o.config.TracesPushInterval.TimeDuration())
+	defer cancel()
+
+	err := o.requestMetadatasFlusher.Flush(ctx)
+	if err != nil {
+		o.logger.WithError(err).Error("Failed to push trace samples to the cloud")
+	}
+
+	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered trace samples to the cloud")
 }
 
 // handleFlushError handles errors generated from the flushing operation.
@@ -258,6 +323,48 @@ func (o *Output) handleFlushError(err error) {
 			}
 		}
 	})
+}
+
+// shouldStopSendingMetrics returns true if the output should interrupt the metric flush.
+//
+// note: The actual test execution should continues,
+// since for local k6 run tests the end-of-test summary (or any other outputs) will still work,
+// but the cloud output doesn't send any more metrics.
+// Instead, if cloudapi.Config.StopOnError is enabled
+// the cloud output should stop the whole test run too.
+// This logic should be handled by the caller.
+func (o *Output) shouldStopSendingMetrics(err error) bool {
+	if err == nil {
+		return false
+	}
+	if errResp, ok := err.(cloudapi.ErrorResponse); ok && errResp.Response != nil { //nolint:errorlint
+		// The Cloud service returns the error code 4 when it doesn't accept any more metrics.
+		// So, when k6 sees that, the cloud output just stops prematurely.
+		return errResp.Response.StatusCode == http.StatusForbidden && errResp.Code == 4
+	}
+
+	return false
+}
+
+func (o *Output) tracingEnabled() bool {
+	// TODO(lukasz): Check if the `tracing` module is imported.
+	//
+	// We want to check if the `tracing` module was imported. If
+	// it wasn't, we don't need to collect any data related to tracing
+	// as there won't be any.
+	//
+	// We currently don't have a way to check if the tracing module
+	// was imported by the user.
+
+	// TODO(lukasz): Check if k6 x Tempo is enabled
+	//
+	// We also want to check whether a given organization is
+	// eligible for k6 x Tempo feature. If it isn't, we don't
+	// want to enable the traces output.
+	//
+	// We currently don't have a backend API to check this
+	// information.
+	return o.config.TracesEnabled.ValueOrZero()
 }
 
 func printableConfig(c cloudapi.Config) map[string]any {

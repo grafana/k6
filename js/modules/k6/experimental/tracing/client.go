@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	httpmodule "go.k6.io/k6/js/modules/k6/http"
@@ -214,13 +215,13 @@ func (c *Client) instrumentedCall(call func(args ...goja.Value) error, args ...g
 	// Add the trace ID to the VU's state, so that it can be
 	// used in the metrics emitted by the HTTP module.
 	c.vu.State().Tags.Modify(func(t *metrics.TagsAndMeta) {
-		t.SetMetadata(metadataTraceIDKeyName, encodedTraceID)
+		t.SetMetadata(MetadataTraceIDKeyName, encodedTraceID)
 	})
 
 	// Remove the trace ID from the VU's state, so that it doesn't leak into other requests.
 	defer func() {
 		c.vu.State().Tags.Modify(func(t *metrics.TagsAndMeta) {
-			t.DeleteMetadata(metadataTraceIDKeyName)
+			t.DeleteMetadata(MetadataTraceIDKeyName)
 		})
 	}()
 

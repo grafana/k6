@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/ingester";
+
+message TestRunLabels {
+	int64 ID = 1;
+	string Scenario = 2;
+	string Group = 3;
+}
+
+message HTTPLabels {
+	string Url = 1;
+	string Method = 2;
+	int64 StatusCode = 3;
+}

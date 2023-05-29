@@ -1,0 +1,24 @@
+syntax = "proto3";
+
+package ingester;
+
+import "v1/ingester/request_metadata.proto";
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/ingester";
+
+service IngesterService {
+	rpc BatchCreateRequestMetadatas(BatchCreateRequestMetadatasRequest) returns (BatchCreateRequestMetadatasResponse) {}
+}
+
+message BatchCreateRequestMetadatasRequest {
+	repeated CreateRequestMetadataRequest Requests = 1;
+}
+
+message CreateRequestMetadataRequest {
+	RequestMetadata RequestMetadata = 1;
+}
+
+message BatchCreateRequestMetadatasResponse {
+	repeated RequestMetadata RequestMetadatas = 1;
+}
+

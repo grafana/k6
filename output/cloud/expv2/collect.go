@@ -2,9 +2,13 @@ package expv2
 
 import (
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
+	"go.k6.io/k6/cloudapi/insights"
+	"go.k6.io/k6/js/modules/k6/experimental/tracing"
+	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
 )
 
@@ -162,4 +166,104 @@ func (c *collector) timeFromBucketID(id int64) int64 {
 
 func (c *collector) bucketCutoffID() int64 {
 	return c.nowFunc().Add(-c.waitPeriod).UnixNano() / int64(c.aggregationPeriod)
+}
+
+type requestMetadatasCollector struct {
+	testRunID int64
+	buffer    insights.RequestMetadatas
+	bufferMu  *sync.Mutex
+}
+
+func newRequestMetadatasCollector(testRunID int64) *requestMetadatasCollector {
+	return &requestMetadatasCollector{
+		testRunID: testRunID,
+		buffer:    nil,
+		bufferMu:  &sync.Mutex{},
+	}
+}
+
+func (c *requestMetadatasCollector) CollectRequestMetadatas(sampleContainers []metrics.SampleContainer) {
+	if len(sampleContainers) < 1 {
+		return
+	}
+
+	trails := c.filterTrailsWithTraces(sampleContainers)
+	if len(trails) < 1 {
+		return
+	}
+
+	c.collectTrails(trails)
+}
+
+func (c *requestMetadatasCollector) filterTrailsWithTraces(sampleContainers []metrics.SampleContainer) []*httpext.Trail {
+	var filteredTrails []*httpext.Trail
+
+	for _, sampleContainer := range sampleContainers {
+		if trail, ok := sampleContainer.(*httpext.Trail); ok {
+			if _, found := trail.Metadata[tracing.MetadataTraceIDKeyName]; found {
+				filteredTrails = append(filteredTrails, trail)
+			}
+		}
+	}
+
+	return filteredTrails
+}
+
+func (c *requestMetadatasCollector) collectTrails(trails []*httpext.Trail) {
+	newBuffer := make(insights.RequestMetadatas, 0, len(trails))
+
+	for _, trail := range trails {
+		m := insights.RequestMetadata{
+			TraceID: trail.Metadata[tracing.MetadataTraceIDKeyName],
+			Start:   trail.EndTime.Add(-trail.Duration),
+			End:     trail.EndTime,
+			TestRunLabels: insights.TestRunLabels{
+				ID:       c.testRunID,
+				Scenario: c.getStringTagFromTrail(trail, "scenario"),
+				Group:    c.getStringTagFromTrail(trail, "group"),
+			},
+			ProtocolLabels: insights.ProtocolHTTPLabels{
+				Url:        c.getStringTagFromTrail(trail, "url"),
+				Method:     c.getStringTagFromTrail(trail, "method"),
+				StatusCode: c.getIntTagFromTrail(trail, "status"),
+			},
+		}
+
+		newBuffer = append(newBuffer, m)
+	}
+
+	c.bufferMu.Lock()
+	defer c.bufferMu.Unlock()
+
+	c.buffer = append(c.buffer, newBuffer...)
+}
+
+func (c *requestMetadatasCollector) PopAll() insights.RequestMetadatas {
+	c.bufferMu.Lock()
+	defer c.bufferMu.Unlock()
+
+	b := c.buffer
+	c.buffer = nil
+	return b
+}
+
+func (c *requestMetadatasCollector) getStringTagFromTrail(trail *httpext.Trail, key string) string {
+	if tag, found := trail.Tags.Get(key); found {
+		return tag
+	}
+
+	return "unknown"
+}
+
+func (c *requestMetadatasCollector) getIntTagFromTrail(trail *httpext.Trail, key string) int64 {
+	if tag, found := trail.Tags.Get(key); found {
+		tagInt, err := strconv.ParseInt(tag, 10, 64)
+		if err != nil {
+			return 0
+		}
+
+		return tagInt
+	}
+
+	return 0
 }

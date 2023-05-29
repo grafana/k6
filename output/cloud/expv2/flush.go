@@ -5,6 +5,7 @@ import (
 
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
+	"go.k6.io/k6/cloudapi/insights"
 )
 
 type pusher interface {
@@ -130,4 +131,29 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 		addBucketToTimeSeriesProto(
 			pbTimeSeries, timeSeries.Metric.Type, bucket.Time, sink)
 	}
+}
+
+type InsightsClient interface {
+	IngestRequestMetadatasBatch(context.Context, insights.RequestMetadatas) error
+}
+
+type tracesFlusher struct {
+	client    InsightsClient
+	collector RequestMetadatasCollector
+}
+
+func newTracesFlusher(client InsightsClient, collector RequestMetadatasCollector) *tracesFlusher {
+	return &tracesFlusher{
+		client:    client,
+		collector: collector,
+	}
+}
+
+func (f *tracesFlusher) Flush(ctx context.Context) error {
+	requestMetadatas := f.collector.PopAll()
+	if len(requestMetadatas) < 1 {
+		return nil
+	}
+
+	return f.client.IngestRequestMetadatasBatch(ctx, requestMetadatas)
 }

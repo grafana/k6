@@ -18,8 +18,8 @@ const (
 	// To not ingest and process the related spans, b/c they are part of a non-cloud run.
 	k6LocalCode = 33
 
-	// metadataTraceIDKeyName is the key name of the traceID in the output metadata.
-	metadataTraceIDKeyName = "trace_id"
+	// MetadataTraceIDKeyName is the key name of the traceID in the output metadata.
+	MetadataTraceIDKeyName = "trace_id"
 
 	// traceIDEncodedSize is the size of the encoded traceID.
 	traceIDEncodedSize = 16
