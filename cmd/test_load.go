@@ -22,6 +22,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -32,17 +33,22 @@ const (
 // loadedTest contains all of data, details and dependencies of a loaded
 // k6 test, but without any config consolidation.
 type loadedTest struct {
-	sourceRootPath string // contains the raw string the user supplied
-	pwd            string
-	source         *loader.SourceData
-	fs             fsext.Fs
-	fileSystems    map[string]fsext.Fs
-	preInitState   *lib.TestPreInitState
-	initRunner     lib.Runner // TODO: rename to something more appropriate
-	keyLogger      io.Closer
+	sourceRootPath     string // contains the raw string the user supplied
+	pwd                string
+	source             *loader.SourceData
+	fs                 fsext.Fs
+	fileSystems        map[string]fsext.Fs
+	preInitState       *lib.TestPreInitState
+	initRunner         lib.Runner // TODO: rename to something more appropriate
+	keyLogger          io.Closer
+	consolidatedConfig Config
+	derivedConfig      Config
 }
 
-func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+func loadTest(
+	gs *state.GlobalState, cmd *cobra.Command, args []string,
+	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
+) (*loadedTest, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
 	}
@@ -65,6 +71,21 @@ func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loaded
 		return nil, err
 	}
 
+	var cliConfig Config
+	if cliConfigGetter != nil {
+		gs.Logger.Debug("Parsing CLI flags...")
+		var err error
+		cliConfig, err = cliConfigGetter(cmd.Flags())
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	keyLogger, err := openSSLKeyLogFile(gs, pwd, runtimeOptions.KeyWriter)
+	if err != nil {
+		return nil, err
+	}
+
 	registry := metrics.NewRegistry()
 	state := &lib.TestPreInitState{
 		Logger:         gs.Logger,
@@ -77,86 +98,106 @@ func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loaded
 			return val, ok
 		},
 	}
-
-	test := &loadedTest{
-		pwd:            pwd,
-		sourceRootPath: sourceRootPath,
-		source:         src,
-		fs:             gs.FS,
-		fileSystems:    fileSystems,
-		preInitState:   state,
+	if keyLogger != nil {
+		state.KeyLogger = &syncWriter{w: keyLogger}
 	}
 
 	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)
-	if err := test.initializeFirstRunner(gs); err != nil {
+	initRunner, err := initializeFirstRunner(gs, state, src, pwd, fileSystems)
+	if err != nil {
 		return nil, fmt.Errorf("could not initialize '%s': %w", sourceRootPath, err)
 	}
 	gs.Logger.Debug("Runner successfully initialized!")
+
+	gs.Logger.Debug("Consolidating config layers...")
+	consolidatedConfig, err := getConsolidatedConfig(gs, cliConfig, initRunner.GetOptions())
+	if err != nil {
+		return nil, err
+	}
+
+	// return consolidateDeriveAndValidateConfig(gs, cmd, cliConfigGetter)
+
+	gs.Logger.Debug("Parsing thresholds and validating config...")
+	// Parse the thresholds, only if the --no-threshold flag is not set.
+	// If parsing the threshold expressions failed, consider it as an
+	// invalid configuration error.
+	if !runtimeOptions.NoThresholds.Bool {
+		for metricName, thresholdsDefinition := range consolidatedConfig.Options.Thresholds {
+			err = thresholdsDefinition.Parse()
+			if err != nil {
+				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+			}
+
+			err = thresholdsDefinition.Validate(metricName, registry)
+			if err != nil {
+				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+			}
+		}
+	}
+
+	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, initRunner.IsExecutable, gs.Logger)
+	if err != nil {
+		return nil, err
+	}
+
+	test := &loadedTest{
+		pwd:                pwd,
+		sourceRootPath:     sourceRootPath,
+		source:             src,
+		fs:                 gs.FS,
+		fileSystems:        fileSystems,
+		preInitState:       state,
+		initRunner:         initRunner,
+		consolidatedConfig: consolidatedConfig,
+		derivedConfig:      derivedConfig,
+	}
+
 	return test, nil
 }
 
-func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
-	testPath := lt.source.URL.String()
+func initializeFirstRunner(gs *state.GlobalState, preInitState *lib.TestPreInitState, source *loader.SourceData, pwd string, fileSystems map[string]fsext.Fs) (runner lib.Runner, err error) {
+	testPath := source.URL.String()
 	logger := gs.Logger.WithField("test_path", testPath)
 
-	testType := lt.preInitState.RuntimeOptions.TestType.String
+	testType := preInitState.RuntimeOptions.TestType.String
 	if testType == "" {
 		logger.Debug("Detecting test type for...")
-		testType = detectTestType(lt.source.Data)
+		testType = detectTestType(source.Data)
 	}
 
-	if lt.preInitState.RuntimeOptions.KeyWriter.Valid {
-		logger.Warnf("SSLKEYLOGFILE was specified, logging TLS connection keys to '%s'...",
-			lt.preInitState.RuntimeOptions.KeyWriter.String)
-		keylogFilename := lt.preInitState.RuntimeOptions.KeyWriter.String
-		// if path is absolute - no point doing anything
-		if !filepath.IsAbs(keylogFilename) {
-			// filepath.Abs could be used but it will get the pwd from `os` package instead of what is in lt.pwd
-			// this is against our general approach of not using `os` directly and makes testing harder
-			keylogFilename = filepath.Join(lt.pwd, keylogFilename)
-		}
-		f, err := lt.fs.OpenFile(keylogFilename, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_APPEND, 0o600)
-		if err != nil {
-			return fmt.Errorf("couldn't get absolute path for keylog file: %w", err)
-		}
-		lt.keyLogger = f
-		lt.preInitState.KeyLogger = &syncWriter{w: f}
-	}
 	switch testType {
 	case testTypeJS:
 		logger.Debug("Trying to load as a JS test...")
-		runner, err := js.New(lt.preInitState, lt.source, lt.fileSystems)
+		runner, err = js.New(preInitState, source, fileSystems)
 		// TODO: should we use common.UnwrapGojaInterruptedError() here?
 		if err != nil {
-			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
+			return nil, fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 		}
-		lt.initRunner = runner
-		return nil
-
 	case testTypeArchive:
 		logger.Debug("Trying to load test as an archive bundle...")
 
 		var arc *lib.Archive
-		arc, err := lib.ReadArchive(bytes.NewReader(lt.source.Data))
+		arc, err := lib.ReadArchive(bytes.NewReader(source.Data))
 		if err != nil {
-			return fmt.Errorf("could not load test archive bundle '%s': %w", testPath, err)
+			return nil, fmt.Errorf("could not load test archive bundle '%s': %w", testPath, err)
 		}
 		logger.Debugf("Loaded test as an archive bundle with type '%s'!", arc.Type)
 
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			lt.initRunner, err = js.NewFromArchive(lt.preInitState, arc)
+			runner, err = js.NewFromArchive(preInitState, arc)
 			if err != nil {
-				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
+				return nil, fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
 			}
-			return nil
 		default:
-			return fmt.Errorf("archive '%s' has an unsupported test type '%s'", testPath, arc.Type)
+			return nil, fmt.Errorf("archive '%s' has an unsupported test type '%s'", testPath, arc.Type)
 		}
 	default:
-		return fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
+		return nil, fmt.Errorf("unknown or unspecified test type '%s' for '%s'", testType, testPath)
 	}
+
+	return runner, nil
 }
 
 // readSource is a small wrapper around loader.ReadSource returning
@@ -231,22 +272,44 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 
 // loadedAndConfiguredTest contains the whole loadedTest, as well as the
 // consolidated test config and the full test run state.
-type loadedAndConfiguredTest struct {
-	*loadedTest
-	consolidatedConfig Config
-	derivedConfig      Config
-}
+// type loadedAndConfiguredTest struct {
+// 	*loadedTest
+// 	consolidatedConfig Config
+// 	derivedConfig      Config
+// }
 
-func loadAndConfigureTest(
-	gs *state.GlobalState, cmd *cobra.Command, args []string,
-	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
-) (*loadedAndConfiguredTest, error) {
-	test, err := loadTest(gs, cmd, args)
-	if err != nil {
-		return nil, err
+// func loadAndConfigureTest(
+// 	gs *state.GlobalState, cmd *cobra.Command, args []string,
+// 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
+// ) (*loadedAndConfiguredTest, error) {
+// 	test, err := loadTest(gs, cmd, args, cliConfigGetter)
+// 	if err != nil {
+// 		return nil, err
+// 	}
+
+// 	return test, nil
+// }
+
+func openSSLKeyLogFile(gs *state.GlobalState, path string, filename null.String) (keyLogFile io.Writer, err error) {
+	if !filename.Valid {
+		return nil, nil
 	}
 
-	return test.consolidateDeriveAndValidateConfig(gs, cmd, cliConfigGetter)
+	keylogFilename := filename.String
+	// if path is absolute - no point doing anything
+	if !filepath.IsAbs(keylogFilename) {
+		// filepath.Abs could be used but it will get the pwd from `os` package instead of what is configured in GlobalState.
+		// This is against our general approach of not using `os` directly and makes testing harder.
+		keylogFilename = filepath.Join(path, keylogFilename)
+	}
+	gs.Logger.Warnf("SSLKEYLOGFILE was specified, logging TLS connection keys to '%s'...",
+		filename)
+	keyLogFile, err = gs.FS.OpenFile(keylogFilename, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_APPEND, 0o600)
+	if err != nil {
+		return nil, fmt.Errorf("couldn't get absolute path for keylog file: %w", err)
+	}
+
+	return keyLogFile, nil
 }
 
 // loadSystemCertPool attempts to load system certificates.

@@ -14,6 +14,7 @@ type TestPreInitState struct {
 	RuntimeOptions RuntimeOptions
 	Registry       *metrics.Registry
 	BuiltinMetrics *metrics.BuiltinMetrics
+	Options        Options
 	Events         *event.System
 	KeyLogger      io.Writer
 	LookupEnv      func(key string) (val string, ok bool)
@@ -25,7 +26,6 @@ type TestPreInitState struct {
 type TestRunState struct {
 	*TestPreInitState
 
-	Options Options
 	Runner  Runner // TODO: rename to something better, see type comment
 	RunTags *metrics.TagSet
 
