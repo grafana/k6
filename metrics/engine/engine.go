@@ -189,7 +189,7 @@ func (me *MetricsEngine) StartThresholdCalculations(
 				breached, shouldAbort := me.evaluateThresholds(true, getCurrentTestRunDuration)
 				if shouldAbort {
 					err := fmt.Errorf(
-						"thresholds on metrics '%s' were breached; at least one has abortOnFail enabled, stopping test prematurely",
+						"thresholds on metrics '%s' were crossed; at least one has abortOnFail enabled, stopping test prematurely",
 						strings.Join(breached, ", "),
 					)
 					me.logger.Debug(err.Error())
@@ -257,7 +257,7 @@ func (me *MetricsEngine) evaluateThresholds(
 	}
 	if len(breachedThresholds) > 0 {
 		sort.Strings(breachedThresholds)
-		me.logger.Debugf("Thresholds on %d metrics breached: %v", len(breachedThresholds), breachedThresholds)
+		me.logger.Debugf("Thresholds on %d metrics crossed: %v", len(breachedThresholds), breachedThresholds)
 	}
 	atomic.StoreUint32(&me.breachedThresholdsCount, uint32(len(breachedThresholds)))
 	return breachedThresholds, shouldAbort

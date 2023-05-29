@@ -655,7 +655,7 @@ func TestThresholdsFailed(t *testing.T) {
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	expErr := "thresholds on metrics 'iterations{scenario:sc1}, iterations{scenario:sc2}' have been breached"
+	expErr := "thresholds on metrics 'iterations{scenario:sc1}, iterations{scenario:sc2}' have been crossed"
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdout := ts.Stdout.String()
 	t.Log(stdout)
@@ -697,7 +697,7 @@ func TestAbortedByThreshold(t *testing.T) {
 	)
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	expErr := "thresholds on metrics 'iterations' were breached; at least one has abortOnFail enabled, stopping test prematurely"
+	expErr := "thresholds on metrics 'iterations' were crossed; at least one has abortOnFail enabled, stopping test prematurely"
 	assert.True(t, testutils.LogContains(ts.LoggerHook.Drain(), logrus.ErrorLevel, expErr))
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
