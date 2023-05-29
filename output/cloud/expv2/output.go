@@ -183,7 +183,7 @@ func (o *Output) flushMetrics() {
 }
 
 // handleFlushError handles errors generated from the flushing operation.
-// It may interrupts the metric collection or invokes abort of the test.
+// It may interrupt the metric collection or invoke aborting of the test.
 //
 // note: The actual test execution should continue, since for local k6 run tests
 // the end-of-test summary (or any other outputs) will still work,
