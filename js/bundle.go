@@ -18,6 +18,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
@@ -105,8 +106,11 @@ func newBundle(
 		pwd:               loader.Dir(src.URL),
 		preInitState:      piState,
 	}
+	moduleState := &modules.State{
+		Events: piState.Events,
+	}
 	c := bundle.newCompiler(piState.Logger)
-	bundle.moduleResolver = newModuleResolution(getJSModules(), generateCJSLoad(bundle, c))
+	bundle.moduleResolver = newModuleResolution(getJSModules(moduleState), generateCJSLoad(bundle, c))
 
 	if err = bundle.moduleResolver.setMain(src, c); err != nil {
 		return nil, err

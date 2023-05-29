@@ -23,6 +23,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -70,6 +71,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if err != nil {
 		return err
 	}
+
+	defer test.preInitState.Events.Stop()
+
 	if test.keyLogger != nil {
 		defer func() {
 			if klErr := test.keyLogger.Close(); klErr != nil {
@@ -276,6 +280,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
+	test.preInitState.Events.Notify(&event.Event{Type: event.InitVUs, Data: nil})
+
 	// Initialize the VUs and executors
 	stopVUEmission, err := execScheduler.Init(runCtx, samples)
 	if err != nil {
@@ -302,6 +308,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
+	test.preInitState.Events.Notify(&event.Event{Type: event.TestStart, Data: nil})
 	err = execScheduler.Run(globalCtx, runCtx, samples)
 
 	// Init has passed successfully, so unless disabled, make sure we send a

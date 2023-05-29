@@ -23,9 +23,9 @@ type (
 
 // New creates an experimental browser RootModule
 // and wraps it around this internal RootModule.
-func New() *RootModule {
+func New(state *modules.State) *RootModule {
 	return &RootModule{
-		rm: xk6browser.New(),
+		rm: xk6browser.New(state),
 	}
 }
 
