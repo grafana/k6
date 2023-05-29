@@ -7,8 +7,6 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/event"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -44,6 +42,8 @@ type VU interface {
 	// Context return the context.Context about the current VU
 	Context() context.Context
 
+	Events() lib.EventSubscriber
+
 	// InitEnv returns common.InitEnvironment instance if present
 	InitEnv() *common.InitEnvironment
 
@@ -77,13 +77,9 @@ type Exports struct {
 type ModuleEvents interface {
 }
 
-type EventSubscriber interface {
-	Subscribe(events ...event.Type) (subID uint64, eventsCh <-chan *event.Event)
-}
-
 // TODO: Move this somewhere central so that it can also be used by any other k6 component, module, extension, etc.
-type State struct {
-	Events EventSubscriber
-	// Eventually lib.Options could go here
-	Logger logrus.FieldLogger
-}
+// type State struct {
+// 	Events EventSubscriber
+// 	// Eventually lib.Options could go here
+// 	Logger logrus.FieldLogger
+// }

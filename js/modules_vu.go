@@ -14,11 +14,16 @@ type moduleVUImpl struct {
 	initEnv   *common.InitEnvironment
 	state     *lib.State
 	runtime   *goja.Runtime
+	events    lib.EventSubscriber
 	eventLoop *eventloop.EventLoop
 }
 
 func (m *moduleVUImpl) Context() context.Context {
 	return m.ctx
+}
+
+func (m *moduleVUImpl) Events() lib.EventSubscriber {
+	return m.events
 }
 
 func (m *moduleVUImpl) InitEnv() *common.InitEnvironment {
