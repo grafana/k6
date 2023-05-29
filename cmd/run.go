@@ -278,17 +278,39 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
+	// subID, evtCh := test.preInitState.Events.Subscribe(event.Init)
+	type execInit struct {
+		stopVUEmission func()
+		err            error
+	}
+	vuInitCh := make(chan execInit)
+	go func() {
+		// evt := <-evtCh
+		// Initialize the VUs and executors
+		fmt.Printf(">>> starting VU init...\n")
+		stopVUEmission, err := execScheduler.Init(runCtx, samples)
+		fmt.Printf(">>> done with VU init...\n")
+		vuInitCh <- execInit{stopVUEmission, err}
+		// evt.Done()
+		// test.preInitState.Events.Unsubscribe(subID)
+		// if err != nil {
+		// 	return err
+		// }
+		// defer stopVUEmission()
+	}()
+
 	// TODO: Make ExecutionScheduler.Init subscribe to the Init event, and block
 	// here until all subscribers have finished processing it?
 	// This would enable concurrent VU/executor and browser initialization.
-	test.preInitState.Events.Notify(&event.Event{Type: event.Init})
-
-	// Initialize the VUs and executors
-	stopVUEmission, err := execScheduler.Init(runCtx, samples)
-	if err != nil {
+	waitInitDone := test.preInitState.Events.Notify(&event.Event{Type: event.Init})
+	if err := waitInitDone(15 * time.Minute); err != nil {
 		return err
 	}
-	defer stopVUEmission()
+	execInitRet := <-vuInitCh
+	if execInitRet.err != nil {
+		return execInitRet.err
+	}
+	defer execInitRet.stopVUEmission()
 
 	if conf.Linger.Bool {
 		defer func() {
