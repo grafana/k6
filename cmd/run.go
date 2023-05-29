@@ -192,14 +192,14 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 			tErr := errext.WithAbortReasonIfNone(
 				errext.WithExitCodeIfNone(
-					fmt.Errorf("thresholds on metrics '%s' have been breached", strings.Join(breachedThresholds, ", ")),
+					fmt.Errorf("thresholds on metrics '%s' have been crossed", strings.Join(breachedThresholds, ", ")),
 					exitcodes.ThresholdsHaveFailed,
 				), errext.AbortedByThresholdsAfterTestEnd)
 
 			if err == nil {
 				err = tErr
 			} else {
-				logger.WithError(tErr).Debug("Breached thresholds, but test already exited with another error")
+				logger.WithError(tErr).Debug("Crossed thresholds, but test already exited with another error")
 			}
 		}
 		if finalizeThresholds != nil {
