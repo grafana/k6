@@ -72,8 +72,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	defer test.preInitState.Events.Stop()
-
 	if test.keyLogger != nil {
 		defer func() {
 			if klErr := test.keyLogger.Close(); klErr != nil {
@@ -280,7 +278,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	stopSignalHandling := handleTestAbortSignals(c.gs, gracefulStop, onHardStop)
 	defer stopSignalHandling()
 
-	test.preInitState.Events.Notify(&event.Event{Type: event.InitVUs, Data: nil})
+	// TODO: Make ExecutionScheduler.Init subscribe to the Init event, and block
+	// here until all subscribers have finished processing it?
+	// This would enable concurrent VU/executor and browser initialization.
+	test.preInitState.Events.Notify(&event.Event{Type: event.Init}, 0)
 
 	// Initialize the VUs and executors
 	stopVUEmission, err := execScheduler.Init(runCtx, samples)
@@ -308,7 +309,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
-	test.preInitState.Events.Notify(&event.Event{Type: event.TestStart, Data: nil})
+	test.preInitState.Events.Notify(&event.Event{Type: event.TestStart}, 0)
+	defer func() {
+		test.preInitState.Events.Notify(&event.Event{Type: event.TestEnd}, 5*time.Second)
+		// XXX: This won't wait for subscriber goroutines to finish.
+		test.preInitState.Events.UnsubscribeAll()
+	}()
 	err = execScheduler.Run(globalCtx, runCtx, samples)
 
 	// Init has passed successfully, so unless disabled, make sure we send a

@@ -78,7 +78,7 @@ type ModuleEvents interface {
 }
 
 type EventSubscriber interface {
-	Subscribe(events ...event.Type) <-chan *event.Event
+	Subscribe(events ...event.Type) (subID uint64, eventsCh <-chan *event.Event)
 }
 
 // TODO: Move this somewhere central so that it can also be used by any other k6 component, module, extension, etc.
