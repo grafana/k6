@@ -76,6 +76,8 @@ func NewFrameSession(
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
+	k6Metrics := k6ext.GetCustomMetrics(ctx)
+
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              s,
@@ -89,7 +91,7 @@ func NewFrameSession(
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		vu:                   k6ext.GetVU(ctx),
-		k6Metrics:            k6ext.GetCustomMetrics(ctx),
+		k6Metrics:            k6Metrics,
 		logger:               l,
 		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
@@ -98,7 +100,7 @@ func NewFrameSession(
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
 	}
-	fs.networkManager, err = NewNetworkManager(ctx, s, fs.manager, parentNM)
+	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM)
 	if err != nil {
 		l.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
 			s.ID(), tid, err)
@@ -793,25 +795,12 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 	}
 
 	switch event.Name {
-	case "init", "commit":
-		frame.initTime = event.Timestamp.Time()
-		return
 	case "load":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventLoad)
 	case "DOMContentLoaded":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventDOMContentLoad)
 	case "networkIdle":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventNetworkIdle)
-	}
-
-	eventToMetric := map[string]*k6metrics.Metric{
-		"load":             fs.k6Metrics.BrowserLoaded,
-		"DOMContentLoaded": fs.k6Metrics.BrowserDOMContentLoaded,
-		"firstPaint":       fs.k6Metrics.BrowserFirstPaint,
-	}
-
-	if m, ok := eventToMetric[event.Name]; ok {
-		frame.emitMetric(m, event.Timestamp.Time())
 	}
 }
 
@@ -1089,7 +1078,7 @@ func (fs *FrameSession) updateViewport() error {
 	// add an inset to viewport depending on the operating system.
 	// this won't add an inset if we're running in headless mode.
 	viewport.calculateInset(
-		fs.page.browserCtx.browser.launchOpts.Headless,
+		fs.page.browserCtx.browser.browserOpts.Headless,
 		runtime.GOOS,
 	)
 	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{

@@ -144,13 +144,14 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/xk6-browser v0.9.0
+# github.com/grafana/xk6-browser v0.9.1-0.20230525133328-61ede75e8eba => /home/ivan/Work/Grafana/xk6-browser
 ## explicit; go 1.19
 github.com/grafana/xk6-browser/api
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium
 github.com/grafana/xk6-browser/common
 github.com/grafana/xk6-browser/common/js
+github.com/grafana/xk6-browser/env
 github.com/grafana/xk6-browser/k6error
 github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout
@@ -445,3 +446,4 @@ gopkg.in/guregu/null.v3
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
+# github.com/grafana/xk6-browser => /home/ivan/Work/Grafana/xk6-browser

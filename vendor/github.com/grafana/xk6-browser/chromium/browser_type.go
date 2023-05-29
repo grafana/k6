@@ -15,6 +15,7 @@ import (
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 	"github.com/grafana/xk6-browser/storage"
@@ -34,12 +35,13 @@ var _ api.BrowserType = &BrowserType{}
 type BrowserType struct {
 	// FIXME: This is only exported because testBrowser needs it. Contexts
 	// shouldn't be stored on structs if we can avoid it.
-	Ctx       context.Context
-	vu        k6modules.VU
-	hooks     *common.Hooks
-	k6Metrics *k6ext.CustomMetrics
-	execPath  string // path to the Chromium executable
-	randSrc   *rand.Rand
+	Ctx          context.Context
+	vu           k6modules.VU
+	hooks        *common.Hooks
+	k6Metrics    *k6ext.CustomMetrics
+	execPath     string // path to the Chromium executable
+	randSrc      *rand.Rand
+	envLookupper env.LookupFunc
 }
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
@@ -49,18 +51,19 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 	// otherwise it will return nil.
 	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
 	b := BrowserType{
-		vu:        vu,
-		hooks:     common.NewHooks(),
-		k6Metrics: k6m,
-		randSrc:   rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
+		vu:           vu,
+		hooks:        common.NewHooks(),
+		k6Metrics:    k6m,
+		randSrc:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
+		envLookupper: os.LookupEnv,
 	}
 
 	return &b
 }
 
 func (b *BrowserType) init(
-	opts goja.Value, isRemoteBrowser bool,
-) (context.Context, *common.LaunchOptions, *log.Logger, error) {
+	isRemoteBrowser bool,
+) (context.Context, *common.BrowserOptions, *log.Logger, error) {
 	ctx := b.initContext()
 
 	logger, err := makeLogger(ctx)
@@ -68,26 +71,27 @@ func (b *BrowserType) init(
 		return nil, nil, nil, fmt.Errorf("error setting up logger: %w", err)
 	}
 
-	var launchOpts *common.LaunchOptions
+	var browserOpts *common.BrowserOptions
 	if isRemoteBrowser {
-		launchOpts = common.NewRemoteBrowserLaunchOptions()
+		browserOpts = common.NewRemoteBrowserOptions()
 	} else {
-		launchOpts = common.NewLaunchOptions()
+		browserOpts = common.NewLocalBrowserOptions()
 	}
 
-	if err = launchOpts.Parse(ctx, logger, opts); err != nil {
-		return nil, nil, nil, fmt.Errorf("error parsing launch options: %w", err)
+	opts := k6ext.GetScenarioOpts(b.vu.Context(), b.vu)
+	if err = browserOpts.Parse(ctx, logger, opts, b.envLookupper); err != nil {
+		return nil, nil, nil, fmt.Errorf("error parsing browser options: %w", err)
 	}
-	ctx = common.WithLaunchOptions(ctx, launchOpts)
+	ctx = common.WithBrowserOptions(ctx, browserOpts)
 
-	if err := logger.SetCategoryFilter(launchOpts.LogCategoryFilter); err != nil {
+	if err := logger.SetCategoryFilter(browserOpts.LogCategoryFilter); err != nil {
 		return nil, nil, nil, fmt.Errorf("error setting category filter: %w", err)
 	}
-	if launchOpts.Debug {
+	if browserOpts.Debug {
 		_ = logger.SetLevel("debug")
 	}
 
-	return ctx, launchOpts, logger, nil
+	return ctx, browserOpts, logger, nil
 }
 
 func (b *BrowserType) initContext() context.Context {
@@ -99,28 +103,28 @@ func (b *BrowserType) initContext() context.Context {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(wsEndpoint string, opts goja.Value) api.Browser {
-	ctx, launchOpts, logger, err := b.init(opts, true)
+func (b *BrowserType) Connect(wsEndpoint string) (api.Browser, error) {
+	ctx, browserOpts, logger, err := b.init(true)
 	if err != nil {
-		k6ext.Panic(ctx, "initializing browser type: %w", err)
+		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, err := b.connect(ctx, wsEndpoint, launchOpts, logger)
+	bp, err := b.connect(ctx, wsEndpoint, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
-			Timeout: launchOpts.Timeout,
+			Timeout: browserOpts.Timeout,
 		}
-		k6ext.Panic(ctx, "%w", err)
+		return nil, fmt.Errorf("%w", err)
 	}
 
-	return bp
+	return bp, nil
 }
 
 func (b *BrowserType) connect(
-	ctx context.Context, wsURL string, opts *common.LaunchOptions, logger *log.Logger,
+	ctx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
 ) (*common.Browser, error) {
-	browserProc, err := b.link(ctx, wsURL, opts, logger)
+	browserProc, err := b.link(ctx, wsURL, logger)
 	if browserProc == nil {
 		return nil, fmt.Errorf("connecting to browser: %w", err)
 	}
@@ -140,10 +144,9 @@ func (b *BrowserType) connect(
 }
 
 func (b *BrowserType) link(
-	ctx context.Context, wsURL string,
-	opts *common.LaunchOptions, logger *log.Logger,
+	ctx context.Context, wsURL string, logger *log.Logger,
 ) (*common.BrowserProcess, error) {
-	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
 	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
 	if err != nil {
 		bProcCtxCancel()
@@ -155,31 +158,27 @@ func (b *BrowserType) link(
 
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch(opts goja.Value) (_ api.Browser, browserProcessID int) {
-	ctx, launchOpts, logger, err := b.init(opts, false)
+func (b *BrowserType) Launch() (_ api.Browser, browserProcessID int, _ error) {
+	ctx, browserOpts, logger, err := b.init(false)
 	if err != nil {
-		k6ext.Panic(ctx, "initializing browser type: %w", err)
+		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, pid, err := b.launch(ctx, launchOpts, logger)
+	bp, pid, err := b.launch(ctx, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
-			Timeout: launchOpts.Timeout,
+			Timeout: browserOpts.Timeout,
 		}
-		k6ext.Panic(ctx, "%w", err)
+		return nil, 0, fmt.Errorf("%w", err)
 	}
 
-	return bp, pid
+	return bp, pid, nil
 }
 
 func (b *BrowserType) launch(
-	ctx context.Context, opts *common.LaunchOptions, logger *log.Logger,
+	ctx context.Context, opts *common.BrowserOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
-	envs := make([]string, 0, len(opts.Env))
-	for k, v := range opts.Env {
-		envs = append(envs, fmt.Sprintf("%s=%s", k, v))
-	}
 	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
@@ -204,7 +203,7 @@ func (b *BrowserType) launch(
 		<-c.Done()
 	}(ctx)
 
-	browserProc, err := b.allocate(ctx, opts, flags, envs, dataDir, logger)
+	browserProc, err := b.allocate(ctx, opts, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -236,11 +235,11 @@ func (b *BrowserType) Name() string {
 
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
-	ctx context.Context, opts *common.LaunchOptions,
-	flags map[string]any, env []string, dataDir *storage.Dir,
+	ctx context.Context, opts *common.BrowserOptions,
+	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
-	bProcCtx, bProcCtxCancel := context.WithTimeout(ctx, opts.Timeout)
+	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
 	defer func() {
 		if rerr != nil {
 			bProcCtxCancel()
@@ -257,7 +256,7 @@ func (b *BrowserType) allocate(
 		path = b.ExecutablePath()
 	}
 
-	return common.NewLocalBrowserProcess(bProcCtx, path, args, env, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
+	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
 }
 
 // ExecutablePath returns the path where the extension expects to find the browser executable.
@@ -300,6 +299,11 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 	return ""
 }
 
+// SetEnvLookupper sets the environment variable lookupper function.
+func (b *BrowserType) SetEnvLookupper(envLookupper env.LookupFunc) {
+	b.envLookupper = envLookupper
+}
+
 // parseArgs parses command-line arguments and returns them.
 func parseArgs(flags map[string]any) ([]string, error) {
 	// Build command line args list
@@ -327,7 +331,7 @@ func parseArgs(flags map[string]any) ([]string, error) {
 	return args, nil
 }
 
-func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[string]any, error) {
+func prepareFlags(lopts *common.BrowserOptions, k6opts *k6lib.Options) (map[string]any, error) {
 	// After Puppeteer's and Playwright's default behavior.
 	f := map[string]any{
 		"disable-background-networking":                      true,
@@ -354,11 +358,10 @@ func prepareFlags(lopts *common.LaunchOptions, k6opts *k6lib.Options) (map[strin
 		"use-mock-keychain":               true,
 		"no-service-autorun":              true,
 
-		"no-startup-window":           true,
-		"no-default-browser-check":    true,
-		"headless":                    lopts.Headless,
-		"auto-open-devtools-for-tabs": lopts.Devtools,
-		"window-size":                 fmt.Sprintf("%d,%d", 800, 600),
+		"no-startup-window":        true,
+		"no-default-browser-check": true,
+		"headless":                 lopts.Headless,
+		"window-size":              fmt.Sprintf("%d,%d", 800, 600),
 	}
 	if lopts.Headless {
 		f["hide-scrollbars"] = true

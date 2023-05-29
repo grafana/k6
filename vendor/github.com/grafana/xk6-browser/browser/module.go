@@ -1,11 +1,16 @@
-// Package browser provides an entry point to the browser extension.
+// Package browser provides an entry point to the browser module.
 package browser
 
 import (
+	"fmt"
+	"os"
+	"time"
+
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
 
+	k6event "go.k6.io/k6/event"
 	k6modules "go.k6.io/k6/js/modules"
 )
 
@@ -13,7 +18,8 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		PidRegistry *pidRegistry
+		PidRegistry    *pidRegistry
+		remoteRegistry *remoteRegistry
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -35,9 +41,30 @@ var (
 )
 
 // New returns a pointer to a new RootModule instance.
-func New() *RootModule {
+func New(state *k6modules.State) *RootModule {
+	// TODO: Only subscribe to events if there are browser scenarios configured.
+	// For this to work, state.Options should be accessible here.
+	evtCh := state.Events.Subscribe(k6event.InitVUs, k6event.TestStart, k6event.TestEnd)
+	go func() {
+		for evt := range evtCh {
+			fmt.Printf(">>> received event: %#+v\n", evt)
+			switch evt.Type {
+			case k6event.InitVUs:
+				// Start browser processes here...
+				// evt.Done() is a no-op in this case, so no need to call it.
+			case k6event.TestEnd:
+				// Stop browser processes here...
+				time.Sleep(time.Second)
+				// Don't forget to call this to signal k6 that it can continue
+				// shutting down!
+				evt.Done()
+			}
+		}
+	}()
+
 	return &RootModule{
-		PidRegistry: &pidRegistry{},
+		PidRegistry:    &pidRegistry{},
+		remoteRegistry: newRemoteRegistry(os.LookupEnv),
 	}
 }
 
@@ -47,8 +74,9 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
 		mod: &JSModule{
 			Chromium: mapBrowserToGoja(moduleVU{
-				VU:          vu,
-				pidRegistry: m.PidRegistry,
+				VU:             vu,
+				pidRegistry:    m.PidRegistry,
+				remoteRegistry: m.remoteRegistry,
 			}),
 			Devices: common.GetDevices(),
 		},

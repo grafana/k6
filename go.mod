@@ -2,6 +2,8 @@ module go.k6.io/k6
 
 go 1.19
 
+replace github.com/grafana/xk6-browser => /home/ivan/Work/Grafana/xk6-browser
+
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
