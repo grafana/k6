@@ -47,7 +47,7 @@ func (s *System) Subscribe(events ...Type) (subID uint64, eventsCh <-chan *Event
 	return subID, evtCh
 }
 
-func (s *System) Notify(event *Event, wait time.Duration) {
+func (s *System) Notify(event *Event) (wait func(time.Duration) error) {
 	s.subMx.RLock()
 	defer s.subMx.RUnlock()
 	totalSubs := len(s.subscribers[event.Type])
@@ -58,14 +58,41 @@ func (s *System) Notify(event *Event, wait time.Duration) {
 	if event.Done == nil {
 		event.Done = func() {}
 	}
-	if wait > 0 {
-		defer s.waitForDone(event, wait, totalSubs)
+	origDoneFn := event.Done
+	doneCh := make(chan struct{})
+	doneFn := func() {
+		origDoneFn()
+		select {
+		case doneCh <- struct{}{}:
+		default:
+		}
 	}
+	event.Done = doneFn
 
 	for _, evtCh := range s.subscribers[event.Type] {
 		select {
 		case evtCh <- event:
 		default:
+		}
+	}
+
+	return func(timeout time.Duration) error {
+		var (
+			doneCount int
+			tout      = time.After(timeout)
+		)
+		for {
+			if doneCount == totalSubs {
+				fmt.Printf(">>> received all %d done signals\n", doneCount)
+				return nil
+			}
+			select {
+			case <-doneCh:
+				fmt.Printf(">>> received 1 done signal\n")
+				doneCount++
+			case <-tout:
+				return fmt.Errorf("timed out after waiting %s for all '%s' events to complete", timeout, event.Type)
+			}
 		}
 	}
 }
@@ -94,35 +121,6 @@ func (s *System) UnsubscribeAll() {
 				seenSubs[subID] = struct{}{}
 			}
 			delete(sub, subID)
-		}
-	}
-}
-
-func (s *System) waitForDone(evt *Event, wait time.Duration, expDoneCount int) {
-	origDoneFn := evt.Done
-	doneCh := make(chan struct{})
-	doneFn := func() {
-		origDoneFn()
-		doneCh <- struct{}{}
-	}
-	evt.Done = doneFn
-
-	var (
-		doneCount int
-		timeout   = time.After(wait)
-	)
-	for {
-		if doneCount == expDoneCount {
-			fmt.Printf(">>> received all %d done signals\n", doneCount)
-			return
-		}
-		select {
-		case <-doneCh:
-			fmt.Printf(">>> received 1 done signal\n")
-			doneCount++
-		case <-timeout:
-			fmt.Printf(">>> timed out after waiting %s for done signals\n", wait)
-			return
 		}
 	}
 }

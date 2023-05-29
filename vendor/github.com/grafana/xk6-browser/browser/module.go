@@ -44,7 +44,7 @@ var (
 func New(state *k6modules.State) *RootModule {
 	// TODO: Only subscribe to events if there are browser scenarios configured.
 	// For this to work, state.Options should be accessible here.
-	_, evtCh := state.Events.Subscribe(k6event.Init, k6event.TestEnd)
+	_, evtCh := state.Events.Subscribe(k6event.Init, k6event.TestStart, k6event.TestEnd)
 	go func() {
 		for evt := range evtCh {
 			fmt.Printf(">>> received event: %#+v\n", evt)
@@ -52,17 +52,23 @@ func New(state *k6modules.State) *RootModule {
 			case k6event.Init:
 				fmt.Printf(">>> starting browser processes...\n")
 				// Start browser processes here...
-				time.Sleep(time.Second)
-				fmt.Printf(">>> done starting browser processes...\n")
-				evt.Done()
+				go func() {
+					time.Sleep(time.Second)
+					fmt.Printf(">>> done starting browser processes...\n")
+					evt.Done()
+				}()
+			case k6event.TestStart:
+				fmt.Printf(">>> test started in browser...\n")
 			case k6event.TestEnd:
 				fmt.Printf(">>> stopping browser processes...\n")
 				// Stop browser processes here...
-				time.Sleep(time.Second)
-				// Don't forget to call this to signal k6 that it can continue
-				// shutting down!
-				fmt.Printf(">>> done stopping browser processes...\n")
-				evt.Done()
+				go func() {
+					time.Sleep(time.Second)
+					// Don't forget to call this to signal k6 that it can
+					// continue shutting down!
+					fmt.Printf(">>> done stopping browser processes...\n")
+					evt.Done()
+				}()
 			}
 		}
 	}()

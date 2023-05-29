@@ -281,7 +281,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// TODO: Make ExecutionScheduler.Init subscribe to the Init event, and block
 	// here until all subscribers have finished processing it?
 	// This would enable concurrent VU/executor and browser initialization.
-	test.preInitState.Events.Notify(&event.Event{Type: event.Init}, 0)
+	test.preInitState.Events.Notify(&event.Event{Type: event.Init})
 
 	// Initialize the VUs and executors
 	stopVUEmission, err := execScheduler.Init(runCtx, samples)
@@ -309,10 +309,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
-	test.preInitState.Events.Notify(&event.Event{Type: event.TestStart}, 0)
+	test.preInitState.Events.Notify(&event.Event{Type: event.TestStart})
 	defer func() {
-		test.preInitState.Events.Notify(&event.Event{Type: event.TestEnd}, 5*time.Second)
-		// XXX: This won't wait for subscriber goroutines to finish.
+		waitAllDone := test.preInitState.Events.Notify(&event.Event{Type: event.TestEnd})
+		if err := waitAllDone(10 * time.Second); err != nil {
+			logger.WithError(err).Warn()
+		}
 		test.preInitState.Events.UnsubscribeAll()
 	}()
 	err = execScheduler.Run(globalCtx, runCtx, samples)
