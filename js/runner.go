@@ -244,13 +244,11 @@ func (r *Runner) newVU(
 		VUID:           vu.ID,
 		VUIDGlobal:     vu.IDGlobal,
 		Samples:        vu.Samples,
-		Events:         r.preInitState.Events,
 		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
 		Group:          r.defaultGroup,
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 	}
 	vu.moduleVUImpl.state = vu.state
-	vu.moduleVUImpl.events = r.preInitState.Events
 	_ = vu.Runtime.Set("console", vu.Console)
 
 	// This is here mostly so if someone tries they get a nice message

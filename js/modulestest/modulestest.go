@@ -17,17 +17,12 @@ type VU struct {
 	InitEnvField          *common.InitEnvironment
 	StateField            *lib.State
 	RuntimeField          *goja.Runtime
-	EventsField           lib.EventSubscriber
 	RegisterCallbackField func() func(f func() error)
 }
 
 // Context returns internally set field to conform to modules.VU interface
 func (m *VU) Context() context.Context {
 	return m.CtxField
-}
-
-func (m *VU) Events() lib.EventSubscriber {
-	return m.EventsField
 }
 
 // InitEnv returns internally set field to conform to modules.VU interface

@@ -11,17 +11,12 @@ import (
 	"github.com/sirupsen/logrus"
 	"golang.org/x/time/rate"
 
-	"go.k6.io/k6/event"
 	"go.k6.io/k6/metrics"
 )
 
 // DialContexter is an interface that can dial with a context
 type DialContexter interface {
 	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
-}
-
-type EventSubscriber interface {
-	Subscribe(events ...event.Type) (subID uint64, eventsCh <-chan *event.Event)
 }
 
 // State provides the volatile state for a VU.
@@ -61,8 +56,6 @@ type State struct {
 
 	// Buffer pool; use instead of allocating fresh buffers when possible.
 	BufferPool *BufferPool
-
-	Events EventSubscriber
 
 	VUID, VUIDGlobal uint64
 	Iteration        int64

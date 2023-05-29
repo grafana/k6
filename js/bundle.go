@@ -18,6 +18,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
@@ -105,8 +106,11 @@ func newBundle(
 		pwd:               loader.Dir(src.URL),
 		preInitState:      piState,
 	}
+	moduleState := &modules.State{
+		Events: piState.Events,
+	}
 	c := bundle.newCompiler(piState.Logger)
-	bundle.moduleResolver = newModuleResolution(getJSModules(), generateCJSLoad(bundle, c))
+	bundle.moduleResolver = newModuleResolution(getJSModules(moduleState), generateCJSLoad(bundle, c))
 
 	if err = bundle.moduleResolver.setMain(src, c); err != nil {
 		return nil, err
@@ -114,11 +118,7 @@ func newBundle(
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	// TODO use a real context
-	vuImpl := &moduleVUImpl{
-		ctx:     context.Background(),
-		runtime: goja.New(),
-		events:  piState.Events,
-	}
+	vuImpl := &moduleVUImpl{ctx: context.Background(), runtime: goja.New()}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	instance, err := bundle.instantiate(vuImpl, 0)
 	if err != nil {
@@ -230,7 +230,7 @@ func (b *Bundle) populateExports(logger logrus.FieldLogger, updateOptions bool, 
 func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance, error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
-	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New(), events: b.preInitState.Events}
+	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New()}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	instance, err := b.instantiate(vuImpl, vuID)
 	if err != nil {

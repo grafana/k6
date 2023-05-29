@@ -4,7 +4,6 @@ package browser
 import (
 	"fmt"
 	"os"
-	"sync"
 	"time"
 
 	"github.com/dop251/goja"
@@ -42,37 +41,37 @@ var (
 )
 
 // New returns a pointer to a new RootModule instance.
-func New() *RootModule {
+func New(state *k6modules.State) *RootModule {
 	// TODO: Only subscribe to events if there are browser scenarios configured.
 	// For this to work, state.Options should be accessible here.
-	// _, evtCh := state.Events.Subscribe(k6event.Init, k6event.TestStart, k6event.TestEnd)
-	// go func() {
-	// 	for evt := range evtCh {
-	// 		fmt.Printf(">>> received event: %#+v\n", evt)
-	// 		switch evt.Type {
-	// 		case k6event.Init:
-	// 			fmt.Printf(">>> starting browser processes...\n")
-	// 			// Start browser processes here...
-	// 			go func() {
-	// 				time.Sleep(time.Second)
-	// 				fmt.Printf(">>> done starting browser processes...\n")
-	// 				evt.Done()
-	// 			}()
-	// 		case k6event.TestStart:
-	// 			fmt.Printf(">>> test started in browser...\n")
-	// 		case k6event.TestEnd:
-	// 			fmt.Printf(">>> stopping browser processes...\n")
-	// 			// Stop browser processes here...
-	// 			go func() {
-	// 				time.Sleep(time.Second)
-	// 				// Don't forget to call this to signal k6 that it can
-	// 				// continue shutting down!
-	// 				fmt.Printf(">>> done stopping browser processes...\n")
-	// 				evt.Done()
-	// 			}()
-	// 		}
-	// 	}
-	// }()
+	_, evtCh := state.Events.Subscribe(k6event.Init, k6event.TestStart, k6event.TestEnd)
+	go func() {
+		for evt := range evtCh {
+			fmt.Printf(">>> received event: %#+v\n", evt)
+			switch evt.Type {
+			case k6event.Init:
+				fmt.Printf(">>> starting browser processes...\n")
+				// Start browser processes here...
+				go func() {
+					time.Sleep(time.Second)
+					fmt.Printf(">>> done starting browser processes...\n")
+					evt.Done()
+				}()
+			case k6event.TestStart:
+				fmt.Printf(">>> test started in browser...\n")
+			case k6event.TestEnd:
+				fmt.Printf(">>> stopping browser processes...\n")
+				// Stop browser processes here...
+				go func() {
+					time.Sleep(time.Second)
+					// Don't forget to call this to signal k6 that it can
+					// continue shutting down!
+					fmt.Printf(">>> done stopping browser processes...\n")
+					evt.Done()
+				}()
+			}
+		}
+	}()
 
 	return &RootModule{
 		PidRegistry:    &pidRegistry{},
@@ -80,41 +79,9 @@ func New() *RootModule {
 	}
 }
 
-var initOnce sync.Once
-
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	initOnce.Do(func() {
-		_, evtCh := vu.Events().Subscribe(k6event.Init, k6event.TestStart, k6event.TestEnd)
-		go func() {
-			for evt := range evtCh {
-				fmt.Printf(">>> received event: %#+v\n", evt)
-				switch evt.Type {
-				case k6event.Init:
-					fmt.Printf(">>> starting browser processes...\n")
-					// Start browser processes here...
-					go func() {
-						time.Sleep(time.Second)
-						fmt.Printf(">>> done starting browser processes...\n")
-						evt.Done()
-					}()
-				case k6event.TestStart:
-					fmt.Printf(">>> test started in browser...\n")
-				case k6event.TestEnd:
-					fmt.Printf(">>> stopping browser processes...\n")
-					// Stop browser processes here...
-					go func() {
-						time.Sleep(time.Second)
-						// Don't forget to call this to signal k6 that it can
-						// continue shutting down!
-						fmt.Printf(">>> done stopping browser processes...\n")
-						evt.Done()
-					}()
-				}
-			}
-		}()
-	})
 	return &ModuleInstance{
 		mod: &JSModule{
 			Chromium: mapBrowserToGoja(moduleVU{
