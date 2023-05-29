@@ -52,7 +52,7 @@ func (s *System) Notify(event *Event) (wait func(time.Duration) error) {
 	defer s.subMx.RUnlock()
 	totalSubs := len(s.subscribers[event.Type])
 	if totalSubs == 0 {
-		return
+		return func(time.Duration) error { return nil }
 	}
 
 	if event.Done == nil {
