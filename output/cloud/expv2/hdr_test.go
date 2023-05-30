@@ -172,7 +172,7 @@ func TestNewHistogramWithNegativeNum(t *testing.T) {
 		FirstNotZeroBucket: 0,
 		Max:                -2.42314,
 		Min:                -2.42314,
-		Buckets:            nil,
+		Buckets:            []uint32{},
 		ExtraLowBucket:     1,
 		ExtraHighBucket:    0,
 		Sum:                -2.42314,
@@ -189,7 +189,7 @@ func TestNewHistogramWithMultipleNegativeNums(t *testing.T) {
 	}
 
 	exp := histogram{
-		Buckets:            nil,
+		Buckets:            []uint32{},
 		FirstNotZeroBucket: 0,
 		ExtraLowBucket:     3,
 		ExtraHighBucket:    0,
@@ -206,7 +206,7 @@ func TestNewHistoramWithNoVals(t *testing.T) {
 
 	res := newHistogram()
 	exp := histogram{
-		Buckets:            nil,
+		Buckets:            []uint32{},
 		FirstNotZeroBucket: 0,
 		ExtraLowBucket:     0,
 		ExtraHighBucket:    0,

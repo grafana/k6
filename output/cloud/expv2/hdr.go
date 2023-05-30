@@ -81,11 +81,10 @@ type histogram struct {
 }
 
 // newHistogram creates an histogram of the provided values.
-//
-// TODO: it isn't really useful so we may consider to drop it, or may consider
-// consider to initialize here the Buckets slice.
 func newHistogram() histogram {
-	return histogram{}
+	return histogram{
+		Buckets: make([]uint32, 0, 32),
+	}
 }
 
 // addToBucket increments the counter of the bucket of the provided value.
@@ -121,21 +120,18 @@ func (h *histogram) addToBucket(v float64) {
 	if blen == 0 {
 		h.FirstNotZeroBucket = index
 		h.LastNotZeroBucket = index
-		// TODO: consider to move this allocation on the constructor
-		// but it could allocate useless memory in case they falls in the
-		// non trackable buckets.
-		h.Buckets = append(h.Buckets, 0)
-	} else {
-		if index < h.FirstNotZeroBucket {
-			h.growLeft(index)
-			h.FirstNotZeroBucket = index
-		}
-		if index > h.LastNotZeroBucket {
-			h.growRight(index)
-			h.LastNotZeroBucket = index
-		}
+		h.Buckets = append(h.Buckets, 1)
+		return
 	}
 
+	if index < h.FirstNotZeroBucket {
+		h.growLeft(index)
+		h.FirstNotZeroBucket = index
+	}
+	if index > h.LastNotZeroBucket {
+		h.growRight(index)
+		h.LastNotZeroBucket = index
+	}
 	h.Buckets[index-h.FirstNotZeroBucket]++
 }
 
@@ -189,7 +185,9 @@ func histogramAsProto(h *histogram, time time.Time) *pbcloud.TrendHdrValue {
 		MaxValue:          h.Max,
 		Sum:               h.Sum,
 		Count:             h.Count,
-		Counters:          h.Buckets,
+	}
+	if len(h.Buckets) > 0 {
+		hval.Counters = h.Buckets
 	}
 	if h.ExtraLowBucket > 0 {
 		hval.ExtraLowValuesCounter = &h.ExtraLowBucket
