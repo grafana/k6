@@ -90,3 +90,11 @@ func RunWithPanicCatching(logger logrus.FieldLogger, rt *goja.Runtime, fn func()
 func IsNullish(v goja.Value) bool {
 	return v == nil || goja.IsUndefined(v) || goja.IsNull(v)
 }
+
+// IsAsyncFunction checks if the provided value is an AsyncFunction
+func IsAsyncFunction(rt *goja.Runtime, val goja.Value) bool {
+	if IsNullish(val) {
+		return false
+	}
+	return val.ToObject(rt).Get("constructor").ToObject(rt).Get("name").String() == "AsyncFunction"
+}

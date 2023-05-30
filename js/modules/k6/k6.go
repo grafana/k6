@@ -88,13 +88,6 @@ func (mi *K6) RandomSeed(seed int64) {
 	mi.vu.Runtime().SetRandSource(randSource)
 }
 
-func isAsyncFunction(rt *goja.Runtime, val goja.Value) bool {
-	if common.IsNullish(val) {
-		return false
-	}
-	return val.ToObject(rt).Get("constructor").ToObject(rt).Get("name").String() == "AsyncFunction"
-}
-
 // Group wraps a function call and executes it within the provided group name.
 func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 	state := mi.vu.State()
@@ -109,7 +102,7 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 	if !ok {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
-	if isAsyncFunction(mi.vu.Runtime(), val) {
+	if common.IsAsyncFunction(mi.vu.Runtime(), val) {
 		return goja.Undefined(), fmt.Errorf(asyncFunctionNotSupportedMsg, "group")
 	}
 	g, err := state.Group.Group(name)
@@ -194,7 +187,7 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 			tags = tags.With("check", check.Name)
 		}
 
-		if isAsyncFunction(rt, val) {
+		if common.IsAsyncFunction(rt, val) {
 			return false, fmt.Errorf(asyncFunctionNotSupportedMsg, "check")
 		}
 
