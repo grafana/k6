@@ -52,39 +52,39 @@ func addBucketToTimeSeriesProto(
 	timeSeries *pbcloud.TimeSeries,
 	mt metrics.MetricType,
 	time time.Time,
-	sink metricValue,
+	value metricValue,
 ) {
 	if timeSeries.Samples == nil {
 		initTimeSeriesSamples(timeSeries, mt)
 	}
 
-	switch typedSink := sink.(type) {
+	switch typedMetricValue := value.(type) {
 	case *counter:
 		samples := timeSeries.GetCounterSamples()
 		samples.Values = append(samples.Values, &pbcloud.CounterValue{
 			Time:  timestamppb.New(time),
-			Value: typedSink.Sum,
+			Value: typedMetricValue.Sum,
 		})
 	case *gauge:
 		samples := timeSeries.GetGaugeSamples()
 		samples.Values = append(samples.Values, &pbcloud.GaugeValue{
 			Time:  timestamppb.New(time),
-			Last:  typedSink.Last,
-			Min:   typedSink.Max,
-			Max:   typedSink.Min,
-			Avg:   typedSink.Avg,
-			Count: typedSink.Count,
+			Last:  typedMetricValue.Last,
+			Min:   typedMetricValue.Max,
+			Max:   typedMetricValue.Min,
+			Avg:   typedMetricValue.Avg,
+			Count: typedMetricValue.Count,
 		})
 	case *rate:
 		samples := timeSeries.GetRateSamples()
 		samples.Values = append(samples.Values, &pbcloud.RateValue{
 			Time:         timestamppb.New(time),
-			NonzeroCount: typedSink.NonZeroCount,
-			TotalCount:   typedSink.Total,
+			NonzeroCount: typedMetricValue.NonZeroCount,
+			TotalCount:   typedMetricValue.Total,
 		})
 	case *histogram:
 		samples := timeSeries.GetTrendHdrSamples()
-		samples.Values = append(samples.Values, histogramAsProto(typedSink, time))
+		samples.Values = append(samples.Values, histogramAsProto(typedMetricValue, time))
 	default:
 		panic(fmt.Sprintf("MetricType %q is not supported", mt))
 	}
