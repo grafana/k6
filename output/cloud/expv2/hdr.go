@@ -82,7 +82,8 @@ type histogram struct {
 
 // newHistogram creates an histogram of the provided values.
 //
-// TODO: it isn't really useful so we may consider to drop it.
+// TODO: it isn't really useful so we may consider to drop it, or may consider
+// consider to initialize here the Buckets slice.
 func newHistogram() histogram {
 	return histogram{}
 }
@@ -116,11 +117,14 @@ func (h *histogram) addToBucket(v float64) {
 
 	index := resolveBucketIndex(v)
 
-	blen := uint32(len(h.Buckets))
+	blen := len(h.Buckets)
 	if blen == 0 {
 		h.FirstNotZeroBucket = index
 		h.LastNotZeroBucket = index
-		h.Buckets = make([]uint32, 1, 32)
+		// TODO: consider to move this allocation on the constructor
+		// but it could allocate useless memory in case they falls in the
+		// non trackable buckets.
+		h.Buckets = append(h.Buckets, 0)
 	} else {
 		if index < h.FirstNotZeroBucket {
 			h.growLeft(index)
@@ -142,17 +146,10 @@ func (h *histogram) growLeft(index uint32) {
 
 	newLen := (h.FirstNotZeroBucket - index) + uint32(len(h.Buckets))
 
-	// there is enough capacity in the undrelying array
-	// reuse it slicing without allocate a new array
-	if uint32(cap(h.Buckets)) >= newLen {
-		upIndex := len(h.Buckets) - 1
-		h.Buckets = h.Buckets[:newLen]
-		h.Buckets = append(h.Buckets[upIndex+1:], h.Buckets[:upIndex+1]...)
-		return
-	}
-
-	// there isn't enough capacity, allocate a new slice
-	// able to contain the new size
+	// TODO: we may consider to swap by sub-groups
+	// e.g  [4, 1] => [4, 1, 0, 0] => [0, 0, 4, 1]
+	// It requires benchmark if it is better than
+	// just copy
 
 	newBuckets := make([]uint32, newLen)
 	copy(newBuckets[h.FirstNotZeroBucket-index:], h.Buckets)
@@ -206,9 +203,7 @@ func histogramAsProto(h *histogram, time time.Time) *pbcloud.TrendHdrValue {
 // resolveBucketIndex returns the index
 // of the bucket in the histogram for the provided value.
 func resolveBucketIndex(val float64) uint32 {
-	// the lowest trackable value is zero
-	// negative number are not expected
-	if val < 0 {
+	if val < lowestTrackable {
 		return 0
 	}
 
