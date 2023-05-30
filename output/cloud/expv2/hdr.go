@@ -127,8 +127,7 @@ func (h *histogram) addToBucket(v float64) {
 	if index < h.FirstNotZeroBucket {
 		h.growLeft(index)
 		h.FirstNotZeroBucket = index
-	}
-	if index > h.LastNotZeroBucket {
+	} else if index > h.LastNotZeroBucket {
 		h.growRight(index)
 		h.LastNotZeroBucket = index
 	}
