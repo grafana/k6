@@ -17,6 +17,7 @@ func newBatchCreateRequestMetadatasRequest(requestMetadatas RequestMetadatas) *i
 
 func newCreateRequestMetadataRequest(requestMetadata RequestMetadata) *ingester.CreateRequestMetadataRequest {
 	setProtocolLabels := func(rm *ingester.RequestMetadata, labels ProtocolLabels) {
+		// TODO(lukasz, other-proto-support): Set other protocol labels.
 		switch l := labels.(type) {
 		case ProtocolHTTPLabels:
 			rm.ProtocolLabels = &ingester.RequestMetadata_HTTPLabels{
