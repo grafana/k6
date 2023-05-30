@@ -82,9 +82,7 @@ type histogram struct {
 
 // newHistogram creates an histogram of the provided values.
 func newHistogram() histogram {
-	return histogram{
-		Buckets: make([]uint32, 0, 32),
-	}
+	return histogram{}
 }
 
 // addToBucket increments the counter of the bucket of the provided value.
@@ -116,13 +114,6 @@ func (h *histogram) addToBucket(v float64) {
 
 	index := resolveBucketIndex(v)
 
-	if len(h.Buckets) == 0 {
-		h.FirstNotZeroBucket = index
-		h.LastNotZeroBucket = index
-		h.Buckets = append(h.Buckets, 1)
-		return
-	}
-
 	// they grow the current Buckets slice if there isn't enough capacity.
 	//
 	// An example with growRight:
@@ -131,6 +122,8 @@ func (h *histogram) addToBucket(v float64) {
 	// then the counter at 5th position will be incremented
 	// generating the final slice [4,1,0,0,0,1]
 	switch {
+	case len(h.Buckets) == 0:
+		h.init(index)
 	case index < h.FirstNotZeroBucket:
 		h.growLeft(index)
 	case index > h.LastNotZeroBucket:
@@ -138,6 +131,13 @@ func (h *histogram) addToBucket(v float64) {
 	default:
 		h.Buckets[index-h.FirstNotZeroBucket]++
 	}
+}
+
+func (h *histogram) init(index uint32) {
+	h.FirstNotZeroBucket = index
+	h.LastNotZeroBucket = index
+	h.Buckets = make([]uint32, 1, 32)
+	h.Buckets[0] = 1
 }
 
 func (h *histogram) growLeft(index uint32) {
@@ -197,9 +197,7 @@ func histogramAsProto(h *histogram, time time.Time) *pbcloud.TrendHdrValue {
 		MaxValue:          h.Max,
 		Sum:               h.Sum,
 		Count:             h.Count,
-	}
-	if len(h.Buckets) > 0 {
-		hval.Counters = h.Buckets
+		Counters:          h.Buckets,
 	}
 	if h.ExtraLowBucket > 0 {
 		hval.ExtraLowValuesCounter = &h.ExtraLowBucket
