@@ -12,6 +12,9 @@ const (
 	Init      Type = "init"
 	TestStart Type = "testStart"
 	TestEnd   Type = "testEnd"
+	IterStart Type = "iterStart"
+	IterEnd   Type = "iterEnd"
+	Exit      Type = "exit"
 )
 
 type Event struct {
