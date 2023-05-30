@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sync"
 	"testing"
@@ -51,8 +52,6 @@ func newConfiguredRuntime() (*goja.Runtime, error) {
 
 func TestSharedArrayConstructorExceptions(t *testing.T) {
 	t.Parallel()
-	rt, err := newConfiguredRuntime()
-	require.NoError(t, err)
 	cases := map[string]struct {
 		code, err string
 	}{
@@ -90,14 +89,18 @@ func TestSharedArrayConstructorExceptions(t *testing.T) {
 	for name, testCase := range cases {
 		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
-			_, err := rt.RunString(testCase.code)
+			t.Parallel()
+			rt, err := newConfiguredRuntime()
+			require.NoError(t, err)
+			_, err = rt.RunString(testCase.code)
 			if testCase.err == "" {
 				require.NoError(t, err)
 				return // the t.Run
 			}
 
 			require.Error(t, err)
-			exc := err.(*goja.Exception)
+			exc := new(goja.Exception)
+			require.True(t, errors.As(err, &exc))
 			require.Contains(t, exc.Error(), testCase.err)
 		})
 	}
@@ -105,16 +108,6 @@ func TestSharedArrayConstructorExceptions(t *testing.T) {
 
 func TestSharedArrayAnotherRuntimeExceptions(t *testing.T) {
 	t.Parallel()
-
-	rt, err := newConfiguredRuntime()
-	require.NoError(t, err)
-	_, err = rt.RunString(makeArrayScript)
-	require.NoError(t, err)
-
-	rt, err = newConfiguredRuntime()
-	require.NoError(t, err)
-	_, err = rt.RunString(makeArrayScript)
-	require.NoError(t, err)
 
 	// use strict is required as otherwise just nothing happens
 	cases := map[string]struct {
@@ -141,14 +134,25 @@ func TestSharedArrayAnotherRuntimeExceptions(t *testing.T) {
 	for name, testCase := range cases {
 		name, testCase := name, testCase
 		t.Run(name, func(t *testing.T) {
-			_, err := rt.RunString(testCase.code)
+			t.Parallel()
+			rt, err := newConfiguredRuntime()
+			require.NoError(t, err)
+			_, err = rt.RunString(makeArrayScript)
+			require.NoError(t, err)
+
+			rt, err = newConfiguredRuntime()
+			require.NoError(t, err)
+			_, err = rt.RunString(makeArrayScript)
+			require.NoError(t, err)
+			_, err = rt.RunString(testCase.code)
 			if testCase.err == "" {
 				require.NoError(t, err)
 				return // the t.Run
 			}
 
 			require.Error(t, err)
-			exc := err.(*goja.Exception)
+			exc := new(goja.Exception)
+			require.True(t, errors.As(err, &exc))
 			require.Contains(t, exc.Error(), testCase.err)
 		})
 	}
