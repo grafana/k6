@@ -42,7 +42,7 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 	t.Parallel()
 
 	// Zero as value
-	res := newHistogram()
+	res := histogram{}
 	res.addToBucket(0)
 	exp := histogram{
 		Buckets:            []uint32{1},
@@ -58,7 +58,7 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 	require.Equal(t, exp, res)
 
 	// Add a lower bucket index within slice capacity
-	res = newHistogram()
+	res = histogram{}
 	res.addToBucket(8)
 	res.addToBucket(5)
 
@@ -76,7 +76,7 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 	require.Equal(t, exp, res)
 
 	// Add a higher bucket index within slice capacity
-	res = newHistogram()
+	res = histogram{}
 	res.addToBucket(100)
 	res.addToBucket(101)
 
@@ -94,7 +94,7 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 	require.Equal(t, exp, res)
 
 	// Same case but reversed test check
-	res = newHistogram()
+	res = histogram{}
 	res.addToBucket(101)
 	res.addToBucket(100)
 
@@ -112,7 +112,7 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 	assert.Equal(t, exp, res)
 
 	// One more complex case with lower index and more than two indexes
-	res = newHistogram()
+	res = histogram{}
 	res.addToBucket(8)
 	res.addToBucket(9)
 	res.addToBucket(10)
@@ -136,7 +136,7 @@ func TestNewHistogramWithSimpleValue(t *testing.T) {
 func TestNewHistogramWithUntrackables(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
+	res := histogram{}
 	for _, v := range []float64{5, -3.14, 2 * 1e9, 1} {
 		res.addToBucket(v)
 	}
@@ -158,7 +158,7 @@ func TestNewHistogramWithUntrackables(t *testing.T) {
 func TestNewHistogramWithMultipleValues(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
+	res := histogram{}
 	for _, v := range []float64{51.8, 103.6, 103.6, 103.6, 103.6} {
 		res.addToBucket(v)
 	}
@@ -181,7 +181,7 @@ func TestNewHistogramWithMultipleValues(t *testing.T) {
 func TestNewHistogramWithNegativeNum(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
+	res := histogram{}
 	res.addToBucket(-2.42314)
 
 	exp := histogram{
@@ -199,7 +199,7 @@ func TestNewHistogramWithNegativeNum(t *testing.T) {
 
 func TestNewHistogramWithMultipleNegativeNums(t *testing.T) {
 	t.Parallel()
-	res := newHistogram()
+	res := histogram{}
 	for _, v := range []float64{-0.001, -0.001, -0.001} {
 		res.addToBucket(v)
 	}
@@ -220,7 +220,7 @@ func TestNewHistogramWithMultipleNegativeNums(t *testing.T) {
 func TestNewHistoramWithNoVals(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
+	res := histogram{}
 	exp := histogram{
 		Buckets:            nil,
 		FirstNotZeroBucket: 0,
@@ -267,17 +267,14 @@ func TestHistogramAsProto(t *testing.T) {
 	cases := []struct {
 		name string
 		vals []float64
-		in   histogram
 		exp  *pbcloud.TrendHdrValue
 	}{
 		{
 			name: "empty histogram",
-			in:   histogram{},
 			exp:  &pbcloud.TrendHdrValue{},
 		},
 		{
 			name: "not trackable values",
-			in:   newHistogram(),
 			vals: []float64{-0.23, 1<<30 + 1},
 			exp: &pbcloud.TrendHdrValue{
 				Count:                  2,
@@ -287,11 +284,11 @@ func TestHistogramAsProto(t *testing.T) {
 				LowerCounterIndex:      0,
 				MinValue:               -0.23,
 				MaxValue:               1<<30 + 1,
+				Sum:                    (1 << 30) + 1 - 0.23,
 			},
 		},
 		{
 			name: "normal values",
-			in:   newHistogram(),
 			vals: []float64{2, 1.1, 3},
 			exp: &pbcloud.TrendHdrValue{
 				Count:                  3,
@@ -301,18 +298,19 @@ func TestHistogramAsProto(t *testing.T) {
 				LowerCounterIndex:      2,
 				MinValue:               1.1,
 				MaxValue:               3,
+				Sum:                    6.1,
 			},
 		},
 	}
 
 	for _, tc := range cases {
+		h := histogram{}
 		for _, v := range tc.vals {
-			tc.in.addToBucket(v)
+			h.addToBucket(v)
 		}
 		tc.exp.MinResolution = 1.0
 		tc.exp.SignificantDigits = 2
 		tc.exp.Time = &timestamppb.Timestamp{Seconds: 1}
-		tc.exp.Sum = tc.in.Sum
-		assert.Equal(t, tc.exp, histogramAsProto(&tc.in, time.Unix(1, 0)), tc.name)
+		assert.Equal(t, tc.exp, histogramAsProto(&h, time.Unix(1, 0)), tc.name)
 	}
 }

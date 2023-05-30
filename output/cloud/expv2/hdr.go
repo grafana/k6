@@ -79,11 +79,6 @@ type histogram struct {
 	Count uint32
 }
 
-// newHistogram creates an histogram of the provided values.
-func newHistogram() histogram {
-	return histogram{}
-}
-
 // addToBucket increments the counter of the bucket of the provided value.
 // If the value is lower or higher than the trackable limits
 // then it is counted into specific buckets. All the stats are also updated accordingly.
