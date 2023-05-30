@@ -1,5 +1,5 @@
 import { check } from 'k6';
-import { chromium } from 'k6/x/browser';
+import { browser } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -19,8 +19,6 @@ export const options = {
 
 export default async function() {
   const preferredColorScheme = 'dark';
-
-  const browser = chromium.launch();
 
   const context = browser.newContext({
     // valid values are "light", "dark" or "no-preference"
@@ -43,6 +41,5 @@ export default async function() {
     });
   } finally {
     page.close();
-    browser.close();
   }
 }

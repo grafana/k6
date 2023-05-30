@@ -1,5 +1,5 @@
 import { check, sleep } from 'k6';
-import { chromium, devices } from 'k6/x/browser';
+import { browser, devices } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -18,8 +18,6 @@ export const options = {
 }
 
 export default async function() {
-  const browser = chromium.launch();
-
   const device = devices['iPhone X'];
   // The spread operator is currently unsupported by k6's Babel, so use
   // Object.assign instead to merge browser context and device options.
@@ -49,6 +47,5 @@ export default async function() {
     }
   } finally {
     page.close();
-    browser.close();
   }
 }
