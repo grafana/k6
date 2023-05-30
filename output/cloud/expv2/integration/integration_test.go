@@ -148,7 +148,7 @@ func testSamples() metrics.Samples {
 				Tags:   r.RootTagSet().With("my_label_4", "my_label_value_4"),
 			},
 			Time:  time.Date(2023, time.May, 1, 4, 0, 0, 0, time.UTC),
-			Value: 186,
+			Value: 6,
 		},
 	}
 	return samples
