@@ -6,6 +6,8 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+// TODO:A potential optimization
+// https://github.com/grafana/k6/pull/3085#discussion_r1210415981
 type metricValue interface {
 	Add(v float64)
 }
