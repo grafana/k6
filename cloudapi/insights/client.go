@@ -5,11 +5,13 @@ import (
 	"crypto/tls"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 
 	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
 )
@@ -25,9 +27,16 @@ var (
 )
 
 type ClientConfig struct {
-	IngesterHost string
-	AuthConfig   ClientAuthConfig
-	TLSConfig    ClientTLSConfig
+	IngesterHost  string
+	ConnectConfig ClientConnectConfig
+	AuthConfig    ClientAuthConfig
+	TLSConfig     ClientTLSConfig
+}
+
+type ClientConnectConfig struct {
+	Block                  bool
+	FailOnNonTempDialError bool
+	Dialer                 func(context.Context, string) (net.Conn, error)
 }
 
 type ClientAuthConfig struct {
@@ -89,10 +98,15 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 	}
 	c.connMu.RUnlock()
 
+	if len(requestMetadatas) < 1 {
+		return nil
+	}
+
 	req := newBatchCreateRequestMetadatasRequest(requestMetadatas)
 	_, err := c.client.BatchCreateRequestMetadatas(ctx, req)
 	if err != nil {
-		return fmt.Errorf("failed to ingest request metadatas batch: %w", err)
+		st := status.Convert(err)
+		return fmt.Errorf("failed to ingest request metadatas batch: code=%s, msg=%s", st.Code().String(), st.Message())
 	}
 
 	return nil
@@ -115,6 +129,18 @@ func (c *Client) Close() error {
 
 func dialOptionsFromClientConfig(cfg ClientConfig) ([]grpc.DialOption, error) {
 	var opts []grpc.DialOption
+
+	if cfg.ConnectConfig.Block {
+		opts = append(opts, grpc.WithBlock())
+	}
+
+	if cfg.ConnectConfig.FailOnNonTempDialError {
+		opts = append(opts, grpc.FailOnNonTempDialError(true))
+	}
+
+	if cfg.ConnectConfig.Dialer != nil {
+		opts = append(opts, grpc.WithContextDialer(cfg.ConnectConfig.Dialer))
+	}
 
 	if cfg.TLSConfig.Insecure {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
