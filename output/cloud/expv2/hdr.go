@@ -116,22 +116,28 @@ func (h *histogram) addToBucket(v float64) {
 
 	index := resolveBucketIndex(v)
 
-	blen := len(h.Buckets)
-	if blen == 0 {
+	if len(h.Buckets) == 0 {
 		h.FirstNotZeroBucket = index
 		h.LastNotZeroBucket = index
 		h.Buckets = append(h.Buckets, 1)
 		return
 	}
 
-	if index < h.FirstNotZeroBucket {
+	// they grow the current Buckets slice if there isn't enough capacity.
+	//
+	// An example with growRight:
+	// With Buckets [4, 1] and index equals to 5
+	// then we expect a slice like [4,1,0,0,0,0]
+	// then the counter at 5th position will be incremented
+	// generating the final slice [4,1,0,0,0,1]
+	switch {
+	case index < h.FirstNotZeroBucket:
 		h.growLeft(index)
-		h.FirstNotZeroBucket = index
-	} else if index > h.LastNotZeroBucket {
+	case index > h.LastNotZeroBucket:
 		h.growRight(index)
-		h.LastNotZeroBucket = index
+	default:
+		h.Buckets[index-h.FirstNotZeroBucket]++
 	}
-	h.Buckets[index-h.FirstNotZeroBucket]++
 }
 
 func (h *histogram) growLeft(index uint32) {
@@ -143,12 +149,15 @@ func (h *histogram) growLeft(index uint32) {
 
 	// TODO: we may consider to swap by sub-groups
 	// e.g  [4, 1] => [4, 1, 0, 0] => [0, 0, 4, 1]
-	// It requires benchmark if it is better than
-	// just copy
+	// It requires a benchmark if it is better than just copy it.
 
 	newBuckets := make([]uint32, newLen)
 	copy(newBuckets[h.FirstNotZeroBucket-index:], h.Buckets)
 	h.Buckets = newBuckets
+
+	// Update the stats
+	h.Buckets[0] = 1
+	h.FirstNotZeroBucket = index
 }
 
 // growRight expands the buckets slice
@@ -171,6 +180,10 @@ func (h *histogram) growRight(index uint32) {
 		copy(newBuckets, h.Buckets)
 		h.Buckets = newBuckets
 	}
+
+	// Update the stats
+	h.Buckets[len(h.Buckets)-1] = 1
+	h.LastNotZeroBucket = index
 }
 
 // histogramAsProto converts the histogram into the equivalent Protobuf version.

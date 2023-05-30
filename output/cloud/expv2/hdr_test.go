@@ -41,12 +41,28 @@ func TestValueBacket(t *testing.T) {
 func TestNewHistogramWithSimpleValue(t *testing.T) {
 	t.Parallel()
 
-	// Add a lower bucket index within slice capacity
+	// Zero as value
 	res := newHistogram()
+	res.addToBucket(0)
+	exp := histogram{
+		Buckets:            []uint32{1},
+		FirstNotZeroBucket: 0,
+		LastNotZeroBucket:  0,
+		ExtraLowBucket:     0,
+		ExtraHighBucket:    0,
+		Max:                0,
+		Min:                0,
+		Sum:                0,
+		Count:              1,
+	}
+	require.Equal(t, exp, res)
+
+	// Add a lower bucket index within slice capacity
+	res = newHistogram()
 	res.addToBucket(8)
 	res.addToBucket(5)
 
-	exp := histogram{
+	exp = histogram{
 		Buckets:            []uint32{1, 0, 0, 1},
 		FirstNotZeroBucket: 5,
 		LastNotZeroBucket:  8,
@@ -233,7 +249,7 @@ func TestHistogramGrowRight(t *testing.T) {
 	h.growRight(5)
 	assert.Len(t, h.Buckets, 6)
 	assert.Equal(t, uint32(101), h.Buckets[2])
-	assert.Equal(t, uint32(0), h.Buckets[5])
+	assert.Equal(t, uint32(1), h.Buckets[5])
 
 	// it is not possible to request an index smaller than
 	// the last already available index
