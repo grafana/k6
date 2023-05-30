@@ -12,6 +12,14 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+const (
+	scenarioTag = "scenario"
+	groupTag    = "group"
+	urlTag      = "url"
+	methodTag   = "method"
+	statusTag   = "status"
+)
+
 type timeBucket struct {
 	Time  int64
 	Sinks map[metrics.TimeSeries]metricValue
@@ -187,29 +195,28 @@ func (c *requestMetadatasCollector) CollectRequestMetadatas(sampleContainers []m
 		return
 	}
 
-	trails := c.filterTrailsWithTraces(sampleContainers)
-	if len(trails) < 1 {
-		return
+	// TODO(lukasz, other-proto-support): Support grpc/websocket trails.
+	httpTrails := c.filterTrailsWithTraces(sampleContainers)
+	if len(httpTrails) > 0 {
+		c.collectHTTPTrails(httpTrails)
 	}
-
-	c.collectTrails(trails)
 }
 
 func (c *requestMetadatasCollector) filterTrailsWithTraces(sampleContainers []metrics.SampleContainer) []*httpext.Trail {
-	var filteredTrails []*httpext.Trail
+	var filteredHTTPTrails []*httpext.Trail
 
 	for _, sampleContainer := range sampleContainers {
 		if trail, ok := sampleContainer.(*httpext.Trail); ok {
 			if _, found := trail.Metadata[tracing.MetadataTraceIDKeyName]; found {
-				filteredTrails = append(filteredTrails, trail)
+				filteredHTTPTrails = append(filteredHTTPTrails, trail)
 			}
 		}
 	}
 
-	return filteredTrails
+	return filteredHTTPTrails
 }
 
-func (c *requestMetadatasCollector) collectTrails(trails []*httpext.Trail) {
+func (c *requestMetadatasCollector) collectHTTPTrails(trails []*httpext.Trail) {
 	newBuffer := make(insights.RequestMetadatas, 0, len(trails))
 
 	for _, trail := range trails {
@@ -219,13 +226,13 @@ func (c *requestMetadatasCollector) collectTrails(trails []*httpext.Trail) {
 			End:     trail.EndTime,
 			TestRunLabels: insights.TestRunLabels{
 				ID:       c.testRunID,
-				Scenario: c.getStringTagFromTrail(trail, "scenario"),
-				Group:    c.getStringTagFromTrail(trail, "group"),
+				Scenario: c.getStringTagFromTrail(trail, scenarioTag),
+				Group:    c.getStringTagFromTrail(trail, groupTag),
 			},
 			ProtocolLabels: insights.ProtocolHTTPLabels{
-				Url:        c.getStringTagFromTrail(trail, "url"),
-				Method:     c.getStringTagFromTrail(trail, "method"),
-				StatusCode: c.getIntTagFromTrail(trail, "status"),
+				Url:        c.getStringTagFromTrail(trail, urlTag),
+				Method:     c.getStringTagFromTrail(trail, methodTag),
+				StatusCode: c.getIntTagFromTrail(trail, statusTag),
 			},
 		}
 
