@@ -30,8 +30,6 @@ func newMetricValue(mt metrics.MetricType) metricValue {
 	return am
 }
 
-// TODO: add unit tests for the Add methods
-
 type counter struct {
 	Sum float64
 }
@@ -66,13 +64,13 @@ func (g *gauge) Add(v float64) {
 }
 
 type rate struct {
-	Trues uint32
-	Total uint32
+	NonZeroCount uint32
+	Total        uint32
 }
 
 func (r *rate) Add(v float64) {
 	r.Total++
 	if v != 0 {
-		r.Trues++
+		r.NonZeroCount++
 	}
 }

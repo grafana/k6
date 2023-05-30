@@ -79,7 +79,7 @@ func addBucketToTimeSeriesProto(
 		samples := timeSeries.GetRateSamples()
 		samples.Values = append(samples.Values, &pbcloud.RateValue{
 			Time:         timestamppb.New(time),
-			NonzeroCount: typedSink.Trues,
+			NonzeroCount: typedSink.NonZeroCount,
 			TotalCount:   typedSink.Total,
 		})
 	case *histogram:
