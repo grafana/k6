@@ -233,20 +233,20 @@ func TestNewHistoramWithNoVals(t *testing.T) {
 	assert.Equal(t, exp, res)
 }
 
-func TestHistogramGrowRight(t *testing.T) {
+func TestHistogramAppendBuckets(t *testing.T) {
 	t.Parallel()
 	h := histogram{}
 
 	// the cap is smaller than requested index
 	// so it creates a new slice
-	h.growRight(3)
+	h.appendBuckets(3)
 	assert.Len(t, h.Buckets, 4)
 
 	// it must preserve already existing items
 	h.Buckets[2] = 101
 
 	// it appends to the same slice
-	h.growRight(5)
+	h.appendBuckets(5)
 	assert.Len(t, h.Buckets, 6)
 	assert.Equal(t, uint32(101), h.Buckets[2])
 	assert.Equal(t, uint32(1), h.Buckets[5])
@@ -254,7 +254,7 @@ func TestHistogramGrowRight(t *testing.T) {
 	// it is not possible to request an index smaller than
 	// the last already available index
 	h.LastNotZeroBucket = 5
-	assert.Panics(t, func() { h.growRight(4) })
+	assert.Panics(t, func() { h.appendBuckets(4) })
 }
 
 func TestHistogramAsProto(t *testing.T) {

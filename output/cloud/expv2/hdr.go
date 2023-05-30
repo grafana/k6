@@ -125,9 +125,9 @@ func (h *histogram) addToBucket(v float64) {
 	case len(h.Buckets) == 0:
 		h.init(index)
 	case index < h.FirstNotZeroBucket:
-		h.growLeft(index)
+		h.prependBuckets(index)
 	case index > h.LastNotZeroBucket:
-		h.growRight(index)
+		h.appendBuckets(index)
 	default:
 		h.Buckets[index-h.FirstNotZeroBucket]++
 	}
@@ -140,7 +140,9 @@ func (h *histogram) init(index uint32) {
 	h.Buckets[0] = 1
 }
 
-func (h *histogram) growLeft(index uint32) {
+// prependBuckets expands the buckets slice with zeros up to the required index,
+// then it increments the required bucket.
+func (h *histogram) prependBuckets(index uint32) {
 	if h.FirstNotZeroBucket <= index {
 		panic("buckets is already contains the requested index")
 	}
@@ -160,10 +162,10 @@ func (h *histogram) growLeft(index uint32) {
 	h.FirstNotZeroBucket = index
 }
 
-// growRight expands the buckets slice
-// with zeros up to the required index.
-// If it array has enough capacity then it reuses it without allocate.
-func (h *histogram) growRight(index uint32) {
+// appendBuckets expands the buckets slice with zeros buckets till the required index,
+// then it increments the required bucket.
+// If the slice has enough capacity then it reuses it without allocate.
+func (h *histogram) appendBuckets(index uint32) {
 	if h.LastNotZeroBucket >= index {
 		panic("buckets is already bigger than requested index")
 	}
