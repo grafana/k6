@@ -22,6 +22,8 @@ type Runtime struct {
 	EventLoop      *eventloop.EventLoop
 	CancelContext  func()
 	BuiltinMetrics *metrics.BuiltinMetrics
+
+	mr *modules.ModuleResolver
 }
 
 // NewRuntime will create a new test runtime and will cancel the context on test/benchmark end
@@ -59,13 +61,21 @@ func (r *Runtime) MoveToVUContext(state *lib.State) {
 	r.VU.StateField = state
 }
 
-// SetupModuleSystem sets up the modules system for the current Runtime.
+// SetupModuleSystem sets up the modules system for the Runtime.
 // See [modules.NewModuleResolver] for the meaning of the parameters.
-func (r *Runtime) SetupModuleSystem(
-	goModules map[string]interface{}, loader modules.FileLoader, c *compiler.Compiler,
-) error {
-	mr := modules.NewModuleResolver(goModules, loader, c)
-	ms := modules.NewModuleSystem(mr, r.VU)
+func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.FileLoader, c *compiler.Compiler) error {
+	r.mr = modules.NewModuleResolver(goModules, loader, c)
+	return r.innerSetupModuleSystem()
+}
+
+// SetupModuleSystemFromAnother sets up the modules system for the Runtime by using the resolver of another runtime.
+func (r *Runtime) SetupModuleSystemFromAnother(another *Runtime) error {
+	r.mr = another.mr
+	return r.innerSetupModuleSystem()
+}
+
+func (r *Runtime) innerSetupModuleSystem() error {
+	ms := modules.NewModuleSystem(r.mr, r.VU)
 	impl := modules.NewLegacyRequireImpl(r.VU, ms, url.URL{})
 	return r.VU.RuntimeField.Set("require", impl.Require)
 }
