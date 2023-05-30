@@ -61,6 +61,11 @@ func (d *Data) Exports() modules.Exports {
 	}
 }
 
+// TODO potentially try to DRY with this with a similar message in the `k6` js module.
+// This likely won't be needed as SharedArray should likely support async function at some point ... somehow.
+const asyncFunctionNotSupportedMsg = "SharedArray constructor does not support async functions as second argument, " +
+	"please see https://k6.io/docs/javascript-api/k6/group/#working-with-async-functions for more info"
+
 // sharedArray is a constructor returning a shareable read-only array
 // indentified by the name and having their contents be whatever the call returns
 func (d *Data) sharedArray(call goja.ConstructorCall) *goja.Object {
@@ -74,8 +79,13 @@ func (d *Data) sharedArray(call goja.ConstructorCall) *goja.Object {
 	if name == "" {
 		common.Throw(rt, errors.New("empty name provided to SharedArray's constructor"))
 	}
+	val := call.Argument(1)
 
-	fn, ok := goja.AssertFunction(call.Argument(1))
+	if common.IsAsyncFunction(rt, val) {
+		common.Throw(rt, errors.New(asyncFunctionNotSupportedMsg))
+	}
+
+	fn, ok := goja.AssertFunction(val)
 	if !ok {
 		common.Throw(rt, errors.New("a function is expected as the second argument of SharedArray's constructor"))
 	}

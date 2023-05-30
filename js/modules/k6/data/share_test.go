@@ -77,6 +77,14 @@ func TestSharedArrayConstructorExceptions(t *testing.T) {
 			code: `var s = new SharedArray("wat3", "astring");`,
 			err:  "a function is expected",
 		},
+		"async function": {
+			code: `var s = new SharedArray("wat3", async function() {});`,
+			err:  "SharedArray constructor does not support async functions as second argument",
+		},
+		"async lambda": {
+			code: `var s = new SharedArray("wat3", async () => {});`,
+			err:  "SharedArray constructor does not support async functions as second argument",
+		},
 	}
 
 	for name, testCase := range cases {
