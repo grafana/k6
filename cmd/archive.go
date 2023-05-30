@@ -16,7 +16,7 @@ type cmdArchive struct {
 }
 
 func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
-	test, err := loadAndConfigureTest(c.gs, cmd, args, getPartialConfig)
+	test, err := loadTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
 	}
@@ -77,7 +77,7 @@ func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(gs, `
   # Archive a test run.
   {{.}} archive -u 10 -d 10s -O myarchive.tar script.js
-  
+
   # Run the resulting archive.
   {{.}} run myarchive.tar`[1:])
 

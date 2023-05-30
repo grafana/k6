@@ -213,6 +213,7 @@ func (pb *ProgressBar) Render(maxLeft, widthDelta int) ProgressBarRender {
 	var progress float64
 	if pb.progress != nil {
 		progress, out.Right = pb.progress()
+
 		progressClamped := Clampf(progress, 0, 1)
 		if progress != progressClamped {
 			progress = progressClamped

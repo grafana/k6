@@ -67,7 +67,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// from sub-contexts while also attaching a reason for the abort.
 	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
 
-	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
+	test, err := loadTest(c.gs, cmd, args, getConfig)
 	if err != nil {
 		return err
 	}

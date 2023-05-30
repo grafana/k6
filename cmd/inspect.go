@@ -21,7 +21,7 @@ func getCmdInspect(gs *state.GlobalState) *cobra.Command {
 		Long:  `Inspect a script or archive.`,
 		Args:  cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			test, err := loadTest(gs, cmd, args)
+			test, err := loadTest(gs, cmd, args, nil)
 			if err != nil {
 				return err
 			}
@@ -65,20 +65,20 @@ func inspectOutputWithExecRequirements(
 	gs *state.GlobalState, cmd *cobra.Command, test *loadedTest,
 ) (interface{}, error) {
 	// we don't actually support CLI flags here, so we pass nil as the getter
-	configuredTest, err := test.consolidateDeriveAndValidateConfig(gs, cmd, nil)
-	if err != nil {
-		return nil, err
-	}
+	// configuredTest, err := test.consolidateDeriveAndValidateConfig(gs, cmd, nil)
+	// if err != nil {
+	// 	return nil, err
+	// }
 
 	et, err := lib.NewExecutionTuple(
-		configuredTest.derivedConfig.ExecutionSegment,
-		configuredTest.derivedConfig.ExecutionSegmentSequence,
+		test.derivedConfig.ExecutionSegment,
+		test.derivedConfig.ExecutionSegmentSequence,
 	)
 	if err != nil {
 		return nil, err
 	}
 
-	executionPlan := configuredTest.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
+	executionPlan := test.derivedConfig.Scenarios.GetFullExecutionRequirements(et)
 	duration, _ := lib.GetEndOffset(executionPlan)
 
 	return struct {
@@ -86,7 +86,7 @@ func inspectOutputWithExecRequirements(
 		TotalDuration types.NullDuration `json:"totalDuration"`
 		MaxVUs        uint64             `json:"maxVUs"`
 	}{
-		configuredTest.derivedConfig.Options,
+		test.derivedConfig.Options,
 		types.NewNullDuration(duration, true),
 		lib.GetMaxPossibleVUs(executionPlan),
 	}, nil

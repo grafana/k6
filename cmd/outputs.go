@@ -69,7 +69,7 @@ func getPossibleIDList(constrs map[string]output.Constructor) string {
 }
 
 func createOutputs(
-	gs *state.GlobalState, test *loadedAndConfiguredTest, executionPlan []lib.ExecutionStep,
+	gs *state.GlobalState, test *loadedTest, executionPlan []lib.ExecutionStep,
 ) ([]output.Output, error) {
 	outputConstructors, err := getAllOutputConstructors()
 	if err != nil {

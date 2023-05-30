@@ -140,6 +140,8 @@ func loadTest(
 		return nil, err
 	}
 
+	state.Options = derivedConfig.Options
+
 	test := &loadedTest{
 		pwd:                pwd,
 		sourceRootPath:     sourceRootPath,
@@ -220,59 +222,59 @@ func detectTestType(data []byte) string {
 	return testTypeJS
 }
 
-func (lt *loadedTest) consolidateDeriveAndValidateConfig(
-	gs *state.GlobalState, cmd *cobra.Command,
-	cliConfGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
-) (*loadedAndConfiguredTest, error) {
-	var cliConfig Config
-	if cliConfGetter != nil {
-		gs.Logger.Debug("Parsing CLI flags...")
-		var err error
-		cliConfig, err = cliConfGetter(cmd.Flags())
-		if err != nil {
-			return nil, err
-		}
-	}
+// func (lt *loadedTest) consolidateDeriveAndValidateConfig(
+// 	gs *state.GlobalState, cmd *cobra.Command,
+// 	cliConfGetter func(flags *pflag.FlagSet) (Config, error), // TODO: obviate
+// ) (*loadedTest, error) {
+// 	var cliConfig Config
+// 	if cliConfGetter != nil {
+// 		gs.Logger.Debug("Parsing CLI flags...")
+// 		var err error
+// 		cliConfig, err = cliConfGetter(cmd.Flags())
+// 		if err != nil {
+// 			return nil, err
+// 		}
+// 	}
 
-	gs.Logger.Debug("Consolidating config layers...")
-	consolidatedConfig, err := getConsolidatedConfig(gs, cliConfig, lt.initRunner.GetOptions())
-	if err != nil {
-		return nil, err
-	}
+// 	gs.Logger.Debug("Consolidating config layers...")
+// 	consolidatedConfig, err := getConsolidatedConfig(gs, cliConfig, lt.initRunner.GetOptions())
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	gs.Logger.Debug("Parsing thresholds and validating config...")
-	// Parse the thresholds, only if the --no-threshold flag is not set.
-	// If parsing the threshold expressions failed, consider it as an
-	// invalid configuration error.
-	if !lt.preInitState.RuntimeOptions.NoThresholds.Bool {
-		for metricName, thresholdsDefinition := range consolidatedConfig.Options.Thresholds {
-			err = thresholdsDefinition.Parse()
-			if err != nil {
-				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-			}
+// 	gs.Logger.Debug("Parsing thresholds and validating config...")
+// 	// Parse the thresholds, only if the --no-threshold flag is not set.
+// 	// If parsing the threshold expressions failed, consider it as an
+// 	// invalid configuration error.
+// 	if !lt.preInitState.RuntimeOptions.NoThresholds.Bool {
+// 		for metricName, thresholdsDefinition := range consolidatedConfig.Options.Thresholds {
+// 			err = thresholdsDefinition.Parse()
+// 			if err != nil {
+// 				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+// 			}
 
-			err = thresholdsDefinition.Validate(metricName, lt.preInitState.Registry)
-			if err != nil {
-				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-			}
-		}
-	}
+// 			err = thresholdsDefinition.Validate(metricName, lt.preInitState.Registry)
+// 			if err != nil {
+// 				return nil, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
+// 			}
+// 		}
+// 	}
 
-	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.Logger)
-	if err != nil {
-		return nil, err
-	}
+// 	derivedConfig, err := deriveAndValidateConfig(consolidatedConfig, lt.initRunner.IsExecutable, gs.Logger)
+// 	if err != nil {
+// 		return nil, err
+// 	}
 
-	return &loadedAndConfiguredTest{
-		loadedTest:         lt,
-		consolidatedConfig: consolidatedConfig,
-		derivedConfig:      derivedConfig,
-	}, nil
-}
+// 	return &loadedTest{
+// 		loadedTest:         lt,
+// 		consolidatedConfig: consolidatedConfig,
+// 		derivedConfig:      derivedConfig,
+// 	}, nil
+// }
 
-// loadedAndConfiguredTest contains the whole loadedTest, as well as the
+// loadedTest contains the whole loadedTest, as well as the
 // consolidated test config and the full test run state.
-// type loadedAndConfiguredTest struct {
+// type loadedTest struct {
 // 	*loadedTest
 // 	consolidatedConfig Config
 // 	derivedConfig      Config
@@ -281,7 +283,7 @@ func (lt *loadedTest) consolidateDeriveAndValidateConfig(
 // func loadAndConfigureTest(
 // 	gs *state.GlobalState, cmd *cobra.Command, args []string,
 // 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
-// ) (*loadedAndConfiguredTest, error) {
+// ) (*loadedTest, error) {
 // 	test, err := loadTest(gs, cmd, args, cliConfigGetter)
 // 	if err != nil {
 // 		return nil, err
@@ -319,23 +321,22 @@ func loadSystemCertPool(logger logrus.FieldLogger) {
 	}
 }
 
-func (lct *loadedAndConfiguredTest) buildTestRunState(
+func (lt *loadedTest) buildTestRunState(
 	configToReinject lib.Options,
 ) (*lib.TestRunState, error) {
 	// This might be the full derived or just the consodlidated options
-	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
+	if err := lt.initRunner.SetOptions(configToReinject); err != nil {
 		return nil, err
 	}
 
 	// it pre-loads system certificates to avoid doing it on the first TLS request.
 	// This is done async to avoid blocking the rest of the loading process as it will not stop if it fails.
-	go loadSystemCertPool(lct.preInitState.Logger)
+	go loadSystemCertPool(lt.preInitState.Logger)
 
 	return &lib.TestRunState{
-		TestPreInitState: lct.preInitState,
-		Runner:           lct.initRunner,
-		Options:          lct.derivedConfig.Options, // we will always run with the derived options
-		RunTags:          lct.preInitState.Registry.RootTagSet().WithTagsFromMap(configToReinject.RunTags),
+		TestPreInitState: lt.preInitState,
+		Runner:           lt.initRunner,
+		RunTags:          lt.preInitState.Registry.RootTagSet().WithTagsFromMap(configToReinject.RunTags),
 	}, nil
 }
 
