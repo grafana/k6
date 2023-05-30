@@ -8,7 +8,7 @@ We hope this updated roadmap provides a clear overview of our plans for k6's fut
 
 ## Short-term goals
 
-These are goals that are tentatively achievable by **Q2 2023**.
+These are goals that are tentatively achievable by **Q2 2023** (April-June).
 
 ### gRPC streaming support
 
