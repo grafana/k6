@@ -1,3 +1,5 @@
+// Package data implements `k6/data` js module for k6.
+// This modules provide utility types to work with data in an efficient way.
 package data
 
 import (

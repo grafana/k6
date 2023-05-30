@@ -33,11 +33,11 @@ func (s sharedArray) wrap(rt *goja.Runtime) goja.Value {
 	})
 }
 
-func (s wrappedSharedArray) Set(index int, val goja.Value) bool {
+func (s wrappedSharedArray) Set(_ int, _ goja.Value) bool {
 	panic(s.rt.NewTypeError("SharedArray is immutable")) // this is specifically a type error
 }
 
-func (s wrappedSharedArray) SetLen(len int) bool {
+func (s wrappedSharedArray) SetLen(_ int) bool {
 	panic(s.rt.NewTypeError("SharedArray is immutable")) // this is specifically a type error
 }
 
