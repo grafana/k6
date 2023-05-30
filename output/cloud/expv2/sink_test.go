@@ -24,6 +24,8 @@ func TestNewSink(t *testing.T) {
 }
 
 func TestCounterAdd(t *testing.T) {
+	t.Parallel()
+
 	c := counter{}
 	c.Add(2.3)
 	assert.Equal(t, 2.3, c.Sum)
@@ -33,6 +35,8 @@ func TestCounterAdd(t *testing.T) {
 }
 
 func TestGaugeAdd(t *testing.T) {
+	t.Parallel()
+
 	g := gauge{}
 	g.Add(28)
 
@@ -61,6 +65,8 @@ func TestGaugeAdd(t *testing.T) {
 }
 
 func TestRateAdd(t *testing.T) {
+	t.Parallel()
+
 	r := rate{}
 	r.Add(91)
 
