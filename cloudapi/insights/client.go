@@ -161,7 +161,7 @@ func dialOptionsFromClientConfig(cfg ClientConfig) ([]grpc.DialOption, error) {
 		opts = append(opts, grpc.WithContextDialer(cfg.ConnectConfig.Dialer))
 	}
 
-	if cfg.TLSConfig.Insecure {
+	if cfg.TLSConfig.Insecure { //nolint: nestif
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	} else {
 		if cfg.TLSConfig.CertFile != "" {
