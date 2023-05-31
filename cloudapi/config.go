@@ -35,6 +35,8 @@ type Config struct {
 	// APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 	APIVersion null.Int `json:"-"`
 
+	// TODO: rename the config field to align to the new logic by time series
+	// when the migration from the version 1 is completed.
 	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"K6_CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
 
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
