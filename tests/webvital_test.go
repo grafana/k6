@@ -20,16 +20,11 @@ func TestWebVitalMetric(t *testing.T) {
 		browser  = newTestBrowser(t, withFileServer(), withSamplesListener(samples))
 		page     = browser.NewPage(nil)
 		expected = map[string]bool{
-			"browser_web_vital_ttfb":      false,
-			"browser_web_vital_ttfb_good": false,
-			"browser_web_vital_fcp":       false,
-			"browser_web_vital_fcp_good":  false,
-			"browser_web_vital_lcp":       false,
-			"browser_web_vital_lcp_good":  false,
-			"browser_web_vital_fid":       false,
-			"browser_web_vital_fid_good":  false,
-			"browser_web_vital_cls":       false,
-			"browser_web_vital_cls_good":  false,
+			"browser_web_vital_ttfb": false,
+			"browser_web_vital_fcp":  false,
+			"browser_web_vital_lcp":  false,
+			"browser_web_vital_fid":  false,
+			"browser_web_vital_cls":  false,
 		}
 	)
 

@@ -306,11 +306,6 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		return fmt.Errorf("metric not registered %q", wv.Name)
 	}
 
-	metricRating, ok := fs.k6Metrics.WebVitals[k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating)]
-	if !ok {
-		return fmt.Errorf("metric not registered %q", k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating))
-	}
-
 	value, err := wv.Value.Float64()
 	if err != nil {
 		return fmt.Errorf("value couldn't be parsed %q", wv.Value)
@@ -322,17 +317,14 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		tags = tags.With("url", wv.URL)
 	}
 
+	tags = tags.With("rate", wv.Rating)
+
 	now := time.Now()
 	k6metrics.PushIfNotDone(fs.ctx, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
 				Value:      value,
-				Time:       now,
-			},
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: metricRating, Tags: tags},
-				Value:      1,
 				Time:       now,
 			},
 		},

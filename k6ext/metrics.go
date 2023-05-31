@@ -1,8 +1,6 @@
 package k6ext
 
 import (
-	"fmt"
-
 	k6metrics "go.k6.io/k6/metrics"
 )
 
@@ -69,13 +67,6 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 		}
 
 		webVitals[k] = registry.MustNewMetric(v, k6metrics.Trend, t)
-
-		webVitals[ConcatWebVitalNameRating(k, "good")] = registry.MustNewMetric(
-			v+"_good", k6metrics.Counter)
-		webVitals[ConcatWebVitalNameRating(k, "needs-improvement")] = registry.MustNewMetric(
-			v+"_needs_improvement", k6metrics.Counter)
-		webVitals[ConcatWebVitalNameRating(k, "poor")] = registry.MustNewMetric(
-			v+"_poor", k6metrics.Counter)
 	}
 
 	//nolint:lll
@@ -91,12 +82,4 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 		BrowserHTTPReqReceiving:      registry.MustNewMetric(browserHTTPReqReceivingName, k6metrics.Trend, k6metrics.Time),
 		BrowserHTTPReqFailed:         registry.MustNewMetric(browserHTTPReqFailedName, k6metrics.Rate),
 	}
-}
-
-// ConcatWebVitalNameRating can be used
-// to create the correct metric key name
-// to retrieve the corresponding metric
-// from the registry.
-func ConcatWebVitalNameRating(name, rating string) string {
-	return fmt.Sprintf("%s:%s", name, rating)
 }
