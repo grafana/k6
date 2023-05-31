@@ -25,8 +25,8 @@ func TestMetricSetBuilderAddTimeBucket(t *testing.T) {
 
 	tb := timeBucket{
 		Time: time.Unix(1, 0),
-		Sinks: map[metrics.TimeSeries]metrics.Sink{
-			timeSeries: &metrics.CounterSink{},
+		Sinks: map[metrics.TimeSeries]metricValue{
+			timeSeries: &counter{},
 		},
 	}
 	msb := newMetricSetBuilder("testrunid-123", 1)

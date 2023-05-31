@@ -52,44 +52,39 @@ func addBucketToTimeSeriesProto(
 	timeSeries *pbcloud.TimeSeries,
 	mt metrics.MetricType,
 	time time.Time,
-	sink metrics.Sink,
+	value metricValue,
 ) {
 	if timeSeries.Samples == nil {
 		initTimeSeriesSamples(timeSeries, mt)
 	}
 
-	switch mt {
-	case metrics.Counter:
-		c := sink.(*metrics.CounterSink).Value //nolint: forcetypeassert
+	switch typedMetricValue := value.(type) {
+	case *counter:
 		samples := timeSeries.GetCounterSamples()
 		samples.Values = append(samples.Values, &pbcloud.CounterValue{
 			Time:  timestamppb.New(time),
-			Value: c,
+			Value: typedMetricValue.Sum,
 		})
-	case metrics.Gauge:
-		g := sink.(*metrics.GaugeSink) //nolint: forcetypeassert
+	case *gauge:
 		samples := timeSeries.GetGaugeSamples()
 		samples.Values = append(samples.Values, &pbcloud.GaugeValue{
-			Time: timestamppb.New(time),
-			Last: g.Value,
-			Min:  g.Max,
-			Max:  g.Min,
-			// TODO: implement the custom gauge for track them
-			Avg:   0,
-			Count: 0,
+			Time:  timestamppb.New(time),
+			Last:  typedMetricValue.Last,
+			Min:   typedMetricValue.Max,
+			Max:   typedMetricValue.Min,
+			Avg:   typedMetricValue.Avg,
+			Count: typedMetricValue.Count,
 		})
-	case metrics.Rate:
-		r := sink.(*metrics.RateSink) //nolint: forcetypeassert
+	case *rate:
 		samples := timeSeries.GetRateSamples()
 		samples.Values = append(samples.Values, &pbcloud.RateValue{
 			Time:         timestamppb.New(time),
-			NonzeroCount: uint32(r.Trues),
-			TotalCount:   uint32(r.Total),
+			NonzeroCount: typedMetricValue.NonZeroCount,
+			TotalCount:   typedMetricValue.Total,
 		})
-	case metrics.Trend:
-		h := sink.(*histogram) //nolint: forcetypeassert
+	case *histogram:
 		samples := timeSeries.GetTrendHdrSamples()
-		samples.Values = append(samples.Values, histogramAsProto(h, time))
+		samples.Values = append(samples.Values, histogramAsProto(typedMetricValue, time))
 	default:
 		panic(fmt.Sprintf("MetricType %q is not supported", mt))
 	}
