@@ -2,7 +2,6 @@ package expv2
 
 import (
 	"testing"
-	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +23,7 @@ func TestMetricSetBuilderAddTimeBucket(t *testing.T) {
 	}
 
 	tb := timeBucket{
-		Time: time.Unix(1, 0),
+		Time: 1,
 		Sinks: map[metrics.TimeSeries]metricValue{
 			timeSeries: &counter{},
 		},

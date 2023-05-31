@@ -311,6 +311,6 @@ func TestHistogramAsProto(t *testing.T) {
 		tc.exp.MinResolution = 1.0
 		tc.exp.SignificantDigits = 2
 		tc.exp.Time = &timestamppb.Timestamp{Seconds: 1}
-		assert.Equal(t, tc.exp, histogramAsProto(&h, time.Unix(1, 0)), tc.name)
+		assert.Equal(t, tc.exp, histogramAsProto(&h, time.Unix(1, 0).UnixNano()), tc.name)
 	}
 }

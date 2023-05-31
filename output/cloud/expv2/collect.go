@@ -9,9 +9,7 @@ import (
 )
 
 type timeBucket struct {
-	// TODO: for performance reasons, use directly a unix time here
-	// so we can avoid time->unix->time
-	Time  time.Time
+	Time  int64
 	Sinks map[metrics.TimeSeries]metricValue
 }
 
@@ -68,11 +66,17 @@ func newCollector(aggrPeriod, waitPeriod time.Duration) (*collector, error) {
 	if aggrPeriod == 0 {
 		return nil, errors.New("aggregation period is not allowed to be zero")
 	}
+	if aggrPeriod != aggrPeriod.Truncate(time.Second) {
+		return nil, errors.New("aggregation period is not allowed to have sub-second precision")
+	}
 	if waitPeriod == 0 {
 		// TODO: we could simplify the expiring logic
 		// just having an internal static logic.
 		// Like skip only not closed buckets bucketEnd > now.
 		return nil, errors.New("aggregation wait period is not allowed to be zero")
+	}
+	if waitPeriod != waitPeriod.Truncate(time.Second) {
+		return nil, errors.New("aggregation wait period is not allowed to have sub-second precision")
 	}
 	return &collector{
 		bq:                bucketQ{},
@@ -152,9 +156,8 @@ func (c *collector) bucketID(t time.Time) int64 {
 	return t.UnixNano() / int64(c.aggregationPeriod)
 }
 
-func (c *collector) timeFromBucketID(id int64) time.Time {
-	return time.Unix(0, id*int64(c.aggregationPeriod)).
-		Truncate(time.Microsecond).UTC()
+func (c *collector) timeFromBucketID(id int64) int64 {
+	return id * int64(c.aggregationPeriod)
 }
 
 func (c *collector) bucketCutoffID() int64 {

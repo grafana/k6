@@ -9,6 +9,17 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+func TestNewCollectorError(t *testing.T) {
+	t.Parallel()
+
+	// TODO: more cases
+	_, err := newCollector(4*time.Second+300*time.Millisecond, 1*time.Second)
+	require.ErrorContains(t, err, "sub-second precision")
+
+	_, err = newCollector(4*time.Second, 1*time.Second+300*time.Millisecond)
+	require.ErrorContains(t, err, "sub-second precision")
+}
+
 func TestCollectorCollectSample(t *testing.T) {
 	t.Parallel()
 
@@ -174,7 +185,7 @@ func TestCollectorExpiredBucketsCutoff(t *testing.T) {
 	assert.NotContains(t, c.timeBuckets, 3)
 
 	require.Len(t, expired, 1)
-	expDateTime := time.Unix(9, 0).UTC()
+	expDateTime := time.Unix(9, 0).UTC().UnixNano()
 	assert.Equal(t, expDateTime, expired[0].Time)
 }
 
@@ -205,7 +216,7 @@ func TestCollectorTimeFromBucketID(t *testing.T) {
 	c := collector{aggregationPeriod: 3 * time.Second}
 
 	// exp = TimeFromUnix(bucketID * aggregationPeriod) = Time(49 * 3s)
-	exp := time.Date(1970, time.January, 1, 0, 2, 27, 0, time.UTC)
+	exp := time.Date(1970, time.January, 1, 0, 2, 27, 0, time.UTC).UnixNano()
 	assert.Equal(t, exp, c.timeFromBucketID(49))
 }
 
@@ -228,7 +239,7 @@ func TestBucketQPush(t *testing.T) {
 	t.Parallel()
 
 	bq := bucketQ{}
-	bq.Push([]timeBucket{{Time: time.Unix(1, 0)}})
+	bq.Push([]timeBucket{{Time: int64(1 * time.Second)}})
 	require.Len(t, bq.buckets, 1)
 }
 
@@ -236,8 +247,8 @@ func TestBucketQPopAll(t *testing.T) {
 	t.Parallel()
 	bq := bucketQ{
 		buckets: []timeBucket{
-			{Time: time.Unix(1, 0)},
-			{Time: time.Unix(2, 0)},
+			{Time: int64(1 * time.Second)},
+			{Time: int64(2 * time.Second)},
 		},
 	}
 	buckets := bq.PopAll()
@@ -273,7 +284,7 @@ func TestBucketQPushPopConcurrency(t *testing.T) {
 		}
 	}()
 
-	now := time.Now()
+	now := time.Now().Truncate(time.Second).UnixNano()
 	for {
 		select {
 		case <-stop:

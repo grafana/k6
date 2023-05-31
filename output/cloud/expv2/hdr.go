@@ -3,10 +3,8 @@ package expv2
 import (
 	"math"
 	"math/bits"
-	"time"
 
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
-	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
 const (
@@ -183,9 +181,9 @@ func (h *histogram) appendBuckets(index uint32) {
 }
 
 // histogramAsProto converts the histogram into the equivalent Protobuf version.
-func histogramAsProto(h *histogram, time time.Time) *pbcloud.TrendHdrValue {
+func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 	hval := &pbcloud.TrendHdrValue{
-		Time:              timestamppb.New(time),
+		Time:              timestampAsProto(time),
 		MinResolution:     1.0,
 		SignificantDigits: 2,
 		LowerCounterIndex: h.FirstNotZeroBucket,
