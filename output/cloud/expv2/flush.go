@@ -3,9 +3,9 @@ package expv2
 import (
 	"context"
 
+	"go.k6.io/k6/cloudapi/insights"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
-	"go.k6.io/k6/cloudapi/insights"
 )
 
 type pusher interface {
