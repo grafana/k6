@@ -317,7 +317,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		tags = tags.With("url", wv.URL)
 	}
 
-	tags = tags.With("rate", wv.Rating)
+	tags = tags.With("rating", wv.Rating)
 
 	now := time.Now()
 	k6metrics.PushIfNotDone(fs.ctx, state.Samples, k6metrics.ConnectedSamples{
