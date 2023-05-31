@@ -64,14 +64,14 @@ func newMockRequestMetadatas() insights.RequestMetadatas {
 			Start:          time.Unix(1337, 0),
 			End:            time.Unix(1338, 0),
 			TestRunLabels:  insights.TestRunLabels{ID: 1, Scenario: "test-scenario-1", Group: "test-group-1"},
-			ProtocolLabels: insights.ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+			ProtocolLabels: insights.ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
 		{
 			TraceID:        "test-trace-id-2",
 			Start:          time.Unix(2337, 0),
 			End:            time.Unix(2338, 0),
 			TestRunLabels:  insights.TestRunLabels{ID: 1, Scenario: "test-scenario-2", Group: "test-group-2"},
-			ProtocolLabels: insights.ProtocolHTTPLabels{Url: "test-url-2", Method: "test-method-2", StatusCode: 200},
+			ProtocolLabels: insights.ProtocolHTTPLabels{URL: "test-url-2", Method: "test-method-2", StatusCode: 200},
 		},
 	}
 }

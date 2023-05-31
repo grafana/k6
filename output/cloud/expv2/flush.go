@@ -133,6 +133,7 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 	}
 }
 
+// InsightsClient is an interface for sending request metadatas to the Insights API.
 type InsightsClient interface {
 	IngestRequestMetadatasBatch(context.Context, insights.RequestMetadatas) error
 }

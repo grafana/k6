@@ -7,7 +7,9 @@ import (
 	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
 )
 
-func newBatchCreateRequestMetadatasRequest(requestMetadatas RequestMetadatas) (*ingester.BatchCreateRequestMetadatasRequest, error) {
+func newBatchCreateRequestMetadatasRequest(
+	requestMetadatas RequestMetadatas,
+) (*ingester.BatchCreateRequestMetadatasRequest, error) {
 	reqs := make([]*ingester.CreateRequestMetadataRequest, 0, len(requestMetadatas))
 	for _, rm := range requestMetadatas {
 		req, err := newCreateRequestMetadataRequest(rm)
@@ -55,7 +57,7 @@ func setProtocolLabels(rm *ingester.RequestMetadata, labels ProtocolLabels) erro
 	case ProtocolHTTPLabels:
 		rm.ProtocolLabels = &ingester.RequestMetadata_HTTPLabels{
 			HTTPLabels: &ingester.HTTPLabels{
-				Url:        l.Url,
+				Url:        l.URL,
 				Method:     l.Method,
 				StatusCode: l.StatusCode,
 			},

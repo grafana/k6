@@ -125,7 +125,8 @@ func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {
 			FailOnNonTempDialError: true,
 			Dialer: func(ctx context.Context, s string) (net.Conn, error) {
 				return nil, &fatalError{}
-			}},
+			},
+		},
 		TLSConfig: ClientTLSConfig{Insecure: true},
 	}
 	cli := NewClient(cfg)
@@ -180,14 +181,14 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 			Start:          time.Unix(9, 0),
 			End:            time.Unix(10, 0),
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
-			ProtocolLabels: ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
 		{
 			TraceID:        "test-trace-id-2",
 			Start:          time.Unix(19, 0),
 			End:            time.Unix(20, 0),
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
-			ProtocolLabels: ProtocolHTTPLabels{Url: "test-url-2", Method: "test-method-2", StatusCode: 401},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-2", Method: "test-method-2", StatusCode: 401},
 		},
 	}
 
@@ -221,7 +222,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithWorkingServerAndCanc
 			Start:          time.Unix(9, 0),
 			End:            time.Unix(10, 0),
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
-			ProtocolLabels: ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
 	}
 
@@ -252,7 +253,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithUninitializedClient(
 			Start:          time.Unix(9, 0),
 			End:            time.Unix(10, 0),
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
-			ProtocolLabels: ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
 	}
 
@@ -285,7 +286,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 			Start:          time.Unix(9, 0),
 			End:            time.Unix(10, 0),
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
-			ProtocolLabels: ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
 	}
 

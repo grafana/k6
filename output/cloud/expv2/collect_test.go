@@ -396,21 +396,21 @@ func Test_requestMetadatasCollector_CollectRequestMetadatas_FiltersAndStoresHTTP
 		Start:          time.Unix(9, 0),
 		End:            time.Unix(10, 0),
 		TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
-		ProtocolLabels: insights.ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+		ProtocolLabels: insights.ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 	})
 	require.Contains(t, col.buffer, insights.RequestMetadata{
 		TraceID:        "test-trace-id-2",
 		Start:          time.Unix(19, 0),
 		End:            time.Unix(20, 0),
 		TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
-		ProtocolLabels: insights.ProtocolHTTPLabels{Url: "test-url-2", Method: "test-method-2", StatusCode: 401},
+		ProtocolLabels: insights.ProtocolHTTPLabels{URL: "test-url-2", Method: "test-method-2", StatusCode: 401},
 	})
 	require.Contains(t, col.buffer, insights.RequestMetadata{
 		TraceID:        "test-trace-id-3",
 		Start:          time.Unix(19, 0),
 		End:            time.Unix(20, 0),
 		TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "unknown", Group: "unknown"},
-		ProtocolLabels: insights.ProtocolHTTPLabels{Url: "unknown", Method: "unknown", StatusCode: 0},
+		ProtocolLabels: insights.ProtocolHTTPLabels{URL: "unknown", Method: "unknown", StatusCode: 0},
 	})
 }
 
@@ -424,14 +424,14 @@ func Test_requestMetadatasCollector_PopAll_DoesNothingWithEmptyData(t *testing.T
 			Start:          time.Unix(9, 0),
 			End:            time.Unix(10, 0),
 			TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
-			ProtocolLabels: insights.ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+			ProtocolLabels: insights.ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
 		{
 			TraceID:        "test-trace-id-2",
 			Start:          time.Unix(19, 0),
 			End:            time.Unix(20, 0),
 			TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "unknown", Group: "unknown"},
-			ProtocolLabels: insights.ProtocolHTTPLabels{Url: "unknown", Method: "unknown", StatusCode: 0},
+			ProtocolLabels: insights.ProtocolHTTPLabels{URL: "unknown", Method: "unknown", StatusCode: 0},
 		},
 	}
 	col := &requestMetadatasCollector{

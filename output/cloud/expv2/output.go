@@ -21,11 +21,14 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+// RequestMetadatasCollector is an interface for collecting request metadatas
+// and retrieving them so they can be flushed using a Flusher.
 type RequestMetadatasCollector interface {
 	CollectRequestMetadatas([]metrics.SampleContainer)
 	PopAll() insights.RequestMetadatas
 }
 
+// flusher is an interface for flushing data to the cloud.
 type flusher interface {
 	flush(context.Context) error
 }
@@ -124,7 +127,7 @@ func (o *Output) Start() error {
 				Enabled:                  true,
 				TestRunID:                testRunID,
 				Token:                    o.config.Token.ValueOrZero(),
-				RequireTransportSecurity: false,
+				RequireTransportSecurity: true,
 			},
 			TLSConfig: insights.ClientTLSConfig{
 				Insecure: false,

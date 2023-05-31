@@ -5,26 +5,47 @@ import (
 	"time"
 )
 
+var (
+	errEmptyTraceID                      = errors.New("empty trace id")
+	errEmptyStartTime                    = errors.New("empty start time")
+	errEmptyEndTime                      = errors.New("empty end time")
+	errEmptyTestRunID                    = errors.New("empty test run id")
+	errEmptyTestRunScenario              = errors.New("empty test run scenario")
+	errEmptyTestRunGroup                 = errors.New("empty test run group")
+	errEmptyProtocolLabels               = errors.New("empty protocol labels")
+	errEmptyProtocolHTTPLabelsURL        = errors.New("empty protocol http labels url")
+	errEmptyProtocolHTTPLabelsMethod     = errors.New("empty protocol http labels method")
+	errEmptyProtocolHTTPLabelsStatusCode = errors.New("empty protocol http labels status code")
+)
+
+// TestRunLabels describes labels associated with a single test run.
 type TestRunLabels struct {
 	ID       int64
 	Scenario string
 	Group    string
 }
 
+// ProtocolLabels is a dummy interface that is used for compile-time type checking.
 type ProtocolLabels interface {
 	IsProtocolLabels()
 }
 
+// ProtocolHTTPLabels describes labels associated with a single HTTP request.
 type ProtocolHTTPLabels struct {
-	Url        string
+	URL        string
 	Method     string
 	StatusCode int64
 }
 
-func (ProtocolHTTPLabels) IsProtocolLabels() {}
+// IsProtocolLabels is a dummy implementation to satisfy the ProtocolLabels interface.
+func (ProtocolHTTPLabels) IsProtocolLabels() {
+	// Do nothing
+}
 
+// RequestMetadatas is a slice of RequestMetadata.
 type RequestMetadatas []RequestMetadata
 
+// RequestMetadata describes metadata associated with a single *traced* request.
 type RequestMetadata struct {
 	TraceID        string
 	Start          time.Time
@@ -33,59 +54,49 @@ type RequestMetadata struct {
 	ProtocolLabels ProtocolLabels
 }
 
-var (
-	ErrEmptyTraceID                      = errors.New("empty trace id")
-	ErrEmptyStartTime                    = errors.New("empty start time")
-	ErrEmptyEndTime                      = errors.New("empty end time")
-	ErrEmptyTestRunID                    = errors.New("empty test run id")
-	ErrEmptyTestRunScenario              = errors.New("empty test run scenario")
-	ErrEmptyTestRunGroup                 = errors.New("empty test run group")
-	ErrEmptyProtocolLabels               = errors.New("empty protocol labels")
-	ErrEmptyProtocolHTTPLabelsUrl        = errors.New("empty protocol http labels url")
-	ErrEmptyProtocolHTTPLabelsMethod     = errors.New("empty protocol http labels method")
-	ErrEmptyProtocolHTTPLabelsStatusCode = errors.New("empty protocol http labels status code")
-)
-
+// Valid returns an error if the RequestMetadata is invalid.
+// The RequestMetadata is considered invalid if any of the
+// fields zero-value or if the ProtocolLabels type is invalid.
 func (rm RequestMetadata) Valid() error {
 	if rm.TraceID == "" {
-		return ErrEmptyTraceID
+		return errEmptyTraceID
 	}
 
 	if rm.Start.IsZero() {
-		return ErrEmptyStartTime
+		return errEmptyStartTime
 	}
 
 	if rm.End.IsZero() {
-		return ErrEmptyEndTime
+		return errEmptyEndTime
 	}
 
 	if rm.TestRunLabels.ID == 0 {
-		return ErrEmptyTestRunID
+		return errEmptyTestRunID
 	}
 
 	if rm.TestRunLabels.Scenario == "" {
-		return ErrEmptyTestRunScenario
+		return errEmptyTestRunScenario
 	}
 
 	if rm.TestRunLabels.Group == "" {
-		return ErrEmptyTestRunGroup
+		return errEmptyTestRunGroup
 	}
 
 	switch l := rm.ProtocolLabels.(type) {
 	case ProtocolHTTPLabels:
-		if l.Url == "" {
-			return ErrEmptyProtocolHTTPLabelsUrl
+		if l.URL == "" {
+			return errEmptyProtocolHTTPLabelsURL
 		}
 
 		if l.Method == "" {
-			return ErrEmptyProtocolHTTPLabelsMethod
+			return errEmptyProtocolHTTPLabelsMethod
 		}
 
 		if l.StatusCode == 0 {
-			return ErrEmptyProtocolHTTPLabelsStatusCode
+			return errEmptyProtocolHTTPLabelsStatusCode
 		}
 	default:
-		return ErrEmptyProtocolLabels
+		return errEmptyProtocolLabels
 	}
 
 	return nil

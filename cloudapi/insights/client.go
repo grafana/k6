@@ -22,10 +22,14 @@ const (
 )
 
 var (
+	// ErrClientAlreadyInitialized is returned when the client is already initialized.
 	ErrClientAlreadyInitialized = errors.New("insights client already initialized")
-	ErrClientClosed             = errors.New("insights client closed")
+
+	// ErrClientClosed is returned when the client is closed.
+	ErrClientClosed = errors.New("insights client closed")
 )
 
+// ClientConfig is the configuration for the client.
 type ClientConfig struct {
 	IngesterHost  string
 	ConnectConfig ClientConnectConfig
@@ -33,12 +37,14 @@ type ClientConfig struct {
 	TLSConfig     ClientTLSConfig
 }
 
+// ClientConnectConfig is the configuration for the client connection.
 type ClientConnectConfig struct {
 	Block                  bool
 	FailOnNonTempDialError bool
 	Dialer                 func(context.Context, string) (net.Conn, error)
 }
 
+// ClientAuthConfig is the configuration for the client authentication.
 type ClientAuthConfig struct {
 	Enabled                  bool
 	TestRunID                int64
@@ -46,11 +52,13 @@ type ClientAuthConfig struct {
 	RequireTransportSecurity bool
 }
 
+// ClientTLSConfig is the configuration for the client TLS.
 type ClientTLSConfig struct {
 	Insecure bool
 	CertFile string
 }
 
+// Client is the client for the k6 Insights ingester service.
 type Client struct {
 	cfg    ClientConfig
 	client ingester.IngesterServiceClient
@@ -58,6 +66,7 @@ type Client struct {
 	connMu *sync.RWMutex
 }
 
+// NewClient creates a new client.
 func NewClient(cfg ClientConfig) *Client {
 	return &Client{
 		cfg:    cfg,
@@ -67,6 +76,7 @@ func NewClient(cfg ClientConfig) *Client {
 	}
 }
 
+// Dial creates a client connection using ClientConfig.
 func (c *Client) Dial(ctx context.Context) error {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
@@ -91,6 +101,7 @@ func (c *Client) Dial(ctx context.Context) error {
 	return nil
 }
 
+// IngestRequestMetadatasBatch ingests a batch of request metadatas.
 func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadatas RequestMetadatas) error {
 	c.connMu.RLock()
 	if c.conn == nil {
@@ -119,6 +130,7 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 	return nil
 }
 
+// Close closes the client.
 func (c *Client) Close() error {
 	c.connMu.Lock()
 	defer c.connMu.Unlock()
@@ -159,7 +171,7 @@ func dialOptionsFromClientConfig(cfg ClientConfig) ([]grpc.DialOption, error) {
 			}
 			opts = append(opts, grpc.WithTransportCredentials(creds))
 		} else {
-			opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{})))
+			opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})))
 		}
 	}
 

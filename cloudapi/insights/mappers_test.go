@@ -19,14 +19,14 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 			Start:          time.Unix(9, 0),
 			End:            time.Unix(10, 0),
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
-			ProtocolLabels: ProtocolHTTPLabels{Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
 		},
 		{
 			TraceID:        "test-trace-id-2",
 			Start:          time.Unix(19, 0),
 			End:            time.Unix(20, 0),
 			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
-			ProtocolLabels: ProtocolHTTPLabels{Url: "test-url-2", Method: "test-method-2", StatusCode: 401},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-2", Method: "test-method-2", StatusCode: 401},
 		},
 	}
 
@@ -43,7 +43,8 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 				TestRunLabels:     &ingester.TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
 				ProtocolLabels: &ingester.RequestMetadata_HTTPLabels{
 					HTTPLabels: &ingester.HTTPLabels{
-						Url: "test-url-1", Method: "test-method-1", StatusCode: 200},
+						Url: "test-url-1", Method: "test-method-1", StatusCode: 200,
+					},
 				},
 			},
 		},
@@ -55,7 +56,8 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 				TestRunLabels:     &ingester.TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
 				ProtocolLabels: &ingester.RequestMetadata_HTTPLabels{
 					HTTPLabels: &ingester.HTTPLabels{
-						Url: "test-url-2", Method: "test-method-2", StatusCode: 401},
+						Url: "test-url-2", Method: "test-method-2", StatusCode: 401,
+					},
 				},
 			},
 		},

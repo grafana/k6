@@ -202,7 +202,9 @@ func (c *requestMetadatasCollector) CollectRequestMetadatas(sampleContainers []m
 	}
 }
 
-func (c *requestMetadatasCollector) filterTrailsWithTraces(sampleContainers []metrics.SampleContainer) []*httpext.Trail {
+func (c *requestMetadatasCollector) filterTrailsWithTraces(
+	sampleContainers []metrics.SampleContainer,
+) []*httpext.Trail {
 	var filteredHTTPTrails []*httpext.Trail
 
 	for _, sampleContainer := range sampleContainers {
@@ -230,7 +232,7 @@ func (c *requestMetadatasCollector) collectHTTPTrails(trails []*httpext.Trail) {
 				Group:    c.getStringTagFromTrail(trail, groupTag),
 			},
 			ProtocolLabels: insights.ProtocolHTTPLabels{
-				Url:        c.getStringTagFromTrail(trail, urlTag),
+				URL:        c.getStringTagFromTrail(trail, urlTag),
 				Method:     c.getStringTagFromTrail(trail, methodTag),
 				StatusCode: c.getIntTagFromTrail(trail, statusTag),
 			},
