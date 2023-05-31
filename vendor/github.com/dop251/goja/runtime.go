@@ -2369,6 +2369,9 @@ func (r *Runtime) wrapJSFunc(fn Callable, typ reflect.Type) func(args []reflect.
 // If an object has a 'length' property and is not a function it is treated as array-like. The resulting slice
 // will contain obj[0], ... obj[length-1].
 //
+// ArrayBuffer and ArrayBuffer-backed types (i.e. typed arrays and DataView) can be exported into []byte. The result
+// is backed by the original data, no copy is performed.
+//
 // For any other Object an error is returned.
 //
 // # Array types
@@ -2417,16 +2420,13 @@ func (r *Runtime) Set(name string, value interface{}) error {
 // Note, this is not the same as GlobalObject().Get(name),
 // because if a global lexical binding (let or const) exists, it is used instead.
 // This method will panic with an *Exception if a JavaScript exception is thrown in the process.
-func (r *Runtime) Get(name string) (ret Value) {
-	r.tryPanic(func() {
-		n := unistring.NewFromString(name)
-		if v, exists := r.global.stash.getByName(n); exists {
-			ret = v
-		} else {
-			ret = r.globalObject.self.getStr(n, nil)
-		}
-	})
-	return
+func (r *Runtime) Get(name string) Value {
+	n := unistring.NewFromString(name)
+	if v, exists := r.global.stash.getByName(n); exists {
+		return v
+	} else {
+		return r.globalObject.self.getStr(n, nil)
+	}
 }
 
 // SetRandSource sets random source for this Runtime. If not called, the default math/rand is used.
@@ -2585,17 +2585,18 @@ func tryFunc(f func()) (ret interface{}) {
 	return
 }
 
+// Try runs a given function catching and returning any JS exception. Use this method to run any code
+// that may throw exceptions (such as Object.Get, Object.String, Object.ToInteger, Object.Export, Runtime.Get, Runtime.InstanceOf, etc.)
+// outside the Runtime execution context (i.e. when calling directly from Go, not from a JS function implemented in Go).
+func (r *Runtime) Try(f func()) *Exception {
+	return r.vm.try(f)
+}
+
 func (r *Runtime) try(f func()) error {
 	if ex := r.vm.try(f); ex != nil {
 		return ex
 	}
 	return nil
-}
-
-func (r *Runtime) tryPanic(f func()) {
-	if ex := r.vm.try(f); ex != nil {
-		panic(ex)
-	}
 }
 
 func (r *Runtime) toObject(v Value, args ...interface{}) *Object {
@@ -3181,4 +3182,10 @@ func assertCallable(v Value) (func(FunctionCall) Value, bool) {
 		return obj.self.assertCallable()
 	}
 	return nil, false
+}
+
+// InstanceOf is an equivalent of "left instanceof right".
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+func (r *Runtime) InstanceOf(left Value, right *Object) (res bool) {
+	return instanceOfOperator(left, right)
 }

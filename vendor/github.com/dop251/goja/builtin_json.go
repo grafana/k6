@@ -3,6 +3,7 @@ package goja
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math"
@@ -20,6 +21,9 @@ func (r *Runtime) builtinJSON_parse(call FunctionCall) Value {
 	d := json.NewDecoder(strings.NewReader(call.Argument(0).toString().String()))
 
 	value, err := r.builtinJSON_decodeValue(d)
+	if errors.Is(err, io.EOF) {
+		panic(r.newError(r.global.SyntaxError, "Unexpected end of JSON input (%v)", err.Error()))
+	}
 	if err != nil {
 		panic(r.newError(r.global.SyntaxError, err.Error()))
 	}
