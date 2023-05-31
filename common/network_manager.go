@@ -224,11 +224,6 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
-				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqs, Tags: tags},
-				Value:      1,
-				Time:       wallTime,
-			},
-			{
 				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
 				Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
 				Time:       wallTime,
@@ -244,26 +239,6 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	if resp != nil && resp.timing != nil {
 		k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
 			Samples: []k6metrics.Sample{
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqConnecting, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
-					Time:       wallTime,
-				},
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqTLSHandshaking, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
-					Time:       wallTime,
-				},
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqSending, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
-					Time:       wallTime,
-				},
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqReceiving, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
-					Time:       wallTime,
-				},
 				{
 					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
 					Value:      failed,
