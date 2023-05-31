@@ -31,7 +31,7 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 	}
 
 	// When
-	got := newBatchCreateRequestMetadatasRequest(rms)
+	got, err := newBatchCreateRequestMetadatasRequest(rms)
 
 	// Then
 	expected := []*ingester.CreateRequestMetadataRequest{
@@ -61,6 +61,7 @@ func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDe
 		},
 	}
 
+	require.NoError(t, err)
 	require.Len(t, got.Requests, 2)
 	require.ElementsMatch(t, got.Requests, expected)
 }

@@ -102,11 +102,15 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 		return nil
 	}
 
-	req := newBatchCreateRequestMetadatasRequest(requestMetadatas)
+	req, err := newBatchCreateRequestMetadatasRequest(requestMetadatas)
+	if err != nil {
+		return fmt.Errorf("failed to create request from request metadatas: %w", err)
+	}
+
 	// TODO(lukasz, retry-support): Retry request with returned metadatas.
 	//
 	// Note: There is currently no backend support backing up this retry mechanism.
-	_, err := c.client.BatchCreateRequestMetadatas(ctx, req)
+	_, err = c.client.BatchCreateRequestMetadatas(ctx, req)
 	if err != nil {
 		st := status.Convert(err)
 		return fmt.Errorf("failed to ingest request metadatas batch: code=%s, msg=%s", st.Code().String(), st.Message())
