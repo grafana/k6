@@ -16,8 +16,12 @@ type metricsFlusher struct {
 	bq                         *bucketQ
 	client                     pusher
 	aggregationPeriodInSeconds uint32
+	maxSeriesInSingleBatch     int
 }
 
+// Flush flushes the queued buckets sending them to the remote Cloud service.
+// If the number of time series collected is bigger than maximum batch size than
+// it splits in chunks.
 func (f *metricsFlusher) Flush(ctx context.Context) error {
 	// drain the buffer
 	buckets := f.bq.PopAll()
@@ -36,10 +40,24 @@ func (f *metricsFlusher) Flush(ctx context.Context) error {
 
 	msb := newMetricSetBuilder(f.referenceID, f.aggregationPeriodInSeconds)
 	for i := 0; i < len(buckets); i++ {
-		msb.addTimeBucket(&buckets[i])
+		msb.addTimeBucket(buckets[i])
+		if len(msb.seriesIndex) < f.maxSeriesInSingleBatch {
+			continue
+		}
+
+		// we hit the chunk size, let's flush
+		err := f.client.push(ctx, f.referenceID, msb.MetricSet)
+		if err != nil {
+			return err
+		}
+		msb = newMetricSetBuilder(f.referenceID, f.aggregationPeriodInSeconds)
 	}
 
-	// send the MetricSet to the remote service
+	if len(msb.seriesIndex) < 1 {
+		return nil
+	}
+
+	// send the last (or the unique) MetricSet chunk to the remote service
 	return f.client.push(ctx, f.referenceID, msb.MetricSet)
 }
 
@@ -84,7 +102,7 @@ func newMetricSetBuilder(testRunID string, aggrPeriodSec uint32) metricSetBuilde
 	}
 }
 
-func (msb *metricSetBuilder) addTimeBucket(bucket *timeBucket) {
+func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 	for timeSeries, sink := range bucket.Sinks {
 		pbmetric, ok := msb.metrics[timeSeries.Metric]
 		if !ok {
