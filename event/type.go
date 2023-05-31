@@ -31,4 +31,5 @@ type IterData struct {
 	Iteration    int64
 	VUID         uint64
 	ScenarioName string
+	Error        error
 }

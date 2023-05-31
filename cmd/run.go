@@ -23,6 +23,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -77,6 +78,18 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 		}()
 	}
+
+	defer func() {
+		waitExitDone := test.preInitState.Events.Emit(&event.Event{
+			Type: event.Exit,
+			Data: &event.ExitData{Error: err},
+		})
+		// TODO: Make the timeout configurable?
+		if werr := waitExitDone(5 * time.Second); werr != nil {
+			logger.WithError(werr).Warn()
+		}
+		test.preInitState.Events.UnsubscribeAll()
+	}()
 
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
@@ -152,6 +165,12 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 		}()
 	}
+
+	// TODO: Subscribe all initialization processes (outputs, VUs and executors)
+	// to the Init event. This would allow running them concurrently, and they
+	// could be synchronized by waiting for the event processing to complete.
+	// This could later be expanded to also initialize browser processes.
+	waitInitDone := test.preInitState.Events.Emit(&event.Event{Type: event.Init})
 
 	// Create and start the outputs. We do it quite early to get any output URLs
 	// or other details below. It also allows us to ensure when they have
@@ -300,9 +319,21 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
+	// TODO: Make the timeout configurable?
+	if werr := waitInitDone(10 * time.Second); werr != nil {
+		logger.WithError(werr).Warn()
+	}
+	test.preInitState.Events.Emit(&event.Event{Type: event.TestStart})
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
 	err = execScheduler.Run(globalCtx, runCtx, samples)
+	waitTestEndDone := test.preInitState.Events.Emit(&event.Event{Type: event.TestEnd})
+	defer func() {
+		// TODO: Make the timeout configurable?
+		if werr := waitTestEndDone(5 * time.Second); werr != nil {
+			logger.WithError(werr).Warn()
+		}
+	}()
 
 	// Init has passed successfully, so unless disabled, make sure we send a
 	// usage report after the context is done.

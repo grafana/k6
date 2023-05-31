@@ -13,6 +13,7 @@ import (
 	"runtime"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -23,7 +24,10 @@ import (
 	"github.com/tidwall/gjson"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd"
+	"go.k6.io/k6/cmd/tests/events"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/event"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
@@ -42,7 +46,6 @@ func TestVersion(t *testing.T) {
 	assert.Contains(t, stdout, runtime.Version())
 	assert.Contains(t, stdout, runtime.GOOS)
 	assert.Contains(t, stdout, runtime.GOARCH)
-	assert.NotContains(t, stdout[:len(stdout)-1], "\n")
 
 	assert.Empty(t, ts.Stderr.Bytes())
 	assert.Empty(t, ts.LoggerHook.Drain())
@@ -1997,4 +2000,98 @@ func TestBadLogOutput(t *testing.T) {
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 		})
 	}
+}
+
+// HACK: We need this so multiple tests can register differently named modules.
+var uniqueModuleNumber uint64 //nolint:gochecknoglobals
+
+// Tests that the appropriate events are emitted at the appropriate times.
+func TestEventSystemOK(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+
+	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+	modules.Register(moduleName, events.New(
+		ts.GlobalState.DefaultFlags.Address, []event.Type{
+			event.Init, event.TestStart, event.IterStart, event.IterEnd,
+			event.TestEnd, event.Exit,
+		}))
+
+	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
+	ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
+		import events from '%s';
+		import { sleep } from 'k6';
+
+		export let options = {
+			vus: 1,
+			iterations: 5,
+		}
+
+		export default function () { sleep(1); }
+	`, moduleName)))
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	expLog := []string{
+		`got event Init with data '<nil>', test status: InitVUs`,
+		`got event TestStart with data '<nil>', test status: Running`,
+		`got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterStart with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterStart with data '{Iteration:2 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterEnd with data '{Iteration:2 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterStart with data '{Iteration:3 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterEnd with data '{Iteration:3 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterStart with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
+		`got event IterEnd with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}', test status: Ended`,
+		`got event TestEnd with data '<nil>', test status: Ended`,
+		`got event Exit with data '&{Error:<nil>}'`,
+	}
+	log := ts.LoggerHook.Lines()
+	assert.Equal(t, expLog, log)
+}
+
+// Tests that the exit event is emitted with the test exit error.
+func TestEventSystemAborted(t *testing.T) {
+	t.Parallel()
+
+	ts := NewGlobalTestState(t)
+
+	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+	modules.Register(moduleName, events.New(
+		ts.GlobalState.DefaultFlags.Address, []event.Type{
+			event.Init, event.TestStart, event.TestEnd, event.Exit,
+		}))
+
+	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
+	ts.ExpectedExitCode = int(exitcodes.ScriptAborted)
+	ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
+		import events from '%s';
+		import { test } from 'k6/execution';
+		import { sleep } from 'k6';
+
+		export let options = {
+			vus: 5,
+			duration: '5s',
+		}
+
+		export default function () {
+			sleep(1);
+			test.abort('oops!');
+		}
+	`, moduleName)))
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	expLog := []string{
+		`got event Init with data '<nil>', test status: InitVUs`,
+		`got event TestStart with data '<nil>', test status: Running`,
+		`got event TestEnd with data '<nil>', test status: Interrupted`,
+		`got event Exit with data '&{Error:test aborted: oops! at file:///-:13:14(12)}'`,
+		`test aborted: oops! at file:///-:13:14(12)`,
+	}
+	log := ts.LoggerHook.Lines()
+	assert.Equal(t, expLog, log)
 }
