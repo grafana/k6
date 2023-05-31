@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/lib"
@@ -15,10 +16,15 @@ type moduleVUImpl struct {
 	state     *lib.State
 	runtime   *goja.Runtime
 	eventLoop *eventloop.EventLoop
+	events    *event.System
 }
 
 func (m *moduleVUImpl) Context() context.Context {
 	return m.ctx
+}
+
+func (m *moduleVUImpl) Events() event.Subscriber {
+	return m.events
 }
 
 func (m *moduleVUImpl) InitEnv() *common.InitEnvironment {

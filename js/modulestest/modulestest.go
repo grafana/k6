@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -15,6 +16,7 @@ var _ modules.VU = &VU{}
 type VU struct {
 	CtxField              context.Context
 	InitEnvField          *common.InitEnvironment
+	EventsField           *event.System
 	StateField            *lib.State
 	RuntimeField          *goja.Runtime
 	RegisterCallbackField func() func(f func() error)
@@ -23,6 +25,11 @@ type VU struct {
 // Context returns internally set field to conform to modules.VU interface
 func (m *VU) Context() context.Context {
 	return m.CtxField
+}
+
+// Events returns internally set field to conform to modules.VU interface
+func (m *VU) Events() event.Subscriber {
+	return m.EventsField
 }
 
 // InitEnv returns internally set field to conform to modules.VU interface

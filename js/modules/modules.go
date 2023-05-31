@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -41,6 +42,8 @@ type Instance interface {
 type VU interface {
 	// Context return the context.Context about the current VU
 	Context() context.Context
+
+	Events() event.Subscriber
 
 	// InitEnv returns common.InitEnvironment instance if present
 	InitEnv() *common.InitEnvironment

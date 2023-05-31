@@ -112,7 +112,7 @@ func newBundle(
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	// TODO use a real context
-	vuImpl := &moduleVUImpl{ctx: context.Background(), runtime: goja.New()}
+	vuImpl := &moduleVUImpl{ctx: context.Background(), runtime: goja.New(), events: piState.Events}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	exports, err := bundle.instantiate(vuImpl, 0)
 	if err != nil {
@@ -220,7 +220,7 @@ func (b *Bundle) populateExports(updateOptions bool, exports *goja.Object) error
 func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance, error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
-	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New()}
+	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New(), events: b.preInitState.Events}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	exports, err := b.instantiate(vuImpl, vuID)
 	if err != nil {
