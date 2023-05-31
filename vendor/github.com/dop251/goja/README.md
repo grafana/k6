@@ -170,12 +170,14 @@ There are 2 approaches:
 
 - Using [AssertFunction()](https://pkg.go.dev/github.com/dop251/goja#AssertFunction):
 ```go
-vm := New()
-_, err := vm.RunString(`
-function sum(a, b) {
-    return a+b;
+const SCRIPT = `
+function f(param) {
+    return +param + 2;
 }
-`)
+`
+
+vm := goja.New()
+_, err := vm.RunString(SCRIPT)
 if err != nil {
     panic(err)
 }
@@ -199,7 +201,7 @@ function f(param) {
 }
 `
 
-vm := New()
+vm := goja.New()
 _, err := vm.RunString(SCRIPT)
 if err != nil {
     panic(err)
@@ -225,7 +227,7 @@ the standard JavaScript naming convention, so if you need to make your JS code l
 dealing with a 3rd party library, you can use a [FieldNameMapper](https://pkg.go.dev/github.com/dop251/goja#FieldNameMapper):
 
 ```go
-vm := New()
+vm := goja.New()
 vm.SetFieldNameMapper(TagFieldNameMapper("json", true))
 type S struct {
     Field int `json:"field"`
@@ -257,7 +259,7 @@ Any exception thrown in JavaScript is returned as an error of type *Exception. I
 by using the Value() method:
 
 ```go
-vm := New()
+vm := goja.New()
 _, err := vm.RunString(`
 
 throw("Test");
@@ -282,7 +284,7 @@ func Test() {
     panic(vm.ToValue("Error"))
 }
 
-vm = New()
+vm = goja.New()
 vm.Set("Test", Test)
 _, err := vm.RunString(`
 
@@ -313,7 +315,7 @@ func TestInterrupt(t *testing.T) {
     }
     `
 
-    vm := New()
+    vm := goja.New()
     time.AfterFunc(200 * time.Millisecond, func() {
         vm.Interrupt("halt")
     })
