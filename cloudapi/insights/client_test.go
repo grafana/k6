@@ -112,7 +112,7 @@ func TestClient_Dial_ReturnsErrorWhenCalledTwice(t *testing.T) {
 
 	// Then
 	require.NoError(t, noErr)
-	require.ErrorIs(t, err, ErrAlreadyInitialized)
+	require.ErrorIs(t, err, ErrClientAlreadyInitialized)
 }
 
 func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {

@@ -22,8 +22,8 @@ const (
 )
 
 var (
-	ErrAlreadyInitialized = errors.New("insights client already initialized")
-	ErrClientClosed       = errors.New("insights client closed")
+	ErrClientAlreadyInitialized = errors.New("insights client already initialized")
+	ErrClientClosed             = errors.New("insights client closed")
 )
 
 type ClientConfig struct {
@@ -72,7 +72,7 @@ func (c *Client) Dial(ctx context.Context) error {
 	defer c.connMu.Unlock()
 
 	if c.conn != nil {
-		return ErrAlreadyInitialized
+		return ErrClientAlreadyInitialized
 	}
 
 	opts, err := dialOptionsFromClientConfig(c.cfg)
