@@ -20,7 +20,7 @@ type (
 		PidRegistry     *pidRegistry
 		browserRegistry *browserRegistry
 		remoteRegistry  *remoteRegistry
-		once            *sync.Once
+		initOnce        *sync.Once
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -46,14 +46,14 @@ func New() *RootModule {
 	return &RootModule{
 		PidRegistry:     &pidRegistry{},
 		browserRegistry: &browserRegistry{},
-		once:            &sync.Once{},
+		initOnce:        &sync.Once{},
 	}
 }
 
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
-	m.once.Do(func() {
+	m.initOnce.Do(func() {
 		// remoteRegistry should only be initialized once as it is
 		// used globally across the whole test run and not just the
 		// current vu. Since newRemoteRegistry can fail with an error,
