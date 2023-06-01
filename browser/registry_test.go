@@ -35,98 +35,98 @@ func TestPidRegistry(t *testing.T) {
 
 func TestIsRemoteBrowser(t *testing.T) {
 	testCases := []struct {
-		name           string
-		expIsRemote    bool
-		expValidWSURLs []string
-		envVarName     string
-		envVarValue    string
-		expErr         error
+		name                    string
+		envVarName, envVarValue string
+		expIsRemote             bool
+		expValidWSURLs          []string
+		expErr                  error
 	}{
 		{
 			name:        "browser is not remote",
-			expIsRemote: false,
 			envVarName:  "FOO",
 			envVarValue: "BAR",
+			expIsRemote: false,
 		},
 		{
 			name:           "single WS URL",
-			expIsRemote:    true,
-			expValidWSURLs: []string{"WS_URL"},
 			envVarName:     "K6_BROWSER_WS_URL",
 			envVarValue:    "WS_URL",
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL"},
 		},
 		{
 			name:           "multiple WS URL",
-			expIsRemote:    true,
-			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2", "WS_URL_3"},
 			envVarName:     "K6_BROWSER_WS_URL",
 			envVarValue:    "WS_URL_1,WS_URL_2,WS_URL_3",
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2", "WS_URL_3"},
 		},
 		{
 			name:           "ending comma is handled",
-			expIsRemote:    true,
-			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
 			envVarName:     "K6_BROWSER_WS_URL",
 			envVarValue:    "WS_URL_1,WS_URL_2,",
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
 		},
 		{
 			name:           "void string does not panic",
-			expIsRemote:    true,
-			expValidWSURLs: []string{""},
 			envVarName:     "K6_BROWSER_WS_URL",
 			envVarValue:    "",
+			expIsRemote:    true,
+			expValidWSURLs: []string{""},
 		},
 		{
 			name:           "comma does not panic",
-			expIsRemote:    true,
-			expValidWSURLs: []string{""},
 			envVarName:     "K6_BROWSER_WS_URL",
 			envVarValue:    ",",
+			expIsRemote:    true,
+			expValidWSURLs: []string{""},
 		},
 		{
 			name:           "read a single scenario with a single ws url",
-			expIsRemote:    true,
-			expValidWSURLs: []string{"WS_URL_1"},
 			envVarName:     "K6_INSTANCE_SCENARIOS",
 			envVarValue:    `[{"id": "one","browsers": [{ "handle": "WS_URL_1" }]}]`,
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL_1"},
 		},
 		{
 			name:           "read a single scenario with a two ws urls",
-			expIsRemote:    true,
-			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
 			envVarName:     "K6_INSTANCE_SCENARIOS",
 			envVarValue:    `[{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]}]`,
+			expIsRemote:    true,
+			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
 		},
 		{
-			name:           "read two scenarios with multiple ws urls",
+			name:       "read two scenarios with multiple ws urls",
+			envVarName: "K6_INSTANCE_SCENARIOS",
+			envVarValue: `[
+				{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]},
+				{"id": "two","browsers": [{"handle": "WS_URL_3"}, {"handle": "WS_URL_4"}]}
+			]`,
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2", "WS_URL_3", "WS_URL_4"},
-			envVarName:     "K6_INSTANCE_SCENARIOS",
-			envVarValue: `[{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]},
-			{"id": "two","browsers": [{"handle": "WS_URL_3"}, {"handle": "WS_URL_4"}]}]`,
 		},
 		{
 			name:           "read scenarios without any ws urls",
-			expIsRemote:    false,
-			expValidWSURLs: []string{""},
 			envVarName:     "K6_INSTANCE_SCENARIOS",
 			envVarValue:    `[{"id": "one","browsers": [{}]}]`,
+			expIsRemote:    false,
+			expValidWSURLs: []string{""},
 		},
 		{
 			name:           "read scenarios without any browser objects",
-			expIsRemote:    false,
-			expValidWSURLs: []string{""},
 			envVarName:     "K6_INSTANCE_SCENARIOS",
 			envVarValue:    `[{"id": "one"}]`,
+			expIsRemote:    false,
+			expValidWSURLs: []string{""},
 		},
 		{
 			name:        "read empty scenarios",
-			expErr:      errors.New("parsing K6_INSTANCE_SCENARIOS: unexpected end of JSON input"),
 			envVarName:  "K6_INSTANCE_SCENARIOS",
 			envVarValue: ``,
+			expErr:      errors.New("parsing K6_INSTANCE_SCENARIOS: unexpected end of JSON input"),
 		},
 	}
-
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			// the real environment  variable we receive needs quoting.
