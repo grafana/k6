@@ -1,6 +1,6 @@
 syntax = "proto3";
 
-package common;
+package k6.cloud.insights.proto.v1.common;
 
 option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/common";
 

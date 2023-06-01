@@ -1,8 +1,10 @@
 syntax = "proto3";
 
-import "v1/ingester/labels.proto";
+package k6.cloud.insights.proto.v1.k6;
 
-option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/ingester";
+import "v1/k6/labels.proto";
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/k6";
 
 message RequestMetadata {
 	string TraceID = 1;

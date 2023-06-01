@@ -19,7 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	IngesterService_BatchCreateRequestMetadatas_FullMethodName = "/ingester.IngesterService/BatchCreateRequestMetadatas"
+	IngesterService_BatchCreateRequestMetadatas_FullMethodName = "/k6.cloud.insights.proto.v1.k6.IngesterService/BatchCreateRequestMetadatas"
+	IngesterService_BatchCreateSpans_FullMethodName            = "/k6.cloud.insights.proto.v1.k6.IngesterService/BatchCreateSpans"
 )
 
 // IngesterServiceClient is the client API for IngesterService service.
@@ -27,6 +28,7 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type IngesterServiceClient interface {
 	BatchCreateRequestMetadatas(ctx context.Context, in *BatchCreateRequestMetadatasRequest, opts ...grpc.CallOption) (*BatchCreateRequestMetadatasResponse, error)
+	BatchCreateSpans(ctx context.Context, in *BatchCreateSpansRequest, opts ...grpc.CallOption) (*BatchCreateSpansResponse, error)
 }
 
 type ingesterServiceClient struct {
@@ -46,11 +48,21 @@ func (c *ingesterServiceClient) BatchCreateRequestMetadatas(ctx context.Context,
 	return out, nil
 }
 
+func (c *ingesterServiceClient) BatchCreateSpans(ctx context.Context, in *BatchCreateSpansRequest, opts ...grpc.CallOption) (*BatchCreateSpansResponse, error) {
+	out := new(BatchCreateSpansResponse)
+	err := c.cc.Invoke(ctx, IngesterService_BatchCreateSpans_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // IngesterServiceServer is the server API for IngesterService service.
 // All implementations must embed UnimplementedIngesterServiceServer
 // for forward compatibility
 type IngesterServiceServer interface {
 	BatchCreateRequestMetadatas(context.Context, *BatchCreateRequestMetadatasRequest) (*BatchCreateRequestMetadatasResponse, error)
+	BatchCreateSpans(context.Context, *BatchCreateSpansRequest) (*BatchCreateSpansResponse, error)
 	mustEmbedUnimplementedIngesterServiceServer()
 }
 
@@ -60,6 +72,9 @@ type UnimplementedIngesterServiceServer struct {
 
 func (UnimplementedIngesterServiceServer) BatchCreateRequestMetadatas(context.Context, *BatchCreateRequestMetadatasRequest) (*BatchCreateRequestMetadatasResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method BatchCreateRequestMetadatas not implemented")
+}
+func (UnimplementedIngesterServiceServer) BatchCreateSpans(context.Context, *BatchCreateSpansRequest) (*BatchCreateSpansResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method BatchCreateSpans not implemented")
 }
 func (UnimplementedIngesterServiceServer) mustEmbedUnimplementedIngesterServiceServer() {}
 
@@ -92,16 +107,38 @@ func _IngesterService_BatchCreateRequestMetadatas_Handler(srv interface{}, ctx c
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IngesterService_BatchCreateSpans_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BatchCreateSpansRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IngesterServiceServer).BatchCreateSpans(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IngesterService_BatchCreateSpans_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IngesterServiceServer).BatchCreateSpans(ctx, req.(*BatchCreateSpansRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IngesterService_ServiceDesc is the grpc.ServiceDesc for IngesterService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var IngesterService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "ingester.IngesterService",
+	ServiceName: "k6.cloud.insights.proto.v1.k6.IngesterService",
 	HandlerType: (*IngesterServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "BatchCreateRequestMetadatas",
 			Handler:    _IngesterService_BatchCreateRequestMetadatas_Handler,
+		},
+		{
+			MethodName: "BatchCreateSpans",
+			Handler:    _IngesterService_BatchCreateSpans_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

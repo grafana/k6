@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
+	"go.k6.io/k6/cloudapi/insights/proto/v1/k6"
 )
 
 func newBatchCreateRequestMetadatasRequest(
@@ -30,11 +31,11 @@ func newCreateRequestMetadataRequest(requestMetadata RequestMetadata) (*ingester
 		return nil, fmt.Errorf("invalid request metadata: %w", err)
 	}
 
-	rm := &ingester.RequestMetadata{
+	rm := &k6.RequestMetadata{
 		TraceID:           requestMetadata.TraceID,
 		StartTimeUnixNano: requestMetadata.Start.UnixNano(),
 		EndTimeUnixNano:   requestMetadata.End.UnixNano(),
-		TestRunLabels: &ingester.TestRunLabels{
+		TestRunLabels: &k6.TestRunLabels{
 			ID:       requestMetadata.TestRunLabels.ID,
 			Scenario: requestMetadata.TestRunLabels.Scenario,
 			Group:    requestMetadata.TestRunLabels.Group,
@@ -51,12 +52,12 @@ func newCreateRequestMetadataRequest(requestMetadata RequestMetadata) (*ingester
 	}, nil
 }
 
-func setProtocolLabels(rm *ingester.RequestMetadata, labels ProtocolLabels) error {
+func setProtocolLabels(rm *k6.RequestMetadata, labels ProtocolLabels) error {
 	// TODO(lukasz, other-proto-support): Set other protocol labels.
 	switch l := labels.(type) {
 	case ProtocolHTTPLabels:
-		rm.ProtocolLabels = &ingester.RequestMetadata_HTTPLabels{
-			HTTPLabels: &ingester.HTTPLabels{
+		rm.ProtocolLabels = &k6.RequestMetadata_HTTPLabels{
+			HTTPLabels: &k6.HTTPLabels{
 				Url:        l.URL,
 				Method:     l.Method,
 				StatusCode: l.StatusCode,
