@@ -49,6 +49,11 @@ func NewClient(logger logrus.FieldLogger, token, host, version string, timeout t
 	return c
 }
 
+// BaseURL returns configured host.
+func (c *Client) BaseURL() string {
+	return c.baseURL
+}
+
 // NewRequest creates new HTTP request.
 //
 // This is the same as http.NewRequest, except that data if not nil
