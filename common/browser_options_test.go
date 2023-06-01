@@ -60,20 +60,20 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			envLookupper: func(k string) (string, bool) {
 				switch k {
 				// disallow changing the following opts
-				case optArgs:
+				case env.BrowserArguments:
 					return "any", true
-				case optExecutablePath:
+				case env.BrowserExecutablePath:
 					return "something else", true
-				case optHeadless:
+				case env.BrowserHeadless:
 					return "false", true
-				case optIgnoreDefaultArgs:
+				case env.BrowserIgnoreDefaultArgs:
 					return "any", true
 				// allow changing the following opts
-				case optDebug:
+				case env.BrowserEnableDebugging:
 					return "true", true
-				case optLogCategoryFilter:
+				case env.LogCategoryFilter:
 					return "...", true
-				case optTimeout:
+				case env.BrowserGlobalTimeout:
 					return "1s", true
 				default:
 					return "", false
@@ -114,7 +114,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optArgs {
+				if k == env.BrowserArguments {
 					return "browser-arg1='value1,browser-arg2=value2,browser-flag", true
 				}
 				return "", false
@@ -132,7 +132,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optDebug {
+				if k == env.BrowserEnableDebugging {
 					return "true", true
 				}
 				return "", false
@@ -147,7 +147,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optDebug {
+				if k == env.BrowserEnableDebugging {
 					return "non-boolean", true
 				}
 				return "", false
@@ -159,7 +159,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optExecutablePath {
+				if k == env.BrowserExecutablePath {
 					return "cmd/somewhere", true
 				}
 				return "", false
@@ -174,7 +174,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optHeadless {
+				if k == env.BrowserHeadless {
 					return "false", true
 				}
 				return "", false
@@ -189,7 +189,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optHeadless {
+				if k == env.BrowserHeadless {
 					return "non-boolean", true
 				}
 				return "", false
@@ -201,7 +201,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optIgnoreDefaultArgs {
+				if k == env.BrowserIgnoreDefaultArgs {
 					return "--hide-scrollbars,--hide-something", true
 				}
 				return "", false
@@ -218,7 +218,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optLogCategoryFilter {
+				if k == env.LogCategoryFilter {
 					return "**", true
 				}
 				return "", false
@@ -233,7 +233,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optTimeout {
+				if k == env.BrowserGlobalTimeout {
 					return "10s", true
 				}
 				return "", false
@@ -248,7 +248,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 				"type": "chromium",
 			},
 			envLookupper: func(k string) (string, bool) {
-				if k == optTimeout {
+				if k == env.BrowserGlobalTimeout {
 					return "ABC", true
 				}
 				return "", false

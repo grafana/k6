@@ -10,6 +10,7 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -86,21 +87,20 @@ func (mi *ModuleInstance) Exports() k6modules.Exports {
 // and debug server, etc.
 func (m *RootModule) initialize(vu k6modules.VU) {
 	var (
-		err error
-		env = vu.InitEnv()
+		err     error
+		initEnv = vu.InitEnv()
 	)
-	m.remoteRegistry, err = newRemoteRegistry(env.LookupEnv)
+	m.remoteRegistry, err = newRemoteRegistry(initEnv.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create remote registry: %v", err)
 	}
-	if _, ok := env.LookupEnv("K6_BROWSER_PPROF"); ok {
+	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
 		go startDebugServer()
 	}
 }
 
 func startDebugServer() {
-	address := "localhost:6060"
-	log.Println("Starting http debug server", address)
-	log.Println(http.ListenAndServe(address, nil)) //nolint:gosec
+	log.Println("Starting http debug server", env.ProfilingServerAddr)
+	log.Println(http.ListenAndServe(env.ProfilingServerAddr, nil)) //nolint:gosec
 	// no linted because we don't need to set timeouts for the debug server.
 }

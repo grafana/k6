@@ -448,7 +448,7 @@ func makeLogger(ctx context.Context, envLookup env.LookupFunc) (*log.Logger, err
 		k6Logger = k6ext.GetVU(ctx).State().Logger
 		logger   = log.New(k6Logger, common.GetIterationID(ctx))
 	)
-	if el, ok := envLookup("XK6_BROWSER_LOG"); ok {
+	if el, ok := envLookup(env.LogLevel); ok {
 		if logger.SetLevel(el) != nil {
 			return nil, fmt.Errorf(
 				"invalid log level %q, should be one of: panic, fatal, error, warn, warning, info, debug, trace",
@@ -456,7 +456,7 @@ func makeLogger(ctx context.Context, envLookup env.LookupFunc) (*log.Logger, err
 			)
 		}
 	}
-	if _, ok := envLookup("XK6_BROWSER_CALLER"); ok {
+	if _, ok := envLookup(env.LogCaller); ok {
 		logger.ReportCaller()
 	}
 

@@ -16,6 +16,7 @@ import (
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
@@ -146,7 +147,7 @@ func TestBrowserUserAgent(t *testing.T) {
 func TestBrowserCrashErr(t *testing.T) {
 	// create a new VU in an environment that requires a bad remote-debugging-port.
 	vu := k6test.NewVU(t, k6test.WithLookupFunc(func(key string) (string, bool) {
-		if key == "K6_BROWSER_ARGS" {
+		if key == env.BrowserArguments {
 			return "remote-debugging-port=99999", true
 		}
 		return "", false

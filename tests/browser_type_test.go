@@ -8,6 +8,7 @@ import (
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
@@ -32,7 +33,7 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 	// Export WS URL env var
 	// pointing to test browser proxy
 	vu := k6test.NewVU(t, k6test.WithLookupFunc(func(key string) (string, bool) {
-		if key == "K6_BROWSER_WS_URL" {
+		if key == env.WebSocketURLs {
 			return bp.wsURL(), true
 		}
 		return "", false

@@ -7,6 +7,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/env"
 )
 
 func TestFramePress(t *testing.T) {
@@ -68,7 +70,7 @@ func TestFrameDismissDialogBox(t *testing.T) {
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	t.Parallel()
 
-	if s, ok := os.LookupEnv("K6_BROWSER_HEADLESS"); ok {
+	if s, ok := os.LookupEnv(env.BrowserHeadless); ok {
 		if v, err := strconv.ParseBool(s); err == nil && v {
 			// We're skipping this when running in headless
 			// environments since the bug that the test fixes
@@ -81,7 +83,7 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 
 	// run the browser in headfull mode.
 	tb := newTestBrowser(t, withFileServer(), withLookupFunc(func(key string) (string, bool) {
-		if key == "K6_BROWSER_HEADLESS" {
+		if key == env.BrowserHeadless {
 			return "0", true
 		}
 		return "", false

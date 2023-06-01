@@ -6,6 +6,8 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/env"
 )
 
 func TestTestBrowserAwaitWithTimeoutShortCircuit(t *testing.T) {
@@ -39,7 +41,7 @@ func TestTestBrowserWithLookupFunc(t *testing.T) {
 	// this lookup is expected to fail because the remote debugging port is
 	// invalid, practically testing that the InitEnv.LookupEnv is used.
 	lookup := func(key string) (string, bool) {
-		if key == "K6_BROWSER_ARGS" {
+		if key == env.BrowserArguments {
 			return "remote-debugging-port=99999", true
 		}
 		return "", false

@@ -8,6 +8,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/env"
 )
 
 func TestPidRegistry(t *testing.T) {
@@ -50,56 +52,56 @@ func TestIsRemoteBrowser(t *testing.T) {
 		},
 		{
 			name:           "single WS URL",
-			envVarName:     "K6_BROWSER_WS_URL",
+			envVarName:     env.WebSocketURLs,
 			envVarValue:    "WS_URL",
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL"},
 		},
 		{
 			name:           "multiple WS URL",
-			envVarName:     "K6_BROWSER_WS_URL",
+			envVarName:     env.WebSocketURLs,
 			envVarValue:    "WS_URL_1,WS_URL_2,WS_URL_3",
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2", "WS_URL_3"},
 		},
 		{
 			name:           "ending comma is handled",
-			envVarName:     "K6_BROWSER_WS_URL",
+			envVarName:     env.WebSocketURLs,
 			envVarValue:    "WS_URL_1,WS_URL_2,",
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
 		},
 		{
 			name:           "void string does not panic",
-			envVarName:     "K6_BROWSER_WS_URL",
+			envVarName:     env.WebSocketURLs,
 			envVarValue:    "",
 			expIsRemote:    true,
 			expValidWSURLs: []string{""},
 		},
 		{
 			name:           "comma does not panic",
-			envVarName:     "K6_BROWSER_WS_URL",
+			envVarName:     env.WebSocketURLs,
 			envVarValue:    ",",
 			expIsRemote:    true,
 			expValidWSURLs: []string{""},
 		},
 		{
 			name:           "read a single scenario with a single ws url",
-			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarName:     env.InstanceScenarios,
 			envVarValue:    `[{"id": "one","browsers": [{ "handle": "WS_URL_1" }]}]`,
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL_1"},
 		},
 		{
 			name:           "read a single scenario with a two ws urls",
-			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarName:     env.InstanceScenarios,
 			envVarValue:    `[{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]}]`,
 			expIsRemote:    true,
 			expValidWSURLs: []string{"WS_URL_1", "WS_URL_2"},
 		},
 		{
 			name:       "read two scenarios with multiple ws urls",
-			envVarName: "K6_INSTANCE_SCENARIOS",
+			envVarName: env.InstanceScenarios,
 			envVarValue: `[
 				{"id": "one","browsers": [{"handle": "WS_URL_1"}, {"handle": "WS_URL_2"}]},
 				{"id": "two","browsers": [{"handle": "WS_URL_3"}, {"handle": "WS_URL_4"}]}
@@ -109,21 +111,21 @@ func TestIsRemoteBrowser(t *testing.T) {
 		},
 		{
 			name:           "read scenarios without any ws urls",
-			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarName:     env.InstanceScenarios,
 			envVarValue:    `[{"id": "one","browsers": [{}]}]`,
 			expIsRemote:    false,
 			expValidWSURLs: []string{""},
 		},
 		{
 			name:           "read scenarios without any browser objects",
-			envVarName:     "K6_INSTANCE_SCENARIOS",
+			envVarName:     env.InstanceScenarios,
 			envVarValue:    `[{"id": "one"}]`,
 			expIsRemote:    false,
 			expValidWSURLs: []string{""},
 		},
 		{
 			name:        "read empty scenarios",
-			envVarName:  "K6_INSTANCE_SCENARIOS",
+			envVarName:  env.InstanceScenarios,
 			envVarValue: ``,
 			expErr:      errors.New("parsing K6_INSTANCE_SCENARIOS: unexpected end of JSON input"),
 		},
@@ -162,9 +164,9 @@ func TestIsRemoteBrowser(t *testing.T) {
 	t.Run("K6_INSTANCE_SCENARIOS should override K6_BROWSER_WS_URL", func(t *testing.T) {
 		lookup := func(key string) (string, bool) {
 			switch key {
-			case "K6_BROWSER_WS_URL":
+			case env.WebSocketURLs:
 				return "WS_URL_1", true
-			case "K6_INSTANCE_SCENARIOS":
+			case env.InstanceScenarios:
 				return strconv.Quote(`[{"id": "one","browsers": [{ "handle": "WS_URL_2" }]}]`), true
 			default:
 				return "", false
