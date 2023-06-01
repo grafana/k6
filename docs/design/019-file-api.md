@@ -1,11 +1,12 @@
 # Introduce a File API module for k6
 
-|         |         |
-| ---------- | ------------ |
-| **author** | @oleiade     |
-| **status** | 🔧 proposal  |
-| **Proof of concept** | [branch](https://github.com/grafana/k6/tree/poc/experimental/fs-module/js/modules/k6/experimental/fs) |
-| **references**           | [[#2977](https://github.com/grafana/k6/issues/2977) [[#2974](https://github.com/grafana/k6/issues/2974)            |
+|                      |                                                                                                                                                                                                           |
+| :------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **author**           | @oleiade                                                                                                                                                                                                  |
+| **status**           | 🔧 proposal                                                                                                                                                                                              |
+| **revisions**        | [previous](https://github.com/grafana/k6/pull/3101/commits/0669d16e76791241b75a2622729327880cd814e2), [initial](https://github.com/grafana/k6/pull/3101/commits/0669d16e76791241b75a2622729327880cd814e2) |
+| **Proof of concept** | [branch](https://github.com/grafana/k6/tree/poc/experimental/fs-module/js/modules/k6/experimental/fs)                                                                                                     |
+| **references**       | [[#2977](https://github.com/grafana/k6/issues/2977) [[#2974](https://github.com/grafana/k6/issues/2974)                                                                                                   |
 
 ## Problem definition
 
@@ -26,7 +27,7 @@ This is due to k6's design for distributed execution, particularly in the cloud.
 
 ### Requirements
 - The solution should allow file interaction during k6 script execution.
-- The solution should resort to asynchronous operations as much as possible.
+- The solution must use asynchronous operations.
 - The module should operate seamlessly in local and cloud setups.
 - The module should strive to optimize memory usage when handling files.
 
@@ -50,7 +51,7 @@ The initial API will mostly be asynchronous, except for the `open` functionality
 
 The API will have the following characteristics:
 - Load file content exactly once into memory.
-- Provide each VU a copy of the file handle pointing to a unique memory area to avoid copying the whole buffer for each VU.
+- As opening files is restricted to the init context, each VU receives a copy of each unique file handle, pointing to a unique memory area to avoid copying the whole buffer for each VU.
 - Ensure each file handle has unique offsets allowing each VU to work independently.
 
 A working [proof of concept](https://github.com/grafana/k6/tree/poc/experimental/fs-module/js/modules/k6/experimental/fs) of the new API is available on GitHub.
@@ -59,28 +60,10 @@ A working [proof of concept](https://github.com/grafana/k6/tree/poc/experimental
 
 ```typescript
 /*
- * readFile reads the whole content of a file and
- * returns its content as an `ArrayBuffer`.
- *
- * It effectively is a drop-in replacement for the
- * current `open(filename, 'b')` API.
- */
-readFileSync(filename: string): ArrayBuffer
-
-/*
- * readFile reads the whole content of a file and
- * returns its content as a `string`.
- *
- * It effectively is a drop-in replacement for the
- * current `open(filename, 'r')` API.
- */
-readTextFileSync(filename: string): string
-
-/*
- * openSync opens a file and returns an instance of a
+ * open opens a file and returns an instance of a
  * `File`.
  */
-openSync(path: string) File
+open(path: string): Promise<File>
 
 /*
  * File is an abstraction to interact with
@@ -112,6 +95,11 @@ interface File {
 	 * Resolves to a `FileInfo` describing the file.
 	 */
 	stat(): Promise<FileInfo>
+
+    /*
+     * close closes the file.
+     */
+    close(): Promise<void>
 }
 
 /*
@@ -130,7 +118,7 @@ interface FileInfo {
 }
 ```
 
-**N.B**: although text and binary files are distinguished by the top-level `readTextFile` and `readFile` operations, the `File` doesn't offer that distinction at the moment. This is based on the assumption we could somewhat easily add `TextDecoder` support to k6. If this assumption was to be invalidated, we could adopt the same API format and have two different read-operation variants on the File, or even expose two different kinds of files `TextFileHandle` and `BinaryFileHandle` for instance.
+**N.B**: although text and binary files are distinguished by the top-level `readTextFile` and `readFile` operations, the `File` doesn't offer that distinction at the moment. This is based on the assumption we could somewhat easily add `TextDecoder` support to k6 (see comments of [#2291](https://github.com/grafana/k6/issues/2291) and [#2440](https://github.com/grafana/k6/issues/2440)). If this assumption was to be invalidated, we could adopt the same API format and have two different read-operation variants on the File, or even expose two different kinds of files `TextFileHandle` and `BinaryFileHandle` for instance.
 
 ## Example usage
 
@@ -169,35 +157,12 @@ export default async function () {
     console.log(`[vu ${__VU}] resultString: ${resultString}`);
 }
 
+export default function teardown() {
+    file.close();
+}
+
 function ab2str(buf) {
     return String.fromCharCode.apply(null, new Uint16Array(buf));
-}
-```
-
-### Potential additions
-
-We have intentionally excluded certain elements from the proposed API. Specifically, the asynchronous `open` function is currently unusable in the init context as it does not support the `await` keyword.
-
-Additionally, while Deno provides synchronous counterparts for its entire API, we may also want to consider doing the same. The primary argument for asynchronous code is to facilitate non-blocking IO.
-
-```typescript
-/*
- * Asynchronous counterparts to currently synchronous
- * proposed APIs.
- */
-open(path: string): Promise<File>
-readFile(filename: string): Promise<ArrayBuffer>
-readTextFile(filename: string): Promise<string>
-
-/*
- * Synchronous counterparts to the already
- * proposed APIs.
- */
-interface File {
-	readSync(p ArrayBuffer | TypedArray | DataView): number
-	readAllSync(): ArrayBuffer
-	seekSync(offset: number, whence: number): number
-	statSync(): FileInfo
 }
 ```
 
@@ -208,19 +173,20 @@ The proposed API is made feasible through the following implementation aspects:
 -   A file's content is loaded into memory only once:
     -   When a file is opened, its content is buffered at the module's root in a dedicated registry, returning a handle with a pointer to that buffer.
     -   Each VU receives a copy of the file handle, enabling them to interact with files using the unique memory area linked to the handle, instead of each receiving a full copy of the buffer.
-    -   As each VU receives a unique file handle linked to the same memory area, they each have unique offsets. This setup allows each VU to process file data independently without conflict or race conditions.
-    -   If we plan to introduce write operations to this API in the future, a synchronization mechanism would be required to ensure adherence to the multiple reader/single writer architecture constraints.
+    - As each invocation of `open*` receives a unique file handle linked to the same memory area, they each have unique offsets. This setup allows each VU to process file data independently without conflict or race conditions.
 
 ### Possible future improvements
 
 #### Introduce stream support
 
-The Deno API's `FsFile` our proposal is inspired by exposes a `readable` read-only property which is a Streams API `ReadableStream` allowing to stream the content of the file.
+The Deno API's `FsFile` our proposal is inspired by exposes a `readable` read-only property which is a [Streams API](https://developer.mozilla.org/en-US/docs/Web/API/Streams_API) `ReadableStream` allowing to stream the content of the file. We have an open issue tracking the implementation of the Streams API in k6 [#2978](https://github.com/grafana/k6/issues/2978).
 
 #### Enable file opening within VU context
+
+See [#3020](https://github.com/grafana/k6/issues/3020)
 
 This is currently unachievable because we must anticipate which files will be opened. While some quick fixes might appear feasible (e.g., parsing the AST before execution to identify files), they quickly fall apart: What if the filename resides in a variable? A plausible solution would involve requiring users to declare necessary resources (files/folders) ahead of time. This approach would ensure these resources are captured and included in the archive for future VU code access.
 
 ## Conclusion
 
-We believe the [proof of concept](https://github.com/grafana/k6/tree/poc/experimental/fs-module/js/modules/k6/experimental/fs) developed along this proposal illustrates the feasability and benefits of developing such an API.
+We believe the [proof of concept](https://github.com/grafana/k6/tree/poc/experimental/fs-module/js/modules/k6/experimental/fs) developed with this proposal illustrates the feasibility and benefits of developing such an API.
