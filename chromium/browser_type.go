@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -62,7 +61,7 @@ func (b *BrowserType) init(
 ) (context.Context, *common.BrowserOptions, *log.Logger, error) {
 	ctx = b.initContext(ctx)
 
-	logger, err := makeLogger(ctx)
+	logger, err := makeLogger(ctx, b.envLookupper)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error setting up logger: %w", err)
 	}
@@ -444,12 +443,12 @@ func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) error {
 }
 
 // makeLogger makes and returns an extension wide logger.
-func makeLogger(ctx context.Context) (*log.Logger, error) {
+func makeLogger(ctx context.Context, envLookup env.LookupFunc) (*log.Logger, error) {
 	var (
 		k6Logger = k6ext.GetVU(ctx).State().Logger
 		logger   = log.New(k6Logger, common.GetIterationID(ctx))
 	)
-	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
+	if el, ok := envLookup("XK6_BROWSER_LOG"); ok {
 		if logger.SetLevel(el) != nil {
 			return nil, fmt.Errorf(
 				"invalid log level %q, should be one of: panic, fatal, error, warn, warning, info, debug, trace",
@@ -457,7 +456,7 @@ func makeLogger(ctx context.Context) (*log.Logger, error) {
 			)
 		}
 	}
-	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {
+	if _, ok := envLookup("XK6_BROWSER_CALLER"); ok {
 		logger.ReportCaller()
 	}
 
