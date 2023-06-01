@@ -3,6 +3,7 @@ package browser
 import (
 	"errors"
 	"os"
+	"strconv"
 	"sync"
 	"testing"
 
@@ -128,7 +129,13 @@ func TestIsRemoteBrowser(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			t.Setenv(tc.envVarName, tc.envVarValue)
+			// the real environment  variable we receive needs quoting.
+			// this makes it as close to the real implementation as possible.
+			v := tc.envVarValue
+			if tc.envVarName == "K6_INSTANCE_SCENARIOS" {
+				v = strconv.Quote(v)
+			}
+			t.Setenv(tc.envVarName, v)
 
 			rr, err := newRemoteRegistry(os.LookupEnv)
 			if tc.expErr != nil {
@@ -148,7 +155,7 @@ func TestIsRemoteBrowser(t *testing.T) {
 
 	t.Run("K6_INSTANCE_SCENARIOS should override K6_BROWSER_WS_URL", func(t *testing.T) {
 		t.Setenv("K6_BROWSER_WS_URL", "WS_URL_1")
-		t.Setenv("K6_INSTANCE_SCENARIOS", `[{"id": "one","browsers": [{ "handle": "WS_URL_2" }]}]`)
+		t.Setenv("K6_INSTANCE_SCENARIOS", strconv.Quote(`[{"id": "one","browsers": [{ "handle": "WS_URL_2" }]}]`))
 
 		rr, err := newRemoteRegistry(os.LookupEnv)
 		assert.NoError(t, err)

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"strconv"
 	"strings"
 	"sync"
 
@@ -95,6 +96,14 @@ func checkForScenarios(envLookup env.LookupFunc) (bool, []string, error) {
 	if !isRemote {
 		return false, nil, nil
 	}
+	// prevent failing in unquoting empty string.
+	if scenariosJSON == "" {
+		return false, nil, nil
+	}
+	scenariosJSON, err := strconv.Unquote(scenariosJSON)
+	if err != nil {
+		return false, nil, fmt.Errorf("unqouting K6_INSTANCE_SCENARIOS: %w", err)
+	}
 
 	var scenarios []struct {
 		ID       string `json:"id"`
@@ -102,9 +111,7 @@ func checkForScenarios(envLookup env.LookupFunc) (bool, []string, error) {
 			Handle string `json:"handle"`
 		} `json:"browsers"`
 	}
-
-	err := json.Unmarshal([]byte(scenariosJSON), &scenarios)
-	if err != nil {
+	if err := json.Unmarshal([]byte(scenariosJSON), &scenarios); err != nil {
 		return false, nil, fmt.Errorf("parsing K6_INSTANCE_SCENARIOS: %w", err)
 	}
 
@@ -117,7 +124,6 @@ func checkForScenarios(envLookup env.LookupFunc) (bool, []string, error) {
 			wsURLs = append(wsURLs, b.Handle)
 		}
 	}
-
 	if len(wsURLs) == 0 {
 		return false, wsURLs, nil
 	}
