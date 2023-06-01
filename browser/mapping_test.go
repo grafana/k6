@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 
 	k6common "go.k6.io/k6/js/common"
@@ -40,6 +39,7 @@ func customMappings() map[string]string {
 		"Frame.id":               "",
 		"Frame.loaderID":         "",
 		"JSHandle.objectID":      "",
+		"Browser.close":          "",
 	}
 }
 
@@ -117,16 +117,10 @@ func TestMappings(t *testing.T) {
 	}
 
 	for name, tt := range map[string]test{
-		"browserType": {
-			apiInterface: (*api.BrowserType)(nil),
-			mapp: func() mapping {
-				return mapBrowserType(moduleVU{VU: vu}, &chromium.BrowserType{}, "", false)
-			},
-		},
 		"browser": {
 			apiInterface: (*api.Browser)(nil),
 			mapp: func() mapping {
-				return mapBrowser(moduleVU{VU: vu}, &chromium.Browser{})
+				return mapBrowser(moduleVU{VU: vu}, "", false)
 			},
 		},
 		"browserContext": {

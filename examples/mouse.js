@@ -1,4 +1,4 @@
-import { chromium } from 'k6/x/browser';
+import { browser } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -14,7 +14,6 @@ export const options = {
 }
 
 export default async function () {
-  const browser = chromium.launch();
   const page = browser.newPage();
 
   await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
@@ -25,5 +24,4 @@ export default async function () {
   await page.mouse.click(newsLinkBox.x + newsLinkBox.width / 2, newsLinkBox.y);
 
   await page.close();
-  await browser.close();
 }

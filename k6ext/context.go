@@ -53,14 +53,23 @@ func Runtime(ctx context.Context) *goja.Runtime {
 	return GetVU(ctx).Runtime()
 }
 
+// GetScenarioName returns the scenario name associated with the given context.
+func GetScenarioName(ctx context.Context) string {
+	ss := k6lib.GetScenarioState(ctx)
+	if ss == nil {
+		return ""
+	}
+	return ss.Name
+}
+
 // GetScenarioOpts returns the browser options and environment variables associated
 // with the given context.
 func GetScenarioOpts(ctx context.Context, vu k6modules.VU) map[string]any {
-	ss := k6lib.GetScenarioState(ctx)
-	if ss == nil {
+	scenario := GetScenarioName(ctx)
+	if scenario == "" {
 		return nil
 	}
-	if so := vu.State().Options.Scenarios[ss.Name].GetScenarioOptions(); so != nil {
+	if so := vu.State().Options.Scenarios[scenario].GetScenarioOptions(); so != nil {
 		return so.Browser
 	}
 	return nil

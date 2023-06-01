@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -151,10 +152,10 @@ func TestBrowserCrashErr(t *testing.T) {
 	vu.MoveToVUContext()
 	t.Setenv("K6_BROWSER_ARGS", "remote-debugging-port=99999")
 
-	require.NoError(t, rt.Set("chromium", jsMod.Chromium))
+	require.NoError(t, rt.Set("browser", jsMod.Browser))
 	_, err := rt.RunString(`
-		const b = chromium.launch();
-		b.close();
+		const p = browser.newPage();
+		p.close();
 	`)
 	assert.ErrorContains(t, err, "launching browser: Invalid devtools server port")
 }
@@ -237,14 +238,16 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 	tb := newTestBrowser(t, withSkipClose())
 	defer tb.Close()
 
-	b1, err := tb.browserType.Connect(tb.wsURL)
+	ctx := context.Background()
+
+	b1, err := tb.browserType.Connect(ctx, tb.wsURL)
 	require.NoError(t, err)
 	bctx1, err := b1.NewContext(nil)
 	require.NoError(t, err)
 	p1, err := bctx1.NewPage()
 	require.NoError(t, err, "failed to create page #1")
 
-	b2, err := tb.browserType.Connect(tb.wsURL)
+	b2, err := tb.browserType.Connect(ctx, tb.wsURL)
 	require.NoError(t, err)
 	bctx2, err := b2.NewContext(nil)
 	require.NoError(t, err)

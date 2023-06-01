@@ -1,4 +1,4 @@
-import { chromium } from 'k6/x/browser';
+import { browser } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -17,8 +17,6 @@ export const options = {
 }
 
 export default async function() {
-  const browser = chromium.launch();
-
   // grant camera and microphone permissions to the
   // new browser context.
   const context = browser.newContext({
@@ -32,6 +30,5 @@ export default async function() {
     page.screenshot({ path: `example-chromium.png` });
   } finally {
     page.close();
-    browser.close();
   }
 }

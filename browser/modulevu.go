@@ -16,6 +16,7 @@ type moduleVU struct {
 	k6modules.VU
 
 	*pidRegistry
+	*browserRegistry
 	*remoteRegistry
 }
 

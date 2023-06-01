@@ -36,9 +36,8 @@ func mapBrowserToGoja(vu moduleVU) *goja.Object {
 		// TODO: Use k6 LookupEnv instead of OS package methods.
 		// See https://github.com/grafana/xk6-browser/issues/822.
 		wsURL, isRemoteBrowser = vu.isRemoteBrowser()
-		browserType            = chromium.NewBrowserType(vu)
 	)
-	for k, v := range mapBrowserType(vu, browserType, wsURL, isRemoteBrowser) {
+	for k, v := range mapBrowser(vu, wsURL, isRemoteBrowser) {
 		err := obj.Set(k, rt.ToValue(v))
 		if err != nil {
 			k6common.Throw(rt, fmt.Errorf("mapping: %w", err))
@@ -677,20 +676,41 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 }
 
 // mapBrowser to the JS module.
-func mapBrowser(vu moduleVU, b api.Browser) mapping {
-	rt := vu.Runtime()
+func mapBrowser(vu moduleVU, wsURL string, isRemoteBrowser bool) mapping { //nolint:funlen
+	var (
+		rt  = vu.Runtime()
+		ctx = context.Background()
+		bt  = chromium.NewBrowserType(vu)
+	)
 	return mapping{
-		"close":       b.Close,
-		"contexts":    b.Contexts,
-		"isConnected": b.IsConnected,
+		"contexts": func() ([]api.BrowserContext, error) {
+			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
+			if err != nil {
+				return nil, err
+			}
+			return b.Contexts(), nil
+		},
+		"isConnected": func() (bool, error) {
+			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
+			if err != nil {
+				return false, err
+			}
+			return b.IsConnected(), nil
+		},
 		"on": func(event string) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
+				b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
+				if err != nil {
+					return nil, err
+				}
 				return b.On(event) //nolint:wrapcheck
 			})
 		},
-		"userAgent": b.UserAgent,
-		"version":   b.Version,
 		"newContext": func(opts goja.Value) (*goja.Object, error) {
+			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
+			if err != nil {
+				return nil, err
+			}
 			bctx, err := b.NewContext(opts)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -698,7 +718,25 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 			m := mapBrowserContext(vu, bctx)
 			return rt.ToValue(m).ToObject(rt), nil
 		},
+		"userAgent": func() (string, error) {
+			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
+			if err != nil {
+				return "", err
+			}
+			return b.UserAgent(), nil
+		},
+		"version": func() (string, error) {
+			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
+			if err != nil {
+				return "", err
+			}
+			return b.Version(), nil
+		},
 		"newPage": func(opts goja.Value) (mapping, error) {
+			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
+			if err != nil {
+				return nil, err
+			}
 			page, err := b.NewPage(opts)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -708,45 +746,52 @@ func mapBrowser(vu moduleVU, b api.Browser) mapping {
 	}
 }
 
-// mapBrowserType to the JS module.
-func mapBrowserType(vu moduleVU, bt api.BrowserType, wsURL string, isRemoteBrowser bool) mapping {
-	rt := vu.Runtime()
-	return mapping{
-		"connect": func(wsEndpoint string, opts goja.Value) (*goja.Object, error) {
-			b, err := bt.Connect(wsEndpoint)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			m := mapBrowser(vu, b)
-			return rt.ToValue(m).ToObject(rt), nil
-		},
-		"executablePath":          bt.ExecutablePath,
-		"launchPersistentContext": bt.LaunchPersistentContext,
-		"name":                    bt.Name,
-		"launch": func(opts goja.Value) (*goja.Object, error) {
-			// If browser is remote, transition from launch
-			// to connect and avoid storing the browser pid
-			// as we have no access to it.
-			if isRemoteBrowser {
-				b, err := bt.Connect(wsURL)
-				if err != nil {
-					return nil, err //nolint:wrapcheck
-				}
-				m := mapBrowser(vu, b)
-				return rt.ToValue(m).ToObject(rt), nil
-			}
+// getOrInitBrowser retrieves the browser for the iteration from the browser registry
+// if it is already initialized. Otherwise initializes a new browser for the iteration
+// and stores it in the registry.
+func getOrInitBrowser(
+	ctx context.Context, bt *chromium.BrowserType, vu moduleVU, wsURL string, isRemoteBrowser bool,
+) (api.Browser, error) {
+	// Index browser pool per VU-scenario-iteration
+	id := fmt.Sprintf("%d-%s-%d",
+		vu.State().VUID,
+		k6ext.GetScenarioName(vu.Context()),
+		vu.State().Iteration,
+	)
 
-			b, pid, err := bt.Launch()
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			// store the pid so we can kill it later on panic.
-			vu.registerPid(pid)
-			m := mapBrowser(vu, b)
+	var (
+		ok  bool
+		err error
+		b   api.Browser
+	)
 
-			return rt.ToValue(m).ToObject(rt), nil
-		},
+	if b, ok = vu.getBrowser(id); ok {
+		return b, nil
 	}
+
+	if isRemoteBrowser {
+		b, err = bt.Connect(ctx, wsURL)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+	} else {
+		var pid int
+		b, pid, err = bt.Launch(ctx)
+		if err != nil {
+			return nil, err //nolint:wrapcheck
+		}
+		vu.registerPid(pid)
+	}
+
+	vu.setBrowser(id, b)
+
+	go func(ctx context.Context) {
+		<-ctx.Done()
+		b.Close()
+		vu.deleteBrowser(id)
+	}(vu.Context())
+
+	return b, nil
 }
 
 func panicIfFatalError(ctx context.Context, err error) {

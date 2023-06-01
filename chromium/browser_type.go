@@ -27,9 +27,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure BrowserType implements the api.BrowserType interface.
-var _ api.BrowserType = &BrowserType{}
-
 // BrowserType provides methods to launch a Chrome browser instance or connect to an existing one.
 // It's the entry point for interacting with the browser.
 type BrowserType struct {
@@ -46,7 +43,7 @@ type BrowserType struct {
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
 // the goja runtime, and returns a new Chrome browser type.
-func NewBrowserType(vu k6modules.VU) api.BrowserType {
+func NewBrowserType(vu k6modules.VU) *BrowserType {
 	// NOTE: vu.InitEnv() *must* be called from the script init scope,
 	// otherwise it will return nil.
 	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
@@ -62,9 +59,9 @@ func NewBrowserType(vu k6modules.VU) api.BrowserType {
 }
 
 func (b *BrowserType) init(
-	isRemoteBrowser bool,
+	ctx context.Context, isRemoteBrowser bool,
 ) (context.Context, *common.BrowserOptions, *log.Logger, error) {
-	ctx := b.initContext()
+	ctx = b.initContext(ctx)
 
 	logger, err := makeLogger(ctx)
 	if err != nil {
@@ -94,8 +91,8 @@ func (b *BrowserType) init(
 	return ctx, browserOpts, logger, nil
 }
 
-func (b *BrowserType) initContext() context.Context {
-	ctx := k6ext.WithVU(b.vu.Context(), b.vu)
+func (b *BrowserType) initContext(ctx context.Context) context.Context {
+	ctx = k6ext.WithVU(ctx, b.vu)
 	ctx = k6ext.WithCustomMetrics(ctx, b.k6Metrics)
 	ctx = common.WithHooks(ctx, b.hooks)
 	ctx = common.WithIterationID(ctx, fmt.Sprintf("%x", b.randSrc.Uint64()))
@@ -103,8 +100,8 @@ func (b *BrowserType) initContext() context.Context {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(wsEndpoint string) (api.Browser, error) {
-	ctx, browserOpts, logger, err := b.init(true)
+func (b *BrowserType) Connect(ctx context.Context, wsEndpoint string) (api.Browser, error) {
+	ctx, browserOpts, logger, err := b.init(ctx, true)
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
@@ -158,8 +155,8 @@ func (b *BrowserType) link(
 
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch() (_ api.Browser, browserProcessID int, _ error) {
-	ctx, browserOpts, logger, err := b.init(false)
+func (b *BrowserType) Launch(ctx context.Context) (_ api.Browser, browserProcessID int, _ error) {
+	ctx, browserOpts, logger, err := b.init(ctx, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}

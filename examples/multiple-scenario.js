@@ -1,4 +1,4 @@
-import { chromium } from 'k6/x/browser';
+import { browser } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -33,25 +33,21 @@ export const options = {
 }
 
 export async function messages() {
-  const browser = chromium.launch();
   const page = browser.newPage();
 
   try {
     await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
   } finally {
     page.close();
-    browser.close();
   }
 }
 
 export async function news() {
-  const browser = chromium.launch();
   const page = browser.newPage();
 
   try {
     await page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' });
   } finally {
     page.close();
-    browser.close();
   }
 }

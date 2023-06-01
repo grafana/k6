@@ -9,6 +9,7 @@ import (
 	"strings"
 	"sync"
 
+	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/env"
 )
 
@@ -145,4 +146,28 @@ func (r *remoteRegistry) isRemoteBrowser() (string, bool) {
 	wsURL := r.wsURLs[i.Int64()]
 
 	return wsURL, true
+}
+
+// browserRegistry stores browser instances indexed per
+// iteration as identified by VUID-scenario-iterationID.
+type browserRegistry struct {
+	m sync.Map
+}
+
+func (p *browserRegistry) setBrowser(id string, b api.Browser) {
+	p.m.Store(id, b)
+}
+
+func (p *browserRegistry) getBrowser(id string) (b api.Browser, ok bool) {
+	e, ok := p.m.Load(id)
+	if ok {
+		b, ok = e.(api.Browser)
+		return b, ok
+	}
+
+	return nil, false
+}
+
+func (p *browserRegistry) deleteBrowser(id string) {
+	p.m.Delete(id)
 }

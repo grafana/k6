@@ -1,4 +1,4 @@
-import { chromium } from 'k6/x/browser';
+import { browser } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -57,7 +57,6 @@ export class Bet {
 }
 
 export default async function() {
-  const browser = chromium.launch();
   const context = browser.newContext();
   const page = context.newPage();
 
@@ -74,6 +73,5 @@ export default async function() {
     console.log("Current bet:", bet.current());
   } finally {
     page.close();
-    browser.close();
   }
 }

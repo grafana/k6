@@ -1,4 +1,4 @@
-import { chromium } from 'k6/x/browser';
+import { browser } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -14,7 +14,6 @@ export const options = {
 }
 
 export default async function () {
-  const browser = chromium.launch();
   const page = browser.newPage();
 
   await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
@@ -30,5 +29,4 @@ export default async function () {
   page.keyboard.press('Enter'); // submit
     
   await page.close();
-  await browser.close();
 }
