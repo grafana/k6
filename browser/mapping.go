@@ -697,15 +697,6 @@ func mapBrowser(vu moduleVU, wsURL string, isRemoteBrowser bool) mapping { //nol
 			}
 			return b.IsConnected(), nil
 		},
-		"on": func(event string) *goja.Promise {
-			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
-				if err != nil {
-					return nil, err
-				}
-				return b.On(event) //nolint:wrapcheck
-			})
-		},
 		"newContext": func(opts goja.Value) (*goja.Object, error) {
 			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
 			if err != nil {

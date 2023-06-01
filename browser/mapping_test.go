@@ -40,6 +40,10 @@ func customMappings() map[string]string {
 		"Frame.loaderID":         "",
 		"JSHandle.objectID":      "",
 		"Browser.close":          "",
+		// TODO: browser.on method is unexposed until more event
+		// types other than 'disconnect' are supported.
+		// See: https://github.com/grafana/xk6-browser/issues/913
+		"Browser.on": "",
 	}
 }
 
