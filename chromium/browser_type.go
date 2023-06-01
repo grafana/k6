@@ -179,8 +179,9 @@ func (b *BrowserType) launch(
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
+
 	dataDir := &storage.Dir{}
-	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
+	if err := dataDir.Make(b.tmpdir(), flags["user-data-dir"]); err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
 	flags["user-data-dir"] = dataDir.Dir
@@ -215,6 +216,14 @@ func (b *BrowserType) launch(
 	}
 
 	return browser, browserProc.Pid(), nil
+}
+
+// tmpdir returns the temporary directory to use for the browser.
+// It returns the value of the TMPDIR environment variable if set,
+// otherwise it returns an empty string.
+func (b *BrowserType) tmpdir() string {
+	dir, _ := b.envLookupper("TMPDIR")
+	return dir
 }
 
 // LaunchPersistentContext launches the browser with persistent storage.

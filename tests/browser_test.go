@@ -40,18 +40,19 @@ func TestBrowserNewPage(t *testing.T) {
 }
 
 func TestTmpDirCleanup(t *testing.T) {
+	t.Parallel()
+
 	tmpDirPath := "./"
 
-	err := os.Setenv("TMPDIR", tmpDirPath)
-	assert.NoError(t, err)
-	defer func() {
-		err = os.Unsetenv("TMPDIR")
-		assert.NoError(t, err)
-	}()
+	b := newTestBrowser(t, withSkipClose(), withLookupFunc(func(k string) (string, bool) {
+		if k == "TMPDIR" {
+			return tmpDirPath, true
+		}
+		return "", false
+	}))
 
-	b := newTestBrowser(t, withSkipClose())
 	p := b.NewPage(nil)
-	err = p.Close(nil)
+	err := p.Close(nil)
 	require.NoError(t, err)
 
 	matches, err := filepath.Glob(tmpDirPath + "xk6-browser-data-*")
