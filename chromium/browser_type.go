@@ -273,7 +273,7 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 		b.execPath = execPath
 	}()
 
-	for _, path := range [...]string{
+	paths := []string{
 		// Unix-like
 		"headless_shell",
 		"headless-shell",
@@ -284,18 +284,19 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 		"google-chrome-beta",
 		"google-chrome-unstable",
 		"/usr/bin/google-chrome",
-
 		// Windows
 		"chrome",
 		"chrome.exe", // in case PATHEXT is misconfigured
 		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
 		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
-		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
-
 		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
 		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-	} {
+	}
+	if userProfile, ok := b.envLookupper("USERPROFILE"); ok {
+		paths = append(paths, filepath.Join(userProfile, `AppData\Local\Google\Chrome\Application\chrome.exe`))
+	}
+	for _, path := range paths {
 		if _, err := exec.LookPath(path); err == nil {
 			return path
 		}
