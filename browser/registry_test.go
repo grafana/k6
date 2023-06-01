@@ -2,7 +2,6 @@ package browser
 
 import (
 	"errors"
-	"os"
 	"strconv"
 	"sync"
 	"testing"
@@ -34,6 +33,8 @@ func TestPidRegistry(t *testing.T) {
 }
 
 func TestIsRemoteBrowser(t *testing.T) {
+	t.Parallel()
+
 	testCases := []struct {
 		name                    string
 		envVarName, envVarValue string
@@ -128,16 +129,22 @@ func TestIsRemoteBrowser(t *testing.T) {
 		},
 	}
 	for _, tc := range testCases {
+		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
-			// the real environment  variable we receive needs quoting.
-			// this makes it as close to the real implementation as possible.
-			v := tc.envVarValue
-			if tc.envVarName == "K6_INSTANCE_SCENARIOS" {
-				v = strconv.Quote(v)
-			}
-			t.Setenv(tc.envVarName, v)
+			t.Parallel()
 
-			rr, err := newRemoteRegistry(os.LookupEnv)
+			lookup := func(key string) (string, bool) {
+				v := tc.envVarValue
+				if tc.envVarName == "K6_INSTANCE_SCENARIOS" {
+					v = strconv.Quote(v)
+				}
+				if key == tc.envVarName {
+					return v, true
+				}
+				return "", false
+			}
+
+			rr, err := newRemoteRegistry(lookup)
 			if tc.expErr != nil {
 				assert.Error(t, tc.expErr, err)
 				return
@@ -145,7 +152,6 @@ func TestIsRemoteBrowser(t *testing.T) {
 			assert.NoError(t, err)
 
 			wsURL, isRemote := rr.isRemoteBrowser()
-
 			require.Equal(t, tc.expIsRemote, isRemote)
 			if isRemote {
 				require.Contains(t, tc.expValidWSURLs, wsURL)
@@ -154,10 +160,18 @@ func TestIsRemoteBrowser(t *testing.T) {
 	}
 
 	t.Run("K6_INSTANCE_SCENARIOS should override K6_BROWSER_WS_URL", func(t *testing.T) {
-		t.Setenv("K6_BROWSER_WS_URL", "WS_URL_1")
-		t.Setenv("K6_INSTANCE_SCENARIOS", strconv.Quote(`[{"id": "one","browsers": [{ "handle": "WS_URL_2" }]}]`))
+		lookup := func(key string) (string, bool) {
+			switch key {
+			case "K6_BROWSER_WS_URL":
+				return "WS_URL_1", true
+			case "K6_INSTANCE_SCENARIOS":
+				return strconv.Quote(`[{"id": "one","browsers": [{ "handle": "WS_URL_2" }]}]`), true
+			default:
+				return "", false
+			}
+		}
 
-		rr, err := newRemoteRegistry(os.LookupEnv)
+		rr, err := newRemoteRegistry(lookup)
 		assert.NoError(t, err)
 
 		wsURL, isRemote := rr.isRemoteBrowser()
