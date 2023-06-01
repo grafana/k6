@@ -61,7 +61,7 @@ func (d *Data) Exports() modules.Exports {
 	}
 }
 
-// TODO potentially try to DRY with this with a similar message in the `k6` js module.
+// TODO potentially try to DRY this with a similar message in the `k6` js module.
 // This likely won't be needed as SharedArray should likely support async function at some point ... somehow.
 const asyncFunctionNotSupportedMsg = "SharedArray constructor does not support async functions as second argument, " +
 	"please see https://k6.io/docs/javascript-api/k6/group/#working-with-async-functions for more info"
