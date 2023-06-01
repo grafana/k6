@@ -9,6 +9,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/fs"
+	"net/url"
 	"os"
 	"path"
 	"runtime"
@@ -21,9 +23,13 @@ import (
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/compiler"
+	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/loader"
 	"gopkg.in/yaml.v3"
 )
 
@@ -80,7 +86,7 @@ var (
 
 		"array-find-from-last", // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
 	}
-	skipWords = []string{"module"}
+	skipWords = []string{}
 	skipList  = map[string]bool{
 		"test/built-ins/Date/parse/without-utc-offset.js": true, // some other reason ?!? depending on local time
 
@@ -217,7 +223,6 @@ var (
 		"test/built-ins/Object/prototype/__lookup", // AnnexB lookupGetter lookupSetter
 		"test/built-ins/Object/prototype/__define", // AnnexB defineGetter defineSetter
 
-		"test/language/module-code/",               // this requires that we rewrite the js package in a way that it can this tests - which is unlikely to ever happen
 		"test/language/expressions/dynamic-import", // not supported
 	}
 )
@@ -395,7 +400,13 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	} else {
 		_ = vm.Set("print", t.Log)
 	}
-	early, origErr, err := ctx.runTC39Script(name, src, meta.Includes, vm, meta.Negative.Type != "")
+	var early bool
+	var origErr error
+	if meta.hasFlag("module") {
+		early, origErr, err = ctx.runTC39Module(name, src, meta.Includes, vm)
+	} else {
+		early, origErr, err = ctx.runTC39Script(name, src, meta.Includes, vm, meta.Negative.Type != "")
+	}
 
 	if err == nil {
 		if meta.Negative.Type != "" {
@@ -643,6 +654,56 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 
 	early = false
 	_, err = vm.RunProgram(p)
+
+	return early, origErr, err
+}
+
+func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *goja.Runtime) (early bool, origErr, err error) {
+	currentFS := os.DirFS(".")
+	if err != nil {
+		panic(err)
+	}
+	moduleRuntime := modulestest.NewRuntime(ctx.t)
+	moduleRuntime.VU.RuntimeField = vm
+	early = true
+	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
+	if err != nil {
+		return
+	}
+
+	err = ctx.runFile(ctx.base, path.Join("harness", "sta.js"), vm)
+	if err != nil {
+		return
+	}
+
+	for _, include := range includes {
+		err = ctx.runFile(ctx.base, path.Join("harness", include), vm)
+		if err != nil {
+			return
+		}
+	}
+
+	comp := ctx.compilerPool.Get()
+	defer ctx.compilerPool.Put(comp)
+	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeExtended}
+
+	mr := modules.NewModuleResolver(nil,
+		func(specifier *url.URL, name string) ([]byte, error) {
+			return fs.ReadFile(currentFS, specifier.Path[1:])
+		},
+		comp)
+	u := &url.URL{Path: path.Join(ctx.base, name)}
+
+	base := u.JoinPath("..")
+	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
+	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms, *base)
+	require.NoError(ctx.t, vm.Set("require", impl.Require))
+
+	early = false
+	_, err = ms.RunSourceData(&loader.SourceData{
+		Data: []byte(src),
+		URL:  u,
+	})
 
 	return early, origErr, err
 }
