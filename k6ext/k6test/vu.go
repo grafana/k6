@@ -57,10 +57,11 @@ func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
 // so that the test can read the metrics being emitted to the channel.
 type WithSamplesListener chan k6metrics.SampleContainer
 
-// WithLookupFunc a custom lookup function that returns test values.
-type WithLookupFunc env.LookupFunc
-
 // NewVU returns a mock k6 VU.
+//
+// opts can be one of the following:
+//   - WithSamplesListener: a bidirectional channel that will be used to emit metrics.
+//   - env.LookupFunc: a lookup function that will be used to lookup environment variables.
 func NewVU(tb testing.TB, opts ...any) *VU {
 	tb.Helper()
 
@@ -72,8 +73,8 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 		switch opt := opt.(type) {
 		case WithSamplesListener:
 			samples = opt
-		case WithLookupFunc:
-			lookupFunc = env.LookupFunc(opt)
+		case env.LookupFunc:
+			lookupFunc = opt
 		}
 	}
 

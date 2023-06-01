@@ -44,10 +44,16 @@ type testBrowser struct {
 }
 
 // newTestBrowser configures and launches a new chrome browser.
-// It automatically closes it when `t` returns.
 //
-// opts provides a way to customize the newTestBrowser.
-// see: withFileServer for an example.
+// It automatically closes it when `t` returns unless `withSkipClose` option is provided.
+//
+// The following opts are available to customize the testBrowser:
+//   - withHTTPServer: enables the HTTPMultiBin server.
+//   - withFileServer: enables the HTTPMultiBin server and serves the given files.
+//   - withLogCache: enables the log cache.
+//   - withSamplesListener: provides a channel to receive the browser metrics.
+//   - env.LookupFunc: provides a custom lookup function for environment variables.
+//   - withSkipClose: skips closing the browser when the test finishes.
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
@@ -75,7 +81,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 			skipClose = true
 		case withSamplesListener:
 			samples = opt
-		case withLookupFunc:
+		case env.LookupFunc:
 			lookupFunc = func(key string) (string, bool) {
 				v, ok := opt(key)
 				if ok {
@@ -471,6 +477,3 @@ func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleCon
 
 	return vu
 }
-
-// WithLookupFunc is a custom lookup function that returns test values.
-type withLookupFunc func(string) (string, bool)
