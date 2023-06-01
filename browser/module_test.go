@@ -7,6 +7,8 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/env"
+
 	k6common "go.k6.io/k6/js/common"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
@@ -23,10 +25,8 @@ func TestModuleNew(t *testing.T) {
 		RuntimeField: goja.New(),
 		InitEnvField: &k6common.InitEnvironment{
 			TestPreInitState: &k6lib.TestPreInitState{
-				Registry: k6metrics.NewRegistry(),
-				LookupEnv: func(key string) (string, bool) {
-					return "", false
-				},
+				Registry:  k6metrics.NewRegistry(),
+				LookupEnv: env.EmptyLookup,
 			},
 		},
 		CtxField: context.Background(),

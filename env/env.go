@@ -1,6 +1,8 @@
 // Package env provides types to interact with environment setup.
 package env
 
+import "os"
+
 // Execution specific.
 const (
 	// InstanceScenarios is an environment variable that can be used to
@@ -62,3 +64,21 @@ const (
 
 // LookupFunc defines a function to look up a key from the environment.
 type LookupFunc func(key string) (string, bool)
+
+// EmptyLookup is a LookupFunc that always returns "" and false.
+func EmptyLookup(key string) (string, bool) { return "", false }
+
+// Lookup is a LookupFunc that uses os.LookupEnv.
+func Lookup(key string) (string, bool) { return os.LookupEnv(key) }
+
+// ConstLookup is a LookupFunc that always returns the given value and true
+// if the key matches the given key. Otherwise it returns EmptyLookup
+// behaviour. Useful for testing.
+func ConstLookup(k, v string) LookupFunc {
+	return func(key string) (string, bool) {
+		if key == k {
+			return v, true
+		}
+		return EmptyLookup(key)
+	}
+}

@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"os"
 	"strconv"
 	"testing"
 
@@ -70,7 +69,7 @@ func TestFrameDismissDialogBox(t *testing.T) {
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	t.Parallel()
 
-	if s, ok := os.LookupEnv(env.BrowserHeadless); ok {
+	if s, ok := env.Lookup(env.BrowserHeadless); ok {
 		if v, err := strconv.ParseBool(s); err == nil && v {
 			// We're skipping this when running in headless
 			// environments since the bug that the test fixes
@@ -82,12 +81,9 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	}
 
 	// run the browser in headfull mode.
-	tb := newTestBrowser(t, withFileServer(), withLookupFunc(func(key string) (string, bool) {
-		if key == env.BrowserHeadless {
-			return "0", true
-		}
-		return "", false
-	}))
+	tb := newTestBrowser(t, withFileServer(), withLookupFunc(
+		env.ConstLookup(env.BrowserHeadless, "0"),
+	))
 
 	p := tb.NewPage(nil)
 	_, err := p.Goto(

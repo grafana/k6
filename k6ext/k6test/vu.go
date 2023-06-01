@@ -66,9 +66,7 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 
 	var (
 		samples    = make(chan k6metrics.SampleContainer, 1000)
-		lookupFunc = func(_ string) (string, bool) {
-			return "", false
-		}
+		lookupFunc = env.EmptyLookup
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {

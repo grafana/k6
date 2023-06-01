@@ -43,15 +43,9 @@ func TestBrowserNewPage(t *testing.T) {
 func TestTmpDirCleanup(t *testing.T) {
 	t.Parallel()
 
-	tmpDirPath := "./"
+	const tmpDirPath = "./"
 
-	b := newTestBrowser(t, withSkipClose(), withLookupFunc(func(k string) (string, bool) {
-		if k == "TMPDIR" {
-			return tmpDirPath, true
-		}
-		return "", false
-	}))
-
+	b := newTestBrowser(t, withSkipClose(), withLookupFunc(env.ConstLookup("TMPDIR", tmpDirPath)))
 	p := b.NewPage(nil)
 	err := p.Close(nil)
 	require.NoError(t, err)
@@ -146,12 +140,9 @@ func TestBrowserUserAgent(t *testing.T) {
 
 func TestBrowserCrashErr(t *testing.T) {
 	// create a new VU in an environment that requires a bad remote-debugging-port.
-	vu := k6test.NewVU(t, k6test.WithLookupFunc(func(key string) (string, bool) {
-		if key == env.BrowserArguments {
-			return "remote-debugging-port=99999", true
-		}
-		return "", false
-	}))
+	vu := k6test.NewVU(t, k6test.WithLookupFunc(
+		env.ConstLookup(env.BrowserArguments, "remote-debugging-port=99999"),
+	))
 
 	mod := browser.New().NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)

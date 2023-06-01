@@ -11,6 +11,7 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 
@@ -57,9 +58,9 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		enableLogCache     = false
 		skipClose          = false
 		samples            = make(chan k6metrics.SampleContainer, 1000)
-		// default lookup function is os.LookupEnv so that we can
+		// default lookup function is env.Lookup so that we can
 		// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
-		lookupFunc = os.LookupEnv
+		lookupFunc = env.Lookup
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -82,7 +83,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 				}
 				// return from the real environment lookup function
 				// so that we can debug (or other things) when we want it.
-				return os.LookupEnv(key)
+				return env.Lookup(key)
 			}
 		}
 	}

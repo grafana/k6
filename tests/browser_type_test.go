@@ -32,12 +32,9 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 
 	// Export WS URL env var
 	// pointing to test browser proxy
-	vu := k6test.NewVU(t, k6test.WithLookupFunc(func(key string) (string, bool) {
-		if key == env.WebSocketURLs {
-			return bp.wsURL(), true
-		}
-		return "", false
-	}))
+	vu := k6test.NewVU(t, k6test.WithLookupFunc(
+		env.ConstLookup(env.WebSocketURLs, bp.wsURL())),
+	)
 
 	// We have to call launch method through JS API in Goja
 	// to take mapping layer into account, instead of calling

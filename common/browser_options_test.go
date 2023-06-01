@@ -21,10 +21,6 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 		Timeout:           DefaultTimeout,
 	}
 
-	noopEnvLookuper := func(string) (string, bool) {
-		return "", false
-	}
-
 	for name, tt := range map[string]struct {
 		opts            map[string]any
 		envLookupper    env.LookupFunc
@@ -36,7 +32,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: noopEnvLookuper,
+			envLookupper: env.EmptyLookup,
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, defaultOptions, lo)
@@ -46,7 +42,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: noopEnvLookuper,
+			envLookupper: env.EmptyLookup,
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, defaultOptions, lo)
@@ -113,12 +109,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserArguments {
-					return "browser-arg1='value1,browser-arg2=value2,browser-flag", true
-				}
-				return "", false
-			},
+			envLookupper: env.ConstLookup(env.BrowserArguments, "browser-arg1='value1,browser-arg2=value2,browser-flag"),
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				require.Len(tb, lo.Args, 3)
@@ -131,12 +122,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserEnableDebugging {
-					return "true", true
-				}
-				return "", false
-			},
+			envLookupper: env.ConstLookup(env.BrowserEnableDebugging, "true"),
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.True(t, lo.Debug)
@@ -146,24 +132,14 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserEnableDebugging {
-					return "non-boolean", true
-				}
-				return "", false
-			},
-			err: "K6_BROWSER_DEBUG should be a boolean",
+			envLookupper: env.ConstLookup(env.BrowserEnableDebugging, "non-boolean"),
+			err:          "K6_BROWSER_DEBUG should be a boolean",
 		},
 		"executablePath": {
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserExecutablePath {
-					return "cmd/somewhere", true
-				}
-				return "", false
-			},
+			envLookupper: env.ConstLookup(env.BrowserExecutablePath, "cmd/somewhere"),
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, "cmd/somewhere", lo.ExecutablePath)
@@ -173,12 +149,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserHeadless {
-					return "false", true
-				}
-				return "", false
-			},
+			envLookupper: env.ConstLookup(env.BrowserHeadless, "false"),
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.False(t, lo.Headless)
@@ -188,24 +159,14 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserHeadless {
-					return "non-boolean", true
-				}
-				return "", false
-			},
-			err: "K6_BROWSER_HEADLESS should be a boolean",
+			envLookupper: env.ConstLookup(env.BrowserHeadless, "non-boolean"),
+			err:          "K6_BROWSER_HEADLESS should be a boolean",
 		},
 		"ignoreDefaultArgs": {
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserIgnoreDefaultArgs {
-					return "--hide-scrollbars,--hide-something", true
-				}
-				return "", false
-			},
+			envLookupper: env.ConstLookup(env.BrowserIgnoreDefaultArgs, "--hide-scrollbars,--hide-something"),
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Len(t, lo.IgnoreDefaultArgs, 2)
@@ -217,12 +178,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.LogCategoryFilter {
-					return "**", true
-				}
-				return "", false
-			},
+			envLookupper: env.ConstLookup(env.LogCategoryFilter, "**"),
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, "**", lo.LogCategoryFilter)
@@ -232,12 +188,7 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserGlobalTimeout {
-					return "10s", true
-				}
-				return "", false
-			},
+			envLookupper: env.ConstLookup(env.BrowserGlobalTimeout, "10s"),
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				assert.Equal(t, 10*time.Second, lo.Timeout)
@@ -247,19 +198,14 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: func(k string) (string, bool) {
-				if k == env.BrowserGlobalTimeout {
-					return "ABC", true
-				}
-				return "", false
-			},
-			err: "K6_BROWSER_TIMEOUT should be a time duration value",
+			envLookupper: env.ConstLookup(env.BrowserGlobalTimeout, "ABC"),
+			err:          "K6_BROWSER_TIMEOUT should be a time duration value",
 		},
 		"browser_type": {
 			opts: map[string]any{
 				"type": "chromium",
 			},
-			envLookupper: noopEnvLookuper,
+			envLookupper: env.EmptyLookup,
 			assert: func(tb testing.TB, lo *BrowserOptions) {
 				tb.Helper()
 				// Noop, just expect no error
@@ -269,11 +215,11 @@ func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
 			opts: map[string]any{
 				"type": "mybrowsertype",
 			},
-			envLookupper: noopEnvLookuper,
+			envLookupper: env.EmptyLookup,
 			err:          "unsupported browser type: mybrowsertype",
 		},
 		"browser_type_unset_err": {
-			envLookupper: noopEnvLookuper,
+			envLookupper: env.EmptyLookup,
 			err:          "browser type option must be set",
 		},
 	} {
