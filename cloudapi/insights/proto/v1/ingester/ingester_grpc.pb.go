@@ -19,8 +19,8 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	IngesterService_BatchCreateRequestMetadatas_FullMethodName = "/k6.cloud.insights.proto.v1.k6.IngesterService/BatchCreateRequestMetadatas"
-	IngesterService_BatchCreateSpans_FullMethodName            = "/k6.cloud.insights.proto.v1.k6.IngesterService/BatchCreateSpans"
+	IngesterService_BatchCreateRequestMetadatas_FullMethodName = "/k6.cloud.insights.proto.v1.ingester.IngesterService/BatchCreateRequestMetadatas"
+	IngesterService_BatchCreateSpans_FullMethodName            = "/k6.cloud.insights.proto.v1.ingester.IngesterService/BatchCreateSpans"
 )
 
 // IngesterServiceClient is the client API for IngesterService service.
@@ -129,7 +129,7 @@ func _IngesterService_BatchCreateSpans_Handler(srv interface{}, ctx context.Cont
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
 var IngesterService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "k6.cloud.insights.proto.v1.k6.IngesterService",
+	ServiceName: "k6.cloud.insights.proto.v1.ingester.IngesterService",
 	HandlerType: (*IngesterServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{

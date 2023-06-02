@@ -2,9 +2,9 @@ syntax = "proto3";
 
 package k6.cloud.insights.proto.v1.trace;
 
-import "v1/common/common.proto";
-
 option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/trace";
+
+import "v1/common/common.proto";
 
 message Span {
   // A unique identifier for a trace.
