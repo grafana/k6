@@ -32,3 +32,18 @@ func (t *testingT) Fatalf(format string, args ...any) {
 	t.fatalfCalled = true
 	t.SkipNow()
 }
+
+func TestTestBrowserWithLookupFunc(t *testing.T) {
+	tt := &testingT{TB: t}
+
+	// this lookup is expected to fail because the remote debugging port is
+	// invalid, practically testing that the InitEnv.LookupEnv is used.
+	lookup := func(key string) (string, bool) {
+		if key == "K6_BROWSER_ARGS" {
+			return "remote-debugging-port=99999", true
+		}
+		return "", false
+	}
+	_ = newTestBrowser(tt, withLookupFunc(lookup))
+	require.True(t, tt.fatalfCalled)
+}
