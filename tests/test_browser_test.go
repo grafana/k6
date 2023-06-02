@@ -18,3 +18,17 @@ func TestTestBrowserAwaitWithTimeoutShortCircuit(t *testing.T) {
 	}))
 	require.Less(t, time.Since(start), time.Second)
 }
+
+// testingT is a wrapper around testing.TB.
+type testingT struct {
+	testing.TB
+	fatalfCalled bool
+}
+
+// Fatalf skips the test immediately after a test is calling it.
+// This is useful when a test is expected to fail, but we don't
+// want to mark it as a failure since it's expected.
+func (t *testingT) Fatalf(format string, args ...any) {
+	t.fatalfCalled = true
+	t.SkipNow()
+}
