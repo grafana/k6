@@ -889,11 +889,11 @@ class InjectedScript {
         case "attached":
           return element ? element : continuePolling;
         case "detached":
-          return !element ? undefined : continuePolling;
+          return !element ? true : continuePolling;
         case "visible":
           return visible ? element : continuePolling;
         case "hidden":
-          return !visible ? undefined : continuePolling;
+          return !visible ? element : continuePolling;
       }
     };
 

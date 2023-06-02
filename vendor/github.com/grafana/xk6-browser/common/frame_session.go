@@ -793,25 +793,12 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 	}
 
 	switch event.Name {
-	case "init", "commit":
-		frame.initTime = event.Timestamp.Time()
-		return
 	case "load":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventLoad)
 	case "DOMContentLoaded":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventDOMContentLoad)
 	case "networkIdle":
 		fs.manager.frameLifecycleEvent(event.FrameID, LifecycleEventNetworkIdle)
-	}
-
-	eventToMetric := map[string]*k6metrics.Metric{
-		"load":             fs.k6Metrics.BrowserLoaded,
-		"DOMContentLoaded": fs.k6Metrics.BrowserDOMContentLoaded,
-		"firstPaint":       fs.k6Metrics.BrowserFirstPaint,
-	}
-
-	if m, ok := eventToMetric[event.Name]; ok {
-		frame.emitMetric(m, event.Timestamp.Time())
 	}
 }
 
