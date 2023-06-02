@@ -49,7 +49,7 @@ type testBrowser struct {
 // It automatically closes it when `t` returns.
 //
 // opts provides a way to customize the newTestBrowser.
-// see: withBrowserOptions for an example.
+// see: withFileServer for an example.
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
@@ -61,6 +61,9 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		enableLogCache     = false
 		skipClose          = false
 		samples            = make(chan k6metrics.SampleContainer, 1000)
+		// default lookup function is os.LookupEnv so that we can
+		// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
+		lookupFunc = os.LookupEnv
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -77,6 +80,16 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 			skipClose = true
 		case withSamplesListener:
 			samples = opt
+		case withLookupFunc:
+			lookupFunc = func(key string) (string, bool) {
+				v, ok := opt(key)
+				if ok {
+					return v, ok
+				}
+				// return from the real environment lookup function
+				// so that we can debug (or other things) when we want it.
+				return os.LookupEnv(key)
+			}
 		}
 	}
 
@@ -89,9 +102,13 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	registry := k6metrics.NewRegistry()
 	k6m := k6ext.RegisterCustomMetrics(registry)
 	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
+	vu.InitEnvField.LookupEnv = lookupFunc
 
 	bt := chromium.NewBrowserType(vu)
+
+	// Delete the pre-init stage data.
 	vu.MoveToVUContext()
+
 	// enable the HTTP test server only when necessary
 	var (
 		testServer *k6httpmultibin.HTTPMultiBin
@@ -131,7 +148,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	tbr := &testBrowser{
 		t:           tb,
-		ctx:         bt.Ctx, // This context has the additional wrapping of common.WithBrowserOptions
+		ctx:         bt.Ctx,
 		http:        testServer,
 		vu:          vu,
 		logCache:    lc,
@@ -495,6 +512,9 @@ func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleCon
 
 	return vu
 }
+
+// WithLookupFunc is a custom lookup function that returns test values.
+type withLookupFunc func(string) (string, bool)
 
 func setupEnvLookupper(tb testing.TB, opts browserOptions) env.LookupFunc {
 	tb.Helper()
