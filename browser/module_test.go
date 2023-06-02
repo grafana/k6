@@ -24,6 +24,9 @@ func TestModuleNew(t *testing.T) {
 		InitEnvField: &k6common.InitEnvironment{
 			TestPreInitState: &k6lib.TestPreInitState{
 				Registry: k6metrics.NewRegistry(),
+				LookupEnv: func(key string) (string, bool) {
+					return "", false
+				},
 			},
 		},
 		CtxField: context.Background(),
