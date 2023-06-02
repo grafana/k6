@@ -620,6 +620,5 @@ func (l *Locator) WaitFor(opts goja.Value) {
 
 func (l *Locator) waitFor(opts *FrameWaitForSelectorOptions) error {
 	opts.Strict = true
-	_, err := l.frame.waitForSelector(l.selector, opts)
-	return err
+	return l.frame.waitFor(l.selector, opts)
 }
