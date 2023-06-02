@@ -86,8 +86,11 @@ func (mi *ModuleInstance) Exports() k6modules.Exports {
 // initialize initializes the module instance with a new remote registry
 // and debug server, etc.
 func (m *RootModule) initialize(vu k6modules.VU) {
-	var err error
-	m.remoteRegistry, err = newRemoteRegistry(os.LookupEnv)
+	var (
+		err error
+		env = vu.InitEnv()
+	)
+	m.remoteRegistry, err = newRemoteRegistry(env.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create remote registry: %v", err)
 	}

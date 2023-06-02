@@ -46,12 +46,14 @@ type BrowserType struct {
 func NewBrowserType(vu k6modules.VU) *BrowserType {
 	// NOTE: vu.InitEnv() *must* be called from the script init scope,
 	// otherwise it will return nil.
+	env := vu.InitEnv()
+
 	return &BrowserType{
 		vu:           vu,
 		hooks:        common.NewHooks(),
-		k6Metrics:    k6ext.RegisterCustomMetrics(vu.InitEnv().Registry),
+		k6Metrics:    k6ext.RegisterCustomMetrics(env.Registry),
 		randSrc:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
-		envLookupper: os.LookupEnv,
+		envLookupper: env.LookupEnv,
 	}
 }
 

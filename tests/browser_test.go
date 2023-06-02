@@ -143,15 +143,21 @@ func TestBrowserUserAgent(t *testing.T) {
 }
 
 func TestBrowserCrashErr(t *testing.T) {
-	vu := k6test.NewVU(t)
-	rt := vu.Runtime()
+	// create a new VU in an environment that requires a bad remote-debugging-port.
+	vu := k6test.NewVU(t, k6test.WithLookupFunc(func(key string) (string, bool) {
+		if key == "K6_BROWSER_ARGS" {
+			return "remote-debugging-port=99999", true
+		}
+		return "", false
+	}))
+
 	mod := browser.New().NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
 	vu.MoveToVUContext()
-	t.Setenv("K6_BROWSER_ARGS", "remote-debugging-port=99999")
 
+	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
 	_, err := rt.RunString(`
 		const p = browser.newPage();
