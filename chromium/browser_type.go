@@ -295,11 +295,6 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 	return ""
 }
 
-// SetEnvLookupper sets the environment variable lookupper function.
-func (b *BrowserType) SetEnvLookupper(envLookupper env.LookupFunc) {
-	b.envLookupper = envLookupper
-}
-
 // parseArgs parses command-line arguments and returns them.
 func parseArgs(flags map[string]any) ([]string, error) {
 	// Build command line args list

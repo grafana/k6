@@ -55,7 +55,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	// set default options and then customize them
 	var (
-		browserOpts        = defaultBrowserOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
 		enableLogCache     = false
@@ -67,8 +66,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case withBrowserOptions:
-			browserOpts = opt
 		case httpServerOption:
 			enableHTTPMultiBin = true
 		case fileServerOption:
@@ -124,8 +121,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
-
-	bt.SetEnvLookupper(setupEnvLookupper(tb, browserOpts))
 
 	b, pid, err := bt.Launch(dummyCtx)
 	if err != nil {
