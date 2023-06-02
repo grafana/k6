@@ -409,17 +409,6 @@ type browserOptions struct {
 	Timeout  string   `js:"timeout"`
 }
 
-// withBrowserOptions is a helper for increasing readability
-// in tests while customizing the browser options.
-//
-// example:
-//
-//	b := TestBrowser(t, withBrowserOptions{
-//	    SlowMo:  "100s",
-//	    Timeout: "30s",
-//	})
-type withBrowserOptions = browserOptions
-
 // defaultBrowserOpts returns defaults for browser options.
 // TestBrowser uses this for launching a browser type by default.
 func defaultBrowserOpts() browserOptions {
