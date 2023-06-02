@@ -89,8 +89,7 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	var err error
 	m.remoteRegistry, err = newRemoteRegistry(os.LookupEnv)
 	if err != nil {
-		ctx := k6ext.WithVU(vu.Context(), vu)
-		k6ext.Panic(ctx, "failed to create remote registry: %v", err)
+		k6ext.Abort(vu.Context(), "failed to create remote registry: %v", err)
 	}
 	if _, ok := os.LookupEnv("K6_BROWSER_PPROF"); ok {
 		go startDebugServer()
