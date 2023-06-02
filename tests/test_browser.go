@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
 	"testing"
 	"time"
 
@@ -396,29 +395,6 @@ func (t testPromise) then(resolve any, reject ...any) testPromise {
 	require.True(t.tb.t, ok)
 
 	return t.tb.promise(p)
-}
-
-// browserOptions provides a way to customize browser
-// options in tests.
-type browserOptions struct {
-	Args     []string `js:"args"`
-	Debug    bool     `js:"debug"`
-	Headless bool     `js:"headless"`
-	Timeout  string   `js:"timeout"`
-}
-
-// defaultBrowserOpts returns defaults for browser options.
-// TestBrowser uses this for launching a browser type by default.
-func defaultBrowserOpts() browserOptions {
-	headless := true
-	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
-		headless, _ = strconv.ParseBool(v)
-	}
-
-	return browserOptions{
-		Headless: headless,
-		Timeout:  "30s",
-	}
 }
 
 // httpServerOption is used to detect whether to enable the HTTP test

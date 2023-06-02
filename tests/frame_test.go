@@ -65,13 +65,10 @@ func TestFrameDismissDialogBox(t *testing.T) {
 	}
 }
 
-// FIX
-// This test does not work on my machine. It fails with:
-// "" != "Done!".
-//
-// OSX: 13.1 (22C65).
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
-	if s, ok := os.LookupEnv("XK6_HEADLESS"); ok {
+	t.Parallel()
+
+	if s, ok := os.LookupEnv("K6_BROWSER_HEADLESS"); ok {
 		if v, err := strconv.ParseBool(s); err == nil && v {
 			// We're skipping this when running in headless
 			// environments since the bug that the test fixes
@@ -82,13 +79,15 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 		}
 	}
 
-	t.Parallel()
+	// run the browser in headfull mode.
+	tb := newTestBrowser(t, withFileServer(), withLookupFunc(func(key string) (string, bool) {
+		if key == "K6_BROWSER_HEADLESS" {
+			return "0", true
+		}
+		return "", false
+	}))
 
-	opts := defaultBrowserOpts()
-	opts.Headless = false
-	tb := newTestBrowser(t, withFileServer(), opts)
 	p := tb.NewPage(nil)
-
 	_, err := p.Goto(
 		tb.staticURL("embedded_iframe.html"),
 		tb.toGojaValue(struct {
