@@ -53,20 +53,14 @@ func New() *RootModule {
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
+	// initialization should be done once per module as it initializes
+	// globally used values across the whole test run and not just the
+	// current VU. Since initialization can fail with an error,
+	// we've had to place it here so that if an error occurs a
+	// panic can be initiated and safely handled by k6.
 	m.initOnce.Do(func() {
-		// remoteRegistry should only be initialized once as it is
-		// used globally across the whole test run and not just the
-		// current vu. Since newRemoteRegistry can fail with an error,
-		// we've had to place it here so that if an error occurs a
-		// panic can be initiated and safely handled by k6.
-		rr, err := newRemoteRegistry(os.LookupEnv)
-		if err != nil {
-			ctx := k6ext.WithVU(vu.Context(), vu)
-			k6ext.Panic(ctx, "failed to create remote registry: %v", err.Error())
-		}
-		m.remoteRegistry = rr
+		m.initialize(vu)
 	})
-
 	return &ModuleInstance{
 		mod: &JSModule{
 			Browser: mapBrowserToGoja(moduleVU{
@@ -84,4 +78,15 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 // scripts.
 func (mi *ModuleInstance) Exports() k6modules.Exports {
 	return k6modules.Exports{Default: mi.mod}
+}
+
+// initialize initializes the module instance with a new remote registry
+// and debug server, etc.
+func (m *RootModule) initialize(vu k6modules.VU) {
+	var err error
+	m.remoteRegistry, err = newRemoteRegistry(os.LookupEnv)
+	if err != nil {
+		ctx := k6ext.WithVU(vu.Context(), vu)
+		k6ext.Panic(ctx, "failed to create remote registry: %v", err)
+	}
 }
