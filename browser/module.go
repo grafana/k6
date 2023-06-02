@@ -2,6 +2,9 @@
 package browser
 
 import (
+	"log"
+	"net/http"
+	_ "net/http/pprof" //nolint:gosec
 	"os"
 	"sync"
 
@@ -89,4 +92,14 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 		ctx := k6ext.WithVU(vu.Context(), vu)
 		k6ext.Panic(ctx, "failed to create remote registry: %v", err)
 	}
+	if _, ok := os.LookupEnv("K6_BROWSER_PPROF"); ok {
+		go startDebugServer()
+	}
+}
+
+func startDebugServer() {
+	address := "localhost:6060"
+	log.Println("Starting http debug server", address)
+	log.Println(http.ListenAndServe(address, nil)) //nolint:gosec
+	// no linted because we don't need to set timeouts for the debug server.
 }
