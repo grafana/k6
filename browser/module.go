@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec
-	"os"
 	"sync"
 
 	"github.com/dop251/goja"
@@ -94,7 +93,7 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create remote registry: %v", err)
 	}
-	if _, ok := os.LookupEnv("K6_BROWSER_PPROF"); ok {
+	if _, ok := env.LookupEnv("K6_BROWSER_PPROF"); ok {
 		go startDebugServer()
 	}
 }
