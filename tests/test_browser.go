@@ -6,14 +6,12 @@ import (
 	"net/http"
 	"os"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 
@@ -499,26 +497,3 @@ func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleCon
 
 // WithLookupFunc is a custom lookup function that returns test values.
 type withLookupFunc func(string) (string, bool)
-
-func setupEnvLookupper(tb testing.TB, opts browserOptions) env.LookupFunc {
-	tb.Helper()
-
-	return func(key string) (string, bool) {
-		switch key {
-		case "K6_BROWSER_ARGS":
-			if len(opts.Args) != 0 {
-				return strings.Join(opts.Args, ","), true
-			}
-		case "K6_BROWSER_DEBUG":
-			return strconv.FormatBool(opts.Debug), true
-		case "K6_BROWSER_HEADLESS":
-			return strconv.FormatBool(opts.Headless), true
-		case "K6_BROWSER_TIMEOUT":
-			if opts.Timeout != "" {
-				return opts.Timeout, true
-			}
-		}
-
-		return "", false
-	}
-}
