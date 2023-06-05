@@ -342,7 +342,7 @@ func Test_requestMetadatasCollector_CollectRequestMetadatas_FiltersAndStoresHTTP
 			Tags: metrics.NewRegistry().RootTagSet().
 				With(scenarioTag, "test-scenario-1").
 				With(groupTag, "test-group-1").
-				With(urlTag, "test-url-1").
+				With(nameTag, "test-url-1").
 				With(methodTag, "test-method-1").
 				With(statusTag, "200"),
 			Metadata: map[string]string{
@@ -361,7 +361,7 @@ func Test_requestMetadatasCollector_CollectRequestMetadatas_FiltersAndStoresHTTP
 			Tags: metrics.NewRegistry().RootTagSet().
 				With(scenarioTag, "test-scenario-2").
 				With(groupTag, "test-group-2").
-				With(urlTag, "test-url-2").
+				With(nameTag, "test-url-2").
 				With(methodTag, "test-method-2").
 				With(statusTag, "401"),
 			Metadata: map[string]string{

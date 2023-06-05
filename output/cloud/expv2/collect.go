@@ -15,7 +15,7 @@ import (
 const (
 	scenarioTag = "scenario"
 	groupTag    = "group"
-	urlTag      = "url"
+	nameTag     = "name"
 	methodTag   = "method"
 	statusTag   = "status"
 )
@@ -232,7 +232,7 @@ func (c *requestMetadatasCollector) collectHTTPTrails(trails []*httpext.Trail) {
 				Group:    c.getStringTagFromTrail(trail, groupTag),
 			},
 			ProtocolLabels: insights.ProtocolHTTPLabels{
-				URL:        c.getStringTagFromTrail(trail, urlTag),
+				URL:        c.getStringTagFromTrail(trail, nameTag),
 				Method:     c.getStringTagFromTrail(trail, methodTag),
 				StatusCode: c.getIntTagFromTrail(trail, statusTag),
 			},
