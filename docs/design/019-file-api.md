@@ -4,7 +4,7 @@
 | :------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **author**           | @oleiade                                                                                                                                                                                                  |
 | **status**           | 🔧 proposal                                                                                                                                                                                              |
-| **revisions**        | [previous](https://github.com/grafana/k6/pull/3101/commits/0669d16e76791241b75a2622729327880cd814e2), [initial](https://github.com/grafana/k6/pull/3101/commits/0669d16e76791241b75a2622729327880cd814e2) |
+| **revisions**        | [previous](https://github.com/grafana/k6/pull/3101/commits/e2b8ddad40d013b56789cb4c89dd8f9c338f42d4), [initial](https://github.com/grafana/k6/pull/3101/commits/0669d16e76791241b75a2622729327880cd814e2) |
 | **Proof of concept** | [branch](https://github.com/grafana/k6/tree/poc/experimental/fs-module/js/modules/k6/experimental/fs)                                                                                                     |
 | **references**       | [[#2977](https://github.com/grafana/k6/issues/2977) [[#2974](https://github.com/grafana/k6/issues/2974)                                                                                                   |
 
@@ -15,21 +15,21 @@ The current version of k6 lets users load file content via [the `open` function]
 In line with [our commitment to optimize large file handling in k6](https://github.com/grafana/k6/issues/2974), we propose introducing a new `fs` module. This module is intended to offer an intuitive and user-friendly API for file interactions within k6 scripts. We'll also provide some ideas for efficient file handling to minimize memory consumption during k6 execution.
 
 ### Context
+
 Currently, files cannot be opened from within a function executed by a VU, only in the init context.
 
 This is due to k6's design for distributed execution, particularly in the cloud. K6 runs the init context once, gathers resources, including files, and sends them to other instances where VU code runs.
 
-### Assumptions
-- The solution should be native to k6, with the code being in the k6 repository and maintained by the k6 OSS team.
-- The new functionality's API should be intuitive for users familiar with filesystem APIs from other languages and technologies.
-- The module should introduce only essential APIs: read-only operations.
-- The proposed API should not affect file handling within HTTP requests.
-
 ### Requirements
-- The solution should allow file interaction during k6 script execution.
+
+- The solution must be native to k6, with the code being in the k6 repository and maintained by the k6 OSS team.
 - The solution must use asynchronous operations.
-- The module should operate seamlessly in local and cloud setups.
-- The module should strive to optimize memory usage when handling files.
+- The solution restricts opening files in the init context only.
+- The solution allows read-only operations on files in the init context and the vu, setup and teardown stages.
+- The solution must provide support for reading text and binary files.
+- The solution must support local and cloud execution seamlessly.
+- The solution must provide substantial improvements to memory usage, compared to using the current `open()` function.
+- The solution's API should be intuitive and hard to misuse for users familiar with filesystem APIs from other languages and technologies.
 
 ### Scope
 
@@ -41,7 +41,10 @@ This is due to k6's design for distributed execution, particularly in the cloud.
 #### Out of scope
 - This proposal doesn't aim to solve memory consumption issues when using file content in HTTP requests, although minor improvements might be suggested.
 - Changes to how k6 gathers resources, particularly files, are out of scope (ideas are proposed in the "Future Improvements" section).
-- Despite the proposed API's potential to support them, write operations are beyond this proposal's scope.
+- Despite the proposed API's potential to support them, write operations are beyond this proposal's scope:
+  - The scope of this proposal is to be a drop-in replacement for the current `open` function.
+  - The support of write operations would require substantial implementation effort and is out of the scope of this proposal.
+  - There is no immediate need for k6 to support write operations on files.
 
 ## Proposed solution
 
@@ -60,8 +63,24 @@ A working [proof of concept](https://github.com/grafana/k6/tree/poc/experimental
 
 ```typescript
 /*
- * open opens a file and returns an instance of a
+ * openSync opens a file and returns an instance of a
  * `File`.
+ */
+openSync(path: string): File
+
+/*
+ * open opens a file and resolves to an instance of a
+ * `File`.
+ *
+ * Because the k6 init context does not support using await yet,
+ * to use this function, users must use a workaround:
+ *
+ * ```
+ * let f;
+ * (async function() {
+ *   f = await asyncOpen("./somefile"); // name for emphasis not as a proposal
+ * }());
+ * ```
  */
 open(path: string): Promise<File>
 
@@ -118,7 +137,7 @@ interface FileInfo {
 }
 ```
 
-**N.B**: although text and binary files are distinguished by the top-level `readTextFile` and `readFile` operations, the `File` doesn't offer that distinction at the moment. This is based on the assumption we could somewhat easily add `TextDecoder` support to k6 (see comments of [#2291](https://github.com/grafana/k6/issues/2291) and [#2440](https://github.com/grafana/k6/issues/2440)). If this assumption was to be invalidated, we could adopt the same API format and have two different read-operation variants on the File, or even expose two different kinds of files `TextFileHandle` and `BinaryFileHandle` for instance.
+**N.B**: the `File` operations only support working with `ArrayBuffer` as of this proposal. This is based on the assumption we could somewhat easily add `TextDecoder` support to k6 (see comments [#2291](https://github.com/grafana/k6/issues/2291) and [#2440](https://github.com/grafana/k6/issues/2440)). If this assumption was to be invalidated, we could adopt the same API format and have two different read-operation variants on the File, or even expose two different kinds of files `TextFileHandle` and `BinaryFileHandle` for instance.
 
 ## Example usage
 
