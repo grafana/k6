@@ -82,15 +82,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		case withSamplesListener:
 			samples = opt
 		case env.LookupFunc:
-			lookupFunc = func(key string) (string, bool) {
-				v, ok := opt(key)
-				if ok {
-					return v, ok
-				}
-				// return from the real environment lookup function
-				// so that we can debug (or other things) when we want it.
-				return env.Lookup(key)
-			}
+			lookupFunc = opt
 		}
 	}
 
