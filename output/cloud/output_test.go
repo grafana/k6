@@ -136,6 +136,10 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 }
 
 func TestOutputStartVersionError(t *testing.T) {
+	t.Skip("We disabled the Versioning to prevent mistakes and not be forced to " +
+		"maintain an experimental API in the future. " +
+		"We will re-enable it after the v0.45.0 release.")
+
 	t.Parallel()
 	o, err := newOutput(output.Params{
 		Logger: testutils.NewLogger(t),
