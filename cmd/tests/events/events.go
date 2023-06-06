@@ -2,10 +2,8 @@
 package events
 
 import (
-	"fmt"
 	"sync"
 
-	"go.k6.io/k6/api/v1/client"
 	"go.k6.io/k6/event"
 	"go.k6.io/k6/js/modules"
 )
@@ -14,7 +12,6 @@ import (
 // instances for each VU.
 type RootModule struct {
 	initOnce        sync.Once
-	apiAddress      string
 	subscribeEvents []event.Type
 }
 
@@ -27,10 +24,9 @@ var (
 )
 
 // New returns a pointer to a new RootModule instance.
-func New(apiAddress string, subscribeEvents []event.Type) *RootModule {
+func New(subscribeEvents []event.Type) *RootModule {
 	return &RootModule{
 		initOnce:        sync.Once{},
-		apiAddress:      apiAddress,
 		subscribeEvents: subscribeEvents,
 	}
 }
@@ -42,19 +38,13 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		sid, evtCh := vu.Events().Subscribe(rm.subscribeEvents...)
 		logger := vu.InitEnv().Logger
 		go func() {
-			api, _ := client.New(rm.apiAddress)
 			for {
 				select {
 				case evt, ok := <-evtCh:
 					if !ok {
 						return
 					}
-					var testStatus string
-					if evt.Type != event.Exit {
-						status, _ := api.Status(vu.Context())
-						testStatus = fmt.Sprintf(", test status: %s", status.Status.String())
-					}
-					logger.Infof("got event %s with data '%+v'%s", evt.Type, evt.Data, testStatus)
+					logger.Infof("got event %s with data '%+v'", evt.Type, evt.Data)
 					evt.Done()
 					if evt.Type == event.Exit {
 						vu.Events().Unsubscribe(sid)

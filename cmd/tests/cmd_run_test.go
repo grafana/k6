@@ -2012,11 +2012,10 @@ func TestEventSystemOK(t *testing.T) {
 	ts := NewGlobalTestState(t)
 
 	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
-	modules.Register(moduleName, events.New(
-		ts.GlobalState.DefaultFlags.Address, []event.Type{
-			event.Init, event.TestStart, event.IterStart, event.IterEnd,
-			event.TestEnd, event.Exit,
-		}))
+	modules.Register(moduleName, events.New([]event.Type{
+		event.Init, event.TestStart, event.IterStart, event.IterEnd,
+		event.TestEnd, event.Exit,
+	}))
 
 	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
 	ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
@@ -2034,19 +2033,19 @@ func TestEventSystemOK(t *testing.T) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	expLog := []string{
-		`got event Init with data '<nil>', test status: InitVUs`,
-		`got event TestStart with data '<nil>', test status: Running`,
-		`got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterStart with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterStart with data '{Iteration:2 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterEnd with data '{Iteration:2 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterStart with data '{Iteration:3 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterEnd with data '{Iteration:3 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterStart with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}', test status: Running`,
-		`got event IterEnd with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}', test status: Ended`,
-		`got event TestEnd with data '<nil>', test status: Ended`,
+		`got event Init with data '<nil>'`,
+		`got event TestStart with data '<nil>'`,
+		`got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterStart with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterStart with data '{Iteration:2 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterEnd with data '{Iteration:2 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterStart with data '{Iteration:3 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterEnd with data '{Iteration:3 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterStart with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event IterEnd with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}'`,
+		`got event TestEnd with data '<nil>'`,
 		`got event Exit with data '&{Error:<nil>}'`,
 	}
 	log := ts.LoggerHook.Lines()
@@ -2060,10 +2059,9 @@ func TestEventSystemAborted(t *testing.T) {
 	ts := NewGlobalTestState(t)
 
 	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
-	modules.Register(moduleName, events.New(
-		ts.GlobalState.DefaultFlags.Address, []event.Type{
-			event.Init, event.TestStart, event.TestEnd, event.Exit,
-		}))
+	modules.Register(moduleName, events.New([]event.Type{
+		event.Init, event.TestStart, event.TestEnd, event.Exit,
+	}))
 
 	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
 	ts.ExpectedExitCode = int(exitcodes.ScriptAborted)
@@ -2086,9 +2084,9 @@ func TestEventSystemAborted(t *testing.T) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	expLog := []string{
-		`got event Init with data '<nil>', test status: InitVUs`,
-		`got event TestStart with data '<nil>', test status: Running`,
-		`got event TestEnd with data '<nil>', test status: Interrupted`,
+		`got event Init with data '<nil>'`,
+		`got event TestStart with data '<nil>'`,
+		`got event TestEnd with data '<nil>'`,
 		`got event Exit with data '&{Error:test aborted: oops! at file:///-:13:14(12)}'`,
 		`test aborted: oops! at file:///-:13:14(12)`,
 	}
