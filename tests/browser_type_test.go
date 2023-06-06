@@ -8,6 +8,7 @@ import (
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
@@ -26,13 +27,12 @@ func TestBrowserTypeConnect(t *testing.T) {
 }
 
 func TestBrowserTypeLaunchToConnect(t *testing.T) {
-	vu := k6test.NewVU(t)
 	tb := newTestBrowser(t)
 	bp := newTestBrowserProxy(t, tb)
 
 	// Export WS URL env var
 	// pointing to test browser proxy
-	t.Setenv("K6_BROWSER_WS_URL", bp.wsURL())
+	vu := k6test.NewVU(t, env.ConstLookup(env.WebSocketURLs, bp.wsURL()))
 
 	// We have to call launch method through JS API in Goja
 	// to take mapping layer into account, instead of calling

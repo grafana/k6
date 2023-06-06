@@ -5,8 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"os"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -46,26 +44,32 @@ type testBrowser struct {
 }
 
 // newTestBrowser configures and launches a new chrome browser.
-// It automatically closes it when `t` returns.
 //
-// opts provides a way to customize the newTestBrowser.
-// see: withBrowserOptions for an example.
+// It automatically closes it when `t` returns unless `withSkipClose` option is provided.
+//
+// The following opts are available to customize the testBrowser:
+//   - withHTTPServer: enables the HTTPMultiBin server.
+//   - withFileServer: enables the HTTPMultiBin server and serves the given files.
+//   - withLogCache: enables the log cache.
+//   - withSamplesListener: provides a channel to receive the browser metrics.
+//   - env.LookupFunc: provides a custom lookup function for environment variables.
+//   - withSkipClose: skips closing the browser when the test finishes.
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
 	// set default options and then customize them
 	var (
-		browserOpts        = defaultBrowserOpts()
 		enableHTTPMultiBin = false
 		enableFileServer   = false
 		enableLogCache     = false
 		skipClose          = false
 		samples            = make(chan k6metrics.SampleContainer, 1000)
+		// default lookup function is env.Lookup so that we can
+		// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
+		lookupFunc = env.Lookup
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case withBrowserOptions:
-			browserOpts = opt
 		case httpServerOption:
 			enableHTTPMultiBin = true
 		case fileServerOption:
@@ -77,6 +81,8 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 			skipClose = true
 		case withSamplesListener:
 			samples = opt
+		case env.LookupFunc:
+			lookupFunc = opt
 		}
 	}
 
@@ -89,9 +95,13 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	registry := k6metrics.NewRegistry()
 	k6m := k6ext.RegisterCustomMetrics(registry)
 	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
+	vu.InitEnvField.LookupEnv = lookupFunc
 
 	bt := chromium.NewBrowserType(vu)
+
+	// Delete the pre-init stage data.
 	vu.MoveToVUContext()
+
 	// enable the HTTP test server only when necessary
 	var (
 		testServer *k6httpmultibin.HTTPMultiBin
@@ -107,8 +117,6 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
 	}
-
-	bt.SetEnvLookupper(setupEnvLookupper(tb, browserOpts))
 
 	b, pid, err := bt.Launch(dummyCtx)
 	if err != nil {
@@ -131,7 +139,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 
 	tbr := &testBrowser{
 		t:           tb,
-		ctx:         bt.Ctx, // This context has the additional wrapping of common.WithBrowserOptions
+		ctx:         bt.Ctx,
 		http:        testServer,
 		vu:          vu,
 		logCache:    lc,
@@ -388,40 +396,6 @@ func (t testPromise) then(resolve any, reject ...any) testPromise {
 	return t.tb.promise(p)
 }
 
-// browserOptions provides a way to customize browser
-// options in tests.
-type browserOptions struct {
-	Args     []string `js:"args"`
-	Debug    bool     `js:"debug"`
-	Headless bool     `js:"headless"`
-	Timeout  string   `js:"timeout"`
-}
-
-// withBrowserOptions is a helper for increasing readability
-// in tests while customizing the browser options.
-//
-// example:
-//
-//	b := TestBrowser(t, withBrowserOptions{
-//	    SlowMo:  "100s",
-//	    Timeout: "30s",
-//	})
-type withBrowserOptions = browserOptions
-
-// defaultBrowserOpts returns defaults for browser options.
-// TestBrowser uses this for launching a browser type by default.
-func defaultBrowserOpts() browserOptions {
-	headless := true
-	if v, found := os.LookupEnv("XK6_BROWSER_TEST_HEADLESS"); found {
-		headless, _ = strconv.ParseBool(v)
-	}
-
-	return browserOptions{
-		Headless: headless,
-		Timeout:  "30s",
-	}
-}
-
 // httpServerOption is used to detect whether to enable the HTTP test
 // server.
 type httpServerOption struct{}
@@ -494,27 +468,4 @@ func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleCon
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
 
 	return vu
-}
-
-func setupEnvLookupper(tb testing.TB, opts browserOptions) env.LookupFunc {
-	tb.Helper()
-
-	return func(key string) (string, bool) {
-		switch key {
-		case "K6_BROWSER_ARGS":
-			if len(opts.Args) != 0 {
-				return strings.Join(opts.Args, ","), true
-			}
-		case "K6_BROWSER_DEBUG":
-			return strconv.FormatBool(opts.Debug), true
-		case "K6_BROWSER_HEADLESS":
-			return strconv.FormatBool(opts.Headless), true
-		case "K6_BROWSER_TIMEOUT":
-			if opts.Timeout != "" {
-				return opts.Timeout, true
-			}
-		}
-
-		return "", false
-	}
 }

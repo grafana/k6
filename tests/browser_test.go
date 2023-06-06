@@ -16,6 +16,7 @@ import (
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
@@ -40,18 +41,13 @@ func TestBrowserNewPage(t *testing.T) {
 }
 
 func TestTmpDirCleanup(t *testing.T) {
-	tmpDirPath := "./"
+	t.Parallel()
 
-	err := os.Setenv("TMPDIR", tmpDirPath)
-	assert.NoError(t, err)
-	defer func() {
-		err = os.Unsetenv("TMPDIR")
-		assert.NoError(t, err)
-	}()
+	const tmpDirPath = "./"
 
-	b := newTestBrowser(t, withSkipClose())
+	b := newTestBrowser(t, withSkipClose(), env.ConstLookup("TMPDIR", tmpDirPath))
 	p := b.NewPage(nil)
-	err = p.Close(nil)
+	err := p.Close(nil)
 	require.NoError(t, err)
 
 	matches, err := filepath.Glob(tmpDirPath + "xk6-browser-data-*")
@@ -143,15 +139,16 @@ func TestBrowserUserAgent(t *testing.T) {
 }
 
 func TestBrowserCrashErr(t *testing.T) {
-	vu := k6test.NewVU(t)
-	rt := vu.Runtime()
+	// create a new VU in an environment that requires a bad remote-debugging-port.
+	vu := k6test.NewVU(t, env.ConstLookup(env.BrowserArguments, "remote-debugging-port=99999"))
+
 	mod := browser.New().NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
 	vu.MoveToVUContext()
-	t.Setenv("K6_BROWSER_ARGS", "remote-debugging-port=99999")
 
+	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
 	_, err := rt.RunString(`
 		const p = browser.newPage();

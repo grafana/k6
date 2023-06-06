@@ -14,21 +14,8 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-const (
-	// Script variables.
-
-	optType = "type"
-
-	// ENV variables.
-
-	optArgs              = "K6_BROWSER_ARGS"
-	optDebug             = "K6_BROWSER_DEBUG"
-	optExecutablePath    = "K6_BROWSER_EXECUTABLE_PATH"
-	optHeadless          = "K6_BROWSER_HEADLESS"
-	optIgnoreDefaultArgs = "K6_BROWSER_IGNORE_DEFAULT_ARGS"
-	optLogCategoryFilter = "K6_BROWSER_LOG_CATEGORY_FILTER"
-	optTimeout           = "K6_BROWSER_TIMEOUT"
-)
+// Script variables.
+const optType = "type"
 
 // BrowserOptions stores browser options.
 type BrowserOptions struct {
@@ -85,13 +72,13 @@ func (bo *BrowserOptions) Parse( //nolint:cyclop
 
 	// Parse env
 	envOpts := [...]string{
-		optArgs,
-		optDebug,
-		optExecutablePath,
-		optHeadless,
-		optIgnoreDefaultArgs,
-		optLogCategoryFilter,
-		optTimeout,
+		env.BrowserArguments,
+		env.BrowserEnableDebugging,
+		env.BrowserExecutablePath,
+		env.BrowserHeadless,
+		env.BrowserIgnoreDefaultArgs,
+		env.LogCategoryFilter,
+		env.BrowserGlobalTimeout,
 	}
 
 	for _, e := range envOpts {
@@ -105,19 +92,19 @@ func (bo *BrowserOptions) Parse( //nolint:cyclop
 		}
 		var err error
 		switch e {
-		case optArgs:
+		case env.BrowserArguments:
 			bo.Args = parseListOpt(ev)
-		case optDebug:
+		case env.BrowserEnableDebugging:
 			bo.Debug, err = parseBoolOpt(e, ev)
-		case optExecutablePath:
+		case env.BrowserExecutablePath:
 			bo.ExecutablePath = ev
-		case optHeadless:
+		case env.BrowserHeadless:
 			bo.Headless, err = parseBoolOpt(e, ev)
-		case optIgnoreDefaultArgs:
+		case env.BrowserIgnoreDefaultArgs:
 			bo.IgnoreDefaultArgs = parseListOpt(ev)
-		case optLogCategoryFilter:
+		case env.LogCategoryFilter:
 			bo.LogCategoryFilter = ev
-		case optTimeout:
+		case env.BrowserGlobalTimeout:
 			bo.Timeout, err = parseTimeOpt(e, ev)
 		}
 		if err != nil {
@@ -134,10 +121,10 @@ func (bo *BrowserOptions) shouldIgnoreIfBrowserIsRemote(opt string) bool {
 	}
 
 	shouldIgnoreIfBrowserIsRemote := map[string]struct{}{
-		optArgs:              {},
-		optExecutablePath:    {},
-		optHeadless:          {},
-		optIgnoreDefaultArgs: {},
+		env.BrowserArguments:         {},
+		env.BrowserExecutablePath:    {},
+		env.BrowserHeadless:          {},
+		env.BrowserIgnoreDefaultArgs: {},
 	}
 	_, ignore := shouldIgnoreIfBrowserIsRemote[opt]
 

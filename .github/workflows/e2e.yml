@@ -67,7 +67,7 @@ jobs:
       - name: Run E2E tests
         run: |
           set -x
-          export XK6_HEADLESS=true
+          export K6_BROWSER_HEADLESS=true
           for f in examples/*.js; do
             ./k6extension run "$f"
           done

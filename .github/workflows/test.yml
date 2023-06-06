@@ -46,7 +46,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          export XK6_HEADLESS=true
+          export K6_BROWSER_HEADLESS=true
           go test "${args[@]}" -timeout 5m ./...
 
   test-tip:
@@ -75,7 +75,7 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          export XK6_HEADLESS=true
+          export K6_BROWSER_HEADLESS=true
           go test "${args[@]}" -timeout 5m ./...
 
   test-current-cov:
@@ -104,7 +104,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          export XK6_HEADLESS=true
+          export K6_BROWSER_HEADLESS=true
           echo "mode: set" > coverage.txt
           for pkg in $(go list ./... | grep -v vendor); do
               list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep github.com/grafana/xk6-browser | grep -v vendor || true)
@@ -156,5 +156,5 @@ jobs:
           go get go.k6.io/k6@master
           go mod tidy
           cat go.mod | grep go.k6.io/k6
-          export XK6_HEADLESS=true
+          export K6_BROWSER_HEADLESS=true
           go test "${args[@]}" -timeout 5m ./...

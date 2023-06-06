@@ -42,7 +42,7 @@ export default async function() {
       'scale': d => d.deviceScaleFactor === device.deviceScaleFactor,
     });
 
-    if (!__ENV.XK6_HEADLESS) {
+    if (!__ENV.K6_BROWSER_HEADLESS) {
       sleep(10);
     }
   } finally {

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"os"
 	"testing"
 	"time"
 
@@ -16,10 +15,6 @@ import (
 
 func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 	t.Parallel()
-
-	if os.Getenv("SKIP_FLAKY") == "true" {
-		t.SkipNow()
-	}
 
 	const timeout = 5 * time.Second
 

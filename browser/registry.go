@@ -70,7 +70,7 @@ func newRemoteRegistry(envLookup env.LookupFunc) (*remoteRegistry, error) {
 }
 
 func checkForBrowserWSURLs(envLookup env.LookupFunc) (bool, []string) {
-	wsURL, isRemote := envLookup("K6_BROWSER_WS_URL")
+	wsURL, isRemote := envLookup(env.WebSocketURLs)
 	if !isRemote {
 		return false, nil
 	}
@@ -93,7 +93,7 @@ func checkForBrowserWSURLs(envLookup env.LookupFunc) (bool, []string) {
 // checkForScenarios will parse the K6_INSTANCE_SCENARIOS env var if
 // it has been defined.
 func checkForScenarios(envLookup env.LookupFunc) (bool, []string, error) {
-	scenariosJSON, isRemote := envLookup("K6_INSTANCE_SCENARIOS")
+	scenariosJSON, isRemote := envLookup(env.InstanceScenarios)
 	if !isRemote {
 		return false, nil, nil
 	}

@@ -6,7 +6,6 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"os"
 	"os/exec"
 	"path/filepath"
 	"sort"
@@ -46,16 +45,15 @@ type BrowserType struct {
 func NewBrowserType(vu k6modules.VU) *BrowserType {
 	// NOTE: vu.InitEnv() *must* be called from the script init scope,
 	// otherwise it will return nil.
-	k6m := k6ext.RegisterCustomMetrics(vu.InitEnv().Registry)
-	b := BrowserType{
+	env := vu.InitEnv()
+
+	return &BrowserType{
 		vu:           vu,
 		hooks:        common.NewHooks(),
-		k6Metrics:    k6m,
+		k6Metrics:    k6ext.RegisterCustomMetrics(env.Registry),
 		randSrc:      rand.New(rand.NewSource(time.Now().UnixNano())), //nolint: gosec
-		envLookupper: os.LookupEnv,
+		envLookupper: env.LookupEnv,
 	}
-
-	return &b
 }
 
 func (b *BrowserType) init(
@@ -63,7 +61,7 @@ func (b *BrowserType) init(
 ) (context.Context, *common.BrowserOptions, *log.Logger, error) {
 	ctx = b.initContext(ctx)
 
-	logger, err := makeLogger(ctx)
+	logger, err := makeLogger(ctx, b.envLookupper)
 	if err != nil {
 		return nil, nil, nil, fmt.Errorf("error setting up logger: %w", err)
 	}
@@ -180,8 +178,9 @@ func (b *BrowserType) launch(
 	if err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
+
 	dataDir := &storage.Dir{}
-	if err := dataDir.Make("", flags["user-data-dir"]); err != nil {
+	if err := dataDir.Make(b.tmpdir(), flags["user-data-dir"]); err != nil {
 		return nil, 0, fmt.Errorf("%w", err)
 	}
 	flags["user-data-dir"] = dataDir.Dir
@@ -216,6 +215,14 @@ func (b *BrowserType) launch(
 	}
 
 	return browser, browserProc.Pid(), nil
+}
+
+// tmpdir returns the temporary directory to use for the browser.
+// It returns the value of the TMPDIR environment variable if set,
+// otherwise it returns an empty string.
+func (b *BrowserType) tmpdir() string {
+	dir, _ := b.envLookupper("TMPDIR")
+	return dir
 }
 
 // LaunchPersistentContext launches the browser with persistent storage.
@@ -265,7 +272,7 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 		b.execPath = execPath
 	}()
 
-	for _, path := range [...]string{
+	paths := []string{
 		// Unix-like
 		"headless_shell",
 		"headless-shell",
@@ -276,29 +283,25 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 		"google-chrome-beta",
 		"google-chrome-unstable",
 		"/usr/bin/google-chrome",
-
 		// Windows
 		"chrome",
 		"chrome.exe", // in case PATHEXT is misconfigured
 		`C:\Program Files (x86)\Google\Chrome\Application\chrome.exe`,
 		`C:\Program Files\Google\Chrome\Application\chrome.exe`,
-		filepath.Join(os.Getenv("USERPROFILE"), `AppData\Local\Google\Chrome\Application\chrome.exe`),
-
 		// Mac (from https://commondatastorage.googleapis.com/chromium-browser-snapshots/index.html?prefix=Mac/857950/)
 		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		"/Applications/Chromium.app/Contents/MacOS/Chromium",
-	} {
+	}
+	if userProfile, ok := b.envLookupper("USERPROFILE"); ok {
+		paths = append(paths, filepath.Join(userProfile, `AppData\Local\Google\Chrome\Application\chrome.exe`))
+	}
+	for _, path := range paths {
 		if _, err := exec.LookPath(path); err == nil {
 			return path
 		}
 	}
 
 	return ""
-}
-
-// SetEnvLookupper sets the environment variable lookupper function.
-func (b *BrowserType) SetEnvLookupper(envLookupper env.LookupFunc) {
-	b.envLookupper = envLookupper
 }
 
 // parseArgs parses command-line arguments and returns them.
@@ -440,12 +443,12 @@ func setFlagsFromK6Options(flags map[string]any, k6opts *k6lib.Options) error {
 }
 
 // makeLogger makes and returns an extension wide logger.
-func makeLogger(ctx context.Context) (*log.Logger, error) {
+func makeLogger(ctx context.Context, envLookup env.LookupFunc) (*log.Logger, error) {
 	var (
 		k6Logger = k6ext.GetVU(ctx).State().Logger
 		logger   = log.New(k6Logger, common.GetIterationID(ctx))
 	)
-	if el, ok := os.LookupEnv("XK6_BROWSER_LOG"); ok {
+	if el, ok := envLookup(env.LogLevel); ok {
 		if logger.SetLevel(el) != nil {
 			return nil, fmt.Errorf(
 				"invalid log level %q, should be one of: panic, fatal, error, warn, warning, info, debug, trace",
@@ -453,7 +456,7 @@ func makeLogger(ctx context.Context) (*log.Logger, error) {
 			)
 		}
 	}
-	if _, ok := os.LookupEnv("XK6_BROWSER_CALLER"); ok {
+	if _, ok := envLookup(env.LogCaller); ok {
 		logger.ReportCaller()
 	}
 

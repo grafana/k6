@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6eventloop "go.k6.io/k6/js/eventloop"
@@ -57,20 +58,32 @@ func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
 type WithSamplesListener chan k6metrics.SampleContainer
 
 // NewVU returns a mock k6 VU.
+//
+// opts can be one of the following:
+//   - WithSamplesListener: a bidirectional channel that will be used to emit metrics.
+//   - env.LookupFunc: a lookup function that will be used to lookup environment variables.
 func NewVU(tb testing.TB, opts ...any) *VU {
 	tb.Helper()
 
-	samples := make(chan k6metrics.SampleContainer, 1000)
+	var (
+		samples    = make(chan k6metrics.SampleContainer, 1000)
+		lookupFunc = env.EmptyLookup
+	)
 	for _, opt := range opts {
-		switch opt := opt.(type) { //nolint:gocritic
+		switch opt := opt.(type) {
 		case WithSamplesListener:
 			samples = opt
+		case env.LookupFunc:
+			lookupFunc = opt
 		}
 	}
 
 	root, err := k6lib.NewGroup("", nil)
 	require.NoError(tb, err)
+
 	testRT := k6modulestest.NewRuntime(tb)
+	testRT.VU.InitEnvField.LookupEnv = lookupFunc
+
 	tags := testRT.VU.InitEnvField.Registry.RootTagSet()
 
 	state := &k6lib.State{
