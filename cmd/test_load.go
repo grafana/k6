@@ -71,7 +71,7 @@ func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loaded
 		RuntimeOptions: runtimeOptions,
 		Registry:       registry,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Events:         event.NewEventSystem(gs.Ctx, 100, gs.Logger),
+		Events:         event.NewEventSystem(100, gs.Logger),
 		LookupEnv: func(key string) (string, bool) {
 			val, ok := gs.Env[key]
 			return val, ok

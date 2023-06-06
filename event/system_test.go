@@ -20,7 +20,7 @@ func TestEventSystem(t *testing.T) {
 		t.Parallel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
-		es := NewEventSystem(context.Background(), 10, logger)
+		es := NewEventSystem(10, logger)
 
 		require.Len(t, es.subscribers, 0)
 
@@ -45,11 +45,9 @@ func TestEventSystem(t *testing.T) {
 
 	t.Run("subscribe/panic", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
-		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
-		es := NewEventSystem(ctx, 10, logger)
+		es := NewEventSystem(10, logger)
 		assert.PanicsWithValue(t, "must subscribe to at least 1 event type", func() {
 			es.Subscribe()
 		})
@@ -59,11 +57,10 @@ func TestEventSystem(t *testing.T) {
 		t.Parallel()
 		testTimeout := 5 * time.Second
 		ctx, cancel := context.WithTimeout(context.Background(), testTimeout)
-
 		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
-		es := NewEventSystem(ctx, 10, logger)
+		es := NewEventSystem(10, logger)
 
 		s1id, s1ch := es.Subscribe(Init, Exit)
 		s2id, s2ch := es.Subscribe(Init, TestStart, TestEnd, Exit)
@@ -143,7 +140,7 @@ func TestEventSystem(t *testing.T) {
 		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
-		es := NewEventSystem(ctx, 100, logger)
+		es := NewEventSystem(100, logger)
 
 		var (
 			wg      sync.WaitGroup
@@ -163,7 +160,9 @@ func TestEventSystem(t *testing.T) {
 		wait := es.Emit(&Event{Type: Exit, Done: func() {
 			atomic.AddUint32(&done, 1)
 		}})
-		err := wait(time.Second)
+		waitCtx, waitCancel := context.WithTimeout(ctx, time.Second)
+		defer waitCancel()
+		err := wait(waitCtx)
 		require.NoError(t, err)
 		assert.Equal(t, uint32(numSubs), done)
 
@@ -172,11 +171,11 @@ func TestEventSystem(t *testing.T) {
 
 	t.Run("emit_and_wait/error", func(t *testing.T) {
 		t.Parallel()
-		ctx, cancel := context.WithCancel(context.Background())
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
-		es := NewEventSystem(ctx, 10, logger)
+		es := NewEventSystem(10, logger)
 
 		sid, evtCh := es.Subscribe(Exit)
 		var wg sync.WaitGroup
@@ -190,8 +189,10 @@ func TestEventSystem(t *testing.T) {
 		wait := es.Emit(&Event{Type: Exit, Done: func() {
 			time.Sleep(200 * time.Millisecond)
 		}})
-		err := wait(100 * time.Millisecond)
-		assert.EqualError(t, err, "timed out after waiting 100ms for all 'Exit' events to be processed")
+		waitCtx, waitCancel := context.WithTimeout(ctx, 100*time.Millisecond)
+		defer waitCancel()
+		err := wait(waitCtx)
+		assert.EqualError(t, err, "context is done before all 'Exit' events were processed")
 
 		wg.Wait()
 	})
@@ -200,7 +201,7 @@ func TestEventSystem(t *testing.T) {
 		t.Parallel()
 		logger := logrus.New()
 		logger.SetOutput(io.Discard)
-		es := NewEventSystem(context.Background(), 10, logger)
+		es := NewEventSystem(10, logger)
 
 		require.Len(t, es.subscribers, 0)
 

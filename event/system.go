@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"sync"
-	"time"
 
 	"github.com/sirupsen/logrus"
 )
@@ -19,7 +18,6 @@ type Subscriber interface {
 // System keeps track of subscribers, and allows subscribing to and emitting
 // events.
 type System struct {
-	ctx         context.Context
 	subMx       sync.RWMutex
 	subIDCount  uint64
 	subscribers map[Type]map[uint64]chan *Event
@@ -33,9 +31,8 @@ type System struct {
 // are emitted very quickly and the event handler goroutine is busy. It is
 // recommended to handle events in a separate goroutine to not block the
 // listener goroutine.
-func NewEventSystem(ctx context.Context, eventBuffer int, logger logrus.FieldLogger) *System {
+func NewEventSystem(eventBuffer int, logger logrus.FieldLogger) *System {
 	return &System{
-		ctx:         ctx,
 		subscribers: make(map[Type]map[uint64]chan *Event),
 		eventBuffer: eventBuffer,
 		logger:      logger,
@@ -74,12 +71,12 @@ func (s *System) Subscribe(events ...Type) (subID uint64, eventsCh <-chan *Event
 // Emit the event to all subscribers of its type.
 // It returns a function that can be optionally used to wait for all subscribers
 // to process the event (by signalling via the Done method).
-func (s *System) Emit(event *Event) (wait func(time.Duration) error) {
+func (s *System) Emit(event *Event) (wait func(context.Context) error) {
 	s.subMx.RLock()
 	defer s.subMx.RUnlock()
 	totalSubs := len(s.subscribers[event.Type])
 	if totalSubs == 0 {
-		return func(time.Duration) error { return nil }
+		return func(context.Context) error { return nil }
 	}
 
 	if event.Done == nil {
@@ -108,11 +105,8 @@ func (s *System) Emit(event *Event) (wait func(time.Duration) error) {
 		"event":       event.Type,
 	}).Trace("Emitted event")
 
-	return func(timeout time.Duration) error {
-		var (
-			doneCount int
-			tout      = time.After(timeout)
-		)
+	return func(ctx context.Context) error {
+		var doneCount int
 		for {
 			if doneCount == totalSubs {
 				close(doneCh)
@@ -121,10 +115,8 @@ func (s *System) Emit(event *Event) (wait func(time.Duration) error) {
 			select {
 			case <-doneCh:
 				doneCount++
-			case <-tout:
-				return fmt.Errorf("timed out after waiting %s for all '%s' events to be processed", timeout, event.Type)
-			case <-s.ctx.Done():
-				return nil
+			case <-ctx.Done():
+				return fmt.Errorf("context is done before all '%s' events were processed", event.Type)
 			}
 		}
 	}

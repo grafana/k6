@@ -85,7 +85,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			Data: &event.ExitData{Error: err},
 		})
 		// TODO: Make the timeout configurable?
-		if werr := waitExitDone(5 * time.Second); werr != nil {
+		waitExitCtx, waitExitCancel := context.WithTimeout(globalCtx, 5*time.Second)
+		defer waitExitCancel()
+		if werr := waitExitDone(waitExitCtx); werr != nil {
 			logger.WithError(werr).Warn()
 		}
 		test.preInitState.Events.UnsubscribeAll()
@@ -320,7 +322,10 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// TODO: Make the timeout configurable?
-	if werr := waitInitDone(10 * time.Second); werr != nil {
+	waitInitCtx, waitInitCancel := context.WithTimeout(globalCtx, 10*time.Second)
+	defer waitInitCancel()
+
+	if werr := waitInitDone(waitInitCtx); werr != nil {
 		logger.WithError(werr).Warn()
 	}
 	test.preInitState.Events.Emit(&event.Event{Type: event.TestStart})
@@ -330,7 +335,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	waitTestEndDone := test.preInitState.Events.Emit(&event.Event{Type: event.TestEnd})
 	defer func() {
 		// TODO: Make the timeout configurable?
-		if werr := waitTestEndDone(5 * time.Second); werr != nil {
+		waitEndCtx, waitEndCancel := context.WithTimeout(globalCtx, 5*time.Second)
+		defer waitEndCancel()
+		if werr := waitTestEndDone(waitEndCtx); werr != nil {
 			logger.WithError(werr).Warn()
 		}
 	}()
