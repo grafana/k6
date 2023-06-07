@@ -30,7 +30,6 @@ type (
 	JSModule struct {
 		Browser *goja.Object
 		Devices map[string]common.Device
-		Version string
 	}
 
 	// ModuleInstance represents an instance of the JS module.
