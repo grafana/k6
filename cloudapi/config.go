@@ -162,7 +162,7 @@ func NewConfig() Config {
 		MetricPushConcurrency: null.NewInt(1, false),
 
 		TracesEnabled:      null.NewBool(false, false),
-		TracesHost:         null.NewString("insights.k6.io", false),
+		TracesHost:         null.NewString("insights.k6.io:4443", false),
 		TracesPushInterval: types.NewNullDuration(1*time.Second, false),
 
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
