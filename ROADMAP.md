@@ -6,21 +6,37 @@ This roadmap covers user-oriented features, UX improvements, JavaScript support,
 
 We hope this updated roadmap provides a clear overview of our plans for k6's future development. As always, we welcome feedback, corrections, and suggestions to make this roadmap more comprehensive, accessible, and valuable for the k6 community.
 
-## Short-term goals
+## Recently completed
 
-These are goals that are tentatively achievable by **Q2 2023** (April-June).
+These are goals that we recently completed and we're actively collecting feedback from the community.
 
 ### gRPC streaming support
 
-Although k6 already supports gRPC, we've been actively working towards adding streaming capabilities. The implementation is mostly complete, and we expect to release it as an experimental feature soon.
+Although k6 already supports gRPC, we've been actively working towards adding streaming capabilities. An experimental module is available as the `k6/experimental/grpc` module.
 
-*see*: [#2020](https://github.com/grafana/k6/issues/2020)
+*see*: the [xk6-grpc](https://github.com/grafana/xk6-grpc) repository which holds the implementation of the `k6/experimental/grpc` module for more details, and the [#2020](https://github.com/grafana/k6/issues/2020) issue for reporting feedback.
 
 ### WebCrypto API
 
-The current k6 crypto module has limitations and doesn't support advanced use cases involving private-key-infrastructure. Our goal is to provide support for encryption/decryption operations using symmetric and asymmetric keys. A partial implementation of the WebCrypto API is available as the `k6/experimental/webcrypto` module, and we're working on adding the remaining features.
+The current k6 crypto module has limitations and doesn't support advanced use cases involving private-key-infrastructure. Our goal is to provide support for encryption/decryption operations using symmetric and asymmetric keys. A partial implementation of the WebCrypto API is available as the `k6/experimental/webcrypto` module.
 
-*see*: the [xk6-webcrypto](https://github.com/grafana/xk6-webcrypto) repository which holds the implementation of the `k6/experimental/webcrypto` module for more details.
+*see*: the [xk6-webcrypto](https://github.com/grafana/xk6-webcrypto) repository which holds the implementation of the `k6/experimental/webcrypto` module for more details and feature requests.
+
+## Short-term goals
+
+These are goals that are tentatively achievable by **Q3 2023** (June-October).
+
+### Large files handling
+
+We're working to improve k6's handling of large files, ensuring efficient and reliable test execution for users working with big data sets or complex test scenarios. Our current file-handling approach can lead to significant memory consumption in some cases. We're addressing this issue, and specific improvements will be incrementally released in upcoming versions.
+
+*see*: [#2974](https://github.com/grafana/k6/issues/2974)
+
+### HTTP API redesign
+
+The k6 HTTP module, while widely used, has limitations, design flaws, and inconsistencies. We've started a project to create a new HTTP module to improve usability and make it more intuitive and user-friendly. The project is currently in the research and analysis phase, with no timeline for completion.
+
+*see*: [#2461](https://github.com/grafana/k6/issues/2461)
 
 ## Mid-term goals
 
@@ -31,12 +47,6 @@ These are goals tentatively achievable by **Q1 2024**.
 Although k6 supports ECMAScript modules, we currently rely on Babel for code transpilation, which has performance and design drawbacks. We're working on implementing native ES module support in Goja, our JavaScript runtime. The project is ongoing, with no estimated delivery date.
 
 *see*: [#2258](https://github.com/grafana/k6/issues/2258)
-
-### Large files handling
-
-We're working to improve k6's handling of large files, ensuring efficient and reliable test execution for users working with big data sets or complex test scenarios. Our current file-handling approach can lead to significant memory consumption in some cases. We're addressing this issue, and specific improvements will be incrementally released in upcoming versions.
-
-*see*: [#2974](https://github.com/grafana/k6/issues/2974)
 
 ### Improve `async/await` syntax support
 
@@ -57,12 +67,6 @@ We're exploring ways to integrate the use of HDR and sparse histograms in k6 to 
 ## Long-term goals
 
 These are goals we anticipate will be delivered more **than a year from now**. We have yet to set a specific timeline for these goals.
-
-### HTTP API redesign
-
-The k6 HTTP module, while widely used, has limitations, design flaws, and inconsistencies. We've started a project to create a new HTTP module to improve usability and make it more intuitive and user-friendly. The project is currently in the research and analysis phase, with no timeline for completion.
-
-*see*: [#2461](https://github.com/grafana/k6/issues/2461)
 
 ### Native distributed execution
 
