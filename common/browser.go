@@ -50,8 +50,8 @@ type Browser struct {
 	// A *Connection is saved to this field, see: connect().
 	conn connection
 
-	contextsMu     sync.RWMutex
-	contexts       map[cdp.BrowserContextID]*BrowserContext
+	contextMu      sync.RWMutex
+	context        *BrowserContext
 	defaultContext *BrowserContext
 
 	// Cancel function to stop event listening
@@ -103,7 +103,6 @@ func newBrowser(
 		state:               int64(BrowserStateOpen),
 		browserProc:         browserProc,
 		browserOpts:         browserOpts,
-		contexts:            make(map[cdp.BrowserContextID]*BrowserContext),
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
 		vu:                  k6ext.GetVU(ctx),
@@ -137,23 +136,29 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
 
-	b.contextsMu.Lock()
-	defer b.contextsMu.Unlock()
-	delete(b.contexts, id)
+	b.contextMu.Lock()
+	defer b.contextMu.Unlock()
+	b.context = nil
 
 	return nil
 }
 
-// getDefaultBrowserContextOrByID returns the BrowserContext for the given page ID.
+// getDefaultBrowserContextOrMatchedID returns the BrowserContext for the given browser context ID.
 // If the browser context is not found, the default BrowserContext is returned.
-func (b *Browser) getDefaultBrowserContextOrByID(id cdp.BrowserContextID) *BrowserContext {
-	b.contextsMu.RLock()
-	defer b.contextsMu.RUnlock()
-	browserCtx := b.defaultContext
-	if bctx, ok := b.contexts[id]; ok {
-		browserCtx = bctx
+// If the existing browser context id doesn't match an error is returned.
+func (b *Browser) getDefaultBrowserContextOrMatchedID(id cdp.BrowserContextID) (*BrowserContext, error) {
+	b.contextMu.RLock()
+	defer b.contextMu.RUnlock()
+
+	if b.context == nil {
+		return b.defaultContext, nil
 	}
-	return browserCtx
+
+	if b.context.id != id {
+		return nil, fmt.Errorf("missing browser context. Have: %s, want: %s", b.context.id, id)
+	}
+
+	return b.context, nil
 }
 
 func (b *Browser) getPages() []*Page {
@@ -225,10 +230,12 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
 		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID)
 
-	var (
-		targetPage = ev.TargetInfo
-		browserCtx = b.getDefaultBrowserContextOrByID(targetPage.BrowserContextID)
-	)
+	targetPage := ev.TargetInfo
+
+	browserCtx, err := b.getDefaultBrowserContextOrMatchedID(targetPage.BrowserContextID)
+	if err != nil {
+		k6ext.Panic(b.ctx, "attaching target to browserContext: %v", err)
+	}
 
 	if !b.isAttachedPageValid(ev, browserCtx) {
 		return // Ignore this page.
@@ -377,10 +384,10 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 }
 
 func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
-	b.contextsMu.RLock()
-	browserCtx, ok := b.contexts[id]
-	b.contextsMu.RUnlock()
-	if !ok {
+	b.contextMu.RLock()
+	browserCtx := b.context
+	b.contextMu.RUnlock()
+	if browserCtx == nil || browserCtx.id != id {
 		return nil, fmt.Errorf("missing browser context: %s", id)
 	}
 
@@ -494,15 +501,14 @@ func (b *Browser) Close() {
 
 // Contexts returns list of browser contexts.
 func (b *Browser) Contexts() []api.BrowserContext {
-	b.contextsMu.RLock()
-	defer b.contextsMu.RUnlock()
+	b.contextMu.RLock()
+	defer b.contextMu.RUnlock()
 
-	contexts := make([]api.BrowserContext, 0, len(b.contexts))
-	for _, b := range b.contexts {
-		contexts = append(contexts, b)
+	if b.context == nil {
+		return []api.BrowserContext{}
 	}
 
-	return contexts
+	return []api.BrowserContext{b.context}
 }
 
 // IsConnected returns whether the WebSocket connection to the browser process
@@ -525,13 +531,13 @@ func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
 		k6ext.Panic(b.ctx, "parsing newContext options: %w", err)
 	}
 
-	b.contextsMu.Lock()
-	defer b.contextsMu.Unlock()
+	b.contextMu.Lock()
+	defer b.contextMu.Unlock()
 	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
 	if err != nil {
 		return nil, fmt.Errorf("new context: %w", err)
 	}
-	b.contexts[browserContextID] = browserCtx
+	b.context = browserCtx
 
 	return browserCtx, nil
 }

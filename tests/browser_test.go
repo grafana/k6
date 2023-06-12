@@ -28,16 +28,16 @@ func TestBrowserNewPage(t *testing.T) {
 
 	p2 := b.NewPage(nil)
 	l = len(b.Contexts())
-	assert.Equal(t, 2, l, "expected there to be 2 browser context, but found %d", l)
+	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
 
 	err := p.Close(nil)
 	require.NoError(t, err)
 	l = len(b.Contexts())
-	assert.Equal(t, 2, l, "expected there to be 2 browser contexts after first page close, but found %d", l)
+	assert.Equal(t, 1, l, "expected there to be 1 browser context after first page close, but found %d", l)
 	err = p2.Close(nil)
 	require.NoError(t, err)
 	l = len(b.Contexts())
-	assert.Equal(t, 2, l, "expected there to be 2 browser contexts after second page close, but found %d", l)
+	assert.Equal(t, 1, l, "expected there to be 1 browser context after second page close, but found %d", l)
 }
 
 func TestTmpDirCleanup(t *testing.T) {

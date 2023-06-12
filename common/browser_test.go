@@ -31,11 +31,11 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		var err error
 		vu := k6test.NewVU(t)
 		ctx = k6ext.WithVU(ctx, vu)
-		b.contexts[id], err = NewBrowserContext(ctx, b, id, nil, nil)
+		b.context, err = NewBrowserContext(ctx, b, id, nil, nil)
 		require.NoError(t, err)
 		return &testCase{
 			b:  b,
-			bc: b.contexts[id],
+			bc: b.context,
 		}
 	}
 
