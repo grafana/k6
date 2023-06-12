@@ -519,6 +519,13 @@ func (b *Browser) IsConnected() bool {
 
 // NewContext creates a new incognito-like browser context.
 func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
+	b.contextMu.RLock()
+	browserCtx := b.context
+	b.contextMu.RUnlock()
+	if browserCtx != nil {
+		return nil, errors.New("close the existing browser context before creating a new one")
+	}
+
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
@@ -533,7 +540,7 @@ func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
 
 	b.contextMu.Lock()
 	defer b.contextMu.Unlock()
-	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	browserCtx, err = NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
 	if err != nil {
 		return nil, fmt.Errorf("new context: %w", err)
 	}

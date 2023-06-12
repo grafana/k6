@@ -12,9 +12,8 @@ import (
 )
 
 func TestKeyboardPress(t *testing.T) {
-	tb := newTestBrowser(t)
-
 	t.Run("all_keys", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 		layout := keyboardlayout.GetKeyboardLayout("us")
@@ -27,6 +26,7 @@ func TestKeyboardPress(t *testing.T) {
 	})
 
 	t.Run("backspace", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
@@ -43,6 +43,7 @@ func TestKeyboardPress(t *testing.T) {
 	})
 
 	t.Run("combo", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
@@ -68,6 +69,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("meta", func(t *testing.T) {
 		t.Skip("FIXME") // See https://github.com/grafana/xk6-browser/issues/424
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
@@ -92,6 +94,7 @@ func TestKeyboardPress(t *testing.T) {
 	})
 
 	t.Run("type does not split on +", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
@@ -105,6 +108,7 @@ func TestKeyboardPress(t *testing.T) {
 	})
 
 	t.Run("capitalization", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
@@ -130,6 +134,7 @@ func TestKeyboardPress(t *testing.T) {
 	})
 
 	t.Run("type not affected by shift", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
@@ -146,6 +151,7 @@ func TestKeyboardPress(t *testing.T) {
 	})
 
 	t.Run("newline", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
@@ -163,6 +169,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	// Replicates the test from https://playwright.dev/docs/api/class-keyboard
 	t.Run("selection", func(t *testing.T) {
+		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
