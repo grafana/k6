@@ -50,7 +50,6 @@ type Browser struct {
 	// A *Connection is saved to this field, see: connect().
 	conn connection
 
-	contextMu      sync.RWMutex
 	context        *BrowserContext
 	defaultContext *BrowserContext
 
@@ -136,8 +135,6 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
 
-	b.contextMu.Lock()
-	defer b.contextMu.Unlock()
 	b.context = nil
 
 	return nil
@@ -147,9 +144,6 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 // If the browser context is not found, the default BrowserContext is returned.
 // If the existing browser context id doesn't match an error is returned.
 func (b *Browser) getDefaultBrowserContextOrMatchedID(id cdp.BrowserContextID) (*BrowserContext, error) {
-	b.contextMu.RLock()
-	defer b.contextMu.RUnlock()
-
 	if b.context == nil {
 		return b.defaultContext, nil
 	}
@@ -384,10 +378,7 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 }
 
 func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
-	b.contextMu.RLock()
-	browserCtx := b.context
-	b.contextMu.RUnlock()
-	if browserCtx == nil || browserCtx.id != id {
+	if b.context == nil || b.context.id != id {
 		return nil, fmt.Errorf("missing browser context: %s", id)
 	}
 
@@ -400,7 +391,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 	waitForPage, removeEventHandler := createWaitForEventHandler(
 		ctx,
-		browserCtx, // browser context will emit the following event:
+		b.context, // browser context will emit the following event:
 		[]string{EventBrowserContextPage},
 		func(e any) bool {
 			tid := <-targetID
@@ -501,9 +492,6 @@ func (b *Browser) Close() {
 
 // Contexts returns list of browser contexts.
 func (b *Browser) Contexts() []api.BrowserContext {
-	b.contextMu.RLock()
-	defer b.contextMu.RUnlock()
-
 	if b.context == nil {
 		return []api.BrowserContext{}
 	}
@@ -519,10 +507,7 @@ func (b *Browser) IsConnected() bool {
 
 // NewContext creates a new incognito-like browser context.
 func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
-	b.contextMu.RLock()
-	browserCtx := b.context
-	b.contextMu.RUnlock()
-	if browserCtx != nil {
+	if b.context != nil {
 		return nil, errors.New("close the existing browser context before creating a new one")
 	}
 
@@ -538,9 +523,7 @@ func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
 		k6ext.Panic(b.ctx, "parsing newContext options: %w", err)
 	}
 
-	b.contextMu.Lock()
-	defer b.contextMu.Unlock()
-	browserCtx, err = NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
 	if err != nil {
 		return nil, fmt.Errorf("new context: %w", err)
 	}
