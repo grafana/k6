@@ -9,7 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/cloudapi/insights"
-	"go.k6.io/k6/js/modules/k6/experimental/tracing"
 	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
@@ -346,7 +345,7 @@ func Test_requestMetadatasCollector_CollectRequestMetadatas_FiltersAndStoresHTTP
 				With(methodTag, "test-method-1").
 				With(statusTag, "200"),
 			Metadata: map[string]string{
-				tracing.MetadataTraceIDKeyName: "test-trace-id-1",
+				metadataTraceIDKey: "test-trace-id-1",
 			},
 		},
 		&httpext.Trail{
@@ -365,14 +364,14 @@ func Test_requestMetadatasCollector_CollectRequestMetadatas_FiltersAndStoresHTTP
 				With(methodTag, "test-method-2").
 				With(statusTag, "401"),
 			Metadata: map[string]string{
-				tracing.MetadataTraceIDKeyName: "test-trace-id-2",
+				metadataTraceIDKey: "test-trace-id-2",
 			},
 		},
 		&httpext.Trail{
 			EndTime:  time.Unix(20, 0),
 			Duration: time.Second,
 			Tags:     metrics.NewRegistry().RootTagSet(),
-			// HTTP trail without tracing.MetadataTraceIDKeyName set should be ignored
+			// HTTP trail without `trace_id` metadata key should be ignored
 			Metadata: map[string]string{},
 		},
 		&httpext.Trail{
@@ -381,7 +380,7 @@ func Test_requestMetadatasCollector_CollectRequestMetadatas_FiltersAndStoresHTTP
 			// If no tags are present, output should be set to `unknown`
 			Tags: metrics.NewRegistry().RootTagSet(),
 			Metadata: map[string]string{
-				tracing.MetadataTraceIDKeyName: "test-trace-id-3",
+				metadataTraceIDKey: "test-trace-id-3",
 			},
 		},
 	}

@@ -215,13 +215,13 @@ func (c *Client) instrumentedCall(call func(args ...goja.Value) error, args ...g
 	// Add the trace ID to the VU's state, so that it can be
 	// used in the metrics emitted by the HTTP module.
 	c.vu.State().Tags.Modify(func(t *metrics.TagsAndMeta) {
-		t.SetMetadata(MetadataTraceIDKeyName, encodedTraceID)
+		t.SetMetadata(metadataTraceIDKeyName, encodedTraceID)
 	})
 
 	// Remove the trace ID from the VU's state, so that it doesn't leak into other requests.
 	defer func() {
 		c.vu.State().Tags.Modify(func(t *metrics.TagsAndMeta) {
-			t.DeleteMetadata(MetadataTraceIDKeyName)
+			t.DeleteMetadata(metadataTraceIDKeyName)
 		})
 	}()
 

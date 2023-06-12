@@ -7,17 +7,17 @@ import (
 	"time"
 
 	"go.k6.io/k6/cloudapi/insights"
-	"go.k6.io/k6/js/modules/k6/experimental/tracing"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
 )
 
 const (
-	scenarioTag = "scenario"
-	groupTag    = "group"
-	nameTag     = "name"
-	methodTag   = "method"
-	statusTag   = "status"
+	metadataTraceIDKey = "trace_id"
+	scenarioTag        = "scenario"
+	groupTag           = "group"
+	nameTag            = "name"
+	methodTag          = "method"
+	statusTag          = "status"
 )
 
 type timeBucket struct {
@@ -209,7 +209,7 @@ func (c *requestMetadatasCollector) filterTrailsWithTraces(
 
 	for _, sampleContainer := range sampleContainers {
 		if trail, ok := sampleContainer.(*httpext.Trail); ok {
-			if _, found := trail.Metadata[tracing.MetadataTraceIDKeyName]; found {
+			if _, found := trail.Metadata[metadataTraceIDKey]; found {
 				filteredHTTPTrails = append(filteredHTTPTrails, trail)
 			}
 		}
@@ -223,7 +223,7 @@ func (c *requestMetadatasCollector) collectHTTPTrails(trails []*httpext.Trail) {
 
 	for _, trail := range trails {
 		m := insights.RequestMetadata{
-			TraceID: trail.Metadata[tracing.MetadataTraceIDKeyName],
+			TraceID: trail.Metadata[metadataTraceIDKey],
 			Start:   trail.EndTime.Add(-trail.Duration),
 			End:     trail.EndTime,
 			TestRunLabels: insights.TestRunLabels{
