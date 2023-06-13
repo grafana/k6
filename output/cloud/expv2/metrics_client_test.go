@@ -1,35 +1,23 @@
 package expv2
 
 import (
-	"bytes"
-	"context"
-	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
-	"sync"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 )
-
-type httpDoerFunc func(*http.Request) (*http.Response, error)
-
-func (fn httpDoerFunc) Do(r *http.Request) (*http.Response, error) {
-	return fn(r)
-}
 
 func TestMetricsClientPush(t *testing.T) {
 	t.Parallel()
 
-	done := make(chan struct{}, 1)
 	reqs := 0
 	h := func(rw http.ResponseWriter, r *http.Request) {
-		defer close(done)
 		reqs++
 
 		assert.Equal(t, "/v2/metrics/test-ref-id", r.URL.Path)
@@ -47,13 +35,12 @@ func TestMetricsClientPush(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(h))
 	defer ts.Close()
 
-	mc, err := newMetricsClient(testutils.NewLogger(t), ts.URL, "fake-token")
+	c := cloudapi.NewClient(nil, "fake-token", ts.URL, "k6cloud/v0.4", 1*time.Second)
+	mc, err := newMetricsClient(c)
 	require.NoError(t, err)
-	mc.httpClient = ts.Client()
 
 	mset := pbcloud.MetricSet{}
-	err = mc.push(context.TODO(), "test-ref-id", &mset)
-	<-done
+	err = mc.push("test-ref-id", &mset)
 	require.NoError(t, err)
 	assert.Equal(t, 1, reqs)
 }
@@ -67,58 +54,10 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(h))
 	defer ts.Close()
 
-	mc, err := newMetricsClient(nil, ts.URL, "fake-token")
+	c := cloudapi.NewClient(nil, "fake-token", ts.URL, "k6cloud/v0.4", 1*time.Second)
+	mc, err := newMetricsClient(c)
 	require.NoError(t, err)
-	mc.httpClient = ts.Client()
 
-	err = mc.push(context.TODO(), "test-ref-id", nil)
+	err = mc.push("test-ref-id", nil)
 	assert.ErrorContains(t, err, "500 Internal Server Error")
-}
-
-func TestMetricsClientPushError(t *testing.T) {
-	t.Parallel()
-
-	httpClientMock := func(_ *http.Request) (*http.Response, error) {
-		return nil, fmt.Errorf("fake generated error")
-	}
-
-	mc := metricsClient{
-		httpClient: httpDoerFunc(httpClientMock),
-		pushBufferPool: sync.Pool{
-			New: func() interface{} {
-				return &bytes.Buffer{}
-			},
-		},
-	}
-
-	err := mc.push(context.TODO(), "test-ref-id", nil)
-	assert.ErrorContains(t, err, "fake generated error")
-}
-
-func TestMetricsClientPushStructuredError(t *testing.T) {
-	t.Parallel()
-
-	exp := cloudapi.ErrorResponse{Code: 1, Message: "test message"}
-
-	httpClientMock := func(_ *http.Request) (*http.Response, error) {
-		b := `{"error":{"code":1,"message":"test message"}}`
-		r := &http.Response{
-			StatusCode: http.StatusBadRequest,
-			Body:       io.NopCloser(bytes.NewBuffer([]byte(b))),
-		}
-		exp.Response = r
-		return r, nil
-	}
-
-	mc := metricsClient{
-		httpClient: httpDoerFunc(httpClientMock),
-		pushBufferPool: sync.Pool{
-			New: func() interface{} {
-				return &bytes.Buffer{}
-			},
-		},
-	}
-
-	err := mc.push(context.TODO(), "test-ref-id", nil)
-	assert.Equal(t, exp, err)
 }

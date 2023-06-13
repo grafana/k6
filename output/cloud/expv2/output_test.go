@@ -1,9 +1,11 @@
 package expv2
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -21,7 +23,8 @@ func TestNew(t *testing.T) {
 	t.Parallel()
 
 	logger, hook := testutils.NewLoggerWithHook(t)
-	o, err := New(logger, cloudapi.Config{APIVersion: null.IntFrom(99)})
+	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
+	o, err := New(logger, cloudapi.Config{APIVersion: null.IntFrom(99)}, c)
 	require.NoError(t, err)
 	require.NotNil(t, o)
 
@@ -56,7 +59,8 @@ func TestOutputSetTestRunStopCallback(t *testing.T) {
 
 func TestOutputCollectSamples(t *testing.T) {
 	t.Parallel()
-	o, err := New(testutils.NewLogger(t), cloudapi.Config{
+
+	conf := cloudapi.Config{
 		Host:                  null.StringFrom("flush-is-disabled"),
 		Token:                 null.StringFrom("a-fake-token"),
 		AggregationWaitPeriod: types.NewNullDuration(5*time.Second, true),
@@ -64,7 +68,11 @@ func TestOutputCollectSamples(t *testing.T) {
 		// instead to be time dependent
 		AggregationPeriod:  types.NewNullDuration(1*time.Hour, true),
 		MetricPushInterval: types.NewNullDuration(1*time.Hour, true),
-	})
+	}
+	logger := testutils.NewLogger(t)
+	cc := cloudapi.NewClient(
+		logger, conf.Token.String, conf.Host.String, "v/test", conf.Timeout.TimeDuration())
+	o, err := New(logger, conf, cc)
 	require.NoError(t, err)
 	require.NoError(t, o.Start())
 	require.Empty(t, o.collector.bq.PopAll())
@@ -272,9 +280,141 @@ func TestOutputStopWithTestError(t *testing.T) {
 	config.Token = null.StringFrom("token-is-required")
 	config.AggregationPeriod = types.NullDurationFrom(1 * time.Hour)
 
-	o, err := New(testutils.NewLogger(t), config)
+	logger := testutils.NewLogger(t)
+	cc := cloudapi.NewClient(
+		logger, config.Token.String, config.Host.String, "v/test", config.Timeout.TimeDuration())
+	o, err := New(logger, config, cc)
 	require.NoError(t, err)
 
 	require.NoError(t, o.Start())
 	require.NoError(t, o.StopWithTestError(errors.New("an error")))
+}
+
+func TestOutputFlushMetricsConcurrently(t *testing.T) {
+	t.Parallel()
+
+	done := make(chan struct{})
+
+	// It blocks on the first request so it asserts that the flush
+	// operations continues concurrently if one more tick is sent in the meantime.
+	//
+	// The second request unblocks.
+	var requestsCount int64
+	flusherMock := func(_ context.Context) {
+		updated := atomic.AddInt64(&requestsCount, 1)
+		if updated == 2 {
+			close(done)
+			return
+		}
+		<-done
+	}
+
+	o := Output{logger: testutils.NewLogger(t)}
+	o.config.MetricPushConcurrency = null.IntFrom(2)
+	o.config.MetricPushInterval = types.NullDurationFrom(1) // loop
+	o.flushing = flusherFunc(flusherMock)
+	o.runFlushWorkers()
+
+	select {
+	case <-time.After(5 * time.Second):
+		t.Error("timed out")
+	case <-done:
+		assert.NotZero(t, atomic.LoadInt64(&requestsCount))
+	}
+}
+
+func TestOutputFlushWorkersStop(t *testing.T) {
+	t.Parallel()
+
+	o := Output{
+		logger: testutils.NewLogger(t),
+		stop:   make(chan struct{}),
+	}
+	o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
+
+	once := sync.Once{}
+	flusherMock := func(_ context.Context) {
+		// it asserts that flushers are set and the flush is invoked
+		once.Do(func() { close(o.stop) })
+	}
+
+	o.flushing = flusherFunc(flusherMock)
+	o.runFlushWorkers()
+
+	// it asserts that all flushers exit
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		o.wg.Wait()
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Error("timed out")
+	case <-done:
+	}
+}
+
+func TestOutputFlushWorkersAbort(t *testing.T) {
+	t.Parallel()
+
+	o := Output{
+		logger: testutils.NewLogger(t),
+		abort:  make(chan struct{}),
+	}
+	o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
+
+	once := sync.Once{}
+	flusherMock := func(_ context.Context) {
+		// it asserts that flushers are set and the flush func is invoked
+		once.Do(func() { close(o.abort) })
+	}
+
+	o.flushing = flusherFunc(flusherMock)
+	o.runFlushWorkers()
+
+	// it asserts that all flushers exit
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		o.wg.Wait()
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Error("timed out")
+	case <-done:
+	}
+}
+
+type flusherFunc func(context.Context)
+
+func (ff flusherFunc) flush(ctx context.Context) error {
+	ff(ctx)
+	return nil
+}
+
+func TestPrintableConfig(t *testing.T) {
+	t.Parallel()
+
+	c := cloudapi.NewConfig()
+	c.Host = null.NewString("http://test.host", false)
+	c.Name = null.NewString("test-name", false)
+	c.PushRefID = null.NewString("test-id-123", false)
+	c.StopOnError = null.NewBool(true, false)
+	c.MetricPushConcurrency = null.NewInt(5, false)
+	c.AggregationPeriod = types.NewNullDuration(10*time.Second, false)
+	c.ProjectID = null.NewInt(123, false)
+	c.Token = null.StringFrom("my personal token")
+
+	exp := map[string]any{
+		"host":                  "http://test.host",
+		"name":                  "test-name",
+		"pushRefID":             "test-id-123",
+		"projectID":             int64(123),
+		"token":                 "***",
+		"stopOnError":           true,
+		"aggregationPeriod":     "10s",
+		"metricPushConcurrency": int64(5),
+	}
+
+	assert.Subset(t, printableConfig(c), exp)
 }

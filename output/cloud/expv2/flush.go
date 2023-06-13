@@ -8,7 +8,7 @@ import (
 )
 
 type pusher interface {
-	push(ctx context.Context, referenceID string, samples *pbcloud.MetricSet) error
+	push(referenceID string, samples *pbcloud.MetricSet) error
 }
 
 type metricsFlusher struct {
@@ -19,10 +19,10 @@ type metricsFlusher struct {
 	maxSeriesInSingleBatch     int
 }
 
-// Flush flushes the queued buckets sending them to the remote Cloud service.
-// If the number of time series collected is bigger than maximum batch size than
-// it splits in chunks.
-func (f *metricsFlusher) Flush(ctx context.Context) error {
+// flush flushes the queued buckets sending them to the remote Cloud service.
+// If the number of time series collected is bigger than maximum batch size
+// then it splits in chunks.
+func (f *metricsFlusher) flush(_ context.Context) error {
 	// drain the buffer
 	buckets := f.bq.PopAll()
 	if len(buckets) < 1 {
@@ -46,7 +46,7 @@ func (f *metricsFlusher) Flush(ctx context.Context) error {
 		}
 
 		// we hit the chunk size, let's flush
-		err := f.client.push(ctx, f.referenceID, msb.MetricSet)
+		err := f.client.push(f.referenceID, msb.MetricSet)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func (f *metricsFlusher) Flush(ctx context.Context) error {
 	}
 
 	// send the last (or the unique) MetricSet chunk to the remote service
-	return f.client.push(ctx, f.referenceID, msb.MetricSet)
+	return f.client.push(f.referenceID, msb.MetricSet)
 }
 
 type metricSetBuilder struct {

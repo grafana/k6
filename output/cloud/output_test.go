@@ -176,6 +176,9 @@ func TestOutputStartVersionedOutputV2(t *testing.T) {
 		},
 	}
 
+	o.client = cloudapi.NewClient(
+		nil, o.config.Token.String, o.config.Host.String, "v/tests", o.config.Timeout.TimeDuration())
+
 	err := o.startVersionedOutput()
 	require.NoError(t, err)
 
