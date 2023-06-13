@@ -1,10 +1,25 @@
+// Copyright 2019, OpenTelemetry Authors
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Messages below are copied from https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto
+
 syntax = "proto3";
 
 package k6.cloud.insights.proto.v1.common;
 
 option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/common";
 
-// Messages below are copied from https://github.com/open-telemetry/opentelemetry-proto/blob/main/opentelemetry/proto/common/v1/common.proto
 // AnyValue is used to represent any type of attribute value. AnyValue may contain a
 // primitive value such as a string or integer or it may contain an arbitrary nested
 // object containing arrays, key-value lists and primitives.
