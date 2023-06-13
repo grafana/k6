@@ -135,6 +135,7 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 
 	defer func() {
 		if resp != nil {
+			_, _ = io.Copy(io.Discard, resp.Body)
 			if cerr := resp.Body.Close(); cerr != nil && err == nil {
 				err = cerr
 			}
