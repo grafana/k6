@@ -108,12 +108,12 @@ func newOutput(params output.Params) (*Output, error) {
 		return nil, errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
 	}
 
-	if !(conf.MetricPushConcurrency.Int64 > 0) {
+	if conf.MetricPushConcurrency.Int64 < 1 {
 		return nil, fmt.Errorf("metrics push concurrency must be a positive number but is %d",
 			conf.MetricPushConcurrency.Int64)
 	}
 
-	if !(conf.MaxMetricSamplesPerPackage.Int64 > 0) {
+	if conf.MaxMetricSamplesPerPackage.Int64 < 1 {
 		return nil, fmt.Errorf("metric samples per package must be a positive number but is %d",
 			conf.MaxMetricSamplesPerPackage.Int64)
 	}
