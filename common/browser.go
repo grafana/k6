@@ -142,17 +142,12 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 
 // getDefaultBrowserContextOrMatchedID returns the BrowserContext for the given browser context ID.
 // If the browser context is not found, the default BrowserContext is returned.
-// If the existing browser context id doesn't match an error is returned.
-func (b *Browser) getDefaultBrowserContextOrMatchedID(id cdp.BrowserContextID) (*BrowserContext, error) {
-	if b.context == nil {
-		return b.defaultContext, nil
+func (b *Browser) getDefaultBrowserContextOrMatchedID(id cdp.BrowserContextID) *BrowserContext {
+	if b.context == nil || b.context.id != id {
+		return b.defaultContext
 	}
 
-	if b.context.id != id {
-		return nil, fmt.Errorf("missing browser context. Have: %s, want: %s", b.context.id, id)
-	}
-
-	return b.context, nil
+	return b.context
 }
 
 func (b *Browser) getPages() []*Page {
@@ -224,12 +219,10 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
 		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID)
 
-	targetPage := ev.TargetInfo
-
-	browserCtx, err := b.getDefaultBrowserContextOrMatchedID(targetPage.BrowserContextID)
-	if err != nil {
-		k6ext.Panic(b.ctx, "attaching target to browserContext: %v", err)
-	}
+	var (
+		targetPage = ev.TargetInfo
+		browserCtx = b.getDefaultBrowserContextOrMatchedID(targetPage.BrowserContextID)
+	)
 
 	if !b.isAttachedPageValid(ev, browserCtx) {
 		return // Ignore this page.
