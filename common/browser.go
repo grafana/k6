@@ -372,7 +372,7 @@ func (b *Browser) onDetachedFromTarget(ev *target.EventDetachedFromTarget) {
 
 func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 	if b.context == nil || b.context.id != id {
-		return nil, fmt.Errorf("missing browser context: %s", id)
+		return nil, fmt.Errorf("missing browser context %s, current context is %s", id, b.context.id)
 	}
 
 	ctx, cancel := context.WithTimeout(b.ctx, b.browserOpts.Timeout)
