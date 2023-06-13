@@ -196,34 +196,20 @@ func (c *requestMetadatasCollector) CollectRequestMetadatas(sampleContainers []m
 	}
 
 	// TODO(lukasz, other-proto-support): Support grpc/websocket trails.
-	httpTrails := c.filterTrailsWithTraces(sampleContainers)
-	if len(httpTrails) > 0 {
-		c.collectHTTPTrails(httpTrails)
-	}
-}
-
-func (c *requestMetadatasCollector) filterTrailsWithTraces(
-	sampleContainers []metrics.SampleContainer,
-) []*httpext.Trail {
-	var filteredHTTPTrails []*httpext.Trail
-
+	var newBuffer insights.RequestMetadatas
 	for _, sampleContainer := range sampleContainers {
-		if trail, ok := sampleContainer.(*httpext.Trail); ok {
-			if _, found := trail.Metadata[metadataTraceIDKey]; found {
-				filteredHTTPTrails = append(filteredHTTPTrails, trail)
-			}
+		trail, ok := sampleContainer.(*httpext.Trail)
+		if !ok {
+			continue
 		}
-	}
 
-	return filteredHTTPTrails
-}
+		traceID, found := trail.Metadata[metadataTraceIDKey]
+		if !found {
+			continue
+		}
 
-func (c *requestMetadatasCollector) collectHTTPTrails(trails []*httpext.Trail) {
-	newBuffer := make(insights.RequestMetadatas, 0, len(trails))
-
-	for _, trail := range trails {
 		m := insights.RequestMetadata{
-			TraceID: trail.Metadata[metadataTraceIDKey],
+			TraceID: traceID,
 			Start:   trail.EndTime.Add(-trail.Duration),
 			End:     trail.EndTime,
 			TestRunLabels: insights.TestRunLabels{
@@ -239,6 +225,10 @@ func (c *requestMetadatasCollector) collectHTTPTrails(trails []*httpext.Trail) {
 		}
 
 		newBuffer = append(newBuffer, m)
+	}
+
+	if len(newBuffer) < 1 {
+		return
 	}
 
 	c.bufferMu.Lock()
