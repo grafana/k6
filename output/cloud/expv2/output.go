@@ -19,16 +19,21 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
+type flusher interface {
+	flush(context.Context) error
+}
+
 // Output sends result data to the k6 Cloud service.
 type Output struct {
 	output.SampleBuffer
 
 	logger      logrus.FieldLogger
 	config      cloudapi.Config
+	cloudClient *cloudapi.Client
 	referenceID string
 
 	collector *collector
-	flushing  *metricsFlusher
+	flushing  flusher
 
 	// wg tracks background goroutines
 	wg sync.WaitGroup
@@ -43,12 +48,13 @@ type Output struct {
 }
 
 // New creates a new cloud output.
-func New(logger logrus.FieldLogger, conf cloudapi.Config) (*Output, error) {
+func New(logger logrus.FieldLogger, conf cloudapi.Config, cloudClient *cloudapi.Client) (*Output, error) {
 	return &Output{
-		config: conf,
-		logger: logger.WithFields(logrus.Fields{"output": "cloudv2"}),
-		abort:  make(chan struct{}),
-		stop:   make(chan struct{}),
+		config:      conf,
+		logger:      logger.WithField("output", "cloudv2"),
+		cloudClient: cloudClient,
+		abort:       make(chan struct{}),
+		stop:        make(chan struct{}),
 	}, nil
 }
 
@@ -77,7 +83,7 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.logger, o.config.Host.String, o.config.Token.String)
+	mc, err := newMetricsClient(o.cloudClient)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}
@@ -91,10 +97,10 @@ func (o *Output) Start() error {
 		maxSeriesInSingleBatch: int(o.config.MaxMetricSamplesPerPackage.Int64),
 	}
 
-	o.periodicInvoke(o.config.MetricPushInterval.TimeDuration(), o.flushMetrics)
+	o.runFlushWorkers()
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
-	o.logger.Debug("Started!")
+	o.logger.WithField("config", printableConfig(o.config)).Debug("Started!")
 	return nil
 }
 
@@ -120,6 +126,31 @@ func (o *Output) StopWithTestError(testErr error) error {
 	o.flushMetrics()
 
 	return nil
+}
+
+func (o *Output) runFlushWorkers() {
+	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
+
+	for i := int64(0); i < o.config.MetricPushConcurrency.Int64; i++ {
+		o.wg.Add(1)
+		go func() {
+			defer func() {
+				t.Stop()
+				o.wg.Done()
+			}()
+
+			for {
+				select {
+				case <-t.C:
+					o.flushMetrics()
+				case <-o.stop:
+					return
+				case <-o.abort:
+					return
+				}
+			}
+		}()
+	}
 }
 
 // AddMetricSamples receives the samples streaming.
@@ -178,10 +209,7 @@ func (o *Output) collectSamples() {
 func (o *Output) flushMetrics() {
 	start := time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), o.config.MetricPushInterval.TimeDuration())
-	defer cancel()
-
-	err := o.flushing.Flush(ctx)
+	err := o.flushing.flush(context.Background())
 	if err != nil {
 		o.handleFlushError(err)
 		return
@@ -230,4 +258,29 @@ func (o *Output) handleFlushError(err error) {
 			}
 		}
 	})
+}
+
+func printableConfig(c cloudapi.Config) map[string]any {
+	m := map[string]any{
+		"host":                       c.Host.String,
+		"name":                       c.Name.String,
+		"timeout":                    c.Timeout.String(),
+		"webAppURL":                  c.WebAppURL.String,
+		"projectID":                  c.ProjectID.Int64,
+		"pushRefID":                  c.PushRefID.String,
+		"stopOnError":                c.StopOnError.Bool,
+		"testRunDetails":             c.TestRunDetails.String,
+		"aggregationPeriod":          c.AggregationPeriod.String(),
+		"aggregationWaitPeriod":      c.AggregationWaitPeriod.String(),
+		"maxMetricSamplesPerPackage": c.MaxMetricSamplesPerPackage.Int64,
+		"metricPushConcurrency":      c.MetricPushConcurrency.Int64,
+		"metricPushInterval":         c.MetricPushInterval.String(),
+		"token":                      "",
+	}
+
+	if c.Token.Valid {
+		m["token"] = "***"
+	}
+
+	return m
 }

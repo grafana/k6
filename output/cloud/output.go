@@ -336,7 +336,7 @@ func (out *Output) startVersionedOutput() error {
 	case int64(apiVersion1):
 		out.versionedOutput, err = cloudv1.New(out.logger, out.config, out.client)
 	case int64(apiVersion2):
-		out.versionedOutput, err = cloudv2.New(out.logger, out.config)
+		out.versionedOutput, err = cloudv2.New(out.logger, out.config, out.client)
 	default:
 		err = fmt.Errorf("v%d is an unexpected version", out.config.APIVersion.Int64)
 	}

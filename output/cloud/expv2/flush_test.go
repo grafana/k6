@@ -82,7 +82,7 @@ func TestMetricsFlusherFlushChunk(t *testing.T) {
 		}
 		require.Len(t, bq.buckets, tc.series)
 
-		err := mf.Flush(context.TODO())
+		err := mf.flush(context.Background())
 		require.NoError(t, err)
 		assert.Equal(t, tc.expFlushCalls, pm.pushCalled)
 	}
@@ -92,7 +92,7 @@ type pusherMock struct {
 	pushCalled int
 }
 
-func (pm *pusherMock) push(_ context.Context, _ string, _ *pbcloud.MetricSet) error {
+func (pm *pusherMock) push(_ string, _ *pbcloud.MetricSet) error {
 	pm.pushCalled++
 	return nil
 }
