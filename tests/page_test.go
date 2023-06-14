@@ -430,7 +430,7 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	}
 	p.SetExtraHTTPHeaders(headers)
 
-	resp, err := p.Goto(b.URL("/get"), nil)
+	resp, err := p.Goto(b.url("/get"), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -640,8 +640,8 @@ func TestPageWaitForLoadState(t *testing.T) {
 func TestPageWaitForNavigationErrOnCtxDone(t *testing.T) {
 	b := newTestBrowser(t)
 	p := b.NewPage(nil)
-	go b.Cancel()
-	<-b.Context().Done()
+	go b.cancelContext()
+	<-b.context().Done()
 	_, err := p.WaitForNavigation(nil)
 	require.ErrorContains(t, err, "canceled")
 }
@@ -666,7 +666,7 @@ func TestPageURL(t *testing.T) {
 	p := b.NewPage(nil)
 	assert.Equal(t, "about:blank", p.URL())
 
-	resp, err := p.Goto(b.URL("/get"), nil)
+	resp, err := p.Goto(b.url("/get"), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Regexp(t, "http://.*/get", p.URL())

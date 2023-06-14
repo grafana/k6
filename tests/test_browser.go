@@ -23,6 +23,8 @@ import (
 	k6metrics "go.k6.io/k6/metrics"
 )
 
+const testBrowserStaticDir = "static"
+
 // testBrowser is a test testBrowser for integration testing.
 type testBrowser struct {
 	t testing.TB
@@ -112,10 +114,8 @@ func (b *testBrowser) NewPage(opts goja.Value) *common.Page {
 	return pp
 }
 
-const testBrowserStaticDir = "static"
-
-// URL returns the listening HTTP test server's URL combined with the given path.
-func (b *testBrowser) URL(path string) string {
+// url returns the listening HTTP test server's url combined with the given path.
+func (b *testBrowser) url(path string) string {
 	b.t.Helper()
 
 	if b.http == nil {
@@ -127,19 +127,14 @@ func (b *testBrowser) URL(path string) string {
 // staticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
 func (b *testBrowser) staticURL(path string) string {
 	b.t.Helper()
-
-	return b.URL("/" + testBrowserStaticDir + "/" + path)
+	return b.url("/" + testBrowserStaticDir + "/" + path)
 }
 
-// Context returns the testBrowser context.
-func (b *testBrowser) Context() context.Context {
-	return b.ctx
-}
+// context returns the testBrowser context.
+func (b *testBrowser) context() context.Context { return b.ctx }
 
-// Cancel cancels the testBrowser context.
-func (b *testBrowser) Cancel() {
-	b.cancel()
-}
+// cancelContext cancels the testBrowser context.
+func (b *testBrowser) cancelContext() { b.cancel() }
 
 // runtime returns a VU runtime.
 func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }

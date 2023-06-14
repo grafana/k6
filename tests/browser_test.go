@@ -113,7 +113,7 @@ func TestBrowserOn(t *testing.T) {
 		require.NoError(t, rt.Set("b", b.Browser))
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		time.AfterFunc(100*time.Millisecond, b.Cancel)
+		time.AfterFunc(100*time.Millisecond, b.cancelContext)
 		_, err := b.runJavaScript(script, "disconnected")
 		assert.ErrorContains(t, err, "browser.on promise rejected: context canceled")
 	})

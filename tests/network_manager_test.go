@@ -44,7 +44,7 @@ func TestBlockHostnames(t *testing.T) {
 	require.Nil(t, res)
 	tb.logCache.assertContains(t, "was interrupted: hostname host.test is in a blocked pattern")
 
-	res, err = p.Goto(tb.URL("/get"), nil)
+	res, err = p.Goto(tb.url("/get"), nil)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -63,7 +63,7 @@ func TestBlockIPs(t *testing.T) {
 	tb.logCache.assertContains(t, `was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
 
 	// Ensure other requests go through
-	res, err = p.Goto(tb.URL("/get"), nil)
+	res, err = p.Goto(tb.url("/get"), nil)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -97,7 +97,7 @@ func TestBasicAuth(t *testing.T) {
 		}{
 			WaitUntil: "load",
 		})
-		url := browser.URL(fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword))
+		url := browser.url(fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword))
 		res, err := p.Goto(url, opts)
 		require.NoError(t, err)
 
