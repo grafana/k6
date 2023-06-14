@@ -96,15 +96,14 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tbopts := newTestBrowserOptions(opts...)
 
 	vu := setupHTTPTestModuleInstance(tb, tbopts.samples)
-
-	dummyCtx, cancel := context.WithCancel(vu.Context())
-	tb.Cleanup(cancel)
-	vu.CtxField = dummyCtx
-
 	registry := k6metrics.NewRegistry()
 	k6m := k6ext.RegisterCustomMetrics(registry)
 	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
 	vu.InitEnvField.LookupEnv = tbopts.lookupFunc
+
+	ctx, cancel := context.WithCancel(vu.Context())
+	vu.CtxField = ctx
+	tb.Cleanup(cancel)
 
 	bt := chromium.NewBrowserType(vu)
 
@@ -127,7 +126,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		state.Transport = testServer.HTTPTransport
 	}
 
-	b, pid, err := bt.Launch(dummyCtx)
+	b, pid, err := bt.Launch(vu.Context())
 	if err != nil {
 		tb.Fatalf("testBrowser: %v", err)
 	}
