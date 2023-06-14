@@ -60,9 +60,6 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 	}
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case fileServerOption:
-			tbo.fileServer = true
-			tbo.httpMultiBin = true
 		case logCacheOption:
 			tbo.logCache = true
 		case withSamplesListener:
@@ -345,10 +342,6 @@ func withHTTPServer() func(tb *testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.httpMultiBin = true }
 }
 
-// fileServerOption is used to detect whether enable the static file
-// server.
-type fileServerOption struct{}
-
 // withFileServer enables the HTTP test server and serves a file server
 // for static files.
 //
@@ -357,8 +350,11 @@ type fileServerOption struct{}
 // example:
 //
 //	b := TestBrowser(t, withFileServer())
-func withFileServer() fileServerOption {
-	return struct{}{}
+func withFileServer() func(tb *testBrowserOptions) {
+	return func(tb *testBrowserOptions) {
+		tb.httpMultiBin = true
+		tb.fileServer = true
+	}
 }
 
 // logCacheOption is used to detect whether to enable the log cache.
