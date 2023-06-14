@@ -76,16 +76,10 @@ func (mc *metricsClient) push(referenceID string, samples *pbcloud.MetricSet) er
 	return nil
 }
 
-const payloadSizeLimit = 100 * 1024 // 100 KiB
-
 func newRequestBody(data *pbcloud.MetricSet) ([]byte, error) {
 	b, err := proto.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("encoding metrics as Protobuf write request failed: %w", err)
-	}
-	if len(b) > payloadSizeLimit {
-		return nil, fmt.Errorf("the Protobuf message is too large to be handled from the Cloud processor; "+
-			"size: %d, limit: 100 KB", len(b))
 	}
 	// TODO: use the framing format
 	// https://github.com/google/snappy/blob/main/framing_format.txt
