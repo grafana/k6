@@ -53,7 +53,7 @@ type testBrowser struct {
 //   - withLogCache: enables the log cache.
 //   - withSamples: provides a channel to receive the browser metrics.
 //   - withSkipClose: skips closing the browser when the test finishes.
-func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
+func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrowser {
 	tb.Helper()
 
 	tbopts := newTestBrowserOptions(opts...)
@@ -297,7 +297,7 @@ type testBrowserOptions struct {
 	lookupFunc   env.LookupFunc
 }
 
-func newTestBrowserOptions(opts ...any) *testBrowserOptions {
+func newTestBrowserOptions(opts ...func(*testBrowserOptions)) *testBrowserOptions {
 	// default lookup function is env.Lookup so that we can
 	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
 	tbo := &testBrowserOptions{
@@ -305,12 +305,7 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 		lookupFunc: env.Lookup,
 	}
 	for _, opt := range opts {
-		switch opt := opt.(type) {
-		case env.LookupFunc:
-			tbo.lookupFunc = opt
-		case func(*testBrowserOptions):
-			opt(tbo)
-		}
+		opt(tbo)
 	}
 
 	return tbo
