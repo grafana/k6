@@ -47,11 +47,11 @@ type testBrowser struct {
 // It automatically closes it when `t` returns unless `withSkipClose` option is provided.
 //
 // The following opts are available to customize the testBrowser:
-//   - withHTTPServer: enables the HTTPMultiBin server.
+//   - withEnvLookup: provides a custom lookup function for environment variables.
 //   - withFileServer: enables the HTTPMultiBin server and serves the given files.
+//   - withHTTPServer: enables the HTTPMultiBin server.
 //   - withLogCache: enables the log cache.
 //   - withSamples: provides a channel to receive the browser metrics.
-//   - env.LookupFunc: provides a custom lookup function for environment variables.
 //   - withSkipClose: skips closing the browser when the test finishes.
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
@@ -314,6 +314,15 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 	}
 
 	return tbo
+}
+
+// withEnvLookup sets the lookup function for environment variables.
+//
+// example:
+//
+//	b := TestBrowser(t, withEnvLookup(env.ConstLookup(env.BrowserHeadless, "0")))
+func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) { //nolint:unused
+	return func(tb *testBrowserOptions) { tb.lookupFunc = lookupFunc }
 }
 
 // withFileServer enables the HTTP test server and serves a file server
