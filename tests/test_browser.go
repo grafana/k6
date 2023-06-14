@@ -56,27 +56,24 @@ type testBrowser struct {
 func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrowser {
 	tb.Helper()
 
+	tbr := &testBrowser{t: tb}
 	tbopts := newTestBrowserOptions(opts...)
-	bt, vu, stop := newBrowserTypeWithVU(tb, tbopts)
-	tb.Cleanup(stop)
-
-	// enable the HTTP test server only when necessary
-	var (
-		testServer *k6httpmultibin.HTTPMultiBin
-		state      = vu.StateField
-		lc         *logCache
-	)
+	tbr.browserType, tbr.vu, tbr.cancel = newBrowserTypeWithVU(tb, tbopts)
+	tb.Cleanup(tbr.cancel)
 
 	if tbopts.logCache {
-		lc = attachLogCache(tb, state.Logger)
+		tbr.logCache = attachLogCache(tb, tbr.vu.StateField.Logger)
 	}
 	if tbopts.httpMultiBin {
-		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
-		state.TLSConfig = testServer.TLSClientConfig
-		state.Transport = testServer.HTTPTransport
+		tbr.http = k6httpmultibin.NewHTTPMultiBin(tb)
+		tbr.vu.StateField.TLSConfig = tbr.http.TLSClientConfig
+		tbr.vu.StateField.Transport = tbr.http.HTTPTransport
+	}
+	if tbopts.fileServer {
+		tbr = tbr.withFileServer()
 	}
 
-	b, pid, err := bt.Launch(vu.Context())
+	b, pid, err := tbr.browserType.Launch(tbr.vu.Context())
 	if err != nil {
 		tb.Fatalf("testBrowser: %v", err)
 	}
@@ -84,32 +81,19 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrows
 	if !ok {
 		tb.Fatalf("testBrowser: unexpected browser %T", b)
 	}
-
+	tbr.Browser = cb
+	tbr.ctx = tbr.browserType.Ctx
+	tbr.pid = pid
+	tbr.wsURL = cb.WsURL()
 	tb.Cleanup(func() {
 		select {
-		case <-vu.Context().Done():
+		case <-tbr.vu.Context().Done():
 		default:
 			if !tbopts.skipClose {
-				b.Close()
+				cb.Close()
 			}
 		}
 	})
-
-	tbr := &testBrowser{
-		t:           tb,
-		ctx:         bt.Ctx,
-		http:        testServer,
-		vu:          vu,
-		logCache:    lc,
-		Browser:     cb,
-		browserType: bt,
-		pid:         pid,
-		wsURL:       cb.WsURL(),
-		cancel:      stop,
-	}
-	if tbopts.fileServer {
-		tbr = tbr.withFileServer()
-	}
 
 	return tbr
 }
