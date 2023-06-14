@@ -205,7 +205,7 @@ jobs:
           fi
       - name: Build loadimpact/k6
         run: docker build -t $LI_DOCKER_IMAGE_ID .
-      - name: Publish loadimpact/k6 image to Docker Hub
+      - name: Publish loadimpact/k6:master image to Docker Hub
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
           echo "Publish to Docker Hub as $LI_DOCKER_IMAGE_ID:master"
