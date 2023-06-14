@@ -283,7 +283,11 @@ func (b *testBrowser) asGojaBool(v any) bool {
 // runJavaScript in the goja runtime.
 func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
 	b.t.Helper()
-	return b.runtime().RunString(fmt.Sprintf(s, args...))
+	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
+	if err != nil {
+		return nil, fmt.Errorf("while running %q(%v): %w", s, args, err)
+	}
+	return v, nil
 }
 
 // Run the given functions in parallel and waits for them to finish.
