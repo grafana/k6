@@ -287,7 +287,7 @@ func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
 }
 
 // Run the given functions in parallel and waits for them to finish.
-func (b *testBrowser) run(ctx context.Context, fs ...func() error) error { //nolint:unused,deadcode
+func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
 	b.t.Helper()
 
 	g, ctx := errgroup.WithContext(ctx)
@@ -295,19 +295,25 @@ func (b *testBrowser) run(ctx context.Context, fs ...func() error) error { //nol
 		f := f
 		g.Go(func() error {
 			errc := make(chan error, 1)
-			go func() {
-				errc <- f()
-			}()
+			go func() { errc <- f() }()
 			select {
 			case err := <-errc:
 				return err
 			case <-ctx.Done():
-				return ctx.Err()
+				if err := ctx.Err(); err != nil {
+					return fmt.Errorf("while running %T: %w", f, err)
+				}
 			}
+
+			return nil
 		})
 	}
 
-	return g.Wait()
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("while waiting for %T: %w", fs, err)
+	}
+
+	return nil
 }
 
 // awaitWithTimeout is the same as await but takes a timeout and times out the function after the time runs out.
