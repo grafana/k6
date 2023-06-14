@@ -45,7 +45,11 @@ func TestTmpDirCleanup(t *testing.T) {
 
 	const tmpDirPath = "./"
 
-	b := newTestBrowser(t, withSkipClose(), env.ConstLookup("TMPDIR", tmpDirPath))
+	b := newTestBrowser(
+		t,
+		withSkipClose(),
+		withEnvLookup(env.ConstLookup("TMPDIR", tmpDirPath)),
+	)
 	p := b.NewPage(nil)
 	err := p.Close(nil)
 	require.NoError(t, err)

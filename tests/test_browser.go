@@ -321,7 +321,7 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 // example:
 //
 //	b := TestBrowser(t, withEnvLookup(env.ConstLookup(env.BrowserHeadless, "0")))
-func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) { //nolint:unused
+func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.lookupFunc = lookupFunc }
 }
 

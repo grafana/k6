@@ -81,7 +81,11 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	}
 
 	// run the browser in headfull mode.
-	tb := newTestBrowser(t, withFileServer(), env.ConstLookup(env.BrowserHeadless, "0"))
+	tb := newTestBrowser(
+		t,
+		withFileServer(),
+		withEnvLookup(env.ConstLookup(env.BrowserHeadless, "0")),
+	)
 
 	p := tb.NewPage(nil)
 	_, err := p.Goto(
