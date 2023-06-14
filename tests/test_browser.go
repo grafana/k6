@@ -373,9 +373,9 @@ func withSkipClose() func(tb *testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.skipClose = true }
 }
 
-// withSamplesListener is used to indicate we want to use a bidirectional channel
+// withSamples is used to indicate we want to use a bidirectional channel
 // so that the test can read the metrics being emitted to the channel.
-func withSamplesListener(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions) {
+func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.samples = sc }
 }
 

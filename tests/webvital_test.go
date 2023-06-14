@@ -17,7 +17,7 @@ import (
 func TestWebVitalMetric(t *testing.T) {
 	var (
 		samples  = make(chan k6metrics.SampleContainer)
-		browser  = newTestBrowser(t, withFileServer(), withSamplesListener(samples))
+		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
 		page     = browser.NewPage(nil)
 		expected = map[string]bool{
 			"browser_web_vital_ttfb": false,
