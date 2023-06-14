@@ -94,21 +94,8 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
 	tbopts := newTestBrowserOptions(opts...)
-
-	vu := setupHTTPTestModuleInstance(tb, tbopts.samples)
-	registry := k6metrics.NewRegistry()
-	k6m := k6ext.RegisterCustomMetrics(registry)
-	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
-	vu.InitEnvField.LookupEnv = tbopts.lookupFunc
-
-	ctx, cancel := context.WithCancel(vu.Context())
-	vu.CtxField = ctx
-	tb.Cleanup(cancel)
-
-	bt := chromium.NewBrowserType(vu)
-
-	// Delete the pre-init stage data.
-	vu.MoveToVUContext()
+	bt, vu, stop := newBrowserTypeWithVU(tb, tbopts)
+	tb.Cleanup(stop)
 
 	// enable the HTTP test server only when necessary
 	var (
@@ -155,7 +142,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		browserType: bt,
 		pid:         pid,
 		wsURL:       cb.WsURL(),
-		cancel:      cancel,
+		cancel:      stop,
 	}
 	if tbopts.fileServer {
 		tbr = tbr.withFileServer()
@@ -422,4 +409,28 @@ func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleCon
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
 
 	return vu
+}
+
+func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
+	_ *chromium.BrowserType,
+	_ *k6test.VU,
+	cancel func(),
+) {
+	tb.Helper()
+
+	vu := setupHTTPTestModuleInstance(tb, opts.samples)
+	registry := k6metrics.NewRegistry()
+	k6m := k6ext.RegisterCustomMetrics(registry)
+	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
+	vu.InitEnvField.LookupEnv = opts.lookupFunc
+
+	ctx, cancel := context.WithCancel(vu.Context())
+	vu.CtxField = ctx
+
+	bt := chromium.NewBrowserType(vu)
+
+	// Delete the pre-init stage data.
+	vu.MoveToVUContext()
+
+	return bt, vu, cancel
 }
