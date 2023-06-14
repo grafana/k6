@@ -41,14 +41,18 @@ func TestOutputFlush(t *testing.T) {
 	defer ts.Close()
 
 	// init conifg
-	c := cloudapi.NewConfig()
-	c.Host = null.StringFrom(ts.URL)
-	c.Token = null.StringFrom("my-secret-token")
-	c.AggregationPeriod = types.NullDurationFrom(3 * time.Second)
-	c.AggregationWaitPeriod = types.NullDurationFrom(1 * time.Second)
+	conf := cloudapi.NewConfig()
+	conf.Host = null.StringFrom(ts.URL)
+	conf.Token = null.StringFrom("my-secret-token")
+	conf.AggregationPeriod = types.NullDurationFrom(3 * time.Second)
+	conf.AggregationWaitPeriod = types.NullDurationFrom(1 * time.Second)
+
+	logger := testutils.NewLogger(t)
+	cc := cloudapi.NewClient(logger, conf.Token.String, conf.Host.String,
+		"expv2/integration", conf.Timeout.TimeDuration())
 
 	// init and start the output
-	o, err := expv2.New(testutils.NewLogger(t), c)
+	o, err := expv2.New(logger, conf, cc)
 	require.NoError(t, err)
 	o.SetReferenceID("my-test-run-id-123")
 	require.NoError(t, o.Start())
