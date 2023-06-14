@@ -42,6 +42,43 @@ type testBrowser struct {
 	cancel context.CancelFunc
 }
 
+type testBrowserOptions struct {
+	fileServer   bool
+	logCache     bool
+	httpMultiBin bool
+	samples      chan k6metrics.SampleContainer
+	skipClose    bool
+	lookupFunc   env.LookupFunc
+}
+
+func newTestBrowserOptions(opts ...any) *testBrowserOptions {
+	// default lookup function is env.Lookup so that we can
+	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
+	tbo := &testBrowserOptions{
+		samples:    make(chan k6metrics.SampleContainer, 1000),
+		lookupFunc: env.Lookup,
+	}
+	for _, opt := range opts {
+		switch opt := opt.(type) {
+		case httpServerOption:
+			tbo.httpMultiBin = true
+		case fileServerOption:
+			tbo.fileServer = true
+			tbo.httpMultiBin = true
+		case logCacheOption:
+			tbo.logCache = true
+		case skipCloseOption:
+			tbo.skipClose = true
+		case withSamplesListener:
+			tbo.samples = opt
+		case env.LookupFunc:
+			tbo.lookupFunc = opt
+		}
+	}
+
+	return tbo
+}
+
 // newTestBrowser configures and launches a new chrome browser.
 //
 // It automatically closes it when `t` returns unless `withSkipClose` option is provided.
@@ -56,36 +93,9 @@ type testBrowser struct {
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	tb.Helper()
 
-	// set default options and then customize them
-	var (
-		enableHTTPMultiBin = false
-		enableFileServer   = false
-		enableLogCache     = false
-		skipClose          = false
-		samples            = make(chan k6metrics.SampleContainer, 1000)
-		// default lookup function is env.Lookup so that we can
-		// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
-		lookupFunc = env.Lookup
-	)
-	for _, opt := range opts {
-		switch opt := opt.(type) {
-		case httpServerOption:
-			enableHTTPMultiBin = true
-		case fileServerOption:
-			enableFileServer = true
-			enableHTTPMultiBin = true
-		case logCacheOption:
-			enableLogCache = true
-		case skipCloseOption:
-			skipClose = true
-		case withSamplesListener:
-			samples = opt
-		case env.LookupFunc:
-			lookupFunc = opt
-		}
-	}
+	tbopts := newTestBrowserOptions(opts...)
 
-	vu := setupHTTPTestModuleInstance(tb, samples)
+	vu := setupHTTPTestModuleInstance(tb, tbopts.samples)
 
 	dummyCtx, cancel := context.WithCancel(vu.Context())
 	tb.Cleanup(cancel)
@@ -94,7 +104,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 	registry := k6metrics.NewRegistry()
 	k6m := k6ext.RegisterCustomMetrics(registry)
 	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
-	vu.InitEnvField.LookupEnv = lookupFunc
+	vu.InitEnvField.LookupEnv = tbopts.lookupFunc
 
 	bt := chromium.NewBrowserType(vu)
 
@@ -108,10 +118,10 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		lc         *logCache
 	)
 
-	if enableLogCache {
+	if tbopts.logCache {
 		lc = attachLogCache(tb, state.Logger)
 	}
-	if enableHTTPMultiBin {
+	if tbopts.httpMultiBin {
 		testServer = k6httpmultibin.NewHTTPMultiBin(tb)
 		state.TLSConfig = testServer.TLSClientConfig
 		state.Transport = testServer.HTTPTransport
@@ -130,7 +140,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		select {
 		case <-vu.Context().Done():
 		default:
-			if !skipClose {
+			if !tbopts.skipClose {
 				b.Close()
 			}
 		}
@@ -148,7 +158,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		wsURL:       cb.WsURL(),
 		cancel:      cancel,
 	}
-	if enableFileServer {
+	if tbopts.fileServer {
 		tbr = tbr.withFileServer()
 	}
 
