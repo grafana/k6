@@ -42,34 +42,6 @@ type testBrowser struct {
 	cancel context.CancelFunc
 }
 
-type testBrowserOptions struct {
-	fileServer   bool
-	logCache     bool
-	httpMultiBin bool
-	samples      chan k6metrics.SampleContainer
-	skipClose    bool
-	lookupFunc   env.LookupFunc
-}
-
-func newTestBrowserOptions(opts ...any) *testBrowserOptions {
-	// default lookup function is env.Lookup so that we can
-	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
-	tbo := &testBrowserOptions{
-		samples:    make(chan k6metrics.SampleContainer, 1000),
-		lookupFunc: env.Lookup,
-	}
-	for _, opt := range opts {
-		switch opt := opt.(type) {
-		case env.LookupFunc:
-			tbo.lookupFunc = opt
-		case func(*testBrowserOptions):
-			opt(tbo)
-		}
-	}
-
-	return tbo
-}
-
 // newTestBrowser configures and launches a new chrome browser.
 //
 // It automatically closes it when `t` returns unless `withSkipClose` option is provided.
@@ -78,7 +50,7 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 //   - withHTTPServer: enables the HTTPMultiBin server.
 //   - withFileServer: enables the HTTPMultiBin server and serves the given files.
 //   - withLogCache: enables the log cache.
-//   - withSamplesListener: provides a channel to receive the browser metrics.
+//   - withSamples: provides a channel to receive the browser metrics.
 //   - env.LookupFunc: provides a custom lookup function for environment variables.
 //   - withSkipClose: skips closing the browser when the test finishes.
 func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
@@ -156,37 +128,7 @@ func (b *testBrowser) NewPage(opts goja.Value) *common.Page {
 	return pp
 }
 
-// withHandler adds the given handler to the HTTP test server and makes it
-// accessible with the given pattern.
-func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *testBrowser {
-	b.t.Helper()
-
-	if b.http == nil {
-		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
-	}
-	b.http.Mux.Handle(pattern, handler)
-	return b
-}
-
 const testBrowserStaticDir = "static"
-
-// withFileServer serves a file server using the HTTP test server that is
-// accessible via `testBrowserStaticDir` prefix.
-//
-// This method is for enabling the static file server after starting a test
-// browser. For early starting the file server see withFileServer function.
-func (b *testBrowser) withFileServer() *testBrowser {
-	b.t.Helper()
-
-	const (
-		slash = string(os.PathSeparator)
-		path  = slash + testBrowserStaticDir + slash
-	)
-
-	fs := http.FileServer(http.Dir(testBrowserStaticDir))
-
-	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
-}
 
 // URL returns the listening HTTP test server's URL combined with the given path.
 func (b *testBrowser) URL(path string) string {
@@ -328,14 +270,50 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	}
 }
 
-// withHTTPServer enables the HTTP test server.
-// It is used to detect whether to enable the HTTP test server.
+// withFileServer serves a file server using the HTTP test server that is
+// accessible via `testBrowserStaticDir` prefix.
 //
-// example:
-//
-//	b := TestBrowser(t, withHTTPServer())
-func withHTTPServer() func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.httpMultiBin = true }
+// This method is for enabling the static file server after starting a test
+// browser. For early starting the file server see withFileServer function.
+func (b *testBrowser) withFileServer() *testBrowser {
+	b.t.Helper()
+
+	const (
+		slash = string(os.PathSeparator)
+		path  = slash + testBrowserStaticDir + slash
+	)
+
+	fs := http.FileServer(http.Dir(testBrowserStaticDir))
+
+	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
+}
+
+type testBrowserOptions struct {
+	fileServer   bool
+	logCache     bool
+	httpMultiBin bool
+	samples      chan k6metrics.SampleContainer
+	skipClose    bool
+	lookupFunc   env.LookupFunc
+}
+
+func newTestBrowserOptions(opts ...any) *testBrowserOptions {
+	// default lookup function is env.Lookup so that we can
+	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
+	tbo := &testBrowserOptions{
+		samples:    make(chan k6metrics.SampleContainer, 1000),
+		lookupFunc: env.Lookup,
+	}
+	for _, opt := range opts {
+		switch opt := opt.(type) {
+		case env.LookupFunc:
+			tbo.lookupFunc = opt
+		case func(*testBrowserOptions):
+			opt(tbo)
+		}
+	}
+
+	return tbo
 }
 
 // withFileServer enables the HTTP test server and serves a file server
@@ -353,6 +331,28 @@ func withFileServer() func(tb *testBrowserOptions) {
 	}
 }
 
+// withHandler adds the given handler to the HTTP test server and makes it
+// accessible with the given pattern.
+func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *testBrowser {
+	b.t.Helper()
+
+	if b.http == nil {
+		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
+	}
+	b.http.Mux.Handle(pattern, handler)
+	return b
+}
+
+// withHTTPServer enables the HTTP test server.
+// It is used to detect whether to enable the HTTP test server.
+//
+// example:
+//
+//	b := TestBrowser(t, withHTTPServer())
+func withHTTPServer() func(tb *testBrowserOptions) {
+	return func(tb *testBrowserOptions) { tb.httpMultiBin = true }
+}
+
 // withLogCache enables the log cache.
 //
 // example:
@@ -360,6 +360,12 @@ func withFileServer() func(tb *testBrowserOptions) {
 //	b := TestBrowser(t, withLogCache())
 func withLogCache() func(tb *testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.logCache = true }
+}
+
+// withSamples is used to indicate we want to use a bidirectional channel
+// so that the test can read the metrics being emitted to the channel.
+func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions) {
+	return func(tb *testBrowserOptions) { tb.samples = sc }
 }
 
 // withSkipClose skips calling Browser.Close() in t.Cleanup().
@@ -373,12 +379,6 @@ func withSkipClose() func(tb *testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.skipClose = true }
 }
 
-// withSamples is used to indicate we want to use a bidirectional channel
-// so that the test can read the metrics being emitted to the channel.
-func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.samples = sc }
-}
-
 func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	_ *chromium.BrowserType,
 	_ *k6test.VU,
@@ -387,7 +387,7 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	tb.Helper()
 
 	// Prepare the VU.
-	vu := k6test.NewVU(tb, k6test.WithSamplesListener(opts.samples))
+	vu := k6test.NewVU(tb, k6test.WithSamples(opts.samples))
 	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
 	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))

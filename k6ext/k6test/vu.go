@@ -53,9 +53,9 @@ func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
 	return n
 }
 
-// WithSamplesListener is used to indicate we want to use a bidirectional channel
+// WithSamples is used to indicate we want to use a bidirectional channel
 // so that the test can read the metrics being emitted to the channel.
-type WithSamplesListener chan k6metrics.SampleContainer
+type WithSamples chan k6metrics.SampleContainer
 
 // NewVU returns a mock k6 VU.
 //
@@ -71,7 +71,7 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case WithSamplesListener:
+		case WithSamples:
 			samples = opt
 		case env.LookupFunc:
 			lookupFunc = opt
