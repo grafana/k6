@@ -141,36 +141,6 @@ func (b *testBrowser) Cancel() {
 	b.cancel()
 }
 
-// attachFrame attaches the frame to the page and returns it.
-func (b *testBrowser) attachFrame(page *common.Page, frameID string, url string) *common.Frame {
-	b.t.Helper()
-
-	pageFn := `
-	async (frameId, url) => {
-		const frame = document.createElement('iframe');
-		frame.src = url;
-		frame.id = frameId;
-		document.body.appendChild(frame);
-		await new Promise(x => frame.onload = x);
-		return frame;
-	}
-	`
-
-	h, err := page.EvaluateHandle(
-		b.toGojaValue(pageFn),
-		b.toGojaValue(frameID),
-		b.toGojaValue(url))
-	require.NoError(b.t, err)
-
-	f, err := h.AsElement().ContentFrame()
-	require.NoError(b.t, err)
-
-	ff, ok := f.(*common.Frame)
-	require.Truef(b.t, ok, "want *common.Frame, got %T", f)
-
-	return ff
-}
-
 // runtime returns a VU runtime.
 func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }
 

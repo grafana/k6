@@ -325,7 +325,29 @@ func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser,
 
 	p := tb.NewPage(nil)
 
-	f := tb.attachFrame(p, "frame1", tb.staticURL("empty.html"))
+	pageFn := `
+	async (frameId, url) => {
+		const frame = document.createElement('iframe');
+		frame.src = url;
+		frame.id = frameId;
+		document.body.appendChild(frame);
+		await new Promise(x => frame.onload = x);
+		return frame;
+	}
+	`
+
+	h, err := p.EvaluateHandle(
+		tb.toGojaValue(pageFn),
+		tb.toGojaValue("frame1"),
+		tb.toGojaValue(tb.staticURL("empty.html")))
+	require.NoError(tb.t, err)
+
+	f, err := h.AsElement().ContentFrame()
+	require.NoError(tb.t, err)
+
+	ff, ok := f.(*common.Frame)
+	require.Truef(tb.t, ok, "want *common.Frame, got %T", f)
+
 	f.SetContent(`
 		<button>a</button>
 		<input type="checkbox" class="check">
@@ -336,5 +358,5 @@ func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser,
 		</select>
 		<input type="file" class="file">
     	`, nil)
-	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, f) })
+	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, ff) })
 }
