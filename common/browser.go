@@ -25,8 +25,7 @@ import (
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
 var (
-	_ EventEmitter = &Browser{}
-	_ api.Browser  = &Browser{}
+	_ api.Browser = &Browser{}
 )
 
 const (
@@ -36,8 +35,6 @@ const (
 
 // Browser stores a Browser context.
 type Browser struct {
-	BaseEventEmitter
-
 	ctx      context.Context
 	cancelFn context.CancelFunc
 
@@ -96,7 +93,6 @@ func newBrowser(
 	logger *log.Logger,
 ) *Browser {
 	return &Browser{
-		BaseEventEmitter:    NewBaseEventEmitter(ctx),
 		ctx:                 ctx,
 		cancelFn:            cancelFn,
 		state:               int64(BrowserStateOpen),
