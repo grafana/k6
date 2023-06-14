@@ -92,7 +92,7 @@ type pusherMock struct {
 	pushCalled int
 }
 
-func (pm *pusherMock) push(_ string, _ *pbcloud.MetricSet) error {
+func (pm *pusherMock) push(_ *pbcloud.MetricSet) error {
 	pm.pushCalled++
 	return nil
 }
