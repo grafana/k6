@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
@@ -230,7 +229,7 @@ func (b *testBrowser) Cancel() {
 }
 
 // attachFrame attaches the frame to the page and returns it.
-func (b *testBrowser) attachFrame(page *common.Page, frameID string, url string) api.Frame {
+func (b *testBrowser) attachFrame(page *common.Page, frameID string, url string) *common.Frame {
 	b.t.Helper()
 
 	pageFn := `
@@ -253,7 +252,10 @@ func (b *testBrowser) attachFrame(page *common.Page, frameID string, url string)
 	f, err := h.AsElement().ContentFrame()
 	require.NoError(b.t, err)
 
-	return f
+	ff, ok := f.(*common.Frame)
+	require.Truef(b.t, ok, "want *common.Frame, got %T", f)
+
+	return ff
 }
 
 // runtime returns a VU runtime.
