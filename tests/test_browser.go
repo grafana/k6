@@ -8,6 +8,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
+	"github.com/stretchr/testify/require"
+	"golang.org/x/sync/errgroup"
+
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
@@ -17,10 +21,6 @@ import (
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 	k6metrics "go.k6.io/k6/metrics"
-
-	"github.com/dop251/goja"
-	"github.com/stretchr/testify/require"
-	"golang.org/x/sync/errgroup"
 )
 
 // testBrowser is a test testBrowser for integration testing.
