@@ -395,22 +395,6 @@ func withSkipClose() skipCloseOption {
 // so that the test can read the metrics being emitted to the channel.
 type withSamplesListener chan k6metrics.SampleContainer
 
-func setupHTTPTestModuleInstance(tb testing.TB, samples chan k6metrics.SampleContainer) *k6test.VU {
-	tb.Helper()
-
-	var (
-		vu   = k6test.NewVU(tb, k6test.WithSamplesListener(samples))
-		root = k6http.New()
-	)
-
-	mi, ok := root.NewModuleInstance(vu).(*k6http.ModuleInstance)
-	require.True(tb, ok)
-
-	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
-
-	return vu
-}
-
 func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	_ *chromium.BrowserType,
 	_ *k6test.VU,
@@ -418,18 +402,20 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 ) {
 	tb.Helper()
 
-	vu := setupHTTPTestModuleInstance(tb, opts.samples)
+	// Prepare the VU.
+	vu := k6test.NewVU(tb, k6test.WithSamplesListener(opts.samples))
+	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
+	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
+	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
 	vu.CtxField = k6ext.WithCustomMetrics(
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
 	vu.InitEnvField.LookupEnv = opts.lookupFunc
-
 	ctx, cancel := context.WithCancel(vu.Context())
 	vu.CtxField = ctx
 
 	bt := chromium.NewBrowserType(vu)
-
 	// Delete the pre-init stage data.
 	vu.MoveToVUContext()
 
