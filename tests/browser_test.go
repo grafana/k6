@@ -76,7 +76,7 @@ func TestBrowserOn(t *testing.T) {
 		t.Parallel()
 
 		b := newTestBrowser(t)
-		require.NoError(t, b.vu.Runtime().Set("b", b.Browser))
+		require.NoError(t, b.runtime().Set("b", b.Browser))
 
 		_, err := b.runJavaScript(script, "wrongevent")
 		require.Error(t, err)
@@ -88,7 +88,7 @@ func TestBrowserOn(t *testing.T) {
 
 		var (
 			b   = newTestBrowser(t, withSkipClose())
-			rt  = b.vu.Runtime()
+			rt  = b.runtime()
 			log []string
 		)
 
@@ -106,7 +106,7 @@ func TestBrowserOn(t *testing.T) {
 
 		var (
 			b   = newTestBrowser(t)
-			rt  = b.vu.Runtime()
+			rt  = b.runtime()
 			log []string
 		)
 

@@ -37,7 +37,6 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 	// We have to call launch method through JS API in Goja
 	// to take mapping layer into account, instead of calling
 	// BrowserType.Launch method directly
-	rt := vu.Runtime()
 	root := browser.New()
 	mod := root.NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
@@ -45,6 +44,7 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 
 	vu.MoveToVUContext()
 
+	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
 	_, err := rt.RunString(`
 		const p = browser.newPage();

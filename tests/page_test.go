@@ -37,18 +37,15 @@ func TestPageEmulateMedia(t *testing.T) {
 	}))
 
 	result := p.Evaluate(tb.toGojaValue("() => matchMedia('print').matches"))
-	res, ok := result.(goja.Value)
-	require.True(t, ok)
+	res := tb.asGojaValue(result)
 	assert.True(t, res.ToBoolean(), "expected media 'print'")
 
 	result = p.Evaluate(tb.toGojaValue("() => matchMedia('(prefers-color-scheme: dark)').matches"))
-	res, ok = result.(goja.Value)
-	require.True(t, ok)
+	res = tb.asGojaValue(result)
 	assert.True(t, res.ToBoolean(), "expected color scheme 'dark'")
 
 	result = p.Evaluate(tb.toGojaValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches"))
-	res, ok = result.(goja.Value)
-	require.True(t, ok)
+	res = tb.asGojaValue(result)
 	assert.True(t, res.ToBoolean(), "expected reduced motion setting to be 'reduce'")
 }
 
@@ -79,8 +76,7 @@ func TestPageEvaluate(t *testing.T) {
 		)
 
 		require.IsType(t, tb.toGojaValue(""), got)
-		gotVal, ok := got.(goja.Value)
-		require.True(t, ok)
+		gotVal := tb.asGojaValue(got)
 		assert.Equal(t, "test", gotVal.Export())
 	})
 
@@ -501,8 +497,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		assert.Contains(t, log, "ok: null")
 
 		argEvalJS := p.Evaluate(tb.toGojaValue("() => window._arg"))
-		argEval, ok := argEvalJS.(goja.Value)
-		require.True(t, ok)
+		argEval := tb.asGojaValue(argEvalJS)
 		var gotArg string
 		_ = tb.runtime().ExportTo(argEval, &gotArg)
 		assert.Equal(t, arg, gotArg)
@@ -532,8 +527,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		assert.Contains(t, log, "ok: null")
 
 		argEvalJS := p.Evaluate(tb.toGojaValue("() => window._args"))
-		argEval, ok := argEvalJS.(goja.Value)
-		require.True(t, ok)
+		argEval := tb.asGojaValue(argEvalJS)
 		var gotArgs []int
 		_ = tb.runtime().ExportTo(argEval, &gotArgs)
 		assert.Equal(t, args, gotArgs)

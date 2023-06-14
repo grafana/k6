@@ -10,7 +10,6 @@ import (
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -83,7 +82,7 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
     }`
 	var r api.Rect
 	webBbox := p.Evaluate(tb.toGojaValue(pageFn), tb.toGojaValue(element))
-	wb, _ := webBbox.(goja.Value)
+	wb := tb.asGojaValue(webBbox)
 	err = tb.runtime().ExportTo(wb, &r)
 	require.NoError(t, err)
 
