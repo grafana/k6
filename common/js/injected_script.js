@@ -223,6 +223,10 @@ class InjectedScript {
         }
         result.push({ element, capture });
       }
+
+      // Explore the Shadow DOM recursively.
+      const shadowResults = this._exploreShadowDOM(root.element, selector, index, queryCache, capture);
+      result.push(...shadowResults);
     }
 
     return this._querySelectorRecursively(
@@ -231,6 +235,26 @@ class InjectedScript {
       index + 1,
       queryCache
     );
+  }
+
+  _exploreShadowDOM(root, selector, index, queryCache, capture) {
+    let result = [];
+    if (root.shadowRoot) {
+      const shadowRootResults = this._querySelectorRecursively(
+        [{ element: root.shadowRoot, capture }],
+        selector,
+        index,
+        queryCache
+      );
+      result = result.concat(shadowRootResults);
+    }
+    
+    for (let i = 0; i < root.children.length; i++) {
+      const childElement = root.children[i];
+      result = result.concat(this._exploreShadowDOM(childElement, selector, index, queryCache, capture));
+    }
+    
+    return result;
   }
 
   // Make sure we target an appropriate node in the DOM before performing an action.

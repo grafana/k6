@@ -448,3 +448,17 @@ func TestLocatorPress(t *testing.T) {
 
 	require.Equal(t, "AbC", l.InputValue(nil))
 }
+
+func TestLocatorShadowDOM(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+	p := tb.NewPage(nil)
+	opts := tb.toGojaValue(jsFrameBaseOpts{Timeout: "1000"})
+
+	_, err := p.Goto(tb.staticURL("shadow_dom_link.html"), nil)
+	require.NoError(t, err)
+
+	err = p.Click("#inner-link", opts)
+	require.NoError(t, err)
+}
