@@ -23,8 +23,8 @@ defaults:
 env:
   APP_NAME: "k6"
   # We'll push to two DockerHub repos at once; `loadimpact/k6` repo is required for backwards compatibility
-  LI_DOCKER_IMAGE_ID: "loadimpact/k6"
-  DOCKER_IMAGE_ID: "grafana/k6"
+  LI_DOCKER_IMAGE_ID: "andrewslotin/lik6"
+  DOCKER_IMAGE_ID: "andrewslotin/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
   DEFAULT_GO_VERSION: "1.20.x"
 
@@ -69,66 +69,6 @@ jobs:
           echo "GO_VERSION=${GO_VERSION}"
           echo "go_version=${GO_VERSION}" >> $GITHUB_OUTPUT
 
-  build:
-    runs-on: ubuntu-latest
-    needs: [configure]
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: ${{ needs.configure.outputs.go_version }}
-          check-latest: true
-      - name: Install nfpm (dep and rpm package builder)
-        run: |
-          go install github.com/goreleaser/nfpm/v2/cmd/nfpm@v2.16.0
-      - name: Install goversioninfo (.syso file creator)
-        run: |
-          go install github.com/josephspurrier/goversioninfo/cmd/goversioninfo@v1.4.0
-      - name: Generate Windows binary metadata (.syso files)
-        run: |
-          IFS=. read -a version_parts <<< "${VERSION#v}"
-          IFS=- read -a version_patch <<< "${version_parts[2]}"
-
-          # Need a blank versioninfo.json for the CLI overrides to work.
-          echo '{}' > versioninfo.json
-          set -x
-          goversioninfo -64 \
-            -platform-specific=true \
-            -charset="1200" \
-            -company="Raintank Inc. d.b.a. Grafana Labs" \
-            -copyright="© Raintank Inc. d.b.a. Grafana Labs. Licensed under AGPL." \
-            -description="A modern load testing tool, using Go and JavaScript" \
-            -icon=packaging/k6.ico \
-            -internal-name="k6" \
-            -original-name="k6.exe" \
-            -product-name="k6" \
-            -translation="0x0409" \
-            -ver-major="${version_parts[0]}" \
-            -ver-minor="${version_parts[1]}" \
-            -ver-patch="${version_patch[0]}" \
-            -special-build=$(IFS='-'; echo "${version_patch[*]:1}";) \
-            -product-version="${VERSION#v}"
-
-          set +x
-          ls -lah | grep -i syso
-
-      - name: Build
-        run: |
-          go version
-          ./build-release.sh "dist" "${VERSION}"
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: binaries
-          path: dist/
-          retention-days: 7
-
   build-docker:
     runs-on: ubuntu-latest
     needs: [configure]
@@ -147,6 +87,7 @@ jobs:
             --bootstrap --use
           docker buildx build \
             --platform linux/amd64,linux/arm64 \
+            --target release \
             -t $DOCKER_IMAGE_ID .
       - name: Check
         run: |
@@ -194,193 +135,43 @@ jobs:
       - name: Publish k6:master image to Docker Hub
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
-          echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:master and $LI_DOCKER_IMAGE_ID:master"
+          echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:master"
           docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:master"
-          docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:master"
           docker push "$DOCKER_IMAGE_ID:master"
-          docker push "$LI_DOCKER_IMAGE_ID:master"
       - name: Publish tagged version image to Docker Hub
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          # We need to push the same image in both the loadimpact and the grafana docker hub orgs
           VERSION="${VERSION#v}"
-          echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:$VERSION and $LI_DOCKER_IMAGE_ID:$VERSION"
+          echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:$VERSION"
           docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
-          docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:$VERSION"
           docker push "$DOCKER_IMAGE_ID:$VERSION"
+          # We also want to tag the latest stable version as latest
+          if [[ ! "$VERSION" =~ (RC|rc) ]]; then
+            echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:latest"
+            docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
+            docker push "$DOCKER_IMAGE_ID:latest"
+          fi
+      - name: Build loadimpact/k6
+        run: |
+          docker buildx build \
+            --platform linux/amd64,linux/arm64 \
+            -t $LI_DOCKER_IMAGE_ID .
+      - name: Publish loadimpact/k6 image to Docker Hub
+        if: ${{ github.ref == 'refs/heads/master' }}
+        run: |
+          echo "Publish to Docker Hub as $LI_DOCKER_IMAGE_ID:master"
+          docker tag "$LI_DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:master"
+          docker push "$LI_DOCKER_IMAGE_ID:master"
+      - name: Publish loadimpact/k6 tagged version image to Docker Hub
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
+        run: |
+          VERSION="${VERSION#v}"
+          echo "Publish to Docker Hub as $LI_DOCKER_IMAGE_ID:$VERSION"
+          docker tag "$LI_DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:$VERSION"
           docker push "$LI_DOCKER_IMAGE_ID:$VERSION"
           # We also want to tag the latest stable version as latest
           if [[ ! "$VERSION" =~ (RC|rc) ]]; then
-            echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:latest and $LI_DOCKER_IMAGE_ID:latest"
-            docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
-            docker tag "$DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:latest"
-            docker push "$DOCKER_IMAGE_ID:latest"
+            echo "Publish to Docker Hub as $LI_DOCKER_IMAGE_ID:latest"
+            docker tag "$LI_DOCKER_IMAGE_ID" "$LI_DOCKER_IMAGE_ID:latest"
             docker push "$LI_DOCKER_IMAGE_ID:latest"
           fi
-
-  package-windows:
-    runs-on: windows-2019
-    defaults:
-      run:
-        shell: pwsh
-    needs: [configure, build]
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Install pandoc
-        uses: crazy-max/ghaction-chocolatey@90deb87d9fbf0bb2f022b91e3bf11b4441cddda5 # v2.1.0
-        with:
-          args: install -y pandoc
-      - name: Install wix tools
-        run: |
-          curl -Lso wix311-binaries.zip https://github.com/wixtoolset/wix3/releases/download/wix3112rtm/wix311-binaries.zip
-          Expand-Archive -Path .\wix311-binaries.zip -DestinationPath .\wix311\
-          echo "$pwd\wix311" | Out-File -FilePath $env:GITHUB_PATH -Append
-      - name: Download binaries
-        uses: actions/download-artifact@v3
-        with:
-          name: binaries
-          path: dist
-      - name: Unzip Windows binary
-        run: |
-          Expand-Archive -Path ".\dist\k6-$env:VERSION-windows-amd64.zip" -DestinationPath .\packaging\
-          move .\packaging\k6-$env:VERSION-windows-amd64\k6.exe .\packaging\
-          rmdir .\packaging\k6-$env:VERSION-windows-amd64\
-      - name: Add signtool to PATH
-        run: echo "${env:ProgramFiles(x86)}\Windows Kits\10\bin\x64" | Out-File -FilePath $env:GITHUB_PATH -Append
-
-      - name: Create the MSI package
-        run: |
-          $env:VERSION = $env:VERSION -replace 'v(\d+\.\d+\.\d+).*','$1'
-          pandoc -s -f markdown -t rtf -o packaging\LICENSE.rtf LICENSE.md
-          cd .\packaging
-          candle.exe -arch x64 "-dVERSION=$env:VERSION" k6.wxs
-          light.exe -ext WixUIExtension k6.wixobj
-
-      - name: Sign Windows binary and .msi package
-        # GH secrets are unavaileble when building from project forks, so this
-        # will fail for external PRs, even if we wanted to do it. And we don't.
-        # We are only going to sign packages that are built from master or a
-        # version tag, or manually triggered dev builds, so we have enough
-        # assurance that package signing works, but don't sign every PR build.
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch' }}
-        run: |
-          # Convert base64 certificate to PFX
-          $bytes = [Convert]::FromBase64String("${{ secrets.WIN_SIGN_CERT }}")
-          [IO.File]::WriteAllBytes("k6.pfx", $bytes)
-
-          # Sign the Windows binary
-          signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.exe"
-
-          # Sign the MSI package
-          signtool sign /f k6.pfx /p "${{ secrets.WIN_SIGN_PASS }}" /tr "http://timestamp.digicert.com" /td sha256 /fd sha256 "packaging\k6.msi"
-
-          # Cleanup signing artifacts
-          del k6.pfx
-
-      - name: Rename MSI package
-        # To keep it consistent with the other artifacts
-        run: move "packaging\k6.msi" "packaging\k6-$env:VERSION-windows-amd64.msi"
-
-      - name: Upload artifacts
-        uses: actions/upload-artifact@v3
-        with:
-          name: binaries-windows
-          path: |
-            packaging/k6-*.msi
-          retention-days: 7
-
-  # Disabled until #1997 and #1998 are addressed.
-  # publish-macos:
-  #   runs-on: macos-latest
-  #   needs: [configure, build]
-  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-  #   env:
-  #     VERSION: ${{ needs.configure.outputs.k6_version }}
-  #     HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-  #   steps:
-  #     - name: Download source code archive
-  #       run: curl -fsSL "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" -o "${VERSION}.tar.gz"
-  #     - name: Set up Homebrew
-  #       uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
-  #     - name: Create version bump PR
-  #       run: |
-  #         brew bump-formula-pr k6 \
-  #           --url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" \
-  #           --sha256="$(shasum -a 256 ${VERSION}.tar.gz | cut -d' ' -f1)"
-
-  publish-github:
-    runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Download binaries
-        uses: actions/download-artifact@v3
-        with:
-          name: binaries
-          path: dist
-      - name: Download Windows binaries
-        uses: actions/download-artifact@v3
-        with:
-          name: binaries-windows
-          path: dist
-      - name: Generate checksum file
-        run: cd dist && sha256sum * > "k6-${VERSION}-checksums.txt"
-      - name: Create release
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          set -x
-          assets=()
-          for asset in ./dist/*; do
-            assets+=("-a" "$asset")
-          done
-          hub release create "${assets[@]}" -m "$VERSION" -m "$(cat ./release\ notes/${VERSION}.md)" "$VERSION"
-
-  publish-packages:
-    runs-on: ubuntu-latest
-    needs: [configure, build, package-windows]
-    if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-    env:
-      VERSION: ${{ needs.configure.outputs.k6_version }}
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-      - name: Download binaries
-        uses: actions/download-artifact@v3
-        with:
-          name: binaries
-          path: dist
-      - name: Download Windows binaries
-        uses: actions/download-artifact@v3
-        with:
-          name: binaries-windows
-          path: dist
-      - name: Rename binaries
-        # To be consistent with the filenames used in dl.k6.io
-        run: |
-          mv "dist/k6-$VERSION-windows-amd64.msi" "dist/k6-$VERSION-amd64.msi"
-          mv "dist/k6-$VERSION-linux-amd64.rpm" "dist/k6-$VERSION-amd64.rpm"
-          mv "dist/k6-$VERSION-linux-amd64.deb" "dist/k6-$VERSION-amd64.deb"
-      - name: Setup docker-compose environment
-        run: |
-          cat > packaging/.env <<EOF
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION=us-east-1
-          AWS_CF_DISTRIBUTION="${{ secrets.AWS_CF_DISTRIBUTION }}"
-          PGP_SIGN_KEY_PASSPHRASE=${{ secrets.PGP_SIGN_KEY_PASSPHRASE }}
-          EOF
-          echo "${{ secrets.PGP_SIGN_KEY }}" > packaging/sign-key.gpg
-      - name: Publish packages
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-          cd packaging
-          docker-compose pull packager
-          docker-compose run --rm packager
