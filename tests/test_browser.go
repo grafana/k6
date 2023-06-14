@@ -407,13 +407,13 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
 	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
-	vu.CtxField = k6ext.WithCustomMetrics(
+	metricsCtx := k6ext.WithCustomMetrics(
 		vu.Context(),
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
-	vu.InitEnvField.LookupEnv = opts.lookupFunc
-	ctx, cancel := context.WithCancel(vu.Context())
+	ctx, cancel := context.WithCancel(metricsCtx)
 	vu.CtxField = ctx
+	vu.InitEnvField.LookupEnv = opts.lookupFunc
 
 	bt := chromium.NewBrowserType(vu)
 	// Delete the pre-init stage data.
