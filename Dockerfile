@@ -25,7 +25,7 @@ WORKDIR /home/k6
 ENTRYPOINT ["k6"]
 
 # Legacy loadimpact/k6 image
-FROM grafana/k6
+FROM --platform=$BUILDPLATFORM release
 
 # Temporarily switch back to root to move files
 USER 0
