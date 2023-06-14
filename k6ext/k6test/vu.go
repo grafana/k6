@@ -33,9 +33,9 @@ type VU struct {
 // ToGojaValue is a convenience method for converting any value to a goja value.
 func (v *VU) ToGojaValue(i any) goja.Value { return v.Runtime().ToValue(i) }
 
-// MoveToVUContext moves the VU to VU context, adding a predefined k6 lib State and nilling the InitEnv
-// to simulate how that is done in the real k6.
-func (v *VU) MoveToVUContext() {
+// RestoreVUState restores the state field of the VU and nilling the InitEnv field.
+// This is done to simulate how k6 operates.
+func (v *VU) RestoreVUState() {
 	v.VU.StateField = v.toBeState
 	v.VU.InitEnvField = nil
 }

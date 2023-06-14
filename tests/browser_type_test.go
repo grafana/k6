@@ -18,7 +18,7 @@ func TestBrowserTypeConnect(t *testing.T) {
 	tb := newTestBrowser(t)
 	vu := k6test.NewVU(t)
 	bt := chromium.NewBrowserType(vu)
-	vu.MoveToVUContext()
+	vu.RestoreVUState()
 
 	b, err := bt.Connect(context.Background(), tb.wsURL)
 	require.NoError(t, err)
@@ -42,7 +42,7 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
-	vu.MoveToVUContext()
+	vu.RestoreVUState()
 
 	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))

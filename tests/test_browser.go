@@ -354,7 +354,7 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 
 	bt := chromium.NewBrowserType(vu)
 	// Delete the pre-init stage data.
-	vu.MoveToVUContext()
+	vu.RestoreVUState()
 
 	return bt, vu, cancel
 }

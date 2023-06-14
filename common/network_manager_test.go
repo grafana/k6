@@ -61,7 +61,7 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 	})
 
 	vu := k6test.NewVU(t)
-	vu.MoveToVUContext()
+	vu.RestoreVUState()
 	st := vu.State()
 	st.Options = k6opts
 	logger := log.New(st.Logger, "")
@@ -268,7 +268,7 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 				vu = k6test.NewVU(t)
 				nm = &NetworkManager{ctx: vu.Context(), vu: vu, customMetrics: k6m}
 			)
-			vu.MoveToVUContext()
+			vu.RestoreVUState()
 
 			req, err := NewRequest(vu.Context(), NewRequestParams{
 				event: &network.EventRequestWillBeSent{
