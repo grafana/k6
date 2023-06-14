@@ -281,6 +281,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 }
 
 func testSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {
+	t.Helper()
+
 	hooks := common.GetHooks(tb.ctx)
 	currentHook := hooks.Get(common.HookApplySlowMo)
 	chCalled := make(chan bool, 1)
@@ -302,6 +304,8 @@ func testSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {
 }
 
 func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *common.Page)) {
+	t.Helper()
+
 	p, ok := tb.NewPage(nil).(*common.Page)
 	require.True(t, ok, "expected page to be a *common.Page")
 
@@ -319,6 +323,8 @@ func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *co
 }
 
 func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser, f api.Frame)) {
+	t.Helper()
+
 	p, ok := tb.NewPage(nil).(*common.Page)
 	require.True(t, ok, "expected page to be a *common.Page")
 
