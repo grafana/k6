@@ -60,7 +60,7 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrows
 	tb.Helper()
 
 	tbr := &testBrowser{t: tb}
-	tbopts := newTestBrowserOptions(opts...)
+	tbopts := newTestBrowserOptions(tbr, opts...)
 	tbr.browserType, tbr.vu, tbr.cancel = newBrowserTypeWithVU(tb, tbopts)
 	tb.Cleanup(tbr.cancel)
 
@@ -240,6 +240,10 @@ func (b *testBrowser) withFileServer() *testBrowser {
 
 // testBrowserOptions is a helper for creating testBrowser options.
 type testBrowserOptions struct {
+	// testBrowser field provides access to the testBrowser instance for
+	// the options to modify it.
+	testBrowser *testBrowser
+
 	fileServer   bool
 	logCache     bool
 	httpMultiBin bool
@@ -250,12 +254,13 @@ type testBrowserOptions struct {
 
 // newTestBrowserOptions creates a new testBrowserOptions with the given options.
 // call apply to reapply the options.
-func newTestBrowserOptions(opts ...func(*testBrowserOptions)) *testBrowserOptions {
+func newTestBrowserOptions(tb *testBrowser, opts ...func(*testBrowserOptions)) *testBrowserOptions {
 	// default lookup function is env.Lookup so that we can
 	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
 	tbo := &testBrowserOptions{
-		samples:    make(chan k6metrics.SampleContainer, 1000),
-		lookupFunc: env.Lookup,
+		testBrowser: tb,
+		samples:     make(chan k6metrics.SampleContainer, 1000),
+		lookupFunc:  env.Lookup,
 	}
 	tbo.apply(opts...)
 
