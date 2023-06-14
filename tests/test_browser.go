@@ -60,8 +60,6 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 	}
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case withSamplesListener:
-			tbo.samples = opt
 		case env.LookupFunc:
 			tbo.lookupFunc = opt
 		case func(*testBrowserOptions):
@@ -377,7 +375,9 @@ func withSkipClose() func(tb *testBrowserOptions) {
 
 // withSamplesListener is used to indicate we want to use a bidirectional channel
 // so that the test can read the metrics being emitted to the channel.
-type withSamplesListener chan k6metrics.SampleContainer
+func withSamplesListener(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions) {
+	return func(tb *testBrowserOptions) { tb.samples = sc }
+}
 
 func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	_ *chromium.BrowserType,
