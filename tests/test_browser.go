@@ -227,7 +227,7 @@ func (b *testBrowser) Cancel() {
 }
 
 // attachFrame attaches the frame to the page and returns it.
-func (b *testBrowser) attachFrame(page api.Page, frameID string, url string) api.Frame {
+func (b *testBrowser) attachFrame(page *common.Page, frameID string, url string) api.Frame {
 	b.t.Helper()
 
 	pageFn := `
