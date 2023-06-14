@@ -67,12 +67,12 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 			tbo.httpMultiBin = true
 		case logCacheOption:
 			tbo.logCache = true
-		case skipCloseOption:
-			tbo.skipClose = true
 		case withSamplesListener:
 			tbo.samples = opt
 		case env.LookupFunc:
 			tbo.lookupFunc = opt
+		case func(*testBrowserOptions):
+			opt(tbo)
 		}
 	}
 
@@ -378,17 +378,15 @@ func withLogCache() logCacheOption {
 	return struct{}{}
 }
 
-// skipCloseOption is used to indicate that we shouldn't call Browser.Close() in
-// t.Cleanup(), since it will presumably be done by the test.
-type skipCloseOption struct{}
-
 // withSkipClose skips calling Browser.Close() in t.Cleanup().
+// It indicates that we shouldn't call Browser.Close() in
+// t.Cleanup(), since it will presumably be done by the test.
 //
 // example:
 //
 //	b := TestBrowser(t, withSkipClose())
-func withSkipClose() skipCloseOption {
-	return struct{}{}
+func withSkipClose() func(tb *testBrowserOptions) {
+	return func(tb *testBrowserOptions) { tb.skipClose = true }
 }
 
 // withSamplesListener is used to indicate we want to use a bidirectional channel
