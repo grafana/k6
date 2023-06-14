@@ -306,9 +306,7 @@ func testSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {
 func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *common.Page)) {
 	t.Helper()
 
-	p, ok := tb.NewPage(nil).(*common.Page)
-	require.True(t, ok, "expected page to be a *common.Page")
-
+	p := tb.NewPage(nil)
 	p.SetContent(`
 		<button>a</button>
 		<input type="checkbox" class="check">
@@ -325,8 +323,7 @@ func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *co
 func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser, f api.Frame)) {
 	t.Helper()
 
-	p, ok := tb.NewPage(nil).(*common.Page)
-	require.True(t, ok, "expected page to be a *common.Page")
+	p := tb.NewPage(nil)
 
 	f := tb.attachFrame(p, "frame1", tb.staticURL("empty.html"))
 	f.SetContent(`
