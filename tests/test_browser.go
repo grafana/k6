@@ -60,8 +60,6 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 	}
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case logCacheOption:
-			tbo.logCache = true
 		case withSamplesListener:
 			tbo.samples = opt
 		case env.LookupFunc:
@@ -357,16 +355,13 @@ func withFileServer() func(tb *testBrowserOptions) {
 	}
 }
 
-// logCacheOption is used to detect whether to enable the log cache.
-type logCacheOption struct{}
-
 // withLogCache enables the log cache.
 //
 // example:
 //
 //	b := TestBrowser(t, withLogCache())
-func withLogCache() logCacheOption {
-	return struct{}{}
+func withLogCache() func(tb *testBrowserOptions) {
+	return func(tb *testBrowserOptions) { tb.logCache = true }
 }
 
 // withSkipClose skips calling Browser.Close() in t.Cleanup().
