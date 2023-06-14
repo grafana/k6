@@ -38,7 +38,7 @@ type testBrowser struct {
 
 	browserType *chromium.BrowserType
 
-	api.Browser
+	*common.Browser
 
 	cancel context.CancelFunc
 }
@@ -143,7 +143,7 @@ func newTestBrowser(tb testing.TB, opts ...any) *testBrowser {
 		http:        testServer,
 		vu:          vu,
 		logCache:    lc,
-		Browser:     b,
+		Browser:     cb,
 		browserType: bt,
 		pid:         pid,
 		wsURL:       cb.WsURL(),
