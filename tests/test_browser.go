@@ -60,8 +60,6 @@ func newTestBrowserOptions(opts ...any) *testBrowserOptions {
 	}
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case httpServerOption:
-			tbo.httpMultiBin = true
 		case fileServerOption:
 			tbo.fileServer = true
 			tbo.httpMultiBin = true
@@ -337,17 +335,14 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	}
 }
 
-// httpServerOption is used to detect whether to enable the HTTP test
-// server.
-type httpServerOption struct{}
-
 // withHTTPServer enables the HTTP test server.
+// It is used to detect whether to enable the HTTP test server.
 //
 // example:
 //
 //	b := TestBrowser(t, withHTTPServer())
-func withHTTPServer() httpServerOption {
-	return struct{}{}
+func withHTTPServer() func(tb *testBrowserOptions) {
+	return func(tb *testBrowserOptions) { tb.httpMultiBin = true }
 }
 
 // fileServerOption is used to detect whether enable the static file
