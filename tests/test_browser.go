@@ -419,9 +419,10 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	tb.Helper()
 
 	vu := setupHTTPTestModuleInstance(tb, opts.samples)
-	registry := k6metrics.NewRegistry()
-	k6m := k6ext.RegisterCustomMetrics(registry)
-	vu.CtxField = k6ext.WithCustomMetrics(vu.Context(), k6m)
+	vu.CtxField = k6ext.WithCustomMetrics(
+		vu.Context(),
+		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
+	)
 	vu.InitEnvField.LookupEnv = opts.lookupFunc
 
 	ctx, cancel := context.WithCancel(vu.Context())
