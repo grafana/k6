@@ -8,7 +8,7 @@ import (
 )
 
 type pusher interface {
-	push(referenceID string, samples *pbcloud.MetricSet) error
+	push(samples *pbcloud.MetricSet) error
 }
 
 type metricsFlusher struct {
@@ -46,7 +46,7 @@ func (f *metricsFlusher) flush(_ context.Context) error {
 		}
 
 		// we hit the chunk size, let's flush
-		err := f.client.push(f.referenceID, msb.MetricSet)
+		err := f.client.push(msb.MetricSet)
 		if err != nil {
 			return err
 		}
@@ -58,7 +58,7 @@ func (f *metricsFlusher) flush(_ context.Context) error {
 	}
 
 	// send the last (or the unique) MetricSet chunk to the remote service
-	return f.client.push(f.referenceID, msb.MetricSet)
+	return f.client.push(msb.MetricSet)
 }
 
 type metricSetBuilder struct {

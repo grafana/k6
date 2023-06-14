@@ -21,41 +21,40 @@ import (
 // to the remote service.
 type metricsClient struct {
 	httpClient *cloudapi.Client
-	baseURL    string
+	url        string
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c *cloudapi.Client) (*metricsClient, error) {
-	// Unfortunately, the cloudapi.Client works across different versions
-	// of the API, but it has the v1 harcoded so we need to trim the wrong path
+func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, error) {
+	// The cloudapi.Client works across different versions of the API, the test
+	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
+	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
 	// to be able to replace it with the correct one.
+	// A versioned client would be better but it would require a breaking change
+	// and considering that other services (e.g. k6-operator) depend on it,
+	// we want to stabilize the API before.
 	u := c.BaseURL()
 	if !strings.HasSuffix(u, "/v1") {
 		return nil, errors.New("a /v1 suffix is expected in the Cloud service's BaseURL path")
 	}
+	if testRunID == "" {
+		return nil, errors.New("TestRunID of the test is required")
+	}
 	return &metricsClient{
 		httpClient: c,
-		baseURL:    strings.TrimSuffix(u, "/v1") + "/v2/metrics/",
+		url:        strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID,
 	}, nil
 }
 
 // Push the provided metrics for the given test run ID.
-func (mc *metricsClient) push(referenceID string, samples *pbcloud.MetricSet) error {
-	if referenceID == "" {
-		return errors.New("TestRunID of the test is required")
-	}
-
+func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
 	b, err := newRequestBody(samples)
 	if err != nil {
 		return err
 	}
 
-	// TODO: it is always the same
-	// we don't expect to share this client across different refID
-	// with a bit of effort we can find a way to just allocate once
-	url := mc.baseURL + referenceID
 	req, err := http.NewRequestWithContext(
-		context.Background(), http.MethodPost, url, io.NopCloser(bytes.NewReader(b)))
+		context.Background(), http.MethodPost, mc.url, io.NopCloser(bytes.NewReader(b)))
 	if err != nil {
 		return err
 	}

@@ -74,6 +74,8 @@ func TestOutputCollectSamples(t *testing.T) {
 		logger, conf.Token.String, conf.Host.String, "v/test", conf.Timeout.TimeDuration())
 	o, err := New(logger, conf, cc)
 	require.NoError(t, err)
+
+	o.SetReferenceID("ref-id-123")
 	require.NoError(t, o.Start())
 	require.Empty(t, o.collector.bq.PopAll())
 
@@ -286,6 +288,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 	o, err := New(logger, config, cc)
 	require.NoError(t, err)
 
+	o.SetReferenceID("ref-id-123")
 	require.NoError(t, o.Start())
 	require.NoError(t, o.StopWithTestError(errors.New("an error")))
 }
