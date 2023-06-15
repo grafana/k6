@@ -66,11 +66,6 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrows
 	tbopts.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbopts.apply(opts...)                  // apply post-init stage options.
 
-	if tbopts.httpMultiBin {
-		tbr.http = k6httpmultibin.NewHTTPMultiBin(tb)
-		tbr.vu.StateField.TLSConfig = tbr.http.TLSClientConfig
-		tbr.vu.StateField.Transport = tbr.http.HTTPTransport
-	}
 	if tbopts.fileServer {
 		tbr = tbr.withFileServer()
 	}
@@ -248,11 +243,10 @@ type testBrowserOptions struct {
 
 	// options
 
-	fileServer   bool
-	httpMultiBin bool
-	samples      chan k6metrics.SampleContainer
-	skipClose    bool
-	lookupFunc   env.LookupFunc
+	fileServer bool
+	samples    chan k6metrics.SampleContainer
+	skipClose  bool
+	lookupFunc env.LookupFunc
 }
 
 // newTestBrowserOptions creates a new testBrowserOptions with the given options.
@@ -295,9 +289,14 @@ func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) {
 //
 //	b := TestBrowser(t, withFileServer())
 func withFileServer() func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) {
-		tb.httpMultiBin = true
-		tb.fileServer = true
+	return func(opts *testBrowserOptions) {
+		tb := opts.testBrowser
+		// file server needs HTTP server.
+		if tb.http == nil {
+			apply := withHTTPServer()
+			apply(opts)
+		}
+		opts.fileServer = true
 	}
 }
 
@@ -320,7 +319,19 @@ func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *tes
 //
 //	b := TestBrowser(t, withHTTPServer())
 func withHTTPServer() func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.httpMultiBin = true }
+	return func(opts *testBrowserOptions) {
+		if !opts.isBrowserTypeInitialized {
+			return
+		}
+		tb := opts.testBrowser
+		if opts.testBrowser.http != nil {
+			// already initialized.
+			return
+		}
+		tb.http = k6httpmultibin.NewHTTPMultiBin(tb.t)
+		tb.vu.StateField.TLSConfig = tb.http.TLSClientConfig
+		tb.vu.StateField.Transport = tb.http.HTTPTransport
+	}
 }
 
 // withLogCache enables the log cache.
