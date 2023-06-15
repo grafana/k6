@@ -210,22 +210,30 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	}
 }
 
-// withFileServer serves a file server using the HTTP test server that is
-// accessible via `testBrowserStaticDir` prefix.
-//
-// This method is for enabling the static file server after starting a test
-// browser. For early starting the file server see withFileServer function.
-func (b *testBrowser) withFileServer() *testBrowser {
-	b.t.Helper()
+// newBrowserTypeWithVU creates a new browser type with a VU.
+func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
+	_ *chromium.BrowserType,
+	_ *k6test.VU,
+	cancel func(),
+) {
+	tb.Helper()
 
-	const (
-		slash = string(os.PathSeparator)
-		path  = slash + testBrowserStaticDir + slash
+	vu := k6test.NewVU(tb, k6test.WithSamples(opts.samples))
+	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
+	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
+	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
+	metricsCtx := k6ext.WithCustomMetrics(
+		vu.Context(),
+		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
+	ctx, cancel := context.WithCancel(metricsCtx)
+	vu.CtxField = ctx
+	vu.InitEnvField.LookupEnv = opts.lookupFunc
 
-	fs := http.FileServer(http.Dir(testBrowserStaticDir))
+	bt := chromium.NewBrowserType(vu)
+	vu.RestoreVUState()
 
-	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
+	return bt, vu, cancel
 }
 
 // testBrowserOptions is a helper for creating testBrowser options.
@@ -298,6 +306,24 @@ func withFileServer() func(tb *testBrowserOptions) {
 	}
 }
 
+// withFileServer serves a file server using the HTTP test server that is
+// accessible via `testBrowserStaticDir` prefix.
+//
+// This method is for enabling the static file server after starting a test
+// browser. For early starting the file server see withFileServer function.
+func (b *testBrowser) withFileServer() *testBrowser {
+	b.t.Helper()
+
+	const (
+		slash = string(os.PathSeparator)
+		path  = slash + testBrowserStaticDir + slash
+	)
+
+	fs := http.FileServer(http.Dir(testBrowserStaticDir))
+
+	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
+}
+
 // withHandler adds the given handler to the HTTP test server and makes it
 // accessible with the given pattern.
 func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *testBrowser {
@@ -362,30 +388,4 @@ func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions)
 //	b := TestBrowser(t, withSkipClose())
 func withSkipClose() func(tb *testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.skipClose = true }
-}
-
-// newBrowserTypeWithVU creates a new browser type with a VU.
-func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
-	_ *chromium.BrowserType,
-	_ *k6test.VU,
-	cancel func(),
-) {
-	tb.Helper()
-
-	vu := k6test.NewVU(tb, k6test.WithSamples(opts.samples))
-	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
-	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
-	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
-	metricsCtx := k6ext.WithCustomMetrics(
-		vu.Context(),
-		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
-	)
-	ctx, cancel := context.WithCancel(metricsCtx)
-	vu.CtxField = ctx
-	vu.InitEnvField.LookupEnv = opts.lookupFunc
-
-	bt := chromium.NewBrowserType(vu)
-	vu.RestoreVUState()
-
-	return bt, vu, cancel
 }
