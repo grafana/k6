@@ -47,6 +47,8 @@ type testBrowser struct {
 	lookupFunc env.LookupFunc
 	// samples is set by the withSamples option.
 	samples chan k6metrics.SampleContainer
+	// skipClose is set by the withSkipClose option.
+	skipClose bool
 }
 
 // newTestBrowser configures and launches a new chrome browser.
@@ -86,7 +88,7 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrows
 		select {
 		case <-tbr.vu.Context().Done():
 		default:
-			if !tbopts.skipClose {
+			if !tbr.skipClose {
 				cb.Close()
 			}
 		}
@@ -248,10 +250,6 @@ type testBrowserOptions struct {
 	// isBrowserTypeInitialized is true if the
 	// browser type has been initialized with a VU.
 	isBrowserTypeInitialized bool
-
-	// options
-
-	skipClose bool
 }
 
 // newTestBrowserOptions creates a new testBrowserOptions with the given options.
@@ -392,5 +390,5 @@ func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions)
 //
 //	b := TestBrowser(t, withSkipClose())
 func withSkipClose() func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.skipClose = true }
+	return func(tb *testBrowserOptions) { tb.testBrowser.skipClose = true }
 }
