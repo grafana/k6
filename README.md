@@ -15,7 +15,8 @@
 <p align="center">
     <a href="https://github.com/grafana/k6/releases">Download</a> ·
     <a href="https://k6.io/docs">Documentation</a> ·
-    <a href="https://community.k6.io/">Community Forum</a>
+    <a href="https://community.k6.io/">Community Forum</a> ·
+    <a href="https://github.com/orgs/grafana/projects/443/views/1">Roadmap</a>
 </p>
 
 <br/>
