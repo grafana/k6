@@ -45,6 +45,8 @@ type testBrowser struct {
 	logCache *logCache
 	// lookupFunc is set by the withEnvLookup option.
 	lookupFunc env.LookupFunc
+	// samples is set by the withSamples option.
+	samples chan k6metrics.SampleContainer
 }
 
 // newTestBrowser configures and launches a new chrome browser.
@@ -220,7 +222,7 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 ) {
 	tb.Helper()
 
-	vu := k6test.NewVU(tb, k6test.WithSamples(opts.samples))
+	vu := k6test.NewVU(tb, k6test.WithSamples(opts.testBrowser.samples))
 	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
 	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
@@ -249,7 +251,6 @@ type testBrowserOptions struct {
 
 	// options
 
-	samples   chan k6metrics.SampleContainer
 	skipClose bool
 }
 
@@ -260,8 +261,8 @@ func newTestBrowserOptions(tb *testBrowser, opts ...func(*testBrowserOptions)) *
 	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
 	tbo := &testBrowserOptions{
 		testBrowser: tb,
-		samples:     make(chan k6metrics.SampleContainer, 1000),
 	}
+	tb.samples = make(chan k6metrics.SampleContainer, 1000)
 	tb.lookupFunc = env.Lookup
 
 	tbo.apply(opts...)
@@ -380,7 +381,7 @@ func withLogCache() func(tb *testBrowserOptions) {
 // withSamples is used to indicate we want to use a bidirectional channel
 // so that the test can read the metrics being emitted to the channel.
 func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.samples = sc }
+	return func(tb *testBrowserOptions) { tb.testBrowser.samples = sc }
 }
 
 // withSkipClose skips calling Browser.Close() in t.Cleanup().
