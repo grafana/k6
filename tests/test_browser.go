@@ -66,10 +66,6 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrows
 	tbopts.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbopts.apply(opts...)                  // apply post-init stage options.
 
-	if tbopts.fileServer {
-		tbr = tbr.withFileServer()
-	}
-
 	b, pid, err := tbr.browserType.Launch(tbr.vu.Context())
 	if err != nil {
 		tb.Fatalf("testBrowser: %v", err)
@@ -243,7 +239,6 @@ type testBrowserOptions struct {
 
 	// options
 
-	fileServer bool
 	samples    chan k6metrics.SampleContainer
 	skipClose  bool
 	lookupFunc env.LookupFunc
@@ -290,13 +285,16 @@ func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) {
 //	b := TestBrowser(t, withFileServer())
 func withFileServer() func(tb *testBrowserOptions) {
 	return func(opts *testBrowserOptions) {
+		if !opts.isBrowserTypeInitialized {
+			return
+		}
 		tb := opts.testBrowser
-		// file server needs HTTP server.
 		if tb.http == nil {
+			// file server needs HTTP server.
 			apply := withHTTPServer()
 			apply(opts)
 		}
-		opts.fileServer = true
+		opts.testBrowser = tb.withFileServer()
 	}
 }
 
