@@ -237,6 +237,7 @@ func (b *testBrowser) withFileServer() *testBrowser {
 	return b.withHandler(path, http.StripPrefix(path, fs).ServeHTTP)
 }
 
+// testBrowserOptions is a helper for creating testBrowser options.
 type testBrowserOptions struct {
 	fileServer   bool
 	logCache     bool
@@ -246,6 +247,8 @@ type testBrowserOptions struct {
 	lookupFunc   env.LookupFunc
 }
 
+// newTestBrowserOptions creates a new testBrowserOptions with the given options.
+// call apply to reapply the options.
 func newTestBrowserOptions(opts ...func(*testBrowserOptions)) *testBrowserOptions {
 	// default lookup function is env.Lookup so that we can
 	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
@@ -253,11 +256,16 @@ func newTestBrowserOptions(opts ...func(*testBrowserOptions)) *testBrowserOption
 		samples:    make(chan k6metrics.SampleContainer, 1000),
 		lookupFunc: env.Lookup,
 	}
+	tbo.apply(opts...)
+
+	return tbo
+}
+
+// apply applies the given options to the testBrowserOptions.
+func (tbo *testBrowserOptions) apply(opts ...func(*testBrowserOptions)) {
 	for _, opt := range opts {
 		opt(tbo)
 	}
-
-	return tbo
 }
 
 // withEnvLookup sets the lookup function for environment variables.
