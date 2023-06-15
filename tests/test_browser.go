@@ -66,9 +66,6 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrows
 	tbopts.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbopts.apply(opts...)                  // apply post-init stage options.
 
-	if tbopts.logCache {
-		tbr.logCache = attachLogCache(tb, tbr.vu.StateField.Logger)
-	}
 	if tbopts.httpMultiBin {
 		tbr.http = k6httpmultibin.NewHTTPMultiBin(tb)
 		tbr.vu.StateField.TLSConfig = tbr.http.TLSClientConfig
@@ -252,7 +249,6 @@ type testBrowserOptions struct {
 	// options
 
 	fileServer   bool
-	logCache     bool
 	httpMultiBin bool
 	samples      chan k6metrics.SampleContainer
 	skipClose    bool
@@ -333,7 +329,13 @@ func withHTTPServer() func(tb *testBrowserOptions) {
 //
 //	b := TestBrowser(t, withLogCache())
 func withLogCache() func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.logCache = true }
+	return func(opts *testBrowserOptions) {
+		if !opts.isBrowserTypeInitialized {
+			return
+		}
+		tb := opts.testBrowser
+		tb.logCache = attachLogCache(tb.t, tb.vu.StateField.Logger)
+	}
 }
 
 // withSamples is used to indicate we want to use a bidirectional channel
