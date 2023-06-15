@@ -39,6 +39,11 @@ type testBrowser struct {
 
 	*common.Browser
 
+	// isBrowserTypeInitialized is true if the browser type has been
+	// initialized with a VU. Some options can only be used in the
+	// post-init stage and require the browser type to be initialized.
+	isBrowserTypeInitialized bool
+
 	// http is set by the withHTTPServer option.
 	http *k6httpmultibin.HTTPMultiBin
 	// logCache is set by the withLogCache option.
@@ -62,15 +67,16 @@ type testBrowser struct {
 //   - withLogCache: enables the log cache.
 //   - withSamples: provides a channel to receive the browser metrics.
 //   - withSkipClose: skips closing the browser when the test finishes.
-func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrowser {
+func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tb.Helper()
 
 	tbr := &testBrowser{t: tb}
-	tbopts := newTestBrowserOptions(tbr, opts...) // apply pre-init stage options.
-	tbr.browserType, tbr.vu, tbr.cancel = newBrowserTypeWithVU(tb, tbopts)
+	tbr.applyDefaultOptions()
+	tbr.applyOptions(opts...) // apply pre-init stage options.
+	tbr.browserType, tbr.vu, tbr.cancel = newBrowserTypeWithVU(tb, tbr)
 	tb.Cleanup(tbr.cancel)
-	tbopts.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
-	tbopts.apply(opts...)                  // apply post-init stage options.
+	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
+	tbr.applyOptions(opts...)           // apply post-init stage options.
 
 	b, pid, err := tbr.browserType.Launch(tbr.vu.Context())
 	if err != nil {
@@ -217,14 +223,14 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 }
 
 // newBrowserTypeWithVU creates a new browser type with a VU.
-func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
+func newBrowserTypeWithVU(tb testing.TB, tbr *testBrowser) (
 	_ *chromium.BrowserType,
 	_ *k6test.VU,
 	cancel func(),
 ) {
 	tb.Helper()
 
-	vu := k6test.NewVU(tb, k6test.WithSamples(opts.testBrowser.samples))
+	vu := k6test.NewVU(tb, k6test.WithSamples(tbr.samples))
 	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
 	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
 	require.NoError(tb, vu.Runtime().Set("http", mi.Exports().Default))
@@ -234,7 +240,7 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	)
 	ctx, cancel := context.WithCancel(metricsCtx)
 	vu.CtxField = ctx
-	vu.InitEnvField.LookupEnv = opts.testBrowser.lookupFunc
+	vu.InitEnvField.LookupEnv = tbr.lookupFunc
 
 	bt := chromium.NewBrowserType(vu)
 	vu.RestoreVUState()
@@ -242,36 +248,18 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	return bt, vu, cancel
 }
 
-// testBrowserOptions is a helper for creating testBrowser options.
-type testBrowserOptions struct {
-	// testBrowser field provides access to the testBrowser instance for
-	// the options to modify it.
-	testBrowser *testBrowser
-	// isBrowserTypeInitialized is true if the
-	// browser type has been initialized with a VU.
-	isBrowserTypeInitialized bool
-}
-
-// newTestBrowserOptions creates a new testBrowserOptions with the given options.
-// call apply to reapply the options.
-func newTestBrowserOptions(tb *testBrowser, opts ...func(*testBrowserOptions)) *testBrowserOptions {
+// applyDefaultOptions applies the default options for the testBrowser.
+func (b *testBrowser) applyDefaultOptions() {
+	b.samples = make(chan k6metrics.SampleContainer, 1000)
 	// default lookup function is env.Lookup so that we can
 	// pass the environment variables while testing, i.e.: K6_BROWSER_LOG.
-	tbo := &testBrowserOptions{
-		testBrowser: tb,
-	}
-	tb.samples = make(chan k6metrics.SampleContainer, 1000)
-	tb.lookupFunc = env.Lookup
-
-	tbo.apply(opts...)
-
-	return tbo
+	b.lookupFunc = env.Lookup
 }
 
-// apply applies the given options to the testBrowserOptions.
-func (tbo *testBrowserOptions) apply(opts ...func(*testBrowserOptions)) {
+// applyOptions applies the given options to the testBrowser.
+func (b *testBrowser) applyOptions(opts ...func(*testBrowser)) {
 	for _, opt := range opts {
-		opt(tbo)
+		opt(b)
 	}
 }
 
@@ -280,10 +268,8 @@ func (tbo *testBrowserOptions) apply(opts ...func(*testBrowserOptions)) {
 // example:
 //
 //	b := TestBrowser(t, withEnvLookup(env.ConstLookup(env.BrowserHeadless, "0")))
-func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) {
-	return func(tb *testBrowserOptions) {
-		tb.testBrowser.lookupFunc = lookupFunc
-	}
+func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowser) {
+	return func(tb *testBrowser) { tb.lookupFunc = lookupFunc }
 }
 
 // withFileServer enables the HTTP test server and serves a file server
@@ -294,18 +280,17 @@ func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) {
 // example:
 //
 //	b := TestBrowser(t, withFileServer())
-func withFileServer() func(tb *testBrowserOptions) {
-	return func(opts *testBrowserOptions) {
-		if !opts.isBrowserTypeInitialized {
+func withFileServer() func(*testBrowser) {
+	return func(tb *testBrowser) {
+		if !tb.isBrowserTypeInitialized {
 			return
 		}
-		tb := opts.testBrowser
 		if tb.http == nil {
 			// file server needs HTTP server.
 			apply := withHTTPServer()
-			apply(opts)
+			apply(tb)
 		}
-		opts.testBrowser = tb.withFileServer()
+		_ = tb.withFileServer()
 	}
 }
 
@@ -345,13 +330,12 @@ func (b *testBrowser) withHandler(pattern string, handler http.HandlerFunc) *tes
 // example:
 //
 //	b := TestBrowser(t, withHTTPServer())
-func withHTTPServer() func(tb *testBrowserOptions) {
-	return func(opts *testBrowserOptions) {
-		if !opts.isBrowserTypeInitialized {
+func withHTTPServer() func(*testBrowser) {
+	return func(tb *testBrowser) {
+		if !tb.isBrowserTypeInitialized {
 			return
 		}
-		tb := opts.testBrowser
-		if opts.testBrowser.http != nil {
+		if tb.http != nil {
 			// already initialized.
 			return
 		}
@@ -366,20 +350,19 @@ func withHTTPServer() func(tb *testBrowserOptions) {
 // example:
 //
 //	b := TestBrowser(t, withLogCache())
-func withLogCache() func(tb *testBrowserOptions) {
-	return func(opts *testBrowserOptions) {
-		if !opts.isBrowserTypeInitialized {
+func withLogCache() func(*testBrowser) {
+	return func(tb *testBrowser) {
+		if !tb.isBrowserTypeInitialized {
 			return
 		}
-		tb := opts.testBrowser
 		tb.logCache = attachLogCache(tb.t, tb.vu.StateField.Logger)
 	}
 }
 
 // withSamples is used to indicate we want to use a bidirectional channel
 // so that the test can read the metrics being emitted to the channel.
-func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.testBrowser.samples = sc }
+func withSamples(sc chan k6metrics.SampleContainer) func(*testBrowser) {
+	return func(tb *testBrowser) { tb.samples = sc }
 }
 
 // withSkipClose skips calling Browser.Close() in t.Cleanup().
@@ -389,6 +372,6 @@ func withSamples(sc chan k6metrics.SampleContainer) func(tb *testBrowserOptions)
 // example:
 //
 //	b := TestBrowser(t, withSkipClose())
-func withSkipClose() func(tb *testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.testBrowser.skipClose = true }
+func withSkipClose() func(*testBrowser) {
+	return func(tb *testBrowser) { tb.skipClose = true }
 }
