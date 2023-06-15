@@ -103,125 +103,6 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	return tbr
 }
 
-// NewPage is a wrapper around Browser.NewPage that fails the test if an
-// error occurs. Added this helper to avoid boilerplate code in tests.
-func (b *testBrowser) NewPage(opts goja.Value) *common.Page {
-	b.t.Helper()
-
-	p, err := b.Browser.NewPage(opts)
-	require.NoError(b.t, err)
-
-	pp, ok := p.(*common.Page)
-	require.Truef(b.t, ok, "want *common.Page, got %T", p)
-
-	return pp
-}
-
-// url returns the listening HTTP test server's url combined with the given path.
-func (b *testBrowser) url(path string) string {
-	b.t.Helper()
-
-	if b.http == nil {
-		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
-	}
-	return b.http.ServerHTTP.URL + path
-}
-
-// staticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
-func (b *testBrowser) staticURL(path string) string {
-	b.t.Helper()
-	return b.url("/" + testBrowserStaticDir + "/" + path)
-}
-
-// context returns the testBrowser context.
-func (b *testBrowser) context() context.Context { return b.ctx }
-
-// cancelContext cancels the testBrowser context.
-func (b *testBrowser) cancelContext() { b.cancel() }
-
-// runtime returns a VU runtime.
-func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }
-
-// toGojaValue converts a value to goja value.
-func (b *testBrowser) toGojaValue(i any) goja.Value { return b.runtime().ToValue(i) }
-
-// asGojaValue asserts that v is a goja value and returns v as a goja.value.
-func (b *testBrowser) asGojaValue(v any) goja.Value {
-	b.t.Helper()
-	gv, ok := v.(goja.Value)
-	require.Truef(b.t, ok, "want goja.Value; got %T", v)
-	return gv
-}
-
-// asGojaBool asserts that v is a boolean goja value and returns v as a boolean.
-func (b *testBrowser) asGojaBool(v any) bool {
-	b.t.Helper()
-	gv := b.asGojaValue(v)
-	require.IsType(b.t, b.toGojaValue(true), gv)
-	return gv.ToBoolean()
-}
-
-// runJavaScript in the goja runtime.
-func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
-	b.t.Helper()
-	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
-	if err != nil {
-		return nil, fmt.Errorf("while running %q(%v): %w", s, args, err)
-	}
-	return v, nil
-}
-
-// Run the given functions in parallel and waits for them to finish.
-func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
-	b.t.Helper()
-
-	g, ctx := errgroup.WithContext(ctx)
-	for _, f := range fs {
-		f := f
-		g.Go(func() error {
-			errc := make(chan error, 1)
-			go func() { errc <- f() }()
-			select {
-			case err := <-errc:
-				return err
-			case <-ctx.Done():
-				if err := ctx.Err(); err != nil {
-					return fmt.Errorf("while running %T: %w", f, err)
-				}
-			}
-
-			return nil
-		})
-	}
-
-	if err := g.Wait(); err != nil {
-		return fmt.Errorf("while waiting for %T: %w", fs, err)
-	}
-
-	return nil
-}
-
-// awaitWithTimeout is the same as await but takes a timeout and times out the function after the time runs out.
-func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) error {
-	b.t.Helper()
-	errC := make(chan error)
-	go func() {
-		defer close(errC)
-		errC <- fn()
-	}()
-
-	// use timer instead of time.After to not leak time.After for the duration of the timeout
-	t := time.NewTimer(timeout)
-	defer t.Stop()
-
-	select {
-	case err := <-errC:
-		return err
-	case <-t.C:
-		return fmt.Errorf("test timed out after %s", timeout)
-	}
-}
-
 // newBrowserTypeWithVU creates a new browser type with a VU.
 func newBrowserTypeWithVU(tb testing.TB, tbr *testBrowser) (
 	_ *chromium.BrowserType,
@@ -374,4 +255,123 @@ func withSamples(sc chan k6metrics.SampleContainer) func(*testBrowser) {
 //	b := TestBrowser(t, withSkipClose())
 func withSkipClose() func(*testBrowser) {
 	return func(tb *testBrowser) { tb.skipClose = true }
+}
+
+// NewPage is a wrapper around Browser.NewPage that fails the test if an
+// error occurs. Added this helper to avoid boilerplate code in tests.
+func (b *testBrowser) NewPage(opts goja.Value) *common.Page {
+	b.t.Helper()
+
+	p, err := b.Browser.NewPage(opts)
+	require.NoError(b.t, err)
+
+	pp, ok := p.(*common.Page)
+	require.Truef(b.t, ok, "want *common.Page, got %T", p)
+
+	return pp
+}
+
+// url returns the listening HTTP test server's url combined with the given path.
+func (b *testBrowser) url(path string) string {
+	b.t.Helper()
+
+	if b.http == nil {
+		b.t.Fatalf("You should enable HTTP test server, see: withHTTPServer option")
+	}
+	return b.http.ServerHTTP.URL + path
+}
+
+// staticURL is a helper for URL("/`testBrowserStaticDir`/"+ path).
+func (b *testBrowser) staticURL(path string) string {
+	b.t.Helper()
+	return b.url("/" + testBrowserStaticDir + "/" + path)
+}
+
+// context returns the testBrowser context.
+func (b *testBrowser) context() context.Context { return b.ctx }
+
+// cancelContext cancels the testBrowser context.
+func (b *testBrowser) cancelContext() { b.cancel() }
+
+// runtime returns a VU runtime.
+func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }
+
+// toGojaValue converts a value to goja value.
+func (b *testBrowser) toGojaValue(i any) goja.Value { return b.runtime().ToValue(i) }
+
+// asGojaValue asserts that v is a goja value and returns v as a goja.value.
+func (b *testBrowser) asGojaValue(v any) goja.Value {
+	b.t.Helper()
+	gv, ok := v.(goja.Value)
+	require.Truef(b.t, ok, "want goja.Value; got %T", v)
+	return gv
+}
+
+// asGojaBool asserts that v is a boolean goja value and returns v as a boolean.
+func (b *testBrowser) asGojaBool(v any) bool {
+	b.t.Helper()
+	gv := b.asGojaValue(v)
+	require.IsType(b.t, b.toGojaValue(true), gv)
+	return gv.ToBoolean()
+}
+
+// runJavaScript in the goja runtime.
+func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
+	b.t.Helper()
+	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
+	if err != nil {
+		return nil, fmt.Errorf("while running %q(%v): %w", s, args, err)
+	}
+	return v, nil
+}
+
+// Run the given functions in parallel and waits for them to finish.
+func (b *testBrowser) run(ctx context.Context, fs ...func() error) error {
+	b.t.Helper()
+
+	g, ctx := errgroup.WithContext(ctx)
+	for _, f := range fs {
+		f := f
+		g.Go(func() error {
+			errc := make(chan error, 1)
+			go func() { errc <- f() }()
+			select {
+			case err := <-errc:
+				return err
+			case <-ctx.Done():
+				if err := ctx.Err(); err != nil {
+					return fmt.Errorf("while running %T: %w", f, err)
+				}
+			}
+
+			return nil
+		})
+	}
+
+	if err := g.Wait(); err != nil {
+		return fmt.Errorf("while waiting for %T: %w", fs, err)
+	}
+
+	return nil
+}
+
+// awaitWithTimeout is the same as await but takes a timeout and times out the function after the time runs out.
+func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) error {
+	b.t.Helper()
+	errC := make(chan error)
+	go func() {
+		defer close(errC)
+		errC <- fn()
+	}()
+
+	// use timer instead of time.After to not leak time.After for the duration of the timeout
+	t := time.NewTimer(timeout)
+	defer t.Stop()
+
+	select {
+	case err := <-errC:
+		return err
+	case <-t.C:
+		return fmt.Errorf("test timed out after %s", timeout)
+	}
 }
