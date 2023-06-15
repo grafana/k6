@@ -60,9 +60,11 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowserOptions)) *testBrows
 	tb.Helper()
 
 	tbr := &testBrowser{t: tb}
-	tbopts := newTestBrowserOptions(tbr, opts...)
+	tbopts := newTestBrowserOptions(tbr, opts...) // apply pre-init stage options.
 	tbr.browserType, tbr.vu, tbr.cancel = newBrowserTypeWithVU(tb, tbopts)
 	tb.Cleanup(tbr.cancel)
+	tbopts.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
+	tbopts.apply(opts...)                  // apply post-init stage options.
 
 	if tbopts.logCache {
 		tbr.logCache = attachLogCache(tb, tbr.vu.StateField.Logger)
@@ -243,6 +245,11 @@ type testBrowserOptions struct {
 	// testBrowser field provides access to the testBrowser instance for
 	// the options to modify it.
 	testBrowser *testBrowser
+	// isBrowserTypeInitialized is true if the
+	// browser type has been initialized with a VU.
+	isBrowserTypeInitialized bool
+
+	// options
 
 	fileServer   bool
 	logCache     bool
@@ -346,6 +353,7 @@ func withSkipClose() func(tb *testBrowserOptions) {
 	return func(tb *testBrowserOptions) { tb.skipClose = true }
 }
 
+// newBrowserTypeWithVU creates a new browser type with a VU.
 func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	_ *chromium.BrowserType,
 	_ *k6test.VU,
@@ -353,7 +361,6 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 ) {
 	tb.Helper()
 
-	// Prepare the VU.
 	vu := k6test.NewVU(tb, k6test.WithSamples(opts.samples))
 	mi, ok := k6http.New().NewModuleInstance(vu).(*k6http.ModuleInstance)
 	require.Truef(tb, ok, "want *k6http.ModuleInstance; got %T", mi)
@@ -367,7 +374,6 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	vu.InitEnvField.LookupEnv = opts.lookupFunc
 
 	bt := chromium.NewBrowserType(vu)
-	// Delete the pre-init stage data.
 	vu.RestoreVUState()
 
 	return bt, vu, cancel
