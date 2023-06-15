@@ -43,6 +43,8 @@ type testBrowser struct {
 	http *k6httpmultibin.HTTPMultiBin
 	// logCache is set by the withLogCache option.
 	logCache *logCache
+	// lookupFunc is set by the withEnvLookup option.
+	lookupFunc env.LookupFunc
 }
 
 // newTestBrowser configures and launches a new chrome browser.
@@ -228,7 +230,7 @@ func newBrowserTypeWithVU(tb testing.TB, opts *testBrowserOptions) (
 	)
 	ctx, cancel := context.WithCancel(metricsCtx)
 	vu.CtxField = ctx
-	vu.InitEnvField.LookupEnv = opts.lookupFunc
+	vu.InitEnvField.LookupEnv = opts.testBrowser.lookupFunc
 
 	bt := chromium.NewBrowserType(vu)
 	vu.RestoreVUState()
@@ -247,9 +249,8 @@ type testBrowserOptions struct {
 
 	// options
 
-	samples    chan k6metrics.SampleContainer
-	skipClose  bool
-	lookupFunc env.LookupFunc
+	samples   chan k6metrics.SampleContainer
+	skipClose bool
 }
 
 // newTestBrowserOptions creates a new testBrowserOptions with the given options.
@@ -260,8 +261,9 @@ func newTestBrowserOptions(tb *testBrowser, opts ...func(*testBrowserOptions)) *
 	tbo := &testBrowserOptions{
 		testBrowser: tb,
 		samples:     make(chan k6metrics.SampleContainer, 1000),
-		lookupFunc:  env.Lookup,
 	}
+	tb.lookupFunc = env.Lookup
+
 	tbo.apply(opts...)
 
 	return tbo
@@ -280,7 +282,9 @@ func (tbo *testBrowserOptions) apply(opts ...func(*testBrowserOptions)) {
 //
 //	b := TestBrowser(t, withEnvLookup(env.ConstLookup(env.BrowserHeadless, "0")))
 func withEnvLookup(lookupFunc env.LookupFunc) func(*testBrowserOptions) {
-	return func(tb *testBrowserOptions) { tb.lookupFunc = lookupFunc }
+	return func(tb *testBrowserOptions) {
+		tb.testBrowser.lookupFunc = lookupFunc
+	}
 }
 
 // withFileServer enables the HTTP test server and serves a file server
