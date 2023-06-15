@@ -29,19 +29,20 @@ const testBrowserStaticDir = "static"
 type testBrowser struct {
 	t testing.TB
 
-	ctx      context.Context
-	http     *k6httpmultibin.HTTPMultiBin
-	vu       *k6test.VU
-	logCache *logCache
-
-	pid   int // the browser process ID
-	wsURL string
+	ctx    context.Context
+	cancel context.CancelFunc
+	vu     *k6test.VU
 
 	browserType *chromium.BrowserType
+	pid         int // the browser process ID
+	wsURL       string
 
 	*common.Browser
 
-	cancel context.CancelFunc
+	// http is set by the withHTTPServer option.
+	http *k6httpmultibin.HTTPMultiBin
+	// logCache is set by the withLogCache option.
+	logCache *logCache
 }
 
 // newTestBrowser configures and launches a new chrome browser.
