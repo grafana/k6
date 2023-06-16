@@ -89,7 +89,7 @@ These links barely scratch the surface! If you're looking for conceptual informa
 
 Our team is dedicated to continuously improving and providing the best user experience possible. The [public roadmap](https://github.com/orgs/grafana/projects/443/views/1) covers user-oriented features, UX improvements and JavaScript support that our team will focus on. Remember that timeframes and priorities may shift, but we believe it's important to share our vision.
 
-We hope it provides a clear overview of our plans for future development. We welcome feedback, corrections, and suggestions to make it more comprehensive, accessible, and valuable for the community.
+We hope it provides a clear overview of our plans for future development. We welcome feedback, corrections, and suggestions via GitHub to make it more comprehensive, accessible, and valuable for the community.
 
 ## Contribute
 
