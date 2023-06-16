@@ -74,7 +74,6 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.applyDefaultOptions()
 	tbr.applyOptions(opts...) // apply pre-init stage options.
 	tbr.vu, tbr.cancel = newTestBrowserVU(tb, tbr)
-	tb.Cleanup(tbr.cancel)
 	tbr.browserType = chromium.NewBrowserType(tbr.vu)
 	tbr.vu.RestoreVUState()
 	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
@@ -120,6 +119,7 @@ func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel fun
 		k6ext.RegisterCustomMetrics(k6metrics.NewRegistry()),
 	)
 	ctx, cancel := context.WithCancel(metricsCtx)
+	tb.Cleanup(cancel)
 	vu.CtxField = ctx
 	vu.InitEnvField.LookupEnv = tbr.lookupFunc
 
