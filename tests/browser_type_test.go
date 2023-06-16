@@ -18,7 +18,7 @@ func TestBrowserTypeConnect(t *testing.T) {
 	tb := newTestBrowser(t)
 	vu := k6test.NewVU(t)
 	bt := chromium.NewBrowserType(vu)
-	vu.MoveToVUContext()
+	vu.ActivateVU()
 
 	b, err := bt.Connect(context.Background(), tb.wsURL)
 	require.NoError(t, err)
@@ -37,14 +37,14 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 	// We have to call launch method through JS API in Goja
 	// to take mapping layer into account, instead of calling
 	// BrowserType.Launch method directly
-	rt := vu.Runtime()
 	root := browser.New()
 	mod := root.NewModuleInstance(vu)
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
-	vu.MoveToVUContext()
+	vu.ActivateVU()
 
+	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
 	_, err := rt.RunString(`
 		const p = browser.newPage();

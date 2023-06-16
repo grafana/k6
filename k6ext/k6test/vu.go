@@ -33,9 +33,10 @@ type VU struct {
 // ToGojaValue is a convenience method for converting any value to a goja value.
 func (v *VU) ToGojaValue(i any) goja.Value { return v.Runtime().ToValue(i) }
 
-// MoveToVUContext moves the VU to VU context, adding a predefined k6 lib State and nilling the InitEnv
-// to simulate how that is done in the real k6.
-func (v *VU) MoveToVUContext() {
+// ActivateVU mimicks activation of the VU as in k6.
+// It transitions the VU from the init stage to the execution stage by
+// setting the VU's state to the state that was passed to NewVU.
+func (v *VU) ActivateVU() {
 	v.VU.StateField = v.toBeState
 	v.VU.InitEnvField = nil
 }
@@ -53,9 +54,9 @@ func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
 	return n
 }
 
-// WithSamplesListener is used to indicate we want to use a bidirectional channel
+// WithSamples is used to indicate we want to use a bidirectional channel
 // so that the test can read the metrics being emitted to the channel.
-type WithSamplesListener chan k6metrics.SampleContainer
+type WithSamples chan k6metrics.SampleContainer
 
 // NewVU returns a mock k6 VU.
 //
@@ -71,7 +72,7 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
-		case WithSamplesListener:
+		case WithSamples:
 			samples = opt
 		case env.LookupFunc:
 			lookupFunc = opt

@@ -716,7 +716,7 @@ func assertHome(
 			WaitUntil: waitUntil,
 			Timeout:   30 * time.Second,
 		})
-		_, err := p.Goto(tb.URL("/home"), opts)
+		_, err := p.Goto(tb.url("/home"), opts)
 		if err == nil {
 			resolved = true
 		} else {

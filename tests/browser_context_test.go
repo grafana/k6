@@ -30,7 +30,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					url: "%v"
 				}
 			];
-		`, testCookieName, testCookieValue, tb.URL(""))
+		`, testCookieName, testCookieValue, tb.url(""))
 		require.NoError(t, err)
 
 		bc.AddCookies(cookies)

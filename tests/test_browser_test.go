@@ -39,6 +39,9 @@ func TestTestBrowserWithLookupFunc(t *testing.T) {
 	tt := &testingT{TB: t}
 	// this operation is expected to fail because the remote debugging port is
 	// invalid, practically testing that the InitEnv.LookupEnv is used.
-	_ = newTestBrowser(tt, env.ConstLookup(env.BrowserArguments, "remote-debugging-port=99999"))
+	_ = newTestBrowser(
+		tt,
+		withEnvLookup(env.ConstLookup(env.BrowserArguments, "remote-debugging-port=99999")),
+	)
 	require.True(t, tt.fatalfCalled)
 }

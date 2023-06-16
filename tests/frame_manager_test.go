@@ -92,7 +92,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		WaitUntil: common.LifecycleEventNetworkIdle,
 		Timeout:   common.DefaultTimeout,
 	})
-	_, err := p.Goto(tb.URL("/first"), opts)
+	_, err := p.Goto(tb.url("/first"), opts)
 	require.NoError(t, err)
 
 	waitForNav := func() error {

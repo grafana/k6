@@ -37,18 +37,15 @@ func TestPageEmulateMedia(t *testing.T) {
 	}))
 
 	result := p.Evaluate(tb.toGojaValue("() => matchMedia('print').matches"))
-	res, ok := result.(goja.Value)
-	require.True(t, ok)
+	res := tb.asGojaValue(result)
 	assert.True(t, res.ToBoolean(), "expected media 'print'")
 
 	result = p.Evaluate(tb.toGojaValue("() => matchMedia('(prefers-color-scheme: dark)').matches"))
-	res, ok = result.(goja.Value)
-	require.True(t, ok)
+	res = tb.asGojaValue(result)
 	assert.True(t, res.ToBoolean(), "expected color scheme 'dark'")
 
 	result = p.Evaluate(tb.toGojaValue("() => matchMedia('(prefers-reduced-motion: reduce)').matches"))
-	res, ok = result.(goja.Value)
-	require.True(t, ok)
+	res = tb.asGojaValue(result)
 	assert.True(t, res.ToBoolean(), "expected reduced motion setting to be 'reduce'")
 }
 
@@ -79,8 +76,7 @@ func TestPageEvaluate(t *testing.T) {
 		)
 
 		require.IsType(t, tb.toGojaValue(""), got)
-		gotVal, ok := got.(goja.Value)
-		require.True(t, ok)
+		gotVal := tb.asGojaValue(got)
 		assert.Equal(t, "test", gotVal.Export())
 	})
 
@@ -434,7 +430,7 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	}
 	p.SetExtraHTTPHeaders(headers)
 
-	resp, err := p.Goto(b.URL("/get"), nil)
+	resp, err := p.Goto(b.url("/get"), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -501,8 +497,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		assert.Contains(t, log, "ok: null")
 
 		argEvalJS := p.Evaluate(tb.toGojaValue("() => window._arg"))
-		argEval, ok := argEvalJS.(goja.Value)
-		require.True(t, ok)
+		argEval := tb.asGojaValue(argEvalJS)
 		var gotArg string
 		_ = tb.runtime().ExportTo(argEval, &gotArg)
 		assert.Equal(t, arg, gotArg)
@@ -532,8 +527,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		assert.Contains(t, log, "ok: null")
 
 		argEvalJS := p.Evaluate(tb.toGojaValue("() => window._args"))
-		argEval, ok := argEvalJS.(goja.Value)
-		require.True(t, ok)
+		argEval := tb.asGojaValue(argEvalJS)
 		var gotArgs []int
 		_ = tb.runtime().ExportTo(argEval, &gotArgs)
 		assert.Equal(t, args, gotArgs)
@@ -646,8 +640,8 @@ func TestPageWaitForLoadState(t *testing.T) {
 func TestPageWaitForNavigationErrOnCtxDone(t *testing.T) {
 	b := newTestBrowser(t)
 	p := b.NewPage(nil)
-	go b.Cancel()
-	<-b.Context().Done()
+	go b.cancelContext()
+	<-b.context().Done()
 	_, err := p.WaitForNavigation(nil)
 	require.ErrorContains(t, err, "canceled")
 }
@@ -672,7 +666,7 @@ func TestPageURL(t *testing.T) {
 	p := b.NewPage(nil)
 	assert.Equal(t, "about:blank", p.URL())
 
-	resp, err := p.Goto(b.URL("/get"), nil)
+	resp, err := p.Goto(b.url("/get"), nil)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Regexp(t, "http://.*/get", p.URL())

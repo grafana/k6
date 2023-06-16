@@ -71,7 +71,11 @@ func TestTmpDirCleanup(t *testing.T) {
 
 	const tmpDirPath = "./"
 
-	b := newTestBrowser(t, withSkipClose(), env.ConstLookup("TMPDIR", tmpDirPath))
+	b := newTestBrowser(
+		t,
+		withSkipClose(),
+		withEnvLookup(env.ConstLookup("TMPDIR", tmpDirPath)),
+	)
 	p := b.NewPage(nil)
 	err := p.Close(nil)
 	require.NoError(t, err)
@@ -98,7 +102,7 @@ func TestBrowserOn(t *testing.T) {
 		t.Parallel()
 
 		b := newTestBrowser(t)
-		require.NoError(t, b.vu.Runtime().Set("b", b.Browser))
+		require.NoError(t, b.runtime().Set("b", b.Browser))
 
 		_, err := b.runJavaScript(script, "wrongevent")
 		require.Error(t, err)
@@ -110,7 +114,7 @@ func TestBrowserOn(t *testing.T) {
 
 		var (
 			b   = newTestBrowser(t, withSkipClose())
-			rt  = b.vu.Runtime()
+			rt  = b.runtime()
 			log []string
 		)
 
@@ -128,14 +132,14 @@ func TestBrowserOn(t *testing.T) {
 
 		var (
 			b   = newTestBrowser(t)
-			rt  = b.vu.Runtime()
+			rt  = b.runtime()
 			log []string
 		)
 
 		require.NoError(t, rt.Set("b", b.Browser))
 		require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
 
-		time.AfterFunc(100*time.Millisecond, b.Cancel)
+		time.AfterFunc(100*time.Millisecond, b.cancelContext)
 		_, err := b.runJavaScript(script, "disconnected")
 		assert.ErrorContains(t, err, "browser.on promise rejected: context canceled")
 	})
@@ -172,7 +176,7 @@ func TestBrowserCrashErr(t *testing.T) {
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
-	vu.MoveToVUContext()
+	vu.ActivateVU()
 
 	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
