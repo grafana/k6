@@ -73,8 +73,10 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr := &testBrowser{t: tb}
 	tbr.applyDefaultOptions()
 	tbr.applyOptions(opts...) // apply pre-init stage options.
-	tbr.browserType, tbr.vu, tbr.cancel = newBrowserTypeWithVU(tb, tbr)
+	tbr.vu, tbr.cancel = newTestBrowserVU(tb, tbr)
 	tb.Cleanup(tbr.cancel)
+	tbr.browserType = chromium.NewBrowserType(tbr.vu)
+	tbr.vu.RestoreVUState()
 	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbr.applyOptions(opts...)           // apply post-init stage options.
 
@@ -103,12 +105,10 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	return tbr
 }
 
-// newBrowserTypeWithVU creates a new browser type with a VU.
-func newBrowserTypeWithVU(tb testing.TB, tbr *testBrowser) (
-	_ *chromium.BrowserType,
-	_ *k6test.VU,
-	cancel func(),
-) {
+// newTestBrowserVU initializes a new VU for browser testing.
+// It returns the VU and a cancel function to stop the VU.
+// VU contains the context with the custom metrics registry.
+func newTestBrowserVU(tb testing.TB, tbr *testBrowser) (_ *k6test.VU, cancel func()) {
 	tb.Helper()
 
 	vu := k6test.NewVU(tb, k6test.WithSamples(tbr.samples))
@@ -123,10 +123,7 @@ func newBrowserTypeWithVU(tb testing.TB, tbr *testBrowser) (
 	vu.CtxField = ctx
 	vu.InitEnvField.LookupEnv = tbr.lookupFunc
 
-	bt := chromium.NewBrowserType(vu)
-	vu.RestoreVUState()
-
-	return bt, vu, cancel
+	return vu, cancel
 }
 
 // applyDefaultOptions applies the default options for the testBrowser.
