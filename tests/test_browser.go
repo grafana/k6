@@ -75,7 +75,7 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.applyOptions(opts...) // apply pre-init stage options.
 	tbr.vu, tbr.cancel = newTestBrowserVU(tb, tbr)
 	tbr.browserType = chromium.NewBrowserType(tbr.vu)
-	tbr.vu.RestoreVUState()
+	tbr.vu.ActivateVU()
 	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbr.applyOptions(opts...)           // apply post-init stage options.
 
