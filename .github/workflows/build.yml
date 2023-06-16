@@ -140,14 +140,7 @@ jobs:
         with:
           fetch-depth: 0
       - name: Build
-        run: |
-          docker buildx create \
-            --name multibuilder \
-            --platform linux/amd64,linux/arm64 \
-            --bootstrap --use
-          docker buildx build \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID .
+        run: docker build -t $DOCKER_IMAGE_ID .
       - name: Check
         run: |
             docker run $DOCKER_IMAGE_ID version
