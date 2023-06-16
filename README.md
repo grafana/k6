@@ -88,9 +88,9 @@ These links barely scratch the surface! If you're looking for conceptual informa
 
 ## Roadmap
 
-Our team is dedicated to continuously improving k6 and providing the best user experience possible. The [k6 public open-source roadmap](https://github.com/orgs/grafana/projects/443/views/1) covers user-oriented features, UX improvements, JavaScript support, and k6 internals that our team will focus on. Remember that timeframes and priorities may shift, but we believe it's important to share our vision and allow users to plan accordingly.
+Our team is dedicated to continuously improving and providing the best user experience possible. The [public roadmap](https://github.com/orgs/grafana/projects/443/views/1) covers user-oriented features, UX improvements and JavaScript support that our team will focus on. Remember that timeframes and priorities may shift, but we believe it's important to share our vision.
 
-We hope it provides a clear overview of our plans for k6's future development. As always, we welcome feedback, corrections, and suggestions to make [this roadmap](https://github.com/orgs/grafana/projects/443/views/1) more comprehensive, accessible, and valuable for the k6 community.
+We hope it provides a clear overview of our plans for future development. We welcome feedback, corrections, and suggestions to make it more comprehensive, accessible, and valuable for the community.
 
 ## Contribute
 
