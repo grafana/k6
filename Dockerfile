@@ -12,8 +12,9 @@ RUN apk add --no-cache ca-certificates && \
     adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /go/bin/k6 /usr/bin/k6
 
-USER 12345
+USER k6
 WORKDIR /home/k6
+
 ENTRYPOINT ["k6"]
 
 # Legacy loadimpact/k6 image
