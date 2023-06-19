@@ -10,6 +10,8 @@ import (
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 
+	k6event "go.k6.io/k6/event"
+	k6common "go.k6.io/k6/js/common"
 	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	k6lib "go.k6.io/k6/lib"
@@ -79,11 +81,17 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 		}
 	}
 
+	logger := k6testutils.NewLogger(tb)
+
 	root, err := k6lib.NewGroup("", nil)
 	require.NoError(tb, err)
 
 	testRT := k6modulestest.NewRuntime(tb)
 	testRT.VU.InitEnvField.LookupEnv = lookupFunc
+	testRT.VU.EventsField = k6common.Events{
+		Global: k6event.NewEventSystem(100, logger),
+		Local:  k6event.NewEventSystem(100, logger),
+	}
 
 	tags := testRT.VU.InitEnvField.Registry.RootTagSet()
 
@@ -108,7 +116,7 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 				},
 			},
 		},
-		Logger:         k6testutils.NewLogger(tb),
+		Logger:         logger,
 		Group:          root,
 		BufferPool:     k6lib.NewBufferPool(),
 		Samples:        samples,
