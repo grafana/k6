@@ -1,18 +1,11 @@
 package browser
 
 import (
-	"context"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/env"
-
-	k6common "go.k6.io/k6/js/common"
-	k6modulestest "go.k6.io/k6/js/modulestest"
-	k6lib "go.k6.io/k6/lib"
-	k6metrics "go.k6.io/k6/metrics"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
 // TestModuleNew tests registering the module.
@@ -21,16 +14,7 @@ import (
 func TestModuleNew(t *testing.T) {
 	t.Parallel()
 
-	vu := &k6modulestest.VU{
-		RuntimeField: goja.New(),
-		InitEnvField: &k6common.InitEnvironment{
-			TestPreInitState: &k6lib.TestPreInitState{
-				Registry:  k6metrics.NewRegistry(),
-				LookupEnv: env.EmptyLookup,
-			},
-		},
-		CtxField: context.Background(),
-	}
+	vu := k6test.NewVU(t)
 	m, ok := New().NewModuleInstance(vu).(*ModuleInstance)
 	require.True(t, ok, "NewModuleInstance should return a ModuleInstance")
 	require.NotNil(t, m.mod, "Module should be set")
