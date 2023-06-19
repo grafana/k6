@@ -151,23 +151,35 @@ func (r *remoteRegistry) isRemoteBrowser() (string, bool) {
 // browserRegistry stores browser instances indexed per
 // iteration as identified by VUID-scenario-iterationID.
 type browserRegistry struct {
-	m sync.Map
+	mu sync.RWMutex
+	m  map[string]api.Browser
+}
+
+func newBrowserRegistry() *browserRegistry {
+	return &browserRegistry{
+		m: make(map[string]api.Browser),
+	}
 }
 
 func (p *browserRegistry) setBrowser(id string, b api.Browser) {
-	p.m.Store(id, b)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	p.m[id] = b
 }
 
 func (p *browserRegistry) getBrowser(id string) (b api.Browser, ok bool) {
-	e, ok := p.m.Load(id)
-	if ok {
-		b, ok = e.(api.Browser)
-		return b, ok
-	}
+	p.mu.RLock()
+	defer p.mu.RUnlock()
 
-	return nil, false
+	b, ok = p.m[id]
+
+	return b, ok
 }
 
 func (p *browserRegistry) deleteBrowser(id string) {
-	p.m.Delete(id)
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	delete(p.m, id)
 }
