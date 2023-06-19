@@ -329,18 +329,9 @@ func (o *Output) handleFlushError(err error) {
 }
 
 func (o *Output) tracingEnabled() bool {
-	// TODO(lukasz): Check if the `tracing` module is imported.
-	//
-	// We want to check if the `tracing` module was imported. If
-	// it wasn't, we don't need to collect any data related to tracing
-	// as there won't be any.
-	//
-	// We currently don't have a way to check if the tracing module
-	// was imported by the user.
-
 	// TODO(lukasz): Check if k6 x Tempo is enabled
 	//
-	// We also want to check whether a given organization is
+	// We want to check whether a given organization is
 	// eligible for k6 x Tempo feature. If it isn't, we don't
 	// want to enable the traces output.
 	//
