@@ -2005,17 +2005,15 @@ func TestBadLogOutput(t *testing.T) {
 // HACK: We need this so multiple tests can register differently named modules.
 var uniqueModuleNumber uint64 //nolint:gochecknoglobals
 
-// Tests that the appropriate events are emitted at the appropriate times.
+// Tests that the appropriate events are emitted in the correct order.
 func TestEventSystemOK(t *testing.T) {
 	t.Parallel()
 
 	ts := NewGlobalTestState(t)
 
 	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
-	modules.Register(moduleName, events.New([]event.Type{
-		event.Init, event.TestStart, event.IterStart, event.IterEnd,
-		event.TestEnd, event.Exit,
-	}))
+	mod := events.New(event.GlobalEvents, event.VUEvents)
+	modules.Register(moduleName, mod)
 
 	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
 	ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
@@ -2031,6 +2029,18 @@ func TestEventSystemOK(t *testing.T) {
 	`, moduleName)))
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	doneCh := make(chan struct{})
+	go func() {
+		mod.WG.Wait()
+		close(doneCh)
+	}()
+
+	select {
+	case <-doneCh:
+	case <-time.After(time.Second):
+		t.Fatal("timed out")
+	}
 
 	expLog := []string{
 		`got event Init with data '<nil>'`,
@@ -2059,9 +2069,8 @@ func TestEventSystemAborted(t *testing.T) {
 	ts := NewGlobalTestState(t)
 
 	moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
-	modules.Register(moduleName, events.New([]event.Type{
-		event.Init, event.TestStart, event.TestEnd, event.Exit,
-	}))
+	mod := events.New(event.GlobalEvents, nil)
+	modules.Register(moduleName, mod)
 
 	ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
 	ts.ExpectedExitCode = int(exitcodes.ScriptAborted)
@@ -2082,6 +2091,18 @@ func TestEventSystemAborted(t *testing.T) {
 	`, moduleName)))
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	doneCh := make(chan struct{})
+	go func() {
+		mod.WG.Wait()
+		close(doneCh)
+	}()
+
+	select {
+	case <-doneCh:
+	case <-time.After(time.Second):
+		t.Fatal("timed out")
+	}
 
 	expLog := []string{
 		`got event Init with data '<nil>'`,

@@ -10,21 +10,25 @@ import (
 	"go.k6.io/k6/lib"
 )
 
+type events struct {
+	global, local *event.System
+}
+
 type moduleVUImpl struct {
 	ctx       context.Context
 	initEnv   *common.InitEnvironment
 	state     *lib.State
 	runtime   *goja.Runtime
 	eventLoop *eventloop.EventLoop
-	events    *event.System
+	events    events
 }
 
 func (m *moduleVUImpl) Context() context.Context {
 	return m.ctx
 }
 
-func (m *moduleVUImpl) Events() event.Subscriber {
-	return m.events
+func (m *moduleVUImpl) Events() common.Events {
+	return common.Events{Global: m.events.global, Local: m.events.local}
 }
 
 func (m *moduleVUImpl) InitEnv() *common.InitEnvironment {

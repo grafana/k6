@@ -772,9 +772,7 @@ func (u *ActiveVU) RunOnce() error {
 		VUID:         u.ID,
 		ScenarioName: u.scenarioName,
 	}
-	if u.Runner.preInitState.Events != nil {
-		u.Runner.preInitState.Events.Emit(&event.Event{Type: event.IterStart, Data: eventIterData})
-	}
+	u.moduleVUImpl.events.local.Emit(&event.Event{Type: event.IterStart, Data: eventIterData})
 
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
@@ -788,9 +786,7 @@ func (u *ActiveVU) RunOnce() error {
 		}
 		eventIterData.Error = err
 	}
-	if u.Runner.preInitState.Events != nil {
-		u.Runner.preInitState.Events.Emit(&event.Event{Type: event.IterEnd, Data: eventIterData})
-	}
+	u.moduleVUImpl.events.local.Emit(&event.Event{Type: event.IterEnd, Data: eventIterData})
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder

@@ -15,6 +15,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
@@ -112,7 +113,14 @@ func newBundle(
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
 	// TODO use a real context
-	vuImpl := &moduleVUImpl{ctx: context.Background(), runtime: goja.New(), events: piState.Events}
+	vuImpl := &moduleVUImpl{
+		ctx:     context.Background(),
+		runtime: goja.New(),
+		events: events{
+			global: piState.Events,
+			local:  event.NewEventSystem(100, piState.Logger),
+		},
+	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	exports, err := bundle.instantiate(vuImpl, 0)
 	if err != nil {
@@ -220,7 +228,14 @@ func (b *Bundle) populateExports(updateOptions bool, exports *goja.Object) error
 func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance, error) {
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
-	vuImpl := &moduleVUImpl{ctx: ctx, runtime: goja.New(), events: b.preInitState.Events}
+	vuImpl := &moduleVUImpl{
+		ctx:     ctx,
+		runtime: goja.New(),
+		events: events{
+			global: b.preInitState.Events,
+			local:  event.NewEventSystem(100, b.preInitState.Logger),
+		},
+	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
 	exports, err := b.instantiate(vuImpl, vuID)
 	if err != nil {

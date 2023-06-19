@@ -20,6 +20,14 @@ const (
 	Exit
 )
 
+//nolint:gochecknoglobals
+var (
+	// GlobalEvents are emitted once per test run.
+	GlobalEvents = []Type{Init, TestStart, TestEnd, Exit}
+	// VUEvents are emitted multiple times per each VU.
+	VUEvents = []Type{IterStart, IterEnd}
+)
+
 // ExitData is the data sent in the Exit event. Error is the error returned by
 // the run command.
 type ExitData struct {
