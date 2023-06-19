@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"sort"
@@ -40,7 +41,7 @@ func FileContentsFromMap(files map[string]string) FileAccessor {
 		if !ok {
 			return nil, os.ErrNotExist
 		}
-		return io.NopCloser(strings.NewReader(contents)), nil
+		return ioutil.NopCloser(strings.NewReader(contents)), nil
 	}
 }
 
