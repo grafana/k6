@@ -238,9 +238,11 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 		m.ID(), frameID, parentFrameID, documentID, name, url, initial)
 
 	if frame != nil {
+		m.framesMu.Unlock()
 		for _, child := range frame.ChildFrames() {
 			m.removeFramesRecursively(child.(*Frame))
 		}
+		m.framesMu.Lock()
 	}
 
 	var mainFrame *Frame
