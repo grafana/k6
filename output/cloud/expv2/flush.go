@@ -150,7 +150,7 @@ func newTracesFlusher(client insightsClient, collector requestMetadatasCollector
 	}
 }
 
-func (f *requestMetadatasFlusher) Flush(ctx context.Context) error {
+func (f *requestMetadatasFlusher) flush(ctx context.Context) error {
 	requestMetadatas := f.collector.PopAll()
 	if len(requestMetadatas) < 1 {
 		return nil

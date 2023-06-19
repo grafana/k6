@@ -171,7 +171,7 @@ func Test_tracesFlusher_Flush_ReturnsNoErrorWithWorkingInsightsClientAndNonCance
 	flusher := newTracesFlusher(cli, col)
 
 	// When
-	err := flusher.Flush(context.Background())
+	err := flusher.flush(context.Background())
 
 	// Then
 	require.NoError(t, err)
@@ -190,7 +190,7 @@ func Test_tracesFlusher_Flush_ReturnsNoErrorWithWorkingInsightsClientAndNonCance
 	flusher := newTracesFlusher(cli, col)
 
 	// When
-	err := flusher.Flush(context.Background())
+	err := flusher.flush(context.Background())
 
 	// Then
 	require.NoError(t, err)
@@ -211,7 +211,7 @@ func Test_tracesFlusher_Flush_ReturnsErrorWithWorkingInsightsClientAndCancelledC
 	cancel()
 
 	// When
-	err := flusher.Flush(ctx)
+	err := flusher.flush(ctx)
 
 	// Then
 	require.Error(t, err)
@@ -231,7 +231,7 @@ func Test_tracesFlusher_Flush_ReturnsErrorWithFailingInsightsClientAndNonCancell
 	flusher := newTracesFlusher(cli, col)
 
 	// When
-	err := flusher.Flush(context.Background())
+	err := flusher.flush(context.Background())
 
 	// Then
 	require.ErrorIs(t, err, testErr)

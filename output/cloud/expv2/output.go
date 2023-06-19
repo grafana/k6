@@ -291,7 +291,7 @@ func (o *Output) flushRequestMetadatas() {
 	ctx, cancel := context.WithTimeout(context.Background(), o.config.TracesPushInterval.TimeDuration())
 	defer cancel()
 
-	err := o.requestMetadatasFlusher.Flush(ctx)
+	err := o.requestMetadatasFlusher.flush(ctx)
 	if err != nil {
 		o.logger.WithError(err).Error("Failed to push trace samples to the cloud")
 	}
