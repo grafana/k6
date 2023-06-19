@@ -744,12 +744,11 @@ func getOrInitBrowser(
 	ctx context.Context, bt *chromium.BrowserType, vu moduleVU, wsURL string, isRemoteBrowser bool,
 ) (api.Browser, error) {
 	var (
-		ok  bool
 		err error
 		b   api.Browser
 	)
 
-	if b, ok = vu.getBrowser(vu.State().Iteration); ok {
+	if b, err = vu.getBrowser(vu.State().Iteration); err == nil {
 		return b, nil
 	}
 

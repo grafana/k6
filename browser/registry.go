@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
@@ -286,13 +287,15 @@ func (r *browserRegistry) setBrowser(id int64, b api.Browser) {
 	r.m[id] = b
 }
 
-func (r *browserRegistry) getBrowser(id int64) (b api.Browser, ok bool) {
+func (r *browserRegistry) getBrowser(id int64) (api.Browser, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
-	b, ok = r.m[id]
+	if b, ok := r.m[id]; ok {
+		return b, nil
+	}
 
-	return b, ok
+	return nil, errors.New("browser not found in registry")
 }
 
 func (r *browserRegistry) deleteBrowser(id int64) {
