@@ -21,16 +21,16 @@ import (
 	"github.com/sirupsen/logrus"
 )
 
-// RequestMetadatasCollector is an interface for collecting request metadatas
-// and retrieving them so they can be flushed using a Flusher.
-type RequestMetadatasCollector interface {
+// requestMetadatasCollector is an interface for collecting request metadatas
+// and retrieving them, so they can be flushed using a flusher.
+type requestMetadatasCollector interface {
 	CollectRequestMetadatas([]metrics.SampleContainer)
 	PopAll() insights.RequestMetadatas
 }
 
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
-	flush(context.Context) error
+	Flush(ctx context.Context) error
 }
 
 // Output sends result data to the k6 Cloud service.
@@ -45,8 +45,8 @@ type Output struct {
 	collector *collector
 	flushing  flusher
 
-	requestMetadatasCollector RequestMetadatasCollector
-	requestMetadatasFlusher   Flusher
+	requestMetadatasCollector requestMetadatasCollector
+	requestMetadatasFlusher   flusher
 
 	// wg tracks background goroutines
 	wg sync.WaitGroup
@@ -271,7 +271,7 @@ func (o *Output) flushMetrics() {
 	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered samples to the cloud")
 }
 
-// flushRequestMetadatas periodically flushes traces collected in RequestMetadatasCollector using Flusher.
+// flushRequestMetadatas periodically flushes traces collected in RequestMetadatasCollector using flusher.
 func (o *Output) flushRequestMetadatas() {
 	start := time.Now()
 

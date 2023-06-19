@@ -133,24 +133,24 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 	}
 }
 
-// InsightsClient is an interface for sending request metadatas to the Insights API.
-type InsightsClient interface {
+// insightsClient is an interface for sending request metadatas to the Insights API.
+type insightsClient interface {
 	IngestRequestMetadatasBatch(context.Context, insights.RequestMetadatas) error
 }
 
-type tracesFlusher struct {
-	client    InsightsClient
-	collector RequestMetadatasCollector
+type requestMetadatasFlusher struct {
+	client    insightsClient
+	collector requestMetadatasCollector
 }
 
-func newTracesFlusher(client InsightsClient, collector RequestMetadatasCollector) *tracesFlusher {
-	return &tracesFlusher{
+func newTracesFlusher(client insightsClient, collector requestMetadatasCollector) *requestMetadatasFlusher {
+	return &requestMetadatasFlusher{
 		client:    client,
 		collector: collector,
 	}
 }
 
-func (f *tracesFlusher) Flush(ctx context.Context) error {
+func (f *requestMetadatasFlusher) Flush(ctx context.Context) error {
 	requestMetadatas := f.collector.PopAll()
 	if len(requestMetadatas) < 1 {
 		return nil

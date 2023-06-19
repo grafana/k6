@@ -433,7 +433,7 @@ func Test_requestMetadatasCollector_PopAll_DoesNothingWithEmptyData(t *testing.T
 			ProtocolLabels: insights.ProtocolHTTPLabels{URL: "unknown", Method: "unknown", StatusCode: 0},
 		},
 	}
-	col := &requestMetadatasCollector{
+	col := &rmCollector{
 		buffer:   data,
 		bufferMu: &sync.Mutex{},
 	}

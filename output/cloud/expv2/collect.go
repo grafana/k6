@@ -176,21 +176,21 @@ func (c *collector) bucketCutoffID() int64 {
 	return c.nowFunc().Add(-c.waitPeriod).UnixNano() / int64(c.aggregationPeriod)
 }
 
-type requestMetadatasCollector struct {
+type rmCollector struct {
 	testRunID int64
 	buffer    insights.RequestMetadatas
 	bufferMu  *sync.Mutex
 }
 
-func newRequestMetadatasCollector(testRunID int64) *requestMetadatasCollector {
-	return &requestMetadatasCollector{
+func newRequestMetadatasCollector(testRunID int64) *rmCollector {
+	return &rmCollector{
 		testRunID: testRunID,
 		buffer:    nil,
 		bufferMu:  &sync.Mutex{},
 	}
 }
 
-func (c *requestMetadatasCollector) CollectRequestMetadatas(sampleContainers []metrics.SampleContainer) {
+func (c *rmCollector) CollectRequestMetadatas(sampleContainers []metrics.SampleContainer) {
 	if len(sampleContainers) < 1 {
 		return
 	}
@@ -237,7 +237,7 @@ func (c *requestMetadatasCollector) CollectRequestMetadatas(sampleContainers []m
 	c.buffer = append(c.buffer, newBuffer...)
 }
 
-func (c *requestMetadatasCollector) PopAll() insights.RequestMetadatas {
+func (c *rmCollector) PopAll() insights.RequestMetadatas {
 	c.bufferMu.Lock()
 	defer c.bufferMu.Unlock()
 
@@ -246,7 +246,7 @@ func (c *requestMetadatasCollector) PopAll() insights.RequestMetadatas {
 	return b
 }
 
-func (c *requestMetadatasCollector) getStringTagFromTrail(trail *httpext.Trail, key string) string {
+func (c *rmCollector) getStringTagFromTrail(trail *httpext.Trail, key string) string {
 	if tag, found := trail.Tags.Get(key); found {
 		return tag
 	}
@@ -254,7 +254,7 @@ func (c *requestMetadatasCollector) getStringTagFromTrail(trail *httpext.Trail, 
 	return "unknown"
 }
 
-func (c *requestMetadatasCollector) getIntTagFromTrail(trail *httpext.Trail, key string) int64 {
+func (c *rmCollector) getIntTagFromTrail(trail *httpext.Trail, key string) int64 {
 	if tag, found := trail.Tags.Get(key); found {
 		tagInt, err := strconv.ParseInt(tag, 10, 64)
 		if err != nil {
