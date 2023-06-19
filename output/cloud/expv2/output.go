@@ -58,6 +58,9 @@ type Output struct {
 	abort        chan struct{}
 	abortOnce    sync.Once
 	testStopFunc func(error)
+
+	// Shutdown hooks to be executed on shutdown.
+	shutdownHooks []func() error
 }
 
 // New creates a new cloud output.
@@ -141,6 +144,10 @@ func (o *Output) Start() error {
 			return err
 		}
 
+		o.shutdownHooks = append(o.shutdownHooks, func() error {
+			return insightsClient.Close()
+		})
+
 		o.requestMetadatasFlusher = newTracesFlusher(insightsClient, o.requestMetadatasCollector)
 
 		o.periodicInvoke(o.config.TracesPushInterval.TimeDuration(), o.flushRequestMetadatas)
@@ -175,6 +182,12 @@ func (o *Output) StopWithTestError(_ error) error {
 	// Flush all the remaining request metadatas.
 	if o.tracingEnabled() {
 		o.flushRequestMetadatas()
+	}
+
+	for _, fn := range o.shutdownHooks {
+		if err := fn(); err != nil {
+			o.logger.WithError(err).Error("Failed to execute shutdown hook")
+		}
 	}
 
 	return nil
