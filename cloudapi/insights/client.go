@@ -104,10 +104,11 @@ func (c *Client) Dial(ctx context.Context) error {
 // IngestRequestMetadatasBatch ingests a batch of request metadatas.
 func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadatas RequestMetadatas) error {
 	c.connMu.RLock()
-	if c.conn == nil {
+	closed := c.conn == nil
+	c.connMu.RUnlock()
+	if closed {
 		return ErrClientClosed
 	}
-	c.connMu.RUnlock()
 
 	if len(requestMetadatas) < 1 {
 		return nil
