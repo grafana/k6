@@ -18,7 +18,7 @@ and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md
 - [ ] I have run linter locally (`make ci-like-lint`) and all checks pass.
 - [ ] I have run tests locally (`make test`) and all tests pass.
 - [ ] I have commented on my code, particularly in hard-to-understand areas.
-<!-- - [ ] ANYTHING ELSE -->
+<!-- - [ ] Any other relevant item -->
 
 ## Related PR(s)/Issue(s)
 
@@ -28,4 +28,4 @@ and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md
 
 <!-- Closes #ISSUE-ID -->
 
-<!-- Thank for your contribution! 🙏🏼 -->
+<!-- Thanks for your contribution! 🙏🏼 -->
