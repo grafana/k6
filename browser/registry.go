@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/chromium"
@@ -164,6 +165,8 @@ type browserRegistry struct {
 	m  map[int64]api.Browser
 
 	buildFn browserBuildFunc
+
+	stopped atomic.Bool // testing purposes
 }
 
 type browserBuildFunc func(ctx context.Context) (api.Browser, error)
@@ -236,6 +239,7 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 		// unsubscribe for the VU events and exit the loop in order to reduce unuseful overhead.
 		if !isBrowserIter(r.vu) {
 			unsubscribeFn()
+			r.stop()
 			e.Done()
 			return
 		}
@@ -316,6 +320,10 @@ func (r *browserRegistry) clear() {
 		b.Close()
 		delete(r.m, id)
 	}
+}
+
+func (r *browserRegistry) stop() {
+	r.stopped.Store(true)
 }
 
 func isBrowserIter(vu k6modules.VU) bool {
