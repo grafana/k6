@@ -305,7 +305,10 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 	f.lifecycleEvents[event] = true
 	f.lifecycleEventsMu.Unlock()
 
-	f.emit(EventFrameAddLifecycle, event)
+	f.emit(EventFrameAddLifecycle, FrameLifecycleEvent{
+		URL:   f.URL(),
+		Event: event,
+	})
 }
 
 func (f *Frame) onLoadingStarted() {
@@ -1693,8 +1696,8 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
-			if le, ok := data.(LifecycleEvent); ok {
-				return le == waitUntil
+			if le, ok := data.(FrameLifecycleEvent); ok {
+				return le.Event == waitUntil
 			}
 			return false
 		})
@@ -1736,8 +1739,8 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
-			if le, ok := data.(LifecycleEvent); ok {
-				return le == parsedOpts.WaitUntil
+			if le, ok := data.(FrameLifecycleEvent); ok {
+				return le.Event == parsedOpts.WaitUntil
 			}
 			return false
 		})

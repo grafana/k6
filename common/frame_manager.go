@@ -592,10 +592,23 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, frame, []string{EventFrameAddLifecycle},
 		func(data any) bool {
-			if le, ok := data.(LifecycleEvent); ok {
-				return le == parsedOpts.WaitUntil
+			le, ok := data.(FrameLifecycleEvent)
+			if !ok {
+				return false
 			}
-			return false
+			// skip the initial blank page if we are navigating to a non-blank page.
+			// otherwise, we will get a lifecycle event for the initial blank page
+			// and return prematurely before waiting for the navigation to complete.
+			if url != "about:blank" && le.URL == "about:blank" {
+				m.logger.Debugf(
+					"FrameManager:NavigateFrame:createWaitForEventPredicateHandler",
+					"fmid:%d fid:%v furl:%s url:%s waitUntil:%s event.lifecycle:%q event.url:%q skipping about:blank",
+					fmid, fid, furl, url, parsedOpts.WaitUntil, le.Event, le.URL,
+				)
+				return false
+			}
+
+			return le.Event == parsedOpts.WaitUntil
 		})
 	defer lifecycleEvtCancel()
 

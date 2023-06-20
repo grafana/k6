@@ -762,8 +762,8 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameAddLifecycle},
 		func(data any) bool {
-			if le, ok := data.(LifecycleEvent); ok {
-				return le == parsedOpts.WaitUntil
+			if le, ok := data.(FrameLifecycleEvent); ok {
+				return le.Event == parsedOpts.WaitUntil
 			}
 			return false
 		})
