@@ -43,6 +43,7 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
 	vu.ActivateVU()
+	vu.StartIteration(t)
 
 	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
