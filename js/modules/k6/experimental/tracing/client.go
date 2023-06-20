@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	httpmodule "go.k6.io/k6/js/modules/k6/http"
