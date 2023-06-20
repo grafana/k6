@@ -676,7 +676,7 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 }
 
 // mapBrowser to the JS module.
-func mapBrowser(vu moduleVU, wsURL string, isRemoteBrowser bool) mapping { //nolint:funlen
+func mapBrowser(vu moduleVU, wsURL string, isRemoteBrowser bool) mapping {
 	var (
 		rt  = vu.Runtime()
 		ctx = context.Background()
@@ -743,20 +743,13 @@ func mapBrowser(vu moduleVU, wsURL string, isRemoteBrowser bool) mapping { //nol
 func getOrInitBrowser(
 	ctx context.Context, bt *chromium.BrowserType, vu moduleVU, wsURL string, isRemoteBrowser bool,
 ) (api.Browser, error) {
-	// Index browser pool per VU-scenario-iteration
-	id := fmt.Sprintf("%d-%s-%d",
-		vu.State().VUID,
-		k6ext.GetScenarioName(vu.Context()),
-		vu.State().Iteration,
-	)
-
 	var (
 		ok  bool
 		err error
 		b   api.Browser
 	)
 
-	if b, ok = vu.getBrowser(id); ok {
+	if b, ok = vu.getBrowser(vu.State().Iteration); ok {
 		return b, nil
 	}
 
@@ -774,12 +767,12 @@ func getOrInitBrowser(
 		vu.registerPid(pid)
 	}
 
-	vu.setBrowser(id, b)
+	vu.setBrowser(vu.State().Iteration, b)
 
 	go func(ctx context.Context) {
 		<-ctx.Done()
 		b.Close()
-		vu.deleteBrowser(id)
+		vu.deleteBrowser(vu.State().Iteration)
 	}(vu.Context())
 
 	return b, nil
