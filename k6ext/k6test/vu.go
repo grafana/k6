@@ -1,6 +1,7 @@
 package k6test
 
 import (
+	"context"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -10,6 +11,7 @@ import (
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 
+	"go.k6.io/k6/event"
 	k6event "go.k6.io/k6/event"
 	k6common "go.k6.io/k6/js/common"
 	k6eventloop "go.k6.io/k6/js/eventloop"
@@ -54,6 +56,70 @@ func (v *VU) AssertSamples(assertSample func(s k6metrics.Sample)) int {
 		}
 	}
 	return n
+}
+
+// WithScenarioName is used to set the scenario name in the IterData
+// for the 'IterStart' event.
+type WithScenarioName = string
+
+// WithVUID is used to set the VU id in the IterData for the 'IterStart'
+// event.
+type WithVUID = uint64
+
+// WithIteration is used to set the iteration in the IterData for the
+// 'IterStart' event.
+type WithIteration = int64
+
+// StartIteration generates a new IterStart event through the VU event system.
+//
+// opts can be used to parameterize the iteration data such as:
+//   - WithScenarioName: sets the scenario name (default is 'default').
+//   - WithVUID: sets the VUID (default 1).
+//   - WithIteration: sets the iteration (default 0).
+func (v *VU) StartIteration(tb testing.TB, opts ...any) {
+	tb.Helper()
+	v.iterEvent(tb, k6event.IterStart, "IterStart", opts...)
+}
+
+// EndIteration generates a new IterEnd event through the VU event system.
+//
+// opts can be used to parameterize the iteration data such as:
+//   - WithScenarioName: sets the scenario name (default is 'default').
+//   - WithVUID: sets the VUID (default 1).
+//   - WithIteration: sets the iteration (default 0).
+func (v *VU) EndIteration(tb testing.TB, opts ...any) {
+	tb.Helper()
+	v.iterEvent(tb, k6event.IterEnd, "IterEnd", opts...)
+}
+
+// iterEvent generates an iteration event for the VU.
+func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, opts ...any) {
+	tb.Helper()
+
+	data := k6event.IterData{
+		Iteration:    0,
+		VUID:         1,
+		ScenarioName: "default",
+	}
+
+	for _, opt := range opts {
+		switch opt := opt.(type) {
+		case WithScenarioName:
+			data.ScenarioName = opt
+		case WithVUID:
+			data.VUID = opt
+		case WithIteration:
+			data.Iteration = opt
+		}
+	}
+
+	events, ok := v.EventsField.Local.(*k6event.System)
+	require.True(tb, ok, "want *k6event.System; got %T", events)
+	waitDone := events.Emit(&k6event.Event{
+		Type: eventType,
+		Data: data,
+	})
+	require.NoError(tb, waitDone(context.Background()), "error waiting on %s done", eventName)
 }
 
 // WithSamples is used to indicate we want to use a bidirectional channel
