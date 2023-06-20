@@ -479,13 +479,9 @@ func (b *Browser) Close() {
 	b.conn.Close()
 }
 
-// Contexts returns list of browser contexts.
-func (b *Browser) Contexts() []api.BrowserContext {
-	if b.context == nil {
-		return []api.BrowserContext{}
-	}
-
-	return []api.BrowserContext{b.context}
+// Context returns the current browser context or nil.
+func (b *Browser) Context() api.BrowserContext {
+	return b.context
 }
 
 // IsConnected returns whether the WebSocket connection to the browser process

@@ -683,12 +683,12 @@ func mapBrowser(vu moduleVU, wsURL string, isRemoteBrowser bool) mapping { //nol
 		bt  = chromium.NewBrowserType(vu)
 	)
 	return mapping{
-		"contexts": func() ([]api.BrowserContext, error) {
+		"context": func() (api.BrowserContext, error) {
 			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)
 			if err != nil {
 				return nil, err
 			}
-			return b.Contexts(), nil
+			return b.Context(), nil
 		},
 		"isConnected": func() (bool, error) {
 			b, err := getOrInitBrowser(ctx, bt, vu, wsURL, isRemoteBrowser)

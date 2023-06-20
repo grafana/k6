@@ -23,47 +23,47 @@ import (
 func TestBrowserNewPage(t *testing.T) {
 	b := newTestBrowser(t)
 	p1 := b.NewPage(nil)
-	l := len(b.Contexts())
-	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
+	c := b.Context()
+	assert.NotNil(t, c)
 
 	_, err := b.Browser.NewPage(nil)
 	assert.EqualError(t, err, "new page: existing browser context must be closed before creating a new one")
 
 	err = p1.Close(nil)
 	require.NoError(t, err)
-	l = len(b.Contexts())
-	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
+	c = b.Context()
+	assert.NotNil(t, c)
 
 	_, err = b.Browser.NewPage(nil)
 	assert.EqualError(t, err, "new page: existing browser context must be closed before creating a new one")
 
-	b.Contexts()[0].Close()
-	l = len(b.Contexts())
-	assert.Equal(t, 0, l, "expected there to be 0 browser context, but found %d", l)
+	b.Context().Close()
+	c = b.Context()
+	assert.Nil(t, c)
 
 	_ = b.NewPage(nil)
-	l = len(b.Contexts())
-	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
+	c = b.Context()
+	assert.NotNil(t, c)
 }
 
 func TestBrowserNewContext(t *testing.T) {
 	b := newTestBrowser(t)
 	bc1, err := b.NewContext(nil)
 	assert.NoError(t, err)
-	l := len(b.Contexts())
-	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
+	c := b.Context()
+	assert.NotNil(t, c)
 
 	_, err = b.NewContext(nil)
 	assert.EqualError(t, err, "existing browser context must be closed before creating a new one")
 
 	bc1.Close()
-	l = len(b.Contexts())
-	assert.Equal(t, 0, l, "expected there to be 0 browser context, but found %d", l)
+	c = b.Context()
+	assert.Nil(t, c)
 
 	_, err = b.NewContext(nil)
 	assert.NoError(t, err)
-	l = len(b.Contexts())
-	assert.Equal(t, 1, l, "expected there to be 1 browser context, but found %d", l)
+	c = b.Context()
+	assert.NotNil(t, c)
 }
 
 func TestTmpDirCleanup(t *testing.T) {
