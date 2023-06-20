@@ -136,6 +136,7 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 // insightsClient is an interface for sending request metadatas to the Insights API.
 type insightsClient interface {
 	IngestRequestMetadatasBatch(context.Context, insights.RequestMetadatas) error
+	Close() error
 }
 
 type requestMetadatasFlusher struct {
