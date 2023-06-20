@@ -20,10 +20,9 @@ type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
-		PidRegistry     *pidRegistry
-		browserRegistry *browserRegistry
-		remoteRegistry  *remoteRegistry
-		initOnce        *sync.Once
+		PidRegistry    *pidRegistry
+		remoteRegistry *remoteRegistry
+		initOnce       *sync.Once
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -46,9 +45,8 @@ var (
 // New returns a pointer to a new RootModule instance.
 func New() *RootModule {
 	return &RootModule{
-		PidRegistry:     &pidRegistry{},
-		browserRegistry: &browserRegistry{},
-		initOnce:        &sync.Once{},
+		PidRegistry: &pidRegistry{},
+		initOnce:    &sync.Once{},
 	}
 }
 
@@ -68,7 +66,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 			Browser: mapBrowserToGoja(moduleVU{
 				VU:              vu,
 				pidRegistry:     m.PidRegistry,
-				browserRegistry: m.browserRegistry,
+				browserRegistry: &browserRegistry{},
 				remoteRegistry:  m.remoteRegistry,
 			}),
 			Devices: common.GetDevices(),
