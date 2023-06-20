@@ -217,6 +217,15 @@ func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 	return nil
 }
 
+// FrameLifecycleEvent is emitted when a frame lifecycle event occurs.
+type FrameLifecycleEvent struct {
+	// URL is the URL of the frame that emitted the event.
+	URL string
+
+	// Event is the lifecycle event that occurred.
+	Event LifecycleEvent
+}
+
 type LifecycleEvent int
 
 const (
