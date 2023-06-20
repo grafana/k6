@@ -28,12 +28,7 @@ type Config struct {
 	TestRunDetails null.String `json:"testRunDetails" envconfig:"K6_CLOUD_TEST_RUN_DETAILS"`
 	NoCompress     null.Bool   `json:"noCompress" envconfig:"K6_CLOUD_NO_COMPRESS"`
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
-
-	// TODO: Renable the cloud output versioning
-	// https://github.com/grafana/k6/issues/3117
-	//
-	// APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
-	APIVersion null.Int `json:"-"`
+	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
 	// TODO: rename the config field to align to the new logic by time series
 	// when the migration from the version 1 is completed.
