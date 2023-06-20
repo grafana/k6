@@ -30,7 +30,7 @@ type requestMetadatasCollector interface {
 
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
-	Flush(ctx context.Context) error
+	flush(context.Context) error
 }
 
 // Output sends result data to the k6 Cloud service.
