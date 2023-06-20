@@ -22,10 +22,16 @@ import (
 type metricsClient struct {
 	httpClient *cloudapi.Client
 	url        string
+	compressor compressor
+}
+
+type compressor interface {
+	Compress(b []byte) ([]byte, error)
+	EncodingHeader() string
 }
 
 // newMetricsClient creates and initializes a new MetricsClient.
-func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, error) {
+func newMetricsClient(c *cloudapi.Client, testRunID, compression string) (*metricsClient, error) {
 	// The cloudapi.Client works across different versions of the API, the test
 	// lifecycle management is under /v1 instead the metrics ingestion is /v2.
 	// Unfortunately, the current client has v1 hard-coded so we need to trim the wrong path
@@ -40,15 +46,24 @@ func newMetricsClient(c *cloudapi.Client, testRunID string) (*metricsClient, err
 	if testRunID == "" {
 		return nil, errors.New("TestRunID of the test is required")
 	}
+
+	// by default, use snappy compression, but allow overriding it
+	// with snappy framed
+	var comp compressor = &snappyCompressor{}
+	if compression == "snappy-framed" {
+		comp = &snappyFramedCompressor{}
+	}
+
 	return &metricsClient{
 		httpClient: c,
 		url:        strings.TrimSuffix(u, "/v1") + "/v2/metrics/" + testRunID,
+		compressor: comp,
 	}, nil
 }
 
 // Push the provided metrics for the given test run ID.
 func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
-	b, err := newRequestBody(samples)
+	b, err := newRequestBody(mc.compressor, samples)
 	if err != nil {
 		return err
 	}
@@ -64,7 +79,7 @@ func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
 	}
 
 	req.Header.Set("Content-Type", "application/x-protobuf")
-	req.Header.Set("Content-Encoding", "snappy")
+	req.Header.Set("Content-Encoding", mc.compressor.EncodingHeader())
 	req.Header.Set("K6-Metrics-Protocol-Version", "2.0")
 
 	err = mc.httpClient.Do(req, nil)
@@ -75,18 +90,62 @@ func (mc *metricsClient) push(samples *pbcloud.MetricSet) error {
 	return nil
 }
 
-func newRequestBody(data *pbcloud.MetricSet) ([]byte, error) {
+func newRequestBody(compressor compressor, data *pbcloud.MetricSet) ([]byte, error) {
 	b, err := proto.Marshal(data)
 	if err != nil {
 		return nil, fmt.Errorf("encoding metrics as Protobuf write request failed: %w", err)
 	}
-	// TODO: use the framing format
-	// https://github.com/google/snappy/blob/main/framing_format.txt
-	// It can be done replacing the encode with
-	// https://pkg.go.dev/github.com/klauspost/compress/snappy#NewBufferedWriter
+
+	b, err = compressor.Compress(b)
+	if err != nil {
+		return nil, fmt.Errorf("metrics request compression failed: %w", err)
+	}
+
+	return b, nil
+}
+
+// snappyCompressor
+type snappyCompressor struct{}
+
+var _ compressor = (*snappyCompressor)(nil)
+
+func (s *snappyCompressor) Compress(b []byte) ([]byte, error) {
 	if snappy.MaxEncodedLen(len(b)) < 0 {
 		return nil, fmt.Errorf("the Protobuf message is too large to be handled by Snappy encoder; "+
 			"size: %d, limit: %d", len(b), 0xffffffff)
 	}
+
 	return snappy.Encode(nil, b), nil
+}
+
+func (s *snappyCompressor) EncodingHeader() string {
+	return "snappy"
+}
+
+// See https://github.com/google/snappy/blob/main/framing_format.txt
+type snappyFramedCompressor struct{}
+
+var _ compressor = (*snappyFramedCompressor)(nil)
+
+func (s *snappyFramedCompressor) Compress(b []byte) ([]byte, error) {
+	var buf bytes.Buffer
+	writer := snappy.NewBufferedWriter(&buf)
+
+	_, err := writer.Write(b)
+	if err != nil {
+		_ = writer.Close()
+
+		return nil, err
+	}
+
+	err = writer.Close()
+	if err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func (s *snappyFramedCompressor) EncodingHeader() string {
+	return "x-snappy-framed"
 }

@@ -41,6 +41,8 @@ type Config struct {
 	// This is how many concurrent pushes will be done at the same time to the cloud
 	MetricPushConcurrency null.Int `json:"metricPushConcurrency" envconfig:"K6_CLOUD_METRIC_PUSH_CONCURRENCY"`
 
+	MetricCompression null.String `json:"metricCompression" envconfig:"K6_CLOUD_METRIC_COMPRESSION"`
+
 	// Indicates whether to send traces to the k6 Insights backend service.
 	TracesEnabled null.Bool `json:"tracesEnabled" envconfig:"K6_CLOUD_TRACES_ENABLED"`
 
@@ -267,6 +269,11 @@ func (c Config) Apply(cfg Config) Config {
 	if cfg.AggregationOutlierIqrCoefUpper.Valid {
 		c.AggregationOutlierIqrCoefUpper = cfg.AggregationOutlierIqrCoefUpper
 	}
+
+	if cfg.MetricCompression.Valid {
+		c.MetricCompression = cfg.MetricCompression
+	}
+
 	return c
 }
 
