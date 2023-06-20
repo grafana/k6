@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"net/http"
 	"strconv"
 	"testing"
 
@@ -100,6 +101,42 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 
 	result := p.TextContent("#doneDiv", nil)
 	assert.EqualValues(t, "Done!", result)
+}
+
+// Without the fix in https://github.com/grafana/xk6-browser/pull/942
+// this test would hang on the "sign in" link click.
+func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
+	t.Parallel()
+
+	if s, ok := env.Lookup(env.BrowserHeadless); ok {
+		if v, err := strconv.ParseBool(s); err == nil && v {
+			// We're skipping this when running in headless
+			// environments since the bug that the test fixes
+			// only surfaces when in headfull mode.
+			// Remove this skip once we have headfull mode in
+			// CI: https://github.com/grafana/xk6-browser/issues/678
+			t.Skip("skipped when in headless mode")
+		}
+	}
+
+	tb := newTestBrowser(
+		t,
+		withFileServer(),
+		withEnvLookup(env.ConstLookup(env.BrowserHeadless, "0")),
+	)
+	p := tb.NewPage(nil)
+	tb.withHandler("/iframeSignIn", func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, tb.staticURL("iframe_signin.html"), http.StatusMovedPermanently)
+	})
+
+	_, err := p.Goto(tb.staticURL("iframe_home.html"), nil)
+	require.NoError(t, err)
+
+	err = p.Click(`a[href="/iframeSignIn"]`, nil)
+	require.NoError(t, err)
+
+	result := p.TextContent("#doneDiv", nil)
+	assert.EqualValues(t, "Sign In Page", result)
 }
 
 func TestFrameTitle(t *testing.T) {
