@@ -15,6 +15,9 @@ import (
 	"github.com/dop251/goja"
 )
 
+// BlankPage represents a blank page.
+const BlankPage = "about:blank"
+
 // ColorScheme represents a browser color scheme.
 type ColorScheme string
 

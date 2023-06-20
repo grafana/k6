@@ -1776,7 +1776,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 				sameDocNav = true
 				break
 			}
-			// request could be nil if navigating to e.g. about:blank
+			// request could be nil if navigating to e.g. BlankPage.
 			req := e.newDocument.request
 			if req != nil {
 				req.responseMu.RLock()

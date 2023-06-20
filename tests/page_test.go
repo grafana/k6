@@ -11,6 +11,8 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 type emulateMediaOpts struct {
@@ -664,7 +666,7 @@ func TestPageURL(t *testing.T) {
 	b := newTestBrowser(t, withHTTPServer())
 
 	p := b.NewPage(nil)
-	assert.Equal(t, "about:blank", p.URL())
+	assert.Equal(t, common.BlankPage, p.URL())
 
 	resp, err := p.Goto(b.url("/get"), nil)
 	require.NoError(t, err)

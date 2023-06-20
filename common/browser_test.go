@@ -61,7 +61,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 				require.Equal(t, target.CommandCreateTarget, method)
 				require.IsType(t, params, &target.CreateTargetParams{})
 				tp, _ := params.(*target.CreateTargetParams)
-				require.Equal(t, "about:blank", tp.URL)
+				require.Equal(t, BlankPage, tp.URL)
 				require.Equal(t, browserContextID, tp.BrowserContextID)
 
 				// newPageInContext event handler will catch this target ID, and compare it to

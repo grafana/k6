@@ -599,11 +599,11 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 			// skip the initial blank page if we are navigating to a non-blank page.
 			// otherwise, we will get a lifecycle event for the initial blank page
 			// and return prematurely before waiting for the navigation to complete.
-			if url != "about:blank" && le.URL == "about:blank" {
+			if url != BlankPage && le.URL == BlankPage {
 				m.logger.Debugf(
 					"FrameManager:NavigateFrame:createWaitForEventPredicateHandler",
-					"fmid:%d fid:%v furl:%s url:%s waitUntil:%s event.lifecycle:%q event.url:%q skipping about:blank",
-					fmid, fid, furl, url, parsedOpts.WaitUntil, le.Event, le.URL,
+					"fmid:%d fid:%v furl:%s url:%s waitUntil:%s event.lifecycle:%q event.url:%q skipping %s",
+					fmid, fid, furl, url, parsedOpts.WaitUntil, le.Event, le.URL, BlankPage,
 				)
 				return false
 			}
@@ -659,7 +659,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 	case evt := <-navEvtCh:
 		if e, ok := evt.(*NavigationEvent); ok {
 			req := e.newDocument.request
-			// Request could be nil in case of navigation to e.g. about:blank
+			// Request could be nil in case of navigation to e.g. BlankPage.
 			if req != nil {
 				req.responseMu.RLock()
 				resp = req.response
