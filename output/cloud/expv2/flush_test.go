@@ -36,12 +36,20 @@ func (c *mockWorkingInsightsClient) IngestRequestMetadatasBatch(ctx context.Cont
 	return nil
 }
 
+func (c *mockWorkingInsightsClient) Close() error {
+	return nil
+}
+
 type mockFailingInsightsClient struct {
 	err error
 }
 
 func (c *mockFailingInsightsClient) IngestRequestMetadatasBatch(_ context.Context, _ insights.RequestMetadatas) error {
 	return c.err
+}
+
+func (c *mockFailingInsightsClient) Close() error {
+	return nil
 }
 
 type mockRequestMetadatasCollector struct {
