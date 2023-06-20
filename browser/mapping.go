@@ -676,21 +676,21 @@ func mapBrowser(vu moduleVU) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"context": func() (api.BrowserContext, error) {
-			b, err := vu.getBrowser(vu.State().Iteration)
+			b, err := vu.browser()
 			if err != nil {
 				return nil, err
 			}
 			return b.Context(), nil
 		},
 		"isConnected": func() (bool, error) {
-			b, err := vu.getBrowser(vu.State().Iteration)
+			b, err := vu.browser()
 			if err != nil {
 				return false, err
 			}
 			return b.IsConnected(), nil
 		},
 		"newContext": func(opts goja.Value) (*goja.Object, error) {
-			b, err := vu.getBrowser(vu.State().Iteration)
+			b, err := vu.browser()
 			if err != nil {
 				return nil, err
 			}
@@ -702,21 +702,21 @@ func mapBrowser(vu moduleVU) mapping {
 			return rt.ToValue(m).ToObject(rt), nil
 		},
 		"userAgent": func() (string, error) {
-			b, err := vu.getBrowser(vu.State().Iteration)
+			b, err := vu.browser()
 			if err != nil {
 				return "", err
 			}
 			return b.UserAgent(), nil
 		},
 		"version": func() (string, error) {
-			b, err := vu.getBrowser(vu.State().Iteration)
+			b, err := vu.browser()
 			if err != nil {
 				return "", err
 			}
 			return b.Version(), nil
 		},
 		"newPage": func(opts goja.Value) (mapping, error) {
-			b, err := vu.getBrowser(vu.State().Iteration)
+			b, err := vu.browser()
 			if err != nil {
 				return nil, err
 			}
