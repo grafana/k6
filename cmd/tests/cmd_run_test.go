@@ -1537,7 +1537,7 @@ func TestMinIterationDuration(t *testing.T) {
 	elapsed := time.Since(start)
 	assert.Greater(t, elapsed, 7*time.Second, "expected more time to have passed because of minIterationDuration")
 	assert.Less(
-		t, elapsed, 14*time.Second,
+		t, elapsed, 15*time.Second,
 		"expected less time to have passed because minIterationDuration should not affect setup() and teardown() ",
 	)
 

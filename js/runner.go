@@ -773,12 +773,18 @@ func (u *ActiveVU) RunOnce() error {
 		ScenarioName: u.scenarioName,
 	}
 
-	waitEventCtx, waitEventCancel := context.WithTimeout(u.RunContext, 30*time.Minute)
-	defer waitEventCancel()
-	waitEventDone := u.moduleVUImpl.events.local.Emit(&event.Event{Type: event.IterStart, Data: eventIterData})
-	if err := waitEventDone(waitEventCtx); err != nil {
-		panic(fmt.Sprintf("error waiting for '%s' event processing to complete: %s", event.IterStart, err))
+	emitEvent := func(evt *event.Event) func() {
+		waitDone := u.moduleVUImpl.events.local.Emit(evt)
+		return func() {
+			waitCtx, waitCancel := context.WithTimeout(u.RunContext, 30*time.Minute)
+			defer waitCancel()
+			if werr := waitDone(waitCtx); werr != nil {
+				u.state.Logger.WithError(werr).Warn()
+			}
+		}
 	}
+
+	emitEvent(&event.Event{Type: event.IterStart, Data: eventIterData})()
 
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
@@ -792,12 +798,8 @@ func (u *ActiveVU) RunOnce() error {
 		}
 		eventIterData.Error = err
 	}
-	waitEventCtx, waitEventCancel = context.WithTimeout(u.RunContext, 30*time.Minute)
-	defer waitEventCancel()
-	waitEventDone = u.moduleVUImpl.events.local.Emit(&event.Event{Type: event.IterEnd, Data: eventIterData})
-	if err = waitEventDone(waitEventCtx); err != nil {
-		panic(fmt.Sprintf("error waiting for '%s' event processing to complete: %s", event.IterEnd, err))
-	}
+
+	emitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})()
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder
