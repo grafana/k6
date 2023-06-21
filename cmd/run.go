@@ -40,6 +40,12 @@ type cmdRun struct {
 	gs *state.GlobalState
 }
 
+// We use an excessively high timeout to wait for event processing to complete,
+// since prematurely proceeding before it is done could create bigger problems.
+// In practice, this effectively acts as no timeout, and the user will have to
+// kill k6 if a hang happens, which is the behavior without events anyway.
+const waitEventDoneTimeout = 30 * time.Minute
+
 // TODO: split apart some more
 //
 //nolint:funlen,gocognit,gocyclo,cyclop
@@ -84,8 +90,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			Type: event.Exit,
 			Data: &event.ExitData{Error: err},
 		})
-		// TODO: Make the timeout configurable?
-		waitExitCtx, waitExitCancel := context.WithTimeout(globalCtx, 5*time.Second)
+		waitExitCtx, waitExitCancel := context.WithTimeout(globalCtx, waitEventDoneTimeout)
 		defer waitExitCancel()
 		if werr := waitExitDone(waitExitCtx); werr != nil {
 			logger.WithError(werr).Warn()
@@ -321,8 +326,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
-	// TODO: Make the timeout configurable?
-	waitInitCtx, waitInitCancel := context.WithTimeout(globalCtx, 10*time.Second)
+	waitInitCtx, waitInitCancel := context.WithTimeout(globalCtx, waitEventDoneTimeout)
 	defer waitInitCancel()
 
 	if werr := waitInitDone(waitInitCtx); werr != nil {
@@ -334,8 +338,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	err = execScheduler.Run(globalCtx, runCtx, samples)
 	waitTestEndDone := test.preInitState.Events.Emit(&event.Event{Type: event.TestEnd})
 	defer func() {
-		// TODO: Make the timeout configurable?
-		waitEndCtx, waitEndCancel := context.WithTimeout(globalCtx, 5*time.Second)
+		waitEndCtx, waitEndCancel := context.WithTimeout(globalCtx, waitEventDoneTimeout)
 		defer waitEndCancel()
 		if werr := waitTestEndDone(waitEndCtx); werr != nil {
 			logger.WithError(werr).Warn()
