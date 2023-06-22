@@ -27,10 +27,6 @@ func newBatchCreateRequestMetadatasRequest(
 }
 
 func newCreateRequestMetadataRequest(requestMetadata RequestMetadata) (*ingester.CreateRequestMetadataRequest, error) {
-	if err := requestMetadata.Valid(); err != nil {
-		return nil, fmt.Errorf("invalid request metadata: %w", err)
-	}
-
 	rm := &k6.RequestMetadata{
 		TraceID:           requestMetadata.TraceID,
 		StartTimeUnixNano: requestMetadata.Start.UnixNano(),
