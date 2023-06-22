@@ -9,7 +9,7 @@
 ## Checklist
 
 <!-- 
-If you haven't reed the contributing guidelines https://github.com/grafana/k6/blob/master/CONTRIBUTING.md 
+If you haven't read the contributing guidelines https://github.com/grafana/k6/blob/master/CONTRIBUTING.md 
 and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md yet, please do so
 -->
 
