@@ -16,7 +16,6 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/event"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
@@ -71,7 +70,7 @@ func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loaded
 		RuntimeOptions: runtimeOptions,
 		Registry:       registry,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Events:         event.NewEventSystem(100, gs.Logger),
+		Events:         gs.Events,
 		LookupEnv: func(key string) (string, bool) {
 			val, ok := gs.Env[key]
 			return val, ok

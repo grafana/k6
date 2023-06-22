@@ -73,20 +73,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// from sub-contexts while also attaching a reason for the abort.
 	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
 
-	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
-	if err != nil {
-		return err
-	}
-	if test.keyLogger != nil {
-		defer func() {
-			if klErr := test.keyLogger.Close(); klErr != nil {
-				logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
-			}
-		}()
-	}
-
 	emitEvent := func(evt *event.Event) func() {
-		waitDone := test.preInitState.Events.Emit(evt)
+		waitDone := c.gs.Events.Emit(evt)
 		return func() {
 			waitCtx, waitCancel := context.WithTimeout(globalCtx, waitEventDoneTimeout)
 			defer waitCancel()
@@ -101,8 +89,20 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			Type: event.Exit,
 			Data: &event.ExitData{Error: err},
 		})()
-		test.preInitState.Events.UnsubscribeAll()
+		c.gs.Events.UnsubscribeAll()
 	}()
+
+	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
+	if err != nil {
+		return err
+	}
+	if test.keyLogger != nil {
+		defer func() {
+			if klErr := test.keyLogger.Close(); klErr != nil {
+				logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
+			}
+		}()
+	}
 
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
