@@ -19,6 +19,8 @@ All team members are expected to open PRs for adding new release notes items whe
 release-notes-v04x <--- my-single-feature-notes-branch
 ```
 
+- [ ] Go through the potential [dependencies updates](https://github.com/grafana/k6/blob/master/Dependencies.md) then create a PR if any is relevant. 
+
 ### Release Preparation
 
 ~ 1 week before the release date.
