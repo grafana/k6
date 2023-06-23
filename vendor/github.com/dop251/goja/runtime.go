@@ -1914,12 +1914,12 @@ func (r *Runtime) toValue(i interface{}, origValue reflect.Value) Value {
 		m.init()
 		return obj
 	case []interface{}:
-		return r.newObjectGoSlice(&i).val
+		return r.newObjectGoSlice(&i, false).val
 	case *[]interface{}:
 		if i == nil {
 			return _null
 		}
-		return r.newObjectGoSlice(i).val
+		return r.newObjectGoSlice(i, true).val
 	}
 
 	if !origValue.IsValid() {
@@ -2614,18 +2614,6 @@ func (r *Runtime) toObject(v Value, args ...interface{}) *Object {
 		}
 		panic(r.NewTypeError("Value is not an object: %s", s))
 	}
-}
-
-func (r *Runtime) toNumber(v Value) Value {
-	switch o := v.(type) {
-	case valueInt, valueFloat:
-		return v
-	case *Object:
-		if pvo, ok := o.self.(*primitiveValueObject); ok {
-			return r.toNumber(pvo.pValue)
-		}
-	}
-	panic(r.NewTypeError("Value is not a number: %s", v))
 }
 
 func (r *Runtime) speciesConstructor(o, defaultConstructor *Object) func(args []Value, newTarget *Object) *Object {

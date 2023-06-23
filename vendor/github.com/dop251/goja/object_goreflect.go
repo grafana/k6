@@ -181,11 +181,6 @@ func (o *objectGoReflect) init() {
 		o.toString = o._toStringError
 	}
 
-	if o.toString != nil || o.valueOf != nil {
-		o.baseObject._putProp("toString", o.val.runtime.newNativeFunc(o.toStringFunc, nil, "toString", nil, 0), true, false, true)
-		o.baseObject._putProp("valueOf", o.val.runtime.newNativeFunc(o.valueOfFunc, nil, "valueOf", nil, 0), true, false, true)
-	}
-
 	if len(o.methodsInfo.Names) > 0 && o.fieldsValue.Kind() != reflect.Interface {
 		o.methodsValue = o.fieldsValue.Addr()
 	} else {
@@ -195,14 +190,6 @@ func (o *objectGoReflect) init() {
 	if j, ok := o.origValue.Interface().(JsonEncodable); ok {
 		o.toJson = j.JsonEncodable
 	}
-}
-
-func (o *objectGoReflect) toStringFunc(FunctionCall) Value {
-	return o.toPrimitiveString()
-}
-
-func (o *objectGoReflect) valueOfFunc(FunctionCall) Value {
-	return o.toPrimitiveNumber()
 }
 
 func (o *objectGoReflect) getStr(name unistring.String, receiver Value) Value {
@@ -304,7 +291,7 @@ func (o *objectGoReflect) getOwnPropStr(name unistring.String) Value {
 		}
 	}
 
-	return nil
+	return o.baseObject.getOwnPropStr(name)
 }
 
 func (o *objectGoReflect) setOwnStr(name unistring.String, val Value, throw bool) bool {
@@ -402,7 +389,7 @@ func (o *objectGoReflect) _has(name string) bool {
 }
 
 func (o *objectGoReflect) hasOwnPropertyStr(name unistring.String) bool {
-	return o._has(name.String())
+	return o._has(name.String()) || o.baseObject.hasOwnPropertyStr(name)
 }
 
 func (o *objectGoReflect) _valueOfInt() Value {
@@ -443,37 +430,6 @@ func (o *objectGoReflect) _toStringBool() Value {
 
 func (o *objectGoReflect) _toStringError() Value {
 	return newStringValue(o.origValue.Interface().(error).Error())
-}
-
-func (o *objectGoReflect) toPrimitiveNumber() Value {
-	if o.valueOf != nil {
-		return o.valueOf()
-	}
-	if o.toString != nil {
-		return o.toString()
-	}
-	return o.baseObject.toPrimitiveNumber()
-}
-
-func (o *objectGoReflect) toPrimitiveString() Value {
-	if o.toString != nil {
-		return o.toString()
-	}
-	if o.valueOf != nil {
-		return o.valueOf().toString()
-	}
-	return o.baseObject.toPrimitiveString()
-}
-
-func (o *objectGoReflect) toPrimitive() Value {
-	if o.valueOf != nil {
-		return o.valueOf()
-	}
-	if o.toString != nil {
-		return o.toString()
-	}
-
-	return o.baseObject.toPrimitive()
 }
 
 func (o *objectGoReflect) deleteStr(name unistring.String, throw bool) bool {

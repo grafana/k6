@@ -158,18 +158,6 @@ func (d *destructKeyedSource) deleteSym(s *Symbol, throw bool) bool {
 	return d.w().deleteSym(s, throw)
 }
 
-func (d *destructKeyedSource) toPrimitiveNumber() Value {
-	return d.w().toPrimitiveNumber()
-}
-
-func (d *destructKeyedSource) toPrimitiveString() Value {
-	return d.w().toPrimitiveString()
-}
-
-func (d *destructKeyedSource) toPrimitive() Value {
-	return d.w().toPrimitive()
-}
-
 func (d *destructKeyedSource) assertCallable() (call func(FunctionCall) Value, ok bool) {
 	return d.w().assertCallable()
 }
