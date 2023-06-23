@@ -425,6 +425,10 @@ func (p *Page) Click(selector string, opts goja.Value) error {
 func (p *Page) Close(opts goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 
+	// forcing the pagehide event to trigger web vitals metrics.
+	v := p.vu.Runtime().ToValue(`() => window.dispatchEvent(new Event('pagehide'))`)
+	_ = p.Evaluate(v)
+
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		return fmt.Errorf("internal error while removing binding from page: %w", err)

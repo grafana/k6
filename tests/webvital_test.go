@@ -72,3 +72,51 @@ func TestWebVitalMetric(t *testing.T) {
 		assert.True(t, v, "expected %s to have been measured and emitted", k)
 	}
 }
+
+func TestWebVitalMetricNoInteraction(t *testing.T) {
+	var (
+		samples  = make(chan k6metrics.SampleContainer)
+		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
+		expected = map[string]bool{
+			"browser_web_vital_ttfb": false,
+			"browser_web_vital_fcp":  false,
+			"browser_web_vital_lcp":  false,
+			"browser_web_vital_cls":  false,
+		}
+	)
+
+	done := make(chan struct{})
+	ctx, cancel := context.WithTimeout(browser.context(), 5*time.Second)
+	defer cancel()
+	go func() {
+		for {
+			var metric k6metrics.SampleContainer
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case metric = <-samples:
+			}
+			samples := metric.GetSamples()
+			for _, s := range samples {
+				if _, ok := expected[s.Metric.Name]; ok {
+					expected[s.Metric.Name] = true
+				}
+			}
+		}
+	}()
+
+	page := browser.NewPage(nil)
+	resp, err := page.Goto(browser.staticURL("/web_vitals.html"), nil)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	// prevents `err:fetching response body: context canceled` warning.`
+	require.NoError(t, page.Close(nil))
+	done <- struct{}{}
+
+	for k, v := range expected {
+		assert.True(t, v, "expected %s to have been measured and emitted", k)
+	}
+}
