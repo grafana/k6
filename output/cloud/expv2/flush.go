@@ -3,6 +3,7 @@ package expv2
 import (
 	"context"
 
+	"go.k6.io/k6/cloudapi/insights"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 )
@@ -130,4 +131,31 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 		addBucketToTimeSeriesProto(
 			pbTimeSeries, timeSeries.Metric.Type, bucket.Time, sink)
 	}
+}
+
+// insightsClient is an interface for sending request metadatas to the Insights API.
+type insightsClient interface {
+	IngestRequestMetadatasBatch(context.Context, insights.RequestMetadatas) error
+	Close() error
+}
+
+type requestMetadatasFlusher struct {
+	client    insightsClient
+	collector requestMetadatasCollector
+}
+
+func newTracesFlusher(client insightsClient, collector requestMetadatasCollector) *requestMetadatasFlusher {
+	return &requestMetadatasFlusher{
+		client:    client,
+		collector: collector,
+	}
+}
+
+func (f *requestMetadatasFlusher) flush(ctx context.Context) error {
+	requestMetadatas := f.collector.PopAll()
+	if len(requestMetadatas) < 1 {
+		return nil
+	}
+
+	return f.client.IngestRequestMetadatasBatch(ctx, requestMetadatas)
 }

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+package k6.cloud.insights.proto.v1.trace;
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/trace";
+
+import "v1/trace/span.proto";
+
+message SpanLabels {
+  string Name = 1;
+  string ServiceName = 2;
+  SpanKind Kind = 3;
+  SpanStatusCode StatusCode = 4;
+}

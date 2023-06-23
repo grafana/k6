@@ -2,10 +2,22 @@ package expv2
 
 import (
 	"errors"
+	"strconv"
 	"sync"
 	"time"
 
+	"go.k6.io/k6/cloudapi/insights"
+	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
+)
+
+const (
+	metadataTraceIDKey = "trace_id"
+	scenarioTag        = "scenario"
+	groupTag           = "group"
+	nameTag            = "name"
+	methodTag          = "method"
+	statusTag          = "status"
 )
 
 type timeBucket struct {
@@ -162,4 +174,95 @@ func (c *collector) timeFromBucketID(id int64) int64 {
 
 func (c *collector) bucketCutoffID() int64 {
 	return c.nowFunc().Add(-c.waitPeriod).UnixNano() / int64(c.aggregationPeriod)
+}
+
+type rmCollector struct {
+	testRunID int64
+	buffer    insights.RequestMetadatas
+	bufferMu  *sync.Mutex
+}
+
+func newRequestMetadatasCollector(testRunID int64) *rmCollector {
+	return &rmCollector{
+		testRunID: testRunID,
+		buffer:    nil,
+		bufferMu:  &sync.Mutex{},
+	}
+}
+
+func (c *rmCollector) CollectRequestMetadatas(sampleContainers []metrics.SampleContainer) {
+	if len(sampleContainers) < 1 {
+		return
+	}
+
+	// TODO(lukasz, other-proto-support): Support grpc/websocket trails.
+	var newBuffer insights.RequestMetadatas
+	for _, sampleContainer := range sampleContainers {
+		trail, ok := sampleContainer.(*httpext.Trail)
+		if !ok {
+			continue
+		}
+
+		traceID, found := trail.Metadata[metadataTraceIDKey]
+		if !found {
+			continue
+		}
+
+		m := insights.RequestMetadata{
+			TraceID: traceID,
+			Start:   trail.EndTime.Add(-trail.Duration),
+			End:     trail.EndTime,
+			TestRunLabels: insights.TestRunLabels{
+				ID:       c.testRunID,
+				Scenario: c.getStringTagFromTrail(trail, scenarioTag),
+				Group:    c.getStringTagFromTrail(trail, groupTag),
+			},
+			ProtocolLabels: insights.ProtocolHTTPLabels{
+				URL:        c.getStringTagFromTrail(trail, nameTag),
+				Method:     c.getStringTagFromTrail(trail, methodTag),
+				StatusCode: c.getIntTagFromTrail(trail, statusTag),
+			},
+		}
+
+		newBuffer = append(newBuffer, m)
+	}
+
+	if len(newBuffer) < 1 {
+		return
+	}
+
+	c.bufferMu.Lock()
+	defer c.bufferMu.Unlock()
+
+	c.buffer = append(c.buffer, newBuffer...)
+}
+
+func (c *rmCollector) PopAll() insights.RequestMetadatas {
+	c.bufferMu.Lock()
+	defer c.bufferMu.Unlock()
+
+	b := c.buffer
+	c.buffer = nil
+	return b
+}
+
+func (c *rmCollector) getStringTagFromTrail(trail *httpext.Trail, key string) string {
+	if tag, found := trail.Tags.Get(key); found {
+		return tag
+	}
+
+	return "unknown"
+}
+
+func (c *rmCollector) getIntTagFromTrail(trail *httpext.Trail, key string) int64 {
+	if tag, found := trail.Tags.Get(key); found {
+		tagInt, err := strconv.ParseInt(tag, 10, 64)
+		if err != nil {
+			return 0
+		}
+
+		return tagInt
+	}
+
+	return 0
 }

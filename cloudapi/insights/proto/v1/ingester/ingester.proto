@@ -1,0 +1,39 @@
+syntax = "proto3";
+
+package k6.cloud.insights.proto.v1.ingester;
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/ingester";
+
+import "v1/k6/request_metadata.proto";
+import "v1/trace/span.proto";
+
+// The IngesterService contains the methods to ingest Spans and Request Metadata,
+// which include information about a k6 load tests.
+service IngesterService {
+  rpc BatchCreateRequestMetadatas(BatchCreateRequestMetadatasRequest) returns (BatchCreateRequestMetadatasResponse) {}
+  rpc BatchCreateSpans(BatchCreateSpansRequest) returns (BatchCreateSpansResponse) {}
+}
+
+message BatchCreateRequestMetadatasRequest {
+  repeated CreateRequestMetadataRequest Requests = 1;
+}
+
+message CreateRequestMetadataRequest {
+  k6.RequestMetadata RequestMetadata = 1;
+}
+
+message BatchCreateRequestMetadatasResponse {
+  repeated k6.RequestMetadata RequestMetadatas = 1;
+}
+
+message BatchCreateSpansRequest {
+  repeated CreateSpanRequest Requests = 1;
+}
+
+message CreateSpanRequest {
+  trace.Span Span = 1;
+}
+
+message BatchCreateSpansResponse {
+  repeated trace.Span Spans = 1;
+}

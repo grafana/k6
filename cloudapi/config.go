@@ -7,6 +7,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/mstoykov/envconfig"
+
 	"go.k6.io/k6/lib/types"
 )
 
@@ -39,6 +40,15 @@ type Config struct {
 
 	// This is how many concurrent pushes will be done at the same time to the cloud
 	MetricPushConcurrency null.Int `json:"metricPushConcurrency" envconfig:"K6_CLOUD_METRIC_PUSH_CONCURRENCY"`
+
+	// Indicates whether to send traces to the k6 Insights backend service.
+	TracesEnabled null.Bool `json:"tracesEnabled" envconfig:"K6_CLOUD_TRACES_ENABLED"`
+
+	// The host of the k6 Insights backend service.
+	TracesHost null.String `json:"traceHost" envconfig:"K6_CLOUD_TRACES_HOST"`
+
+	// The time interval between periodic API calls for sending samples to the cloud ingest service.
+	TracesPushInterval types.NullDuration `json:"tracesPushInterval" envconfig:"K6_CLOUD_TRACES_PUSH_INTERVAL"`
 
 	// Aggregation docs:
 	//
@@ -145,11 +155,16 @@ type Config struct {
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
 	return Config{
-		Host:                       null.NewString("https://ingest.k6.io", false),
-		LogsTailURL:                null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
-		WebAppURL:                  null.NewString("https://app.k6.io", false),
-		MetricPushInterval:         types.NewNullDuration(1*time.Second, false),
-		MetricPushConcurrency:      null.NewInt(1, false),
+		Host:                  null.NewString("https://ingest.k6.io", false),
+		LogsTailURL:           null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
+		WebAppURL:             null.NewString("https://app.k6.io", false),
+		MetricPushInterval:    types.NewNullDuration(1*time.Second, false),
+		MetricPushConcurrency: null.NewInt(1, false),
+
+		TracesEnabled:      null.NewBool(false, false),
+		TracesHost:         null.NewString("insights.k6.io:4443", false),
+		TracesPushInterval: types.NewNullDuration(1*time.Second, false),
+
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
 		Timeout:                    types.NewNullDuration(1*time.Minute, false),
 		APIVersion:                 null.NewInt(1, false),
@@ -215,6 +230,15 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.MetricPushConcurrency.Valid {
 		c.MetricPushConcurrency = cfg.MetricPushConcurrency
+	}
+	if cfg.TracesEnabled.Valid {
+		c.TracesEnabled = cfg.TracesEnabled
+	}
+	if cfg.TracesHost.Valid {
+		c.TracesHost = cfg.TracesHost
+	}
+	if cfg.TracesPushInterval.Valid {
+		c.TracesPushInterval = cfg.TracesPushInterval
 	}
 	if cfg.AggregationPeriod.Valid {
 		c.AggregationPeriod = cfg.AggregationPeriod

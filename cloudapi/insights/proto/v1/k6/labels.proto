@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package k6.cloud.insights.proto.v1.k6;
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/k6";
+
+message TestRunLabels {
+  int64 ID = 1;
+  string Scenario = 2;
+  string Group = 3;
+}
+
+message HTTPLabels {
+  string Url = 1;
+  string Method = 2;
+  int64 StatusCode = 3;
+}
