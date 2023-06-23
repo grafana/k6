@@ -326,7 +326,7 @@ func parseArgs(flags map[string]any) ([]string, error) {
 
 	// Force the first page to be blank, instead of the welcome page;
 	// --no-first-run doesn't enforce that.
-	// args = append(args, "about:blank")
+	// args = append(args, common.BlankPage)
 	// args = append(args, "--no-startup-window")
 	return args, nil
 }
