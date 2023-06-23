@@ -43,15 +43,16 @@ var (
 )
 
 var (
-	reflectTypeInt    = reflect.TypeOf(int64(0))
-	reflectTypeBool   = reflect.TypeOf(false)
-	reflectTypeNil    = reflect.TypeOf(nil)
-	reflectTypeFloat  = reflect.TypeOf(float64(0))
-	reflectTypeMap    = reflect.TypeOf(map[string]interface{}{})
-	reflectTypeArray  = reflect.TypeOf([]interface{}{})
-	reflectTypeString = reflect.TypeOf("")
-	reflectTypeFunc   = reflect.TypeOf((func(FunctionCall) Value)(nil))
-	reflectTypeError  = reflect.TypeOf((*error)(nil)).Elem()
+	reflectTypeInt      = reflect.TypeOf(int64(0))
+	reflectTypeBool     = reflect.TypeOf(false)
+	reflectTypeNil      = reflect.TypeOf(nil)
+	reflectTypeFloat    = reflect.TypeOf(float64(0))
+	reflectTypeMap      = reflect.TypeOf(map[string]interface{}{})
+	reflectTypeArray    = reflect.TypeOf([]interface{}{})
+	reflectTypeArrayPtr = reflect.TypeOf((*[]interface{})(nil))
+	reflectTypeString   = reflect.TypeOf("")
+	reflectTypeFunc     = reflect.TypeOf((func(FunctionCall) Value)(nil))
+	reflectTypeError    = reflect.TypeOf((*error)(nil)).Elem()
 )
 
 var intCache [256]Value

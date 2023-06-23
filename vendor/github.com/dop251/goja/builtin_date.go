@@ -165,10 +165,10 @@ func (r *Runtime) dateproto_toPrimitive(call FunctionCall) Value {
 	arg := call.Argument(0)
 
 	if asciiString("string").StrictEquals(arg) || asciiString("default").StrictEquals(arg) {
-		return o.self.toPrimitiveString()
+		return o.ordinaryToPrimitiveString()
 	}
 	if asciiString("number").StrictEquals(arg) {
-		return o.self.toPrimitiveNumber()
+		return o.ordinaryToPrimitiveNumber()
 	}
 	panic(r.NewTypeError("Invalid hint: %s", arg))
 }

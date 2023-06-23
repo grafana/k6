@@ -13,6 +13,11 @@ func (r *Runtime) booleanproto_toString(call FunctionCall) Value {
 				goto success
 			}
 		}
+		if o, ok := o.self.(*objectGoReflect); ok {
+			if o.class == classBoolean && o.toString != nil {
+				return o.toString()
+			}
+		}
 	}
 	r.typeErrorResult(true, "Method Boolean.prototype.toString is called on incompatible receiver")
 
@@ -31,6 +36,11 @@ func (r *Runtime) booleanproto_valueOf(call FunctionCall) Value {
 		if p, ok := o.self.(*primitiveValueObject); ok {
 			if b, ok := p.pValue.(valueBool); ok {
 				return b
+			}
+		}
+		if o, ok := o.self.(*objectGoReflect); ok {
+			if o.class == classBoolean && o.valueOf != nil {
+				return o.valueOf()
 			}
 		}
 	}

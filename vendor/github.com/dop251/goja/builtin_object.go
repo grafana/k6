@@ -462,6 +462,11 @@ func (r *Runtime) objectproto_toString(call FunctionCall) Value {
 		return stringObjectUndefined
 	default:
 		obj := o.ToObject(r)
+		if o, ok := obj.self.(*objectGoReflect); ok {
+			if toString := o.toString; toString != nil {
+				return toString()
+			}
+		}
 		var clsName string
 		if isArray(obj) {
 			clsName = classArray

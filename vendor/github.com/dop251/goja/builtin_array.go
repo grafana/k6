@@ -208,6 +208,16 @@ func (r *Runtime) arrayproto_join(call FunctionCall) Value {
 
 func (r *Runtime) arrayproto_toString(call FunctionCall) Value {
 	array := call.This.ToObject(r)
+	var toString func() Value
+	switch a := array.self.(type) {
+	case *objectGoSliceReflect:
+		toString = a.toString
+	case *objectGoArrayReflect:
+		toString = a.toString
+	}
+	if toString != nil {
+		return toString()
+	}
 	f := array.self.getStr("join", nil)
 	if fObj, ok := f.(*Object); ok {
 		if fcall, ok := fObj.self.assertCallable(); ok {

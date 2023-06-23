@@ -324,9 +324,9 @@ func (ctx *_builtinJSON_stringifyContext) str(key Value, holder *Object) bool {
 			} else {
 				switch o1.className() {
 				case classNumber:
-					value = o1.toPrimitiveNumber()
+					value = o1.val.ordinaryToPrimitiveNumber()
 				case classString:
-					value = o1.toPrimitiveString()
+					value = o1.val.ordinaryToPrimitiveString()
 				case classBoolean:
 					if o.ToInteger() != 0 {
 						value = valueTrue

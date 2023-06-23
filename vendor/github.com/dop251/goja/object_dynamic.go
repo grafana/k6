@@ -431,18 +431,6 @@ func (*baseDynamicObject) deleteSym(_ *Symbol, _ bool) bool {
 	return true
 }
 
-func (o *baseDynamicObject) toPrimitiveNumber() Value {
-	return o.val.genericToPrimitiveNumber()
-}
-
-func (o *baseDynamicObject) toPrimitiveString() Value {
-	return o.val.genericToPrimitiveString()
-}
-
-func (o *baseDynamicObject) toPrimitive() Value {
-	return o.val.genericToPrimitive()
-}
-
 func (o *baseDynamicObject) assertCallable() (call func(FunctionCall) Value, ok bool) {
 	return nil, false
 }

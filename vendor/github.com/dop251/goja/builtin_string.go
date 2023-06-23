@@ -74,6 +74,14 @@ func (r *Runtime) stringproto_toStringValueOf(this Value, funcName string) Value
 		if strObj, ok := obj.self.(*stringObject); ok {
 			return strObj.value
 		}
+		if reflectObj, ok := obj.self.(*objectGoReflect); ok && reflectObj.class == classString {
+			if toString := reflectObj.toString; toString != nil {
+				return toString()
+			}
+			if valueOf := reflectObj.valueOf; valueOf != nil {
+				return valueOf()
+			}
+		}
 	}
 	r.typeErrorResult(true, "String.prototype.%s is called on incompatible receiver", funcName)
 	return nil
