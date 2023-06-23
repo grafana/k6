@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package k6.cloud.insights.proto.v1.k6;
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/k6";
+
+import "v1/k6/labels.proto";
+
+message RequestMetadata {
+	string TraceID = 1;
+	int64 StartTimeUnixNano = 2;
+	int64 EndTimeUnixNano = 3;
+	TestRunLabels TestRunLabels = 4;
+	oneof ProtocolLabels {
+		HTTPLabels HTTPLabels = 5;
+	}
+}

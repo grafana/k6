@@ -1,0 +1,72 @@
+syntax = "proto3";
+
+package k6.cloud.insights.proto.v1.trace;
+
+option go_package = "go.k6.io/k6/cloudapi/insights/proto/v1/trace";
+
+import "v1/common/common.proto";
+
+message Span {
+  // A unique identifier for a trace.
+  string TraceID = 1;
+
+  // A unique identifier for a span within a trace.
+  string SpanID = 2;
+
+  // The start time of the span.
+  sfixed64 StartTimeUnixNano = 3;
+
+  // The end time of the span.
+  sfixed64 EndTimeUnixNano = 4;
+
+  // A description of the span's operation.
+  string Name = 5;
+
+  // Logical name of the service.
+  string ServiceName = 6;
+
+  // Distinguishes between spans generated in a particular context.
+  SpanKind Kind = 7;
+
+  // The status code.
+  SpanStatusCode StatusCode = 8;
+
+  // The attributes associated with the span.
+  // https://github.com/open-telemetry/opentelemetry-specification/tree/main/specification/resource/semantic_conventions
+  // https://github.com/opentracing/specification/blob/master/semantic_conventions.md#span-tags-table
+  repeated common.KeyValue Attributes = 9;
+}
+
+// SpanKind is the type of span.
+enum SpanKind {
+  // Unspecified. Do NOT use as default.
+  SPAN_KIND_UNSPECIFIED = 0;
+
+  // Indicates that the span represents an internal operation within an application,
+  // as opposed to an operation happening at the boundaries. Default value.
+  SPAN_KIND_INTERNAL = 1;
+
+  // Indicates that the span covers server-side handling of an RPC or other
+  // remote network request.
+  SPAN_KIND_SERVER = 2;
+
+  // Indicates that the span describes a request to some remote service.
+  SPAN_KIND_CLIENT = 3;
+
+  // Indicates that the span describes a producer sending a message to a broker.
+  SPAN_KIND_PRODUCER = 4;
+
+  // Indicates that the span describes consumer receiving a message from a broker.
+  SPAN_KIND_CONSUMER = 5;
+}
+
+// For the semantics of status codes see
+// https://github.com/open-telemetry/opentelemetry-specification/blob/main/specification/trace/api.md#set-status
+enum SpanStatusCode {
+  // The default status.
+  STATUS_CODE_UNSET = 0;
+  // The Span has been validated by an Application developers or Operator to have completed successfully.
+  STATUS_CODE_OK = 1;
+  // The Span contains an error.
+  STATUS_CODE_ERROR = 2;
+};
