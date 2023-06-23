@@ -742,7 +742,6 @@ searchDict:
 				x := load64(src, s-2)
 				m2Hash := hash6(x, tableBits)
 				currHash := hash6(x>>8, tableBits)
-				candidate = int(table[currHash])
 				table[m2Hash] = uint32(s - 2)
 				table[currHash] = uint32(s - 1)
 				cv = load64(src, s)
