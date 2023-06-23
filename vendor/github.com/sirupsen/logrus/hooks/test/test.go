@@ -32,7 +32,7 @@ func NewGlobal() *Hook {
 func NewLocal(logger *logrus.Logger) *Hook {
 
 	hook := new(Hook)
-	logger.Hooks.Add(hook)
+	logger.AddHook(hook)
 
 	return hook
 
