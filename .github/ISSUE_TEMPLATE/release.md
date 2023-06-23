@@ -12,14 +12,8 @@ title: 'k6 release v0.4x.0'
 
 ### At the beginning of the cycle
 
-- [ ] Create a new branch `release-notes-v04x` and add the new related release notes file.
-      
-All team members are expected to open PRs for adding new release notes items when they add a new change to the k6 code base. The issue's assignee should remember from time to time to do it, if some PRs are forgotten.
-```
-release-notes-v04x <--- my-single-feature-notes-branch
-```
-
-- [ ] Go through the potential [dependencies updates](https://github.com/grafana/k6/blob/master/Dependencies.md) then create a PR if any is relevant. 
+- [ ] Create a new branch `release-notes-v04x` and add a new related [release notes file](release-template/release%20notes) using the available [template](release-template/release%20notes/template.md).
+- [ ] Go through the potential [dependencies updates](Dependencies.md) then create a PR if any is relevant. 
 
 ### Release Preparation
 
