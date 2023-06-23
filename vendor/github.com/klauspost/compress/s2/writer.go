@@ -771,7 +771,7 @@ func (w *Writer) closeIndex(idx bool) ([]byte, error) {
 	}
 
 	var index []byte
-	if w.err(nil) == nil && w.writer != nil {
+	if w.err(err) == nil && w.writer != nil {
 		// Create index.
 		if idx {
 			compSize := int64(-1)
