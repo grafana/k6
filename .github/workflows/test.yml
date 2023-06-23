@@ -18,7 +18,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.18.x]
-        platform: [ubuntu-latest]
+        platform: [ubuntu-latest-8-cores]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -50,7 +50,7 @@ jobs:
           go test "${args[@]}" -timeout 5m ./...
 
   test-tip:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-latest-8-cores
     continue-on-error: true
     steps:
       - name: Checkout code
@@ -83,7 +83,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.19.x]
-        platform: [ubuntu-latest]
+        platform: [ubuntu-latest-8-cores]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -129,7 +129,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.19.x]
-        platform: [ubuntu-latest]
+        platform: [ubuntu-latest-8-cores]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
