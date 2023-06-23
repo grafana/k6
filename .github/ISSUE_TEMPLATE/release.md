@@ -41,6 +41,7 @@ release-notes-v04x <--- my-single-feature-notes-branch
 
 - [ ] The PR with archiving the old version JS API merged first and rebase the rest on top.
 - [ ] PRs with changes related to the release merged.
+- [ ] After merging all k6-docs' PRs ensure that we have no broken links by checking "Check broken links" job in GitHub actions. 
 - [ ] [The new Docs Release vX.Y.Z](https://github.com/grafana/k6-docs/releases/new) published.
 - [ ] Release Notes PR contains the right links to the docs.
 
@@ -58,3 +59,4 @@ release-notes-v04x <--- my-single-feature-notes-branch
 ## Wrapping Release
 
 - [ ] `DefinitelyTyped/DefinitelyTyped` PR(s) merged.
+- [ ] Update the k6's `.github/ISSUE_TEMPLATE/release.md` if new repeated steps appear.
