@@ -28,21 +28,24 @@ func TestWebVitalMetric(t *testing.T) {
 		}
 	)
 
-	count := 0
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second*3)
+	done := make(chan struct{})
+	ctx, cancel := context.WithTimeout(browser.context(), 5*time.Second)
+	defer cancel()
 	go func() {
 		for {
-			metric := <-samples
+			var metric k6metrics.SampleContainer
+			select {
+			case <-done:
+				return
+			case <-ctx.Done():
+				return
+			case metric = <-samples:
+			}
 			samples := metric.GetSamples()
 			for _, s := range samples {
 				if _, ok := expected[s.Metric.Name]; ok {
 					expected[s.Metric.Name] = true
-					count++
 				}
-			}
-			if count == len(expected) {
-				cancel()
-				break
 			}
 		}
 	}()
@@ -54,10 +57,16 @@ func TestWebVitalMetric(t *testing.T) {
 	// A click action helps measure first input delay.
 	// The click action also refreshes the page, which
 	// also helps the web vital library to measure CLS.
-	err = page.Click("#clickMe", nil)
+	err = browser.run(
+		ctx,
+		func() error { return page.Click("#clickMe", nil) },
+		func() error { _, err := page.WaitForNavigation(nil); return err },
+	)
 	require.NoError(t, err)
 
-	<-ctx.Done()
+	// prevents `err:fetching response body: context canceled` warning.`
+	require.NoError(t, page.Close(nil))
+	done <- struct{}{}
 
 	for k, v := range expected {
 		assert.True(t, v, "expected %s to have been measured and emitted", k)
