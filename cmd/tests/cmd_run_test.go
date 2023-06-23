@@ -2165,3 +2165,66 @@ func TestEventSystemError(t *testing.T) {
 		})
 	}
 }
+
+func BenchmarkRun(b *testing.B) {
+	b.StopTimer()
+
+	for i := 0; i < b.N; i++ {
+		ts := NewGlobalTestState(b)
+
+		ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
+		ts.Stdin = bytes.NewBuffer([]byte(`
+		export let options = {
+			vus: 10,
+			iterations: 100,
+		}
+
+		export default function () {}
+		`))
+		ts.ExpectedExitCode = 0
+
+		b.StartTimer()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		b.StopTimer()
+	}
+}
+
+func BenchmarkRunEvents(b *testing.B) {
+	b.StopTimer()
+
+	for i := 0; i < b.N; i++ {
+		ts := NewGlobalTestState(b)
+
+		moduleName := fmt.Sprintf("k6/x/testevents-%d", atomic.AddUint64(&uniqueModuleNumber, 1))
+		mod := events.New(event.GlobalEvents, event.VUEvents)
+		modules.Register(moduleName, mod)
+
+		ts.CmdArgs = []string{"k6", "--quiet", "run", "-"}
+		ts.Stdin = bytes.NewBuffer([]byte(fmt.Sprintf(`
+		import events from '%s';
+		export let options = {
+			vus: 10,
+			iterations: 100,
+		}
+
+		export default function () {}
+		`, moduleName)))
+		ts.ExpectedExitCode = 0
+
+		b.StartTimer()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		b.StopTimer()
+
+		doneCh := make(chan struct{})
+		go func() {
+			mod.WG.Wait()
+			close(doneCh)
+		}()
+
+		select {
+		case <-doneCh:
+		case <-time.After(time.Second):
+			b.Fatal("timed out")
+		}
+	}
+}
