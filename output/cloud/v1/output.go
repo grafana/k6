@@ -24,6 +24,9 @@ type Output struct {
 	logger logrus.FieldLogger
 	config cloudapi.Config
 
+	// referenceID is the legacy name used by the Backend for the test run id.
+	// Note: This output's version is almost deprecated so we don't apply
+	// the renaming to its internals.
 	referenceID string
 	client      *MetricsClient
 
