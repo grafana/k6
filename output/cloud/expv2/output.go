@@ -40,7 +40,7 @@ type Output struct {
 	logger      logrus.FieldLogger
 	config      cloudapi.Config
 	cloudClient *cloudapi.Client
-	referenceID string
+	testRunID   string
 
 	collector *collector
 	flushing  flusher
@@ -74,7 +74,7 @@ func New(logger logrus.FieldLogger, conf cloudapi.Config, cloudClient *cloudapi.
 
 // SetReferenceID sets the Cloud's test run ID.
 func (o *Output) SetReferenceID(refID string) {
-	o.referenceID = refID
+	o.testRunID = refID
 }
 
 // SetTestRunStopCallback receives the function that
@@ -98,12 +98,12 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.referenceID)
+	mc, err := newMetricsClient(o.cloudClient, o.testRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}
 	o.flushing = &metricsFlusher{
-		referenceID:                o.referenceID,
+		testRunID:                  o.testRunID,
 		bq:                         &o.collector.bq,
 		client:                     mc,
 		aggregationPeriodInSeconds: uint32(o.config.AggregationPeriod.TimeDuration().Seconds()),
@@ -114,7 +114,7 @@ func (o *Output) Start() error {
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
 	if o.tracingEnabled() {
-		testRunID, err := strconv.ParseInt(o.referenceID, 10, 64)
+		testRunID, err := strconv.ParseInt(o.testRunID, 10, 64)
 		if err != nil {
 			return err
 		}

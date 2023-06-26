@@ -42,7 +42,7 @@ func TestOutputSetReferenceID(t *testing.T) {
 	t.Parallel()
 	o := Output{}
 	o.SetReferenceID("my-test-run-id")
-	assert.Equal(t, "my-test-run-id", o.referenceID)
+	assert.Equal(t, "my-test-run-id", o.testRunID)
 }
 
 func TestOutputSetTestRunStopCallback(t *testing.T) {
