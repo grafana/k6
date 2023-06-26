@@ -72,9 +72,9 @@ func New(logger logrus.FieldLogger, conf cloudapi.Config, cloudClient *cloudapi.
 	}, nil
 }
 
-// SetReferenceID sets the Cloud's test run ID.
-func (o *Output) SetReferenceID(refID string) {
-	o.testRunID = refID
+// SetTestRunID sets the Cloud's test run id.
+func (o *Output) SetTestRunID(id string) {
+	o.testRunID = id
 }
 
 // SetTestRunStopCallback receives the function that

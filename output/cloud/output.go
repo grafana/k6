@@ -35,7 +35,7 @@ type versionedOutput interface {
 	StopWithTestError(testRunErr error) error
 
 	SetTestRunStopCallback(func(error))
-	SetReferenceID(id string)
+	SetTestRunID(id string)
 
 	AddMetricSamples(samples []metrics.SampleContainer)
 }
@@ -350,7 +350,7 @@ func (out *Output) startVersionedOutput() error {
 		return err
 	}
 
-	out.versionedOutput.SetReferenceID(out.referenceID)
+	out.versionedOutput.SetTestRunID(out.referenceID)
 	out.versionedOutput.SetTestRunStopCallback(out.testStopFunc)
 	return out.versionedOutput.Start()
 }

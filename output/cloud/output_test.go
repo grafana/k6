@@ -362,8 +362,8 @@ func (o versionedOutputMock) SetTestRunStopCallback(_ func(error)) {
 	o.callback("SetTestRunStopCallback")
 }
 
-func (o versionedOutputMock) SetReferenceID(id string) {
-	o.callback("SetReferenceID")
+func (o versionedOutputMock) SetTestRunID(id string) {
+	o.callback("SetTestRunID")
 }
 
 func (o versionedOutputMock) AddMetricSamples(samples []metrics.SampleContainer) {
