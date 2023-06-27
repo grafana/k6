@@ -63,9 +63,7 @@ func (f *metricsFlusher) flush(_ context.Context) error {
 }
 
 type metricSetBuilder struct {
-	MetricSet                  *pbcloud.MetricSet
-	TestRunID                  string
-	AggregationPeriodInSeconds uint32
+	MetricSet *pbcloud.MetricSet
 
 	// TODO: If we will introduce the metricID then we could
 	// just use it as map's key (map[uint64]pbcloud.Metric). It is faster.
@@ -92,15 +90,16 @@ type metricSetBuilder struct {
 }
 
 func newMetricSetBuilder(testRunID string, aggrPeriodSec uint32) metricSetBuilder {
-	return metricSetBuilder{
-		TestRunID:                  testRunID,
-		MetricSet:                  &pbcloud.MetricSet{},
-		AggregationPeriodInSeconds: aggrPeriodSec,
+	builder := metricSetBuilder{
+		MetricSet: &pbcloud.MetricSet{},
 		// TODO: evaluate if removing the pointer from pbcloud.Metric
 		// is a better trade-off
 		metrics:     make(map[*metrics.Metric]*pbcloud.Metric),
 		seriesIndex: make(map[metrics.TimeSeries]uint),
 	}
+	builder.MetricSet.TestRunId = testRunID
+	builder.MetricSet.AggregationPeriod = aggrPeriodSec
+	return builder
 }
 
 func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
@@ -119,8 +118,7 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 		ix, ok := msb.seriesIndex[timeSeries]
 		if !ok {
 			pbTimeSeries = &pbcloud.TimeSeries{
-				AggregationPeriod: msb.AggregationPeriodInSeconds,
-				Labels:            mapTimeSeriesLabelsProto(timeSeries, msb.TestRunID),
+				Labels: mapTimeSeriesLabelsProto(timeSeries.Tags),
 			}
 			pbmetric.TimeSeries = append(pbmetric.TimeSeries, pbTimeSeries)
 			msb.seriesIndex[timeSeries] = uint(len(pbmetric.TimeSeries) - 1)
