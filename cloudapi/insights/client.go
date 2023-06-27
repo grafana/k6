@@ -6,9 +6,13 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"strings"
 	"sync"
+	"time"
 
+	grpcRetry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
@@ -35,6 +39,7 @@ type ClientConfig struct {
 	ConnectConfig ClientConnectConfig
 	AuthConfig    ClientAuthConfig
 	TLSConfig     ClientTLSConfig
+	RetryConfig   RetryConfig
 }
 
 // ClientConnectConfig is the configuration for the client connection.
@@ -56,6 +61,21 @@ type ClientAuthConfig struct {
 type ClientTLSConfig struct {
 	Insecure bool
 	CertFile string
+}
+
+// RetryConfig is the configuration for the client retries.
+type RetryConfig struct {
+	RetryableStatusCodes string
+	MaxAttempts          uint
+	PerRetryTimeout      time.Duration
+	BackoffConfig        BackoffConfig
+}
+
+// BackoffConfig is the configuration for the client retries using the backoff exponential with jitter algorithm.
+type BackoffConfig struct {
+	Enabled        bool
+	JitterFraction float64
+	WaitBetween    time.Duration
 }
 
 // Client is the client for the k6 Insights ingester service.
@@ -119,9 +139,6 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 		return fmt.Errorf("failed to create request from request metadatas: %w", err)
 	}
 
-	// TODO(lukasz, retry-support): Retry request with returned metadatas.
-	//
-	// Note: There is currently no backend support backing up this retry mechanism.
 	_, err = c.client.BatchCreateRequestMetadatas(ctx, req)
 	if err != nil {
 		st := status.Convert(err)
@@ -180,7 +197,71 @@ func dialOptionsFromClientConfig(cfg ClientConfig) ([]grpc.DialOption, error) {
 		opts = append(opts, grpc.WithPerRPCCredentials(newPerRPCCredentials(cfg.AuthConfig)))
 	}
 
+	rI, err := retryInterceptor(cfg.RetryConfig)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create retry interceptors: %w", err)
+	}
+
+	opts = append(opts, grpc.WithChainUnaryInterceptor(rI...))
+
 	return opts, nil
+}
+
+func retryInterceptor(retryConfig RetryConfig) ([]grpc.UnaryClientInterceptor, error) {
+	rSC, err := retryableStatusCodes(retryConfig.RetryableStatusCodes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse retryable status codes: %w", err)
+	}
+	withCodes := grpcRetry.WithCodes(rSC...)
+	withMax := grpcRetry.WithMax(retryConfig.MaxAttempts)
+	withPerRetryTimeout := grpcRetry.WithPerRetryTimeout(retryConfig.PerRetryTimeout)
+
+	backoffConfig := retryConfig.BackoffConfig
+	if backoffConfig.Enabled {
+		backoff := grpcRetry.WithBackoff(grpcRetry.BackoffExponentialWithJitter(backoffConfig.WaitBetween, backoffConfig.JitterFraction))
+		unaryInterceptor := grpcRetry.UnaryClientInterceptor(withCodes, withMax, withPerRetryTimeout, backoff)
+		return []grpc.UnaryClientInterceptor{unaryInterceptor}, nil
+	}
+
+	unaryInterceptor := grpcRetry.UnaryClientInterceptor(withCodes, withMax, withPerRetryTimeout)
+	return []grpc.UnaryClientInterceptor{unaryInterceptor}, nil
+}
+
+func retryableStatusCodes(retryableStatusCodes string) ([]codes.Code, error) {
+	statusCodeMap := map[string]codes.Code{
+		"OK":                  codes.OK,
+		"CANCELLED":           codes.Canceled,
+		"UNKNOWN":             codes.Unknown,
+		"INVALID_ARGUMENT":    codes.InvalidArgument,
+		"DEADLINE_EXCEEDED":   codes.DeadlineExceeded,
+		"NOT_FOUND":           codes.NotFound,
+		"ALREADY_EXISTS":      codes.AlreadyExists,
+		"PERMISSION_DENIED":   codes.PermissionDenied,
+		"UNAUTHENTICATED":     codes.Unauthenticated,
+		"RESOURCE_EXHAUSTED":  codes.ResourceExhausted,
+		"FAILED_PRECONDITION": codes.FailedPrecondition,
+		"ABORTED":             codes.Aborted,
+		"OUT_OF_RANGE":        codes.OutOfRange,
+		"UNIMPLEMENTED":       codes.Unimplemented,
+		"INTERNAL":            codes.Internal,
+		"UNAVAILABLE":         codes.Unavailable,
+		"DATA_LOSS":           codes.DataLoss,
+	}
+
+	if len(retryableStatusCodes) == 0 {
+		return nil, fmt.Errorf("no retryable status codes provided")
+	}
+
+	var errorCodes []codes.Code
+	for _, code := range strings.Split(retryableStatusCodes, ",") {
+		errorCode, ok := statusCodeMap[code]
+		if !ok {
+			return nil, fmt.Errorf("invalid status code %s provided", code)
+		}
+		errorCodes = append(errorCodes, errorCode)
+	}
+
+	return errorCodes, nil
 }
 
 type perRPCCredentials struct {

@@ -3,6 +3,8 @@ package insights
 import (
 	"context"
 	"errors"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"net"
 	"testing"
 	"time"
@@ -41,6 +43,8 @@ type mockWorkingIngesterServer struct {
 	ingester.UnimplementedIngesterServiceServer
 	batchCreateRequestMetadatasInvoked bool
 	dataUploaded                       bool
+	maxAttemptsTillSuccess             uint
+	attempts                           uint
 }
 
 func (s *mockWorkingIngesterServer) BatchCreateRequestMetadatas(ctx context.Context, _ *ingester.BatchCreateRequestMetadatasRequest) (*ingester.BatchCreateRequestMetadatasResponse, error) {
@@ -54,9 +58,15 @@ func (s *mockWorkingIngesterServer) BatchCreateRequestMetadatas(ctx context.Cont
 
 	s.dataUploaded = true
 
-	return &ingester.BatchCreateRequestMetadatasResponse{
-		RequestMetadatas: nil,
-	}, nil
+	if s.attempts >= s.maxAttemptsTillSuccess {
+		return &ingester.BatchCreateRequestMetadatasResponse{
+			RequestMetadatas: nil,
+		}, nil
+	}
+
+	s.attempts++
+
+	return nil, status.Error(codes.Unavailable, "unavailable")
 }
 
 type mockFailingIngesterServer struct {
@@ -66,6 +76,26 @@ type mockFailingIngesterServer struct {
 
 func (m *mockFailingIngesterServer) BatchCreateRequestMetadatas(_ context.Context, _ *ingester.BatchCreateRequestMetadatasRequest) (*ingester.BatchCreateRequestMetadatasResponse, error) {
 	return nil, m.err
+}
+
+type mockRetryFailingIngesterServer struct {
+	ingester.UnimplementedIngesterServiceServer
+	maxAttempts uint
+	attempts    uint
+	err         string
+}
+
+func (m *mockRetryFailingIngesterServer) BatchCreateRequestMetadatas(_ context.Context, _ *ingester.BatchCreateRequestMetadatasRequest) (*ingester.BatchCreateRequestMetadatasResponse, error) {
+	return nil, nil
+}
+
+func (m *mockRetryFailingIngesterServer) BatchCreateSpans(_ context.Context, _ *ingester.BatchCreateSpansRequest) (*ingester.BatchCreateSpansResponse, error) {
+	if m.attempts >= m.maxAttempts {
+		return &ingester.BatchCreateSpansResponse{}, nil
+	}
+
+	m.attempts++
+	return nil, status.Error(codes.Unavailable, m.err)
 }
 
 type fatalError struct{}
@@ -83,6 +113,7 @@ func TestClient_Dial_ReturnsNoErrorWithWorkingDialer(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 
@@ -103,6 +134,7 @@ func TestClient_Dial_ReturnsErrorWhenCalledTwice(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 
@@ -127,7 +159,8 @@ func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {
 				return nil, &fatalError{}
 			},
 		},
-		TLSConfig: ClientTLSConfig{Insecure: true},
+		TLSConfig:   ClientTLSConfig{Insecure: true},
+		RetryConfig: RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 
@@ -137,6 +170,47 @@ func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {
 	// Then
 	var fatalErr *fatalError
 	require.ErrorAs(t, err, &fatalErr)
+}
+
+func TestClient_Dial_ReturnsErrorWithoutRetryableStatusCodes(t *testing.T) {
+	t.Parallel()
+
+	// Given
+	ser := &mockWorkingIngesterServer{}
+	lis := newMockListener(t, ser)
+
+	cfg := ClientConfig{
+		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
+		TLSConfig:     ClientTLSConfig{Insecure: true},
+	}
+	cli := NewClient(cfg)
+
+	// When
+	err := cli.Dial(context.Background())
+
+	// Then
+	require.Error(t, err)
+}
+
+func TestClient_Dial_ReturnsErrorWithInvalidRetryableStatusCodes(t *testing.T) {
+	t.Parallel()
+
+	// Given
+	ser := &mockWorkingIngesterServer{}
+	lis := newMockListener(t, ser)
+
+	cfg := ClientConfig{
+		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
+		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "RANDOM,INTERNAL"},
+	}
+	cli := NewClient(cfg)
+
+	// When
+	err := cli.Dial(context.Background())
+
+	// Then
+	require.Error(t, err)
 }
 
 func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNonCancelledContextAndNoData(t *testing.T) {
@@ -149,6 +223,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -172,6 +247,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -211,6 +287,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithWorkingServerAndCanc
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -277,6 +354,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -297,6 +375,94 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 	require.ErrorContains(t, err, testErr.Error())
 }
 
+func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithNoErrorAfterRetrySeveralTimes(t *testing.T) {
+	t.Parallel()
+
+	// Given
+	ser := &mockWorkingIngesterServer{maxAttemptsTillSuccess: 10}
+	lis := newMockListener(t, ser)
+
+	cfg := ClientConfig{
+		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
+		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig: RetryConfig{
+			MaxAttempts:          20,
+			RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+	}
+	cli := NewClient(cfg)
+	require.NoError(t, cli.Dial(context.Background()))
+	data := RequestMetadatas{
+		{
+			TraceID:        "test-trace-id-1",
+			Start:          time.Unix(9, 0),
+			End:            time.Unix(10, 0),
+			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
+		},
+		{
+			TraceID:        "test-trace-id-2",
+			Start:          time.Unix(19, 0),
+			End:            time.Unix(20, 0),
+			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-2", Method: "test-method-2", StatusCode: 401},
+		},
+	}
+
+	// When
+	err := cli.IngestRequestMetadatasBatch(context.Background(), data)
+
+	// Then
+	require.NoError(t, err)
+	require.True(t, ser.batchCreateRequestMetadatasInvoked)
+	require.True(t, ser.dataUploaded)
+	require.Equal(t, uint(10), ser.attempts)
+}
+
+func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithErrorAfterRetrySeveralTimes(t *testing.T) {
+	t.Parallel()
+
+	// Given
+	ser := &mockWorkingIngesterServer{maxAttemptsTillSuccess: 10}
+	lis := newMockListener(t, ser)
+
+	cfg := ClientConfig{
+		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
+		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig: RetryConfig{
+			BackoffConfig: BackoffConfig{
+				Enabled:        true,
+				JitterFraction: 0.1,
+			},
+			MaxAttempts:          5,
+			RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+	}
+	cli := NewClient(cfg)
+	require.NoError(t, cli.Dial(context.Background()))
+	data := RequestMetadatas{
+		{
+			TraceID:        "test-trace-id-1",
+			Start:          time.Unix(9, 0),
+			End:            time.Unix(10, 0),
+			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-1", Group: "test-group-1"},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-1", Method: "test-method-1", StatusCode: 200},
+		},
+		{
+			TraceID:        "test-trace-id-2",
+			Start:          time.Unix(19, 0),
+			End:            time.Unix(20, 0),
+			TestRunLabels:  TestRunLabels{ID: 1337, Scenario: "test-scenario-2", Group: "test-group-2"},
+			ProtocolLabels: ProtocolHTTPLabels{URL: "test-url-2", Method: "test-method-2", StatusCode: 401},
+		},
+	}
+
+	// When
+	err := cli.IngestRequestMetadatasBatch(context.Background(), data)
+
+	// Then
+	require.Error(t, err)
+	require.Equal(t, uint(5), ser.attempts)
+}
+
 func TestClient_Close_ReturnsNoErrorWhenClosedOnce(t *testing.T) {
 	t.Parallel()
 
@@ -307,6 +473,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedOnce(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -328,6 +495,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedTwice(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
+		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
