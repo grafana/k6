@@ -78,26 +78,6 @@ func (m *mockFailingIngesterServer) BatchCreateRequestMetadatas(_ context.Contex
 	return nil, m.err
 }
 
-type mockRetryFailingIngesterServer struct {
-	ingester.UnimplementedIngesterServiceServer
-	maxAttempts uint
-	attempts    uint
-	err         string
-}
-
-func (m *mockRetryFailingIngesterServer) BatchCreateRequestMetadatas(_ context.Context, _ *ingester.BatchCreateRequestMetadatasRequest) (*ingester.BatchCreateRequestMetadatasResponse, error) {
-	return nil, nil
-}
-
-func (m *mockRetryFailingIngesterServer) BatchCreateSpans(_ context.Context, _ *ingester.BatchCreateSpansRequest) (*ingester.BatchCreateSpansResponse, error) {
-	if m.attempts >= m.maxAttempts {
-		return &ingester.BatchCreateSpansResponse{}, nil
-	}
-
-	m.attempts++
-	return nil, status.Error(codes.Unavailable, m.err)
-}
-
 type fatalError struct{}
 
 func (*fatalError) Error() string   { return "context dialer error" }
@@ -387,7 +367,8 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithNoErrorAfterRetrySev
 		TLSConfig:     ClientTLSConfig{Insecure: true},
 		RetryConfig: RetryConfig{
 			MaxAttempts:          20,
-			RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+			RetryableStatusCodes: "INTERNAL,UNAVAILABLE",
+		},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -434,7 +415,8 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithErrorAfterRetrySever
 				JitterFraction: 0.1,
 			},
 			MaxAttempts:          5,
-			RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+			RetryableStatusCodes: "INTERNAL,UNAVAILABLE",
+		},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))

@@ -218,7 +218,8 @@ func retryInterceptor(retryConfig RetryConfig) ([]grpc.UnaryClientInterceptor, e
 
 	backoffConfig := retryConfig.BackoffConfig
 	if backoffConfig.Enabled {
-		backoff := grpcRetry.WithBackoff(grpcRetry.BackoffExponentialWithJitter(backoffConfig.WaitBetween, backoffConfig.JitterFraction))
+		backoff := grpcRetry.WithBackoff(
+			grpcRetry.BackoffExponentialWithJitter(backoffConfig.WaitBetween, backoffConfig.JitterFraction))
 		unaryInterceptor := grpcRetry.UnaryClientInterceptor(withCodes, withMax, withPerRetryTimeout, backoff)
 		return []grpc.UnaryClientInterceptor{unaryInterceptor}, nil
 	}
@@ -252,8 +253,9 @@ func retryableStatusCodes(retryableStatusCodes string) ([]codes.Code, error) {
 		return nil, fmt.Errorf("no retryable status codes provided")
 	}
 
-	var errorCodes []codes.Code
-	for _, code := range strings.Split(retryableStatusCodes, ",") {
+	statusCodes := strings.Split(retryableStatusCodes, ",")
+	errorCodes := make([]codes.Code, 0, len(statusCodes))
+	for _, code := range statusCodes {
 		errorCode, ok := statusCodeMap[code]
 		if !ok {
 			return nil, fmt.Errorf("invalid status code %s provided", code)
