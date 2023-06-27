@@ -32,8 +32,7 @@ func TestOutputFlush(t *testing.T) {
 	// TODO: it has 3s for aggregation time
 	// then it means it will execute for +3s that it is a waste of time
 	// because it isn't really required.
-	// Reduce the aggregation time (to 1s?) then run always.
-	t.Skip("Skip the integration test, if required enable it manually")
+	// Reduce the aggregation time (to 1s?)
 	t.Parallel()
 
 	results := make(chan *pbcloud.MetricSet)
