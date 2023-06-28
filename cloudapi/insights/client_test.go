@@ -355,7 +355,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 	require.ErrorContains(t, err, testErr.Error())
 }
 
-func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithNoErrorAfterRetrySeveralTimes(t *testing.T) {
+func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorAfterRetrySeveralTimes(t *testing.T) {
 	t.Parallel()
 
 	// Given
@@ -399,7 +399,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithNoErrorAfterRetrySev
 	require.Equal(t, uint(10), ser.attempts)
 }
 
-func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithErrorAfterRetrySeveralTimes(t *testing.T) {
+func TestClient_IngestRequestMetadatasBatch_ReturnsErrorAfterExhaustingMaxRetryAttempts(t *testing.T) {
 	t.Parallel()
 
 	// Given
