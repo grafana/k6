@@ -39,7 +39,7 @@ type ClientConfig struct {
 	ConnectConfig ClientConnectConfig
 	AuthConfig    ClientAuthConfig
 	TLSConfig     ClientTLSConfig
-	RetryConfig   RetryConfig
+	RetryConfig   ClientRetryConfig
 }
 
 // ClientConnectConfig is the configuration for the client connection.
@@ -63,16 +63,16 @@ type ClientTLSConfig struct {
 	CertFile string
 }
 
-// RetryConfig is the configuration for the client retries.
-type RetryConfig struct {
+// ClientRetryConfig is the configuration for the client retries.
+type ClientRetryConfig struct {
 	RetryableStatusCodes string
 	MaxAttempts          uint
 	PerRetryTimeout      time.Duration
-	BackoffConfig        BackoffConfig
+	BackoffConfig        ClientBackoffConfig
 }
 
-// BackoffConfig is the configuration for the client retries using the backoff exponential with jitter algorithm.
-type BackoffConfig struct {
+// ClientBackoffConfig is the configuration for the client retries using the backoff exponential with jitter algorithm.
+type ClientBackoffConfig struct {
 	Enabled        bool
 	JitterFraction float64
 	WaitBetween    time.Duration
@@ -207,7 +207,7 @@ func dialOptionsFromClientConfig(cfg ClientConfig) ([]grpc.DialOption, error) {
 	return opts, nil
 }
 
-func retryInterceptor(retryConfig RetryConfig) ([]grpc.UnaryClientInterceptor, error) {
+func retryInterceptor(retryConfig ClientRetryConfig) ([]grpc.UnaryClientInterceptor, error) {
 	rSC, err := retryableStatusCodes(retryConfig.RetryableStatusCodes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse retryable status codes: %w", err)

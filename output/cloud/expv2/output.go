@@ -133,11 +133,11 @@ func (o *Output) Start() error {
 			TLSConfig: insights.ClientTLSConfig{
 				Insecure: false,
 			},
-			RetryConfig: insights.RetryConfig{
+			RetryConfig: insights.ClientRetryConfig{
 				RetryableStatusCodes: "UNAVAILABLE,INTERNAL",
 				MaxAttempts:          5,
 				PerRetryTimeout:      1 * time.Second,
-				BackoffConfig: insights.BackoffConfig{
+				BackoffConfig: insights.ClientBackoffConfig{
 					Enabled:        true,
 					JitterFraction: 0.1,
 					WaitBetween:    1 * time.Second,

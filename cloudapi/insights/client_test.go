@@ -93,7 +93,7 @@ func TestClient_Dial_ReturnsNoErrorWithWorkingDialer(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 
@@ -114,7 +114,7 @@ func TestClient_Dial_ReturnsErrorWhenCalledTwice(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 
@@ -140,7 +140,7 @@ func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {
 			},
 		},
 		TLSConfig:   ClientTLSConfig{Insecure: true},
-		RetryConfig: RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig: ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 
@@ -182,7 +182,7 @@ func TestClient_Dial_ReturnsErrorWithInvalidRetryableStatusCodes(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "RANDOM,INTERNAL"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "RANDOM,INTERNAL"},
 	}
 	cli := NewClient(cfg)
 
@@ -203,7 +203,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -227,7 +227,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -267,7 +267,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithWorkingServerAndCanc
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -334,7 +334,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -365,7 +365,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithNoErrorAfterRetrySev
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig: RetryConfig{
+		RetryConfig: ClientRetryConfig{
 			MaxAttempts:          20,
 			RetryableStatusCodes: "INTERNAL,UNAVAILABLE",
 		},
@@ -409,8 +409,8 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithErrorAfterRetrySever
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig: RetryConfig{
-			BackoffConfig: BackoffConfig{
+		RetryConfig: ClientRetryConfig{
+			BackoffConfig: ClientBackoffConfig{
 				Enabled:        true,
 				JitterFraction: 0.1,
 			},
@@ -455,7 +455,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedOnce(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -477,7 +477,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedTwice(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   RetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "INTERNAL,UNAVAILABLE"},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
