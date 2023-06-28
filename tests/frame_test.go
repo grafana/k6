@@ -1,9 +1,11 @@
 package tests
 
 import (
+	"context"
 	"net/http"
 	"strconv"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -132,7 +134,14 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 	_, err := p.Goto(tb.staticURL("iframe_home.html"), nil)
 	require.NoError(t, err)
 
-	err = p.Click(`a[href="/iframeSignIn"]`, nil)
+	ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
+	defer cancel()
+
+	err = tb.run(
+		ctx,
+		func() error { return p.Click(`a[href="/iframeSignIn"]`, nil) },
+		func() error { _, err := p.WaitForNavigation(nil); return err },
+	)
 	require.NoError(t, err)
 
 	result := p.TextContent("#doneDiv", nil)
