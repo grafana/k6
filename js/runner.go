@@ -773,18 +773,16 @@ func (u *ActiveVU) RunOnce() error {
 		ScenarioName: u.scenarioName,
 	}
 
-	emitEvent := func(evt *event.Event) func() {
+	emitAndWaitEvent := func(evt *event.Event) {
 		waitDone := u.moduleVUImpl.events.local.Emit(evt)
-		return func() {
-			waitCtx, waitCancel := context.WithTimeout(u.RunContext, 30*time.Minute)
-			defer waitCancel()
-			if werr := waitDone(waitCtx); werr != nil {
-				u.state.Logger.WithError(werr).Warn()
-			}
+		waitCtx, waitCancel := context.WithTimeout(u.RunContext, 30*time.Minute)
+		defer waitCancel()
+		if werr := waitDone(waitCtx); werr != nil {
+			u.state.Logger.WithError(werr).Warn()
 		}
 	}
 
-	emitEvent(&event.Event{Type: event.IterStart, Data: eventIterData})()
+	emitAndWaitEvent(&event.Event{Type: event.IterStart, Data: eventIterData})
 
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
@@ -799,7 +797,7 @@ func (u *ActiveVU) RunOnce() error {
 		eventIterData.Error = err
 	}
 
-	emitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})()
+	emitAndWaitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder

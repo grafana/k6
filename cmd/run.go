@@ -85,10 +85,11 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	defer func() {
-		emitEvent(&event.Event{
+		waitExitDone := emitEvent(&event.Event{
 			Type: event.Exit,
 			Data: &event.ExitData{Error: err},
-		})()
+		})
+		waitExitDone()
 		c.gs.Events.UnsubscribeAll()
 	}()
 
@@ -179,10 +180,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
-	// TODO: Subscribe all initialization processes (outputs, VUs and executors)
-	// to the Init event. This would allow running them concurrently, and they
-	// could be synchronized by waiting for the event processing to complete.
-	// This could later be expanded to also initialize browser processes.
 	waitInitDone := emitEvent(&event.Event{Type: event.Init})
 
 	// Create and start the outputs. We do it quite early to get any output URLs
@@ -334,13 +331,15 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	waitInitDone()
 
-	emitEvent(&event.Event{Type: event.TestStart})()
+	waitTestStartDone := emitEvent(&event.Event{Type: event.TestStart})
+	waitTestStartDone()
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
 	err = execScheduler.Run(globalCtx, runCtx, samples)
 
-	defer emitEvent(&event.Event{Type: event.TestEnd})()
+	waitTestEndDone := emitEvent(&event.Event{Type: event.TestEnd})
+	defer waitTestEndDone()
 
 	// Init has passed successfully, so unless disabled, make sure we send a
 	// usage report after the context is done.
