@@ -118,6 +118,11 @@ func newOutput(params output.Params) (*Output, error) {
 			conf.MaxMetricSamplesPerPackage.Int64)
 	}
 
+	if conf.MaxTimeSeriesInBatch.Int64 < 1 {
+		return nil, fmt.Errorf("max allowed number of time series in a single batch must be a positive number but is %d",
+			conf.MaxTimeSeriesInBatch.Int64)
+	}
+
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration())
 

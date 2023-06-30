@@ -107,9 +107,7 @@ func (o *Output) Start() error {
 		bq:                         &o.collector.bq,
 		client:                     mc,
 		aggregationPeriodInSeconds: uint32(o.config.AggregationPeriod.TimeDuration().Seconds()),
-		// TODO: rename the config field to align to the new logic by time series
-		// when the migration from the version 1 is completed.
-		maxSeriesInSingleBatch: int(o.config.MaxMetricSamplesPerPackage.Int64),
+		maxSeriesInBatch:           int(o.config.MaxTimeSeriesInBatch.Int64),
 	}
 
 	o.runFlushWorkers()

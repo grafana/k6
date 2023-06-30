@@ -17,7 +17,7 @@ type metricsFlusher struct {
 	bq                         *bucketQ
 	client                     pusher
 	aggregationPeriodInSeconds uint32
-	maxSeriesInSingleBatch     int
+	maxSeriesInBatch           int
 }
 
 // flush flushes the queued buckets sending them to the remote Cloud service.
@@ -42,7 +42,7 @@ func (f *metricsFlusher) flush(_ context.Context) error {
 	msb := newMetricSetBuilder(f.referenceID, f.aggregationPeriodInSeconds)
 	for i := 0; i < len(buckets); i++ {
 		msb.addTimeBucket(buckets[i])
-		if len(msb.seriesIndex) < f.maxSeriesInSingleBatch {
+		if len(msb.seriesIndex) < f.maxSeriesInBatch {
 			continue
 		}
 

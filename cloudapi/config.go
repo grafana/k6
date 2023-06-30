@@ -31,9 +31,8 @@ type Config struct {
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
-	// TODO: rename the config field to align to the new logic by time series
-	// when the migration from the version 1 is completed.
-	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"K6_CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
+	// Defines the max allowed number of time series in a single batch.
+	MaxTimeSeriesInBatch null.Int `json:"maxTimeSeriesInBatch" envconfig:"K6_CLOUD_MAX_TIME_SERIES_IN_BATCH"`
 
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
 	MetricPushInterval types.NullDuration `json:"metricPushInterval" envconfig:"K6_CLOUD_METRIC_PUSH_INTERVAL"`
@@ -150,6 +149,9 @@ type Config struct {
 
 	// Connection or request times with how many IQRs above Q3 to consier as non-aggregatable outliers.
 	AggregationOutlierIqrCoefUpper null.Float `json:"aggregationOutlierIqrCoefUpper" envconfig:"K6_CLOUD_AGGREGATION_OUTLIER_IQR_COEF_UPPER"`
+
+	// Deprecated: Remove this when migration from the cloud output v1 will be completed
+	MaxMetricSamplesPerPackage null.Int `json:"maxMetricSamplesPerPackage" envconfig:"K6_CLOUD_MAX_METRIC_SAMPLES_PER_PACKAGE"`
 }
 
 // NewConfig creates a new Config instance with default values for some fields.
@@ -166,6 +168,7 @@ func NewConfig() Config {
 		TracesPushInterval: types.NewNullDuration(1*time.Second, false),
 
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
+		MaxTimeSeriesInBatch:       null.NewInt(10000, false),
 		Timeout:                    types.NewNullDuration(1*time.Minute, false),
 		APIVersion:                 null.NewInt(1, false),
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
@@ -224,6 +227,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.MaxMetricSamplesPerPackage.Valid {
 		c.MaxMetricSamplesPerPackage = cfg.MaxMetricSamplesPerPackage
+	}
+	if cfg.MaxTimeSeriesInBatch.Valid {
+		c.MaxTimeSeriesInBatch = cfg.MaxTimeSeriesInBatch
 	}
 	if cfg.MetricPushInterval.Valid {
 		c.MetricPushInterval = cfg.MetricPushInterval
