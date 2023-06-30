@@ -408,8 +408,8 @@ func Test_requestMetadatasCollector_CollectRequestMetadatas_FiltersAndStoresHTTP
 		TraceID:        "test-trace-id-3",
 		Start:          time.Unix(19, 0),
 		End:            time.Unix(20, 0),
-		TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "unknown", Group: "unknown"},
-		ProtocolLabels: insights.ProtocolHTTPLabels{URL: "unknown", Method: "unknown", StatusCode: 0},
+		TestRunLabels:  insights.TestRunLabels{ID: 1337, Scenario: "", Group: ""},
+		ProtocolLabels: insights.ProtocolHTTPLabels{URL: "", Method: "", StatusCode: 0},
 	})
 }
 

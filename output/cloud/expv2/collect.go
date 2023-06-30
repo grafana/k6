@@ -251,7 +251,7 @@ func (c *rmCollector) getStringTagFromTrail(trail *httpext.Trail, key string) st
 		return tag
 	}
 
-	return "unknown"
+	return ""
 }
 
 func (c *rmCollector) getIntTagFromTrail(trail *httpext.Trail, key string) int64 {
