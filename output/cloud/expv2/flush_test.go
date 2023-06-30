@@ -132,9 +132,9 @@ func TestMetricsFlusherFlushChunk(t *testing.T) {
 		bq := &bucketQ{}
 		pm := &pusherMock{}
 		mf := metricsFlusher{
-			bq:                     bq,
-			client:                 pm,
-			maxSeriesInSingleBatch: 3,
+			bq:               bq,
+			client:           pm,
+			maxSeriesInBatch: 3,
 		}
 
 		bq.buckets = make([]timeBucket, 0, tc.series)
