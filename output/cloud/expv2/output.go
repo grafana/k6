@@ -98,7 +98,7 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.referenceID)
+	mc, err := newMetricsClient(o.cloudClient, o.referenceID, o.config.MetricCompression.String)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}

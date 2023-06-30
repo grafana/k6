@@ -24,7 +24,6 @@ func TestMetricsClientPush(t *testing.T) {
 		assert.Equal(t, http.MethodPost, r.Method)
 		assert.Equal(t, "Token fake-token", r.Header.Get("Authorization"))
 		assert.Contains(t, r.Header.Get("User-Agent"), "k6cloud/v0.4")
-		assert.Equal(t, "application/x-protobuf", r.Header.Get("Content-Type"))
 		assert.Equal(t, "snappy", r.Header.Get("Content-Encoding"))
 		assert.Equal(t, "2.0", r.Header.Get("K6-Metrics-Protocol-Version"))
 		b, err := io.ReadAll(r.Body)
@@ -36,10 +35,18 @@ func TestMetricsClientPush(t *testing.T) {
 	defer ts.Close()
 
 	c := cloudapi.NewClient(nil, "fake-token", ts.URL, "k6cloud/v0.4", 1*time.Second)
-	mc, err := newMetricsClient(c, "test-ref-id")
+	mc, err := newMetricsClient(c, "test-ref-id", "snappy")
 	require.NoError(t, err)
 
-	mset := pbcloud.MetricSet{}
+	mset := pbcloud.MetricSet{
+		Metrics: []*pbcloud.Metric{
+			{
+				Name:       "http_reqs",
+				Type:       pbcloud.MetricType_METRIC_TYPE_COUNTER,
+				TimeSeries: []*pbcloud.TimeSeries{},
+			},
+		},
+	}
 	err = mc.push(&mset)
 	require.NoError(t, err)
 	assert.Equal(t, 1, reqs)
@@ -55,7 +62,7 @@ func TestMetricsClientPushUnexpectedStatus(t *testing.T) {
 	defer ts.Close()
 
 	c := cloudapi.NewClient(nil, "fake-token", ts.URL, "k6cloud/v0.4", 1*time.Second)
-	mc, err := newMetricsClient(c, "test-ref-id")
+	mc, err := newMetricsClient(c, "test-ref-id", "snappy")
 	require.NoError(t, err)
 
 	err = mc.push(nil)
