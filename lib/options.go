@@ -111,6 +111,9 @@ func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 
 // Fields for TLSAuth. Unmarshalling hack.
 type TLSAuthFields struct {
+	// CACerts as PEM-encoded string(s), including "-----BEGIN CERTIFICATE-----".
+	CACerts []string `json:"cacerts"`
+
 	// Certificate and key as a PEM-encoded string, including "-----BEGIN CERTIFICATE-----".
 	Cert     string      `json:"cert"`
 	Key      string      `json:"key"`
@@ -132,6 +135,21 @@ func (c *TLSAuth) UnmarshalJSON(data []byte) error {
 	}
 	if _, err := c.Certificate(); err != nil {
 		return err
+	}
+	return nil
+}
+
+// RootCAs appends certs from input CACerts to the input cert pool
+func (c *TLSAuth) RootCAs(rootCAs *x509.CertPool) error {
+	if c.CACerts != nil && len(c.CACerts) > 0 {
+		if rootCAs == nil {
+			rootCAs = x509.NewCertPool()
+		}
+		for _, caCert := range c.CACerts {
+			if ok := rootCAs.AppendCertsFromPEM([]byte(caCert)); !ok {
+				return fmt.Errorf("unable to load CA Certificate PEM")
+			}
+		}
 	}
 	return nil
 }

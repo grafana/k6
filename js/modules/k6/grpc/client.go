@@ -2,6 +2,8 @@ package grpc
 
 import (
 	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
 	"io"
@@ -108,6 +110,51 @@ func (c *Client) LoadProtoset(protosetPath string) ([]MethodInfo, error) {
 	return c.convertToMethodInfo(fdset)
 }
 
+func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Config, error) {
+	var cp *x509.CertPool
+	var err error
+	if cp, err = x509.SystemCertPool(); err != nil {
+		return nil, err
+	}
+	if len(caCertificates) > 0 {
+		for i, caCert := range caCertificates {
+			if ok := cp.AppendCertsFromPEM(caCert); !ok {
+				return nil, fmt.Errorf("failed to append ca certificate [%d] from PEM", i)
+			}
+		}
+	}
+	cert, certerr := tls.X509KeyPair(certificate, key)
+	if certerr != nil {
+		return nil, fmt.Errorf("failed to append certificate from PEM")
+	}
+	return &tls.Config{
+		RootCAs:      cp,
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}, nil
+}
+
+func buildTLSConfigFromMap(tlsConfigMap map[string]interface{}) (*tls.Config, error) {
+	var cert, key []byte
+	var ca [][]byte
+	if certstr, ok := tlsConfigMap["cert"].(string); ok {
+		cert = []byte(certstr)
+	}
+	if keystr, ok := tlsConfigMap["key"].(string); ok {
+		key = []byte(keystr)
+	}
+	cas := tlsConfigMap["cacerts"]
+	ca = make([][]byte, 0)
+	if casarr, ok := cas.([]string); ok {
+		for _, casEntry := range casarr {
+			ca = append(ca, []byte(casEntry))
+		}
+	} else if casstr, casstrok := cas.(string); casstrok {
+		ca = append(ca, []byte(casstr))
+	}
+	return buildTLSConfig(cert, key, ca)
+}
+
 // Connect is a block dial to the gRPC server at the given address (host:port)
 func (c *Client) Connect(addr string, params map[string]interface{}) (bool, error) {
 	state := c.vu.State()
@@ -124,10 +171,16 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 
 	var tcred credentials.TransportCredentials
 	if !p.IsPlaintext {
-		tlsCfg := state.TLSConfig.Clone()
+		var tlsCfg *tls.Config
+		if len(p.TLSConfig) > 0 {
+			if tlsCfg, err = buildTLSConfigFromMap(p.TLSConfig); err != nil {
+				return false, err
+			}
+		} else {
+			tlsCfg = state.TLSConfig.Clone()
+		}
 		tlsCfg.NextProtos = []string{"h2"}
 
-		// TODO(rogchap): Would be good to add support for custom RootCAs (self signed)
 		tcred = credentials.NewTLS(tlsCfg)
 	} else {
 		tcred = insecure.NewCredentials()
@@ -373,6 +426,7 @@ type connectParams struct {
 	Timeout               time.Duration
 	MaxReceiveSize        int64
 	MaxSendSize           int64
+	TLSConfig             map[string]interface{}
 }
 
 func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, error) {
@@ -382,6 +436,7 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		Timeout:               time.Minute,
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
+		TLSConfig:             make(map[string]interface{}),
 	}
 	for k, v := range raw {
 		switch k {
@@ -421,7 +476,35 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 			if params.MaxSendSize < 0 {
 				return params, fmt.Errorf("invalid maxSendSize value: '%#v, it needs to be a positive integer", v)
 			}
+		case "tlsconfig":
+			var ok bool
+			params.TLSConfig, ok = v.(map[string]interface{})
+			err := fmt.Errorf("invalid tlsconfig value: '%#v', tlsconfig needs cert, key, and (optionally) cacerts", v)
 
+			if !ok {
+				return params, err
+			}
+			if cert, certok := params.TLSConfig["cert"]; certok {
+				if _, ok = cert.(string); !ok {
+					return params, err
+				}
+			} else {
+				return params, err
+			}
+			if key, keyok := params.TLSConfig["key"]; keyok {
+				if _, ok = key.(string); !ok {
+					return params, err
+				}
+			} else {
+				return params, err
+			}
+			if cacerts, cacertsok := params.TLSConfig["cacerts"]; cacertsok {
+				if _, ok = cacerts.([]string); !ok {
+					if _, ok = cacerts.(string); !ok {
+						return params, err
+					}
+				}
+			}
 		default:
 			return params, fmt.Errorf("unknown connect param: %q", k)
 		}
