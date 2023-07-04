@@ -262,6 +262,53 @@ func TestClient(t *testing.T) {
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { timeout: 3456.3 });`},
 		},
 		{
+			name: "ConnectTlsInvalidEmptyTls",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", { tls: { }});`,
+				err:  "invalid grpc.connect() parameters: invalid tls value: 'map[string]interface {}{}', tls needs cert, key, and (optionally) cacerts",
+			},
+		},
+		{
+			name: "ConnectTlsInvalidTlsParamCertType",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", { tls: { cert: 0 }});`,
+				err:  `invalid grpc.connect() parameters: invalid tls cert value: 'map[string]interface {}{"cert":0}', it needs to be a PEM formatted string`,
+			},
+		},
+		{
+			name: "ConnectTlsInvalidTlsParamKeyType",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", { tls: { cert: "", key: 0 }});`,
+				err:  `invalid grpc.connect() parameters: invalid tls key value: 'map[string]interface {}{"cert":"", "key":0}', it needs to be a PEM formatted string`,
+			},
+		},
+		{
+			name: "ConnectTlsInvalidTlsParamCACertsType",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", { tls: { cert: "", key: "", cacerts: 0 }});`,
+				err:  `invalid grpc.connect() parameters: invalid tls cacerts value: 'map[string]interface {}{"cacerts":0, "cert":"", "key":""}', it needs to be a string or string[] of PEM formatted strings`,
+			},
+		},
+		{
+			name: "ConnectTls",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { tls: { cacerts: "LOCALHOST_CERT", cert: "LOCALHOST_CERT", key: "LOCALHOST_KEY" }});`},
+		},
+		{
 			name: "Connect",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();

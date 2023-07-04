@@ -112,11 +112,8 @@ func (c *Client) LoadProtoset(protosetPath string) ([]MethodInfo, error) {
 
 func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Config, error) {
 	var cp *x509.CertPool
-	var err error
-	if cp, err = x509.SystemCertPool(); err != nil {
-		return nil, err
-	}
 	if len(caCertificates) > 0 {
+		cp, _ = x509.SystemCertPool()
 		for i, caCert := range caCertificates {
 			if ok := cp.AppendCertsFromPEM(caCert); !ok {
 				return nil, fmt.Errorf("failed to append ca certificate [%d] from PEM", i)
@@ -172,8 +169,8 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 	var tcred credentials.TransportCredentials
 	if !p.IsPlaintext {
 		var tlsCfg *tls.Config
-		if len(p.TLSConfig) > 0 {
-			if tlsCfg, err = buildTLSConfigFromMap(p.TLSConfig); err != nil {
+		if len(p.TLS) > 0 {
+			if tlsCfg, err = buildTLSConfigFromMap(p.TLS); err != nil {
 				return false, err
 			}
 		} else {
@@ -426,7 +423,7 @@ type connectParams struct {
 	Timeout               time.Duration
 	MaxReceiveSize        int64
 	MaxSendSize           int64
-	TLSConfig             map[string]interface{}
+	TLS                   map[string]interface{}
 }
 
 func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, error) {
@@ -436,7 +433,7 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		Timeout:               time.Minute,
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
-		TLSConfig:             make(map[string]interface{}),
+		TLS:                   make(map[string]interface{}),
 	}
 	for k, v := range raw {
 		switch k {
@@ -476,32 +473,33 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 			if params.MaxSendSize < 0 {
 				return params, fmt.Errorf("invalid maxSendSize value: '%#v, it needs to be a positive integer", v)
 			}
-		case "tlsconfig":
+		case "tls":
 			var ok bool
-			params.TLSConfig, ok = v.(map[string]interface{})
-			err := fmt.Errorf("invalid tlsconfig value: '%#v', tlsconfig needs cert, key, and (optionally) cacerts", v)
+			params.TLS, ok = v.(map[string]interface{})
+			err := fmt.Errorf("invalid tls value: '%#v', tls needs cert, key, and (optionally) cacerts", v)
 
 			if !ok {
 				return params, err
 			}
-			if cert, certok := params.TLSConfig["cert"]; certok {
+			if cert, certok := params.TLS["cert"]; certok {
 				if _, ok = cert.(string); !ok {
-					return params, err
+					return params, fmt.Errorf("invalid tls cert value: '%#v', it needs to be a PEM formatted string", v)
 				}
 			} else {
 				return params, err
 			}
-			if key, keyok := params.TLSConfig["key"]; keyok {
+			if key, keyok := params.TLS["key"]; keyok {
 				if _, ok = key.(string); !ok {
-					return params, err
+					return params, fmt.Errorf("invalid tls key value: '%#v', it needs to be a PEM formatted string", v)
 				}
 			} else {
 				return params, err
 			}
-			if cacerts, cacertsok := params.TLSConfig["cacerts"]; cacertsok {
+			if cacerts, cacertsok := params.TLS["cacerts"]; cacertsok {
 				if _, ok = cacerts.([]interface{}); !ok {
 					if _, ok = cacerts.(string); !ok {
-						return params, err
+						return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
+							" it needs to be a string or string[] of PEM formatted strings", v)
 					}
 				}
 			}
