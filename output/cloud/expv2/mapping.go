@@ -2,6 +2,7 @@ package expv2
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/mstoykov/atlas"
 	"go.k6.io/k6/metrics"
@@ -10,21 +11,37 @@ import (
 )
 
 // TODO: unit test
-func mapTimeSeriesLabelsProto(tags *metrics.TagSet) []*pbcloud.Label {
+func mapTimeSeriesLabelsProto(tags *metrics.TagSet) ([]*pbcloud.Label, map[string]struct{}) {
 	labels := make([]*pbcloud.Label, 0, ((*atlas.Node)(tags)).Len())
+	discardedLabels := make(map[string]struct{})
 
 	// TODO: move it as a shared func
 	// https://github.com/grafana/k6/issues/2764
 	n := (*atlas.Node)(tags)
 	if n.Len() < 1 {
-		return labels
+		return labels, discardedLabels
 	}
 	for !n.IsRoot() {
 		prev, key, value := n.Data()
-		labels = append(labels, &pbcloud.Label{Name: key, Value: value})
+
 		n = prev
+		if isReservedLabelName(key) {
+			discardedLabels[key] = struct{}{}
+			continue
+		}
+
+		labels = append(labels, &pbcloud.Label{Name: key, Value: value})
 	}
-	return labels
+	return labels, discardedLabels
+}
+
+func isReservedLabelName(name string) bool {
+	// this is a reserved label prefix for the prometheus
+	if strings.HasPrefix(name, "__") {
+		return true
+	}
+
+	return name == "test_run_id"
 }
 
 // TODO: unit test

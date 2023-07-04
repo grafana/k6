@@ -106,6 +106,8 @@ func (o *Output) Start() error {
 		referenceID:                o.referenceID,
 		bq:                         &o.collector.bq,
 		client:                     mc,
+		logger:                     o.logger,
+		discardedLabels:            make(map[string]struct{}),
 		aggregationPeriodInSeconds: uint32(o.config.AggregationPeriod.TimeDuration().Seconds()),
 		maxSeriesInBatch:           int(o.config.MaxTimeSeriesInBatch.Int64),
 	}
