@@ -5,6 +5,7 @@ import (
 	"context"
 	"crypto/tls"
 	"errors"
+	"fmt"
 	"io"
 	"net/url"
 	"os"
@@ -307,6 +308,30 @@ func TestClient(t *testing.T) {
 				var client = new grpc.Client();
 				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { tls: { cacerts: "LOCALHOST_CERT", cert: "LOCALHOST_CERT", key: "LOCALHOST_KEY" }});`},
+		},
+		{
+			name: "ConnectTlsUnknownAuthority",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '1s', tls: { cert: "%s", key: "%s" }});`,
+				"-----BEGIN CERTIFICATE-----\\n"+
+					"MIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\n"+
+					"TXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\n"+
+					"BAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\n"+
+					"gZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\n"+
+					"ABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\n"+
+					"BBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\n"+
+					"u/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\n"+
+					"zk9eWNHFXDA9U6U=\\n"+
+					"-----END CERTIFICATE-----",
+				"-----BEGIN EC PRIVATE KEY-----\\n"+
+					"MHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\n"+
+					"AwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\n"+
+					"V71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n"+
+					"-----END EC PRIVATE KEY-----"),
+				err: "certificate signed by unknown authority",
+			},
 		},
 		{
 			name: "Connect",

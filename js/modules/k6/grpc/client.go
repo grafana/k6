@@ -140,14 +140,15 @@ func buildTLSConfigFromMap(tlsConfigMap map[string]interface{}) (*tls.Config, er
 	if keystr, ok := tlsConfigMap["key"].(string); ok {
 		key = []byte(keystr)
 	}
-	cas := tlsConfigMap["cacerts"]
-	ca = make([][]byte, 0)
-	if casarr, ok := cas.([]string); ok {
-		for _, casEntry := range casarr {
-			ca = append(ca, []byte(casEntry))
+	if cas, ok := tlsConfigMap["cacerts"]; ok {
+		ca = make([][]byte, 0)
+		if casarr, ok := cas.([]string); ok {
+			for _, casEntry := range casarr {
+				ca = append(ca, []byte(casEntry))
+			}
+		} else if casstr, casstrok := cas.(string); casstrok {
+			ca = append(ca, []byte(casstr))
 		}
-	} else if casstr, casstrok := cas.(string); casstrok {
-		ca = append(ca, []byte(casstr))
 	}
 	return buildTLSConfig(cert, key, ca)
 }
