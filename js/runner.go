@@ -3,7 +3,6 @@ package js
 import (
 	"context"
 	"crypto/tls"
-	"crypto/x509"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -149,13 +148,8 @@ func (r *Runner) newVU(
 	tlsAuth := r.Bundle.Options.TLSAuth
 	certs := make([]tls.Certificate, len(tlsAuth))
 	nameToCert := make(map[string]*tls.Certificate)
-	var rootCAs *x509.CertPool
 	for i, auth := range tlsAuth {
 		cert, errC := auth.Certificate()
-		if errC != nil {
-			return nil, errC
-		}
-		errC = auth.RootCAs(rootCAs)
 		if errC != nil {
 			return nil, errC
 		}
@@ -181,7 +175,6 @@ func (r *Runner) newVU(
 	}
 
 	tlsConfig := &tls.Config{
-		RootCAs:            rootCAs,
 		InsecureSkipVerify: r.Bundle.Options.InsecureSkipTLSVerify.Bool, //nolint:gosec
 		CipherSuites:       cipherSuites,
 		MinVersion:         uint16(tlsVersions.Min),
