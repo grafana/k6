@@ -125,7 +125,7 @@ func (o *Output) Start() error {
 
 		insightsClientConfig := insights.ClientConfig{
 			IngesterHost: o.config.TracesHost.ValueOrZero(),
-			Timeout:      types.NewNullDuration(1*time.Minute, false),
+			Timeout:      types.NewNullDuration(90*time.Second, false),
 			AuthConfig: insights.ClientAuthConfig{
 				Enabled:                  true,
 				TestRunID:                testRunID,
@@ -138,7 +138,7 @@ func (o *Output) Start() error {
 			RetryConfig: insights.ClientRetryConfig{
 				RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED",
 				MaxAttempts:          5,
-				PerRetryTimeout:      5 * time.Second,
+				PerRetryTimeout:      30 * time.Second,
 				BackoffConfig: insights.ClientBackoffConfig{
 					Enabled:        true,
 					JitterFraction: 0.1,
