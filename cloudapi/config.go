@@ -166,7 +166,7 @@ func NewConfig() Config {
 
 		TracesEnabled:         null.NewBool(false, false),
 		TracesHost:            null.NewString("insights.k6.io:4443", false),
-		TracesPushInterval:    types.NewNullDuration(10*time.Second, false),
+		TracesPushInterval:    types.NewNullDuration(1*time.Second, false),
 		TracesPushConcurrency: null.NewInt(1, false),
 
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
