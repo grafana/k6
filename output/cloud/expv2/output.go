@@ -137,7 +137,7 @@ func (o *Output) Start() error {
 			},
 			RetryConfig: insights.ClientRetryConfig{
 				RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED",
-				MaxAttempts:          5,
+				MaxAttempts:          3,
 				PerRetryTimeout:      30 * time.Second,
 				BackoffConfig: insights.ClientBackoffConfig{
 					Enabled:        true,
