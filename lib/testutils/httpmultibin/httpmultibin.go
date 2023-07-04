@@ -117,6 +117,39 @@ xiUZS4SoaJq6ZvcBYS62Yr1t8n09iG47YL8ibgtmH3L+svaotvpVxVK+d7BLevA/
 ZboOWVe3icTy64BT3OQhmg==
 -----END RSA PRIVATE KEY-----`
 
+// trivial password: abc123
+const localhostEncryptedKey = `-----BEGIN RSA PRIVATE KEY-----
+Proc-Type: 4,ENCRYPTED
+DEK-Info: AES-256-CBC,B2557B8662FBEC979823E6F51B8ED777
+
+9xXt7ZCYHjYz501uiQKPLpxmz1qGNwu/u2VCwu/dFql2BLGfKrk5j4ZvaoKqUwVB
+QfUaisSv1g++Rh13qDOOvRO38TF7aQPxImqCw2ew/fFC0JTiPWpSaQtIcWOxASpa
+s84Z4LIolfeLxXyOG3JwWeKG/WQCMf1QNM+LXlfCJU6vdY0KeoDUcp4CkFNDdUrx
+qGaF4xJxaQfLSSLuXlWTYmz+IlPMy/xOUCn3eSemWd4ZBdFUIwsSsuQkZHzthjJg
+DbvAzuEzvQENXInnfYHkA4XHM+SMV+4d+aZgPNUSWv3YfXeOhapdpeAjVq6Q2TiX
+xkFOjFYUKWO6sLWS5WfB1eqwwh9vNkZVHbmYYUvJbc2Aw0EJlQWxeQ6Vj0d6TIev
+EPr6jFROaJ5kTd2XxG4HzJcGWsV27q4r159GGGmrZk1GjGZKImWP6Y5f3t4u+uJZ
+EHVGx+SkilEaOM0ar1sXGgtIif741GRYYibd9hD1+0hSOxyVpehtEeb/wJRG4Vd6
+i07ANkqwOop4K/nW5OOXKEz6eDrXAAJ2gzjN74WCyR5nJ2XoTjUa9Vo9hNrBcmtL
+dRoeHOu9BhN+mu8YPwdisjtK6AJorsf0bQWqGpnexFw9Fq/XMpCTBT6P5X6gsNAs
+RKvS5bwai7e9pJqZY+iJjdCTnFflDTX/r/lt4SxIkoZvGoGEVeMJsc6yFZP6yDCx
+zjZkk0R3WsVusheATVBJJJcsHLdaUR707TU5lmhVFx0BYcBVrfKNc1h0E+alSM5R
+ij3T88ipk8BN4/e6gUpQCptMtda7wFCxiAIU+l1skGmM29ZvPB8BNAbMFCxioBGk
+Me6QWcqOTLzoLwFHH2hSPYhZKeadCyz53OKbyIK/m06BXMVpFaIxesJZx6qW3aew
+gShlUwr7yu9QJlxGZX0wIC1dyT69lRcLsbqzqnp6EMspSEZYvysq2k0GKZyAqLnr
+e9CClm0wMnj45SK34/s1BWZNbBgXkDlzTKwMMN6RRY09seLoooJ64QPXgvW8T96P
+0my7xtvtmt3h7krsudV68JbgaMotjvzV2vOxgD+s93QQIByIU+mTef5giEshERTL
+8cOw4jp99p0wswH9hbn8TQsSf1UPFsL8P3HbD6HiNKKA1YyijgSIEQ6z0H0ALujb
+hvweCPpwvOQAXxg+cpumn0bu7oLonWhdy+pkfYEvw/UWNX/7Qd7EIp8v84FI6J0U
+jX2iIIBm8rbA+lF10jo7GobPoQ4bGDEQOsNxuUSYvc07HoMpEVTH9Kg8dOZmvRQp
+pwyG4/o2+5LWXw8c1+1KNvdlhM8iMrCzz/0gok7UHLvisb3MruZE9c6Ujoua09Tu
+shPGfJzXelJiRUwajFFAeBS/TPPBqi8KjFrz+sjYA8rFk7rHZZYW2p1n11Z+SLWj
+MwBqQ5yCLohZe5UELdei8h0OuUOgfvnmJWcNk0vhlC1RxzjgUE1ZuQgD+yVbnWEu
+XtcpRl5KCY7LnKflxpY5flhLdL0I4pH3coBcWn+87F8TCwxE6xt9Db/ny0Upoupf
+iZ1HoCyF0iJj75Duu9Ssr61gR8Gd/R6agXEhi19o517yeK7x+a+UPAinojjROQGD
+-----END RSA PRIVATE KEY-----
+`
+
 // HTTPMultiBin can be used as a local alternative of httpbin.org. It offers both http and https servers, as well as real domains
 type HTTPMultiBin struct {
 	Mux             *http.ServeMux
@@ -447,6 +480,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 			"GRPCBIN_ADDR", fmt.Sprintf("%s:%s", httpsDomain, http2URL.Port()),
 			"LOCALHOST_CERT", strings.ReplaceAll(localhostCert, "\n", "\\n"),
 			"LOCALHOST_KEY", strings.ReplaceAll(localhostKey, "\n", "\\n"),
+			"LOCALHOST_ENCRYPTED_KEY", strings.ReplaceAll(localhostEncryptedKey, "\n", "\\n"),
 		),
 		TLSClientConfig: tlsConfig,
 		Dialer:          dialer,

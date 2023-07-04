@@ -4,6 +4,7 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -110,6 +111,32 @@ func (c *Client) LoadProtoset(protosetPath string) ([]MethodInfo, error) {
 	return c.convertToMethodInfo(fdset)
 }
 
+func decryptPrivateKey(key, password []byte) ([]byte, error) {
+	block, _ := pem.Decode(key)
+	if block == nil {
+		return nil, fmt.Errorf("failed to decode PEM key")
+	}
+
+	blockType := block.Type
+	if blockType == "ENCRYPTED PRIVATE KEY" {
+		return nil, fmt.Errorf("encrypted pkcs8 formatted key is not supported")
+	}
+	/*
+	   Even though `DecryptPEMBlock` has been deprecated since 1.16.x it is still
+	   being used here because it is deprecated due to it not supporting *good* crypography
+	   ultimately though we want to support something so we will be using it for now.
+	*/
+	decryptedKey, err := x509.DecryptPEMBlock(block, password) //nolint:staticcheck
+	if err != nil {
+		return nil, err
+	}
+	key = pem.EncodeToMemory(&pem.Block{
+		Type:  blockType,
+		Bytes: decryptedKey,
+	})
+	return key, nil
+}
+
 func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Config, error) {
 	var cp *x509.CertPool
 	if len(caCertificates) > 0 {
@@ -132,13 +159,22 @@ func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Conf
 }
 
 func buildTLSConfigFromMap(tlsConfigMap map[string]interface{}) (*tls.Config, error) {
-	var cert, key []byte
+	var cert, key, pass []byte
 	var ca [][]byte
+	var err error
 	if certstr, ok := tlsConfigMap["cert"].(string); ok {
 		cert = []byte(certstr)
 	}
 	if keystr, ok := tlsConfigMap["key"].(string); ok {
 		key = []byte(keystr)
+	}
+	if passstr, ok := tlsConfigMap["password"].(string); ok {
+		pass = []byte(passstr)
+		if len(pass) > 0 {
+			if key, err = decryptPrivateKey(key, pass); err != nil {
+				return nil, err
+			}
+		}
 	}
 	if cas, ok := tlsConfigMap["cacerts"]; ok {
 		ca = make([][]byte, 0)
@@ -477,7 +513,7 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		case "tls":
 			var ok bool
 			params.TLS, ok = v.(map[string]interface{})
-			err := fmt.Errorf("invalid tls value: '%#v', tls needs cert, key, and (optionally) cacerts", v)
+			err := fmt.Errorf("invalid tls value: '%#v', tls needs cert, key, (optional) password, and (optionally) cacerts", v)
 
 			if !ok {
 				return params, err
@@ -495,6 +531,13 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 				}
 			} else {
 				return params, err
+			}
+
+			// optional map keys below
+			if pass, passok := params.TLS["password"]; passok {
+				if _, ok = pass.(string); !ok {
+					return params, fmt.Errorf("invalid tls password value: '%#v', it needs to be a string", v)
+				}
 			}
 			if cacerts, cacertsok := params.TLS["cacerts"]; cacertsok {
 				if _, ok = cacerts.([]interface{}); !ok {

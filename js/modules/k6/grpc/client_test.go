@@ -293,6 +293,16 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "ConnectTlsInvalidTlsParamPasswordType",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", { tls: { cert: "", key: "", password: 0 }});`,
+				err:  `invalid grpc.connect() parameters: invalid tls password value: 'map[string]interface {}{"cert":"", "key":"", "password":0}', it needs to be a string`,
+			},
+		},
+		{
 			name: "ConnectTlsInvalidTlsParamCACertsType",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
@@ -310,27 +320,63 @@ func TestClient(t *testing.T) {
 			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { tls: { cacerts: "LOCALHOST_CERT", cert: "LOCALHOST_CERT", key: "LOCALHOST_KEY" }});`},
 		},
 		{
+			name: "ConnectTlsEncryptedKey",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{code: `client.connect("GRPCBIN_ADDR", { tls: { cacerts: "LOCALHOST_CERT", cert: "LOCALHOST_CERT", key: "LOCALHOST_ENCRYPTED_KEY", password:"abc123" }});`},
+		},
+		{
 			name: "ConnectTlsUnknownAuthority",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
 				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
-			vuString: codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '1s', tls: { cert: "%s", key: "%s" }});`,
-				"-----BEGIN CERTIFICATE-----\\n"+
-					"MIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\n"+
-					"TXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\n"+
-					"BAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\n"+
-					"gZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\n"+
-					"ABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\n"+
-					"BBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\n"+
-					"u/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\n"+
-					"zk9eWNHFXDA9U6U=\\n"+
-					"-----END CERTIFICATE-----",
-				"-----BEGIN EC PRIVATE KEY-----\\n"+
-					"MHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\n"+
-					"AwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\n"+
-					"V71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n"+
-					"-----END EC PRIVATE KEY-----"),
+			vuString: codeBlock{
+				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '1s', tls: { cert: "%s", key: "%s" }});`,
+					"-----BEGIN CERTIFICATE-----\\n"+
+						"MIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\n"+
+						"TXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\n"+
+						"BAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\n"+
+						"gZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\n"+
+						"ABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\n"+
+						"BBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\n"+
+						"u/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\n"+
+						"zk9eWNHFXDA9U6U=\\n"+
+						"-----END CERTIFICATE-----",
+					"-----BEGIN EC PRIVATE KEY-----\\n"+
+						"MHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\n"+
+						"AwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\n"+
+						"V71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n"+
+						"-----END EC PRIVATE KEY-----"),
 				err: "certificate signed by unknown authority",
+			},
+		},
+		{
+			name: "ConnectTlsEncryptedUnknownAuthority",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '1s', tls: { cert: "%s", key: "%s", password: "abc321" }});`,
+					"-----BEGIN CERTIFICATE-----\\n"+
+						"MIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\n"+
+						"TXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\n"+
+						"BAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\n"+
+						"gZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\n"+
+						"ABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\n"+
+						"BBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\n"+
+						"u/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\n"+
+						"zk9eWNHFXDA9U6U=\\n"+
+						"-----END CERTIFICATE-----",
+					"-----BEGIN EC PRIVATE KEY-----\\n"+
+						"Proc-Type: 4,ENCRYPTED\\n"+
+						"DEK-Info: AES-256-CBC,3E311E9B602231BFB5C752071EE7D652"+
+						"\\n\\n"+
+						"sAKeqbacug0v4ruE1A0CACwGVEGBQVOl1CiGVp5RsxgNZKXzMS6EsTTNLw378coF\\n"+
+						"KXbF+he05HIuzToOz2ANLXov1iCrVpotKVB4l2obTQvg+5VET902ky99Mc9Us7jd\\n"+
+						"UwW8LpXlSlhcNWuUfK6wyosL42TbcIxjqZWaESW+6ww=\\n"+
+						"-----END EC PRIVATE KEY-----"),
+				err: "x509: decryption password incorrect",
 			},
 		},
 		{
