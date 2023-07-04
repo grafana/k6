@@ -11,6 +11,7 @@ import (
 	"time"
 
 	grpcRetry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
+	"go.k6.io/k6/lib/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -36,6 +37,7 @@ var (
 // ClientConfig is the configuration for the client.
 type ClientConfig struct {
 	IngesterHost  string
+	Timeout       types.NullDuration
 	ConnectConfig ClientConnectConfig
 	AuthConfig    ClientAuthConfig
 	TLSConfig     ClientTLSConfig
@@ -129,6 +131,9 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 	if closed {
 		return ErrClientClosed
 	}
+
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout.TimeDuration())
+	defer cancel()
 
 	if len(requestMetadatas) < 1 {
 		return nil

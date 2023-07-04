@@ -388,6 +388,101 @@ func TestOutputFlushWorkersAbort(t *testing.T) {
 	}
 }
 
+func TestOutputFlushRequestMetadatasConcurrently(t *testing.T) {
+	t.Parallel()
+
+	done := make(chan struct{})
+
+	// It blocks on the first request, so it asserts that the flush
+	// operations continues concurrently if one more tick is sent in the meantime.
+	//
+	// The second request unblocks.
+	var requestsCount int64
+	flusherMock := func(_ context.Context) {
+		updated := atomic.AddInt64(&requestsCount, 1)
+		if updated == 2 {
+			close(done)
+			return
+		}
+		<-done
+	}
+
+	o := Output{logger: testutils.NewLogger(t)}
+	o.config.TracesPushConcurrency = null.IntFrom(2)
+	o.config.TracesPushInterval = types.NullDurationFrom(1) // loop
+	o.requestMetadatasFlusher = flusherFunc(flusherMock)
+	o.runFlushRequestMetadatas()
+
+	select {
+	case <-time.After(5 * time.Second):
+		t.Error("timed out")
+	case <-done:
+		assert.NotZero(t, atomic.LoadInt64(&requestsCount))
+	}
+}
+
+func TestOutputFlushRequestMetadatasStop(t *testing.T) {
+	t.Parallel()
+
+	o := Output{
+		logger: testutils.NewLogger(t),
+		stop:   make(chan struct{}),
+	}
+	o.config.TracesPushInterval = types.NullDurationFrom(1 * time.Millisecond)
+
+	once := sync.Once{}
+	flusherMock := func(_ context.Context) {
+		// it asserts that flushers are set and the flush is invoked
+		once.Do(func() { close(o.stop) })
+	}
+
+	o.requestMetadatasFlusher = flusherFunc(flusherMock)
+	o.runFlushRequestMetadatas()
+
+	// it asserts that all flushers exit
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		o.wg.Wait()
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Error("timed out")
+	case <-done:
+	}
+}
+
+func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
+	t.Parallel()
+
+	o := Output{
+		logger: testutils.NewLogger(t),
+		abort:  make(chan struct{}),
+	}
+	o.config.TracesPushInterval = types.NullDurationFrom(1 * time.Millisecond)
+
+	once := sync.Once{}
+	flusherMock := func(_ context.Context) {
+		// it asserts that flushers are set and the flush func is invoked
+		once.Do(func() { close(o.abort) })
+	}
+
+	o.requestMetadatasFlusher = flusherFunc(flusherMock)
+	o.runFlushRequestMetadatas()
+
+	// it asserts that all flushers exit
+	done := make(chan struct{})
+	go func() {
+		defer close(done)
+		o.wg.Wait()
+	}()
+	select {
+	case <-time.After(time.Second):
+		t.Error("timed out")
+	case <-done:
+	}
+}
+
 type flusherFunc func(context.Context)
 
 func (ff flusherFunc) flush(ctx context.Context) error {

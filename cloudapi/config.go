@@ -47,6 +47,9 @@ type Config struct {
 	// The host of the k6 Insights backend service.
 	TracesHost null.String `json:"traceHost" envconfig:"K6_CLOUD_TRACES_HOST"`
 
+	// This is how many concurrent pushes will be done at the same time to the cloud
+	TracesPushConcurrency null.Int `json:"tracesPushConcurrency" envconfig:"K6_CLOUD_TRACES_PUSH_CONCURRENCY"`
+
 	// The time interval between periodic API calls for sending samples to the cloud ingest service.
 	TracesPushInterval types.NullDuration `json:"tracesPushInterval" envconfig:"K6_CLOUD_TRACES_PUSH_INTERVAL"`
 
@@ -161,9 +164,10 @@ func NewConfig() Config {
 		MetricPushInterval:    types.NewNullDuration(1*time.Second, false),
 		MetricPushConcurrency: null.NewInt(1, false),
 
-		TracesEnabled:      null.NewBool(false, false),
-		TracesHost:         null.NewString("insights.k6.io:4443", false),
-		TracesPushInterval: types.NewNullDuration(1*time.Second, false),
+		TracesEnabled:         null.NewBool(false, false),
+		TracesHost:            null.NewString("insights.k6.io:4443", false),
+		TracesPushInterval:    types.NewNullDuration(10*time.Second, false),
+		TracesPushConcurrency: null.NewInt(6, false),
 
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
 		Timeout:                    types.NewNullDuration(1*time.Minute, false),
@@ -239,6 +243,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.TracesPushInterval.Valid {
 		c.TracesPushInterval = cfg.TracesPushInterval
+	}
+	if cfg.TracesPushConcurrency.Valid {
+		c.TracesPushConcurrency = cfg.TracesPushConcurrency
 	}
 	if cfg.AggregationPeriod.Valid {
 		c.AggregationPeriod = cfg.AggregationPeriod
