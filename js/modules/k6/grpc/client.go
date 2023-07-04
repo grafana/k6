@@ -499,7 +499,7 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 				return params, err
 			}
 			if cacerts, cacertsok := params.TLSConfig["cacerts"]; cacertsok {
-				if _, ok = cacerts.([]string); !ok {
+				if _, ok = cacerts.([]interface{}); !ok {
 					if _, ok = cacerts.(string); !ok {
 						return params, err
 					}
