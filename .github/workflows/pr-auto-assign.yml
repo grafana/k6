@@ -1,4 +1,4 @@
-name: 'Auto assign PR reviewers'
+name: "Auto assign PR reviewers"
 on:
   pull_request_target:
     types: [opened, ready_for_review, reopened]
@@ -16,11 +16,21 @@ jobs:
           script: |
             const reviewers = ['mstoykov', 'imiric', 'codebien', 'olegbespalov', 'oleiade'];
             const reviewerCount = 2;
+            const crypto = require("node:crypto");
 
-            const reviewersWithoutAuthor = reviewers.filter(user => user !== context.payload.pull_request.user.login);
+            const getNRandom = (n, array) => {
+              let result = new Array();
+              for (;n > 0 && array.length > 0; n--) {
+                const chosen = array[crypto.randomInt(array.length)];
+                result.push(chosen);
+                array = array.filter(el => el != chosen);
+              }
+              return result;
+            }
+
             github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
-              reviewers: reviewersWithoutAuthor.sort(() => 0.5 - Math.random()).slice(0, reviewerCount),
+              reviewers: getNRandom(reviewerCount, reviewers),
             });
