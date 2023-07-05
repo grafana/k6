@@ -8,7 +8,7 @@ client.load([], "./grpc_server/route_guide.proto")
 export default () => {
     client.connect("127.0.0.1:10000", { plaintext: true })
 
-    const response = client.invoke("main.RouteGuide/GetFeature", {
+    const response = client.invoke("main.FeatureExplorer/GetFeature", {
         latitude: 410248224,
         longitude: -747127767
     })
