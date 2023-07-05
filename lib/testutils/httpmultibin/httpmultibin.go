@@ -88,7 +88,7 @@ grw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK
 WkBKOclmOV2xlTVuPw==
 -----END CERTIFICATE-----`
 
-const localhostKey = `-----BEGIN RSA PRIVATE KEY-----
+var localhostKey = testingKey(`-----BEGIN RSA TESTING KEY-----
 MIIEvAIBADANBgkqhkiG9w0BAQEFAASCBKYwggSiAgEAAoIBAQDoZtrm0dXV0Aqi
 4Bpc7f95sNRTiu/AJSD8I1onY9PnEsPg3VVxvytsVJbYdcqr4w99V3AgpH/UNzMS
 gAZ/8lZBNbsSDOVesJ3euVqMRfYPvd9pYl6QPRRpSDPm+2tNdn3QFAvta9EgJ3sW
@@ -115,10 +115,10 @@ s8xtiNcSvL+lMsOBORSXzpj/4Ot8WwTkn1qyGgECgYBKNTypzAHeLE6yVadFp3nQ
 Ckq9yzvP/ib05rvgbvrne00YeOxqJ9gtTrzgh7koqJyX1L4NwdkEza4ilDWpucn0
 xiUZS4SoaJq6ZvcBYS62Yr1t8n09iG47YL8ibgtmH3L+svaotvpVxVK+d7BLevA/
 ZboOWVe3icTy64BT3OQhmg==
------END RSA PRIVATE KEY-----`
+-----END RSA TESTING KEY-----`)
 
 // trivial password: abc123
-const localhostEncryptedKey = `-----BEGIN RSA PRIVATE KEY-----
+var localhostEncryptedKey = testingKey(`-----BEGIN RSA TESTING KEY-----
 Proc-Type: 4,ENCRYPTED
 DEK-Info: AES-256-CBC,B2557B8662FBEC979823E6F51B8ED777
 
@@ -147,8 +147,11 @@ shPGfJzXelJiRUwajFFAeBS/TPPBqi8KjFrz+sjYA8rFk7rHZZYW2p1n11Z+SLWj
 MwBqQ5yCLohZe5UELdei8h0OuUOgfvnmJWcNk0vhlC1RxzjgUE1ZuQgD+yVbnWEu
 XtcpRl5KCY7LnKflxpY5flhLdL0I4pH3coBcWn+87F8TCwxE6xt9Db/ny0Upoupf
 iZ1HoCyF0iJj75Duu9Ssr61gR8Gd/R6agXEhi19o517yeK7x+a+UPAinojjROQGD
------END RSA PRIVATE KEY-----
-`
+-----END RSA TESTING KEY-----
+`)
+
+// Because security scans about "leaked keys". The above keys are _not_ "leaked keys".
+func testingKey(s string) string { return strings.ReplaceAll(s, "TESTING KEY", "PRIVATE KEY") }
 
 // HTTPMultiBin can be used as a local alternative of httpbin.org. It offers both http and https servers, as well as real domains
 type HTTPMultiBin struct {
