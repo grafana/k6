@@ -74,7 +74,7 @@ func (f *metricsFlusher) push(msb metricSetBuilder) error {
 		}
 
 		f.discardedLabels[key] = struct{}{}
-		f.logger.Warnf("Label %s was discarded since it can't be used with the cloud output", key)
+		f.logger.Warnf("Tag %s has been discarded since it is reserved for Cloud operations.", key)
 	}
 
 	return f.client.push(msb.MetricSet)
@@ -107,7 +107,7 @@ type metricSetBuilder struct {
 	seriesIndex map[metrics.TimeSeries]uint
 
 	// discardedLabels tracks the labels that have been discarded
-	// because they are not supported by the remote service.
+	// since they are reserved for internal usage by the Cloud service.
 	discardedLabels map[string]struct{}
 }
 
@@ -157,12 +157,16 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 	}
 }
 
-func (msb *metricSetBuilder) recordDiscardedLabels(labels map[string]struct{}) {
+func (msb *metricSetBuilder) recordDiscardedLabels(labels []string) {
+	if len(labels) == 0 {
+		return
+	}
+
 	if msb.discardedLabels == nil {
 		msb.discardedLabels = make(map[string]struct{})
 	}
 
-	for key := range labels {
+	for _, key := range labels {
 		if _, ok := msb.discardedLabels[key]; ok {
 			continue
 		}

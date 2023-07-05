@@ -135,10 +135,10 @@ func TestMetricsFlusherFlushChunk(t *testing.T) {
 		bq := &bucketQ{}
 		pm := &pusherMock{}
 		mf := metricsFlusher{
-			bq:                     bq,
-			client:                 pm,
-			logger:                 logger,
-			discardedLabels:        make(map[string]struct{}),
+			bq:               bq,
+			client:           pm,
+			logger:           logger,
+			discardedLabels:  make(map[string]struct{}),
 			maxSeriesInBatch: 3,
 		}
 
@@ -180,11 +180,11 @@ func TestFlushWithReservedLabels(t *testing.T) {
 	}
 
 	mf := metricsFlusher{
-		bq:                     bq,
-		client:                 pm,
-		maxSeriesInSingleBatch: 2,
-		logger:                 logger,
-		discardedLabels:        make(map[string]struct{}),
+		bq:               bq,
+		client:           pm,
+		maxSeriesInBatch: 2,
+		logger:           logger,
+		discardedLabels:  make(map[string]struct{}),
 	}
 
 	r := metrics.NewRegistry()
@@ -224,8 +224,8 @@ func TestFlushWithReservedLabels(t *testing.T) {
 
 	// check that warnings sown only once per label
 	require.Len(t, loglines, 2)
-	testutils.LogContains(loglines, logrus.WarnLevel, "Label __name__ was discarded since it can't be used with the cloud output")
-	testutils.LogContains(loglines, logrus.WarnLevel, "Label test_run_id was discarded since it can't be used with the cloud output")
+	testutils.LogContains(loglines, logrus.WarnLevel, "Tag __name__ has been discarded since it is reserved for Cloud operations.")
+	testutils.LogContains(loglines, logrus.WarnLevel, "Tag test_run_id has been discarded since it is reserved for Cloud operations.")
 
 	// check that flusher is not sending labels with reserved names
 	require.Len(t, collected[0].Metrics, 1)
