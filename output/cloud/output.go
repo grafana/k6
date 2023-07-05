@@ -163,7 +163,7 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 func (out *Output) Start() error {
 	if out.config.PushRefID.Valid {
 		out.testRunID = out.config.PushRefID.String
-		out.logger.WithField("testRunID", out.testRunID).Debug("directly pushing metrics without init")
+		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
 		return out.startVersionedOutput()
 	}
 
@@ -334,7 +334,7 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 
 func (out *Output) startVersionedOutput() error {
 	if out.testRunID == "" {
-		return errors.New("ReferenceID is required")
+		return errors.New("TestRunID is required")
 	}
 	var err error
 	switch out.config.APIVersion.Int64 {

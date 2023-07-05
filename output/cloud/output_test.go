@@ -201,7 +201,7 @@ func TestOutputStartVersionedOutputV1(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func TestOutputStartWithReferenceID(t *testing.T) {
+func TestOutputStartWithTestRunID(t *testing.T) {
 	t.Parallel()
 
 	handler := func(w http.ResponseWriter, r *http.Request) {

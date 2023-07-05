@@ -38,7 +38,7 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, int64(99), o.config.APIVersion.Int64)
 }
 
-func TestOutputSetReferenceID(t *testing.T) {
+func TestOutputSetTestRunID(t *testing.T) {
 	t.Parallel()
 	o := Output{}
 	o.SetTestRunID("my-test-run-id")
