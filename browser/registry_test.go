@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"context"
 	"errors"
 	"strconv"
 	"sync"
@@ -10,6 +11,9 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/env"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
+
+	k6event "go.k6.io/k6/event"
 )
 
 func TestPidRegistry(t *testing.T) {
@@ -180,5 +184,93 @@ func TestIsRemoteBrowser(t *testing.T) {
 
 		require.Equal(t, true, isRemote)
 		require.Equal(t, "WS_URL_2", wsURL)
+	})
+}
+
+func TestBrowserRegistry(t *testing.T) {
+	t.Parallel()
+
+	remoteRegistry, err := newRemoteRegistry(func(key string) (string, bool) {
+		// No env vars
+		return "", false
+	})
+	require.NoError(t, err)
+
+	t.Run("init_and_close_browsers_on_iter_events", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		browserRegistry := newBrowserRegistry(vu, remoteRegistry, &pidRegistry{})
+
+		vu.ActivateVU()
+
+		// Send a few IterStart events
+		vu.StartIteration(t, k6test.WithIteration(0))
+		vu.StartIteration(t, k6test.WithIteration(1))
+		vu.StartIteration(t, k6test.WithIteration(2))
+
+		// Verify browsers are initialized
+		browserRegistry.mu.RLock()
+		assert.Equal(t, 3, len(browserRegistry.m))
+		browserRegistry.mu.RUnlock()
+
+		// Send IterEnd events
+		vu.EndIteration(t, k6test.WithIteration(0))
+		vu.EndIteration(t, k6test.WithIteration(1))
+		vu.EndIteration(t, k6test.WithIteration(2))
+
+		// Verify there are no browsers left
+		browserRegistry.mu.RLock()
+		assert.Equal(t, 0, len(browserRegistry.m))
+		browserRegistry.mu.RUnlock()
+	})
+
+	t.Run("close_browsers_on_exit_event", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		browserRegistry := newBrowserRegistry(vu, remoteRegistry, &pidRegistry{})
+
+		vu.ActivateVU()
+
+		// Send a few IterStart events
+		vu.StartIteration(t, k6test.WithIteration(0))
+		vu.StartIteration(t, k6test.WithIteration(1))
+		vu.StartIteration(t, k6test.WithIteration(2))
+
+		// Verify browsers are initialized
+		browserRegistry.mu.RLock()
+		assert.Equal(t, 3, len(browserRegistry.m))
+		browserRegistry.mu.RUnlock()
+
+		// Send Exit event
+		events, ok := vu.EventsField.Global.(*k6event.System)
+		require.True(t, ok, "want *k6event.System; got %T", events)
+		waitDone := events.Emit(&k6event.Event{
+			Type: k6event.Exit,
+		})
+		require.NoError(t, waitDone(context.Background()), "error waiting on Exit done")
+
+		// Verify there are no browsers left
+		browserRegistry.mu.RLock()
+		assert.Equal(t, 0, len(browserRegistry.m))
+		browserRegistry.mu.RUnlock()
+	})
+
+	t.Run("unsubscribe_on_non_browser_vu", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		browserRegistry := newBrowserRegistry(vu, remoteRegistry, &pidRegistry{})
+
+		vu.ActivateVU()
+
+		// Unset browser type option in scenario options in order to represent that VU is not
+		// a browser test VU
+		delete(vu.StateField.Options.Scenarios["default"].GetScenarioOptions().Browser, "type")
+
+		vu.StartIteration(t)
+
+		assert.True(t, browserRegistry.stopped.Load())
 	})
 }

@@ -1,16 +1,24 @@
 package browser
 
 import (
+	"context"
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math/big"
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/env"
+	"github.com/grafana/xk6-browser/k6ext"
+
+	k6event "go.k6.io/k6/event"
+	k6modules "go.k6.io/k6/js/modules"
 )
 
 // pidRegistry keeps track of the launched browser process IDs.
@@ -148,26 +156,178 @@ func (r *remoteRegistry) isRemoteBrowser() (string, bool) {
 	return wsURL, true
 }
 
-// browserRegistry stores browser instances indexed per
-// iteration as identified by VUID-scenario-iterationID.
+// browserRegistry stores a single VU browser instances
+// indexed per iteration.
 type browserRegistry struct {
-	m sync.Map
+	vu k6modules.VU
+
+	mu sync.RWMutex
+	m  map[int64]api.Browser
+
+	buildFn browserBuildFunc
+
+	stopped atomic.Bool // testing purposes
 }
 
-func (p *browserRegistry) setBrowser(id string, b api.Browser) {
-	p.m.Store(id, b)
-}
+type browserBuildFunc func(ctx context.Context) (api.Browser, error)
 
-func (p *browserRegistry) getBrowser(id string) (b api.Browser, ok bool) {
-	e, ok := p.m.Load(id)
-	if ok {
-		b, ok = e.(api.Browser)
-		return b, ok
+func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry) *browserRegistry {
+	bt := chromium.NewBrowserType(vu)
+	builder := func(ctx context.Context) (api.Browser, error) {
+		var (
+			err                    error
+			b                      api.Browser
+			wsURL, isRemoteBrowser = remote.isRemoteBrowser()
+		)
+
+		if isRemoteBrowser {
+			b, err = bt.Connect(ctx, wsURL)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+		} else {
+			var pid int
+			b, pid, err = bt.Launch(ctx)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			pids.registerPid(pid)
+		}
+
+		return b, nil
 	}
 
-	return nil, false
+	r := &browserRegistry{
+		vu:      vu,
+		m:       make(map[int64]api.Browser),
+		buildFn: builder,
+	}
+
+	exitSubID, exitCh := vu.Events().Global.Subscribe(
+		k6event.Exit,
+	)
+	go r.handleExitEvent(exitCh)
+
+	iterSubID, eventsCh := vu.Events().Local.Subscribe(
+		k6event.IterStart,
+		k6event.IterEnd,
+	)
+	unsubscribe := func() {
+		vu.Events().Local.Unsubscribe(iterSubID)
+		vu.Events().Global.Unsubscribe(exitSubID)
+	}
+	go r.handleIterEvents(eventsCh, unsubscribe)
+
+	return r
 }
 
-func (p *browserRegistry) deleteBrowser(id string) {
-	p.m.Delete(id)
+func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsubscribeFn func()) {
+	var (
+		ok    bool
+		data  k6event.IterData
+		ctx   = context.Background()
+		vuCtx = k6ext.WithVU(r.vu.Context(), r.vu)
+	)
+
+	for e := range eventsCh {
+		// If browser module is imported in the test, NewModuleInstance will be called for
+		// every VU. Because on VU init stage we can not distinguish to which scenario it
+		// belongs or access its options (because state is nil), we have to always subscribe
+		// to each VU iter events, including VUs that do not make use of the browser in their
+		// iterations.
+		// Therefore, if we get an event that does not correspond to a browser iteration, then
+		// unsubscribe for the VU events and exit the loop in order to reduce unuseful overhead.
+		if !isBrowserIter(r.vu) {
+			unsubscribeFn()
+			r.stop()
+			e.Done()
+			return
+		}
+
+		if data, ok = e.Data.(k6event.IterData); !ok {
+			e.Done()
+			k6ext.Abort(vuCtx, "unexpected iteration event data format: %v", e.Data)
+			// Continue so we don't block the k6 event system producer.
+			// Test will be aborted by k6, which will previously send the
+			// 'Exit' event so browser resources cleanup can be guaranteed.
+			continue
+		}
+
+		switch e.Type { //nolint:exhaustive
+		case k6event.IterStart:
+			b, err := r.buildFn(ctx)
+			if err != nil {
+				e.Done()
+				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
+				// Continue so we don't block the k6 event system producer.
+				// Test will be aborted by k6, which will previously send the
+				// 'Exit' event so browser resources cleanup can be guaranteed.
+				continue
+			}
+			r.setBrowser(data.Iteration, b)
+		case k6event.IterEnd:
+			r.deleteBrowser(data.Iteration)
+		default:
+			r.vu.State().Logger.Warnf("received unexpected event type: %v", e.Type)
+		}
+
+		e.Done()
+	}
+}
+
+func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event) {
+	e, ok := <-exitCh
+	if !ok {
+		return
+	}
+	defer e.Done()
+	r.clear()
+}
+
+func (r *browserRegistry) setBrowser(id int64, b api.Browser) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	r.m[id] = b
+}
+
+func (r *browserRegistry) getBrowser(id int64) (api.Browser, error) {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+
+	if b, ok := r.m[id]; ok {
+		return b, nil
+	}
+
+	return nil, errors.New("browser not found in registry")
+}
+
+func (r *browserRegistry) deleteBrowser(id int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if b, ok := r.m[id]; ok {
+		b.Close()
+		delete(r.m, id)
+	}
+}
+
+func (r *browserRegistry) clear() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for id, b := range r.m {
+		b.Close()
+		delete(r.m, id)
+	}
+}
+
+func (r *browserRegistry) stop() {
+	r.stopped.Store(true)
+}
+
+func isBrowserIter(vu k6modules.VU) bool {
+	opts := k6ext.GetScenarioOpts(vu.Context(), vu)
+	_, ok := opts["type"] // Check if browser type option is set
+	return ok
 }
