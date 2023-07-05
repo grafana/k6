@@ -118,7 +118,7 @@ func newMetricSetBuilder(testRunID string, aggrPeriodSec uint32) metricSetBuilde
 		// is a better trade-off
 		metrics:         make(map[*metrics.Metric]*pbcloud.Metric),
 		seriesIndex:     make(map[metrics.TimeSeries]uint),
-		discardedLabels: make(map[string]struct{}),
+		discardedLabels: nil,
 	}
 	builder.MetricSet.TestRunId = testRunID
 	builder.MetricSet.AggregationPeriod = aggrPeriodSec
@@ -158,6 +158,10 @@ func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
 }
 
 func (msb *metricSetBuilder) recordDiscardedLabels(labels map[string]struct{}) {
+	if msb.discardedLabels == nil {
+		msb.discardedLabels = make(map[string]struct{})
+	}
+
 	for key := range labels {
 		if _, ok := msb.discardedLabels[key]; ok {
 			continue

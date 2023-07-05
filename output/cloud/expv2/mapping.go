@@ -13,9 +13,9 @@ import (
 // TODO: unit test
 func mapTimeSeriesLabelsProto(tags *metrics.TagSet) ([]*pbcloud.Label, map[string]struct{}) {
 	labels := make([]*pbcloud.Label, 0, ((*atlas.Node)(tags)).Len())
-	discardedLabels := make(map[string]struct{})
+	var discardedLabels map[string]struct{}
 
-	// TODO: move it as a shared func
+	// TODO: move this as a shared func
 	// https://github.com/grafana/k6/issues/2764
 	n := (*atlas.Node)(tags)
 	if n.Len() < 1 {
@@ -25,12 +25,16 @@ func mapTimeSeriesLabelsProto(tags *metrics.TagSet) ([]*pbcloud.Label, map[strin
 		prev, key, value := n.Data()
 
 		n = prev
-		if isReservedLabelName(key) {
-			discardedLabels[key] = struct{}{}
+		if !isReservedLabelName(key) {
+			labels = append(labels, &pbcloud.Label{Name: key, Value: value})
 			continue
 		}
 
-		labels = append(labels, &pbcloud.Label{Name: key, Value: value})
+		if discardedLabels == nil {
+			discardedLabels = make(map[string]struct{})
+		}
+
+		discardedLabels[key] = struct{}{}
 	}
 	return labels, discardedLabels
 }
