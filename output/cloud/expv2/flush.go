@@ -13,7 +13,7 @@ type pusher interface {
 }
 
 type metricsFlusher struct {
-	referenceID                string
+	testRunID                  string
 	bq                         *bucketQ
 	client                     pusher
 	aggregationPeriodInSeconds uint32
@@ -39,7 +39,7 @@ func (f *metricsFlusher) flush(_ context.Context) error {
 	// and group them by metric. To avoid doing too many loops and allocations,
 	// the metricSetBuilder is used for doing it during the traverse of the buckets.
 
-	msb := newMetricSetBuilder(f.referenceID, f.aggregationPeriodInSeconds)
+	msb := newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 	for i := 0; i < len(buckets); i++ {
 		msb.addTimeBucket(buckets[i])
 		if len(msb.seriesIndex) < f.maxSeriesInBatch {
@@ -51,7 +51,7 @@ func (f *metricsFlusher) flush(_ context.Context) error {
 		if err != nil {
 			return err
 		}
-		msb = newMetricSetBuilder(f.referenceID, f.aggregationPeriodInSeconds)
+		msb = newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 	}
 
 	if len(msb.seriesIndex) < 1 {

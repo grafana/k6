@@ -35,7 +35,7 @@ type versionedOutput interface {
 	StopWithTestError(testRunErr error) error
 
 	SetTestRunStopCallback(func(error))
-	SetReferenceID(id string)
+	SetTestRunID(id string)
 
 	AddMetricSamples(samples []metrics.SampleContainer)
 }
@@ -52,9 +52,9 @@ const (
 type Output struct {
 	versionedOutput
 
-	logger      logrus.FieldLogger
-	config      cloudapi.Config
-	referenceID string
+	logger    logrus.FieldLogger
+	config    cloudapi.Config
+	testRunID string
 
 	executionPlan []lib.ExecutionStep
 	duration      int64 // in seconds
@@ -162,8 +162,8 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 // goroutine that would listen for metric samples and send them to the cloud.
 func (out *Output) Start() error {
 	if out.config.PushRefID.Valid {
-		out.referenceID = out.config.PushRefID.String
-		out.logger.WithField("referenceId", out.referenceID).Debug("directly pushing metrics without init")
+		out.testRunID = out.config.PushRefID.String
+		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
 		return out.startVersionedOutput()
 	}
 
@@ -186,7 +186,7 @@ func (out *Output) Start() error {
 	if err != nil {
 		return err
 	}
-	out.referenceID = response.ReferenceID
+	out.testRunID = response.ReferenceID
 
 	if response.ConfigOverride != nil {
 		out.logger.WithFields(logrus.Fields{
@@ -201,17 +201,17 @@ func (out *Output) Start() error {
 	}
 
 	out.logger.WithFields(logrus.Fields{
-		"name":        out.config.Name,
-		"projectId":   out.config.ProjectID,
-		"duration":    out.duration,
-		"referenceId": out.referenceID,
+		"name":      out.config.Name,
+		"projectId": out.config.ProjectID,
+		"duration":  out.duration,
+		"testRunId": out.testRunID,
 	}).Debug("Started!")
 	return nil
 }
 
 // Description returns the URL with the test run results.
 func (out *Output) Description() string {
-	return fmt.Sprintf("cloud (%s)", cloudapi.URLForResults(out.referenceID, out.config))
+	return fmt.Sprintf("cloud (%s)", cloudapi.URLForResults(out.testRunID, out.config))
 }
 
 // SetThresholds receives the thresholds before the output is Start()-ed.
@@ -257,7 +257,7 @@ func (out *Output) StopWithTestError(testErr error) error {
 }
 
 func (out *Output) testFinished(testErr error) error {
-	if out.referenceID == "" || out.config.PushRefID.Valid {
+	if out.testRunID == "" || out.config.PushRefID.Valid {
 		return nil
 	}
 
@@ -275,12 +275,12 @@ func (out *Output) testFinished(testErr error) error {
 
 	runStatus := out.getRunStatus(testErr)
 	out.logger.WithFields(logrus.Fields{
-		"ref":        out.referenceID,
+		"ref":        out.testRunID,
 		"tainted":    testTainted,
 		"run_status": runStatus,
 	}).Debug("Sending test finished")
 
-	return out.client.TestFinished(out.referenceID, thresholdResults, testTainted, runStatus)
+	return out.client.TestFinished(out.testRunID, thresholdResults, testTainted, runStatus)
 }
 
 // getRunStatus determines the run status of the test based on the error.
@@ -333,8 +333,8 @@ func (out *Output) getRunStatus(testErr error) cloudapi.RunStatus {
 }
 
 func (out *Output) startVersionedOutput() error {
-	if out.referenceID == "" {
-		return errors.New("ReferenceID is required")
+	if out.testRunID == "" {
+		return errors.New("TestRunID is required")
 	}
 	var err error
 	switch out.config.APIVersion.Int64 {
@@ -350,7 +350,7 @@ func (out *Output) startVersionedOutput() error {
 		return err
 	}
 
-	out.versionedOutput.SetReferenceID(out.referenceID)
+	out.versionedOutput.SetTestRunID(out.testRunID)
 	out.versionedOutput.SetTestRunStopCallback(out.testStopFunc)
 	return out.versionedOutput.Start()
 }
