@@ -10,15 +10,12 @@ import (
 )
 
 // TODO: unit test
-func mapTimeSeriesLabelsProto(timeSeries metrics.TimeSeries, testRunID string) []*pbcloud.Label {
-	labels := make([]*pbcloud.Label, 0, ((*atlas.Node)(timeSeries.Tags)).Len()+2)
-	labels = append(labels,
-		&pbcloud.Label{Name: "__name__", Value: timeSeries.Metric.Name},
-		&pbcloud.Label{Name: "test_run_id", Value: testRunID})
+func mapTimeSeriesLabelsProto(tags *metrics.TagSet) []*pbcloud.Label {
+	labels := make([]*pbcloud.Label, 0, ((*atlas.Node)(tags)).Len())
 
 	// TODO: move it as a shared func
 	// https://github.com/grafana/k6/issues/2764
-	n := (*atlas.Node)(timeSeries.Tags)
+	n := (*atlas.Node)(tags)
 	if n.Len() < 1 {
 		return labels
 	}
