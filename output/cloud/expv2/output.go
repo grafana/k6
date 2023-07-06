@@ -31,7 +31,7 @@ type requestMetadatasCollector interface {
 
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
-	flush(context.Context) error
+	flush() error
 }
 
 // Output sends result data to the k6 Cloud service.
@@ -278,7 +278,7 @@ func (o *Output) collectSamples() {
 func (o *Output) flushMetrics() {
 	start := time.Now()
 
-	err := o.flushing.flush(context.Background())
+	err := o.flushing.flush()
 	if err != nil {
 		o.handleFlushError(err)
 		return
@@ -314,7 +314,7 @@ func (o *Output) runFlushRequestMetadatas() {
 func (o *Output) flushRequestMetadatas() {
 	start := time.Now()
 
-	err := o.requestMetadatasFlusher.flush(context.Background())
+	err := o.requestMetadatasFlusher.flush()
 	if err != nil {
 		o.logger.WithError(err).WithField("t", time.Since(start)).Error("Failed to push trace samples to the cloud")
 	}

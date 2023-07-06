@@ -1,7 +1,6 @@
 package expv2
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -303,7 +302,7 @@ func TestOutputFlushMetricsConcurrently(t *testing.T) {
 	//
 	// The second request unblocks.
 	var requestsCount int64
-	flusherMock := func(_ context.Context) {
+	flusherMock := func() {
 		updated := atomic.AddInt64(&requestsCount, 1)
 		if updated == 2 {
 			close(done)
@@ -336,7 +335,7 @@ func TestOutputFlushWorkersStop(t *testing.T) {
 	o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 	once := sync.Once{}
-	flusherMock := func(_ context.Context) {
+	flusherMock := func() {
 		// it asserts that flushers are set and the flush is invoked
 		once.Do(func() { close(o.stop) })
 	}
@@ -367,7 +366,7 @@ func TestOutputFlushWorkersAbort(t *testing.T) {
 	o.config.MetricPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 	once := sync.Once{}
-	flusherMock := func(_ context.Context) {
+	flusherMock := func() {
 		// it asserts that flushers are set and the flush func is invoked
 		once.Do(func() { close(o.abort) })
 	}
@@ -398,7 +397,7 @@ func TestOutputFlushRequestMetadatasConcurrently(t *testing.T) {
 	//
 	// The second request unblocks.
 	var requestsCount int64
-	flusherMock := func(_ context.Context) {
+	flusherMock := func() {
 		updated := atomic.AddInt64(&requestsCount, 1)
 		if updated == 2 {
 			close(done)
@@ -431,7 +430,7 @@ func TestOutputFlushRequestMetadatasStop(t *testing.T) {
 	o.config.TracesPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 	once := sync.Once{}
-	flusherMock := func(_ context.Context) {
+	flusherMock := func() {
 		// it asserts that flushers are set and the flush is invoked
 		once.Do(func() { close(o.stop) })
 	}
@@ -462,7 +461,7 @@ func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
 	o.config.TracesPushInterval = types.NullDurationFrom(1 * time.Millisecond)
 
 	once := sync.Once{}
-	flusherMock := func(_ context.Context) {
+	flusherMock := func() {
 		// it asserts that flushers are set and the flush func is invoked
 		once.Do(func() { close(o.abort) })
 	}
@@ -483,10 +482,10 @@ func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
 	}
 }
 
-type flusherFunc func(context.Context)
+type flusherFunc func()
 
-func (ff flusherFunc) flush(ctx context.Context) error {
-	ff(ctx)
+func (ff flusherFunc) flush() error {
+	ff()
 	return nil
 }
 
