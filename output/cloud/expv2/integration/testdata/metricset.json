@@ -92,7 +92,12 @@
                 "counters": [
                   1
                 ],
-                "lowerCounterIndex": 6,
+                "spans": [
+                  {
+                    "offset": 6,
+                    "length": 1
+                  }
+                ],
                 "maxValue": 6,
                 "minValue": 6,
                 "sum": 6
