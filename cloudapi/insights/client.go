@@ -239,14 +239,12 @@ func retryableStatusCodes(retryableStatusCodes string) ([]codes.Code, error) {
 	}
 
 	statusCodes := strings.Split(retryableStatusCodes, ",")
-	errorCodes := make([]codes.Code, 0, len(statusCodes))
-	for _, code := range statusCodes {
-		var errorCode codes.Code
-		err := errorCode.UnmarshalJSON([]byte(code))
+	errorCodes := make([]codes.Code, len(statusCodes))
+	for i, code := range statusCodes {
+		err := errorCodes[i].UnmarshalJSON([]byte(code))
 		if err != nil {
 			return nil, fmt.Errorf("invalid status code %s provided", code)
 		}
-		errorCodes = append(errorCodes, errorCode)
 	}
 
 	return errorCodes, nil
