@@ -147,9 +147,9 @@ func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Conf
 			}
 		}
 	}
-	cert, certerr := tls.X509KeyPair(certificate, key)
-	if certerr != nil {
-		return nil, fmt.Errorf("failed to append certificate from PEM")
+	cert, err := tls.X509KeyPair(certificate, key)
+	if err != nil {
+		return nil, fmt.Errorf("failed to append certificate from PEM: %w", err)
 	}
 	return &tls.Config{
 		RootCAs:      cp,
