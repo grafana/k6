@@ -207,12 +207,12 @@ func dialOptionsFromClientConfig(cfg ClientConfig) ([]grpc.DialOption, error) {
 		return nil, fmt.Errorf("failed to create retry interceptors: %w", err)
 	}
 
-	opts = append(opts, grpc.WithChainUnaryInterceptor(rI...))
+	opts = append(opts, grpc.WithChainUnaryInterceptor([]grpc.UnaryClientInterceptor{rI}...))
 
 	return opts, nil
 }
 
-func retryInterceptor(retryConfig ClientRetryConfig) ([]grpc.UnaryClientInterceptor, error) {
+func retryInterceptor(retryConfig ClientRetryConfig) (grpc.UnaryClientInterceptor, error) {
 	rSC, err := retryableStatusCodes(retryConfig.RetryableStatusCodes)
 	if err != nil {
 		return nil, fmt.Errorf("failed to parse retryable status codes: %w", err)
@@ -220,17 +220,17 @@ func retryInterceptor(retryConfig ClientRetryConfig) ([]grpc.UnaryClientIntercep
 	withCodes := grpcRetry.WithCodes(rSC...)
 	withMax := grpcRetry.WithMax(retryConfig.MaxAttempts)
 	withPerRetryTimeout := grpcRetry.WithPerRetryTimeout(retryConfig.PerRetryTimeout)
+	callOptions := []grpcRetry.CallOption{withCodes, withMax, withPerRetryTimeout}
 
 	backoffConfig := retryConfig.BackoffConfig
 	if backoffConfig.Enabled {
 		backoff := grpcRetry.WithBackoff(
 			grpcRetry.BackoffExponentialWithJitter(backoffConfig.WaitBetween, backoffConfig.JitterFraction))
-		unaryInterceptor := grpcRetry.UnaryClientInterceptor(withCodes, withMax, withPerRetryTimeout, backoff)
-		return []grpc.UnaryClientInterceptor{unaryInterceptor}, nil
+		callOptions = append(callOptions, backoff)
 	}
 
-	unaryInterceptor := grpcRetry.UnaryClientInterceptor(withCodes, withMax, withPerRetryTimeout)
-	return []grpc.UnaryClientInterceptor{unaryInterceptor}, nil
+	unaryInterceptor := grpcRetry.UnaryClientInterceptor(callOptions...)
+	return unaryInterceptor, nil
 }
 
 func retryableStatusCodes(retryableStatusCodes string) ([]codes.Code, error) {
