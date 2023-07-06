@@ -470,7 +470,6 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		Timeout:               time.Minute,
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
-		TLS:                   make(map[string]interface{}),
 	}
 	for k, v := range raw {
 		switch k {
