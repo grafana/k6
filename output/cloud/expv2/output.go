@@ -346,20 +346,20 @@ func (o *Output) tracingEnabled() bool {
 
 func printableConfig(c cloudapi.Config) map[string]any {
 	m := map[string]any{
-		"host":                       c.Host.String,
-		"name":                       c.Name.String,
-		"timeout":                    c.Timeout.String(),
-		"webAppURL":                  c.WebAppURL.String,
-		"projectID":                  c.ProjectID.Int64,
-		"pushRefID":                  c.PushRefID.String,
-		"stopOnError":                c.StopOnError.Bool,
-		"testRunDetails":             c.TestRunDetails.String,
-		"aggregationPeriod":          c.AggregationPeriod.String(),
-		"aggregationWaitPeriod":      c.AggregationWaitPeriod.String(),
-		"maxMetricSamplesPerPackage": c.MaxMetricSamplesPerPackage.Int64,
-		"metricPushConcurrency":      c.MetricPushConcurrency.Int64,
-		"metricPushInterval":         c.MetricPushInterval.String(),
-		"token":                      "",
+		"host":                  c.Host.String,
+		"name":                  c.Name.String,
+		"timeout":               c.Timeout.String(),
+		"webAppURL":             c.WebAppURL.String,
+		"projectID":             c.ProjectID.Int64,
+		"pushRefID":             c.PushRefID.String,
+		"stopOnError":           c.StopOnError.Bool,
+		"testRunDetails":        c.TestRunDetails.String,
+		"aggregationPeriod":     c.AggregationPeriod.String(),
+		"aggregationWaitPeriod": c.AggregationWaitPeriod.String(),
+		"maxTimeSeriesInBatch":  c.MaxTimeSeriesInBatch.Int64,
+		"metricPushConcurrency": c.MetricPushConcurrency.Int64,
+		"metricPushInterval":    c.MetricPushInterval.String(),
+		"token":                 "",
 	}
 
 	if c.Token.Valid {
