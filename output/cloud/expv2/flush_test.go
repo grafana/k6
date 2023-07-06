@@ -216,7 +216,7 @@ func TestFlushWithReservedLabels(t *testing.T) {
 		},
 	})
 
-	err := mf.flush(context.Background())
+	err := mf.flush()
 	require.NoError(t, err)
 
 	loglines := hook.Drain()
