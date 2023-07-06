@@ -23,6 +23,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -38,6 +39,12 @@ import (
 type cmdRun struct {
 	gs *state.GlobalState
 }
+
+// We use an excessively high timeout to wait for event processing to complete,
+// since prematurely proceeding before it is done could create bigger problems.
+// In practice, this effectively acts as no timeout, and the user will have to
+// kill k6 if a hang happens, which is the behavior without events anyway.
+const waitEventDoneTimeout = 30 * time.Minute
 
 // TODO: split apart some more
 //
@@ -65,6 +72,26 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// execution.NewTestRunContext() function so that it can be aborted even
 	// from sub-contexts while also attaching a reason for the abort.
 	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
+
+	emitEvent := func(evt *event.Event) func() {
+		waitDone := c.gs.Events.Emit(evt)
+		return func() {
+			waitCtx, waitCancel := context.WithTimeout(globalCtx, waitEventDoneTimeout)
+			defer waitCancel()
+			if werr := waitDone(waitCtx); werr != nil {
+				logger.WithError(werr).Warn()
+			}
+		}
+	}
+
+	defer func() {
+		waitExitDone := emitEvent(&event.Event{
+			Type: event.Exit,
+			Data: &event.ExitData{Error: err},
+		})
+		waitExitDone()
+		c.gs.Events.UnsubscribeAll()
+	}()
 
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
 	if err != nil {
@@ -152,6 +179,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			}
 		}()
 	}
+
+	waitInitDone := emitEvent(&event.Event{Type: event.Init})
 
 	// Create and start the outputs. We do it quite early to get any output URLs
 	// or other details below. It also allows us to ensure when they have
@@ -300,9 +329,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
+	waitInitDone()
+
+	waitTestStartDone := emitEvent(&event.Event{Type: event.TestStart})
+	waitTestStartDone()
+
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
 	err = execScheduler.Run(globalCtx, runCtx, samples)
+
+	waitTestEndDone := emitEvent(&event.Event{Type: event.TestEnd})
+	defer waitTestEndDone()
 
 	// Init has passed successfully, so unless disabled, make sure we send a
 	// usage report after the context is done.

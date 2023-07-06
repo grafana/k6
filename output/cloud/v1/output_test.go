@@ -176,7 +176,7 @@ func runCloudOutputTestCase(t *testing.T, minSamples int) {
 	})
 	require.NoError(t, err)
 
-	out.SetReferenceID("123")
+	out.SetTestRunID("123")
 	require.NoError(t, out.Start())
 
 	now := time.Now()
@@ -289,7 +289,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
 	require.NoError(t, err)
-	out.SetReferenceID("12")
+	out.SetTestRunID("12")
 
 	maxMetricSamplesPerPackage := 20
 	out.config.MaxMetricSamplesPerPackage = null.IntFrom(int64(maxMetricSamplesPerPackage))
@@ -421,7 +421,7 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		assert.NoError(t, json.Unmarshal(body, &receivedSamples))
 	})
 
-	out.SetReferenceID("12")
+	out.SetTestRunID("12")
 	require.NoError(t, out.Start())
 
 	out.AddMetricSamples([]metrics.SampleContainer{metrics.Sample{
@@ -512,7 +512,7 @@ func TestCloudOutputPushRefID(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	out.SetReferenceID("333")
+	out.SetTestRunID("333")
 	require.NoError(t, out.Start())
 
 	now := time.Now()
@@ -594,7 +594,7 @@ func TestCloudOutputRecvIterLIAllIterations(t *testing.T) {
 		m.Unlock()
 	})
 
-	out.SetReferenceID("123")
+	out.SetTestRunID("123")
 	require.NoError(t, out.Start())
 
 	now := time.Now()

@@ -15,6 +15,7 @@ var _ modules.VU = &VU{}
 type VU struct {
 	CtxField              context.Context
 	InitEnvField          *common.InitEnvironment
+	EventsField           common.Events
 	StateField            *lib.State
 	RuntimeField          *goja.Runtime
 	RegisterCallbackField func() func(f func() error)
@@ -23,6 +24,11 @@ type VU struct {
 // Context returns internally set field to conform to modules.VU interface
 func (m *VU) Context() context.Context {
 	return m.CtxField
+}
+
+// Events returns internally set field to conform to modules.VU interface
+func (m *VU) Events() common.Events {
+	return m.EventsField
 }
 
 // InitEnv returns internally set field to conform to modules.VU interface

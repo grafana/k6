@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"os"
+	"sort"
 	"testing"
 	"time"
 
@@ -32,8 +33,7 @@ func TestOutputFlush(t *testing.T) {
 	// TODO: it has 3s for aggregation time
 	// then it means it will execute for +3s that it is a waste of time
 	// because it isn't really required.
-	// Reduce the aggregation time (to 1s?) then run always.
-	t.Skip("Skip the integration test, if required enable it manually")
+	// Reduce the aggregation time (to 1s?)
 	t.Parallel()
 
 	results := make(chan *pbcloud.MetricSet)
@@ -54,7 +54,7 @@ func TestOutputFlush(t *testing.T) {
 	// init and start the output
 	o, err := expv2.New(logger, conf, cc)
 	require.NoError(t, err)
-	o.SetReferenceID("my-test-run-id-123")
+	o.SetTestRunID("my-test-run-id-123")
 	require.NoError(t, o.Start())
 
 	// collect and flush samples
@@ -63,21 +63,27 @@ func TestOutputFlush(t *testing.T) {
 	})
 
 	// wait for results
-	mset := <-results
+	capturedMetrics := <-results
 	close(results)
 	assert.NoError(t, o.StopWithTestError(nil))
+
+	// sort the metrics' result by name to have a deterministic order
+	// that should be same as the expected json
+	sort.Slice(capturedMetrics.Metrics, func(i, j int) bool {
+		return capturedMetrics.Metrics[i].Name < capturedMetrics.Metrics[j].Name
+	})
 
 	// read and convert the json version
 	// of the expected protobuf sent request
 	var exp pbcloud.MetricSet
-	expjs, err := os.ReadFile("./testdata/metricset.json") //nolint:forbidigo // ReadFile here is used in a test
+	expectedMetrics, err := os.ReadFile("./testdata/metricset.json") //nolint:forbidigo // ReadFile here is used in a test
 	require.NoError(t, err)
-	err = protojson.Unmarshal(expjs, &exp)
+	err = protojson.Unmarshal(expectedMetrics, &exp)
 	require.NoError(t, err)
 
-	msetjs, err := protojson.Marshal(mset)
+	actualMetrics, err := protojson.Marshal(capturedMetrics)
 	require.NoError(t, err)
-	assert.JSONEq(t, string(expjs), string(msetjs))
+	assert.JSONEq(t, string(expectedMetrics), string(actualMetrics))
 }
 
 func metricsHandler(results chan<- *pbcloud.MetricSet) http.HandlerFunc {

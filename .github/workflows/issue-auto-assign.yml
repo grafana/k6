@@ -1,4 +1,4 @@
-name: 'Auto assign maintainer to issue'
+name: "Auto assign maintainer to issue"
 on:
   issues:
     types: [opened]
@@ -20,10 +20,21 @@ jobs:
             if (context.payload.issue.assignees.length > 0 || assignees.includes(context.payload.issue.user.login)) {
               return;
             }
+            const crypto = require("node:crypto");
+
+            const getNRandom = (n, array) => {
+              let result = new Array();
+              for (;n > 0 && array.length > 0; n--) {
+                const chosen = array[crypto.randomInt(array.length)];
+                result.push(chosen);
+                array = array.filter(el => el != chosen);
+              }
+              return result;
+            }
 
             github.rest.issues.addAssignees({
               owner: context.repo.owner,
               repo: context.repo.repo,
               issue_number: context.issue.number,
-              assignees: assignees.sort(() => 0.5 - Math.random()).slice(0, assigneeCount),
+              assignees: getNRandom(assigneeCount, assignees),
             });

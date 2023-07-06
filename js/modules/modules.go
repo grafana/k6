@@ -42,6 +42,14 @@ type VU interface {
 	// Context return the context.Context about the current VU
 	Context() context.Context
 
+	// Events allows subscribing to global k6 execution events, such as Init and
+	// Exit, and to local (per-VU) events, such as IterStart and IterEnd.
+	// NOTE: This API is EXPERIMENTAL and may be changed, renamed or
+	// completely removed in a later k6 release.
+	// FIXME: Subscribing to global events shouldn't be part of this VU (local)
+	// interface.
+	Events() common.Events
+
 	// InitEnv returns common.InitEnvironment instance if present
 	InitEnv() *common.InitEnvironment
 
@@ -55,9 +63,6 @@ type VU interface {
 	// on the event loop *at a later point in time*. See the documentation for
 	// `EventLoop.RegisterCallback()` in the `k6/js/eventloop` Go module for
 	// the very important details on its usage and restrictions.
-	//
-	// Notice: This API is EXPERIMENTAL and may be changed, renamed or
-	// completely removed in a later k6 release.
 	RegisterCallback() (enqueueCallback func(func() error))
 
 	// sealing field will help probably with pointing users that they just need to embed this in their Instance

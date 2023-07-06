@@ -12,6 +12,7 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/ui/console"
 )
@@ -39,6 +40,7 @@ type GlobalState struct {
 	BinaryName string
 	CmdArgs    []string
 	Env        map[string]string
+	Events     *event.System
 
 	DefaultFlags, Flags GlobalFlags
 
@@ -110,6 +112,7 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 		BinaryName:   filepath.Base(binary),
 		CmdArgs:      os.Args,
 		Env:          env,
+		Events:       event.NewEventSystem(100, logger),
 		DefaultFlags: defaultFlags,
 		Flags:        getFlags(defaultFlags, env),
 		OutMutex:     outMutex,

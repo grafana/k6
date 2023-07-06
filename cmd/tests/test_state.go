@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/ui/console"
@@ -90,6 +91,7 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 		BinaryName:   "k6",
 		CmdArgs:      []string{},
 		Env:          map[string]string{"K6_NO_USAGE_REPORT": "true"},
+		Events:       event.NewEventSystem(100, logger),
 		DefaultFlags: defaultFlags,
 		Flags:        defaultFlags,
 		OutMutex:     outMutex,

@@ -4,6 +4,7 @@ import (
 	"io"
 
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/metrics"
 )
 
@@ -13,6 +14,7 @@ type TestPreInitState struct {
 	RuntimeOptions RuntimeOptions
 	Registry       *metrics.Registry
 	BuiltinMetrics *metrics.BuiltinMetrics
+	Events         *event.System
 	KeyLogger      io.Writer
 	LookupEnv      func(key string) (val string, ok bool)
 	Logger         logrus.FieldLogger

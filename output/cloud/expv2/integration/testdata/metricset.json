@@ -1,4 +1,6 @@
 {
+  "testRunId": "my-test-run-id-123",
+  "aggregationPeriod": 3,
   "metrics": [
     {
       "name": "metric_counter_1",
@@ -7,19 +9,10 @@
         {
           "labels": [
             {
-              "name": "__name__",
-              "value": "metric_counter_1"
-            },
-            {
-              "name": "test_run_id",
-              "value": "my-test-run-id-123"
-            },
-            {
               "name": "my_label_1",
               "value": "my_label_value_1"
             }
           ],
-          "aggregationPeriod": 3,
           "counterSamples": {
             "values": [
               {
@@ -38,19 +31,10 @@
         {
           "labels": [
             {
-              "name": "__name__",
-              "value": "metric_gauge_2"
-            },
-            {
-              "name": "test_run_id",
-              "value": "my-test-run-id-123"
-            },
-            {
               "name": "my_label_2",
               "value": "my_label_value_2"
             }
           ],
-          "aggregationPeriod": 3,
           "gaugeSamples": {
             "values": [
               {
@@ -73,19 +57,10 @@
         {
           "labels": [
             {
-              "name": "__name__",
-              "value": "metric_rate_3"
-            },
-            {
-              "name": "test_run_id",
-              "value": "my-test-run-id-123"
-            },
-            {
               "name": "my_label_3",
               "value": "my_label_value_3"
             }
           ],
-          "aggregationPeriod": 3,
           "rateSamples": {
             "values": [
               {
@@ -105,19 +80,10 @@
         {
           "labels": [
             {
-              "name": "__name__",
-              "value": "metric_trend_4"
-            },
-            {
-              "name": "test_run_id",
-              "value": "my-test-run-id-123"
-            },
-            {
               "name": "my_label_4",
               "value": "my_label_value_4"
             }
           ],
-          "aggregationPeriod": 3,
           "trendHdrSamples": {
             "values": [
               {
@@ -128,9 +94,7 @@
                 ],
                 "lowerCounterIndex": 6,
                 "maxValue": 6,
-                "minResolution": 1,
                 "minValue": 6,
-                "significantDigits": 2,
                 "sum": 6
               }
             ]

@@ -36,6 +36,7 @@ func TestConfigApply(t *testing.T) {
 		StopOnError:                     null.NewBool(true, true),
 		APIVersion:                      null.NewInt(2, true),
 		MaxMetricSamplesPerPackage:      null.NewInt(2, true),
+		MaxTimeSeriesInBatch:            null.NewInt(3, true),
 		MetricPushInterval:              types.NewNullDuration(1*time.Second, true),
 		MetricPushConcurrency:           null.NewInt(3, true),
 		TracesEnabled:                   null.NewBool(true, true),

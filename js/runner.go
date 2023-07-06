@@ -23,6 +23,7 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/lib"
@@ -765,6 +766,24 @@ func (u *ActiveVU) RunOnce() error {
 	ctx, cancel := context.WithCancel(u.RunContext)
 	defer cancel()
 	u.moduleVUImpl.ctx = ctx
+
+	eventIterData := event.IterData{
+		Iteration:    u.iteration,
+		VUID:         u.ID,
+		ScenarioName: u.scenarioName,
+	}
+
+	emitAndWaitEvent := func(evt *event.Event) {
+		waitDone := u.moduleVUImpl.events.local.Emit(evt)
+		waitCtx, waitCancel := context.WithTimeout(u.RunContext, 30*time.Minute)
+		defer waitCancel()
+		if werr := waitDone(waitCtx); werr != nil {
+			u.state.Logger.WithError(werr).Warn()
+		}
+	}
+
+	emitAndWaitEvent(&event.Event{Type: event.IterStart, Data: eventIterData})
+
 	// Call the exported function.
 	_, isFullIteration, totalTime, err := u.runFn(ctx, true, fn, cancel, u.setupData)
 	if err != nil {
@@ -775,7 +794,10 @@ func (u *ActiveVU) RunOnce() error {
 				err = v
 			}
 		}
+		eventIterData.Error = err
 	}
+
+	emitAndWaitEvent(&event.Event{Type: event.IterEnd, Data: eventIterData})
 
 	// If MinIterationDuration is specified and the iteration wasn't canceled
 	// and was less than it, sleep for the remainder

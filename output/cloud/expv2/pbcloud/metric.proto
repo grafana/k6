@@ -21,7 +21,14 @@ enum MetricType {
 // that is encoded and sent over the wire.
 message MetricSet {
   // Required.
-  repeated Metric metrics = 1;
+  string test_run_id = 1;
+
+  // Required.
+  // time bucket size in seconds
+  uint32 aggregation_period = 2;
+
+  // Required.
+  repeated Metric metrics = 3;
 }
 
 message Metric {
@@ -45,24 +52,17 @@ message Label {
   string value = 2;
 }
 
-// TimeSeries is a single metric with a unique set of labels..
+// TimeSeries is a single metric with a unique set of labels.
 message TimeSeries {
-  // Required.
-  //
-  // At minimum two labels should be present:
-  // - name: "__name__", value: "metric name this time series belongs to/is contained within",
-  // - name: "test_run_id", value: "cloud test run ID this time series belongs to".
+  // Optional.
   repeated Label labels = 1;
-
-  // time bucket size in seconds
-  uint32 aggregation_period = 2;
 
   // Required.
   oneof samples {
-    CounterSamples counter_samples = 3;
-    GaugeSamples gauge_samples = 4;
-    RateSamples rate_samples = 5;
-    TrendHdrSamples trend_hdr_samples = 6;
+    CounterSamples counter_samples = 2;
+    GaugeSamples gauge_samples = 3;
+    RateSamples rate_samples = 4;
+    TrendHdrSamples trend_hdr_samples = 5;
   }
 }
 
@@ -119,25 +119,26 @@ message TrendHdrValue {
   // Required.
   google.protobuf.Timestamp time = 1;
 
-  // histogram parameter - value multiplier aka smallest value, default = 1.0
-  double min_resolution = 2;
-  // histogram parameter - number of significant digits used to calculate buckets formula,
-  // default = 2
-  uint32 significant_digits = 3;
-
   // buckets
-  repeated uint32 counters = 4;
+  repeated uint32 counters = 2;
   // index of first bucket in `counters`
-  uint32 lower_counter_index = 5;
+  uint32 lower_counter_index = 3;
   // sum of observations
-  double sum = 6;
+  double sum = 4;
   // count of observations
-  uint32 count = 7;
+  uint32 count = 5;
   // smallest and largest observed value
-  double min_value = 8;
-  double max_value = 9;
+  double min_value = 6;
+  double max_value = 7;
 
-  // counters for zero- and infinity-buckets
-  optional uint32 extra_low_values_counter = 10;
-  optional uint32 extra_high_values_counter = 11;
+  // counters for zero and infinity buckets
+  optional uint32 extra_low_values_counter = 8;
+  optional uint32 extra_high_values_counter = 9;
+
+  // histogram parameter - value multiplier aka smallest value
+  // default = 1.0
+  optional double min_resolution = 10;
+  // histogram parameter - number of significant digits used to calculate buckets formula
+  // default = 2
+  optional uint32 significant_digits = 11;
 }
