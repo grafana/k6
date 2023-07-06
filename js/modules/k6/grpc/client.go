@@ -154,7 +154,6 @@ func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Conf
 	return &tls.Config{
 		RootCAs:      cp,
 		Certificates: []tls.Certificate{cert},
-		MinVersion:   tls.VersionTLS12,
 	}, nil
 }
 
