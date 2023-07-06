@@ -45,7 +45,7 @@ func TestCreateTestRun(t *testing.T) {
 	assert.NotNil(t, resp.ConfigOverride)
 	assert.True(t, resp.ConfigOverride.AggregationPeriod.Valid)
 	assert.Equal(t, types.Duration(2*time.Second), resp.ConfigOverride.AggregationPeriod.Duration)
-	assert.False(t, resp.ConfigOverride.AggregationMinSamples.Valid)
+	assert.False(t, resp.ConfigOverride.MaxTimeSeriesInBatch.Valid)
 }
 
 func TestFinished(t *testing.T) {
