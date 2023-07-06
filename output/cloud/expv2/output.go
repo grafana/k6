@@ -293,10 +293,8 @@ func (o *Output) runFlushRequestMetadatas() {
 	for i := int64(0); i < o.config.TracesPushConcurrency.Int64; i++ {
 		o.wg.Add(1)
 		go func() {
-			defer func() {
-				t.Stop()
-				o.wg.Done()
-			}()
+			defer o.wg.Done()
+			defer t.Stop()
 
 			for {
 				select {
