@@ -7,10 +7,12 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/cloudapi/insights"
+	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 )
@@ -127,13 +129,16 @@ func TestMetricsFlusherFlushChunk(t *testing.T) {
 
 	r := metrics.NewRegistry()
 	m1 := r.MustNewMetric("metric1", metrics.Counter)
-
 	for _, tc := range testCases {
+		logger, _ := testutils.NewLoggerWithHook(t)
+
 		bq := &bucketQ{}
 		pm := &pusherMock{}
 		mf := metricsFlusher{
 			bq:               bq,
 			client:           pm,
+			logger:           logger,
+			discardedLabels:  make(map[string]struct{}),
 			maxSeriesInBatch: 3,
 		}
 
@@ -160,11 +165,91 @@ func TestMetricsFlusherFlushChunk(t *testing.T) {
 	}
 }
 
+func TestFlushWithReservedLabels(t *testing.T) {
+	t.Parallel()
+
+	logger, hook := testutils.NewLoggerWithHook(t)
+
+	collected := make([]*pbcloud.MetricSet, 0)
+
+	bq := &bucketQ{}
+	pm := &pusherMock{
+		hook: func(ms *pbcloud.MetricSet) {
+			collected = append(collected, ms)
+		},
+	}
+
+	mf := metricsFlusher{
+		bq:               bq,
+		client:           pm,
+		maxSeriesInBatch: 2,
+		logger:           logger,
+		discardedLabels:  make(map[string]struct{}),
+	}
+
+	r := metrics.NewRegistry()
+	m1 := r.MustNewMetric("metric1", metrics.Counter)
+
+	ts1 := metrics.TimeSeries{
+		Metric: m1,
+		Tags:   r.RootTagSet().With("key1", "val1").With("__name__", "val2").With("test_run_id", "testrunid-123"),
+	}
+	bq.Push([]timeBucket{
+		{
+			Time: 1,
+			Sinks: map[metrics.TimeSeries]metricValue{
+				ts1: &counter{Sum: float64(1)},
+			},
+		},
+	})
+
+	ts2 := metrics.TimeSeries{
+		Metric: m1,
+		Tags:   r.RootTagSet().With("key1", "val2").With("__name__", "val2"),
+	}
+	bq.Push([]timeBucket{
+		{
+			Time: 2,
+			Sinks: map[metrics.TimeSeries]metricValue{
+				ts2: &counter{Sum: float64(1)},
+			},
+		},
+	})
+
+	err := mf.flush(context.Background())
+	require.NoError(t, err)
+
+	loglines := hook.Drain()
+	assert.Equal(t, 1, len(collected))
+
+	// check that warnings sown only once per label
+	require.Len(t, loglines, 2)
+	testutils.LogContains(loglines, logrus.WarnLevel, "Tag __name__ has been discarded since it is reserved for Cloud operations.")
+	testutils.LogContains(loglines, logrus.WarnLevel, "Tag test_run_id has been discarded since it is reserved for Cloud operations.")
+
+	// check that flusher is not sending labels with reserved names
+	require.Len(t, collected[0].Metrics, 1)
+
+	ts := collected[0].Metrics[0].TimeSeries
+	require.Len(t, ts[0].Labels, 1)
+	assert.Equal(t, "key1", ts[0].Labels[0].Name)
+	assert.Equal(t, "val1", ts[0].Labels[0].Value)
+
+	require.Len(t, ts[1].Labels, 1)
+	assert.Equal(t, "key1", ts[1].Labels[0].Name)
+	assert.Equal(t, "val2", ts[1].Labels[0].Value)
+}
+
 type pusherMock struct {
+	hook       func(*pbcloud.MetricSet)
 	pushCalled int
 }
 
-func (pm *pusherMock) push(_ *pbcloud.MetricSet) error {
+func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
+	if pm.hook != nil {
+		pm.hook(ms)
+	}
+
 	pm.pushCalled++
 	return nil
 }
