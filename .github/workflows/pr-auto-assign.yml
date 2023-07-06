@@ -27,10 +27,11 @@ jobs:
               }
               return result;
             }
+            const reviewersWithoutAuthor = reviewers.filter(user => user !== context.payload.pull_request.user.login);
 
             github.rest.pulls.requestReviewers({
               owner: context.repo.owner,
               repo: context.repo.repo,
               pull_number: context.payload.pull_request.number,
-              reviewers: getNRandom(reviewerCount, reviewers),
+              reviewers: getNRandom(reviewerCount, reviewersWithoutAuthor),
             });
