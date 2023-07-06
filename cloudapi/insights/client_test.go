@@ -95,7 +95,7 @@ func TestClient_Dial_ReturnsNoErrorWithWorkingDialer(t *testing.T) {
 		Timeout:       types.NullDurationFrom(1 * time.Second),
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 
@@ -117,7 +117,7 @@ func TestClient_Dial_ReturnsErrorWhenCalledTwice(t *testing.T) {
 		Timeout:       types.NullDurationFrom(1 * time.Second),
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 
@@ -143,7 +143,7 @@ func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {
 			},
 		},
 		TLSConfig:   ClientTLSConfig{Insecure: true},
-		RetryConfig: ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig: ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 
@@ -209,7 +209,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 		Timeout:       types.NullDurationFrom(1 * time.Second),
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -234,7 +234,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorWithWorkingServerAndNo
 		Timeout:       types.NullDurationFrom(1 * time.Second),
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -275,7 +275,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithWorkingServerAndCanc
 		Timeout:       types.NullDurationFrom(1 * time.Second),
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -344,7 +344,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorWithFailingServerAndNonC
 		Timeout:       types.NullDurationFrom(1 * time.Second),
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -378,7 +378,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsNoErrorAfterRetrySeveralTimes
 		TLSConfig:     ClientTLSConfig{Insecure: true},
 		RetryConfig: ClientRetryConfig{
 			MaxAttempts:          20,
-			RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED",
+			RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
 			BackoffConfig: ClientBackoffConfig{
 				Enabled:        true,
 				JitterFraction: 0.1,
@@ -431,7 +431,7 @@ func TestClient_IngestRequestMetadatasBatch_ReturnsErrorAfterExhaustingMaxRetryA
 				JitterFraction: 0.1,
 			},
 			MaxAttempts:          5,
-			RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED",
+			RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
 		},
 	}
 	cli := NewClient(cfg)
@@ -471,7 +471,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedOnce(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))
@@ -493,7 +493,7 @@ func TestClient_Close_ReturnsNoErrorWhenClosedTwice(t *testing.T) {
 	cfg := ClientConfig{
 		ConnectConfig: ClientConnectConfig{Dialer: newMockContextDialer(t, lis)},
 		TLSConfig:     ClientTLSConfig{Insecure: true},
-		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED"},
+		RetryConfig:   ClientRetryConfig{RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`},
 	}
 	cli := NewClient(cfg)
 	require.NoError(t, cli.Dial(context.Background()))

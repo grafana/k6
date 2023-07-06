@@ -234,26 +234,6 @@ func retryInterceptor(retryConfig ClientRetryConfig) (grpc.UnaryClientIntercepto
 }
 
 func retryableStatusCodes(retryableStatusCodes string) ([]codes.Code, error) {
-	statusCodeMap := map[string]codes.Code{
-		"OK":                  codes.OK,
-		"CANCELLED":           codes.Canceled,
-		"UNKNOWN":             codes.Unknown,
-		"INVALID_ARGUMENT":    codes.InvalidArgument,
-		"DEADLINE_EXCEEDED":   codes.DeadlineExceeded,
-		"NOT_FOUND":           codes.NotFound,
-		"ALREADY_EXISTS":      codes.AlreadyExists,
-		"PERMISSION_DENIED":   codes.PermissionDenied,
-		"UNAUTHENTICATED":     codes.Unauthenticated,
-		"RESOURCE_EXHAUSTED":  codes.ResourceExhausted,
-		"FAILED_PRECONDITION": codes.FailedPrecondition,
-		"ABORTED":             codes.Aborted,
-		"OUT_OF_RANGE":        codes.OutOfRange,
-		"UNIMPLEMENTED":       codes.Unimplemented,
-		"INTERNAL":            codes.Internal,
-		"UNAVAILABLE":         codes.Unavailable,
-		"DATA_LOSS":           codes.DataLoss,
-	}
-
 	if len(retryableStatusCodes) == 0 {
 		return nil, fmt.Errorf("no retryable status codes provided")
 	}
@@ -261,8 +241,9 @@ func retryableStatusCodes(retryableStatusCodes string) ([]codes.Code, error) {
 	statusCodes := strings.Split(retryableStatusCodes, ",")
 	errorCodes := make([]codes.Code, 0, len(statusCodes))
 	for _, code := range statusCodes {
-		errorCode, ok := statusCodeMap[code]
-		if !ok {
+		var errorCode codes.Code
+		err := errorCode.UnmarshalJSON([]byte(code))
+		if err != nil {
 			return nil, fmt.Errorf("invalid status code %s provided", code)
 		}
 		errorCodes = append(errorCodes, errorCode)

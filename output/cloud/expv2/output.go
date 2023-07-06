@@ -136,7 +136,7 @@ func (o *Output) Start() error {
 				Insecure: false,
 			},
 			RetryConfig: insights.ClientRetryConfig{
-				RetryableStatusCodes: "UNKNOWN,INTERNAL,UNAVAILABLE,DEADLINE_EXCEEDED",
+				RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
 				MaxAttempts:          3,
 				PerRetryTimeout:      30 * time.Second,
 				BackoffConfig: insights.ClientBackoffConfig{
