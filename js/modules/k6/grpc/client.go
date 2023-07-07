@@ -111,6 +111,7 @@ func (c *Client) LoadProtoset(protosetPath string) ([]MethodInfo, error) {
 	return c.convertToMethodInfo(fdset)
 }
 
+// Note: this function was lifted from `lib/options.go`
 func decryptPrivateKey(key, password []byte) ([]byte, error) {
 	block, _ := pem.Decode(key)
 	if block == nil {
@@ -137,7 +138,7 @@ func decryptPrivateKey(key, password []byte) ([]byte, error) {
 	return key, nil
 }
 
-func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Config, error) {
+func buildTLSConfig(parentConfig *tls.Config, certificate, key []byte, caCertificates [][]byte) (*tls.Config, error) {
 	var cp *x509.CertPool
 	if len(caCertificates) > 0 {
 		cp, _ = x509.SystemCertPool()
@@ -147,17 +148,30 @@ func buildTLSConfig(certificate, key []byte, caCertificates [][]byte) (*tls.Conf
 			}
 		}
 	}
-	cert, err := tls.X509KeyPair(certificate, key)
-	if err != nil {
-		return nil, fmt.Errorf("failed to append certificate from PEM: %w", err)
+
+	// Ignoring 'TLS MinVersion is too low' because this tls.Config will inherit MinValue and MaxValue
+	// from the vu state tls.Config
+
+	//nolint:golint,gosec
+	tlsCfg := &tls.Config{
+		CipherSuites:       parentConfig.CipherSuites,
+		InsecureSkipVerify: parentConfig.InsecureSkipVerify,
+		MinVersion:         parentConfig.MinVersion,
+		MaxVersion:         parentConfig.MaxVersion,
+		Renegotiation:      parentConfig.Renegotiation,
+		RootCAs:            cp,
 	}
-	return &tls.Config{
-		RootCAs:      cp,
-		Certificates: []tls.Certificate{cert},
-	}, nil
+	if len(certificate) > 0 && len(key) > 0 {
+		cert, err := tls.X509KeyPair(certificate, key)
+		if err != nil {
+			return nil, fmt.Errorf("failed to append certificate from PEM: %w", err)
+		}
+		tlsCfg.Certificates = []tls.Certificate{cert}
+	}
+	return tlsCfg, nil
 }
 
-func buildTLSConfigFromMap(tlsConfigMap map[string]interface{}) (*tls.Config, error) {
+func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]interface{}) (*tls.Config, error) {
 	var cert, key, pass []byte
 	var ca [][]byte
 	var err error
@@ -167,8 +181,8 @@ func buildTLSConfigFromMap(tlsConfigMap map[string]interface{}) (*tls.Config, er
 	if keystr, ok := tlsConfigMap["key"].(string); ok {
 		key = []byte(keystr)
 	}
-	if passstr, ok := tlsConfigMap["password"].(string); ok {
-		pass = []byte(passstr)
+	if passwordStr, ok := tlsConfigMap["password"].(string); ok {
+		pass = []byte(passwordStr)
 		if len(pass) > 0 {
 			if key, err = decryptPrivateKey(key, pass); err != nil {
 				return nil, err
@@ -176,16 +190,20 @@ func buildTLSConfigFromMap(tlsConfigMap map[string]interface{}) (*tls.Config, er
 		}
 	}
 	if cas, ok := tlsConfigMap["cacerts"]; ok {
-		ca = make([][]byte, 0)
-		if casarr, ok := cas.([]string); ok {
-			for _, casEntry := range casarr {
-				ca = append(ca, []byte(casEntry))
+		var caCertsArray []interface{}
+		if caCertsArray, ok = cas.([]interface{}); ok {
+			ca = make([][]byte, len(caCertsArray))
+			for i, entry := range caCertsArray {
+				var entryStr string
+				if entryStr, ok = entry.(string); ok {
+					ca[i] = []byte(entryStr)
+				}
 			}
-		} else if casstr, casstrok := cas.(string); casstrok {
-			ca = append(ca, []byte(casstr))
+		} else if caCertStr, caCertStrOk := cas.(string); caCertStrOk {
+			ca = [][]byte{[]byte(caCertStr)}
 		}
 	}
-	return buildTLSConfig(cert, key, ca)
+	return buildTLSConfig(parentConfig, cert, key, ca)
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
@@ -206,7 +224,7 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 	if !p.IsPlaintext {
 		var tlsCfg *tls.Config
 		if len(p.TLS) > 0 {
-			if tlsCfg, err = buildTLSConfigFromMap(p.TLS); err != nil {
+			if tlsCfg, err = buildTLSConfigFromMap(state.TLSConfig.Clone(), p.TLS); err != nil {
 				return false, err
 			}
 		} else {
@@ -511,38 +529,38 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		case "tls":
 			var ok bool
 			params.TLS, ok = v.(map[string]interface{})
-			err := fmt.Errorf("invalid tls value: '%#v', tls needs cert, key, (optional) password, and (optionally) cacerts", v)
 
 			if !ok {
-				return params, err
+				return params, fmt.Errorf("invalid tls value: '%#v', expected (optional) keys: cert, key, password, and cacerts", v)
 			}
+			// optional map keys below
 			if cert, certok := params.TLS["cert"]; certok {
 				if _, ok = cert.(string); !ok {
 					return params, fmt.Errorf("invalid tls cert value: '%#v', it needs to be a PEM formatted string", v)
 				}
-			} else {
-				return params, err
 			}
 			if key, keyok := params.TLS["key"]; keyok {
 				if _, ok = key.(string); !ok {
 					return params, fmt.Errorf("invalid tls key value: '%#v', it needs to be a PEM formatted string", v)
 				}
-			} else {
-				return params, err
 			}
-
-			// optional map keys below
 			if pass, passok := params.TLS["password"]; passok {
 				if _, ok = pass.(string); !ok {
 					return params, fmt.Errorf("invalid tls password value: '%#v', it needs to be a string", v)
 				}
 			}
 			if cacerts, cacertsok := params.TLS["cacerts"]; cacertsok {
-				if _, ok = cacerts.([]interface{}); !ok {
-					if _, ok = cacerts.(string); !ok {
-						return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
-							" it needs to be a string or string[] of PEM formatted strings", v)
+				var cacertsArray []interface{}
+				if cacertsArray, ok = cacerts.([]interface{}); ok {
+					for _, cacertsArrayEntry := range cacertsArray {
+						if _, ok = cacertsArrayEntry.(string); !ok {
+							return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
+								" it needs to be a string or string[] of PEM formatted strings", v)
+						}
 					}
+				} else if _, ok = cacerts.(string); !ok {
+					return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
+						" it needs to be a string or string[] of PEM formatted strings", v)
 				}
 			}
 		default:
