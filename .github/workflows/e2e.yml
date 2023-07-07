@@ -67,6 +67,9 @@ jobs:
       - name: Run E2E tests
         run: |
           set -x
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
+          fi
           export K6_BROWSER_HEADLESS=true
           for f in examples/*.js; do
             ./k6extension run "$f"
