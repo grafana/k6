@@ -21,7 +21,6 @@ type getOutputFn func(
 	pushInterval types.NullDuration,
 ) (*Output, error)
 
-//nolint:funlen
 func baseTest(t *testing.T,
 	getOutput getOutputFn,
 	checkResult func(t *testing.T, samples []metrics.SampleContainer, expectedOutput, output string),

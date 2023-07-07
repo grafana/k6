@@ -16,10 +16,10 @@ import (
 // Copied from https://github.com/k6io/jslib.k6.io/tree/master/lib/k6-summary
 //
 //go:embed summary.js
-var jslibSummaryCode string //nolint:gochecknoglobals
+var jslibSummaryCode string
 
 //go:embed summary-wrapper.js
-var summaryWrapperLambdaCode string //nolint:gochecknoglobals
+var summaryWrapperLambdaCode string
 
 // TODO: figure out something saner... refactor the sinks and how we deal with
 // metrics in general... so much pain and misery... :sob:

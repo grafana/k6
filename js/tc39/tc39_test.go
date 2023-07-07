@@ -284,7 +284,7 @@ func parseTC39File(name string) (*tc39Meta, string, error) {
 	if err != nil {
 		return nil, "", err
 	}
-	defer f.Close() //nolint:errcheck,gosec
+	defer f.Close() //nolint:errcheck
 
 	b, err := io.ReadAll(f)
 	if err != nil {
@@ -586,7 +586,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*goja.Program, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer f.Close() //nolint:gosec,errcheck
+		defer f.Close() //nolint:errcheck
 
 		b, err := io.ReadAll(f)
 		if err != nil {
