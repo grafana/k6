@@ -66,7 +66,7 @@ func TestParseThresholdExpression(t *testing.T) {
 
 func BenchmarkParseThresholdExpression(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		parseThresholdExpression("count>20") // nolint
+		_, _ = parseThresholdExpression("count>20")
 	}
 }
 
@@ -203,7 +203,7 @@ func TestParseThresholdAggregationMethod(t *testing.T) {
 
 func BenchmarkParseThresholdAggregationMethod(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		parseThresholdAggregationMethod("p(99.9)") // nolint
+		_, _, _ = parseThresholdAggregationMethod("p(99.9)")
 	}
 }
 
@@ -336,6 +336,6 @@ func TestScanThresholdExpression(t *testing.T) {
 
 func BenchmarkScanThresholdExpression(b *testing.B) {
 	for i := 0; i < b.N; i++ {
-		scanThresholdExpression("foo<=bar") // nolint
+		_, _, _, _ = scanThresholdExpression("foo<=bar")
 	}
 }

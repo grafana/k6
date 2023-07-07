@@ -148,8 +148,6 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 }
 
 // Check will emit check metrics for the provided checks.
-//
-//nolint:cyclop
 func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := mi.vu.State()
 	if state == nil {

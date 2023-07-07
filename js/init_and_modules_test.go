@@ -27,15 +27,15 @@ type CheckModule struct {
 	vuCtxCalled   int
 }
 
-func (cm *CheckModule) InitCtx(ctx context.Context) {
+func (cm *CheckModule) InitCtx(_ context.Context) {
 	cm.initCtxCalled++
 }
 
-func (cm *CheckModule) VuCtx(ctx context.Context) {
+func (cm *CheckModule) VuCtx(_ context.Context) {
 	cm.vuCtxCalled++
 }
 
-var uniqueModuleNumber int64 //nolint // we need this so multiple test can register differently named modules
+var uniqueModuleNumber int64 //nolint:gochecknoglobals // we need this so multiple test can register differently named modules
 
 func TestNewJSRunnerWithCustomModule(t *testing.T) {
 	t.Parallel()

@@ -72,7 +72,7 @@ func newTransport(
 // Helper method to finish the tracer trail, assemble the tag values and emits
 // the metric samples for the supplied unfinished request.
 //
-//nolint:nestif,funlen
+//nolint:funlen
 func (t *transport) measureAndEmitMetrics(unfReq *unfinishedRequest) *finishedRequest {
 	trail := unfReq.tracer.Done()
 

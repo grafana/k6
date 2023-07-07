@@ -87,7 +87,7 @@ type executorTest struct {
 	options lib.Options
 	state   *lib.ExecutionState
 
-	ctx      context.Context //nolint
+	ctx      context.Context
 	cancel   context.CancelFunc
 	executor lib.Executor
 	logHook  *testutils.SimpleLogrusHook

@@ -107,7 +107,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	require.Empty(t, test.logHook.Drain())
 }
 
-//nolint:tparallel,paralleltest // this is flaky if ran with other tests
+//nolint:paralleltest // this is flaky if ran with other tests
 func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		t.Skipf("this test is very flaky on the Windows GitHub Action runners...")

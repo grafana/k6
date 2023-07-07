@@ -19,7 +19,7 @@ import (
 )
 
 //go:embed lib/babel.min.js
-var babelSrc string //nolint:gochecknoglobals
+var babelSrc string
 
 var (
 	DefaultOpts = map[string]interface{}{
