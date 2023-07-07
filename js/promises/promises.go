@@ -10,7 +10,7 @@ import (
 //
 // Calling the function will create a goja promise and return its `resolve` and `reject` callbacks, wrapped
 // in such a way that it will block the k6 JS runtime's event loop from exiting before they are
-// called, even if the promise isn't revoled by the time the current script ends executing.
+// called, even if the promise isn't resolved by the time the current script ends executing.
 //
 // A typical usage would be:
 //
@@ -27,10 +27,10 @@ import (
 //		    }()
 //		    return promise
 //		  }
-func MakeHandledPromise(vu modules.VU) (*goja.Promise, func(interface{}), func(interface{})) {
+func MakeHandledPromise(vu modules.VU) (promise *Promise, resolve func(result interface{}), reject func(reason interface{})) {
 	runtime := vu.Runtime()
-	callback := vu.RegisterCallback()
 	promise, resolve, reject := runtime.NewPromise()
+	callback := vu.RegisterCallback()
 
 	return promise, func(i interface{}) {
 			callback(func() error {
