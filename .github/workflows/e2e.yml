@@ -48,22 +48,6 @@ jobs:
             --output ./k6extension \
             --with github.com/grafana/xk6-browser=.
           ./k6extension version
-      - name: Install Chrome dependencies
-        if: runner.os == 'Linux'
-        run: "${GITHUB_WORKSPACE}/.github/bin/install_chrome_deps_linux.sh"
-      - name: Setup Chrome
-        uses: browser-actions/setup-chrome@latest
-        with:
-          chrome-version: stable
-      - name: Chrome version
-        if: runner.os != 'Windows'
-        run: chrome --version
-      - name: Chrome version
-        if: runner.os == 'Windows'
-        shell: pwsh
-        # chrome --version doesn't work on Windows :-/
-        # See https://bugs.chromium.org/p/chromium/issues/detail?id=158372
-        run: (get-command chrome.exe).Version
       - name: Run E2E tests
         run: |
           set -x
