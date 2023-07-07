@@ -19,8 +19,8 @@ jobs:
     strategy:
       matrix:
         go: [stable, tip]
-        platform: [ubuntu-latest-8-cores, windows-latest, macos-latest]
-    runs-on: ubuntu-latest-8-cores
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
