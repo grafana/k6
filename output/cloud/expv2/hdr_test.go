@@ -53,7 +53,6 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 			vals: []float64{0},
 			exp: histogram{
 				Buckets:         map[uint32]uint32{0: 1},
-				Indexes:         []uint32{0},
 				ExtraLowBucket:  0,
 				ExtraHighBucket: 0,
 				Max:             0,
@@ -66,7 +65,6 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 			vals: []float64{8, 5},
 			exp: histogram{
 				Buckets:         map[uint32]uint32{5: 1, 8: 1},
-				Indexes:         []uint32{5, 8},
 				ExtraLowBucket:  0,
 				ExtraHighBucket: 0,
 				Max:             8,
@@ -79,7 +77,6 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 			vals: []float64{8, 9, 10, 5},
 			exp: histogram{
 				Buckets:         map[uint32]uint32{8: 1, 9: 1, 10: 1, 5: 1},
-				Indexes:         []uint32{5, 8, 9, 10},
 				ExtraLowBucket:  0,
 				ExtraHighBucket: 0,
 				Max:             10,
@@ -92,7 +89,6 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 			vals: []float64{100, 101},
 			exp: histogram{
 				Buckets:         map[uint32]uint32{100: 1, 101: 1},
-				Indexes:         []uint32{100, 101},
 				ExtraLowBucket:  0,
 				ExtraHighBucket: 0,
 				Max:             101,
@@ -105,7 +101,6 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 			vals: []float64{101, 100},
 			exp: histogram{
 				Buckets:         map[uint32]uint32{100: 1, 101: 1},
-				Indexes:         []uint32{100, 101},
 				ExtraLowBucket:  0,
 				ExtraHighBucket: 0,
 				Max:             101,
@@ -139,7 +134,6 @@ func TestHistogramAddWithUntrackables(t *testing.T) {
 
 	exp := &histogram{
 		Buckets:         map[uint32]uint32{1: 1, 5: 1},
-		Indexes:         []uint32{1, 5},
 		ExtraLowBucket:  1,
 		ExtraHighBucket: 1,
 		Max:             2 * 1e9,
@@ -160,7 +154,6 @@ func TestHistogramAddWithMultipleOccurances(t *testing.T) {
 
 	exp := &histogram{
 		Buckets:         map[uint32]uint32{52: 1, 104: 4},
-		Indexes:         []uint32{52, 104},
 		Max:             103.6,
 		Min:             51.8,
 		ExtraLowBucket:  0,

@@ -42,10 +42,6 @@ type histogram struct {
 	// because they contain exception cases and require to be tracked in a dedicated way.
 	Buckets map[uint32]uint32
 
-	// Indexes keeps an ordered slice of unique-seen buckets' indexes.
-	// It allows to iterate the buckets in order. It uses an ascendent order.
-	Indexes []uint32
-
 	// ExtraLowBucket counts occurrences of observed values smaller
 	// than the minimum trackable value.
 	ExtraLowBucket uint32
@@ -98,55 +94,41 @@ func (h *histogram) addToBucket(v float64) {
 		return
 	}
 
-	ix := resolveBucketIndex(v)
-	if _, contains := h.Buckets[ix]; !contains {
-		h.trackBucket(ix)
-	}
-
-	h.Buckets[ix]++
-}
-
-// trackBucket stores the unique seen buckets.
-func (h *histogram) trackBucket(index uint32) {
-	i := sort.Search(len(h.Indexes), func(i int) bool {
-		return h.Indexes[i] > index
-	})
-
-	// insert at the end
-	if len(h.Indexes) == i {
-		h.Indexes = append(h.Indexes, index)
-		return
-	}
-
-	// insert at specific `i`
-	h.Indexes = append(h.Indexes, 0)
-	copy(h.Indexes[i+1:], h.Indexes[i:])
-	h.Indexes[i] = index
+	h.Buckets[resolveBucketIndex(v)]++
 }
 
 // histogramAsProto converts the histogram into the equivalent Protobuf version.
 func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 	var (
+		indexes  []uint32
 		counters []uint32
 		spans    []*pbcloud.BucketSpan
 	)
 
 	// allocate only if at least one item is available, in the case of only
 	// untrackable values, then Indexes and Buckets are expected to be empty.
-	if len(h.Indexes) > 0 {
+	if len(h.Buckets) > 0 {
+		indexes = make([]uint32, 0, len(h.Buckets))
+		for index := range h.Buckets {
+			indexes = append(indexes, index)
+		}
+		sort.Slice(indexes, func(i, j int) bool {
+			return indexes[i] < indexes[j]
+		})
+
 		// init the counters
-		counters = make([]uint32, 1, len(h.Indexes))
-		counters[0] = h.Buckets[h.Indexes[0]]
+		counters = make([]uint32, 1, len(h.Buckets))
+		counters[0] = h.Buckets[indexes[0]]
 		// open the first span
-		spans = append(spans, &pbcloud.BucketSpan{Offset: h.Indexes[0], Length: 1})
+		spans = append(spans, &pbcloud.BucketSpan{Offset: indexes[0], Length: 1})
 	}
 
-	for i := 1; i < len(h.Buckets); i++ {
-		counters = append(counters, h.Buckets[h.Indexes[i]])
+	for i := 1; i < len(indexes); i++ {
+		counters = append(counters, h.Buckets[indexes[i]])
 
 		// if the current and the previous indexes are not consecutive
 		// consider as closed the current on-going span and start a new one.
-		if diff := h.Indexes[i] - h.Indexes[i-1]; diff > 1 {
+		if diff := indexes[i] - indexes[i-1]; diff > 1 {
 			spans = append(spans, &pbcloud.BucketSpan{Offset: diff, Length: 1})
 			continue
 		}
