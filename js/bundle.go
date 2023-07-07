@@ -319,7 +319,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 	var exportsV goja.Value
 	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
-			//nolint:shadow,govet // here we shadow err on purpose
+			//nolint:govet // here we shadow err on purpose
 			var err error
 			exportsV, err = modSys.RunSourceData(b.sourceData)
 			return err
