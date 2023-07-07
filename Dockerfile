@@ -8,8 +8,8 @@ RUN CGO_ENABLED=0 go install go.k6.io/xk6/cmd/xk6@latest  \
     --with github.com/grafana/xk6-output-prometheus-remote=. \
     --output /tmp/k6
 
-# Create image for running k6 with output for Prometheus Remote Write
-FROM alpine:3.17
+# Create image for running k6 with output for Prometheus remote write
+FROM alpine:3.18
 
 # hadolint ignore=DL3018
 RUN apk add --no-cache ca-certificates && \
