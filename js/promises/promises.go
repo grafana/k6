@@ -27,9 +27,9 @@ import (
 //		    }()
 //		    return promise
 //		  }
-func MakeHandledPromise(vu modules.VU) (promise *Promise, resolve func(result interface{}), reject func(reason interface{})) {
+func MakeHandledPromise(vu modules.VU) (promise *goja.Promise, resolve func(result interface{}), reject func(reason interface{})) {
 	runtime := vu.Runtime()
-	promise, resolve, reject := runtime.NewPromise()
+	promise, resolve, reject = runtime.NewPromise()
 	callback := vu.RegisterCallback()
 
 	return promise, func(i interface{}) {
