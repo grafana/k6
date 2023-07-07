@@ -1,6 +1,7 @@
 package expv2
 
 import (
+	"math"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -16,7 +17,11 @@ func TestNewSink(t *testing.T) {
 		{metrics.Counter, &counter{}},
 		{metrics.Gauge, &gauge{}},
 		{metrics.Rate, &rate{}},
-		{metrics.Trend, &histogram{}},
+		{metrics.Trend, &histogram{
+			Buckets: map[uint32]uint32{},
+			Max:     -math.MaxFloat64,
+			Min:     math.MaxFloat64},
+		},
 	}
 	for _, tc := range tests {
 		assert.Equal(t, tc.exp, newMetricValue(tc.mt))

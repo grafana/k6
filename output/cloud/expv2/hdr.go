@@ -67,20 +67,28 @@ type histogram struct {
 	Count uint32
 }
 
+func newHistogram() *histogram {
+	return &histogram{
+		Buckets: make(map[uint32]uint32),
+		Max:     -math.MaxFloat64,
+		Min:     math.MaxFloat64,
+	}
+}
+
 // addToBucket increments the counter of the bucket of the provided value.
 // If the value is lower or higher than the trackable limits
 // then it is counted into specific buckets. All the stats are also updated accordingly.
 func (h *histogram) addToBucket(v float64) {
-	if h.Count == 0 {
-		h.Max, h.Min = v, v
-	} else {
-		if v > h.Max {
-			h.Max = v
-		}
-		if v < h.Min {
-			h.Min = v
-		}
+	// if h.Count == 0 {
+	// 	h.Max, h.Min = v, v
+	// } else {
+	if v > h.Max {
+		h.Max = v
 	}
+	if v < h.Min {
+		h.Min = v
+	}
+	// }
 
 	h.Count++
 	h.Sum += v
@@ -99,9 +107,6 @@ func (h *histogram) addToBucket(v float64) {
 		h.trackBucket(ix)
 	}
 
-	if h.Buckets == nil {
-		h.Buckets = make(map[uint32]uint32)
-	}
 	h.Buckets[ix]++
 }
 
@@ -117,10 +122,10 @@ func (h *histogram) trackBucket(index uint32) {
 		return
 	}
 
-	// insert in the middle
-	h.Indexes = append(h.Indexes, 0)     // expand the slice
-	copy(h.Indexes[i+1:], h.Indexes[i:]) // make the space
-	h.Indexes[i] = index                 // set the index
+	// insert at specific `i`
+	h.Indexes = append(h.Indexes, 0)
+	copy(h.Indexes[i+1:], h.Indexes[i:])
+	h.Indexes[i] = index
 }
 
 // histogramAsProto converts the histogram into the equivalent Protobuf version.
@@ -130,7 +135,8 @@ func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 		spans    []*pbcloud.BucketSpan
 	)
 
-	// allocate only if at least one item is available
+	// allocate only if at least one item is available, in the case of only
+	// untrackable values, then Indexes and Buckets are expected to be empty.
 	if len(h.Indexes) > 0 {
 		// init the counters
 		counters = make([]uint32, 1, len(h.Indexes))
