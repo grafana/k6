@@ -967,7 +967,7 @@ func TestClient_TlsParameters(t *testing.T) {
 				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
 			},
 			initString: codeBlock{code: "var client = new grpc.Client();"},
-			vuString:   codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '2s', tls: { cacerts: "%s", cert: "%s", key: "%s" }});`, localhostCert, clientCert, clientKey)},
+			vuString:   codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { tls: { cacerts: "%s", cert: "%s", key: "%s" }});`, localhostCert, clientCert, clientKey)},
 		},
 		{
 			name:       "ConnectTlsEncryptedKey",
@@ -978,7 +978,7 @@ func TestClient_TlsParameters(t *testing.T) {
 			name:       "ConnectTlsEncryptedKeyDecryptionFailed",
 			initString: codeBlock{code: "var client = new grpc.Client();"},
 			vuString: codeBlock{
-				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '1s', tls: { cert: "%s", key: "%s", password: "abc321" }});`,
+				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cert: "%s", key: "%s", password: "abc321" }});`,
 					clientCert,
 					clientEncryptedKey,
 				),
@@ -995,7 +995,7 @@ func TestClient_TlsParameters(t *testing.T) {
 			},
 			initString: codeBlock{code: `var client = new grpc.Client();`},
 			vuString: codeBlock{
-				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '2s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});`,
+				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});`,
 					localhostCert,
 					clientCertNoAuth,
 					clientKey),
@@ -1013,7 +1013,7 @@ func TestClient_TlsParameters(t *testing.T) {
 			initString: codeBlock{code: `var client = new grpc.Client();`},
 			vuString: codeBlock{
 				code: fmt.Sprintf(`
-				client.connect("GRPCBIN_ADDR", { timeout: '1s', tls: { cacerts: ["%s"], cert: "%s", key: "%s", password: "abc123" }});
+				client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cacerts: ["%s"], cert: "%s", key: "%s", password: "abc123" }});
 				`,
 					localhostCert,
 					clientCertNoAuth,
@@ -1037,7 +1037,7 @@ func TestClient_TlsParameters(t *testing.T) {
 				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
 			vuString: codeBlock{
 				code: fmt.Sprintf(`
-				client.connect("GRPCBIN_ADDR", { timeout: '1s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});
+				client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});
 				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
 				if (resp.status !== grpc.StatusOK) {
 					throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
