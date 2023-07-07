@@ -1,4 +1,4 @@
-# v1.51.2
+# v1.53.3
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   deadline: 5m
@@ -59,6 +59,12 @@ linters-settings:
       # Forbid everything in syscall except the uppercase constants
       - '^syscall\.[^A-Z_]+$(# Using anything except constants from the syscall package is forbidden )?'
       - '^logrus\.Logger$'
+  depguard:
+     rules:
+      main:
+        deny:
+          - pkg: io/ioutil
+            desc: ioutil is deprecated, see https://go.dev/doc/go1.16#ioutil
 
 linters:
   disable-all: true
