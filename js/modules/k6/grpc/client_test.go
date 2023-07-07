@@ -872,7 +872,7 @@ func TestClient(t *testing.T) {
 	}
 }
 
-func TestClient_Connect_TlsParameters(t *testing.T) {
+func TestClient_TlsParameters(t *testing.T) {
 	t.Parallel()
 
 	testingKey := func(s string) string {
