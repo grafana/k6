@@ -119,6 +119,7 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 	for i, tc := range cases {
 		tc := tc
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
 			h := newHistogram()
 			for _, v := range tc.vals {
 				h.Add(v)
@@ -131,9 +132,9 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 func TestHistogramAddWithUntrackables(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
+	h := newHistogram()
 	for _, v := range []float64{5, -3.14, 2 * 1e9, 1} {
-		res.Add(v)
+		h.Add(v)
 	}
 
 	exp := &histogram{
@@ -146,15 +147,15 @@ func TestHistogramAddWithUntrackables(t *testing.T) {
 		Sum:             2*1e9 + 5 + 1 - 3.14,
 		Count:           4,
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, exp, h)
 }
 
 func TestHistogramAddWithMultipleOccurances(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
+	h := newHistogram()
 	for _, v := range []float64{51.8, 103.6, 103.6, 103.6, 103.6} {
-		res.Add(v)
+		h.Add(v)
 	}
 
 	exp := &histogram{
@@ -167,14 +168,14 @@ func TestHistogramAddWithMultipleOccurances(t *testing.T) {
 		Sum:             466.20000000000005,
 		Count:           5,
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, exp, h)
 }
 
 func TestHistogramAddWithNegativeNum(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
-	res.Add(-2.42314)
+	h := newHistogram()
+	h.Add(-2.42314)
 
 	exp := &histogram{
 		Max:             -2.42314,
@@ -185,14 +186,14 @@ func TestHistogramAddWithNegativeNum(t *testing.T) {
 		Sum:             -2.42314,
 		Count:           1,
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, exp, h)
 }
 
 func TestHistogramAddWithMultipleNegativeNums(t *testing.T) {
 	t.Parallel()
-	res := newHistogram()
+	h := newHistogram()
 	for _, v := range []float64{-0.001, -0.001, -0.001} {
-		res.Add(v)
+		h.Add(v)
 	}
 
 	exp := &histogram{
@@ -204,13 +205,13 @@ func TestHistogramAddWithMultipleNegativeNums(t *testing.T) {
 		Sum:             -0.003,
 		Count:           3,
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, exp, h)
 }
 
 func TestNewHistoramWithNoVals(t *testing.T) {
 	t.Parallel()
 
-	res := newHistogram()
+	h := newHistogram()
 	exp := &histogram{
 		Buckets:         map[uint32]uint32{},
 		ExtraLowBucket:  0,
@@ -219,7 +220,7 @@ func TestNewHistoramWithNoVals(t *testing.T) {
 		Min:             math.MaxFloat64,
 		Sum:             0,
 	}
-	assert.Equal(t, exp, res)
+	assert.Equal(t, exp, h)
 }
 
 func TestHistogramAsProto(t *testing.T) {
@@ -315,12 +316,16 @@ func TestHistogramAsProto(t *testing.T) {
 		},
 	}
 
-	for _, tc := range cases {
-		h := newHistogram()
-		for _, v := range tc.vals {
-			h.Add(v)
-		}
-		tc.exp.Time = &timestamppb.Timestamp{Seconds: 1}
-		assert.Equal(t, tc.exp, histogramAsProto(h, time.Unix(1, 0).UnixNano()), tc.name)
+	for i, tc := range cases {
+		tc := tc
+		t.Run(strconv.Itoa(i), func(t *testing.T) {
+			t.Parallel()
+			h := newHistogram()
+			for _, v := range tc.vals {
+				h.Add(v)
+			}
+			tc.exp.Time = &timestamppb.Timestamp{Seconds: 1}
+			assert.Equal(t, tc.exp, histogramAsProto(h, time.Unix(1, 0).UnixNano()), tc.name)
+		})
 	}
 }

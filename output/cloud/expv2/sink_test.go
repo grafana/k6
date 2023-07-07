@@ -17,10 +17,13 @@ func TestNewSink(t *testing.T) {
 		{metrics.Counter, &counter{}},
 		{metrics.Gauge, &gauge{}},
 		{metrics.Rate, &rate{}},
-		{metrics.Trend, &histogram{
-			Buckets: map[uint32]uint32{},
-			Max:     -math.MaxFloat64,
-			Min:     math.MaxFloat64},
+		{
+			metrics.Trend,
+			&histogram{
+				Buckets: map[uint32]uint32{},
+				Max:     -math.MaxFloat64,
+				Min:     math.MaxFloat64,
+			},
 		},
 	}
 	for _, tc := range tests {

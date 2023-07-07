@@ -79,16 +79,12 @@ func newHistogram() *histogram {
 // If the value is lower or higher than the trackable limits
 // then it is counted into specific buckets. All the stats are also updated accordingly.
 func (h *histogram) addToBucket(v float64) {
-	// if h.Count == 0 {
-	// 	h.Max, h.Min = v, v
-	// } else {
 	if v > h.Max {
 		h.Max = v
 	}
 	if v < h.Min {
 		h.Min = v
 	}
-	// }
 
 	h.Count++
 	h.Sum += v
