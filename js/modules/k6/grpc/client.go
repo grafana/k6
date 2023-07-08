@@ -295,8 +295,16 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 			}
 		}
 		messages := fd.Messages()
+
+		stack := make([]protoreflect.MessageDescriptor, 0, messages.Len())
 		for i := 0; i < messages.Len(); i++ {
-			message := messages.Get(i)
+			stack = append(stack, messages.Get(i))
+		}
+
+		for len(stack) > 0 {
+			message := stack[len(stack)-1]
+			stack = stack[:len(stack)-1]
+
 			_, errFind := protoregistry.GlobalTypes.FindMessageByName(message.FullName())
 			if errors.Is(errFind, protoregistry.NotFound) {
 				err = protoregistry.GlobalTypes.RegisterMessage(dynamicpb.NewMessageType(message))
@@ -304,7 +312,13 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 					return false
 				}
 			}
+
+			nested := message.Messages()
+			for i := 0; i < nested.Len(); i++ {
+				stack = append(stack, nested.Get(i))
+			}
 		}
+
 		return true
 	})
 	if err != nil {
