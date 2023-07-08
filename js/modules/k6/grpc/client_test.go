@@ -880,14 +880,14 @@ func TestClient_TlsParameters(t *testing.T) {
 		return strings.ReplaceAll(s, "TESTING KEY", "PRIVATE KEY")
 	}
 
-	clientCACert := []byte("-----BEGIN CERTIFICATE-----\nMIIBWzCCAQGgAwIBAgIJAIQMBgLi+DV6MAoGCCqGSM49BAMCMBAxDjAMBgNVBAMM\nBU15IENBMCAXDTIyMDEyMTEyMjkzNloYDzMwMjEwNTI0MTIyOTM2WjAQMQ4wDAYD\nVQQDDAVNeSBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHnrghULHa2hSa/C\nWimwCn42KWdlPqd6/zs3JgLIxTvBHJJlfbhWbBqtybqyovWd3QykHMIpx0NZmpYn\nG8FoWpmjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\nDgQWBBSkukBA8lgFvvBJAYKsoSUR+PX71jAKBggqhkjOPQQDAgNIADBFAiEAiFF7\nY54CMNRSBSVMgd4mQgrzJInRH88KpLsQ7VeOAaQCIEa0vaLln9zxIDZQKocml4Db\nAEJr8tDzMKIds6sRTBT4\n-----END CERTIFICATE-----")
-	localhostCert := "-----BEGIN CERTIFICATE-----\\nMIIDOTCCAiGgAwIBAgIQSRJrEpBGFc7tNb1fb5pKFzANBgkqhkiG9w0BAQsFADAS\\nMRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw\\nMDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\\nMIIBCgKCAQEA6Gba5tHV1dAKouAaXO3/ebDUU4rvwCUg/CNaJ2PT5xLD4N1Vcb8r\\nbFSW2HXKq+MPfVdwIKR/1DczEoAGf/JWQTW7EgzlXrCd3rlajEX2D73faWJekD0U\\naUgz5vtrTXZ90BQL7WvRICd7FlEZ6FPOcPlumiyNmzUqtwGhO+9ad1W5BqJaRI6P\\nYfouNkwR6Na4TzSj5BrqUfP0FwDizKSJ0XXmh8g8G9mtwxOSN3Ru1QFc61Xyeluk\\nPOGKBV/q6RBNklTNe0gI8usUMlYyoC7ytppNMW7X2vodAelSu25jgx2anj9fDVZu\\nh7AXF5+4nJS4AAt0n1lNY7nGSsdZas8PbQIDAQABo4GIMIGFMA4GA1UdDwEB/wQE\\nAwICpDATBgNVHSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\\nDgQWBBStsdjh3/JCXXYlQryOrL4Sh7BW5TAuBgNVHREEJzAlggtleGFtcGxlLmNv\\nbYcEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATANBgkqhkiG9w0BAQsFAAOCAQEAxWGI\\n5NhpF3nwwy/4yB4i/CwwSpLrWUa70NyhvprUBC50PxiXav1TeDzwzLx/o5HyNwsv\\ncxv3HdkLW59i/0SlJSrNnWdfZ19oTcS+6PtLoVyISgtyN6DpkKpdG1cOkW3Cy2P2\\n+tK/tKHRP1Y/Ra0RiDpOAmqn0gCOFGz8+lqDIor/T7MTpibL3IxqWfPrvfVRHL3B\\ngrw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK\\n5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/\\nWkBKOclmOV2xlTVuPw==\\n-----END CERTIFICATE-----"
-	localhostEncryptedKey := testingKey("-----BEGIN RSA TESTING KEY-----\\nProc-Type: 4,ENCRYPTED\\nDEK-Info: AES-256-CBC,B2557B8662FBEC979823E6F51B8ED777\\n\\n9xXt7ZCYHjYz501uiQKPLpxmz1qGNwu/u2VCwu/dFql2BLGfKrk5j4ZvaoKqUwVB\\nQfUaisSv1g++Rh13qDOOvRO38TF7aQPxImqCw2ew/fFC0JTiPWpSaQtIcWOxASpa\\ns84Z4LIolfeLxXyOG3JwWeKG/WQCMf1QNM+LXlfCJU6vdY0KeoDUcp4CkFNDdUrx\\nqGaF4xJxaQfLSSLuXlWTYmz+IlPMy/xOUCn3eSemWd4ZBdFUIwsSsuQkZHzthjJg\\nDbvAzuEzvQENXInnfYHkA4XHM+SMV+4d+aZgPNUSWv3YfXeOhapdpeAjVq6Q2TiX\\nxkFOjFYUKWO6sLWS5WfB1eqwwh9vNkZVHbmYYUvJbc2Aw0EJlQWxeQ6Vj0d6TIev\\nEPr6jFROaJ5kTd2XxG4HzJcGWsV27q4r159GGGmrZk1GjGZKImWP6Y5f3t4u+uJZ\\nEHVGx+SkilEaOM0ar1sXGgtIif741GRYYibd9hD1+0hSOxyVpehtEeb/wJRG4Vd6\\ni07ANkqwOop4K/nW5OOXKEz6eDrXAAJ2gzjN74WCyR5nJ2XoTjUa9Vo9hNrBcmtL\\ndRoeHOu9BhN+mu8YPwdisjtK6AJorsf0bQWqGpnexFw9Fq/XMpCTBT6P5X6gsNAs\\nRKvS5bwai7e9pJqZY+iJjdCTnFflDTX/r/lt4SxIkoZvGoGEVeMJsc6yFZP6yDCx\\nzjZkk0R3WsVusheATVBJJJcsHLdaUR707TU5lmhVFx0BYcBVrfKNc1h0E+alSM5R\\nij3T88ipk8BN4/e6gUpQCptMtda7wFCxiAIU+l1skGmM29ZvPB8BNAbMFCxioBGk\\nMe6QWcqOTLzoLwFHH2hSPYhZKeadCyz53OKbyIK/m06BXMVpFaIxesJZx6qW3aew\\ngShlUwr7yu9QJlxGZX0wIC1dyT69lRcLsbqzqnp6EMspSEZYvysq2k0GKZyAqLnr\\ne9CClm0wMnj45SK34/s1BWZNbBgXkDlzTKwMMN6RRY09seLoooJ64QPXgvW8T96P\\n0my7xtvtmt3h7krsudV68JbgaMotjvzV2vOxgD+s93QQIByIU+mTef5giEshERTL\\n8cOw4jp99p0wswH9hbn8TQsSf1UPFsL8P3HbD6HiNKKA1YyijgSIEQ6z0H0ALujb\\nhvweCPpwvOQAXxg+cpumn0bu7oLonWhdy+pkfYEvw/UWNX/7Qd7EIp8v84FI6J0U\\njX2iIIBm8rbA+lF10jo7GobPoQ4bGDEQOsNxuUSYvc07HoMpEVTH9Kg8dOZmvRQp\\npwyG4/o2+5LWXw8c1+1KNvdlhM8iMrCzz/0gok7UHLvisb3MruZE9c6Ujoua09Tu\\nshPGfJzXelJiRUwajFFAeBS/TPPBqi8KjFrz+sjYA8rFk7rHZZYW2p1n11Z+SLWj\\nMwBqQ5yCLohZe5UELdei8h0OuUOgfvnmJWcNk0vhlC1RxzjgUE1ZuQgD+yVbnWEu\\nXtcpRl5KCY7LnKflxpY5flhLdL0I4pH3coBcWn+87F8TCwxE6xt9Db/ny0Upoupf\\niZ1HoCyF0iJj75Duu9Ssr61gR8Gd/R6agXEhi19o517yeK7x+a+UPAinojjROQGD\\n-----END RSA TESTING KEY-----\\n")
-	clientCert := "-----BEGIN CERTIFICATE-----\\nMIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\nTXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\nBAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\ngZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\nABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\nBBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\nu/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\nzk9eWNHFXDA9U6U=\\n-----END CERTIFICATE-----"
-	clientKey := testingKey("-----BEGIN EC TESTING KEY-----\\nMHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\nAwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\nV71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n-----END EC TESTING KEY-----")
-	clientEncryptedKey := testingKey("-----BEGIN EC TESTING KEY-----\\nProc-Type: 4,ENCRYPTED\\nDEK-Info: AES-256-CBC,3E311E9B602231BFB5C752071EE7D652\\n\\nsAKeqbacug0v4ruE1A0CACwGVEGBQVOl1CiGVp5RsxgNZKXzMS6EsTTNLw378coF\\nKXbF+he05HIuzToOz2ANLXov1iCrVpotKVB4l2obTQvg+5VET902ky99Mc9Us7jd\\nUwW8LpXlSlhcNWuUfK6wyosL42TbcIxjqZWaESW+6ww=\\n-----END EC TESTING KEY-----")
+	clientAuthCA := []byte("-----BEGIN CERTIFICATE-----\nMIIBWzCCAQGgAwIBAgIJAIQMBgLi+DV6MAoGCCqGSM49BAMCMBAxDjAMBgNVBAMM\nBU15IENBMCAXDTIyMDEyMTEyMjkzNloYDzMwMjEwNTI0MTIyOTM2WjAQMQ4wDAYD\nVQQDDAVNeSBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHnrghULHa2hSa/C\nWimwCn42KWdlPqd6/zs3JgLIxTvBHJJlfbhWbBqtybqyovWd3QykHMIpx0NZmpYn\nG8FoWpmjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\nDgQWBBSkukBA8lgFvvBJAYKsoSUR+PX71jAKBggqhkjOPQQDAgNIADBFAiEAiFF7\nY54CMNRSBSVMgd4mQgrzJInRH88KpLsQ7VeOAaQCIEa0vaLln9zxIDZQKocml4Db\nAEJr8tDzMKIds6sRTBT4\n-----END CERTIFICATE-----")
+	localHostCert := "-----BEGIN CERTIFICATE-----\\nMIIDOTCCAiGgAwIBAgIQSRJrEpBGFc7tNb1fb5pKFzANBgkqhkiG9w0BAQsFADAS\\nMRAwDgYDVQQKEwdBY21lIENvMCAXDTcwMDEwMTAwMDAwMFoYDzIwODQwMTI5MTYw\\nMDAwWjASMRAwDgYDVQQKEwdBY21lIENvMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8A\\nMIIBCgKCAQEA6Gba5tHV1dAKouAaXO3/ebDUU4rvwCUg/CNaJ2PT5xLD4N1Vcb8r\\nbFSW2HXKq+MPfVdwIKR/1DczEoAGf/JWQTW7EgzlXrCd3rlajEX2D73faWJekD0U\\naUgz5vtrTXZ90BQL7WvRICd7FlEZ6FPOcPlumiyNmzUqtwGhO+9ad1W5BqJaRI6P\\nYfouNkwR6Na4TzSj5BrqUfP0FwDizKSJ0XXmh8g8G9mtwxOSN3Ru1QFc61Xyeluk\\nPOGKBV/q6RBNklTNe0gI8usUMlYyoC7ytppNMW7X2vodAelSu25jgx2anj9fDVZu\\nh7AXF5+4nJS4AAt0n1lNY7nGSsdZas8PbQIDAQABo4GIMIGFMA4GA1UdDwEB/wQE\\nAwICpDATBgNVHSUEDDAKBggrBgEFBQcDATAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\\nDgQWBBStsdjh3/JCXXYlQryOrL4Sh7BW5TAuBgNVHREEJzAlggtleGFtcGxlLmNv\\nbYcEfwAAAYcQAAAAAAAAAAAAAAAAAAAAATANBgkqhkiG9w0BAQsFAAOCAQEAxWGI\\n5NhpF3nwwy/4yB4i/CwwSpLrWUa70NyhvprUBC50PxiXav1TeDzwzLx/o5HyNwsv\\ncxv3HdkLW59i/0SlJSrNnWdfZ19oTcS+6PtLoVyISgtyN6DpkKpdG1cOkW3Cy2P2\\n+tK/tKHRP1Y/Ra0RiDpOAmqn0gCOFGz8+lqDIor/T7MTpibL3IxqWfPrvfVRHL3B\\ngrw/ZQTTIVjjh4JBSW3WyWgNo/ikC1lrVxzl4iPUGptxT36Cr7Zk2Bsg0XqwbOvK\\n5d+NTDREkSnUbie4GeutujmX3Dsx88UiV6UY/4lHJa6I5leHUNOHahRbpbWeOfs/\\nWkBKOclmOV2xlTVuPw==\\n-----END CERTIFICATE-----"
+	clientAuth := "-----BEGIN CERTIFICATE-----\\nMIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\nTXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\nBAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\ngZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\nABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\nBBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\nu/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\nzk9eWNHFXDA9U6U=\\n-----END CERTIFICATE-----"
+	clientAuthKey := testingKey("-----BEGIN EC TESTING KEY-----\\nMHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\nAwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\nV71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n-----END EC TESTING KEY-----")
+	clientAuthKeyEncrypted := testingKey("-----BEGIN EC TESTING KEY-----\\nProc-Type: 4,ENCRYPTED\\nDEK-Info: AES-256-CBC,3E311E9B602231BFB5C752071EE7D652\\n\\nsAKeqbacug0v4ruE1A0CACwGVEGBQVOl1CiGVp5RsxgNZKXzMS6EsTTNLw378coF\\nKXbF+he05HIuzToOz2ANLXov1iCrVpotKVB4l2obTQvg+5VET902ky99Mc9Us7jd\\nUwW8LpXlSlhcNWuUfK6wyosL42TbcIxjqZWaESW+6ww=\\n-----END EC TESTING KEY-----")
+	clientAuthBad := "-----BEGIN CERTIFICATE-----\\nMIIB2TCCAX6gAwIBAgIUJIZKiR78AH2ioZ+Jae/sElgH85kwCgYIKoZIzj0EAwIw\\nEDEOMAwGA1UEAwwFTXkgQ0EwHhcNMjMwNzA3MTAyNjQ2WhcNMjQwNzA2MTAyNjQ2\\nWjARMQ8wDQYDVQQDDAZjbGllbnQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASj\\nOziUDGBuCi7QwIGfMzoNj4phzJkJ4w9h7SOHEsCFCSZ7x1i6MGxXvX5Ol3j/W93S\\ntSJlCPvvxGXVawAQHJ4Ho4G0MIGxMAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQD\\nAgWgMCwGCWCGSAGG+EIBDQQfFh1Mb2NhbCBUZXN0IENsaWVudCBDZXJ0aWZpY2F0\\nZTAdBgNVHQ4EFgQUrbSXtZnDxJwTmesLyjxuMy9JtQswHwYDVR0jBBgwFoAUpLpA\\nQPJYBb7wSQGCrKElEfj1+9YwDgYDVR0PAQH/BAQDAgXgMBMGA1UdJQQMMAoGCCsG\\nAQUFBwMEMAoGCCqGSM49BAMCA0kAMEYCIQDcHrzug3V3WvUU+tEKhG1C4cPG5rPJ\\n/y3oOoM0roOnsgIhAP23UmiC6Qdgj+MOhXWSaNt3exWvlxdKmLm2edkxaTs+\\n-----END CERTIFICATE-----"
+
 	trivialKeyPassword := "abc123"
-	clientCertNoAuth := "-----BEGIN CERTIFICATE-----\\nMIIB2TCCAX6gAwIBAgIUJIZKiR78AH2ioZ+Jae/sElgH85kwCgYIKoZIzj0EAwIw\\nEDEOMAwGA1UEAwwFTXkgQ0EwHhcNMjMwNzA3MTAyNjQ2WhcNMjQwNzA2MTAyNjQ2\\nWjARMQ8wDQYDVQQDDAZjbGllbnQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASj\\nOziUDGBuCi7QwIGfMzoNj4phzJkJ4w9h7SOHEsCFCSZ7x1i6MGxXvX5Ol3j/W93S\\ntSJlCPvvxGXVawAQHJ4Ho4G0MIGxMAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQD\\nAgWgMCwGCWCGSAGG+EIBDQQfFh1Mb2NhbCBUZXN0IENsaWVudCBDZXJ0aWZpY2F0\\nZTAdBgNVHQ4EFgQUrbSXtZnDxJwTmesLyjxuMy9JtQswHwYDVR0jBBgwFoAUpLpA\\nQPJYBb7wSQGCrKElEfj1+9YwDgYDVR0PAQH/BAQDAgXgMBMGA1UdJQQMMAoGCCsG\\nAQUFBwMEMAoGCCqGSM49BAMCA0kAMEYCIQDcHrzug3V3WvUU+tEKhG1C4cPG5rPJ\\n/y3oOoM0roOnsgIhAP23UmiC6Qdgj+MOhXWSaNt3exWvlxdKmLm2edkxaTs+\\n-----END CERTIFICATE-----"
 
 	type testState struct {
 		*modulestest.Runtime
@@ -962,25 +962,31 @@ func TestClient_TlsParameters(t *testing.T) {
 			name: "ConnectTls",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
-				clientCAPool.AppendCertsFromPEM(clientCACert)
+				clientCAPool.AppendCertsFromPEM(clientAuthCA)
 				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
 				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
 			},
 			initString: codeBlock{code: "var client = new grpc.Client();"},
-			vuString:   codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { tls: { cacerts: "%s", cert: "%s", key: "%s" }});`, localhostCert, clientCert, clientKey)},
+			vuString:   codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { tls: { cacerts: "%s", cert: "%s", key: "%s" }});`, localHostCert, clientAuth, clientAuthKey)},
 		},
 		{
-			name:       "ConnectTlsEncryptedKey",
+			name: "ConnectTlsEncryptedKey",
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				clientCAPool := x509.NewCertPool()
+				clientCAPool.AppendCertsFromPEM(clientAuthCA)
+				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
+				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
+			},
 			initString: codeBlock{code: "var client = new grpc.Client();"},
-			vuString:   codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { tls: { cacerts: ["%s"], cert: "%[1]s", key: "%s", password: "%s" }});`, localhostCert, localhostEncryptedKey, trivialKeyPassword)},
+			vuString:   codeBlock{code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { tls: { cacerts: ["%s"], cert: "%s", key: "%s", password: "%s" }});`, localHostCert, clientAuth, clientAuthKeyEncrypted, trivialKeyPassword)},
 		},
 		{
 			name:       "ConnectTlsEncryptedKeyDecryptionFailed",
 			initString: codeBlock{code: "var client = new grpc.Client();"},
 			vuString: codeBlock{
 				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cert: "%s", key: "%s", password: "abc321" }});`,
-					clientCert,
-					clientEncryptedKey,
+					clientAuth,
+					clientAuthKeyEncrypted,
 				),
 				err: "x509: decryption password incorrect",
 			},
@@ -989,16 +995,16 @@ func TestClient_TlsParameters(t *testing.T) {
 			name: "ConnectTlsClientCertNoClientAuth",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
-				clientCAPool.AppendCertsFromPEM(clientCACert)
+				clientCAPool.AppendCertsFromPEM(clientAuthCA)
 				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
 				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
 			},
 			initString: codeBlock{code: `var client = new grpc.Client();`},
 			vuString: codeBlock{
 				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});`,
-					localhostCert,
-					clientCertNoAuth,
-					clientKey),
+					localHostCert,
+					clientAuthBad,
+					clientAuthKey),
 				err: "remote error: tls: bad certificate",
 			},
 		},
@@ -1006,18 +1012,19 @@ func TestClient_TlsParameters(t *testing.T) {
 			name: "ConnectTlsClientCertWithPasswordNoClientAuth",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
-				clientCAPool.AppendCertsFromPEM(clientCACert)
+				clientCAPool.AppendCertsFromPEM(clientAuthCA)
 				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
 				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
 			},
 			initString: codeBlock{code: `var client = new grpc.Client();`},
 			vuString: codeBlock{
 				code: fmt.Sprintf(`
-				client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cacerts: ["%s"], cert: "%s", key: "%s", password: "abc123" }});
+				client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cacerts: ["%s"], cert: "%s", key: "%s", password: "%s" }});
 				`,
-					localhostCert,
-					clientCertNoAuth,
-					clientEncryptedKey),
+					localHostCert,
+					clientAuthBad,
+					clientAuthKeyEncrypted,
+					trivialKeyPassword),
 				err: "remote error: tls: bad certificate",
 			},
 		},
@@ -1025,7 +1032,7 @@ func TestClient_TlsParameters(t *testing.T) {
 			name: "ConnectTlsInvokeSuccess",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
-				clientCAPool.AppendCertsFromPEM(clientCACert)
+				clientCAPool.AppendCertsFromPEM(clientAuthCA)
 				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
 				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
 				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
@@ -1042,9 +1049,9 @@ func TestClient_TlsParameters(t *testing.T) {
 				if (resp.status !== grpc.StatusOK) {
 					throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
 				}`,
-					localhostCert,
-					clientCert,
-					clientKey),
+					localHostCert,
+					clientAuth,
+					clientAuthKey),
 			},
 		},
 	}
