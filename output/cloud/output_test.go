@@ -150,7 +150,7 @@ func TestOutputStartVersionError(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	o.referenceID = "123"
+	o.testRunID = "123"
 	err = o.startVersionedOutput()
 	require.ErrorContains(t, err, "v99 is an unexpected version")
 }
@@ -159,8 +159,8 @@ func TestOutputStartVersionedOutputV2(t *testing.T) {
 	t.Parallel()
 
 	o := Output{
-		logger:      testutils.NewLogger(t),
-		referenceID: "123",
+		logger:    testutils.NewLogger(t),
+		testRunID: "123",
 		config: cloudapi.Config{
 			APIVersion:            null.IntFrom(2),
 			Host:                  null.StringFrom("fake-cloud-url"),
@@ -186,7 +186,7 @@ func TestOutputStartVersionedOutputV1(t *testing.T) {
 	t.Parallel()
 
 	o := Output{
-		referenceID: "123",
+		testRunID: "123",
 		config: cloudapi.Config{
 			APIVersion: null.IntFrom(1),
 			// Here, we are enabling but silencing the related async op
@@ -201,7 +201,7 @@ func TestOutputStartVersionedOutputV1(t *testing.T) {
 	assert.True(t, ok)
 }
 
-func TestOutputStartWithReferenceID(t *testing.T) {
+func TestOutputStartWithTestRunID(t *testing.T) {
 	t.Parallel()
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
@@ -233,13 +233,13 @@ func TestCloudOutputDescription(t *testing.T) {
 
 	t.Run("WithTestRunDetails", func(t *testing.T) {
 		t.Parallel()
-		o := Output{referenceID: "74"}
+		o := Output{testRunID: "74"}
 		o.config.TestRunDetails = null.StringFrom("my-custom-string")
 		assert.Equal(t, "cloud (my-custom-string)", o.Description())
 	})
 	t.Run("WithWebAppURL", func(t *testing.T) {
 		t.Parallel()
-		o := Output{referenceID: "74"}
+		o := Output{testRunID: "74"}
 		o.config.WebAppURL = null.StringFrom("mywebappurl.com")
 		assert.Equal(t, "cloud (mywebappurl.com/runs/74)", o.Description())
 	})
@@ -282,7 +282,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 	require.NoError(t, err)
 
 	calledStopFn := false
-	out.referenceID = "test-ref-id-1234"
+	out.testRunID = "test-ref-id-1234"
 	out.versionedOutput = versionedOutputMock{
 		callback: func(fn string) {
 			if fn == "StopWithTestError" {
@@ -362,8 +362,8 @@ func (o versionedOutputMock) SetTestRunStopCallback(_ func(error)) {
 	o.callback("SetTestRunStopCallback")
 }
 
-func (o versionedOutputMock) SetReferenceID(id string) {
-	o.callback("SetReferenceID")
+func (o versionedOutputMock) SetTestRunID(id string) {
+	o.callback("SetTestRunID")
 }
 
 func (o versionedOutputMock) AddMetricSamples(samples []metrics.SampleContainer) {

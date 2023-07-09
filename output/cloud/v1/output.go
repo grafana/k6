@@ -24,6 +24,9 @@ type Output struct {
 	logger logrus.FieldLogger
 	config cloudapi.Config
 
+	// referenceID is the legacy name used by the Backend for the test run id.
+	// Note: This output's version is almost deprecated so we don't apply
+	// the renaming to its internals.
 	referenceID string
 	client      *MetricsClient
 
@@ -65,8 +68,8 @@ func New(logger logrus.FieldLogger, conf cloudapi.Config, testAPIClient *cloudap
 	}, nil
 }
 
-// SetReferenceID sets the passed Reference ID.
-func (out *Output) SetReferenceID(id string) {
+// SetTestRunID sets the passed test run id.
+func (out *Output) SetTestRunID(id string) {
 	out.referenceID = id
 }
 

@@ -40,7 +40,7 @@ type Output struct {
 	logger      logrus.FieldLogger
 	config      cloudapi.Config
 	cloudClient *cloudapi.Client
-	referenceID string
+	testRunID   string
 
 	collector *collector
 	flushing  flusher
@@ -72,9 +72,9 @@ func New(logger logrus.FieldLogger, conf cloudapi.Config, cloudClient *cloudapi.
 	}, nil
 }
 
-// SetReferenceID sets the Cloud's test run ID.
-func (o *Output) SetReferenceID(refID string) {
-	o.referenceID = refID
+// SetTestRunID sets the Cloud's test run id.
+func (o *Output) SetTestRunID(id string) {
+	o.testRunID = id
 }
 
 // SetTestRunStopCallback receives the function that
@@ -98,25 +98,25 @@ func (o *Output) Start() error {
 		return fmt.Errorf("failed to initialize the samples collector: %w", err)
 	}
 
-	mc, err := newMetricsClient(o.cloudClient, o.referenceID)
+	mc, err := newMetricsClient(o.cloudClient, o.testRunID)
 	if err != nil {
 		return fmt.Errorf("failed to initialize the http metrics flush client: %w", err)
 	}
 	o.flushing = &metricsFlusher{
-		referenceID:                o.referenceID,
+		testRunID:                  o.testRunID,
 		bq:                         &o.collector.bq,
 		client:                     mc,
+		logger:                     o.logger,
+		discardedLabels:            make(map[string]struct{}),
 		aggregationPeriodInSeconds: uint32(o.config.AggregationPeriod.TimeDuration().Seconds()),
-		// TODO: rename the config field to align to the new logic by time series
-		// when the migration from the version 1 is completed.
-		maxSeriesInSingleBatch: int(o.config.MaxMetricSamplesPerPackage.Int64),
+		maxSeriesInBatch:           int(o.config.MaxTimeSeriesInBatch.Int64),
 	}
 
 	o.runFlushWorkers()
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
 	if o.tracingEnabled() {
-		testRunID, err := strconv.ParseInt(o.referenceID, 10, 64)
+		testRunID, err := strconv.ParseInt(o.testRunID, 10, 64)
 		if err != nil {
 			return err
 		}
@@ -346,20 +346,20 @@ func (o *Output) tracingEnabled() bool {
 
 func printableConfig(c cloudapi.Config) map[string]any {
 	m := map[string]any{
-		"host":                       c.Host.String,
-		"name":                       c.Name.String,
-		"timeout":                    c.Timeout.String(),
-		"webAppURL":                  c.WebAppURL.String,
-		"projectID":                  c.ProjectID.Int64,
-		"pushRefID":                  c.PushRefID.String,
-		"stopOnError":                c.StopOnError.Bool,
-		"testRunDetails":             c.TestRunDetails.String,
-		"aggregationPeriod":          c.AggregationPeriod.String(),
-		"aggregationWaitPeriod":      c.AggregationWaitPeriod.String(),
-		"maxMetricSamplesPerPackage": c.MaxMetricSamplesPerPackage.Int64,
-		"metricPushConcurrency":      c.MetricPushConcurrency.Int64,
-		"metricPushInterval":         c.MetricPushInterval.String(),
-		"token":                      "",
+		"host":                  c.Host.String,
+		"name":                  c.Name.String,
+		"timeout":               c.Timeout.String(),
+		"webAppURL":             c.WebAppURL.String,
+		"projectID":             c.ProjectID.Int64,
+		"pushRefID":             c.PushRefID.String,
+		"stopOnError":           c.StopOnError.Bool,
+		"testRunDetails":        c.TestRunDetails.String,
+		"aggregationPeriod":     c.AggregationPeriod.String(),
+		"aggregationWaitPeriod": c.AggregationWaitPeriod.String(),
+		"maxTimeSeriesInBatch":  c.MaxTimeSeriesInBatch.Int64,
+		"metricPushConcurrency": c.MetricPushConcurrency.Int64,
+		"metricPushInterval":    c.MetricPushInterval.String(),
+		"token":                 "",
 	}
 
 	if c.Token.Valid {

@@ -38,11 +38,11 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, int64(99), o.config.APIVersion.Int64)
 }
 
-func TestOutputSetReferenceID(t *testing.T) {
+func TestOutputSetTestRunID(t *testing.T) {
 	t.Parallel()
 	o := Output{}
-	o.SetReferenceID("my-test-run-id")
-	assert.Equal(t, "my-test-run-id", o.referenceID)
+	o.SetTestRunID("my-test-run-id")
+	assert.Equal(t, "my-test-run-id", o.testRunID)
 }
 
 func TestOutputSetTestRunStopCallback(t *testing.T) {
@@ -75,7 +75,7 @@ func TestOutputCollectSamples(t *testing.T) {
 	o, err := New(logger, conf, cc)
 	require.NoError(t, err)
 
-	o.SetReferenceID("ref-id-123")
+	o.SetTestRunID("ref-id-123")
 	require.NoError(t, o.Start())
 	require.Empty(t, o.collector.bq.PopAll())
 
@@ -288,7 +288,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 	o, err := New(logger, config, cc)
 	require.NoError(t, err)
 
-	o.SetReferenceID("ref-id-123")
+	o.SetTestRunID("ref-id-123")
 	require.NoError(t, o.Start())
 	require.NoError(t, o.StopWithTestError(errors.New("an error")))
 }

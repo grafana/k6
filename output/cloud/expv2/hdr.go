@@ -184,8 +184,6 @@ func (h *histogram) appendBuckets(index uint32) {
 func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 	hval := &pbcloud.TrendHdrValue{
 		Time:              timestampAsProto(time),
-		MinResolution:     1.0,
-		SignificantDigits: 2,
 		LowerCounterIndex: h.FirstNotZeroBucket,
 		MinValue:          h.Min,
 		MaxValue:          h.Max,
