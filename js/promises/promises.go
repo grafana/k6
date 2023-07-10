@@ -28,8 +28,7 @@ import (
 //		    return promise
 //		  }
 func New(vu modules.VU) (p *goja.Promise, resolve func(result any), reject func(reason any)) {
-	runtime := vu.Runtime()
-	p, resolve, reject = runtime.NewPromise()
+	p, resolve, reject = vu.Runtime().NewPromise()
 	callback := vu.RegisterCallback()
 
 	return p, func(i interface{}) {
