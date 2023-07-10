@@ -9,7 +9,7 @@ import (
 // MakeHandledPromise can be used to create promises that will be dispatched to k6's event loop.
 //
 // Calling the function will create a goja promise and return its `resolve` and `reject` callbacks, wrapped
-// in such a way that it will block the k6 JS runtime's event loop from exiting before they are
+// in such a way that it will block the k6 JavaScript runtime's event loop from exiting before they are
 // called, even if the promise isn't resolved by the time the current script ends executing.
 //
 // A typical usage would be:
