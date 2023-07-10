@@ -28,18 +28,22 @@ import (
 //		    return promise
 //		  }
 func New(vu modules.VU) (p *goja.Promise, resolve func(result any), reject func(reason any)) {
-	p, resolve, reject = vu.Runtime().NewPromise()
+	p, resolveFunc, rejectFunc := vu.Runtime().NewPromise()
 	callback := vu.RegisterCallback()
 
-	return p, func(i interface{}) {
-			callback(func() error {
-				resolve(i)
-				return nil
-			})
-		}, func(i interface{}) {
-			callback(func() error {
-				reject(i)
-				return nil
-			})
-		}
+	resolve = func(result any) {
+		callback(func() error {
+			resolveFunc(result)
+			return nil
+		})
+	}
+
+	reject = func(reason any) {
+		callback(func() error {
+			rejectFunc(reason)
+			return nil
+		})
+	}
+
+	return p, resolve, reject
 }
