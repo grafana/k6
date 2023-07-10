@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/cloudapi/insights"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 
@@ -30,7 +31,7 @@ type requestMetadatasCollector interface {
 
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
-	flush(context.Context) error
+	flush() error
 }
 
 // Output sends result data to the k6 Cloud service.
@@ -124,6 +125,7 @@ func (o *Output) Start() error {
 
 		insightsClientConfig := insights.ClientConfig{
 			IngesterHost: o.config.TracesHost.ValueOrZero(),
+			Timeout:      types.NewNullDuration(90*time.Second, false),
 			AuthConfig: insights.ClientAuthConfig{
 				Enabled:                  true,
 				TestRunID:                testRunID,
@@ -132,6 +134,16 @@ func (o *Output) Start() error {
 			},
 			TLSConfig: insights.ClientTLSConfig{
 				Insecure: false,
+			},
+			RetryConfig: insights.ClientRetryConfig{
+				RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
+				MaxAttempts:          3,
+				PerRetryTimeout:      30 * time.Second,
+				BackoffConfig: insights.ClientBackoffConfig{
+					Enabled:        true,
+					JitterFraction: 0.1,
+					WaitBetween:    1 * time.Second,
+				},
 			},
 		}
 		insightsClient := insights.NewClient(insightsClientConfig)
@@ -144,7 +156,7 @@ func (o *Output) Start() error {
 
 		o.insightsClient = insightsClient
 		o.requestMetadatasFlusher = newTracesFlusher(insightsClient, o.requestMetadatasCollector)
-		o.periodicInvoke(o.config.TracesPushInterval.TimeDuration(), o.flushRequestMetadatas)
+		o.runFlushRequestMetadatas()
 	}
 
 	o.logger.WithField("config", printableConfig(o.config)).Debug("Started!")
@@ -266,7 +278,7 @@ func (o *Output) collectSamples() {
 func (o *Output) flushMetrics() {
 	start := time.Now()
 
-	err := o.flushing.flush(context.Background())
+	err := o.flushing.flush()
 	if err != nil {
 		o.handleFlushError(err)
 		return
@@ -275,14 +287,34 @@ func (o *Output) flushMetrics() {
 	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered samples to the cloud")
 }
 
+func (o *Output) runFlushRequestMetadatas() {
+	t := time.NewTicker(o.config.TracesPushInterval.TimeDuration())
+
+	for i := int64(0); i < o.config.TracesPushConcurrency.Int64; i++ {
+		o.wg.Add(1)
+		go func() {
+			defer o.wg.Done()
+			defer t.Stop()
+
+			for {
+				select {
+				case <-t.C:
+					o.flushRequestMetadatas()
+				case <-o.stop:
+					return
+				case <-o.abort:
+					return
+				}
+			}
+		}()
+	}
+}
+
 // flushRequestMetadatas periodically flushes traces collected in RequestMetadatasCollector using flusher.
 func (o *Output) flushRequestMetadatas() {
 	start := time.Now()
 
-	ctx, cancel := context.WithTimeout(context.Background(), o.config.TracesPushInterval.TimeDuration())
-	defer cancel()
-
-	err := o.requestMetadatasFlusher.flush(ctx)
+	err := o.requestMetadatasFlusher.flush()
 	if err != nil {
 		o.logger.WithError(err).WithField("t", time.Since(start)).Error("Failed to push trace samples to the cloud")
 	}

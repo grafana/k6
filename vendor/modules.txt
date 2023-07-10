@@ -178,6 +178,11 @@ github.com/grafana/xk6-webcrypto/webcrypto
 ## explicit; go 1.18
 github.com/grafana/xk6-websockets/websockets
 github.com/grafana/xk6-websockets/websockets/events
+# github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
+## explicit; go 1.14
+github.com/grpc-ecosystem/go-grpc-middleware/retry
+github.com/grpc-ecosystem/go-grpc-middleware/util/backoffutils
+github.com/grpc-ecosystem/go-grpc-middleware/util/metautils
 # github.com/inconshreveable/mousetrap v1.0.0
 ## explicit
 github.com/inconshreveable/mousetrap

@@ -26,7 +26,7 @@ type metricsFlusher struct {
 // flush flushes the queued buckets sending them to the remote Cloud service.
 // If the number of time series collected is bigger than maximum batch size
 // then it splits in chunks.
-func (f *metricsFlusher) flush(_ context.Context) error {
+func (f *metricsFlusher) flush() error {
 	// drain the buffer
 	buckets := f.bq.PopAll()
 	if len(buckets) < 1 {
@@ -193,11 +193,11 @@ func newTracesFlusher(client insightsClient, collector requestMetadatasCollector
 	}
 }
 
-func (f *requestMetadatasFlusher) flush(ctx context.Context) error {
+func (f *requestMetadatasFlusher) flush() error {
 	requestMetadatas := f.collector.PopAll()
 	if len(requestMetadatas) < 1 {
 		return nil
 	}
 
-	return f.client.IngestRequestMetadatasBatch(ctx, requestMetadatas)
+	return f.client.IngestRequestMetadatasBatch(context.Background(), requestMetadatas)
 }
