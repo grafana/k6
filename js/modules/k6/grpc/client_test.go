@@ -995,7 +995,7 @@ func TestClientLoadProto(t *testing.T) {
 		samples := make(chan metrics.SampleContainer, 1000)
 		testRuntime := modulestest.NewRuntime(t)
 
-		cwd, err := os.Getwd()
+		cwd, err := os.Getwd() //nolint:forbidigo
 		require.NoError(t, err)
 		fs := fsext.NewOsFs()
 		if isWindows {
