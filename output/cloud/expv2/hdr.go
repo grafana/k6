@@ -128,8 +128,8 @@ func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 
 		// if the current and the previous indexes are not consecutive
 		// consider as closed the current on-going span and start a new one.
-		if diff := indexes[i] - indexes[i-1]; diff > 1 {
-			spans = append(spans, &pbcloud.BucketSpan{Offset: diff, Length: 1})
+		if zerosBetween := indexes[i] - indexes[i-1] - 1; zerosBetween > 0 {
+			spans = append(spans, &pbcloud.BucketSpan{Offset: zerosBetween, Length: 1})
 			continue
 		}
 

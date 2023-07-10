@@ -251,6 +251,42 @@ func TestHistogramAsProto(t *testing.T) {
 		},
 		{
 			name: "normal values",
+			vals: []float64{7, 8, 9, 11, 12, 11.5, 10.5},
+			exp: &pbcloud.TrendHdrValue{
+				Count:                  7,
+				ExtraLowValuesCounter:  nil,
+				ExtraHighValuesCounter: nil,
+				Counters:               []uint32{1, 1, 1, 2, 2},
+				Spans: []*pbcloud.BucketSpan{
+					{Offset: 7, Length: 3},
+					{Offset: 1, Length: 2},
+				},
+				MinValue: 7,
+				MaxValue: 12,
+				Sum:      69,
+			},
+		},
+		{
+			name: "with Zero-point values",
+			vals: []float64{2, 0.01, 3},
+			exp: &pbcloud.TrendHdrValue{
+				Count:                  3,
+				ExtraLowValuesCounter:  nil,
+				ExtraHighValuesCounter: nil,
+				Counters:               []uint32{1, 1, 1},
+				Spans: []*pbcloud.BucketSpan{
+					{
+						Offset: 1,
+						Length: 3,
+					},
+				},
+				MinValue: 0.01,
+				MaxValue: 3,
+				Sum:      5.01,
+			},
+		},
+		{
+			name: "a basic case",
 			vals: []float64{2, 1.1, 3},
 			exp: &pbcloud.TrendHdrValue{
 				Count:                  3,
@@ -288,17 +324,17 @@ func TestHistogramAsProto(t *testing.T) {
 				Counters: []uint32{3, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 2, 1},
 				Spans: []*pbcloud.BucketSpan{
 					{Offset: 19, Length: 1},
-					{Offset: 33, Length: 2},
-					{Offset: 111, Length: 1},
-					{Offset: 75, Length: 1},
-					{Offset: 23, Length: 2}, // 262
-					{Offset: 57, Length: 1},
-					{Offset: 105, Length: 1},
-					{Offset: 40, Length: 1},
 					{Offset: 32, Length: 2},
-					{Offset: 156, Length: 1}, // 654
-					{Offset: 114, Length: 1},
-					{Offset: 411, Length: 1},
+					{Offset: 110, Length: 1},
+					{Offset: 74, Length: 1},
+					{Offset: 22, Length: 2}, // 262
+					{Offset: 56, Length: 1},
+					{Offset: 104, Length: 1},
+					{Offset: 39, Length: 1},
+					{Offset: 31, Length: 2},
+					{Offset: 155, Length: 1}, // 654
+					{Offset: 113, Length: 1},
+					{Offset: 410, Length: 1},
 				},
 				ExtraLowValuesCounter:  nil,
 				ExtraHighValuesCounter: nil,
