@@ -8,6 +8,7 @@ import (
 	"net"
 	"strconv"
 	"strings"
+	"sync"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -50,8 +51,15 @@ type clientConnCloser interface {
 
 // Conn is a gRPC client connection.
 type Conn struct {
-	raw clientConnCloser
+	addr string
+	raw  clientConnCloser
 }
+
+var (
+	connections       = make(map[string]*grpc.ClientConn, 2)
+	connectionsAddrMu = make(map[string]*sync.Mutex, 2)
+	connectionsMu     sync.Mutex
+)
 
 // DefaultOptions generates an option set
 // with common options for requests from a VU.
@@ -78,6 +86,52 @@ func Dial(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, 
 	return &Conn{
 		raw: conn,
 	}, nil
+}
+
+// DialShared establish a gRPC connection if a shared connection for the same address does not already exist.
+// Note: only use a shared connection over the same address if the service is the same OR if multiple services are muxed
+// over this shared address.
+func DialShared(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, error) {
+	var (
+		conn *grpc.ClientConn
+		err  error
+	)
+	var ok bool
+
+	addrMu := findAddrMutex(addr)
+	// Lock for mutating connections map
+	addrMu.Lock()
+	defer addrMu.Unlock()
+	// As we may modify the clients map
+	// We lock to ensure we only open a single connection and add it to the map. Subsequent consumers will obtain
+	// the dialed connection.
+	if conn, ok = connections[addr]; !ok {
+		conn, err = grpc.DialContext(ctx, addr, options...)
+		if err != nil {
+			return nil, err
+		}
+		connections[addr] = conn
+	}
+
+	if err != nil {
+		return nil, err
+	}
+	return &Conn{
+		addr: addr,
+		raw:  conn,
+	}, nil
+}
+
+func findAddrMutex(addr string) (addrMu *sync.Mutex) {
+	// Lock for mutating connectionsAddrMu map
+	connectionsMu.Lock()
+	defer connectionsMu.Unlock()
+	var ok bool
+	if addrMu, ok = connectionsAddrMu[addr]; !ok {
+		addrMu = &sync.Mutex{}
+		connectionsAddrMu[addr] = addrMu
+	}
+	return addrMu
 }
 
 // Reflect returns using the reflection the FileDescriptorSet describing the service.
@@ -170,6 +224,16 @@ func (c *Conn) Invoke(
 
 // Close closes the underhood connection.
 func (c *Conn) Close() error {
+	if c.addr != "" {
+		// Lock for mutating connections map
+		if addrMu, ok := connectionsAddrMu[c.addr]; ok {
+			addrMu.Lock()
+			// no need to close as it will close below, just need to remove connection from shared map
+			delete(connections, c.addr)
+			addrMu.Unlock()
+		}
+	}
+
 	return c.raw.Close()
 }
 

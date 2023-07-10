@@ -150,7 +150,14 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 	}
 
 	c.addr = addr
-	c.conn, err = grpcext.Dial(ctx, addr, opts...)
+
+	// Create a local function variable to point to the appropriate Dial
+	dialFn := grpcext.Dial
+	if p.ConnectionSharing {
+		dialFn = grpcext.DialShared
+	}
+
+	c.conn, err = dialFn(ctx, addr, opts...)
 	if err != nil {
 		return false, err
 	}
@@ -373,6 +380,7 @@ type connectParams struct {
 	Timeout               time.Duration
 	MaxReceiveSize        int64
 	MaxSendSize           int64
+	ConnectionSharing     bool
 }
 
 func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, error) {
@@ -382,6 +390,7 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		Timeout:               time.Minute,
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
+		ConnectionSharing:     false,
 	}
 	for k, v := range raw {
 		switch k {
@@ -421,7 +430,12 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 			if params.MaxSendSize < 0 {
 				return params, fmt.Errorf("invalid maxSendSize value: '%#v, it needs to be a positive integer", v)
 			}
-
+		case "connectionSharing":
+			var ok bool
+			params.ConnectionSharing, ok = v.(bool)
+			if !ok {
+				return params, fmt.Errorf("invalid connectionSharing value: '%#v', it needs to be boolean", v)
+			}
 		default:
 			return params, fmt.Errorf("unknown connect param: %q", k)
 		}
