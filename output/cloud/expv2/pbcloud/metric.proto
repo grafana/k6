@@ -115,30 +115,40 @@ message RateValue {
   uint32 total_count = 3;
 }
 
+// BucketSpan represents the consecutive and significant (non-zero) buckets.
+// The concept is imported from the Prometheus' native histogram.
+// It should simplify an eventual transition to Prometheus.
+// https://github.com/prometheus/prometheus/blob/f399f386cef3b19c48157e9678a4f50997db3f41/prompb/io/prometheus/client/metrics.proto#L115-L124
+message BucketSpan {
+  uint32 offset = 1; // Gap to previous span, or starting point for 1st span.
+  uint32 length = 2; // Length of the next consecutive buckets.
+}
+
 message TrendHdrValue {
   // Required.
   google.protobuf.Timestamp time = 1;
 
-  // buckets
+  // positive buckets starting from bucket 1, each counter is an absolute value.
   repeated uint32 counters = 2;
-  // index of first bucket in `counters`
-  uint32 lower_counter_index = 3;
-  // sum of observations
-  double sum = 4;
-  // count of observations
-  uint32 count = 5;
-  // smallest and largest observed value
-  double min_value = 6;
-  double max_value = 7;
+  repeated BucketSpan spans = 3;
 
-  // counters for zero and infinity buckets
-  optional uint32 extra_low_values_counter = 8;
-  optional uint32 extra_high_values_counter = 9;
+  // sum of observations
+  double sum = 5;
+  // count of observations
+  uint32 count = 6;
+  // smallest and largest observed value
+  double min_value = 7;
+  double max_value = 8;
+
+  // counters for zero- and infinity-buckets
+  optional uint32 extra_low_values_counter = 9;
+  optional uint32 extra_high_values_counter = 10;
 
   // histogram parameter - value multiplier aka smallest value
   // default = 1.0
-  optional double min_resolution = 10;
+  optional double min_resolution = 11;
+
   // histogram parameter - number of significant digits used to calculate buckets formula
   // default = 2
-  optional uint32 significant_digits = 11;
+  optional uint32 significant_digits = 12;
 }
