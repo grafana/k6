@@ -13,15 +13,13 @@ function print(metric) {
 }
 
 function load() {
-  const reportAllChanges = {
-    reportAllChanges: true,
-  }
-  webVitals.onCLS(print, reportAllChanges);
-  webVitals.onFID(print, reportAllChanges);
-  webVitals.onLCP(print, reportAllChanges);
-  webVitals.onFCP(print, reportAllChanges);
-  webVitals.onINP(print, reportAllChanges);
-  webVitals.onTTFB(print, reportAllChanges);
+  webVitals.onCLS(print);
+  webVitals.onFID(print);
+  webVitals.onLCP(print);
+
+  webVitals.onFCP(print);
+  webVitals.onINP(print);
+  webVitals.onTTFB(print);
 }
 
 load();
