@@ -1001,7 +1001,7 @@ func TestClient_TlsParameters(t *testing.T) {
 			},
 			initString: codeBlock{code: `var client = new grpc.Client();`},
 			vuString: codeBlock{
-				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '5s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});`,
+				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});`,
 					localHostCert,
 					clientAuthBad,
 					clientAuthKey),
