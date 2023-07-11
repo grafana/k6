@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -18,7 +17,7 @@ func TestFail(t *testing.T) {
 	t.Parallel()
 	tc := testCaseRuntime(t)
 
-	_, err := tc.run(`k6.fail("blah")`)
+	_, err := tc.testRuntime.RunOnEventLoop(`k6.fail("blah")`)
 	assert.Contains(t, err.Error(), "blah")
 }
 
@@ -36,7 +35,7 @@ func TestSleep(t *testing.T) {
 			t.Parallel()
 			tc := testCaseRuntime(t)
 			startTime := time.Now()
-			_, err := tc.run(`k6.sleep(1)`)
+			_, err := tc.testRuntime.RunOnEventLoop(`k6.sleep(1)`)
 			endTime := time.Now()
 			assert.NoError(t, err)
 			assert.True(t, endTime.Sub(startTime) > d, "did not sleep long enough")
@@ -51,7 +50,7 @@ func TestSleep(t *testing.T) {
 		dch := make(chan time.Duration)
 		go func() {
 			startTime := time.Now()
-			_, err := tc.run(`k6.sleep(10)`)
+			_, err := tc.testRuntime.RunOnEventLoop(`k6.sleep(10)`)
 			endTime := time.Now()
 			assert.NoError(t, err)
 			dch <- endTime.Sub(startTime)
@@ -72,13 +71,13 @@ func TestRandSeed(t *testing.T) {
 	tc := testCaseRuntime(t)
 
 	rand := 0.8487305991992138
-	_, err := tc.run(fmt.Sprintf(`
+	_, err := tc.testRuntime.RunOnEventLoop(fmt.Sprintf(`
 		var rnd = Math.random();
 		if (rnd == %.16f) { throw new Error("wrong random: " + rnd); }
 	`, rand))
 	assert.NoError(t, err)
 
-	_, err = tc.run(fmt.Sprintf(`
+	_, err = tc.testRuntime.RunOnEventLoop(fmt.Sprintf(`
 		k6.randomSeed(12345)
 		var rnd = Math.random();
 		if (rnd != %.16f) { throw new Error("wrong random: " + rnd); }
@@ -101,7 +100,7 @@ func TestGroup(t *testing.T) {
 			assert.Equal(t, state.Group.Name, "my group")
 			assert.Equal(t, state.Group.Parent, root)
 		}))
-		_, err := tc.run(`k6.group("my group", fn)`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("my group", fn)`)
 		assert.NoError(t, err)
 		assert.Equal(t, state.Group, root)
 		groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
@@ -112,21 +111,21 @@ func TestGroup(t *testing.T) {
 	t.Run("Invalid", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
-		_, err := tc.run(`k6.group("::", function() { throw new Error("nooo") })`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("::", function() { throw new Error("nooo") })`)
 		assert.Contains(t, err.Error(), "group and check names may not contain '::'")
 	})
 
 	t.Run("async function", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
-		_, err := tc.run(`k6.group("something", async function() { })`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("something", async function() { })`)
 		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
 	})
 
 	t.Run("async lambda", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
-		_, err := tc.run(`k6.group("something", async () => { })`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("something", async () => { })`)
 		assert.ErrorContains(t, err, "group() does not support async functions as arguments")
 	})
 }
@@ -137,7 +136,7 @@ func TestCheckObject(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
 
-		_, err := tc.run(`k6.check(null, { "check": true })`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, { "check": true })`)
 		assert.NoError(t, err)
 
 		bufSamples := metrics.GetBufferedSamples(tc.samples)
@@ -158,7 +157,7 @@ func TestCheckObject(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
 
-		_, err := tc.run(`k6.check(null, { "a": true, "b": false })`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, { "a": true, "b": false })`)
 		assert.NoError(t, err)
 
 		bufSamples := metrics.GetBufferedSamples(tc.samples)
@@ -187,21 +186,21 @@ func TestCheckObject(t *testing.T) {
 	t.Run("Invalid", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
-		_, err := tc.run(`k6.check(null, { "::": true })`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, { "::": true })`)
 		assert.Contains(t, err.Error(), "group and check names may not contain '::'")
 	})
 
 	t.Run("async function", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
-		_, err := tc.run(`k6.check("something", {"async": async function() { }})`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.check("something", {"async": async function() { }})`)
 		assert.ErrorContains(t, err, "check() does not support async functions as arguments")
 	})
 
 	t.Run("async lambda", func(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
-		_, err := tc.run(`k6.check("something", {"async": async () =>{ }})`)
+		_, err := tc.testRuntime.RunOnEventLoop(`k6.check("something", {"async": async () =>{ }})`)
 		assert.ErrorContains(t, err, "check() does not support async functions as arguments")
 	})
 }
@@ -210,7 +209,7 @@ func TestCheckArray(t *testing.T) {
 	t.Parallel()
 	tc := testCaseRuntime(t)
 
-	_, err := tc.run(`k6.check(null, [ true ])`)
+	_, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, [ true ])`)
 	assert.NoError(t, err)
 
 	bufSamples := metrics.GetBufferedSamples(tc.samples)
@@ -234,7 +233,7 @@ func TestCheckContextDone(t *testing.T) {
 		tc := testCaseRuntime(t)
 
 		tc.testRuntime.CancelContext()
-		v, err := tc.run(` k6.check(null, {"name": ()=>{ return true }})`)
+		v, err := tc.testRuntime.RunOnEventLoop(` k6.check(null, {"name": ()=>{ return true }})`)
 		assert.NoError(t, err)
 		assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)
 		assert.True(t, v.ToBoolean())
@@ -244,7 +243,7 @@ func TestCheckContextDone(t *testing.T) {
 		tc := testCaseRuntime(t)
 
 		tc.testRuntime.CancelContext()
-		v, err := tc.run(`k6.check(null, {"name": ()=>{ return false }})`)
+		v, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, {"name": ()=>{ return false }})`)
 		assert.NoError(t, err)
 		assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)
 		assert.False(t, v.ToBoolean())
@@ -255,7 +254,7 @@ func TestCheckLiteral(t *testing.T) {
 	t.Parallel()
 	tc := testCaseRuntime(t)
 
-	_, err := tc.run(`k6.check(null, 12345)`)
+	_, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, 12345)`)
 	assert.NoError(t, err)
 	assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)
 }
@@ -264,7 +263,7 @@ func TestCheckNull(t *testing.T) {
 	t.Parallel()
 	tc := testCaseRuntime(t)
 
-	_, err := tc.run(`k6.check(5)`)
+	_, err := tc.testRuntime.RunOnEventLoop(`k6.check(5)`)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no checks provided")
 	assert.Len(t, metrics.GetBufferedSamples(tc.samples), 0)
@@ -273,7 +272,7 @@ func TestCheckNull(t *testing.T) {
 func TestCheckThrows(t *testing.T) {
 	t.Parallel()
 	tc := testCaseRuntime(t)
-	_, err := tc.run(`
+	_, err := tc.testRuntime.RunOnEventLoop(`
 		k6.check(null, {
 			"a": function() { throw new Error("error A") },
 			"b": function() { throw new Error("error B") },
@@ -324,7 +323,7 @@ func TestCheckTypes(t *testing.T) {
 					t.Parallel()
 					tc := testCaseRuntime(t)
 
-					v, err := tc.run(fmt.Sprintf(tpl, value))
+					v, err := tc.testRuntime.RunOnEventLoop(fmt.Sprintf(tpl, value))
 					require.NoError(t, err)
 					assert.Equal(t, succ, v.Export())
 
@@ -355,7 +354,7 @@ func TestCheckContextExpiry(t *testing.T) {
 
 	tc := testCaseRuntime(t)
 
-	v, err := tc.run(`value = k6.check(null, { "check": true })`)
+	v, err := tc.testRuntime.RunOnEventLoop(`value = k6.check(null, { "check": true })`)
 	require.NoError(t, err)
 	assert.Equal(t, true, v.Export())
 
@@ -365,7 +364,7 @@ func TestCheckContextExpiry(t *testing.T) {
 
 	tc.testRuntime.CancelContext()
 
-	v, err = tc.run(`k6.check(null, { "check": true })`)
+	v, err = tc.testRuntime.RunOnEventLoop(`k6.check(null, { "check": true })`)
 	require.NoError(t, err)
 	assert.Equal(t, true, v.Export())
 
@@ -377,7 +376,7 @@ func TestCheckTags(t *testing.T) {
 	t.Parallel()
 	tc := testCaseRuntime(t)
 
-	v, err := tc.run(`k6.check(null, {"check": true}, {a: 1, b: "2"})`)
+	v, err := tc.testRuntime.RunOnEventLoop(`k6.check(null, {"check": true}, {a: 1, b: "2"})`)
 	require.NoError(t, err)
 	assert.Equal(t, true, v.Export())
 
@@ -427,13 +426,4 @@ func testCaseRuntime(t testing.TB) *testCase {
 		samples:     samples,
 		testRuntime: testRuntime,
 	}
-}
-
-func (t *testCase) run(script string) (v goja.Value, err error) {
-	defer t.testRuntime.EventLoop.WaitOnRegistered()
-	err = t.testRuntime.EventLoop.Start(func() error {
-		v, err = t.testRuntime.VU.Runtime().RunString(script)
-		return err
-	})
-	return v, err
 }
