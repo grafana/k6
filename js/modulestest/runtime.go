@@ -74,6 +74,34 @@ func (r *Runtime) SetupModuleSystemFromAnother(another *Runtime) error {
 	return r.innerSetupModuleSystem()
 }
 
+// RunOnEventLoop will run the given code on the event loop.
+//
+// It is meant as a helper to test code that is expected to be run on the event loop, such
+// as code that returns a promise.
+//
+// A typical usage is to facilitate writing tests for asynchrounous code:
+//
+//	func TestSomething(t *testing.T) {
+//	    runtime := modulestest.NewRuntime(t)
+//
+//	    err := runtime.RunOnEventLoop(`
+//	        doSomethingAsync().then(() => {
+//	            // do some assertions
+//	        });
+//	    `)
+//	    require.NoError(t, err)
+//	}
+func (r *Runtime) RunOnEventLoop(code string) (value goja.Value, err error) {
+	defer r.EventLoop.WaitOnRegistered()
+
+	err = r.EventLoop.Start(func() error {
+		value, err = r.VU.Runtime().RunString(code)
+		return err
+	})
+
+	return value, err
+}
+
 func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
 	impl := modules.NewLegacyRequireImpl(r.VU, ms, url.URL{})

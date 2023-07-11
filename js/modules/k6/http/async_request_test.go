@@ -7,22 +7,11 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/modulestest"
 )
 
 func wrapInAsyncLambda(input string) string {
 	// This makes it possible to use `await` freely on the "top" level
 	return "(async () => {\n " + input + "\n })()"
-}
-
-func runOnEventLoop(runtime *modulestest.Runtime, code string) error {
-	// TODO move this in modulestest.Runtime and extend it
-	err := runtime.EventLoop.Start(func() error {
-		_, err := runtime.VU.Runtime().RunString(wrapInAsyncLambda(code))
-		return err
-	})
-	runtime.EventLoop.WaitOnRegistered()
-	return err
 }
 
 func TestAsyncRequest(t *testing.T) {
@@ -32,7 +21,7 @@ func TestAsyncRequest(t *testing.T) {
 		ts := newTestCase(t)
 
 		sr := ts.tb.Replacer.Replace
-		err := runOnEventLoop(ts.runtime, sr(`
+		_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(sr(`
 				var reqUrl = "HTTPBIN_URL/cookies"
 				var res = await http.asyncRequest("GET", reqUrl);
 				var jar = new http.CookieJar();
@@ -50,7 +39,7 @@ func TestAsyncRequest(t *testing.T) {
 				}
 				if (res.request["cookies"]["key2"][0].name != "key2") { throw new Error("wrong http request cookies: " + JSON.stringify(JSON.stringify(res.request["cookies"]["key2"]))) }
 				if (res.request["headers"]["User-Agent"][0] != "TestUserAgent") { throw new Error("wrong http request headers: " + JSON.stringify(res.request)) }
-				`))
+				`)))
 		assert.NoError(t, err)
 	})
 	t.Run("NonEmptyBody", func(t *testing.T) {
@@ -58,18 +47,18 @@ func TestAsyncRequest(t *testing.T) {
 		ts := newTestCase(t)
 
 		sr := ts.tb.Replacer.Replace
-		err := runOnEventLoop(ts.runtime, sr(`
+		_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(sr(`
 				var res = await http.asyncRequest("POST", "HTTPBIN_URL/post", {a: "a", b: 2}, {headers: {"Content-Type": "application/x-www-form-urlencoded; charset=utf-8"}});
 				if (res.status != 200) { throw new Error("wrong status: " + res.status); }
 				if (res.request["body"] != "a=a&b=2") { throw new Error("http request body was not set properly: " + JSON.stringify(res.request))}
-				`))
+				`)))
 		assert.NoError(t, err)
 	})
 	t.Run("Concurrent", func(t *testing.T) {
 		t.Parallel()
 		ts := newTestCase(t)
 		sr := ts.tb.Replacer.Replace
-		err := runOnEventLoop(ts.runtime, sr(`
+		_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(sr(`
             let start = Date.now()
             let p1 = http.asyncRequest("GET", "HTTPBIN_URL/delay/200ms").then(() => { return Date.now() - start})
             let p2 = http.asyncRequest("GET", "HTTPBIN_URL/delay/100ms").then(() =>  { return Date.now() - start})
@@ -78,8 +67,7 @@ func TestAsyncRequest(t *testing.T) {
             if (time1 < time2) {
                 throw("request that should've taken 200ms took less time then one that should take 100ms " + time1 +">" + time2 )
             }
-
-				`))
+		`)))
 		assert.NoError(t, err)
 	})
 }
@@ -102,7 +90,7 @@ func TestAsyncRequestResponseCallbackRace(t *testing.T) {
 		// t.Log(s) // uncomment for debugging
 	})
 	require.NoError(t, err)
-	err = runOnEventLoop(ts.runtime, ts.tb.Replacer.Replace(`
+	_, err = ts.runtime.RunOnEventLoop(wrapInAsyncLambda(ts.tb.Replacer.Replace(`
         let call = (i) => {
             log("s"+i)
             if (i > 200) { return null; }
@@ -113,7 +101,7 @@ func TestAsyncRequestResponseCallbackRace(t *testing.T) {
             call(0)
             await http.asyncRequest("GET", "HTTPBIN_URL/redirect/20").then(() => log("!!!!!!!!!!!!!!!"+j))
         }
-    `))
+    `)))
 	require.NoError(t, err)
 }
 
@@ -126,13 +114,13 @@ func TestAsyncRequestErrors(t *testing.T) {
 			t.Parallel()
 			ts := newTestCase(t)
 
-			err := runOnEventLoop(ts.runtime, `
+			_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(`
             try {
                 http.asyncRequest("", "").catch((e) => globalThis.promiseRejected = e )
             } catch (e) {
                 globalThis.exceptionThrown = e
             }
-            `)
+            `))
 			require.NoError(t, err)
 			promiseRejected := ts.runtime.VU.Runtime().Get("promiseRejected")
 			exceptionThrown := ts.runtime.VU.Runtime().Get("exceptionThrown")
@@ -148,13 +136,13 @@ func TestAsyncRequestErrors(t *testing.T) {
 		t.Run("throw=false", func(t *testing.T) {
 			t.Parallel()
 			ts := newTestCase(t)
-			err := runOnEventLoop(ts.runtime, `
+			_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(`
 				var res = await http.asyncRequest("GET", "some://example.com", null, { throw: false });
 				if (res.error.search('unsupported protocol scheme "some"')  == -1) {
 					throw new Error("wrong error:" + res.error);
 				}
 				throw new Error("another error");
-			`)
+			`))
 			require.ErrorContains(t, err, "another error")
 
 			logEntry := ts.hook.LastEntry()
@@ -181,7 +169,7 @@ func TestAsyncRequestErrors(t *testing.T) {
                     globalThis.exceptionThrown = e
                 }
 			`
-			err := runOnEventLoop(ts.runtime, js)
+			_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(js))
 			require.NoError(t, err)
 			promiseRejected := ts.runtime.VU.Runtime().Get("promiseRejected")
 			exceptionThrown := ts.runtime.VU.Runtime().Get("exceptionThrown")
@@ -203,7 +191,7 @@ func TestAsyncRequestErrors(t *testing.T) {
                 var r = await http.asyncRequest("GET", "https:// test.k6.io");
                 globalThis.ret = {error: r.error, error_code: r.error_code};
 			`
-			err := runOnEventLoop(ts.runtime, js)
+			_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(js))
 			require.NoError(t, err)
 			ret := rt.GlobalObject().Get("ret")
 			var retobj map[string]interface{}
@@ -237,7 +225,7 @@ func TestAsyncRequestErrors(t *testing.T) {
                 r.json();
                 globalThis.ret = r.error_code; // not reached because of json()
 			`
-			err := runOnEventLoop(ts.runtime, js)
+			_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(js))
 			ret := rt.GlobalObject().Get("ret")
 			require.Error(t, err)
 			assert.Nil(t, ret)
@@ -256,12 +244,12 @@ func TestAsyncRequestErrors(t *testing.T) {
 	t.Run("Unroutable", func(t *testing.T) {
 		t.Parallel()
 		ts := newTestCase(t)
-		err := runOnEventLoop(ts.runtime, `
+		_, err := ts.runtime.RunOnEventLoop(wrapInAsyncLambda(`
             try {
                 http.asyncRequest("GET", "http://sdafsgdhfjg/").catch((e) => globalThis.promiseRejected = e )
             } catch (e) {
                 globalThis.exceptionThrown = e
-            }`)
+            }`))
 		expErr := "lookup sdafsgdhfjg"
 		require.NoError(t, err)
 		promiseRejected := ts.runtime.VU.Runtime().Get("promiseRejected")
