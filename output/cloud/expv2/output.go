@@ -124,12 +124,12 @@ func (o *Output) Start() error {
 		o.requestMetadatasCollector = newRequestMetadatasCollector(testRunID)
 
 		insightsClientConfig := insights.ClientConfig{
-			IngesterHost: o.config.TracesHost.ValueOrZero(),
+			IngesterHost: o.config.TracesHost.String,
 			Timeout:      types.NewNullDuration(90*time.Second, false),
 			AuthConfig: insights.ClientAuthConfig{
 				Enabled:                  true,
 				TestRunID:                testRunID,
-				Token:                    o.config.Token.ValueOrZero(),
+				Token:                    o.config.Token.String,
 				RequireTransportSecurity: true,
 			},
 			TLSConfig: insights.ClientTLSConfig{
