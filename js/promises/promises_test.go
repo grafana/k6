@@ -15,13 +15,8 @@ func TestNew(t *testing.T) {
 		t.Parallel()
 
 		runtime := modulestest.NewRuntime(t)
-		promise, resolve, _ := New(runtime.VU)
-
-		go func() {
-			resolve("resolved")
-		}()
-
 		err := runtime.EventLoop.Start(func() error {
+			promise, resolve, _ := New(runtime.VU)
 			err := runtime.VU.Runtime().Set("promise", promise)
 			require.NoError(t, err)
 
@@ -32,6 +27,9 @@ func TestNew(t *testing.T) {
 						err => { throw "unexpected error: " + err },
 					)
 			`)
+			go func() {
+				resolve("resolved")
+			}()
 
 			return err
 		})
@@ -43,13 +41,8 @@ func TestNew(t *testing.T) {
 		t.Parallel()
 
 		runtime := modulestest.NewRuntime(t)
-		promise, _, reject := New(runtime.VU)
-
-		go func() {
-			reject("rejected")
-		}()
-
 		err := runtime.EventLoop.Start(func() error {
+			promise, _, reject := New(runtime.VU)
 			err := runtime.VU.Runtime().Set("promise", promise)
 			require.NoError(t, err)
 
@@ -60,6 +53,9 @@ func TestNew(t *testing.T) {
 						err => { if (err !== "rejected") { throw "unexpected error: " + err } },
 					)
 			`)
+			go func() {
+				reject("rejected")
+			}()
 
 			return err
 		})
