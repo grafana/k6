@@ -98,9 +98,16 @@ func DialShared(ctx context.Context, addr string, options ...grpc.DialOption) (*
 	)
 	var ok bool
 
-	addrMu := findAddrMutex(addr)
+	var addrMu *sync.Mutex
+	// Lock for mutating connectionsAddrMu map
+	connectionsMu.Lock()
+	if addrMu, ok = connectionsAddrMu[addr]; !ok {
+		addrMu = &sync.Mutex{}
+		connectionsAddrMu[addr] = addrMu
+	}
 	// Lock for mutating connections map
 	addrMu.Lock()
+	connectionsMu.Unlock()
 	defer addrMu.Unlock()
 	// As we may modify the clients map
 	// We lock to ensure we only open a single connection and add it to the map. Subsequent consumers will obtain
@@ -120,18 +127,6 @@ func DialShared(ctx context.Context, addr string, options ...grpc.DialOption) (*
 		addr: addr,
 		raw:  conn,
 	}, nil
-}
-
-func findAddrMutex(addr string) (addrMu *sync.Mutex) {
-	// Lock for mutating connectionsAddrMu map
-	connectionsMu.Lock()
-	defer connectionsMu.Unlock()
-	var ok bool
-	if addrMu, ok = connectionsAddrMu[addr]; !ok {
-		addrMu = &sync.Mutex{}
-		connectionsAddrMu[addr] = addrMu
-	}
-	return addrMu
 }
 
 // Reflect returns using the reflection the FileDescriptorSet describing the service.
