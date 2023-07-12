@@ -257,6 +257,9 @@ github.com/mstoykov/k6-taskqueue-lib/taskqueue
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 ## explicit
 github.com/nu7hatch/gouuid
+# github.com/openhistogram/circonusllhist v0.3.1-0.20210609143308-c78ce013c914
+## explicit; go 1.16
+github.com/openhistogram/circonusllhist
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
