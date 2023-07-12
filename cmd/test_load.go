@@ -41,7 +41,7 @@ type loadedTest struct {
 	keyLogger      io.Closer
 }
 
-func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
 	}
@@ -236,11 +236,11 @@ type loadedAndConfiguredTest struct {
 	derivedConfig      Config
 }
 
-func loadAndConfigureTest(
+func loadAndConfigureLocalTest(
 	gs *state.GlobalState, cmd *cobra.Command, args []string,
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
 ) (*loadedAndConfiguredTest, error) {
-	test, err := loadTest(gs, cmd, args)
+	test, err := loadLocalTest(gs, cmd, args)
 	if err != nil {
 		return nil, err
 	}

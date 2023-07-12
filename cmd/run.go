@@ -40,6 +40,9 @@ import (
 // cmdRun handles the `k6 run` sub-command
 type cmdRun struct {
 	gs *state.GlobalState
+
+	// TODO: figure out something more elegant?
+	loadConfiguredTest func(cmd *cobra.Command, args []string) (*loadedAndConfiguredTest, execution.Controller, error)
 }
 
 const (
@@ -101,7 +104,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		c.gs.Events.UnsubscribeAll()
 	}()
 
-	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
+	test, controller, err := c.loadConfiguredTest(cmd, args)
 	if err != nil {
 		return err
 	}
@@ -133,7 +136,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Create a local execution scheduler wrapping the runner.
 	logger.Debug("Initializing the execution scheduler...")
-	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
+	execScheduler, err := execution.NewScheduler(testRunState, controller)
 	if err != nil {
 		return err
 	}
@@ -460,6 +463,10 @@ func (c *cmdRun) setupTracerProvider(ctx context.Context, test *loadedAndConfigu
 func getCmdRun(gs *state.GlobalState) *cobra.Command {
 	c := &cmdRun{
 		gs: gs,
+		loadConfiguredTest: func(cmd *cobra.Command, args []string) (*loadedAndConfiguredTest, execution.Controller, error) {
+			test, err := loadAndConfigureLocalTest(gs, cmd, args, getConfig)
+			return test, local.NewController(), err
+		},
 	}
 
 	exampleText := getExampleText(gs, `
