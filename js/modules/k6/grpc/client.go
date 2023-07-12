@@ -120,7 +120,7 @@ func decryptPrivateKey(key, password []byte) ([]byte, error) {
 
 	blockType := block.Type
 	if blockType == "ENCRYPTED PRIVATE KEY" {
-		return nil, fmt.Errorf("encrypted pkcs8 formatted key is not supported")
+		return nil, errors.New("encrypted pkcs8 formatted key is not supported")
 	}
 	/*
 	   Even though `DecryptPEMBlock` has been deprecated since 1.16.x it is still
