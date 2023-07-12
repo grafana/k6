@@ -2,6 +2,7 @@ package expv2
 
 import (
 	"context"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/cloudapi/insights"
@@ -27,6 +28,7 @@ type metricsFlusher struct {
 // If the number of time series collected is bigger than maximum batch size
 // then it splits in chunks.
 func (f *metricsFlusher) flush() error {
+
 	// drain the buffer
 	buckets := f.bq.PopAll()
 	if len(buckets) < 1 {
@@ -42,6 +44,20 @@ func (f *metricsFlusher) flush() error {
 	// and group them by metric. To avoid doing too many loops and allocations,
 	// the metricSetBuilder is used for doing it during the traverse of the buckets.
 
+	var (
+		seriesCount  int
+		batchesCount int
+		start        = time.Now()
+	)
+
+	defer func() {
+		f.logger.
+			WithField("t", time.Since(start)).
+			WithField("series", seriesCount).
+			WithField("buckets", len(buckets)).
+			WithField("batches", batchesCount).Debug("Flush the queued buckets")
+	}()
+
 	msb := newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 	for i := 0; i < len(buckets); i++ {
 		for timeSeries, sink := range buckets[i].Sinks {
@@ -51,8 +67,8 @@ func (f *metricsFlusher) flush() error {
 			}
 
 			// we hit the batch size, let's flush
-			f.logger.WithField("limit", f.maxSeriesInBatch).
-				Debug("Flushing a partial, hit the max number of series allowed in a single batch")
+			batchesCount++
+			seriesCount += len(msb.seriesIndex)
 			err := f.push(msb)
 			if err != nil {
 				return err
@@ -65,8 +81,9 @@ func (f *metricsFlusher) flush() error {
 		return nil
 	}
 
-	f.logger.WithField("series", len(msb.seriesIndex)).Debug("Flushing the batch")
 	// send the last (or the unique) MetricSet chunk to the remote service
+	batchesCount++
+	seriesCount += len(msb.seriesIndex)
 	return f.push(msb)
 }
 
