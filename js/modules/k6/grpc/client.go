@@ -222,13 +222,11 @@ func (c *Client) Connect(addr string, params map[string]interface{}) (bool, erro
 
 	var tcred credentials.TransportCredentials
 	if !p.IsPlaintext {
-		var tlsCfg *tls.Config
+		tlsCfg := state.TLSConfig.Clone()
 		if len(p.TLS) > 0 {
-			if tlsCfg, err = buildTLSConfigFromMap(state.TLSConfig.Clone(), p.TLS); err != nil {
+			if tlsCfg, err = buildTLSConfigFromMap(tlsCfg, p.TLS); err != nil {
 				return false, err
 			}
-		} else {
-			tlsCfg = state.TLSConfig.Clone()
 		}
 		tlsCfg.NextProtos = []string{"h2"}
 
