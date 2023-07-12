@@ -22,7 +22,7 @@ func newMetricValue(mt metrics.MetricType) metricValue {
 	case metrics.Rate:
 		am = &rate{}
 	case metrics.Trend:
-		am = &histogram{}
+		am = newHistogram()
 	default:
 		// Should not be possible to create
 		// an invalid metric type except for specific

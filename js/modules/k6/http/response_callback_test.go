@@ -262,11 +262,7 @@ func TestResponseCallbackInAction(t *testing.T) {
 			t.Helper()
 			ts.instance.defaultClient.responseCallback = defaultExpectedStatuses.match
 
-			err := ts.runtime.EventLoop.Start(func() error {
-				_, err := ts.runtime.VU.Runtime().RunString(sr(code))
-				return err
-			})
-			ts.runtime.EventLoop.WaitOnRegistered()
+			_, err := ts.runtime.RunOnEventLoop(sr(code))
 			assert.NoError(t, err)
 			bufSamples := metrics.GetBufferedSamples(samples)
 

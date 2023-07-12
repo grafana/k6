@@ -12,7 +12,7 @@ import (
 // 	logHook := testutils.NewLogHook(logrus.WarnLevel)
 // 	testLog := logrus.New()
 // 	testLog.AddHook(logHook)
-// 	testLog.SetOutput(ioutil.Discard)
+// 	testLog.SetOutput(io.Discard)
 // 	return logrus.NewEntry(testLog)
 // }
 

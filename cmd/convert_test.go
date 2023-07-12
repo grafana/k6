@@ -1,7 +1,7 @@
 package cmd
 
 import (
-	"io/ioutil"
+	"os"
 	"regexp"
 	"testing"
 
@@ -102,10 +102,10 @@ export default function() {
 
 func TestConvertCmdCorrelate(t *testing.T) {
 	t.Parallel()
-	har, err := ioutil.ReadFile("testdata/example.har")
+	har, err := os.ReadFile("testdata/example.har") //nolint:forbidigo
 	require.NoError(t, err)
 
-	expectedTestPlan, err := ioutil.ReadFile("testdata/example.js")
+	expectedTestPlan, err := os.ReadFile("testdata/example.js") //nolint:forbidigo
 	require.NoError(t, err)
 
 	ts := tests.NewGlobalTestState(t)

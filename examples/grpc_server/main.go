@@ -28,7 +28,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"os"
 	"log"
 	"math"
 	"math/rand"
@@ -187,7 +187,7 @@ func loadFeatures(filePath string) []*Feature {
 	var data []byte
 	if filePath != "" {
 		var err error
-		data, err = ioutil.ReadFile(filePath)
+		data, err = os.ReadFile(filePath)
 		if err != nil {
 			log.Fatalf("Failed to load default features: %v", err)
 		}

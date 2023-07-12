@@ -253,15 +253,11 @@ func TestCallingInstrumentedRequestEmitsTraceIdMetadata(t *testing.T) {
 	// Assert there is no trace_id key in vu metadata before calling an instrumented
 	// function, and that it's cleaned up after the call.
 	t.Cleanup(testCase.TestRuntime.EventLoop.WaitOnRegistered)
-	err = testCase.TestRuntime.EventLoop.Start(func() error {
-		_, err = rt.RunString(httpBin.Replacer.Replace(`
-        	assert_has_trace_id_metadata(false)
-        	http.request("GET", "HTTPBIN_URL")
-        	assert_has_trace_id_metadata(false)
-        `))
-
-		return err
-	})
+	_, err = testCase.TestRuntime.RunOnEventLoop(httpBin.Replacer.Replace(`
+		assert_has_trace_id_metadata(false)
+		http.request("GET", "HTTPBIN_URL")
+		assert_has_trace_id_metadata(false)
+	`))
 	require.NoError(t, err)
 	close(samples)
 

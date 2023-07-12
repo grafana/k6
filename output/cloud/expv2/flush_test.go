@@ -159,7 +159,7 @@ func TestMetricsFlusherFlushChunk(t *testing.T) {
 		}
 		require.Len(t, bq.buckets, tc.series)
 
-		err := mf.flush(context.Background())
+		err := mf.flush()
 		require.NoError(t, err)
 		assert.Equal(t, tc.expFlushCalls, pm.pushCalled)
 	}
@@ -216,7 +216,7 @@ func TestFlushWithReservedLabels(t *testing.T) {
 		},
 	})
 
-	err := mf.flush(context.Background())
+	err := mf.flush()
 	require.NoError(t, err)
 
 	loglines := hook.Drain()
@@ -264,7 +264,7 @@ func Test_tracesFlusher_Flush_ReturnsNoErrorWithWorkingInsightsClientAndNonCance
 	flusher := newTracesFlusher(cli, col)
 
 	// When
-	err := flusher.flush(context.Background())
+	err := flusher.flush()
 
 	// Then
 	require.NoError(t, err)
@@ -283,34 +283,13 @@ func Test_tracesFlusher_Flush_ReturnsNoErrorWithWorkingInsightsClientAndNonCance
 	flusher := newTracesFlusher(cli, col)
 
 	// When
-	err := flusher.flush(context.Background())
+	err := flusher.flush()
 
 	// Then
 	require.NoError(t, err)
 	require.True(t, cli.ingestRequestMetadatasBatchInvoked)
 	require.True(t, cli.dataSent)
 	require.Equal(t, data, cli.data)
-}
-
-func Test_tracesFlusher_Flush_ReturnsErrorWithWorkingInsightsClientAndCancelledContext(t *testing.T) {
-	t.Parallel()
-
-	// Given
-	data := newMockRequestMetadatas()
-	cli := &mockWorkingInsightsClient{}
-	col := &mockRequestMetadatasCollector{data: data}
-	flusher := newTracesFlusher(cli, col)
-	ctx, cancel := context.WithCancel(context.Background())
-	cancel()
-
-	// When
-	err := flusher.flush(ctx)
-
-	// Then
-	require.Error(t, err)
-	require.True(t, cli.ingestRequestMetadatasBatchInvoked)
-	require.False(t, cli.dataSent)
-	require.Empty(t, cli.data)
 }
 
 func Test_tracesFlusher_Flush_ReturnsErrorWithFailingInsightsClientAndNonCancelledContext(t *testing.T) {
@@ -324,7 +303,7 @@ func Test_tracesFlusher_Flush_ReturnsErrorWithFailingInsightsClientAndNonCancell
 	flusher := newTracesFlusher(cli, col)
 
 	// When
-	err := flusher.flush(context.Background())
+	err := flusher.flush()
 
 	// Then
 	require.ErrorIs(t, err, testErr)

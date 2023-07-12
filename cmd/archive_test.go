@@ -7,7 +7,7 @@ import (
 	"errors"
 	"io"
 	"io/fs"
-	"io/ioutil"
+	"os"
 	"path/filepath"
 	"syscall"
 	"testing"
@@ -77,7 +77,7 @@ func TestArchiveThresholds(t *testing.T) {
 		t.Run(testCase.name, func(t *testing.T) {
 			t.Parallel()
 
-			testScript, err := ioutil.ReadFile(testCase.testFilename)
+			testScript, err := os.ReadFile(testCase.testFilename) //nolint:forbidigo
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)

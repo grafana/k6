@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"io"
 	"io/fs"
-	"io/ioutil"
+	"os"
 	"path"
 	"path/filepath"
 	"runtime"
@@ -196,7 +196,7 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
+			testScript, err := os.ReadFile(path.Join("testdata", tc.testFilename)) //nolint:forbidigo
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)
@@ -251,7 +251,7 @@ func TestInvalidOptionsThresholdErrExitCode(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
+			testScript, err := os.ReadFile(path.Join("testdata", tc.testFilename)) //nolint:forbidigo
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)
@@ -301,7 +301,7 @@ func TestThresholdsRuntimeBehavior(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
-			testScript, err := ioutil.ReadFile(path.Join("testdata", tc.testFilename))
+			testScript, err := os.ReadFile(path.Join("testdata", tc.testFilename)) //nolint:forbidigo
 			require.NoError(t, err)
 
 			ts := tests.NewGlobalTestState(t)

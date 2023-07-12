@@ -1,0 +1,36 @@
+// The purpose of this proto file is to demonstrate that we can have
+// nested types and that we should be able to load them correctly.
+
+syntax = "proto3";
+
+package grpc.testing;
+
+// Example to demonstrate that it is possible to define
+// and use message types within other message types
+message Outer {      // Level 0
+  message MiddleAA { // Level 1
+    message Inner {  // Level 2
+      int64 ival = 1;
+      bool booly = 2;
+    }
+    Inner inner = 1;
+  }
+
+  message MiddleBB { // Level 1
+    message Inner {  // Level 2
+      int32 ival = 1;
+      bool booly = 2;
+    }
+    Inner inner = 1;
+  }
+
+  MiddleAA middleAA = 1;
+  MiddleBB middleBB = 2;
+}
+
+// Example to demonstrate that it is possible to reuse
+// a message type outside its parent message type
+message MeldOuter {
+  Outer.MiddleAA.Inner innerAA = 1;
+  Outer.MiddleBB.Inner innerBB = 2;
+}

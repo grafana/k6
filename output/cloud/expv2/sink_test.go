@@ -16,7 +16,7 @@ func TestNewSink(t *testing.T) {
 		{metrics.Counter, &counter{}},
 		{metrics.Gauge, &gauge{}},
 		{metrics.Rate, &rate{}},
-		{metrics.Trend, &histogram{}},
+		{metrics.Trend, newHistogram()},
 	}
 	for _, tc := range tests {
 		assert.Equal(t, tc.exp, newMetricValue(tc.mt))

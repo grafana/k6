@@ -18,7 +18,8 @@ import (
 // TODO?: Discard? Or make this actually user-configurable somehow? hello #883...
 var DefaultGracefulStopValue = 30 * time.Second //nolint:gochecknoglobals
 
-var executorNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`) //nolint:gochecknoglobals
+var executorNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`)
+
 const executorNameErr = "the executor name should contain only numbers, latin letters, underscores, and dashes"
 
 // BaseConfig contains the common config fields for all executors

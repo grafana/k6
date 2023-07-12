@@ -1,4 +1,4 @@
-# v1.51.2
+# v1.53.3
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   deadline: 5m
@@ -69,7 +69,6 @@ linters:
     - bodyclose
     - contextcheck
     - cyclop
-    - depguard
     - dogsled
     - dupl
     - durationcheck
