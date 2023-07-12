@@ -99,14 +99,8 @@ func TestMetricSetBuilderAddTimeBucket(t *testing.T) {
 		Tags:   r.RootTagSet().With("key1", "val1"),
 	}
 
-	tb := timeBucket{
-		Time: 1,
-		Sinks: map[metrics.TimeSeries]metricValue{
-			timeSeries: &counter{},
-		},
-	}
 	msb := newMetricSetBuilder("testrunid-123", 1)
-	msb.addTimeBucket(tb)
+	msb.addTimeSeries(1, timeSeries, &counter{})
 
 	assert.Contains(t, msb.metrics, m1)
 	require.Contains(t, msb.seriesIndex, timeSeries)
@@ -115,8 +109,52 @@ func TestMetricSetBuilderAddTimeBucket(t *testing.T) {
 	require.Len(t, msb.MetricSet.Metrics, 1)
 	assert.Len(t, msb.MetricSet.Metrics[0].TimeSeries, 1)
 }
+func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
+	t.Parallel()
 
-func TestMetricsFlusherFlushChunk(t *testing.T) {
+	testCases := []struct {
+		series        int
+		expFlushCalls int
+	}{
+		{series: 5, expFlushCalls: 2},
+		{series: 2, expFlushCalls: 1},
+	}
+
+	r := metrics.NewRegistry()
+	m1 := r.MustNewMetric("metric1", metrics.Counter)
+	for _, tc := range testCases {
+		logger, _ := testutils.NewLoggerWithHook(t)
+
+		bq := &bucketQ{}
+		pm := &pusherMock{}
+		mf := metricsFlusher{
+			bq:               bq,
+			client:           pm,
+			logger:           logger,
+			discardedLabels:  make(map[string]struct{}),
+			maxSeriesInBatch: 3,
+		}
+
+		bq.buckets = make([]timeBucket, 0, tc.series)
+		sinks := make(map[metrics.TimeSeries]metricValue)
+		for i := 0; i < tc.series; i++ {
+			ts := metrics.TimeSeries{
+				Metric: m1,
+				Tags:   r.RootTagSet().With("key1", "val"+strconv.Itoa(i)),
+			}
+
+			sinks[ts] = &counter{Sum: float64(1)}
+		}
+		require.Len(t, sinks, tc.series)
+
+		bq.Push([]timeBucket{{Time: 1, Sinks: sinks}})
+		err := mf.flush()
+		require.NoError(t, err)
+		assert.Equal(t, tc.expFlushCalls, pm.pushCalled)
+	}
+}
+
+func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {

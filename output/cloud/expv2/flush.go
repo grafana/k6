@@ -44,19 +44,21 @@ func (f *metricsFlusher) flush() error {
 
 	msb := newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 	for i := 0; i < len(buckets); i++ {
-		msb.addTimeBucket(buckets[i])
-		if len(msb.seriesIndex) < f.maxSeriesInBatch {
-			continue
-		}
+		for timeSeries, sink := range buckets[i].Sinks {
+			msb.addTimeSeries(buckets[i].Time, timeSeries, sink)
+			if len(msb.seriesIndex) < f.maxSeriesInBatch {
+				continue
+			}
 
-		// we hit the batch size, let's flush
-		f.logger.WithField("limit", f.maxSeriesInBatch).
-			Debug("Flushing a partial, hit the max number of series allowed in a single batch")
-		err := f.push(msb)
-		if err != nil {
-			return err
+			// we hit the batch size, let's flush
+			f.logger.WithField("limit", f.maxSeriesInBatch).
+				Debug("Flushing a partial, hit the max number of series allowed in a single batch")
+			err := f.push(msb)
+			if err != nil {
+				return err
+			}
+			msb = newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 		}
-		msb = newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 	}
 
 	if len(msb.seriesIndex) < 1 {
@@ -128,36 +130,34 @@ func newMetricSetBuilder(testRunID string, aggrPeriodSec uint32) metricSetBuilde
 	return builder
 }
 
-func (msb *metricSetBuilder) addTimeBucket(bucket timeBucket) {
-	for timeSeries, sink := range bucket.Sinks {
-		pbmetric, ok := msb.metrics[timeSeries.Metric]
-		if !ok {
-			pbmetric = &pbcloud.Metric{
-				Name: timeSeries.Metric.Name,
-				Type: mapMetricTypeProto(timeSeries.Metric.Type),
-			}
-			msb.metrics[timeSeries.Metric] = pbmetric
-			msb.MetricSet.Metrics = append(msb.MetricSet.Metrics, pbmetric)
+func (msb *metricSetBuilder) addTimeSeries(timestamp int64, timeSeries metrics.TimeSeries, sink metricValue) {
+	pbmetric, ok := msb.metrics[timeSeries.Metric]
+	if !ok {
+		pbmetric = &pbcloud.Metric{
+			Name: timeSeries.Metric.Name,
+			Type: mapMetricTypeProto(timeSeries.Metric.Type),
 		}
-
-		var pbTimeSeries *pbcloud.TimeSeries
-		ix, ok := msb.seriesIndex[timeSeries]
-		if !ok {
-			labels, discardedLabels := mapTimeSeriesLabelsProto(timeSeries.Tags)
-			msb.recordDiscardedLabels(discardedLabels)
-
-			pbTimeSeries = &pbcloud.TimeSeries{
-				Labels: labels,
-			}
-			pbmetric.TimeSeries = append(pbmetric.TimeSeries, pbTimeSeries)
-			msb.seriesIndex[timeSeries] = uint(len(pbmetric.TimeSeries) - 1)
-		} else {
-			pbTimeSeries = pbmetric.TimeSeries[ix]
-		}
-
-		addBucketToTimeSeriesProto(
-			pbTimeSeries, timeSeries.Metric.Type, bucket.Time, sink)
+		msb.metrics[timeSeries.Metric] = pbmetric
+		msb.MetricSet.Metrics = append(msb.MetricSet.Metrics, pbmetric)
 	}
+
+	var pbTimeSeries *pbcloud.TimeSeries
+	ix, ok := msb.seriesIndex[timeSeries]
+	if !ok {
+		labels, discardedLabels := mapTimeSeriesLabelsProto(timeSeries.Tags)
+		msb.recordDiscardedLabels(discardedLabels)
+
+		pbTimeSeries = &pbcloud.TimeSeries{
+			Labels: labels,
+		}
+		pbmetric.TimeSeries = append(pbmetric.TimeSeries, pbTimeSeries)
+		msb.seriesIndex[timeSeries] = uint(len(pbmetric.TimeSeries) - 1)
+	} else {
+		pbTimeSeries = pbmetric.TimeSeries[ix]
+	}
+
+	addBucketToTimeSeriesProto(
+		pbTimeSeries, timeSeries.Metric.Type, timestamp, sink)
 }
 
 func (msb *metricSetBuilder) recordDiscardedLabels(labels []string) {
