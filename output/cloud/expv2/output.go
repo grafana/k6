@@ -331,24 +331,30 @@ func (o *Output) flushRequestMetadatas() {
 // Instead, if cloudapi.Config.StopOnError is enabled the cloud output should
 // stop the whole test run too. This logic should be handled by the caller.
 func (o *Output) handleFlushError(err error) {
+	// Don't actually handle any errors if we were aborted
+	select {
+	case <-o.abort:
+		return
+	default:
+	}
+
 	o.logger.WithError(err).Error("Failed to push metrics to the cloud")
 
 	var errResp cloudapi.ErrorResponse
 	if !errors.As(err, &errResp) || errResp.Response == nil {
 		return
 	}
-
 	// The Cloud service returns the error code 4 when it doesn't accept any more metrics.
 	// So, when k6 sees that, the cloud output just stops prematurely.
 	if errResp.Response.StatusCode != http.StatusForbidden || errResp.Code != 4 {
 		return
 	}
 
-	o.logger.WithError(err).Warn("Interrupt sending metrics to cloud due to an error")
-
 	// Do not close multiple times (that would panic) in the case
 	// we hit this multiple times and/or concurrently
 	o.abortOnce.Do(func() {
+		o.logger.WithError(err).Warn("Interrupt sending metrics to cloud due to an error")
+
 		close(o.abort)
 
 		if o.config.StopOnError.Bool {
