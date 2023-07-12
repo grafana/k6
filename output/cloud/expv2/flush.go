@@ -68,8 +68,7 @@ func (f *metricsFlusher) flush() error {
 			// we hit the batch size, let's flush
 			batchesCount++
 			seriesCount += len(msb.seriesIndex)
-			err := f.push(msb)
-			if err != nil {
+			if err := f.push(msb); err != nil {
 				return err
 			}
 			msb = newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
@@ -158,8 +157,7 @@ func (msb *metricSetBuilder) addTimeSeries(timestamp int64, timeSeries metrics.T
 	}
 
 	var pbTimeSeries *pbcloud.TimeSeries
-	ix, ok := msb.seriesIndex[timeSeries]
-	if !ok {
+	if ix, ok := msb.seriesIndex[timeSeries]; !ok {
 		labels, discardedLabels := mapTimeSeriesLabelsProto(timeSeries.Tags)
 		msb.recordDiscardedLabels(discardedLabels)
 
@@ -171,9 +169,7 @@ func (msb *metricSetBuilder) addTimeSeries(timestamp int64, timeSeries metrics.T
 	} else {
 		pbTimeSeries = pbmetric.TimeSeries[ix]
 	}
-
-	addBucketToTimeSeriesProto(
-		pbTimeSeries, timeSeries.Metric.Type, timestamp, sink)
+	addBucketToTimeSeriesProto(pbTimeSeries, timeSeries.Metric.Type, timestamp, sink)
 }
 
 func (msb *metricSetBuilder) recordDiscardedLabels(labels []string) {
