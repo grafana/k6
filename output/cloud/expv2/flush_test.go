@@ -261,9 +261,8 @@ func TestFlushWithReservedLabels(t *testing.T) {
 	assert.Equal(t, 1, len(collected))
 
 	// check that warnings sown only once per label
-	require.Len(t, loglines, 2)
-	testutils.LogContains(loglines, logrus.WarnLevel, "Tag __name__ has been discarded since it is reserved for Cloud operations.")
-	testutils.LogContains(loglines, logrus.WarnLevel, "Tag test_run_id has been discarded since it is reserved for Cloud operations.")
+	assert.Len(t, testutils.FilterEntries(loglines, logrus.WarnLevel, "Tag __name__ has been discarded since it is reserved for Cloud operations."), 1)
+	assert.Len(t, testutils.FilterEntries(loglines, logrus.WarnLevel, "Tag test_run_id has been discarded since it is reserved for Cloud operations."), 1)
 
 	// check that flusher is not sending labels with reserved names
 	require.Len(t, collected[0].Metrics, 1)
