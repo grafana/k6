@@ -955,7 +955,7 @@ func TestClient_TlsParameters(t *testing.T) {
 			initString: codeBlock{code: "var client = new grpc.Client();"},
 			vuString: codeBlock{
 				code: `client.connect("GRPCBIN_ADDR", { tls: { cert: "", key: "", cacerts: 0 }});`,
-				err:  `invalid grpc.connect() parameters: invalid tls cacerts value: 'map[string]interface {}{"cacerts":0, "cert":"", "key":""}', it needs to be a string or string[] of PEM formatted strings`,
+				err:  `invalid grpc.connect() parameters: invalid tls cacerts value: 'map[string]interface {}{"cacerts":0, "cert":"", "key":""}', it needs to be a string or an array of PEM formatted strings`,
 			},
 		},
 		{
