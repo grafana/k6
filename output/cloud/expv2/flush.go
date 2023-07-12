@@ -28,7 +28,6 @@ type metricsFlusher struct {
 // If the number of time series collected is bigger than maximum batch size
 // then it splits in chunks.
 func (f *metricsFlusher) flush() error {
-
 	// drain the buffer
 	buckets := f.bq.PopAll()
 	if len(buckets) < 1 {
