@@ -15,7 +15,7 @@ func TestNewMetric(t *testing.T) {
 	}{
 		"Counter": {Counter, &CounterSink{}},
 		"Gauge":   {Gauge, &GaugeSink{}},
-		"Trend":   {Trend, &TrendSink{}},
+		"Trend":   {Trend, NewTrendSink()},
 		"Rate":    {Rate, &RateSink{}},
 	}
 

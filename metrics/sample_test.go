@@ -99,11 +99,11 @@ func TestGetResolversForTrendColumnsCalculation(t *testing.T) {
 }
 
 func createTestTrendSink(count int) *TrendSink {
-	sink := TrendSink{}
+	sink := NewTrendSink()
 
 	for i := 0; i < count; i++ {
 		sink.Add(Sample{Value: float64(i)})
 	}
 
-	return &sink
+	return sink
 }
