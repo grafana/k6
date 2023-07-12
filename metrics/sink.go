@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -13,7 +12,6 @@ var (
 	_ Sink = &GaugeSink{}
 	_ Sink = &TrendSink{}
 	_ Sink = &RateSink{}
-	_ Sink = &DummySink{}
 )
 
 type Sink interface {
@@ -179,17 +177,4 @@ func (r RateSink) Format(t time.Duration) map[string]float64 {
 	}
 
 	return map[string]float64{"rate": rate}
-}
-
-type DummySink map[string]float64
-
-// IsEmpty indicates whether the DummySink is empty.
-func (d DummySink) IsEmpty() bool { return len(d) == 0 }
-
-func (d DummySink) Add(s Sample) {
-	panic(errors.New("you can't add samples to a dummy sink"))
-}
-
-func (d DummySink) Format(t time.Duration) map[string]float64 {
-	return map[string]float64(d)
 }

@@ -656,8 +656,8 @@ func TestThresholdsRun(t *testing.T) {
 		{
 			name: "Running thresholds of existing sink",
 			args: args{
-				sink:                 DummySink{"p(95)": 1234.5},
-				thresholdExpressions: []string{"p(95)<2000"},
+				sink:                 &CounterSink{Value: 1234.5},
+				thresholdExpressions: []string{"count<2000"},
 				duration:             0,
 			},
 			want:    true,
@@ -666,8 +666,8 @@ func TestThresholdsRun(t *testing.T) {
 		{
 			name: "Running thresholds of existing sink but failing threshold",
 			args: args{
-				sink:                 DummySink{"p(95)": 3000},
-				thresholdExpressions: []string{"p(95)<2000"},
+				sink:                 &CounterSink{Value: 3000},
+				thresholdExpressions: []string{"count<2000"},
 				duration:             0,
 			},
 			want:    false,
@@ -676,7 +676,7 @@ func TestThresholdsRun(t *testing.T) {
 		{
 			name: "Running threshold on non existing sink does not fail",
 			args: args{
-				sink:                 DummySink{"dummy": 0},
+				sink:                 &CounterSink{},
 				thresholdExpressions: []string{"p(95)<2000"},
 				duration:             0,
 			},

@@ -259,13 +259,3 @@ func TestRateSink(t *testing.T) {
 		assert.Equal(t, map[string]float64{"rate": 0.5}, sink.Format(0))
 	})
 }
-
-func TestDummySinkAddPanics(t *testing.T) {
-	assert.Panics(t, func() {
-		DummySink{}.Add(Sample{})
-	})
-}
-
-func TestDummySinkFormatReturnsItself(t *testing.T) {
-	assert.Equal(t, map[string]float64{"a": 1}, DummySink{"a": 1}.Format(0))
-}

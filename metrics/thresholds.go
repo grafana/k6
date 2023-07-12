@@ -206,10 +206,6 @@ func (ts *Thresholds) Run(sink Sink, duration time.Duration) (bool, error) {
 		if sinkImpl.Total > 0 {
 			ts.sinked["rate"] = float64(sinkImpl.Trues) / float64(sinkImpl.Total)
 		}
-	case DummySink:
-		for k, v := range sinkImpl {
-			ts.sinked[k] = v
-		}
 	default:
 		return false, fmt.Errorf("unable to run Thresholds; reason: unknown sink type")
 	}
