@@ -49,7 +49,9 @@ func (f *metricsFlusher) flush() error {
 			continue
 		}
 
-		// we hit the chunk size, let's flush
+		// we hit the batch size, let's flush
+		f.logger.WithField("limit", f.maxSeriesInBatch).
+			Debug("Flushing a partial, hit the max number of series allowed in a single batch")
 		err := f.push(msb)
 		if err != nil {
 			return err
@@ -61,6 +63,7 @@ func (f *metricsFlusher) flush() error {
 		return nil
 	}
 
+	f.logger.WithField("series", len(msb.seriesIndex)).Debug("Flushing the batch")
 	// send the last (or the unique) MetricSet chunk to the remote service
 	return f.push(msb)
 }
