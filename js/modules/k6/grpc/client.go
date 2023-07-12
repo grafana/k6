@@ -115,7 +115,7 @@ func (c *Client) LoadProtoset(protosetPath string) ([]MethodInfo, error) {
 func decryptPrivateKey(key, password []byte) ([]byte, error) {
 	block, _ := pem.Decode(key)
 	if block == nil {
-		return nil, fmt.Errorf("failed to decode PEM key")
+		return nil, errors.New("failed to decode PEM key")
 	}
 
 	blockType := block.Type
