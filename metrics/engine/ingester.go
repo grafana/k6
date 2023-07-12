@@ -13,16 +13,16 @@ const (
 	timeSeriesFirstLimit = 100_000
 )
 
-var _ output.Output = &outputIngester{}
+var _ output.Output = &OutputIngester{}
 
 // IngesterDescription is a short description for ingester.
 // This variable is used from a function in cmd/ui file for matching this output
 // and print a special text.
 const IngesterDescription = "Internal Metrics Ingester"
 
-// outputIngester implements the output.Output interface and can be used to
+// OutputIngester implements the output.Output interface and can be used to
 // "feed" the MetricsEngine data from a `k6 run` test run.
-type outputIngester struct {
+type OutputIngester struct {
 	output.SampleBuffer
 	logger logrus.FieldLogger
 
@@ -32,12 +32,12 @@ type outputIngester struct {
 }
 
 // Description returns a human-readable description of the output.
-func (oi *outputIngester) Description() string {
+func (oi *OutputIngester) Description() string {
 	return IngesterDescription
 }
 
 // Start the engine by initializing a new output.PeriodicFlusher
-func (oi *outputIngester) Start() error {
+func (oi *OutputIngester) Start() error {
 	oi.logger.Debug("Starting...")
 
 	pf, err := output.NewPeriodicFlusher(collectRate, oi.flushMetrics)
@@ -51,7 +51,7 @@ func (oi *outputIngester) Start() error {
 }
 
 // Stop flushes any remaining metrics and stops the goroutine.
-func (oi *outputIngester) Stop() error {
+func (oi *OutputIngester) Stop() error {
 	oi.logger.Debug("Stopping...")
 	defer oi.logger.Debug("Stopped!")
 	oi.periodicFlusher.Stop()
@@ -59,7 +59,7 @@ func (oi *outputIngester) Stop() error {
 }
 
 // flushMetrics Writes samples to the MetricsEngine
-func (oi *outputIngester) flushMetrics() {
+func (oi *OutputIngester) flushMetrics() {
 	sampleContainers := oi.GetBufferedSamples()
 	if len(sampleContainers) == 0 {
 		return

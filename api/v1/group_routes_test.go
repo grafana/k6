@@ -44,7 +44,7 @@ func getControlSurface(tb testing.TB, testState *lib.TestRunState) *ControlSurfa
 	execScheduler, err := execution.NewScheduler(testState)
 	require.NoError(tb, err)
 
-	me, err := engine.NewMetricsEngine(testState)
+	me, err := engine.NewMetricsEngine(testState.Registry, testState.Logger)
 	require.NoError(tb, err)
 
 	ctx, cancel := context.WithCancel(context.Background())

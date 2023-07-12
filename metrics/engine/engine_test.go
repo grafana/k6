@@ -32,9 +32,11 @@ func TestNewMetricsEngineWithThresholds(t *testing.T) {
 	_, err = trs.Registry.NewMetric("metric2", metrics.Counter)
 	require.NoError(t, err)
 
-	me, err := NewMetricsEngine(trs)
+	me, err := NewMetricsEngine(trs.Registry, trs.Logger)
 	require.NoError(t, err)
 	require.NotNil(t, me)
+
+	require.NoError(t, me.InitSubMetricsAndThresholds(trs.Options, false))
 
 	assert.Len(t, me.metricsWithThresholds, 2)
 }
@@ -57,7 +59,7 @@ func TestMetricsEngineGetThresholdMetricOrSubmetricError(t *testing.T) {
 			t.Parallel()
 
 			me := newTestMetricsEngine(t)
-			_, err := me.test.Registry.NewMetric("metric1", metrics.Counter)
+			_, err := me.registry.NewMetric("metric1", metrics.Counter)
 			require.NoError(t, err)
 
 			_, err = me.getThresholdMetricOrSubmetric(tc.metricDefinition)
@@ -69,16 +71,8 @@ func TestMetricsEngineGetThresholdMetricOrSubmetricError(t *testing.T) {
 func TestNewMetricsEngineNoThresholds(t *testing.T) {
 	t.Parallel()
 
-	trs := &lib.TestRunState{
-		TestPreInitState: &lib.TestPreInitState{
-			Logger: testutils.NewLogger(t),
-		},
-	}
-
-	me, err := NewMetricsEngine(trs)
-	require.NoError(t, err)
+	me := newTestMetricsEngine(t)
 	require.NotNil(t, me)
-
 	assert.Empty(t, me.metricsWithThresholds)
 }
 
@@ -113,9 +107,9 @@ func TestMetricsEngineEvaluateThresholdNoAbort(t *testing.T) {
 			t.Parallel()
 			me := newTestMetricsEngine(t)
 
-			m1, err := me.test.Registry.NewMetric("m1", metrics.Counter)
+			m1, err := me.registry.NewMetric("m1", metrics.Counter)
 			require.NoError(t, err)
-			m2, err := me.test.Registry.NewMetric("m2", metrics.Counter)
+			m2, err := me.registry.NewMetric("m2", metrics.Counter)
 			require.NoError(t, err)
 
 			ths := metrics.NewThresholds([]string{tc.threshold})
@@ -138,9 +132,9 @@ func TestMetricsEngineEvaluateIgnoreEmptySink(t *testing.T) {
 
 	me := newTestMetricsEngine(t)
 
-	m1, err := me.test.Registry.NewMetric("m1", metrics.Counter)
+	m1, err := me.registry.NewMetric("m1", metrics.Counter)
 	require.NoError(t, err)
-	m2, err := me.test.Registry.NewMetric("m2", metrics.Counter)
+	m2, err := me.registry.NewMetric("m2", metrics.Counter)
 	require.NoError(t, err)
 
 	ths := metrics.NewThresholds([]string{"count>5"})
@@ -159,18 +153,10 @@ func TestMetricsEngineEvaluateIgnoreEmptySink(t *testing.T) {
 	assert.Empty(t, breached)
 }
 
-func newTestMetricsEngine(t *testing.T) MetricsEngine {
-	trs := &lib.TestRunState{
-		TestPreInitState: &lib.TestPreInitState{
-			Logger:   testutils.NewLogger(t),
-			Registry: metrics.NewRegistry(),
-		},
-	}
-
-	return MetricsEngine{
-		logger: trs.Logger,
-		test:   trs,
-	}
+func newTestMetricsEngine(t *testing.T) *MetricsEngine {
+	m, err := NewMetricsEngine(metrics.NewRegistry(), testutils.NewLogger(t))
+	require.NoError(t, err)
+	return m
 }
 
 func zeroTestRunDuration() time.Duration {
