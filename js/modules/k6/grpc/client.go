@@ -555,7 +555,7 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 					for _, cacertsArrayEntry := range cacertsArray {
 						if _, ok = cacertsArrayEntry.(string); !ok {
 							return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
-								" it needs to be a string or string[] of PEM formatted strings", v)
+								" it needs to be a string or an array of PEM formatted strings", v)
 						}
 					}
 				} else if _, ok = cacerts.(string); !ok {
