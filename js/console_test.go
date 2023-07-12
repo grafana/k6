@@ -334,7 +334,7 @@ func TestFileConsole(t *testing.T) {
 						msg, deleteFile := msg, deleteFile
 						t.Run(msg, func(t *testing.T) {
 							t.Parallel()
-							f, err := os.CreateTemp("", "")
+							f, err := os.CreateTemp("", "") //nolint:forbidigo
 							if err != nil {
 								t.Fatalf("Couldn't create temporary file for testing: %s", err)
 							}
