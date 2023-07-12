@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/url"
 	"os"
 	"path/filepath"
@@ -659,7 +658,7 @@ func TestOpen(t *testing.T) {
 			return fs, "", func() {}
 		},
 		"OsFS": func() (fsext.Fs, string, func()) {
-			prefix, err := ioutil.TempDir("", "k6_open_test")
+			prefix, err := os.MkdirTemp("", "k6_open_test") //nolint:forbidigo
 			require.NoError(t, err)
 			fs := fsext.NewOsFs()
 			filePath := filepath.Join(prefix, "/path/to/file.txt")

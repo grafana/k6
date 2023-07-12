@@ -13,13 +13,13 @@ import (
 	"go/build"
 	"io"
 	"io/fs"
-	"io/ioutil"
 	stdlog "log"
 	"math/big"
 	"net"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -2408,7 +2408,7 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 	}
 
 	fs := fsext.NewMemMapFs()
-	protoFile, err := ioutil.ReadFile("../lib/testutils/httpmultibin/grpc_testing/test.proto")
+	protoFile, err := os.ReadFile("../lib/testutils/httpmultibin/grpc_testing/test.proto") //nolint:forbidigo
 	require.NoError(t, err)
 	require.NoError(t, fsext.WriteFile(fs, "/path/to/service.proto", protoFile, 0o644))
 	require.NoError(t, fsext.WriteFile(fs, "/path/to/same-dir.proto", []byte(
