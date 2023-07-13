@@ -874,6 +874,181 @@ func TestClient(t *testing.T) {
 	}
 }
 
+func TestClient_ConnectionSharingParameter(t *testing.T) {
+	t.Parallel()
+	type testState struct {
+		*modulestest.Runtime
+		httpBin *httpmultibin.HTTPMultiBin
+		samples chan metrics.SampleContainer
+	}
+
+	setup := func(t *testing.T) testState {
+		t.Helper()
+
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		samples := make(chan metrics.SampleContainer, 1000)
+		testRuntime := modulestest.NewRuntime(t)
+
+		cwd, err := os.Getwd() //nolint:golint,forbidigo
+		require.NoError(t, err)
+		fs := fsext.NewOsFs()
+		if isWindows {
+			fs = fsext.NewTrimFilePathSeparatorFs(fs)
+		}
+		testRuntime.VU.InitEnvField.CWD = &url.URL{Path: cwd}
+		testRuntime.VU.InitEnvField.FileSystems = map[string]fsext.Fs{"file": fs}
+
+		return testState{
+			Runtime: testRuntime,
+			httpBin: tb,
+			samples: samples,
+		}
+	}
+
+	tests := []testcase{
+		{
+			name: "ConnectConnectionSharingDefault",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				var client1 = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+					client0.connect("GRPCBIN_ADDR");
+					client1.connect("GRPCBIN_ADDR");
+					if (client0.isSameConnection(client1)) {
+						throw new Error("unexpected connection equality");
+					}`,
+			},
+		},
+		{
+			name: "ConnectConnectionSharingFalseFalse",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				var client1 = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+					client0.connect("GRPCBIN_ADDR", { connectionSharing: false});
+					client1.connect("GRPCBIN_ADDR", { connectionSharing: false});
+					if (client0.isSameConnection(client1)) {
+						throw new Error("unexpected connection equality");
+					}`,
+			},
+		},
+		{
+			name: "ConnectConnectionSharingFalseTrue",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				var client1 = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+					client0.connect("GRPCBIN_ADDR", { connectionSharing: true});
+					client1.connect("GRPCBIN_ADDR", { connectionSharing: false});
+					if (client0.isSameConnection(client1)) {
+						throw new Error("unexpected connection equality");
+					}`,
+			},
+		},
+		{
+			name: "ConnectConnectionSharingTrueTrue",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				var client1 = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+					client0.connect("GRPCBIN_ADDR", { connectionSharing: true});
+					client1.connect("GRPCBIN_ADDR", { connectionSharing: true});
+					if (!client0.isSameConnection(client1)) {
+						throw new Error("unexpected connection inequality");
+					}`,
+			},
+		},
+		{
+			name: "ConnectConnectionSharingTrueFalseTrue",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				var client1 = new grpc.Client();
+				var client2 = new grpc.Client();`},
+			vuString: codeBlock{
+				code: `
+					client0.connect("GRPCBIN_ADDR", { connectionSharing: true});
+					client1.connect("GRPCBIN_ADDR", { connectionSharing: false});
+					client2.connect("GRPCBIN_ADDR", { connectionSharing: true});
+					if (client0.isSameConnection(client1)) {
+						throw new Error("unexpected connection equality");
+					}
+					if (!client0.isSameConnection(client2)) {
+						throw new Error("unexpected connection inequality");
+					}`,
+			},
+		},
+	}
+	assertResponse := func(t *testing.T, cb codeBlock, err error, val goja.Value, ts testState) {
+		if isWindows && cb.windowsErr != "" && err != nil {
+			err = errors.New(strings.ReplaceAll(err.Error(), cb.windowsErr, cb.err))
+		}
+		if cb.err == "" {
+			assert.NoError(t, err)
+		} else {
+			require.Error(t, err)
+			assert.Contains(t, err.Error(), cb.err)
+		}
+		if cb.val != nil {
+			require.NotNil(t, val)
+			assert.Equal(t, cb.val, val.Export())
+		}
+		if cb.asserts != nil {
+			cb.asserts(t, ts.httpBin, ts.samples, err)
+		}
+	}
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			ts := setup(t)
+
+			m, ok := New().NewModuleInstance(ts.VU).(*ModuleInstance)
+			require.True(t, ok)
+			require.NoError(t, ts.VU.Runtime().Set("grpc", m.Exports().Named))
+
+			// setup necessary environment if needed by a test
+			if tt.setup != nil {
+				tt.setup(ts.httpBin)
+			}
+
+			replace := func(code string) (goja.Value, error) {
+				return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
+			}
+
+			val, err := replace(tt.initString.code)
+			assertResponse(t, tt.initString, err, val, ts)
+
+			registry := metrics.NewRegistry()
+			root, err := lib.NewGroup("", nil)
+			require.NoError(t, err)
+
+			state := &lib.State{
+				Group:     root,
+				Dialer:    ts.httpBin.Dialer,
+				TLSConfig: ts.httpBin.TLSClientConfig,
+				Samples:   ts.samples,
+				Options: lib.Options{
+					SystemTags: metrics.NewSystemTagSet(
+						metrics.TagName,
+						metrics.TagURL,
+					),
+					UserAgent: null.StringFrom("k6-test"),
+				},
+				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
+			}
+			ts.MoveToVUContext(state)
+			val, err = replace(tt.vuString.code)
+			assertResponse(t, tt.vuString, err, val, ts)
+		})
+	}
+}
+
 func TestClient_TlsParameters(t *testing.T) {
 	t.Parallel()
 

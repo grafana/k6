@@ -206,6 +206,27 @@ func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]int
 	return buildTLSConfig(parentConfig, cert, key, ca)
 }
 
+// IsSameConnection compares this Client to another Client's raw connection for equality
+// See: connectParams.ConnectionSharing parameter
+func (c *Client) IsSameConnection(v goja.Value) (bool, error) {
+	rt := c.vu.Runtime()
+
+	if common.IsNullish(v) {
+		return false, nil
+	}
+
+	client, ok := v.ToObject(rt).Export().(*Client)
+	if !ok {
+		return false, errors.New("parameter must a 'Client'")
+	}
+
+	if client.conn == nil || c.conn == nil {
+		return false, errors.New("no gRPC connection, you must call connect first")
+	}
+
+	return c.conn.Equals(client.conn), nil
+}
+
 // Connect is a block dial to the gRPC server at the given address (host:port)
 func (c *Client) Connect(addr string, params map[string]interface{}) (bool, error) {
 	state := c.vu.State()

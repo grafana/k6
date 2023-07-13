@@ -129,6 +129,15 @@ func DialShared(ctx context.Context, addr string, options ...grpc.DialOption) (*
 	}, nil
 }
 
+// Equals compares two Conn pointers for equality of `addr` and `raw` connection.
+// See: Client connectParams ConnectionSharing parameter
+func (c *Conn) Equals(conn *Conn) bool {
+	if c.raw == nil || c.addr == "" || conn == nil || conn.raw == nil || conn.addr == "" {
+		return false
+	}
+	return c.raw == conn.raw && c.addr == conn.addr
+}
+
 // Reflect returns using the reflection the FileDescriptorSet describing the service.
 func (c *Conn) Reflect(ctx context.Context) (*descriptorpb.FileDescriptorSet, error) {
 	rc := reflectionClient{Conn: c.raw}
