@@ -150,10 +150,13 @@ func (h *lokiHook) Listen(ctx context.Context) {
 		pushCh     = make(chan chan int64)
 	)
 
+	pushDone := make(chan struct{})
+	defer func() { <-pushDone }()
 	defer ticker.Stop()
 	defer close(pushCh)
 
 	go func() {
+		defer close(pushDone)
 		oldLogs := make([]tmpMsg, 0, h.limit*2)
 		for ch := range pushCh {
 			msgsToPush, msgs = msgs, msgsToPush
