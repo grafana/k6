@@ -2,6 +2,8 @@ package expv2
 
 import (
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -56,11 +58,12 @@ func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
 		bq := &bucketQ{}
 		pm := &pusherMock{}
 		mf := metricsFlusher{
-			bq:               bq,
-			client:           pm,
-			logger:           logger,
-			discardedLabels:  make(map[string]struct{}),
-			maxSeriesInBatch: 3,
+			bq:                   bq,
+			client:               pm,
+			logger:               logger,
+			discardedLabels:      make(map[string]struct{}),
+			maxSeriesInBatch:     3,
+			batchPushConcurrency: 5,
 		}
 
 		bq.buckets = make([]timeBucket, 0, tc.series)
@@ -78,7 +81,7 @@ func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
 		bq.Push([]timeBucket{{Time: 1, Sinks: sinks}})
 		err := mf.flush()
 		require.NoError(t, err)
-		assert.Equal(t, tc.expFlushCalls, pm.pushCalled)
+		assert.Equal(t, tc.expFlushCalls, pm.timesCalled())
 	}
 }
 
@@ -101,11 +104,12 @@ func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 		bq := &bucketQ{}
 		pm := &pusherMock{}
 		mf := metricsFlusher{
-			bq:               bq,
-			client:           pm,
-			logger:           logger,
-			discardedLabels:  make(map[string]struct{}),
-			maxSeriesInBatch: 3,
+			bq:                   bq,
+			client:               pm,
+			logger:               logger,
+			discardedLabels:      make(map[string]struct{}),
+			maxSeriesInBatch:     3,
+			batchPushConcurrency: 5,
 		}
 
 		bq.buckets = make([]timeBucket, 0, tc.series)
@@ -127,7 +131,7 @@ func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 
 		err := mf.flush()
 		require.NoError(t, err)
-		assert.Equal(t, tc.expFlushCalls, pm.pushCalled)
+		assert.Equal(t, tc.expFlushCalls, pm.timesCalled())
 	}
 }
 
@@ -136,21 +140,25 @@ func TestFlushWithReservedLabels(t *testing.T) {
 
 	logger, hook := testutils.NewLoggerWithHook(t)
 
+	mutex := sync.Mutex{}
 	collected := make([]*pbcloud.MetricSet, 0)
 
 	bq := &bucketQ{}
 	pm := &pusherMock{
 		hook: func(ms *pbcloud.MetricSet) {
+			mutex.Lock()
 			collected = append(collected, ms)
+			mutex.Unlock()
 		},
 	}
 
 	mf := metricsFlusher{
-		bq:               bq,
-		client:           pm,
-		maxSeriesInBatch: 2,
-		logger:           logger,
-		discardedLabels:  make(map[string]struct{}),
+		bq:                   bq,
+		client:               pm,
+		maxSeriesInBatch:     2,
+		logger:               logger,
+		discardedLabels:      make(map[string]struct{}),
+		batchPushConcurrency: 5,
 	}
 
 	r := metrics.NewRegistry()
@@ -186,7 +194,7 @@ func TestFlushWithReservedLabels(t *testing.T) {
 	require.NoError(t, err)
 
 	loglines := hook.Drain()
-	assert.Equal(t, 1, len(collected))
+	require.Len(t, collected, 1)
 
 	// check that warnings sown only once per label
 	assert.Len(t, testutils.FilterEntries(loglines, logrus.WarnLevel, "Tag __name__ has been discarded since it is reserved for Cloud operations."), 1)
@@ -207,7 +215,11 @@ func TestFlushWithReservedLabels(t *testing.T) {
 
 type pusherMock struct {
 	hook       func(*pbcloud.MetricSet)
-	pushCalled int
+	pushCalled int64
+}
+
+func (pm *pusherMock) timesCalled() int {
+	return int(atomic.LoadInt64(&pm.pushCalled))
 }
 
 func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
@@ -215,6 +227,6 @@ func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
 		pm.hook(ms)
 	}
 
-	pm.pushCalled++
+	atomic.AddInt64(&pm.pushCalled, 1)
 	return nil
 }

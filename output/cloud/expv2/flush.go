@@ -1,6 +1,8 @@
 package expv2
 
 import (
+	"math"
+	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -21,6 +23,7 @@ type metricsFlusher struct {
 	discardedLabels            map[string]struct{}
 	aggregationPeriodInSeconds uint32
 	maxSeriesInBatch           int
+	batchPushConcurrency       int
 }
 
 // flush flushes the queued buckets sending them to the remote Cloud service.
@@ -43,9 +46,9 @@ func (f *metricsFlusher) flush() error {
 	// the metricSetBuilder is used for doing it during the traverse of the buckets.
 
 	var (
-		seriesCount  int
-		batchesCount int
-		start        = time.Now()
+		start       = time.Now()
+		batches     []metricSetBuilder
+		seriesCount int
 	)
 
 	defer func() {
@@ -53,35 +56,83 @@ func (f *metricsFlusher) flush() error {
 			WithField("t", time.Since(start)).
 			WithField("series", seriesCount).
 			WithField("buckets", len(buckets)).
-			WithField("batches", batchesCount).Debug("Flush the queued buckets")
+			WithField("batches", len(batches)).Debug("Flush the queued buckets")
 	}()
 
 	msb := newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 	for i := 0; i < len(buckets); i++ {
 		for timeSeries, sink := range buckets[i].Sinks {
 			msb.addTimeSeries(buckets[i].Time, timeSeries, sink)
-			if len(msb.seriesIndex) < f.maxSeriesInBatch {
+			if len(msb.seriesIndex) <= f.maxSeriesInBatch {
 				continue
 			}
 
-			// we hit the batch size, let's flush
-			batchesCount++
+			// We hit the batch size, let's flush
 			seriesCount += len(msb.seriesIndex)
-			if err := f.push(msb); err != nil {
-				return err
-			}
+			batches = append(batches, msb)
+
+			// Reset the builder
 			msb = newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 		}
 	}
 
-	if len(msb.seriesIndex) < 1 {
-		return nil
+	// send the last (or the unique) MetricSet chunk to the remote service
+	seriesCount += len(msb.seriesIndex)
+	batches = append(batches, msb)
+
+	return f.flushBatches(batches)
+}
+
+func (f *metricsFlusher) flushBatches(batches []metricSetBuilder) error {
+	var (
+		wg   = sync.WaitGroup{}
+		errs = make(chan error)
+		done = make(chan struct{})
+		stop = make(chan struct{})
+
+		workers   = int(math.Min(float64(len(batches)), float64(f.batchPushConcurrency)))
+		chunkSize = len(batches) / workers
+	)
+
+	wg.Add(workers)
+	for workersIndex := 0; workersIndex < workers; workersIndex++ {
+		offset := (workersIndex * chunkSize)
+		end := offset + chunkSize
+		if workersIndex == workers-1 {
+			end = len(batches)
+		}
+
+		go func(chunk []metricSetBuilder) {
+			defer wg.Done()
+
+			for i := 0; i < len(chunk); i++ {
+				select {
+				case <-stop:
+					return
+				default:
+				}
+				if err := f.push(chunk[i]); err != nil {
+					errs <- err
+				}
+			}
+		}(batches[offset:end])
 	}
 
-	// send the last (or the unique) MetricSet chunk to the remote service
-	batchesCount++
-	seriesCount += len(msb.seriesIndex)
-	return f.push(msb)
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
+
+	for {
+		select {
+		case err := <-errs:
+			close(stop)
+			<-done
+			return err
+		case <-done:
+			return nil
+		}
+	}
 }
 
 // push sends the metric set to the remote service.

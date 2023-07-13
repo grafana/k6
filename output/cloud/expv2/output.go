@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -112,6 +113,10 @@ func (o *Output) Start() error {
 		discardedLabels:            make(map[string]struct{}),
 		aggregationPeriodInSeconds: uint32(o.config.AggregationPeriod.TimeDuration().Seconds()),
 		maxSeriesInBatch:           int(o.config.MaxTimeSeriesInBatch.Int64),
+		// TODO: when the migration from v1 is over
+		// change the default of cloudapi.MetricPushConcurrency to use GOMAXPROCS(0)
+		// batchPushConcurrency: int(o.config.MetricPushConcurrency.Int64),
+		batchPushConcurrency: runtime.GOMAXPROCS(0),
 	}
 
 	o.runFlushWorkers()
@@ -178,11 +183,12 @@ func (o *Output) StopWithTestError(_ error) error {
 }
 
 func (o *Output) runFlushWorkers() {
+	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
+
+	// TODO: drop it when we are sure of the new proposed architecture
 	// workers := o.config.MetricPushConcurrency.Int64
 	// Details: https://github.com/grafana/k6/issues/3192
 	workers := 1
-
-	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
 	for i := 0; i < workers; i++ {
 		o.wg.Add(1)
