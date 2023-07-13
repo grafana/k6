@@ -179,7 +179,7 @@ func (r *Response) bodySize() int64 {
 	}
 
 	if err := r.fetchBody(); err != nil {
-		r.logger.Warnf("Response:bodySize:fetchBody",
+		r.logger.Debugf("Response:bodySize:fetchBody",
 			"url:%s method:%s err:%s", r.url, r.request.method, err)
 	}
 
