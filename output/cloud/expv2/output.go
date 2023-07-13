@@ -178,9 +178,13 @@ func (o *Output) StopWithTestError(_ error) error {
 }
 
 func (o *Output) runFlushWorkers() {
+	// workers := o.config.MetricPushConcurrency.Int64
+	// Details: https://github.com/grafana/k6/issues/3192
+	workers := 1
+
 	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
-	for i := int64(0); i < o.config.MetricPushConcurrency.Int64; i++ {
+	for i := 0; i < workers; i++ {
 		o.wg.Add(1)
 		go func() {
 			defer func() {
