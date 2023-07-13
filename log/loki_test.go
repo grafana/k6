@@ -1,8 +1,13 @@
 package log
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"io"
+	"net/http"
+	"net/http/httptest"
+	"sync"
 	"testing"
 	"time"
 
@@ -143,5 +148,45 @@ func TestFilterLabels(t *testing.T) {
 			assert.Equal(t, c.result, result)
 			assert.Equal(t, c.expectedLabels, c.labels)
 		})
+	}
+}
+
+func TestLokiFlushingOnStop(t *testing.T) {
+	t.Parallel()
+	receivedData := make(chan string, 1)
+	srv := httptest.NewServer(
+		http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			b, err := io.ReadAll(req.Body)
+			if err != nil {
+				t.Fatal(err)
+			}
+			receivedData <- string(b)
+			close(receivedData) // this is mostly as this should never be called twice, so panicking here in that case
+		}),
+	)
+	configLine := fmt.Sprintf("loki=%s,pushPeriod=1h", srv.URL)
+	h, err := LokiFromConfigLine(nil, configLine)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := new(sync.WaitGroup)
+	now := time.Now()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = h.Fire(&logrus.Entry{Time: now, Level: logrus.InfoLevel, Message: "test message"})
+		time.Sleep(time.Millisecond * 10)
+		cancel()
+	}()
+	h.Listen(ctx)
+	wg.Wait()
+	select {
+	case data := <-receivedData:
+		require.JSONEq(t,
+			fmt.Sprintf(
+				`{"streams":[{"stream":{"level":"info"},"values":[["%d","test message"]]}]}`, now.UnixNano()),
+			data)
+	default:
+		t.Fatal("No logs were received from loki before hook has finished")
 	}
 }
