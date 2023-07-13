@@ -19,6 +19,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/execution"
+	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/js"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/executor"
@@ -73,7 +74,7 @@ func newTestScheduler(
 		testRunState.Logger = logger
 	}
 
-	execScheduler, err = execution.NewScheduler(testRunState)
+	execScheduler, err = execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
 	samples = make(chan metrics.SampleContainer, newOpts.MetricSamplesBufferSize.Int64)
@@ -141,7 +142,7 @@ func TestSchedulerRunNonDefault(t *testing.T) {
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 
-			execScheduler, err := execution.NewScheduler(testRunState)
+			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -258,7 +259,7 @@ func TestSchedulerRunEnv(t *testing.T) {
 			require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
-			execScheduler, err := execution.NewScheduler(testRunState)
+			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithCancel(context.Background())
@@ -332,7 +333,7 @@ func TestSchedulerSystemTags(t *testing.T) {
 	})))
 
 	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
-	execScheduler, err := execution.NewScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -468,7 +469,7 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 			require.NoError(t, err)
 
 			testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
-			execScheduler, err := execution.NewScheduler(testRunState)
+			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
@@ -637,7 +638,7 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
-	execScheduler, err := execution.NewScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -978,7 +979,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 	defer cancel()
 
 	testRunState := getTestRunState(t, getTestPreInitState(t), runner.GetOptions(), runner)
-	execScheduler, err := execution.NewScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
 	samples := make(chan metrics.SampleContainer, 300)
@@ -1190,7 +1191,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, piState, options, runner)
-	execScheduler, err := execution.NewScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -1362,7 +1363,7 @@ func TestNewSchedulerHasWork(t *testing.T) {
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
-	execScheduler, err := execution.NewScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
 	assert.Len(t, execScheduler.GetExecutors(), 2)
