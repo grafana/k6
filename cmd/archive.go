@@ -16,7 +16,11 @@ type cmdArchive struct {
 }
 
 func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
-	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
+	preInitState, err := getPreInitState(c.gs, cmd)
+	if err != nil {
+		return err
+	}
+	test, err := loadAndConfigureLocalTest(c.gs, preInitState, cmd, args[0], getPartialConfig)
 	if err != nil {
 		return err
 	}
@@ -88,7 +92,7 @@ func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 
 An archive is a fully self-contained test run, and can be executed identically elsewhere.`,
 		Example: exampleText,
-		Args:    cobra.ExactArgs(1),
+		Args:    cobra.ExactArgs(1), // TODO: remove and support test suites?
 		RunE:    c.run,
 	}
 

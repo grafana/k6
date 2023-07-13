@@ -86,12 +86,72 @@ func getMetricsHook(
 	}
 }
 
+func loadAndConfigureDistTest(gs *state.GlobalState, distTest *distributed.Test) (*loadedAndConfiguredTest, error) {
+	var options lib.Options
+	if err := json.Unmarshal(distTest.Options, &options); err != nil {
+		return nil, err
+	}
+
+	arc, err := lib.ReadArchive(bytes.NewReader(distTest.Archive))
+	if err != nil {
+		return nil, err
+	}
+
+	registry := metrics.NewRegistry()
+	piState := &lib.TestPreInitState{
+		Logger: gs.Logger,
+		RuntimeOptions: lib.RuntimeOptions{
+			NoThresholds:      null.BoolFrom(true),
+			NoSummary:         null.BoolFrom(true),
+			Env:               arc.Env,
+			CompatibilityMode: null.StringFrom(arc.CompatibilityMode),
+		},
+		Registry:       registry,
+		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+	}
+
+	initRunner, err := js.NewFromArchive(piState, arc)
+	if err != nil {
+		return nil, err
+	}
+
+	test := &loadedTest{
+		pwd:            arc.Pwd,
+		sourceRootPath: arc.Filename,
+		source: &loader.SourceData{
+			Data: distTest.Archive,
+			URL:  arc.FilenameURL,
+		},
+		fs:           afero.NewMemMapFs(), // TODO: figure out what should be here
+		fileSystems:  arc.Filesystems,
+		preInitState: piState,
+		initRunner:   initRunner,
+	}
+
+	pseudoConsoldatedConfig := applyDefault(Config{Options: options})
+	for _, thresholds := range pseudoConsoldatedConfig.Thresholds {
+		if err = thresholds.Parse(); err != nil {
+			return nil, err
+		}
+	}
+	derivedConfig, err := deriveAndValidateConfig(pseudoConsoldatedConfig, initRunner.IsExecutable, gs.Logger)
+	if err != nil {
+		return nil, err
+	}
+
+	return &loadedAndConfiguredTest{
+		loadedTest:         test,
+		consolidatedConfig: pseudoConsoldatedConfig,
+		derivedConfig:      derivedConfig,
+	}, nil
+}
+
 // TODO: a whole lot of cleanup, refactoring, error handling and hardening
-func getCmdAgent(gs *state.GlobalState) *cobra.Command { //nolint: funlen
+func getCmdAgent(gs *state.GlobalState) *cobra.Command {
 	c := &cmdsRunAndAgent{gs: gs}
 
-	c.loadConfiguredTest = func(cmd *cobra.Command, args []string) (
-		*loadedAndConfiguredTest, execution.Controller, error,
+	c.loadConfiguredTests = func(cmd *cobra.Command, args []string) (
+		[]*loadedAndConfiguredTest, execution.Controller, error,
 	) {
 		// TODO: add some gRPC authentication
 		conn, err := grpc.Dial(args[0], grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -110,6 +170,15 @@ func getCmdAgent(gs *state.GlobalState) *cobra.Command { //nolint: funlen
 			return nil, nil, err
 		}
 
+		var configuredTests []*loadedAndConfiguredTest
+		for _, test := range resp.Tests {
+			cTest, lcErr := loadAndConfigureDistTest(gs, test)
+			if lcErr != nil {
+				return nil, nil, lcErr
+			}
+			configuredTests = append(configuredTests, cTest)
+		}
+
 		c.metricsEngineHook = getMetricsHook(gs.Ctx, resp.InstanceID, client, gs.Logger)
 
 		controller, err := distributed.NewAgentController(gs.Ctx, resp.InstanceID, client, gs.Logger)
@@ -117,67 +186,9 @@ func getCmdAgent(gs *state.GlobalState) *cobra.Command { //nolint: funlen
 			return nil, nil, err
 		}
 
-		var options lib.Options
-		if err = json.Unmarshal(resp.Options, &options); err != nil {
-			return nil, nil, err
-		}
-
-		arc, err := lib.ReadArchive(bytes.NewReader(resp.Archive))
-		if err != nil {
-			return nil, nil, err
-		}
-
-		registry := metrics.NewRegistry()
-		piState := &lib.TestPreInitState{
-			Logger: gs.Logger,
-			RuntimeOptions: lib.RuntimeOptions{
-				NoThresholds:      null.BoolFrom(true),
-				NoSummary:         null.BoolFrom(true),
-				Env:               arc.Env,
-				CompatibilityMode: null.StringFrom(arc.CompatibilityMode),
-			},
-			Registry:       registry,
-			BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		}
-
-		initRunner, err := js.NewFromArchive(piState, arc)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		test := &loadedTest{
-			pwd:            arc.Pwd,
-			sourceRootPath: arc.Filename,
-			source: &loader.SourceData{
-				Data: resp.Archive,
-				URL:  arc.FilenameURL,
-			},
-			fs:           afero.NewMemMapFs(), // TODO: figure out what should be here
-			fileSystems:  arc.Filesystems,
-			preInitState: piState,
-			initRunner:   initRunner,
-		}
-
-		pseudoConsoldatedConfig := applyDefault(Config{Options: options})
-		for _, thresholds := range pseudoConsoldatedConfig.Thresholds {
-			if err = thresholds.Parse(); err != nil {
-				return nil, nil, err
-			}
-		}
-		derivedConfig, err := deriveAndValidateConfig(pseudoConsoldatedConfig, initRunner.IsExecutable, gs.Logger)
-		if err != nil {
-			return nil, nil, err
-		}
-
-		configuredTest := &loadedAndConfiguredTest{
-			loadedTest:         test,
-			consolidatedConfig: pseudoConsoldatedConfig,
-			derivedConfig:      derivedConfig,
-		}
-
 		gs.Flags.Address = "" // TODO: fix, this is a hack so agents don't start an API server
 
-		return configuredTest, controller, nil // TODO
+		return configuredTests, controller, nil // TODO
 	}
 
 	agentCmd := &cobra.Command{
