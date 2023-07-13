@@ -69,6 +69,7 @@ func TestSyslogFromConfigLine(t *testing.T) {
 	for _, test := range tests {
 		test := test
 		t.Run(test.line, func(t *testing.T) {
+			t.Parallel()
 			// no parallel because this is way too fast and parallel will only slow it down
 
 			res, err := LokiFromConfigLine(nil, test.line)
@@ -76,16 +77,19 @@ func TestSyslogFromConfigLine(t *testing.T) {
 				require.Error(t, err)
 				return
 			}
+			hook, ok := res.(*lokiHook)
+			require.True(t, ok)
 			require.NoError(t, err)
 
-			test.res.client = res.(*lokiHook).client
-			test.res.ch = res.(*lokiHook).ch
+			test.res.client = hook.client
+			test.res.ch = hook.ch
 			require.Equal(t, &test.res, res)
 		})
 	}
 }
 
 func TestLogEntryMarshal(t *testing.T) {
+	t.Parallel()
 	entry := logEntry{
 		t:   9223372036854775807, // the actual max
 		msg: "something",
@@ -98,6 +102,7 @@ func TestLogEntryMarshal(t *testing.T) {
 }
 
 func TestFilterLabels(t *testing.T) {
+	t.Parallel()
 	cases := []struct {
 		allowedLabels  []string
 		labels         map[string]string
@@ -131,6 +136,7 @@ func TestFilterLabels(t *testing.T) {
 	for i, c := range cases {
 		c := c
 		t.Run(fmt.Sprint(i), func(t *testing.T) {
+			t.Parallel()
 			h := &lokiHook{}
 			h.allowedLabels = c.allowedLabels
 			result := h.filterLabels(c.labels, c.msg)
