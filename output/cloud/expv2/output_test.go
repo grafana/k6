@@ -305,7 +305,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 	require.NoError(t, o.StopWithTestError(errors.New("an error")))
 }
 
-func TestOutputFlushMetricsConcurrently(t *testing.T) {
+func TestOutputFlushTicks(t *testing.T) {
 	t.Parallel()
 
 	done := make(chan struct{})
@@ -321,12 +321,10 @@ func TestOutputFlushMetricsConcurrently(t *testing.T) {
 			close(done)
 			return
 		}
-		<-done
 	}
 
 	o := Output{logger: testutils.NewLogger(t)}
-	o.config.MetricPushConcurrency = null.IntFrom(2)
-	o.config.MetricPushInterval = types.NullDurationFrom(1) // loop
+	o.config.MetricPushInterval = types.NullDurationFrom(100 * time.Millisecond) // loop
 	o.flushing = flusherFunc(flusherMock)
 	o.runFlushWorkers()
 

@@ -112,7 +112,11 @@ func (f *metricsFlusher) flushBatches(batches []metricSetBuilder) error {
 				default:
 				}
 				if err := f.push(chunk[i]); err != nil {
-					errs <- err
+					select {
+					case errs <- err:
+					case <-stop:
+						return
+					}
 				}
 			}
 		}(batches[offset:end])

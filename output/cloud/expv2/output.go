@@ -7,7 +7,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"runtime"
 	"strconv"
 	"sync"
 	"time"
@@ -115,8 +114,7 @@ func (o *Output) Start() error {
 		maxSeriesInBatch:           int(o.config.MaxTimeSeriesInBatch.Int64),
 		// TODO: when the migration from v1 is over
 		// change the default of cloudapi.MetricPushConcurrency to use GOMAXPROCS(0)
-		// batchPushConcurrency: int(o.config.MetricPushConcurrency.Int64),
-		batchPushConcurrency: runtime.GOMAXPROCS(0),
+		batchPushConcurrency: int(o.config.MetricPushConcurrency.Int64),
 	}
 
 	o.runFlushWorkers()
@@ -185,31 +183,25 @@ func (o *Output) StopWithTestError(_ error) error {
 func (o *Output) runFlushWorkers() {
 	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
-	// TODO: drop it when we are sure of the new proposed architecture
-	// workers := o.config.MetricPushConcurrency.Int64
-	// Details: https://github.com/grafana/k6/issues/3192
-	workers := 1
+	o.wg.Add(1)
 
-	for i := 0; i < workers; i++ {
-		o.wg.Add(1)
-		go func() {
-			defer func() {
-				t.Stop()
-				o.wg.Done()
-			}()
-
-			for {
-				select {
-				case <-t.C:
-					o.flushMetrics()
-				case <-o.stop:
-					return
-				case <-o.abort:
-					return
-				}
-			}
+	go func() {
+		defer func() {
+			t.Stop()
+			o.wg.Done()
 		}()
-	}
+
+		for {
+			select {
+			case <-t.C:
+				o.flushMetrics()
+			case <-o.stop:
+				return
+			case <-o.abort:
+				return
+			}
+		}
+	}()
 }
 
 // AddMetricSamples receives the samples streaming.
