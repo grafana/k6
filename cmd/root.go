@@ -64,6 +64,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect,
 		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
 		getCmdStats, getCmdStatus, getCmdVersion,
+		getCmdAgent, getCmdCoordnator,
 	}
 
 	for _, sc := range subCommands {
