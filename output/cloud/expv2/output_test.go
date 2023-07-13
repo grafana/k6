@@ -37,6 +37,18 @@ func TestNew(t *testing.T) {
 	assert.Equal(t, int64(99), o.config.APIVersion.Int64)
 }
 
+func TestNewWithConfigOverwritten(t *testing.T) {
+	t.Parallel()
+
+	logger := testutils.NewLogger(t)
+	c := cloudapi.NewClient(logger, "my-token", "the-host", "v/foo", 1*time.Second)
+	conf := cloudapi.Config{Host: null.StringFrom("the-new-host")}
+	o, err := New(logger, conf, c)
+	require.NoError(t, err)
+	require.NotNil(t, o)
+	assert.Equal(t, "the-new-host/v1", o.cloudClient.BaseURL())
+}
+
 func TestOutputSetTestRunID(t *testing.T) {
 	t.Parallel()
 	o := Output{}

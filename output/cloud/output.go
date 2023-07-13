@@ -337,6 +337,14 @@ func (out *Output) startVersionedOutput() error {
 		return errors.New("TestRunID is required")
 	}
 	var err error
+
+	// TODO: move here the creation of a new cloudapi.Client
+	// so in the case the config has been overwritten the client uses the correct
+	// value.
+	//
+	// This logic is handled individually by each single output, it has the downside
+	// that we could break the logic and not catch easly it.
+
 	switch out.config.APIVersion.Int64 {
 	case int64(apiVersion1):
 		out.versionedOutput, err = cloudv1.New(out.logger, out.config, out.client)
