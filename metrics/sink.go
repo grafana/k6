@@ -1,6 +1,7 @@
 package metrics
 
 import (
+	"encoding/json"
 	"fmt"
 	"math"
 	"sort"
@@ -18,6 +19,9 @@ type Sink interface {
 	Add(s Sample)                              // Add a sample to the sink.
 	Format(t time.Duration) map[string]float64 // Data for thresholds.
 	IsEmpty() bool                             // Check if the Sink is empty.
+
+	Drain() ([]byte, error) // Drain encodes the current sink values and clears them.
+	Merge([]byte) error     // Merge decoeds the given values and merges them with the values in the current sink.
 }
 
 // NewSink creates the related Sink for
@@ -64,7 +68,33 @@ func (c *CounterSink) Format(t time.Duration) map[string]float64 {
 	}
 }
 
+// Drain encodes the current sink values and clears them.
+// TODO: something more robust and efficient
+func (c *CounterSink) Drain() ([]byte, error) {
+	res := []byte(fmt.Sprintf("%d %b", c.First.UnixMilli(), c.Value))
+	c.Value = 0
+	return res, nil
+}
+
+// Merge decoeds the given values and merges them with the values in the current sink.
+func (c *CounterSink) Merge(from []byte) error {
+	var firstMs int64
+	var val float64
+	_, err := fmt.Sscanf(string(from), "%d %b", &firstMs, &val)
+	if err != nil {
+		return err
+	}
+
+	c.Value += val
+	if first := time.UnixMilli(firstMs); c.First.After(first) {
+		c.First = first
+	}
+
+	return nil
+}
+
 type GaugeSink struct {
+	Last     time.Time
 	Value    float64
 	Max, Min float64
 	minSet   bool
@@ -74,6 +104,7 @@ type GaugeSink struct {
 func (g *GaugeSink) IsEmpty() bool { return !g.minSet }
 
 func (g *GaugeSink) Add(s Sample) {
+	g.Last = s.Time
 	g.Value = s.Value
 	if s.Value > g.Max {
 		g.Max = s.Value
@@ -86,6 +117,44 @@ func (g *GaugeSink) Add(s Sample) {
 
 func (g *GaugeSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{"value": g.Value}
+}
+
+// Drain encodes the current sink values and clears them.
+//
+// TODO: something more robust and efficient
+func (g *GaugeSink) Drain() ([]byte, error) {
+	res := []byte(fmt.Sprintf("%d %b %b %b", g.Last.UnixMilli(), g.Value, g.Min, g.Max))
+
+	g.Last = time.Time{}
+	g.Value = 0
+
+	return res, nil
+}
+
+// Merge decoeds the given values and merges them with the values in the current sink.
+func (g *GaugeSink) Merge(from []byte) error {
+	var lastMms int64
+	var val, min, max float64
+	_, err := fmt.Sscanf(string(from), "%d %b %b %b", &lastMms, &val, &min, &max)
+	if err != nil {
+		return err
+	}
+
+	last := time.UnixMilli(lastMms)
+	if last.After(g.Last) {
+		g.Last = last
+		g.Value = val
+	}
+
+	if max > g.Max {
+		g.Max = max
+	}
+	if min < g.Min || !g.minSet {
+		g.Min = min
+		g.minSet = true
+	}
+
+	return nil
 }
 
 // NewTrendSink makes a Trend sink with the OpenHistogram circllhist histogram.
@@ -187,6 +256,29 @@ func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
 	}
 }
 
+// Drain encodes the current sink values and clears them.
+//
+// TODO: obviously use something more efficient (e.g. protobuf)
+func (t *TrendSink) Drain() ([]byte, error) {
+	res, err := json.Marshal(t.values)
+	*t = TrendSink{}
+	return res, err
+}
+
+// Merge decoeds the given values and merges them with the values in the current sink.
+func (t *TrendSink) Merge(from []byte) error {
+	// TODO: obviously use something more efficient (e.g. protobuf), this is
+	// just for demo purposes
+	var values []float64
+	if err := json.Unmarshal(from, &values); err != nil {
+		return err
+	}
+	for _, v := range values {
+		t.Add(Sample{Value: v})
+	}
+	return nil
+}
+
 type RateSink struct {
 	Trues int64
 	Total int64
@@ -209,4 +301,27 @@ func (r RateSink) Format(t time.Duration) map[string]float64 {
 	}
 
 	return map[string]float64{"rate": rate}
+}
+
+// Drain encodes the current sink values and clears them.
+//
+// TODO: something more robust and efficient
+func (r *RateSink) Drain() ([]byte, error) {
+	res := []byte(fmt.Sprintf("%d %d", r.Trues, r.Total))
+	r.Trues = 0
+	r.Total = 0
+	return res, nil
+}
+
+// Merge decoeds the given values and merges them with the values in the current sink.
+func (r *RateSink) Merge(from []byte) error {
+	var trues, total int64
+	_, err := fmt.Sscanf(string(from), "%d %d", &trues, &total)
+	if err != nil {
+		return err
+	}
+
+	r.Trues += trues
+	r.Total += total
+	return nil
 }

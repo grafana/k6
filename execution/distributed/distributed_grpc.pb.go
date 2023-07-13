@@ -24,6 +24,7 @@ const _ = grpc.SupportPackageIsVersion7
 type DistributedTestClient interface {
 	Register(ctx context.Context, in *RegisterRequest, opts ...grpc.CallOption) (*RegisterResponse, error)
 	CommandAndControl(ctx context.Context, opts ...grpc.CallOption) (DistributedTest_CommandAndControlClient, error)
+	SendMetrics(ctx context.Context, in *MetricsDump, opts ...grpc.CallOption) (*MetricsDumpResponse, error)
 }
 
 type distributedTestClient struct {
@@ -74,12 +75,22 @@ func (x *distributedTestCommandAndControlClient) Recv() (*ControllerMessage, err
 	return m, nil
 }
 
+func (c *distributedTestClient) SendMetrics(ctx context.Context, in *MetricsDump, opts ...grpc.CallOption) (*MetricsDumpResponse, error) {
+	out := new(MetricsDumpResponse)
+	err := c.cc.Invoke(ctx, "/distributed.DistributedTest/SendMetrics", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DistributedTestServer is the server API for DistributedTest service.
 // All implementations must embed UnimplementedDistributedTestServer
 // for forward compatibility
 type DistributedTestServer interface {
 	Register(context.Context, *RegisterRequest) (*RegisterResponse, error)
 	CommandAndControl(DistributedTest_CommandAndControlServer) error
+	SendMetrics(context.Context, *MetricsDump) (*MetricsDumpResponse, error)
 	mustEmbedUnimplementedDistributedTestServer()
 }
 
@@ -92,6 +103,9 @@ func (UnimplementedDistributedTestServer) Register(context.Context, *RegisterReq
 }
 func (UnimplementedDistributedTestServer) CommandAndControl(DistributedTest_CommandAndControlServer) error {
 	return status.Errorf(codes.Unimplemented, "method CommandAndControl not implemented")
+}
+func (UnimplementedDistributedTestServer) SendMetrics(context.Context, *MetricsDump) (*MetricsDumpResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SendMetrics not implemented")
 }
 func (UnimplementedDistributedTestServer) mustEmbedUnimplementedDistributedTestServer() {}
 
@@ -150,6 +164,24 @@ func (x *distributedTestCommandAndControlServer) Recv() (*AgentMessage, error) {
 	return m, nil
 }
 
+func _DistributedTest_SendMetrics_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(MetricsDump)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DistributedTestServer).SendMetrics(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/distributed.DistributedTest/SendMetrics",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DistributedTestServer).SendMetrics(ctx, req.(*MetricsDump))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DistributedTest_ServiceDesc is the grpc.ServiceDesc for DistributedTest service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -160,6 +192,10 @@ var DistributedTest_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "Register",
 			Handler:    _DistributedTest_Register_Handler,
+		},
+		{
+			MethodName: "SendMetrics",
+			Handler:    _DistributedTest_SendMetrics_Handler,
 		},
 	},
 	Streams: []grpc.StreamDesc{

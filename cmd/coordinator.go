@@ -1,12 +1,19 @@
 package cmd
 
 import (
+	"fmt"
 	"net"
+	"strings"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/execution/distributed"
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics/engine"
 	"google.golang.org/grpc"
 )
 
@@ -17,17 +24,78 @@ type cmdCoordinator struct {
 	instanceCount int
 }
 
-func (c *cmdCoordinator) run(cmd *cobra.Command, args []string) (err error) {
+// TODO: split apart
+func (c *cmdCoordinator) run(cmd *cobra.Command, args []string) (err error) { //nolint: funlen
+	ctx, runAbort := execution.NewTestRunContext(c.gs.Ctx, c.gs.Logger)
+
 	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
 	}
 
+	// Only consolidated options, not derived
+	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
+	if err != nil {
+		return err
+	}
+
+	metricsEngine, err := engine.NewMetricsEngine(testRunState.Registry, c.gs.Logger)
+	if err != nil {
+		return err
+	}
+
 	coordinator, err := distributed.NewCoordinatorServer(
-		c.instanceCount, test.initRunner.MakeArchive(), c.gs.Logger,
+		c.instanceCount, test.initRunner.MakeArchive(), metricsEngine, c.gs.Logger,
 	)
 	if err != nil {
 		return err
+	}
+
+	if !testRunState.RuntimeOptions.NoSummary.Bool {
+		defer func() {
+			c.gs.Logger.Debug("Generating the end-of-test summary...")
+			summaryResult, serr := test.initRunner.HandleSummary(ctx, &lib.Summary{
+				Metrics:         metricsEngine.ObservedMetrics,
+				RootGroup:       test.initRunner.GetDefaultGroup(),
+				TestRunDuration: coordinator.GetCurrentTestRunDuration(),
+				NoColor:         c.gs.Flags.NoColor,
+				UIState: lib.UIState{
+					IsStdOutTTY: c.gs.Stdout.IsTTY,
+					IsStdErrTTY: c.gs.Stderr.IsTTY,
+				},
+			})
+			if serr == nil {
+				serr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
+			}
+			if serr != nil {
+				c.gs.Logger.WithError(serr).Error("Failed to handle the end-of-test summary")
+			}
+		}()
+	}
+
+	if !testRunState.RuntimeOptions.NoThresholds.Bool {
+		getCurrentTestDuration := coordinator.GetCurrentTestRunDuration
+		finalizeThresholds := metricsEngine.StartThresholdCalculations(nil, runAbort, getCurrentTestDuration)
+
+		defer func() {
+			// This gets called after all of the outputs have stopped, so we are
+			// sure there won't be any more metrics being sent.
+			c.gs.Logger.Debug("Finalizing thresholds...")
+			breachedThresholds := finalizeThresholds()
+			if len(breachedThresholds) > 0 {
+				tErr := errext.WithAbortReasonIfNone(
+					errext.WithExitCodeIfNone(
+						fmt.Errorf("thresholds on metrics '%s' have been breached", strings.Join(breachedThresholds, ", ")),
+						exitcodes.ThresholdsHaveFailed,
+					), errext.AbortedByThresholdsAfterTestEnd)
+
+				if err == nil {
+					err = tErr
+				} else {
+					c.gs.Logger.WithError(tErr).Debug("Breached thresholds, but test already exited with another error")
+				}
+			}
+		}()
 	}
 
 	c.gs.Logger.Infof("Starting gRPC server on %s", c.gRPCAddress)

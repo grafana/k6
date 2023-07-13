@@ -61,6 +61,39 @@ func (me *MetricsEngine) CreateIngester() *OutputIngester {
 	}
 }
 
+// ImportMetric parses metric and the data for the given metric and merges it in
+// the MetricsEngine's Sink for it.
+//
+// TODO: something better? deduplicate code with getThresholdMetricOrSubmetric
+func (me *MetricsEngine) ImportMetric(name string, data []byte) error {
+	me.MetricsLock.Lock()
+	defer me.MetricsLock.Unlock()
+
+	// TODO: replace with strings.Cut after Go 1.18
+	nameParts := strings.SplitN(name, "{", 2)
+
+	metric := me.registry.Get(nameParts[0])
+	if metric == nil {
+		return fmt.Errorf("metric '%s' does not exist in the script", nameParts[0])
+	}
+	if len(nameParts) == 1 { // no sub-metric
+		me.markObserved(metric)
+		return metric.Sink.Merge(data)
+	}
+
+	if nameParts[1][len(nameParts[1])-1] != '}' {
+		return fmt.Errorf("missing ending bracket, sub-metric format needs to be 'metric{key:value}'")
+	}
+
+	sm, err := metric.AddSubmetric(nameParts[1][:len(nameParts[1])-1])
+	if err != nil {
+		return err
+	}
+
+	me.markObserved(sm.Metric)
+	return sm.Metric.Sink.Merge(data)
+}
+
 func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Metric, error) {
 	// TODO: replace with strings.Cut after Go 1.18
 	nameParts := strings.SplitN(name, "{", 2)

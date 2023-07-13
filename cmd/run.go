@@ -43,6 +43,7 @@ type cmdsRunAndAgent struct {
 
 	// TODO: figure out something more elegant?
 	loadConfiguredTest func(cmd *cobra.Command, args []string) (*loadedAndConfiguredTest, execution.Controller, error)
+	metricsEngineHook  func(*engine.MetricsEngine) func()
 	testEndHook        func(err error)
 }
 
@@ -179,9 +180,9 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	// We'll need to pipe metrics to the MetricsEngine and process them if any
-	// of these are enabled: thresholds, end-of-test summary
+	// of these are enabled: thresholds, end-of-test summary, engine hook
 	shouldProcessMetrics := (!testRunState.RuntimeOptions.NoSummary.Bool ||
-		!testRunState.RuntimeOptions.NoThresholds.Bool)
+		!testRunState.RuntimeOptions.NoThresholds.Bool || c.metricsEngineHook != nil)
 	var metricsIngester *engine.OutputIngester
 	if shouldProcessMetrics {
 		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, testRunState.RuntimeOptions.NoThresholds.Bool)
@@ -243,6 +244,11 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 		// since they may change the run status for the outputs.
 		stopOutputs(err)
 	}()
+
+	if c.metricsEngineHook != nil {
+		hookFinalize := c.metricsEngineHook(metricsEngine)
+		defer hookFinalize()
+	}
 
 	if !testRunState.RuntimeOptions.NoThresholds.Bool {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(
