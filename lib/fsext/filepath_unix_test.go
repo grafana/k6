@@ -72,3 +72,59 @@ func TestJoinFilePath(t *testing.T) {
 		})
 	}
 }
+
+func TestAbs(t *testing.T) {
+	t.Parallel()
+
+	type args struct {
+		root string
+		path string
+	}
+	tests := []struct {
+		name string
+		args args
+		want string
+	}{
+		{
+			name: "absolute path",
+			args: args{
+				root: "/",
+				path: "/test",
+			},
+			want: "/test",
+		},
+		{
+			name: "relative path",
+			args: args{
+				root: "/",
+				path: "test",
+			},
+			want: "/test",
+		},
+		{
+			name: "relative path with leading dot",
+			args: args{
+				root: "/",
+				path: "./test",
+			},
+			want: "/test",
+		},
+		{
+			name: "relative path with leading double dot",
+			args: args{
+				root: "/",
+				path: "../test",
+			},
+			want: "/test",
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			assert.Equal(t, tt.want, fsext.Abs(tt.args.root, tt.args.path))
+		})
+	}
+}

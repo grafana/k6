@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
-	"path/filepath"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
@@ -20,18 +19,7 @@ const cantBeUsedOutsideInitContextMsg = `the "%s" function is only available in 
 // contents of a file. If the second argument is "b" it returns an ArrayBuffer
 // instance, otherwise a string representation.
 func openImpl(rt *goja.Runtime, fs fsext.Fs, basePWD *url.URL, filename string, args ...string) (goja.Value, error) {
-	// Here IsAbs should be enough but unfortunately it doesn't handle absolute paths starting from
-	// the current drive on windows like `\users\noname\...`. Also it makes it more easy to test and
-	// will probably be need for archive execution under windows if always consider '/...' as an
-	// absolute path.
-	if filename[0] != '/' && filename[0] != '\\' && !filepath.IsAbs(filename) {
-		filename = filepath.Join(basePWD.Path, filename)
-	}
-	filename = filepath.Clean(filename)
-
-	if filename[0:1] != fsext.FilePathSeparator {
-		filename = fsext.FilePathSeparator + filename
-	}
+	filename = fsext.Abs(basePWD.Path, filename)
 
 	data, err := readFile(fs, filename)
 	if err != nil {
