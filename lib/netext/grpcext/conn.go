@@ -57,7 +57,11 @@ type Conn struct {
 }
 
 var (
-	connections       = make(map[string]*grpc.ClientConn, 2)
+	// Is there any other way?
+
+	//nolint:golint,gochecknoglobals
+	connections = make(map[string]*grpc.ClientConn, 2)
+	//nolint:golint,gochecknoglobals
 	connectionsAddrMu = &sync.Map{}
 )
 
