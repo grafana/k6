@@ -4,6 +4,7 @@ package grpcext
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"strconv"
@@ -57,8 +58,7 @@ type Conn struct {
 
 var (
 	connections       = make(map[string]*grpc.ClientConn, 2)
-	connectionsAddrMu = make(map[string]*sync.Mutex, 2)
-	connectionsMu     sync.Mutex
+	connectionsAddrMu = &sync.Map{}
 )
 
 // DefaultOptions generates an option set
@@ -100,15 +100,17 @@ func DialShared(ctx context.Context, addr string, options ...grpc.DialOption) (*
 
 	var addrMu *sync.Mutex
 	// Lock for mutating connectionsAddrMu map
-	connectionsMu.Lock()
-	if addrMu, ok = connectionsAddrMu[addr]; !ok {
-		addrMu = &sync.Mutex{}
-		connectionsAddrMu[addr] = addrMu
+	if addrMuEntry, _ := connectionsAddrMu.LoadOrStore(addr, &sync.Mutex{}); addrMuEntry != nil {
+		if addrMu, ok = addrMuEntry.(*sync.Mutex); ok {
+			// Lock for mutating connections map
+			addrMu.Lock()
+			defer addrMu.Unlock()
+		}
 	}
-	// Lock for mutating connections map
-	addrMu.Lock()
-	connectionsMu.Unlock()
-	defer addrMu.Unlock()
+	if addrMu == nil {
+		return nil, errors.New("unable to find connection address mutex, this should not happen")
+	}
+
 	// As we may modify the clients map
 	// We lock to ensure we only open a single connection and add it to the map. Subsequent consumers will obtain
 	// the dialed connection.
@@ -230,11 +232,14 @@ func (c *Conn) Invoke(
 func (c *Conn) Close() error {
 	if c.addr != "" {
 		// Lock for mutating connections map
-		if addrMu, ok := connectionsAddrMu[c.addr]; ok {
-			addrMu.Lock()
-			// no need to close as it will close below, just need to remove connection from shared map
-			delete(connections, c.addr)
-			addrMu.Unlock()
+		var addrMu *sync.Mutex
+		// Lock for mutating connectionsAddrMu map
+		if addrMuEntry, ok := connectionsAddrMu.Load(c.addr); ok && addrMuEntry != nil {
+			if addrMu, ok = addrMuEntry.(*sync.Mutex); ok {
+				addrMu.Lock()
+				delete(connections, c.addr)
+				addrMu.Unlock()
+			}
 		}
 	}
 
