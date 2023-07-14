@@ -50,7 +50,8 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
-			"open": mi.Open,
+			"open":     mi.Open,
+			"openSync": mi.OpenSync,
 		},
 	}
 }
@@ -88,6 +89,50 @@ func (mi *ModuleInstance) Open(path goja.Value) *goja.Promise {
 	}()
 
 	return promise
+}
+
+// OpenSync opens a file and returns a [File] instance.
+//
+// This method is synchronous and should only be used in the init context.
+//
+// This method is intended as a temporary workaround until we have proper
+// support for asynchronous functions execution in the k6 init context.
+//
+// TODO @oleiade: remove this method once we have proper support for
+// asynchronous functions execution in the k6 init context.
+func (mi *ModuleInstance) OpenSync(path goja.Value) (goja.Value, error) {
+	rt := mi.vu.Runtime()
+
+	// Files can only be opened in the init context.
+	if mi.vu.State() != nil {
+		common.Throw(
+			rt,
+			newFsError(ForbiddenError, "openSync() failed; reason: opening a file in the VU context is forbidden"),
+		)
+	}
+
+	if common.IsNullish(path) {
+		common.Throw(
+			rt,
+			newFsError(TypeError, "openSync() failed; reason: path cannot be null or undefined"),
+		)
+	}
+
+	// Obtain the underlying path string from the JS value.
+	pathStr := path.String()
+	if pathStr == "" {
+		common.Throw(
+			rt,
+			newFsError(TypeError, "open() failed; reason: path cannot be empty"),
+		)
+	}
+
+	file, err := mi.openImpl(pathStr)
+	if err != nil {
+		common.Throw(rt, err)
+	}
+
+	return rt.ToValue(file), nil
 }
 
 func (mi *ModuleInstance) openImpl(path string) (*File, error) {

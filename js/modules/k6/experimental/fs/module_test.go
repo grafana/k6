@@ -173,6 +173,159 @@ func TestOpen(t *testing.T) {
 	})
 }
 
+func TestOpenSync(t *testing.T) {
+	t.Parallel()
+
+	t.Run("opening existing file synchronously should succeed", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name     string
+			openPath string
+			wantPath string
+		}{
+			{
+				name:     "open absolute path",
+				openPath: fsext.FilePathSeparator + "bonjour.txt",
+				wantPath: fsext.FilePathSeparator + "bonjour.txt",
+			},
+			{
+				name:     "open relative path",
+				openPath: filepath.Join(".", fsext.FilePathSeparator, "bonjour.txt"),
+				wantPath: fsext.FilePathSeparator + "bonjour.txt",
+			},
+			{
+				name:     "open path with ..",
+				openPath: fsext.FilePathSeparator + "dir" + fsext.FilePathSeparator + ".." + fsext.FilePathSeparator + "bonjour.txt",
+				wantPath: fsext.FilePathSeparator + "bonjour.txt",
+			},
+		}
+
+		for _, tt := range tests {
+			tt := tt
+
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				runtime, err := newConfiguredRuntime(t)
+				require.NoError(t, err)
+
+				fs := newTestFs(t, func(fs afero.Fs) error {
+					fileErr := afero.WriteFile(fs, tt.wantPath, []byte("Bonjour, le monde"), 0o644)
+					if fileErr != nil {
+						return fileErr
+					}
+
+					return fs.Mkdir(fsext.FilePathSeparator+"dir", 0o644)
+				})
+				runtime.VU.InitEnvField.FileSystems["file"] = fs
+				runtime.VU.InitEnvField.CWD = &url.URL{Scheme: "file", Path: fsext.FilePathSeparator}
+
+				_, err = runtime.VU.RuntimeField.RunString(fmt.Sprintf(`
+					try {
+						const file = fs.openSync(%q)
+
+						if (file.path !== %q) {
+							throw 'unexpected file path ' + file.path + '; expected %q';
+						}
+					} catch (err) {
+						throw "unexpected error: " + err
+					}
+
+				`, tt.openPath, tt.wantPath, tt.wantPath))
+
+				assert.NoError(t, err)
+			})
+		}
+	})
+
+	t.Run("opening file synchronously in VU context should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		runtime.MoveToVUContext(&lib.State{
+			Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("tag-vu", "mytag")),
+		})
+
+		_, err = runtime.VU.RuntimeField.RunString(`
+			fs.openSync('bonjour.txt')
+		`)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "ForbiddenError")
+	})
+
+	t.Run("calling openSync without providing a path should fail", func(t *testing.T) {
+		t.Parallel()
+
+		tests := []struct {
+			name     string
+			openPath string
+		}{
+			{
+				name:     "openSync empty path should fail",
+				openPath: "",
+			},
+			{
+				name:     "openSync null path should fail",
+				openPath: "null",
+			},
+			{
+				name:     "openSync undefined path should fail",
+				openPath: "undefined",
+			},
+		}
+
+		for _, tt := range tests {
+			tt := tt
+
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				runtime, err := newConfiguredRuntime(t)
+				require.NoError(t, err)
+
+				_, gotErr := runtime.VU.RuntimeField.RunString(fmt.Sprintf(`fs.openSync(%q)`, tt.openPath))
+
+				assert.Error(t, gotErr)
+			})
+		}
+	})
+
+	t.Run("opening directory synchronously should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testDirPath := fsext.FilePathSeparator + "dir"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return fs.Mkdir(testDirPath, 0o644)
+		})
+
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.VU.RuntimeField.RunString(fmt.Sprintf(`fs.openSync(%q)`, testDirPath))
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "InvalidResourceError")
+	})
+
+	t.Run("opening non existing file synchronously should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		_, err = runtime.VU.RuntimeField.RunString(`fs.openSync('doesnotexist.txt')`)
+
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "NotFoundError")
+	})
+}
+
 func TestFile(t *testing.T) {
 	t.Parallel()
 
