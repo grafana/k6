@@ -21,6 +21,13 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 )
 
+// errBrowserNotFoundInRegistry indicates that the browser instance
+// for the iteration, which should have been initialized as a result
+// of the IterStart event, has not been found in the registry. This
+// might happen if browser type option is not set in scenario definition.
+var errBrowserNotFoundInRegistry = errors.New("browser not found in registry. " +
+	"make sure to set browser type option in scenario definition in order to use the browser module")
+
 // pidRegistry keeps track of the launched browser process IDs.
 type pidRegistry struct {
 	mu  sync.RWMutex
@@ -299,7 +306,7 @@ func (r *browserRegistry) getBrowser(id int64) (api.Browser, error) {
 		return b, nil
 	}
 
-	return nil, errors.New("browser not found in registry")
+	return nil, errBrowserNotFoundInRegistry
 }
 
 func (r *browserRegistry) deleteBrowser(id int64) {
