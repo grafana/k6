@@ -204,7 +204,7 @@ jobs:
             docker push "$DOCKER_IMAGE_ID:latest"
           fi
       - name: Build loadimpact/k6
-        run: docker build -t $LI_DOCKER_IMAGE_ID .
+        run: docker build -t $LI_DOCKER_IMAGE_ID --target legacy .
       - name: Publish loadimpact/k6:master image to Docker Hub
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |

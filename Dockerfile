@@ -18,7 +18,7 @@ WORKDIR /home/k6
 ENTRYPOINT ["k6"]
 
 # Legacy loadimpact/k6 image
-FROM release
+FROM release as legacy
 
 COPY entrypoint-legacy.sh /usr/bin/
 
