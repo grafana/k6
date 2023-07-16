@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/cloudapi/insights"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
@@ -63,13 +64,20 @@ type Output struct {
 }
 
 // New creates a new cloud output.
-func New(logger logrus.FieldLogger, conf cloudapi.Config, cloudClient *cloudapi.Client) (*Output, error) {
+func New(logger logrus.FieldLogger, conf cloudapi.Config, _ *cloudapi.Client) (*Output, error) {
 	return &Output{
-		config:      conf,
-		logger:      logger.WithField("output", "cloudv2"),
-		cloudClient: cloudClient,
-		abort:       make(chan struct{}),
-		stop:        make(chan struct{}),
+		config: conf,
+		logger: logger.WithField("output", "cloudv2"),
+		abort:  make(chan struct{}),
+		stop:   make(chan struct{}),
+
+		// TODO: move this creation operation to the centralized output. Reducing the probability to
+		// break the logic for the config overwriting.
+		//
+		// It creates a new client because in the case the backend has overwritten
+		// the config we need to use the new set.
+		cloudClient: cloudapi.NewClient(
+			logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration()),
 	}, nil
 }
 

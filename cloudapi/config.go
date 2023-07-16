@@ -175,9 +175,13 @@ func NewConfig() Config {
 		TracesPushConcurrency: null.NewInt(1, false),
 
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
-		MaxTimeSeriesInBatch:       null.NewInt(10000, false),
 		Timeout:                    types.NewNullDuration(1*time.Minute, false),
 		APIVersion:                 null.NewInt(1, false),
+
+		// The set value (1000) is selected for performance reasons.
+		// Any change to this value should be first discussed with internal stakeholders.
+		MaxTimeSeriesInBatch: null.NewInt(1000, false),
+
 		// Aggregation is disabled by default, since AggregationPeriod has no default value
 		// but if it's enabled manually or from the cloud service, those are the default values it will use:
 		AggregationCalcInterval:         types.NewNullDuration(3*time.Second, false),

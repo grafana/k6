@@ -6,7 +6,7 @@
 | **status**           | 🔧 proposal                                                                                                                                                                                              |
 | **revisions**        | [previous](https://github.com/grafana/k6/pull/3101/commits/e2b8ddad40d013b56789cb4c89dd8f9c338f42d4), [initial](https://github.com/grafana/k6/pull/3101/commits/0669d16e76791241b75a2622729327880cd814e2) |
 | **Proof of concept** | [branch](https://github.com/grafana/k6/tree/poc/experimental/fs-module/js/modules/k6/experimental/fs)                                                                                                     |
-| **references**       | [[#2977](https://github.com/grafana/k6/issues/2977) [[#2974](https://github.com/grafana/k6/issues/2974)                                                                                                   |
+| **references**       | [#2977](https://github.com/grafana/k6/issues/2977) [#2974](https://github.com/grafana/k6/issues/2974)                                                                                                   |
 
 ## Problem definition
 
