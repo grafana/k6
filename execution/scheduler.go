@@ -377,7 +377,7 @@ func (e *Scheduler) runExecutor(
 // and emission of the `vus` and `vus_max` metrics.
 func (e *Scheduler) Init(
 	runCtx context.Context, samplesOut chan<- metrics.SampleContainer,
-) (stopVUEmission func(), err error) {
+) (stopVUEmission func(), initErr error) {
 	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-init")
 
 	execSchedRunCtx, execSchedRunCancel := context.WithCancel(runCtx)
@@ -390,11 +390,11 @@ func (e *Scheduler) Init(
 
 	defer func() {
 		if interruptErr := GetCancelReasonIfTestAborted(runCtx); interruptErr != nil {
-			logger.Debugf("The test run was interrupted, returning '%s' instead of '%s'", interruptErr, err)
+			logger.Debugf("The test run was interrupted, returning '%s' instead of '%s'", interruptErr, initErr)
 			e.state.SetExecutionStatus(lib.ExecutionStatusInterrupted)
-			err = interruptErr
+			initErr = interruptErr
 		}
-		if err != nil {
+		if initErr != nil {
 			stopVUEmission()
 		}
 	}()
@@ -406,14 +406,14 @@ func (e *Scheduler) Init(
 // out channel.
 //
 //nolint:funlen
-func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) (err error) {
+func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) (runErr error) {
 	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-run")
 
 	defer func() {
 		if interruptErr := GetCancelReasonIfTestAborted(runCtx); interruptErr != nil {
-			logger.Debugf("The test run was interrupted, returning '%s' instead of '%s'", interruptErr, err)
+			logger.Debugf("The test run was interrupted, returning '%s' instead of '%s'", interruptErr, runErr)
 			e.state.SetExecutionStatus(lib.ExecutionStatusInterrupted)
-			err = interruptErr
+			runErr = interruptErr
 		}
 	}()
 
