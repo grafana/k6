@@ -981,6 +981,73 @@ func TestClient_ConnectionSharingParameter(t *testing.T) {
 					}`,
 			},
 		},
+		{
+			name: "ConnectConnectionSharingMax2Default",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				var client1 = new grpc.Client();
+				var client2 = new grpc.Client();
+				const maxSharing = 2;
+				`},
+			vuString: codeBlock{
+				code: `
+					client0.connect("GRPCBIN_ADDR", { connectionSharing: maxSharing });
+					client1.connect("GRPCBIN_ADDR", { connectionSharing: maxSharing });
+					client2.connect("GRPCBIN_ADDR", { connectionSharing: maxSharing });
+					if (!client0.isSameConnection(client1)) {
+						throw new Error("unexpected connection inequality");
+					}
+					if (client0.isSameConnection(client2)) {
+						throw new Error("unexpected connection equality");
+					}`,
+			},
+		},
+		{
+			name: "ConnectConnectionSharingValue1",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				const maxSharing = 1;
+				`},
+			vuString: codeBlock{
+				code: `client0.connect("GRPCBIN_ADDR", { connectionSharing: maxSharing });`,
+				err:  "it needs to be boolean or a positive integer > 1",
+			},
+		},
+		{
+			// First 100 connections (0 - 99) will be shared, last connection: [100] will be a new connection
+			// Only 2 connections total will be opened
+			name: "ConnectConnectionSharingValue100",
+			initString: codeBlock{code: `
+				const clients = [];
+                for(var i = 0; i < 101; i++) {
+					clients.push(new grpc.Client());
+				}`},
+			vuString: codeBlock{
+				code: `
+                for(let i = 0; i < 101; i++) {
+					clients[i].connect("GRPCBIN_ADDR", { connectionSharing: true });
+				}
+				for(var i = 1; i < 100; i++) {
+					if (!clients[i].isSameConnection(clients[0])) {
+						throw new Error("unexpected connection inequality:" + i);
+					}
+				}
+				if (clients[100].isSameConnection(clients[0])) {
+					throw new Error("unexpected connection equality");
+				}`,
+			},
+		},
+		{
+			name: "ConnectConnectionSharingValueBad",
+			initString: codeBlock{code: `
+				var client0 = new grpc.Client();
+				const maxSharing = "on";
+				`},
+			vuString: codeBlock{
+				code: `client0.connect("GRPCBIN_ADDR", { connectionSharing: maxSharing });`,
+				err:  "it needs to be boolean or a positive integer > 1",
+			},
+		},
 	}
 	assertResponse := func(t *testing.T, cb codeBlock, err error, val goja.Value, ts testState) {
 		if isWindows && cb.windowsErr != "" && err != nil {

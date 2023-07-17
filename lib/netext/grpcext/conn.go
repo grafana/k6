@@ -10,6 +10,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -52,15 +53,16 @@ type clientConnCloser interface {
 
 // Conn is a gRPC client connection.
 type Conn struct {
-	addr string
-	raw  clientConnCloser
+	addr   string
+	shares atomic.Uint64
+	raw    clientConnCloser
 }
 
 var (
 	// Is there any other way?
 
 	//nolint:golint,gochecknoglobals
-	connections = make(map[string]*grpc.ClientConn, 2)
+	connections = &sync.Map{}
 	//nolint:golint,gochecknoglobals
 	connectionsAddrMu = &sync.Map{}
 )
@@ -95,10 +97,12 @@ func Dial(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, 
 // DialShared establish a gRPC connection if a shared connection for the same address does not already exist.
 // Note: only use a shared connection over the same address if the service is the same OR if multiple services are muxed
 // over this shared address.
-func DialShared(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, error) {
+func DialShared(ctx context.Context, addr string, connectionSharing uint64, options ...grpc.DialOption) (*Conn, error) {
 	var (
-		conn *grpc.ClientConn
-		err  error
+		iconn interface{}
+		conn  []*Conn
+		raw   *grpc.ClientConn
+		err   error
 	)
 	var ok bool
 
@@ -118,21 +122,46 @@ func DialShared(ctx context.Context, addr string, options ...grpc.DialOption) (*
 	// As we may modify the clients map
 	// We lock to ensure we only open a single connection and add it to the map. Subsequent consumers will obtain
 	// the dialed connection.
-	if conn, ok = connections[addr]; !ok {
-		conn, err = grpc.DialContext(ctx, addr, options...)
+	// Get the connections array and check if the number of available tickets is
+	if iconn, ok = connections.Load(addr); !ok {
+		raw, err = grpc.DialContext(ctx, addr, options...)
 		if err != nil {
 			return nil, err
 		}
-		connections[addr] = conn
+		conn = make([]*Conn, 0)
+		newConn := &Conn{
+			addr:   addr,
+			raw:    raw,
+			shares: atomic.Uint64{},
+		}
+		newConn.shares.Store(connectionSharing)
+		conn = append(conn, newConn)
+		connections.Store(addr, conn)
+	} else {
+		if conn, ok = iconn.([]*Conn); ok {
+			if conn[len(conn)-1].shares.CompareAndSwap(1, 0) {
+				raw, err = grpc.DialContext(ctx, addr, options...)
+				if err != nil {
+					return nil, err
+				}
+				newConn := &Conn{
+					addr:   addr,
+					raw:    raw,
+					shares: atomic.Uint64{},
+				}
+				newConn.shares.Store(connectionSharing)
+				conn = append(conn, newConn)
+				connections.Store(addr, conn)
+			} else {
+				conn[len(conn)-1].shares.Add(^uint64(0))
+			}
+		}
 	}
 
 	if err != nil {
 		return nil, err
 	}
-	return &Conn{
-		addr: addr,
-		raw:  conn,
-	}, nil
+	return conn[len(conn)-1], nil
 }
 
 // Equals compares two Conn pointers for equality of `addr` and `raw` connection.
@@ -241,7 +270,18 @@ func (c *Conn) Close() error {
 		if addrMuEntry, ok := connectionsAddrMu.Load(c.addr); ok && addrMuEntry != nil {
 			if addrMu, ok = addrMuEntry.(*sync.Mutex); ok {
 				addrMu.Lock()
-				delete(connections, c.addr)
+				if iconn, cok := connections.Load(c.addr); cok {
+					conn, convok := iconn.([]*Conn)
+					if convok {
+						for _, cconn := range conn {
+							if cconn.raw != c.raw {
+								// TODO: bubble errors up?
+								_ = cconn.raw.Close()
+							}
+						}
+					}
+				}
+				connections.Delete(c.addr)
 				addrMu.Unlock()
 			}
 		}
