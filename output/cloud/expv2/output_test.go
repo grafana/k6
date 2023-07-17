@@ -11,11 +11,12 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/guregu/null.v3"
+
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
-	"gopkg.in/guregu/null.v3"
 )
 
 func TestNew(t *testing.T) {
@@ -495,6 +496,10 @@ func TestOutputFlushRequestMetadatasAbort(t *testing.T) {
 }
 
 type flusherFunc func()
+
+func (ff flusherFunc) Flush() error {
+	return ff.flush()
+}
 
 func (ff flusherFunc) flush() error {
 	ff()
