@@ -89,6 +89,7 @@ type Client struct {
 	connMu *sync.RWMutex
 }
 
+// NewDefaultClientConfigForTestRun creates a new default client config for a test run.
 func NewDefaultClientConfigForTestRun(ingesterHost, authToken string, testRunID int64) ClientConfig {
 	return ClientConfig{
 		IngesterHost: ingesterHost,
