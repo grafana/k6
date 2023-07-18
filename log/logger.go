@@ -6,7 +6,6 @@ import (
 	"io/ioutil"
 	"regexp"
 	"runtime"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -98,9 +97,8 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...a
 		return
 	}
 	fields := logrus.Fields{
-		"category":  category,
-		"elapsed":   fmt.Sprintf("%d ms", elapsed),
-		"goroutine": goRoutineID(),
+		"category": category,
+		"elapsed":  fmt.Sprintf("%d ms", elapsed),
 	}
 	if l.iterID != "" && l.GetLevel() > logrus.InfoLevel {
 		fields["iteration_id"] = l.iterID
@@ -174,17 +172,6 @@ func (l *Logger) SetCategoryFilter(filter string) (err error) {
 		return fmt.Errorf("invalid category filter %q: %w", filter, err)
 	}
 	return nil
-}
-
-func goRoutineID() int {
-	var buf [64]byte
-	n := runtime.Stack(buf[:], false)
-	idField := strings.Fields(strings.TrimPrefix(string(buf[:n]), "goroutine "))[0]
-	id, err := strconv.Atoi(idField)
-	if err != nil {
-		panic(fmt.Sprintf("internal error while getting goroutine ID: %v", err))
-	}
-	return id
 }
 
 type consoleLogFormatter struct {
