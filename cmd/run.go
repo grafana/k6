@@ -147,17 +147,28 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		return err
 	}
 
-	executionState := execScheduler.GetState()
-	metricsEngine, err := engine.NewMetricsEngine(executionState.Test)
+	metricsEngine, err := engine.NewMetricsEngine(testRunState.Registry, logger)
 	if err != nil {
 		return err
 	}
-	if !testRunState.RuntimeOptions.NoSummary.Bool || !testRunState.RuntimeOptions.NoThresholds.Bool {
+
+	// We'll need to pipe metrics to the MetricsEngine and process them if any
+	// of these are enabled: thresholds, end-of-test summary
+	shouldProcessMetrics := (!testRunState.RuntimeOptions.NoSummary.Bool ||
+		!testRunState.RuntimeOptions.NoThresholds.Bool)
+	var metricsIngester *engine.OutputIngester
+	if shouldProcessMetrics {
+		err = metricsEngine.InitSubMetricsAndThresholds(conf.Options, testRunState.RuntimeOptions.NoThresholds.Bool)
+		if err != nil {
+			return err
+		}
 		// We'll need to pipe metrics to the MetricsEngine if either the
 		// thresholds or the end-of-test summary are enabled.
-		outputs = append(outputs, metricsEngine.CreateIngester())
+		metricsIngester = metricsEngine.CreateIngester()
+		outputs = append(outputs, metricsIngester)
 	}
 
+	executionState := execScheduler.GetState()
 	if !testRunState.RuntimeOptions.NoSummary.Bool {
 		defer func() {
 			logger.Debug("Generating the end-of-test summary...")
@@ -208,7 +219,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}()
 
 	if !testRunState.RuntimeOptions.NoThresholds.Bool {
-		finalizeThresholds := metricsEngine.StartThresholdCalculations(runAbort, executionState.GetCurrentTestRunDuration)
+		finalizeThresholds := metricsEngine.StartThresholdCalculations(
+			metricsIngester, runAbort, executionState.GetCurrentTestRunDuration,
+		)
 		handleFinalThresholdCalculation := func() {
 			// This gets called after the Samples channel has been closed and
 			// the OutputManager has flushed all of the cached samples to
@@ -283,7 +296,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	printExecutionDescription(
-		c.gs, "local", args[0], "", conf, execScheduler.GetState().ExecutionTuple, executionPlan, outputs,
+		c.gs, "local", args[0], "", conf, executionState.ExecutionTuple, executionPlan, outputs,
 	)
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.

@@ -19,7 +19,7 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	testMetric, err := piState.Registry.NewMetric("test_metric", metrics.Trend)
 	require.NoError(t, err)
 
-	ingester := outputIngester{
+	ingester := OutputIngester{
 		logger: piState.Logger,
 		metricsEngine: &MetricsEngine{
 			ObservedMetrics: make(map[string]*metrics.Metric),
@@ -55,9 +55,8 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	me := &MetricsEngine{
-		test: &lib.TestRunState{
-			TestPreInitState: piState,
-		},
+		logger:          piState.Logger,
+		registry:        piState.Registry,
 		ObservedMetrics: make(map[string]*metrics.Metric),
 	}
 	_, err = me.getThresholdMetricOrSubmetric("test_metric{a:1}")
@@ -66,7 +65,7 @@ func TestIngesterOutputFlushSubmetrics(t *testing.T) {
 	// assert that observed metrics is empty before to start
 	require.Empty(t, me.ObservedMetrics)
 
-	ingester := outputIngester{
+	ingester := OutputIngester{
 		logger:        piState.Logger,
 		metricsEngine: me,
 		cardinality:   newCardinalityControl(),
@@ -107,7 +106,7 @@ func TestOutputFlushMetricsTimeSeriesWarning(t *testing.T) {
 	require.NoError(t, err)
 
 	logger, hook := testutils.NewLoggerWithHook(nil)
-	ingester := outputIngester{
+	ingester := OutputIngester{
 		logger: logger,
 		metricsEngine: &MetricsEngine{
 			ObservedMetrics: make(map[string]*metrics.Metric),

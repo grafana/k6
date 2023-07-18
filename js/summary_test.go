@@ -150,7 +150,7 @@ func createTestMetrics(t *testing.T) (map[string]*metrics.Metric, *lib.Group) {
 	require.NoError(t, err)
 	checksMetric.Tainted = null.BoolFrom(false)
 	checksMetric.Thresholds = metrics.Thresholds{Thresholds: []*metrics.Threshold{{Source: "rate>70", LastFailed: false}}}
-	sink := &metrics.TrendSink{}
+	sink := metrics.NewTrendSink()
 
 	samples := []float64{10.0, 15.0, 20.0}
 	for _, s := range samples {

@@ -15,7 +15,6 @@ import (
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -25,13 +24,11 @@ const thresholdsRate = 2 * time.Second
 // aggregated metric sample values. They are used to generate the end-of-test
 // summary and to evaluate the test thresholds.
 type MetricsEngine struct {
-	logger         logrus.FieldLogger
-	test           *lib.TestRunState
-	outputIngester *outputIngester
+	registry *metrics.Registry
+	logger   logrus.FieldLogger
 
 	// These can be both top-level metrics or sub-metrics
-	metricsWithThresholds []*metrics.Metric
-
+	metricsWithThresholds   []*metrics.Metric
 	breachedThresholdsCount uint32
 
 	// TODO: completely refactor:
@@ -44,18 +41,11 @@ type MetricsEngine struct {
 }
 
 // NewMetricsEngine creates a new metrics Engine with the given parameters.
-func NewMetricsEngine(runState *lib.TestRunState) (*MetricsEngine, error) {
+func NewMetricsEngine(registry *metrics.Registry, logger logrus.FieldLogger) (*MetricsEngine, error) {
 	me := &MetricsEngine{
-		test:            runState,
-		logger:          runState.Logger.WithField("component", "metrics-engine"),
+		registry:        registry,
+		logger:          logger.WithField("component", "metrics-engine"),
 		ObservedMetrics: make(map[string]*metrics.Metric),
-	}
-
-	if !(me.test.RuntimeOptions.NoSummary.Bool && me.test.RuntimeOptions.NoThresholds.Bool) {
-		err := me.initSubMetricsAndThresholds()
-		if err != nil {
-			return nil, err
-		}
 	}
 
 	return me, nil
@@ -63,20 +53,19 @@ func NewMetricsEngine(runState *lib.TestRunState) (*MetricsEngine, error) {
 
 // CreateIngester returns a pseudo-Output that uses the given metric samples to
 // update the engine's inner state.
-func (me *MetricsEngine) CreateIngester() output.Output {
-	me.outputIngester = &outputIngester{
+func (me *MetricsEngine) CreateIngester() *OutputIngester {
+	return &OutputIngester{
 		logger:        me.logger.WithField("component", "metrics-engine-ingester"),
 		metricsEngine: me,
 		cardinality:   newCardinalityControl(),
 	}
-	return me.outputIngester
 }
 
 func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Metric, error) {
 	// TODO: replace with strings.Cut after Go 1.18
 	nameParts := strings.SplitN(name, "{", 2)
 
-	metric := me.test.Registry.Get(nameParts[0])
+	metric := me.registry.Get(nameParts[0])
 	if metric == nil {
 		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[0])
 	}
@@ -125,11 +114,14 @@ func (me *MetricsEngine) markObserved(metric *metrics.Metric) {
 	}
 }
 
-func (me *MetricsEngine) initSubMetricsAndThresholds() error {
-	for metricName, thresholds := range me.test.Options.Thresholds {
+// InitSubMetricsAndThresholds parses the thresholds from the test Options and
+// initializes both the thresholds themselves, as well as any submetrics that
+// were referenced in them.
+func (me *MetricsEngine) InitSubMetricsAndThresholds(options lib.Options, onlyLogErrors bool) error {
+	for metricName, thresholds := range options.Thresholds {
 		metric, err := me.getThresholdMetricOrSubmetric(metricName)
 
-		if me.test.RuntimeOptions.NoThresholds.Bool {
+		if onlyLogErrors {
 			if err != nil {
 				me.logger.WithError(err).Warnf("Invalid metric '%s' in threshold definitions", metricName)
 			}
@@ -154,7 +146,7 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 
 	// TODO: refactor out of here when https://github.com/grafana/k6/issues/1321
 	// lands and there is a better way to enable a metric with tag
-	if me.test.Options.SystemTags.Has(metrics.TagExpectedResponse) {
+	if options.SystemTags.Has(metrics.TagExpectedResponse) {
 		_, err := me.getThresholdMetricOrSubmetric("http_req_duration{expected_response:true}")
 		if err != nil {
 			return err // shouldn't happen, but ¯\_(ツ)_/¯
@@ -167,10 +159,10 @@ func (me *MetricsEngine) initSubMetricsAndThresholds() error {
 // StartThresholdCalculations spins up a new goroutine to crunch thresholds and
 // returns a callback that will stop the goroutine and finalizes calculations.
 func (me *MetricsEngine) StartThresholdCalculations(
+	ingester *OutputIngester,
 	abortRun func(error),
 	getCurrentTestRunDuration func() time.Duration,
-) (finalize func() (breached []string),
-) {
+) (finalize func() (breached []string)) {
 	if len(me.metricsWithThresholds) == 0 {
 		return nil // no thresholds were defined
 	}
@@ -205,9 +197,9 @@ func (me *MetricsEngine) StartThresholdCalculations(
 	}()
 
 	return func() []string {
-		if me.outputIngester != nil {
+		if ingester != nil {
 			// Stop the ingester so we don't get any more metrics
-			err := me.outputIngester.Stop()
+			err := ingester.Stop()
 			if err != nil {
 				me.logger.WithError(err).Warnf("There was a problem stopping the output ingester.")
 			}

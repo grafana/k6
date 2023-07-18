@@ -1,7 +1,6 @@
 package metrics
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"sort"
@@ -11,9 +10,8 @@ import (
 var (
 	_ Sink = &CounterSink{}
 	_ Sink = &GaugeSink{}
-	_ Sink = &TrendSink{}
+	_ Sink = NewTrendSink()
 	_ Sink = &RateSink{}
-	_ Sink = &DummySink{}
 )
 
 type Sink interface {
@@ -32,7 +30,7 @@ func NewSink(mt MetricType) Sink {
 	case Gauge:
 		sink = &GaugeSink{}
 	case Trend:
-		sink = &TrendSink{}
+		sink = NewTrendSink()
 	case Rate:
 		sink = &RateSink{}
 	default:
@@ -90,67 +88,101 @@ func (g *GaugeSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{"value": g.Value}
 }
 
+// NewTrendSink makes a Trend sink with the OpenHistogram circllhist histogram.
+func NewTrendSink() *TrendSink {
+	return &TrendSink{}
+}
+
 type TrendSink struct {
-	Values []float64
+	values []float64
 	sorted bool
 
-	Count    uint64
-	Min, Max float64
-	Sum, Avg float64
+	count    uint64
+	min, max float64
+	// TODO: unexport after this dependency is removed:
+	// https://github.com/grafana/xk6-output-prometheus-remote/blob/v0.2.1/pkg/remotewrite/remotewrite.go#L173
+	Sum float64
 }
 
 // IsEmpty indicates whether the TrendSink is empty.
-func (t *TrendSink) IsEmpty() bool { return t.Count == 0 }
+func (t *TrendSink) IsEmpty() bool { return t.count == 0 }
 
 func (t *TrendSink) Add(s Sample) {
-	if t.Count == 0 {
-		t.Max, t.Min = s.Value, s.Value
+	if t.count == 0 {
+		t.max, t.min = s.Value, s.Value
 	} else {
-		if s.Value > t.Max {
-			t.Max = s.Value
+		if s.Value > t.max {
+			t.max = s.Value
 		}
-		if s.Value < t.Min {
-			t.Min = s.Value
+		if s.Value < t.min {
+			t.min = s.Value
 		}
 	}
 
-	t.Values = append(t.Values, s.Value)
+	t.values = append(t.values, s.Value)
 	t.sorted = false
-	t.Count += 1
+	t.count++
 	t.Sum += s.Value
-	t.Avg = t.Sum / float64(t.Count)
 }
 
 // P calculates the given percentile from sink values.
 func (t *TrendSink) P(pct float64) float64 {
-	switch t.Count {
+	switch t.count {
 	case 0:
 		return 0
 	case 1:
-		return t.Values[0]
+		return t.values[0]
 	default:
 		if !t.sorted {
-			sort.Float64s(t.Values)
+			sort.Float64s(t.values)
 			t.sorted = true
 		}
 
 		// If percentile falls on a value in Values slice, we return that value.
 		// If percentile does not fall on a value in Values slice, we calculate (linear interpolation)
 		// the value that would fall at percentile, given the values above and below that percentile.
-		i := pct * (float64(t.Count) - 1.0)
-		j := t.Values[int(math.Floor(i))]
-		k := t.Values[int(math.Ceil(i))]
+		i := pct * (float64(t.count) - 1.0)
+		j := t.values[int(math.Floor(i))]
+		k := t.values[int(math.Ceil(i))]
 		f := i - math.Floor(i)
 		return j + (k-j)*f
 	}
 }
 
+// Min returns the minimum value.
+func (t *TrendSink) Min() float64 {
+	return t.min
+}
+
+// Max returns the maximum value.
+func (t *TrendSink) Max() float64 {
+	return t.max
+}
+
+// Count returns the number of recorded values.
+func (t *TrendSink) Count() uint64 {
+	return t.count
+}
+
+// Avg returns the average (i.e. mean) value.
+func (t *TrendSink) Avg() float64 {
+	if t.count > 0 {
+		return t.Sum / float64(t.count)
+	}
+	return 0
+}
+
+// Total returns the total (i.e. "sum") value for all measurements.
+func (t *TrendSink) Total() float64 {
+	return t.Sum
+}
+
 func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
 	// TODO: respect the summaryTrendStats for REST API
 	return map[string]float64{
-		"min":   t.Min,
-		"max":   t.Max,
-		"avg":   t.Avg,
+		"min":   t.Min(),
+		"max":   t.Max(),
+		"avg":   t.Avg(),
 		"med":   t.P(0.5),
 		"p(90)": t.P(0.90),
 		"p(95)": t.P(0.95),
@@ -179,17 +211,4 @@ func (r RateSink) Format(t time.Duration) map[string]float64 {
 	}
 
 	return map[string]float64{"rate": rate}
-}
-
-type DummySink map[string]float64
-
-// IsEmpty indicates whether the DummySink is empty.
-func (d DummySink) IsEmpty() bool { return len(d) == 0 }
-
-func (d DummySink) Add(s Sample) {
-	panic(errors.New("you can't add samples to a dummy sink"))
-}
-
-func (d DummySink) Format(t time.Duration) map[string]float64 {
-	return map[string]float64(d)
 }
