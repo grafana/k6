@@ -11,12 +11,13 @@ import (
 	"time"
 
 	grpcRetry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
-	"go.k6.io/k6/lib/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
+
+	"go.k6.io/k6/lib/types"
 
 	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
 )
@@ -86,6 +87,32 @@ type Client struct {
 	client ingester.IngesterServiceClient
 	conn   *grpc.ClientConn
 	connMu *sync.RWMutex
+}
+
+func NewDefaultClientConfigForTestRun(ingesterHost, authToken string, testRunID int64) ClientConfig {
+	return ClientConfig{
+		IngesterHost: ingesterHost,
+		Timeout:      types.NewNullDuration(90*time.Second, false),
+		AuthConfig: ClientAuthConfig{
+			Enabled:                  true,
+			TestRunID:                testRunID,
+			Token:                    authToken,
+			RequireTransportSecurity: true,
+		},
+		TLSConfig: ClientTLSConfig{
+			Insecure: false,
+		},
+		RetryConfig: ClientRetryConfig{
+			RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
+			MaxAttempts:          3,
+			PerRetryTimeout:      30 * time.Second,
+			BackoffConfig: ClientBackoffConfig{
+				Enabled:        true,
+				JitterFraction: 0.1,
+				WaitBetween:    1 * time.Second,
+			},
+		},
+	}
 }
 
 // NewClient creates a new client.

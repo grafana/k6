@@ -16,7 +16,6 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	insightsOutput "go.k6.io/k6/output/cloud/insights"
@@ -125,29 +124,11 @@ func (o *Output) Start() error {
 		}
 		o.requestMetadatasCollector = insightsOutput.NewCollector(testRunID)
 
-		insightsClientConfig := insights.ClientConfig{
-			IngesterHost: o.config.TracesHost.String,
-			Timeout:      types.NewNullDuration(90*time.Second, false),
-			AuthConfig: insights.ClientAuthConfig{
-				Enabled:                  true,
-				TestRunID:                testRunID,
-				Token:                    o.config.Token.String,
-				RequireTransportSecurity: true,
-			},
-			TLSConfig: insights.ClientTLSConfig{
-				Insecure: false,
-			},
-			RetryConfig: insights.ClientRetryConfig{
-				RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
-				MaxAttempts:          3,
-				PerRetryTimeout:      30 * time.Second,
-				BackoffConfig: insights.ClientBackoffConfig{
-					Enabled:        true,
-					JitterFraction: 0.1,
-					WaitBetween:    1 * time.Second,
-				},
-			},
-		}
+		insightsClientConfig := insights.NewDefaultClientConfigForTestRun(
+			o.config.TracesHost.String,
+			o.config.Token.String,
+			testRunID,
+		)
 		insightsClient := insights.NewClient(insightsClientConfig)
 
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
