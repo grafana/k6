@@ -97,6 +97,7 @@ func (l *Logger) Logf(level logrus.Level, category string, msg string, args ...a
 		return
 	}
 	fields := logrus.Fields{
+		"source":   "browser",
 		"category": category,
 		"elapsed":  fmt.Sprintf("%d ms", elapsed),
 	}
