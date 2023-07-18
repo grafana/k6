@@ -61,13 +61,16 @@ type histogram struct {
 
 	// Count is counts the amount of observed values.
 	Count uint32
+
+	MinResolution float64
 }
 
-func newHistogram() *histogram {
+func newHistogram(minResolution float64) *histogram {
 	return &histogram{
 		Buckets: make(map[uint32]uint32),
 		Max:     -math.MaxFloat64,
 		Min:     math.MaxFloat64,
+		MinResolution: minResolution,
 	}
 }
 
@@ -84,6 +87,10 @@ func (h *histogram) addToBucket(v float64) {
 
 	h.Count++
 	h.Sum += v
+
+	if h.MinResolution != 1.0 {
+		v = v / h.MinResolution
+	}
 
 	if v > highestTrackable {
 		h.ExtraHighBucket++
@@ -150,6 +157,9 @@ func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 	}
 	if h.ExtraHighBucket > 0 {
 		hval.ExtraHighValuesCounter = &h.ExtraHighBucket
+	}
+	if h.MinResolution != 1.0 {
+	    hval.MinResolution = &h.MinResolution
 	}
 	return hval
 }

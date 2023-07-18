@@ -12,9 +12,9 @@ type metricValue interface {
 	Add(v float64)
 }
 
-func newMetricValue(mt metrics.MetricType) metricValue {
+func newMetricValue(m *metrics.Metric) metricValue {
 	var am metricValue
-	switch mt {
+	switch m.Type {
 	case metrics.Counter:
 		am = &counter{}
 	case metrics.Gauge:
@@ -22,12 +22,20 @@ func newMetricValue(mt metrics.MetricType) metricValue {
 	case metrics.Rate:
 		am = &rate{}
 	case metrics.Trend:
-		am = newHistogram()
+	    var minResolution float64;
+	    if m.Name == "my_special_metric_name" {
+	        minResolution = 0.000001
+	    } else {
+	        // default
+	        minResolution = 1.0
+	    }
+
+		am = newHistogram(minResolution)
 	default:
 		// Should not be possible to create
 		// an invalid metric type except for specific
 		// and controlled tests
-		panic(fmt.Sprintf("MetricType %q is not supported", mt))
+		panic(fmt.Sprintf("MetricType %q is not supported", m.Type))
 	}
 	return am
 }
