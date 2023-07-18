@@ -547,6 +547,8 @@ func (out *Output) flushRequestMetadatas() {
 	err := out.requestMetadatasFlusher.Flush()
 	if err != nil {
 		out.logger.WithError(err).WithField("t", time.Since(start)).Error("Failed to push trace samples to the cloud")
+
+		return
 	}
 
 	out.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered trace samples to the cloud")
