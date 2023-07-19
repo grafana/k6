@@ -48,13 +48,13 @@ func TestExtendedTrendSinkMapPrompb(t *testing.T) {
 	resolver["p095"] = resolver["p(95)"]
 	delete(resolver, "p(95)")
 	resolver["sum"] = func(t *metrics.TrendSink) float64 {
-		return t.Sum
+		return t.Total()
 	}
 
 	st, err := newExtendedTrendSink(resolver)
 	require.NoError(t, err)
 	st.Add(sample)
-	require.Equal(t, st.Count, uint64(1))
+	require.Equal(t, st.Count(), uint64(1))
 
 	ts := st.MapPrompb(sample.TimeSeries, sample.Time)
 	require.Len(t, ts, 8)
@@ -163,7 +163,7 @@ func TestNativeHistogramSinkMapPrompb(t *testing.T) {
 func BenchmarkK6TrendSinkAdd(b *testing.B) {
 	m := &metrics.Metric{
 		Type: metrics.Trend,
-		Sink: &metrics.TrendSink{},
+		Sink: metrics.NewTrendSink(),
 	}
 	s := metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
