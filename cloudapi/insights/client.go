@@ -11,7 +11,6 @@ import (
 	"time"
 
 	grpcRetry "github.com/grpc-ecosystem/go-grpc-middleware/retry"
-	"go.k6.io/k6/lib/types"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -37,7 +36,7 @@ var (
 // ClientConfig is the configuration for the client.
 type ClientConfig struct {
 	IngesterHost  string
-	Timeout       types.NullDuration
+	Timeout       time.Duration
 	ConnectConfig ClientConnectConfig
 	AuthConfig    ClientAuthConfig
 	TLSConfig     ClientTLSConfig
@@ -48,6 +47,7 @@ type ClientConfig struct {
 type ClientConnectConfig struct {
 	Block                  bool
 	FailOnNonTempDialError bool
+	Timeout                time.Duration
 	Dialer                 func(context.Context, string) (net.Conn, error)
 }
 
@@ -88,6 +88,39 @@ type Client struct {
 	connMu *sync.RWMutex
 }
 
+// NewDefaultClientConfigForTestRun creates a new default client config for a test run.
+func NewDefaultClientConfigForTestRun(ingesterHost, authToken string, testRunID int64) ClientConfig {
+	return ClientConfig{
+		IngesterHost: ingesterHost,
+		Timeout:      90 * time.Second,
+		ConnectConfig: ClientConnectConfig{
+			Block:                  false,
+			FailOnNonTempDialError: false,
+			Timeout:                10 * time.Second,
+			Dialer:                 nil,
+		},
+		AuthConfig: ClientAuthConfig{
+			Enabled:                  true,
+			TestRunID:                testRunID,
+			Token:                    authToken,
+			RequireTransportSecurity: true,
+		},
+		TLSConfig: ClientTLSConfig{
+			Insecure: false,
+		},
+		RetryConfig: ClientRetryConfig{
+			RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
+			MaxAttempts:          3,
+			PerRetryTimeout:      30 * time.Second,
+			BackoffConfig: ClientBackoffConfig{
+				Enabled:        true,
+				JitterFraction: 0.1,
+				WaitBetween:    1 * time.Second,
+			},
+		},
+	}
+}
+
 // NewClient creates a new client.
 func NewClient(cfg ClientConfig) *Client {
 	return &Client{
@@ -112,6 +145,8 @@ func (c *Client) Dial(ctx context.Context) error {
 		return fmt.Errorf("failed to create dial options: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.ConnectConfig.Timeout)
+	defer cancel()
 	conn, err := grpc.DialContext(ctx, c.cfg.IngesterHost, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to dial: %w", err)
@@ -132,9 +167,6 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 		return ErrClientClosed
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout.TimeDuration())
-	defer cancel()
-
 	if len(requestMetadatas) < 1 {
 		return nil
 	}
@@ -144,6 +176,8 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 		return fmt.Errorf("failed to create request from request metadatas: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout)
+	defer cancel()
 	_, err = c.client.BatchCreateRequestMetadatas(ctx, req)
 	if err != nil {
 		st := status.Convert(err)
