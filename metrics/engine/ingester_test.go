@@ -44,7 +44,7 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	assert.Equal(t, testMetric, metric)
 
 	sink := metric.Sink.(*metrics.TrendSink) //nolint:forcetypeassert
-	assert.Equal(t, 42.0, sink.Sum)
+	assert.Equal(t, 42.0, sink.Total())
 }
 
 func TestIngesterOutputFlushSubmetrics(t *testing.T) {
