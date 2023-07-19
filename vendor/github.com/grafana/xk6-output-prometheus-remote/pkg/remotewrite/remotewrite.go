@@ -170,7 +170,7 @@ func (o *Output) setTrendStatsResolver(trendStats []string) error {
 	// it adds it specifically
 	if hasSum {
 		resolvers["sum"] = func(t *metrics.TrendSink) float64 {
-			return t.Sum
+			return t.Total()
 		}
 	}
 	o.trendStatsResolver = make(TrendStatsResolver, len(resolvers))

@@ -15,7 +15,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-browser v0.10.0
 	github.com/grafana/xk6-grpc v0.1.2
-	github.com/grafana/xk6-output-prometheus-remote v0.2.1
+	github.com/grafana/xk6-output-prometheus-remote v0.2.2-0.20230719110733-69f101ee8ade
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
 	github.com/grafana/xk6-webcrypto v0.1.0

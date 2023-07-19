@@ -99,9 +99,7 @@ type TrendSink struct {
 
 	count    uint64
 	min, max float64
-	// TODO: unexport after this dependency is removed:
-	// https://github.com/grafana/xk6-output-prometheus-remote/blob/v0.2.1/pkg/remotewrite/remotewrite.go#L173
-	Sum float64
+	sum      float64
 }
 
 // IsEmpty indicates whether the TrendSink is empty.
@@ -122,7 +120,7 @@ func (t *TrendSink) Add(s Sample) {
 	t.values = append(t.values, s.Value)
 	t.sorted = false
 	t.count++
-	t.Sum += s.Value
+	t.sum += s.Value
 }
 
 // P calculates the given percentile from sink values.
@@ -167,14 +165,14 @@ func (t *TrendSink) Count() uint64 {
 // Avg returns the average (i.e. mean) value.
 func (t *TrendSink) Avg() float64 {
 	if t.count > 0 {
-		return t.Sum / float64(t.count)
+		return t.sum / float64(t.count)
 	}
 	return 0
 }
 
 // Total returns the total (i.e. "sum") value for all measurements.
 func (t *TrendSink) Total() float64 {
-	return t.Sum
+	return t.sum
 }
 
 func (t *TrendSink) Format(tt time.Duration) map[string]float64 {

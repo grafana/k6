@@ -25,7 +25,7 @@ func newExtendedTrendSink(tsr TrendStatsResolver) (*extendedTrendSink, error) {
 		return nil, fmt.Errorf("trend stats resolver is empty")
 	}
 	return &extendedTrendSink{
-		TrendSink:  &metrics.TrendSink{},
+		TrendSink:  metrics.NewTrendSink(),
 		trendStats: tsr,
 	}, nil
 }
@@ -167,6 +167,16 @@ func (*nativeHistogramSink) Format(td time.Duration) map[string]float64 {
 // IsEmpty implements metrics.Sink.
 func (*nativeHistogramSink) IsEmpty() bool {
 	panic("Native Histogram Sink has no support of emptiness check (IsEmpty)")
+}
+
+// Drain implements metrics.Sink.
+func (*nativeHistogramSink) Drain() ([]byte, error) {
+	panic("Native Histogram Sink has no support of draining")
+}
+
+// Merge implements metrics.Sink.
+func (*nativeHistogramSink) Merge(from []byte) error {
+	panic("Native Histogram Sink has no support of merging")
 }
 
 // MapPrompb maps the Trend type to the experimental Native Histogram.
