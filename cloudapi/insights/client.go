@@ -17,8 +17,6 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"go.k6.io/k6/lib/types"
-
 	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
 )
 
@@ -38,7 +36,7 @@ var (
 // ClientConfig is the configuration for the client.
 type ClientConfig struct {
 	IngesterHost  string
-	Timeout       types.NullDuration
+	Timeout       time.Duration
 	ConnectConfig ClientConnectConfig
 	AuthConfig    ClientAuthConfig
 	TLSConfig     ClientTLSConfig
@@ -49,6 +47,7 @@ type ClientConfig struct {
 type ClientConnectConfig struct {
 	Block                  bool
 	FailOnNonTempDialError bool
+	Timeout                time.Duration
 	Dialer                 func(context.Context, string) (net.Conn, error)
 }
 
@@ -93,7 +92,13 @@ type Client struct {
 func NewDefaultClientConfigForTestRun(ingesterHost, authToken string, testRunID int64) ClientConfig {
 	return ClientConfig{
 		IngesterHost: ingesterHost,
-		Timeout:      types.NewNullDuration(90*time.Second, false),
+		Timeout:      90 * time.Second,
+		ConnectConfig: ClientConnectConfig{
+			Block:                  false,
+			FailOnNonTempDialError: false,
+			Timeout:                10 * time.Second,
+			Dialer:                 nil,
+		},
 		AuthConfig: ClientAuthConfig{
 			Enabled:                  true,
 			TestRunID:                testRunID,
@@ -140,6 +145,8 @@ func (c *Client) Dial(ctx context.Context) error {
 		return fmt.Errorf("failed to create dial options: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.ConnectConfig.Timeout)
+	defer cancel()
 	conn, err := grpc.DialContext(ctx, c.cfg.IngesterHost, opts...)
 	if err != nil {
 		return fmt.Errorf("failed to dial: %w", err)
@@ -160,9 +167,6 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 		return ErrClientClosed
 	}
 
-	ctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout.TimeDuration())
-	defer cancel()
-
 	if len(requestMetadatas) < 1 {
 		return nil
 	}
@@ -172,6 +176,8 @@ func (c *Client) IngestRequestMetadatasBatch(ctx context.Context, requestMetadat
 		return fmt.Errorf("failed to create request from request metadatas: %w", err)
 	}
 
+	ctx, cancel := context.WithTimeout(ctx, c.cfg.Timeout)
+	defer cancel()
 	_, err = c.client.BatchCreateRequestMetadatas(ctx, req)
 	if err != nil {
 		st := status.Convert(err)

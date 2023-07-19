@@ -123,9 +123,7 @@ func (out *Output) Start() error {
 		)
 		insightsClient := insights.NewClient(insightsClientConfig)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := insightsClient.Dial(ctx); err != nil {
+		if err := insightsClient.Dial(context.Background()); err != nil {
 			return err
 		}
 
