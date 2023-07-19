@@ -117,12 +117,14 @@ func (mi *ModuleInstance) stream(c goja.ConstructorCall) *goja.Object {
 
 	p.SetSystemTags(mi.vu.State(), client.addr, methodName)
 
+	logger := mi.vu.State().Logger.WithField("streamMethod", methodName)
+
 	s := &stream{
 		vu:               mi.vu,
 		client:           client,
 		methodDescriptor: methodDescriptor,
 		method:           methodName,
-		logger:           mi.vu.State().Logger,
+		logger:           logger,
 
 		tq: taskqueue.New(mi.vu.RegisterCallback),
 
