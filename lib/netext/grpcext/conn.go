@@ -64,7 +64,9 @@ var (
 	//nolint:golint,gochecknoglobals
 	connections = &sync.Map{}
 	//nolint:golint,gochecknoglobals
-	connectionsAddrMu = &sync.Map{}
+	connectionsAddrMu             = &sync.Map{}
+	errClosingSharedConnection    = errors.New("error closing shared connection")
+	errUnexpectedSharedConnection = errors.New("unexpected entry for shared connection mutex")
 )
 
 // DefaultOptions generates an option set
@@ -263,31 +265,60 @@ func (c *Conn) Invoke(
 
 // Close closes the underhood connection.
 func (c *Conn) Close() error {
+	var err error
 	if c.addr != "" {
 		// Lock for mutating connections map
-		var addrMu *sync.Mutex
-		// Lock for mutating connectionsAddrMu map
-		if addrMuEntry, ok := connectionsAddrMu.Load(c.addr); ok && addrMuEntry != nil {
-			if addrMu, ok = addrMuEntry.(*sync.Mutex); ok {
-				addrMu.Lock()
-				if iconn, cok := connections.Load(c.addr); cok {
-					conn, convok := iconn.([]*Conn)
-					if convok {
-						for _, cconn := range conn {
-							if cconn.raw != c.raw {
-								// TODO: bubble errors up?
-								_ = cconn.raw.Close()
-							}
-						}
-					}
-				}
-				connections.Delete(c.addr)
-				addrMu.Unlock()
-			}
+		err = c.closeShared()
+		if errors.Is(err, errUnexpectedSharedConnection) {
+			err = c.raw.Close()
 		}
+	} else {
+		err = c.raw.Close()
 	}
 
-	return c.raw.Close()
+	return err
+}
+
+func (c *Conn) closeShared() error {
+	var (
+		addrMu      *sync.Mutex
+		ok          bool
+		addrMuEntry interface{}
+		err         error
+	)
+
+	// Lock for mutating connectionsAddrMu map
+	if addrMuEntry, ok = connectionsAddrMu.Load(c.addr); ok && addrMuEntry != nil {
+		addrMu, ok = addrMuEntry.(*sync.Mutex)
+	}
+	if !ok {
+		return errUnexpectedSharedConnection
+	}
+	addrMu.Lock()
+	if iconn, cok := connections.Load(c.addr); cok {
+		conn, convok := iconn.([]*Conn)
+		if !convok {
+			connections.Delete(c.addr)
+			addrMu.Unlock()
+			return errUnexpectedSharedConnection
+		}
+		for _, cconn := range conn {
+			if cconn.raw == c.raw {
+				continue
+			}
+			cerr := cconn.raw.Close()
+			if cerr != nil && err == nil {
+				err = errClosingSharedConnection
+			}
+		}
+		if err == nil {
+			err = c.raw.Close()
+		}
+	}
+	connections.Delete(c.addr)
+	addrMu.Unlock()
+
+	return err
 }
 
 type statsHandler struct {
