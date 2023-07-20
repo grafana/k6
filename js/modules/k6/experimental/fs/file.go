@@ -11,6 +11,9 @@ type file struct {
 
 	// data holds a pointer to the file's data
 	data []byte
+
+	// offset holds the current offset in the file
+	offset int
 }
 
 // Stat returns a FileInfo describing the named file.
@@ -29,4 +32,22 @@ type FileInfo struct {
 
 	// Name holds the length in bytes of the file.
 	Size int `json:"size"`
+}
+
+func (f *file) Read(into []byte) (int, error) {
+	start := f.offset
+	if start == len(f.data) {
+		return 0, newFsError(EOFError, "EOF")
+	}
+
+	end := f.offset + len(into)
+	if end > len(f.data) {
+		end = len(f.data)
+	}
+
+	n := copy(into, f.data[start:end])
+
+	f.offset += n
+
+	return n, nil
 }
