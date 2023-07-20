@@ -47,7 +47,7 @@ func (f *metricsFlusher) flush() error {
 
 	var (
 		start       = time.Now()
-		batches     []metricSetBuilder
+		batches     []*pbcloud.MetricSet
 		seriesCount int
 	)
 
@@ -69,7 +69,8 @@ func (f *metricsFlusher) flush() error {
 
 			// We hit the batch size, let's flush
 			seriesCount += len(msb.seriesIndex)
-			batches = append(batches, msb)
+			batches = append(batches, msb.MetricSet)
+			f.reportDiscardedLabels(msb.discardedLabels)
 
 			// Reset the builder
 			msb = newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
@@ -78,12 +79,13 @@ func (f *metricsFlusher) flush() error {
 
 	// send the last (or the unique) MetricSet chunk to the remote service
 	seriesCount += len(msb.seriesIndex)
-	batches = append(batches, msb)
+	batches = append(batches, msb.MetricSet)
+	f.reportDiscardedLabels(msb.discardedLabels)
 
 	return f.flushBatches(batches)
 }
 
-func (f *metricsFlusher) flushBatches(batches []metricSetBuilder) error {
+func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 	var (
 		wg   = sync.WaitGroup{}
 		errs = make(chan error)
@@ -102,7 +104,7 @@ func (f *metricsFlusher) flushBatches(batches []metricSetBuilder) error {
 			end = len(batches)
 		}
 
-		go func(chunk []metricSetBuilder) {
+		go func(chunk []*pbcloud.MetricSet) {
 			defer wg.Done()
 
 			for i := 0; i < len(chunk); i++ {
@@ -111,7 +113,7 @@ func (f *metricsFlusher) flushBatches(batches []metricSetBuilder) error {
 					return
 				default:
 				}
-				if err := f.push(chunk[i]); err != nil {
+				if err := f.client.push(chunk[i]); err != nil {
 					select {
 					case errs <- err:
 					case <-stop:
@@ -139,10 +141,8 @@ func (f *metricsFlusher) flushBatches(batches []metricSetBuilder) error {
 	}
 }
 
-// push sends the metric set to the remote service.
-// it also checks if the labels are discarded and logs a warning if so.
-func (f *metricsFlusher) push(msb metricSetBuilder) error {
-	for key := range msb.discardedLabels {
+func (f *metricsFlusher) reportDiscardedLabels(discardedLabels map[string]struct{}) {
+	for key := range discardedLabels {
 		if _, ok := f.discardedLabels[key]; ok {
 			continue
 		}
@@ -150,8 +150,6 @@ func (f *metricsFlusher) push(msb metricSetBuilder) error {
 		f.discardedLabels[key] = struct{}{}
 		f.logger.Warnf("Tag %s has been discarded since it is reserved for Cloud operations.", key)
 	}
-
-	return f.client.push(msb.MetricSet)
 }
 
 type metricSetBuilder struct {
