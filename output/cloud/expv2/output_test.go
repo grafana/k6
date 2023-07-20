@@ -326,7 +326,7 @@ func TestOutputFlushTicks(t *testing.T) {
 	o := Output{logger: testutils.NewLogger(t)}
 	o.config.MetricPushInterval = types.NullDurationFrom(100 * time.Millisecond) // loop
 	o.flushing = flusherFunc(flusherMock)
-	o.runFlushWorkers()
+	o.runPeriodicFlush()
 
 	select {
 	case <-time.After(5 * time.Second):
@@ -352,7 +352,7 @@ func TestOutputFlushWorkersStop(t *testing.T) {
 	}
 
 	o.flushing = flusherFunc(flusherMock)
-	o.runFlushWorkers()
+	o.runPeriodicFlush()
 
 	// it asserts that all flushers exit
 	done := make(chan struct{})
@@ -383,7 +383,7 @@ func TestOutputFlushWorkersAbort(t *testing.T) {
 	}
 
 	o.flushing = flusherFunc(flusherMock)
-	o.runFlushWorkers()
+	o.runPeriodicFlush()
 
 	// it asserts that all flushers exit
 	done := make(chan struct{})

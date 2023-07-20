@@ -117,7 +117,7 @@ func (o *Output) Start() error {
 		batchPushConcurrency: int(o.config.MetricPushConcurrency.Int64),
 	}
 
-	o.runFlushWorkers()
+	o.runPeriodicFlush()
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
 	if insightsOutput.Enabled(o.config) {
@@ -180,7 +180,7 @@ func (o *Output) StopWithTestError(_ error) error {
 	return nil
 }
 
-func (o *Output) runFlushWorkers() {
+func (o *Output) runPeriodicFlush() {
 	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
 	o.wg.Add(1)
