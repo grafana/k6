@@ -16,19 +16,12 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
+	insightsOutput "go.k6.io/k6/output/cloud/insights"
 
 	"github.com/sirupsen/logrus"
 )
-
-// requestMetadatasCollector is an interface for collecting request metadatas
-// and retrieving them, so they can be flushed using a flusher.
-type requestMetadatasCollector interface {
-	CollectRequestMetadatas([]metrics.SampleContainer)
-	PopAll() insights.RequestMetadatas
-}
 
 // flusher is an interface for flushing data to the cloud.
 type flusher interface {
@@ -47,9 +40,9 @@ type Output struct {
 	collector *collector
 	flushing  flusher
 
-	insightsClient            insightsClient
-	requestMetadatasCollector requestMetadatasCollector
-	requestMetadatasFlusher   flusher
+	insightsClient            insightsOutput.Client
+	requestMetadatasCollector insightsOutput.RequestMetadatasCollector
+	requestMetadatasFlusher   insightsOutput.RequestMetadatasFlusher
 
 	// wg tracks background goroutines
 	wg sync.WaitGroup
@@ -124,46 +117,26 @@ func (o *Output) Start() error {
 	o.runFlushWorkers()
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
-	if o.tracingEnabled() {
+	if insightsOutput.Enabled(o.config) {
 		testRunID, err := strconv.ParseInt(o.testRunID, 10, 64)
 		if err != nil {
 			return err
 		}
-		o.requestMetadatasCollector = newRequestMetadatasCollector(testRunID)
+		o.requestMetadatasCollector = insightsOutput.NewCollector(testRunID)
 
-		insightsClientConfig := insights.ClientConfig{
-			IngesterHost: o.config.TracesHost.String,
-			Timeout:      types.NewNullDuration(90*time.Second, false),
-			AuthConfig: insights.ClientAuthConfig{
-				Enabled:                  true,
-				TestRunID:                testRunID,
-				Token:                    o.config.Token.String,
-				RequireTransportSecurity: true,
-			},
-			TLSConfig: insights.ClientTLSConfig{
-				Insecure: false,
-			},
-			RetryConfig: insights.ClientRetryConfig{
-				RetryableStatusCodes: `"UNKNOWN","INTERNAL","UNAVAILABLE","DEADLINE_EXCEEDED"`,
-				MaxAttempts:          3,
-				PerRetryTimeout:      30 * time.Second,
-				BackoffConfig: insights.ClientBackoffConfig{
-					Enabled:        true,
-					JitterFraction: 0.1,
-					WaitBetween:    1 * time.Second,
-				},
-			},
-		}
+		insightsClientConfig := insights.NewDefaultClientConfigForTestRun(
+			o.config.TracesHost.String,
+			o.config.Token.String,
+			testRunID,
+		)
 		insightsClient := insights.NewClient(insightsClientConfig)
 
-		ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-		defer cancel()
-		if err := insightsClient.Dial(ctx); err != nil {
+		if err := insightsClient.Dial(context.Background()); err != nil {
 			return err
 		}
 
 		o.insightsClient = insightsClient
-		o.requestMetadatasFlusher = newTracesFlusher(insightsClient, o.requestMetadatasCollector)
+		o.requestMetadatasFlusher = insightsOutput.NewFlusher(insightsClient, o.requestMetadatasCollector)
 		o.runFlushRequestMetadatas()
 	}
 
@@ -194,7 +167,7 @@ func (o *Output) StopWithTestError(_ error) error {
 	o.flushMetrics()
 
 	// Flush all the remaining request metadatas.
-	if o.tracingEnabled() {
+	if insightsOutput.Enabled(o.config) {
 		o.flushRequestMetadatas()
 		if err := o.insightsClient.Close(); err != nil {
 			o.logger.WithError(err).Error("Failed to close the insights client")
@@ -277,7 +250,7 @@ func (o *Output) collectSamples() {
 	samples := o.GetBufferedSamples()
 	o.collector.CollectSamples(samples)
 
-	if o.tracingEnabled() {
+	if insightsOutput.Enabled(o.config) {
 		o.requestMetadatasCollector.CollectRequestMetadatas(samples)
 	}
 }
@@ -322,9 +295,11 @@ func (o *Output) runFlushRequestMetadatas() {
 func (o *Output) flushRequestMetadatas() {
 	start := time.Now()
 
-	err := o.requestMetadatasFlusher.flush()
+	err := o.requestMetadatasFlusher.Flush()
 	if err != nil {
 		o.logger.WithError(err).WithField("t", time.Since(start)).Error("Failed to push trace samples to the cloud")
+
+		return
 	}
 
 	o.logger.WithField("t", time.Since(start)).Debug("Successfully flushed buffered trace samples to the cloud")
@@ -376,18 +351,6 @@ func (o *Output) handleFlushError(err error) {
 			}
 		}
 	})
-}
-
-func (o *Output) tracingEnabled() bool {
-	// TODO(lukasz): Check if k6 x Tempo is enabled
-	//
-	// We want to check whether a given organization is
-	// eligible for k6 x Tempo feature. If it isn't, we may
-	// consider to skip the traces output.
-	//
-	// We currently don't have a backend API to check this
-	// information.
-	return o.config.TracesEnabled.ValueOrZero()
 }
 
 func printableConfig(c cloudapi.Config) map[string]any {

@@ -160,7 +160,7 @@ github.com/grafana/xk6-browser/storage
 ## explicit; go 1.19
 github.com/grafana/xk6-grpc/grpc
 github.com/grafana/xk6-grpc/lib/netext/grpcext
-# github.com/grafana/xk6-output-prometheus-remote v0.2.1
+# github.com/grafana/xk6-output-prometheus-remote v0.2.2-0.20230719110733-69f101ee8ade
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
