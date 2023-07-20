@@ -212,6 +212,84 @@ func TestFile(t *testing.T) {
 
 		assert.NoError(t, err)
 	})
+
+	t.Run("read called with invalid argument should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(fmt.Sprintf(`
+			fs.open(%q).then(file => {
+
+				// No buffer argument provided should fail with TypeError.
+				file.read().then(
+					res => { throw 'unexpected promise resolution with result: ' + res },
+					err => { if (err.name !== 'TypeError') { throw 'unexpected error: ' + err } },
+				)
+
+				// null buffer argument should fail with TypeError.
+				file.read(null).then(
+					res => { throw 'unexpected promise resolution with result: ' + res },
+					err => { if (err.name !== 'TypeError') { throw 'unexpected error: ' + err } },
+				)
+
+				// undefined buffer argument should fail with TypeError.
+				file.read(undefined).then(
+					res => { throw 'unexpected promise resolution with result: ' + res },
+					err => { if (err.name !== 'TypeError') { throw 'unexpected error: ' + err } },
+				)
+
+				// Invalid type argument should fail with TypeError.
+				file.read(1).then(
+					res => { throw 'unexpected promise resolution with result: ' + res },
+					err => { if (err.name !== 'TypeError') { throw 'unexpected error: ' + err } },
+				)
+			})
+		`, testFilePath))
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("read called when end of file reached should return null and succeed", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(fmt.Sprintf(`
+			fs.open(%q).then(file => {
+				let buffer = new Uint8Array(5);
+				file.read(buffer).then(
+					bytesRead => {
+						if (bytesRead !== 5) { throw 'expected read to return 5, got ' + bytesRead + ' instead'}
+
+						// Reading from the end of the file should return null.
+						file.read(buffer).then(
+							bytesRead => { if (bytesRead !== null) { throw 'expected read to return null got ' + bytesRead + ' instead' } },
+							err => { throw 'unexpected error: ' + err },
+						)
+					},
+					err => { throw 'unexpected error: ' + err },
+				)
+
+			})
+		`, testFilePath))
+
+		assert.NoError(t, err)
+	})
 }
 
 func TestOpenImpl(t *testing.T) {

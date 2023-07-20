@@ -3,6 +3,7 @@
 package fs
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/dop251/goja"
@@ -161,6 +162,48 @@ func (f *File) Stat() *goja.Promise {
 
 	go func() {
 		resolve(f.file.Stat())
+	}()
+
+	return promise
+}
+
+// Read the file's content into an `into` (ArrayBuffer, TypedArray or DataView).
+//
+// Resolves to either the number of bytes read during the operation
+// or EOF (null) if there was nothing more to read.
+//
+// It is possible for a read to successfully return with 0 bytes.
+// This does not indicate EOF.
+func (f *File) Read(into goja.Value) *goja.Promise {
+	promise, resolve, reject := promises.New(f.vu)
+
+	if common.IsNullish(into) {
+		reject(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
+		return promise
+	}
+
+	buffer, err := exportArrayBuffer(f.vu.Runtime(), into)
+	if err != nil {
+		reject(newFsError(TypeError, fmt.Sprintf("read() failed; reason: %s", err)))
+		return promise
+	}
+
+	go func() {
+		n, err := f.file.Read(buffer)
+		if err != nil {
+			// Following Deno's behavior, we return null if we reach EOF.
+			var fsErr *fsError
+			ok := errors.As(err, &fsErr)
+			if ok && fsErr.kind == EOFError {
+				resolve(nil)
+			} else {
+				reject(err)
+			}
+
+			return
+		}
+
+		resolve(n)
 	}()
 
 	return promise
