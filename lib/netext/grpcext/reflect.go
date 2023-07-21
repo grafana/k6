@@ -67,10 +67,14 @@ func (rc *reflectionClient) resolveServiceFileDescriptors(
 			if err = proto.Unmarshal(raw, &fdp); err != nil {
 				return nil, fmt.Errorf("can't unmarshal proto on service %q: %w", service, err)
 			}
+
 			fdkey := fileDescriptorLookupKey{
-				Package: *fdp.Package,
-				Name:    *fdp.Name,
+				Name: *fdp.Name,
 			}
+			if fdp.Package != nil {
+				fdkey.Package = *fdp.Package
+			}
+
 			if seen[fdkey] {
 				// When a proto file contains declarations for multiple services
 				// then the same proto file is returned multiple times,
