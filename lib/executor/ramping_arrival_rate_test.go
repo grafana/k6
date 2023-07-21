@@ -360,7 +360,7 @@ func TestRampingArrivalRateCal(t *testing.T) {
 		timeUnit      time.Duration
 	}{
 		{
-			expectedTimes: []time.Duration{time.Millisecond * 3162, time.Millisecond * 4472, time.Millisecond * 5500, time.Millisecond * 6527, time.Millisecond * 7837, time.Second * 11},
+			expectedTimes: []time.Duration{time.Millisecond * 3162, time.Millisecond * 4472, time.Millisecond * 5500, time.Millisecond * 6500, time.Millisecond * 7837, time.Second * 11},
 			et:            mustNewExecutionTuple(nil, nil),
 		},
 		{
@@ -380,7 +380,7 @@ func TestRampingArrivalRateCal(t *testing.T) {
 			et:            mustNewExecutionTuple(newExecutionSegmentFromString("2/3:1"), nil),
 		},
 		{
-			expectedTimes: []time.Duration{time.Millisecond * 3162, time.Millisecond * 6527},
+			expectedTimes: []time.Duration{time.Millisecond * 3162, time.Millisecond * 6500},
 			et:            mustNewExecutionTuple(newExecutionSegmentFromString("0:1/3"), newExecutionSegmentSequenceFromString("0,1/3,2/3,1")),
 		},
 		{

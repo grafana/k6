@@ -263,7 +263,7 @@ func (varc RampingArrivalRateConfig) cal(et *lib.ExecutionTuple, ch chan<- time.
 			}
 		} else {
 			endCount += dur * to
-			for ; i <= endCount; i += float64(next()) {
+			for ; i <= math.Ceil(endCount); i += float64(next()) {
 				ch <- time.Duration((i-doneSoFar)/to) + stageStart
 			}
 		}
