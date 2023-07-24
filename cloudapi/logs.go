@@ -100,6 +100,8 @@ func (c *Config) logtailConn(ctx context.Context, referenceID string, since time
 
 	headers := make(http.Header)
 	headers.Add("Sec-WebSocket-Protocol", "token="+c.Token.String)
+	headers.Add("Authorization", "token "+c.Token.String)
+	headers.Add("X-K6TestRun-Id", referenceID)
 
 	var conn *websocket.Conn
 	err = retry(sleeperFunc(time.Sleep), 3, 5*time.Second, 2*time.Minute, func() (err error) {
