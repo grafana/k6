@@ -1,7 +1,6 @@
 package expv2
 
 import (
-	"math"
 	"sync"
 	"time"
 
@@ -86,13 +85,20 @@ func (f *metricsFlusher) flush() error {
 }
 
 func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
+	// TODO remove after go 1.21 becomes the minimum supported version - it has `min` in it
+	min := func(a, b int) int {
+		if a < b {
+			return a
+		}
+		return b
+	}
 	var (
 		wg   = sync.WaitGroup{}
 		errs = make(chan error)
 		done = make(chan struct{})
 		stop = make(chan struct{})
 
-		workers   = int(math.Min(float64(len(batches)), float64(f.batchPushConcurrency)))
+		workers   = min(len(batches), f.batchPushConcurrency)
 		chunkSize = len(batches) / workers
 	)
 
