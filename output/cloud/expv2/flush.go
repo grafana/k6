@@ -126,7 +126,7 @@ outer:
 
 	for ; workers != 0; workers-- {
 		err := <-errs
-		if err != nil && finalErr != nil {
+		if err != nil && finalErr == nil {
 			finalErr = err
 		}
 	}
