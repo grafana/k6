@@ -92,34 +92,29 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 		}
 		return b
 	}
+
 	var (
 		wg   = sync.WaitGroup{}
 		errs = make(chan error)
 		done = make(chan struct{})
 		stop = make(chan struct{})
+		feed = make(chan *pbcloud.MetricSet)
 
-		workers   = min(len(batches), f.batchPushConcurrency)
-		chunkSize = len(batches) / workers
+		workers = min(len(batches), f.batchPushConcurrency)
 	)
 
 	wg.Add(workers)
 	for workersIndex := 0; workersIndex < workers; workersIndex++ {
-		offset := (workersIndex * chunkSize)
-		end := offset + chunkSize
-		if workersIndex == workers-1 {
-			end = len(batches)
-		}
-
-		go func(chunk []*pbcloud.MetricSet) {
+		go func() {
 			defer wg.Done()
 
-			for i := 0; i < len(chunk); i++ {
+			for chunk := range feed {
 				select {
 				case <-stop:
 					return
 				default:
 				}
-				if err := f.client.push(chunk[i]); err != nil {
+				if err := f.client.push(chunk); err != nil {
 					select {
 					case errs <- err:
 					case <-stop:
@@ -127,23 +122,33 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 					}
 				}
 			}
-		}(batches[offset:end])
+		}()
 	}
+
+	for i := 0; i < len(batches); i++ {
+		select {
+		case err := <-errs:
+			close(stop)
+			close(feed)
+			return err
+		case feed <- batches[i]:
+		}
+	}
+
+	close(feed)
 
 	go func() {
 		defer close(done)
 		wg.Wait()
 	}()
 
-	for {
-		select {
-		case err := <-errs:
-			close(stop)
-			<-done
-			return err
-		case <-done:
-			return nil
-		}
+	select {
+	case err := <-errs:
+		close(stop)
+		<-done
+		return err
+	case <-done:
+		return nil
 	}
 }
 
