@@ -582,7 +582,8 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	l := fs.serializer.
 		WithTime(event.Timestamp.Time()).
-		WithField("source", "browser-console-api")
+		WithField("source", "browser").
+		WithField("browser_source", "console-api")
 
 		/* accessing the state Group while not on the eventloop is racy
 		if s := fs.vu.State(); s.Group.Path != "" {
