@@ -112,9 +112,12 @@ func (o *Output) Start() error {
 		discardedLabels:            make(map[string]struct{}),
 		aggregationPeriodInSeconds: uint32(o.config.AggregationPeriod.TimeDuration().Seconds()),
 		maxSeriesInBatch:           int(o.config.MaxTimeSeriesInBatch.Int64),
+		// TODO: when the migration from v1 is over
+		// change the default of cloudapi.MetricPushConcurrency to use GOMAXPROCS(0)
+		batchPushConcurrency: int(o.config.MetricPushConcurrency.Int64),
 	}
 
-	o.runFlushWorkers()
+	o.runPeriodicFlush()
 	o.periodicInvoke(o.config.AggregationPeriod.TimeDuration(), o.collectSamples)
 
 	if insightsOutput.Enabled(o.config) {
@@ -177,29 +180,28 @@ func (o *Output) StopWithTestError(_ error) error {
 	return nil
 }
 
-func (o *Output) runFlushWorkers() {
+func (o *Output) runPeriodicFlush() {
 	t := time.NewTicker(o.config.MetricPushInterval.TimeDuration())
 
-	for i := int64(0); i < o.config.MetricPushConcurrency.Int64; i++ {
-		o.wg.Add(1)
-		go func() {
-			defer func() {
-				t.Stop()
-				o.wg.Done()
-			}()
+	o.wg.Add(1)
 
-			for {
-				select {
-				case <-t.C:
-					o.flushMetrics()
-				case <-o.stop:
-					return
-				case <-o.abort:
-					return
-				}
-			}
+	go func() {
+		defer func() {
+			t.Stop()
+			o.wg.Done()
 		}()
-	}
+
+		for {
+			select {
+			case <-t.C:
+				o.flushMetrics()
+			case <-o.stop:
+				return
+			case <-o.abort:
+				return
+			}
+		}
+	}()
 }
 
 // AddMetricSamples receives the samples streaming.

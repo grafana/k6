@@ -1,7 +1,10 @@
 package expv2
 
 import (
+	"errors"
 	"strconv"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -37,6 +40,7 @@ func TestMetricSetBuilderAddTimeBucket(t *testing.T) {
 	require.Len(t, msb.MetricSet.Metrics, 1)
 	assert.Len(t, msb.MetricSet.Metrics[0].TimeSeries, 1)
 }
+
 func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
 	t.Parallel()
 
@@ -56,11 +60,12 @@ func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
 		bq := &bucketQ{}
 		pm := &pusherMock{}
 		mf := metricsFlusher{
-			bq:               bq,
-			client:           pm,
-			logger:           logger,
-			discardedLabels:  make(map[string]struct{}),
-			maxSeriesInBatch: 3,
+			bq:                   bq,
+			client:               pm,
+			logger:               logger,
+			discardedLabels:      make(map[string]struct{}),
+			maxSeriesInBatch:     3,
+			batchPushConcurrency: 5,
 		}
 
 		bq.buckets = make([]timeBucket, 0, tc.series)
@@ -78,7 +83,7 @@ func TestMetricsFlusherFlushInBatchWithinBucket(t *testing.T) {
 		bq.Push([]timeBucket{{Time: 1, Sinks: sinks}})
 		err := mf.flush()
 		require.NoError(t, err)
-		assert.Equal(t, tc.expFlushCalls, pm.pushCalled)
+		assert.Equal(t, tc.expFlushCalls, pm.timesCalled())
 	}
 }
 
@@ -86,11 +91,11 @@ func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		series        int
-		expFlushCalls int
+		series       int
+		expPushCalls int
 	}{
-		{series: 5, expFlushCalls: 2},
-		{series: 2, expFlushCalls: 1},
+		{series: 5, expPushCalls: 2},
+		{series: 2, expPushCalls: 1},
 	}
 
 	r := metrics.NewRegistry()
@@ -101,11 +106,12 @@ func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 		bq := &bucketQ{}
 		pm := &pusherMock{}
 		mf := metricsFlusher{
-			bq:               bq,
-			client:           pm,
-			logger:           logger,
-			discardedLabels:  make(map[string]struct{}),
-			maxSeriesInBatch: 3,
+			bq:                   bq,
+			client:               pm,
+			logger:               logger,
+			discardedLabels:      make(map[string]struct{}),
+			maxSeriesInBatch:     3,
+			batchPushConcurrency: 5,
 		}
 
 		bq.buckets = make([]timeBucket, 0, tc.series)
@@ -127,7 +133,7 @@ func TestMetricsFlusherFlushInBatchAcrossBuckets(t *testing.T) {
 
 		err := mf.flush()
 		require.NoError(t, err)
-		assert.Equal(t, tc.expFlushCalls, pm.pushCalled)
+		assert.Equal(t, tc.expPushCalls, pm.timesCalled())
 	}
 }
 
@@ -136,21 +142,25 @@ func TestFlushWithReservedLabels(t *testing.T) {
 
 	logger, hook := testutils.NewLoggerWithHook(t)
 
+	mutex := sync.Mutex{}
 	collected := make([]*pbcloud.MetricSet, 0)
 
 	bq := &bucketQ{}
 	pm := &pusherMock{
 		hook: func(ms *pbcloud.MetricSet) {
+			mutex.Lock()
 			collected = append(collected, ms)
+			mutex.Unlock()
 		},
 	}
 
 	mf := metricsFlusher{
-		bq:               bq,
-		client:           pm,
-		maxSeriesInBatch: 2,
-		logger:           logger,
-		discardedLabels:  make(map[string]struct{}),
+		bq:                   bq,
+		client:               pm,
+		maxSeriesInBatch:     2,
+		logger:               logger,
+		discardedLabels:      make(map[string]struct{}),
+		batchPushConcurrency: 5,
 	}
 
 	r := metrics.NewRegistry()
@@ -186,7 +196,7 @@ func TestFlushWithReservedLabels(t *testing.T) {
 	require.NoError(t, err)
 
 	loglines := hook.Drain()
-	assert.Equal(t, 1, len(collected))
+	require.Len(t, collected, 1)
 
 	// check that warnings sown only once per label
 	assert.Len(t, testutils.FilterEntries(loglines, logrus.WarnLevel, "Tag __name__ has been discarded since it is reserved for Cloud operations."), 1)
@@ -206,8 +216,16 @@ func TestFlushWithReservedLabels(t *testing.T) {
 }
 
 type pusherMock struct {
-	hook       func(*pbcloud.MetricSet)
-	pushCalled int
+	// hook is called when the push method is called.
+	hook func(*pbcloud.MetricSet)
+	// errFn if this defined, it is called at the end of push
+	// and result error is returned.
+	errFn      func() error
+	pushCalled int64
+}
+
+func (pm *pusherMock) timesCalled() int {
+	return int(atomic.LoadInt64(&pm.pushCalled))
 }
 
 func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
@@ -215,6 +233,62 @@ func (pm *pusherMock) push(ms *pbcloud.MetricSet) error {
 		pm.hook(ms)
 	}
 
-	pm.pushCalled++
+	atomic.AddInt64(&pm.pushCalled, 1)
+
+	if pm.errFn != nil {
+		return pm.errFn()
+	}
+
 	return nil
+}
+
+func TestMetricsFlusherErrorCase(t *testing.T) {
+	t.Parallel()
+
+	r := metrics.NewRegistry()
+	m1 := r.MustNewMetric("metric1", metrics.Counter)
+
+	logger, _ := testutils.NewLoggerWithHook(t)
+
+	bq := &bucketQ{}
+	pm := &pusherMock{
+		errFn: func() error {
+			return errors.New("some error")
+		},
+	}
+	mf := metricsFlusher{
+		bq:                   bq,
+		client:               pm,
+		logger:               logger,
+		discardedLabels:      make(map[string]struct{}),
+		maxSeriesInBatch:     3,
+		batchPushConcurrency: 2,
+	}
+
+	series := 7
+
+	bq.buckets = make([]timeBucket, 0, series)
+	for i := 0; i < series; i++ {
+		ts := metrics.TimeSeries{
+			Metric: m1,
+			Tags:   r.RootTagSet().With("key1", "val"+strconv.Itoa(i)),
+		}
+		bq.Push([]timeBucket{
+			{
+				Time: int64(i) + 1,
+				Sinks: map[metrics.TimeSeries]metricValue{
+					ts: &counter{Sum: float64(1)},
+				},
+			},
+		})
+	}
+	require.Len(t, bq.buckets, series)
+
+	err := mf.flush()
+	require.Error(t, err)
+	// since the push happens concurrently the number of the calls could vary,
+	// but at least one call should happen and it should be less than the
+	// batchPushConcurrency
+	assert.LessOrEqual(t, pm.timesCalled(), mf.batchPushConcurrency)
+	assert.GreaterOrEqual(t, pm.timesCalled(), 1)
 }

@@ -21,6 +21,7 @@ type metricsFlusher struct {
 	discardedLabels            map[string]struct{}
 	aggregationPeriodInSeconds uint32
 	maxSeriesInBatch           int
+	batchPushConcurrency       int
 }
 
 // flush flushes the queued buckets sending them to the remote Cloud service.
@@ -43,9 +44,9 @@ func (f *metricsFlusher) flush() error {
 	// the metricSetBuilder is used for doing it during the traverse of the buckets.
 
 	var (
-		seriesCount  int
-		batchesCount int
-		start        = time.Now()
+		start       = time.Now()
+		batches     []*pbcloud.MetricSet
+		seriesCount int
 	)
 
 	defer func() {
@@ -53,41 +54,87 @@ func (f *metricsFlusher) flush() error {
 			WithField("t", time.Since(start)).
 			WithField("series", seriesCount).
 			WithField("buckets", len(buckets)).
-			WithField("batches", batchesCount).Debug("Flush the queued buckets")
+			WithField("batches", len(batches)).Debug("Flush the queued buckets")
 	}()
 
 	msb := newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 	for i := 0; i < len(buckets); i++ {
 		for timeSeries, sink := range buckets[i].Sinks {
 			msb.addTimeSeries(buckets[i].Time, timeSeries, sink)
-			if len(msb.seriesIndex) < f.maxSeriesInBatch {
+			if len(msb.seriesIndex) <= f.maxSeriesInBatch {
 				continue
 			}
 
-			// we hit the batch size, let's flush
-			batchesCount++
+			// We hit the batch size, let's flush
 			seriesCount += len(msb.seriesIndex)
-			if err := f.push(msb); err != nil {
-				return err
-			}
+			batches = append(batches, msb.MetricSet)
+			f.reportDiscardedLabels(msb.discardedLabels)
+
+			// Reset the builder
 			msb = newMetricSetBuilder(f.testRunID, f.aggregationPeriodInSeconds)
 		}
 	}
 
-	if len(msb.seriesIndex) < 1 {
-		return nil
-	}
-
 	// send the last (or the unique) MetricSet chunk to the remote service
-	batchesCount++
 	seriesCount += len(msb.seriesIndex)
-	return f.push(msb)
+	batches = append(batches, msb.MetricSet)
+	f.reportDiscardedLabels(msb.discardedLabels)
+
+	return f.flushBatches(batches)
 }
 
-// push sends the metric set to the remote service.
-// it also checks if the labels are discarded and logs a warning if so.
-func (f *metricsFlusher) push(msb metricSetBuilder) error {
-	for key := range msb.discardedLabels {
+func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
+	// TODO remove after go 1.21 becomes the minimum supported version - it has `min` in it
+	min := func(a, b int) int {
+		if a < b {
+			return a
+		}
+		return b
+	}
+
+	var (
+		workers  = min(len(batches), f.batchPushConcurrency)
+		errs     = make(chan error, workers)
+		feed     = make(chan *pbcloud.MetricSet)
+		finalErr error
+	)
+
+	for i := 0; i < workers; i++ {
+		go func() {
+			for chunk := range feed {
+				if err := f.client.push(chunk); err != nil {
+					errs <- err
+					return
+				}
+			}
+			errs <- nil
+		}()
+	}
+
+outer:
+	for i := 0; i < len(batches); i++ {
+		select {
+		case err := <-errs:
+			workers--
+			finalErr = err
+			break outer
+		case feed <- batches[i]:
+		}
+	}
+
+	close(feed)
+
+	for ; workers != 0; workers-- {
+		err := <-errs
+		if err != nil && finalErr == nil {
+			finalErr = err
+		}
+	}
+	return finalErr
+}
+
+func (f *metricsFlusher) reportDiscardedLabels(discardedLabels map[string]struct{}) {
+	for key := range discardedLabels {
 		if _, ok := f.discardedLabels[key]; ok {
 			continue
 		}
@@ -95,8 +142,6 @@ func (f *metricsFlusher) push(msb metricSetBuilder) error {
 		f.discardedLabels[key] = struct{}{}
 		f.logger.Warnf("Tag %s has been discarded since it is reserved for Cloud operations.", key)
 	}
-
-	return f.client.push(msb.MetricSet)
 }
 
 type metricSetBuilder struct {
