@@ -1,7 +1,6 @@
 package expv2
 
 import (
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -94,50 +93,44 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 	}
 
 	var (
-		wg      = sync.WaitGroup{}
-		workers = min(len(batches), f.batchPushConcurrency)
-		errs    = make(chan error, workers)
-		feed    = make(chan *pbcloud.MetricSet)
-		done    = make(chan struct{})
+		workers  = min(len(batches), f.batchPushConcurrency)
+		errs     = make(chan error, workers)
+		feed     = make(chan *pbcloud.MetricSet)
+		finalErr error
 	)
 
-	wg.Add(workers)
 	for i := 0; i < workers; i++ {
 		go func() {
-			defer wg.Done()
-
 			for chunk := range feed {
 				if err := f.client.push(chunk); err != nil {
 					errs <- err
 					return
 				}
 			}
+			errs <- nil
 		}()
 	}
-	go func() {
-		defer close(done)
-		wg.Wait()
-	}()
 
+outer:
 	for i := 0; i < len(batches); i++ {
 		select {
 		case err := <-errs:
-			close(feed)
-			<-done
-			return err
+			workers--
+			finalErr = err
+			break outer
 		case feed <- batches[i]:
 		}
 	}
 
 	close(feed)
 
-	select {
-	case err := <-errs:
-		<-done
-		return err
-	case <-done:
-		return nil
+	for ; workers != 0; workers-- {
+		err := <-errs
+		if err != nil && finalErr != nil {
+			finalErr = err
+		}
 	}
+	return finalErr
 }
 
 func (f *metricsFlusher) reportDiscardedLabels(discardedLabels map[string]struct{}) {
