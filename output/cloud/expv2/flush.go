@@ -94,42 +94,36 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 	}
 
 	var (
-		wg   = sync.WaitGroup{}
-		errs = make(chan error)
-		done = make(chan struct{})
-		stop = make(chan struct{})
-		feed = make(chan *pbcloud.MetricSet)
-
+		wg      = sync.WaitGroup{}
 		workers = min(len(batches), f.batchPushConcurrency)
+		errs    = make(chan error, workers)
+		feed    = make(chan *pbcloud.MetricSet)
+		done    = make(chan struct{})
 	)
 
 	wg.Add(workers)
-	for workersIndex := 0; workersIndex < workers; workersIndex++ {
+	for i := 0; i < workers; i++ {
 		go func() {
 			defer wg.Done()
 
 			for chunk := range feed {
-				select {
-				case <-stop:
-					return
-				default:
-				}
 				if err := f.client.push(chunk); err != nil {
-					select {
-					case errs <- err:
-					case <-stop:
-						return
-					}
+					errs <- err
+					return
 				}
 			}
 		}()
 	}
+	go func() {
+		defer close(done)
+		wg.Wait()
+	}()
 
 	for i := 0; i < len(batches); i++ {
 		select {
 		case err := <-errs:
-			close(stop)
 			close(feed)
+			<-done
 			return err
 		case feed <- batches[i]:
 		}
@@ -137,14 +131,8 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 
 	close(feed)
 
-	go func() {
-		defer close(done)
-		wg.Wait()
-	}()
-
 	select {
 	case err := <-errs:
-		close(stop)
 		<-done
 		return err
 	case <-done:
