@@ -61,7 +61,7 @@ func (f *metricsFlusher) flush() error {
 	for i := 0; i < len(buckets); i++ {
 		for timeSeries, sink := range buckets[i].Sinks {
 			msb.addTimeSeries(buckets[i].Time, timeSeries, sink)
-			if len(msb.seriesIndex) <= f.maxSeriesInBatch {
+			if len(msb.seriesIndex) < f.maxSeriesInBatch {
 				continue
 			}
 
@@ -76,9 +76,11 @@ func (f *metricsFlusher) flush() error {
 	}
 
 	// send the last (or the unique) MetricSet chunk to the remote service
-	seriesCount += len(msb.seriesIndex)
-	batches = append(batches, msb.MetricSet)
-	f.reportDiscardedLabels(msb.discardedLabels)
+	if len(msb.seriesIndex) != 0 {
+		seriesCount += len(msb.seriesIndex)
+		batches = append(batches, msb.MetricSet)
+		f.reportDiscardedLabels(msb.discardedLabels)
+	}
 
 	return f.flushBatches(batches)
 }
