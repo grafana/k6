@@ -709,6 +709,28 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *
 	return nil
 }
 
+// EvaluateWithContext will evaluate provided page function within an execution context.
+// The passed in context will be used instead of the frame's context. The context must
+// be a derivative of one that contains the goja runtime.
+func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error) {
+	f.log.Debugf("Frame:EvaluateWithContext", "fid:%s furl:%q", f.ID(), f.URL())
+
+	f.waitForExecutionContext(mainWorld)
+
+	opts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+	result, err := f.evaluate(ctx, mainWorld, opts, pageFunc, args...)
+	if err != nil {
+		return nil, fmt.Errorf("evaluating JS: %w", err)
+	}
+
+	applySlowMo(ctx)
+
+	return result, nil
+}
+
 // Evaluate will evaluate provided page function within an execution context.
 func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())

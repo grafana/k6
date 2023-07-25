@@ -35,11 +35,12 @@ func customMappings() map[string]string {
 		"Page.getMouse":       "mouse",
 		"Page.getTouchscreen": "touchscreen",
 		// internal methods
-		"ElementHandle.objectID": "",
-		"Frame.id":               "",
-		"Frame.loaderID":         "",
-		"JSHandle.objectID":      "",
-		"Browser.close":          "",
+		"ElementHandle.objectID":    "",
+		"Frame.id":                  "",
+		"Frame.loaderID":            "",
+		"JSHandle.objectID":         "",
+		"Browser.close":             "",
+		"Frame.evaluateWithContext": "",
 		// TODO: browser.on method is unexposed until more event
 		// types other than 'disconnect' are supported.
 		// See: https://github.com/grafana/xk6-browser/issues/913
