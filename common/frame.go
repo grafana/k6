@@ -735,18 +735,10 @@ func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc goja.Value, ar
 func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.waitForExecutionContext(mainWorld)
-
-	opts := evalOptions{
-		forceCallable: true,
-		returnByValue: true,
-	}
-	result, err := f.evaluate(f.ctx, mainWorld, opts, pageFunc, args...)
+	result, err := f.EvaluateWithContext(f.ctx, pageFunc, args...)
 	if err != nil {
-		k6ext.Panic(f.ctx, "evaluating JS: %v", err)
+		k6ext.Panic(f.ctx, "%v", err)
 	}
-
-	applySlowMo(f.ctx)
 
 	return result
 }
