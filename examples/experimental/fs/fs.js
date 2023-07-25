@@ -1,8 +1,8 @@
-import { open } from "k6/experimental/fs";
+import { open, SeekMode } from "k6/experimental/fs";
 
 export const options = {
-	vus: 100,
-	iterations: 1000,
+	vus: 1,
+	iterations: 1,
 };
 
 // As k6 does not support asynchronous code in the init context, yet, we need to
@@ -30,4 +30,7 @@ export default async function () {
 	if (bytesRead != fileinfo.size) {
 		throw new Error("Unexpected number of bytes read");
 	}
+
+	const offset = await file.seek(0, SeekMode.Start);
+	console.log(`Seeked to offset ${offset}`);
 }
