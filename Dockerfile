@@ -18,8 +18,26 @@ WORKDIR /home/k6
 ENTRYPOINT ["k6"]
 
 # Legacy loadimpact/k6 image
-FROM release
+FROM release as legacy
 
 COPY entrypoint-legacy.sh /usr/bin/
 
 ENTRYPOINT ["/usr/bin/entrypoint-legacy.sh"]
+
+# Browser-enabled bundle
+FROM release as with-browser
+
+USER root
+
+COPY --from=release /usr/bin/k6 /usr/bin/k6
+RUN apk --no-cache add chromium-swiftshader
+
+USER k6
+
+ENV CHROME_BIN=/usr/bin/chromium-browser
+ENV CHROME_PATH=/usr/lib/chromium/
+
+ENV K6_BROWSER_ENABLED=true
+ENV K6_BROWSER_HEADLESS=true
+
+ENTRYPOINT ["k6"]

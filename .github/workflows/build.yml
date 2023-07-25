@@ -154,6 +154,8 @@ jobs:
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
 
+      - name: Build browser-enabled image
+        run: docker build -t $DOCKER_IMAGE_ID:with-browser --target with-browser .
       - name: Log into ghcr.io
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         run: |
@@ -165,6 +167,8 @@ jobs:
           echo "Publish as ghcr.io/$GHCR_IMAGE_ID:$VERSION"
           docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$GHCR_IMAGE_ID:master"
           docker push "ghcr.io/$GHCR_IMAGE_ID:master"
+          docker tag "$DOCKER_IMAGE_ID:with-browser" "ghcr.io/$GHCR_IMAGE_ID:master-with-browser"
+          docker push "ghcr.io/$GHCR_IMAGE_ID:master-with-browser"
       - name: Publish tagged version image to ghcr.io
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
@@ -172,11 +176,15 @@ jobs:
           echo "Publish as ghcr.io/$GHCR_IMAGE_ID:$VERSION"
           docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$GHCR_IMAGE_ID:$VERSION"
           docker push "ghcr.io/$GHCR_IMAGE_ID:$VERSION"
+          docker tag "$DOCKER_IMAGE_ID:with-browser" "ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser"
+          docker push "ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser"
           # We also want to tag the latest stable version as latest
           if [[ ! "$VERSION" =~ (RC|rc) ]]; then
             echo "Publish as ghcr.io/$GHCR_IMAGE_ID:latest"
             docker tag "$DOCKER_IMAGE_ID" "ghcr.io/$GHCR_IMAGE_ID:latest"
             docker push "ghcr.io/$GHCR_IMAGE_ID:latest"
+            docker tag "$DOCKER_IMAGE_ID:with-browser" "ghcr.io/$GHCR_IMAGE_ID:latest-with-browser"
+            docker push "ghcr.io/$GHCR_IMAGE_ID:latest-with-browser"
           fi
 
       - name: Log into Docker Hub
@@ -190,6 +198,8 @@ jobs:
           echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:master"
           docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:master"
           docker push "$DOCKER_IMAGE_ID:master"
+          docker tag "$DOCKER_IMAGE_ID:with-browser" "$DOCKER_IMAGE_ID:master-with-browser"
+          docker push "$DOCKER_IMAGE_ID:master-with-browser"
       - name: Publish tagged version image to Docker Hub
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
@@ -197,14 +207,18 @@ jobs:
           echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:$VERSION"
           docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:$VERSION"
           docker push "$DOCKER_IMAGE_ID:$VERSION"
+          docker tag "$DOCKER_IMAGE_ID:with-browser" "$DOCKER_IMAGE_ID:$VERSION-with-browser"
+          docker push "$DOCKER_IMAGE_ID:$VERSION-with-browser"
           # We also want to tag the latest stable version as latest
           if [[ ! "$VERSION" =~ (RC|rc) ]]; then
             echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:latest"
             docker tag "$DOCKER_IMAGE_ID" "$DOCKER_IMAGE_ID:latest"
             docker push "$DOCKER_IMAGE_ID:latest"
+            docker tag "$DOCKER_IMAGE_ID:with-browser" $DOCKER_IMAGE_ID:latest-with-browser"
+            docker push "$DOCKER_IMAGE_ID:latest-with-browser"
           fi
       - name: Build loadimpact/k6
-        run: docker build -t $LI_DOCKER_IMAGE_ID .
+        run: docker build -t $LI_DOCKER_IMAGE_ID --target legacy .
       - name: Publish loadimpact/k6:master image to Docker Hub
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
