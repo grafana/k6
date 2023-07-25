@@ -343,7 +343,7 @@ func (h *lokiHook) push(b bytes.Buffer) error {
 	req.Header.Set("Content-Type", "application/json")
 
 	for _, header := range h.headers {
-		req.Header.Set(header[0], header[1])
+		req.Header.Add(header[0], header[1])
 	}
 
 	res, err := h.client.Do(req)

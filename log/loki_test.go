@@ -191,3 +191,38 @@ func TestLokiFlushingOnStop(t *testing.T) {
 		t.Fatal("No logs were received from loki before hook has finished")
 	}
 }
+
+func TestLokiHeaders(t *testing.T) {
+	t.Parallel()
+	receivedHeaders := make(chan http.Header, 1)
+	srv := httptest.NewServer(
+		http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+			receivedHeaders <- req.Header
+			close(receivedHeaders) // see comment in TestLokiFlushingOnStop
+		}),
+	)
+	configLine := fmt.Sprintf("loki=%s,pushPeriod=1h,header.X-Foo=bar,header.Test=hello world,header.X-Foo=baz", srv.URL)
+	h, err := LokiFromConfigLine(nil, configLine)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	wg := new(sync.WaitGroup)
+	now := time.Now()
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		err = h.Fire(&logrus.Entry{Time: now, Level: logrus.InfoLevel, Message: "test message"})
+		time.Sleep(time.Millisecond * 10)
+		cancel()
+	}()
+	h.Listen(ctx)
+	wg.Wait()
+
+	select {
+	case headers := <-receivedHeaders:
+		require.Equal(t, []string{"bar", "baz"}, headers["X-Foo"])
+		require.Equal(t, []string{"hello world"}, headers["Test"])
+	default:
+		t.Fatal("No logs were received from loki before hook has finished")
+	}
+}
