@@ -215,6 +215,95 @@ func TestFlushWithReservedLabels(t *testing.T) {
 	assert.Equal(t, "val2", ts[1].Labels[0].Value)
 }
 
+func TestFlushMaxSeriesInBatch(t *testing.T) {
+	t.Parallel()
+
+	logger := testutils.NewLogger(t)
+
+	mutex := sync.Mutex{}
+	collected := make([]*pbcloud.MetricSet, 0)
+
+	bq := &bucketQ{}
+	pm := &pusherMock{
+		hook: func(ms *pbcloud.MetricSet) {
+			mutex.Lock()
+			collected = append(collected, ms)
+			mutex.Unlock()
+		},
+	}
+
+	mf := metricsFlusher{
+		bq:                   bq,
+		client:               pm,
+		maxSeriesInBatch:     2,
+		logger:               logger,
+		discardedLabels:      make(map[string]struct{}),
+		batchPushConcurrency: 5,
+	}
+
+	r := metrics.NewRegistry()
+	m1 := r.MustNewMetric("metric1", metrics.Counter)
+
+	ts1 := metrics.TimeSeries{
+		Metric: m1,
+		Tags:   r.RootTagSet().With("key1", "val1"),
+	}
+	bq.Push([]timeBucket{
+		{
+			Time: 1,
+			Sinks: map[metrics.TimeSeries]metricValue{
+				ts1: &counter{Sum: float64(1)},
+			},
+		},
+	})
+
+	ts2 := metrics.TimeSeries{
+		Metric: m1,
+		Tags:   r.RootTagSet().With("key1", "val2"),
+	}
+	bq.Push([]timeBucket{
+		{
+			Time: 2,
+			Sinks: map[metrics.TimeSeries]metricValue{
+				ts2: &counter{Sum: float64(2)},
+			},
+		},
+	})
+
+	ts3 := metrics.TimeSeries{
+		Metric: m1,
+		Tags:   r.RootTagSet().With("key1", "val3"),
+	}
+	bq.Push([]timeBucket{
+		{
+			Time: 3,
+			Sinks: map[metrics.TimeSeries]metricValue{
+				ts3: &counter{Sum: float64(3)},
+			},
+		},
+	})
+	err := mf.flush()
+	require.NoError(t, err)
+
+	require.Len(t, collected, 2)
+
+	require.Len(t, collected[0].Metrics, 1)
+
+	ts := collected[0].Metrics[0].TimeSeries
+	require.Len(t, ts[0].Labels, 1)
+	assert.Equal(t, "key1", ts[0].Labels[0].Name)
+	assert.Equal(t, "val1", ts[0].Labels[0].Value)
+
+	require.Len(t, ts[1].Labels, 1)
+	assert.Equal(t, "key1", ts[1].Labels[0].Name)
+	assert.Equal(t, "val2", ts[1].Labels[0].Value)
+
+	ts = collected[1].Metrics[0].TimeSeries
+	require.Len(t, ts[0].Labels, 1)
+	assert.Equal(t, "key1", ts[0].Labels[0].Name)
+	assert.Equal(t, "val3", ts[0].Labels[0].Value)
+}
+
 type pusherMock struct {
 	// hook is called when the push method is called.
 	hook func(*pbcloud.MetricSet)
