@@ -160,6 +160,7 @@ func (l *Logger) ConsoleLogFormatterSerializer() *Logger {
 			Out:       l.Out,
 			Level:     l.Level,
 			Formatter: &consoleLogFormatter{l.Formatter},
+			Hooks:     l.Hooks,
 		},
 	}
 }
