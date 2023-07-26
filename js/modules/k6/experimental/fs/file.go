@@ -54,6 +54,11 @@ func (f *file) Read(into []byte) (int, error) {
 	return n, nil
 }
 
+// ReadAll reads the entire file into memory.
+func (f *file) ReadAll() []byte {
+	return f.data
+}
+
 // Seek sets the offset for the next operation on the file, under the mode given by `whence`.
 //
 // `offset` indicates the number of bytes to move the offset. Based on
