@@ -290,6 +290,32 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("readAll should return the content of the whole file", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(fmt.Sprintf(`
+			fs.open(%q).then(file => {
+				file.readAll().then(
+					content => {
+						if (content !== 'hello') { throw 'expected readAll to return "hello", got ' + content + ' instead'}
+					},
+					err => { throw 'unexpected error: ' + err },
+				)
+			})
+		`, testFilePath))
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("seek with invalid arguments should fail", func(t *testing.T) {
 		t.Parallel()
 
