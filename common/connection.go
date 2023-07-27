@@ -329,7 +329,7 @@ func (c *Connection) recvLoop() {
 			sid, tid := eva.SessionID, eva.TargetInfo.TargetID
 
 			c.sessionsMu.Lock()
-			session := NewSession(c.ctx, c, sid, tid, c.logger)
+			session := NewSession(c.ctx, c, sid, tid, c.logger, c.msgID)
 			c.logger.Debugf("Connection:recvLoop:EventAttachedToTarget", "sid:%v tid:%v wsURL:%q", sid, tid, c.wsURL)
 			c.sessions[sid] = session
 			c.sessionsMu.Unlock()
