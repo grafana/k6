@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -429,7 +430,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.frameManager.requestStarted(req)
 }
 
-func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
+func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) { //nolint:funlen
 	m.logger.Debugf("NetworkManager:onRequestPaused",
 		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
@@ -441,18 +442,31 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		if failErr != nil {
 			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
 			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				m.logger.Errorf("NetworkManager:onRequestPaused",
-					"interrupting request: %s", err)
-			} else {
-				m.logger.Warnf("NetworkManager:onRequestPaused",
-					"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
+				// Avoid logging as error when context is canceled.
+				// Most probably this happens when trying to fail a site's background request
+				// while the iteration is ending and therefore the browser context is being closed.
+				if errors.Is(err, context.Canceled) {
+					m.logger.Debug("NetworkManager:onRequestPaused", "context canceled interrupting request")
+				} else {
+					m.logger.Errorf("NetworkManager:onRequestPaused", "interrupting request: %s", err)
+				}
 				return
 			}
+			m.logger.Warnf("NetworkManager:onRequestPaused",
+				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
+
+			return
 		}
 		action := fetch.ContinueRequest(event.RequestID)
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			m.logger.Errorf("NetworkManager:onRequestPaused",
-				"continuing request: %s", err)
+			// Avoid logging as error when context is canceled.
+			// Most probably this happens when trying to continue a site's background request
+			// while the iteration is ending and therefore the browser context is being closed.
+			if errors.Is(err, context.Canceled) {
+				m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
+				return
+			}
+			m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
 		}
 	}()
 
