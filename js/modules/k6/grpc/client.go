@@ -59,7 +59,7 @@ import (
 	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 )
 
-//nolint: lll
+// nolint: lll
 var (
 	errInvokeRPCInInitContext = common.NewInitContextError("invoking RPC methods in the init context is not supported")
 	errConnectInInitContext   = common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
@@ -557,8 +557,11 @@ func (c *Client) Invoke(
 		// {"x":6,"y":4,"z":0}
 		raw, _ := marshaler.Marshal(resp)
 		msg := make(map[string]interface{})
-		_ = json.Unmarshal(raw, &msg)
+		er := json.Unmarshal(raw, &msg)
 		response.Message = msg
+		if er != nil {
+			response.Message = string(raw)
+		}
 	}
 	return &response, nil
 }
