@@ -125,7 +125,7 @@ type Connection struct {
 	done         chan struct{}
 	closing      chan struct{}
 	shutdownOnce sync.Once
-	msgID        int64
+	msgID        *msgID
 
 	sessionsMu sync.RWMutex
 	sessions   map[target.SessionID]*Session
@@ -163,7 +163,7 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 		errorCh:          make(chan error),
 		done:             make(chan struct{}),
 		closing:          make(chan struct{}),
-		msgID:            0,
+		msgID:            &msgID{},
 		sessions:         make(map[target.SessionID]*Session),
 	}
 
@@ -509,7 +509,7 @@ func (c *Connection) Close(args ...goja.Value) {
 // Execute implements cdproto.Executor and performs a synchronous send and receive.
 func (c *Connection) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
 	c.logger.Debugf("connection:Execute", "wsURL:%q method:%q", c.wsURL, method)
-	id := atomic.AddInt64(&c.msgID, 1)
+	id := c.msgID.new()
 
 	// Setup event handler used to block for response to message being sent.
 	ch := make(chan *cdproto.Message, 1)
