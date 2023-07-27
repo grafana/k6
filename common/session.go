@@ -23,7 +23,7 @@ type Session struct {
 	conn     *Connection
 	id       target.SessionID
 	targetID target.ID
-	msgID    *msgID
+	msgIDGen msgIDGenerator
 	readCh   chan *cdproto.Message
 	done     chan struct{}
 	closed   bool
@@ -34,7 +34,7 @@ type Session struct {
 
 // NewSession creates a new session.
 func NewSession(
-	ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *log.Logger, msgID *msgID,
+	ctx context.Context, conn *Connection, id target.SessionID, tid target.ID, logger *log.Logger, msgIDGen msgIDGenerator,
 ) *Session {
 	s := Session{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
@@ -43,7 +43,7 @@ func NewSession(
 		targetID:         tid,
 		readCh:           make(chan *cdproto.Message),
 		done:             make(chan struct{}),
-		msgID:            msgID,
+		msgIDGen:         msgIDGen,
 
 		logger: logger,
 	}
@@ -118,7 +118,7 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		return ErrTargetCrashed
 	}
 
-	id := s.msgID.new()
+	id := s.msgIDGen.newID()
 
 	// Setup event handler used to block for response to message being sent.
 	ch := make(chan *cdproto.Message, 1)
@@ -186,7 +186,7 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		}
 	}
 	msg := &cdproto.Message{
-		ID: s.msgID.new(),
+		ID: s.msgIDGen.newID(),
 		// We use different sessions to send messages to "targets"
 		// (browser, page, frame etc.) in CDP.
 		//
