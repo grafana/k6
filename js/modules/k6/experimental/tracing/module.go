@@ -93,7 +93,7 @@ func (mi *ModuleInstance) newClient(cc goja.ConstructorCall) *goja.Object {
 //
 // When used in the context of a k6 script, it will automatically replace
 // the imported http module's methods with instrumented ones.
-func (mi *ModuleInstance) instrumentHTTP(options options) {
+func (mi *ModuleInstance) instrumentHTTP(options goja.Value) {
 	rt := mi.vu.Runtime()
 
 	if mi.vu.State() != nil {
@@ -109,10 +109,17 @@ func (mi *ModuleInstance) instrumentHTTP(options options) {
 		common.Throw(rt, err)
 	}
 
+	// Parse the options instance from the JS value.
+	// This will also validate the options, and set the sampling
+	// rate to 1.0 if the option was not set.
+	opts, err := newOptions(rt, options)
+	if err != nil {
+		common.Throw(rt, fmt.Errorf("unable to parse options object; reason: %w", err))
+	}
+
 	// Initialize the tracing module's instance default client,
 	// and configure it using the user-supplied set of options.
-	var err error
-	mi.Client, err = NewClient(mi.vu, options)
+	mi.Client, err = NewClient(mi.vu, opts)
 	if err != nil {
 		common.Throw(rt, err)
 	}

@@ -38,7 +38,7 @@ func newOptions(rt *goja.Runtime, from goja.Value) (options, error) {
 	}
 
 	fromSamplingValue := from.ToObject(rt).Get("sampling")
-	if fromSamplingValue == nil || common.IsNullish(fromSamplingValue) {
+	if common.IsNullish(fromSamplingValue) {
 		opts.Sampling = defaultSamplingRate
 	}
 
