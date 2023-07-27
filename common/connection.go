@@ -28,6 +28,19 @@ const wsWriteBufferSize = 1 << 20
 var _ EventEmitter = &Connection{}
 var _ cdp.Executor = &Connection{}
 
+// Each connection needs its own msgID. A msgID will be used by the
+// connection and associated sessions. When a CDP request is made to
+// chrome, it's best to work with unique ids to avoid the Execute
+// handlers working with the wrong response, or handlers deadlocking
+// when their response is rerouted to the wrong handler.
+type msgID struct {
+	id int64
+}
+
+func (m *msgID) new() int64 {
+	return atomic.AddInt64(&m.id, 1)
+}
+
 type executorEmitter interface {
 	cdp.Executor
 	EventEmitter
