@@ -305,7 +305,10 @@ func (f *Frame) onLifecycleEvent(event LifecycleEvent) {
 	f.lifecycleEvents[event] = true
 	f.lifecycleEventsMu.Unlock()
 
-	f.emit(EventFrameAddLifecycle, event)
+	f.emit(EventFrameAddLifecycle, FrameLifecycleEvent{
+		URL:   f.URL(),
+		Event: event,
+	})
 }
 
 func (f *Frame) onLoadingStarted() {
@@ -706,9 +709,11 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *
 	return nil
 }
 
-// Evaluate will evaluate provided page function within an execution context.
-func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
-	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
+// EvaluateWithContext will evaluate provided page function within an execution context.
+// The passed in context will be used instead of the frame's context. The context must
+// be a derivative of one that contains the goja runtime.
+func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error) {
+	f.log.Debugf("Frame:EvaluateWithContext", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
 
@@ -716,12 +721,24 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := f.evaluate(f.ctx, mainWorld, opts, pageFunc, args...)
+	result, err := f.evaluate(ctx, mainWorld, opts, pageFunc, args...)
 	if err != nil {
-		k6ext.Panic(f.ctx, "evaluating JS: %v", err)
+		return nil, fmt.Errorf("evaluating JS: %w", err)
 	}
 
-	applySlowMo(f.ctx)
+	applySlowMo(ctx)
+
+	return result, nil
+}
+
+// Evaluate will evaluate provided page function within an execution context.
+func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
+	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
+
+	result, err := f.EvaluateWithContext(f.ctx, pageFunc, args...)
+	if err != nil {
+		k6ext.Panic(f.ctx, "%v", err)
+	}
 
 	return result
 }
@@ -1693,8 +1710,8 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
-			if le, ok := data.(LifecycleEvent); ok {
-				return le == waitUntil
+			if le, ok := data.(FrameLifecycleEvent); ok {
+				return le.Event == waitUntil
 			}
 			return false
 		})
@@ -1736,8 +1753,8 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
-			if le, ok := data.(LifecycleEvent); ok {
-				return le == parsedOpts.WaitUntil
+			if le, ok := data.(FrameLifecycleEvent); ok {
+				return le.Event == parsedOpts.WaitUntil
 			}
 			return false
 		})
@@ -1773,7 +1790,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 				sameDocNav = true
 				break
 			}
-			// request could be nil if navigating to e.g. about:blank
+			// request could be nil if navigating to e.g. BlankPage.
 			req := e.newDocument.request
 			if req != nil {
 				req.responseMu.RLock()

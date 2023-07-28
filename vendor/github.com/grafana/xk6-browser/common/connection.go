@@ -28,6 +28,25 @@ const wsWriteBufferSize = 1 << 20
 var _ EventEmitter = &Connection{}
 var _ cdp.Executor = &Connection{}
 
+// Each connection needs its own msgID. A msgID will be used by the
+// connection and associated sessions. When a CDP request is made to
+// chrome, it's best to work with unique ids to avoid the Execute
+// handlers working with the wrong response, or handlers deadlocking
+// when their response is rerouted to the wrong handler.
+//
+// Use the msgIDGenerator interface to abstract `id` away.
+type msgID struct {
+	id int64
+}
+
+func (m *msgID) newID() int64 {
+	return atomic.AddInt64(&m.id, 1)
+}
+
+type msgIDGenerator interface {
+	newID() int64
+}
+
 type executorEmitter interface {
 	cdp.Executor
 	EventEmitter
@@ -112,7 +131,7 @@ type Connection struct {
 	done         chan struct{}
 	closing      chan struct{}
 	shutdownOnce sync.Once
-	msgID        int64
+	msgIDGen     msgIDGenerator
 
 	sessionsMu sync.RWMutex
 	sessions   map[target.SessionID]*Session
@@ -150,7 +169,7 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 		errorCh:          make(chan error),
 		done:             make(chan struct{}),
 		closing:          make(chan struct{}),
-		msgID:            0,
+		msgIDGen:         &msgID{},
 		sessions:         make(map[target.SessionID]*Session),
 	}
 
@@ -316,7 +335,7 @@ func (c *Connection) recvLoop() {
 			sid, tid := eva.SessionID, eva.TargetInfo.TargetID
 
 			c.sessionsMu.Lock()
-			session := NewSession(c.ctx, c, sid, tid, c.logger)
+			session := NewSession(c.ctx, c, sid, tid, c.logger, c.msgIDGen)
 			c.logger.Debugf("Connection:recvLoop:EventAttachedToTarget", "sid:%v tid:%v wsURL:%q", sid, tid, c.wsURL)
 			c.sessions[sid] = session
 			c.sessionsMu.Unlock()
@@ -496,7 +515,7 @@ func (c *Connection) Close(args ...goja.Value) {
 // Execute implements cdproto.Executor and performs a synchronous send and receive.
 func (c *Connection) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
 	c.logger.Debugf("connection:Execute", "wsURL:%q method:%q", c.wsURL, method)
-	id := atomic.AddInt64(&c.msgID, 1)
+	id := c.msgIDGen.newID()
 
 	// Setup event handler used to block for response to message being sent.
 	ch := make(chan *cdproto.Message, 1)

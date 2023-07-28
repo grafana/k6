@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net"
 	"net/url"
@@ -34,14 +35,15 @@ var _ EventEmitter = &NetworkManager{}
 type NetworkManager struct {
 	BaseEventEmitter
 
-	ctx          context.Context
-	logger       *log.Logger
-	session      session
-	parent       *NetworkManager
-	frameManager *FrameManager
-	credentials  *Credentials
-	resolver     k6netext.Resolver
-	vu           k6modules.VU
+	ctx           context.Context
+	logger        *log.Logger
+	session       session
+	parent        *NetworkManager
+	frameManager  *FrameManager
+	credentials   *Credentials
+	resolver      k6netext.Resolver
+	vu            k6modules.VU
+	customMetrics *k6ext.CustomMetrics
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
@@ -59,7 +61,7 @@ type NetworkManager struct {
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
-	ctx context.Context, s session, fm *FrameManager, parent *NetworkManager,
+	ctx context.Context, customMetrics *k6ext.CustomMetrics, s session, fm *FrameManager, parent *NetworkManager,
 ) (*NetworkManager, error) {
 	vu := k6ext.GetVU(ctx)
 	state := vu.State()
@@ -80,6 +82,7 @@ func NewNetworkManager(
 		frameManager:     fm,
 		resolver:         resolver,
 		vu:               vu,
+		customMetrics:    customMetrics,
 		reqIDToRequest:   make(map[network.RequestID]*Request),
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
@@ -153,10 +156,10 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = tags.With("url", req.URL())
 	}
 
-	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
+	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
-				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataSent, Tags: tags},
+				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataSent, Tags: tags},
 				Value:      float64(req.Size().Total()),
 				Time:       req.wallTime,
 			},
@@ -176,6 +179,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		fromCache, fromPreCache, fromSvcWrk bool
 		url                                 = req.url.String()
 		wallTime                            = time.Now()
+		failed                              float64
 	)
 	if resp != nil {
 		status = resp.status
@@ -187,6 +191,11 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		fromSvcWrk = resp.fromServiceWorker
 		wallTime = resp.wallTime
 		url = resp.url
+		// Assuming that a failure is when status
+		// is not between 200 and 399 (inclusive).
+		if status < 200 || status > 399 {
+			failed = 1
+		}
 	} else {
 		m.logger.Debugf("NetworkManager:emitResponseMetrics",
 			"response is nil url:%s method:%s", req.url, req.method)
@@ -213,20 +222,15 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	tags = tags.With("from_prefetch_cache", strconv.FormatBool(fromPreCache))
 	tags = tags.With("from_service_worker", strconv.FormatBool(fromSvcWrk))
 
-	k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
+	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
-				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqs, Tags: tags},
-				Value:      1,
-				Time:       wallTime,
-			},
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqDuration, Tags: tags},
+				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqDuration, Tags: tags},
 				Value:      k6metrics.D(wallTime.Sub(req.wallTime)),
 				Time:       wallTime,
 			},
 			{
-				TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.DataReceived, Tags: tags},
+				TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserDataReceived, Tags: tags},
 				Value:      float64(bodySize),
 				Time:       wallTime,
 			},
@@ -234,26 +238,11 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	})
 
 	if resp != nil && resp.timing != nil {
-		k6metrics.PushIfNotDone(m.ctx, state.Samples, k6metrics.ConnectedSamples{
+		k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
 			Samples: []k6metrics.Sample{
 				{
-					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqConnecting, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.ConnectEnd-resp.timing.ConnectStart) * time.Millisecond),
-					Time:       wallTime,
-				},
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqTLSHandshaking, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.SslEnd-resp.timing.SslStart) * time.Millisecond),
-					Time:       wallTime,
-				},
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqSending, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.SendEnd-resp.timing.SendStart) * time.Millisecond),
-					Time:       wallTime,
-				},
-				{
-					TimeSeries: k6metrics.TimeSeries{Metric: state.BuiltinMetrics.HTTPReqReceiving, Tags: tags},
-					Value:      k6metrics.D(time.Duration(resp.timing.ReceiveHeadersEnd-resp.timing.SendEnd) * time.Millisecond),
+					TimeSeries: k6metrics.TimeSeries{Metric: m.customMetrics.BrowserHTTPReqFailed, Tags: tags},
+					Value:      failed,
 					Time:       wallTime,
 				},
 			},
@@ -441,7 +430,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.frameManager.requestStarted(req)
 }
 
-func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
+func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) { //nolint:funlen
 	m.logger.Debugf("NetworkManager:onRequestPaused",
 		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",
@@ -453,18 +442,31 @@ func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 		if failErr != nil {
 			action := fetch.FailRequest(event.RequestID, network.ErrorReasonBlockedByClient)
 			if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-				m.logger.Errorf("NetworkManager:onRequestPaused",
-					"interrupting request: %s", err)
-			} else {
-				m.logger.Warnf("NetworkManager:onRequestPaused",
-					"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
+				// Avoid logging as error when context is canceled.
+				// Most probably this happens when trying to fail a site's background request
+				// while the iteration is ending and therefore the browser context is being closed.
+				if errors.Is(err, context.Canceled) {
+					m.logger.Debug("NetworkManager:onRequestPaused", "context canceled interrupting request")
+				} else {
+					m.logger.Errorf("NetworkManager:onRequestPaused", "interrupting request: %s", err)
+				}
 				return
 			}
+			m.logger.Warnf("NetworkManager:onRequestPaused",
+				"request %s %s was interrupted: %s", event.Request.Method, event.Request.URL, failErr)
+
+			return
 		}
 		action := fetch.ContinueRequest(event.RequestID)
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			m.logger.Errorf("NetworkManager:onRequestPaused",
-				"continuing request: %s", err)
+			// Avoid logging as error when context is canceled.
+			// Most probably this happens when trying to continue a site's background request
+			// while the iteration is ending and therefore the browser context is being closed.
+			if errors.Is(err, context.Canceled) {
+				m.logger.Debug("NetworkManager:onRequestPaused", "context canceled continuing request")
+				return
+			}
+			m.logger.Errorf("NetworkManager:onRequestPaused", "continuing request: %s", err)
 		}
 	}()
 

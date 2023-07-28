@@ -35,10 +35,10 @@ type BrowserProcess struct {
 // NewLocalBrowserProcess starts a local browser process and
 // returns a new BrowserProcess instance to interact with it.
 func NewLocalBrowserProcess(
-	ctx context.Context, path string, args, env []string, dataDir *storage.Dir,
+	ctx context.Context, path string, args []string, dataDir *storage.Dir,
 	ctxCancel context.CancelFunc, logger *log.Logger,
 ) (*BrowserProcess, error) {
-	cmd, err := execute(ctx, ctxCancel, path, args, env, dataDir, logger)
+	cmd, err := execute(ctx, path, args, dataDir, logger)
 	if err != nil {
 		return nil, err
 	}
@@ -151,7 +151,7 @@ type command struct {
 }
 
 func execute(
-	ctx context.Context, ctxCancel func(), path string, args, env []string,
+	ctx context.Context, path string, args []string,
 	dataDir *storage.Dir, logger *log.Logger,
 ) (command, error) {
 	cmd := exec.CommandContext(ctx, path, args...)
@@ -164,11 +164,6 @@ func execute(
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		return command{}, fmt.Errorf("%w", err)
-	}
-
-	// Set up environment variable for process
-	if len(env) > 0 {
-		cmd.Env = append(os.Environ(), env...)
 	}
 
 	// We must start the cmd before calling cmd.Wait, as otherwise the two
