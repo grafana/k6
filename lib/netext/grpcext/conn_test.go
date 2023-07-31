@@ -189,6 +189,28 @@ func TestResolveFileDescriptors(t *testing.T) {
 			services:            []string{},
 			expectedDescriptors: 0,
 		},
+		{
+			name:                "NoPackage",
+			services:            []string{"Service1", "Service2"},
+			expectedDescriptors: 2,
+		},
+		{
+			name:                "NoPackageDeduplicateServices",
+			services:            []string{"Service1", "Service2", "Service1"},
+			expectedDescriptors: 2,
+		},
+		{
+			name:                "MixPackage",
+			pkgs:                []string{"mypkg1"},
+			services:            []string{"Service1", "Service2"},
+			expectedDescriptors: 2,
+		},
+		{
+			name:                "MixPackageDeduplicateServices",
+			pkgs:                []string{"mypkg1"},
+			services:            []string{"Service1", "Service2", "Service1"},
+			expectedDescriptors: 2,
+		},
 	}
 
 	for _, tt := range tests {
@@ -199,10 +221,16 @@ func TestResolveFileDescriptors(t *testing.T) {
 				lsr  = &reflectpb.ListServiceResponse{}
 				mock = &getServiceFileDescriptorMock{}
 			)
+
+			var pkg string
+			if len(tt.pkgs) == 1 {
+				pkg = tt.pkgs[0]
+			}
+
 			for i, service := range tt.services {
 				// if only one package is defined then
 				// the package is the same for every service
-				pkg := tt.pkgs[0]
+
 				if len(tt.pkgs) > 1 {
 					pkg = tt.pkgs[i]
 				}
