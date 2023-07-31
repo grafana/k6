@@ -12,10 +12,10 @@ import (
 
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/stale"
 
+	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/golang/snappy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 	"google.golang.org/protobuf/proto"
 )
 
