@@ -655,6 +655,20 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "ReflectMetadata",
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				reflection.Register(tb.ServerGRPC)
+			},
+			initString: codeBlock{
+				code: `var client = new grpc.Client();`,
+			},
+			vuString: codeBlock{
+				code: `
+					client.connect("GRPCBIN_ADDR", {reflect: true, reflectMetadata: { "X-Load-Tester": "k6" } })
+				`,
+			},
+		},
+		{
 			name: "ReflectInvokeNoExist",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				reflection.Register(tb.ServerGRPC)
