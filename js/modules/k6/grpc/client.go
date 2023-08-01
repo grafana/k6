@@ -552,8 +552,8 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 			if !ok {
 				return params, errors.New("metadata must be an object with key-value pairs")
 			}
+			// Same way metadata is handled in invoke parameter parsing
 			for hk, kv := range rawHeaders {
-				// TODO(rogchap): Should we manage a string slice?
 				strval, ok := kv.(string)
 				if !ok {
 					return params, fmt.Errorf("metadata %q value must be a string", hk)
