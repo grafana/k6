@@ -98,6 +98,38 @@ func TestTmpDirCleanup(t *testing.T) {
 	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern `xk6-browser-data-*`")
 }
 
+func TestTmpDirCleanupOnContextClose(t *testing.T) {
+	t.Parallel()
+
+	const tmpDirPath = "./2/"
+	err := os.Mkdir(tmpDirPath, os.ModePerm)
+	require.NoError(t, err)
+
+	defer func() {
+		err = os.Remove(tmpDirPath)
+		require.NoError(t, err)
+	}()
+
+	b := newTestBrowser(
+		t,
+		withSkipClose(),
+		withEnvLookup(env.ConstLookup("TMPDIR", tmpDirPath)),
+	)
+
+	matches, err := filepath.Glob(tmpDirPath + "xk6-browser-data-*")
+	assert.NoError(t, err)
+	assert.NotEmpty(t, matches, "a dir should exist that matches the pattern `xk6-browser-data-*`")
+
+	b.cancelContext()
+	<-b.ctx.Done()
+
+	require.NotPanicsf(t, b.Close, "first call to browser.close should not panic")
+
+	matches, err = filepath.Glob(tmpDirPath + "xk6-browser-data-*")
+	assert.NoError(t, err)
+	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern `xk6-browser-data-*`")
+}
+
 func TestBrowserOn(t *testing.T) {
 	t.Parallel()
 
