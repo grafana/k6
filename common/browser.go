@@ -453,7 +453,7 @@ func (b *Browser) Close() {
 		var closeErr *websocket.CloseError
 		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.ctx, b.conn))
 		if err != nil && !errors.As(err, &closeErr) {
-			k6ext.Panic(b.ctx, "closing the browser: %v", err)
+			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
 	}
 
