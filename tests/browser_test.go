@@ -69,7 +69,14 @@ func TestBrowserNewContext(t *testing.T) {
 func TestTmpDirCleanup(t *testing.T) {
 	t.Parallel()
 
-	const tmpDirPath = "./"
+	const tmpDirPath = "./1/"
+	err := os.Mkdir(tmpDirPath, os.ModePerm)
+	require.NoError(t, err)
+
+	defer func() {
+		err = os.Remove(tmpDirPath)
+		require.NoError(t, err)
+	}()
 
 	b := newTestBrowser(
 		t,
@@ -77,7 +84,7 @@ func TestTmpDirCleanup(t *testing.T) {
 		withEnvLookup(env.ConstLookup("TMPDIR", tmpDirPath)),
 	)
 	p := b.NewPage(nil)
-	err := p.Close(nil)
+	err = p.Close(nil)
 	require.NoError(t, err)
 
 	matches, err := filepath.Glob(tmpDirPath + "xk6-browser-data-*")
