@@ -213,8 +213,6 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 	exitSubID, exitCh := vu.Events().Global.Subscribe(
 		k6event.Exit,
 	)
-	go r.handleExitEvent(exitCh)
-
 	iterSubID, eventsCh := vu.Events().Local.Subscribe(
 		k6event.IterStart,
 		k6event.IterEnd,
@@ -223,6 +221,8 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 		vu.Events().Local.Unsubscribe(iterSubID)
 		vu.Events().Global.Unsubscribe(exitSubID)
 	}
+
+	go r.handleExitEvent(exitCh, unsubscribe)
 	go r.handleIterEvents(eventsCh, unsubscribe)
 
 	return r
@@ -282,7 +282,9 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 	}
 }
 
-func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event) {
+func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscribeFn func()) {
+	defer unsubscribeFn()
+
 	e, ok := <-exitCh
 	if !ok {
 		return
