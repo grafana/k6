@@ -396,10 +396,11 @@ func TestResponse(t *testing.T) {
 	})
 }
 
+//nolint:errcheck,gosec
 func BenchmarkUnmarshalJson(b *testing.B) {
 	var v map[string]interface{}
 
 	for i := 0; i < b.N; i++ {
-		unmarshalJson([]byte(jsonData), v)
+		unmarshalJSON([]byte(jsonData), v)
 	}
 }

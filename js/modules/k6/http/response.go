@@ -97,7 +97,7 @@ func (res *Response) JSON(selector ...string) goja.Value {
 			return rt.ToValue(result.Value())
 		}
 
-		if err := unmarshalJson(body, &v); err != nil {
+		if err := unmarshalJSON(body, &v); err != nil {
 			var syntaxError *json.SyntaxError
 			if errors.As(err, &syntaxError) {
 				err = checkErrorInJSON(body, int(syntaxError.Offset), err)
@@ -111,7 +111,7 @@ func (res *Response) JSON(selector ...string) goja.Value {
 	return rt.ToValue(res.cachedJSON)
 }
 
-func unmarshalJson(data []byte, v any) error {
+func unmarshalJSON(data []byte, v any) error {
 	return json.Unmarshal(data, v)
 }
 
