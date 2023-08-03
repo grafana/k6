@@ -2154,3 +2154,65 @@ func BenchmarkRunEvents(b *testing.B) {
 		}
 	}
 }
+
+func TestBrowserPermissions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		options          string
+		expectedExitCode exitcodes.ExitCode
+		expectedError    string
+	}{
+		{
+			name:             "browser option not set",
+			options:          "",
+			expectedExitCode: 0,
+			expectedError:    "GoError: browser not found in registry. make sure to set browser type option in scenario definition in order to use the browser module",
+		},
+		{
+			name: "browser option set",
+			options: `export const options = {
+				scenarios: {
+						browser: {
+						executor: 'shared-iterations',
+						options: {
+							browser: {
+								type: 'chromium',
+							},
+						},
+					},
+				},
+			}`,
+			expectedExitCode: 0,
+			expectedError:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			script := fmt.Sprintf(`
+			import { browser } from 'k6/experimental/browser';
+
+			%s
+
+			export default function() {
+			  browser.isConnected();
+			};
+			`, tt.options)
+
+			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			loglines := ts.LoggerHook.Drain()
+
+			if tt.expectedError == "" {
+				require.Len(t, loglines, 0)
+				return
+			}
+
+			assert.Contains(t, loglines[0].Message, tt.expectedError)
+		})
+	}
+}
