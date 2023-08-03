@@ -70,10 +70,12 @@ func TestTmpDirCleanup(t *testing.T) {
 	t.Parallel()
 
 	tmpDirPath, err := os.MkdirTemp("./", "")
-	defer func() {
-		err := os.RemoveAll(tmpDirPath)
-		require.NoError(t, err)
-	}()
+	t.Cleanup(
+		func() {
+			err := os.RemoveAll(tmpDirPath)
+			require.NoError(t, err)
+		},
+	)
 	require.NoError(t, err)
 
 	b := newTestBrowser(
@@ -100,10 +102,12 @@ func TestTmpDirCleanupOnContextClose(t *testing.T) {
 	t.Parallel()
 
 	tmpDirPath, err := os.MkdirTemp("./", "")
-	defer func() {
-		err := os.RemoveAll(tmpDirPath)
-		require.NoError(t, err)
-	}()
+	t.Cleanup(
+		func() {
+			err := os.RemoveAll(tmpDirPath)
+			require.NoError(t, err)
+		},
+	)
 	require.NoError(t, err)
 
 	b := newTestBrowser(
