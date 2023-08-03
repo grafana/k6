@@ -1,12 +1,13 @@
 package http
 
 import (
-	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
+
+	"github.com/goccy/go-json"
 
 	"github.com/dop251/goja"
 	"github.com/tidwall/gjson"
@@ -96,7 +97,7 @@ func (res *Response) JSON(selector ...string) goja.Value {
 			return rt.ToValue(result.Value())
 		}
 
-		if err := json.Unmarshal(body, &v); err != nil {
+		if err := unmarshalJson(body, &v); err != nil {
 			var syntaxError *json.SyntaxError
 			if errors.As(err, &syntaxError) {
 				err = checkErrorInJSON(body, int(syntaxError.Offset), err)
@@ -108,6 +109,10 @@ func (res *Response) JSON(selector ...string) goja.Value {
 	}
 
 	return rt.ToValue(res.cachedJSON)
+}
+
+func unmarshalJson(data []byte, v any) error {
+	return json.Unmarshal(data, v)
 }
 
 func checkErrorInJSON(input []byte, offset int, err error) error {

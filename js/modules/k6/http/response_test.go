@@ -395,3 +395,11 @@ func TestResponse(t *testing.T) {
 		})
 	})
 }
+
+func BenchmarkUnmarshalJson(b *testing.B) {
+	var v map[string]interface{}
+
+	for i := 0; i < b.N; i++ {
+		unmarshalJson([]byte(jsonData), v)
+	}
+}
