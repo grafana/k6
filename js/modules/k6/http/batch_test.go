@@ -152,7 +152,7 @@ func TestBatchErrorNoPanic(t *testing.T) {
 					`, tc.code))
 			require.Error(t, err)
 			assert.Nil(t, ret)
-			assert.Contains(t, err.Error(), "unexpected end of JSON input")
+			assert.Contains(t, err.Error(), "cannot parse json due to an error")
 			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)

@@ -594,7 +594,7 @@ func TestRequest(t *testing.T) {
 			ret, err := rt.RunString(js)
 			require.Error(t, err)
 			assert.Nil(t, ret)
-			assert.Contains(t, err.Error(), "unexpected end of JSON input")
+			assert.Contains(t, err.Error(), "cannot parse json due to an error")
 
 			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
