@@ -185,20 +185,6 @@ func (b *BrowserType) launch(
 	}
 	flags["user-data-dir"] = dataDir.Dir
 
-	go func(c context.Context) {
-		defer func() {
-			if err := dataDir.Cleanup(); err != nil {
-				logger.Errorf("BrowserType:Launch", "cleaning up the user data directory: %v", err)
-			}
-		}()
-		// There's a small chance that this might be called
-		// if the context is closed by the k6 runtime. To
-		// guarantee the cleanup we would need to orchestrate
-		// it correctly which https://github.com/grafana/k6/issues/2432
-		// will enable once it's complete.
-		<-c.Done()
-	}(ctx)
-
 	browserProc, err := b.allocate(ctx, opts, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
