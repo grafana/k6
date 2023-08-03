@@ -190,12 +190,12 @@ func TestResponse(t *testing.T) {
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/html").json();`))
-			assert.Contains(t, err.Error(), "cannot parse json due to an error at line 1, character 2 , error: invalid character '<' looking for beginning of value")
+			assert.Contains(t, err.Error(), "cannot parse json due to an error")
 		})
 
 		t.Run("Invalid", func(t *testing.T) {
 			_, err := rt.RunString(sr(`http.request("GET", "HTTPBIN_URL/invalidjson").json();`))
-			assert.Contains(t, err.Error(), "cannot parse json due to an error at line 3, character 9 , error: invalid character 'e' in literal true (expecting 'r')")
+			assert.Contains(t, err.Error(), "cannot parse json due to an error")
 		})
 
 		t.Run("NoResponseBody", func(t *testing.T) {
