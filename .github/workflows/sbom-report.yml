@@ -2,7 +2,7 @@ name: syft-sbom-ci
 
 on:
   release:
-    types: [created]
+    types: [published]
 
 jobs:
   syft-sbom:
