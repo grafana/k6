@@ -3,8 +3,8 @@ package remotewrite
 import (
 	"sort"
 
+	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/mstoykov/atlas"
-	prompb "go.buf.build/grpc/go/prometheus/prometheus"
 	"go.k6.io/k6/metrics"
 )
 
