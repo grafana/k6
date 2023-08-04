@@ -556,6 +556,8 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 // using `SubtleCrypto.ExportKey` or `SubtleCrypto.WrapKey`.
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
+//
+//nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) DeriveKey(
 	algorithm goja.Value,
 	baseKey goja.Value,
@@ -593,6 +595,8 @@ func (sc *SubtleCrypto) DeriveKey(
 // using `SubtleCrypto.ImportKey`.
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
+//
+//nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, length int) *goja.Promise {
 	// TODO: implementation
 	return nil
@@ -787,6 +791,8 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 //   - an `SubtleCrypto.AesCbcParams` object
 //   - an `SubtleCrypto.AesGcmParams` object
 //   - for the AES-KW algorithm, pass the string "AES-KW", or an object of the form `{ name: "AES-KW" }`
+//
+//nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) WrapKey(
 	format KeyFormat,
 	key goja.Value,
@@ -840,6 +846,8 @@ func (sc *SubtleCrypto) WrapKey(
 // The `extractable` parameter identifies whether the key is extractable.
 //
 // The `keyUsages` parameter identifies the operations that the key can be used for.
+//
+//nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) UnwrapKey(
 	format KeyFormat,
 	wrappedKey []byte,
