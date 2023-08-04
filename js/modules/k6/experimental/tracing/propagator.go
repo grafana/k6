@@ -69,11 +69,11 @@ const (
 	// "0 value is valid and means “root span” (when not ignored)"
 	JaegerRootSpanID = "0"
 
-	// JaegerSampledTraceFlag is the trace-flag value for an unsampled trace.
-	JaegerSampledTraceFlag = "0"
+	// JaegerUnsampledTraceFlag is the trace-flag value for an unsampled trace.
+	JaegerUnsampledTraceFlag = "0"
 
-	// JaegerUnsampledTraceFlag is the trace-flag value for a sampled trace.
-	JaegerUnsampledTraceFlag = "1"
+	// JaegerSampledTraceFlag is the trace-flag value for a sampled trace.
+	JaegerSampledTraceFlag = "1"
 )
 
 // JaegerPropagator is a Propagator for the Jaeger trace context header
