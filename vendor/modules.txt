@@ -1,3 +1,9 @@
+# buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.31.0-20210810001428-4df00b267f94.1
+## explicit
+buf.build/gen/go/gogo/protobuf/protocolbuffers/go/gogoproto
+# buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.31.0-20230627135113-9a12bc2590d2.1
+## explicit
+buf.build/gen/go/prometheus/prometheus/protocolbuffers/go
 # github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 ## explicit
 github.com/Azure/go-ntlmssp
@@ -160,7 +166,7 @@ github.com/grafana/xk6-browser/storage
 ## explicit; go 1.19
 github.com/grafana/xk6-grpc/grpc
 github.com/grafana/xk6-grpc/lib/netext/grpcext
-# github.com/grafana/xk6-output-prometheus-remote v0.2.1
+# github.com/grafana/xk6-output-prometheus-remote v0.2.2-0.20230804114542-d969b142f46f
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
@@ -292,12 +298,6 @@ github.com/tidwall/match
 # github.com/tidwall/pretty v1.2.1
 ## explicit; go 1.16
 github.com/tidwall/pretty
-# go.buf.build/grpc/go/gogo/protobuf v1.4.9
-## explicit
-go.buf.build/grpc/go/gogo/protobuf/gogoproto
-# go.buf.build/grpc/go/prometheus/prometheus v1.4.4
-## explicit
-go.buf.build/grpc/go/prometheus/prometheus
 # go.uber.org/goleak v1.2.1
 ## explicit; go 1.18
 go.uber.org/goleak
@@ -402,7 +402,7 @@ google.golang.org/grpc/serviceconfig
 google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
-# google.golang.org/protobuf v1.30.0
+# google.golang.org/protobuf v1.31.0
 ## explicit; go 1.11
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext

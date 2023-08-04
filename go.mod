@@ -15,7 +15,7 @@ require (
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-browser v0.10.0
 	github.com/grafana/xk6-grpc v0.1.2
-	github.com/grafana/xk6-output-prometheus-remote v0.2.1
+	github.com/grafana/xk6-output-prometheus-remote v0.2.2-0.20230804114542-d969b142f46f
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
 	github.com/grafana/xk6-webcrypto v0.1.0
@@ -45,12 +45,14 @@ require (
 	golang.org/x/term v0.8.0
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.55.0
-	google.golang.org/protobuf v1.30.0
+	google.golang.org/protobuf v1.31.0
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
+	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.31.0-20210810001428-4df00b267f94.1 // indirect
+	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.31.0-20230627135113-9a12bc2590d2.1 // indirect
 	github.com/andybalholm/cascadia v1.3.1 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/bufbuild/protocompile v0.4.0 // indirect
@@ -74,8 +76,6 @@ require (
 	github.com/prometheus/common v0.37.0 // indirect
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
-	go.buf.build/grpc/go/gogo/protobuf v1.4.9 // indirect
-	go.buf.build/grpc/go/prometheus/prometheus v1.4.4 // indirect
 	golang.org/x/sync v0.2.0 // indirect
 	golang.org/x/sys v0.8.0 // indirect
 	golang.org/x/text v0.9.0 // indirect

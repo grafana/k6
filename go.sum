@@ -1,3 +1,7 @@
+buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.31.0-20210810001428-4df00b267f94.1 h1:IpfoSUtXcmtXmL672yCeHx96evE7Z4AyWo8R2lVBU3o=
+buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.31.0-20210810001428-4df00b267f94.1/go.mod h1:Az9fvKFYQGtiDa7cPW9T3Nbw8u3hpmD6wG15RsbQlA0=
+buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.31.0-20230627135113-9a12bc2590d2.1 h1:aAMGEehZVBrkvsvQYwE4yNrXRYkSX84eZpRaKPiDuxg=
+buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.31.0-20230627135113-9a12bc2590d2.1/go.mod h1:iqW5nSujn3ZJ9ISZQX3K/uWwjckAp8hz0J4/wNgFBZo=
 cloud.google.com/go v0.26.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.34.0/go.mod h1:aQUYkXzVsufM+DwF1aE+0xfcU+56JwCaLick0ClmMTw=
 cloud.google.com/go v0.38.0/go.mod h1:990N+gfupTy94rShfmMCWGDn0LpTmnzTp2qbd1dvSRU=
@@ -181,8 +185,8 @@ github.com/grafana/xk6-browser v0.10.0 h1:Mnx0Ho+mlyFGlV7zW7zXkN0njRglh9JflLV+Oz
 github.com/grafana/xk6-browser v0.10.0/go.mod h1:ax6OHARpNEu9hSGYOAI4grAwiRapsNPi9TBQxDYurKw=
 github.com/grafana/xk6-grpc v0.1.2 h1:gNN3PYV2dIPoq1zTVz8YOxrWhl1D15jhRR0EA9ZYhBw=
 github.com/grafana/xk6-grpc v0.1.2/go.mod h1:iq6qHN64XgAEmDHKf0OXZ4mvoqF4Udr22fiCIXNpXA0=
-github.com/grafana/xk6-output-prometheus-remote v0.2.1 h1:/JOMHwByfCkFe17iokUDKCIjh8e5g0gqqnrg8zSnxf4=
-github.com/grafana/xk6-output-prometheus-remote v0.2.1/go.mod h1:JWUOn1fY8Yp3dM+IaPSNMM6t+sF3aJ2AA7Qzs6lKGww=
+github.com/grafana/xk6-output-prometheus-remote v0.2.2-0.20230804114542-d969b142f46f h1:pU/hHteHbSKg12VkYIs2HN+f2Xj+k7BADd33hYVVOXo=
+github.com/grafana/xk6-output-prometheus-remote v0.2.2-0.20230804114542-d969b142f46f/go.mod h1:GUDZB2TOIsi5b3jCUtggouMQJw5gx2McXcUgtV6BvSY=
 github.com/grafana/xk6-redis v0.1.1 h1:rvWnLanRB2qzDwuY6NMBe6PXei3wJ3kjYvfCwRJ+q+8=
 github.com/grafana/xk6-redis v0.1.1/go.mod h1:z7el1Tz8advY+ex419KfLbENzSQYgaA2lQYwMlt9yMM=
 github.com/grafana/xk6-timers v0.1.2 h1:YVM6hPDgvy4SkdZQpd+/r9M0kDi1g+QdbSxW5ClfwDk=
@@ -327,10 +331,6 @@ github.com/yuin/goldmark v1.1.25/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9de
 github.com/yuin/goldmark v1.1.27/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.1.32/go.mod h1:3hX8gzYuyVAZsxl0MRgGTJEmQBFcNTphYh9decYSb74=
 github.com/yuin/goldmark v1.4.13/go.mod h1:6yULJ656Px+3vBD8DxQVa3kxgyrAnzto9xy5taEt/CY=
-go.buf.build/grpc/go/gogo/protobuf v1.4.9 h1:IaG7Rh/dtmoY1ZVJwSwyaGjQ8yb8emVMuX888kxpXbo=
-go.buf.build/grpc/go/gogo/protobuf v1.4.9/go.mod h1:2rkC/lMWRLTLC2Bmn8BUP3ED9Kxx7FN3OHk+u7KCHDU=
-go.buf.build/grpc/go/prometheus/prometheus v1.4.4 h1:ddBWiMMWJsyqalhiUikpUwLsGZ18GqGCzsu8khG2mB4=
-go.buf.build/grpc/go/prometheus/prometheus v1.4.4/go.mod h1:QjrcwuvXQEp/Z0H21rmFvy4QTTnyWvfT5sffq/BlEJU=
 go.opencensus.io v0.21.0/go.mod h1:mSImk1erAIZhrmZN+AvHh14ztQfjbGwt4TtuofqLduU=
 go.opencensus.io v0.22.0/go.mod h1:+kGneAE2xo2IficOXnaByMWTGM9T73dGwxeWcUqIpI8=
 go.opencensus.io v0.22.2/go.mod h1:yxeiOL68Rb0Xd1ddK5vPZ/oVn4vY4Ynel7k9FzqtOIw=
@@ -613,7 +613,6 @@ google.golang.org/grpc v1.28.0/go.mod h1:rpkK4SK4GF4Ach/+MFLZUBavHOvF2JJB5uozKKa
 google.golang.org/grpc v1.29.1/go.mod h1:itym6AZVZYACWQqET3MqgPpjcuV5QH3BxFS3IjizoKk=
 google.golang.org/grpc v1.30.0/go.mod h1:N36X2cJ7JwdamYAgDz+s+rVMFjt3numwzf/HckM8pak=
 google.golang.org/grpc v1.31.0/go.mod h1:N36X2cJ7JwdamYAgDz+s+rVMFjt3numwzf/HckM8pak=
-google.golang.org/grpc v1.32.0/go.mod h1:N36X2cJ7JwdamYAgDz+s+rVMFjt3numwzf/HckM8pak=
 google.golang.org/grpc v1.55.0 h1:3Oj82/tFSCeUrRTg/5E/7d/W5A1tj6Ky1ABAuZuv5ag=
 google.golang.org/grpc v1.55.0/go.mod h1:iYEXKGkEBhg1PjZQvoYEVPTDkHo1/bjTnfwTeGONTY8=
 google.golang.org/protobuf v0.0.0-20200109180630-ec00e32a8dfd/go.mod h1:DFci5gLYBciE7Vtevhsrf46CRTquxDuWsQurQQe4oz8=
@@ -628,9 +627,8 @@ google.golang.org/protobuf v1.24.0/go.mod h1:r/3tXBNzIEhYS9I1OUVjXDlt8tc493IdKGj
 google.golang.org/protobuf v1.25.0/go.mod h1:9JNX74DMeImyA3h4bdi1ymwjUzf21/xIlbajtzgsN7c=
 google.golang.org/protobuf v1.26.0-rc.1/go.mod h1:jlhhOSvTdKEhbULTjvd4ARK9grFBp09yW+WbY/TyQbw=
 google.golang.org/protobuf v1.26.0/go.mod h1:9q0QmTI4eRPtz6boOQmLYwt+qCgq0jsYwAQnmE0givc=
-google.golang.org/protobuf v1.28.1/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
-google.golang.org/protobuf v1.30.0 h1:kPPoIgf3TsEvrm0PFe15JQ+570QVxYzEvvHqChK+cng=
-google.golang.org/protobuf v1.30.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
+google.golang.org/protobuf v1.31.0 h1:g0LDEJHgrBl9N9r17Ru3sqWhkIx2NB67okBHPwC7hs8=
+google.golang.org/protobuf v1.31.0/go.mod h1:HV8QOd/L58Z+nl8r43ehVNZIU/HEI6OcFqwMG9pJV4I=
 gopkg.in/alecthomas/kingpin.v2 v2.2.6/go.mod h1:FMv+mEhP44yOT+4EoQTLFTRgOQ1FBLkstjWtayDeSgw=
 gopkg.in/check.v1 v0.0.0-20161208181325-20d25e280405/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
 gopkg.in/check.v1 v1.0.0-20180628173108-788fd7840127/go.mod h1:Co6ibVJAznAaIkqp8huTwlJQCZ016jof/cbN4VW5Yz0=
