@@ -183,8 +183,8 @@ github.com/googleapis/gax-go/v2 v2.0.4/go.mod h1:0Wqv26UfaUD9n4G6kQubkQ+KchISgw+
 github.com/googleapis/gax-go/v2 v2.0.5/go.mod h1:DWXyrwAJ9X0FpwwEdw+IPEYBICEFu5mhpdKc/us6bOk=
 github.com/gorilla/websocket v1.5.0 h1:PPwGk2jz7EePpoHN/+ClbZu8SPxiqlu12wZP/3sWmnc=
 github.com/gorilla/websocket v1.5.0/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
-github.com/grafana/xk6-browser v1.0.1 h1:/GvMHhDMbNCEuu6ml/AIaQNtHOpj06GpKfgQJpNzPIg=
-github.com/grafana/xk6-browser v1.0.1/go.mod h1:Ck8IWES3Emu4CMKktQ/oD7l/JFj/1ESnDIbQGpfaoYA=
+github.com/grafana/xk6-browser v1.0.2 h1:B9ll8xLH68hfCBy3sTzhmksCxwgJBIcqgPeX3mht6jM=
+github.com/grafana/xk6-browser v1.0.2/go.mod h1:LV/ECGBCN3vRN/A4St+Ep9JUpbKJuRsj+6TBihQptGw=
 github.com/grafana/xk6-grpc v0.1.3-0.20230717090346-fb49221e0ce1 h1:SdMihJN+fkH6cO/1NeAnVxSVOnJ3ZkZ1v7FJnrcqhog=
 github.com/grafana/xk6-grpc v0.1.3-0.20230717090346-fb49221e0ce1/go.mod h1:iq6qHN64XgAEmDHKf0OXZ4mvoqF4Udr22fiCIXNpXA0=
 github.com/grafana/xk6-output-prometheus-remote v0.2.3 h1:ta4wFrO85+29H0papAbeMCavHrBuHDZ4bdKC1Zv8zlo=

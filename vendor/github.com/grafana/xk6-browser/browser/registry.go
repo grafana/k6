@@ -230,10 +230,9 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 
 func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsubscribeFn func()) {
 	var (
-		ok    bool
-		data  k6event.IterData
-		ctx   = context.Background()
-		vuCtx = k6ext.WithVU(r.vu.Context(), r.vu)
+		ok   bool
+		data k6event.IterData
+		ctx  = context.Background()
 	)
 
 	for e := range eventsCh {
@@ -250,6 +249,12 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 			e.Done()
 			return
 		}
+
+		// The context in the VU is not thread safe. It can
+		// be safely accessed during an iteration but not
+		// before one is started. This is why it is being
+		// accessed and used here.
+		vuCtx := k6ext.WithVU(r.vu.Context(), r.vu)
 
 		if data, ok = e.Data.(k6event.IterData); !ok {
 			e.Done()
