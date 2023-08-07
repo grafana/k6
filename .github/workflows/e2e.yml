@@ -44,7 +44,7 @@ jobs:
           which go
           go version
 
-          GOPRIVATE="go.k6.io/k6" xk6 build latest \
+          GOPRIVATE="go.k6.io/k6" xk6 build \
             --output ./k6extension \
             --with github.com/grafana/xk6-browser=.
           ./k6extension version
