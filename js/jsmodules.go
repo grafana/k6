@@ -8,7 +8,6 @@ import (
 	"go.k6.io/k6/js/modules/k6/data"
 	"go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modules/k6/execution"
-	"go.k6.io/k6/js/modules/k6/experimental/browser"
 	"go.k6.io/k6/js/modules/k6/experimental/tracing"
 	"go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/js/modules/k6/html"
@@ -16,6 +15,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/metrics"
 	"go.k6.io/k6/js/modules/k6/ws"
 
+	"github.com/grafana/xk6-browser/browser"
 	expGrpc "github.com/grafana/xk6-grpc/grpc"
 	"github.com/grafana/xk6-redis/redis"
 	"github.com/grafana/xk6-timers/timers"

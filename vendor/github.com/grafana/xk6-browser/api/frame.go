@@ -1,6 +1,10 @@
 package api
 
-import "github.com/dop251/goja"
+import (
+	"context"
+
+	"github.com/dop251/goja"
+)
 
 // Frame is the interface of a CDP target frame.
 type Frame interface {
@@ -12,6 +16,8 @@ type Frame interface {
 	Content() string
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
+	// EvaluateWithContext for internal use only
+	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)
 	Evaluate(pageFunc goja.Value, args ...goja.Value) any
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)
 	Fill(selector string, value string, opts goja.Value)

@@ -7,7 +7,7 @@ import (
 type ctxKey int
 
 const (
-	ctxKeyLaunchOptions ctxKey = iota
+	ctxKeyBrowserOptions ctxKey = iota
 	ctxKeyHooks
 	ctxKeyIterationID
 )
@@ -35,16 +35,21 @@ func GetIterationID(ctx context.Context) string {
 	return s
 }
 
-func WithLaunchOptions(ctx context.Context, opts *LaunchOptions) context.Context {
-	return context.WithValue(ctx, ctxKeyLaunchOptions, opts)
+// WithBrowserOptions adds the browser options to the context.
+func WithBrowserOptions(ctx context.Context, opts *BrowserOptions) context.Context {
+	return context.WithValue(ctx, ctxKeyBrowserOptions, opts)
 }
 
-func GetLaunchOptions(ctx context.Context) *LaunchOptions {
-	v := ctx.Value(ctxKeyLaunchOptions)
+// GetBrowserOptions returns the browser options attached to the context.
+func GetBrowserOptions(ctx context.Context) *BrowserOptions {
+	v := ctx.Value(ctxKeyBrowserOptions)
 	if v == nil {
 		return nil
 	}
-	return v.(*LaunchOptions)
+	if bo, ok := v.(*BrowserOptions); ok {
+		return bo
+	}
+	return nil
 }
 
 // contextWithDoneChan returns a new context that is canceled either
