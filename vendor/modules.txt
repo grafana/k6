@@ -150,13 +150,14 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
-# github.com/grafana/xk6-browser v0.10.0
+# github.com/grafana/xk6-browser v1.0.2
 ## explicit; go 1.19
 github.com/grafana/xk6-browser/api
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium
 github.com/grafana/xk6-browser/common
 github.com/grafana/xk6-browser/common/js
+github.com/grafana/xk6-browser/env
 github.com/grafana/xk6-browser/k6error
 github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout

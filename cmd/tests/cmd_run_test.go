@@ -1827,80 +1827,6 @@ func BenchmarkReadResponseBody(b *testing.B) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
-func TestBrowserPermissions(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name             string
-		envVarValue      string
-		envVarMsgValue   string
-		expectedExitCode exitcodes.ExitCode
-		expectedError    string
-	}{
-		{
-			name:             "no env var set",
-			envVarValue:      "",
-			expectedExitCode: 107,
-			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
-		},
-		{
-			name:             "env var set but set to false",
-			envVarValue:      "false",
-			expectedExitCode: 107,
-			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
-		},
-		{
-			name:             "env var set but set to 09adsu",
-			envVarValue:      "09adsu",
-			expectedExitCode: 107,
-			expectedError:    "To run browser tests set env var K6_BROWSER_ENABLED=true",
-		},
-		{
-			name:             "with custom message",
-			envVarValue:      "09adsu",
-			envVarMsgValue:   "Try again later",
-			expectedExitCode: 107,
-			expectedError:    "Try again later",
-		},
-		{
-			name:             "env var set and set to true",
-			envVarValue:      "true",
-			expectedExitCode: 0,
-			expectedError:    "",
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			script := `
-			import { chromium } from 'k6/experimental/browser';
-
-			export default function() {};
-			`
-
-			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
-			if tt.envVarValue != "" {
-				ts.Env["K6_BROWSER_ENABLED"] = tt.envVarValue
-			}
-			if tt.envVarMsgValue != "" {
-				ts.Env["K6_BROWSER_ENABLED_MSG"] = tt.envVarMsgValue
-			}
-			cmd.ExecuteWithGlobalState(ts.GlobalState)
-
-			loglines := ts.LoggerHook.Drain()
-
-			if tt.expectedError == "" {
-				require.Len(t, loglines, 0)
-				return
-			}
-
-			assert.Contains(t, loglines[0].Message, tt.expectedError)
-		})
-	}
-}
-
 func TestUIRenderOutput(t *testing.T) {
 	t.Parallel()
 
@@ -2226,5 +2152,67 @@ func BenchmarkRunEvents(b *testing.B) {
 		case <-time.After(time.Second):
 			b.Fatal("timed out")
 		}
+	}
+}
+
+func TestBrowserPermissions(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name             string
+		options          string
+		expectedExitCode exitcodes.ExitCode
+		expectedError    string
+	}{
+		{
+			name:             "browser option not set",
+			options:          "",
+			expectedExitCode: 0,
+			expectedError:    "GoError: browser not found in registry. make sure to set browser type option in scenario definition in order to use the browser module",
+		},
+		{
+			name: "browser option set",
+			options: `export const options = {
+				scenarios: {
+						browser: {
+						executor: 'shared-iterations',
+						options: {
+							browser: {
+								type: 'chromium',
+							},
+						},
+					},
+				},
+			}`,
+			expectedExitCode: 0,
+			expectedError:    "",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			script := fmt.Sprintf(`
+			import { browser } from 'k6/experimental/browser';
+
+			%s
+
+			export default function() {
+			  browser.isConnected();
+			};
+			`, tt.options)
+
+			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+			loglines := ts.LoggerHook.Drain()
+
+			if tt.expectedError == "" {
+				require.Len(t, loglines, 0)
+				return
+			}
+
+			assert.Contains(t, loglines[0].Message, tt.expectedError)
+		})
 	}
 }

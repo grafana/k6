@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 
+	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -16,6 +17,12 @@ type moduleVU struct {
 	k6modules.VU
 
 	*pidRegistry
+	*browserRegistry
+}
+
+// browser returns the VU browser instance for the current iteration.
+func (vu moduleVU) browser() (api.Browser, error) {
+	return vu.browserRegistry.getBrowser(vu.State().Iteration)
 }
 
 func (vu moduleVU) Context() context.Context {

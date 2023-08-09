@@ -15,6 +15,9 @@ import (
 	"github.com/dop251/goja"
 )
 
+// BlankPage represents a blank page.
+const BlankPage = "about:blank"
+
 // ColorScheme represents a browser color scheme.
 type ColorScheme string
 
@@ -215,6 +218,15 @@ func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 	// Note that if the string cannot be found then it will be set to the zero value.
 	*f = imageFormatToID[j]
 	return nil
+}
+
+// FrameLifecycleEvent is emitted when a frame lifecycle event occurs.
+type FrameLifecycleEvent struct {
+	// URL is the URL of the frame that emitted the event.
+	URL string
+
+	// Event is the lifecycle event that occurred.
+	Event LifecycleEvent
 }
 
 type LifecycleEvent int

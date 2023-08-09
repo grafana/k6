@@ -76,6 +76,8 @@ func NewFrameSession(
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
+	k6Metrics := k6ext.GetCustomMetrics(ctx)
+
 	fs := FrameSession{
 		ctx:                  ctx, // TODO: create cancelable context that can be used to cancel and close all child sessions
 		session:              s,
@@ -89,7 +91,7 @@ func NewFrameSession(
 		eventCh:              make(chan Event),
 		childSessions:        make(map[cdp.FrameID]*FrameSession),
 		vu:                   k6ext.GetVU(ctx),
-		k6Metrics:            k6ext.GetCustomMetrics(ctx),
+		k6Metrics:            k6Metrics,
 		logger:               l,
 		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
@@ -98,7 +100,7 @@ func NewFrameSession(
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
 	}
-	fs.networkManager, err = NewNetworkManager(ctx, s, fs.manager, parentNM)
+	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM)
 	if err != nil {
 		l.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
 			s.ID(), tid, err)
@@ -304,11 +306,6 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		return fmt.Errorf("metric not registered %q", wv.Name)
 	}
 
-	metricRating, ok := fs.k6Metrics.WebVitals[k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating)]
-	if !ok {
-		return fmt.Errorf("metric not registered %q", k6ext.ConcatWebVitalNameRating(wv.Name, wv.Rating))
-	}
-
 	value, err := wv.Value.Float64()
 	if err != nil {
 		return fmt.Errorf("value couldn't be parsed %q", wv.Value)
@@ -320,17 +317,14 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		tags = tags.With("url", wv.URL)
 	}
 
+	tags = tags.With("rating", wv.Rating)
+
 	now := time.Now()
-	k6metrics.PushIfNotDone(fs.ctx, state.Samples, k6metrics.ConnectedSamples{
+	k6metrics.PushIfNotDone(fs.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
 		Samples: []k6metrics.Sample{
 			{
 				TimeSeries: k6metrics.TimeSeries{Metric: metric, Tags: tags},
 				Value:      value,
-				Time:       now,
-			},
-			{
-				TimeSeries: k6metrics.TimeSeries{Metric: metricRating, Tags: tags},
-				Value:      1,
 				Time:       now,
 			},
 		},
@@ -588,7 +582,8 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	l := fs.serializer.
 		WithTime(event.Timestamp.Time()).
-		WithField("source", "browser-console-api")
+		WithField("source", "browser").
+		WithField("browser_source", "console-api")
 
 		/* accessing the state Group while not on the eventloop is racy
 		if s := fs.vu.State(); s.Group.Path != "" {
@@ -1076,7 +1071,7 @@ func (fs *FrameSession) updateViewport() error {
 	// add an inset to viewport depending on the operating system.
 	// this won't add an inset if we're running in headless mode.
 	viewport.calculateInset(
-		fs.page.browserCtx.browser.launchOpts.Headless,
+		fs.page.browserCtx.browser.browserOpts.Headless,
 		runtime.GOOS,
 	)
 	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{

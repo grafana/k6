@@ -425,13 +425,22 @@ func (p *Page) Click(selector string, opts goja.Value) error {
 func (p *Page) Close(opts goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 
+	// forcing the pagehide event to trigger web vitals metrics.
+	v := p.vu.Runtime().ToValue(`() => window.dispatchEvent(new Event('pagehide'))`)
+	ctx, cancel := context.WithTimeout(p.ctx, p.defaultTimeout())
+	defer cancel()
+	_, err := p.MainFrame().EvaluateWithContext(ctx, v)
+	if err != nil {
+		p.logger.Warnf("Page:Close", "failed to hide page: %v", err)
+	}
+
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		return fmt.Errorf("internal error while removing binding from page: %w", err)
 	}
 
 	action := target.CloseTarget(p.targetID)
-	err := action.Do(cdp.WithExecutor(p.ctx, p.session))
+	err = action.Do(cdp.WithExecutor(p.ctx, p.session))
 	if err != nil {
 		// When a close target command is sent to the browser via CDP,
 		// the browser will start to cleanup and the first thing it
@@ -762,8 +771,8 @@ func (p *Page) Reload(opts goja.Value) api.Response {
 	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
 		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameAddLifecycle},
 		func(data any) bool {
-			if le, ok := data.(LifecycleEvent); ok {
-				return le == parsedOpts.WaitUntil
+			if le, ok := data.(FrameLifecycleEvent); ok {
+				return le.Event == parsedOpts.WaitUntil
 			}
 			return false
 		})
