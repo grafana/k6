@@ -461,11 +461,15 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 				// TODO(rogchap): Should we manage a string slice?
 				strval, ok := kv.(string)
 				if !ok {
-					binval, ok := kv.([]byte)
-					if !ok {
-						return result, fmt.Errorf("metadata %q value must be a string or []byte", hk)
+					if strings.HasSuffix(hk, "-bin") {
+						binval, ok := kv.([]byte)
+						if !ok {
+							return result, fmt.Errorf("metadata %q value must be a string or binary", hk)
+						}
+						strval = string(binval)
+					} else {
+						return result, fmt.Errorf("metadata %q value must be a string", hk)
 					}
-					strval = string(binval)
 				}
 				result.Metadata[hk] = strval
 			}
