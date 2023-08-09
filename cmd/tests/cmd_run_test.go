@@ -2164,12 +2164,27 @@ func TestBrowserPermissions(t *testing.T) {
 		expectedExitCode exitcodes.ExitCode
 		expectedError    string
 	}{
+		// When we do not supply the correct browser options,
+		// we expect that the test iteration will stop and not
+		// attempt to start a chrome instance.
 		{
 			name:             "browser option not set",
 			options:          "",
 			expectedExitCode: 0,
 			expectedError:    "GoError: browser not found in registry. make sure to set browser type option in scenario definition in order to use the browser module",
 		},
+		// When we do supply the correct browser options,
+		// we expect that the browser module will start
+		// the a chrome instance and work with the browser
+		// APIs defined in the test script.
+		//
+		// We do not actually want to rely on having chrome
+		// installed on dev/ci machines, and all we need to
+		// verify is that the browser module does try to exec
+		// a command when the correct browser options are supplied.
+		// This test will try to run a "fake" command and we
+		// expect that the test will fail when attempting to
+		// run that command.
 		{
 			name: "browser option set",
 			options: `export const options = {
@@ -2184,8 +2199,8 @@ func TestBrowserPermissions(t *testing.T) {
 					},
 				},
 			}`,
-			expectedExitCode: 0,
-			expectedError:    "",
+			expectedExitCode: 108,
+			expectedError:    "error building browser on IterStart: launching browser: exec: \"k6-browser-fake-cmd\": executable file not found in $PATH",
 		},
 	}
 
@@ -2204,13 +2219,9 @@ func TestBrowserPermissions(t *testing.T) {
 			`, tt.options)
 
 			ts := getSingleFileTestState(t, script, []string{}, tt.expectedExitCode)
+			ts.Env["K6_BROWSER_EXECUTABLE_PATH"] = "k6-browser-fake-cmd"
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 			loglines := ts.LoggerHook.Drain()
-
-			if tt.expectedError == "" {
-				require.Len(t, loglines, 0)
-				return
-			}
 
 			assert.Contains(t, loglines[0].Message, tt.expectedError)
 		})
