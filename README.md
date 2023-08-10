@@ -14,7 +14,7 @@
 <p align="center">
     <a href="https://github.com/grafana/xk6-browser/releases">Download</a> ·
     <a href="https://k6.io/docs/javascript-api/k6-x-browser/">Documentation</a> ·
-    <a href="https://community.k6.io/c/xk6-browser/14">Community Forum</a>
+    <a href="https://community.grafana.com/c/grafana-k6/k6-browser/79">Community Forum</a>
 </p>
 
 <br/>
