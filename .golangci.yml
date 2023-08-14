@@ -96,6 +96,7 @@ linters:
     - govet
     - importas
     - ineffassign
+    - interfacebloat
     - lll
     - makezero
     - misspell
