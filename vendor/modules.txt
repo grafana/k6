@@ -313,7 +313,7 @@ go.uber.org/goleak/internal/stack
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/net v0.11.0
+# golang.org/x/net v0.14.0
 ## explicit; go 1.17
 golang.org/x/net/html
 golang.org/x/net/html/atom

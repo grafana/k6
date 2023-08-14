@@ -42,7 +42,7 @@ require (
 	github.com/tidwall/pretty v1.2.1
 	go.uber.org/goleak v1.2.1
 	golang.org/x/crypto v0.12.0
-	golang.org/x/net v0.11.0
+	golang.org/x/net v0.14.0
 	golang.org/x/term v0.11.0
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.56.1
