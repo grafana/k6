@@ -195,8 +195,8 @@ github.com/grafana/xk6-timers v0.1.2 h1:YVM6hPDgvy4SkdZQpd+/r9M0kDi1g+QdbSxW5Clf
 github.com/grafana/xk6-timers v0.1.2/go.mod h1:XHmDIXAKe30NJMXrxKIKMFXx98etsCl0jBYktjsSURc=
 github.com/grafana/xk6-webcrypto v0.1.0 h1:StrQZkUi4vo3bAMmBUHvIQ8P+zNKCH3AwN22TZdDwHs=
 github.com/grafana/xk6-webcrypto v0.1.0/go.mod h1:JKxlKj03+zI6Bf/PUuXxrx4lJraBZx9UOrX4mtqB5+E=
-github.com/grafana/xk6-websockets v0.2.0 h1:oZcq4lm/p/Tc94ZMMNeYDML0DjU39jasC6kTyc6iF+8=
-github.com/grafana/xk6-websockets v0.2.0/go.mod h1:4SaWAP+ZVHoWn8oOcq6m38lDLjEWikAWDZhJi5XZ1ms=
+github.com/grafana/xk6-websockets v0.2.1 h1:99tuI5g9UPTCpGbiEo/9E7VFKQIOvTLq231qoMVef5c=
+github.com/grafana/xk6-websockets v0.2.1/go.mod h1:f0XN0IGHx6m8jWh/w8ZFG6mZlRgzpztSHmvd4uK9RJo=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
 github.com/hashicorp/golang-lru v0.5.0/go.mod h1:/m3WP610KZHVQ1SGc6re/UDhFvYD7pJ4Ao+sR/qLZy8=

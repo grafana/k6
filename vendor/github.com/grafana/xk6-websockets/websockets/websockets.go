@@ -103,19 +103,10 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		common.Throw(rt, err)
 	}
 
-	// TODO implement protocols
-	registerCallback := func() func(func() error) {
-		callback := r.vu.RegisterCallback()
-		return func(f func() error) {
-			callback(f)
-			// fmt.Println("callback ended")
-		}
-	}
-
 	w := &webSocket{
 		vu:             r.vu,
 		url:            url,
-		tq:             taskqueue.New(registerCallback),
+		tq:             taskqueue.New(r.vu.RegisterCallback),
 		readyState:     CONNECTING,
 		builtinMetrics: r.vu.State().BuiltinMetrics,
 		done:           make(chan struct{}),
@@ -123,10 +114,7 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 		eventListeners: newEventListeners(),
 		obj:            rt.NewObject(),
 		tagsAndMeta:    params.tagsAndMeta,
-		sendPings: ping{
-			timestamps: make(map[string]time.Time),
-			counter:    0,
-		},
+		sendPings:      ping{timestamps: make(map[string]time.Time)},
 	}
 
 	// Maybe have this after the goroutine below ?!?
@@ -323,7 +311,6 @@ func (w *webSocket) emitConnectionMetrics(ctx context.Context, start time.Time, 
 
 const writeWait = 10 * time.Second
 
-//nolint:funlen,gocognit
 func (w *webSocket) loop() {
 	// Pass ping/pong events through the main control loop
 	pingChan := make(chan string)
@@ -331,133 +318,27 @@ func (w *webSocket) loop() {
 	w.conn.SetPingHandler(func(msg string) error { pingChan <- msg; return nil })
 	w.conn.SetPongHandler(func(pingID string) error { pongChan <- pingID; return nil })
 
-	// readCloseChan := make(chan int)
-	// readErrChan := make(chan error)
-	samplesOutput := w.vu.State().Samples
 	ctx := w.vu.Context()
 	wg := new(sync.WaitGroup)
 
 	defer func() {
-		now := time.Now()
-		duration := metrics.D(time.Since(w.started))
-
 		metrics.PushIfNotDone(ctx, w.vu.State().Samples, metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
 				Metric: w.builtinMetrics.WSSessionDuration,
 				Tags:   w.tagsAndMeta.Tags,
 			},
-			Time:     now,
+			Time:     time.Now(),
 			Metadata: w.tagsAndMeta.Metadata,
-			Value:    duration,
+			Value:    metrics.D(time.Since(w.started)),
 		})
 		_ = w.conn.Close()
 		wg.Wait()
 		w.tq.Close()
 	}()
-	wg.Add(1)
-	// Wraps a couple of channels around conn.ReadMessage
-	go func() { // copied from k6/ws
-		defer wg.Done()
-		for {
-			messageType, data, err := w.conn.ReadMessage()
-			if err != nil {
-				if !websocket.IsUnexpectedCloseError(
-					err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
-					w.tq.Queue(func() error {
-						return w.connectionClosedWithError(nil)
-					})
-					return
-				}
-				w.tq.Queue(func() error {
-					_ = w.conn.Close() // TODO fix this
-					return w.connectionClosedWithError(err)
-				})
-				return
-			}
+	wg.Add(2)
+	go w.readPump(wg)
+	go w.writePump(wg)
 
-			w.queueMessage(&message{
-				mtype: messageType,
-				data:  data,
-				t:     time.Now(),
-			})
-		}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		wg.Add(1)
-		writeChannel := make(chan message)
-		go func() {
-			defer wg.Done()
-			for {
-				select {
-				case msg, ok := <-writeChannel:
-					if !ok {
-						return
-					}
-					size := len(msg.data)
-
-					err := func() error {
-						if msg.mtype != websocket.PingMessage {
-							return w.conn.WriteMessage(msg.mtype, msg.data)
-						}
-
-						// WriteControl is concurrently okay
-						return w.conn.WriteControl(msg.mtype, msg.data, msg.t.Add(writeWait))
-					}()
-					if err != nil {
-						w.tq.Queue(func() error {
-							_ = w.conn.Close() // TODO fix
-							// fmt.Println("write channel", err)
-							closeErr := w.connectionClosedWithError(err)
-							return closeErr
-						})
-						return
-					}
-					// This from the specification needs to happen like that instead of with
-					// atomics or locks outside of the event loop
-					w.tq.Queue(func() error {
-						w.bufferedAmount -= size
-						return nil
-					})
-
-					metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
-						TimeSeries: metrics.TimeSeries{
-							Metric: w.builtinMetrics.WSMessagesSent,
-							Tags:   w.tagsAndMeta.Tags,
-						},
-						Time:     time.Now(),
-						Metadata: w.tagsAndMeta.Metadata,
-						Value:    1,
-					})
-				case <-w.done:
-					return
-				}
-			}
-		}()
-		{
-			defer close(writeChannel)
-			queue := make([]message, 0)
-			var wch chan message
-			var msg message
-			for {
-				wch = nil // this way if nothing to read it will just block
-				if len(queue) > 0 {
-					msg = queue[0]
-					wch = writeChannel
-				}
-				select {
-				case msg = <-w.writeQueueCh:
-					queue = append(queue, msg)
-				case wch <- msg:
-					queue = queue[:copy(queue, queue[1:])]
-				case <-w.done:
-					return
-				}
-			}
-		}
-	}()
 	ctxDone := ctx.Done()
 	for {
 		select {
@@ -537,6 +418,117 @@ func (w *webSocket) queueMessage(msg *message) {
 		}
 		return nil
 	})
+}
+
+func (w *webSocket) readPump(wg *sync.WaitGroup) {
+	defer wg.Done()
+	for {
+		messageType, data, err := w.conn.ReadMessage()
+		if err == nil {
+			w.queueMessage(&message{
+				mtype: messageType,
+				data:  data,
+				t:     time.Now(),
+			})
+
+			continue
+		}
+
+		if !websocket.IsUnexpectedCloseError(
+			err, websocket.CloseNormalClosure, websocket.CloseGoingAway) {
+			// maybe still log it with debug level?
+			err = nil
+		}
+
+		if err != nil {
+			w.tq.Queue(func() error {
+				_ = w.conn.Close() // TODO fix this
+				return nil
+			})
+		}
+
+		w.tq.Queue(func() error {
+			return w.connectionClosedWithError(err)
+		})
+
+		return
+	}
+}
+
+func (w *webSocket) writePump(wg *sync.WaitGroup) {
+	defer wg.Done()
+	wg.Add(1)
+	samplesOutput := w.vu.State().Samples
+	ctx := w.vu.Context()
+	writeChannel := make(chan message)
+	go func() {
+		defer wg.Done()
+		for {
+			select {
+			case msg, ok := <-writeChannel:
+				if !ok {
+					return
+				}
+				size := len(msg.data)
+
+				err := func() error {
+					if msg.mtype != websocket.PingMessage {
+						return w.conn.WriteMessage(msg.mtype, msg.data)
+					}
+
+					// WriteControl is concurrently okay
+					return w.conn.WriteControl(msg.mtype, msg.data, msg.t.Add(writeWait))
+				}()
+				if err != nil {
+					w.tq.Queue(func() error {
+						_ = w.conn.Close() // TODO fix
+						closeErr := w.connectionClosedWithError(err)
+						return closeErr
+					})
+					return
+				}
+				// This from the specification needs to happen like that instead of with
+				// atomics or locks outside of the event loop
+				w.tq.Queue(func() error {
+					w.bufferedAmount -= size
+					return nil
+				})
+
+				metrics.PushIfNotDone(ctx, samplesOutput, metrics.Sample{
+					TimeSeries: metrics.TimeSeries{
+						Metric: w.builtinMetrics.WSMessagesSent,
+						Tags:   w.tagsAndMeta.Tags,
+					},
+					Time:     time.Now(),
+					Metadata: w.tagsAndMeta.Metadata,
+					Value:    1,
+				})
+			case <-w.done:
+				return
+			}
+		}
+	}()
+	{
+		defer close(writeChannel)
+		queue := make([]message, 0)
+		var wch chan message
+		var msg message
+		for {
+			wch = nil // this way if nothing to read it will just block
+			if len(queue) > 0 {
+				msg = queue[0]
+				wch = writeChannel
+			}
+			select {
+			case msg = <-w.writeQueueCh:
+				queue = append(queue, msg)
+			case wch <- msg:
+				queue = queue[:copy(queue, queue[1:])]
+			case <-w.done:
+				return
+			}
+		}
+	}
 }
 
 func (w *webSocket) send(msg goja.Value) {
@@ -630,7 +622,6 @@ func (w *webSocket) close(code int, reason string) {
 	if code == 0 {
 		code = websocket.CloseNormalClosure
 	}
-	// fmt.Println("in Close")
 	w.writeQueueCh <- message{
 		mtype: websocket.CloseMessage,
 		data:  websocket.FormatCloseMessage(code, reason),
@@ -640,7 +631,6 @@ func (w *webSocket) close(code int, reason string) {
 
 func (w *webSocket) queueClose() {
 	w.tq.Queue(func() error {
-		// fmt.Println("in close")
 		w.close(websocket.CloseNormalClosure, "")
 		return nil
 	})
@@ -661,9 +651,7 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 	if w.readyState == CLOSED {
 		return nil
 	}
-	// fmt.Println(w.url, "closing")
 	w.readyState = CLOSED
-	// fmt.Println("closing w.done")
 	close(w.done)
 
 	if err != nil {

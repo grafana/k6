@@ -181,7 +181,7 @@ github.com/grafana/xk6-timers/timers
 # github.com/grafana/xk6-webcrypto v0.1.0
 ## explicit; go 1.19
 github.com/grafana/xk6-webcrypto/webcrypto
-# github.com/grafana/xk6-websockets v0.2.0
+# github.com/grafana/xk6-websockets v0.2.1
 ## explicit; go 1.18
 github.com/grafana/xk6-websockets/websockets
 github.com/grafana/xk6-websockets/websockets/events

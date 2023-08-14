@@ -19,7 +19,7 @@ require (
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
 	github.com/grafana/xk6-webcrypto v0.1.0
-	github.com/grafana/xk6-websockets v0.2.0
+	github.com/grafana/xk6-websockets v0.2.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.15.1
