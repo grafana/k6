@@ -41,7 +41,7 @@ require (
 	github.com/tidwall/gjson v1.16.0
 	github.com/tidwall/pretty v1.2.1
 	go.uber.org/goleak v1.2.1
-	golang.org/x/crypto v0.10.0
+	golang.org/x/crypto v0.12.0
 	golang.org/x/net v0.11.0
 	golang.org/x/term v0.11.0
 	golang.org/x/time v0.3.0
@@ -79,6 +79,6 @@ require (
 	github.com/tidwall/match v1.1.1 // indirect
 	golang.org/x/sync v0.2.0 // indirect
 	golang.org/x/sys v0.11.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 )
