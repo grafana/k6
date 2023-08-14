@@ -18,7 +18,7 @@ var (
 )
 
 func (r *Runtime) builtin_symbol(call FunctionCall) Value {
-	var desc valueString
+	var desc String
 	if arg := call.Argument(0); !IsUndefined(arg) {
 		desc = arg.toString()
 	}

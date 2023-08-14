@@ -61,8 +61,8 @@ func (r *Runtime) builtin_isFinite(call FunctionCall) Value {
 	return valueTrue
 }
 
-func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueString {
-	reader := uriString.reader()
+func (r *Runtime) _encode(uriString String, unescaped *[256]bool) String {
+	reader := uriString.Reader()
 	utf8Buf := make([]byte, utf8.UTFMax)
 	needed := false
 	l := 0
@@ -92,7 +92,7 @@ func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueStri
 
 	buf := make([]byte, l)
 	i := 0
-	reader = uriString.reader()
+	reader = uriString.Reader()
 	for {
 		rn, _, err := reader.ReadRune()
 		if err == io.EOF {
@@ -120,7 +120,7 @@ func (r *Runtime) _encode(uriString valueString, unescaped *[256]bool) valueStri
 	return asciiString(buf)
 }
 
-func (r *Runtime) _decode(sv valueString, reservedSet *[256]bool) valueString {
+func (r *Runtime) _decode(sv String, reservedSet *[256]bool) String {
 	s := sv.String()
 	hexCount := 0
 	for i := 0; i < len(s); {
@@ -239,9 +239,9 @@ func (r *Runtime) builtin_encodeURIComponent(call FunctionCall) Value {
 func (r *Runtime) builtin_escape(call FunctionCall) Value {
 	s := call.Argument(0).toString()
 	var sb strings.Builder
-	l := s.length()
+	l := s.Length()
 	for i := 0; i < l; i++ {
-		r := uint16(s.charAt(i))
+		r := s.CharAt(i)
 		if r >= 'A' && r <= 'Z' || r >= 'a' && r <= 'z' || r >= '0' && r <= '9' ||
 			r == '@' || r == '*' || r == '_' || r == '+' || r == '-' || r == '.' || r == '/' {
 			sb.WriteByte(byte(r))
@@ -262,7 +262,7 @@ func (r *Runtime) builtin_escape(call FunctionCall) Value {
 
 func (r *Runtime) builtin_unescape(call FunctionCall) Value {
 	s := call.Argument(0).toString()
-	l := s.length()
+	l := s.Length()
 	var asciiBuf []byte
 	var unicodeBuf []uint16
 	_, u := devirtualizeString(s)
@@ -274,31 +274,31 @@ func (r *Runtime) builtin_unescape(call FunctionCall) Value {
 		asciiBuf = make([]byte, 0, l)
 	}
 	for i := 0; i < l; {
-		r := s.charAt(i)
+		r := s.CharAt(i)
 		if r == '%' {
-			if i <= l-6 && s.charAt(i+1) == 'u' {
-				c0 := s.charAt(i + 2)
-				c1 := s.charAt(i + 3)
-				c2 := s.charAt(i + 4)
-				c3 := s.charAt(i + 5)
+			if i <= l-6 && s.CharAt(i+1) == 'u' {
+				c0 := s.CharAt(i + 2)
+				c1 := s.CharAt(i + 3)
+				c2 := s.CharAt(i + 4)
+				c3 := s.CharAt(i + 5)
 				if c0 <= 0xff && ishex(byte(c0)) &&
 					c1 <= 0xff && ishex(byte(c1)) &&
 					c2 <= 0xff && ishex(byte(c2)) &&
 					c3 <= 0xff && ishex(byte(c3)) {
-					r = rune(unhex(byte(c0)))<<12 |
-						rune(unhex(byte(c1)))<<8 |
-						rune(unhex(byte(c2)))<<4 |
-						rune(unhex(byte(c3)))
+					r = uint16(unhex(byte(c0)))<<12 |
+						uint16(unhex(byte(c1)))<<8 |
+						uint16(unhex(byte(c2)))<<4 |
+						uint16(unhex(byte(c3)))
 					i += 5
 					goto out
 				}
 			}
 			if i <= l-3 {
-				c0 := s.charAt(i + 1)
-				c1 := s.charAt(i + 2)
+				c0 := s.CharAt(i + 1)
+				c1 := s.CharAt(i + 2)
 				if c0 <= 0xff && ishex(byte(c0)) &&
 					c1 <= 0xff && ishex(byte(c1)) {
-					r = rune(unhex(byte(c0))<<4 | unhex(byte(c1)))
+					r = uint16(unhex(byte(c0))<<4 | unhex(byte(c1)))
 					i += 2
 				}
 			}
@@ -314,7 +314,7 @@ func (r *Runtime) builtin_unescape(call FunctionCall) Value {
 			unicode = true
 		}
 		if unicode {
-			unicodeBuf = append(unicodeBuf, uint16(r))
+			unicodeBuf = append(unicodeBuf, r)
 		} else {
 			asciiBuf = append(asciiBuf, byte(r))
 		}

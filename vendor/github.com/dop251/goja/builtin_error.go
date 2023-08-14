@@ -10,8 +10,8 @@ type errorObject struct {
 	stackPropAdded bool
 }
 
-func (e *errorObject) formatStack() valueString {
-	var b valueStringBuilder
+func (e *errorObject) formatStack() String {
+	var b StringBuilder
 	val := writeErrorString(&b, e.val)
 	if val != nil {
 		b.WriteString(val)
@@ -19,7 +19,7 @@ func (e *errorObject) formatStack() valueString {
 	b.WriteRune('\n')
 
 	for _, frame := range e.stack {
-		b.WriteASCII("\tat ")
+		b.writeASCII("\tat ")
 		frame.WriteToValueBuilder(&b)
 		b.WriteRune('\n')
 	}
@@ -141,8 +141,8 @@ func (r *Runtime) builtin_AggregateError(args []Value, proto *Object) *Object {
 	return obj.val
 }
 
-func writeErrorString(sb *valueStringBuilder, obj *Object) valueString {
-	var nameStr, msgStr valueString
+func writeErrorString(sb *StringBuilder, obj *Object) String {
+	var nameStr, msgStr String
 	name := obj.self.getStr("name", nil)
 	if name == nil || name == _undefined {
 		nameStr = asciiString("Error")
@@ -155,10 +155,10 @@ func writeErrorString(sb *valueStringBuilder, obj *Object) valueString {
 	} else {
 		msgStr = msg.toString()
 	}
-	if nameStr.length() == 0 {
+	if nameStr.Length() == 0 {
 		return msgStr
 	}
-	if msgStr.length() == 0 {
+	if msgStr.Length() == 0 {
 		return nameStr
 	}
 	sb.WriteString(nameStr)
@@ -168,7 +168,7 @@ func writeErrorString(sb *valueStringBuilder, obj *Object) valueString {
 }
 
 func (r *Runtime) error_toString(call FunctionCall) Value {
-	var sb valueStringBuilder
+	var sb StringBuilder
 	val := writeErrorString(&sb, r.toObject(call.This))
 	if val != nil {
 		return val
@@ -176,7 +176,7 @@ func (r *Runtime) error_toString(call FunctionCall) Value {
 	return sb.String()
 }
 
-func (r *Runtime) createErrorPrototype(name valueString) *Object {
+func (r *Runtime) createErrorPrototype(name String) *Object {
 	o := r.newBaseObject(r.global.ErrorPrototype, classObject)
 	o._putProp("message", stringEmpty, true, false, true)
 	o._putProp("name", name, true, false, true)

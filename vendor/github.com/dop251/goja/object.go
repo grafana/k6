@@ -151,7 +151,7 @@ type objectExportCtx struct {
 type objectImpl interface {
 	sortable
 	className() string
-	typeOf() valueString
+	typeOf() String
 	getStr(p unistring.String, receiver Value) Value
 	getIdx(p valueInt, receiver Value) Value
 	getSym(p *Symbol, receiver Value) Value
@@ -279,7 +279,7 @@ func (o *baseObject) className() string {
 	return o.class
 }
 
-func (o *baseObject) typeOf() valueString {
+func (o *baseObject) typeOf() String {
 	return stringObjectC
 }
 

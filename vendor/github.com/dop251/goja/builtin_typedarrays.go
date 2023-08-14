@@ -744,7 +744,7 @@ func (r *Runtime) typedArrayProto_join(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		ta.viewedArrayBuf.ensureNotDetached(true)
 		s := call.Argument(0)
-		var sep valueString
+		var sep String
 		if s != _undefined {
 			sep = s.toString()
 		} else {
@@ -755,7 +755,7 @@ func (r *Runtime) typedArrayProto_join(call FunctionCall) Value {
 			return stringEmpty
 		}
 
-		var buf valueStringBuilder
+		var buf StringBuilder
 
 		var element0 Value
 		if ta.isValidIntegerIndex(0) {
@@ -1120,7 +1120,7 @@ func (r *Runtime) typedArrayProto_subarray(call FunctionCall) Value {
 func (r *Runtime) typedArrayProto_toLocaleString(call FunctionCall) Value {
 	if ta, ok := r.toObject(call.This).self.(*typedArrayObject); ok {
 		length := ta.length
-		var buf valueStringBuilder
+		var buf StringBuilder
 		for i := 0; i < length; i++ {
 			ta.viewedArrayBuf.ensureNotDetached(true)
 			if i > 0 {

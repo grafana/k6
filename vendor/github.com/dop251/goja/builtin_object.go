@@ -474,7 +474,7 @@ func (r *Runtime) objectproto_toString(call FunctionCall) Value {
 			clsName = obj.self.className()
 		}
 		if tag := obj.self.getSym(SymToStringTag, nil); tag != nil {
-			if str, ok := tag.(valueString); ok {
+			if str, ok := tag.(String); ok {
 				clsName = str.String()
 			}
 		}

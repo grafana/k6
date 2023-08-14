@@ -17,7 +17,7 @@ func (o *lazyObject) className() string {
 	return obj.className()
 }
 
-func (o *lazyObject) typeOf() valueString {
+func (o *lazyObject) typeOf() String {
 	obj := o.create(o.val)
 	o.val.self = obj
 	return obj.typeOf()
