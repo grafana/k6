@@ -25,13 +25,19 @@ import (
 	"github.com/dop251/goja"
 )
 
-const webVitalBinding = "k6browserSendWebVitalMetric"
+const (
+	webVitalBinding = "k6browserSendWebVitalMetric"
+
+	eventPageConsoleAPICalled = "console"
+)
 
 // Ensure page implements the EventEmitter, Target and Page interfaces.
 var (
 	_ EventEmitter = &Page{}
 	_ api.Page     = &Page{}
 )
+
+type consoleEventHandlerFunc func(*api.ConsoleMessage) error
 
 // Page stores Page/tab related context.
 type Page struct {
@@ -70,6 +76,10 @@ type Page struct {
 
 	backgroundPage bool
 
+	eventCh         chan Event
+	eventHandlers   map[string][]consoleEventHandlerFunc
+	eventHandlersMu sync.RWMutex
+
 	mainFrameSession *FrameSession
 	frameSessions    map[cdp.FrameID]*FrameSession
 	frameSessionsMu  sync.RWMutex
@@ -105,6 +115,8 @@ func NewPage(
 		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
+		eventCh:          make(chan Event),
+		eventHandlers:    make(map[string][]consoleEventHandlerFunc),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		routes:           make([]api.Route, 0),
@@ -732,6 +744,25 @@ func (p *Page) MainFrame() api.Frame {
 	}
 
 	return mf
+}
+
+// On subscribes to a page event for which the given handler will be executed
+// passing in the ConsoleMessage associated with the event.
+// The only accepted event value is 'console'.
+func (p *Page) On(event string, handler func(*api.ConsoleMessage) error) error {
+	if event != eventPageConsoleAPICalled {
+		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
+	}
+
+	p.eventHandlersMu.Lock()
+	defer p.eventHandlersMu.Unlock()
+
+	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
+		p.eventHandlers[eventPageConsoleAPICalled] = make([]consoleEventHandlerFunc, 0, 1)
+	}
+	p.eventHandlers[eventPageConsoleAPICalled] = append(p.eventHandlers[eventPageConsoleAPICalled], handler)
+
+	return nil
 }
 
 // Opener returns the opener of the target.
