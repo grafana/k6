@@ -22,7 +22,7 @@ title: 'k6 release v0.4x.0'
 - [ ] k6-docs PRs for all new or changed functionality have been created.
 - [ ] All PRs to the k6 repository in the current [milestone](https://github.com/grafana/k6/milestones) have been merged.
 - [ ] A pull request with the release notes and request the final reviews (including the @k6-browser, devrels folks).
-- [ ] Open a PR for bumping [the version](https://github.com/grafana/k6/blob/9fa50b2d1f259cdccff5cc7bc18a236d31c345ac/lib/consts/consts.go#L11)).
+- [ ] Open a PR for bumping [the version](https://github.com/grafana/k6/blob/9fa50b2d1f259cdccff5cc7bc18a236d31c345ac/lib/consts/consts.go#L11).
 - [ ] The release notes PR shared in the `#k6-oss-dev` internal channel mentioning all the impacted teams (@k6-browser, @k6-chaos, @k6 devrel and any other potential stackholder of the new release).
 - [ ] `DefinitelyTyped/DefinitelyTyped` PR(s) is ready.
 
@@ -43,6 +43,7 @@ title: 'k6 release v0.4x.0'
 
 #### In k6 repository
 
+- [ ] PR for bumping [the version](https://github.com/grafana/k6/blob/9fa50b2d1f259cdccff5cc7bc18a236d31c345ac/lib/consts/consts.go#L11) merged.
 - [ ] Release notes PR merged.
 - [ ] A new tag from the CLI `vX.Y.Z` created (`git tag v0.4x.0 -m "v0.4x.0"`) & pushed.
 
