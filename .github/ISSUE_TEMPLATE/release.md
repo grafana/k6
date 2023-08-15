@@ -2,6 +2,7 @@
 name: k6 Release
 about: k6 release accommodates activities and a checklist with the k6 open-source release process.
 title: 'k6 release v0.4x.0'
+labels: ["release"]
 ---
 
 **Release Date**:
@@ -12,7 +13,7 @@ title: 'k6 release v0.4x.0'
 
 ### At the beginning of the cycle
 
-- [ ] Create a new `release-notes-v04x` branch and add a new [release notes file](release-template/release%20notes) using the available [template](release-template/release%20notes/template.md) to the [repository's `release notes` folder](https://github.com/grafana/k6/tree/cbd9e9ad184f19fdd84c7041f8084218ce4b738f/release%20notes).
+- [ ] Create a new `release-notes-v04x` branch and add a new release notes file using the available [template](release notes/template.md) to the [repository's `release notes` folder](/release notes).
 - [ ] Go through the potential [dependencies updates](Dependencies.md) and create a dedicated PR if any of them is relevant to this release.
 
 ### Release Preparation
