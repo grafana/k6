@@ -904,7 +904,7 @@ func (e *compiledSuperBracketExpr) deleteExpr() compiledExpr {
 func (c *compiler) checkConstantString(expr compiledExpr) (unistring.String, bool) {
 	if expr.constant() {
 		if val, ex := c.evalConst(expr); ex == nil {
-			if s, ok := val.(valueString); ok {
+			if s, ok := val.(String); ok {
 				return s.string(), true
 			}
 		}

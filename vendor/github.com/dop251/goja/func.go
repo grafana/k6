@@ -53,7 +53,7 @@ type AsyncContextTracker interface {
 }
 
 type funcObjectImpl interface {
-	source() valueString
+	source() String
 }
 
 type baseFuncObject struct {
@@ -154,7 +154,7 @@ type generatorObject struct {
 	state     generatorState
 }
 
-func (f *nativeFuncObject) source() valueString {
+func (f *nativeFuncObject) source() String {
 	return newStringValue(fmt.Sprintf("function %s() { [native code] }", nilSafe(f.getStr("name", nil)).toString()))
 }
 
@@ -253,7 +253,7 @@ func (f *baseFuncObject) createInstance(newTarget *Object) *Object {
 	return f.val.runtime.newBaseObject(proto, classObject).val
 }
 
-func (f *baseJsFuncObject) source() valueString {
+func (f *baseJsFuncObject) source() String {
 	return newStringValue(f.src)
 }
 
@@ -458,7 +458,7 @@ func (f *baseFuncObject) exportType() reflect.Type {
 	return reflectTypeFunc
 }
 
-func (f *baseFuncObject) typeOf() valueString {
+func (f *baseFuncObject) typeOf() String {
 	return stringFunction
 }
 

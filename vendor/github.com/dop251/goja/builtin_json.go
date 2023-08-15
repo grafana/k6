@@ -196,7 +196,7 @@ func (r *Runtime) builtinJSON_stringify(call FunctionCall) Value {
 				var name string
 				value := replacer.self.getIdx(valueInt(int64(index)), nil)
 				switch v := value.(type) {
-				case valueFloat, valueInt, valueString:
+				case valueFloat, valueInt, String:
 					name = value.String()
 				case *Object:
 					switch v.self.className() {
@@ -249,7 +249,7 @@ func (r *Runtime) builtinJSON_stringify(call FunctionCall) Value {
 				ctx.gap = strings.Repeat(" ", int(num))
 			}
 		} else {
-			if s, ok := spaceValue.(valueString); ok {
+			if s, ok := spaceValue.(String); ok {
 				str := s.String()
 				if len(str) > 10 {
 					ctx.gap = str[:10]
@@ -345,7 +345,7 @@ func (ctx *_builtinJSON_stringifyContext) str(key Value, holder *Object) bool {
 		} else {
 			ctx.buf.WriteString("false")
 		}
-	case valueString:
+	case String:
 		ctx.quote(value1)
 	case valueInt:
 		ctx.buf.WriteString(value.String())
@@ -476,7 +476,7 @@ func (ctx *_builtinJSON_stringifyContext) jo(object *Object) {
 	ctx.buf.WriteByte('}')
 }
 
-func (ctx *_builtinJSON_stringifyContext) quote(str valueString) {
+func (ctx *_builtinJSON_stringifyContext) quote(str String) {
 	ctx.buf.WriteByte('"')
 	reader := &lenientUtf16Decoder{utf16Reader: str.utf16Reader()}
 	for {

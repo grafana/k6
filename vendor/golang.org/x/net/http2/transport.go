@@ -19,6 +19,7 @@ import (
 	"io/fs"
 	"log"
 	"math"
+	"math/bits"
 	mathrand "math/rand"
 	"net"
 	"net/http"
@@ -518,11 +519,14 @@ func (t *Transport) RoundTrip(req *http.Request) (*http.Response, error) {
 func authorityAddr(scheme string, authority string) (addr string) {
 	host, port, err := net.SplitHostPort(authority)
 	if err != nil { // authority didn't have a port
+		host = authority
+		port = ""
+	}
+	if port == "" { // authority's port was empty
 		port = "443"
 		if scheme == "http" {
 			port = "80"
 		}
-		host = authority
 	}
 	if a, err := idna.ToASCII(host); err == nil {
 		host = a
@@ -1268,22 +1272,7 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	cancelRequest := func(cs *clientStream, err error) error {
 		cs.cc.mu.Lock()
-		cs.abortStreamLocked(err)
 		bodyClosed := cs.reqBodyClosed
-		if cs.ID != 0 {
-			// This request may have failed because of a problem with the connection,
-			// or for some unrelated reason. (For example, the user might have canceled
-			// the request without waiting for a response.) Mark the connection as
-			// not reusable, since trying to reuse a dead connection is worse than
-			// unnecessarily creating a new one.
-			//
-			// If cs.ID is 0, then the request was never allocated a stream ID and
-			// whatever went wrong was unrelated to the connection. We might have
-			// timed out waiting for a stream slot when StrictMaxConcurrentStreams
-			// is set, for example, in which case retrying on a different connection
-			// will not help.
-			cs.cc.doNotReuse = true
-		}
 		cs.cc.mu.Unlock()
 		// Wait for the request body to be closed.
 		//
@@ -1318,11 +1307,14 @@ func (cc *ClientConn) RoundTrip(req *http.Request) (*http.Response, error) {
 				return handleResponseHeaders()
 			default:
 				waitDone()
-				return nil, cancelRequest(cs, cs.abortErr)
+				return nil, cs.abortErr
 			}
 		case <-ctx.Done():
-			return nil, cancelRequest(cs, ctx.Err())
+			err := ctx.Err()
+			cs.abortStream(err)
+			return nil, cancelRequest(cs, err)
 		case <-cs.reqCancel:
+			cs.abortStream(errRequestCanceled)
 			return nil, cancelRequest(cs, errRequestCanceled)
 		}
 	}
@@ -1689,7 +1681,27 @@ func (cs *clientStream) frameScratchBufferLen(maxFrameSize int) int {
 	return int(n) // doesn't truncate; max is 512K
 }
 
-var bufPool sync.Pool // of *[]byte
+// Seven bufPools manage different frame sizes. This helps to avoid scenarios where long-running
+// streaming requests using small frame sizes occupy large buffers initially allocated for prior
+// requests needing big buffers. The size ranges are as follows:
+// {0 KB, 16 KB], {16 KB, 32 KB], {32 KB, 64 KB], {64 KB, 128 KB], {128 KB, 256 KB],
+// {256 KB, 512 KB], {512 KB, infinity}
+// In practice, the maximum scratch buffer size should not exceed 512 KB due to
+// frameScratchBufferLen(maxFrameSize), thus the "infinity pool" should never be used.
+// It exists mainly as a safety measure, for potential future increases in max buffer size.
+var bufPools [7]sync.Pool // of *[]byte
+func bufPoolIndex(size int) int {
+	if size <= 16384 {
+		return 0
+	}
+	size -= 1
+	bits := bits.Len(uint(size))
+	index := bits - 14
+	if index >= len(bufPools) {
+		return len(bufPools) - 1
+	}
+	return index
+}
 
 func (cs *clientStream) writeRequestBody(req *http.Request) (err error) {
 	cc := cs.cc
@@ -1707,12 +1719,13 @@ func (cs *clientStream) writeRequestBody(req *http.Request) (err error) {
 	// Scratch buffer for reading into & writing from.
 	scratchLen := cs.frameScratchBufferLen(maxFrameSize)
 	var buf []byte
-	if bp, ok := bufPool.Get().(*[]byte); ok && len(*bp) >= scratchLen {
-		defer bufPool.Put(bp)
+	index := bufPoolIndex(scratchLen)
+	if bp, ok := bufPools[index].Get().(*[]byte); ok && len(*bp) >= scratchLen {
+		defer bufPools[index].Put(bp)
 		buf = *bp
 	} else {
 		buf = make([]byte, scratchLen)
-		defer bufPool.Put(&buf)
+		defer bufPools[index].Put(&buf)
 	}
 
 	var sawEOF bool
@@ -1879,6 +1892,9 @@ func (cc *ClientConn) encodeHeaders(req *http.Request, addGzipHeader bool, trail
 	host, err := httpguts.PunycodeHostPort(host)
 	if err != nil {
 		return nil, err
+	}
+	if !httpguts.ValidHostHeader(host) {
+		return nil, errors.New("http2: invalid Host header")
 	}
 
 	var path string

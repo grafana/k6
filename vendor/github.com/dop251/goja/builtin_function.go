@@ -5,7 +5,7 @@ import (
 )
 
 func (r *Runtime) functionCtor(args []Value, proto *Object, async, generator bool) *Object {
-	var sb valueStringBuilder
+	var sb StringBuilder
 	if async {
 		if generator {
 			sb.WriteString(asciiString("(async function* anonymous("))
@@ -194,8 +194,8 @@ func (r *Runtime) functionproto_bind(call FunctionCall) Value {
 lenNotInt:
 	name := obj.self.getStr("name", nil)
 	nameStr := stringBound_
-	if s, ok := name.(valueString); ok {
-		nameStr = nameStr.concat(s)
+	if s, ok := name.(String); ok {
+		nameStr = nameStr.Concat(s)
 	}
 
 	v := &Object{runtime: r}

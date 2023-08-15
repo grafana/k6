@@ -137,12 +137,21 @@ next major release.*
 
 The `~` (tilde) operator will convert a value to a boolean before comparison.
 
+Supported tilde comparison type are:
+
+```
+~true      Converts true-ish values to true
+~false     Converts false-ish and non-existent values to true
+~null      Converts null and non-existent values to true
+~*         Converts any existing value to true
+```
+
 For example, using the following JSON:
 
 ```json
 {
   "vals": [
-    { "a": 1, "b": true },
+    { "a": 1, "b": "data" },
     { "a": 2, "b": true },
     { "a": 3, "b": false },
     { "a": 4, "b": "0" },
@@ -157,14 +166,22 @@ For example, using the following JSON:
 }
 ```
 
-You can now query for all true(ish) or false(ish) values:
+To query for all true-ish or false-ish values:
 
 ```
-vals.#(b==~true)#.a    >> [1,2,6,7,8]
+vals.#(b==~true)#.a    >> [2,6,7,8]
 vals.#(b==~false)#.a   >> [3,4,5,9,10,11]
 ```
 
 The last value which was non-existent is treated as `false`
+
+To query for null and explicit value existence:
+
+```
+vals.#(b==~null)#.a    >> [10,11]
+vals.#(b==~*)#.a       >> [1,2,3,4,5,6,7,8,9,10]
+vals.#(b!=~*)#.a       >> [11]
+```
 
 ### Dot vs Pipe
 
@@ -241,6 +258,7 @@ There are currently the following built-in modifiers:
 - `@tostr`: Converts json to a string. Wraps a json string.
 - `@fromstr`: Converts a string from json. Unwraps a json string.
 - `@group`: Groups arrays of objects. See [e4fc67c](https://github.com/tidwall/gjson/commit/e4fc67c92aeebf2089fabc7872f010e340d105db).
+- `@dig`: Search for a value without providing its entire path. See [e8e87f2](https://github.com/tidwall/gjson/commit/e8e87f2a00dc41f3aba5631094e21f59a8cf8cbf).
 
 #### Modifier arguments
 

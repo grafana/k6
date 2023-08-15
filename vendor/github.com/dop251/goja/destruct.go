@@ -52,7 +52,7 @@ func (d *destructKeyedSource) className() string {
 	return d.w().className()
 }
 
-func (d *destructKeyedSource) typeOf() valueString {
+func (d *destructKeyedSource) typeOf() String {
 	return d.w().typeOf()
 }
 

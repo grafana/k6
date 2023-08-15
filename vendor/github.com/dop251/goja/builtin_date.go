@@ -23,7 +23,7 @@ func (r *Runtime) makeDate(args []Value, utc bool) (t time.Time, valid bool) {
 		}
 		if !valid {
 			pv := toPrimitive(args[0])
-			if val, ok := pv.(valueString); ok {
+			if val, ok := pv.(String); ok {
 				return dateParse(val.String())
 			}
 			pv = pv.ToNumber()

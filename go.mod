@@ -8,22 +8,22 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.5
-	github.com/dop251/goja v0.0.0-20230621100801-7749907a8a20
+	github.com/dop251/goja v0.0.0-20230812105242-81d76064690d
 	github.com/fatih/color v1.15.0
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-browser v1.0.2
-	github.com/grafana/xk6-grpc v0.1.3-0.20230717090346-fb49221e0ce1
+	github.com/grafana/xk6-grpc v0.1.3
 	github.com/grafana/xk6-output-prometheus-remote v0.2.3
 	github.com/grafana/xk6-redis v0.1.1
 	github.com/grafana/xk6-timers v0.1.2
 	github.com/grafana/xk6-webcrypto v0.1.0
-	github.com/grafana/xk6-websockets v0.2.0
+	github.com/grafana/xk6-websockets v0.2.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.15.1
-	github.com/klauspost/compress v1.16.6
+	github.com/klauspost/compress v1.16.7
 	github.com/mailru/easyjson v0.7.7
 	github.com/mattn/go-colorable v0.1.13
 	github.com/mattn/go-isatty v0.0.19
@@ -38,12 +38,12 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
-	github.com/tidwall/gjson v1.14.4
+	github.com/tidwall/gjson v1.16.0
 	github.com/tidwall/pretty v1.2.1
 	go.uber.org/goleak v1.2.1
-	golang.org/x/crypto v0.10.0
-	golang.org/x/net v0.11.0
-	golang.org/x/term v0.9.0
+	golang.org/x/crypto v0.12.0
+	golang.org/x/net v0.14.0
+	golang.org/x/term v0.11.0
 	golang.org/x/time v0.3.0
 	google.golang.org/grpc v1.56.1
 	google.golang.org/protobuf v1.31.0
@@ -78,7 +78,7 @@ require (
 	github.com/prometheus/procfs v0.8.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	golang.org/x/sync v0.2.0 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 	google.golang.org/genproto v0.0.0-20230410155749-daa745c078e1 // indirect
 )

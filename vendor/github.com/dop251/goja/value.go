@@ -74,7 +74,7 @@ var intCache [256]Value
 // For Object it depends on the Object type, see Object.Export() for more details.
 type Value interface {
 	ToInteger() int64
-	toString() valueString
+	toString() String
 	string() unistring.String
 	ToString() Value
 	String() string
@@ -116,7 +116,7 @@ type valueUndefined struct {
 // Symbols can be shared by multiple Runtimes.
 type Symbol struct {
 	h    uintptr
-	desc valueString
+	desc String
 }
 
 type valueUnresolved struct {
@@ -178,7 +178,7 @@ func (i valueInt) ToInteger() int64 {
 	return int64(i)
 }
 
-func (i valueInt) toString() valueString {
+func (i valueInt) toString() String {
 	return asciiString(i.String())
 }
 
@@ -220,7 +220,7 @@ func (i valueInt) Equals(other Value) bool {
 		return i == o
 	case valueFloat:
 		return float64(i) == float64(o)
-	case valueString:
+	case String:
 		return o.ToNumber().Equals(i)
 	case valueBool:
 		return int64(i) == o.ToInteger()
@@ -265,7 +265,7 @@ func (b valueBool) ToInteger() int64 {
 	return 0
 }
 
-func (b valueBool) toString() valueString {
+func (b valueBool) toString() String {
 	if b {
 		return stringTrue
 	}
@@ -360,7 +360,7 @@ func (n valueNull) ToInteger() int64 {
 	return 0
 }
 
-func (n valueNull) toString() valueString {
+func (n valueNull) toString() String {
 	return stringNull
 }
 
@@ -376,7 +376,7 @@ func (n valueNull) String() string {
 	return "null"
 }
 
-func (u valueUndefined) toString() valueString {
+func (u valueUndefined) toString() String {
 	return stringUndefined
 }
 
@@ -470,7 +470,7 @@ func (p *valueProperty) ToInteger() int64 {
 	return 0
 }
 
-func (p *valueProperty) toString() valueString {
+func (p *valueProperty) toString() String {
 	return stringEmpty
 }
 
@@ -579,7 +579,7 @@ func (f valueFloat) ToInteger() int64 {
 	return floatToIntClip(float64(f))
 }
 
-func (f valueFloat) toString() valueString {
+func (f valueFloat) toString() String {
 	return asciiString(f.String())
 }
 
@@ -643,7 +643,7 @@ func (f valueFloat) Equals(other Value) bool {
 		return f == o
 	case valueInt:
 		return float64(f) == float64(o)
-	case valueString, valueBool:
+	case String, valueBool:
 		return float64(f) == o.ToFloat()
 	case *Object:
 		return f.Equals(o.toPrimitive())
@@ -686,7 +686,7 @@ func (o *Object) ToInteger() int64 {
 	return o.toPrimitiveNumber().ToNumber().ToInteger()
 }
 
-func (o *Object) toString() valueString {
+func (o *Object) toString() String {
 	return o.toPrimitiveString().toString()
 }
 
@@ -728,7 +728,7 @@ func (o *Object) Equals(other Value) bool {
 	}
 
 	switch o1 := other.(type) {
-	case valueInt, valueFloat, valueString, *Symbol:
+	case valueInt, valueFloat, String, *Symbol:
 		return o.toPrimitive().Equals(other)
 	case valueBool:
 		return o.Equals(o1.ToNumber())
@@ -952,7 +952,7 @@ func (o valueUnresolved) ToInteger() int64 {
 	return 0
 }
 
-func (o valueUnresolved) toString() valueString {
+func (o valueUnresolved) toString() String {
 	o.throw()
 	return nil
 }
@@ -1031,7 +1031,7 @@ func (s *Symbol) ToInteger() int64 {
 	panic(typeError("Cannot convert a Symbol value to a number"))
 }
 
-func (s *Symbol) toString() valueString {
+func (s *Symbol) toString() String {
 	panic(typeError("Cannot convert a Symbol value to a string"))
 }
 
@@ -1111,7 +1111,7 @@ func exportValue(v Value, ctx *objectExportCtx) interface{} {
 	return v.Export()
 }
 
-func newSymbol(s valueString) *Symbol {
+func newSymbol(s String) *Symbol {
 	r := &Symbol{
 		desc: s,
 	}
@@ -1127,16 +1127,16 @@ func NewSymbol(s string) *Symbol {
 	return newSymbol(newStringValue(s))
 }
 
-func (s *Symbol) descriptiveString() valueString {
+func (s *Symbol) descriptiveString() String {
 	desc := s.desc
 	if desc == nil {
 		desc = stringEmpty
 	}
-	return asciiString("Symbol(").concat(desc).concat(asciiString(")"))
+	return asciiString("Symbol(").Concat(desc).Concat(asciiString(")"))
 }
 
-func funcName(prefix string, n Value) valueString {
-	var b valueStringBuilder
+func funcName(prefix string, n Value) String {
+	var b StringBuilder
 	b.WriteString(asciiString(prefix))
 	if sym, ok := n.(*Symbol); ok {
 		if sym.desc != nil {

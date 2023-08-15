@@ -183,7 +183,7 @@ NaNLoop:
 
 func pow(x, y Value) Value {
 	if x, ok := x.(valueInt); ok {
-		if y, ok := y.(valueInt); ok && y >= 0 && y < 64 {
+		if y, ok := y.(valueInt); ok && y >= 0 {
 			if y == 0 {
 				return intToValue(1)
 			}

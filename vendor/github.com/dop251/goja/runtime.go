@@ -228,24 +228,24 @@ func (f *StackFrame) Position() file.Position {
 	return f.prg.src.Position(f.prg.sourceOffset(f.pc))
 }
 
-func (f *StackFrame) WriteToValueBuilder(b *valueStringBuilder) {
+func (f *StackFrame) WriteToValueBuilder(b *StringBuilder) {
 	if f.prg != nil {
 		if n := f.prg.funcName; n != "" {
 			b.WriteString(stringValueFromRaw(n))
-			b.WriteASCII(" (")
+			b.writeASCII(" (")
 		}
 		p := f.Position()
 		if p.Filename != "" {
-			b.WriteASCII(p.Filename)
+			b.WriteUTF8String(p.Filename)
 		} else {
-			b.WriteASCII("<eval>")
+			b.writeASCII("<eval>")
 		}
 		b.WriteRune(':')
-		b.WriteASCII(strconv.Itoa(p.Line))
+		b.writeASCII(strconv.Itoa(p.Line))
 		b.WriteRune(':')
-		b.WriteASCII(strconv.Itoa(p.Column))
+		b.writeASCII(strconv.Itoa(p.Column))
 		b.WriteRune('(')
-		b.WriteASCII(strconv.Itoa(f.pc))
+		b.writeASCII(strconv.Itoa(f.pc))
 		b.WriteRune(')')
 		if f.prg.funcName != "" {
 			b.WriteRune(')')
@@ -253,9 +253,9 @@ func (f *StackFrame) WriteToValueBuilder(b *valueStringBuilder) {
 	} else {
 		if f.funcName != "" {
 			b.WriteString(stringValueFromRaw(f.funcName))
-			b.WriteASCII(" (")
+			b.writeASCII(" (")
 		}
-		b.WriteASCII("native")
+		b.writeASCII("native")
 		if f.funcName != "" {
 			b.WriteRune(')')
 		}
@@ -953,7 +953,7 @@ func (r *Runtime) builtin_thrower(call FunctionCall) Value {
 	return nil
 }
 
-func (r *Runtime) eval(srcVal valueString, direct, strict bool) Value {
+func (r *Runtime) eval(srcVal String, direct, strict bool) Value {
 	src := escapeInvalidUtf16(srcVal)
 	vm := r.vm
 	inGlobal := true
@@ -1001,7 +1001,7 @@ func (r *Runtime) builtin_eval(call FunctionCall) Value {
 	if len(call.Arguments) == 0 {
 		return _undefined
 	}
-	if str, ok := call.Arguments[0].(valueString); ok {
+	if str, ok := call.Arguments[0].(String); ok {
 		return r.eval(str, false, false)
 	}
 	return call.Arguments[0]
@@ -1267,7 +1267,7 @@ repeat:
 				goto fail
 			}
 		}
-	case valueString:
+	case String:
 		v = num.ToNumber()
 		goto repeat
 	default:
@@ -1658,7 +1658,8 @@ Notes on individual types:
 
 # Primitive types
 
-Primitive types (numbers, string, bool) are converted to the corresponding JavaScript primitives.
+Primitive types (numbers, string, bool) are converted to the corresponding JavaScript primitives. These values
+are goroutine-safe and can be transferred between runtimes.
 
 # Strings
 
@@ -2769,6 +2770,37 @@ func (ir *iteratorRecord) returnIter() {
 func (ir *iteratorRecord) close() {
 	ir.iterator = nil
 	ir.next = nil
+}
+
+// ForOf is a Go equivalent of for-of loop. The function panics if an exception is thrown at any point
+// while iterating, including if the supplied value is not iterable
+// (https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Iteration_protocols#the_iterable_protocol).
+// When using outside of Runtime.Run (i.e. when calling directly from Go code, not from a JS function implemented
+// in Go) it must be enclosed in Try. See the example.
+func (r *Runtime) ForOf(iterable Value, step func(curValue Value) (continueIteration bool)) {
+	iter := r.getIterator(iterable, nil)
+	for {
+		value, ex := iter.step()
+		if ex != nil {
+			panic(ex)
+		}
+		if value != nil {
+			var continueIteration bool
+			ex := r.vm.try(func() {
+				continueIteration = step(value)
+			})
+			if ex != nil {
+				iter.returnIter()
+				panic(ex)
+			}
+			if !continueIteration {
+				iter.returnIter()
+				break
+			}
+		} else {
+			break
+		}
+	}
 }
 
 func (r *Runtime) createIterResultObject(value Value, done bool) Value {

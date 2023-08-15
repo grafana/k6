@@ -147,6 +147,13 @@ type Reader struct {
 	ignoreCRC      bool
 }
 
+// GetBufferCapacity returns the capacity of the internal buffer.
+// This might be useful to know when reusing the same reader in combination
+// with the lazy buffer option.
+func (r *Reader) GetBufferCapacity() int {
+	return cap(r.buf)
+}
+
 // ensureBufferSize will ensure that the buffer can take at least n bytes.
 // If false is returned the buffer exceeds maximum allowed size.
 func (r *Reader) ensureBufferSize(n int) bool {

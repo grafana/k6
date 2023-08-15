@@ -178,7 +178,7 @@ func (r *Runtime) arrayproto_pop(call FunctionCall) Value {
 func (r *Runtime) arrayproto_join(call FunctionCall) Value {
 	o := call.This.ToObject(r)
 	l := int(toLength(o.self.getStr("length", nil)))
-	var sep valueString
+	var sep String
 	if s := call.Argument(0); s != _undefined {
 		sep = s.toString()
 	} else {
@@ -188,7 +188,7 @@ func (r *Runtime) arrayproto_join(call FunctionCall) Value {
 		return stringEmpty
 	}
 
-	var buf valueStringBuilder
+	var buf StringBuilder
 
 	element0 := o.self.getIdx(valueInt(0), nil)
 	if element0 != nil && element0 != _undefined && element0 != _null {
@@ -231,7 +231,7 @@ func (r *Runtime) arrayproto_toString(call FunctionCall) Value {
 	})
 }
 
-func (r *Runtime) writeItemLocaleString(item Value, buf *valueStringBuilder) {
+func (r *Runtime) writeItemLocaleString(item Value, buf *StringBuilder) {
 	if item != nil && item != _undefined && item != _null {
 		if f, ok := r.getVStr(item, "toLocaleString").(*Object); ok {
 			if c, ok := f.self.assertCallable(); ok {
@@ -248,7 +248,7 @@ func (r *Runtime) writeItemLocaleString(item Value, buf *valueStringBuilder) {
 
 func (r *Runtime) arrayproto_toLocaleString(call FunctionCall) Value {
 	array := call.This.ToObject(r)
-	var buf valueStringBuilder
+	var buf StringBuilder
 	if a := r.checkStdArrayObj(array); a != nil {
 		for i, item := range a.values {
 			if i > 0 {
@@ -1559,7 +1559,7 @@ func (a *arraySortCtx) sortCompare(x, y Value) int {
 		}
 		return 0
 	}
-	return x.toString().compareTo(y.toString())
+	return x.toString().CompareTo(y.toString())
 }
 
 // sort.Interface

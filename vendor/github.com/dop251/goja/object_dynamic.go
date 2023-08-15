@@ -555,7 +555,7 @@ func (o *baseDynamicObject) getPrivateEnv(*privateEnvType, bool) *privateElement
 	panic(newTypeError("Dynamic objects cannot have private elements"))
 }
 
-func (o *baseDynamicObject) typeOf() valueString {
+func (o *baseDynamicObject) typeOf() String {
 	return stringObjectC
 }
 

@@ -803,50 +803,8 @@ L:
 	return left
 }
 
-func (self *_parser) parsePostfixExpression() ast.Expression {
-	operand := self.parseLeftHandSideExpressionAllowCall()
-
+func (self *_parser) parseUpdateExpression() ast.Expression {
 	switch self.token {
-	case token.INCREMENT, token.DECREMENT:
-		// Make sure there is no line terminator here
-		if self.implicitSemicolon {
-			break
-		}
-		tkn := self.token
-		idx := self.idx
-		self.next()
-		switch operand.(type) {
-		case *ast.Identifier, *ast.DotExpression, *ast.PrivateDotExpression, *ast.BracketExpression:
-		default:
-			self.error(idx, "Invalid left-hand side in assignment")
-			self.nextStatement()
-			return &ast.BadExpression{From: idx, To: self.idx}
-		}
-		return &ast.UnaryExpression{
-			Operator: tkn,
-			Idx:      idx,
-			Operand:  operand,
-			Postfix:  true,
-		}
-	}
-
-	return operand
-}
-
-func (self *_parser) parseUnaryExpression() ast.Expression {
-
-	switch self.token {
-	case token.PLUS, token.MINUS, token.NOT, token.BITWISE_NOT:
-		fallthrough
-	case token.DELETE, token.VOID, token.TYPEOF:
-		tkn := self.token
-		idx := self.idx
-		self.next()
-		return &ast.UnaryExpression{
-			Operator: tkn,
-			Idx:      idx,
-			Operand:  self.parseUnaryExpression(),
-		}
 	case token.INCREMENT, token.DECREMENT:
 		tkn := self.token
 		idx := self.idx
@@ -863,6 +821,48 @@ func (self *_parser) parseUnaryExpression() ast.Expression {
 			Operator: tkn,
 			Idx:      idx,
 			Operand:  operand,
+		}
+	default:
+		operand := self.parseLeftHandSideExpressionAllowCall()
+		if self.token == token.INCREMENT || self.token == token.DECREMENT {
+			// Make sure there is no line terminator here
+			if self.implicitSemicolon {
+				return operand
+			}
+			tkn := self.token
+			idx := self.idx
+			self.next()
+			switch operand.(type) {
+			case *ast.Identifier, *ast.DotExpression, *ast.PrivateDotExpression, *ast.BracketExpression:
+			default:
+				self.error(idx, "Invalid left-hand side in assignment")
+				self.nextStatement()
+				return &ast.BadExpression{From: idx, To: self.idx}
+			}
+			return &ast.UnaryExpression{
+				Operator: tkn,
+				Idx:      idx,
+				Operand:  operand,
+				Postfix:  true,
+			}
+		}
+		return operand
+	}
+}
+
+func (self *_parser) parseUnaryExpression() ast.Expression {
+
+	switch self.token {
+	case token.PLUS, token.MINUS, token.NOT, token.BITWISE_NOT:
+		fallthrough
+	case token.DELETE, token.VOID, token.TYPEOF:
+		tkn := self.token
+		idx := self.idx
+		self.next()
+		return &ast.UnaryExpression{
+			Operator: tkn,
+			Idx:      idx,
+			Operand:  self.parseUnaryExpression(),
 		}
 	case token.AWAIT:
 		if self.scope.allowAwait {
@@ -885,25 +885,30 @@ func (self *_parser) parseUnaryExpression() ast.Expression {
 		}
 	}
 
-	return self.parsePostfixExpression()
-}
-
-func isUpdateExpression(expr ast.Expression) bool {
-	if ux, ok := expr.(*ast.UnaryExpression); ok {
-		return ux.Operator == token.INCREMENT || ux.Operator == token.DECREMENT
-	}
-	return true
+	return self.parseUpdateExpression()
 }
 
 func (self *_parser) parseExponentiationExpression() ast.Expression {
+	parenthesis := self.token == token.LEFT_PARENTHESIS
+
 	left := self.parseUnaryExpression()
 
-	for self.token == token.EXPONENT && isUpdateExpression(left) {
-		self.next()
-		left = &ast.BinaryExpression{
-			Operator: token.EXPONENT,
-			Left:     left,
-			Right:    self.parseExponentiationExpression(),
+	if self.token == token.EXPONENT {
+		if !parenthesis {
+			if u, isUnary := left.(*ast.UnaryExpression); isUnary && u.Operator != token.INCREMENT && u.Operator != token.DECREMENT {
+				self.error(self.idx, "Unary operator used immediately before exponentiation expression. Parenthesis must be used to disambiguate operator precedence")
+			}
+		}
+		for {
+			self.next()
+			left = &ast.BinaryExpression{
+				Operator: token.EXPONENT,
+				Left:     left,
+				Right:    self.parseExponentiationExpression(),
+			}
+			if self.token != token.EXPONENT {
+				break
+			}
 		}
 	}
 

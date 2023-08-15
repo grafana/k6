@@ -183,10 +183,13 @@ func (pb *profBuffer) addSamples(p *profile.Profile, n *profSampleNode) {
 func (p *profiler) run() {
 	ticker := time.NewTicker(profInterval)
 	counter := 0
-L:
+
 	for ts := range ticker.C {
 		p.mu.Lock()
 		left := len(p.trackers)
+		if left == 0 {
+			break
+		}
 		for {
 			// This loop runs until either one of the VMs is signalled or all of the VMs are scanned and found
 			// busy or deleted.
@@ -196,28 +199,19 @@ L:
 			tracker := p.trackers[counter]
 			req := atomic.LoadInt32(&tracker.req)
 			if req == profReqSampleReady {
-				if p.buf != nil {
-					p.buf.addSample(tracker)
-				}
+				p.buf.addSample(tracker)
 			}
 			if atomic.LoadInt32(&tracker.finished) != 0 {
 				p.trackers[counter] = p.trackers[len(p.trackers)-1]
 				p.trackers[len(p.trackers)-1] = nil
 				p.trackers = p.trackers[:len(p.trackers)-1]
-				if len(p.trackers) == 0 {
-					break L
-				}
 			} else {
 				counter++
-				if p.buf != nil {
-					if req != profReqDoSample {
-						// signal the VM to take a sample
-						tracker.start = ts
-						atomic.StoreInt32(&tracker.req, profReqDoSample)
-						break
-					}
-				} else {
-					atomic.StoreInt32(&tracker.req, profReqStop)
+				if req != profReqDoSample {
+					// signal the VM to take a sample
+					tracker.start = ts
+					atomic.StoreInt32(&tracker.req, profReqDoSample)
+					break
 				}
 			}
 			left--
@@ -236,10 +230,14 @@ L:
 func (p *profiler) registerVm() *profTracker {
 	pt := new(profTracker)
 	p.mu.Lock()
-	p.trackers = append(p.trackers, pt)
-	if !p.running {
-		go p.run()
-		p.running = true
+	if p.buf != nil {
+		p.trackers = append(p.trackers, pt)
+		if !p.running {
+			go p.run()
+			p.running = true
+		}
+	} else {
+		pt.req = profReqStop
 	}
 	p.mu.Unlock()
 	return pt
@@ -258,10 +256,54 @@ func (p *profiler) start() error {
 
 func (p *profiler) stop() *profile.Profile {
 	p.mu.Lock()
-	buf := p.buf
-	p.buf = nil
+	trackers, buf := p.trackers, p.buf
+	p.trackers, p.buf = nil, nil
 	p.mu.Unlock()
 	if buf != nil {
+		k := 0
+		for i, tracker := range trackers {
+			req := atomic.LoadInt32(&tracker.req)
+			if req == profReqSampleReady {
+				buf.addSample(tracker)
+			} else if req == profReqDoSample {
+				// In case the VM is requested to do a sample, there is a small chance of a race
+				// where we set profReqStop in between the read and the write, so that the req
+				// ends up being set to profReqSampleReady. It's no such a big deal if we do nothing,
+				// it just means the VM remains in tracing mode until it finishes the current run,
+				// but we do an extra cleanup step later just in case.
+				if i != k {
+					trackers[k] = trackers[i]
+				}
+				k++
+			}
+			atomic.StoreInt32(&tracker.req, profReqStop)
+		}
+
+		if k > 0 {
+			trackers = trackers[:k]
+			go func() {
+				// Make sure all VMs are requested to stop tracing.
+				for {
+					k := 0
+					for i, tracker := range trackers {
+						req := atomic.LoadInt32(&tracker.req)
+						if req != profReqStop {
+							atomic.StoreInt32(&tracker.req, profReqStop)
+							if i != k {
+								trackers[k] = trackers[i]
+							}
+							k++
+						}
+					}
+
+					if k == 0 {
+						return
+					}
+					trackers = trackers[:k]
+					time.Sleep(100 * time.Millisecond)
+				}
+			}()
+		}
 		return buf.profile()
 	}
 	return nil
