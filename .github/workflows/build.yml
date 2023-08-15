@@ -356,7 +356,9 @@ jobs:
       - name: Anchore SBOM Action
         uses: anchore/sbom-action@v0.12.0
         with:
-          artifact-name: ${{ github.event.repository.name }}-spdx.json
+          artifact-name: k6-${{ env.VERSION }}-spdx.json
+          upload-release-assets: false
+          output-file: dist/k6-${{ env.VERSION }}-spdx.json
       - name: Create release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
