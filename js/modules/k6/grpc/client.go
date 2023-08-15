@@ -461,6 +461,8 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 				// TODO(rogchap): Should we manage a string slice?
 				strval, ok := kv.(string)
 				if !ok {
+					// The spec defines that Binary-valued keys end in -bin
+					//  https://grpc.io/docs/what-is-grpc/core-concepts/#metadata
 					if strings.HasSuffix(hk, "-bin") {
 						binval, ok := kv.([]byte)
 						if !ok {
