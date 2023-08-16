@@ -46,9 +46,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
-          export K6_BROWSER_HEADLESS=true
-          go test "${args[@]}" -timeout 5m ./...
+          K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 5m ./...
 
   test-tip:
     runs-on: ubuntu-latest
@@ -76,9 +74,7 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
-          export K6_BROWSER_HEADLESS=true
-          go test "${args[@]}" -timeout 5m ./...
+          K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 5m ./...
 
   test-current-cov:
     strategy:
@@ -106,8 +102,6 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
-          export K6_BROWSER_HEADLESS=true
           echo "mode: set" > coverage.txt
           for pkg in $(go list ./... | grep -v vendor); do
               list=$(go list -test -f  '{{ join .Deps  "\n"}}' $pkg | grep github.com/grafana/xk6-browser | grep -v vendor || true)
@@ -115,7 +109,7 @@ jobs:
                   list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
               fi
 
-              go test "${args[@]}" -timeout 5m --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+              K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 5m --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
           done
           grep -h -v "^mode:" *.coverage >> coverage.txt
           rm -f *.coverage
@@ -159,6 +153,4 @@ jobs:
           go get go.k6.io/k6@master
           go mod tidy
           cat go.mod | grep go.k6.io/k6
-          export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
-          export K6_BROWSER_HEADLESS=true
-          go test "${args[@]}" -timeout 5m ./...
+          K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 5m ./...
