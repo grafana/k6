@@ -46,6 +46,11 @@ type VUActivationParams struct {
 //
 // TODO: Rename this to something more obvious? This name made sense a very long
 // time ago.
+//
+// interfacebloat: We may evaluate in the future to move out some methods;
+// but considering how central it is, it would require a huge effort.
+//
+//nolint:interfacebloat
 type Runner interface {
 	// Creates an Archive of the runner. There should be a corresponding NewFromArchive() function
 	// that will restore the runner from the archive.

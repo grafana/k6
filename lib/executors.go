@@ -55,6 +55,8 @@ type ExecutionStep struct {
 // TODO: make []ExecutionStep or []ExecutorConfig their own type?
 
 // ExecutorConfig is an interface that should be implemented by all executor config types
+//
+//nolint:interfacebloat // We don't have plan to split it.
 type ExecutorConfig interface {
 	Validate() []error
 
