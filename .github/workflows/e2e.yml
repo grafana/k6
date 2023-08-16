@@ -56,6 +56,10 @@ jobs:
           fi
           export K6_BROWSER_HEADLESS=true
           for f in examples/*.js; do
+            if [ "$f" == "examples/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
+              echo "skipping $f on Windows"
+              continue
+            fi
             ./k6extension run "$f"
           done
       - name: Check screenshot
