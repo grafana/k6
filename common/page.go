@@ -14,6 +14,7 @@ import (
 
 	k6modules "go.k6.io/k6/js/modules"
 
+	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
@@ -148,6 +149,8 @@ func NewPage(
 	p.Mouse = NewMouse(ctx, s, p.frameManager.MainFrame(), bctx.timeoutSettings, p.Keyboard)
 	p.Touchscreen = NewTouchscreen(ctx, s, p.Keyboard)
 
+	p.initEvents()
+
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		return nil, fmt.Errorf("internal error while auto attaching to browser pages: %w", err)
@@ -163,6 +166,40 @@ func NewPage(
 	}
 
 	return &p, nil
+}
+
+func (p *Page) initEvents() {
+	p.logger.Debugf("Page:initEvents",
+		"sid:%v tid:%v", p.session.ID(), p.targetID)
+
+	events := []string{
+		cdproto.EventRuntimeConsoleAPICalled,
+	}
+	p.session.on(p.ctx, events, p.eventCh)
+
+	go func() {
+		p.logger.Debugf("Page:initEvents:go",
+			"sid:%v tid:%v", p.session.ID(), p.targetID)
+		defer p.logger.Debugf("Page:initEvents:go:return",
+			"sid:%v tid:%v", p.session.ID(), p.targetID)
+
+		for {
+			select {
+			case <-p.session.Done():
+				p.logger.Debugf("Page:initEvents:go:session.done",
+					"sid:%v tid:%v", p.session.ID(), p.targetID)
+				return
+			case <-p.ctx.Done():
+				p.logger.Debugf("Page:initEvents:go:ctx.Done",
+					"sid:%v tid:%v", p.session.ID(), p.targetID)
+				return
+			case event := <-p.eventCh:
+				if ev, ok := event.data.(*cdpruntime.EventConsoleAPICalled); ok {
+					p.onConsoleAPICalled(ev)
+				}
+			}
+		}
+	}()
 }
 
 func (p *Page) closeWorker(sessionID target.SessionID) {
@@ -1070,6 +1107,66 @@ func (p *Page) Workers() []api.Worker {
 	return workers
 }
 
+func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
+	// If there are no handlers for EventConsoleAPICalled, return
+	p.eventHandlersMu.RLock()
+	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
+		p.eventHandlersMu.RUnlock()
+		return
+	}
+	p.eventHandlersMu.RUnlock()
+
+	m, err := p.consoleMsgFromConsoleEvent(event)
+	if err != nil {
+		p.logger.Errorf("Page:onConsoleAPICalled", "building console message: %v", err)
+		return
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[eventPageConsoleAPICalled] {
+		h := h
+		if err := h(m); err != nil {
+			p.logger.Errorf("Page:onConsoleAPICalled", "executing handler: %v", err)
+		}
+	}
+}
+
+func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*api.ConsoleMessage, error) {
+	execCtx, err := p.executionContextForID(e.ExecutionContextID)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		l = p.logger.WithTime(e.Timestamp.Time()).
+			WithField("source", "browser").
+			WithField("browser_source", "console-api")
+
+		objects       = make([]any, 0, len(e.Args))
+		objectHandles = make([]api.JSHandle, 0, len(e.Args))
+	)
+
+	for _, robj := range e.Args {
+		i, err := parseRemoteObject(robj)
+		if err != nil {
+			handleParseRemoteObjectErr(p.ctx, err, l)
+		}
+
+		objects = append(objects, i)
+		objectHandles = append(objectHandles, NewJSHandle(
+			p.ctx, p.session, execCtx, execCtx.Frame(), robj, p.logger,
+		))
+	}
+
+	return &api.ConsoleMessage{
+		Args: objectHandles,
+		Page: p,
+		Text: textForConsoleEvent(e, objects),
+		Type: e.Type.String(),
+	}, nil
+}
+
 // executionContextForID returns the page ExecutionContext for the given ID.
 func (p *Page) executionContextForID( //nolint:unused
 	executionContextID cdpruntime.ExecutionContextID,
@@ -1093,4 +1190,31 @@ func (p *Page) sessionID() (sid target.SessionID) {
 		sid = p.session.ID()
 	}
 	return sid
+}
+
+// textForConsoleEvent generates the text representation for a consoleAPICalled event
+// mimicking Playwright's behavior.
+func textForConsoleEvent(e *cdpruntime.EventConsoleAPICalled, args []any) string {
+	if e.Type.String() == "dir" || e.Type.String() == "dirxml" ||
+		e.Type.String() == "table" {
+		if len(e.Args) > 0 {
+			// These commands accept a single arg
+			return e.Args[0].Description
+		}
+		return ""
+	}
+
+	// args is a mix of string and non strings, so using fmt.Sprint(args...)
+	// might not add spaces between all elements, therefore use a strings.Builder
+	// and handle format and concatenation
+	var b strings.Builder
+	for i, a := range args {
+		format := " %v"
+		if i == 0 {
+			format = "%v"
+		}
+		b.WriteString(fmt.Sprintf(format, a))
+	}
+
+	return b.String()
 }
