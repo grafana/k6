@@ -74,7 +74,7 @@ type mockFailingIngesterServer struct {
 	err error
 }
 
-func (m *mockFailingIngesterServer) BatchCreateRequestMetadatas(_ context.Context, _ *ingester.BatchCreateRequestMetadatasRequest) (*ingester.BatchCreateRequestMetadatasResponse, error) {
+func (m *mockFailingIngesterServer) BatchCreateRequestMetadatas(ctx context.Context, _ *ingester.BatchCreateRequestMetadatasRequest) (*ingester.BatchCreateRequestMetadatasResponse, error) {
 	return nil, m.err
 }
 
