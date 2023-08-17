@@ -30,15 +30,5 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      - name: Install Go
-        uses: actions/setup-go@v3
-        with:
-          go-version: 1.19.x
-      - name: Retrieve golangci-lint version
-        run: |
-          echo "::set-output name=Version::$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')"
-        id: version
-      - name: golangci-lint
-        uses: golangci/golangci-lint-action@v2
-        with:
-          version: ${{ steps.version.outputs.Version }}
+      - name: Run k6 golangci-lint CI
+        uses: grafana/k6/.github/actions/lint@master
