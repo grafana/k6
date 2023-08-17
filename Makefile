@@ -1,5 +1,6 @@
 MAKEFLAGS += --silent
 GOLANGCI_CONFIG ?= .golangci.yml
+GOLANGCI_LINT_VERSION = $(shell "$(head -n 1 .golangci.yml | tr -d '\# ')")
 
 all: clean lint test build
 
@@ -29,12 +30,16 @@ ws-echo-server-stop:
 linter-config:
 	test -s "${GOLANGCI_CONFIG}" || (echo "No linter config, downloading from main k6 repository..." && curl --silent --show-error --fail --no-location https://raw.githubusercontent.com/grafana/k6/master/.golangci.yml --output "${GOLANGCI_CONFIG}")
 
+## check-linter-version: Checks if the linter version is the same as the one specified in the linter config.
+check-linter-version:
+	(golangci-lint version | grep "version $(shell head -n 1 .golangci.yml | tr -d '\# ')") || echo "Your installation of golangci-lint is different from the one that is specified in k6's linter config (there it's $(shell head -n 1 .golangci.yml | tr -d '\# ')). Results could be different in the CI."
+
 ## test: Executes any tests.
 test:
 	go test -race -timeout 30s ./...
 
 ## lint: Runs the linters.
-lint: linter-config
+lint: linter-config check-linter-version
 	echo "Running linters..."
 	golangci-lint run --out-format=tab ./...
 
@@ -48,4 +53,4 @@ clean:
 	rm .golangci.yml
 	rm -rf vendor
 
-.PHONY: test lint check ws-echo-server-run ws-echo-server-stop build clean linter-config
+.PHONY: test lint check ws-echo-server-run ws-echo-server-stop build clean linter-config check-linter-version
