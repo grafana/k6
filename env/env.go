@@ -1,7 +1,10 @@
 // Package env provides types to interact with environment setup.
 package env
 
-import "os"
+import (
+	"os"
+	"strconv"
+)
 
 // Execution specific.
 const (
@@ -66,7 +69,7 @@ const (
 type LookupFunc func(key string) (string, bool)
 
 // EmptyLookup is a LookupFunc that always returns "" and false.
-func EmptyLookup(key string) (string, bool) { return "", false }
+func EmptyLookup(_ string) (string, bool) { return "", false }
 
 // Lookup is a LookupFunc that uses os.LookupEnv.
 func Lookup(key string) (string, bool) { return os.LookupEnv(key) }
@@ -81,4 +84,19 @@ func ConstLookup(k, v string) LookupFunc {
 		}
 		return EmptyLookup(key)
 	}
+}
+
+// LookupBool returns the result of Lookup as a bool.
+// Returns false if the key does not exist or the value
+// is not a bool.
+func LookupBool(key string) bool {
+	v, ok := Lookup(key)
+	if !ok {
+		return false
+	}
+	bv, err := strconv.ParseBool(v)
+	if err != nil {
+		return false
+	}
+	return bv
 }

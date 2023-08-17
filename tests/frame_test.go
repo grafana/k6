@@ -3,7 +3,6 @@ package tests
 import (
 	"context"
 	"net/http"
-	"strconv"
 	"testing"
 	"time"
 
@@ -72,15 +71,13 @@ func TestFrameDismissDialogBox(t *testing.T) {
 func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	t.Parallel()
 
-	if s, ok := env.Lookup(env.BrowserHeadless); ok {
-		if v, err := strconv.ParseBool(s); err == nil && v {
-			// We're skipping this when running in headless
-			// environments since the bug that the test fixes
-			// only surfaces when in headfull mode.
-			// Remove this skip once we have headfull mode in
-			// CI: https://github.com/grafana/xk6-browser/issues/678
-			t.Skip("skipped when in headless mode")
-		}
+	// We're skipping this when running in headless
+	// environments since the bug that the test fixes
+	// only surfaces when in headfull mode.
+	// Remove this skip once we have headfull mode in
+	// CI: https://github.com/grafana/xk6-browser/issues/678
+	if env.LookupBool(env.BrowserHeadless) {
+		t.Skip("skipped when in headless mode")
 	}
 
 	// run the browser in headfull mode.
@@ -110,15 +107,13 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 	t.Parallel()
 
-	if s, ok := env.Lookup(env.BrowserHeadless); ok {
-		if v, err := strconv.ParseBool(s); err == nil && v {
-			// We're skipping this when running in headless
-			// environments since the bug that the test fixes
-			// only surfaces when in headfull mode.
-			// Remove this skip once we have headfull mode in
-			// CI: https://github.com/grafana/xk6-browser/issues/678
-			t.Skip("skipped when in headless mode")
-		}
+	// We're skipping this when running in headless
+	// environments since the bug that the test fixes
+	// only surfaces when in headfull mode.
+	// Remove this skip once we have headfull mode in
+	// CI: https://github.com/grafana/xk6-browser/issues/678
+	if env.LookupBool(env.BrowserHeadless) {
+		t.Skip("skipped when in headless mode")
 	}
 
 	tb := newTestBrowser(
