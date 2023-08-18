@@ -1,13 +1,40 @@
 package cmd
 
 import (
-	"fmt"
-
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/lib/fsext"
 )
 
+const defaultNewScriptName = "script.js"
+
+// initCmd represents the `k6 init` command
+type initCmd struct {
+	gs *state.GlobalState
+}
+
+func (c *initCmd) run(cmd *cobra.Command, args []string) error {
+	target := defaultNewScriptName
+	if len(args) > 0 {
+		target = args[0]
+	}
+
+	fileExists, err := fsext.Exists(c.gs.FS, target)
+	if err != nil {
+		return err
+	}
+
+	if fileExists {
+		c.gs.Logger.Errorf("%s already exists", target)
+		return err
+	}
+
+	return nil
+}
+
 func getCmdInit(gs *state.GlobalState) *cobra.Command {
+	c := &initCmd{gs: gs}
+
 	exampleText := getExampleText(gs, `
   # Create a minimal k6 script in the current directory. By default, k6 creates script.js.
   {{.}} init
@@ -26,8 +53,6 @@ provided, the script will be stored in script.js.
 
 This command will not overwrite existing files.`,
 		Example: exampleText,
-		Run: func(cmd *cobra.Command, args []string) {
-			fmt.Println("init called")
-		},
+		RunE:    c.run,
 	}
 }
