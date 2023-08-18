@@ -145,7 +145,7 @@ func (conf Config) Apply(applied Config) Config {
 // GetConsolidatedConfig combines the options' values from the different sources
 // and returns the merged options. The Order of precedence used is documented
 // in the k6 Documentation https://k6.io/docs/using-k6/k6-options/how-to/#order-of-precedence.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, url string) (Config, error) {
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _ string) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf, err := parseJSON(jsonRawConf)
@@ -165,6 +165,7 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, u
 
 	// TODO: define a way for defining Output's options
 	// then support them.
+	// url is the third GetConsolidatedConfig's argument which is omitted for now
 	//nolint:gocritic
 	//
 	//if url != "" {
