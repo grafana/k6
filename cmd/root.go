@@ -59,7 +59,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdInspect,
 		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion,
+		getCmdStats, getCmdStatus, getCmdVersion, getCmdInit,
 	}
 
 	for _, sc := range subCommands {
