@@ -20,7 +20,7 @@ It is implemented using the [xk6](https://k6.io/blog/extending-k6-with-xk6/) sys
 
 ## Requirements
 
-* [Golang 1.17+](https://go.dev/)
+* [Golang 1.19+](https://go.dev/)
 * [Git](https://git-scm.com/)
 * [xk6](https://github.com/grafana/xk6) (`go install go.k6.io/xk6/cmd/xk6@latest`)
 * [curl](https://curl.se/) (downloading the k6 core's linter rule-set)
