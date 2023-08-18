@@ -225,7 +225,7 @@ var (
 
 		"test/language/expressions/dynamic-import", // not supported
 
-		// Go 1.16 only supports unicode 13; Whiule go 1.21 has support for this - we disable them
+		// Go 1.16 only supports unicode 13; While go 1.21 has support for this - we disable them
 		// so that they aren't flaky between versions.
 		"test/language/identifiers/start-unicode-14.",
 		"test/language/identifiers/part-unicode-14.",
