@@ -70,11 +70,11 @@ type Page struct {
 	backgroundPage bool
 
 	mainFrameSession *FrameSession
-	// TODO: FrameSession changes by attachFrameSession (mutex?)
-	frameSessions map[cdp.FrameID]*FrameSession
-	workers       map[target.SessionID]*Worker
-	routes        []api.Route
-	vu            k6modules.VU
+	frameSessions    map[cdp.FrameID]*FrameSession
+	frameSessionsMu  sync.RWMutex
+	workers          map[target.SessionID]*Worker
+	routes           []api.Route
+	vu               k6modules.VU
 
 	logger *log.Logger
 }
@@ -129,7 +129,9 @@ func NewPage(
 
 		return nil, err
 	}
+	p.frameSessionsMu.Lock()
 	p.frameSessions[cdp.FrameID(tid)] = p.mainFrameSession
+	p.frameSessionsMu.Unlock()
 	p.Mouse = NewMouse(ctx, s, p.frameManager.MainFrame(), bctx.timeoutSettings, p.Keyboard)
 	p.Touchscreen = NewTouchscreen(ctx, s, p.Keyboard)
 
@@ -275,12 +277,15 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
 	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.ID(), fid)
+	p.frameSessionsMu.Lock()
+	defer p.frameSessionsMu.Unlock()
 	fs.page.frameSessions[fid] = fs
 }
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) *FrameSession {
 	p.logger.Debugf("Page:getFrameSession", "sid:%v fid:%v", p.sessionID(), frameID)
-
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 	return p.frameSessions[frameID]
 }
 
@@ -320,6 +325,9 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 func (p *Page) updateExtraHTTPHeaders() {
 	p.logger.Debugf("Page:updateExtraHTTPHeaders", "sid:%v", p.sessionID())
 
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+
 	for _, fs := range p.frameSessions {
 		fs.updateExtraHTTPHeaders(false)
 	}
@@ -327,6 +335,9 @@ func (p *Page) updateExtraHTTPHeaders() {
 
 func (p *Page) updateGeolocation() error {
 	p.logger.Debugf("Page:updateGeolocation", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
 		p.logger.Debugf("Page:updateGeolocation:frameSession",
@@ -341,11 +352,15 @@ func (p *Page) updateGeolocation() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func (p *Page) updateOffline() {
 	p.logger.Debugf("Page:updateOffline", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
 		fs.updateOffline(false)
@@ -354,6 +369,9 @@ func (p *Page) updateOffline() {
 
 func (p *Page) updateHttpCredentials() {
 	p.logger.Debugf("Page:updateHttpCredentials", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
 		fs.updateHTTPCredentials(false)
@@ -503,11 +521,14 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 	p.colorScheme = parsedOpts.ColorScheme
 	p.reducedMotion = parsedOpts.ReducedMotion
 
+	p.frameSessionsMu.RLock()
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
+			p.frameSessionsMu.RUnlock()
 			k6ext.Panic(p.ctx, "emulating media: %w", err)
 		}
 	}
+	p.frameSessionsMu.RUnlock()
 
 	applySlowMo(p.ctx)
 }
