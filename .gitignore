@@ -10,6 +10,7 @@
 *.syso
 .idea
 *.DS_Store
+script.js
 
 /versioninfo.json
 

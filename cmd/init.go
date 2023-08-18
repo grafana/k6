@@ -1,12 +1,24 @@
 package cmd
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/lib/fsext"
 )
 
-const defaultNewScriptName = "script.js"
+const (
+	defaultNewScriptName = "script.js"
+	defaultNewScript     = `import http from 'k6/http';
+import { sleep } from 'k6';
+
+export default function () {
+  http.get('https://grafana.com');
+  sleep(1);
+}
+`
+)
 
 // initCmd represents the `k6 init` command
 type initCmd struct {
@@ -28,6 +40,20 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error {
 		c.gs.Logger.Errorf("%s already exists", target)
 		return err
 	}
+
+	fd, err := c.gs.FS.Create(target)
+	if err != nil {
+		return err
+	}
+	defer fd.Close()
+
+	_, err = fd.Write([]byte(defaultNewScript))
+	if err != nil {
+		return err
+	}
+
+	printToStdout(c.gs, fmt.Sprintf("Initialized a new k6 test script in %s.\n", target))
+	printToStdout(c.gs, fmt.Sprintf("You can now execute it by running `%s run %s`.\n", c.gs.BinaryName, target))
 
 	return nil
 }
