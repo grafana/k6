@@ -79,6 +79,7 @@ provided, the script will be stored in script.js.
 
 This command will not overwrite existing files.`,
 		Example: exampleText,
+		Args:    cobra.MaximumNArgs(1),
 		RunE:    c.run,
 	}
 }
