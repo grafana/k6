@@ -6,12 +6,16 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/png"
+	"strings"
+	"sync"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 )
 
@@ -701,6 +705,251 @@ func TestPageClose(t *testing.T) {
 		err = p.Close(nil)
 		assert.NoError(t, err)
 	})
+}
+
+func TestPageOn(t *testing.T) { //nolint:gocognit
+	t.Parallel()
+
+	const blankPage = "about:blank"
+
+	testCases := []struct {
+		name      string
+		consoleFn string
+		assertFn  func(*api.ConsoleMessage) bool
+	}{
+		{
+			name:      "on console.log",
+			consoleFn: "() => console.log('this is a log message')",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "log" &&
+					cm.Text == "this is a log message" &&
+					cm.Args[0].JSONValue().String() == "this is a log message" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.debug",
+			consoleFn: "() => console.debug('this is a debug message')",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "debug" &&
+					cm.Text == "this is a debug message" &&
+					cm.Args[0].JSONValue().String() == "this is a debug message" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.info",
+			consoleFn: "() => console.info('this is an info message')",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "info" &&
+					cm.Text == "this is an info message" &&
+					cm.Args[0].JSONValue().String() == "this is an info message" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.error",
+			consoleFn: "() => console.error('this is an error message')",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "error" &&
+					cm.Text == "this is an error message" &&
+					cm.Args[0].JSONValue().String() == "this is an error message" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.warn",
+			consoleFn: "() => console.warn('this is a warning message')",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "warning" &&
+					cm.Text == "this is a warning message" &&
+					cm.Args[0].JSONValue().String() == "this is a warning message" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.dir",
+			consoleFn: "() => console.dir(document.location)",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "dir" &&
+					cm.Text == "Location" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.dirxml",
+			consoleFn: "() => console.dirxml(document.location)",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "dirxml" &&
+					cm.Text == "Location" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.table",
+			consoleFn: "() => console.table([['Grafana', 'k6'], ['Grafana', 'Mimir']])",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "table" &&
+					cm.Text == "Array(2)" &&
+					cm.Args[0].JSONValue().String() == "Grafana,k6,Grafana,Mimir" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.trace",
+			consoleFn: "() => console.trace('trace example')",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "trace" &&
+					cm.Text == "trace example" &&
+					cm.Args[0].JSONValue().String() == "trace example" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.clear",
+			consoleFn: "() => console.clear()",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "clear" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.group",
+			consoleFn: "() => console.group()",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "startGroup" &&
+					cm.Text == "console.group" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.groupCollapsed",
+			consoleFn: "() => console.groupCollapsed()",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "startGroupCollapsed" &&
+					cm.Text == "console.groupCollapsed" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.groupEnd",
+			consoleFn: "() => console.groupEnd()",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "endGroup" &&
+					cm.Text == "console.groupEnd" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.assert",
+			consoleFn: "() => console.assert(2 == 3)", // Only writes to console if assertion is false
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "assert" &&
+					cm.Text == "console.assert" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.count (default label)",
+			consoleFn: "() => console.count()", // default label
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "count" &&
+					cm.Text == "default: 1" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.count",
+			consoleFn: "() => console.count('k6')",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "count" &&
+					cm.Text == "k6: 1" &&
+					cm.Page.URL() == blankPage
+			},
+		},
+		{
+			name:      "on console.time",
+			consoleFn: "() => { console.time('k6'); console.timeEnd('k6'); }",
+			assertFn: func(cm *api.ConsoleMessage) bool {
+				return cm.Type == "timeEnd" && strings.HasPrefix(cm.Text, "k6: 0.0") &&
+					cm.Page.URL() == blankPage
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			// Use withSkipClose() opt as we will close it
+			// manually to force the page.TaskQueue closing
+			tb := newTestBrowser(t, withSkipClose())
+			p := tb.NewPage(nil)
+
+			var (
+				assertOne, assertTwo bool
+				wg                   sync.WaitGroup
+
+				assertTO bool
+				testTO   = 5 * time.Second
+			)
+
+			// Console Messages should be multiplexed for every registered handler
+			eventHandlerOne := func(cm *api.ConsoleMessage) error { //nolint:unparam
+				defer wg.Done()
+				assertOne = tc.assertFn(cm)
+				return nil
+			}
+
+			eventHandlerTwo := func(cm *api.ConsoleMessage) error { //nolint:unparam
+				defer wg.Done()
+				assertTwo = tc.assertFn(cm)
+				return nil
+			}
+
+			wg.Add(2)
+
+			err := tb.vu.Loop.Start(func() error {
+				r := tb.vu.Loop.RegisterCallback()
+				go func() {
+					// Wait for handlers to be called
+					// or for the test to time out
+					done := make(chan struct{})
+					go func() {
+						wg.Wait()
+						close(done)
+					}()
+
+					select {
+					case <-done:
+					case <-time.After(testTO):
+						assertTO = true
+					}
+
+					r(func() error {
+						tb.Close()
+						return nil
+					})
+				}()
+				err := p.On("console", eventHandlerOne)
+				if err != nil {
+					return err
+				}
+				err = p.On("console", eventHandlerTwo)
+				if err != nil {
+					return err
+				}
+				p.Evaluate(tb.toGojaValue(tc.consoleFn))
+
+				return nil
+			})
+			require.NoError(t, err)
+
+			assert.False(t, assertTO, "test timed out before event handlers were called")
+			assert.True(t, assertOne && assertTwo, "error asserting console message")
+		})
+	}
 }
 
 func assertExceptionContains(t *testing.T, rt *goja.Runtime, fn func(), expErrMsg string) {
