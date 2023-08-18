@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/lib/fsext"
 )
@@ -22,7 +23,16 @@ export default function () {
 
 // initCmd represents the `k6 init` command
 type initCmd struct {
-	gs *state.GlobalState
+	gs             *state.GlobalState
+	overwriteFiles bool
+}
+
+func (c *initCmd) flagSet() *pflag.FlagSet {
+	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
+	flags.SortFlags = false
+	flags.BoolVarP(&c.overwriteFiles, "force", "f", false, "Overwrite existing files")
+
+	return flags
 }
 
 func (c *initCmd) run(cmd *cobra.Command, args []string) error {
@@ -36,7 +46,7 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	if fileExists {
+	if fileExists && !c.overwriteFiles {
 		c.gs.Logger.Errorf("%s already exists", target)
 		return err
 	}
@@ -66,9 +76,12 @@ func getCmdInit(gs *state.GlobalState) *cobra.Command {
   {{.}} init
 
   # Create a minimal k6 script in the current directory and store it in test.js
-  {{.}} init test.js`)
+  {{.}} init test.js
 
-	return &cobra.Command{
+  # Overwrite existing test.js with a minimal k6 script
+  {{.}} init -f test.js`[1:])
+
+	initCmd := &cobra.Command{
 		Use:   "init",
 		Short: "Initialize a new k6 script.",
 		Long: `Initialize a new k6 script.
@@ -82,4 +95,7 @@ This command will not overwrite existing files.`,
 		Args:    cobra.MaximumNArgs(1),
 		RunE:    c.run,
 	}
+	initCmd.Flags().AddFlagSet(c.flagSet())
+
+	return initCmd
 }
