@@ -155,12 +155,12 @@ func (sink *nativeHistogramSink) Add(s metrics.Sample) {
 // One method interfaces could be even better, to be checked.
 
 // P implements metrics.Sink.
-func (*nativeHistogramSink) P(pct float64) float64 {
+func (*nativeHistogramSink) P(_ float64) float64 {
 	panic("Native Histogram Sink has no support of percentile (P)")
 }
 
 // Format implements metrics.Sink.
-func (*nativeHistogramSink) Format(td time.Duration) map[string]float64 {
+func (*nativeHistogramSink) Format(_ time.Duration) map[string]float64 {
 	panic("Native Histogram Sink has no support of formatting (Format)")
 }
 
@@ -175,7 +175,7 @@ func (*nativeHistogramSink) Drain() ([]byte, error) {
 }
 
 // Merge implements metrics.Sink.
-func (*nativeHistogramSink) Merge(from []byte) error {
+func (*nativeHistogramSink) Merge(_ []byte) error {
 	panic("Native Histogram Sink has no support of merging")
 }
 
