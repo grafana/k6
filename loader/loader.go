@@ -199,8 +199,8 @@ func Load(
 			}
 		case moduleSpecifier.Scheme == "":
 			logger.Warningf(`The moduleSpecifier "%s" has no scheme but we will try to resolve it as remote module. `+
-				`This will be deprecated in the future and all remote modules will `+
-				`need to explicitly use "https" as scheme.`, originalModuleSpecifier)
+				`This is deprecated and will be removed in v0.48.0 - all remote modules will `+
+				`need to explicitly be prepended with "https://".`, originalModuleSpecifier)
 			*finalModuleSpecifierURL = *moduleSpecifier
 			finalModuleSpecifierURL.Scheme = scheme
 		default:
