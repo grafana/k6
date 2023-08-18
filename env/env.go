@@ -87,16 +87,16 @@ func ConstLookup(k, v string) LookupFunc {
 }
 
 // LookupBool returns the result of Lookup as a bool.
-// Returns false if the key does not exist or the value
-// is not a bool.
-func LookupBool(key string) bool {
+// If the key does not exist or the value is not a valid bool, it returns false.
+// Otherwise it returns the bool value and true.
+func LookupBool(key string) (value bool, ok bool) {
 	v, ok := Lookup(key)
 	if !ok {
-		return false
+		return false, false
 	}
 	bv, err := strconv.ParseBool(v)
 	if err != nil {
-		return false
+		return false, true
 	}
-	return bv
+	return bv, true
 }

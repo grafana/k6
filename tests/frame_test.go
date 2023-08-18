@@ -76,7 +76,7 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	// only surfaces when in headfull mode.
 	// Remove this skip once we have headfull mode in
 	// CI: https://github.com/grafana/xk6-browser/issues/678
-	if env.LookupBool(env.BrowserHeadless) {
+	if v, ok := env.LookupBool(env.BrowserHeadless); !ok || v {
 		t.Skip("skipped when in headless mode")
 	}
 
@@ -112,7 +112,7 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 	// only surfaces when in headfull mode.
 	// Remove this skip once we have headfull mode in
 	// CI: https://github.com/grafana/xk6-browser/issues/678
-	if env.LookupBool(env.BrowserHeadless) {
+	if v, ok := env.LookupBool(env.BrowserHeadless); !ok || v {
 		t.Skip("skipped when in headless mode")
 	}
 
