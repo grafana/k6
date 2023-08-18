@@ -100,3 +100,11 @@ func LookupBool(key string) (value bool, ok bool) {
 	}
 	return bv, true
 }
+
+// IsBrowserHeadless returns true if the BrowserHeadless environment
+// variable is not set or set to true.
+// The default behaviour is to run the browser in headless mode.
+func IsBrowserHeadless() bool {
+	v, ok := LookupBool(BrowserHeadless)
+	return !ok || v
+}
