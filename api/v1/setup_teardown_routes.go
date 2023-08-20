@@ -71,6 +71,7 @@ func handleRunSetup(cs *ControlSurface, rw http.ResponseWriter, r *http.Request)
 	runner := cs.RunState.Runner
 
 	if err := cs.RunState.Runner.Setup(r.Context(), cs.Samples); err != nil {
+		cs.RunState.Logger.WithError(err).Error("Error executing setup")
 		apiError(rw, "Error executing setup", err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -81,6 +82,7 @@ func handleRunSetup(cs *ControlSurface, rw http.ResponseWriter, r *http.Request)
 // handleRunTeardown executes the runner's Teardown() method
 func handleRunTeardown(cs *ControlSurface, rw http.ResponseWriter, r *http.Request) {
 	if err := cs.RunState.Runner.Teardown(r.Context(), cs.Samples); err != nil {
+		cs.RunState.Logger.WithError(err).Error("Error executing teardown")
 		apiError(rw, "Error executing teardown", err.Error(), http.StatusInternalServerError)
 	}
 }
