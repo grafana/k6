@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/ext"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/log"
 )
@@ -66,8 +67,37 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		rootCmd.AddCommand(sc(gs))
 	}
 
+	extCommands, err := getCommandExtensions(rootCmd, ext.Get(ext.CommandExtension))
+	cobra.CheckErr(err)
+
+	for _, ec := range extCommands {
+		cmd, err := ec(gs)
+		cobra.CheckErr(err)
+		rootCmd.AddCommand(cmd)
+	}
+
 	c.cmd = rootCmd
 	return c
+}
+
+func getCommandExtensions(rootCmd *cobra.Command, reg map[string]*ext.Extension) ([]Constructor, error) {
+	result := make([]Constructor, 0, len(reg))
+
+	for _, e := range reg {
+		cmd, _, err := rootCmd.Find([]string{e.Name})
+		if err == nil && cmd != nil {
+			return nil, fmt.Errorf("invalid command extension %s, built-in command with the same name already exists", e.Name)
+		}
+
+		m, ok := e.Module.(Constructor)
+		if !ok {
+			return nil, fmt.Errorf("unexpected command extension type %T", e.Module)
+		}
+
+		result = append(result, m)
+	}
+
+	return result, nil
 }
 
 func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {

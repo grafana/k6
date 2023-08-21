@@ -25,6 +25,7 @@ type ExtensionType uint8
 const (
 	JSExtension ExtensionType = iota + 1
 	OutputExtension
+	CommandExtension
 )
 
 func (e ExtensionType) String() string {
@@ -34,6 +35,8 @@ func (e ExtensionType) String() string {
 		s = "js"
 	case OutputExtension:
 		s = "output"
+	case CommandExtension:
+		s = "command"
 	}
 	return s
 }
@@ -100,13 +103,16 @@ func GetAll() []*Extension {
 	mx.RLock()
 	defer mx.RUnlock()
 
-	js, out := extensions[JSExtension], extensions[OutputExtension]
-	result := make([]*Extension, 0, len(js)+len(out))
+	js, out, cmd := extensions[JSExtension], extensions[OutputExtension], extensions[CommandExtension]
+	result := make([]*Extension, 0, len(js)+len(out)+len(cmd))
 
 	for _, e := range js {
 		result = append(result, e)
 	}
 	for _, e := range out {
+		result = append(result, e)
+	}
+	for _, e := range cmd {
 		result = append(result, e)
 	}
 
@@ -157,4 +163,5 @@ func extractModuleInfo(mod interface{}) (path, version string) {
 func init() {
 	extensions[JSExtension] = make(map[string]*Extension)
 	extensions[OutputExtension] = make(map[string]*Extension)
+	extensions[CommandExtension] = make(map[string]*Extension)
 }
