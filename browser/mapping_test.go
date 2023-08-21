@@ -45,7 +45,6 @@ func customMappings() map[string]string {
 		// types other than 'disconnect' are supported.
 		// See: https://github.com/grafana/xk6-browser/issues/913
 		"Browser.on": "",
-		"Page.on":    "",
 	}
 }
 

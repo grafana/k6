@@ -506,7 +506,15 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"mouse":  rt.ToValue(p.GetMouse()).ToObject(rt),
+		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
+		"on": func(event string, handler goja.Callable) error {
+			mapMsgAndHandleEvent := func(m *api.ConsoleMessage) error {
+				mapping := mapConsoleMessage(vu, m)
+				_, err := handler(goja.Undefined(), vu.Runtime().ToValue(mapping))
+				return err
+			}
+			return p.On(event, mapMsgAndHandleEvent) //nolint:wrapcheck
+		},
 		"opener": p.Opener,
 		"pause":  p.Pause,
 		"pdf":    p.Pdf,
