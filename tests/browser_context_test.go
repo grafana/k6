@@ -432,3 +432,18 @@ func TestBrowserContextCookies(t *testing.T) {
 		})
 	}
 }
+
+func TestK6Object(t *testing.T) {
+	b := newTestBrowser(t, withFileServer())
+	p := b.NewPage(nil)
+
+	url := b.staticURL("empty.html")
+	r, err := p.Goto(url, nil)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+
+	k6Obj := p.Evaluate(b.toGojaValue(`() => window.k6`))
+	k6ObjGoja := b.toGojaValue(k6Obj)
+
+	assert.False(t, k6ObjGoja.Equals(goja.Null()))
+}
