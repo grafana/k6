@@ -284,6 +284,28 @@ func TestBrowserContextCookies(t *testing.T) {
 				},
 			},
 		},
+		"cookie_with_path": {
+			setupHandler: okHandler,
+			documentCookiesSnippet: `
+				() => {
+					document.cookie = "name=value; path=/empty";
+					return document.cookie;
+				}
+			`,
+			wantDocumentCookies: "name=value",
+			wantContextCookies: []*api.Cookie{
+				{
+					Name:     "name",
+					Value:    "value",
+					Domain:   "127.0.0.1",
+					Expires:  -1,
+					HTTPOnly: false,
+					Path:     "/empty",
+					SameSite: "",
+					Secure:   false,
+				},
+			},
+		},
 	}
 	for name, tt := range tests {
 		tt := tt
