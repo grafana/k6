@@ -188,6 +188,17 @@ func TestMappings(t *testing.T) {
 				return mapLocator(moduleVU{VU: vu}, &common.Locator{})
 			},
 		},
+		"mapConsoleMessage": {
+			apiInterface: (*interface {
+				Args() []api.JSHandle
+				Page() api.Page
+				Text() string
+				Type() string
+			})(nil),
+			mapp: func() mapping {
+				return mapConsoleMessage(moduleVU{VU: vu}, &api.ConsoleMessage{})
+			},
+		},
 	} {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
