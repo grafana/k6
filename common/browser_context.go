@@ -497,5 +497,40 @@ func (b *BrowserContext) ClearCookies() error {
 // them are set by the page, i.e., using the Set-Cookie HTTP header or via
 // JavaScript like document.cookie.
 func (b *BrowserContext) Cookies() ([]*api.Cookie, error) {
-	return nil, fmt.Errorf("BrowserContext.cookies() has not been implemented yet: %w", k6error.ErrFatal)
+	b.logger.Debugf("BrowserContext:Cookies", "bctxid:%v", b.id)
+
+	// get cookies from this browser context.
+	getCookies := storage.
+		GetCookies().
+		WithBrowserContextID(b.id)
+	networkCookies, err := getCookies.Do(
+		cdp.WithExecutor(b.ctx, b.browser.conn),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("getting cookies from the browser context: %w", err)
+	}
+
+	// return if no cookies found so we don't have to needlessly convert them.
+	// users can still work with cookies using the empty slice.
+	// like this: cookies.length === 0.
+	if len(networkCookies) == 0 {
+		return nil, nil
+	}
+
+	// convert the received CDP cookies to the browser API format.
+	cookies := make([]*api.Cookie, len(networkCookies))
+	for i, c := range networkCookies {
+		cookies[i] = &api.Cookie{
+			Name:     c.Name,
+			Value:    c.Value,
+			Domain:   c.Domain,
+			Path:     c.Path,
+			Expires:  int64(c.Expires),
+			HTTPOnly: c.HTTPOnly,
+			Secure:   c.Secure,
+			SameSite: api.CookieSameSite(c.SameSite),
+		}
+	}
+
+	return cookies, nil
 }
