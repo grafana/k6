@@ -363,6 +363,29 @@ func TestBrowserContextCookies(t *testing.T) {
 				},
 			},
 		},
+		"same_site_lax_cookie": {
+			setupHandler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Set-Cookie", "name=value;SameSite=Lax")
+			},
+			documentCookiesSnippet: `
+				() => {
+					return document.cookie;
+				}
+			`,
+			wantDocumentCookies: "name=value",
+			wantContextCookies: []*api.Cookie{
+				{
+					SameSite: api.CookieSameSiteLax,
+					Name:     "name",
+					Value:    "value",
+					Domain:   "127.0.0.1",
+					Expires:  -1,
+					HTTPOnly: false,
+					Path:     "/",
+					Secure:   false,
+				},
+			},
+		},
 	}
 	for name, tt := range tests {
 		tt := tt
