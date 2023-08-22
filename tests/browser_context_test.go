@@ -2,11 +2,14 @@ package tests
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/api"
 )
 
 func TestBrowserContextAddCookies(t *testing.T) {
@@ -186,6 +189,89 @@ func TestBrowserContextAddCookies(t *testing.T) {
 				return
 			}
 			require.NoError(t, bc.AddCookies(cookies))
+		})
+	}
+}
+
+func TestBrowserContextCookies(t *testing.T) {
+	t.Parallel()
+
+	// an empty page is required to set cookies. we're just using a
+	// simple handler that returns 200 OK to have an empty page.
+	okHandler := func(w http.ResponseWriter, _ *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	}
+
+	tests := map[string]struct {
+		// setupHandler is a handler that will be used to setup the
+		// test environment. it acts like a page returning cookies.
+		setupHandler func(w http.ResponseWriter, r *http.Request)
+
+		// documentCookiesSnippet is a JavaScript snippet that will be
+		// evaluated in the page to set document.cookie.
+		documentCookiesSnippet string
+
+		// wantDocumentCookies is a string representation of the
+		// document.cookie value that is expected to be set.
+		wantDocumentCookies string
+
+		// wantContextCookies is a list of cookies that are expected
+		// to be set in the browser context.
+		wantContextCookies []*api.Cookie
+	}{
+		"no_cookies": {
+			setupHandler: okHandler,
+			documentCookiesSnippet: `
+				() => {
+					return document.cookie;
+				}
+			`,
+			wantDocumentCookies: "",
+			wantContextCookies:  nil,
+		},
+	}
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			// an empty page is required to set cookies
+			// since we want to run cookie tests in parallel
+			// we're creating a new browser context for each test.
+			tb := newTestBrowser(t, withHTTPServer())
+			p := tb.NewPage(nil)
+
+			// the setupHandler can set some cookies
+			// that will be received by the browser context.
+			tb.withHandler("/empty", tt.setupHandler)
+			_, err := p.Goto(tb.url("/empty"), nil)
+			require.NoErrorf(t,
+				err, "failed to open an empty page",
+			)
+
+			// setting document.cookie into the page
+			cookie := p.Evaluate(tb.toGojaValue(tt.documentCookiesSnippet))
+			require.Equalf(t,
+				tt.wantDocumentCookies,
+				tb.asGojaValue(cookie).String(),
+				"incorrect document.cookie received",
+			)
+
+			// getting cookies from the browser context
+			// either from the page or from the context
+			// some cookies can be set by the response handler
+			cookies, err := p.Context().Cookies()
+			require.NoErrorf(t,
+				err, "failed to get cookies from the browser context",
+			)
+			require.Lenf(t,
+				cookies, len(tt.wantContextCookies),
+				"incorrect number of cookies received from the browser context",
+			)
+			assert.Equalf(t,
+				tt.wantContextCookies, cookies,
+				"incorrect cookies received from the browser context",
+			)
 		})
 	}
 }
