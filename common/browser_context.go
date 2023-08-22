@@ -479,15 +479,16 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) error {
 }
 
 // ClearCookies clears cookies.
-func (b *BrowserContext) ClearCookies() {
+func (b *BrowserContext) ClearCookies() error {
 	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
 
 	clearCookies := storage.
 		ClearCookies().
 		WithBrowserContextID(b.id)
 	if err := clearCookies.Do(b.ctx); err != nil {
-		k6ext.Panic(b.ctx, "clearing cookies: %w", err)
+		return fmt.Errorf("clearing cookies: %w", err)
 	}
+	return nil
 }
 
 // Cookies is not implemented.

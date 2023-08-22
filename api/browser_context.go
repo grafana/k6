@@ -9,7 +9,7 @@ type BrowserContext interface {
 	AddCookies(cookies goja.Value) error
 	AddInitScript(script goja.Value, arg goja.Value) error
 	Browser() Browser
-	ClearCookies()
+	ClearCookies() error
 	ClearPermissions()
 	Close()
 	Cookies() ([]any, error) // TODO: make it []Cookie later on
