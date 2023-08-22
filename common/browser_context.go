@@ -439,16 +439,9 @@ func (b *BrowserContext) getSession(id target.SessionID) *Session {
 
 // AddCookies adds cookies into this browser context.
 // All pages within this context will have these cookies installed.
-func (b *BrowserContext) AddCookies(cookies goja.Value) {
+func (b *BrowserContext) AddCookies(cookies goja.Value) error {
 	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
 
-	err := b.addCookies(cookies)
-	if err != nil {
-		k6ext.Panic(b.ctx, "adding cookies: %w", err)
-	}
-}
-
-func (b *BrowserContext) addCookies(cookies goja.Value) error {
 	var cookieParams []network.CookieParam
 	if !gojaValueExists(cookies) {
 		return Error("cookies argument must be set")

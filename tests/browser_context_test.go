@@ -55,22 +55,22 @@ func TestBrowserContextAddCookies(t *testing.T) {
 	errorTests := []struct {
 		description string
 		cookiesCmd  string
-		shouldPanic bool
+		shouldFail  bool
 	}{
 		{
 			description: "nil_cookies",
 			cookiesCmd:  "",
-			shouldPanic: true,
+			shouldFail:  true,
 		},
 		{
 			description: "goja_null_cookies",
 			cookiesCmd:  "null;",
-			shouldPanic: true,
+			shouldFail:  true,
 		},
 		{
 			description: "goja_undefined_cookies",
 			cookiesCmd:  "undefined;",
-			shouldPanic: true,
+			shouldFail:  true,
 		},
 		{
 			description: "goja_cookies_object",
@@ -81,12 +81,12 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					url: "http://test.go",
 				});
 			`,
-			shouldPanic: true,
+			shouldFail: true,
 		},
 		{
 			description: "goja_cookies_string",
 			cookiesCmd:  `"test_cookie_name=test_cookie_value"`,
-			shouldPanic: true,
+			shouldFail:  true,
 		},
 		{
 			description: "cookie_missing_name",
@@ -96,7 +96,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					url: "http://test.go",
 				}
 			];`,
-			shouldPanic: true,
+			shouldFail: true,
 		},
 		{
 			description: "cookie_missing_value",
@@ -106,7 +106,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					url: "http://test.go",
 				}
 			];`,
-			shouldPanic: true,
+			shouldFail: true,
 		},
 		{
 			description: "cookie_missing_url",
@@ -116,7 +116,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					value: "test_cookie_value",
 				}
 			];`,
-			shouldPanic: true,
+			shouldFail: true,
 		},
 		{
 			description: "cookies_missing_path",
@@ -127,7 +127,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					domain: "http://test.go",
 				}
 			];`,
-			shouldPanic: true,
+			shouldFail: true,
 		},
 		{
 			description: "cookies_missing_domain",
@@ -138,7 +138,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					path: "/to/page",
 				}
 			];`,
-			shouldPanic: true,
+			shouldFail: true,
 		},
 		{
 			description: "cookie_with_url",
@@ -149,7 +149,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					url: "http://test.go",
 				}
 			];`,
-			shouldPanic: false,
+			shouldFail: false,
 		},
 		{
 			description: "cookie_with_domain_and_path",
@@ -161,10 +161,9 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					path: "/to/page",
 				}
 			];`,
-			shouldPanic: false,
+			shouldFail: false,
 		},
 	}
-
 	for _, tt := range errorTests {
 		tt := tt
 		t.Run(tt.description, func(t *testing.T) {
@@ -182,11 +181,11 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			bc, err := tb.NewContext(nil)
 			require.NoError(t, err)
 
-			if tt.shouldPanic {
-				assert.Panics(t, func() { bc.AddCookies(cookies) })
-			} else {
-				assert.NotPanics(t, func() { bc.AddCookies(cookies) })
+			if tt.shouldFail {
+				require.Error(t, bc.AddCookies(cookies))
+				return
 			}
+			require.NoError(t, bc.AddCookies(cookies))
 		})
 	}
 }
