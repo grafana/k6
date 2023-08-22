@@ -451,44 +451,35 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) {
 func (b *BrowserContext) addCookies(cookies goja.Value) error {
 	var cookieParams []network.CookieParam
 	if !gojaValueExists(cookies) {
-		return Error("cookies value is not set")
+		return Error("cookies argument must be set")
+	}
+	if err := b.vu.Runtime().ExportTo(cookies, &cookieParams); err != nil {
+		return fmt.Errorf("cannot recognize cookie values: %w", err)
 	}
 
-	rt := b.vu.Runtime()
-	err := rt.ExportTo(cookies, &cookieParams)
-	if err != nil {
-		return fmt.Errorf("unable to export cookies value to cookieParams. %w", err)
-	}
+	coookiesToSet := make([]*network.CookieParam, len(cookieParams))
+	for i, cookie := range cookieParams {
+		c := cookie
 
-	// Create new array of pointers to items in cookieParams
-	var cookieParamsPointers []*network.CookieParam
-	for i := 0; i < len(cookieParams); i++ {
-		cookieParam := cookieParams[i]
-
-		if cookieParam.Name == "" {
-			return fmt.Errorf("cookie name is not set. %#v", cookieParam)
+		if c.Name == "" {
+			return fmt.Errorf("cookie name must be set: %#v", c)
 		}
-
-		if cookieParam.Value == "" {
-			return fmt.Errorf("cookie value is not set. %#v", cookieParam)
+		if c.Value == "" {
+			return fmt.Errorf("cookie value must be set: %#v", c)
 		}
-
 		// if URL is not set, both Domain and Path must be provided
-		if cookieParam.URL == "" {
-			if cookieParam.Domain == "" || cookieParam.Path == "" {
-				return fmt.Errorf(
-					"if cookie url is not provided, both domain and path must be specified. %#v",
-					cookieParam,
-				)
-			}
+		if c.URL == "" && (c.Domain == "" || c.Path == "") {
+			const msg = "if cookie URL is not provided, both domain and path must be specified: %#v"
+			return fmt.Errorf(msg, c)
 		}
-
-		cookieParamsPointers = append(cookieParamsPointers, &cookieParam)
+		coookiesToSet[i] = &c
 	}
 
-	action := storage.SetCookies(cookieParamsPointers).WithBrowserContextID(b.id)
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
-		return fmt.Errorf("unable to execute SetCookies action: %w", err)
+	setCookies := storage.
+		SetCookies(coookiesToSet).
+		WithBrowserContextID(b.id)
+	if err := setCookies.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		return fmt.Errorf("cannot set cookies: %w", err)
 	}
 
 	return nil
