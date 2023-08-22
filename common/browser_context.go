@@ -491,7 +491,11 @@ func (b *BrowserContext) ClearCookies() error {
 	return nil
 }
 
-// Cookies is not implemented.
-func (b *BrowserContext) Cookies() ([]any, error) {
+// Cookies returns all cookies.
+// Some of them can be added with the AddCookies method and some of them are
+// automatically taken from the browser context when it is created. And some of
+// them are set by the page, i.e., using the Set-Cookie HTTP header or via
+// JavaScript like document.cookie.
+func (b *BrowserContext) Cookies() ([]*api.Cookie, error) {
 	return nil, fmt.Errorf("BrowserContext.cookies() has not been implemented yet: %w", k6error.ErrFatal)
 }

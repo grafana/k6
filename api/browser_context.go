@@ -12,7 +12,7 @@ type BrowserContext interface {
 	ClearCookies() error
 	ClearPermissions()
 	Close()
-	Cookies() ([]any, error) // TODO: make it []Cookie later on
+	Cookies() ([]*Cookie, error)
 	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
 	ExposeFunction(name string, callback goja.Callable)
 	GrantPermissions(permissions []string, opts goja.Value)

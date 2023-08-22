@@ -619,7 +619,7 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 		"clearCookies":     bc.ClearCookies,
 		"clearPermissions": bc.ClearPermissions,
 		"close":            bc.Close,
-		"cookies": func() ([]any, error) {
+		"cookies": func() ([]*api.Cookie, error) {
 			cc, err := bc.Cookies()
 			ctx := vu.Context()
 			panicIfFatalError(ctx, err)
