@@ -306,6 +306,17 @@ func TestBrowserContextCookies(t *testing.T) {
 				},
 			},
 		},
+		"cookie_with_different_domain": {
+			setupHandler: okHandler,
+			documentCookiesSnippet: `
+				() => {
+					document.cookie = "name=value; domain=k6.io";
+					return document.cookie;
+				}
+			`,
+			wantDocumentCookies: "", // some cookies cannot be set (i.e. cookies using different domains)
+			wantContextCookies:  nil,
+		},
 	}
 	for name, tt := range tests {
 		tt := tt
