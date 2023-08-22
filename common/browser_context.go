@@ -489,8 +489,10 @@ func (b *BrowserContext) addCookies(cookies goja.Value) error {
 func (b *BrowserContext) ClearCookies() {
 	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
 
-	action := storage.ClearCookies().WithBrowserContextID(b.id)
-	if err := action.Do(b.ctx); err != nil {
+	clearCookies := storage.
+		ClearCookies().
+		WithBrowserContextID(b.id)
+	if err := clearCookies.Do(b.ctx); err != nil {
 		k6ext.Panic(b.ctx, "clearing cookies: %w", err)
 	}
 }
