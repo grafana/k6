@@ -79,17 +79,6 @@ func NewBrowserContext(
 	return &b, nil
 }
 
-// AddCookies adds cookies into this browser context.
-// All pages within this context will have these cookies installed.
-func (b *BrowserContext) AddCookies(cookies goja.Value) {
-	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
-
-	err := b.addCookies(cookies)
-	if err != nil {
-		k6ext.Panic(b.ctx, "adding cookies: %w", err)
-	}
-}
-
 // AddInitScript adds a script that will be initialized on all new pages.
 func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) error {
 	b.logger.Debugf("BrowserContext:AddInitScript", "bctxid:%v", b.id)
@@ -145,16 +134,6 @@ func (b *BrowserContext) Browser() api.Browser {
 	return b.browser
 }
 
-// ClearCookies clears cookies.
-func (b *BrowserContext) ClearCookies() {
-	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
-
-	action := storage.ClearCookies().WithBrowserContextID(b.id)
-	if err := action.Do(b.ctx); err != nil {
-		k6ext.Panic(b.ctx, "clearing cookies: %w", err)
-	}
-}
-
 // ClearPermissions clears any permission overrides.
 func (b *BrowserContext) ClearPermissions() {
 	b.logger.Debugf("BrowserContext:ClearPermissions", "bctxid:%v", b.id)
@@ -175,11 +154,6 @@ func (b *BrowserContext) Close() {
 	if err := b.browser.disposeContext(b.id); err != nil {
 		k6ext.Panic(b.ctx, "disposing browser context: %w", err)
 	}
-}
-
-// Cookies is not implemented.
-func (b *BrowserContext) Cookies() ([]any, error) {
-	return nil, fmt.Errorf("BrowserContext.cookies() has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // ExposeBinding is not implemented.
@@ -463,6 +437,17 @@ func (b *BrowserContext) getSession(id target.SessionID) *Session {
 	return b.browser.conn.getSession(id)
 }
 
+// AddCookies adds cookies into this browser context.
+// All pages within this context will have these cookies installed.
+func (b *BrowserContext) AddCookies(cookies goja.Value) {
+	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
+
+	err := b.addCookies(cookies)
+	if err != nil {
+		k6ext.Panic(b.ctx, "adding cookies: %w", err)
+	}
+}
+
 func (b *BrowserContext) addCookies(cookies goja.Value) error {
 	var cookieParams []network.CookieParam
 	if !gojaValueExists(cookies) {
@@ -507,4 +492,19 @@ func (b *BrowserContext) addCookies(cookies goja.Value) error {
 	}
 
 	return nil
+}
+
+// ClearCookies clears cookies.
+func (b *BrowserContext) ClearCookies() {
+	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
+
+	action := storage.ClearCookies().WithBrowserContextID(b.id)
+	if err := action.Do(b.ctx); err != nil {
+		k6ext.Panic(b.ctx, "clearing cookies: %w", err)
+	}
+}
+
+// Cookies is not implemented.
+func (b *BrowserContext) Cookies() ([]any, error) {
+	return nil, fmt.Errorf("BrowserContext.cookies() has not been implemented yet: %w", k6error.ErrFatal)
 }
