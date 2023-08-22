@@ -317,6 +317,29 @@ func TestBrowserContextCookies(t *testing.T) {
 			wantDocumentCookies: "", // some cookies cannot be set (i.e. cookies using different domains)
 			wantContextCookies:  nil,
 		},
+		"http_only_cookie": {
+			setupHandler: func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("Set-Cookie", "name=value;HttpOnly; Path=/")
+			},
+			documentCookiesSnippet: `
+				() => {
+					return document.cookie;
+				}
+			`,
+			wantDocumentCookies: "",
+			wantContextCookies: []*api.Cookie{
+				{
+					HTTPOnly: true,
+					Name:     "name",
+					Value:    "value",
+					Domain:   "127.0.0.1",
+					Expires:  -1,
+					Path:     "/",
+					SameSite: "",
+					Secure:   false,
+				},
+			},
+		},
 	}
 	for name, tt := range tests {
 		tt := tt
