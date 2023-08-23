@@ -1040,7 +1040,7 @@ func (p *Page) Workers() []api.Worker {
 }
 
 // executionContextForID returns the page ExecutionContext for the given ID.
-func (p *Page) executionContextForID(
+func (p *Page) executionContextForID( //nolint:unused
 	executionContextID cdpruntime.ExecutionContextID,
 ) (*ExecutionContext, error) {
 	p.frameSessionsMu.RLock()
