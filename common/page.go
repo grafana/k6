@@ -1168,7 +1168,7 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 }
 
 // executionContextForID returns the page ExecutionContext for the given ID.
-func (p *Page) executionContextForID( //nolint:unused
+func (p *Page) executionContextForID(
 	executionContextID cdpruntime.ExecutionContextID,
 ) (*ExecutionContext, error) {
 	p.frameSessionsMu.RLock()

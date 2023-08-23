@@ -1085,7 +1085,7 @@ func (fs *FrameSession) updateViewport() error {
 	return nil
 }
 
-func (fs *FrameSession) executionContextForID( //nolint:unused
+func (fs *FrameSession) executionContextForID(
 	executionContextID cdpruntime.ExecutionContextID,
 ) (*ExecutionContext, error) {
 	fs.contextIDToContextMu.Lock()
