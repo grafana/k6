@@ -1091,7 +1091,7 @@ func (fs *FrameSession) executionContextForID( //nolint:unused
 	fs.contextIDToContextMu.Lock()
 	defer fs.contextIDToContextMu.Unlock()
 
-	if exc, ok := fs.parent.contextIDToContext[executionContextID]; ok {
+	if exc, ok := fs.contextIDToContext[executionContextID]; ok {
 		return exc, nil
 	}
 
