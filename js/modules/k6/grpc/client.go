@@ -463,7 +463,8 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 				//  https://grpc.io/docs/what-is-grpc/core-concepts/#metadata
 				var strval string
 				if strings.HasSuffix(hk, "-bin") {
-					binval, ok := kv.([]byte)
+					var binval []byte
+					binval, ok = kv.([]byte)
 					if !ok {
 						return result, fmt.Errorf("metadata %q value must be binary", hk)
 					}
