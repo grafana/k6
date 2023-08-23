@@ -1,5 +1,7 @@
 name: "Auto assign maintainer to issue"
 on:
+  # makes this workflow re-usable
+  workflow_call:
   issues:
     types: [opened]
 
