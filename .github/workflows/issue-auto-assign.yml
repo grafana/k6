@@ -10,5 +10,31 @@ jobs:
   assign-user:
     runs-on: ubuntu-latest
     steps:
-      - name: Assign k6's maintainer to issue
-        uses: ./.github/actions/issue-assigner/
+      - uses: actions/github-script@v6
+        with:
+          script: |
+            const assignees = ['mstoykov', 'codebien', 'olegbespalov', 'oleiade'];
+            const assigneeCount = 1;
+
+            // Do not automatically assign users if someone was already assigned or it was opened by a maintainer
+            if (context.payload.issue.assignees.length > 0 || assignees.includes(context.payload.issue.user.login)) {
+              return;
+            }
+            const crypto = require("node:crypto");
+
+            const getNRandom = (n, array) => {
+              let result = new Array();
+              for (;n > 0 && array.length > 0; n--) {
+                const chosen = array[crypto.randomInt(array.length)];
+                result.push(chosen);
+                array = array.filter(el => el != chosen);
+              }
+              return result;
+            }
+
+            github.rest.issues.addAssignees({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              assignees: getNRandom(assigneeCount, assignees),
+            });
