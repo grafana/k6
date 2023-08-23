@@ -20,6 +20,7 @@ import (
 	"github.com/chromedp/cdproto/page"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 )
@@ -1036,6 +1037,22 @@ func (p *Page) Workers() []api.Worker {
 		workers = append(workers, w)
 	}
 	return workers
+}
+
+// executionContextForID returns the page ExecutionContext for the given ID.
+func (p *Page) executionContextForID(
+	executionContextID cdpruntime.ExecutionContextID,
+) (*ExecutionContext, error) {
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+
+	for _, fs := range p.frameSessions {
+		if exc, err := fs.executionContextForID(executionContextID); err == nil {
+			return exc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
 }
 
 // sessionID returns the Page's session ID.
