@@ -1,6 +1,6 @@
 name: Bug report
 description: Use this template for reporting bugs. Please search existing issues first.
-labels: bug
+labels: [bug, triage]
 body:
   - type: textarea
     attributes:
