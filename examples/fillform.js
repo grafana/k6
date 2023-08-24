@@ -41,6 +41,14 @@ export default async function() {
     check(page, {
       'header': page.locator('h2').textContent() == 'Welcome, admin!',
     });
+
+    // Check whether we receive cookies from the logged site.
+    check(context.cookies(), {
+      'session cookie is set': cookies => {
+        const sessionID = cookies.find(c => c.name == 'sid')
+        return typeof sessionID !== 'undefined'
+      }
+    })
   } finally {
     page.close();
   }
