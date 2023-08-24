@@ -9,6 +9,11 @@ import (
 )
 
 const (
+	// defaultMinimumResolution is the default resolution used by histogram.
+	// It allows to have a higher granularity compared to the basic 1.0 value,
+	// supporting floating points up to 3 digits.
+	defaultMinimumResolution = .001
+
 	// lowestTrackable represents the minimum value that the histogram tracks.
 	// Essentially, it excludes negative numbers.
 	// Most of metrics tracked by histograms are durations
@@ -17,12 +22,6 @@ const (
 	// In the future, we may expand and include them,
 	// probably after https://github.com/grafana/k6/issues/763.
 	lowestTrackable = 0
-
-	// highestTrackable represents the maximum
-	// value that the histogram is able to track with high accuracy (0.1% of error).
-	// It should be a high enough
-	// and rationale value for the k6 context; 2^30 = 1_073_741_824
-	highestTrackable = 1 << 30
 )
 
 // histogram represents a distribution
@@ -61,13 +60,18 @@ type histogram struct {
 
 	// Count is counts the amount of observed values.
 	Count uint32
+
+	// MinimumResolution represents resolution used by Histogram.
+	// In principle, it is a multiplier factor for the tracked values.
+	MinimumResolution float64
 }
 
 func newHistogram() *histogram {
 	return &histogram{
-		Buckets: make(map[uint32]uint32),
-		Max:     -math.MaxFloat64,
-		Min:     math.MaxFloat64,
+		MinimumResolution: defaultMinimumResolution,
+		Buckets:           make(map[uint32]uint32),
+		Max:               -math.MaxFloat64,
+		Min:               math.MaxFloat64,
 	}
 }
 
@@ -85,7 +89,9 @@ func (h *histogram) addToBucket(v float64) {
 	h.Count++
 	h.Sum += v
 
-	if v > highestTrackable {
+	v /= h.MinimumResolution
+
+	if v > math.MaxInt64 {
 		h.ExtraHighBucket++
 		return
 	}
@@ -151,6 +157,9 @@ func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 	if h.ExtraHighBucket > 0 {
 		hval.ExtraHighValuesCounter = &h.ExtraHighBucket
 	}
+	// We don't expect to change the minimum resolution at runtime
+	// so it is safe use directly a pointer without creating a copy
+	hval.MinResolution = &h.MinimumResolution
 	return hval
 }
 
@@ -164,7 +173,7 @@ func resolveBucketIndex(val float64) uint32 {
 	// We upscale to the next integer to ensure that each sample falls
 	// within a specific bucket, even when the value is fractional.
 	// This avoids under-representing the distribution in the histogram.
-	upscaled := uint32(math.Ceil(val))
+	upscaled := uint64(math.Ceil(val))
 
 	// In histograms, bucket boundaries are usually defined as multiples of powers of 2,
 	// allowing for efficient computation of bucket indexes.
@@ -181,11 +190,11 @@ func resolveBucketIndex(val float64) uint32 {
 	//     2^10 = 1024 ~ 1000 = 10^3
 	// f(x) = 3*x + 1 - empiric formula that works for us
 	// since f(2)=7 and f(3)=10
-	const k = uint32(7)
+	const k = uint64(7)
 
 	// 256 = 1 << (k+1)
 	if upscaled < 256 {
-		return upscaled
+		return uint32(upscaled)
 	}
 
 	// `nkdiff` helps us find the right bucket for `upscaled`. It does so by determining the
@@ -205,8 +214,12 @@ func resolveBucketIndex(val float64) uint32 {
 	//          = (n-k+1)<<k + u>>(n-k) - (1<<k) =
 	//          = (n-k)<<k + u>>(n-k)
 	//
-	nkdiff := uint32(bits.Len32(upscaled>>k) - 1) // msb index
-	return (nkdiff << k) + (upscaled >> nkdiff)
+	nkdiff := uint64(bits.Len64(upscaled>>k)) - 1 // msb index
+
+	// We cast safely downscaling because we don't expect we may hit the uint32 limit
+	// with the bucket index. The bucket represented from the index as MaxUint32
+	// would be a very huge number bigger than the trackable limits.
+	return uint32((nkdiff << k) + (upscaled >> nkdiff))
 }
 
 // Add implements the metricValue interface.

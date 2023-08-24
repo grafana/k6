@@ -94,13 +94,14 @@
                 ],
                 "spans": [
                   {
-                    "offset": 6,
+                    "offset": 827,
                     "length": 1
                   }
                 ],
                 "maxValue": 6,
                 "minValue": 6,
-                "sum": 6
+                "sum": 6,
+                "minResolution": 0.001
               }
             ]
           }
