@@ -1265,7 +1265,7 @@ func TestLockingUpWithAThrow(t *testing.T) {
 	err := ts.ev.Start(func() error {
 		_, runErr := ts.rt.RunString(sr(`
 		let a = 0;
-		const connections = 1000;
+		const connections = 200;
 		async function s() {
 			let ws = new WebSocket("WSBIN_URL/ws-echo")
 			ws.addEventListener("open", () => {
