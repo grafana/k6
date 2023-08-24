@@ -8,12 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
-
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
@@ -24,6 +18,13 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/log"
+
+	k6modules "go.k6.io/k6/js/modules"
 )
 
 const (
@@ -88,6 +89,8 @@ type Page struct {
 	routes           []api.Route
 	vu               k6modules.VU
 
+	tq *taskqueue.TaskQueue
+
 	logger *log.Logger
 }
 
@@ -122,6 +125,7 @@ func NewPage(
 		workers:          make(map[target.SessionID]*Worker),
 		routes:           make([]api.Route, 0),
 		vu:               k6ext.GetVU(ctx),
+		tq:               taskqueue.New(k6ext.GetVU(ctx).RegisterCallback),
 		logger:           logger,
 	}
 
@@ -180,8 +184,13 @@ func (p *Page) initEvents() {
 	go func() {
 		p.logger.Debugf("Page:initEvents:go",
 			"sid:%v tid:%v", p.session.ID(), p.targetID)
-		defer p.logger.Debugf("Page:initEvents:go:return",
-			"sid:%v tid:%v", p.session.ID(), p.targetID)
+		defer func() {
+			p.logger.Debugf("Page:initEvents:go:return",
+				"sid:%v tid:%v", p.session.ID(), p.targetID)
+			// The TaskQueue must be closed in order to let
+			// the event loop finish
+			p.tq.Close()
+		}()
 
 		for {
 			select {
@@ -1126,9 +1135,14 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	defer p.eventHandlersMu.RUnlock()
 	for _, h := range p.eventHandlers[eventPageConsoleAPICalled] {
 		h := h
-		if err := h(m); err != nil {
-			p.logger.Errorf("Page:onConsoleAPICalled", "executing handler: %v", err)
-		}
+		// Use TaskQueue in order to synchronize handlers execution in the event loop,
+		// as it is not thread safe and events are processed from a background goroutine
+		p.tq.Queue(func() error {
+			if err := h(m); err != nil {
+				return fmt.Errorf("executing onConsoleAPICalled handler: %w", err)
+			}
+			return nil
+		})
 	}
 }
 
