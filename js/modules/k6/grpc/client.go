@@ -468,6 +468,7 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 					if !ok {
 						return result, fmt.Errorf("metadata %q value must be binary", hk)
 					}
+					// https://github.com/grpc/grpc-go/blob/v1.57.0/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
 					strval = string(binval)
 				} else if strval, ok = kv.(string); !ok {
 					return result, fmt.Errorf("metadata %q value must be a string", hk)
