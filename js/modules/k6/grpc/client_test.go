@@ -486,6 +486,31 @@ func TestClient(t *testing.T) {
 			`},
 		},
 		{
+			name: "RequestBinHeaders",
+			initString: codeBlock{
+				code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+					md, ok := metadata.FromIncomingContext(ctx)
+					if !ok || len(md["x-load-tester-bin"]) == 0 || md["x-load-tester-bin"][0] != string([]byte{2, 200}) {
+						return nil, status.Error(codes.FailedPrecondition, "")
+					}
+
+					return &grpc_testing.Empty{}, nil
+				}
+			},
+			vuString: codeBlock{code: `
+				client.connect("GRPCBIN_ADDR");
+				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {}, { metadata: { "X-Load-Tester-bin": new Uint8Array([2, 200]) } })
+				if (resp.status !== grpc.StatusOK) {
+					throw new Error("failed to send correct headers in the request")
+				}
+			`},
+		},
+		{
 			name: "ResponseMessage",
 			initString: codeBlock{
 				code: `

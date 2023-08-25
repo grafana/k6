@@ -459,8 +459,18 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 			}
 			for hk, kv := range rawHeaders {
 				// TODO(rogchap): Should we manage a string slice?
-				strval, ok := kv.(string)
-				if !ok {
+				// The spec defines that Binary-valued keys end in -bin
+				//  https://grpc.io/docs/what-is-grpc/core-concepts/#metadata
+				var strval string
+				if strings.HasSuffix(hk, "-bin") {
+					var binval []byte
+					binval, ok = kv.([]byte)
+					if !ok {
+						return result, fmt.Errorf("metadata %q value must be binary", hk)
+					}
+					// https://github.com/grpc/grpc-go/blob/v1.57.0/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
+					strval = string(binval)
+				} else if strval, ok = kv.(string); !ok {
 					return result, fmt.Errorf("metadata %q value must be a string", hk)
 				}
 				result.Metadata[hk] = strval
