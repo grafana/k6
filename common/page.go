@@ -125,7 +125,6 @@ func NewPage(
 		workers:          make(map[target.SessionID]*Worker),
 		routes:           make([]api.Route, 0),
 		vu:               k6ext.GetVU(ctx),
-		tq:               taskqueue.New(k6ext.GetVU(ctx).RegisterCallback),
 		logger:           logger,
 	}
 
@@ -187,9 +186,12 @@ func (p *Page) initEvents() {
 		defer func() {
 			p.logger.Debugf("Page:initEvents:go:return",
 				"sid:%v tid:%v", p.session.ID(), p.targetID)
-			// The TaskQueue must be closed in order to let
-			// the event loop finish
-			p.tq.Close()
+			// TaskQueue is only initialized when calling page.on() method
+			// so users are not always required to close the page in order
+			// to let the iteration finish.
+			if p.tq != nil {
+				p.tq.Close()
+			}
 		}()
 
 		for {
@@ -798,6 +800,13 @@ func (p *Page) MainFrame() api.Frame {
 func (p *Page) On(event string, handler func(*api.ConsoleMessage) error) error {
 	if event != eventPageConsoleAPICalled {
 		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
+	}
+
+	// Once the TaskQueue is initialized, it has to be closed so the event loop can finish.
+	// Therefore, instead of doing it in the constructor, we initialize it only when page.on()
+	// is called, so the user is only required to close the page it using this method.
+	if p.tq == nil {
+		p.tq = taskqueue.New(p.vu.RegisterCallback)
 	}
 
 	p.eventHandlersMu.Lock()
