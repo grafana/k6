@@ -24,26 +24,70 @@ import (
 )
 
 func TestInvoke(t *testing.T) {
-	t.Parallel()
+	ctx := context.Background()
+	tests := []struct {
+		name       string
+		ctx        context.Context
+		md         metadata.MD
+		url        string
+		req        Request
+		resp       Response
+		invokemock func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error
+	}{
+		{
+			name: "hello",
+			ctx:  ctx,
+			md:   metadata.New(nil),
+			url:  "/hello.HelloService/SayHello",
+			req: Request{
+				Message:          []byte(`{"greeting":"text request"}`),
+				MethodDescriptor: methodFromProto("SayHello"),
+			},
+			invokemock: func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error {
+				err := protojson.Unmarshal([]byte(`{"reply":"text reply"}`), out)
+				require.NoError(t, err)
 
-	helloReply := func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error {
-		err := protojson.Unmarshal([]byte(`{"reply":"text reply"}`), out)
-		require.NoError(t, err)
+				return nil
+			},
+			resp: Response{
+				Message: map[string]interface{}{"reply": "text reply"},
+			},
+		},
+		{
+			name: "primitive",
+			ctx:  ctx,
+			md:   metadata.New(nil),
+			url:  "/hello.HelloService/SayHello",
+			req: Request{
+				Message:          []byte(`text request`),
+				MethodDescriptor: methodFromProto("SayPrimitive"),
+			},
+			invokemock: func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error {
+				err := protojson.Unmarshal([]byte(`false`), out)
+				require.NoError(t, err)
 
-		return nil
+				return nil
+			},
+			resp: Response{
+				Message: "text reply",
+			},
+		},
 	}
 
-	c := Conn{raw: invokemock(helloReply)}
-	r := Request{
-		MethodDescriptor: methodFromProto("SayHello"),
-		Message:          []byte(`{"greeting":"text request"}`),
-	}
-	res, err := c.Invoke(context.Background(), "/hello.HelloService/SayHello", metadata.New(nil), r)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
 
-	assert.Equal(t, codes.OK, res.Status)
-	assert.Equal(t, map[string]interface{}{"reply": "text reply"}, res.Message)
-	assert.Empty(t, res.Error)
+			c := Conn{raw: invokemock(tt.invokemock)}
+			res, err := c.Invoke(ctx, tt.url, tt.md, tt.req)
+			require.NoError(t, err)
+
+			assert.Equal(t, codes.OK, res.Status)
+			assert.Equal(t, tt.resp.Message, res.Message)
+			assert.Empty(t, res.Error)
+		})
+	}
 }
 
 func TestInvokeWithCallOptions(t *testing.T) {
@@ -275,8 +319,11 @@ syntax = "proto3";
 
 package hello;
 
+import "google/protobuf/wrappers.proto";
+
 service HelloService {
   rpc SayHello(HelloRequest) returns (HelloResponse);
+  rpc SayPrimitive(google.protobuf.StringValue) returns (google.protobuf.BoolValue);
   rpc NoOp(Empty) returns (Empty);
   rpc LotsOfReplies(HelloRequest) returns (stream HelloResponse);
   rpc LotsOfGreetings(stream HelloRequest) returns (HelloResponse);
