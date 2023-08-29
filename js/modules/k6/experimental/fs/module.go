@@ -51,6 +51,11 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
 			"open": mi.Open,
+			"SeekMode": map[string]any{
+				"Start":   SeekModeStart,
+				"Current": SeekModeCurrent,
+				"End":     SeekModeEnd,
+			},
 		},
 	}
 }
@@ -237,6 +242,52 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 		} else {
 			reject(err)
 		}
+	}()
+
+	return promise
+}
+
+// Seek seeks to the given `offset` in the file, under the given `whence` mode.
+//
+// The returned promise resolves to the new `offset` (position) within the file, which
+// is expressed in bytes from the selected start, current, or end position depending
+// the provided `whence`.
+func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
+	promise, resolve, reject := promises.New(f.vu)
+
+	if common.IsNullish(offset) {
+		reject(newFsError(TypeError, "seek() failed; reason: offset cannot be null or undefined"))
+		return promise
+	}
+
+	offsetInt := offset.ToInteger()
+	if offsetInt < 0 {
+		reject(newFsError(TypeError, "seek() failed; reason: offset cannot be negative"))
+		return promise
+	}
+
+	if common.IsNullish(whence) {
+		reject(newFsError(TypeError, "seek() failed; reason: whence cannot be null or undefined"))
+		return promise
+	}
+
+	seekMode := SeekMode(whence.ToInteger())
+	switch seekMode {
+	case SeekModeStart, SeekModeCurrent, SeekModeEnd:
+		// Valid modes, do nothing.
+	default:
+		reject(newFsError(TypeError, "seek() failed; reason: whence must be a SeekMode"))
+		return promise
+	}
+
+	go func() {
+		newOffset, err := f.file.Seek(int(offsetInt), seekMode)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(newOffset)
 	}()
 
 	return promise
