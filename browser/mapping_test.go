@@ -78,10 +78,9 @@ func TestMappings(t *testing.T) {
 		t.Helper()
 
 		var (
-			typ     = reflect.TypeOf(tt.apiInterface).Elem()
-			typName = typ.Name()
-			mapped  = tt.mapp()
-			tested  = make(map[string]bool)
+			typ    = reflect.TypeOf(tt.apiInterface).Elem()
+			mapped = tt.mapp()
+			tested = make(map[string]bool)
 		)
 		for i := 0; i < typ.NumMethod(); i++ {
 			method := typ.Method(i)
@@ -91,12 +90,12 @@ func TestMappings(t *testing.T) {
 			// so we need to convert the first letter to lowercase.
 			m := toFirstLetterLower(method.Name)
 
-			cm, cmok := isCustomMapping(customMappings, typName, m)
+			cm, cmok := isCustomMapping(customMappings, typ.Name(), m)
 			// if the method is a custom mapping, it should not be
 			// mapped to the module. so we should not find it in
 			// the mapped methods.
 			if _, ok := mapped[m]; cmok && ok {
-				t.Errorf("method %s should not be mapped for %s", m, typName)
+				t.Errorf("method %s should not be mapped", m)
 			}
 			// a custom mapping with an empty string means that
 			// the method should not exist on the API.
@@ -110,7 +109,7 @@ func TestMappings(t *testing.T) {
 				m = cm
 			}
 			if _, ok := mapped[m]; !ok {
-				t.Errorf("method %s for %s not found", m, typName)
+				t.Errorf("method %s not found", m)
 			}
 			// to detect if a method is redundantly mapped.
 			tested[m] = true
@@ -118,7 +117,7 @@ func TestMappings(t *testing.T) {
 		// detect redundant mappings.
 		for m := range mapped {
 			if !tested[m] {
-				t.Errorf("method %s is redundant for %s", m, typName)
+				t.Errorf("method %s is redundant", m)
 			}
 		}
 	}
