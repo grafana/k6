@@ -74,7 +74,9 @@ func TestMappings(t *testing.T) {
 	// testMapping tests that all the methods of an API are mapped
 	// to the module. And wildcards are mapped correctly and their
 	// methods are not mapped.
-	testMapping := func(tt test) {
+	testMapping := func(t *testing.T, tt test) {
+		t.Helper()
+
 		var (
 			typ     = reflect.TypeOf(tt.apiInterface).Elem()
 			typName = typ.Name()
@@ -190,7 +192,7 @@ func TestMappings(t *testing.T) {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			testMapping(tt)
+			testMapping(t, tt)
 		})
 	}
 }
