@@ -34,6 +34,9 @@ const (
 
 	// TypeError is emitted when an incorrect type has been used.
 	TypeError
+
+	// EOFError is emitted when the end of a file has been reached.
+	EOFError
 )
 
 // fsError represents a custom error object emitted by the fs module.
