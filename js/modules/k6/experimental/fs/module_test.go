@@ -289,6 +289,56 @@ func TestFile(t *testing.T) {
 
 		assert.NoError(t, err)
 	})
+
+	t.Run("seek with invalid arguments should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(fmt.Sprintf(`
+			fs.open(%q).then(file => {
+				// null offset should fail with TypeError.
+				file.seek(null).then(
+					res => { throw "file.seek(null) promise unexpectedly resolved with result: " + res },
+					err => { if (err.name !== 'TypeError') { throw "file.seek(null) rejected with unexpected error: " + err } },
+				)
+				// undefined offset should fail with TypeError.
+				file.seek(undefined).then(
+					res => { throw "file.seek(undefined) promise unexpectedly promise resolved with result: " + res },
+					err => { if (err.name !== 'TypeError') { throw "file.seek(undefined) rejected with unexpected error: " + err} },
+				)
+				// Invalid type offset should fail with TypeError.
+				file.seek('abc').then(
+					res => { throw "file.seek('abc') promise unexpectedly resolved with result: " + res },
+					err => { if (err.name !== 'TypeError') { throw "file.seek('1') rejected with unexpected error: " + err } },
+				)
+				// Negative offset should fail with TypeError.
+				file.seek(-1).then(
+					res => { throw "file.seek(-1) promise unexpectedly resolved with result: " + res },
+					err => { if (err.name !== 'TypeError') { throw "file.seek(-1) rejected with unexpected error: " + err} },
+				)
+				// Invalid type whence should fail with TypeError.
+				file.seek(1, 'abc').then(
+					res => { throw "file.seek(1, 'abc') promise unexpectedly resolved with result: " + res },
+					err => { if (err.name !== 'TypeError') { throw "file.seek(1, '1') rejected with unexpected error: " + err } },
+				)
+				// Invalid whence should fail with TypeError.
+				file.seek(1, -1).then(
+					res => { throw "file.seek(1, -1) promise unexpectedly resolved with result: " + res },
+					err => { if (err.name !== 'TypeError') { throw "file.seek(1, -1) rejected with unexpected error: " + err} },
+				)
+			})
+		`, testFilePath))
+
+		assert.NoError(t, err)
+	})
 }
 
 func TestOpenImpl(t *testing.T) {
