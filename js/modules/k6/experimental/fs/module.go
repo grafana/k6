@@ -165,3 +165,59 @@ func (f *File) Stat() *goja.Promise {
 
 	return promise
 }
+
+// Read the file's content, and writes it into the provided Uint8Array.
+//
+// Resolves to either the number of bytes read during the operation
+// or EOF (null) if there was nothing more to read.
+//
+// It is possible for a read to successfully return with 0 bytes.
+// This does not indicate EOF.
+func (f *File) Read(into goja.Value) *goja.Promise {
+	promise, resolve, reject := promises.New(f.vu)
+
+	if common.IsNullish(into) {
+		reject(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
+		return promise
+	}
+
+	// We expect the into argument to be a `Uint8Array` instance
+	intoObj := into.ToObject(f.vu.Runtime())
+	uint8ArrayConstructor := f.vu.Runtime().Get("Uint8Array")
+	if isUint8Array := intoObj.Get("constructor").SameAs(uint8ArrayConstructor); !isUint8Array {
+		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+		return promise
+	}
+
+	// Obtain the underlying ArrayBuffer from the Uint8Array
+	ab, ok := intoObj.Get("buffer").Export().(goja.ArrayBuffer)
+	if !ok {
+		reject(newFsError(TypeError, "read() failed; reason: into argument cannot be interpreted as ArrayBuffer"))
+		return promise
+	}
+
+	// Obtain the underlying byte slice from the ArrayBuffer.
+	// Note that this is not a copy, and will be modified by the Read operation
+	// in place.
+	buffer := ab.Bytes()
+
+	go func() {
+		n, err := f.file.Read(buffer)
+		if err != nil {
+			// Following Deno's behavior, we return null if we reach EOF.
+			var fsErr *fsError
+			ok := errors.As(err, &fsErr)
+			if ok && fsErr.kind == EOFError {
+				resolve(nil)
+			} else {
+				reject(err)
+			}
+
+			return
+		}
+
+		resolve(n)
+	}()
+
+	return promise
+}
