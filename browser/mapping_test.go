@@ -95,7 +95,7 @@ func TestMappings(t *testing.T) {
 			// mapped to the module. so we should not find it in
 			// the mapped methods.
 			if _, ok := mapped[m]; cmok && ok {
-				t.Errorf("method %s should not be mapped", m)
+				t.Errorf("method %q should not be mapped", m)
 			}
 			// a custom mapping with an empty string means that
 			// the method should not exist on the API.
@@ -109,7 +109,7 @@ func TestMappings(t *testing.T) {
 				m = cm
 			}
 			if _, ok := mapped[m]; !ok {
-				t.Errorf("method %s not found", m)
+				t.Errorf("method %q not found", m)
 			}
 			// to detect if a method is redundantly mapped.
 			tested[m] = true
@@ -117,7 +117,7 @@ func TestMappings(t *testing.T) {
 		// detect redundant mappings.
 		for m := range mapped {
 			if !tested[m] {
-				t.Errorf("method %s is redundant", m)
+				t.Errorf("method %q is redundant", m)
 			}
 		}
 	}
