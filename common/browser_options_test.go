@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/xk6-browser/log"
 )
 
-func TestBrowserOptionsParse(t *testing.T) { //nolint:gocognit
+func TestBrowserOptionsParse(t *testing.T) {
 	t.Parallel()
 
 	defaultOptions := &BrowserOptions{

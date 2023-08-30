@@ -10,6 +10,8 @@ import (
 )
 
 func TestSplit(t *testing.T) {
+	t.Parallel()
+
 	type args struct {
 		keys string
 	}
@@ -62,16 +64,22 @@ func TestSplit(t *testing.T) {
 		},
 	}
 	for _, tt := range tests {
+		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			got := split(tt.args.keys)
+			t.Parallel()
 
+			got := split(tt.args.keys)
 			assert.Equal(t, tt.want, got)
 		})
 	}
 }
 
 func TestKeyboardPress(t *testing.T) {
+	t.Parallel()
+
 	t.Run("panics when '' empty key passed in", func(t *testing.T) {
+		t.Parallel()
+
 		vu := k6test.NewVU(t)
 		k := NewKeyboard(vu.Context(), nil)
 		assert.Panics(t, func() { k.Press("", nil) })
@@ -79,6 +87,8 @@ func TestKeyboardPress(t *testing.T) {
 }
 
 func TestKeyDefinitionCode(t *testing.T) {
+	t.Parallel()
+
 	var (
 		vu = k6test.NewVU(t)
 		k  = NewKeyboard(vu.Context(), nil)
@@ -178,7 +188,10 @@ func TestKeyDefinitionCode(t *testing.T) {
 	}
 
 	for _, tt := range tests {
+		tt := tt
 		t.Run(string(tt.key), func(t *testing.T) {
+			t.Parallel()
+
 			kd := k.keyDefinitionFromKey(tt.key)
 			assert.Contains(t, tt.expectedCodes, kd.Code)
 		})

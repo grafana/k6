@@ -7,27 +7,41 @@ import (
 )
 
 func TestTimeoutSettings(t *testing.T) {
+	t.Parallel()
+
 	t.Run("TimeoutSettings.NewTimeoutSettings", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("should work", testTimeoutSettingsNewTimeoutSettings)
 		t.Run("should work with parent", testTimeoutSettingsNewTimeoutSettingsWithParent)
 	})
 	t.Run("TimeoutSettings.setDefaultTimeout", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("should work", testTimeoutSettingsSetDefaultTimeout)
 	})
 	t.Run("TimeoutSettings.setDefaultNavigationTimeout", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("should work", testTimeoutSettingsSetDefaultNavigationTimeout)
 	})
 	t.Run("TimeoutSettings.navigationTimeout", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("should work", testTimeoutSettingsNavigationTimeout)
 		t.Run("should work with parent", testTimeoutSettingsNavigationTimeoutWithParent)
 	})
 	t.Run("TimeoutSettings.timeout", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("should work", testTimeoutSettingsTimeout)
 		t.Run("should work with parent", testTimeoutSettingsTimeoutWithParent)
 	})
 }
 
 func testTimeoutSettingsNewTimeoutSettings(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 	assert.Nil(t, ts.parent)
 	assert.Nil(t, ts.defaultTimeout)
@@ -35,6 +49,8 @@ func testTimeoutSettingsNewTimeoutSettings(t *testing.T) {
 }
 
 func testTimeoutSettingsNewTimeoutSettingsWithParent(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 	tsWithParent := NewTimeoutSettings(ts)
 	assert.Equal(t, ts, tsWithParent.parent)
@@ -43,18 +59,24 @@ func testTimeoutSettingsNewTimeoutSettingsWithParent(t *testing.T) {
 }
 
 func testTimeoutSettingsSetDefaultTimeout(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 	ts.setDefaultTimeout(100)
 	assert.Equal(t, int64(100), *ts.defaultTimeout)
 }
 
 func testTimeoutSettingsSetDefaultNavigationTimeout(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 	ts.setDefaultNavigationTimeout(100)
 	assert.Equal(t, int64(100), *ts.defaultNavigationTimeout)
 }
 
 func testTimeoutSettingsNavigationTimeout(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 
 	// Assert default timeout value is used
@@ -66,6 +88,8 @@ func testTimeoutSettingsNavigationTimeout(t *testing.T) {
 }
 
 func testTimeoutSettingsNavigationTimeoutWithParent(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 	tsWithParent := NewTimeoutSettings(ts)
 
@@ -82,6 +106,8 @@ func testTimeoutSettingsNavigationTimeoutWithParent(t *testing.T) {
 }
 
 func testTimeoutSettingsTimeout(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 
 	// Assert default timeout value is used
@@ -93,6 +119,8 @@ func testTimeoutSettingsTimeout(t *testing.T) {
 }
 
 func testTimeoutSettingsTimeoutWithParent(t *testing.T) {
+	t.Parallel()
+
 	ts := NewTimeoutSettings(nil)
 	tsWithParent := NewTimeoutSettings(ts)
 

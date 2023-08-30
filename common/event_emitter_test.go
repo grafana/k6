@@ -14,6 +14,8 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	t.Parallel()
 
 	t.Run("add event handler", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
@@ -29,6 +31,8 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	})
 
 	t.Run("remove event handler", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		cancelCtx, cancelFn := context.WithCancel(ctx)
 		emitter := NewBaseEventEmitter(cancelCtx)
@@ -45,6 +49,8 @@ func TestEventEmitterSpecificEvent(t *testing.T) {
 	})
 
 	t.Run("emit event", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event, 1)
@@ -64,6 +70,8 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	t.Parallel()
 
 	t.Run("add catch-all event handler", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event)
@@ -78,6 +86,8 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	})
 
 	t.Run("remove catch-all event handler", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		emitter := NewBaseEventEmitter(ctx)
 		cancelCtx, cancelFn := context.WithCancel(ctx)
@@ -93,6 +103,8 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	})
 
 	t.Run("emit event", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		emitter := NewBaseEventEmitter(ctx)
 		ch := make(chan Event, 1)
@@ -113,6 +125,8 @@ func TestBaseEventEmitter(t *testing.T) {
 	t.Parallel()
 
 	t.Run("order of emitted events kept", func(t *testing.T) {
+		t.Parallel()
+
 		// Test description
 		//
 		// 1. Emit many events from the emitWorker.
@@ -120,8 +134,6 @@ func TestBaseEventEmitter(t *testing.T) {
 		//
 		// Success criteria: Ensure that the ordering of events is
 		//                   received in the order they're emitted.
-
-		t.Parallel()
 
 		eventName := "AtomicIntEvent"
 		maxInt := 100
@@ -168,6 +180,8 @@ func TestBaseEventEmitter(t *testing.T) {
 	})
 
 	t.Run("order of emitted different event types kept", func(t *testing.T) {
+		t.Parallel()
+
 		// Test description
 		//
 		// 1. Emit many different event types from the emitWorker.
@@ -175,8 +189,6 @@ func TestBaseEventEmitter(t *testing.T) {
 		//
 		// Success criteria: Ensure that the ordering of events is
 		//                   received in the order they're emitted.
-
-		t.Parallel()
 
 		eventName1 := "AtomicIntEvent1"
 		eventName2 := "AtomicIntEvent2"
@@ -231,6 +243,8 @@ func TestBaseEventEmitter(t *testing.T) {
 	})
 
 	t.Run("handler can emit without deadlocking", func(t *testing.T) {
+		t.Parallel()
+
 		// Test description
 		//
 		// 1. Emit many events from the emitWorker.
@@ -240,8 +254,6 @@ func TestBaseEventEmitter(t *testing.T) {
 		//
 		// Success criteria: No deadlock should occur between receiving,
 		//                   emitting, and receiving of events.
-
-		t.Parallel()
 
 		eventName1 := "AtomicIntEvent1"
 		eventName2 := "AtomicIntEvent2"

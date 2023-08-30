@@ -15,6 +15,7 @@ import (
 
 func TestRequest(t *testing.T) {
 	t.Parallel()
+
 	ts := cdp.MonotonicTime(time.Now())
 	wt := cdp.TimeSinceEpoch(time.Now())
 	headers := map[string]any{"key": "value"}
@@ -38,6 +39,7 @@ func TestRequest(t *testing.T) {
 
 	t.Run("error_parse_url", func(t *testing.T) {
 		t.Parallel()
+
 		evt := &network.EventRequestWillBeSent{
 			RequestID: network.RequestID("1234"),
 			Request: &network.Request{

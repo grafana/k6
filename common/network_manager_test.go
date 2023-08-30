@@ -118,6 +118,8 @@ func TestOnRequestPausedBlockedHostnames(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			blocked, err := k6types.NewNullHostnameTrie(tc.blockedHostnames)
 			require.NoError(t, err)
 
@@ -180,6 +182,8 @@ func TestOnRequestPausedBlockedIPs(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
 			blockedIPs := make([]*k6lib.IPNet, len(tc.blockedIPs))
 			for i, ipcidr := range tc.blockedIPs {
 				ipnet, err := k6lib.ParseCIDR(ipcidr)

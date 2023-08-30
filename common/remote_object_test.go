@@ -20,6 +20,8 @@ func TestValueFromRemoteObject(t *testing.T) {
 	t.Parallel()
 
 	t.Run("unserializable value error", func(t *testing.T) {
+		t.Parallel()
+
 		vu := k6test.NewVU(t)
 		unserializableValue := runtime.UnserializableValue("a string instead")
 		remoteObject := &runtime.RemoteObject{
@@ -33,6 +35,8 @@ func TestValueFromRemoteObject(t *testing.T) {
 	})
 
 	t.Run("bigint parsing error", func(t *testing.T) {
+		t.Parallel()
+
 		vu := k6test.NewVU(t)
 		unserializableValue := runtime.UnserializableValue("a string instead")
 		remoteObject := &runtime.RemoteObject{
@@ -47,6 +51,8 @@ func TestValueFromRemoteObject(t *testing.T) {
 	})
 
 	t.Run("float64 unserializable values", func(t *testing.T) {
+		t.Parallel()
+
 		vu := k6test.NewVU(t)
 		unserializableValues := []struct {
 			value    string
@@ -87,6 +93,8 @@ func TestValueFromRemoteObject(t *testing.T) {
 	})
 
 	t.Run("primitive types", func(t *testing.T) {
+		t.Parallel()
+
 		primitiveTypes := []struct {
 			typ   runtime.Type
 			value any
@@ -130,6 +138,8 @@ func TestValueFromRemoteObject(t *testing.T) {
 	})
 
 	t.Run("remote object with ID", func(t *testing.T) {
+		t.Parallel()
+
 		remoteObjectID := runtime.RemoteObjectID("object_id_0123456789")
 		remoteObject := &runtime.RemoteObject{
 			Type:     "object",

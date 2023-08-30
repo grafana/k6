@@ -20,6 +20,8 @@ import (
 )
 
 func TestSessionCreateSession(t *testing.T) {
+	t.Parallel()
+
 	const (
 		cdpTargetID         = "target_id_0123456789"
 		cdpBrowserContextID = "browser_context_id_0123456789"
@@ -81,6 +83,8 @@ func TestSessionCreateSession(t *testing.T) {
 	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, &cmdsReceived))
 
 	t.Run("send and recv session commands", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)

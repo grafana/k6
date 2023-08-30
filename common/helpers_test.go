@@ -27,6 +27,8 @@ func TestConvertArgument(t *testing.T) {
 	t.Parallel()
 
 	t.Run("int64", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 		var value int64 = 777
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -39,6 +41,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("int64 maxint", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 
 		var value int64 = math.MaxInt32 + 1
@@ -51,6 +55,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("float64", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 
 		var value float64 = 777.0
@@ -64,6 +70,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("float64 unserializable values", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 
 		unserializableValues := []struct {
@@ -98,6 +106,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("bool", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 
 		var value bool = true
@@ -111,6 +121,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("string", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 		var value string = "hello world"
 		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
@@ -123,6 +135,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 		log := log.NewNullLogger()
 
@@ -146,6 +160,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle wrong context", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 		log := log.NewNullLogger()
 
@@ -168,6 +184,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle is disposed", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 		log := log.NewNullLogger()
 
@@ -190,6 +208,8 @@ func TestConvertArgument(t *testing.T) {
 	})
 
 	t.Run("*BaseJSHandle as *ElementHandle", func(t *testing.T) {
+		t.Parallel()
+
 		execCtx, ctx, rt := newExecCtx()
 		log := log.NewNullLogger()
 

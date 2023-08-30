@@ -13,6 +13,8 @@ import (
 )
 
 func TestErrorFromDOMError(t *testing.T) {
+	t.Parallel()
+
 	for _, tc := range []struct {
 		in       string
 		sentinel bool // if it returns the same error value
@@ -156,6 +158,8 @@ func TestQueryAll(t *testing.T) {
 	}
 
 	t.Run("eval_call", func(t *testing.T) {
+		t.Parallel()
+
 		const selector = "body"
 
 		_, _ = (&ElementHandle{}).queryAll(

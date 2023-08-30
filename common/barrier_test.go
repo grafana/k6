@@ -11,6 +11,8 @@ import (
 )
 
 func TestBarrier(t *testing.T) {
+	t.Parallel()
+
 	ctx := context.Background()
 
 	log := log.NewNullLogger()
