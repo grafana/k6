@@ -11,9 +11,13 @@ import (
 )
 
 func TestDirMake(t *testing.T) {
+	t.Parallel()
+
 	tmpDir := os.TempDir()
 
 	t.Run("dir_provided", func(t *testing.T) {
+		t.Parallel()
+
 		dir, err := os.MkdirTemp("", "*")
 		require.NoError(t, err)
 		t.Cleanup(func() { _ = os.RemoveAll(dir) })
@@ -30,6 +34,8 @@ func TestDirMake(t *testing.T) {
 	})
 
 	t.Run("dir_absent", func(t *testing.T) {
+		t.Parallel()
+
 		var s Dir
 		require.NoError(t, s.Make("", ""))
 		require.True(t, strings.HasPrefix(s.Dir, tmpDir))
@@ -44,6 +50,8 @@ func TestDirMake(t *testing.T) {
 	})
 
 	t.Run("dir_mk_err", func(t *testing.T) {
+		t.Parallel()
+
 		var s Dir
 		require.ErrorIs(t, s.Make("/NOT_EXISTING_DIRECTORY/K6/BROWSER", ""), fs.ErrNotExist)
 		assert.Empty(t, s.Dir)
