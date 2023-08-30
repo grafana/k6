@@ -31,6 +31,8 @@ func TestURLSkipRequest(t *testing.T) {
 }
 
 func TestBlockHostnames(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withHTTPServer(), withLogCache())
 
 	blocked, err := k6types.NewNullHostnameTrie([]string{"*.test"})
@@ -50,6 +52,8 @@ func TestBlockHostnames(t *testing.T) {
 }
 
 func TestBlockIPs(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withHTTPServer(), withLogCache())
 
 	ipnet, err := k6lib.ParseCIDR("10.0.0.0/8")
@@ -69,6 +73,8 @@ func TestBlockIPs(t *testing.T) {
 }
 
 func TestBasicAuth(t *testing.T) {
+	t.Parallel()
+
 	const (
 		validUser     = "validuser"
 		validPassword = "validpass"
@@ -104,11 +110,15 @@ func TestBasicAuth(t *testing.T) {
 	}
 
 	t.Run("valid", func(t *testing.T) {
+		t.Parallel()
+
 		resp := auth(t, validUser, validPassword)
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusOK, int(resp.Status()))
 	})
 	t.Run("invalid", func(t *testing.T) {
+		t.Parallel()
+
 		resp := auth(t, "invalidUser", "invalidPassword")
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusUnauthorized, int(resp.Status()))

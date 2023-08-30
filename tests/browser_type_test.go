@@ -13,6 +13,8 @@ import (
 )
 
 func TestBrowserTypeConnect(t *testing.T) {
+	t.Parallel()
+
 	// Start a test browser so we can get its WS URL
 	// and use it to connect through BrowserType.Connect.
 	tb := newTestBrowser(t)
@@ -27,6 +29,8 @@ func TestBrowserTypeConnect(t *testing.T) {
 }
 
 func TestBrowserTypeLaunchToConnect(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	bp := newTestBrowserProxy(t, tb)
 

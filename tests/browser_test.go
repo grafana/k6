@@ -21,6 +21,8 @@ import (
 )
 
 func TestBrowserNewPage(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t)
 	p1 := b.NewPage(nil)
 	c := b.Context()
@@ -47,6 +49,8 @@ func TestBrowserNewPage(t *testing.T) {
 }
 
 func TestBrowserNewContext(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t)
 	bc1, err := b.NewContext(nil)
 	assert.NoError(t, err)
@@ -186,6 +190,8 @@ func TestBrowserOn(t *testing.T) {
 
 // This only works for Chrome!
 func TestBrowserVersion(t *testing.T) {
+	t.Parallel()
+
 	const re = `^\d+\.\d+\.\d+\.\d+$`
 	r, _ := regexp.Compile(re)
 	ver := newTestBrowser(t).Version()
@@ -196,6 +202,8 @@ func TestBrowserVersion(t *testing.T) {
 // TODO: Improve this test, see:
 // https://github.com/grafana/xk6-browser/pull/51#discussion_r742696736
 func TestBrowserUserAgent(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t)
 
 	// testBrowserVersion() tests the version already
@@ -208,6 +216,8 @@ func TestBrowserUserAgent(t *testing.T) {
 }
 
 func TestBrowserCrashErr(t *testing.T) {
+	t.Parallel()
+
 	// create a new VU in an environment that requires a bad remote-debugging-port.
 	vu := k6test.NewVU(t, env.ConstLookup(env.BrowserArguments, "remote-debugging-port=99999"))
 
@@ -257,6 +267,9 @@ func TestBrowserLogIterationID(t *testing.T) {
 }
 
 func TestMultiBrowserPanic(t *testing.T) {
+	// this test should run sequentially.
+	// don't use t.Parallel() here.
+
 	var b1, b2 *testBrowser
 
 	// run it in a test to kick in the Cleanup() in testBrowser.
@@ -302,6 +315,8 @@ func TestBrowserMultiClose(t *testing.T) {
 }
 
 func TestMultiConnectToSingleBrowser(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withSkipClose())
 	defer tb.Close()
 

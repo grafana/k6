@@ -13,6 +13,8 @@ import (
 )
 
 func TestFramePress(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 
 	p := tb.NewPage(nil)
@@ -144,6 +146,8 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 }
 
 func TestFrameTitle(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
 	assert.Equal(t, "Some title", p.MainFrame().Title())

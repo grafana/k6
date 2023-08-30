@@ -60,6 +60,8 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 }
 
 func TestWaitForFrameNavigation(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withHTTPServer())
 	p := tb.NewPage(nil)
 

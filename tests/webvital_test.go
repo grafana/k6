@@ -15,6 +15,8 @@ import (
 // are being emitted when navigating and interacting with
 // a web page.
 func TestWebVitalMetric(t *testing.T) {
+	t.Parallel()
+
 	var (
 		samples  = make(chan k6metrics.SampleContainer)
 		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
@@ -74,6 +76,8 @@ func TestWebVitalMetric(t *testing.T) {
 }
 
 func TestWebVitalMetricNoInteraction(t *testing.T) {
+	t.Parallel()
+
 	var (
 		samples  = make(chan k6metrics.SampleContainer)
 		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))

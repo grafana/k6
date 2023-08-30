@@ -54,6 +54,8 @@ var htmlInputButton = fmt.Sprintf(`
 `, mouseHelperScriptSource)
 
 func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<div style="display:none">hello</div>`, nil)
@@ -63,6 +65,8 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 }
 
 func TestElementHandleBoundingBoxSVG(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -90,6 +94,8 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 }
 
 func TestElementHandleClick(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -112,6 +118,8 @@ func TestElementHandleClick(t *testing.T) {
 }
 
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -137,6 +145,8 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 }
 
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -162,6 +172,8 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 }
 
 func TestElementHandleClickConcealedLink(t *testing.T) {
+	t.Parallel()
+
 	const (
 		wantBefore = "🙈"
 		wantAfter  = "🐵"
@@ -200,6 +212,8 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 }
 
 func TestElementHandleNonClickable(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t, withFileServer())
 
 	bctx, err := tb.NewContext(nil)
@@ -216,6 +230,8 @@ func TestElementHandleNonClickable(t *testing.T) {
 }
 
 func TestElementHandleGetAttribute(t *testing.T) {
+	t.Parallel()
+
 	const want = "https://somewhere"
 
 	p := newTestBrowser(t).NewPage(nil)
@@ -231,6 +247,8 @@ func TestElementHandleGetAttribute(t *testing.T) {
 }
 
 func TestElementHandleInputValue(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`
@@ -262,6 +280,8 @@ func TestElementHandleInputValue(t *testing.T) {
 }
 
 func TestElementHandleIsChecked(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input type="checkbox" checked>`, nil)
@@ -279,6 +299,9 @@ func TestElementHandleIsChecked(t *testing.T) {
 }
 
 func TestElementHandleQueryAll(t *testing.T) {
+	// tests are faster than parallel execution.
+	// do not make this test parallel.
+
 	const (
 		wantLiLen = 2
 		query     = "li.ali"
@@ -315,6 +338,8 @@ func TestElementHandleQueryAll(t *testing.T) {
 }
 
 func TestElementHandleScreenshot(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -363,6 +388,8 @@ func TestElementHandleScreenshot(t *testing.T) {
 }
 
 func TestElementHandleWaitForSelector(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 	p.SetContent(`<div class="root"></div>`, nil)
@@ -391,6 +418,8 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 }
 
 func TestElementHandlePress(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 
 	p := tb.NewPage(nil)

@@ -33,6 +33,8 @@ type jsFrameBaseOpts struct {
 const sampleHTML = `<div><b>Test</b><ol><li><i>One</i></li></ol></div>`
 
 func TestPageEmulateMedia(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -130,6 +132,8 @@ func TestPageEvaluate(t *testing.T) {
 }
 
 func TestPageGoto(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t, withFileServer())
 	p := b.NewPage(nil)
 
@@ -141,6 +145,8 @@ func TestPageGoto(t *testing.T) {
 }
 
 func TestPageGotoDataURI(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t)
 	p := b.NewPage(nil)
 
@@ -151,6 +157,8 @@ func TestPageGotoDataURI(t *testing.T) {
 }
 
 func TestPageGotoWaitUntilLoad(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t, withFileServer())
 	p := b.NewPage(nil)
 
@@ -174,6 +182,8 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 }
 
 func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t, withFileServer())
 	p := b.NewPage(nil)
 
@@ -293,6 +303,8 @@ func TestPageTextContent(t *testing.T) {
 }
 
 func TestPageInputValue(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`
@@ -313,6 +325,8 @@ func TestPageInputValue(t *testing.T) {
 
 // test for: https://github.com/grafana/xk6-browser/issues/132
 func TestPageInputSpecialCharacters(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input id="special">`, nil)
@@ -336,6 +350,10 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 }
 
 func TestPageFill(t *testing.T) {
+	// these tests are not parallel by intention because
+	// they're testing the same page instance and they're
+	// faster when run sequentially.
+
 	p := newTestBrowser(t).NewPage(nil)
 	p.SetContent(`
 		<input id="text" type="text" value="something" />
@@ -368,6 +386,8 @@ func TestPageFill(t *testing.T) {
 }
 
 func TestPageIsChecked(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 
 	p.SetContent(`<input type="checkbox" checked>`, nil)
@@ -378,6 +398,8 @@ func TestPageIsChecked(t *testing.T) {
 }
 
 func TestPageScreenshotFullpage(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
@@ -421,12 +443,16 @@ func TestPageScreenshotFullpage(t *testing.T) {
 }
 
 func TestPageTitle(t *testing.T) {
+	t.Parallel()
+
 	p := newTestBrowser(t).NewPage(nil)
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
 	assert.Equal(t, "Some title", p.Title())
 }
 
 func TestPageSetExtraHTTPHeaders(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t, withHTTPServer())
 
 	p := b.NewPage(nil)
@@ -644,6 +670,8 @@ func TestPageWaitForLoadState(t *testing.T) {
 
 // See: The issue #187 for details.
 func TestPageWaitForNavigationErrOnCtxDone(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t)
 	p := b.NewPage(nil)
 	go b.cancelContext()
@@ -653,6 +681,8 @@ func TestPageWaitForNavigationErrOnCtxDone(t *testing.T) {
 }
 
 func TestPagePress(t *testing.T) {
+	t.Parallel()
+
 	tb := newTestBrowser(t)
 
 	p := tb.NewPage(nil)
@@ -667,6 +697,8 @@ func TestPagePress(t *testing.T) {
 }
 
 func TestPageURL(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t, withHTTPServer())
 
 	p := b.NewPage(nil)
