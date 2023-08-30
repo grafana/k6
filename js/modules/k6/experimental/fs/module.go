@@ -35,7 +35,7 @@ var (
 // New returns a pointer to a new [RootModule] instance.
 func New() *RootModule {
 	return &RootModule{
-		cache: &cache{},
+		cache: &cache{openedRefCounts: make(map[string]uint)},
 	}
 }
 
@@ -123,8 +123,9 @@ func (mi *ModuleInstance) openImpl(path string) (*File, error) {
 	return &File{
 		Path: path,
 		file: file{
-			path: path,
-			data: data,
+			path:       path,
+			data:       data,
+			closerFunc: mi.cache.close,
 		},
 		vu:       mi.vu,
 		registry: mi.cache,
@@ -164,4 +165,11 @@ func (f *File) Stat() *goja.Promise {
 	}()
 
 	return promise
+}
+
+// Close closes the file.
+func (f *File) Close() {
+	if err := f.file.close(); err != nil {
+		common.Throw(f.vu.Runtime(), err)
+	}
 }

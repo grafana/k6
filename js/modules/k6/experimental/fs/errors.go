@@ -34,6 +34,10 @@ const (
 
 	// TypeError is emitted when an incorrect type has been used.
 	TypeError
+
+	// ClosedError is emitted when an operation is attempted on a closed
+	// file.
+	ClosedError
 )
 
 // fsError represents a custom error object emitted by the fs module.

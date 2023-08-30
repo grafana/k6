@@ -23,6 +23,14 @@ type cache struct {
 	// Importantly, this also means that if the
 	// file is modified from outside of k6, the changes will not be reflected in the file's data.
 	openedFiles sync.Map
+
+	// refCounts holds a safe for concurrent use map, holding the number of times
+	// a file was opened.
+	openedRefCounts map[string]uint
+
+	// mutex is used to ensure that the openedRefCounts map is not accessed concurrently.
+	// We resort to using a mutex as opposed to a sync.Map because we need to be able to
+	mutex sync.Mutex
 }
 
 // open retrieves the content of a given file from the specified filesystem (fromFs) and
@@ -56,6 +64,12 @@ func (fr *cache) open(filename string, fromFs afero.Fs) ([]byte, error) {
 			panic(fmt.Errorf("registry's file %s is not stored as a byte slice", filename))
 		}
 
+		// Increase the ref count.
+		fr.mutex.Lock()
+		fr.openedRefCounts[filename]++
+		fmt.Println("cache.open[file already loaded]: openedRefCount=", fr.openedRefCounts[filename])
+		fr.mutex.Unlock()
+
 		return data, nil
 	}
 
@@ -76,5 +90,42 @@ func (fr *cache) open(filename string, fromFs afero.Fs) ([]byte, error) {
 
 	fr.openedFiles.Store(filename, data)
 
+	// As this is the first time we open the file, initialize
+	// the ref count to 1.
+	fr.mutex.Lock()
+	fr.openedRefCounts[filename] = 1
+	fmt.Println("cache.open[initializing open]: openedRefCount=", 1)
+	fr.mutex.Unlock()
+
 	return data, nil
+}
+
+func (fr *cache) close(filename string) error {
+	fr.mutex.Lock()
+	defer fr.mutex.Unlock()
+
+	// If no ref count is found, it means the file was either never
+	// opened, or already closed.
+	if _, ok := fr.openedRefCounts[filename]; !ok {
+		return newFsError(ClosedError, fmt.Sprintf("file %s is not opened", filename))
+	}
+
+	// If the ref count is 0, it means the file was already closed.
+	if fr.openedRefCounts[filename] == 0 {
+		return newFsError(ClosedError, fmt.Sprintf("file %s is already closed", filename))
+	}
+
+	// Decrease the ref count.
+	fr.openedRefCounts[filename]--
+	fmt.Println("cache.close: openedRefCount=", fr.openedRefCounts[filename])
+
+	// If the ref count is 0, it means the file was closed for the last time.
+	// We can safely remove it from the openedFiles map.
+	if fr.openedRefCounts[filename] == 0 {
+		fr.openedFiles.Delete(filename)
+		delete(fr.openedRefCounts, filename)
+		fmt.Println("cache.close: last openedRefCount=", fr.openedRefCounts[filename])
+	}
+
+	return nil
 }

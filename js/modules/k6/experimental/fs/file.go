@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"fmt"
 	"path/filepath"
 )
 
@@ -10,6 +11,20 @@ type file struct {
 
 	// data holds a pointer to the file's data
 	data []byte
+
+	// isClosed indicates whether the file is closed or not.
+	isClosed bool
+
+	// closerFunc holds a function that can be used to close the file.
+	//
+	// This is used to ensure that whatever operation necessary to cleanly
+	// close the file is performed.
+	//
+	// In our case, the [closerFunc] is provided by the [cache] struct, and
+	// it ensures the file's reference count is decreased on close, and that,
+	// if relevant (the ref count is zero), the cached file content is released
+	// from memory.
+	closerFunc func(string) error
 }
 
 // Stat returns a FileInfo describing the named file.
@@ -25,4 +40,21 @@ type FileInfo struct {
 
 	// Size holds the size of the file in bytes.
 	Size int `json:"size"`
+}
+
+func (f *file) close() error {
+	if f.isClosed {
+		return nil
+	}
+
+	if f.closerFunc == nil {
+		return fmt.Errorf("file %s has no closer function", f.path)
+	}
+
+	if err := f.closerFunc(f.path); err != nil {
+		return err
+	}
+	f.isClosed = true
+
+	return nil
 }
