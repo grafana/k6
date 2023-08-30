@@ -17,6 +17,8 @@ import (
 )
 
 func TestPidRegistry(t *testing.T) {
+	t.Parallel()
+
 	p := &pidRegistry{}
 
 	var wg sync.WaitGroup
@@ -166,6 +168,8 @@ func TestIsRemoteBrowser(t *testing.T) {
 	}
 
 	t.Run("K6_INSTANCE_SCENARIOS should override K6_BROWSER_WS_URL", func(t *testing.T) {
+		t.Parallel()
+
 		lookup := func(key string) (string, bool) {
 			switch key {
 			case env.WebSocketURLs:
