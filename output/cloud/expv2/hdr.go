@@ -28,7 +28,8 @@ const (
 // of metrics samples' values as histogram.
 //
 // The histogram is the representation of base-2 exponential Histogram with two layers.
-// The first layer has primary buckets in the form of a power of two, and a second layer of buckets for each primary bucket with an equally distributed amount of buckets inside.
+// The first layer has primary buckets in the form of a power of two, and a second layer of buckets
+// for each primary bucket with an equally distributed amount of buckets inside.
 //
 // The histogram has a series of (N * 2^m) buckets, where:
 // N = a power of 2 that defines the number of primary buckets
