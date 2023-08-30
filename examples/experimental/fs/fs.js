@@ -50,3 +50,7 @@ export default async function () {
 	// Seek back to the beginning of the file
 	await file.seek(0, SeekMode.Start);
 }
+
+export async function teardown() {
+	file.close();
+}

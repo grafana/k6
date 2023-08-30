@@ -226,6 +226,35 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("stat on closed file should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+			await file.close()
+
+			try {
+				const info = await file.stat()
+				throw 'unexpected promise resolution with result: ' + info;
+			} catch (err) {
+				if (err.name !== 'BadResourceError') {
+					throw 'unexpected error: ' + err
+				}
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("read in multiple iterations", func(t *testing.T) {
 		t.Parallel()
 
@@ -366,6 +395,35 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("read on closed file should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+			await file.close()
+
+			try {
+				const bytesRead = await file.read(new Uint8Array(3))
+				throw 'unexpected promise resolution with result: ' + bytesRead;
+			} catch (err) {
+				if (err.name !== 'BadResourceError') {
+					throw 'unexpected error: ' + err
+				}
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("seek with invalid arguments should fail", func(t *testing.T) {
 		t.Parallel()
 
@@ -440,6 +498,65 @@ func TestFile(t *testing.T) {
 			} catch (err) {
 				if (err.name !== 'TypeError') {
 					throw "file.seek(1, -1) rejected with unexpected error: " + err
+				}
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("seek on closed file should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+			await file.close()
+
+			try {
+				const newOffset = await file.seek(0, fs.SeekMode.Start)
+				throw 'unexpected promise resolution with result: ' + newOffset;
+			} catch (err) {
+				if (err.name !== 'BadResourceError') {
+					throw 'unexpected error: ' + err
+				}
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("double close should fail", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+
+			await file.close()
+
+			try {
+				await file.close()
+				throw 'unexpected promise resolution';
+			} catch (err) {
+				if (err.name !== 'BadResourceError') {
+					throw 'unexpected error: ' + err
 				}
 			}
 		`, testFilePath)))

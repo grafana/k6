@@ -240,10 +240,17 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 		var fsErr *fsError
 		isFsErr := errors.As(err, &fsErr)
 		if isFsErr {
-			if fsErr.kind == EOFError && n == 0 {
-				resolve(nil)
-			} else {
-				resolve(n)
+			switch fsErr.kind {
+			case EOFError:
+				if n == 0 {
+					resolve(nil)
+				} else {
+					resolve(n)
+				}
+			case BadResourceError:
+				reject(newFsError(BadResourceError, "read() failed; reason: the file has been closed"))
+			default:
+				reject(err)
 			}
 		} else {
 			reject(err)
@@ -300,6 +307,42 @@ func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 		}
 
 		resolve(newOffset)
+	}()
+
+	return promise
+}
+
+// Close closes the file and returns a promise that will resolve to null
+// once the operation is complete.
+//
+// Closing a file is a no-op in k6, as we don't have to worry about file
+// descriptors. However, we still expose this method to the user to be
+// consistent with the existing APIs such as Node's or Deno's.
+//
+// The promise will resolve to null, regardless of whether the file was
+// previously opened or not.
+//
+// One of the reasons this method is currently is a no-op is that as of
+// today (v0.46), k6 does not support opening files in the VU context. As
+// a result, the file is always opened in the init context, and thus
+// closed when the init context is closed. Any attempt of clever strategies
+// attempting to limit long-lived files' content in memory (e.g reference
+// counting the VU instances of a file, and releasing the memory once the
+// count reaches zero) would thus be premature.
+//
+// TODO: reevaluate a more sophisticated strategy once we support opening
+// files in the VU context.
+func (f *File) Close() *goja.Promise {
+	promise, resolve, reject := promises.New(f.vu)
+
+	go func() {
+		err := f.file.Close()
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(goja.Null())
 	}()
 
 	return promise
