@@ -46,9 +46,10 @@ func TestResolveBucketIndex(t *testing.T) {
 		{in: 1 << 40, exp: 4352},
 		{in: 1 << 62, exp: 7168},
 
-		{in: math.MaxInt32, exp: 3199},  // 2B
-		{in: math.MaxUint32, exp: 3327}, // 4B
-		{in: math.MaxInt64, exp: 7296},  // Huge number // 9.22...e+18
+		{in: math.MaxInt32, exp: 3199},        // 2B
+		{in: math.MaxUint32, exp: 3327},       // 4B
+		{in: math.MaxInt64, exp: 7296},        // Huge number // 9.22...e+18
+		{in: math.MaxInt64 + 2000, exp: 7296}, // Assert that it does not overflow
 	}
 	for _, tc := range tests {
 		assert.Equal(t, int(tc.exp), int(resolveBucketIndex(tc.in)), tc.in)
@@ -144,7 +145,7 @@ func TestHistogramAddWithUntrackables(t *testing.T) {
 
 	h := newHistogram()
 	h.MinimumResolution = 1.0
-	for _, v := range []float64{5, -3.14, 1<<62 + 1, 1} {
+	for _, v := range []float64{5, -3.14, math.MaxInt64 + 3239, 1} {
 		h.Add(v)
 	}
 
@@ -152,9 +153,9 @@ func TestHistogramAddWithUntrackables(t *testing.T) {
 		Buckets:           map[uint32]uint32{1: 1, 5: 1},
 		ExtraLowBucket:    1,
 		ExtraHighBucket:   1,
-		Max:               1 << 62,
+		Max:               9223372036854779046,
 		Min:               -3.14,
-		Sum:               1<<62 + 1 + 5 + 1 - 3.14,
+		Sum:               math.MaxInt64 + 3239 + 5 + 1 - 3.14,
 		Count:             4,
 		MinimumResolution: 1.0,
 	}
@@ -283,7 +284,7 @@ func TestHistogramAsProto(t *testing.T) {
 		},
 		{
 			name: "UntrackableValues",
-			vals: []float64{-0.23, 1<<62 + 1},
+			vals: []float64{-0.23, 1<<64 - 1},
 			exp: &pbcloud.TrendHdrValue{
 				ExtraLowValuesCounter:  uint32ptr(1),
 				ExtraHighValuesCounter: uint32ptr(1),
@@ -291,8 +292,8 @@ func TestHistogramAsProto(t *testing.T) {
 				Spans:                  nil,
 				Count:                  2,
 				MinValue:               -0.23,
-				MaxValue:               1<<62 + 1,
-				Sum:                    (1 << 62) + 1 - 0.23,
+				MaxValue:               1<<64 - 1,
+				Sum:                    (1 << 64) - 1 - 0.23,
 			},
 		},
 		{
