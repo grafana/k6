@@ -65,7 +65,7 @@ jobs:
               echo "skipping $f on Windows"
               continue
             fi
-            ./k6extension run "$f"
+            ./k6extension run -q "$f"
           done
       - name: Check screenshot
         if: matrix.go != 'tip' || matrix.platform != 'windows-latest'
