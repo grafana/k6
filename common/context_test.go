@@ -9,6 +9,8 @@ import (
 )
 
 func TestContextWithDoneChan(t *testing.T) {
+	t.Parallel()
+
 	done := make(chan struct{})
 	ctx := contextWithDoneChan(context.Background(), done)
 	close(done)

@@ -299,8 +299,7 @@ func TestElementHandleIsChecked(t *testing.T) {
 }
 
 func TestElementHandleQueryAll(t *testing.T) {
-	// tests are faster than parallel execution.
-	// do not make this test parallel.
+	t.Parallel()
 
 	const (
 		wantLiLen = 2
@@ -316,6 +315,8 @@ func TestElementHandleQueryAll(t *testing.T) {
   	`, nil)
 
 	t.Run("element_handle", func(t *testing.T) {
+		t.Parallel()
+
 		el, err := p.Query("#aul")
 		require.NoError(t, err)
 
@@ -325,12 +326,16 @@ func TestElementHandleQueryAll(t *testing.T) {
 		assert.Equal(t, wantLiLen, len(els))
 	})
 	t.Run("page", func(t *testing.T) {
+		t.Parallel()
+
 		els, err := p.QueryAll(query)
 		require.NoError(t, err)
 
 		assert.Equal(t, wantLiLen, len(els))
 	})
 	t.Run("frame", func(t *testing.T) {
+		t.Parallel()
+
 		els, err := p.MainFrame().QueryAll(query)
 		require.NoError(t, err)
 		assert.Equal(t, wantLiLen, len(els))

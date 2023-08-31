@@ -19,9 +19,13 @@ import (
 )
 
 func TestConnection(t *testing.T) {
+	t.Parallel()
+
 	server := ws.NewServer(t, ws.WithEchoHandler("/echo"))
 
 	t.Run("connect", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/echo", url.Host)
@@ -33,9 +37,13 @@ func TestConnection(t *testing.T) {
 }
 
 func TestConnectionClosureAbnormal(t *testing.T) {
+	t.Parallel()
+
 	server := ws.NewServer(t, ws.WithClosureAbnormalHandler("/closure-abnormal"))
 
 	t.Run("closure abnormal", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/closure-abnormal", url.Host)
@@ -50,9 +58,13 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 }
 
 func TestConnectionSendRecv(t *testing.T) {
+	t.Parallel()
+
 	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", ws.CDPDefaultHandler, nil))
 
 	t.Run("send command with empty reply", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
@@ -67,6 +79,8 @@ func TestConnectionSendRecv(t *testing.T) {
 }
 
 func TestConnectionCreateSession(t *testing.T) {
+	t.Parallel()
+
 	cmdsReceived := make([]cdproto.MethodType, 0)
 	handler := func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
 		if msg.SessionID == "" && msg.Method != "" {
@@ -116,6 +130,8 @@ func TestConnectionCreateSession(t *testing.T) {
 	server := ws.NewServer(t, ws.WithCDPHandler("/cdp", handler, &cmdsReceived))
 
 	t.Run("create session for target", func(t *testing.T) {
+		t.Parallel()
+
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)

@@ -12,6 +12,8 @@ import (
 // tests. Since we don't yet have any of them, it makes sense to keep
 // this test.
 func TestPageLocator(t *testing.T) {
+	t.Parallel()
+
 	const (
 		wantMainFrameID = "1"
 		wantSelector    = "span"
