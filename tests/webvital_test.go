@@ -112,7 +112,13 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 	}()
 
 	page := browser.NewPage(nil)
-	resp, err := page.Goto(browser.staticURL("/web_vitals.html"), nil)
+	resp, err := page.Goto(
+		browser.staticURL("web_vitals.html"),
+		browser.toGojaValue(map[string]any{
+			// wait until the page is completely loaded.
+			"waitUntil": "networkidle",
+		}),
+	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
