@@ -26,9 +26,6 @@ import (
 var (
 	_ EventEmitter       = &BrowserContext{}
 	_ api.BrowserContext = &BrowserContext{}
-
-	//nolint:gochecknoglobals
-	k6ObjScript = "window.k6 = {};"
 )
 
 // BrowserContext stores context information for a single independent browser session.
@@ -69,7 +66,7 @@ func NewBrowserContext(
 	}
 
 	rt := b.vu.Runtime()
-	k6Obj := rt.ToValue(k6ObjScript)
+	k6Obj := rt.ToValue(js.K6ObjectScript)
 	wv := rt.ToValue(js.WebVitalIIFEScript)
 	wvi := rt.ToValue(js.WebVitalInitScript)
 

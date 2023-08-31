@@ -34,7 +34,7 @@ func TestNewBrowserContext(t *testing.T) {
 				webVitalIIFEScriptFound = true
 			case js.WebVitalInitScript:
 				webVitalInitScriptFound = true
-			case k6ObjScript:
+			case js.K6ObjectScript:
 				k6ObjScriptFound = true
 			default:
 				assert.Fail(t, "script is neither WebVitalIIFEScript, WebVitalInitScript, nor k6ObjScript")
