@@ -434,6 +434,8 @@ func TestBrowserContextCookies(t *testing.T) {
 }
 
 func TestK6Object(t *testing.T) {
+	t.Parallel()
+
 	b := newTestBrowser(t, withFileServer())
 	p := b.NewPage(nil)
 
