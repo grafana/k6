@@ -16,8 +16,8 @@ body:
       required: true
   - type: textarea
     attributes:
-      label: Suggestion
-      description: Do you have a suggestion to close the issue?
+      label: How?
+      description: Do you have any suggestions/solutions on how to solve the issue?
     validations:
       required: false
   - type: textarea
