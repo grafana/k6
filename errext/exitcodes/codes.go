@@ -29,7 +29,7 @@ const (
 	GenericTimeout ExitCode = 102 // TODO: remove?
 
 	// ScriptStoppedFromRESTAPI indicates the execution has been
-	// stopped by a call to the REST API.
+	// stopped by a call to the k6's REST API.
 	ScriptStoppedFromRESTAPI ExitCode = 103
 
 	// InvalidConfig indicates an invalid configuration.
