@@ -130,6 +130,8 @@ func TestHistogramAddWithSimpleValues(t *testing.T) {
 		t.Run(strconv.Itoa(i), func(t *testing.T) {
 			t.Parallel()
 			h := newHistogram()
+			// We use a lower resolution instead of the default
+			// so we can keep smaller numbers in this test
 			h.MinimumResolution = 1.0
 			for _, v := range tc.vals {
 				h.Add(v)
@@ -188,7 +190,6 @@ func TestHistogramAddWithNegativeNum(t *testing.T) {
 	t.Parallel()
 
 	h := newHistogram()
-	h.MinimumResolution = 1.0
 	h.Add(-2.42314)
 
 	exp := &histogram{
@@ -199,7 +200,7 @@ func TestHistogramAddWithNegativeNum(t *testing.T) {
 		ExtraHighBucket:   0,
 		Sum:               -2.42314,
 		Count:             1,
-		MinimumResolution: 1.0,
+		MinimumResolution: .001,
 	}
 	assert.Equal(t, exp, h)
 }
@@ -207,7 +208,6 @@ func TestHistogramAddWithNegativeNum(t *testing.T) {
 func TestHistogramAddWithMultipleNegativeNums(t *testing.T) {
 	t.Parallel()
 	h := newHistogram()
-	h.MinimumResolution = 1.0
 	for _, v := range []float64{-0.001, -0.001, -0.001} {
 		h.Add(v)
 	}
@@ -220,9 +220,8 @@ func TestHistogramAddWithMultipleNegativeNums(t *testing.T) {
 		Min:               -0.001,
 		Sum:               -0.003,
 		Count:             3,
-		MinimumResolution: 1.0,
+		MinimumResolution: .001,
 	}
-	h.MinimumResolution = 1.0
 	assert.Equal(t, exp, h)
 }
 
@@ -257,7 +256,7 @@ func TestNewHistoram(t *testing.T) {
 		Max:               -math.MaxFloat64,
 		Min:               math.MaxFloat64,
 		Sum:               0,
-		MinimumResolution: 0.001,
+		MinimumResolution: .001,
 	}
 	assert.Equal(t, exp, h)
 }
@@ -283,8 +282,9 @@ func TestHistogramAsProto(t *testing.T) {
 			},
 		},
 		{
-			name: "UntrackableValues",
-			vals: []float64{-0.23, 1<<64 - 1},
+			name:          "UntrackableValues",
+			vals:          []float64{-0.23, 1<<64 - 1},
+			minResolution: 1.0,
 			exp: &pbcloud.TrendHdrValue{
 				ExtraLowValuesCounter:  uint32ptr(1),
 				ExtraHighValuesCounter: uint32ptr(1),
@@ -294,11 +294,13 @@ func TestHistogramAsProto(t *testing.T) {
 				MinValue:               -0.23,
 				MaxValue:               1<<64 - 1,
 				Sum:                    (1 << 64) - 1 - 0.23,
+				MinResolution:          1.0,
 			},
 		},
 		{
-			name: "SimpleValues",
-			vals: []float64{7, 8, 9, 11, 12, 11.5, 10.5},
+			name:          "SimpleValuesWithLowerResolution",
+			vals:          []float64{7, 8, 9, 11, 12, 11.5, 10.5},
+			minResolution: 1.0,
 			exp: &pbcloud.TrendHdrValue{
 				Count:                  7,
 				ExtraLowValuesCounter:  nil,
@@ -306,16 +308,42 @@ func TestHistogramAsProto(t *testing.T) {
 				Counters:               []uint32{1, 1, 1, 2, 2},
 				Spans: []*pbcloud.BucketSpan{
 					{Offset: 7, Length: 3},
-					{Offset: 1, Length: 2},
+					{Offset: 1, Length: 2}, // 11
 				},
-				MinValue: 7,
-				MaxValue: 12,
-				Sum:      69,
+				MinValue:      7,
+				MaxValue:      12,
+				Sum:           69,
+				MinResolution: 1.0,
 			},
 		},
 		{
-			name: "WithZeroPointValues",
-			vals: []float64{2, 0.01, 3},
+			name:          "SimpleValues",
+			vals:          []float64{7, 8, 9, 11, 12, 11.5, 10.5},
+			minResolution: .001,
+			exp: &pbcloud.TrendHdrValue{
+				Count:                  7,
+				ExtraLowValuesCounter:  nil,
+				ExtraHighValuesCounter: nil,
+				Counters:               []uint32{1, 1, 1, 1, 1, 1, 1},
+				Spans: []*pbcloud.BucketSpan{
+					{Offset: 858, Length: 1},
+					{Offset: 31, Length: 1}, // 890
+					{Offset: 17, Length: 1}, // 908
+					{Offset: 23, Length: 1}, // 932
+					{Offset: 6, Length: 1},  // 939
+					{Offset: 7, Length: 1},  // 947
+					{Offset: 7, Length: 1},  // 955
+				},
+				MinValue:      7,
+				MaxValue:      12,
+				Sum:           69,
+				MinResolution: .001,
+			},
+		},
+		{
+			name:          "WithZeroPointValues",
+			vals:          []float64{2, 0.01, 3},
+			minResolution: .001,
 			exp: &pbcloud.TrendHdrValue{
 				Count:                  3,
 				ExtraLowValuesCounter:  nil,
@@ -323,18 +351,28 @@ func TestHistogramAsProto(t *testing.T) {
 				Counters:               []uint32{1, 1, 1},
 				Spans: []*pbcloud.BucketSpan{
 					{
-						Offset: 1,
-						Length: 3,
+						Offset: 10,
+						Length: 1,
+					},
+					{
+						Offset: 623,
+						Length: 1,
+					},
+					{
+						Offset: 64,
+						Length: 1,
 					},
 				},
-				MinValue: 0.01,
-				MaxValue: 3,
-				Sum:      5.01,
+				MinValue:      0.01,
+				MaxValue:      3,
+				Sum:           5.01,
+				MinResolution: .001,
 			},
 		},
 		{
-			name: "VeryBasic",
-			vals: []float64{2, 1.1, 3},
+			name:          "VeryBasic",
+			vals:          []float64{2, 1.1, 3},
+			minResolution: 1.0,
 			exp: &pbcloud.TrendHdrValue{
 				Count:                  3,
 				ExtraLowValuesCounter:  nil,
@@ -346,9 +384,10 @@ func TestHistogramAsProto(t *testing.T) {
 						Length: 2,
 					},
 				},
-				MinValue: 1.1,
-				MaxValue: 3,
-				Sum:      6.1,
+				MinValue:      1.1,
+				MaxValue:      3,
+				Sum:           6.1,
+				MinResolution: 1.0,
 			},
 		},
 		{
@@ -358,6 +397,9 @@ func TestHistogramAsProto(t *testing.T) {
 				163.85, 4105, 835.27, 52, 18.28, 238.44, 39751, 18.86,
 				967.05, 967.01, 967, 4123.5, 270.69, 677.27,
 			},
+			// It uses 1.0 as resolution for keeping numbers smaller
+			// and the test more controllable.
+			minResolution: 1.0,
 			// Sorted:
 			//     18.28,18.49,18.86,52,52.25,163.85,
 			//     238.44,268.85,270.69,383.47,677.27,835.27,967,967.01,967.05
@@ -388,11 +430,13 @@ func TestHistogramAsProto(t *testing.T) {
 				MinValue:               18.28,
 				MaxValue:               39751,
 				Sum:                    56153.280000000006,
+				MinResolution:          1.0,
 			},
 		},
 		{
-			name: "Unrealistic",
-			vals: []float64{math.MaxUint32},
+			name:          "Unrealistic",
+			vals:          []float64{math.MaxUint32},
+			minResolution: .001,
 			exp: &pbcloud.TrendHdrValue{
 				Count:                  1,
 				ExtraLowValuesCounter:  nil,
@@ -400,13 +444,14 @@ func TestHistogramAsProto(t *testing.T) {
 				Counters:               []uint32{1},
 				Spans: []*pbcloud.BucketSpan{
 					{
-						Offset: 3327,
+						Offset: 4601,
 						Length: 1,
 					},
 				},
-				MinValue: math.MaxUint32,
-				MaxValue: math.MaxUint32,
-				Sum:      math.MaxUint32,
+				MinValue:      math.MaxUint32,
+				MaxValue:      math.MaxUint32,
+				Sum:           math.MaxUint32,
+				MinResolution: .001,
 			},
 		},
 		{
@@ -417,7 +462,7 @@ func TestHistogramAsProto(t *testing.T) {
 				Count:                  3,
 				ExtraLowValuesCounter:  nil,
 				ExtraHighValuesCounter: nil,
-				MinResolution:          float64ptr(defaultMinimumResolution),
+				MinResolution:          defaultMinimumResolution,
 				Counters:               []uint32{1, 2},
 				Spans: []*pbcloud.BucketSpan{
 					{
@@ -442,12 +487,6 @@ func TestHistogramAsProto(t *testing.T) {
 			t.Parallel()
 
 			h := newHistogram()
-			// TODO: refactor
-			// An hack for preserving as the default for the tests the old value 1.0
-			if tc.minResolution == 0 {
-				tc.minResolution = 1.0
-				tc.exp.MinResolution = float64ptr(1.0)
-			}
 			h.MinimumResolution = tc.minResolution
 
 			for _, v := range tc.vals {
@@ -461,8 +500,4 @@ func TestHistogramAsProto(t *testing.T) {
 			assert.Equal(t, tc.exp, hproto, tc.name)
 		})
 	}
-}
-
-func float64ptr(n float64) *float64 {
-	return &n
 }
