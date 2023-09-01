@@ -39,7 +39,7 @@ export default async function() {
       page.locator('input[type="submit"]').click(),
     ]);
     check(page, {
-      'header': page => page.locator('h2').textContent() == 'Welcome, admin!',
+      'header': p => p.locator('h2').textContent() == 'Welcome, admin!',
     });
 
     // Check whether we receive cookies from the logged site.
