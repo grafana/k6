@@ -143,13 +143,14 @@ func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 	}
 
 	hval := &pbcloud.TrendHdrValue{
-		Time:     timestampAsProto(time),
-		MinValue: h.Min,
-		MaxValue: h.Max,
-		Sum:      h.Sum,
-		Count:    h.Count,
-		Counters: counters,
-		Spans:    spans,
+		Time:          timestampAsProto(time),
+		MinValue:      h.Min,
+		MaxValue:      h.Max,
+		Sum:           h.Sum,
+		Count:         h.Count,
+		Counters:      counters,
+		Spans:         spans,
+		MinResolution: h.MinimumResolution,
 	}
 	if h.ExtraLowBucket > 0 {
 		hval.ExtraLowValuesCounter = &h.ExtraLowBucket
@@ -157,9 +158,6 @@ func histogramAsProto(h *histogram, time int64) *pbcloud.TrendHdrValue {
 	if h.ExtraHighBucket > 0 {
 		hval.ExtraHighValuesCounter = &h.ExtraHighBucket
 	}
-	// We don't expect to change the minimum resolution at runtime
-	// so it is safe use directly a pointer without creating a copy
-	hval.MinResolution = &h.MinimumResolution
 	return hval
 }
 

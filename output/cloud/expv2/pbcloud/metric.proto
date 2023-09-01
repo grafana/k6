@@ -144,9 +144,10 @@ message TrendHdrValue {
   optional uint32 extra_low_values_counter = 9;
   optional uint32 extra_high_values_counter = 10;
 
-  // histogram parameter - value multiplier aka smallest value
+  // min_resolution is a multiplier factor applied to the tracked values of the histogram.
+  // It is helpful for up and down scaling values and representing different orders of magnitude.
   // default = 1.0
-  optional double min_resolution = 11;
+  double min_resolution = 11;
 
   // histogram parameter - number of significant digits used to calculate buckets formula
   // default = 2
