@@ -6,3 +6,6 @@ contact_links:
   - name: xk6-browser Documentation
     url: https://github.com/grafana/k6-docs
     about: Please add any documentation related issues here.
+  - name: xk6-browser Migration Guide
+    url: https://k6.io/docs/using-k6-browser/migrating-to-k6-v0-46/
+    about: Please review the guide if you're migrating to k6 v0.46+ from an older version of xk6-browser.
