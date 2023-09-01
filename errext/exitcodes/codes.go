@@ -40,7 +40,7 @@ const (
 	// than a failure.
 	ExternalAbort ExitCode = 105
 
-	// CannotStartRESTAPI indicates the REST API server could not be started.
+	// CannotStartRESTAPI indicates the k6's REST API server could not be started.
 	CannotStartRESTAPI ExitCode = 106
 
 	// ScriptException indicates an exception was thrown during the
