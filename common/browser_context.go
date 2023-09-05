@@ -446,7 +446,7 @@ func (b *BrowserContext) getSession(id target.SessionID) *Session {
 func (b *BrowserContext) AddCookies(cookies goja.Value) error {
 	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
 
-	var cookieParams []network.CookieParam
+	var cookieParams []*network.CookieParam
 	if !gojaValueExists(cookies) {
 		return Error("cookies argument must be set")
 	}
@@ -454,10 +454,7 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) error {
 		return fmt.Errorf("cannot recognize cookie values: %w", err)
 	}
 
-	coookiesToSet := make([]*network.CookieParam, len(cookieParams))
-	for i, cookie := range cookieParams {
-		c := cookie
-
+	for _, c := range cookieParams {
 		if c.Name == "" {
 			return fmt.Errorf("cookie name must be set: %#v", c)
 		}
@@ -469,11 +466,10 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) error {
 			const msg = "if cookie URL is not provided, both domain and path must be specified: %#v"
 			return fmt.Errorf(msg, c)
 		}
-		coookiesToSet[i] = &c
 	}
 
 	setCookies := storage.
-		SetCookies(coookiesToSet).
+		SetCookies(cookieParams).
 		WithBrowserContextID(b.id)
 	if err := setCookies.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
 		return fmt.Errorf("cannot set cookies: %w", err)
