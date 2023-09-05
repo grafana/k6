@@ -457,7 +457,14 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) error {
 	return b.addCookies(cookieParams)
 }
 
+// addCookies is like AddCookies but accepts a slice of cookies instead
+// of a goja.Value array.
 func (b *BrowserContext) addCookies(cookies []*api.Cookie) error {
+	// skip work if no cookies provided.
+	if len(cookies) == 0 {
+		return fmt.Errorf("no cookies provided")
+	}
+
 	cookiesToSet := make([]*network.CookieParam, 0, len(cookies))
 	for _, c := range cookies {
 		if c.Name == "" {
