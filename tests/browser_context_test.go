@@ -20,23 +20,21 @@ func TestBrowserContextAddCookies(t *testing.T) {
 
 		tb := newTestBrowser(t, withFileServer())
 
-		testCookieName := "test_cookie_name"
-		testCookieValue := "test_cookie_value"
+		const (
+			testCookieName  = "test_cookie_name"
+			testCookieValue = "test_cookie_value"
+		)
 
 		bc, err := tb.NewContext(nil)
 		require.NoError(t, err)
-		cookies, err := tb.runJavaScript(`
-			[
-				{
-					name: "%v",
-					value: "%v",
-					url: "%v"
-				}
-			];
-		`, testCookieName, testCookieValue, tb.url(""))
+		err = bc.AddCookies([]*api.Cookie{
+			{
+				Name:  testCookieName,
+				Value: testCookieValue,
+				URL:   tb.url(""),
+			},
+		})
 		require.NoError(t, err)
-
-		bc.AddCookies(cookies)
 
 		p, err := bc.NewPage()
 		require.NoError(t, err)
@@ -57,113 +55,99 @@ func TestBrowserContextAddCookies(t *testing.T) {
 
 	errorTests := []struct {
 		description string
-		cookiesCmd  string
+		cookies     []*api.Cookie
 		shouldFail  bool
 	}{
 		{
 			description: "nil_cookies",
-			cookiesCmd:  "",
+			cookies:     nil,
 			shouldFail:  true,
 		},
 		{
-			description: "goja_null_cookies",
-			cookiesCmd:  "null;",
-			shouldFail:  true,
-		},
-		{
-			description: "goja_undefined_cookies",
-			cookiesCmd:  "undefined;",
-			shouldFail:  true,
-		},
-		{
-			description: "goja_cookies_object",
-			cookiesCmd: `
-				({
-					name: "test_cookie_name",
-					value: "test_cookie_value",
-					url: "http://test.go",
-				});
-			`,
-			shouldFail: true,
-		},
-		{
-			description: "goja_cookies_string",
-			cookiesCmd:  `"test_cookie_name=test_cookie_value"`,
-			shouldFail:  true,
+			description: "cookie",
+			cookies: []*api.Cookie{
+				{
+					Name:  "test_cookie_name",
+					Value: "test_cookie_value",
+					URL:   "http://test.go",
+				},
+			},
+			shouldFail: false,
 		},
 		{
 			description: "cookie_missing_name",
-			cookiesCmd: `[
+			cookies: []*api.Cookie{
 				{
-					value: "test_cookie_value",
-					url: "http://test.go",
-				}
-			];`,
+					Value: "test_cookie_value",
+					URL:   "http://test.go",
+				},
+			},
 			shouldFail: true,
 		},
 		{
 			description: "cookie_missing_value",
-			cookiesCmd: `[
+			cookies: []*api.Cookie{
 				{
-					name: "test_cookie_name",
-					url: "http://test.go",
-				}
-			];`,
+					Name: "test_cookie_name",
+					URL:  "http://test.go",
+				},
+			},
 			shouldFail: true,
 		},
 		{
 			description: "cookie_missing_url",
-			cookiesCmd: `[
+			cookies: []*api.Cookie{
 				{
-					name: "test_cookie_name",
-					value: "test_cookie_value",
-				}
-			];`,
+					Name:  "test_cookie_name",
+					Value: "test_cookie_value",
+				},
+			},
 			shouldFail: true,
 		},
 		{
 			description: "cookies_missing_path",
-			cookiesCmd: `[
+			cookies: []*api.Cookie{
 				{
-					name: "test_cookie_name",
-					value: "test_cookie_value",
-					domain: "http://test.go",
-				}
-			];`,
+					Name:   "test_cookie_name",
+					Value:  "test_cookie_value",
+					Domain: "test.go",
+				},
+			},
 			shouldFail: true,
 		},
 		{
 			description: "cookies_missing_domain",
-			cookiesCmd: `[
+			cookies: []*api.Cookie{
 				{
-					name: "test_cookie_name",
-					value: "test_cookie_value",
-					path: "/to/page",
-				}
-			];`,
+					Name:  "test_cookie_name",
+					Value: "test_cookie_value",
+					Path:  "/to/page",
+				},
+			},
 			shouldFail: true,
 		},
+
 		{
 			description: "cookie_with_url",
-			cookiesCmd: `[
+			cookies: []*api.Cookie{
 				{
-					name: "test_cookie_name",
-					value: "test_cookie_value",
-					url: "http://test.go",
-				}
-			];`,
+					Name:  "test_cookie_name",
+					Value: "test_cookie_value",
+					URL:   "http://test.go",
+				},
+			},
 			shouldFail: false,
 		},
 		{
 			description: "cookie_with_domain_and_path",
-			cookiesCmd: `[
+			cookies: []*api.Cookie{
 				{
-					name: "test_cookie_name",
-					value: "test_cookie_value",
-					domain: "http://test.go",
-					path: "/to/page",
-				}
-			];`,
+					Name:   "test_cookie_name",
+					Value:  "test_cookie_value",
+					Domain: "test.go",
+					Path:   "/to/page",
+				},
+			},
 			shouldFail: false,
 		},
 	}
@@ -173,22 +157,15 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
-
-			var cookies goja.Value
-			if tt.cookiesCmd != "" {
-				var err error
-				cookies, err = tb.runJavaScript(tt.cookiesCmd)
-				require.NoError(t, err)
-			}
-
 			bc, err := tb.NewContext(nil)
 			require.NoError(t, err)
 
+			err = bc.AddCookies(tt.cookies)
 			if tt.shouldFail {
-				require.Error(t, bc.AddCookies(cookies))
+				require.Error(t, err)
 				return
 			}
-			require.NoError(t, bc.AddCookies(cookies))
+			require.NoError(t, err)
 		})
 	}
 }

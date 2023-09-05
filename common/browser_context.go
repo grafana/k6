@@ -443,23 +443,9 @@ func (b *BrowserContext) getSession(id target.SessionID) *Session {
 
 // AddCookies adds cookies into this browser context.
 // All pages within this context will have these cookies installed.
-func (b *BrowserContext) AddCookies(cookies goja.Value) error {
+func (b *BrowserContext) AddCookies(cookies []*api.Cookie) error {
 	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
 
-	var cookieParams []*api.Cookie
-	if !gojaValueExists(cookies) {
-		return Error("cookies argument must be set")
-	}
-	if err := b.vu.Runtime().ExportTo(cookies, &cookieParams); err != nil {
-		return fmt.Errorf("cannot recognize cookie values: %w", err)
-	}
-
-	return b.addCookies(cookieParams)
-}
-
-// addCookies is like AddCookies but accepts a slice of cookies instead
-// of a goja.Value array.
-func (b *BrowserContext) addCookies(cookies []*api.Cookie) error {
 	// skip work if no cookies provided.
 	if len(cookies) == 0 {
 		return fmt.Errorf("no cookies provided")
