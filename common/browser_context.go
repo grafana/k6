@@ -454,8 +454,12 @@ func (b *BrowserContext) AddCookies(cookies goja.Value) error {
 		return fmt.Errorf("cannot recognize cookie values: %w", err)
 	}
 
-	cookiesToSet := make([]*network.CookieParam, 0, len(cookieParams))
-	for _, c := range cookieParams {
+	return b.addCookies(cookieParams)
+}
+
+func (b *BrowserContext) addCookies(cookies []*api.Cookie) error {
+	cookiesToSet := make([]*network.CookieParam, 0, len(cookies))
+	for _, c := range cookies {
 		if c.Name == "" {
 			return fmt.Errorf("cookie name must be set: %#v", c)
 		}
