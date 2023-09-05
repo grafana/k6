@@ -53,13 +53,12 @@ func TestBrowserContextAddCookies(t *testing.T) {
 		assert.EqualValues(t, fmt.Sprintf("%v=%v", testCookieName, testCookieValue), result)
 	})
 
-	tests := []struct {
-		description string
-		cookies     []*api.Cookie
-		shouldFail  bool
+	tests := map[string]struct {
+		name    string
+		cookies []*api.Cookie
+		wantErr bool
 	}{
-		{
-			description: "cookie",
+		"cookie": {
 			cookies: []*api.Cookie{
 				{
 					Name:  "test_cookie_name",
@@ -67,10 +66,9 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					URL:   "http://test.go",
 				},
 			},
-			shouldFail: false,
+			wantErr: false,
 		},
-		{
-			description: "cookie_with_url",
+		"cookie_with_url": {
 			cookies: []*api.Cookie{
 				{
 					Name:  "test_cookie_name",
@@ -78,10 +76,9 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					URL:   "http://test.go",
 				},
 			},
-			shouldFail: false,
+			wantErr: false,
 		},
-		{
-			description: "cookie_with_domain_and_path",
+		"cookie_with_domain_and_path": {
 			cookies: []*api.Cookie{
 				{
 					Name:   "test_cookie_name",
@@ -90,45 +87,40 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					Path:   "/to/page",
 				},
 			},
-			shouldFail: false,
+			wantErr: false,
 		},
-		{
-			description: "nil_cookies",
-			cookies:     nil,
-			shouldFail:  true,
+		"nil_cookies": {
+			cookies: nil,
+			wantErr: true,
 		},
-		{
-			description: "cookie_missing_name",
+		"cookie_missing_name": {
 			cookies: []*api.Cookie{
 				{
 					Value: "test_cookie_value",
 					URL:   "http://test.go",
 				},
 			},
-			shouldFail: true,
+			wantErr: true,
 		},
-		{
-			description: "cookie_missing_value",
+		"cookie_missing_value": {
 			cookies: []*api.Cookie{
 				{
 					Name: "test_cookie_name",
 					URL:  "http://test.go",
 				},
 			},
-			shouldFail: true,
+			wantErr: true,
 		},
-		{
-			description: "cookie_missing_url",
+		"cookie_missing_url": {
 			cookies: []*api.Cookie{
 				{
 					Name:  "test_cookie_name",
 					Value: "test_cookie_value",
 				},
 			},
-			shouldFail: true,
+			wantErr: true,
 		},
-		{
-			description: "cookies_missing_path",
+		"cookies_missing_path": {
 			cookies: []*api.Cookie{
 				{
 					Name:   "test_cookie_name",
@@ -136,10 +128,9 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					Domain: "test.go",
 				},
 			},
-			shouldFail: true,
+			wantErr: true,
 		},
-		{
-			description: "cookies_missing_domain",
+		"cookies_missing_domain": {
 			cookies: []*api.Cookie{
 				{
 					Name:  "test_cookie_name",
@@ -147,12 +138,12 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					Path:  "/to/page",
 				},
 			},
-			shouldFail: true,
+			wantErr: true,
 		},
 	}
-	for _, tt := range tests {
+	for name, tt := range tests {
 		tt := tt
-		t.Run(tt.description, func(t *testing.T) {
+		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
 			tb := newTestBrowser(t, withFileServer())
@@ -160,7 +151,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			require.NoError(t, err)
 
 			err = bc.AddCookies(tt.cookies)
-			if tt.shouldFail {
+			if tt.wantErr {
 				require.Error(t, err)
 				return
 			}
