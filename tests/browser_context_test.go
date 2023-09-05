@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"fmt"
 	"net/http"
 	"testing"
 
@@ -15,48 +14,11 @@ import (
 func TestBrowserContextAddCookies(t *testing.T) {
 	t.Parallel()
 
-	t.Run("document_cookies", func(t *testing.T) {
-		t.Parallel()
-
-		tb := newTestBrowser(t, withFileServer())
-
-		const (
-			testCookieName  = "test_cookie_name"
-			testCookieValue = "test_cookie_value"
-		)
-
-		bc, err := tb.NewContext(nil)
-		require.NoError(t, err)
-		err = bc.AddCookies([]*api.Cookie{
-			{
-				Name:  testCookieName,
-				Value: testCookieValue,
-				URL:   tb.url(""),
-			},
-		})
-		require.NoError(t, err)
-
-		p, err := bc.NewPage()
-		require.NoError(t, err)
-
-		_, err = p.Goto(
-			tb.staticURL("add_cookies.html"),
-			tb.toGojaValue(struct {
-				WaitUntil string `js:"waitUntil"`
-			}{
-				WaitUntil: "load",
-			}),
-		)
-		require.NoError(t, err)
-
-		result := p.TextContent("#cookies", nil)
-		assert.EqualValues(t, fmt.Sprintf("%v=%v", testCookieName, testCookieValue), result)
-	})
-
 	tests := map[string]struct {
-		name    string
-		cookies []*api.Cookie
-		wantErr bool
+		name             string
+		cookies          []*api.Cookie
+		wantCookiesToSet []*api.Cookie
+		wantErr          bool
 	}{
 		"cookie": {
 			cookies: []*api.Cookie{
@@ -64,6 +26,18 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					Name:  "test_cookie_name",
 					Value: "test_cookie_value",
 					URL:   "http://test.go",
+				},
+			},
+			wantCookiesToSet: []*api.Cookie{
+				{
+					Name:     "test_cookie_name",
+					Value:    "test_cookie_value",
+					Domain:   "test.go",
+					Expires:  -1,
+					HTTPOnly: false,
+					Path:     "/",
+					SameSite: "",
+					Secure:   false,
 				},
 			},
 			wantErr: false,
@@ -76,6 +50,18 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					URL:   "http://test.go",
 				},
 			},
+			wantCookiesToSet: []*api.Cookie{
+				{
+					Name:     "test_cookie_name",
+					Value:    "test_cookie_value",
+					Domain:   "test.go",
+					Expires:  -1,
+					HTTPOnly: false,
+					Path:     "/",
+					SameSite: "",
+					Secure:   false,
+				},
+			},
 			wantErr: false,
 		},
 		"cookie_with_domain_and_path": {
@@ -85,6 +71,18 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					Value:  "test_cookie_value",
 					Domain: "test.go",
 					Path:   "/to/page",
+				},
+			},
+			wantCookiesToSet: []*api.Cookie{
+				{
+					Name:     "test_cookie_name",
+					Value:    "test_cookie_value",
+					Domain:   "test.go",
+					Expires:  -1,
+					HTTPOnly: false,
+					Path:     "/to/page",
+					SameSite: "",
+					Secure:   false,
 				},
 			},
 			wantErr: false,
@@ -156,6 +154,20 @@ func TestBrowserContextAddCookies(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
+
+			// ensure cookies are set.
+			cookies, err := bc.Cookies()
+			require.NoErrorf(t,
+				err, "failed to get cookies from the browser context",
+			)
+			require.Lenf(t,
+				tt.wantCookiesToSet, len(tt.cookies),
+				"incorrect number of cookies received from the browser context",
+			)
+			assert.Equalf(t,
+				tt.wantCookiesToSet, cookies,
+				"incorrect cookies received from the browser context",
+			)
 		})
 	}
 }
