@@ -163,11 +163,13 @@ jobs:
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
 
-      - name: Log into ghcr.io
+      - name: Log into registries (ghcr.io and Docker Hub)
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         run: |
           # Log into GitHub Container Registry
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
+          # Log into Docker Hub Registry
+          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
       - name: Publish k6:master image to ghcr.io
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
@@ -202,13 +204,6 @@ jobs:
               --platform linux/amd64,linux/arm64 \
               -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
           fi
-
-      - name: Log into Docker Hub
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          # Log into Docker Hub Registry
-          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
-
       - name: Publish k6:master image to Docker Hub
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
