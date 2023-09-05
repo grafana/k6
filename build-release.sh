@@ -10,7 +10,8 @@ export OUT_DIR="${1-dist}"
 export VERSION=${2:-$(git describe --tags --always --dirty)}
 
 # To overwrite the version details, pass something as the third arg. Empty string disables it.
-export VERSION_DETAILS=${3-"$(date -u +"%FT%T%z")/$(git describe --tags --always --long --dirty)"}
+export COMMIT_DATE=$(git log -1 --format=%at $VERSION | { read d ; date -u +"%FT%T%z" -d @"$d" ; })
+export VERSION_DETAILS=${3-"${COMMIT_DATE}/$(git describe --tags --always --long --dirty)"}
 set +x
 
 build() {
