@@ -15,7 +15,7 @@ import (
 func TestBrowserContextAddCookies(t *testing.T) {
 	t.Parallel()
 
-	t.Run("happy_path", func(t *testing.T) {
+	t.Run("document_cookies", func(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t, withFileServer())
@@ -53,16 +53,11 @@ func TestBrowserContextAddCookies(t *testing.T) {
 		assert.EqualValues(t, fmt.Sprintf("%v=%v", testCookieName, testCookieValue), result)
 	})
 
-	errorTests := []struct {
+	tests := []struct {
 		description string
 		cookies     []*api.Cookie
 		shouldFail  bool
 	}{
-		{
-			description: "nil_cookies",
-			cookies:     nil,
-			shouldFail:  true,
-		},
 		{
 			description: "cookie",
 			cookies: []*api.Cookie{
@@ -73,6 +68,34 @@ func TestBrowserContextAddCookies(t *testing.T) {
 				},
 			},
 			shouldFail: false,
+		},
+		{
+			description: "cookie_with_url",
+			cookies: []*api.Cookie{
+				{
+					Name:  "test_cookie_name",
+					Value: "test_cookie_value",
+					URL:   "http://test.go",
+				},
+			},
+			shouldFail: false,
+		},
+		{
+			description: "cookie_with_domain_and_path",
+			cookies: []*api.Cookie{
+				{
+					Name:   "test_cookie_name",
+					Value:  "test_cookie_value",
+					Domain: "test.go",
+					Path:   "/to/page",
+				},
+			},
+			shouldFail: false,
+		},
+		{
+			description: "nil_cookies",
+			cookies:     nil,
+			shouldFail:  true,
 		},
 		{
 			description: "cookie_missing_name",
@@ -126,32 +149,8 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			},
 			shouldFail: true,
 		},
-
-		{
-			description: "cookie_with_url",
-			cookies: []*api.Cookie{
-				{
-					Name:  "test_cookie_name",
-					Value: "test_cookie_value",
-					URL:   "http://test.go",
-				},
-			},
-			shouldFail: false,
-		},
-		{
-			description: "cookie_with_domain_and_path",
-			cookies: []*api.Cookie{
-				{
-					Name:   "test_cookie_name",
-					Value:  "test_cookie_value",
-					Domain: "test.go",
-					Path:   "/to/page",
-				},
-			},
-			shouldFail: false,
-		},
 	}
-	for _, tt := range errorTests {
+	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.description, func(t *testing.T) {
 			t.Parallel()
