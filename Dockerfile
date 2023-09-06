@@ -37,7 +37,6 @@ USER k6
 ENV CHROME_BIN=/usr/bin/chromium-browser
 ENV CHROME_PATH=/usr/lib/chromium/
 
-ENV K6_BROWSER_ENABLED=true
 ENV K6_BROWSER_HEADLESS=true
 
 ENTRYPOINT ["k6"]
