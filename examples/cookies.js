@@ -60,12 +60,10 @@ export default async function () {
         expires: dayBefore
       }
     ]);
-
-    check(context.cookies().length, {
+    let cookies = context.cookies();
+    check(cookies.length, {
       'number of cookies should be 2': n => n === 2,
     });
-
-    const cookies = context.cookies();
     check(cookies[0], {
       'cookie 1 name should be testcookie': c => c.name === 'testcookie',
       'cookie 1 value should be 1': c => c.value === '1',
@@ -73,6 +71,41 @@ export default async function () {
     check(cookies[1], {
       'cookie 2 name should be testcookie2': c => c.name === 'testcookie2',
       'cookie 2 value should be 2': c => c.value === '2',
+    });
+
+    // let's add more cookies to filter by urls.
+    context.addCookies([
+      {
+        name: 'foo',
+        value: '42',
+        sameSite: 'Strict',
+        url: 'http://foo.com'
+      },
+      {
+        name: 'bar',
+        value: '43',
+        sameSite: 'Lax',
+        url: 'https://bar.com'
+      },
+      {
+        name: 'baz',
+        value: '44',
+        sameSite: 'Lax',
+        url: 'https://baz.com'
+      }
+    ]);
+
+    cookies = context.cookies('http://foo.com', 'https://baz.com');
+    check(cookies.length, {
+      'number of filtered cookies should be 2': n => n === 2,
+    });
+    check(cookies[0], {
+      'the first filtered cookie name should be foo': c => c.name === 'foo',
+      'the first filtered cookie value should be 42': c => c.value === '42',
+    });
+    check(cookies[1], {
+      'the second filtered cookie name should be baz': c => c.name === 'baz',
+      'the second filtered cookie value should be 44': c => c.value === '44',
     });
   } finally {
     page.close();
