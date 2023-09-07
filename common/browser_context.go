@@ -3,7 +3,9 @@ package common
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
@@ -511,7 +513,7 @@ func (b *BrowserContext) ClearCookies() error {
 // automatically taken from the browser context when it is created. And some of
 // them are set by the page, i.e., using the Set-Cookie HTTP header or via
 // JavaScript like document.cookie.
-func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) { //nolint:revive // TODO: remove
+func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) {
 	b.logger.Debugf("BrowserContext:Cookies", "bctxid:%v", b.id)
 
 	// get cookies from this browser context.
@@ -522,9 +524,8 @@ func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) { //noli
 		cdp.WithExecutor(b.ctx, b.browser.conn),
 	)
 	if err != nil {
-		return nil, fmt.Errorf("getting cookies from the browser context: %w", err)
+		return nil, fmt.Errorf("retrieving cookies: %w", err)
 	}
-
 	// return if no cookies found so we don't have to needlessly convert them.
 	// users can still work with cookies using the empty slice.
 	// like this: cookies.length === 0.
@@ -546,6 +547,131 @@ func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) { //noli
 			SameSite: api.CookieSameSite(c.SameSite),
 		}
 	}
+	// filter cookies by the provided URLs.
+	cookies, err = filterCookies(cookies, urls...)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving cookies: %w", err)
+	}
+	if len(cookies) == 0 {
+		return nil, nil
+	}
 
 	return cookies, nil
+}
+
+// filterCookies filters the given cookies based on URLs.
+// If an error occurs while parsing the cookie URLs, the error is returned.
+func filterCookies(cookies []*api.Cookie, urls ...string) ([]*api.Cookie, error) {
+	if len(urls) == 0 || len(cookies) == 0 {
+		return cookies, nil
+	}
+
+	purls, err := parseURLs(urls...)
+	if err != nil {
+		return nil, fmt.Errorf("filtering by URL: %w", err)
+	}
+
+	// the following algorithm is like a sorting algorithm,
+	// but instead of sorting, it filters the cookies slice
+	// in place, without allocating a new slice. this is
+	// done to avoid unnecessary allocations and copying
+	// of data.
+	//
+	// n is used to remember the last cookie that should be
+	// kept in the cookies slice. all cookies before n should
+	// be kept, all cookies after n should be removed. it
+	// constantly shifts cookies to be kept to the left in the
+	// slice, overwriting cookies that should be removed.
+	//
+	// if a cookie should not be kept, it will be overwritten
+	// by the next cookie that should be kept. if no cookies
+	// should be kept, a nil slice is returned. otherwise,
+	// the slice is truncated to the last cookie that should
+	// be kept.
+
+	var n int
+
+	for _, c := range cookies {
+		var keep bool
+
+		for _, uri := range purls {
+			if shouldFilterCookie(c, uri) {
+				keep = true
+				break
+			}
+		}
+		if !keep {
+			continue
+		}
+		cookies[n] = c
+		n++
+	}
+	// if no cookies should be kept, return nil instead of
+	// an empty slice to conform with the API error behavior.
+	// also makes tests concise.
+	if n == 0 {
+		return nil, nil
+	}
+
+	// remove all cookies after the last cookie that should be kept.
+	return cookies[:n], nil
+}
+
+// shouldFilterCookie determines whether a cookie should be kept,
+// based on its compatibility with a specific URL.
+// Returns true if the cookie should be kept, false otherwise.
+func shouldFilterCookie(c *api.Cookie, uri *url.URL) bool {
+	// Ensure consistent domain formatting for easier comparison.
+	// A leading dot means the cookie is valid across subdomains.
+	// For example, if the domain is example.com, then adding a
+	// dot turns it into .example.com, making the cookie valid
+	// for sub.example.com, another.example.com, etc.
+	domain := c.Domain
+	if !strings.HasPrefix(domain, ".") {
+		domain = "." + domain
+	}
+	// Confirm that the cookie's domain is a suffix of the URL's
+	// hostname, emulating how a browser would scope cookies to
+	// specific domains.
+	if !strings.HasSuffix("."+uri.Hostname(), domain) {
+		return false
+	}
+	// Follow RFC 6265 for cookies: an empty or missing path should
+	// be treated as "/".
+	//
+	// See: https://datatracker.ietf.org/doc/html/rfc6265#section-5.1.4
+	if uri.Path == "" {
+		uri.Path = "/"
+	}
+	// Ensure that the cookie applies to the specific path of the
+	// URL, emulating how a browser would scope cookies to specific
+	// paths within a domain.
+	if !strings.HasPrefix(uri.Path, c.Path) {
+		return false
+	}
+	// Emulate browser behavior: Don't include secure cookies when
+	// the scheme is not HTTPS, unless it's localhost.
+	if uri.Scheme != "https" && uri.Hostname() != "localhost" && c.Secure {
+		return false
+	}
+
+	// Keep the cookie.
+	return true
+}
+
+// parseURLs parses the given URLs.
+// If an error occurs while parsing a URL, the error is returned.
+func parseURLs(urls ...string) ([]*url.URL, error) {
+	purls := make([]*url.URL, len(urls))
+	for i, u := range urls {
+		uri, err := url.ParseRequestURI(
+			strings.TrimSpace(u),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", u, err)
+		}
+		purls[i] = uri
+	}
+
+	return purls, nil
 }
