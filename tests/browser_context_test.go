@@ -3,6 +3,7 @@ package tests
 import (
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
@@ -13,6 +14,13 @@ import (
 
 func TestBrowserContextAddCookies(t *testing.T) {
 	t.Parallel()
+
+	dayAfter := time.Now().
+		Add(24 * time.Hour).
+		Unix()
+	dayBefore := time.Now().
+		Add(-24 * time.Hour).
+		Unix()
 
 	tests := map[string]struct {
 		name             string
@@ -83,6 +91,47 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					Path:     "/to/page",
 					SameSite: "",
 					Secure:   false,
+				},
+			},
+			wantErr: false,
+		},
+		"cookie_with_expiration": {
+			cookies: []*api.Cookie{
+				// session cookie
+				{
+					Name:  "session_cookie",
+					Value: "session_cookie_value",
+					URL:   "http://test.go",
+				},
+				// persistent cookie
+				{
+					Name:    "persistent_cookie_name",
+					Value:   "persistent_cookie_value",
+					Expires: dayAfter,
+					URL:     "http://test.go",
+				},
+				// expired cookie
+				{
+					Name:    "expired_cookie_name",
+					Value:   "expired_cookie_value",
+					Expires: dayBefore,
+					URL:     "http://test.go",
+				},
+			},
+			wantCookiesToSet: []*api.Cookie{
+				{
+					Name:    "session_cookie",
+					Value:   "session_cookie_value",
+					Domain:  "test.go",
+					Expires: -1,
+					Path:    "/",
+				},
+				{
+					Name:    "persistent_cookie_name",
+					Value:   "persistent_cookie_value",
+					Domain:  "test.go",
+					Expires: dayAfter,
+					Path:    "/",
 				},
 			},
 			wantErr: false,
@@ -161,7 +210,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 				err, "failed to get cookies from the browser context",
 			)
 			require.Lenf(t,
-				tt.wantCookiesToSet, len(tt.cookies),
+				tt.wantCookiesToSet, len(cookies),
 				"incorrect number of cookies received from the browser context",
 			)
 			assert.Equalf(t,
