@@ -464,13 +464,19 @@ func (b *BrowserContext) AddCookies(cookies []*api.Cookie) error {
 			const msg = "if cookie URL is not provided, both domain and path must be specified: %#v"
 			return fmt.Errorf(msg, c)
 		}
+		// calculate the cookie expiration date, session cookie if not set.
+		var ts *cdp.TimeSinceEpoch
+		if c.Expires > 0 {
+			t := cdp.TimeSinceEpoch(time.Unix(c.Expires, 0))
+			ts = &t
+		}
 		cookiesToSet = append(cookiesToSet, &network.CookieParam{
 			Name:     c.Name,
 			Value:    c.Value,
 			Domain:   c.Domain,
 			Path:     c.Path,
 			URL:      c.URL,
-			Expires:  nil, // TODO: fix this
+			Expires:  ts,
 			HTTPOnly: c.HTTPOnly,
 			Secure:   c.Secure,
 			SameSite: network.CookieSameSite(c.SameSite),
