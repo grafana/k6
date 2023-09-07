@@ -511,7 +511,7 @@ func (b *BrowserContext) ClearCookies() error {
 // automatically taken from the browser context when it is created. And some of
 // them are set by the page, i.e., using the Set-Cookie HTTP header or via
 // JavaScript like document.cookie.
-func (b *BrowserContext) Cookies() ([]*api.Cookie, error) {
+func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) { //nolint:revive // TODO: remove
 	b.logger.Debugf("BrowserContext:Cookies", "bctxid:%v", b.id)
 
 	// get cookies from this browser context.
