@@ -239,6 +239,15 @@ func TestBrowserContextCookies(t *testing.T) {
 		// evaluated in the page to set document.cookie.
 		documentCookiesSnippet string
 
+		// addCookies is a list of cookies that will be added to the
+		// browser context using the AddCookies method.
+		// if empty, no cookies will be added.
+		addCookies []*api.Cookie
+
+		// filterCookiesByURLs allows to filter cookies by URLs.
+		// if nil, all cookies will be returned.
+		filterCookiesByURLs []string
+
 		// wantDocumentCookies is a string representation of the
 		// document.cookie value that is expected to be set.
 		wantDocumentCookies string
@@ -246,6 +255,8 @@ func TestBrowserContextCookies(t *testing.T) {
 		// wantContextCookies is a list of cookies that are expected
 		// to be set in the browser context.
 		wantContextCookies []*api.Cookie
+
+		wantErr bool
 	}{
 		"no_cookies": {
 			setupHandler: okHandler,
@@ -254,6 +265,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "",
 			wantContextCookies:  nil,
 		},
@@ -265,6 +277,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
 			wantContextCookies: []*api.Cookie{
 				{
@@ -288,6 +301,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value; name2=value2",
 			wantContextCookies: []*api.Cookie{
 				{
@@ -320,6 +334,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
 			wantContextCookies: []*api.Cookie{
 				{
@@ -342,6 +357,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "", // some cookies cannot be set (i.e. cookies using different domains)
 			wantContextCookies:  nil,
 		},
@@ -354,6 +370,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "",
 			wantContextCookies: []*api.Cookie{
 				{
@@ -377,6 +394,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
 			wantContextCookies: []*api.Cookie{
 				{
@@ -400,6 +418,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
+			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
 			wantContextCookies: []*api.Cookie{
 				{
@@ -413,6 +432,110 @@ func TestBrowserContextCookies(t *testing.T) {
 					Secure:   false,
 				},
 			},
+		},
+		"filter_cookies_by_urls": {
+			setupHandler: okHandler,
+			documentCookiesSnippet: `
+				() => {
+					return document.cookie;
+				}
+			`,
+			addCookies: []*api.Cookie{
+				{
+					Name:     "fooCookie",
+					Value:    "fooValue",
+					URL:      "https://foo.com",
+					SameSite: api.CookieSameSiteNone,
+				},
+				{
+					Name:     "barCookie",
+					Value:    "barValue",
+					URL:      "https://bar.com",
+					SameSite: api.CookieSameSiteLax,
+				},
+				{
+					Name:     "bazCookie",
+					Value:    "bazValue",
+					URL:      "https://baz.com",
+					SameSite: api.CookieSameSiteLax,
+				},
+			},
+			filterCookiesByURLs: []string{
+				"https://foo.com",
+				"https://baz.com",
+			},
+			wantDocumentCookies: "",
+			wantContextCookies: []*api.Cookie{
+				{
+					Name:     "fooCookie",
+					Value:    "fooValue",
+					Domain:   "foo.com",
+					Expires:  -1,
+					HTTPOnly: false,
+					Path:     "/",
+					Secure:   true,
+					SameSite: api.CookieSameSiteNone,
+				},
+				{
+					Name:     "bazCookie",
+					Value:    "bazValue",
+					Domain:   "baz.com",
+					Expires:  -1,
+					HTTPOnly: false,
+					Path:     "/",
+					Secure:   true,
+					SameSite: api.CookieSameSiteLax,
+				},
+			},
+		},
+		"filter_no_cookies": {
+			setupHandler: okHandler,
+			documentCookiesSnippet: `
+				() => {
+					return document.cookie;
+				}
+			`,
+			addCookies: []*api.Cookie{
+				{
+					Name:     "fooCookie",
+					Value:    "fooValue",
+					URL:      "https://foo.com",
+					SameSite: api.CookieSameSiteNone,
+				},
+				{
+					Name:     "barCookie",
+					Value:    "barValue",
+					URL:      "https://bar.com",
+					SameSite: api.CookieSameSiteLax,
+				},
+			},
+			filterCookiesByURLs: []string{
+				"https://baz.com",
+			},
+			wantDocumentCookies: "",
+			wantContextCookies:  nil,
+		},
+		"filter_invalid": {
+			setupHandler: okHandler,
+			documentCookiesSnippet: `
+				() => {
+					return document.cookie;
+				}
+			`,
+			addCookies: []*api.Cookie{
+				{
+					Name:     "fooCookie",
+					Value:    "fooValue",
+					URL:      "https://foo.com",
+					SameSite: api.CookieSameSiteNone,
+				},
+			},
+			filterCookiesByURLs: []string{
+				"LOREM IPSUM",
+			},
+			wantDocumentCookies: "",
+			wantContextCookies:  nil,
+			wantErr:             true,
 		},
 	}
 	for name, tt := range tests {
@@ -442,14 +565,28 @@ func TestBrowserContextCookies(t *testing.T) {
 				"incorrect document.cookie received",
 			)
 
+			// adding cookies to the browser context by our API.
+			if tt.addCookies != nil {
+				err := p.Context().AddCookies(tt.addCookies)
+				require.NoErrorf(t,
+					err, "failed to add cookies to the browser context: %#v", tt.addCookies,
+				)
+			}
+
 			// getting cookies from the browser context
 			// either from the page or from the context
 			// some cookies can be set by the response handler
-			cookies, err := p.Context().Cookies()
+			cookies, err := p.Context().Cookies(tt.filterCookiesByURLs...)
+			if tt.wantErr {
+				require.Errorf(t,
+					err, "expected an error, but got none",
+				)
+				return
+			}
 			require.NoErrorf(t,
 				err, "failed to get cookies from the browser context",
 			)
-			require.Lenf(t,
+			assert.Lenf(t,
 				cookies, len(tt.wantContextCookies),
 				"incorrect number of cookies received from the browser context",
 			)
