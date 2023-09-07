@@ -28,8 +28,13 @@ export default async function () {
     });
 
     // add some cookies to the browser context
+    const unixTimeSinceEpoch = Math.round(new Date() / 1000);
+    const dayAfter = unixTimeSinceEpoch+60*60*24;
+    const dayBefore = unixTimeSinceEpoch-60*60*24;
     context.addCookies([{name: 'testcookie', value: '1', sameSite: 'Strict', domain: '127.0.0.1', path: '/'}]);
-    context.addCookies([{name: 'testcookie2', value: '2', sameSite: 'Lax', domain: '127.0.0.1', path: '/'}]);
+    context.addCookies([{name: 'testcookie2', value: '2', sameSite: 'Lax', domain: '127.0.0.1', path: '/', expires: dayAfter}]);
+    // won't set this cookie because it's expired
+    context.addCookies([{name: 'testcookie3', value: '3', sameSite: 'Lax', domain: '127.0.0.1', path: '/', expires: dayBefore}]);
 
     check(context.cookies().length, {
       'number of cookies should be 2': n => n === 2,
