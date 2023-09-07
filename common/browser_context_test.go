@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
@@ -49,4 +50,241 @@ func TestNewBrowserContext(t *testing.T) {
 		assert.True(t, webVitalInitScriptFound, "WebVitalInitScript was not initialized in the context")
 		assert.True(t, k6ObjScriptFound, "k6ObjScript was not initialized in the context")
 	})
+}
+
+func TestFilterCookies(t *testing.T) {
+	tests := map[string]struct {
+		filterByURLs []string
+		cookies      []*api.Cookie
+		wantCookies  []*api.Cookie
+		wantErr      bool
+	}{
+		"no_cookies": {
+			filterByURLs: []string{"https://example.com"},
+			cookies:      nil,
+			wantCookies:  nil,
+		},
+		"filter_none": {
+			filterByURLs: nil,
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+				{
+					Domain: "bar.com",
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+				{
+					Domain: "bar.com",
+				},
+			},
+		},
+		"filter_by_url": {
+			filterByURLs: []string{
+				"https://foo.com",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+				{
+					Domain: "bar.com",
+				},
+				{
+					Domain: "baz.com",
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+			},
+		},
+		"filter_by_urls": {
+			filterByURLs: []string{
+				"https://foo.com",
+				"https://baz.com",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+				{
+					Domain: "bar.com",
+				},
+				{
+					Domain: "baz.com",
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+				{
+					Domain: "baz.com",
+				},
+			},
+		},
+		"filter_by_subdomain": {
+			filterByURLs: []string{
+				"https://sub.foo.com",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: ".foo.com",
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: ".foo.com",
+				},
+			},
+		},
+		"filter_dot_prefixed_domains": {
+			filterByURLs: []string{
+				"https://foo.com",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: ".foo.com",
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: ".foo.com",
+				},
+			},
+		},
+		"filter_by_secure_cookies": {
+			filterByURLs: []string{
+				"https://foo.com",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+					Secure: true,
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+					Secure: true,
+				},
+			},
+		},
+		"filter_by_http_only_cookies": {
+			filterByURLs: []string{
+				"https://foo.com",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain:   "foo.com",
+					HTTPOnly: true,
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain:   "foo.com",
+					HTTPOnly: true,
+				},
+			},
+		},
+		"filter_by_path": {
+			filterByURLs: []string{
+				"https://foo.com/bar",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+					Path:   "/bar",
+				},
+				{
+					Domain: "foo.com",
+					Path:   "/baz",
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+					Path:   "/bar",
+				},
+			},
+		},
+		"disallow_secure_cookie_on_http": {
+			filterByURLs: []string{
+				"http://foo.com",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+					Secure: true,
+				},
+			},
+			wantCookies: nil,
+		},
+		"invalid_filter": {
+			filterByURLs: []string{
+				"HELLO WORLD!",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+			},
+			wantCookies: nil,
+			wantErr:     true,
+		},
+		"invalid_filter_empty": {
+			filterByURLs: []string{
+				"",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+			},
+			wantCookies: nil,
+			wantErr:     true,
+		},
+		"invalid_filter_multi": {
+			filterByURLs: []string{
+				"https://foo.com", "", "HELLO WORLD",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "foo.com",
+				},
+			},
+			wantCookies: nil,
+			wantErr:     true,
+		},
+	}
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cookies, err := filterCookies(
+				tt.cookies,
+				tt.filterByURLs...,
+			)
+			if tt.wantErr {
+				assert.Nilf(t, cookies, "want no cookies after an error, but got %#v", cookies)
+				require.Errorf(t, err, "want an error, but got none")
+				return
+			}
+			require.NoError(t, err)
+
+			assert.Lenf(t,
+				cookies, len(tt.wantCookies),
+				"incorrect number of cookies filtered. filter: %#v", tt.filterByURLs,
+			)
+
+			assert.Equalf(t,
+				tt.wantCookies, cookies,
+				"incorrect cookies filtered by the filter %#v", tt.filterByURLs,
+			)
+		})
+	}
 }
