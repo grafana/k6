@@ -17,15 +17,41 @@ var VersionDetails = "" //nolint:gochecknoglobals
 // the currently running k6 executable.
 func FullVersion() string {
 	goVersionArch := fmt.Sprintf("%s, %s/%s", runtime.Version(), runtime.GOOS, runtime.GOARCH)
-	if VersionDetails != "" {
-		return fmt.Sprintf("%s (%s, %s)", Version, VersionDetails, goVersionArch)
+
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return fmt.Sprintf("%s (%s)", Version, goVersionArch)
 	}
 
-	if buildInfo, ok := debug.ReadBuildInfo(); ok {
-		return fmt.Sprintf("%s (%s, %s)", Version, buildInfo.Main.Version, goVersionArch)
+	var (
+		commit string
+		dirty  bool
+	)
+	for _, s := range buildInfo.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			commitLen := 10
+			if len(s.Value) < commitLen {
+				commitLen = len(s.Value)
+			}
+			commit = s.Value[:commitLen]
+		case "vcs.modified":
+			if s.Value == "true" {
+				dirty = true
+			}
+		default:
+		}
 	}
 
-	return fmt.Sprintf("%s (dev build, %s)", Version, goVersionArch)
+	if commit == "" {
+		return fmt.Sprintf("%s (%s)", Version, goVersionArch)
+	}
+
+	if dirty {
+		commit += "-dirty"
+	}
+
+	return fmt.Sprintf("%s (commit/%s, %s)", Version, commit, goVersionArch)
 }
 
 // Banner returns the ASCII-art banner with the k6 logo and stylized website URL
