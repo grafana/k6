@@ -550,7 +550,7 @@ func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) {
 	// filter cookies by the provided URLs.
 	cookies, err = filterCookies(cookies, urls...)
 	if err != nil {
-		return nil, fmt.Errorf("retrieving cookies: %w", err)
+		return nil, fmt.Errorf("filtering cookies: %w", err)
 	}
 	if len(cookies) == 0 {
 		return nil, nil
@@ -568,7 +568,7 @@ func filterCookies(cookies []*api.Cookie, urls ...string) ([]*api.Cookie, error)
 
 	purls, err := parseURLs(urls...)
 	if err != nil {
-		return nil, fmt.Errorf("filtering by URL: %w", err)
+		return nil, fmt.Errorf("parsing urls: %w", err)
 	}
 
 	// the following algorithm is like a sorting algorithm,
@@ -595,7 +595,7 @@ func filterCookies(cookies []*api.Cookie, urls ...string) ([]*api.Cookie, error)
 		var keep bool
 
 		for _, uri := range purls {
-			if shouldFilterCookie(c, uri) {
+			if shouldKeepCookie(c, uri) {
 				keep = true
 				break
 			}
@@ -617,10 +617,10 @@ func filterCookies(cookies []*api.Cookie, urls ...string) ([]*api.Cookie, error)
 	return cookies[:n], nil
 }
 
-// shouldFilterCookie determines whether a cookie should be kept,
+// shouldKeepCookie determines whether a cookie should be kept,
 // based on its compatibility with a specific URL.
 // Returns true if the cookie should be kept, false otherwise.
-func shouldFilterCookie(c *api.Cookie, uri *url.URL) bool {
+func shouldKeepCookie(c *api.Cookie, uri *url.URL) bool {
 	// Ensure consistent domain formatting for easier comparison.
 	// A leading dot means the cookie is valid across subdomains.
 	// For example, if the domain is example.com, then adding a
@@ -633,20 +633,21 @@ func shouldFilterCookie(c *api.Cookie, uri *url.URL) bool {
 	// Confirm that the cookie's domain is a suffix of the URL's
 	// hostname, emulating how a browser would scope cookies to
 	// specific domains.
-	if !strings.HasSuffix("."+uri.Hostname(), domain) {
+	if !strings.HasSuffix(domain, "."+uri.Hostname()) {
 		return false
 	}
 	// Follow RFC 6265 for cookies: an empty or missing path should
 	// be treated as "/".
 	//
 	// See: https://datatracker.ietf.org/doc/html/rfc6265#section-5.1.4
-	if uri.Path == "" {
-		uri.Path = "/"
+	path := c.Path
+	if path == "" {
+		path = "/"
 	}
 	// Ensure that the cookie applies to the specific path of the
 	// URL, emulating how a browser would scope cookies to specific
 	// paths within a domain.
-	if !strings.HasPrefix(uri.Path, c.Path) {
+	if !strings.HasPrefix(path, uri.Path) {
 		return false
 	}
 	// Emulate browser behavior: Don't include secure cookies when

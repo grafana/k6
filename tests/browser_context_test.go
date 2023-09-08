@@ -209,10 +209,6 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			require.NoErrorf(t,
 				err, "failed to get cookies from the browser context",
 			)
-			require.Lenf(t,
-				tt.wantCookiesToSet, len(cookies),
-				"incorrect number of cookies received from the browser context",
-			)
 			assert.Equalf(t,
 				tt.wantCookiesToSet, cookies,
 				"incorrect cookies received from the browser context",
@@ -585,10 +581,6 @@ func TestBrowserContextCookies(t *testing.T) {
 			}
 			require.NoErrorf(t,
 				err, "failed to get cookies from the browser context",
-			)
-			assert.Lenf(t,
-				cookies, len(tt.wantContextCookies),
-				"incorrect number of cookies received from the browser context",
 			)
 			assert.Equalf(t,
 				tt.wantContextCookies, cookies,

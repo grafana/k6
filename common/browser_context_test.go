@@ -53,6 +53,8 @@ func TestNewBrowserContext(t *testing.T) {
 }
 
 func TestFilterCookies(t *testing.T) {
+	t.Parallel()
+
 	tests := map[string]struct {
 		filterByURLs []string
 		cookies      []*api.Cookie
@@ -135,12 +137,15 @@ func TestFilterCookies(t *testing.T) {
 			},
 			cookies: []*api.Cookie{
 				{
+					Domain: "sub.foo.com",
+				},
+				{
 					Domain: ".foo.com",
 				},
 			},
 			wantCookies: []*api.Cookie{
 				{
-					Domain: ".foo.com",
+					Domain: "sub.foo.com",
 				},
 			},
 		},
@@ -214,6 +219,23 @@ func TestFilterCookies(t *testing.T) {
 				},
 			},
 		},
+		"allow_secure_cookie_on_localhost": {
+			filterByURLs: []string{
+				"http://localhost",
+			},
+			cookies: []*api.Cookie{
+				{
+					Domain: "localhost",
+					Secure: true,
+				},
+			},
+			wantCookies: []*api.Cookie{
+				{
+					Domain: "localhost",
+					Secure: true,
+				},
+			},
+		},
 		"disallow_secure_cookie_on_http": {
 			filterByURLs: []string{
 				"http://foo.com",
@@ -264,7 +286,10 @@ func TestFilterCookies(t *testing.T) {
 		},
 	}
 	for name, tt := range tests {
+		tt := tt
 		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
 			cookies, err := filterCookies(
 				tt.cookies,
 				tt.filterByURLs...,
@@ -275,11 +300,6 @@ func TestFilterCookies(t *testing.T) {
 				return
 			}
 			require.NoError(t, err)
-
-			assert.Lenf(t,
-				cookies, len(tt.wantCookies),
-				"incorrect number of cookies filtered. filter: %#v", tt.filterByURLs,
-			)
 
 			assert.Equalf(t,
 				tt.wantCookies, cookies,
