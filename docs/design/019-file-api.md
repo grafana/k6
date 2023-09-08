@@ -189,10 +189,11 @@ function ab2str(buf) {
 
 The proposed API is made feasible through the following implementation aspects:
 
--   A file's content is loaded into memory only once:
+- A file's content is loaded into memory only once:
     -   When a file is opened, its content is buffered at the module's root in a dedicated registry, returning a handle with a pointer to that buffer.
     -   Each VU receives a copy of the file handle, enabling them to interact with files using the unique memory area linked to the handle, instead of each receiving a full copy of the buffer.
     - As each invocation of `open*` receives a unique file handle linked to the same memory area, they each have unique offsets. This setup allows each VU to process file data independently without conflict or race conditions.
+
 
 ### Possible future improvements
 
@@ -205,6 +206,16 @@ The Deno API's `FsFile` our proposal is inspired by exposes a `readable` read-on
 See [#3020](https://github.com/grafana/k6/issues/3020)
 
 This is currently unachievable because we must anticipate which files will be opened. While some quick fixes might appear feasible (e.g., parsing the AST before execution to identify files), they quickly fall apart: What if the filename resides in a variable? A plausible solution would involve requiring users to declare necessary resources (files/folders) ahead of time. This approach would ensure these resources are captured and included in the archive for future VU code access.
+
+#### Scoped file closing:
+
+Based on the current implementation of k6, file opening is confined to the init context. Given this, we operate under the presumption that the lifespan of a file handle aligns with that of the init context. Furthermore, we recognize the possibility that the init context may undergo multiple evaluations throughout a script's execution.
+
+As a result, the `File` interface's `close` method is similarly bound to the init context's scope. That is, it can either be invoked outside the VU stage (in the `handleSummary` function for instance) or be automatically executed, implicitly, at the conclusion of the test, harnessing [the k6 internal event system](https://github.com/grafana/k6/pull/3112).
+
+A refinement could consist in:
+  - subsequent versions, [once we enable file opening within the VU context](https://github.com/grafana/k6/issues/3020), would then permit and advocate for files to be closed within the VU stage as well.
+  - presuming the design of the open function remains consistent with the current proposal, our underlying mechanism would pivot to a reference counting system. This would ensure that a file is only closed when all VUs have concluded their interactions with it.
 
 ## Conclusion
 
