@@ -9,8 +9,6 @@ export OUT_DIR="${1-dist}"
 # To override the latest git tag as the version, pass something else as the second arg.
 export VERSION=${2:-$(git describe --tags --always --dirty)}
 
-# To overwrite the version details, pass something as the third arg. Empty string disables it.
-export VERSION_DETAILS=${3-"$(date -u +"%FT%T%z")/$(git describe --tags --always --long --dirty)"}
 set +x
 
 build() {
@@ -18,9 +16,6 @@ build() {
     local NAME="k6-${VERSION}-${ALIAS}"
 
     local BUILD_ARGS=(-o "${OUT_DIR}/${NAME}/k6${SUFFIX}" -trimpath)
-    if [ -n "$VERSION_DETAILS" ]; then
-        BUILD_ARGS+=(-ldflags "-X go.k6.io/k6/lib/consts.VersionDetails=$VERSION_DETAILS")
-    fi
 
     local PACKAGE_FORMATS
     IFS="," read -ra PACKAGE_FORMATS <<< "${3}"
