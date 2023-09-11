@@ -24,7 +24,4 @@ tests :
 
 check : ci-like-lint tests
 
-container:
-	docker build --rm --pull --no-cache -t grafana/k6 .
-
-.PHONY: build format ci-like-lint lint tests check container
+.PHONY: build format ci-like-lint lint tests check
