@@ -3,7 +3,7 @@ WORKDIR $GOPATH/src/go.k6.io/k6
 COPY . .
 ARG TARGETOS TARGETARCH
 RUN apk --no-cache add git=~2
-RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -a -trimpath -o /usr/bin/k6
+RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /usr/bin/k6
 
 # Runtime stage
 FROM alpine:3.18 as release
