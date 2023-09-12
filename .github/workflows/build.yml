@@ -146,6 +146,7 @@ jobs:
             --platform linux/amd64,linux/arm64 \
             --bootstrap --use
           docker buildx build \
+            --target release \
             --platform linux/amd64,linux/arm64 \
             -t $DOCKER_IMAGE_ID .
       - name: Check
@@ -175,6 +176,7 @@ jobs:
         run: |
           echo "Publish $GHCR_IMAGE_ID:master* images"
           docker buildx build --push \
+            --target release \
             --platform linux/amd64,linux/arm64 \
             -t $DOCKER_IMAGE_ID:master \
             -t ghcr.io/$GHCR_IMAGE_ID:master .
@@ -185,6 +187,7 @@ jobs:
             -t ghcr.io/$GHCR_IMAGE_ID:master-with-browser .
           # LoadImpact images are deprecated, we don't build arm64 for it.
           docker buildx build --push \
+            --target legacy \
             --platform linux/amd64 \
             -t $LI_DOCKER_IMAGE_ID:master .
       - name: Publish tagged version images
@@ -193,6 +196,7 @@ jobs:
           VERSION="${VERSION#v}"
           echo "Publish $GHCR_IMAGE_ID:$VERSION images"
           docker buildx build --push \
+            --target release \
             --platform linux/amd64,linux/arm64 \
             -t $DOCKER_IMAGE_ID:$VERSION \
             -t ghcr.io/$GHCR_IMAGE_ID:$VERSION .
@@ -203,12 +207,14 @@ jobs:
             -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
           # LoadImpact images are deprecated, we don't build arm64 for it.
           docker buildx build --push \
+            --target legacy \
             --platform linux/amd64 \
             -t $LI_DOCKER_IMAGE_ID:$VERSION .
           # We also want to tag the latest stable version as latest
           if [[ ! "$VERSION" =~ (RC|rc) ]]; then
             echo "Publish $GHCR_IMAGE_ID:latest"
             docker buildx build --push \
+              --target release \
               --platform linux/amd64,linux/arm64 \
               -t $DOCKER_IMAGE_ID:latest \
               -t ghcr.io/$GHCR_IMAGE_ID:latest .
@@ -219,6 +225,7 @@ jobs:
               -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
             # LoadImpact images are deprecated, we don't build arm64 for it.
             docker buildx build --push \
+              --target legacy \
               --platform linux/amd64 \
               -t $LI_DOCKER_IMAGE_ID:latest .
           fi
