@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -94,9 +94,9 @@ const (
 	// MessageOptionsTag is the tag number of the options element in a message
 	// descriptor proto.
 	MessageOptionsTag = 7
-	// MessageOneOfsTag is the tag number of the one-ofs element in a message
+	// MessageOneofsTag is the tag number of the one-ofs element in a message
 	// descriptor proto.
-	MessageOneOfsTag = 8
+	MessageOneofsTag = 8
 	// MessageReservedRangesTag is the tag number of the reserved ranges element
 	// in a message descriptor proto.
 	MessageReservedRangesTag = 9
@@ -153,12 +153,12 @@ const (
 	// FieldProto3OptionalTag is the tag number of the proto3_optional element
 	// in a descriptor proto.
 	FieldProto3OptionalTag = 17
-	// OneOfNameTag is the tag number of the name element in a one-of
+	// OneofNameTag is the tag number of the name element in a one-of
 	// descriptor proto.
-	OneOfNameTag = 1
-	// OneOfOptionsTag is the tag number of the options element in a one-of
+	OneofNameTag = 1
+	// OneofOptionsTag is the tag number of the options element in a one-of
 	// descriptor proto.
-	OneOfOptionsTag = 2
+	OneofOptionsTag = 2
 	// EnumNameTag is the tag number of the name element in an enum descriptor
 	// proto.
 	EnumNameTag = 1

@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -123,10 +123,7 @@ func (s *Symbols) importFileWithExtensions(pkg *packageSymbols, fd protoreflect.
 		}
 		pos := sourcePositionForNumber(fld)
 		extendee := fld.ContainingMessage()
-		if err := s.AddExtension(packageFor(extendee), extendee.FullName(), fld.Number(), pos, handler); err != nil {
-			return err
-		}
-		return nil
+		return s.AddExtension(packageFor(extendee), extendee.FullName(), fld.Number(), pos, handler)
 	})
 }
 
@@ -311,7 +308,7 @@ func sourcePositionFor(d protoreflect.Descriptor) ast.SourcePos {
 	case protoreflect.MessageDescriptor:
 		namePath = append(namePath, internal.MessageNameTag)
 	case protoreflect.OneofDescriptor:
-		namePath = append(namePath, internal.OneOfNameTag)
+		namePath = append(namePath, internal.OneofNameTag)
 	case protoreflect.EnumDescriptor:
 		namePath = append(namePath, internal.EnumNameTag)
 	case protoreflect.EnumValueDescriptor:
@@ -411,11 +408,7 @@ func (s *Symbols) importResultWithExtensions(pkg *packageSymbols, r *result, han
 		node := r.FieldNode(fd.FieldDescriptorProto())
 		pos := file.NodeInfo(node.FieldTag()).Start()
 		extendee := fd.ContainingMessage()
-		if err := s.AddExtension(packageFor(extendee), extendee.FullName(), fd.Number(), pos, handler); err != nil {
-			return err
-		}
-
-		return nil
+		return s.AddExtension(packageFor(extendee), extendee.FullName(), fd.Number(), pos, handler)
 	})
 }
 
@@ -498,8 +491,8 @@ func nameStart(file ast.FileDeclNode, n ast.Node) ast.SourcePos {
 		return file.NodeInfo(n.FieldName()).Start()
 	case ast.MessageDeclNode:
 		return file.NodeInfo(n.MessageName()).Start()
-	case ast.OneOfDeclNode:
-		return file.NodeInfo(n.OneOfName()).Start()
+	case ast.OneofDeclNode:
+		return file.NodeInfo(n.OneofName()).Start()
 	case ast.EnumValueDeclNode:
 		return file.NodeInfo(n.GetName()).Start()
 	case *ast.EnumNode:

@@ -179,11 +179,10 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 	}
 
 	fds := make([]protoreflect.FileDescriptor, len(results))
+	alreadySeen := make(map[string]struct{}, len(results))
 	for i, res := range results {
-		if linkRes, ok := res.(linker.Result); ok {
-			removeDynamicExtensions(linkRes.FileDescriptorProto())
-		}
-		fds[i] = results[i]
+		removeDynamicExtensions(res, alreadySeen)
+		fds[i] = res
 	}
 	return desc.WrapFiles(fds)
 }
@@ -254,17 +253,17 @@ func (p Parser) ParseFilesButDoNotLink(filenames ...string) ([]*descriptorpb.Fil
 	protos := make([]*descriptorpb.FileDescriptorProto, len(results))
 	for i, res := range results {
 		protos[i] = res.FileDescriptorProto()
-		var optsIndex options.Index
+		var optsIndex sourceinfo.OptionIndex
 		if p.InterpretOptionsInUnlinkedFiles {
 			var err error
 			optsIndex, err = options.InterpretUnlinkedOptions(res)
 			if err != nil {
 				return nil, err
 			}
-			removeDynamicExtensions(protos[i])
+			removeDynamicExtensionsFromProto(protos[i])
 		}
 		if p.IncludeSourceCodeInfo {
-			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex)
+			protos[i].SourceCodeInfo = sourceinfo.GenerateSourceInfo(res.AST(), optsIndex, sourceinfo.WithExtraComments())
 		}
 	}
 
@@ -597,7 +596,23 @@ func fixupFilenames(protos map[string]parser.Result) map[string]parser.Result {
 	return revisedProtos
 }
 
-func removeDynamicExtensions(fd *descriptorpb.FileDescriptorProto) {
+func removeDynamicExtensions(fd protoreflect.FileDescriptor, alreadySeen map[string]struct{}) {
+	if _, ok := alreadySeen[fd.Path()]; ok {
+		// already processed
+		return
+	}
+	alreadySeen[fd.Path()] = struct{}{}
+	res, ok := fd.(linker.Result)
+	if ok {
+		removeDynamicExtensionsFromProto(res.FileDescriptorProto())
+	}
+	// also remove extensions from dependencies
+	for i, length := 0, fd.Imports().Len(); i < length; i++ {
+		removeDynamicExtensions(fd.Imports().Get(i).FileDescriptor, alreadySeen)
+	}
+}
+
+func removeDynamicExtensionsFromProto(fd *descriptorpb.FileDescriptorProto) {
 	// protocompile returns descriptors with dynamic extension fields for custom options.
 	// But protoparse only used known custom options and everything else defined in the
 	// sources would be stored as unrecognized fields. So to bridge the difference in

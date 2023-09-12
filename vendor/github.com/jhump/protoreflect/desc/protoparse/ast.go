@@ -148,7 +148,7 @@ func convertASTMessageElement(f *ast.FileNode, el ast.MessageElement) ast2.Messa
 		return convertASTField(f, el)
 	case *ast.MapFieldNode:
 		return convertASTMapField(f, el)
-	case *ast.OneOfNode:
+	case *ast.OneofNode:
 		return convertASTOneOf(f, el)
 	case *ast.GroupNode:
 		return convertASTGroup(f, el)
@@ -241,7 +241,7 @@ func convertASTGroup(f *ast.FileNode, g *ast.GroupNode) *ast2.GroupNode {
 	)
 }
 
-func convertASTOneOf(f *ast.FileNode, oo *ast.OneOfNode) *ast2.OneOfNode {
+func convertASTOneOf(f *ast.FileNode, oo *ast.OneofNode) *ast2.OneOfNode {
 	decls := make([]ast2.OneOfElement, len(oo.Decls))
 	for i := range oo.Decls {
 		decls[i] = convertASTOneOfElement(f, oo.Decls[i])
@@ -255,7 +255,7 @@ func convertASTOneOf(f *ast.FileNode, oo *ast.OneOfNode) *ast2.OneOfNode {
 	)
 }
 
-func convertASTOneOfElement(f *ast.FileNode, el ast.OneOfElement) ast2.OneOfElement {
+func convertASTOneOfElement(f *ast.FileNode, el ast.OneofElement) ast2.OneOfElement {
 	switch el := el.(type) {
 	case *ast.OptionNode:
 		return convertASTOption(f, el)

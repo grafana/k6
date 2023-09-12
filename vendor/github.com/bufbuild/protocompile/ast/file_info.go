@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -351,7 +351,7 @@ func (f *FileInfo) SourcePos(offset int) SourcePos {
 		return f.lines[n] > offset
 	})
 
-	// If it weren't for tabs and multi-byte unicode characters, we
+	// If it weren't for tabs and multibyte unicode characters, we
 	// could trivially compute the column just based on offset and the
 	// starting offset of lineNumber :(
 	// Wish this were more efficient... that would require also storing

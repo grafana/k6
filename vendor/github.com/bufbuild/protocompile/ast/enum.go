@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -100,7 +100,7 @@ type EnumValueDeclNode interface {
 var _ EnumValueDeclNode = (*EnumValueNode)(nil)
 var _ EnumValueDeclNode = NoSourceNode{}
 
-// EnumNode represents an enum declaration. Example:
+// EnumValueNode represents an enum declaration. Example:
 //
 //	UNSET = 0 [deprecated = true];
 type EnumValueNode struct {

@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,58 +15,20 @@
 package linker
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
+	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/descriptorpb"
-	"google.golang.org/protobuf/types/dynamicpb"
 
 	"github.com/bufbuild/protocompile/ast"
 	"github.com/bufbuild/protocompile/internal"
 	"github.com/bufbuild/protocompile/reporter"
 	"github.com/bufbuild/protocompile/walk"
 )
-
-func (r *result) ResolveMessageType(name protoreflect.FullName) protoreflect.MessageDescriptor {
-	d := r.resolveElement(name)
-	if md, ok := d.(protoreflect.MessageDescriptor); ok {
-		return md
-	}
-	return nil
-}
-
-func (r *result) ResolveOptionsType(name protoreflect.FullName) protoreflect.MessageDescriptor {
-	d, _ := ResolverFromFile(r).FindDescriptorByName(name)
-	md, _ := d.(protoreflect.MessageDescriptor)
-	if md != nil && md.ParentFile() != nil {
-		r.markUsed(md.ParentFile().Path())
-	}
-	return md
-}
-
-func (r *result) ResolveEnumType(name protoreflect.FullName) protoreflect.EnumDescriptor {
-	d := r.resolveElement(name)
-	if ed, ok := d.(protoreflect.EnumDescriptor); ok {
-		return ed
-	}
-	return nil
-}
-
-func (r *result) ResolveExtension(name protoreflect.FullName) protoreflect.ExtensionTypeDescriptor {
-	d := r.resolveElement(name)
-	if ed, ok := d.(protoreflect.ExtensionDescriptor); ok {
-		if !ed.IsExtension() {
-			return nil
-		}
-		if td, ok := ed.(protoreflect.ExtensionTypeDescriptor); ok {
-			return td
-		}
-		return dynamicpb.NewExtensionType(ed).TypeDescriptor()
-	}
-	return nil
-}
 
 func (r *result) ResolveMessageLiteralExtensionName(node ast.IdentValueNode) string {
 	return r.optionQualifiedNames[node]
@@ -76,11 +38,57 @@ func (r *result) resolveElement(name protoreflect.FullName) protoreflect.Descrip
 	if len(name) > 0 && name[0] == '.' {
 		name = name[1:]
 	}
-	importedFd, res := resolveElement(r, name, false, nil)
-	if importedFd != nil {
-		r.markUsed(importedFd.Path())
-	}
+	res, _ := resolveInFile(r, false, nil, func(f File) (protoreflect.Descriptor, error) {
+		d := resolveElementInFile(name, f)
+		if d != nil {
+			return d, nil
+		}
+		return nil, protoregistry.NotFound
+	})
 	return res
+}
+
+func resolveInFile[T any](f File, publicImportsOnly bool, checked []string, fn func(File) (T, error)) (T, error) {
+	var zero T
+	path := f.Path()
+	for _, str := range checked {
+		if str == path {
+			// already checked
+			return zero, protoregistry.NotFound
+		}
+	}
+	checked = append(checked, path)
+
+	res, err := fn(f)
+	if err == nil {
+		// found it
+		return res, nil
+	}
+	if !errors.Is(err, protoregistry.NotFound) {
+		return zero, err
+	}
+
+	imports := f.Imports()
+	for i, l := 0, imports.Len(); i < l; i++ {
+		imp := imports.Get(i)
+		if publicImportsOnly && !imp.IsPublic {
+			continue
+		}
+		res, err := resolveInFile(f.FindImportByPath(imp.Path()), true, checked, fn)
+		if errors.Is(err, protoregistry.NotFound) {
+			continue
+		}
+		if err != nil {
+			return zero, err
+		}
+		if !imp.IsPublic {
+			if r, ok := f.(*result); ok {
+				r.markUsed(imp.Path())
+			}
+		}
+		return res, nil
+	}
+	return zero, err
 }
 
 func (r *result) markUsed(importPath string) {
@@ -115,38 +123,6 @@ func (r *result) CheckForUnusedImports(handler *reporter.Handler) {
 			handler.HandleWarningWithPos(pos, errUnusedImport(dep))
 		}
 	}
-}
-
-func resolveElement(f File, fqn protoreflect.FullName, publicImportsOnly bool, checked []string) (imported File, d protoreflect.Descriptor) {
-	path := f.Path()
-	for _, str := range checked {
-		if str == path {
-			// already checked
-			return nil, nil
-		}
-	}
-	checked = append(checked, path)
-
-	r := resolveElementInFile(fqn, f)
-	if r != nil {
-		// not imported, but present in f
-		return nil, r
-	}
-
-	// When publicImportsOnly = false, we are searching only directly imported symbols. But
-	// we also need to search transitive public imports due to semantics of public imports.
-	for i := 0; i < f.Imports().Len(); i++ {
-		dep := f.Imports().Get(i)
-		if dep.IsPublic || !publicImportsOnly {
-			depFile := f.FindImportByPath(dep.Path())
-			_, d := resolveElement(depFile, fqn, true, checked)
-			if d != nil {
-				return depFile, d
-			}
-		}
-	}
-
-	return nil, nil
 }
 
 func descriptorTypeWithArticle(d protoreflect.Descriptor) string {
