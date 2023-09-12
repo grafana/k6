@@ -163,94 +163,60 @@ jobs:
             docker run $DOCKER_IMAGE_ID pause --help
             docker run $DOCKER_IMAGE_ID resume --help
 
-      - name: Log into ghcr.io
+      - name: Log into registries (ghcr.io and Docker Hub)
         if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
         run: |
           # Log into GitHub Container Registry
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login https://ghcr.io -u ${{ github.actor }} --password-stdin
-      - name: Publish k6:master image to ghcr.io
+          # Log into Docker Hub Registry
+          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+      - name: Publish k6:master images
         if: ${{ github.ref == 'refs/heads/master' }}
         run: |
-          echo "Publish as ghcr.io/$GHCR_IMAGE_ID:$VERSION"
+          echo "Publish $GHCR_IMAGE_ID:master* images"
           docker buildx build --push \
             --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:master \
             -t ghcr.io/$GHCR_IMAGE_ID:master .
           docker buildx build --push \
             --target with-browser \
             --platform linux/amd64,linux/arm64 \
+            -t $DOCKER_IMAGE_ID:master-with-browser \
             -t ghcr.io/$GHCR_IMAGE_ID:master-with-browser .
-      - name: Publish tagged version image to ghcr.io
-        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          VERSION="${VERSION#v}"
-          echo "Publish as ghcr.io/$GHCR_IMAGE_ID:$VERSION"
-          docker buildx build --push \
-            --platform linux/amd64,linux/arm64 \
-            -t ghcr.io/$GHCR_IMAGE_ID:$VERSION .
-          docker buildx build --push \
-            --target with-browser \
-            --platform linux/amd64,linux/arm64 \
-            -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
-          # We also want to tag the latest stable version as latest
-          if [[ ! "$VERSION" =~ (RC|rc) ]]; then
-            echo "Publish as ghcr.io/$GHCR_IMAGE_ID:latest"
-            docker buildx build --push \
-              --platform linux/amd64,linux/arm64 \
-              -t ghcr.io/$GHCR_IMAGE_ID:latest .
-            docker buildx build --push \
-              --target with-browser \
-              --platform linux/amd64,linux/arm64 \
-              -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
-          fi
-
-      - name: Log into Docker Hub
-        if: ${{ github.ref == 'refs/heads/master' || startsWith(github.ref, 'refs/tags/v') }}
-        run: |
-          # Log into Docker Hub Registry
-          echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
-
-      - name: Publish k6:master image to Docker Hub
-        if: ${{ github.ref == 'refs/heads/master' }}
-        run: |
-          echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:master and $LI_DOCKER_IMAGE_ID:master"
-          docker buildx build --push \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:master .
-          docker buildx build --push \
-            --target with-browser \
-            --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:master-with-browser .
           # LoadImpact images are deprecated, we don't build arm64 for it.
           docker buildx build --push \
             --platform linux/amd64 \
             -t $LI_DOCKER_IMAGE_ID:master .
-      - name: Publish tagged version image to Docker Hub
+      - name: Publish tagged version images
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         run: |
-          # We need to push the same image in both the loadimpact and the grafana docker hub orgs
           VERSION="${VERSION#v}"
-          echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:$VERSION and $LI_DOCKER_IMAGE_ID:$VERSION"
+          echo "Publish $GHCR_IMAGE_ID:$VERSION images"
           docker buildx build --push \
             --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:$VERSION .
+            -t $DOCKER_IMAGE_ID:$VERSION \
+            -t ghcr.io/$GHCR_IMAGE_ID:$VERSION .
           docker buildx build --push \
             --target with-browser \
             --platform linux/amd64,linux/arm64 \
-            -t $DOCKER_IMAGE_ID:$VERSION-with-browser .
+            -t $DOCKER_IMAGE_ID:$VERSION-with-browser \
+            -t ghcr.io/$GHCR_IMAGE_ID:$VERSION-with-browser .
           # LoadImpact images are deprecated, we don't build arm64 for it.
           docker buildx build --push \
             --platform linux/amd64 \
             -t $LI_DOCKER_IMAGE_ID:$VERSION .
           # We also want to tag the latest stable version as latest
           if [[ ! "$VERSION" =~ (RC|rc) ]]; then
-            echo "Publish to Docker Hub as $DOCKER_IMAGE_ID:latest and $LI_DOCKER_IMAGE_ID:latest"
+            echo "Publish $GHCR_IMAGE_ID:latest"
             docker buildx build --push \
               --platform linux/amd64,linux/arm64 \
-              -t $DOCKER_IMAGE_ID:latest .
+              -t $DOCKER_IMAGE_ID:latest \
+              -t ghcr.io/$GHCR_IMAGE_ID:latest .
             docker buildx build --push \
               --target with-browser \
               --platform linux/amd64,linux/arm64 \
-              -t $DOCKER_IMAGE_ID:latest-with-browser .
+              -t $DOCKER_IMAGE_ID:latest-with-browser \
+              -t ghcr.io/$GHCR_IMAGE_ID:latest-with-browser .
             # LoadImpact images are deprecated, we don't build arm64 for it.
             docker buildx build --push \
               --platform linux/amd64 \
