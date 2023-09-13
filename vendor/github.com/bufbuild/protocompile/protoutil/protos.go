@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,7 +45,7 @@ import (
 //	 FileDescriptor      |  FileDescriptorProto()
 //	 MessageDescriptor   |  MessageDescriptorProto()
 //	 FieldDescriptor     |  FieldDescriptorProto()
-//	 OneofDescriptor     |  OneOfDescriptorProto()
+//	 OneofDescriptor     |  OneofDescriptorProto()
 //	 EnumDescriptor      |  EnumDescriptorProto()
 //	 EnumValueDescriptor |  EnumValueDescriptorProto()
 //	 ServiceDescriptor   |  ServiceDescriptorProto()

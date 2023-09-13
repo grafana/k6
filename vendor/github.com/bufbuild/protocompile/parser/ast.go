@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -16,183 +16,58 @@ package parser
 
 import "github.com/bufbuild/protocompile/ast"
 
-// the types below are accumulator types: linked lists that are
-// constructed during parsing and then converted to slices of AST nodes
-// once the whole list has been parsed
-// TODO: change grammar to use slices of nodes instead of these constructions
+// the types below are accumulator types, just used in intermediate productions
+// to accumulate slices that will get stored in AST nodes
 
-type compactOptionList struct {
-	option *ast.OptionNode
-	comma  *ast.RuneNode
-	next   *compactOptionList
+type compactOptionSlices struct {
+	options []*ast.OptionNode
+	commas  []*ast.RuneNode
 }
 
-func (list *compactOptionList) toNodes() ([]*ast.OptionNode, []*ast.RuneNode) {
-	l := 0
-	for cur := list; cur != nil; cur = cur.next {
-		l++
-	}
-	opts := make([]*ast.OptionNode, l)
-	commas := make([]*ast.RuneNode, l-1)
-	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		opts[i] = cur.option
-		if cur.comma != nil {
-			commas[i] = cur.comma
-		}
-	}
-	return opts, commas
-}
-
-type stringList struct {
-	str  *ast.StringLiteralNode
-	next *stringList
-}
-
-func (list *stringList) toStringValueNode() ast.StringValueNode {
-	if list.next == nil {
-		// single name
-		return list.str
-	}
-
-	l := 0
-	for cur := list; cur != nil; cur = cur.next {
-		l++
-	}
-	strs := make([]*ast.StringLiteralNode, l)
-	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		strs[i] = cur.str
+func toStringValueNode(strs []*ast.StringLiteralNode) ast.StringValueNode {
+	if len(strs) == 1 {
+		return strs[0]
 	}
 	return ast.NewCompoundLiteralStringNode(strs...)
 }
 
-type nameList struct {
-	name  ast.StringValueNode
-	comma *ast.RuneNode
-	next  *nameList
+type nameSlices struct {
+	names  []ast.StringValueNode
+	commas []*ast.RuneNode
 }
 
-func (list *nameList) toNodes() ([]ast.StringValueNode, []*ast.RuneNode) {
-	l := 0
-	for cur := list; cur != nil; cur = cur.next {
-		l++
-	}
-	names := make([]ast.StringValueNode, l)
-	commas := make([]*ast.RuneNode, l-1)
-	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		names[i] = cur.name
-		if cur.comma != nil {
-			commas[i] = cur.comma
-		}
-	}
-	return names, commas
+type rangeSlices struct {
+	ranges []*ast.RangeNode
+	commas []*ast.RuneNode
 }
 
-type rangeList struct {
-	rng   *ast.RangeNode
-	comma *ast.RuneNode
-	next  *rangeList
+type valueSlices struct {
+	vals   []ast.ValueNode
+	commas []*ast.RuneNode
 }
 
-func (list *rangeList) toNodes() ([]*ast.RangeNode, []*ast.RuneNode) {
-	l := 0
-	for cur := list; cur != nil; cur = cur.next {
-		l++
-	}
-	ranges := make([]*ast.RangeNode, l)
-	commas := make([]*ast.RuneNode, l-1)
-	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		ranges[i] = cur.rng
-		if cur.comma != nil {
-			commas[i] = cur.comma
-		}
-	}
-	return ranges, commas
+type fieldRefSlices struct {
+	refs []*ast.FieldReferenceNode
+	dots []*ast.RuneNode
 }
 
-type valueList struct {
-	val   ast.ValueNode
-	comma *ast.RuneNode
-	next  *valueList
+type identSlices struct {
+	idents []*ast.IdentNode
+	dots   []*ast.RuneNode
 }
 
-func (list *valueList) toNodes() ([]ast.ValueNode, []*ast.RuneNode) {
-	if list == nil {
-		return nil, nil
+func (s *identSlices) toIdentValueNode(leadingDot *ast.RuneNode) ast.IdentValueNode {
+	if len(s.idents) == 1 && leadingDot == nil {
+		// single simple name
+		return s.idents[0]
 	}
-	l := 0
-	for cur := list; cur != nil; cur = cur.next {
-		l++
-	}
-	vals := make([]ast.ValueNode, l)
-	commas := make([]*ast.RuneNode, l-1)
-	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		vals[i] = cur.val
-		if cur.comma != nil {
-			commas[i] = cur.comma
-		}
-	}
-	return vals, commas
-}
-
-type fieldRefList struct {
-	ref  *ast.FieldReferenceNode
-	dot  *ast.RuneNode
-	next *fieldRefList
-}
-
-func (list *fieldRefList) toNodes() ([]*ast.FieldReferenceNode, []*ast.RuneNode) {
-	l := 0
-	for cur := list; cur != nil; cur = cur.next {
-		l++
-	}
-	refs := make([]*ast.FieldReferenceNode, l)
-	dots := make([]*ast.RuneNode, l-1)
-	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		refs[i] = cur.ref
-		if cur.dot != nil {
-			dots[i] = cur.dot
-		}
-	}
-
-	return refs, dots
-}
-
-type identList struct {
-	ident *ast.IdentNode
-	dot   *ast.RuneNode
-	next  *identList
-}
-
-func (list *identList) toIdentValueNode(leadingDot *ast.RuneNode) ast.IdentValueNode {
-	if list.next == nil && leadingDot == nil {
-		// single name
-		return list.ident
-	}
-
-	l := 0
-	for cur := list; cur != nil; cur = cur.next {
-		l++
-	}
-	idents := make([]*ast.IdentNode, l)
-	dots := make([]*ast.RuneNode, l-1)
-	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		idents[i] = cur.ident
-		if cur.dot != nil {
-			dots[i] = cur.dot
-		}
-	}
-
-	return ast.NewCompoundIdentNode(leadingDot, idents, dots)
-}
-
-type messageFieldEntry struct {
-	field     *ast.MessageFieldNode
-	delimiter *ast.RuneNode
+	return ast.NewCompoundIdentNode(leadingDot, s.idents, s.dots)
 }
 
 type messageFieldList struct {
-	field *messageFieldEntry
-	next  *messageFieldList
+	field     *ast.MessageFieldNode
+	delimiter *ast.RuneNode
+	next      *messageFieldList
 }
 
 func (list *messageFieldList) toNodes() ([]*ast.MessageFieldNode, []*ast.RuneNode) {
@@ -206,11 +81,10 @@ func (list *messageFieldList) toNodes() ([]*ast.MessageFieldNode, []*ast.RuneNod
 	fields := make([]*ast.MessageFieldNode, l)
 	delimiters := make([]*ast.RuneNode, l)
 	for cur, i := list, 0; cur != nil; cur, i = cur.next, i+1 {
-		fields[i] = cur.field.field
-		if cur.field.delimiter != nil {
-			delimiters[i] = cur.field.delimiter
+		fields[i] = cur.field
+		if cur.delimiter != nil {
+			delimiters[i] = cur.delimiter
 		}
 	}
-
 	return fields, delimiters
 }

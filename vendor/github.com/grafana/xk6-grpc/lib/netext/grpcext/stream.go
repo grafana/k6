@@ -29,13 +29,13 @@ var ErrCanceled = errors.New("canceled by client (k6)")
 // ReceiveConverted receives a converted message from the stream
 // if the stream has been closed successfully, it returns io.EOF
 // if the stream has been cancelled, it returns ErrCanceled
-func (s *Stream) ReceiveConverted() (map[string]interface{}, error) {
+func (s *Stream) ReceiveConverted() (interface{}, error) {
 	raw, err := s.receive()
 	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, err
 	}
 
-	msg, errConv := s.convert(raw)
+	msg, errConv := convert(s.marshaler, raw)
 	if errConv != nil {
 		return nil, errConv
 	}
@@ -60,7 +60,7 @@ func (s *Stream) receive() (*dynamicpb.Message, error) {
 	return nil, err
 }
 
-// convert converts the message to the map[string]interface{} format
+// convert converts the message to the interface{}
 // which could be returned to the JS
 // there is a lot of marshaling/unmarshaling here, but if we just pass the dynamic message
 // the default Marshaller would be used, which would strip any zero/default values from the JSON.
@@ -78,15 +78,15 @@ func (s *Stream) receive() (*dynamicpb.Message, error) {
 // {"x":6,"y":4}
 // rather than the desired:
 // {"x":6,"y":4,"z":0}
-func (s *Stream) convert(msg *dynamicpb.Message) (map[string]interface{}, error) {
+func convert(marshaler protojson.MarshalOptions, msg *dynamicpb.Message) (interface{}, error) {
 	// TODO(olegbespalov): add the test that checks that message is not nil
 
-	raw, err := s.marshaler.Marshal(msg)
+	raw, err := marshaler.Marshal(msg)
 	if err != nil {
 		return nil, fmt.Errorf("failed to marshal the message: %w", err)
 	}
 
-	back := make(map[string]interface{})
+	var back interface{}
 
 	err = json.Unmarshal(raw, &back)
 	if err != nil {

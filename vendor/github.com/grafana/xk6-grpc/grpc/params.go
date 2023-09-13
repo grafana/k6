@@ -47,12 +47,23 @@ func newCallParams(vu modules.VU, input goja.Value) (*callParams, error) {
 				return result, errors.New("metadata must be an object with key-value pairs")
 			}
 			for hk, kv := range rawHeaders {
-				strval, ok := kv.(string)
-				if !ok {
+				var val string
+
+				// The gRPC spec defines that Binary-valued keys end in -bin
+				// https://grpc.io/docs/what-is-grpc/core-concepts/#metadata
+				if strings.HasSuffix(hk, "-bin") {
+					var binVal []byte
+					if binVal, ok = kv.([]byte); !ok {
+						return result, fmt.Errorf("metadata %q value must be binary", hk)
+					}
+
+					// https://github.com/grpc/grpc-go/blob/v1.57.0/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
+					val = string(binVal)
+				} else if val, ok = kv.(string); !ok {
 					return result, fmt.Errorf("metadata %q value must be a string", hk)
 				}
 
-				result.Metadata.Append(hk, strval)
+				result.Metadata.Append(hk, val)
 			}
 		case "tags":
 			if err := common.ApplyCustomUserTags(rt, &result.TagsAndMeta, params.Get(k)); err != nil {

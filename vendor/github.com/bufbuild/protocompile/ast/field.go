@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -64,7 +64,7 @@ type FieldNode struct {
 }
 
 func (*FieldNode) msgElement()    {}
-func (*FieldNode) oneOfElement()  {}
+func (*FieldNode) oneofElement()  {}
 func (*FieldNode) extendElement() {}
 
 // NewFieldNode creates a new *FieldNode. The label and options arguments may be
@@ -213,7 +213,7 @@ type GroupNode struct {
 }
 
 func (*GroupNode) msgElement()    {}
-func (*GroupNode) oneOfElement()  {}
+func (*GroupNode) oneofElement()  {}
 func (*GroupNode) extendElement() {}
 
 // NewGroupNode creates a new *GroupNode. The label and options arguments may be
@@ -322,19 +322,19 @@ func (n *GroupNode) MessageName() Node {
 	return n.Name
 }
 
-// OneOfDeclNode is a node in the AST that defines a oneof. There are
+// OneofDeclNode is a node in the AST that defines a oneof. There are
 // multiple types of AST nodes that declare oneofs:
-//   - *OneOfNode
-//   - *SyntheticOneOf
+//   - *OneofNode
+//   - *SyntheticOneof
 //
 // This also allows NoSourceNode to be used in place of one of the above
 // for some usages.
-type OneOfDeclNode interface {
+type OneofDeclNode interface {
 	Node
-	OneOfName() Node
+	OneofName() Node
 }
 
-// OneOfNode represents a one-of declaration. Example:
+// OneofNode represents a one-of declaration. Example:
 //
 //	oneof query {
 //	  string by_name = 2;
@@ -342,18 +342,18 @@ type OneOfDeclNode interface {
 //	  Address by_address = 4;
 //	  Labels by_label = 5;
 //	}
-type OneOfNode struct {
+type OneofNode struct {
 	compositeNode
 	Keyword    *KeywordNode
 	Name       *IdentNode
 	OpenBrace  *RuneNode
-	Decls      []OneOfElement
+	Decls      []OneofElement
 	CloseBrace *RuneNode
 }
 
-func (*OneOfNode) msgElement() {}
+func (*OneofNode) msgElement() {}
 
-// NewOneOfNode creates a new *OneOfNode. All arguments must be non-nil. While
+// NewOneofNode creates a new *OneofNode. All arguments must be non-nil. While
 // it is technically allowed for decls to be nil or empty, the resulting node
 // will not be a valid oneof, which must have at least one field.
 //   - keyword: The token corresponding to the "oneof" keyword.
@@ -361,7 +361,7 @@ func (*OneOfNode) msgElement() {}
 //   - openBrace: The token corresponding to the "{" rune that starts the body.
 //   - decls: All declarations inside the oneof body.
 //   - closeBrace: The token corresponding to the "}" rune that ends the body.
-func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []OneOfElement, closeBrace *RuneNode) *OneOfNode {
+func NewOneofNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, decls []OneofElement, closeBrace *RuneNode) *OneofNode {
 	if keyword == nil {
 		panic("keyword is nil")
 	}
@@ -385,11 +385,11 @@ func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, de
 		switch decl := decl.(type) {
 		case *OptionNode, *FieldNode, *GroupNode, *EmptyDeclNode:
 		default:
-			panic(fmt.Sprintf("invalid OneOfElement type: %T", decl))
+			panic(fmt.Sprintf("invalid OneofElement type: %T", decl))
 		}
 	}
 
-	return &OneOfNode{
+	return &OneofNode{
 		compositeNode: compositeNode{
 			children: children,
 		},
@@ -401,53 +401,53 @@ func NewOneOfNode(keyword *KeywordNode, name *IdentNode, openBrace *RuneNode, de
 	}
 }
 
-func (n *OneOfNode) OneOfName() Node {
+func (n *OneofNode) OneofName() Node {
 	return n.Name
 }
 
-// OneOfElement is an interface implemented by all AST nodes that can
+// OneofElement is an interface implemented by all AST nodes that can
 // appear in the body of a oneof declaration.
-type OneOfElement interface {
+type OneofElement interface {
 	Node
-	oneOfElement()
+	oneofElement()
 }
 
-var _ OneOfElement = (*OptionNode)(nil)
-var _ OneOfElement = (*FieldNode)(nil)
-var _ OneOfElement = (*GroupNode)(nil)
-var _ OneOfElement = (*EmptyDeclNode)(nil)
+var _ OneofElement = (*OptionNode)(nil)
+var _ OneofElement = (*FieldNode)(nil)
+var _ OneofElement = (*GroupNode)(nil)
+var _ OneofElement = (*EmptyDeclNode)(nil)
 
-// SyntheticOneOf is not an actual node in the AST but a synthetic node
+// SyntheticOneof is not an actual node in the AST but a synthetic node
 // that represents the oneof implied by a proto3 optional field.
-type SyntheticOneOf struct {
+type SyntheticOneof struct {
 	Field *FieldNode
 }
 
-var _ Node = (*SyntheticOneOf)(nil)
+var _ Node = (*SyntheticOneof)(nil)
 
-// NewSyntheticOneOf creates a new *SyntheticOneOf that corresponds to the
+// NewSyntheticOneof creates a new *SyntheticOneof that corresponds to the
 // given proto3 optional field.
-func NewSyntheticOneOf(field *FieldNode) *SyntheticOneOf {
-	return &SyntheticOneOf{Field: field}
+func NewSyntheticOneof(field *FieldNode) *SyntheticOneof {
+	return &SyntheticOneof{Field: field}
 }
 
-func (n *SyntheticOneOf) Start() Token {
+func (n *SyntheticOneof) Start() Token {
 	return n.Field.Start()
 }
 
-func (n *SyntheticOneOf) End() Token {
+func (n *SyntheticOneof) End() Token {
 	return n.Field.End()
 }
 
-func (n *SyntheticOneOf) LeadingComments() []Comment {
+func (n *SyntheticOneof) LeadingComments() []Comment {
 	return nil
 }
 
-func (n *SyntheticOneOf) TrailingComments() []Comment {
+func (n *SyntheticOneof) TrailingComments() []Comment {
 	return nil
 }
 
-func (n *SyntheticOneOf) OneOfName() Node {
+func (n *SyntheticOneof) OneofName() Node {
 	return n.Field.FieldName()
 }
 
