@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -28,7 +28,7 @@ import (
 
 // File is like a super-powered protoreflect.FileDescriptor. It includes helpful
 // methods for looking up elements in the descriptor and can be used to create a
-// resolver for all of the file's transitive closure of dependencies. (See
+// resolver for all the file's transitive closure of dependencies. (See
 // ResolverFromFile.)
 type File interface {
 	protoreflect.FileDescriptor
@@ -42,10 +42,6 @@ type File interface {
 	// that extends the given message name. If no such extension is defined in this
 	// file, nil is returned.
 	FindExtensionByNumber(message protoreflect.FullName, tag protoreflect.FieldNumber) protoreflect.ExtensionTypeDescriptor
-	// Imports returns this file's imports. These are only the files directly
-	// imported by the file. Indirect transitive dependencies will not be in
-	// the returned slice.
-	importsAsFiles() Files
 }
 
 // NewFile converts a protoreflect.FileDescriptor to a File. The given deps must
@@ -147,10 +143,6 @@ func (f *file) FindExtensionByNumber(msg protoreflect.FullName, tag protoreflect
 	return findExtension(f, msg, tag)
 }
 
-func (f *file) importsAsFiles() Files {
-	return f.deps
-}
-
 var _ File = (*file)(nil)
 
 // Files represents a set of protobuf files. It is a slice of File values, but
@@ -187,58 +179,53 @@ type Resolver interface {
 	protoregistry.ExtensionTypeResolver
 }
 
-// ResolverFromFile returns a Resolver that uses the given file plus all of its
-// imports as the source of descriptors. If a given query cannot be answered with
-// these files, the query will fail with a protoregistry.NotFound error. This
-// does not recursively search the entire transitive closure; it only searches
-// the given file and its immediate dependencies. This is useful for resolving
-// elements visible to the file.
-//
-// If the given file is the result of a call to Link, then all dependencies
-// provided in the call to Link are searched (which could actually include more
-// than just the file's direct imports).
+// ResolverFromFile returns a Resolver that can resolve any element that is
+// visible to the given file. It will search the given file, its imports, and
+// any transitive public imports.
 //
 // Note that this function does not compute any additional indexes for efficient
 // search, so queries generally take linear time, O(n) where n is the number of
-// files in the transitive closure of the given file. Queries for an extension
+// files whose elements are visible to the given file. Queries for an extension
 // by number are linear with the number of messages and extensions defined across
-// all the files.
+// those files.
 func ResolverFromFile(f File) Resolver {
-	return fileResolver{
-		f:    f,
-		deps: f.importsAsFiles().AsResolver(),
-	}
+	return fileResolver{f: f}
 }
 
 type fileResolver struct {
-	f    File
-	deps Resolver
+	f File
 }
 
 func (r fileResolver) FindFileByPath(path string) (protoreflect.FileDescriptor, error) {
-	if r.f.Path() == path {
-		return r.f, nil
-	}
-	return r.deps.FindFileByPath(path)
+	return resolveInFile(r.f, false, nil, func(f File) (protoreflect.FileDescriptor, error) {
+		if f.Path() == path {
+			return f, nil
+		}
+		return nil, protoregistry.NotFound
+	})
 }
 
 func (r fileResolver) FindDescriptorByName(name protoreflect.FullName) (protoreflect.Descriptor, error) {
-	d := r.f.FindDescriptorByName(name)
-	if d != nil {
-		return d, nil
-	}
-	return r.deps.FindDescriptorByName(name)
+	return resolveInFile(r.f, false, nil, func(f File) (protoreflect.Descriptor, error) {
+		if d := f.FindDescriptorByName(name); d != nil {
+			return d, nil
+		}
+		return nil, protoregistry.NotFound
+	})
 }
 
 func (r fileResolver) FindMessageByName(message protoreflect.FullName) (protoreflect.MessageType, error) {
-	d := r.f.FindDescriptorByName(message)
-	if d != nil {
-		if md, ok := d.(protoreflect.MessageDescriptor); ok {
+	return resolveInFile(r.f, false, nil, func(f File) (protoreflect.MessageType, error) {
+		d := f.FindDescriptorByName(message)
+		if d != nil {
+			md, ok := d.(protoreflect.MessageDescriptor)
+			if !ok {
+				return nil, fmt.Errorf("%q is %s, not a message", message, descriptorTypeWithArticle(d))
+			}
 			return dynamicpb.NewMessageType(md), nil
 		}
 		return nil, protoregistry.NotFound
-	}
-	return r.deps.FindMessageByName(message)
+	})
 }
 
 func (r fileResolver) FindMessageByURL(url string) (protoreflect.MessageType, error) {
@@ -248,35 +235,34 @@ func (r fileResolver) FindMessageByURL(url string) (protoreflect.MessageType, er
 
 func messageNameFromURL(url string) string {
 	lastSlash := strings.LastIndexByte(url, '/')
-	var fullName string
-	if lastSlash >= 0 {
-		fullName = url[lastSlash+1:]
-	} else {
-		fullName = url
-	}
-	return fullName
+	return url[lastSlash+1:]
 }
 
 func (r fileResolver) FindExtensionByName(field protoreflect.FullName) (protoreflect.ExtensionType, error) {
-	d := r.f.FindDescriptorByName(field)
-	if d != nil {
-		if extd, ok := d.(protoreflect.ExtensionTypeDescriptor); ok {
-			return extd.Type(), nil
-		}
-		if fld, ok := d.(protoreflect.FieldDescriptor); ok && fld.IsExtension() {
+	return resolveInFile(r.f, false, nil, func(f File) (protoreflect.ExtensionType, error) {
+		d := f.FindDescriptorByName(field)
+		if d != nil {
+			fld, ok := d.(protoreflect.FieldDescriptor)
+			if !ok || !fld.IsExtension() {
+				return nil, fmt.Errorf("%q is %s, not an extension", field, descriptorTypeWithArticle(d))
+			}
+			if extd, ok := fld.(protoreflect.ExtensionTypeDescriptor); ok {
+				return extd.Type(), nil
+			}
 			return dynamicpb.NewExtensionType(fld), nil
 		}
 		return nil, protoregistry.NotFound
-	}
-	return r.deps.FindExtensionByName(field)
+	})
 }
 
 func (r fileResolver) FindExtensionByNumber(message protoreflect.FullName, field protoreflect.FieldNumber) (protoreflect.ExtensionType, error) {
-	ext := findExtension(r.f, message, field)
-	if ext != nil {
-		return ext.Type(), nil
-	}
-	return r.deps.FindExtensionByNumber(message, field)
+	return resolveInFile(r.f, false, nil, func(f File) (protoreflect.ExtensionType, error) {
+		ext := findExtension(f, message, field)
+		if ext != nil {
+			return ext.Type(), nil
+		}
+		return nil, protoregistry.NotFound
+	})
 }
 
 type filesResolver []File

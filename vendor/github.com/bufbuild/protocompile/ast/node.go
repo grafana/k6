@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -133,7 +133,7 @@ func NewEmptyDeclNode(semicolon *RuneNode) *EmptyDeclNode {
 func (e *EmptyDeclNode) fileElement()    {}
 func (e *EmptyDeclNode) msgElement()     {}
 func (e *EmptyDeclNode) extendElement()  {}
-func (e *EmptyDeclNode) oneOfElement()   {}
+func (e *EmptyDeclNode) oneofElement()   {}
 func (e *EmptyDeclNode) enumElement()    {}
 func (e *EmptyDeclNode) serviceElement() {}
 func (e *EmptyDeclNode) methodElement()  {}

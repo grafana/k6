@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -359,7 +359,7 @@ func (w *protoWalker) walkDescriptorProto(prefix string, path protoreflect.Sourc
 		var p protoreflect.SourcePath
 		if w.usePath {
 			p = path
-			p = append(p, internal.MessageOneOfsTag, int32(i))
+			p = append(p, internal.MessageOneofsTag, int32(i))
 		}
 		fqn := prefix + oo.GetName()
 		if err := w.enter(protoreflect.FullName(fqn), p, oo); err != nil {

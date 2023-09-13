@@ -14,115 +14,113 @@ import (
 // fields inside this union end up as the fields in a structure known
 // as ${PREFIX}SymType, of which a reference is passed to the lexer.
 %union{
-	file      *ast.FileNode
-	syn       *ast.SyntaxNode
-	fileDecl  ast.FileElement
-	fileDecls []ast.FileElement
-	pkg       *ast.PackageNode
-	imprt     *ast.ImportNode
-	msg       *ast.MessageNode
-	msgDecl   ast.MessageElement
-	msgDecls  []ast.MessageElement
-	fld       *ast.FieldNode
-	mapFld    *ast.MapFieldNode
-	mapType   *ast.MapTypeNode
-	grp       *ast.GroupNode
-	oo        *ast.OneOfNode
-	ooDecl    ast.OneOfElement
-	ooDecls   []ast.OneOfElement
-	ext       *ast.ExtensionRangeNode
-	resvd     *ast.ReservedNode
-	en        *ast.EnumNode
-	enDecl    ast.EnumElement
-	enDecls   []ast.EnumElement
-	env       *ast.EnumValueNode
-	extend    *ast.ExtendNode
-	extDecl   ast.ExtendElement
-	extDecls  []ast.ExtendElement
-	svc       *ast.ServiceNode
-	svcDecl   ast.ServiceElement
-	svcDecls  []ast.ServiceElement
-	mtd       *ast.RPCNode
-	rpcType   *ast.RPCTypeNode
-	rpcDecl   ast.RPCElement
-	rpcDecls  []ast.RPCElement
-	opt       *ast.OptionNode
-	opts      *compactOptionList
-	ref       *ast.FieldReferenceNode
-	optNms    *fieldRefList
-	cmpctOpts *ast.CompactOptionsNode
-	rng       *ast.RangeNode
-	rngs      *rangeList
-	names     *nameList
-	cid       *identList
-	tid       ast.IdentValueNode
-	sl        *valueList
-	msgField  *ast.MessageFieldNode
-	msgEntry  *messageFieldEntry
-	msgLit    *messageFieldList
-	v         ast.ValueNode
-	il        ast.IntValueNode
-	str       *stringList
-	s         *ast.StringLiteralNode
-	i         *ast.UintLiteralNode
-	f         *ast.FloatLiteralNode
-	id        *ast.IdentNode
-	b         *ast.RuneNode
-	err       error
+	file         *ast.FileNode
+	syn          *ast.SyntaxNode
+	fileElement  ast.FileElement
+	fileElements []ast.FileElement
+	pkg          *ast.PackageNode
+	imprt        *ast.ImportNode
+	msg          *ast.MessageNode
+	msgElement   ast.MessageElement
+	msgElements  []ast.MessageElement
+	fld          *ast.FieldNode
+	mapFld       *ast.MapFieldNode
+	mapType      *ast.MapTypeNode
+	grp          *ast.GroupNode
+	oo           *ast.OneofNode
+	ooElement    ast.OneofElement
+	ooElements   []ast.OneofElement
+	ext          *ast.ExtensionRangeNode
+	resvd        *ast.ReservedNode
+	en           *ast.EnumNode
+	enElement    ast.EnumElement
+	enElements   []ast.EnumElement
+	env          *ast.EnumValueNode
+	extend       *ast.ExtendNode
+	extElement   ast.ExtendElement
+	extElements  []ast.ExtendElement
+	svc          *ast.ServiceNode
+	svcElement   ast.ServiceElement
+	svcElements  []ast.ServiceElement
+	mtd          *ast.RPCNode
+	mtdMsgType   *ast.RPCTypeNode
+	mtdElement   ast.RPCElement
+	mtdElements  []ast.RPCElement
+	opt          *ast.OptionNode
+	opts         *compactOptionSlices
+	ref          *ast.FieldReferenceNode
+	optNms       *fieldRefSlices
+	cmpctOpts    *ast.CompactOptionsNode
+	rng          *ast.RangeNode
+	rngs         *rangeSlices
+	names        *nameSlices
+	cid          *identSlices
+	tid          ast.IdentValueNode
+	sl           *valueSlices
+	msgLitFlds   *messageFieldList
+	msgLitFld    *ast.MessageFieldNode
+	v            ast.ValueNode
+	il           ast.IntValueNode
+	str          []*ast.StringLiteralNode
+	s            *ast.StringLiteralNode
+	i            *ast.UintLiteralNode
+	f            *ast.FloatLiteralNode
+	id           *ast.IdentNode
+	b            *ast.RuneNode
+	err          error
 }
 
 // any non-terminal which returns a value needs a type, which is
 // really a field name in the above union struct
-%type <file>      file
-%type <syn>       syntax
-%type <fileDecl>  fileDecl
-%type <fileDecls> fileDecls
-%type <imprt>     import
-%type <pkg>       package
-%type <opt>       option compactOption
-%type <opts>      compactOptionDecls
-%type <rpcDecl>   rpcDecl
-%type <rpcDecls>  rpcDecls
-%type <ref>       optionNameComponent aggName
-%type <optNms>    optionName
-%type <cmpctOpts> compactOptions
-%type <v>         constant scalarConstant aggregate msgLit numLit
-%type <il>        intLit
-%type <id>        name keyType msgElementName extElementName oneofElementName enumElementName
-%type <cid>       ident msgElementIdent extElementIdent oneofElementIdent
-%type <tid>       typeIdent msgElementTypeIdent extElementTypeIdent oneofElementTypeIdent
-%type <sl>        constantList msgList
-%type <msgField>  aggFieldEntry
-%type <msgEntry>  aggField
-%type <msgLit>    aggFields
-%type <fld>       msgField oneofField extField
-%type <oo>        oneof
-%type <grp>       group oneofGroup
-%type <mapFld>    mapField
-%type <mapType>   mapType
-%type <msg>       message
-%type <msgDecl>   messageDecl
-%type <msgDecls>  messageDecls
-%type <ooDecl>    ooDecl
-%type <ooDecls>   ooDecls
-%type <names>     fieldNames
-%type <resvd>     msgReserved enumReserved reservedNames
-%type <rng>       tagRange enumRange
-%type <rngs>      tagRanges enumRanges
-%type <ext>       extensions
-%type <en>        enum
-%type <enDecl>    enumDecl
-%type <enDecls>   enumDecls
-%type <env>       enumValue
-%type <extend>    extend
-%type <extDecl>   extendDecl
-%type <extDecls>  extendDecls
-%type <str>       stringLit
-%type <svc>       service
-%type <svcDecl>   serviceDecl
-%type <svcDecls>  serviceDecls
-%type <mtd>       rpc
-%type <rpcType>   rpcType
+%type <file>         file
+%type <syn>          syntaxDecl
+%type <fileElement>  fileElement
+%type <fileElements> fileElements
+%type <imprt>        importDecl
+%type <pkg>          packageDecl
+%type <opt>          optionDecl compactOption
+%type <opts>         compactOptionDecls
+%type <ref>          extensionName messageLiteralFieldName
+%type <optNms>       optionName
+%type <cmpctOpts>    compactOptions
+%type <v>            value optionValue scalarValue messageLiteralWithBraces messageLiteral numLit listLiteral listElement listOfMessagesLiteral messageValue
+%type <il>           enumValueNumber
+%type <id>           identifier mapKeyType msgElementName extElementName oneofElementName notGroupElementName mtdElementName enumValueName fieldCardinality
+%type <cid>          qualifiedIdentifier msgElementIdent extElementIdent oneofElementIdent notGroupElementIdent mtdElementIdent
+%type <tid>          typeName msgElementTypeIdent extElementTypeIdent oneofElementTypeIdent notGroupElementTypeIdent mtdElementTypeIdent
+%type <sl>           listElements messageLiterals
+%type <msgLitFlds>   messageLiteralFieldEntry messageLiteralFields messageTextFormat
+%type <msgLitFld>    messageLiteralField
+%type <fld>          messageFieldDecl oneofFieldDecl extensionFieldDecl
+%type <oo>           oneofDecl
+%type <grp>          groupDecl oneofGroupDecl
+%type <mapFld>       mapFieldDecl
+%type <mapType>      mapType
+%type <msg>          messageDecl
+%type <msgElement>   messageElement
+%type <msgElements>  messageElements messageBody
+%type <ooElement>    oneofElement
+%type <ooElements>   oneofElements oneofBody
+%type <names>        fieldNames
+%type <resvd>        msgReserved enumReserved reservedNames
+%type <rng>          tagRange enumValueRange
+%type <rngs>         tagRanges enumValueRanges
+%type <ext>          extensionRangeDecl
+%type <en>           enumDecl
+%type <enElement>    enumElement
+%type <enElements>   enumElements enumBody
+%type <env>          enumValueDecl
+%type <extend>       extensionDecl
+%type <extElement>   extensionElement
+%type <extElements>  extensionElements extensionBody
+%type <str>          stringLit
+%type <svc>          serviceDecl
+%type <svcElement>   serviceElement
+%type <svcElements>  serviceElements serviceBody
+%type <mtd>          methodDecl
+%type <mtdElement>   methodElement
+%type <mtdElements>  methodElements methodBody
+%type <mtdMsgType>   methodMessageType
 
 // same for terminals
 %token <s>   _STRING_LIT
@@ -140,17 +138,17 @@ import (
 
 %%
 
-file : syntax {
+file : syntaxDecl {
 		lex := protolex.(*protoLex)
 		$$ = ast.NewFileNode(lex.info, $1, nil, lex.eof)
 		lex.res = $$
 	}
-	| fileDecls  {
+	| fileElements  {
 		lex := protolex.(*protoLex)
 		$$ = ast.NewFileNode(lex.info, nil, $1, lex.eof)
 		lex.res = $$
 	}
-	| syntax fileDecls {
+	| syntaxDecl fileElements {
 		lex := protolex.(*protoLex)
 		$$ = ast.NewFileNode(lex.info, $1, $2, lex.eof)
 		lex.res = $$
@@ -161,14 +159,14 @@ file : syntax {
 		lex.res = $$
 	}
 
-fileDecls : fileDecls fileDecl {
+fileElements : fileElements fileElement {
 		if $2 != nil {
 			$$ = append($1, $2)
 		} else {
 			$$ = $1
 		}
 	}
-	| fileDecl {
+	| fileElement {
 		if $1 != nil {
 			$$ = []ast.FileElement{$1}
 		} else {
@@ -176,60 +174,59 @@ fileDecls : fileDecls fileDecl {
 		}
 	}
 
-fileDecl : import {
+fileElement : importDecl {
 		$$ = $1
 	}
-	| package {
+	| packageDecl {
 		$$ = $1
 	}
-	| option {
+	| optionDecl {
 		$$ = $1
 	}
-	| message {
+	| messageDecl {
 		$$ = $1
 	}
-	| enum {
+	| enumDecl {
 		$$ = $1
 	}
-	| extend {
+	| extensionDecl {
 		$$ = $1
 	}
-	| service {
+	| serviceDecl {
 		$$ = $1
 	}
 	| ';' {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
-	| error ';' {
-		$$ = nil
-	}
 	| error {
 		$$ = nil
 	}
 
-syntax : _SYNTAX '=' stringLit ';' {
-		$$ = ast.NewSyntaxNode($1.ToKeyword(), $2, $3.toStringValueNode(), $4)
+syntaxDecl : _SYNTAX '=' stringLit ';' {
+		$$ = ast.NewSyntaxNode($1.ToKeyword(), $2, toStringValueNode($3), $4)
 	}
 
-import : _IMPORT stringLit ';' {
-		$$ = ast.NewImportNode($1.ToKeyword(), nil, nil, $2.toStringValueNode(), $3)
+importDecl : _IMPORT stringLit ';' {
+		$$ = ast.NewImportNode($1.ToKeyword(), nil, nil, toStringValueNode($2), $3)
 	}
 	| _IMPORT _WEAK stringLit ';' {
-		$$ = ast.NewImportNode($1.ToKeyword(), nil, $2.ToKeyword(), $3.toStringValueNode(), $4)
+		$$ = ast.NewImportNode($1.ToKeyword(), nil, $2.ToKeyword(), toStringValueNode($3), $4)
 	}
 	| _IMPORT _PUBLIC stringLit ';' {
-		$$ = ast.NewImportNode($1.ToKeyword(), $2.ToKeyword(), nil, $3.toStringValueNode(), $4)
+		$$ = ast.NewImportNode($1.ToKeyword(), $2.ToKeyword(), nil, toStringValueNode($3), $4)
 	}
 
-package : _PACKAGE ident ';' {
+packageDecl : _PACKAGE qualifiedIdentifier ';' {
 		$$ = ast.NewPackageNode($1.ToKeyword(), $2.toIdentValueNode(nil), $3)
 	}
 
-ident : name {
-		$$ = &identList{$1, nil, nil}
+qualifiedIdentifier : identifier {
+		$$ = &identSlices{idents: []*ast.IdentNode{$1}}
 	}
-	| name '.' ident {
-		$$ = &identList{$1, $2, $3}
+	| qualifiedIdentifier '.' identifier {
+		$1.idents = append($1.idents, $3)
+		$1.dots = append($1.dots, $2)
+		$$ = $1
 	}
 
 // to mimic limitations of protoc recursive-descent parser,
@@ -237,54 +234,85 @@ ident : name {
 // (or oneof statement keywords [e.g. "option"] below)
 
 msgElementIdent : msgElementName {
-		$$ = &identList{$1, nil, nil}
+		$$ = &identSlices{idents: []*ast.IdentNode{$1}}
 	}
-	| msgElementName '.' ident {
-		$$ = &identList{$1, $2, $3}
+	| msgElementIdent '.' identifier {
+		$1.idents = append($1.idents, $3)
+		$1.dots = append($1.dots, $2)
+		$$ = $1
 	}
 
 extElementIdent : extElementName {
-		$$ = &identList{$1, nil, nil}
+		$$ = &identSlices{idents: []*ast.IdentNode{$1}}
 	}
-	| extElementName '.' ident {
-		$$ = &identList{$1, $2, $3}
+	| extElementIdent '.' identifier {
+		$1.idents = append($1.idents, $3)
+		$1.dots = append($1.dots, $2)
+		$$ = $1
 	}
 
 oneofElementIdent : oneofElementName {
-		$$ = &identList{$1, nil, nil}
+		$$ = &identSlices{idents: []*ast.IdentNode{$1}}
 	}
-	| oneofElementName '.' ident {
-		$$ = &identList{$1, $2, $3}
+	| oneofElementIdent '.' identifier {
+		$1.idents = append($1.idents, $3)
+		$1.dots = append($1.dots, $2)
+		$$ = $1
 	}
 
-option : _OPTION optionName '=' constant ';' {
-		refs, dots := $2.toNodes()
-		optName := ast.NewOptionNameNode(refs, dots)
+notGroupElementIdent : notGroupElementName {
+		$$ = &identSlices{idents: []*ast.IdentNode{$1}}
+	}
+	| notGroupElementIdent '.' identifier {
+		$1.idents = append($1.idents, $3)
+		$1.dots = append($1.dots, $2)
+		$$ = $1
+	}
+
+mtdElementIdent : mtdElementName {
+		$$ = &identSlices{idents: []*ast.IdentNode{$1}}
+	}
+	| mtdElementIdent '.' identifier {
+		$1.idents = append($1.idents, $3)
+		$1.dots = append($1.dots, $2)
+		$$ = $1
+	}
+
+optionDecl : _OPTION optionName '=' optionValue ';' {
+		optName := ast.NewOptionNameNode($2.refs, $2.dots)
 		$$ = ast.NewOptionNode($1.ToKeyword(), optName, $3, $4, $5)
 	}
 
-optionName : optionNameComponent {
-		$$ = &fieldRefList{$1, nil, nil}
+optionName : identifier {
+		fieldReferenceNode := ast.NewFieldReferenceNode($1)
+		$$ = &fieldRefSlices{refs: []*ast.FieldReferenceNode{fieldReferenceNode}}
 	}
-	| optionNameComponent '.' optionName {
-		$$ = &fieldRefList{$1, $2, $3}
+	| optionName '.' identifier {
+		$1.refs = append($1.refs, ast.NewFieldReferenceNode($3))
+		$1.dots = append($1.dots, $2)
+		$$ = $1
+	}
+	| extensionName {
+		$$ = &fieldRefSlices{refs: []*ast.FieldReferenceNode{$1}}
+	}
+	| optionName '.' extensionName {
+		$1.refs = append($1.refs, $3)
+		$1.dots = append($1.dots, $2)
+		$$ = $1
 	}
 
-optionNameComponent : name {
-		$$ = ast.NewFieldReferenceNode($1)
-	}
-	| '(' typeIdent ')' {
+extensionName : '(' typeName ')' {
 		$$ = ast.NewExtensionFieldReferenceNode($1, $2, $3)
 	}
 
-constant : scalarConstant
-	| aggregate
+optionValue : scalarValue
+	| messageLiteralWithBraces
 
-scalarConstant : stringLit {
-		$$ = $1.toStringValueNode()
+scalarValue : stringLit {
+		$$ = toStringValueNode($1)
 	}
 	| numLit
-	| name {
+	| identifier {
 		$$ = $1
 	}
 
@@ -321,55 +349,53 @@ numLit : _FLOAT_LIT {
 	}
 
 stringLit : _STRING_LIT {
-		$$ = &stringList{$1, nil}
+		$$ = []*ast.StringLiteralNode{$1}
 	}
-	| _STRING_LIT stringLit  {
-		$$ = &stringList{$1, $2}
-	}
-
-aggregate : '{' aggFields '}' {
-		fields, delims := $2.toNodes()
-		$$ = ast.NewMessageLiteralNode($1, fields, delims, $3)
-	}
-	| '{' error '}' {
-	    $$ = nil
+	| stringLit _STRING_LIT {
+		$$ = append($1, $2)
 	}
 
-aggFields : aggField {
-		if $1 != nil {
-			$$ = &messageFieldList{$1, nil}
+messageLiteralWithBraces : '{' messageTextFormat '}' {
+		if $2 == nil {
+			$$ = ast.NewMessageLiteralNode($1, nil, nil, $3)
 		} else {
-			$$ = nil
+			fields, delimiters := $2.toNodes()
+			$$ = ast.NewMessageLiteralNode($1, fields, delimiters, $3)
 		}
 	}
-	| aggField aggFields {
+	| '{' '}' {
+		$$ = ast.NewMessageLiteralNode($1, nil, nil, $2)
+	}
+
+messageTextFormat : messageLiteralFields
+
+messageLiteralFields : messageLiteralFieldEntry
+	| messageLiteralFieldEntry messageLiteralFields {
 		if $1 != nil {
-			$$ = &messageFieldList{$1, $2}
+			$1.next = $2
+			$$ = $1
 		} else {
 			$$ = $2
 		}
 	}
-	| {
-		$$ = nil
-	}
 
-aggField : aggFieldEntry {
+messageLiteralFieldEntry : messageLiteralField {
 		if $1 != nil {
-			$$ = &messageFieldEntry{$1, nil}
+			$$ = &messageFieldList{field: $1}
 		} else {
 			$$ = nil
 		}
 	}
-	| aggFieldEntry ',' {
+	| messageLiteralField ',' {
 		if $1 != nil {
-			$$ = &messageFieldEntry{$1, $2}
+			$$ = &messageFieldList{field: $1, delimiter: $2}
 		} else {
 			$$ = nil
 		}
 	}
-	| aggFieldEntry ';' {
+	| messageLiteralField ';' {
 		if $1 != nil {
-			$$ = &messageFieldEntry{$1, $2}
+			$$ = &messageFieldList{field: $1, delimiter: $2}
 		} else {
 			$$ = nil
 		}
@@ -384,280 +410,208 @@ aggField : aggFieldEntry {
 		$$ = nil
 	}
 
-aggFieldEntry : aggName ':' scalarConstant {
+messageLiteralField : messageLiteralFieldName ':' value {
 		if $1 != nil {
 			$$ = ast.NewMessageFieldNode($1, $2, $3)
 		} else {
 			$$ = nil
 		}
 	}
-	| aggName '[' ']' {
+	| messageLiteralFieldName messageValue {
 		if $1 != nil {
-			val := ast.NewArrayLiteralNode($2, nil, nil, $3)
-			$$ = ast.NewMessageFieldNode($1, nil, val)
-		} else {
-			$$ = nil
-		}
-	}
-	| aggName ':' '[' ']' {
-		if $1 != nil {
-			val := ast.NewArrayLiteralNode($3, nil, nil, $4)
-			$$ = ast.NewMessageFieldNode($1, $2, val)
-		} else {
-			$$ = nil
-		}
-	}
-	| aggName '[' msgList ']' {
-		if $1 != nil {
-			vals, commas := $3.toNodes()
-			val := ast.NewArrayLiteralNode($2, vals, commas, $4)
-			$$ = ast.NewMessageFieldNode($1, nil, val)
-		} else {
-			$$ = nil
-		}
-	}
-	| aggName ':' '[' constantList ']' {
-		if $1 != nil {
-			vals, commas := $4.toNodes()
-			val := ast.NewArrayLiteralNode($3, vals, commas, $5)
-			$$ = ast.NewMessageFieldNode($1, $2, val)
-		} else {
-			$$ = nil
-		}
-	}
-	| aggName ':' '[' error ']' {
-		$$ = nil
-	}
-	| aggName '[' error ']' {
-		$$ = nil
-	}
-	| aggName ':' msgLit {
-		if $1 != nil && $3 != nil {
-			$$ = ast.NewMessageFieldNode($1, $2, $3)
-		} else {
-			$$ = nil
-		}
-	}
-	| aggName msgLit {
-		if $1 != nil && $2 != nil {
 			$$ = ast.NewMessageFieldNode($1, nil, $2)
 		} else {
 			$$ = nil
 		}
 	}
-	| aggName ':' '<' error '>' {
-		$$ = nil
-	}
-	| aggName '<' error '>' {
+	| error ':' value {
 		$$ = nil
 	}
 
-aggName : name {
+messageLiteralFieldName : identifier {
 		$$ = ast.NewFieldReferenceNode($1)
 	}
-	| '[' ident ']' {
+	| '[' qualifiedIdentifier ']' {
 		$$ = ast.NewExtensionFieldReferenceNode($1, $2.toIdentValueNode(nil), $3)
 	}
-	| '[' ident '/' ident ']' {
+	| '[' qualifiedIdentifier '/' qualifiedIdentifier ']' {
 		$$ = ast.NewAnyTypeReferenceNode($1, $2.toIdentValueNode(nil), $3, $4.toIdentValueNode(nil), $5)
 	}
 	| '[' error ']' {
 		$$ = nil
 	}
 
-msgList : msgLit {
-		if $1 == nil {
-			$$ = nil
+value : scalarValue
+	| messageLiteral
+	| listLiteral
+
+messageValue : messageLiteral
+	| listOfMessagesLiteral
+
+messageLiteral : messageLiteralWithBraces
+	| '<' messageTextFormat '>' {
+		if $2 == nil {
+			$$ = ast.NewMessageLiteralNode($1, nil, nil, $3)
 		} else {
-			$$ = &valueList{$1, nil, nil}
+			fields, delimiters := $2.toNodes()
+			$$ = ast.NewMessageLiteralNode($1, fields, delimiters, $3)
 		}
 	}
-	| msgLit ',' msgList {
-		if $1 == nil {
-			$$ = nil
-		} else {
-			$$ = &valueList{$1, $2, $3}
-		}
+	| '<' '>' {
+		$$ = ast.NewMessageLiteralNode($1, nil, nil, $2)
 	}
 
-msgLit : aggregate {
+listLiteral : '[' listElements ']' {
+		if $2 == nil {
+			$$ = ast.NewArrayLiteralNode($1, nil, nil, $3)
+		} else {
+			$$ = ast.NewArrayLiteralNode($1, $2.vals, $2.commas, $3)
+		}
+	}
+	| '[' ']' {
+		$$ = ast.NewArrayLiteralNode($1, nil, nil, $2)
+	}
+	| '[' error ']' {
+		$$ = nil
+	}
+
+listElements : listElement {
+		$$ = &valueSlices{vals: []ast.ValueNode{$1}}
+	}
+	| listElements ',' listElement {
+		$1.vals = append($1.vals, $3)
+		$1.commas = append($1.commas, $2)
 		$$ = $1
 	}
-	| '<' aggFields '>' {
-		fields, delims := $2.toNodes()
-		$$ = ast.NewMessageLiteralNode($1, fields, delims, $3)
+
+listElement : scalarValue
+	| messageLiteral
+
+listOfMessagesLiteral : '[' messageLiterals ']' {
+		if $2 == nil {
+			$$ = ast.NewArrayLiteralNode($1, nil, nil, $3)
+		} else {
+			$$ = ast.NewArrayLiteralNode($1, $2.vals, $2.commas, $3)
+		}
 	}
-	| '<' error '>' {
+	| '[' ']' {
+		$$ = ast.NewArrayLiteralNode($1, nil, nil, $2)
+	}
+	| '[' error ']' {
 		$$ = nil
 	}
 
-constantList : constant {
-		$$ = &valueList{$1, nil, nil}
+messageLiterals : messageLiteral {
+		$$ = &valueSlices{vals: []ast.ValueNode{$1}}
 	}
-	| constant ',' constantList {
-		$$ = &valueList{$1, $2, $3}
-	}
-	| '<' aggFields '>' {
-		fields, delims := $2.toNodes()
-		msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
-		$$ = &valueList{msg, nil, nil}
-	}
-	| '<' aggFields '>' ',' constantList {
-		fields, delims := $2.toNodes()
-		msg := ast.NewMessageLiteralNode($1, fields, delims, $3)
-		$$ = &valueList{msg, $4, $5}
-	}
-	| '<' error '>' {
-		$$ = nil
-	}
-	| '<' error '>' ',' constantList {
-		$$ = $5
+	| messageLiterals ',' messageLiteral {
+		$1.vals = append($1.vals, $3)
+		$1.commas = append($1.commas, $2)
+		$$ = $1
 	}
 
-typeIdent : ident {
+typeName : qualifiedIdentifier {
 		$$ = $1.toIdentValueNode(nil)
 	}
-	| '.' ident {
+	| '.' qualifiedIdentifier {
 		$$ = $2.toIdentValueNode($1)
 	}
 
 msgElementTypeIdent : msgElementIdent {
 		$$ = $1.toIdentValueNode(nil)
 	}
-	| '.' ident {
+	| '.' qualifiedIdentifier {
 		$$ = $2.toIdentValueNode($1)
 	}
 
 extElementTypeIdent : extElementIdent {
 		$$ = $1.toIdentValueNode(nil)
 	}
-	| '.' ident {
+	| '.' qualifiedIdentifier {
 		$$ = $2.toIdentValueNode($1)
 	}
 
 oneofElementTypeIdent : oneofElementIdent {
 		$$ = $1.toIdentValueNode(nil)
 	}
-	| '.' ident {
+	| '.' qualifiedIdentifier {
 		$$ = $2.toIdentValueNode($1)
 	}
 
-msgField : _REQUIRED typeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+notGroupElementTypeIdent : notGroupElementIdent {
+		$$ = $1.toIdentValueNode(nil)
 	}
-	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
-	}
-	| _REPEATED typeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
-	}
-	| _REQUIRED typeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
-	}
-	| _OPTIONAL typeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
-	}
-	| _REPEATED typeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
-	}
-	| msgElementTypeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
-	}
-	| msgElementTypeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
+	| '.' qualifiedIdentifier {
+		$$ = $2.toIdentValueNode($1)
 	}
 
-extField : _REQUIRED typeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+mtdElementTypeIdent : mtdElementIdent {
+		$$ = $1.toIdentValueNode(nil)
 	}
-	| _OPTIONAL typeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+	| '.' qualifiedIdentifier {
+		$$ = $2.toIdentValueNode($1)
 	}
-	| _REPEATED typeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
-	}
-	| _REQUIRED typeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
-	}
-	| _OPTIONAL typeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
-	}
-	| _REPEATED typeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
-	}
-	| extElementTypeIdent name '=' _INT_LIT ';' {
-		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
-	}
-	| extElementTypeIdent name '=' _INT_LIT compactOptions ';' {
-		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
-	}
+
+fieldCardinality : _REQUIRED
+	| _OPTIONAL
+	| _REPEATED
 
 compactOptions: '[' compactOptionDecls ']' {
-		opts, commas := $2.toNodes()
-		$$ = ast.NewCompactOptionsNode($1, opts, commas, $3)
+		$$ = ast.NewCompactOptionsNode($1, $2.options, $2.commas, $3)
 	}
 
 compactOptionDecls : compactOption {
-		$$ = &compactOptionList{$1, nil, nil}
+		$$ = &compactOptionSlices{options: []*ast.OptionNode{$1}}
 	}
-	| compactOption ',' compactOptionDecls {
-		$$ = &compactOptionList{$1, $2, $3}
+	| compactOptionDecls ',' compactOption {
+		$1.options = append($1.options, $3)
+		$1.commas = append($1.commas, $2)
+		$$ = $1
 	}
 
-compactOption: optionName '=' constant {
-		refs, dots := $1.toNodes()
-		optName := ast.NewOptionNameNode(refs, dots)
+compactOption: optionName '=' optionValue {
+		optName := ast.NewOptionNameNode($1.refs, $1.dots)
 		$$ = ast.NewCompactOptionNode(optName, $2, $3)
 	}
 
-group : _REQUIRED _GROUP name '=' _INT_LIT '{' messageDecls '}' {
+groupDecl : fieldCardinality _GROUP identifier '=' _INT_LIT '{' messageBody '}' {
 		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
 	}
-	| _OPTIONAL _GROUP name '=' _INT_LIT '{' messageDecls '}' {
-		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
-	}
-	| _REPEATED _GROUP name '=' _INT_LIT '{' messageDecls '}' {
-		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, nil, $6, $7, $8)
-	}
-	| _REQUIRED _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
-		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
-	}
-	| _OPTIONAL _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
-		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
-	}
-	| _REPEATED _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
+	| fieldCardinality _GROUP identifier '=' _INT_LIT compactOptions '{' messageBody '}' {
 		$$ = ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9)
 	}
 
-oneof : _ONEOF name '{' ooDecls '}' {
-		$$ = ast.NewOneOfNode($1.ToKeyword(), $2, $3, $4, $5)
+oneofDecl : _ONEOF identifier '{' oneofBody '}' {
+		$$ = ast.NewOneofNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
-ooDecls : ooDecls ooDecl {
+oneofBody : {
+		$$ = nil
+	}
+	| oneofElements
+
+oneofElements : oneofElements oneofElement {
 		if $2 != nil {
 			$$ = append($1, $2)
 		} else {
 			$$ = $1
 		}
 	}
-	| ooDecl {
+	| oneofElement {
 		if $1 != nil {
-			$$ = []ast.OneOfElement{$1}
+			$$ = []ast.OneofElement{$1}
 		} else {
 			$$ = nil
 		}
 	}
-	| {
-		$$ = nil
-	}
 
-ooDecl : option {
+oneofElement : optionDecl {
 		$$ = $1
 	}
-	| oneofField {
+	| oneofFieldDecl {
 		$$ = $1
 	}
-	| oneofGroup {
+	| oneofGroupDecl {
 		$$ = $1
 	}
 	| error ';' {
@@ -667,32 +621,32 @@ ooDecl : option {
 		$$ = nil
 	}
 
-oneofField : oneofElementTypeIdent name '=' _INT_LIT ';' {
+oneofFieldDecl : oneofElementTypeIdent identifier '=' _INT_LIT ';' {
 		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
 	}
-	| oneofElementTypeIdent name '=' _INT_LIT compactOptions ';' {
+	| oneofElementTypeIdent identifier '=' _INT_LIT compactOptions ';' {
 		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
 	}
 
-oneofGroup : _GROUP name '=' _INT_LIT '{' messageDecls '}' {
+oneofGroupDecl : _GROUP identifier '=' _INT_LIT '{' messageBody '}' {
 		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, nil, $5, $6, $7)
 	}
-	| _GROUP name '=' _INT_LIT compactOptions '{' messageDecls '}' {
+	| _GROUP identifier '=' _INT_LIT compactOptions '{' messageBody '}' {
 		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, $5, $6, $7, $8)
 	}
 
-mapField : mapType name '=' _INT_LIT ';' {
+mapFieldDecl : mapType identifier '=' _INT_LIT ';' {
 		$$ = ast.NewMapFieldNode($1, $2, $3, $4, nil, $5)
 	}
-	| mapType name '=' _INT_LIT compactOptions ';' {
+	| mapType identifier '=' _INT_LIT compactOptions ';' {
 		$$ = ast.NewMapFieldNode($1, $2, $3, $4, $5, $6)
 	}
 
-mapType : _MAP '<' keyType ',' typeIdent '>' {
+mapType : _MAP '<' mapKeyType ',' typeName '>' {
 		$$ = ast.NewMapTypeNode($1.ToKeyword(), $2, $3, $4, $5, $6)
 	}
 
-keyType : _INT32
+mapKeyType : _INT32
 	| _INT64
 	| _UINT32
 	| _UINT64
@@ -705,20 +659,20 @@ keyType : _INT32
 	| _BOOL
 	| _STRING
 
-extensions : _EXTENSIONS tagRanges ';' {
-		ranges, commas := $2.toNodes()
-		$$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, nil, $3)
+extensionRangeDecl : _EXTENSIONS tagRanges ';' {
+		$$ = ast.NewExtensionRangeNode($1.ToKeyword(), $2.ranges, $2.commas, nil, $3)
 	}
 	| _EXTENSIONS tagRanges compactOptions ';' {
-		ranges, commas := $2.toNodes()
-		$$ = ast.NewExtensionRangeNode($1.ToKeyword(), ranges, commas, $3, $4)
+		$$ = ast.NewExtensionRangeNode($1.ToKeyword(), $2.ranges, $2.commas, $3, $4)
 	}
 
 tagRanges : tagRange {
-		$$ = &rangeList{$1, nil, nil}
+		$$ = &rangeSlices{ranges: []*ast.RangeNode{$1}}
 	}
-	| tagRange ',' tagRanges {
-		$$ = &rangeList{$1, $2, $3}
+	| tagRanges ',' tagRange {
+		$1.ranges = append($1.ranges, $3)
+		$1.commas = append($1.commas, $2)
+		$$ = $1
 	}
 
 tagRange : _INT_LIT {
@@ -731,24 +685,26 @@ tagRange : _INT_LIT {
 		$$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
 	}
 
-enumRanges : enumRange {
-		$$ = &rangeList{$1, nil, nil}
+enumValueRanges : enumValueRange {
+		$$ = &rangeSlices{ranges: []*ast.RangeNode{$1}}
 	}
-	| enumRange ',' enumRanges {
-		$$ = &rangeList{$1, $2, $3}
+	| enumValueRanges ',' enumValueRange {
+		$1.ranges = append($1.ranges, $3)
+		$1.commas = append($1.commas, $2)
+		$$ = $1
 	}
 
-enumRange : intLit {
+enumValueRange : enumValueNumber {
 		$$ = ast.NewRangeNode($1, nil, nil, nil)
 	}
-	| intLit _TO intLit {
+	| enumValueNumber _TO enumValueNumber {
 		$$ = ast.NewRangeNode($1, $2.ToKeyword(), $3, nil)
 	}
-	| intLit _TO _MAX {
+	| enumValueNumber _TO _MAX {
 		$$ = ast.NewRangeNode($1, $2.ToKeyword(), nil, $3.ToKeyword())
 	}
 
-intLit : _INT_LIT {
+enumValueNumber : _INT_LIT {
 		$$ = $1
 	}
 	| '-' _INT_LIT {
@@ -756,55 +712,56 @@ intLit : _INT_LIT {
 	}
 
 msgReserved : _RESERVED tagRanges ';' {
-		ranges, commas := $2.toNodes()
-		$$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
+		$$ = ast.NewReservedRangesNode($1.ToKeyword(), $2.ranges, $2.commas, $3)
 	}
 	| reservedNames
 
-enumReserved : _RESERVED enumRanges ';' {
-		ranges, commas := $2.toNodes()
-		$$ = ast.NewReservedRangesNode($1.ToKeyword(), ranges, commas, $3)
+enumReserved : _RESERVED enumValueRanges ';' {
+		$$ = ast.NewReservedRangesNode($1.ToKeyword(), $2.ranges, $2.commas, $3)
 	}
 	| reservedNames
 
 reservedNames : _RESERVED fieldNames ';' {
-		names, commas := $2.toNodes()
-		$$ = ast.NewReservedNamesNode($1.ToKeyword(), names, commas, $3)
+		$$ = ast.NewReservedNamesNode($1.ToKeyword(), $2.names, $2.commas, $3)
 	}
 
 fieldNames : stringLit {
-		$$ = &nameList{$1.toStringValueNode(), nil, nil}
+		$$ = &nameSlices{names: []ast.StringValueNode{toStringValueNode($1)}}
 	}
-	| stringLit ',' fieldNames {
-		$$ = &nameList{$1.toStringValueNode(), $2, $3}
+	| fieldNames ',' stringLit {
+		$1.names = append($1.names, toStringValueNode($3))
+		$1.commas = append($1.commas, $2)
+		$$ = $1
 	}
 
-enum : _ENUM name '{' enumDecls '}' {
+enumDecl : _ENUM identifier '{' enumBody '}' {
 		$$ = ast.NewEnumNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
-enumDecls : enumDecls enumDecl {
+enumBody : {
+		$$ = nil
+	}
+	| enumElements
+
+enumElements : enumElements enumElement {
 		if $2 != nil {
 			$$ = append($1, $2)
 		} else {
 			$$ = $1
 		}
 	}
-	| enumDecl {
+	| enumElement {
 		if $1 != nil {
 			$$ = []ast.EnumElement{$1}
 		} else {
 			$$ = nil
 		}
 	}
-	| {
-		$$ = nil
-	}
 
-enumDecl : option {
+enumElement : optionDecl {
 		$$ = $1
 	}
-	| enumValue {
+	| enumValueDecl {
 		$$ = $1
 	}
 	| enumReserved {
@@ -813,67 +770,66 @@ enumDecl : option {
 	| ';' {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
-	| error ';' {
-		$$ = nil
-	}
 	| error {
 		$$ = nil
 	}
 
-enumValue : enumElementName '=' intLit ';' {
+enumValueDecl : enumValueName '=' enumValueNumber ';' {
 		$$ = ast.NewEnumValueNode($1, $2, $3, nil, $4)
 	}
-	|  enumElementName '=' intLit compactOptions ';' {
+	|  enumValueName '=' enumValueNumber compactOptions ';' {
 		$$ = ast.NewEnumValueNode($1, $2, $3, $4, $5)
 	}
 
-message : _MESSAGE name '{' messageDecls '}' {
+messageDecl : _MESSAGE identifier '{' messageBody '}' {
 		$$ = ast.NewMessageNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
-messageDecls : messageDecls messageDecl {
+messageBody : {
+		$$ = nil
+	}
+	| messageElements
+
+messageElements : messageElements messageElement {
 		if $2 != nil {
 			$$ = append($1, $2)
 		} else {
 			$$ = $1
 		}
 	}
-	| messageDecl {
+	| messageElement {
 		if $1 != nil {
 			$$ = []ast.MessageElement{$1}
 		} else {
 			$$ = nil
 		}
 	}
-	| {
-		$$ = nil
-	}
 
-messageDecl : msgField {
+messageElement : messageFieldDecl {
 		$$ = $1
 	}
-	| enum {
+	| enumDecl {
 		$$ = $1
 	}
-	| message {
+	| messageDecl {
 		$$ = $1
 	}
-	| extend {
+	| extensionDecl {
 		$$ = $1
 	}
-	| extensions {
+	| extensionRangeDecl {
 		$$ = $1
 	}
-	| group {
+	| groupDecl {
 		$$ = $1
 	}
-	| option {
+	| optionDecl {
 		$$ = $1
 	}
-	| oneof {
+	| oneofDecl {
 		$$ = $1
 	}
-	| mapField {
+	| mapFieldDecl {
 		$$ = $1
 	}
 	| msgReserved {
@@ -882,39 +838,51 @@ messageDecl : msgField {
 	| ';' {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
-	| error ';' {
-		$$ = nil
-	}
 	| error {
 		$$ = nil
 	}
 
-extend : _EXTEND typeIdent '{' extendDecls '}' {
+messageFieldDecl : fieldCardinality notGroupElementTypeIdent identifier '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+	}
+	| fieldCardinality notGroupElementTypeIdent identifier '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+	}
+	| msgElementTypeIdent identifier '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
+	}
+	| msgElementTypeIdent identifier '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
+	}
+
+extensionDecl : _EXTEND typeName '{' extensionBody '}' {
 		$$ = ast.NewExtendNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
-extendDecls : extendDecls extendDecl {
+extensionBody : {
+		$$ = nil
+	}
+	| extensionElements
+
+extensionElements : extensionElements extensionElement {
 		if $2 != nil {
 			$$ = append($1, $2)
 		} else {
 			$$ = $1
 		}
 	}
-	| extendDecl {
+	| extensionElement {
 		if $1 != nil {
 			$$ = []ast.ExtendElement{$1}
 		} else {
 			$$ = nil
 		}
 	}
-	| {
-		$$ = nil
-	}
 
-extendDecl : extField {
+extensionElement : extensionFieldDecl {
 		$$ = $1
 	}
-	| group {
+	| groupDecl {
 		$$ = $1
 	}
 	| error ';' {
@@ -924,94 +892,105 @@ extendDecl : extField {
 		$$ = nil
 	}
 
-service : _SERVICE name '{' serviceDecls '}' {
+extensionFieldDecl : fieldCardinality notGroupElementTypeIdent identifier '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, nil, $6)
+	}
+	| fieldCardinality notGroupElementTypeIdent identifier '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode($1.ToKeyword(), $2, $3, $4, $5, $6, $7)
+	}
+	| extElementTypeIdent identifier '=' _INT_LIT ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, nil, $5)
+	}
+	| extElementTypeIdent identifier '=' _INT_LIT compactOptions ';' {
+		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
+	}
+
+serviceDecl : _SERVICE identifier '{' serviceBody '}' {
 		$$ = ast.NewServiceNode($1.ToKeyword(), $2, $3, $4, $5)
 	}
 
-serviceDecls : serviceDecls serviceDecl {
+serviceBody : {
+		$$ = nil
+	}
+	| serviceElements
+
+serviceElements : serviceElements serviceElement {
 		if $2 != nil {
 			$$ = append($1, $2)
 		} else {
 			$$ = $1
 		}
 	}
-	| serviceDecl {
+	| serviceElement {
 		if $1 != nil {
 			$$ = []ast.ServiceElement{$1}
 		} else {
 			$$ = nil
 		}
 	}
-	| {
-		$$ = nil
-	}
 
 // NB: doc suggests support for "stream" declaration, separate from "rpc", but
 // it does not appear to be supported in protoc (doc is likely from grammar for
 // Google-internal version of protoc, with support for streaming stubby)
-serviceDecl : option {
+serviceElement : optionDecl {
 		$$ = $1
 	}
-	| rpc {
+	| methodDecl {
 		$$ = $1
 	}
 	| ';' {
 		$$ = ast.NewEmptyDeclNode($1)
 	}
-	| error ';' {
-		$$ = nil
-	}
 	| error {
 		$$ = nil
 	}
 
-rpc : _RPC name rpcType _RETURNS rpcType ';' {
+methodDecl : _RPC identifier methodMessageType _RETURNS methodMessageType ';' {
 		$$ = ast.NewRPCNode($1.ToKeyword(), $2, $3, $4.ToKeyword(), $5, $6)
 	}
-	| _RPC name rpcType _RETURNS rpcType '{' rpcDecls '}' {
+	| _RPC identifier methodMessageType _RETURNS methodMessageType '{' methodBody '}' {
 		$$ = ast.NewRPCNodeWithBody($1.ToKeyword(), $2, $3, $4.ToKeyword(), $5, $6, $7, $8)
 	}
 
-rpcType : '(' _STREAM typeIdent ')' {
+methodMessageType : '(' _STREAM typeName ')' {
 		$$ = ast.NewRPCTypeNode($1, $2.ToKeyword(), $3, $4)
 	}
-	| '(' typeIdent ')' {
+	| '(' mtdElementTypeIdent ')' {
 		$$ = ast.NewRPCTypeNode($1, nil, $2, $3)
 	}
 
-rpcDecls : rpcDecls rpcDecl {
+methodBody : {
+		$$ = nil
+	}
+	| methodElements
+
+methodElements : methodElements methodElement {
 		if $2 != nil {
 			$$ = append($1, $2)
 		} else {
 			$$ = $1
 		}
 	}
-	| rpcDecl {
+	| methodElement {
 		if $1 != nil {
 			$$ = []ast.RPCElement{$1}
 		} else {
 			$$ = nil
 		}
 	}
-	| {
-		$$ = nil
-	}
 
-rpcDecl : option {
+methodElement : optionDecl {
 		$$ = $1
 	}
 	| ';' {
 		$$ = ast.NewEmptyDeclNode($1)
-	}
-	| error ';' {
-		$$ = nil
 	}
 	| error {
 		$$ = nil
 	}
 
 // excludes message, enum, oneof, extensions, reserved, extend,
-//   option, optional, required, and repeated
+//   option, group, optional, required, and repeated
 msgElementName : _NAME
 	| _SYNTAX
 	| _IMPORT
@@ -1037,7 +1016,6 @@ msgElementName : _NAME
 	| _BOOL
 	| _STRING
 	| _BYTES
-	| _GROUP
 	| _MAP
 	| _TO
 	| _MAX
@@ -1046,7 +1024,7 @@ msgElementName : _NAME
 	| _STREAM
 	| _RETURNS
 
-// excludes optional, required, and repeated
+// excludes group, optional, required, and repeated
 extElementName : _NAME
 	| _SYNTAX
 	| _IMPORT
@@ -1073,7 +1051,6 @@ extElementName : _NAME
 	| _BOOL
 	| _STRING
 	| _BYTES
-	| _GROUP
 	| _ONEOF
 	| _MAP
 	| _EXTENSIONS
@@ -1089,7 +1066,7 @@ extElementName : _NAME
 	| _RETURNS
 
 // excludes reserved, option
-enumElementName : _NAME
+enumValueName : _NAME
 	| _SYNTAX
 	| _IMPORT
 	| _WEAK
@@ -1131,7 +1108,7 @@ enumElementName : _NAME
 	| _STREAM
 	| _RETURNS
 
-// excludes option, optional, required, and repeated
+// excludes group, option, optional, required, and repeated
 oneofElementName : _NAME
 	| _SYNTAX
 	| _IMPORT
@@ -1142,6 +1119,94 @@ oneofElementName : _NAME
 	| _FALSE
 	| _INF
 	| _NAN
+	| _DOUBLE
+	| _FLOAT
+	| _INT32
+	| _INT64
+	| _UINT32
+	| _UINT64
+	| _SINT32
+	| _SINT64
+	| _FIXED32
+	| _FIXED64
+	| _SFIXED32
+	| _SFIXED64
+	| _BOOL
+	| _STRING
+	| _BYTES
+	| _ONEOF
+	| _MAP
+	| _EXTENSIONS
+	| _TO
+	| _MAX
+	| _RESERVED
+	| _ENUM
+	| _MESSAGE
+	| _EXTEND
+	| _SERVICE
+	| _RPC
+	| _STREAM
+	| _RETURNS
+
+// excludes group
+notGroupElementName : _NAME
+	| _SYNTAX
+	| _IMPORT
+	| _WEAK
+	| _PUBLIC
+	| _PACKAGE
+	| _OPTION
+	| _TRUE
+	| _FALSE
+	| _INF
+	| _NAN
+	| _REPEATED
+	| _OPTIONAL
+	| _REQUIRED
+	| _DOUBLE
+	| _FLOAT
+	| _INT32
+	| _INT64
+	| _UINT32
+	| _UINT64
+	| _SINT32
+	| _SINT64
+	| _FIXED32
+	| _FIXED64
+	| _SFIXED32
+	| _SFIXED64
+	| _BOOL
+	| _STRING
+	| _BYTES
+	| _ONEOF
+	| _MAP
+	| _EXTENSIONS
+	| _TO
+	| _MAX
+	| _RESERVED
+	| _ENUM
+	| _MESSAGE
+	| _EXTEND
+	| _SERVICE
+	| _RPC
+	| _STREAM
+	| _RETURNS
+
+// excludes stream
+mtdElementName : _NAME
+	| _SYNTAX
+	| _IMPORT
+	| _WEAK
+	| _PUBLIC
+	| _PACKAGE
+	| _OPTION
+	| _TRUE
+	| _FALSE
+	| _INF
+	| _NAN
+	| _REPEATED
+	| _OPTIONAL
+	| _REQUIRED
 	| _DOUBLE
 	| _FLOAT
 	| _INT32
@@ -1169,10 +1234,9 @@ oneofElementName : _NAME
 	| _EXTEND
 	| _SERVICE
 	| _RPC
-	| _STREAM
 	| _RETURNS
 
-name : _NAME
+identifier : _NAME
 	| _SYNTAX
 	| _IMPORT
 	| _WEAK

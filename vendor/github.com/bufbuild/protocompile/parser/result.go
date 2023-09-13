@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -552,10 +552,10 @@ func (r *result) addMessageBody(msgd *descriptorpb.DescriptorProto, body *ast.Me
 			fd, md := r.asGroupDescriptors(decl, isProto3, maxTag, handler, depth+1)
 			msgd.Field = append(msgd.Field, fd)
 			msgd.NestedType = append(msgd.NestedType, md)
-		case *ast.OneOfNode:
+		case *ast.OneofNode:
 			oodIndex := len(msgd.OneofDecl)
 			ood := &descriptorpb.OneofDescriptorProto{Name: proto.String(decl.Name.Val)}
-			r.putOneOfNode(ood, decl)
+			r.putOneofNode(ood, decl)
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			ooFields := 0
 			for _, oodecl := range decl.Decls {
@@ -769,7 +769,7 @@ func (r *result) processProto3OptionalFields(msgd *descriptorpb.DescriptorProto)
 			ood := &descriptorpb.OneofDescriptorProto{Name: proto.String(ooName)}
 			msgd.OneofDecl = append(msgd.OneofDecl, ood)
 			ooident := r.FieldNode(fd).(*ast.FieldNode) //nolint:errcheck
-			r.putOneOfNode(ood, ast.NewSyntheticOneOf(ooident))
+			r.putOneofNode(ood, ast.NewSyntheticOneof(ooident))
 		}
 	}
 }
@@ -816,7 +816,7 @@ func (r *result) FieldNode(f *descriptorpb.FieldDescriptorProto) ast.FieldDeclNo
 	return r.nodes[f].(ast.FieldDeclNode)
 }
 
-func (r *result) OneOfNode(o *descriptorpb.OneofDescriptorProto) ast.Node {
+func (r *result) OneofNode(o *descriptorpb.OneofDescriptorProto) ast.Node {
 	if r.nodes == nil {
 		return ast.NewNoSourceNode(r.proto.GetName())
 	}
@@ -892,7 +892,7 @@ func (r *result) putFieldNode(f *descriptorpb.FieldDescriptorProto, n ast.FieldD
 	r.nodes[f] = n
 }
 
-func (r *result) putOneOfNode(o *descriptorpb.OneofDescriptorProto, n ast.OneOfDeclNode) {
+func (r *result) putOneofNode(o *descriptorpb.OneofDescriptorProto, n ast.OneofDeclNode) {
 	r.nodes[o] = n
 }
 

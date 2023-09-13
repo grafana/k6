@@ -154,23 +154,11 @@ func (c *Conn) Invoke(
 	}
 
 	if resp != nil {
-		// (rogchap) there is a lot of marshaling/unmarshaling here, but if we just pass the dynamic message
-		// the default Marshaller would be used, which would strip any zero/default values from the JSON.
-		// eg. given this message:
-		// message Point {
-		//    double x = 1;
-		// 	  double y = 2;
-		// 	  double z = 3;
-		// }
-		// and a value like this:
-		// msg := Point{X: 6, Y: 4, Z: 0}
-		// would result in JSON output:
-		// {"x":6,"y":4}
-		// rather than the desired:
-		// {"x":6,"y":4,"z":0}
-		raw, _ := marshaler.Marshal(resp)
-		msg := make(map[string]interface{})
-		_ = json.Unmarshal(raw, &msg)
+		msg, err := convert(marshaler, resp)
+		if err != nil {
+			return nil, fmt.Errorf("unable to convert response object to JSON: %w", err)
+		}
+
 		response.Message = msg
 	}
 	return &response, nil

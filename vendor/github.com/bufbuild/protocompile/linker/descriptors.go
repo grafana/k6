@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
 package linker
 
 import (
-	"bytes"
 	"fmt"
 	"strconv"
 	"strings"
@@ -174,7 +173,7 @@ func computeSourceLocIndex(locs []protoreflect.SourceLocation) map[interface{}]i
 
 func asSourceLocations(srcInfoProtos []*descriptorpb.SourceCodeInfo_Location) []protoreflect.SourceLocation {
 	locs := make([]protoreflect.SourceLocation, len(srcInfoProtos))
-	prev := map[string]*protoreflect.SourceLocation{}
+	prev := map[any]*protoreflect.SourceLocation{}
 	for i, loc := range srcInfoProtos {
 		var stLin, stCol, enLin, enCol int
 		if len(loc.Span) == 3 {
@@ -193,7 +192,7 @@ func asSourceLocations(srcInfoProtos []*descriptorpb.SourceCodeInfo_Location) []
 			EndLine:                 enLin,
 			EndColumn:               enCol,
 		}
-		str := pathStr(loc.Path)
+		str := pathKey(loc.Path)
 		pr := prev[str]
 		if pr != nil {
 			pr.Next = i
@@ -201,14 +200,6 @@ func asSourceLocations(srcInfoProtos []*descriptorpb.SourceCodeInfo_Location) []
 		prev[str] = &locs[i]
 	}
 	return locs
-}
-
-func pathStr(p protoreflect.SourcePath) string {
-	var buf bytes.Buffer
-	for _, v := range p {
-		fmt.Fprintf(&buf, "%x:", v)
-	}
-	return buf.String()
 }
 
 // AddOptionBytes associates the given opts (an options message encoded in the
@@ -450,7 +441,7 @@ func computePath(d protoreflect.Descriptor) (protoreflect.SourcePath, bool) {
 		case protoreflect.OneofDescriptor:
 			path = append(path, int32(d.Index()))
 			if _, ok := p.(protoreflect.MessageDescriptor); ok {
-				path = append(path, internal.MessageOneOfsTag)
+				path = append(path, internal.MessageOneofsTag)
 			} else {
 				return nil, false
 			}
@@ -557,7 +548,7 @@ func (r *result) createMessageDescriptor(md *descriptorpb.DescriptorProto, paren
 	// NB: We MUST create fields before oneofs so that we can populate the
 	//  set of fields that belong to the oneof
 	ret.fields = r.createFields(prefix, ret, md.Field)
-	ret.oneofs = r.createOneOfs(prefix, ret, md.OneofDecl)
+	ret.oneofs = r.createOneofs(prefix, ret, md.OneofDecl)
 	ret.nestedMessages = r.createMessages(prefix, ret, md.NestedType)
 	ret.nestedEnums = r.createEnums(prefix, ret, md.EnumType)
 	ret.nestedExtensions = r.createExtensions(prefix, ret, md.Extension)
@@ -1546,10 +1537,10 @@ type oneofDescriptors struct {
 	oneofs []*oneofDescriptor
 }
 
-func (r *result) createOneOfs(prefix string, parent *msgDescriptor, ooProtos []*descriptorpb.OneofDescriptorProto) oneofDescriptors {
+func (r *result) createOneofs(prefix string, parent *msgDescriptor, ooProtos []*descriptorpb.OneofDescriptorProto) oneofDescriptors {
 	oos := make([]*oneofDescriptor, len(ooProtos))
 	for i, fldProto := range ooProtos {
-		oos[i] = r.createOneOfDescriptor(fldProto, parent, i, prefix+fldProto.GetName())
+		oos[i] = r.createOneofDescriptor(fldProto, parent, i, prefix+fldProto.GetName())
 	}
 	return oneofDescriptors{oneofs: oos}
 }
@@ -1585,7 +1576,7 @@ type oneofDescriptor struct {
 var _ protoreflect.OneofDescriptor = (*oneofDescriptor)(nil)
 var _ protoutil.DescriptorProtoWrapper = (*oneofDescriptor)(nil)
 
-func (r *result) createOneOfDescriptor(ood *descriptorpb.OneofDescriptorProto, parent *msgDescriptor, index int, fqn string) *oneofDescriptor {
+func (r *result) createOneofDescriptor(ood *descriptorpb.OneofDescriptorProto, parent *msgDescriptor, index int, fqn string) *oneofDescriptor {
 	ret := &oneofDescriptor{file: r, parent: parent, index: index, proto: ood, fqn: fqn}
 	r.descriptors[fqn] = ret
 
@@ -1600,7 +1591,7 @@ func (r *result) createOneOfDescriptor(ood *descriptorpb.OneofDescriptorProto, p
 	return ret
 }
 
-func (o *oneofDescriptor) OneOfDescriptorProto() *descriptorpb.OneofDescriptorProto {
+func (o *oneofDescriptor) OneofDescriptorProto() *descriptorpb.OneofDescriptorProto {
 	return o.proto
 }
 
@@ -1867,10 +1858,6 @@ func (r *result) FindExtensionByNumber(msg protoreflect.FullName, tag protorefle
 func (r *result) FindDescriptorByName(name protoreflect.FullName) protoreflect.Descriptor {
 	fqn := strings.TrimPrefix(string(name), ".")
 	return r.descriptors[fqn]
-}
-
-func (r *result) importsAsFiles() Files {
-	return r.deps
 }
 
 func (r *result) hasSource() bool {

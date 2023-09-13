@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"reflect"
 	"sync"
 	"time"
 
@@ -28,7 +29,6 @@ type message struct {
 
 const (
 	opened = iota + 1
-	closing
 	closed
 )
 
@@ -51,8 +51,8 @@ type stream struct {
 
 	obj *goja.Object // the object that is given to js to interact with the stream
 
-	state int8
-	done  chan struct{}
+	writingState int8
+	done         chan struct{}
 
 	writeQueueCh chan message
 
@@ -141,7 +141,7 @@ func (s *stream) loop() {
 	}
 }
 
-func (s *stream) queueMessage(msg map[string]interface{}) {
+func (s *stream) queueMessage(msg interface{}) {
 	metrics.PushIfNotDone(s.vu.Context(), s.vu.State().Samples, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: s.instanceMetrics.StreamsMessagesReceived,
@@ -185,17 +185,19 @@ func (s *stream) readData(wg *sync.WaitGroup) {
 			return
 		}
 
-		if len(msg) == 0 && isRegularClosing(err) {
+		if isRegularClosing(err) {
 			s.logger.WithError(err).Debug("stream is cancelled/finished")
 
 			s.tq.Queue(func() error {
-				return s.closeWithError(nil)
+				return s.closeWithError(err)
 			})
 
 			return
 		}
 
-		s.queueMessage(msg)
+		if msg != nil || !reflect.ValueOf(msg).IsNil() {
+			s.queueMessage(msg)
+		}
 	}
 }
 
@@ -299,7 +301,7 @@ func (s *stream) on(event string, listener func(goja.Value) (goja.Value, error))
 
 // write writes a message to the stream
 func (s *stream) write(input goja.Value) {
-	if s.state != opened {
+	if s.writingState != opened {
 		return
 	}
 
@@ -320,11 +322,13 @@ func (s *stream) write(input goja.Value) {
 
 // end closes client the stream
 func (s *stream) end() {
-	if s.state == closed || s.state == closing {
+	if s.writingState == closed {
 		return
 	}
 
-	s.state = closing
+	s.logger.Debugf("finishing stream %s writing", s.method)
+
+	s.writingState = closed
 	s.writeQueueCh <- message{isClosing: true}
 }
 
@@ -334,16 +338,23 @@ func (s *stream) closeWithError(err error) error {
 	return s.callErrorListeners(err)
 }
 
-// close changes the stream state to closed and triggers the end event listeners
+// close closes the stream and call end event listeners
+// Note: in the regular closing the io.EOF could come
 func (s *stream) close(err error) {
-	if s.state == closed {
+	if err == nil {
 		return
 	}
 
-	s.logger.WithError(err).Debug("stream is closing")
+	select {
+	case <-s.done:
+		s.logger.Debugf("stream %v is already closed", s.method)
+		return
+	default:
+	}
 
-	s.state = closed
+	s.logger.Debugf("stream %s is closing", s.method)
 	close(s.done)
+
 	s.tq.Queue(func() error {
 		return s.callEventListeners(eventEnd)
 	})
@@ -354,7 +365,7 @@ func (s *stream) close(err error) {
 }
 
 func (s *stream) callErrorListeners(e error) error {
-	if e == nil {
+	if e == nil || errors.Is(e, io.EOF) {
 		return nil
 	}
 

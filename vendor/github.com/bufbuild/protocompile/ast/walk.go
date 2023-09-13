@@ -1,4 +1,4 @@
-// Copyright 2020-2022 Buf Technologies, Inc.
+// Copyright 2020-2023 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -133,8 +133,8 @@ func Visit(n Node, v Visitor) error {
 		return v.VisitMapFieldNode(n)
 	case *MapTypeNode:
 		return v.VisitMapTypeNode(n)
-	case *OneOfNode:
-		return v.VisitOneOfNode(n)
+	case *OneofNode:
+		return v.VisitOneofNode(n)
 	case *EnumNode:
 		return v.VisitEnumNode(n)
 	case *EnumValueNode:
@@ -283,8 +283,8 @@ type Visitor interface {
 	VisitMapFieldNode(*MapFieldNode) error
 	// VisitMapTypeNode is invoked when visiting a *MapTypeNode in the AST.
 	VisitMapTypeNode(*MapTypeNode) error
-	// VisitOneOfNode is invoked when visiting a *OneOfNode in the AST.
-	VisitOneOfNode(*OneOfNode) error
+	// VisitOneofNode is invoked when visiting a *OneofNode in the AST.
+	VisitOneofNode(*OneofNode) error
 	// VisitEnumNode is invoked when visiting an *EnumNode in the AST.
 	VisitEnumNode(*EnumNode) error
 	// VisitEnumValueNode is invoked when visiting an *EnumValueNode in the AST.
@@ -405,7 +405,7 @@ func (n NoOpVisitor) VisitMapTypeNode(_ *MapTypeNode) error {
 	return nil
 }
 
-func (n NoOpVisitor) VisitOneOfNode(_ *OneOfNode) error {
+func (n NoOpVisitor) VisitOneofNode(_ *OneofNode) error {
 	return nil
 }
 
@@ -537,7 +537,7 @@ type SimpleVisitor struct {
 	DoVisitGroupNode                 func(*GroupNode) error
 	DoVisitMapFieldNode              func(*MapFieldNode) error
 	DoVisitMapTypeNode               func(*MapTypeNode) error
-	DoVisitOneOfNode                 func(*OneOfNode) error
+	DoVisitOneofNode                 func(*OneofNode) error
 	DoVisitEnumNode                  func(*EnumNode) error
 	DoVisitEnumValueNode             func(*EnumValueNode) error
 	DoVisitServiceNode               func(*ServiceNode) error
@@ -755,9 +755,9 @@ func (b *SimpleVisitor) VisitMapTypeNode(node *MapTypeNode) error {
 	return b.visitInterface(node)
 }
 
-func (b *SimpleVisitor) VisitOneOfNode(node *OneOfNode) error {
-	if b.DoVisitOneOfNode != nil {
-		return b.DoVisitOneOfNode(node)
+func (b *SimpleVisitor) VisitOneofNode(node *OneofNode) error {
+	if b.DoVisitOneofNode != nil {
+		return b.DoVisitOneofNode(node)
 	}
 	return b.visitInterface(node)
 }
