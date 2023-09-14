@@ -883,7 +883,7 @@ func (f *Frame) Goto(url string, opts goja.Value) (api.Response, error) {
 		defaultReferer = netMgr.extraHTTPHeaders["referer"]
 		parsedOpts     = NewFrameGotoOptions(
 			defaultReferer,
-			time.Duration(f.manager.timeoutSettings.navigationTimeout())*time.Second,
+			time.Duration(f.manager.timeoutSettings.navigationTimeout())*time.Millisecond,
 		)
 	)
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {

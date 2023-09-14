@@ -35,7 +35,7 @@ func (t *TimeoutSettings) navigationTimeout() int64 {
 	if t.parent != nil {
 		return t.parent.navigationTimeout()
 	}
-	return int64(DefaultTimeout.Seconds())
+	return int64(DefaultTimeout.Milliseconds())
 }
 
 func (t *TimeoutSettings) timeout() int64 {
