@@ -223,7 +223,7 @@ func (p *Page) closeWorker(sessionID target.SessionID) {
 }
 
 func (p *Page) defaultTimeout() time.Duration {
-	return time.Duration(p.timeoutSettings.timeout()) * time.Second
+	return time.Duration(p.timeoutSettings.timeout()) * time.Millisecond
 }
 
 func (p *Page) didClose() {

@@ -45,5 +45,5 @@ func (t *TimeoutSettings) timeout() int64 {
 	if t.parent != nil {
 		return t.parent.timeout()
 	}
-	return int64(DefaultTimeout.Seconds())
+	return int64(DefaultTimeout.Milliseconds())
 }

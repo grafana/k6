@@ -111,7 +111,7 @@ func testTimeoutSettingsTimeout(t *testing.T) {
 	ts := NewTimeoutSettings(nil)
 
 	// Assert default timeout value is used
-	assert.Equal(t, int64(DefaultTimeout.Seconds()), ts.timeout())
+	assert.Equal(t, int64(DefaultTimeout.Milliseconds()), ts.timeout())
 
 	// Assert custom default timeout is used
 	ts.setDefaultTimeout(100)
@@ -125,7 +125,7 @@ func testTimeoutSettingsTimeoutWithParent(t *testing.T) {
 	tsWithParent := NewTimeoutSettings(ts)
 
 	// Assert default timeout value is used
-	assert.Equal(t, int64(DefaultTimeout.Seconds()), tsWithParent.timeout())
+	assert.Equal(t, int64(DefaultTimeout.Milliseconds()), tsWithParent.timeout())
 
 	// Assert custom default timeout from parent is used
 	ts.setDefaultTimeout(1000)
