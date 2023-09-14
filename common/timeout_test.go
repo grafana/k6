@@ -71,7 +71,7 @@ func testTimeoutSettingsSetDefaultNavigationTimeout(t *testing.T) {
 
 	ts := NewTimeoutSettings(nil)
 	ts.setDefaultNavigationTimeout(100)
-	assert.Equal(t, int64(100), *ts.defaultNavigationTimeout)
+	assert.Equal(t, int64(100), ts.defaultNavigationTimeout.Milliseconds())
 }
 
 func testTimeoutSettingsNavigationTimeout(t *testing.T) {
@@ -80,11 +80,11 @@ func testTimeoutSettingsNavigationTimeout(t *testing.T) {
 	ts := NewTimeoutSettings(nil)
 
 	// Assert default timeout value is used
-	assert.Equal(t, int64(DefaultTimeout.Milliseconds()), ts.navigationTimeout())
+	assert.Equal(t, DefaultTimeout, ts.navigationTimeout())
 
 	// Assert custom default timeout is used
 	ts.setDefaultNavigationTimeout(100)
-	assert.Equal(t, int64(100), ts.navigationTimeout())
+	assert.Equal(t, int64(100), ts.navigationTimeout().Milliseconds())
 }
 
 func testTimeoutSettingsNavigationTimeoutWithParent(t *testing.T) {
@@ -94,15 +94,15 @@ func testTimeoutSettingsNavigationTimeoutWithParent(t *testing.T) {
 	tsWithParent := NewTimeoutSettings(ts)
 
 	// Assert default timeout value is used
-	assert.Equal(t, int64(DefaultTimeout.Milliseconds()), tsWithParent.navigationTimeout())
+	assert.Equal(t, DefaultTimeout, tsWithParent.navigationTimeout())
 
 	// Assert custom default timeout from parent is used
 	ts.setDefaultNavigationTimeout(1000)
-	assert.Equal(t, int64(1000), tsWithParent.navigationTimeout())
+	assert.Equal(t, int64(1000), tsWithParent.navigationTimeout().Milliseconds())
 
 	// Assert custom default timeout is used (over parent)
 	tsWithParent.setDefaultNavigationTimeout(100)
-	assert.Equal(t, int64(100), tsWithParent.navigationTimeout())
+	assert.Equal(t, int64(100), tsWithParent.navigationTimeout().Milliseconds())
 }
 
 func testTimeoutSettingsTimeout(t *testing.T) {

@@ -1,10 +1,12 @@
 package common
 
+import "time"
+
 // TimeoutSettings holds information on timeout settings.
 type TimeoutSettings struct {
 	parent                   *TimeoutSettings
 	defaultTimeout           *int64
-	defaultNavigationTimeout *int64
+	defaultNavigationTimeout *time.Duration
 }
 
 // NewTimeoutSettings creates a new timeout settings object.
@@ -22,20 +24,21 @@ func (t *TimeoutSettings) setDefaultTimeout(timeout int64) {
 }
 
 func (t *TimeoutSettings) setDefaultNavigationTimeout(timeout int64) {
-	t.defaultNavigationTimeout = &timeout
+	d := time.Duration(timeout) * time.Millisecond
+	t.defaultNavigationTimeout = &d
 }
 
-func (t *TimeoutSettings) navigationTimeout() int64 {
+func (t *TimeoutSettings) navigationTimeout() time.Duration {
 	if t.defaultNavigationTimeout != nil {
 		return *t.defaultNavigationTimeout
 	}
 	if t.defaultTimeout != nil {
-		return *t.defaultTimeout
+		return time.Duration(*t.defaultTimeout * time.Hour.Milliseconds())
 	}
 	if t.parent != nil {
 		return t.parent.navigationTimeout()
 	}
-	return int64(DefaultTimeout.Milliseconds())
+	return DefaultTimeout
 }
 
 func (t *TimeoutSettings) timeout() int64 {
