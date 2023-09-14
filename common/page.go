@@ -223,7 +223,7 @@ func (p *Page) closeWorker(sessionID target.SessionID) {
 }
 
 func (p *Page) defaultTimeout() time.Duration {
-	return time.Duration(p.timeoutSettings.timeout()) * time.Millisecond
+	return p.timeoutSettings.timeout()
 }
 
 func (p *Page) didClose() {
@@ -975,7 +975,7 @@ func (p *Page) SetDefaultNavigationTimeout(timeout int64) {
 func (p *Page) SetDefaultTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
-	p.timeoutSettings.setDefaultTimeout(timeout)
+	p.timeoutSettings.setDefaultTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetExtraHTTPHeaders sets default HTTP headers for page and whole frame hierarchy.

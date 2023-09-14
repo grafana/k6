@@ -198,7 +198,7 @@ func (f *Frame) detach() {
 }
 
 func (f *Frame) defaultTimeout() time.Duration {
-	return time.Duration(f.manager.timeoutSettings.timeout()) * time.Millisecond
+	return f.manager.timeoutSettings.timeout()
 }
 
 func (f *Frame) document() (*ElementHandle, error) {
@@ -1738,7 +1738,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 		"fid:%s furl:%s", f.ID(), f.URL())
 
 	parsedOpts := NewFrameWaitForNavigationOptions(
-		time.Duration(f.manager.timeoutSettings.timeout()) * time.Millisecond)
+		f.manager.timeoutSettings.timeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "parsing wait for navigation options: %w", err)
 	}

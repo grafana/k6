@@ -272,7 +272,7 @@ func (b *BrowserContext) SetDefaultNavigationTimeout(timeout int64) {
 func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 	b.logger.Debugf("BrowserContext:SetDefaultTimeout", "bctxid:%v timeout:%d", b.id, timeout)
 
-	b.timeoutSettings.setDefaultTimeout(timeout)
+	b.timeoutSettings.setDefaultTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetExtraHTTPHeaders is not implemented.

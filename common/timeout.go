@@ -5,7 +5,7 @@ import "time"
 // TimeoutSettings holds information on timeout settings.
 type TimeoutSettings struct {
 	parent                   *TimeoutSettings
-	defaultTimeout           *int64
+	defaultTimeout           *time.Duration
 	defaultNavigationTimeout *time.Duration
 }
 
@@ -19,7 +19,7 @@ func NewTimeoutSettings(parent *TimeoutSettings) *TimeoutSettings {
 	return t
 }
 
-func (t *TimeoutSettings) setDefaultTimeout(timeout int64) {
+func (t *TimeoutSettings) setDefaultTimeout(timeout time.Duration) {
 	t.defaultTimeout = &timeout
 }
 
@@ -32,7 +32,7 @@ func (t *TimeoutSettings) navigationTimeout() time.Duration {
 		return *t.defaultNavigationTimeout
 	}
 	if t.defaultTimeout != nil {
-		return time.Duration(*t.defaultTimeout * time.Hour.Milliseconds())
+		return *t.defaultTimeout
 	}
 	if t.parent != nil {
 		return t.parent.navigationTimeout()
@@ -40,12 +40,12 @@ func (t *TimeoutSettings) navigationTimeout() time.Duration {
 	return DefaultTimeout
 }
 
-func (t *TimeoutSettings) timeout() int64 {
+func (t *TimeoutSettings) timeout() time.Duration {
 	if t.defaultTimeout != nil {
 		return *t.defaultTimeout
 	}
 	if t.parent != nil {
 		return t.parent.timeout()
 	}
-	return int64(DefaultTimeout.Milliseconds())
+	return DefaultTimeout
 }
