@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"net/http"
 	"testing"
 	"time"
@@ -605,4 +606,59 @@ func TestK6Object(t *testing.T) {
 	k6ObjGoja := b.toGojaValue(k6Obj)
 
 	assert.False(t, k6ObjGoja.Equals(goja.Null()))
+}
+
+func TestBrowserContextTimeout(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                     string
+		defaultTimeout           time.Duration
+		defaultNavigationTimeout time.Duration
+	}{
+		{
+			name:           "fail when timeout exceeds default timeout",
+			defaultTimeout: 1 * time.Millisecond,
+		},
+		{
+			name:                     "fail when timeout exceeds default navigation timeout",
+			defaultNavigationTimeout: 1 * time.Millisecond,
+		},
+		{
+			name:                     "default navigation timeout supersedes default timeout",
+			defaultTimeout:           30 * time.Second,
+			defaultNavigationTimeout: 1 * time.Millisecond,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withHTTPServer())
+
+			tb.withHandler("/slow", func(w http.ResponseWriter, _ *http.Request) {
+				time.Sleep(1000 * time.Millisecond)
+				fmt.Fprintf(w, `sorry for being so slow`)
+			})
+
+			bc, err := tb.NewContext(nil)
+			require.NoError(t, err)
+
+			if tc.defaultTimeout != 0 {
+				bc.SetDefaultTimeout(tc.defaultTimeout.Milliseconds())
+			}
+			if tc.defaultNavigationTimeout != 0 {
+				bc.SetDefaultNavigationTimeout(tc.defaultNavigationTimeout.Milliseconds())
+			}
+
+			p, err := bc.NewPage()
+			require.NoError(t, err)
+
+			res, err := p.Goto(tb.url("/slow"), nil)
+			require.Nil(t, res)
+			assert.ErrorContains(t, err, "timed out after")
+		})
+	}
 }
