@@ -2,6 +2,7 @@ package common
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -70,7 +71,7 @@ func testTimeoutSettingsSetDefaultNavigationTimeout(t *testing.T) {
 	t.Parallel()
 
 	ts := NewTimeoutSettings(nil)
-	ts.setDefaultNavigationTimeout(100)
+	ts.setDefaultNavigationTimeout(time.Duration(100) * time.Millisecond)
 	assert.Equal(t, int64(100), ts.defaultNavigationTimeout.Milliseconds())
 }
 
@@ -83,7 +84,7 @@ func testTimeoutSettingsNavigationTimeout(t *testing.T) {
 	assert.Equal(t, DefaultTimeout, ts.navigationTimeout())
 
 	// Assert custom default timeout is used
-	ts.setDefaultNavigationTimeout(100)
+	ts.setDefaultNavigationTimeout(time.Duration(100) * time.Millisecond)
 	assert.Equal(t, int64(100), ts.navigationTimeout().Milliseconds())
 }
 
@@ -97,11 +98,11 @@ func testTimeoutSettingsNavigationTimeoutWithParent(t *testing.T) {
 	assert.Equal(t, DefaultTimeout, tsWithParent.navigationTimeout())
 
 	// Assert custom default timeout from parent is used
-	ts.setDefaultNavigationTimeout(1000)
+	ts.setDefaultNavigationTimeout(time.Duration(1000) * time.Millisecond)
 	assert.Equal(t, int64(1000), tsWithParent.navigationTimeout().Milliseconds())
 
 	// Assert custom default timeout is used (over parent)
-	tsWithParent.setDefaultNavigationTimeout(100)
+	tsWithParent.setDefaultNavigationTimeout(time.Duration(100) * time.Millisecond)
 	assert.Equal(t, int64(100), tsWithParent.navigationTimeout().Milliseconds())
 }
 

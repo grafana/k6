@@ -968,7 +968,7 @@ func (p *Page) SetContent(html string, opts goja.Value) {
 func (p *Page) SetDefaultNavigationTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultNavigationTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
-	p.timeoutSettings.setDefaultNavigationTimeout(timeout)
+	p.timeoutSettings.setDefaultNavigationTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetDefaultTimeout sets the default maximum timeout in milliseconds.

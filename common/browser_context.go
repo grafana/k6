@@ -265,7 +265,7 @@ func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
 func (b *BrowserContext) SetDefaultNavigationTimeout(timeout int64) {
 	b.logger.Debugf("BrowserContext:SetDefaultNavigationTimeout", "bctxid:%v timeout:%d", b.id, timeout)
 
-	b.timeoutSettings.setDefaultNavigationTimeout(timeout)
+	b.timeoutSettings.setDefaultNavigationTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetDefaultTimeout sets the default maximum timeout in milliseconds.

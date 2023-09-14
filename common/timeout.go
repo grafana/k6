@@ -23,9 +23,8 @@ func (t *TimeoutSettings) setDefaultTimeout(timeout int64) {
 	t.defaultTimeout = &timeout
 }
 
-func (t *TimeoutSettings) setDefaultNavigationTimeout(timeout int64) {
-	d := time.Duration(timeout) * time.Millisecond
-	t.defaultNavigationTimeout = &d
+func (t *TimeoutSettings) setDefaultNavigationTimeout(timeout time.Duration) {
+	t.defaultNavigationTimeout = &timeout
 }
 
 func (t *TimeoutSettings) navigationTimeout() time.Duration {
