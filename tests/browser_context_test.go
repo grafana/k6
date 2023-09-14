@@ -639,7 +639,7 @@ func TestBrowserContextTimeout(t *testing.T) {
 			tb := newTestBrowser(t, withHTTPServer())
 
 			tb.withHandler("/slow", func(w http.ResponseWriter, _ *http.Request) {
-				time.Sleep(1000 * time.Millisecond)
+				time.Sleep(100 * time.Millisecond)
 				fmt.Fprintf(w, `sorry for being so slow`)
 			})
 
