@@ -1428,7 +1428,9 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 func (f *Frame) SetContent(html string, opts goja.Value) {
 	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
 
-	parsedOpts := NewFrameSetContentOptions(f.defaultTimeout())
+	parsedOpts := NewFrameSetContentOptions(
+		f.manager.timeoutSettings.navigationTimeout(),
+	)
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		k6ext.Panic(f.ctx, "parsing set content options: %w", err)
 	}
