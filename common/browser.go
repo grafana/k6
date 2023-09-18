@@ -47,6 +47,16 @@ type Browser struct {
 	// A *Connection is saved to this field, see: connect().
 	conn connection
 
+	// This mutex is only needed in an edge case where we have multiple
+	// instances of k6 connecting to the same chrome instance. In this
+	// case when a page is created by the first k6 instance, the second
+	// instance of k6 will also receive an onAttachedToTarget event. When
+	// this occurs there's a small chance that at the same time a new
+	// context is being created by the second k6 instance. So the read
+	// occurs in getDefaultBrowserContextOrMatchedID which is called by
+	// onAttachedToTarget, and the write in NewContext. This mutex protects
+	// the read/write race condition for this one case.
+	contextMu      sync.RWMutex
 	context        *BrowserContext
 	defaultContext *BrowserContext
 
@@ -139,6 +149,9 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 // getDefaultBrowserContextOrMatchedID returns the BrowserContext for the given browser context ID.
 // If the browser context is not found, the default BrowserContext is returned.
 func (b *Browser) getDefaultBrowserContextOrMatchedID(id cdp.BrowserContextID) *BrowserContext {
+	b.contextMu.RLock()
+	defer b.contextMu.RUnlock()
+
 	if b.context == nil || b.context.id != id {
 		return b.defaultContext
 	}
@@ -512,6 +525,9 @@ func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
 	if err != nil {
 		return nil, fmt.Errorf("new context: %w", err)
 	}
+
+	b.contextMu.Lock()
+	defer b.contextMu.Unlock()
 	b.context = browserCtx
 
 	return browserCtx, nil
