@@ -46,8 +46,8 @@ type Bundle struct {
 // https://github.com/grafana/k6/issues/3065
 func (b *Bundle) checkMetricNamesForPrometheusCompatibility() {
 	const (
-		nameRegexString = "^[a-zA-Z_][a-zA-Z0-9_]{1,63}$"
-		badNameWarning  = "Metric name should only include ASCII letters, numbers and underscores. " +
+		nameRegexString = "^[a-zA-Z_][a-zA-Z0-9_]{1,128}$"
+		badNameWarning  = "Metric name should only include up to 128 ASCII letters, numbers and/or underscores. " +
 			"This name will stop working in k6 v0.48.0 (around December 2023)."
 	)
 

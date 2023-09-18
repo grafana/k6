@@ -1575,7 +1575,7 @@ func TestMetricNameWarning(t *testing.T) {
 	t.Log(stdout)
 
 	logEntries := ts.LoggerHook.Drain()
-	expectedMsg := `Metric name should only include ASCII letters, numbers and underscores. This name will stop working in `
+	expectedMsg := `Metric name should only include up to 128 ASCII letters, numbers and/or underscores.`
 	filteredEntries := testutils.FilterEntries(logEntries, logrus.WarnLevel, expectedMsg)
 	require.Len(t, filteredEntries, 2)
 	// we do it this way as ordering is not guaranteed
