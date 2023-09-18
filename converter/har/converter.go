@@ -228,13 +228,11 @@ func Convert(h HAR, options lib.Options, minSleep, maxSleep uint, enableChecks b
 						}
 					}
 
-					if e.Response.Headers != nil {
-						for _, header := range e.Response.Headers {
-							if header.Name == "Location" {
-								fprintf(w, "\t\tredirectUrl = res.headers.Location;\n")
-								recordedRedirectURL = header.Value
-								break
-							}
+					for _, header := range e.Response.Headers {
+						if header.Name == "Location" {
+							fprintf(w, "\t\tredirectUrl = res.headers.Location;\n")
+							recordedRedirectURL = header.Value
+							break
 						}
 					}
 
