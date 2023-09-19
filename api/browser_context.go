@@ -41,15 +41,16 @@ type BrowserContext interface {
 //
 // https://datatracker.ietf.org/doc/html/rfc6265.
 type Cookie struct {
-	Name     string         `json:"name"`          // Cookie name.
-	Value    string         `json:"value"`         // Cookie value.
-	Domain   string         `json:"domain"`        // Cookie domain.
-	Path     string         `json:"path"`          // Cookie path.
-	Expires  int64          `json:"expires"`       // Cookie expiration date as the number of seconds since the UNIX epoch.
-	HTTPOnly bool           `json:"httpOnly"`      // True if cookie is http-only.
-	Secure   bool           `json:"secure"`        // True if cookie is secure.
-	SameSite CookieSameSite `json:"sameSite"`      // Cookie SameSite type.
-	URL      string         `json:"url,omitempty"` // Cookie URL.
+	Name     string         `json:"name"`                   // Cookie name.
+	Value    string         `json:"value"`                  // Cookie value.
+	Domain   string         `json:"domain"`                 // Cookie domain.
+	Path     string         `json:"path"`                   // Cookie path.
+	HTTPOnly bool           `js:"httpOnly" json:"httpOnly"` // True if cookie is http-only.
+	Secure   bool           `json:"secure"`                 // True if cookie is secure.
+	SameSite CookieSameSite `js:"sameSite" json:"sameSite"` // Cookie SameSite type.
+	URL      string         `js:"url" json:"url,omitempty"` // Cookie URL.
+	// Cookie expiration date as the number of seconds since the UNIX epoch.
+	Expires int64 `json:"expires"`
 }
 
 // CookieSameSite represents the cookie's 'SameSite' status.
