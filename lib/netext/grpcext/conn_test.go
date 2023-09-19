@@ -5,7 +5,6 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"sync/atomic"
 	"testing"
 
 	"github.com/jhump/protoreflect/desc/protoparse"
@@ -14,12 +13,9 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
-	reflectpb "google.golang.org/grpc/reflection/grpc_reflection_v1alpha"
 	"google.golang.org/protobuf/encoding/protojson"
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protodesc"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
@@ -155,107 +151,6 @@ func TestConnInvokeInvalid(t *testing.T) {
 			assert.Contains(t, err.Error(), tt.experr)
 		})
 	}
-}
-
-func TestResolveFileDescriptors(t *testing.T) {
-	t.Parallel()
-
-	tests := []struct {
-		name                string
-		pkgs                []string
-		services            []string
-		expectedDescriptors int
-	}{
-		{
-			name:                "SuccessSamePackage",
-			pkgs:                []string{"mypkg"},
-			services:            []string{"Service1", "Service2", "Service3"},
-			expectedDescriptors: 3,
-		},
-		{
-			name:                "SuccessMultiPackages",
-			pkgs:                []string{"mypkg1", "mypkg2", "mypkg3"},
-			services:            []string{"Service", "Service", "Service"},
-			expectedDescriptors: 3,
-		},
-		{
-			name:                "DeduplicateServices",
-			pkgs:                []string{"mypkg1"},
-			services:            []string{"Service1", "Service2", "Service1"},
-			expectedDescriptors: 2,
-		},
-		{
-			name:                "NoServices",
-			services:            []string{},
-			expectedDescriptors: 0,
-		},
-	}
-
-	for _, tt := range tests {
-		tt := tt
-		t.Run(tt.name, func(t *testing.T) {
-			t.Parallel()
-			var (
-				lsr  = &reflectpb.ListServiceResponse{}
-				mock = &getServiceFileDescriptorMock{}
-			)
-			for i, service := range tt.services {
-				// if only one package is defined then
-				// the package is the same for every service
-				pkg := tt.pkgs[0]
-				if len(tt.pkgs) > 1 {
-					pkg = tt.pkgs[i]
-				}
-
-				lsr.Service = append(lsr.Service, &reflectpb.ServiceResponse{
-					Name: fmt.Sprintf("%s.%s", pkg, service),
-				})
-				mock.pkgs = append(mock.pkgs, pkg)
-				mock.names = append(mock.names, service)
-			}
-
-			rc := reflectionClient{}
-			fdset, err := rc.resolveServiceFileDescriptors(mock, lsr)
-			require.NoError(t, err)
-			assert.Len(t, fdset.File, tt.expectedDescriptors)
-		})
-	}
-}
-
-type getServiceFileDescriptorMock struct {
-	pkgs  []string
-	names []string
-	nreqs int64
-}
-
-func (m *getServiceFileDescriptorMock) Send(req *reflectpb.ServerReflectionRequest) error {
-	// TODO: check that the sent message is expected,
-	// otherwise return an error
-	return nil
-}
-
-func (m *getServiceFileDescriptorMock) Recv() (*reflectpb.ServerReflectionResponse, error) {
-	n := atomic.AddInt64(&m.nreqs, 1)
-	ptr := func(s string) (sptr *string) {
-		return &s
-	}
-	index := n - 1
-	fdp := &descriptorpb.FileDescriptorProto{
-		Package: ptr(m.pkgs[index]),
-		Name:    ptr(m.names[index]),
-	}
-	b, err := proto.Marshal(fdp)
-	if err != nil {
-		return nil, err
-	}
-	srr := &reflectpb.ServerReflectionResponse{
-		MessageResponse: &reflectpb.ServerReflectionResponse_FileDescriptorResponse{
-			FileDescriptorResponse: &reflectpb.FileDescriptorResponse{
-				FileDescriptorProto: [][]byte{b},
-			},
-		},
-	}
-	return srr, nil
 }
 
 func methodFromProto(method string) protoreflect.MethodDescriptor {
