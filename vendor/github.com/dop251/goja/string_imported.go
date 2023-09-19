@@ -88,7 +88,7 @@ func (i *importedString) ToBoolean() bool {
 }
 
 func (i *importedString) ToObject(r *Runtime) *Object {
-	return r._newString(i, r.global.StringPrototype)
+	return r._newString(i, r.getStringPrototype())
 }
 
 func (i *importedString) SameAs(other Value) bool {

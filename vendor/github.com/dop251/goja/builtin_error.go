@@ -176,61 +176,114 @@ func (r *Runtime) error_toString(call FunctionCall) Value {
 	return sb.String()
 }
 
-func (r *Runtime) createErrorPrototype(name String) *Object {
-	o := r.newBaseObject(r.global.ErrorPrototype, classObject)
+func (r *Runtime) createErrorPrototype(name String, ctor *Object) *Object {
+	o := r.newBaseObject(r.getErrorPrototype(), classObject)
 	o._putProp("message", stringEmpty, true, false, true)
 	o._putProp("name", name, true, false, true)
+	o._putProp("constructor", ctor, true, false, true)
 	return o.val
 }
 
-func (r *Runtime) initErrors() {
-	r.global.ErrorPrototype = r.NewObject()
-	o := r.global.ErrorPrototype.self
-	o._putProp("message", stringEmpty, true, false, true)
-	o._putProp("name", stringError, true, false, true)
-	o._putProp("toString", r.newNativeFunc(r.error_toString, nil, "toString", nil, 0), true, false, true)
+func (r *Runtime) getErrorPrototype() *Object {
+	ret := r.global.ErrorPrototype
+	if ret == nil {
+		ret = r.NewObject()
+		r.global.ErrorPrototype = ret
+		o := ret.self
+		o._putProp("message", stringEmpty, true, false, true)
+		o._putProp("name", stringError, true, false, true)
+		o._putProp("toString", r.newNativeFunc(r.error_toString, "toString", 0), true, false, true)
+		o._putProp("constructor", r.getError(), true, false, true)
+	}
+	return ret
+}
 
-	r.global.Error = r.newNativeFuncConstruct(r.builtin_Error, "Error", r.global.ErrorPrototype, 1)
-	r.addToGlobal("Error", r.global.Error)
+func (r *Runtime) getError() *Object {
+	ret := r.global.Error
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Error = ret
+		r.newNativeFuncConstruct(ret, r.builtin_Error, "Error", r.getErrorPrototype(), 1)
+	}
+	return ret
+}
 
-	r.global.AggregateErrorPrototype = r.createErrorPrototype(stringAggregateError)
-	r.global.AggregateError = r.newNativeFuncConstructProto(r.builtin_AggregateError, "AggregateError", r.global.AggregateErrorPrototype, r.global.Error, 2)
-	r.addToGlobal("AggregateError", r.global.AggregateError)
+func (r *Runtime) getAggregateError() *Object {
+	ret := r.global.AggregateError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.AggregateError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_AggregateError, "AggregateError", r.createErrorPrototype(stringAggregateError, ret), r.getError(), 2)
+	}
+	return ret
+}
 
-	r.global.TypeErrorPrototype = r.createErrorPrototype(stringTypeError)
+func (r *Runtime) getTypeError() *Object {
+	ret := r.global.TypeError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.TypeError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_Error, "TypeError", r.createErrorPrototype(stringTypeError, ret), r.getError(), 1)
+	}
+	return ret
+}
 
-	r.global.TypeError = r.newNativeFuncConstructProto(r.builtin_Error, "TypeError", r.global.TypeErrorPrototype, r.global.Error, 1)
-	r.addToGlobal("TypeError", r.global.TypeError)
+func (r *Runtime) getReferenceError() *Object {
+	ret := r.global.ReferenceError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.ReferenceError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_Error, "ReferenceError", r.createErrorPrototype(stringReferenceError, ret), r.getError(), 1)
+	}
+	return ret
+}
 
-	r.global.ReferenceErrorPrototype = r.createErrorPrototype(stringReferenceError)
+func (r *Runtime) getSyntaxError() *Object {
+	ret := r.global.SyntaxError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.SyntaxError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_Error, "SyntaxError", r.createErrorPrototype(stringSyntaxError, ret), r.getError(), 1)
+	}
+	return ret
+}
 
-	r.global.ReferenceError = r.newNativeFuncConstructProto(r.builtin_Error, "ReferenceError", r.global.ReferenceErrorPrototype, r.global.Error, 1)
-	r.addToGlobal("ReferenceError", r.global.ReferenceError)
+func (r *Runtime) getRangeError() *Object {
+	ret := r.global.RangeError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.RangeError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_Error, "RangeError", r.createErrorPrototype(stringRangeError, ret), r.getError(), 1)
+	}
+	return ret
+}
 
-	r.global.SyntaxErrorPrototype = r.createErrorPrototype(stringSyntaxError)
+func (r *Runtime) getEvalError() *Object {
+	ret := r.global.EvalError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.EvalError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_Error, "EvalError", r.createErrorPrototype(stringEvalError, ret), r.getError(), 1)
+	}
+	return ret
+}
 
-	r.global.SyntaxError = r.newNativeFuncConstructProto(r.builtin_Error, "SyntaxError", r.global.SyntaxErrorPrototype, r.global.Error, 1)
-	r.addToGlobal("SyntaxError", r.global.SyntaxError)
+func (r *Runtime) getURIError() *Object {
+	ret := r.global.URIError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.URIError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_Error, "URIError", r.createErrorPrototype(stringURIError, ret), r.getError(), 1)
+	}
+	return ret
+}
 
-	r.global.RangeErrorPrototype = r.createErrorPrototype(stringRangeError)
-
-	r.global.RangeError = r.newNativeFuncConstructProto(r.builtin_Error, "RangeError", r.global.RangeErrorPrototype, r.global.Error, 1)
-	r.addToGlobal("RangeError", r.global.RangeError)
-
-	r.global.EvalErrorPrototype = r.createErrorPrototype(stringEvalError)
-	o = r.global.EvalErrorPrototype.self
-	o._putProp("name", stringEvalError, true, false, true)
-
-	r.global.EvalError = r.newNativeFuncConstructProto(r.builtin_Error, "EvalError", r.global.EvalErrorPrototype, r.global.Error, 1)
-	r.addToGlobal("EvalError", r.global.EvalError)
-
-	r.global.URIErrorPrototype = r.createErrorPrototype(stringURIError)
-
-	r.global.URIError = r.newNativeFuncConstructProto(r.builtin_Error, "URIError", r.global.URIErrorPrototype, r.global.Error, 1)
-	r.addToGlobal("URIError", r.global.URIError)
-
-	r.global.GoErrorPrototype = r.createErrorPrototype(stringGoError)
-
-	r.global.GoError = r.newNativeFuncConstructProto(r.builtin_Error, "GoError", r.global.GoErrorPrototype, r.global.Error, 1)
-	r.addToGlobal("GoError", r.global.GoError)
+func (r *Runtime) getGoError() *Object {
+	ret := r.global.GoError
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.GoError = ret
+		r.newNativeFuncConstructProto(ret, r.builtin_Error, "GoError", r.createErrorPrototype(stringGoError, ret), r.getError(), 1)
+	}
+	return ret
 }

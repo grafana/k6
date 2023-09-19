@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"math"
 	"sort"
+	"sync"
 	"unsafe"
 
 	"github.com/dop251/goja/unistring"
@@ -78,7 +79,7 @@ func (r *Runtime) builtin_newArrayBuffer(args []Value, newTarget *Object) *Objec
 	if newTarget == nil {
 		panic(r.needNew("ArrayBuffer"))
 	}
-	b := r._newArrayBuffer(r.getPrototypeFromCtor(newTarget, r.global.ArrayBuffer, r.global.ArrayBufferPrototype), nil)
+	b := r._newArrayBuffer(r.getPrototypeFromCtor(newTarget, r.getArrayBuffer(), r.getArrayBufferPrototype()), nil)
 	if len(args) > 0 {
 		b.data = allocByteSlice(r.toIndex(args[0]))
 	}
@@ -109,7 +110,7 @@ func (r *Runtime) arrayBufferProto_slice(call FunctionCall) Value {
 		}
 		stop = relToIdx(stop, l)
 		newLen := max(stop-start, 0)
-		ret := r.speciesConstructor(o, r.global.ArrayBuffer)([]Value{intToValue(newLen)}, nil)
+		ret := r.speciesConstructor(o, r.getArrayBuffer())([]Value{intToValue(newLen)}, nil)
 		if ab, ok := ret.self.(*arrayBufferObject); ok {
 			if newLen > 0 {
 				b.ensureNotDetached(true)
@@ -145,7 +146,7 @@ func (r *Runtime) newDataView(args []Value, newTarget *Object) *Object {
 	if newTarget == nil {
 		panic(r.needNew("DataView"))
 	}
-	proto := r.getPrototypeFromCtor(newTarget, r.global.DataView, r.global.DataViewPrototype)
+	proto := r.getPrototypeFromCtor(newTarget, r.getDataView(), r.getDataViewPrototype())
 	var bufArg Value
 	if len(args) > 0 {
 		bufArg = args[0]
@@ -165,13 +166,13 @@ func (r *Runtime) newDataView(args []Value, newTarget *Object) *Object {
 		byteOffset = r.toIndex(offsetArg)
 		buffer.ensureNotDetached(true)
 		if byteOffset > len(buffer.data) {
-			panic(r.newError(r.global.RangeError, "Start offset %s is outside the bounds of the buffer", offsetArg.String()))
+			panic(r.newError(r.getRangeError(), "Start offset %s is outside the bounds of the buffer", offsetArg.String()))
 		}
 	}
 	if len(args) > 2 && args[2] != nil && args[2] != _undefined {
 		byteLen = r.toIndex(args[2])
 		if byteOffset+byteLen > len(buffer.data) {
-			panic(r.newError(r.global.RangeError, "Invalid DataView length %d", byteLen))
+			panic(r.newError(r.getRangeError(), "Invalid DataView length %d", byteLen))
 		}
 	} else {
 		byteLen = len(buffer.data) - byteOffset
@@ -509,7 +510,7 @@ func (r *Runtime) typedArrayProto_filter(call FunctionCall) Value {
 			}
 		}
 		c := r.speciesConstructorObj(o, ta.defaultCtor)
-		ab := r._newArrayBuffer(r.global.ArrayBufferPrototype, nil)
+		ab := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
 		ab.data = buf
 		kept := r.toConstructor(ta.defaultCtor)([]Value{ab.val}, ta.defaultCtor)
 		if c == ta.defaultCtor {
@@ -945,7 +946,7 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 		srcObj := call.Argument(0).ToObject(r)
 		targetOffset := toIntStrict(call.Argument(1).ToInteger())
 		if targetOffset < 0 {
-			panic(r.newError(r.global.RangeError, "offset should be >= 0"))
+			panic(r.newError(r.getRangeError(), "offset should be >= 0"))
 		}
 		ta.viewedArrayBuf.ensureNotDetached(true)
 		targetLen := ta.length
@@ -953,7 +954,7 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 			src.viewedArrayBuf.ensureNotDetached(true)
 			srcLen := src.length
 			if x := srcLen + targetOffset; x < 0 || x > targetLen {
-				panic(r.newError(r.global.RangeError, "Source is too large"))
+				panic(r.newError(r.getRangeError(), "Source is too large"))
 			}
 			if src.defaultCtor == ta.defaultCtor {
 				copy(ta.viewedArrayBuf.data[(ta.offset+targetOffset)*ta.elemSize:],
@@ -1002,7 +1003,7 @@ func (r *Runtime) typedArrayProto_set(call FunctionCall) Value {
 			targetLen := ta.length
 			srcLen := toIntStrict(toLength(srcObj.self.getStr("length", nil)))
 			if x := srcLen + targetOffset; x < 0 || x > targetLen {
-				panic(r.newError(r.global.RangeError, "Source is too large"))
+				panic(r.newError(r.getRangeError(), "Source is too large"))
 			}
 			for i := 0; i < srcLen; i++ {
 				val := nilSafe(srcObj.self.getIdx(valueInt(i), nil))
@@ -1214,7 +1215,7 @@ func (r *Runtime) typedArray_of(call FunctionCall) Value {
 }
 
 func (r *Runtime) allocateTypedArray(newTarget *Object, length int, taCtor typedArrayObjectCtor, proto *Object) *typedArrayObject {
-	buf := r._newArrayBuffer(r.global.ArrayBufferPrototype, nil)
+	buf := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
 	ta := taCtor(buf, 0, length, r.getPrototypeFromCtor(newTarget, nil, proto))
 	if length > 0 {
 		buf.data = allocByteSlice(length * ta.elemSize)
@@ -1297,7 +1298,7 @@ func (r *Runtime) _newTypedArrayFromArrayBuffer(ab *arrayBufferObject, args []Va
 	if len(args) > 1 && args[1] != nil && args[1] != _undefined {
 		byteOffset = r.toIndex(args[1])
 		if byteOffset%ta.elemSize != 0 {
-			panic(r.newError(r.global.RangeError, "Start offset of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
+			panic(r.newError(r.getRangeError(), "Start offset of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
 		}
 	}
 	var length int
@@ -1305,16 +1306,16 @@ func (r *Runtime) _newTypedArrayFromArrayBuffer(ab *arrayBufferObject, args []Va
 		length = r.toIndex(args[2])
 		ab.ensureNotDetached(true)
 		if byteOffset+length*ta.elemSize > len(ab.data) {
-			panic(r.newError(r.global.RangeError, "Invalid typed array length: %d", length))
+			panic(r.newError(r.getRangeError(), "Invalid typed array length: %d", length))
 		}
 	} else {
 		ab.ensureNotDetached(true)
 		if len(ab.data)%ta.elemSize != 0 {
-			panic(r.newError(r.global.RangeError, "Byte length of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
+			panic(r.newError(r.getRangeError(), "Byte length of %s should be a multiple of %d", newTarget.self.getStr("name", nil), ta.elemSize))
 		}
 		length = (len(ab.data) - byteOffset) / ta.elemSize
 		if length < 0 {
-			panic(r.newError(r.global.RangeError, "Start offset %d is outside the bounds of the buffer", byteOffset))
+			panic(r.newError(r.getRangeError(), "Start offset %d is outside the bounds of the buffer", byteOffset))
 		}
 	}
 	ta.offset = byteOffset / ta.elemSize
@@ -1327,7 +1328,8 @@ func (r *Runtime) _newTypedArrayFromTypedArray(src *typedArrayObject, newTarget 
 	src.viewedArrayBuf.ensureNotDetached(true)
 	l := src.length
 
-	dst.viewedArrayBuf.prototype = r.getPrototypeFromCtor(r.speciesConstructorObj(src.viewedArrayBuf.val, r.global.ArrayBuffer), r.global.ArrayBuffer, r.global.ArrayBufferPrototype)
+	arrayBuffer := r.getArrayBuffer()
+	dst.viewedArrayBuf.prototype = r.getPrototypeFromCtor(r.speciesConstructorObj(src.viewedArrayBuf.val, arrayBuffer), arrayBuffer, r.getArrayBufferPrototype())
 	dst.viewedArrayBuf.data = allocByteSlice(toIntStrict(int64(l) * int64(dst.elemSize)))
 	src.viewedArrayBuf.ensureNotDetached(true)
 	if src.defaultCtor == dst.defaultCtor {
@@ -1408,192 +1410,371 @@ func (r *Runtime) createArrayBufferProto(val *Object) objectImpl {
 	byteLengthProp := &valueProperty{
 		accessor:     true,
 		configurable: true,
-		getterFunc:   r.newNativeFunc(r.arrayBufferProto_getByteLength, nil, "get byteLength", nil, 0),
+		getterFunc:   r.newNativeFunc(r.arrayBufferProto_getByteLength, "get byteLength", 0),
 	}
 	b._put("byteLength", byteLengthProp)
-	b._putProp("constructor", r.global.ArrayBuffer, true, false, true)
-	b._putProp("slice", r.newNativeFunc(r.arrayBufferProto_slice, nil, "slice", nil, 2), true, false, true)
+	b._putProp("constructor", r.getArrayBuffer(), true, false, true)
+	b._putProp("slice", r.newNativeFunc(r.arrayBufferProto_slice, "slice", 2), true, false, true)
 	b._putSym(SymToStringTag, valueProp(asciiString("ArrayBuffer"), false, false, true))
 	return b
 }
 
 func (r *Runtime) createArrayBuffer(val *Object) objectImpl {
-	o := r.newNativeConstructOnly(val, r.builtin_newArrayBuffer, r.global.ArrayBufferPrototype, "ArrayBuffer", 1)
-	o._putProp("isView", r.newNativeFunc(r.arrayBuffer_isView, nil, "isView", nil, 1), true, false, true)
+	o := r.newNativeConstructOnly(val, r.builtin_newArrayBuffer, r.getArrayBufferPrototype(), "ArrayBuffer", 1)
+	o._putProp("isView", r.newNativeFunc(r.arrayBuffer_isView, "isView", 1), true, false, true)
 	r.putSpeciesReturnThis(o)
 
 	return o
-}
-
-func (r *Runtime) createDataViewProto(val *Object) objectImpl {
-	b := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
-	b._put("buffer", &valueProperty{
-		accessor:     true,
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.dataViewProto_getBuffer, nil, "get buffer", nil, 0),
-	})
-	b._put("byteLength", &valueProperty{
-		accessor:     true,
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.dataViewProto_getByteLen, nil, "get byteLength", nil, 0),
-	})
-	b._put("byteOffset", &valueProperty{
-		accessor:     true,
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.dataViewProto_getByteOffset, nil, "get byteOffset", nil, 0),
-	})
-	b._putProp("constructor", r.global.DataView, true, false, true)
-	b._putProp("getFloat32", r.newNativeFunc(r.dataViewProto_getFloat32, nil, "getFloat32", nil, 1), true, false, true)
-	b._putProp("getFloat64", r.newNativeFunc(r.dataViewProto_getFloat64, nil, "getFloat64", nil, 1), true, false, true)
-	b._putProp("getInt8", r.newNativeFunc(r.dataViewProto_getInt8, nil, "getInt8", nil, 1), true, false, true)
-	b._putProp("getInt16", r.newNativeFunc(r.dataViewProto_getInt16, nil, "getInt16", nil, 1), true, false, true)
-	b._putProp("getInt32", r.newNativeFunc(r.dataViewProto_getInt32, nil, "getInt32", nil, 1), true, false, true)
-	b._putProp("getUint8", r.newNativeFunc(r.dataViewProto_getUint8, nil, "getUint8", nil, 1), true, false, true)
-	b._putProp("getUint16", r.newNativeFunc(r.dataViewProto_getUint16, nil, "getUint16", nil, 1), true, false, true)
-	b._putProp("getUint32", r.newNativeFunc(r.dataViewProto_getUint32, nil, "getUint32", nil, 1), true, false, true)
-	b._putProp("setFloat32", r.newNativeFunc(r.dataViewProto_setFloat32, nil, "setFloat32", nil, 2), true, false, true)
-	b._putProp("setFloat64", r.newNativeFunc(r.dataViewProto_setFloat64, nil, "setFloat64", nil, 2), true, false, true)
-	b._putProp("setInt8", r.newNativeFunc(r.dataViewProto_setInt8, nil, "setInt8", nil, 2), true, false, true)
-	b._putProp("setInt16", r.newNativeFunc(r.dataViewProto_setInt16, nil, "setInt16", nil, 2), true, false, true)
-	b._putProp("setInt32", r.newNativeFunc(r.dataViewProto_setInt32, nil, "setInt32", nil, 2), true, false, true)
-	b._putProp("setUint8", r.newNativeFunc(r.dataViewProto_setUint8, nil, "setUint8", nil, 2), true, false, true)
-	b._putProp("setUint16", r.newNativeFunc(r.dataViewProto_setUint16, nil, "setUint16", nil, 2), true, false, true)
-	b._putProp("setUint32", r.newNativeFunc(r.dataViewProto_setUint32, nil, "setUint32", nil, 2), true, false, true)
-	b._putSym(SymToStringTag, valueProp(asciiString("DataView"), false, false, true))
-
-	return b
 }
 
 func (r *Runtime) createDataView(val *Object) objectImpl {
-	o := r.newNativeConstructOnly(val, r.newDataView, r.global.DataViewPrototype, "DataView", 1)
+	o := r.newNativeConstructOnly(val, r.newDataView, r.getDataViewPrototype(), "DataView", 1)
 	return o
 }
 
-func (r *Runtime) createTypedArrayProto(val *Object) objectImpl {
-	b := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
-	b._put("buffer", &valueProperty{
-		accessor:     true,
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.typedArrayProto_getBuffer, nil, "get buffer", nil, 0),
-	})
-	b._put("byteLength", &valueProperty{
-		accessor:     true,
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.typedArrayProto_getByteLen, nil, "get byteLength", nil, 0),
-	})
-	b._put("byteOffset", &valueProperty{
-		accessor:     true,
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.typedArrayProto_getByteOffset, nil, "get byteOffset", nil, 0),
-	})
-	b._putProp("at", r.newNativeFunc(r.typedArrayProto_at, nil, "at", nil, 1), true, false, true)
-	b._putProp("constructor", r.global.TypedArray, true, false, true)
-	b._putProp("copyWithin", r.newNativeFunc(r.typedArrayProto_copyWithin, nil, "copyWithin", nil, 2), true, false, true)
-	b._putProp("entries", r.newNativeFunc(r.typedArrayProto_entries, nil, "entries", nil, 0), true, false, true)
-	b._putProp("every", r.newNativeFunc(r.typedArrayProto_every, nil, "every", nil, 1), true, false, true)
-	b._putProp("fill", r.newNativeFunc(r.typedArrayProto_fill, nil, "fill", nil, 1), true, false, true)
-	b._putProp("filter", r.newNativeFunc(r.typedArrayProto_filter, nil, "filter", nil, 1), true, false, true)
-	b._putProp("find", r.newNativeFunc(r.typedArrayProto_find, nil, "find", nil, 1), true, false, true)
-	b._putProp("findIndex", r.newNativeFunc(r.typedArrayProto_findIndex, nil, "findIndex", nil, 1), true, false, true)
-	b._putProp("findLast", r.newNativeFunc(r.typedArrayProto_findLast, nil, "findLast", nil, 1), true, false, true)
-	b._putProp("findLastIndex", r.newNativeFunc(r.typedArrayProto_findLastIndex, nil, "findLastIndex", nil, 1), true, false, true)
-	b._putProp("forEach", r.newNativeFunc(r.typedArrayProto_forEach, nil, "forEach", nil, 1), true, false, true)
-	b._putProp("includes", r.newNativeFunc(r.typedArrayProto_includes, nil, "includes", nil, 1), true, false, true)
-	b._putProp("indexOf", r.newNativeFunc(r.typedArrayProto_indexOf, nil, "indexOf", nil, 1), true, false, true)
-	b._putProp("join", r.newNativeFunc(r.typedArrayProto_join, nil, "join", nil, 1), true, false, true)
-	b._putProp("keys", r.newNativeFunc(r.typedArrayProto_keys, nil, "keys", nil, 0), true, false, true)
-	b._putProp("lastIndexOf", r.newNativeFunc(r.typedArrayProto_lastIndexOf, nil, "lastIndexOf", nil, 1), true, false, true)
-	b._put("length", &valueProperty{
-		accessor:     true,
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.typedArrayProto_getLength, nil, "get length", nil, 0),
-	})
-	b._putProp("map", r.newNativeFunc(r.typedArrayProto_map, nil, "map", nil, 1), true, false, true)
-	b._putProp("reduce", r.newNativeFunc(r.typedArrayProto_reduce, nil, "reduce", nil, 1), true, false, true)
-	b._putProp("reduceRight", r.newNativeFunc(r.typedArrayProto_reduceRight, nil, "reduceRight", nil, 1), true, false, true)
-	b._putProp("reverse", r.newNativeFunc(r.typedArrayProto_reverse, nil, "reverse", nil, 0), true, false, true)
-	b._putProp("set", r.newNativeFunc(r.typedArrayProto_set, nil, "set", nil, 1), true, false, true)
-	b._putProp("slice", r.newNativeFunc(r.typedArrayProto_slice, nil, "slice", nil, 2), true, false, true)
-	b._putProp("some", r.newNativeFunc(r.typedArrayProto_some, nil, "some", nil, 1), true, false, true)
-	b._putProp("sort", r.newNativeFunc(r.typedArrayProto_sort, nil, "sort", nil, 1), true, false, true)
-	b._putProp("subarray", r.newNativeFunc(r.typedArrayProto_subarray, nil, "subarray", nil, 2), true, false, true)
-	b._putProp("toLocaleString", r.newNativeFunc(r.typedArrayProto_toLocaleString, nil, "toLocaleString", nil, 0), true, false, true)
-	b._putProp("toString", r.global.arrayToString, true, false, true)
-	valuesFunc := r.newNativeFunc(r.typedArrayProto_values, nil, "values", nil, 0)
-	b._putProp("values", valuesFunc, true, false, true)
-	b._putSym(SymIterator, valueProp(valuesFunc, true, false, true))
-	b._putSym(SymToStringTag, &valueProperty{
-		getterFunc:   r.newNativeFunc(r.typedArrayProto_toStringTag, nil, "get [Symbol.toStringTag]", nil, 0),
-		accessor:     true,
-		configurable: true,
-	})
-
-	return b
-}
-
 func (r *Runtime) createTypedArray(val *Object) objectImpl {
-	o := r.newNativeConstructOnly(val, r.newTypedArray, r.global.TypedArrayPrototype, "TypedArray", 0)
-	o._putProp("from", r.newNativeFunc(r.typedArray_from, nil, "from", nil, 1), true, false, true)
-	o._putProp("of", r.newNativeFunc(r.typedArray_of, nil, "of", nil, 0), true, false, true)
+	o := r.newNativeConstructOnly(val, r.newTypedArray, r.getTypedArrayPrototype(), "TypedArray", 0)
+	o._putProp("from", r.newNativeFunc(r.typedArray_from, "from", 1), true, false, true)
+	o._putProp("of", r.newNativeFunc(r.typedArray_of, "of", 0), true, false, true)
 	r.putSpeciesReturnThis(o)
 
 	return o
 }
 
-func (r *Runtime) typedArrayCreator(ctor func(args []Value, newTarget, proto *Object) *Object, name unistring.String, bytesPerElement int) func(val *Object) objectImpl {
-	return func(val *Object) objectImpl {
-		p := r.newBaseObject(r.global.TypedArrayPrototype, classObject)
-		o := r.newNativeConstructOnly(val, func(args []Value, newTarget *Object) *Object {
-			return ctor(args, newTarget, p.val)
-		}, p.val, name, 3)
-
-		p._putProp("constructor", o.val, true, false, true)
-
-		o.prototype = r.global.TypedArray
-		bpe := intToValue(int64(bytesPerElement))
-		o._putProp("BYTES_PER_ELEMENT", bpe, false, false, false)
-		p._putProp("BYTES_PER_ELEMENT", bpe, false, false, false)
-		return o
+func (r *Runtime) getTypedArray() *Object {
+	ret := r.global.TypedArray
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.TypedArray = ret
+		r.createTypedArray(ret)
 	}
+	return ret
 }
 
-func (r *Runtime) initTypedArrays() {
+func (r *Runtime) createTypedArrayCtor(val *Object, ctor func(args []Value, newTarget, proto *Object) *Object, name unistring.String, bytesPerElement int) {
+	p := r.newBaseObject(r.getTypedArrayPrototype(), classObject)
+	o := r.newNativeConstructOnly(val, func(args []Value, newTarget *Object) *Object {
+		return ctor(args, newTarget, p.val)
+	}, p.val, name, 3)
 
-	r.global.ArrayBufferPrototype = r.newLazyObject(r.createArrayBufferProto)
-	r.global.ArrayBuffer = r.newLazyObject(r.createArrayBuffer)
-	r.addToGlobal("ArrayBuffer", r.global.ArrayBuffer)
+	p._putProp("constructor", o.val, true, false, true)
 
-	r.global.DataViewPrototype = r.newLazyObject(r.createDataViewProto)
-	r.global.DataView = r.newLazyObject(r.createDataView)
-	r.addToGlobal("DataView", r.global.DataView)
+	o.prototype = r.getTypedArray()
+	bpe := intToValue(int64(bytesPerElement))
+	o._putProp("BYTES_PER_ELEMENT", bpe, false, false, false)
+	p._putProp("BYTES_PER_ELEMENT", bpe, false, false, false)
+}
 
-	r.global.TypedArrayPrototype = r.newLazyObject(r.createTypedArrayProto)
-	r.global.TypedArray = r.newLazyObject(r.createTypedArray)
+func addTypedArrays(t *objectTemplate) {
+	t.putStr("ArrayBuffer", func(r *Runtime) Value { return valueProp(r.getArrayBuffer(), true, false, true) })
+	t.putStr("DataView", func(r *Runtime) Value { return valueProp(r.getDataView(), true, false, true) })
+	t.putStr("Uint8Array", func(r *Runtime) Value { return valueProp(r.getUint8Array(), true, false, true) })
+	t.putStr("Uint8ClampedArray", func(r *Runtime) Value { return valueProp(r.getUint8ClampedArray(), true, false, true) })
+	t.putStr("Int8Array", func(r *Runtime) Value { return valueProp(r.getInt8Array(), true, false, true) })
+	t.putStr("Uint16Array", func(r *Runtime) Value { return valueProp(r.getUint16Array(), true, false, true) })
+	t.putStr("Int16Array", func(r *Runtime) Value { return valueProp(r.getInt16Array(), true, false, true) })
+	t.putStr("Uint32Array", func(r *Runtime) Value { return valueProp(r.getUint32Array(), true, false, true) })
+	t.putStr("Int32Array", func(r *Runtime) Value { return valueProp(r.getInt32Array(), true, false, true) })
+	t.putStr("Float32Array", func(r *Runtime) Value { return valueProp(r.getFloat32Array(), true, false, true) })
+	t.putStr("Float64Array", func(r *Runtime) Value { return valueProp(r.getFloat64Array(), true, false, true) })
+}
 
-	r.global.Uint8Array = r.newLazyObject(r.typedArrayCreator(r.newUint8Array, "Uint8Array", 1))
-	r.addToGlobal("Uint8Array", r.global.Uint8Array)
+func createTypedArrayProtoTemplate() *objectTemplate {
+	t := newObjectTemplate()
+	t.protoFactory = func(r *Runtime) *Object {
+		return r.global.ObjectPrototype
+	}
 
-	r.global.Uint8ClampedArray = r.newLazyObject(r.typedArrayCreator(r.newUint8ClampedArray, "Uint8ClampedArray", 1))
-	r.addToGlobal("Uint8ClampedArray", r.global.Uint8ClampedArray)
+	t.putStr("buffer", func(r *Runtime) Value {
+		return &valueProperty{
+			accessor:     true,
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.typedArrayProto_getBuffer, "get buffer", 0),
+		}
+	})
 
-	r.global.Int8Array = r.newLazyObject(r.typedArrayCreator(r.newInt8Array, "Int8Array", 1))
-	r.addToGlobal("Int8Array", r.global.Int8Array)
+	t.putStr("byteLength", func(r *Runtime) Value {
+		return &valueProperty{
+			accessor:     true,
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.typedArrayProto_getByteLen, "get byteLength", 0),
+		}
+	})
 
-	r.global.Uint16Array = r.newLazyObject(r.typedArrayCreator(r.newUint16Array, "Uint16Array", 2))
-	r.addToGlobal("Uint16Array", r.global.Uint16Array)
+	t.putStr("byteOffset", func(r *Runtime) Value {
+		return &valueProperty{
+			accessor:     true,
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.typedArrayProto_getByteOffset, "get byteOffset", 0),
+		}
+	})
 
-	r.global.Int16Array = r.newLazyObject(r.typedArrayCreator(r.newInt16Array, "Int16Array", 2))
-	r.addToGlobal("Int16Array", r.global.Int16Array)
+	t.putStr("at", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_at, "at", 1) })
+	t.putStr("constructor", func(r *Runtime) Value { return valueProp(r.getTypedArray(), true, false, true) })
+	t.putStr("copyWithin", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_copyWithin, "copyWithin", 2) })
+	t.putStr("entries", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_entries, "entries", 0) })
+	t.putStr("every", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_every, "every", 1) })
+	t.putStr("fill", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_fill, "fill", 1) })
+	t.putStr("filter", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_filter, "filter", 1) })
+	t.putStr("find", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_find, "find", 1) })
+	t.putStr("findIndex", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_findIndex, "findIndex", 1) })
+	t.putStr("findLast", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_findLast, "findLast", 1) })
+	t.putStr("findLastIndex", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_findLastIndex, "findLastIndex", 1) })
+	t.putStr("forEach", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_forEach, "forEach", 1) })
+	t.putStr("includes", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_includes, "includes", 1) })
+	t.putStr("indexOf", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_indexOf, "indexOf", 1) })
+	t.putStr("join", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_join, "join", 1) })
+	t.putStr("keys", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_keys, "keys", 0) })
+	t.putStr("lastIndexOf", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_lastIndexOf, "lastIndexOf", 1) })
+	t.putStr("length", func(r *Runtime) Value {
+		return &valueProperty{
+			accessor:     true,
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.typedArrayProto_getLength, "get length", 0),
+		}
+	})
+	t.putStr("map", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_map, "map", 1) })
+	t.putStr("reduce", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_reduce, "reduce", 1) })
+	t.putStr("reduceRight", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_reduceRight, "reduceRight", 1) })
+	t.putStr("reverse", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_reverse, "reverse", 0) })
+	t.putStr("set", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_set, "set", 1) })
+	t.putStr("slice", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_slice, "slice", 2) })
+	t.putStr("some", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_some, "some", 1) })
+	t.putStr("sort", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_sort, "sort", 1) })
+	t.putStr("subarray", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_subarray, "subarray", 2) })
+	t.putStr("toLocaleString", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_toLocaleString, "toLocaleString", 0) })
+	t.putStr("toString", func(r *Runtime) Value { return valueProp(r.getArrayToString(), true, false, true) })
+	t.putStr("values", func(r *Runtime) Value { return valueProp(r.getTypedArrayValues(), true, false, true) })
 
-	r.global.Uint32Array = r.newLazyObject(r.typedArrayCreator(r.newUint32Array, "Uint32Array", 4))
-	r.addToGlobal("Uint32Array", r.global.Uint32Array)
+	t.putSym(SymIterator, func(r *Runtime) Value { return valueProp(r.getTypedArrayValues(), true, false, true) })
+	t.putSym(SymToStringTag, func(r *Runtime) Value {
+		return &valueProperty{
+			getterFunc:   r.newNativeFunc(r.typedArrayProto_toStringTag, "get [Symbol.toStringTag]", 0),
+			accessor:     true,
+			configurable: true,
+		}
+	})
 
-	r.global.Int32Array = r.newLazyObject(r.typedArrayCreator(r.newInt32Array, "Int32Array", 4))
-	r.addToGlobal("Int32Array", r.global.Int32Array)
+	return t
+}
 
-	r.global.Float32Array = r.newLazyObject(r.typedArrayCreator(r.newFloat32Array, "Float32Array", 4))
-	r.addToGlobal("Float32Array", r.global.Float32Array)
+func (r *Runtime) getTypedArrayValues() *Object {
+	ret := r.global.typedArrayValues
+	if ret == nil {
+		ret = r.newNativeFunc(r.typedArrayProto_values, "values", 0)
+		r.global.typedArrayValues = ret
+	}
+	return ret
+}
 
-	r.global.Float64Array = r.newLazyObject(r.typedArrayCreator(r.newFloat64Array, "Float64Array", 8))
-	r.addToGlobal("Float64Array", r.global.Float64Array)
+var typedArrayProtoTemplate *objectTemplate
+var typedArrayProtoTemplateOnce sync.Once
+
+func getTypedArrayProtoTemplate() *objectTemplate {
+	typedArrayProtoTemplateOnce.Do(func() {
+		typedArrayProtoTemplate = createTypedArrayProtoTemplate()
+	})
+	return typedArrayProtoTemplate
+}
+
+func (r *Runtime) getTypedArrayPrototype() *Object {
+	ret := r.global.TypedArrayPrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.TypedArrayPrototype = ret
+		r.newTemplatedObject(getTypedArrayProtoTemplate(), ret)
+	}
+	return ret
+}
+
+func (r *Runtime) getUint8Array() *Object {
+	ret := r.global.Uint8Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Uint8Array = ret
+		r.createTypedArrayCtor(ret, r.newUint8Array, "Uint8Array", 1)
+	}
+	return ret
+}
+
+func (r *Runtime) getUint8ClampedArray() *Object {
+	ret := r.global.Uint8ClampedArray
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Uint8ClampedArray = ret
+		r.createTypedArrayCtor(ret, r.newUint8ClampedArray, "Uint8ClampedArray", 1)
+	}
+	return ret
+}
+
+func (r *Runtime) getInt8Array() *Object {
+	ret := r.global.Int8Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Int8Array = ret
+		r.createTypedArrayCtor(ret, r.newInt8Array, "Int8Array", 1)
+	}
+	return ret
+}
+
+func (r *Runtime) getUint16Array() *Object {
+	ret := r.global.Uint16Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Uint16Array = ret
+		r.createTypedArrayCtor(ret, r.newUint16Array, "Uint16Array", 2)
+	}
+	return ret
+}
+
+func (r *Runtime) getInt16Array() *Object {
+	ret := r.global.Int16Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Int16Array = ret
+		r.createTypedArrayCtor(ret, r.newInt16Array, "Int16Array", 2)
+	}
+	return ret
+}
+
+func (r *Runtime) getUint32Array() *Object {
+	ret := r.global.Uint32Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Uint32Array = ret
+		r.createTypedArrayCtor(ret, r.newUint32Array, "Uint32Array", 4)
+	}
+	return ret
+}
+
+func (r *Runtime) getInt32Array() *Object {
+	ret := r.global.Int32Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Int32Array = ret
+		r.createTypedArrayCtor(ret, r.newInt32Array, "Int32Array", 4)
+	}
+	return ret
+}
+
+func (r *Runtime) getFloat32Array() *Object {
+	ret := r.global.Float32Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Float32Array = ret
+		r.createTypedArrayCtor(ret, r.newFloat32Array, "Float32Array", 4)
+	}
+	return ret
+}
+
+func (r *Runtime) getFloat64Array() *Object {
+	ret := r.global.Float64Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Float64Array = ret
+		r.createTypedArrayCtor(ret, r.newFloat64Array, "Float64Array", 8)
+	}
+	return ret
+}
+
+func createDataViewProtoTemplate() *objectTemplate {
+	t := newObjectTemplate()
+	t.protoFactory = func(r *Runtime) *Object {
+		return r.global.ObjectPrototype
+	}
+
+	t.putStr("buffer", func(r *Runtime) Value {
+		return &valueProperty{
+			accessor:     true,
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.dataViewProto_getBuffer, "get buffer", 0),
+		}
+	})
+	t.putStr("byteLength", func(r *Runtime) Value {
+		return &valueProperty{
+			accessor:     true,
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.dataViewProto_getByteLen, "get byteLength", 0),
+		}
+	})
+	t.putStr("byteOffset", func(r *Runtime) Value {
+		return &valueProperty{
+			accessor:     true,
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.dataViewProto_getByteOffset, "get byteOffset", 0),
+		}
+	})
+
+	t.putStr("constructor", func(r *Runtime) Value { return valueProp(r.getDataView(), true, false, true) })
+
+	t.putStr("getFloat32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat32, "getFloat32", 1) })
+	t.putStr("getFloat64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getFloat64, "getFloat64", 1) })
+	t.putStr("getInt8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getInt8, "getInt8", 1) })
+	t.putStr("getInt16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getInt16, "getInt16", 1) })
+	t.putStr("getInt32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getInt32, "getInt32", 1) })
+	t.putStr("getUint8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getUint8, "getUint8", 1) })
+	t.putStr("getUint16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getUint16, "getUint16", 1) })
+	t.putStr("getUint32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_getUint32, "getUint32", 1) })
+	t.putStr("setFloat32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat32, "setFloat32", 2) })
+	t.putStr("setFloat64", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setFloat64, "setFloat64", 2) })
+	t.putStr("setInt8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setInt8, "setInt8", 2) })
+	t.putStr("setInt16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setInt16, "setInt16", 2) })
+	t.putStr("setInt32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setInt32, "setInt32", 2) })
+	t.putStr("setUint8", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setUint8, "setUint8", 2) })
+	t.putStr("setUint16", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setUint16, "setUint16", 2) })
+	t.putStr("setUint32", func(r *Runtime) Value { return r.methodProp(r.dataViewProto_setUint32, "setUint32", 2) })
+
+	t.putSym(SymToStringTag, func(r *Runtime) Value { return valueProp(asciiString("DataView"), false, false, true) })
+
+	return t
+}
+
+var dataViewProtoTemplate *objectTemplate
+var dataViewProtoTemplateOnce sync.Once
+
+func getDataViewProtoTemplate() *objectTemplate {
+	dataViewProtoTemplateOnce.Do(func() {
+		dataViewProtoTemplate = createDataViewProtoTemplate()
+	})
+	return dataViewProtoTemplate
+}
+
+func (r *Runtime) getDataViewPrototype() *Object {
+	ret := r.global.DataViewPrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.DataViewPrototype = ret
+		r.newTemplatedObject(getDataViewProtoTemplate(), ret)
+	}
+	return ret
+}
+
+func (r *Runtime) getDataView() *Object {
+	ret := r.global.DataView
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.DataView = ret
+		ret.self = r.createDataView(ret)
+	}
+	return ret
+}
+
+func (r *Runtime) getArrayBufferPrototype() *Object {
+	ret := r.global.ArrayBufferPrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.ArrayBufferPrototype = ret
+		ret.self = r.createArrayBufferProto(ret)
+	}
+	return ret
+}
+
+func (r *Runtime) getArrayBuffer() *Object {
+	ret := r.global.ArrayBuffer
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.ArrayBuffer = ret
+		ret.self = r.createArrayBuffer(ret)
+	}
+	return ret
 }

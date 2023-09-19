@@ -345,7 +345,7 @@ func (r *Runtime) builtin_newProxy(args []Value, newTarget *Object) *Object {
 	if newTarget == nil {
 		panic(r.needNew("Proxy"))
 	}
-	return r.newProxy(args, r.getPrototypeFromCtor(newTarget, r.global.Proxy, r.global.ObjectPrototype))
+	return r.newProxy(args, r.getPrototypeFromCtor(newTarget, r.getProxy(), r.global.ObjectPrototype))
 }
 
 func (r *Runtime) NewProxy(target *Object, nativeHandler *ProxyTrapConfig) Proxy {
@@ -367,7 +367,7 @@ func (r *Runtime) builtin_proxy_revocable(call FunctionCall) Value {
 				revoke := r.newNativeFunc(func(FunctionCall) Value {
 					proxy.revoke()
 					return _undefined
-				}, nil, "", nil, 0)
+				}, "", 0)
 				ret := r.NewObject()
 				ret.self._putProp("proxy", proxy.val, true, true, true)
 				ret.self._putProp("revoke", revoke, true, true, true)
@@ -381,11 +381,16 @@ func (r *Runtime) builtin_proxy_revocable(call FunctionCall) Value {
 func (r *Runtime) createProxy(val *Object) objectImpl {
 	o := r.newNativeConstructOnly(val, r.builtin_newProxy, nil, "Proxy", 2)
 
-	o._putProp("revocable", r.newNativeFunc(r.builtin_proxy_revocable, nil, "revocable", nil, 2), true, false, true)
+	o._putProp("revocable", r.newNativeFunc(r.builtin_proxy_revocable, "revocable", 2), true, false, true)
 	return o
 }
 
-func (r *Runtime) initProxy() {
-	r.global.Proxy = r.newLazyObject(r.createProxy)
-	r.addToGlobal("Proxy", r.global.Proxy)
+func (r *Runtime) getProxy() *Object {
+	ret := r.global.Proxy
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Proxy = ret
+		r.createProxy(ret)
+	}
+	return ret
 }

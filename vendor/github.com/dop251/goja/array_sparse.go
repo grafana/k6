@@ -302,6 +302,18 @@ func (a *sparseArrayObject) hasOwnPropertyIdx(idx valueInt) bool {
 	return a.baseObject.hasOwnPropertyStr(idx.string())
 }
 
+func (a *sparseArrayObject) hasPropertyIdx(idx valueInt) bool {
+	if a.hasOwnPropertyIdx(idx) {
+		return true
+	}
+
+	if a.prototype != nil {
+		return a.prototype.self.hasPropertyIdx(idx)
+	}
+
+	return false
+}
+
 func (a *sparseArrayObject) expand(idx uint32) bool {
 	if l := len(a.items); l >= 1024 {
 		if ii := a.items[l-1].idx; ii > idx {
@@ -458,7 +470,7 @@ func (a *sparseArrayObject) exportType() reflect.Type {
 
 func (a *sparseArrayObject) exportToArrayOrSlice(dst reflect.Value, typ reflect.Type, ctx *objectExportCtx) error {
 	r := a.val.runtime
-	if iter := a.getSym(SymIterator, nil); iter == r.global.arrayValues || iter == nil {
+	if iter := a.getSym(SymIterator, nil); iter == r.getArrayValues() || iter == nil {
 		l := toIntStrict(int64(a.length))
 		if typ.Kind() == reflect.Array {
 			if dst.Len() != l {

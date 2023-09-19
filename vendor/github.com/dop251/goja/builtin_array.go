@@ -3,6 +3,7 @@ package goja
 import (
 	"math"
 	"sort"
+	"sync"
 )
 
 func (r *Runtime) newArray(prototype *Object) (a *arrayObject) {
@@ -19,7 +20,7 @@ func (r *Runtime) newArray(prototype *Object) (a *arrayObject) {
 }
 
 func (r *Runtime) newArrayObject() *arrayObject {
-	return r.newArray(r.global.ArrayPrototype)
+	return r.newArray(r.getArrayPrototype())
 }
 
 func setArrayValues(a *arrayObject, values []Value) *arrayObject {
@@ -96,7 +97,7 @@ func (r *Runtime) builtin_newArray(args []Value, proto *Object) *Object {
 			if float64(al) == float64(f) {
 				return r.newArrayLength(al)
 			} else {
-				panic(r.newError(r.global.RangeError, "Invalid array length"))
+				panic(r.newError(r.getRangeError(), "Invalid array length"))
 			}
 		}
 		return setArrayValues(r.newArray(proto), []Value{args[0]}).val
@@ -1259,7 +1260,7 @@ func (r *Runtime) checkStdArray(v Value) *arrayObject {
 
 func (r *Runtime) checkStdArrayIter(v Value) *arrayObject {
 	if arr := r.checkStdArray(v); arr != nil &&
-		arr.getSym(SymIterator, nil) == r.global.arrayValues {
+		arr.getSym(SymIterator, nil) == r.getArrayValues() {
 
 		return arr
 	}
@@ -1398,80 +1399,110 @@ func (r *Runtime) arrayIterProto_next(call FunctionCall) Value {
 	panic(r.NewTypeError("Method Array Iterator.prototype.next called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: thisObj})))
 }
 
-func (r *Runtime) createArrayProto(val *Object) objectImpl {
-	o := &arrayObject{
-		baseObject: baseObject{
-			class:      classArray,
-			val:        val,
-			extensible: true,
-			prototype:  r.global.ObjectPrototype,
-		},
+func createArrayProtoTemplate() *objectTemplate {
+	t := newObjectTemplate()
+	t.protoFactory = func(r *Runtime) *Object {
+		return r.global.ObjectPrototype
 	}
-	o.init()
 
-	o._putProp("at", r.newNativeFunc(r.arrayproto_at, nil, "at", nil, 1), true, false, true)
-	o._putProp("constructor", r.global.Array, true, false, true)
-	o._putProp("concat", r.newNativeFunc(r.arrayproto_concat, nil, "concat", nil, 1), true, false, true)
-	o._putProp("copyWithin", r.newNativeFunc(r.arrayproto_copyWithin, nil, "copyWithin", nil, 2), true, false, true)
-	o._putProp("entries", r.newNativeFunc(r.arrayproto_entries, nil, "entries", nil, 0), true, false, true)
-	o._putProp("every", r.newNativeFunc(r.arrayproto_every, nil, "every", nil, 1), true, false, true)
-	o._putProp("fill", r.newNativeFunc(r.arrayproto_fill, nil, "fill", nil, 1), true, false, true)
-	o._putProp("filter", r.newNativeFunc(r.arrayproto_filter, nil, "filter", nil, 1), true, false, true)
-	o._putProp("find", r.newNativeFunc(r.arrayproto_find, nil, "find", nil, 1), true, false, true)
-	o._putProp("findIndex", r.newNativeFunc(r.arrayproto_findIndex, nil, "findIndex", nil, 1), true, false, true)
-	o._putProp("findLast", r.newNativeFunc(r.arrayproto_findLast, nil, "findLast", nil, 1), true, false, true)
-	o._putProp("findLastIndex", r.newNativeFunc(r.arrayproto_findLastIndex, nil, "findLastIndex", nil, 1), true, false, true)
-	o._putProp("flat", r.newNativeFunc(r.arrayproto_flat, nil, "flat", nil, 0), true, false, true)
-	o._putProp("flatMap", r.newNativeFunc(r.arrayproto_flatMap, nil, "flatMap", nil, 1), true, false, true)
-	o._putProp("forEach", r.newNativeFunc(r.arrayproto_forEach, nil, "forEach", nil, 1), true, false, true)
-	o._putProp("includes", r.newNativeFunc(r.arrayproto_includes, nil, "includes", nil, 1), true, false, true)
-	o._putProp("indexOf", r.newNativeFunc(r.arrayproto_indexOf, nil, "indexOf", nil, 1), true, false, true)
-	o._putProp("join", r.newNativeFunc(r.arrayproto_join, nil, "join", nil, 1), true, false, true)
-	o._putProp("keys", r.newNativeFunc(r.arrayproto_keys, nil, "keys", nil, 0), true, false, true)
-	o._putProp("lastIndexOf", r.newNativeFunc(r.arrayproto_lastIndexOf, nil, "lastIndexOf", nil, 1), true, false, true)
-	o._putProp("map", r.newNativeFunc(r.arrayproto_map, nil, "map", nil, 1), true, false, true)
-	o._putProp("pop", r.newNativeFunc(r.arrayproto_pop, nil, "pop", nil, 0), true, false, true)
-	o._putProp("push", r.newNativeFunc(r.arrayproto_push, nil, "push", nil, 1), true, false, true)
-	o._putProp("reduce", r.newNativeFunc(r.arrayproto_reduce, nil, "reduce", nil, 1), true, false, true)
-	o._putProp("reduceRight", r.newNativeFunc(r.arrayproto_reduceRight, nil, "reduceRight", nil, 1), true, false, true)
-	o._putProp("reverse", r.newNativeFunc(r.arrayproto_reverse, nil, "reverse", nil, 0), true, false, true)
-	o._putProp("shift", r.newNativeFunc(r.arrayproto_shift, nil, "shift", nil, 0), true, false, true)
-	o._putProp("slice", r.newNativeFunc(r.arrayproto_slice, nil, "slice", nil, 2), true, false, true)
-	o._putProp("some", r.newNativeFunc(r.arrayproto_some, nil, "some", nil, 1), true, false, true)
-	o._putProp("sort", r.newNativeFunc(r.arrayproto_sort, nil, "sort", nil, 1), true, false, true)
-	o._putProp("splice", r.newNativeFunc(r.arrayproto_splice, nil, "splice", nil, 2), true, false, true)
-	o._putProp("toLocaleString", r.newNativeFunc(r.arrayproto_toLocaleString, nil, "toLocaleString", nil, 0), true, false, true)
-	o._putProp("toString", r.global.arrayToString, true, false, true)
-	o._putProp("unshift", r.newNativeFunc(r.arrayproto_unshift, nil, "unshift", nil, 1), true, false, true)
-	o._putProp("values", r.global.arrayValues, true, false, true)
+	t.putStr("length", func(r *Runtime) Value { return valueProp(_positiveZero, true, false, false) })
 
-	o._putSym(SymIterator, valueProp(r.global.arrayValues, true, false, true))
+	t.putStr("constructor", func(r *Runtime) Value { return valueProp(r.getArray(), true, false, true) })
 
-	bl := r.newBaseObject(nil, classObject)
-	bl.setOwnStr("copyWithin", valueTrue, true)
-	bl.setOwnStr("entries", valueTrue, true)
-	bl.setOwnStr("fill", valueTrue, true)
-	bl.setOwnStr("find", valueTrue, true)
-	bl.setOwnStr("findIndex", valueTrue, true)
-	bl.setOwnStr("findLast", valueTrue, true)
-	bl.setOwnStr("findLastIndex", valueTrue, true)
-	bl.setOwnStr("flat", valueTrue, true)
-	bl.setOwnStr("flatMap", valueTrue, true)
-	bl.setOwnStr("includes", valueTrue, true)
-	bl.setOwnStr("keys", valueTrue, true)
-	bl.setOwnStr("values", valueTrue, true)
-	bl.setOwnStr("groupBy", valueTrue, true)
-	bl.setOwnStr("groupByToMap", valueTrue, true)
-	o._putSym(SymUnscopables, valueProp(bl.val, false, false, true))
+	t.putStr("at", func(r *Runtime) Value { return r.methodProp(r.arrayproto_at, "at", 1) })
+	t.putStr("concat", func(r *Runtime) Value { return r.methodProp(r.arrayproto_concat, "concat", 1) })
+	t.putStr("copyWithin", func(r *Runtime) Value { return r.methodProp(r.arrayproto_copyWithin, "copyWithin", 2) })
+	t.putStr("entries", func(r *Runtime) Value { return r.methodProp(r.arrayproto_entries, "entries", 0) })
+	t.putStr("every", func(r *Runtime) Value { return r.methodProp(r.arrayproto_every, "every", 1) })
+	t.putStr("fill", func(r *Runtime) Value { return r.methodProp(r.arrayproto_fill, "fill", 1) })
+	t.putStr("filter", func(r *Runtime) Value { return r.methodProp(r.arrayproto_filter, "filter", 1) })
+	t.putStr("find", func(r *Runtime) Value { return r.methodProp(r.arrayproto_find, "find", 1) })
+	t.putStr("findIndex", func(r *Runtime) Value { return r.methodProp(r.arrayproto_findIndex, "findIndex", 1) })
+	t.putStr("findLast", func(r *Runtime) Value { return r.methodProp(r.arrayproto_findLast, "findLast", 1) })
+	t.putStr("findLastIndex", func(r *Runtime) Value { return r.methodProp(r.arrayproto_findLastIndex, "findLastIndex", 1) })
+	t.putStr("flat", func(r *Runtime) Value { return r.methodProp(r.arrayproto_flat, "flat", 0) })
+	t.putStr("flatMap", func(r *Runtime) Value { return r.methodProp(r.arrayproto_flatMap, "flatMap", 1) })
+	t.putStr("forEach", func(r *Runtime) Value { return r.methodProp(r.arrayproto_forEach, "forEach", 1) })
+	t.putStr("includes", func(r *Runtime) Value { return r.methodProp(r.arrayproto_includes, "includes", 1) })
+	t.putStr("indexOf", func(r *Runtime) Value { return r.methodProp(r.arrayproto_indexOf, "indexOf", 1) })
+	t.putStr("join", func(r *Runtime) Value { return r.methodProp(r.arrayproto_join, "join", 1) })
+	t.putStr("keys", func(r *Runtime) Value { return r.methodProp(r.arrayproto_keys, "keys", 0) })
+	t.putStr("lastIndexOf", func(r *Runtime) Value { return r.methodProp(r.arrayproto_lastIndexOf, "lastIndexOf", 1) })
+	t.putStr("map", func(r *Runtime) Value { return r.methodProp(r.arrayproto_map, "map", 1) })
+	t.putStr("pop", func(r *Runtime) Value { return r.methodProp(r.arrayproto_pop, "pop", 0) })
+	t.putStr("push", func(r *Runtime) Value { return r.methodProp(r.arrayproto_push, "push", 1) })
+	t.putStr("reduce", func(r *Runtime) Value { return r.methodProp(r.arrayproto_reduce, "reduce", 1) })
+	t.putStr("reduceRight", func(r *Runtime) Value { return r.methodProp(r.arrayproto_reduceRight, "reduceRight", 1) })
+	t.putStr("reverse", func(r *Runtime) Value { return r.methodProp(r.arrayproto_reverse, "reverse", 0) })
+	t.putStr("shift", func(r *Runtime) Value { return r.methodProp(r.arrayproto_shift, "shift", 0) })
+	t.putStr("slice", func(r *Runtime) Value { return r.methodProp(r.arrayproto_slice, "slice", 2) })
+	t.putStr("some", func(r *Runtime) Value { return r.methodProp(r.arrayproto_some, "some", 1) })
+	t.putStr("sort", func(r *Runtime) Value { return r.methodProp(r.arrayproto_sort, "sort", 1) })
+	t.putStr("splice", func(r *Runtime) Value { return r.methodProp(r.arrayproto_splice, "splice", 2) })
+	t.putStr("toLocaleString", func(r *Runtime) Value { return r.methodProp(r.arrayproto_toLocaleString, "toLocaleString", 0) })
+	t.putStr("toString", func(r *Runtime) Value { return valueProp(r.getArrayToString(), true, false, true) })
+	t.putStr("unshift", func(r *Runtime) Value { return r.methodProp(r.arrayproto_unshift, "unshift", 1) })
+	t.putStr("values", func(r *Runtime) Value { return valueProp(r.getArrayValues(), true, false, true) })
 
-	return o
+	t.putSym(SymIterator, func(r *Runtime) Value { return valueProp(r.getArrayValues(), true, false, true) })
+	t.putSym(SymUnscopables, func(r *Runtime) Value {
+		bl := r.newBaseObject(nil, classObject)
+		bl.setOwnStr("copyWithin", valueTrue, true)
+		bl.setOwnStr("entries", valueTrue, true)
+		bl.setOwnStr("fill", valueTrue, true)
+		bl.setOwnStr("find", valueTrue, true)
+		bl.setOwnStr("findIndex", valueTrue, true)
+		bl.setOwnStr("findLast", valueTrue, true)
+		bl.setOwnStr("findLastIndex", valueTrue, true)
+		bl.setOwnStr("flat", valueTrue, true)
+		bl.setOwnStr("flatMap", valueTrue, true)
+		bl.setOwnStr("includes", valueTrue, true)
+		bl.setOwnStr("keys", valueTrue, true)
+		bl.setOwnStr("values", valueTrue, true)
+		bl.setOwnStr("groupBy", valueTrue, true)
+		bl.setOwnStr("groupByToMap", valueTrue, true)
+
+		return valueProp(bl.val, false, false, true)
+	})
+
+	return t
+}
+
+var arrayProtoTemplate *objectTemplate
+var arrayProtoTemplateOnce sync.Once
+
+func getArrayProtoTemplate() *objectTemplate {
+	arrayProtoTemplateOnce.Do(func() {
+		arrayProtoTemplate = createArrayProtoTemplate()
+	})
+	return arrayProtoTemplate
+}
+
+func (r *Runtime) getArrayPrototype() *Object {
+	ret := r.global.ArrayPrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.ArrayPrototype = ret
+		r.newTemplatedArrayObject(getArrayProtoTemplate(), ret)
+	}
+	return ret
+}
+
+func (r *Runtime) getArray() *Object {
+	ret := r.global.Array
+	if ret == nil {
+		ret = &Object{runtime: r}
+		ret.self = r.createArray(ret)
+		r.global.Array = ret
+	}
+	return ret
 }
 
 func (r *Runtime) createArray(val *Object) objectImpl {
-	o := r.newNativeFuncConstructObj(val, r.builtin_newArray, "Array", r.global.ArrayPrototype, 1)
-	o._putProp("from", r.newNativeFunc(r.array_from, nil, "from", nil, 1), true, false, true)
-	o._putProp("isArray", r.newNativeFunc(r.array_isArray, nil, "isArray", nil, 1), true, false, true)
-	o._putProp("of", r.newNativeFunc(r.array_of, nil, "of", nil, 0), true, false, true)
+	o := r.newNativeFuncConstructObj(val, r.builtin_newArray, "Array", r.getArrayPrototype(), 1)
+	o._putProp("from", r.newNativeFunc(r.array_from, "from", 1), true, false, true)
+	o._putProp("isArray", r.newNativeFunc(r.array_isArray, "isArray", 1), true, false, true)
+	o._putProp("of", r.newNativeFunc(r.array_of, "of", 0), true, false, true)
 	r.putSpeciesReturnThis(o)
 
 	return o
@@ -1480,20 +1511,28 @@ func (r *Runtime) createArray(val *Object) objectImpl {
 func (r *Runtime) createArrayIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
-	o._putProp("next", r.newNativeFunc(r.arrayIterProto_next, nil, "next", nil, 0), true, false, true)
+	o._putProp("next", r.newNativeFunc(r.arrayIterProto_next, "next", 0), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classArrayIterator), false, false, true))
 
 	return o
 }
 
-func (r *Runtime) initArray() {
-	r.global.arrayValues = r.newNativeFunc(r.arrayproto_values, nil, "values", nil, 0)
-	r.global.arrayToString = r.newNativeFunc(r.arrayproto_toString, nil, "toString", nil, 0)
+func (r *Runtime) getArrayValues() *Object {
+	ret := r.global.arrayValues
+	if ret == nil {
+		ret = r.newNativeFunc(r.arrayproto_values, "values", 0)
+		r.global.arrayValues = ret
+	}
+	return ret
+}
 
-	r.global.ArrayPrototype = r.newLazyObject(r.createArrayProto)
-
-	r.global.Array = r.newLazyObject(r.createArray)
-	r.addToGlobal("Array", r.global.Array)
+func (r *Runtime) getArrayToString() *Object {
+	ret := r.global.arrayToString
+	if ret == nil {
+		ret = r.newNativeFunc(r.arrayproto_toString, "toString", 0)
+		r.global.arrayToString = ret
+	}
+	return ret
 }
 
 func (r *Runtime) getArrayIteratorPrototype() *Object {

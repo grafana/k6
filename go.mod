@@ -8,7 +8,7 @@ require (
 	github.com/PuerkitoBio/goquery v1.8.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.0.5
-	github.com/dop251/goja v0.0.0-20230828202809-3dbe69dd2b8e
+	github.com/dop251/goja v0.0.0-20230919141708-865aea360f25
 	github.com/fatih/color v1.15.0
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/golang/protobuf v1.5.3

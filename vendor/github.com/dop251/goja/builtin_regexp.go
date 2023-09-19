@@ -347,7 +347,7 @@ func (r *Runtime) builtin_RegExp(call FunctionCall) Value {
 			}
 		}
 	}
-	return r.newRegExp(pattern, flags, r.global.RegExpPrototype).val
+	return r.newRegExp(pattern, flags, r.getRegExpPrototype()).val
 }
 
 func (r *Runtime) regexpproto_compile(call FunctionCall) Value {
@@ -771,7 +771,7 @@ func (r *Runtime) regexpproto_stdMatcherAll(call FunctionCall) Value {
 	thisObj := r.toObject(call.This)
 	s := call.Argument(0).toString()
 	flags := nilSafe(thisObj.self.getStr("flags", nil)).toString()
-	c := r.speciesConstructorObj(call.This.(*Object), r.global.RegExp)
+	c := r.speciesConstructorObj(call.This.(*Object), r.getRegExp())
 	matcher := r.toConstructor(c)([]Value{call.This, flags}, nil)
 	matcher.self.setOwnStr("lastIndex", valueInt(toLength(thisObj.self.getStr("lastIndex", nil))), true)
 	flagsStr := flags.String()
@@ -963,7 +963,7 @@ func (r *Runtime) regexpproto_stdSplitter(call FunctionCall) Value {
 	limitValue := call.Argument(1)
 	var splitter *Object
 	search := r.checkStdRegexp(rxObj)
-	c := r.speciesConstructorObj(rxObj, r.global.RegExp)
+	c := r.speciesConstructorObj(rxObj, r.getRegExp())
 	if search == nil || c != r.global.RegExp {
 		flags := nilSafe(rxObj.self.getStr("flags", nil)).toString()
 		flagsStr := flags.String()
@@ -1214,7 +1214,7 @@ func (r *Runtime) regExpStringIteratorProto_next(call FunctionCall) Value {
 func (r *Runtime) createRegExpStringIteratorPrototype(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
-	o._putProp("next", r.newNativeFunc(r.regExpStringIteratorProto_next, nil, "next", nil, 0), true, false, true)
+	o._putProp("next", r.newNativeFunc(r.regExpStringIteratorProto_next, "next", 0), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classRegExpStringIterator), false, false, true))
 
 	return o
@@ -1230,60 +1230,75 @@ func (r *Runtime) getRegExpStringIteratorPrototype() *Object {
 	return o
 }
 
-func (r *Runtime) initRegExp() {
-	o := r.newGuardedObject(r.global.ObjectPrototype, classObject)
-	r.global.RegExpPrototype = o.val
-	r.global.stdRegexpProto = o
+func (r *Runtime) getRegExp() *Object {
+	ret := r.global.RegExp
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.RegExp = ret
+		proto := r.getRegExpPrototype()
+		r.newNativeFuncAndConstruct(ret, r.builtin_RegExp,
+			r.wrapNativeConstruct(r.builtin_newRegExp, ret, proto), proto, "RegExp", intToValue(2))
+		rx := ret.self
+		r.putSpeciesReturnThis(rx)
+	}
+	return ret
+}
 
-	o._putProp("compile", r.newNativeFunc(r.regexpproto_compile, nil, "compile", nil, 2), true, false, true)
-	o._putProp("exec", r.newNativeFunc(r.regexpproto_exec, nil, "exec", nil, 1), true, false, true)
-	o._putProp("test", r.newNativeFunc(r.regexpproto_test, nil, "test", nil, 1), true, false, true)
-	o._putProp("toString", r.newNativeFunc(r.regexpproto_toString, nil, "toString", nil, 0), true, false, true)
-	o.setOwnStr("source", &valueProperty{
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.regexpproto_getSource, nil, "get source", nil, 0),
-		accessor:     true,
-	}, false)
-	o.setOwnStr("global", &valueProperty{
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.regexpproto_getGlobal, nil, "get global", nil, 0),
-		accessor:     true,
-	}, false)
-	o.setOwnStr("multiline", &valueProperty{
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.regexpproto_getMultiline, nil, "get multiline", nil, 0),
-		accessor:     true,
-	}, false)
-	o.setOwnStr("ignoreCase", &valueProperty{
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.regexpproto_getIgnoreCase, nil, "get ignoreCase", nil, 0),
-		accessor:     true,
-	}, false)
-	o.setOwnStr("unicode", &valueProperty{
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.regexpproto_getUnicode, nil, "get unicode", nil, 0),
-		accessor:     true,
-	}, false)
-	o.setOwnStr("sticky", &valueProperty{
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.regexpproto_getSticky, nil, "get sticky", nil, 0),
-		accessor:     true,
-	}, false)
-	o.setOwnStr("flags", &valueProperty{
-		configurable: true,
-		getterFunc:   r.newNativeFunc(r.regexpproto_getFlags, nil, "get flags", nil, 0),
-		accessor:     true,
-	}, false)
+func (r *Runtime) getRegExpPrototype() *Object {
+	ret := r.global.RegExpPrototype
+	if ret == nil {
+		o := r.newGuardedObject(r.global.ObjectPrototype, classObject)
+		ret = o.val
+		r.global.RegExpPrototype = ret
+		r.global.stdRegexpProto = o
 
-	o._putSym(SymMatch, valueProp(r.newNativeFunc(r.regexpproto_stdMatcher, nil, "[Symbol.match]", nil, 1), true, false, true))
-	o._putSym(SymMatchAll, valueProp(r.newNativeFunc(r.regexpproto_stdMatcherAll, nil, "[Symbol.matchAll]", nil, 1), true, false, true))
-	o._putSym(SymSearch, valueProp(r.newNativeFunc(r.regexpproto_stdSearch, nil, "[Symbol.search]", nil, 1), true, false, true))
-	o._putSym(SymSplit, valueProp(r.newNativeFunc(r.regexpproto_stdSplitter, nil, "[Symbol.split]", nil, 2), true, false, true))
-	o._putSym(SymReplace, valueProp(r.newNativeFunc(r.regexpproto_stdReplacer, nil, "[Symbol.replace]", nil, 2), true, false, true))
-	o.guard("exec", "global", "multiline", "ignoreCase", "unicode", "sticky")
+		o._putProp("constructor", r.getRegExp(), true, false, true)
+		o._putProp("compile", r.newNativeFunc(r.regexpproto_compile, "compile", 2), true, false, true)
+		o._putProp("exec", r.newNativeFunc(r.regexpproto_exec, "exec", 1), true, false, true)
+		o._putProp("test", r.newNativeFunc(r.regexpproto_test, "test", 1), true, false, true)
+		o._putProp("toString", r.newNativeFunc(r.regexpproto_toString, "toString", 0), true, false, true)
+		o.setOwnStr("source", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getSource, "get source", 0),
+			accessor:     true,
+		}, false)
+		o.setOwnStr("global", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getGlobal, "get global", 0),
+			accessor:     true,
+		}, false)
+		o.setOwnStr("multiline", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getMultiline, "get multiline", 0),
+			accessor:     true,
+		}, false)
+		o.setOwnStr("ignoreCase", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getIgnoreCase, "get ignoreCase", 0),
+			accessor:     true,
+		}, false)
+		o.setOwnStr("unicode", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getUnicode, "get unicode", 0),
+			accessor:     true,
+		}, false)
+		o.setOwnStr("sticky", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getSticky, "get sticky", 0),
+			accessor:     true,
+		}, false)
+		o.setOwnStr("flags", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getFlags, "get flags", 0),
+			accessor:     true,
+		}, false)
 
-	r.global.RegExp = r.newNativeFunc(r.builtin_RegExp, r.builtin_newRegExp, "RegExp", r.global.RegExpPrototype, 2)
-	rx := r.global.RegExp.self
-	r.putSpeciesReturnThis(rx)
-	r.addToGlobal("RegExp", r.global.RegExp)
+		o._putSym(SymMatch, valueProp(r.newNativeFunc(r.regexpproto_stdMatcher, "[Symbol.match]", 1), true, false, true))
+		o._putSym(SymMatchAll, valueProp(r.newNativeFunc(r.regexpproto_stdMatcherAll, "[Symbol.matchAll]", 1), true, false, true))
+		o._putSym(SymSearch, valueProp(r.newNativeFunc(r.regexpproto_stdSearch, "[Symbol.search]", 1), true, false, true))
+		o._putSym(SymSplit, valueProp(r.newNativeFunc(r.regexpproto_stdSplitter, "[Symbol.split]", 2), true, false, true))
+		o._putSym(SymReplace, valueProp(r.newNativeFunc(r.regexpproto_stdReplacer, "[Symbol.replace]", 2), true, false, true))
+		o.guard("exec", "global", "multiline", "ignoreCase", "unicode", "sticky")
+	}
+	return ret
 }

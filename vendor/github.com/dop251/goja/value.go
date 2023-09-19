@@ -203,7 +203,7 @@ func (i valueInt) ToBoolean() bool {
 }
 
 func (i valueInt) ToObject(r *Runtime) *Object {
-	return r.newPrimitiveObject(i, r.global.NumberPrototype, classNumber)
+	return r.newPrimitiveObject(i, r.getNumberPrototype(), classNumber)
 }
 
 func (i valueInt) ToNumber() Value {
@@ -243,7 +243,7 @@ func (i valueInt) StrictEquals(other Value) bool {
 }
 
 func (i valueInt) baseObject(r *Runtime) *Object {
-	return r.global.NumberPrototype
+	return r.getNumberPrototype()
 }
 
 func (i valueInt) Export() interface{} {
@@ -299,7 +299,7 @@ func (b valueBool) ToBoolean() bool {
 }
 
 func (b valueBool) ToObject(r *Runtime) *Object {
-	return r.newPrimitiveObject(b, r.global.BooleanPrototype, "Boolean")
+	return r.newPrimitiveObject(b, r.getBooleanPrototype(), "Boolean")
 }
 
 func (b valueBool) ToNumber() Value {
@@ -337,7 +337,7 @@ func (b valueBool) StrictEquals(other Value) bool {
 }
 
 func (b valueBool) baseObject(r *Runtime) *Object {
-	return r.global.BooleanPrototype
+	return r.getBooleanPrototype()
 }
 
 func (b valueBool) Export() interface{} {
@@ -604,7 +604,7 @@ func (f valueFloat) ToBoolean() bool {
 }
 
 func (f valueFloat) ToObject(r *Runtime) *Object {
-	return r.newPrimitiveObject(f, r.global.NumberPrototype, "Number")
+	return r.newPrimitiveObject(f, r.getNumberPrototype(), "Number")
 }
 
 func (f valueFloat) ToNumber() Value {
@@ -664,7 +664,7 @@ func (f valueFloat) StrictEquals(other Value) bool {
 }
 
 func (f valueFloat) baseObject(r *Runtime) *Object {
-	return r.global.NumberPrototype
+	return r.getNumberPrototype()
 }
 
 func (f valueFloat) Export() interface{} {
@@ -1097,7 +1097,7 @@ func (s *Symbol) ExportType() reflect.Type {
 }
 
 func (s *Symbol) baseObject(r *Runtime) *Object {
-	return r.newPrimitiveObject(s, r.global.SymbolPrototype, classObject)
+	return r.newPrimitiveObject(s, r.getSymbolPrototype(), classObject)
 }
 
 func (s *Symbol) hash(*maphash.Hash) uint64 {

@@ -367,7 +367,7 @@ func (f *classFuncObject) construct(args []Value, newTarget *Object) *Object {
 			if v := r.vm.stack[r.vm.sp+1]; v != nil { // using residual 'this' value (a bit hacky)
 				instance = r.toObject(v)
 			} else {
-				panic(r.newError(r.global.ReferenceError, "Must call super constructor in derived class before returning from derived constructor"))
+				panic(r.newError(r.getReferenceError(), "Must call super constructor in derived class before returning from derived constructor"))
 			}
 		}
 		return instance
@@ -509,9 +509,9 @@ func (f *baseFuncObject) init(name unistring.String, length Value) {
 	f._putProp("name", stringValueFromRaw(name), false, false, true)
 }
 
-func (f *baseFuncObject) hasInstance(v Value) bool {
+func hasInstance(val *Object, v Value) bool {
 	if v, ok := v.(*Object); ok {
-		o := f.val.self.getStr("prototype", nil)
+		o := val.self.getStr("prototype", nil)
 		if o1, ok := o.(*Object); ok {
 			for {
 				v = v.self.proto()
@@ -523,11 +523,15 @@ func (f *baseFuncObject) hasInstance(v Value) bool {
 				}
 			}
 		} else {
-			f.val.runtime.typeErrorResult(true, "prototype is not an object")
+			panic(val.runtime.NewTypeError("prototype is not an object"))
 		}
 	}
 
 	return false
+}
+
+func (f *baseFuncObject) hasInstance(v Value) bool {
+	return hasInstance(f.val, v)
 }
 
 func (f *nativeFuncObject) defaultConstruct(ccall func(ConstructorCall) *Object, args []Value, newTarget *Object) *Object {
@@ -707,7 +711,7 @@ func (ar *asyncRunner) step(res Value, done bool, ex *Exception) {
 	}
 
 	// await
-	promise := r.promiseResolve(r.global.Promise, res)
+	promise := r.promiseResolve(r.getPromise(), res)
 	promise.self.(*Promise).addReactions(&promiseReaction{
 		typ:         promiseReactionFulfill,
 		handler:     &jobCallback{callback: ar.onFulfilled},
@@ -722,7 +726,7 @@ func (ar *asyncRunner) step(res Value, done bool, ex *Exception) {
 func (ar *asyncRunner) start(nArgs int) {
 	r := ar.f.runtime
 	ar.gen.vm = r.vm
-	ar.promiseCap = r.newPromiseCapability(r.global.Promise)
+	ar.promiseCap = r.newPromiseCapability(r.getPromise())
 	sp := r.vm.sp
 	ar.gen.enter()
 	ar.vmCall(r.vm, nArgs)

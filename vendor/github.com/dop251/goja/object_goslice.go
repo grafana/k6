@@ -34,7 +34,7 @@ func (r *Runtime) newObjectGoSlice(data *[]interface{}, isPtr bool) *objectGoSli
 func (o *objectGoSlice) init() {
 	o.baseObject.init()
 	o.class = classArray
-	o.prototype = o.val.runtime.global.ArrayPrototype
+	o.prototype = o.val.runtime.getArrayPrototype()
 	o.lengthProp.writable = true
 	o.extensible = true
 	o.baseObject._put("length", &o.lengthProp)
