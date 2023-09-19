@@ -591,6 +591,32 @@ func TestBrowserContextCookies(t *testing.T) {
 	}
 }
 
+func TestBrowserContextClearCookies(t *testing.T) {
+	t.Parallel()
+
+	// add a cookie and clear it out
+
+	tb := newTestBrowser(t, withHTTPServer())
+	p := tb.NewPage(nil)
+	bctx := p.Context()
+
+	err := bctx.AddCookies(
+		[]*api.Cookie{
+			{
+				Name:  "test_cookie_name",
+				Value: "test_cookie_value",
+				URL:   "http://test.go",
+			},
+		},
+	)
+	require.NoError(t, err)
+	require.NoError(t, bctx.ClearCookies())
+
+	cookies, err := bctx.Cookies()
+	require.NoError(t, err)
+	require.Emptyf(t, cookies, "want no cookies, but got: %#v", cookies)
+}
+
 func TestK6Object(t *testing.T) {
 	t.Parallel()
 
