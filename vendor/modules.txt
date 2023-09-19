@@ -163,7 +163,7 @@ github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
-# github.com/grafana/xk6-grpc v0.1.4-0.20230911131934-0250ce428019
+# github.com/grafana/xk6-grpc v0.1.4-0.20230919144024-6ed5daf33509
 ## explicit; go 1.19
 github.com/grafana/xk6-grpc/grpc
 github.com/grafana/xk6-grpc/lib/netext/grpcext
