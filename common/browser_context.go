@@ -502,7 +502,7 @@ func (b *BrowserContext) ClearCookies() error {
 	clearCookies := storage.
 		ClearCookies().
 		WithBrowserContextID(b.id)
-	if err := clearCookies.Do(b.ctx); err != nil {
+	if err := clearCookies.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
 		return fmt.Errorf("clearing cookies: %w", err)
 	}
 	return nil
