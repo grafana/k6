@@ -114,6 +114,13 @@ export default async function () {
       'the second filtered cookie name should be baz': c => c.name === 'baz',
       'the second filtered cookie value should be 44': c => c.value === '44',
     });
+
+    // clear cookies
+    context.clearCookies();
+    cookies = context.cookies();
+    check(cookies.length, {
+      'number of cookies should be zero': n => n === 0,
+    });
   } finally {
     page.close();
   }
