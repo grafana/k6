@@ -39,5 +39,8 @@ ENV CHROME_BIN=/usr/bin/chromium-browser
 ENV CHROME_PATH=/usr/lib/chromium/
 
 ENV K6_BROWSER_HEADLESS=true
+# no-sandbox chrome arg is required to run chrome browser in
+# alpine and avoids the usage of SYS_ADMIN Docker capability
+ENV K6_BROWSER_ARGS=no-sandbox
 
 ENTRYPOINT ["k6"]
