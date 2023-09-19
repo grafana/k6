@@ -511,9 +511,10 @@ func (self *_parser) parseThrowStatement() ast.Statement {
 }
 
 func (self *_parser) parseSwitchStatement() ast.Statement {
-	self.expect(token.SWITCH)
+	idx := self.expect(token.SWITCH)
 	self.expect(token.LEFT_PARENTHESIS)
 	node := &ast.SwitchStatement{
+		Switch:       idx,
 		Discriminant: self.parseExpression(),
 		Default:      -1,
 	}
@@ -529,6 +530,7 @@ func (self *_parser) parseSwitchStatement() ast.Statement {
 
 	for index := 0; self.token != token.EOF; index++ {
 		if self.token == token.RIGHT_BRACE {
+			node.RightBrace = self.idx
 			self.next()
 			break
 		}
@@ -547,11 +549,10 @@ func (self *_parser) parseSwitchStatement() ast.Statement {
 }
 
 func (self *_parser) parseWithStatement() ast.Statement {
-	self.expect(token.WITH)
+	node := &ast.WithStatement{}
+	node.With = self.expect(token.WITH)
 	self.expect(token.LEFT_PARENTHESIS)
-	node := &ast.WithStatement{
-		Object: self.parseExpression(),
-	}
+	node.Object = self.parseExpression()
 	self.expect(token.RIGHT_PARENTHESIS)
 	self.scope.allowLet = false
 	node.Body = self.parseStatement()
@@ -816,8 +817,8 @@ func (self *_parser) parseDoWhileStatement() ast.Statement {
 		self.scope.inIteration = inIteration
 	}()
 
-	self.expect(token.DO)
 	node := &ast.DoWhileStatement{}
+	node.Do = self.expect(token.DO)
 	if self.token == token.LEFT_BRACE {
 		node.Body = self.parseBlockStatement()
 	} else {
@@ -828,7 +829,7 @@ func (self *_parser) parseDoWhileStatement() ast.Statement {
 	self.expect(token.WHILE)
 	self.expect(token.LEFT_PARENTHESIS)
 	node.Test = self.parseExpression()
-	self.expect(token.RIGHT_PARENTHESIS)
+	node.RightParenthesis = self.expect(token.RIGHT_PARENTHESIS)
 	if self.token == token.SEMICOLON {
 		self.next()
 	}
@@ -837,10 +838,11 @@ func (self *_parser) parseDoWhileStatement() ast.Statement {
 }
 
 func (self *_parser) parseWhileStatement() ast.Statement {
-	self.expect(token.WHILE)
+	idx := self.expect(token.WHILE)
 	self.expect(token.LEFT_PARENTHESIS)
 	node := &ast.WhileStatement{
-		Test: self.parseExpression(),
+		While: idx,
+		Test:  self.parseExpression(),
 	}
 	self.expect(token.RIGHT_PARENTHESIS)
 	node.Body = self.parseIterationStatement()
