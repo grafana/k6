@@ -667,6 +667,18 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "ReflectV1",
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				reflection.RegisterV1(tb.ServerGRPC)
+			},
+			initString: codeBlock{
+				code: `var client = new grpc.Client();`,
+			},
+			vuString: codeBlock{
+				code: `client.connect("GRPCBIN_ADDR", {reflect: true})`,
+			},
+		},
+		{
 			name: "ReflectBadParam",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				reflection.Register(tb.ServerGRPC)
