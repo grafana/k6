@@ -402,7 +402,7 @@ func (s unicodeString) ToNumber() Value {
 }
 
 func (s unicodeString) ToObject(r *Runtime) *Object {
-	return r._newString(s, r.global.StringPrototype)
+	return r._newString(s, r.getStringPrototype())
 }
 
 func (s unicodeString) equals(other unicodeString) bool {
@@ -447,7 +447,7 @@ func (s unicodeString) StrictEquals(other Value) bool {
 }
 
 func (s unicodeString) baseObject(r *Runtime) *Object {
-	ss := r.stringSingleton
+	ss := r.getStringSingleton()
 	ss.value = s
 	ss.setLength()
 	return ss.val

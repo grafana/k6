@@ -871,7 +871,7 @@ func (o *Object) ordinaryToPrimitiveString() Value {
 		return v
 	}
 
-	panic(o.runtime.NewTypeError("Could not convert %v to primitive", o.self))
+	panic(o.runtime.NewTypeError("Could not convert %v (%T) to primitive", o.self, o.self))
 }
 
 func (o *Object) tryExoticToPrimitive(hint Value) Value {
@@ -916,8 +916,8 @@ func (o *baseObject) assertCallable() (func(FunctionCall) Value, bool) {
 	return nil, false
 }
 
-func (o *baseObject) vmCall(vm *vm, n int) {
-	vm.r.typeErrorResult(true, "Not a function: %s", o.val.toString())
+func (o *baseObject) vmCall(vm *vm, _ int) {
+	panic(vm.r.NewTypeError("Not a function: %s", o.val.toString()))
 }
 
 func (o *baseObject) assertConstructor() func(args []Value, newTarget *Object) *Object {

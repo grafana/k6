@@ -49,12 +49,27 @@ func (r *Runtime) booleanproto_valueOf(call FunctionCall) Value {
 	return nil
 }
 
-func (r *Runtime) initBoolean() {
-	r.global.BooleanPrototype = r.newPrimitiveObject(valueFalse, r.global.ObjectPrototype, classBoolean)
-	o := r.global.BooleanPrototype.self
-	o._putProp("toString", r.newNativeFunc(r.booleanproto_toString, nil, "toString", nil, 0), true, false, true)
-	o._putProp("valueOf", r.newNativeFunc(r.booleanproto_valueOf, nil, "valueOf", nil, 0), true, false, true)
+func (r *Runtime) getBooleanPrototype() *Object {
+	ret := r.global.BooleanPrototype
+	if ret == nil {
+		ret = r.newPrimitiveObject(valueFalse, r.global.ObjectPrototype, classBoolean)
+		r.global.BooleanPrototype = ret
+		o := ret.self
+		o._putProp("toString", r.newNativeFunc(r.booleanproto_toString, "toString", 0), true, false, true)
+		o._putProp("valueOf", r.newNativeFunc(r.booleanproto_valueOf, "valueOf", 0), true, false, true)
+		o._putProp("constructor", r.getBoolean(), true, false, true)
+	}
+	return ret
+}
 
-	r.global.Boolean = r.newNativeFunc(r.builtin_Boolean, r.builtin_newBoolean, "Boolean", r.global.BooleanPrototype, 1)
-	r.addToGlobal("Boolean", r.global.Boolean)
+func (r *Runtime) getBoolean() *Object {
+	ret := r.global.Boolean
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Boolean = ret
+		proto := r.getBooleanPrototype()
+		r.newNativeFuncAndConstruct(ret, r.builtin_Boolean,
+			r.wrapNativeConstruct(r.builtin_newBoolean, ret, proto), proto, "Boolean", intToValue(1))
+	}
+	return ret
 }

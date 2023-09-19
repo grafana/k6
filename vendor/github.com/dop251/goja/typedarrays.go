@@ -117,7 +117,7 @@ func (a ArrayBuffer) Detached() bool {
 // using this typed array will result in unaligned access which may cause performance degradation or runtime panics
 // on some architectures or configurations.
 func (r *Runtime) NewArrayBuffer(data []byte) ArrayBuffer {
-	buf := r._newArrayBuffer(r.global.ArrayBufferPrototype, nil)
+	buf := r._newArrayBuffer(r.getArrayBufferPrototype(), nil)
 	buf.data = data
 	return ArrayBuffer{
 		buf: buf,
@@ -901,6 +901,8 @@ func (r *Runtime) _newTypedArrayObject(buf *arrayBufferObject, offset, length, e
 }
 
 func (r *Runtime) newUint8ArrayObject(buf *arrayBufferObject, offset, length int, proto *Object) *typedArrayObject {
+	// Note, no need to use r.getUint8Array() here or in the similar methods below, because the value is already set
+	// by the time they are called.
 	return r._newTypedArrayObject(buf, offset, length, 1, r.global.Uint8Array, (*uint8Array)(&buf.data), proto)
 }
 
@@ -939,7 +941,7 @@ func (r *Runtime) newFloat64ArrayObject(buf *arrayBufferObject, offset, length i
 func (o *dataViewObject) getIdxAndByteOrder(getIdx int, littleEndianVal Value, size int) (int, byteOrder) {
 	o.viewedArrayBuf.ensureNotDetached(true)
 	if getIdx+size > o.byteLen {
-		panic(o.val.runtime.newError(o.val.runtime.global.RangeError, "Index %d is out of bounds", getIdx))
+		panic(o.val.runtime.newError(o.val.runtime.getRangeError(), "Index %d is out of bounds", getIdx))
 	}
 	getIdx += o.byteOffset
 	var bo byteOrder

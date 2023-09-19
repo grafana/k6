@@ -141,7 +141,7 @@ func (r *Runtime) NewDynamicArray(a DynamicArray) *Object {
 		a: a,
 		baseDynamicObject: baseDynamicObject{
 			val:       v,
-			prototype: r.global.ArrayPrototype,
+			prototype: r.getArrayPrototype(),
 		},
 	}
 	v.self = o

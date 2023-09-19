@@ -90,17 +90,6 @@ func (r *Runtime) needNew(name string) *Object {
 	return r.NewTypeError("Constructor %s requires 'new'", name)
 }
 
-func (r *Runtime) getPrototypeFromCtor(newTarget, defCtor, defProto *Object) *Object {
-	if newTarget == defCtor {
-		return defProto
-	}
-	proto := newTarget.self.getStr("prototype", nil)
-	if obj, ok := proto.(*Object); ok {
-		return obj
-	}
-	return defProto
-}
-
 func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 	if newTarget == nil {
 		panic(r.needNew("WeakMap"))
@@ -148,12 +137,12 @@ func (r *Runtime) builtin_newWeakMap(args []Value, newTarget *Object) *Object {
 func (r *Runtime) createWeakMapProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
 
-	o._putProp("constructor", r.global.WeakMap, true, false, true)
-	r.global.weakMapAdder = r.newNativeFunc(r.weakMapProto_set, nil, "set", nil, 2)
+	o._putProp("constructor", r.getWeakMap(), true, false, true)
+	r.global.weakMapAdder = r.newNativeFunc(r.weakMapProto_set, "set", 2)
 	o._putProp("set", r.global.weakMapAdder, true, false, true)
-	o._putProp("delete", r.newNativeFunc(r.weakMapProto_delete, nil, "delete", nil, 1), true, false, true)
-	o._putProp("has", r.newNativeFunc(r.weakMapProto_has, nil, "has", nil, 1), true, false, true)
-	o._putProp("get", r.newNativeFunc(r.weakMapProto_get, nil, "get", nil, 1), true, false, true)
+	o._putProp("delete", r.newNativeFunc(r.weakMapProto_delete, "delete", 1), true, false, true)
+	o._putProp("has", r.newNativeFunc(r.weakMapProto_has, "has", 1), true, false, true)
+	o._putProp("get", r.newNativeFunc(r.weakMapProto_get, "get", 1), true, false, true)
 
 	o._putSym(SymToStringTag, valueProp(asciiString(classWeakMap), false, false, true))
 
@@ -161,14 +150,27 @@ func (r *Runtime) createWeakMapProto(val *Object) objectImpl {
 }
 
 func (r *Runtime) createWeakMap(val *Object) objectImpl {
-	o := r.newNativeConstructOnly(val, r.builtin_newWeakMap, r.global.WeakMapPrototype, "WeakMap", 0)
+	o := r.newNativeConstructOnly(val, r.builtin_newWeakMap, r.getWeakMapPrototype(), "WeakMap", 0)
 
 	return o
 }
 
-func (r *Runtime) initWeakMap() {
-	r.global.WeakMapPrototype = r.newLazyObject(r.createWeakMapProto)
-	r.global.WeakMap = r.newLazyObject(r.createWeakMap)
+func (r *Runtime) getWeakMapPrototype() *Object {
+	ret := r.global.WeakMapPrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.WeakMapPrototype = ret
+		ret.self = r.createWeakMapProto(ret)
+	}
+	return ret
+}
 
-	r.addToGlobal("WeakMap", r.global.WeakMap)
+func (r *Runtime) getWeakMap() *Object {
+	ret := r.global.WeakMap
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.WeakMap = ret
+		ret.self = r.createWeakMap(ret)
+	}
+	return ret
 }

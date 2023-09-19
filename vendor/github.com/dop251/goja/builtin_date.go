@@ -3,6 +3,7 @@ package goja
 import (
 	"fmt"
 	"math"
+	"sync"
 	"time"
 )
 
@@ -133,7 +134,7 @@ func (r *Runtime) dateproto_toISOString(call FunctionCall) Value {
 			// extended year
 			return asciiString(fmt.Sprintf("%+06d-", year) + utc.Format(isoDateTimeLayout[5:]))
 		} else {
-			panic(r.newError(r.global.RangeError, "Invalid time value"))
+			panic(r.newError(r.getRangeError(), "Invalid time value"))
 		}
 	}
 	panic(r.NewTypeError("Method Date.prototype.toISOString is called on incompatible receiver"))
@@ -938,78 +939,120 @@ func (r *Runtime) dateproto_setUTCFullYear(call FunctionCall) Value {
 	panic(r.NewTypeError("Method Date.prototype.setUTCFullYear is called on incompatible receiver"))
 }
 
-func (r *Runtime) createDateProto(val *Object) objectImpl {
-	o := &baseObject{
-		class:      classObject,
-		val:        val,
-		extensible: true,
-		prototype:  r.global.ObjectPrototype,
+var dateTemplate *objectTemplate
+var dateTemplateOnce sync.Once
+
+func getDateTemplate() *objectTemplate {
+	dateTemplateOnce.Do(func() {
+		dateTemplate = createDateTemplate()
+	})
+	return dateTemplate
+}
+
+func createDateTemplate() *objectTemplate {
+	t := newObjectTemplate()
+	t.protoFactory = func(r *Runtime) *Object {
+		return r.getFunctionPrototype()
 	}
-	o.init()
 
-	o._putProp("constructor", r.global.Date, true, false, true)
-	o._putProp("toString", r.newNativeFunc(r.dateproto_toString, nil, "toString", nil, 0), true, false, true)
-	o._putProp("toDateString", r.newNativeFunc(r.dateproto_toDateString, nil, "toDateString", nil, 0), true, false, true)
-	o._putProp("toTimeString", r.newNativeFunc(r.dateproto_toTimeString, nil, "toTimeString", nil, 0), true, false, true)
-	o._putProp("toLocaleString", r.newNativeFunc(r.dateproto_toLocaleString, nil, "toLocaleString", nil, 0), true, false, true)
-	o._putProp("toLocaleDateString", r.newNativeFunc(r.dateproto_toLocaleDateString, nil, "toLocaleDateString", nil, 0), true, false, true)
-	o._putProp("toLocaleTimeString", r.newNativeFunc(r.dateproto_toLocaleTimeString, nil, "toLocaleTimeString", nil, 0), true, false, true)
-	o._putProp("valueOf", r.newNativeFunc(r.dateproto_valueOf, nil, "valueOf", nil, 0), true, false, true)
-	o._putProp("getTime", r.newNativeFunc(r.dateproto_getTime, nil, "getTime", nil, 0), true, false, true)
-	o._putProp("getFullYear", r.newNativeFunc(r.dateproto_getFullYear, nil, "getFullYear", nil, 0), true, false, true)
-	o._putProp("getUTCFullYear", r.newNativeFunc(r.dateproto_getUTCFullYear, nil, "getUTCFullYear", nil, 0), true, false, true)
-	o._putProp("getMonth", r.newNativeFunc(r.dateproto_getMonth, nil, "getMonth", nil, 0), true, false, true)
-	o._putProp("getUTCMonth", r.newNativeFunc(r.dateproto_getUTCMonth, nil, "getUTCMonth", nil, 0), true, false, true)
-	o._putProp("getDate", r.newNativeFunc(r.dateproto_getDate, nil, "getDate", nil, 0), true, false, true)
-	o._putProp("getUTCDate", r.newNativeFunc(r.dateproto_getUTCDate, nil, "getUTCDate", nil, 0), true, false, true)
-	o._putProp("getDay", r.newNativeFunc(r.dateproto_getDay, nil, "getDay", nil, 0), true, false, true)
-	o._putProp("getUTCDay", r.newNativeFunc(r.dateproto_getUTCDay, nil, "getUTCDay", nil, 0), true, false, true)
-	o._putProp("getHours", r.newNativeFunc(r.dateproto_getHours, nil, "getHours", nil, 0), true, false, true)
-	o._putProp("getUTCHours", r.newNativeFunc(r.dateproto_getUTCHours, nil, "getUTCHours", nil, 0), true, false, true)
-	o._putProp("getMinutes", r.newNativeFunc(r.dateproto_getMinutes, nil, "getMinutes", nil, 0), true, false, true)
-	o._putProp("getUTCMinutes", r.newNativeFunc(r.dateproto_getUTCMinutes, nil, "getUTCMinutes", nil, 0), true, false, true)
-	o._putProp("getSeconds", r.newNativeFunc(r.dateproto_getSeconds, nil, "getSeconds", nil, 0), true, false, true)
-	o._putProp("getUTCSeconds", r.newNativeFunc(r.dateproto_getUTCSeconds, nil, "getUTCSeconds", nil, 0), true, false, true)
-	o._putProp("getMilliseconds", r.newNativeFunc(r.dateproto_getMilliseconds, nil, "getMilliseconds", nil, 0), true, false, true)
-	o._putProp("getUTCMilliseconds", r.newNativeFunc(r.dateproto_getUTCMilliseconds, nil, "getUTCMilliseconds", nil, 0), true, false, true)
-	o._putProp("getTimezoneOffset", r.newNativeFunc(r.dateproto_getTimezoneOffset, nil, "getTimezoneOffset", nil, 0), true, false, true)
-	o._putProp("setTime", r.newNativeFunc(r.dateproto_setTime, nil, "setTime", nil, 1), true, false, true)
-	o._putProp("setMilliseconds", r.newNativeFunc(r.dateproto_setMilliseconds, nil, "setMilliseconds", nil, 1), true, false, true)
-	o._putProp("setUTCMilliseconds", r.newNativeFunc(r.dateproto_setUTCMilliseconds, nil, "setUTCMilliseconds", nil, 1), true, false, true)
-	o._putProp("setSeconds", r.newNativeFunc(r.dateproto_setSeconds, nil, "setSeconds", nil, 2), true, false, true)
-	o._putProp("setUTCSeconds", r.newNativeFunc(r.dateproto_setUTCSeconds, nil, "setUTCSeconds", nil, 2), true, false, true)
-	o._putProp("setMinutes", r.newNativeFunc(r.dateproto_setMinutes, nil, "setMinutes", nil, 3), true, false, true)
-	o._putProp("setUTCMinutes", r.newNativeFunc(r.dateproto_setUTCMinutes, nil, "setUTCMinutes", nil, 3), true, false, true)
-	o._putProp("setHours", r.newNativeFunc(r.dateproto_setHours, nil, "setHours", nil, 4), true, false, true)
-	o._putProp("setUTCHours", r.newNativeFunc(r.dateproto_setUTCHours, nil, "setUTCHours", nil, 4), true, false, true)
-	o._putProp("setDate", r.newNativeFunc(r.dateproto_setDate, nil, "setDate", nil, 1), true, false, true)
-	o._putProp("setUTCDate", r.newNativeFunc(r.dateproto_setUTCDate, nil, "setUTCDate", nil, 1), true, false, true)
-	o._putProp("setMonth", r.newNativeFunc(r.dateproto_setMonth, nil, "setMonth", nil, 2), true, false, true)
-	o._putProp("setUTCMonth", r.newNativeFunc(r.dateproto_setUTCMonth, nil, "setUTCMonth", nil, 2), true, false, true)
-	o._putProp("setFullYear", r.newNativeFunc(r.dateproto_setFullYear, nil, "setFullYear", nil, 3), true, false, true)
-	o._putProp("setUTCFullYear", r.newNativeFunc(r.dateproto_setUTCFullYear, nil, "setUTCFullYear", nil, 3), true, false, true)
-	o._putProp("toUTCString", r.newNativeFunc(r.dateproto_toUTCString, nil, "toUTCString", nil, 0), true, false, true)
-	o._putProp("toISOString", r.newNativeFunc(r.dateproto_toISOString, nil, "toISOString", nil, 0), true, false, true)
-	o._putProp("toJSON", r.newNativeFunc(r.dateproto_toJSON, nil, "toJSON", nil, 1), true, false, true)
+	t.putStr("name", func(r *Runtime) Value { return valueProp(asciiString("Date"), false, false, true) })
+	t.putStr("length", func(r *Runtime) Value { return valueProp(intToValue(7), false, false, true) })
 
-	o._putSym(SymToPrimitive, valueProp(r.newNativeFunc(r.dateproto_toPrimitive, nil, "[Symbol.toPrimitive]", nil, 1), false, false, true))
+	t.putStr("prototype", func(r *Runtime) Value { return valueProp(r.getDatePrototype(), false, false, false) })
 
-	return o
+	t.putStr("parse", func(r *Runtime) Value { return r.methodProp(r.date_parse, "parse", 1) })
+	t.putStr("UTC", func(r *Runtime) Value { return r.methodProp(r.date_UTC, "UTC", 7) })
+	t.putStr("now", func(r *Runtime) Value { return r.methodProp(r.date_now, "now", 0) })
+
+	return t
 }
 
-func (r *Runtime) createDate(val *Object) objectImpl {
-	o := r.newNativeFuncObj(val, r.builtin_date, r.builtin_newDate, "Date", r.global.DatePrototype, intToValue(7))
-
-	o._putProp("parse", r.newNativeFunc(r.date_parse, nil, "parse", nil, 1), true, false, true)
-	o._putProp("UTC", r.newNativeFunc(r.date_UTC, nil, "UTC", nil, 7), true, false, true)
-	o._putProp("now", r.newNativeFunc(r.date_now, nil, "now", nil, 0), true, false, true)
-
-	return o
+func (r *Runtime) getDate() *Object {
+	ret := r.global.Date
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Date = ret
+		r.newTemplatedFuncObject(getDateTemplate(), ret, r.builtin_date,
+			r.wrapNativeConstruct(r.builtin_newDate, ret, r.getDatePrototype()))
+	}
+	return ret
 }
 
-func (r *Runtime) initDate() {
-	r.global.DatePrototype = r.newLazyObject(r.createDateProto)
+func createDateProtoTemplate() *objectTemplate {
+	t := newObjectTemplate()
+	t.protoFactory = func(r *Runtime) *Object {
+		return r.global.ObjectPrototype
+	}
 
-	r.global.Date = r.newLazyObject(r.createDate)
-	r.addToGlobal("Date", r.global.Date)
+	t.putStr("constructor", func(r *Runtime) Value { return valueProp(r.getDate(), true, false, true) })
+
+	t.putStr("toString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toString, "toString", 0) })
+	t.putStr("toDateString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toDateString, "toDateString", 0) })
+	t.putStr("toTimeString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toTimeString, "toTimeString", 0) })
+	t.putStr("toLocaleString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toLocaleString, "toLocaleString", 0) })
+	t.putStr("toLocaleDateString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toLocaleDateString, "toLocaleDateString", 0) })
+	t.putStr("toLocaleTimeString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toLocaleTimeString, "toLocaleTimeString", 0) })
+	t.putStr("valueOf", func(r *Runtime) Value { return r.methodProp(r.dateproto_valueOf, "valueOf", 0) })
+	t.putStr("getTime", func(r *Runtime) Value { return r.methodProp(r.dateproto_getTime, "getTime", 0) })
+	t.putStr("getFullYear", func(r *Runtime) Value { return r.methodProp(r.dateproto_getFullYear, "getFullYear", 0) })
+	t.putStr("getUTCFullYear", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCFullYear, "getUTCFullYear", 0) })
+	t.putStr("getMonth", func(r *Runtime) Value { return r.methodProp(r.dateproto_getMonth, "getMonth", 0) })
+	t.putStr("getUTCMonth", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCMonth, "getUTCMonth", 0) })
+	t.putStr("getDate", func(r *Runtime) Value { return r.methodProp(r.dateproto_getDate, "getDate", 0) })
+	t.putStr("getUTCDate", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCDate, "getUTCDate", 0) })
+	t.putStr("getDay", func(r *Runtime) Value { return r.methodProp(r.dateproto_getDay, "getDay", 0) })
+	t.putStr("getUTCDay", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCDay, "getUTCDay", 0) })
+	t.putStr("getHours", func(r *Runtime) Value { return r.methodProp(r.dateproto_getHours, "getHours", 0) })
+	t.putStr("getUTCHours", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCHours, "getUTCHours", 0) })
+	t.putStr("getMinutes", func(r *Runtime) Value { return r.methodProp(r.dateproto_getMinutes, "getMinutes", 0) })
+	t.putStr("getUTCMinutes", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCMinutes, "getUTCMinutes", 0) })
+	t.putStr("getSeconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_getSeconds, "getSeconds", 0) })
+	t.putStr("getUTCSeconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCSeconds, "getUTCSeconds", 0) })
+	t.putStr("getMilliseconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_getMilliseconds, "getMilliseconds", 0) })
+	t.putStr("getUTCMilliseconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_getUTCMilliseconds, "getUTCMilliseconds", 0) })
+	t.putStr("getTimezoneOffset", func(r *Runtime) Value { return r.methodProp(r.dateproto_getTimezoneOffset, "getTimezoneOffset", 0) })
+	t.putStr("setTime", func(r *Runtime) Value { return r.methodProp(r.dateproto_setTime, "setTime", 1) })
+	t.putStr("setMilliseconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_setMilliseconds, "setMilliseconds", 1) })
+	t.putStr("setUTCMilliseconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_setUTCMilliseconds, "setUTCMilliseconds", 1) })
+	t.putStr("setSeconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_setSeconds, "setSeconds", 2) })
+	t.putStr("setUTCSeconds", func(r *Runtime) Value { return r.methodProp(r.dateproto_setUTCSeconds, "setUTCSeconds", 2) })
+	t.putStr("setMinutes", func(r *Runtime) Value { return r.methodProp(r.dateproto_setMinutes, "setMinutes", 3) })
+	t.putStr("setUTCMinutes", func(r *Runtime) Value { return r.methodProp(r.dateproto_setUTCMinutes, "setUTCMinutes", 3) })
+	t.putStr("setHours", func(r *Runtime) Value { return r.methodProp(r.dateproto_setHours, "setHours", 4) })
+	t.putStr("setUTCHours", func(r *Runtime) Value { return r.methodProp(r.dateproto_setUTCHours, "setUTCHours", 4) })
+	t.putStr("setDate", func(r *Runtime) Value { return r.methodProp(r.dateproto_setDate, "setDate", 1) })
+	t.putStr("setUTCDate", func(r *Runtime) Value { return r.methodProp(r.dateproto_setUTCDate, "setUTCDate", 1) })
+	t.putStr("setMonth", func(r *Runtime) Value { return r.methodProp(r.dateproto_setMonth, "setMonth", 2) })
+	t.putStr("setUTCMonth", func(r *Runtime) Value { return r.methodProp(r.dateproto_setUTCMonth, "setUTCMonth", 2) })
+	t.putStr("setFullYear", func(r *Runtime) Value { return r.methodProp(r.dateproto_setFullYear, "setFullYear", 3) })
+	t.putStr("setUTCFullYear", func(r *Runtime) Value { return r.methodProp(r.dateproto_setUTCFullYear, "setUTCFullYear", 3) })
+	t.putStr("toUTCString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toUTCString, "toUTCString", 0) })
+	t.putStr("toISOString", func(r *Runtime) Value { return r.methodProp(r.dateproto_toISOString, "toISOString", 0) })
+	t.putStr("toJSON", func(r *Runtime) Value { return r.methodProp(r.dateproto_toJSON, "toJSON", 1) })
+
+	t.putSym(SymToPrimitive, func(r *Runtime) Value {
+		return valueProp(r.newNativeFunc(r.dateproto_toPrimitive, "[Symbol.toPrimitive]", 1), false, false, true)
+	})
+
+	return t
+}
+
+var dateProtoTemplate *objectTemplate
+var dateProtoTemplateOnce sync.Once
+
+func getDateProtoTemplate() *objectTemplate {
+	dateProtoTemplateOnce.Do(func() {
+		dateProtoTemplate = createDateProtoTemplate()
+	})
+	return dateProtoTemplate
+}
+
+func (r *Runtime) getDatePrototype() *Object {
+	ret := r.global.DatePrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.DatePrototype = ret
+		r.newTemplatedObject(getDateProtoTemplate(), ret)
+	}
+	return ret
 }

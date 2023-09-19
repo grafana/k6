@@ -110,29 +110,29 @@ func (r *Runtime) createSymbolProto(val *Object) objectImpl {
 	}
 	o.init()
 
-	o._putProp("constructor", r.global.Symbol, true, false, true)
+	o._putProp("constructor", r.getSymbol(), true, false, true)
 	o.setOwnStr("description", &valueProperty{
 		configurable: true,
 		getterFunc: r.newNativeFunc(func(call FunctionCall) Value {
 			return r.thisSymbolValue(call.This).desc
-		}, nil, "get description", nil, 0),
+		}, "get description", 0),
 		accessor: true,
 	}, false)
-	o._putProp("toString", r.newNativeFunc(r.symbolproto_tostring, nil, "toString", nil, 0), true, false, true)
-	o._putProp("valueOf", r.newNativeFunc(r.symbolproto_valueOf, nil, "valueOf", nil, 0), true, false, true)
-	o._putSym(SymToPrimitive, valueProp(r.newNativeFunc(r.symbolproto_valueOf, nil, "[Symbol.toPrimitive]", nil, 1), false, false, true))
+	o._putProp("toString", r.newNativeFunc(r.symbolproto_tostring, "toString", 0), true, false, true)
+	o._putProp("valueOf", r.newNativeFunc(r.symbolproto_valueOf, "valueOf", 0), true, false, true)
+	o._putSym(SymToPrimitive, valueProp(r.newNativeFunc(r.symbolproto_valueOf, "[Symbol.toPrimitive]", 1), false, false, true))
 	o._putSym(SymToStringTag, valueProp(newStringValue("Symbol"), false, false, true))
 
 	return o
 }
 
 func (r *Runtime) createSymbol(val *Object) objectImpl {
-	o := r.newNativeFuncObj(val, r.builtin_symbol, func(args []Value, proto *Object) *Object {
+	o := r.newNativeFuncAndConstruct(val, r.builtin_symbol, func(args []Value, newTarget *Object) *Object {
 		panic(r.NewTypeError("Symbol is not a constructor"))
-	}, "Symbol", r.global.SymbolPrototype, _positiveZero)
+	}, r.getSymbolPrototype(), "Symbol", _positiveZero)
 
-	o._putProp("for", r.newNativeFunc(r.symbol_for, nil, "for", nil, 1), true, false, true)
-	o._putProp("keyFor", r.newNativeFunc(r.symbol_keyfor, nil, "keyFor", nil, 1), true, false, true)
+	o._putProp("for", r.newNativeFunc(r.symbol_for, "for", 1), true, false, true)
+	o._putProp("keyFor", r.newNativeFunc(r.symbol_keyfor, "keyFor", 1), true, false, true)
 
 	for _, s := range []*Symbol{
 		SymHasInstance,
@@ -156,10 +156,22 @@ func (r *Runtime) createSymbol(val *Object) objectImpl {
 	return o
 }
 
-func (r *Runtime) initSymbol() {
-	r.global.SymbolPrototype = r.newLazyObject(r.createSymbolProto)
+func (r *Runtime) getSymbolPrototype() *Object {
+	ret := r.global.SymbolPrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.SymbolPrototype = ret
+		ret.self = r.createSymbolProto(ret)
+	}
+	return ret
+}
 
-	r.global.Symbol = r.newLazyObject(r.createSymbol)
-	r.addToGlobal("Symbol", r.global.Symbol)
-
+func (r *Runtime) getSymbol() *Object {
+	ret := r.global.Symbol
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Symbol = ret
+		ret.self = r.createSymbol(ret)
+	}
+	return ret
 }

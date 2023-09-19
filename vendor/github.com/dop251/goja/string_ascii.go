@@ -209,7 +209,7 @@ func (s asciiString) ToNumber() Value {
 }
 
 func (s asciiString) ToObject(r *Runtime) *Object {
-	return r._newString(s, r.global.StringPrototype)
+	return r._newString(s, r.getStringPrototype())
 }
 
 func (s asciiString) SameAs(other Value) bool {
@@ -258,7 +258,7 @@ func (s asciiString) StrictEquals(other Value) bool {
 }
 
 func (s asciiString) baseObject(r *Runtime) *Object {
-	ss := r.stringSingleton
+	ss := r.getStringSingleton()
 	ss.value = s
 	ss.setLength()
 	return ss.val

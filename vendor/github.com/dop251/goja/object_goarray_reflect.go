@@ -59,7 +59,7 @@ func (c *valueArrayCache) shrink(newlen int) {
 func (o *objectGoArrayReflect) _init() {
 	o.objectGoReflect.init()
 	o.class = classArray
-	o.prototype = o.val.runtime.global.ArrayPrototype
+	o.prototype = o.val.runtime.getArrayPrototype()
 	o.baseObject._put("length", &o.lengthProp)
 }
 

@@ -274,25 +274,25 @@ func (r *Runtime) setIterProto_next(call FunctionCall) Value {
 func (r *Runtime) createSetProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
 
-	o._putProp("constructor", r.global.Set, true, false, true)
-	r.global.setAdder = r.newNativeFunc(r.setProto_add, nil, "add", nil, 1)
+	o._putProp("constructor", r.getSet(), true, false, true)
+	r.global.setAdder = r.newNativeFunc(r.setProto_add, "add", 1)
 	o._putProp("add", r.global.setAdder, true, false, true)
 
-	o._putProp("clear", r.newNativeFunc(r.setProto_clear, nil, "clear", nil, 0), true, false, true)
-	o._putProp("delete", r.newNativeFunc(r.setProto_delete, nil, "delete", nil, 1), true, false, true)
-	o._putProp("forEach", r.newNativeFunc(r.setProto_forEach, nil, "forEach", nil, 1), true, false, true)
-	o._putProp("has", r.newNativeFunc(r.setProto_has, nil, "has", nil, 1), true, false, true)
+	o._putProp("clear", r.newNativeFunc(r.setProto_clear, "clear", 0), true, false, true)
+	o._putProp("delete", r.newNativeFunc(r.setProto_delete, "delete", 1), true, false, true)
+	o._putProp("forEach", r.newNativeFunc(r.setProto_forEach, "forEach", 1), true, false, true)
+	o._putProp("has", r.newNativeFunc(r.setProto_has, "has", 1), true, false, true)
 	o.setOwnStr("size", &valueProperty{
-		getterFunc:   r.newNativeFunc(r.setProto_getSize, nil, "get size", nil, 0),
+		getterFunc:   r.newNativeFunc(r.setProto_getSize, "get size", 0),
 		accessor:     true,
 		writable:     true,
 		configurable: true,
 	}, true)
 
-	valuesFunc := r.newNativeFunc(r.setProto_values, nil, "values", nil, 0)
+	valuesFunc := r.newNativeFunc(r.setProto_values, "values", 0)
 	o._putProp("values", valuesFunc, true, false, true)
 	o._putProp("keys", valuesFunc, true, false, true)
-	o._putProp("entries", r.newNativeFunc(r.setProto_entries, nil, "entries", nil, 0), true, false, true)
+	o._putProp("entries", r.newNativeFunc(r.setProto_entries, "entries", 0), true, false, true)
 	o._putSym(SymIterator, valueProp(valuesFunc, true, false, true))
 	o._putSym(SymToStringTag, valueProp(asciiString(classSet), false, false, true))
 
@@ -300,7 +300,7 @@ func (r *Runtime) createSetProto(val *Object) objectImpl {
 }
 
 func (r *Runtime) createSet(val *Object) objectImpl {
-	o := r.newNativeConstructOnly(val, r.builtin_newSet, r.global.SetPrototype, "Set", 0)
+	o := r.newNativeConstructOnly(val, r.builtin_newSet, r.getSetPrototype(), "Set", 0)
 	r.putSpeciesReturnThis(o)
 
 	return o
@@ -309,7 +309,7 @@ func (r *Runtime) createSet(val *Object) objectImpl {
 func (r *Runtime) createSetIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.getIteratorPrototype(), classObject)
 
-	o._putProp("next", r.newNativeFunc(r.setIterProto_next, nil, "next", nil, 0), true, false, true)
+	o._putProp("next", r.newNativeFunc(r.setIterProto_next, "next", 0), true, false, true)
 	o._putSym(SymToStringTag, valueProp(asciiString(classSetIterator), false, false, true))
 
 	return o
@@ -325,9 +325,22 @@ func (r *Runtime) getSetIteratorPrototype() *Object {
 	return o
 }
 
-func (r *Runtime) initSet() {
-	r.global.SetPrototype = r.newLazyObject(r.createSetProto)
-	r.global.Set = r.newLazyObject(r.createSet)
+func (r *Runtime) getSetPrototype() *Object {
+	ret := r.global.SetPrototype
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.SetPrototype = ret
+		ret.self = r.createSetProto(ret)
+	}
+	return ret
+}
 
-	r.addToGlobal("Set", r.global.Set)
+func (r *Runtime) getSet() *Object {
+	ret := r.global.Set
+	if ret == nil {
+		ret = &Object{runtime: r}
+		r.global.Set = ret
+		ret.self = r.createSet(ret)
+	}
+	return ret
 }
