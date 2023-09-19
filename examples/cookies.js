@@ -40,6 +40,8 @@ export default async function () {
         sameSite: 'Strict',
         domain: '127.0.0.1',
         path: '/',
+        httpOnly: true,
+        secure: true,
       },
       // this cookie expires in a day
       {
@@ -67,6 +69,12 @@ export default async function () {
     check(cookies[0], {
       'cookie 1 name should be testcookie': c => c.name === 'testcookie',
       'cookie 1 value should be 1': c => c.value === '1',
+      'cookie 1 should be session cookie': c => c.expires === -1,
+      'cookie 1 should have domain': c => c.domain === '127.0.0.1',
+      'cookie 1 should have path': c => c.path === '/',
+      'cookie 1 should have sameSite': c => c.sameSite == 'Strict',
+      'cookie 1 should be httpOnly': c => c.httpOnly === true,
+      'cookie 1 should be secure': c => c.secure === true,
     });
     check(cookies[1], {
       'cookie 2 name should be testcookie2': c => c.name === 'testcookie2',
@@ -94,7 +102,6 @@ export default async function () {
         url: 'https://baz.com'
       }
     ]);
-
     cookies = context.cookies('http://foo.com', 'https://baz.com');
     check(cookies.length, {
       'number of filtered cookies should be 2': n => n === 2,
