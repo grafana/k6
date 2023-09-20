@@ -17,9 +17,11 @@ import (
 	"google.golang.org/grpc/reflection"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
+	"google.golang.org/protobuf/types/known/wrapperspb"
 
 	"github.com/dop251/goja"
 	"github.com/golang/protobuf/ptypes/any"
+	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -38,6 +40,7 @@ import (
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	grpcanytesting "go.k6.io/k6/lib/testutils/httpmultibin/grpc_any_testing"
 	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_testing"
+	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_wrappers_testing"
 	"go.k6.io/k6/metrics"
 )
 
@@ -840,6 +843,91 @@ func TestClient(t *testing.T) {
 			client.close();
 			client.invoke();`,
 				err: "no gRPC connection",
+			},
+		},
+		{
+			name: "Wrappers",
+			setup: func(hb *httpmultibin.HTTPMultiBin) {
+				srv := grpc_wrappers_testing.Register(hb.ServerGRPC)
+
+				srv.TestStringImplementation = func(_ context.Context, sv *wrappers.StringValue) (*wrappers.StringValue, error) {
+					return &wrapperspb.StringValue{
+						Value: "hey " + sv.Value,
+					}, nil
+				}
+			},
+			initString: codeBlock{
+				code: `
+				const client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_wrappers_testing/test.proto");
+				`,
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+
+				let respString = client.invoke("grpc.wrappers.testing.Service/TestString", "John")
+				if (respString.message !== "hey John") {
+					throw new Error("expected to get 'hey John', but got a " + respString.message)
+				}
+			`,
+			},
+		},
+		{
+			name: "WrappersWithReflection",
+			setup: func(hb *httpmultibin.HTTPMultiBin) {
+				reflection.Register(hb.ServerGRPC)
+
+				srv := grpc_wrappers_testing.Register(hb.ServerGRPC)
+
+				srv.TestIntegerImplementation = func(_ context.Context, iv *wrappers.Int64Value) (*wrappers.Int64Value, error) {
+					return &wrappers.Int64Value{
+						Value: 2 * iv.Value,
+					}, nil
+				}
+
+				srv.TestStringImplementation = func(_ context.Context, sv *wrappers.StringValue) (*wrappers.StringValue, error) {
+					return &wrapperspb.StringValue{
+						Value: "hey " + sv.Value,
+					}, nil
+				}
+
+				srv.TestBooleanImplementation = func(_ context.Context, bv *wrappers.BoolValue) (*wrappers.BoolValue, error) {
+					return &wrapperspb.BoolValue{
+						Value: bv.Value != true,
+					}, nil
+				}
+
+				srv.TestDoubleImplementation = func(_ context.Context, bv *wrappers.DoubleValue) (*wrappers.DoubleValue, error) {
+					return &wrapperspb.DoubleValue{
+						Value: bv.Value * 2,
+					}, nil
+				}
+			},
+			initString: codeBlock{
+				code: `
+				const client = new grpc.Client();
+				`,
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR", {reflect: true});
+
+				let respString = client.invoke("grpc.wrappers.testing.Service/TestString", "John")
+				if (respString.message !== "hey John") {
+					throw new Error("expected to get 'hey John', but got a " + respString.message)
+				}
+
+				let respInt = client.invoke("grpc.wrappers.testing.Service/TestInteger", "3")
+				if (respInt.message !== "6") {
+					throw new Error("expected to get '6', but got a " + respInt.message)
+				}
+
+				let respDouble = client.invoke("grpc.wrappers.testing.Service/TestDouble", "2.7")
+				if (respDouble.message !== 5.4) {
+					throw new Error("expected to get '5.4', but got a " + respDouble.message)
+				}
+			`,
 			},
 		},
 	}
