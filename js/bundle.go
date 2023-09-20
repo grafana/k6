@@ -46,6 +46,8 @@ type Bundle struct {
 // https://github.com/grafana/k6/issues/3065
 func (b *Bundle) checkMetricNamesForPrometheusCompatibility() {
 	const (
+		// The name restrictions are the union of Otel and Prometheus naming restrictions, with the length restrictions of 128
+		// coming from old k6 restrictions where character set was way bigger though.
 		nameRegexString = "^[a-zA-Z_][a-zA-Z0-9_]{1,128}$"
 		badNameWarning  = "Metric name should only include up to 128 ASCII letters, numbers and/or underscores. " +
 			"This name will stop working in k6 v0.48.0 (around December 2023)."
