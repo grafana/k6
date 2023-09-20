@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
@@ -687,4 +688,139 @@ func TestBrowserContextTimeout(t *testing.T) {
 			assert.ErrorContains(t, err, "timed out after")
 		})
 	}
+}
+
+func TestBrowserContextWaitForEvent(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name            string
+		event           string
+		optsOrPredicate *optsOrPredicate
+	}{
+		{
+			name:  "successfully wait for page creation",
+			event: "page",
+		},
+		{
+			name:            "successfully wait for page creation with only predicate",
+			event:           "page",
+			optsOrPredicate: &optsOrPredicate{justPredicate: stringPtr("() => true;")},
+		},
+		{
+			name:            "successfully wait for page creation with predicate in option",
+			event:           "page",
+			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => true;")},
+		},
+		{
+			name:            "successfully wait for page creation with predicate and timeout in option",
+			event:           "page",
+			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => true;"), timeout: int64Ptr(1000)},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t)
+
+			bc, err := tb.NewContext(nil)
+			require.NoError(t, err)
+
+			ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
+			defer cancel()
+
+			var p1, p2 api.Page
+			err = tb.run(
+				ctx,
+				func() error {
+					op := optsOrPredicateToGojaValue(t, tb, tc.optsOrPredicate)
+					resp, err := bc.WaitForEvent(tc.event, op)
+					if resp != nil {
+						var ok bool
+						p1, ok = resp.(api.Page)
+						require.True(t, ok)
+					}
+					return err
+				},
+				func() error {
+					var err error
+					p2, err = bc.NewPage()
+					return err
+				},
+			)
+			assert.NoError(t, err)
+			assert.Equal(t, p1.MainFrame().ID(), p2.MainFrame().ID())
+		})
+	}
+}
+
+type optsOrPredicate struct {
+	predicate     *string
+	timeout       *int64
+	justPredicate *string
+}
+
+func stringPtr(value string) *string {
+	strPointer := new(string)
+	*strPointer = value
+	return strPointer
+}
+
+func int64Ptr(value int64) *int64 {
+	int64Pointer := new(int64)
+	*int64Pointer = value
+	return int64Pointer
+}
+
+func optsOrPredicateToGojaValue(t *testing.T, tb *testBrowser, op *optsOrPredicate) goja.Value {
+	t.Helper()
+
+	if op == nil {
+		return nil
+	}
+
+	if op.justPredicate != nil {
+		predicate, err := tb.runJavaScript(*op.justPredicate)
+		require.NoError(t, err)
+		return predicate
+	}
+
+	if op.predicate != nil && op.timeout == nil {
+		predicate, err := tb.runJavaScript(*op.predicate)
+		require.NoError(t, err)
+
+		opts := tb.toGojaValue(struct {
+			Predicate goja.Value
+		}{
+			Predicate: predicate,
+		})
+
+		return opts.ToObject(tb.runtime())
+	}
+
+	if op.predicate == nil && op.timeout != nil {
+		opts := tb.toGojaValue(struct {
+			Timeout int64
+		}{
+			Timeout: *op.timeout,
+		})
+
+		return opts.ToObject(tb.runtime())
+	}
+
+	predicate, err := tb.runJavaScript(*op.predicate)
+	require.NoError(t, err)
+
+	opts := tb.toGojaValue(struct {
+		Predicate goja.Value
+		Timeout   int64
+	}{
+		Predicate: predicate,
+		Timeout:   *op.timeout,
+	})
+
+	return opts.ToObject(tb.runtime())
 }
