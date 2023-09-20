@@ -1,16 +1,11 @@
-package grpc
+package grpc_test
 
 import (
 	"bytes"
 	"context"
 	"crypto/tls"
 	"crypto/x509"
-	"errors"
 	"fmt"
-	"io"
-	"net/url"
-	"os"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -19,7 +14,6 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 
-	"github.com/dop251/goja"
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/sirupsen/logrus"
@@ -30,13 +24,9 @@ import (
 	"google.golang.org/grpc/metadata"
 	grpcstats "google.golang.org/grpc/stats"
 	"google.golang.org/grpc/status"
-	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
+	k6grpc "go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/lib/netext/grpcext"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	grpcanytesting "go.k6.io/k6/lib/testutils/httpmultibin/grpc_any_testing"
 	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_testing"
@@ -44,76 +34,8 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-const isWindows = runtime.GOOS == "windows"
-
-// codeBlock represents an execution of a k6 script.
-type codeBlock struct {
-	code       string
-	val        interface{}
-	err        string
-	windowsErr string
-	asserts    func(*testing.T, *httpmultibin.HTTPMultiBin, chan metrics.SampleContainer, error)
-}
-
-type testcase struct {
-	name       string
-	setup      func(*httpmultibin.HTTPMultiBin)
-	initString codeBlock // runs in the init context
-	vuString   codeBlock // runs in the vu context
-}
-
 func TestClient(t *testing.T) {
 	t.Parallel()
-
-	type testState struct {
-		*modulestest.Runtime
-		httpBin *httpmultibin.HTTPMultiBin
-		samples chan metrics.SampleContainer
-	}
-	setup := func(t *testing.T) testState {
-		t.Helper()
-
-		tb := httpmultibin.NewHTTPMultiBin(t)
-		samples := make(chan metrics.SampleContainer, 1000)
-		testRuntime := modulestest.NewRuntime(t)
-
-		cwd, err := os.Getwd() //nolint:golint,forbidigo
-		require.NoError(t, err)
-		fs := fsext.NewOsFs()
-		if isWindows {
-			fs = fsext.NewTrimFilePathSeparatorFs(fs)
-		}
-		testRuntime.VU.InitEnvField.CWD = &url.URL{Path: cwd}
-		testRuntime.VU.InitEnvField.FileSystems = map[string]fsext.Fs{"file": fs}
-
-		return testState{
-			Runtime: testRuntime,
-			httpBin: tb,
-			samples: samples,
-		}
-	}
-
-	assertMetricEmitted := func(
-		t *testing.T,
-		metricName string,
-		sampleContainers []metrics.SampleContainer,
-		url string,
-	) {
-		seenMetric := false
-
-		for _, sampleContainer := range sampleContainers {
-			for _, sample := range sampleContainer.GetSamples() {
-				surl, ok := sample.Tags.Get("url")
-				assert.True(t, ok)
-				if surl == url {
-					if sample.Metric.Name == metricName {
-						seenMetric = true
-					}
-				}
-			}
-		}
-		assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
-	}
 
 	tests := []testcase{
 		{
@@ -159,7 +81,7 @@ func TestClient(t *testing.T) {
 				code: `
 			var client = new grpc.Client();
 			client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
-				val: []MethodInfo{{MethodInfo: grpc.MethodInfo{Name: "EmptyCall", IsClientStream: false, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/EmptyCall"}, {MethodInfo: grpc.MethodInfo{Name: "UnaryCall", IsClientStream: false, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/UnaryCall"}, {MethodInfo: grpc.MethodInfo{Name: "StreamingOutputCall", IsClientStream: false, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/StreamingOutputCall"}, {MethodInfo: grpc.MethodInfo{Name: "StreamingInputCall", IsClientStream: true, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/StreamingInputCall"}, {MethodInfo: grpc.MethodInfo{Name: "FullDuplexCall", IsClientStream: true, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/FullDuplexCall"}, {MethodInfo: grpc.MethodInfo{Name: "HalfDuplexCall", IsClientStream: true, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/HalfDuplexCall"}},
+				val: []k6grpc.MethodInfo{{MethodInfo: grpc.MethodInfo{Name: "EmptyCall", IsClientStream: false, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/EmptyCall"}, {MethodInfo: grpc.MethodInfo{Name: "UnaryCall", IsClientStream: false, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/UnaryCall"}, {MethodInfo: grpc.MethodInfo{Name: "StreamingOutputCall", IsClientStream: false, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/StreamingOutputCall"}, {MethodInfo: grpc.MethodInfo{Name: "StreamingInputCall", IsClientStream: true, IsServerStream: false}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/StreamingInputCall"}, {MethodInfo: grpc.MethodInfo{Name: "FullDuplexCall", IsClientStream: true, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/FullDuplexCall"}, {MethodInfo: grpc.MethodInfo{Name: "HalfDuplexCall", IsClientStream: true, IsServerStream: true}, Package: "grpc.testing", Service: "TestService", FullMethod: "/grpc.testing.TestService/HalfDuplexCall"}},
 			},
 		},
 		{
@@ -186,7 +108,7 @@ func TestClient(t *testing.T) {
 				code: `
 			var client = new grpc.Client();
 			client.loadProtoset("../../../../lib/testutils/httpmultibin/grpc_protoset_testing/test.protoset");`,
-				val: []MethodInfo{
+				val: []k6grpc.MethodInfo{
 					{
 						MethodInfo: grpc.MethodInfo{Name: "Test", IsClientStream: false, IsServerStream: false},
 						Package:    "grpc.protoset.testing", Service: "TestService", FullMethod: "/grpc.protoset.testing.TestService/Test",
@@ -932,68 +854,24 @@ func TestClient(t *testing.T) {
 		},
 	}
 
-	assertResponse := func(t *testing.T, cb codeBlock, err error, val goja.Value, ts testState) {
-		if isWindows && cb.windowsErr != "" && err != nil {
-			err = errors.New(strings.ReplaceAll(err.Error(), cb.windowsErr, cb.err))
-		}
-		if cb.err == "" {
-			assert.NoError(t, err)
-		} else {
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), cb.err)
-		}
-		if cb.val != nil {
-			require.NotNil(t, val)
-			assert.Equal(t, cb.val, val.Export())
-		}
-		if cb.asserts != nil {
-			cb.asserts(t, ts.httpBin, ts.samples, err)
-		}
-	}
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ts := setup(t)
-
-			m, ok := New().NewModuleInstance(ts.VU).(*ModuleInstance)
-			require.True(t, ok)
-			require.NoError(t, ts.VU.Runtime().Set("grpc", m.Exports().Named))
+			ts := newTestState(t)
 
 			// setup necessary environment if needed by a test
 			if tt.setup != nil {
 				tt.setup(ts.httpBin)
 			}
 
-			replace := func(code string) (goja.Value, error) {
-				return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
-			}
-
-			val, err := replace(tt.initString.code)
+			val, err := ts.Run(tt.initString.code)
 			assertResponse(t, tt.initString, err, val, ts)
 
-			registry := metrics.NewRegistry()
-			root, err := lib.NewGroup("", nil)
-			require.NoError(t, err)
+			ts.ToVUContext()
 
-			state := &lib.State{
-				Group:     root,
-				Dialer:    ts.httpBin.Dialer,
-				TLSConfig: ts.httpBin.TLSClientConfig,
-				Samples:   ts.samples,
-				Options: lib.Options{
-					SystemTags: metrics.NewSystemTagSet(
-						metrics.TagName,
-						metrics.TagURL,
-					),
-					UserAgent: null.StringFrom("k6-test"),
-				},
-				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
-			}
-			ts.MoveToVUContext(state)
-			val, err = replace(tt.vuString.code)
+			val, err = ts.Run(tt.vuString.code)
 			assertResponse(t, tt.vuString, err, val, ts)
 		})
 	}
@@ -1015,35 +893,6 @@ func TestClient_TlsParameters(t *testing.T) {
 	clientAuthBad := "-----BEGIN CERTIFICATE-----\\nMIIB2TCCAX6gAwIBAgIUJIZKiR78AH2ioZ+Jae/sElgH85kwCgYIKoZIzj0EAwIw\\nEDEOMAwGA1UEAwwFTXkgQ0EwHhcNMjMwNzA3MTAyNjQ2WhcNMjQwNzA2MTAyNjQ2\\nWjARMQ8wDQYDVQQDDAZjbGllbnQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASj\\nOziUDGBuCi7QwIGfMzoNj4phzJkJ4w9h7SOHEsCFCSZ7x1i6MGxXvX5Ol3j/W93S\\ntSJlCPvvxGXVawAQHJ4Ho4G0MIGxMAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQD\\nAgWgMCwGCWCGSAGG+EIBDQQfFh1Mb2NhbCBUZXN0IENsaWVudCBDZXJ0aWZpY2F0\\nZTAdBgNVHQ4EFgQUrbSXtZnDxJwTmesLyjxuMy9JtQswHwYDVR0jBBgwFoAUpLpA\\nQPJYBb7wSQGCrKElEfj1+9YwDgYDVR0PAQH/BAQDAgXgMBMGA1UdJQQMMAoGCCsG\\nAQUFBwMEMAoGCCqGSM49BAMCA0kAMEYCIQDcHrzug3V3WvUU+tEKhG1C4cPG5rPJ\\n/y3oOoM0roOnsgIhAP23UmiC6Qdgj+MOhXWSaNt3exWvlxdKmLm2edkxaTs+\\n-----END CERTIFICATE-----"
 
 	trivialKeyPassword := "abc123"
-
-	type testState struct {
-		*modulestest.Runtime
-		httpBin *httpmultibin.HTTPMultiBin
-		samples chan metrics.SampleContainer
-	}
-
-	setup := func(t *testing.T) testState {
-		t.Helper()
-
-		tb := httpmultibin.NewHTTPMultiBin(t)
-		samples := make(chan metrics.SampleContainer, 1000)
-		testRuntime := modulestest.NewRuntime(t)
-
-		cwd, err := os.Getwd() //nolint:golint,forbidigo
-		require.NoError(t, err)
-		fs := fsext.NewOsFs()
-		if isWindows {
-			fs = fsext.NewTrimFilePathSeparatorFs(fs)
-		}
-		testRuntime.VU.InitEnvField.CWD = &url.URL{Path: cwd}
-		testRuntime.VU.InitEnvField.FileSystems = map[string]fsext.Fs{"file": fs}
-
-		return testState{
-			Runtime: testRuntime,
-			httpBin: tb,
-			samples: samples,
-		}
-	}
 
 	tests := []testcase{
 		{
@@ -1182,68 +1031,25 @@ func TestClient_TlsParameters(t *testing.T) {
 			},
 		},
 	}
-	assertResponse := func(t *testing.T, cb codeBlock, err error, val goja.Value, ts testState) {
-		if isWindows && cb.windowsErr != "" && err != nil {
-			err = errors.New(strings.ReplaceAll(err.Error(), cb.windowsErr, cb.err))
-		}
-		if cb.err == "" {
-			assert.NoError(t, err)
-		} else {
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), cb.err)
-		}
-		if cb.val != nil {
-			require.NotNil(t, val)
-			assert.Equal(t, cb.val, val.Export())
-		}
-		if cb.asserts != nil {
-			cb.asserts(t, ts.httpBin, ts.samples, err)
-		}
-	}
+
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			ts := setup(t)
-
-			m, ok := New().NewModuleInstance(ts.VU).(*ModuleInstance)
-			require.True(t, ok)
-			require.NoError(t, ts.VU.Runtime().Set("grpc", m.Exports().Named))
+			ts := newTestState(t)
 
 			// setup necessary environment if needed by a test
 			if tt.setup != nil {
 				tt.setup(ts.httpBin)
 			}
 
-			replace := func(code string) (goja.Value, error) {
-				return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
-			}
-
-			val, err := replace(tt.initString.code)
+			val, err := ts.Run(tt.initString.code)
 			assertResponse(t, tt.initString, err, val, ts)
 
-			registry := metrics.NewRegistry()
-			root, err := lib.NewGroup("", nil)
-			require.NoError(t, err)
+			ts.ToVUContext()
 
-			state := &lib.State{
-				Group:     root,
-				Dialer:    ts.httpBin.Dialer,
-				TLSConfig: ts.httpBin.TLSClientConfig,
-				Samples:   ts.samples,
-				Options: lib.Options{
-					SystemTags: metrics.NewSystemTagSet(
-						metrics.TagName,
-						metrics.TagURL,
-					),
-					UserAgent: null.StringFrom("k6-test"),
-				},
-				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
-			}
-			ts.MoveToVUContext(state)
-			val, err = replace(tt.vuString.code)
+			val, err = ts.Run(tt.vuString.code)
 			assertResponse(t, tt.vuString, err, val, ts)
 		})
 	}
@@ -1325,34 +1131,36 @@ func TestDebugStat(t *testing.T) {
 func TestClientInvokeHeadersDeprecated(t *testing.T) {
 	t.Parallel()
 
-	registry := metrics.NewRegistry()
+	ts := newTestState(t)
+	reflection.Register(ts.httpBin.ServerGRPC)
 
-	logHook := testutils.NewLogHook(logrus.WarnLevel)
-	testLog := logrus.New()
-	testLog.AddHook(logHook)
-	testLog.SetOutput(io.Discard)
-
-	rt := goja.New()
-	c := Client{
-		vu: &modulestest.VU{
-			StateField: &lib.State{
-				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-				Logger:         testLog,
-				Tags:           lib.NewVUStateTags(registry.RootTagSet()),
-			},
-			RuntimeField: rt,
-		},
+	ts.httpBin.GRPCStub.EmptyCallFunc = func(_ context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+		return &grpc_testing.Empty{}, nil
 	}
 
-	params := rt.ToValue(map[string]interface{}{
-		"headers": map[string]interface{}{
-			"X-HEADER-FOO": "bar",
-		},
-	})
-	_, err := c.parseInvokeParams(params)
-	require.NoError(t, err)
+	initString := codeBlock{
+		code: `var client = new grpc.Client();`,
+	}
+	vuString := codeBlock{
+		code: `
+		client.connect("GRPCBIN_ADDR", {reflect:true});
+		var resp = client.invoke("grpc.testing.TestService/EmptyCall", {}, { headers: { "X-Load-Tester": "k6" } })
+		if (resp.status !== grpc.StatusOK) {
+			throw new Error("failed to send a request")
+		}
+		`,
+	}
 
-	entries := logHook.Drain()
+	val, err := ts.Run(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	val, err = ts.Run(vuString.code)
+	assertResponse(t, vuString, err, val, ts)
+
+	entries := ts.loggerHook.Drain()
+
 	require.Len(t, entries, 1)
 	require.Contains(t, entries[0].Message, "headers property is deprecated")
 }
@@ -1360,39 +1168,7 @@ func TestClientInvokeHeadersDeprecated(t *testing.T) {
 func TestClientLoadProto(t *testing.T) {
 	t.Parallel()
 
-	type testState struct {
-		*modulestest.Runtime
-		httpBin *httpmultibin.HTTPMultiBin
-		samples chan metrics.SampleContainer
-	}
-	setup := func(t *testing.T) testState {
-		t.Helper()
-
-		tb := httpmultibin.NewHTTPMultiBin(t)
-		samples := make(chan metrics.SampleContainer, 1000)
-		testRuntime := modulestest.NewRuntime(t)
-
-		cwd, err := os.Getwd() //nolint:forbidigo
-		require.NoError(t, err)
-		fs := fsext.NewOsFs()
-		if isWindows {
-			fs = fsext.NewTrimFilePathSeparatorFs(fs)
-		}
-		testRuntime.VU.InitEnvField.CWD = &url.URL{Path: cwd}
-		testRuntime.VU.InitEnvField.FileSystems = map[string]fsext.Fs{"file": fs}
-
-		return testState{
-			Runtime: testRuntime,
-			httpBin: tb,
-			samples: samples,
-		}
-	}
-
-	ts := setup(t)
-
-	m, ok := New().NewModuleInstance(ts.VU).(*ModuleInstance)
-	require.True(t, ok)
-	require.NoError(t, ts.VU.Runtime().Set("grpc", m.Exports().Named))
+	ts := newTestState(t)
 
 	code := `
 		var client = new grpc.Client();
