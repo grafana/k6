@@ -207,13 +207,13 @@ func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]int
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
-func (c *Client) Connect(addr string, params map[string]interface{}) (bool, error) {
+func (c *Client) Connect(addr string, params goja.Value) (bool, error) {
 	state := c.vu.State()
 	if state == nil {
 		return false, common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
 	}
 
-	p, err := c.parseConnectParams(params)
+	p, err := newConnectParams(c.vu.Runtime(), params)
 	if err != nil {
 		return false, fmt.Errorf("invalid grpc.connect() parameters: %w", err)
 	}
@@ -517,7 +517,7 @@ type connectParams struct {
 	TLS                   map[string]interface{}
 }
 
-func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, error) { //nolint:funlen
+func newConnectParams(rt *goja.Runtime, input goja.Value) (connectParams, error) { //nolint:funlen,gocognit,cyclop
 	params := connectParams{
 		IsPlaintext:           false,
 		UseReflectionProtocol: false,
@@ -525,7 +525,16 @@ func (c *Client) parseConnectParams(raw map[string]interface{}) (connectParams, 
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
 	}
-	for k, v := range raw {
+
+	if common.IsNullish(input) {
+		return params, nil
+	}
+
+	raw := input.ToObject(rt)
+
+	for _, k := range raw.Keys() {
+		v := raw.Get(k).Export()
+
 		switch k {
 		case "plaintext":
 			var ok bool
