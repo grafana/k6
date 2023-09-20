@@ -388,6 +388,17 @@ func (b *BrowserContext) runWaitForEventHandler(
 ) {
 	b.logger.Debugf("BrowserContext:WaitForEvent:go():starts", "bctxid:%v", b.id)
 	defer b.logger.Debugf("BrowserContext:WaitForEvent:go():returns", "bctxid:%v", b.id)
+
+	var p *Page
+	defer func() {
+		out <- p
+		close(out)
+
+		// We wait for one matching event only,
+		// then remove event handler by cancelling context and stopping goroutine.
+		evCancelFn()
+	}()
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -396,37 +407,19 @@ func (b *BrowserContext) runWaitForEventHandler(
 		case ev := <-chEvHandler:
 			if ev.typ == EventBrowserContextClose {
 				b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
-				out <- nil
-				close(out)
-
-				// We wait for one matching event only,
-				// then remove event handler by cancelling context and stopping goroutine.
-				evCancelFn()
 				return
 			}
 			if ev.typ == EventBrowserContextPage {
 				b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage", "bctxid:%v", b.id)
-				p, _ := ev.data.(*Page)
+				p, _ = ev.data.(*Page)
 
 				if predicateFn == nil {
 					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
-					out <- p
-					close(out)
-
-					// We wait for one matching event only,
-					// then remove event handler by cancelling context and stopping goroutine.
-					evCancelFn()
 					return
 				}
 
 				if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
 					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:predicateFn:return", "bctxid:%v", b.id)
-					out <- p
-					close(out)
-
-					// We wait for one matching event only,
-					// then remove event handler by cancelling context and stopping goroutine.
-					evCancelFn()
 					return
 				}
 			}
