@@ -345,7 +345,7 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
 	parsedOpts := NewWaitForEventOptions(
-		b.browser.browserOpts.Timeout * time.Second,
+		b.timeoutSettings.timeout(),
 	)
 	if err := parsedOpts.Parse(b.ctx, optsOrPredicate); err != nil {
 		k6ext.Panic(b.ctx, "parsing waitForEvent options: %w", err)
