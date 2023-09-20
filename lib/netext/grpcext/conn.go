@@ -161,7 +161,7 @@ func (c *Conn) Invoke(
 		// rather than the desired:
 		// {"x":6,"y":4,"z":0}
 		raw, _ := marshaler.Marshal(resp)
-		msg := make(map[string]interface{})
+		var msg interface{}
 		_ = json.Unmarshal(raw, &msg)
 		response.Message = msg
 	}
