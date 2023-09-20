@@ -34,7 +34,7 @@ type BrowserContext interface {
 	SetOffline(offline bool)
 	StorageState(opts goja.Value)
 	Unroute(url goja.Value, handler goja.Callable)
-	WaitForEvent(event string, optsOrPredicate goja.Value) any
+	WaitForEvent(event string, optsOrPredicate goja.Value) (any, error)
 }
 
 // Cookie represents a browser cookie.

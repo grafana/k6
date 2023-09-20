@@ -341,7 +341,7 @@ func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
 }
 
 // WaitForEvent waits for event.
-func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) any {
+func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) (any, error) {
 	// TODO: This public API needs Promise support (as return value) to be useful in JS!
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
@@ -349,15 +349,10 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		b.timeoutSettings.timeout(),
 	)
 	if err := parsedOpts.Parse(b.ctx, optsOrPredicate); err != nil {
-		k6ext.Panic(b.ctx, "parsing waitForEvent options: %w", err)
+		return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
 	}
 
-	resp, err := b.waitForEvent(event, parsedOpts.PredicateFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(b.ctx, "waitForEvent failed: %w", err)
-	}
-
-	return resp
+	return b.waitForEvent(event, parsedOpts.PredicateFn, parsedOpts.Timeout)
 }
 
 func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, timeout time.Duration) (any, error) {
