@@ -344,36 +344,14 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 	// TODO: This public API needs Promise support (as return value) to be useful in JS!
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
-	var (
-		isCallable  bool
-		predicateFn goja.Callable
-		// TODO: Find out whether * time.Second is necessary.
-		timeout = b.browser.browserOpts.Timeout * time.Second //nolint:durationcheck
+	parsedOpts := NewWaitForEventOptions(
+		b.browser.browserOpts.Timeout * time.Second,
 	)
-	if gojaValueExists(optsOrPredicate) {
-		switch optsOrPredicate.ExportType() {
-		case reflect.TypeOf(goja.Object{}):
-			opts := optsOrPredicate.ToObject(b.vu.Runtime())
-			for _, k := range opts.Keys() {
-				switch k {
-				case "predicate":
-					predicateFn, isCallable = goja.AssertFunction(opts.Get(k))
-					if !isCallable {
-						k6ext.Panic(b.ctx, "predicate function is not callable")
-					}
-				case "timeout":
-					timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-				}
-			}
-		default:
-			predicateFn, isCallable = goja.AssertFunction(optsOrPredicate)
-			if !isCallable {
-				k6ext.Panic(b.ctx, "predicate function is not callable")
-			}
-		}
+	if err := parsedOpts.Parse(b.ctx, optsOrPredicate); err != nil {
+		k6ext.Panic(b.ctx, "parsing waitForEvent options: %w", err)
 	}
 
-	return b.waitForEvent(event, predicateFn, timeout)
+	return b.waitForEvent(event, parsedOpts.PredicateFn, parsedOpts.Timeout)
 }
 
 func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, timeout time.Duration) any {
