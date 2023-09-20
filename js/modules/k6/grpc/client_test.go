@@ -13,6 +13,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/reflect/protoregistry"
 	"google.golang.org/protobuf/types/known/wrapperspb"
+	"gopkg.in/guregu/null.v3"
 
 	"github.com/golang/protobuf/ptypes/any"
 	"github.com/golang/protobuf/ptypes/wrappers"
@@ -1192,4 +1193,47 @@ func TestClientLoadProto(t *testing.T) {
 		assert.NotNil(t, found, "Expected to find the message type %s, but an error occurred", expected)
 		assert.Nil(t, err, "It was not expected that there would be an error, but it got: %v", err)
 	}
+}
+
+func TestClientConnectionReflectMetadata(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	reflection.Register(ts.httpBin.ServerGRPC)
+
+	initString := codeBlock{
+		code: `var client = new grpc.Client();`,
+	}
+	vuString := codeBlock{
+		code: `client.connect("GRPCBIN_ADDR", {reflect: true, reflectMetadata: {"x-test": "custom-header-for-reflection"}})`,
+	}
+
+	val, err := ts.Run(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	// this should trigger logging of the outgoing gRPC metadata
+	ts.VU.State().Options.HTTPDebug = null.NewString("full", true)
+
+	val, err = ts.Run(vuString.code)
+	assertResponse(t, vuString, err, val, ts)
+
+	entries := ts.loggerHook.Drain()
+
+	// since we enable debug logging, we should see the metadata in the logs
+	foundReflectionCall := false
+	for _, entry := range entries {
+		if strings.Contains(entry.Message, "ServerReflection/ServerReflectionInfo") {
+			foundReflectionCall = true
+
+			// check that the metadata is present
+			assert.Contains(t, entry.Message, "x-test: custom-header-for-reflection")
+			// check that user-agent header is present
+			assert.Contains(t, entry.Message, "user-agent: k6-test")
+		}
+	}
+
+	assert.True(t, foundReflectionCall, "expected to find a reflection call in the logs, but didn't")
 }
