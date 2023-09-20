@@ -351,10 +351,19 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		k6ext.Panic(b.ctx, "parsing waitForEvent options: %w", err)
 	}
 
-	return b.waitForEvent(event, parsedOpts.PredicateFn, parsedOpts.Timeout)
+	resp, err := b.waitForEvent(event, parsedOpts.PredicateFn, parsedOpts.Timeout)
+	if err != nil {
+		k6ext.Panic(b.ctx, "waitForEvent failed: %w", err)
+	}
+
+	return resp
 }
 
-func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, timeout time.Duration) any {
+func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, timeout time.Duration) (any, error) {
+	if event != "page" {
+		return nil, fmt.Errorf("\"page\" is the only event that is supported, you passed in %q", event)
+	}
+
 	evCancelCtx, evCancelFn := context.WithCancel(b.ctx)
 	chEvHandler := make(chan Event)
 	ch := make(chan any)
@@ -371,11 +380,11 @@ func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, t
 		b.logger.Debugf("BrowserContext:WaitForEvent:timeout", "bctxid:%v event:%q", b.id, event)
 	case evData := <-ch:
 		b.logger.Debugf("BrowserContext:WaitForEvent:evData", "bctxid:%v event:%q", b.id, event)
-		return evData
+		return evData, nil
 	}
 	b.logger.Debugf("BrowserContext:WaitForEvent:return nil", "bctxid:%v event:%q", b.id, event)
 
-	return nil
+	return nil, nil
 }
 
 func (b *BrowserContext) runWaitForEventHandler(
