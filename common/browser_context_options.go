@@ -2,8 +2,8 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"reflect"
 	"time"
 
 	"github.com/grafana/xk6-browser/k6ext"
@@ -154,29 +154,25 @@ func NewWaitForEventOptions(defaultTimeout time.Duration) *WaitForEventOptions {
 // It can parse only a callable predicate function or an object
 // which contains a callable predicate function and a timeout.
 func (w *WaitForEventOptions) Parse(ctx context.Context, optsOrPredicate goja.Value) error {
-	var (
-		isCallable bool
-	)
+	var isCallable bool
 	if gojaValueExists(optsOrPredicate) {
-		switch optsOrPredicate.ExportType() {
-		case reflect.TypeOf(goja.Object{}):
-			rt := k6ext.Runtime(ctx)
-			opts := optsOrPredicate.ToObject(rt)
-			for _, k := range opts.Keys() {
-				switch k {
-				case "predicate":
-					w.PredicateFn, isCallable = goja.AssertFunction(opts.Get(k))
-					if !isCallable {
-						return fmt.Errorf("predicate function is not callable")
-					}
-				case "timeout":
-					w.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+		rt := k6ext.Runtime(ctx)
+
+		w.PredicateFn, isCallable = goja.AssertFunction(optsOrPredicate)
+		if isCallable {
+			return nil
+		}
+
+		opts := optsOrPredicate.ToObject(rt)
+		for _, k := range opts.Keys() {
+			switch k {
+			case "predicate":
+				w.PredicateFn, isCallable = goja.AssertFunction(opts.Get(k))
+				if !isCallable {
+					return errors.New("predicate function is not callable")
 				}
-			}
-		default:
-			w.PredicateFn, isCallable = goja.AssertFunction(optsOrPredicate)
-			if !isCallable {
-				return fmt.Errorf("predicate function is not callable")
+			case "timeout": //nolint:goconst
+				w.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			}
 		}
 	}
