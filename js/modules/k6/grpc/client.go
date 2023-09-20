@@ -260,6 +260,9 @@ func (c *Client) Connect(addr string, params goja.Value) (bool, error) {
 	if !p.UseReflectionProtocol {
 		return true, nil
 	}
+
+	ctx = metadata.NewOutgoingContext(ctx, p.ReflectionMetadata)
+
 	fdset, err := c.conn.Reflect(ctx)
 	if err != nil {
 		return false, err
@@ -510,6 +513,7 @@ func newMetadata(input goja.Value) (metadata.MD, error) {
 
 type connectParams struct {
 	IsPlaintext           bool
+	ReflectionMetadata    metadata.MD
 	UseReflectionProtocol bool
 	Timeout               time.Duration
 	MaxReceiveSize        int64
@@ -521,6 +525,7 @@ func newConnectParams(rt *goja.Runtime, input goja.Value) (connectParams, error)
 	params := connectParams{
 		IsPlaintext:           false,
 		UseReflectionProtocol: false,
+		ReflectionMetadata:    metadata.New(nil),
 		Timeout:               time.Minute,
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
@@ -554,6 +559,12 @@ func newConnectParams(rt *goja.Runtime, input goja.Value) (connectParams, error)
 			if !ok {
 				return params, fmt.Errorf("invalid reflect value: '%#v', it needs to be boolean", v)
 			}
+		case "reflectMetadata":
+			md, err := newMetadata(raw.Get(k))
+			if err != nil {
+				return params, fmt.Errorf("invalid reflectMetadata param: %w", err)
+			}
+			params.ReflectionMetadata = md
 		case "maxReceiveSize":
 			var ok bool
 			params.MaxReceiveSize, ok = v.(int64)
