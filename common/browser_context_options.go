@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/grafana/xk6-browser/k6ext"
 
@@ -130,5 +131,27 @@ func (b *BrowserContextOptions) Parse(ctx context.Context, opts goja.Value) erro
 			}
 		}
 	}
+	return nil
+}
+
+// WaitForEventOptions are the options used by
+// the browserContext.waitForEvent API.
+type WaitForEventOptions struct {
+	Timeout     time.Duration
+	PredicateFn goja.Callable
+}
+
+// NewWaitForEventOptions created a new instance of
+// WaitForEventOptions with a default timeout.
+func NewWaitForEventOptions(defaultTimeout time.Duration) *WaitForEventOptions {
+	return &WaitForEventOptions{
+		Timeout: defaultTimeout,
+	}
+}
+
+// Parse will parse the options or a callable predicate function.
+// It can parse only a callable predicate function or an object
+// which contains a callable predicate function and a timeout.
+func (w *WaitForEventOptions) Parse(ctx context.Context, optsOrPredicate goja.Value) error {
 	return nil
 }
