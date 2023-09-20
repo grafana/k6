@@ -648,7 +648,22 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 		"setOffline":         bc.SetOffline,
 		"storageState":       bc.StorageState,
 		"unroute":            bc.Unroute,
-		"waitForEvent":       bc.WaitForEvent,
+		"waitForEvent": func(event string, optsOrPredicate goja.Value) *goja.Promise {
+			ctx := vu.Context()
+			return k6ext.Promise(ctx, func() (result any, reason error) {
+				resp, err := bc.WaitForEvent(event, optsOrPredicate)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+
+				p, ok := resp.(api.Page)
+				if !ok {
+					panicIfFatalError(ctx, fmt.Errorf("response object is not a page: %w", k6error.ErrFatal))
+				}
+
+				return mapPage(vu, p), nil
+			})
+		},
 		"pages": func() *goja.Object {
 			var (
 				mpages []mapping

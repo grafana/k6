@@ -342,7 +342,6 @@ func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
 
 // WaitForEvent waits for event.
 func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) (any, error) {
-	// TODO: This public API needs Promise support (as return value) to be useful in JS!
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
 	parsedOpts := NewWaitForEventOptions(
