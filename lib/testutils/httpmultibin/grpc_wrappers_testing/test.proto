@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+package grpc.wrappers.testing;
+
+// this proto contains service that helps tests some of well-known types or wrappers
+// https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/wrappers.proto
+
+import "google/protobuf/wrappers.proto";
+
+option go_package ="./grpc_wrappers_testing";
+
+service Service {
+   rpc TestString(google.protobuf.StringValue) returns (google.protobuf.StringValue);
+   rpc TestInteger(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
+   rpc TestBoolean(google.protobuf.BoolValue) returns (google.protobuf.BoolValue);
+   rpc TestDouble(google.protobuf.DoubleValue) returns (google.protobuf.DoubleValue);
+}
