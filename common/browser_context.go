@@ -381,6 +381,8 @@ func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, t
 	}
 }
 
+// runWaitForEventHandler can work with a nil predicateFn.
+// If predicateFn is nil, it will return the response straight away.
 func (b *BrowserContext) runWaitForEventHandler(
 	ctx context.Context, evCancelFn func(), chEvHandler chan Event, out chan any, predicateFn goja.Callable,
 ) {
@@ -405,8 +407,20 @@ func (b *BrowserContext) runWaitForEventHandler(
 			if ev.typ == EventBrowserContextPage {
 				b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage", "bctxid:%v", b.id)
 				p, _ := ev.data.(*Page)
-				if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
+
+				if predicateFn == nil {
 					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
+					out <- p
+					close(out)
+
+					// We wait for one matching event only,
+					// then remove event handler by cancelling context and stopping goroutine.
+					evCancelFn()
+					return
+				}
+
+				if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
+					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:predicateFn:return", "bctxid:%v", b.id)
 					out <- p
 					close(out)
 
