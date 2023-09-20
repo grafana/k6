@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -375,16 +376,14 @@ func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, t
 
 	select {
 	case <-b.ctx.Done():
-		b.logger.Debugf("BrowserContext:WaitForEvent:ctx.Done", "bctxid:%v event:%q", b.id, event)
+		return nil, errors.New("test iteration ended")
 	case <-time.After(timeout):
 		b.logger.Debugf("BrowserContext:WaitForEvent:timeout", "bctxid:%v event:%q", b.id, event)
+		return nil, fmt.Errorf("waitForEvent timed out after %v", timeout)
 	case evData := <-ch:
 		b.logger.Debugf("BrowserContext:WaitForEvent:evData", "bctxid:%v event:%q", b.id, event)
 		return evData, nil
 	}
-	b.logger.Debugf("BrowserContext:WaitForEvent:return nil", "bctxid:%v event:%q", b.id, event)
-
-	return nil, nil
 }
 
 func (b *BrowserContext) runWaitForEventHandler(
