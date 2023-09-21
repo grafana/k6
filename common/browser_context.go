@@ -422,21 +422,24 @@ func (b *BrowserContext) runWaitForEventHandler(
 				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
 				return
 			}
-			if ev.typ == EventBrowserContextPage {
-				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage", "bctxid:%v", b.id)
-				p, _ = ev.data.(*Page)
 
-				if predicateFn == nil {
-					b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
-					return
-				}
+			if ev.typ != EventBrowserContextPage {
+				continue
+			}
 
-				if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
-					b.logger.Debugf(
-						"BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:predicateFn:return",
-						"bctxid:%v", b.id,
-					)
-				}
+			b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage", "bctxid:%v", b.id)
+			p, _ = ev.data.(*Page)
+
+			if predicateFn == nil {
+				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
+				return
+			}
+
+			if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
+				b.logger.Debugf(
+					"BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:predicateFn:return",
+					"bctxid:%v", b.id,
+				)
 			}
 		}
 	}
