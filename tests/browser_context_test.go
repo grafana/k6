@@ -700,31 +700,37 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 		wantErr         string
 	}{
 		{
-			name:  "successfully wait for page creation",
+			// No predicate or options.
+			name:  "success",
 			event: "page",
 		},
 		{
-			name:            "successfully wait for page creation with only predicate",
+			// With a predicate function but not options.
+			name:            "success_with_predicate",
 			event:           "page",
 			optsOrPredicate: &optsOrPredicate{justPredicate: stringPtr("() => true;")},
 		},
 		{
-			name:            "successfully wait for page creation with predicate in option",
+			// With a predicate function in an option object.
+			name:            "success_with_option_predicate",
 			event:           "page",
 			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => true;")},
 		},
 		{
-			name:            "successfully wait for page creation with predicate and timeout in option",
+			// With a predicate function and a new timeout in an option object.
+			name:            "success_with_option_predicate_timeout",
 			event:           "page",
 			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => true;"), timeout: int64Ptr(1000)},
 		},
 		{
-			name:    "fails when event other than page passed in",
+			// Fails when an event other than "page" is passed in.
+			name:    "fails_incorrect_event",
 			event:   "browser",
 			wantErr: "incorrect event \"browser\", \"page\" is the only event supported",
 		},
 		{
-			name:            "fails due to timeout",
+			// Fails when the timeout fires while waiting on waitForEvent.
+			name:            "fails_timeout",
 			event:           "page",
 			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => false;"), timeout: int64Ptr(10)},
 			wantErr:         "waitForEvent timed out after 10ms",
