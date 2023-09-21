@@ -31,6 +31,16 @@ var (
 	_ api.BrowserContext = &BrowserContext{}
 )
 
+// waitForEventType represents the event types that can be used when working
+// with the browserContext.waitForEvent API.
+type waitForEventType string
+
+const (
+	// waitForEventTypePage represents the page event which fires when a new
+	// page is created.
+	waitForEventTypePage = "page"
+)
+
 // BrowserContext stores context information for a single independent browser session.
 // A newly launched browser instance contains a default browser context.
 // Any browser context created aside from the default will be considered an "incognito"
@@ -351,12 +361,16 @@ func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) 
 		return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
 	}
 
-	return b.waitForEvent(event, parsedOpts.PredicateFn, parsedOpts.Timeout)
+	return b.waitForEvent(waitForEventType(event), parsedOpts.PredicateFn, parsedOpts.Timeout)
 }
 
-func (b *BrowserContext) waitForEvent(event string, predicateFn goja.Callable, timeout time.Duration) (any, error) {
-	if event != "page" {
-		return nil, fmt.Errorf("\"page\" is the only event that is supported, you passed in %q", event)
+func (b *BrowserContext) waitForEvent(
+	event waitForEventType,
+	predicateFn goja.Callable,
+	timeout time.Duration,
+) (any, error) {
+	if event != waitForEventTypePage {
+		return nil, fmt.Errorf("%q is the only event that is supported, you passed in %q", waitForEventTypePage, event)
 	}
 
 	evCancelCtx, evCancelFn := context.WithCancel(b.ctx)
