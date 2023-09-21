@@ -16,8 +16,7 @@ export const options = {
 export default async function() {
   const context = browser.newContext()
 
-  // We want to wait for two page creations
-  // before carrying on.
+  // We want to wait for two page creations before carrying on.
   var counter = 0
   const promise = context.waitForEvent("page", { predicate: page => {
     if (++counter == 2) {
@@ -30,9 +29,8 @@ export default async function() {
   const page = context.newPage()
   const page2 = context.newPage()
 
-  // We await for the page creation
-  // events to be processed and the
-  // predicate to pass.
+  // We await for the page creation events to be processed and the predicate
+  // to pass.
   await promise
   console.log('predicate passed')
 

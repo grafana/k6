@@ -394,8 +394,8 @@ func (b *BrowserContext) waitForEvent(
 	}
 }
 
-// runWaitForEventHandler can work with a nil predicateFn.
-// If predicateFn is nil, it will return the response straight away.
+// runWaitForEventHandler can work with a nil predicateFn. If predicateFn is
+// nil it will return the response straight away.
 func (b *BrowserContext) runWaitForEventHandler(
 	ctx context.Context, evCancelFn func(), chEvHandler chan Event, out chan any, predicateFn goja.Callable,
 ) {
@@ -407,8 +407,8 @@ func (b *BrowserContext) runWaitForEventHandler(
 		out <- p
 		close(out)
 
-		// We wait for one matching event only,
-		// then remove event handler by cancelling context and stopping goroutine.
+		// We wait for one matching event only, then remove event handler by
+		// cancelling context and stopping goroutine.
 		evCancelFn()
 	}()
 
