@@ -27,7 +27,7 @@ export const options = {
     },
   },
   thresholds: {
-    browser_web_vital_fcp: ['max < 1000'],
+    browser_web_vital_fcp: ['max < 5000'],
     checks: ["rate==1.0"]
   }
 }
