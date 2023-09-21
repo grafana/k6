@@ -10,7 +10,7 @@ require (
 	github.com/prometheus/client_model v0.3.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
-	go.k6.io/k6 v0.45.1-0.20230719100510-ac9c6bc85d13
+	go.k6.io/k6 v0.46.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/guregu/null.v3 v3.3.0
 )
