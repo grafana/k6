@@ -399,8 +399,8 @@ func (b *BrowserContext) waitForEvent(
 func (b *BrowserContext) runWaitForEventHandler(
 	ctx context.Context, evCancelFn func(), chEvHandler chan Event, out chan any, predicateFn goja.Callable,
 ) {
-	b.logger.Debugf("BrowserContext:WaitForEvent:go():starts", "bctxid:%v", b.id)
-	defer b.logger.Debugf("BrowserContext:WaitForEvent:go():returns", "bctxid:%v", b.id)
+	b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():starts", "bctxid:%v", b.id)
+	defer b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():returns", "bctxid:%v", b.id)
 
 	var p *Page
 	defer func() {
@@ -415,25 +415,27 @@ func (b *BrowserContext) runWaitForEventHandler(
 	for {
 		select {
 		case <-ctx.Done():
-			b.logger.Debugf("BrowserContext:WaitForEvent:go():ctx:done", "bctxid:%v", b.id)
+			b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():ctx:done", "bctxid:%v", b.id)
 			return
 		case ev := <-chEvHandler:
 			if ev.typ == EventBrowserContextClose {
-				b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
+				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
 				return
 			}
 			if ev.typ == EventBrowserContextPage {
-				b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage", "bctxid:%v", b.id)
+				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage", "bctxid:%v", b.id)
 				p, _ = ev.data.(*Page)
 
 				if predicateFn == nil {
-					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
+					b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
 					return
 				}
 
 				if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
-					b.logger.Debugf("BrowserContext:WaitForEvent:go():EventBrowserContextPage:predicateFn:return", "bctxid:%v", b.id)
-					return
+					b.logger.Debugf(
+						"BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:predicateFn:return",
+						"bctxid:%v", b.id,
+					)
 				}
 			}
 		}
