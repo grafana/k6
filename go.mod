@@ -7,7 +7,7 @@ require (
 	github.com/golang/snappy v0.0.4
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/prometheus/client_golang v1.16.0
-	github.com/prometheus/client_model v0.3.0
+	github.com/prometheus/client_model v0.4.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	go.k6.io/k6 v0.46.1-0.20230921075448-d1c5ee8fb28d
