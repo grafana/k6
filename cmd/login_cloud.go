@@ -23,10 +23,10 @@ func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(gs, `
   # Show the stored token.
   {{.}} login cloud -s
-  
+
   # Store a token.
   {{.}} login cloud -t YOUR_TOKEN
-  
+
   # Log in with an email/password.
   {{.}} login cloud`[1:])
 
@@ -55,11 +55,12 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 
 			// We want to use this fully consolidated config for things like
 			// host addresses, so users can overwrite them with env vars.
-			consolidatedCurrentConfig, err := cloudapi.GetConsolidatedConfig(
-				currentJSONConfigRaw, gs.Env, "", nil)
+			consolidatedCurrentConfig, _, err := cloudapi.GetConsolidatedConfig(
+				currentJSONConfigRaw, gs.Env, "", nil, nil)
 			if err != nil {
 				return err
 			}
+
 			// But we don't want to save them back to the JSON file, we only
 			// want to save what already existed there and the login details.
 			newCloudConf := currentJSONConfig

@@ -307,6 +307,10 @@ type Options struct {
 	// iteration is shorter than the specified value.
 	MinIterationDuration types.NullDuration `json:"minIterationDuration" envconfig:"K6_MIN_ITERATION_DURATION"`
 
+	// Cloud is the config for the cloud
+	// formally known as ext.loadimpact
+	Cloud json.RawMessage `json:"cloud,omitempty" ignored:"true"`
+
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
 	External map[string]json.RawMessage `json:"ext" ignored:"true"`

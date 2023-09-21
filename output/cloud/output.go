@@ -77,8 +77,13 @@ func New(params output.Params) (output.Output, error) {
 
 // New creates a new cloud output.
 func newOutput(params output.Params) (*Output, error) {
-	conf, err := cloudapi.GetConsolidatedConfig(
-		params.JSONConfig, params.Environment, params.ConfigArgument, params.ScriptOptions.External)
+	conf, _, err := cloudapi.GetConsolidatedConfig(
+		params.JSONConfig,
+		params.Environment,
+		params.ConfigArgument,
+		params.ScriptOptions.Cloud,
+		params.ScriptOptions.External,
+	)
 	if err != nil {
 		return nil, err
 	}
