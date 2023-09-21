@@ -503,6 +503,11 @@ func (c *Client) Batch(reqsV ...goja.Value) (interface{}, error) {
 			err = e
 		}
 	}
+	for _, req := range batchReqs {
+		if req.Response != nil {
+			c.processResponse(req.Response, req.ParsedHTTPRequest.ResponseType)
+		}
+	}
 	return results, err
 }
 
