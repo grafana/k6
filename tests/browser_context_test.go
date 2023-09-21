@@ -697,6 +697,7 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 		name            string
 		event           string
 		optsOrPredicate *optsOrPredicate
+		wantErr         string
 	}{
 		{
 			name:  "successfully wait for page creation",
@@ -716,6 +717,17 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 			name:            "successfully wait for page creation with predicate and timeout in option",
 			event:           "page",
 			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => true;"), timeout: int64Ptr(1000)},
+		},
+		{
+			name:    "fails when event other than page passed in",
+			event:   "browser",
+			wantErr: "\"page\" is the only event that is supported, you passed in \"browser\"",
+		},
+		{
+			name:            "fails due to timeout",
+			event:           "page",
+			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => false;"), timeout: int64Ptr(10)},
+			wantErr:         "waitForEvent timed out after 10ms",
 		},
 	}
 
@@ -751,8 +763,14 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 					return err
 				},
 			)
-			assert.NoError(t, err)
-			assert.Equal(t, p1.MainFrame().ID(), p2.MainFrame().ID())
+
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+				assert.Equal(t, p1.MainFrame().ID(), p2.MainFrame().ID())
+				return
+			}
+
+			assert.ErrorContains(t, err, tc.wantErr)
 		})
 	}
 }
