@@ -370,7 +370,7 @@ func (b *BrowserContext) waitForEvent(
 	timeout time.Duration,
 ) (any, error) {
 	if event != waitForEventTypePage {
-		return nil, fmt.Errorf("%q is the only event that is supported, you passed in %q", waitForEventTypePage, event)
+		return nil, fmt.Errorf("incorrect event %q, %q is the only event supported", event, waitForEventTypePage)
 	}
 
 	evCancelCtx, evCancelFn := context.WithCancel(b.ctx)
