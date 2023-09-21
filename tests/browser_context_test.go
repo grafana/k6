@@ -751,6 +751,9 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 			defer cancel()
 
 			var p1, p2 api.Page
+			// We need to run waitForEvent in parallel to the page creation.
+			// If we run them synchronously then waitForEvent will wait
+			// indefinitely and eventually the test will timeout.
 			err = tb.run(
 				ctx,
 				func() error {
@@ -772,6 +775,8 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 
 			if tc.wantErr == "" {
 				assert.NoError(t, err)
+				// We want to make sure that the page that was created with
+				// newPage matches the return value from waitForEvent.
 				assert.Equal(t, p1.MainFrame().ID(), p2.MainFrame().ID())
 				return
 			}
@@ -781,6 +786,9 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 	}
 }
 
+// optsOrPredicate is a helper type to enable us to package up the optional
+// arguments which could either be a predicate function, or the options object
+// which contains a predicate function and a timeout.
 type optsOrPredicate struct {
 	predicate     *string
 	timeout       *int64
@@ -799,19 +807,26 @@ func int64Ptr(value int64) *int64 {
 	return int64Pointer
 }
 
+// optsOrPredicateToGojaValue will take optsOrPredicate and correctly define the
+// optional options where necessary. It will either return nil, a predicate
+// function or an options object.
 func optsOrPredicateToGojaValue(t *testing.T, tb *testBrowser, op *optsOrPredicate) goja.Value {
 	t.Helper()
 
+	// Options or predicate are undefined.
 	if op == nil {
 		return nil
 	}
 
+	// The optional argument is a predicate function.
 	if op.justPredicate != nil {
 		predicate, err := tb.runJavaScript(*op.justPredicate)
 		require.NoError(t, err)
 		return predicate
 	}
 
+	// The option argument is a options object with only the predicate function
+	// defined but no timeout.
 	if op.predicate != nil && op.timeout == nil {
 		predicate, err := tb.runJavaScript(*op.predicate)
 		require.NoError(t, err)
@@ -825,6 +840,7 @@ func optsOrPredicateToGojaValue(t *testing.T, tb *testBrowser, op *optsOrPredica
 		return opts.ToObject(tb.runtime())
 	}
 
+	// The option argument is a options object with only timeout.
 	if op.predicate == nil && op.timeout != nil {
 		opts := tb.toGojaValue(struct {
 			Timeout int64
@@ -835,6 +851,8 @@ func optsOrPredicateToGojaValue(t *testing.T, tb *testBrowser, op *optsOrPredica
 		return opts.ToObject(tb.runtime())
 	}
 
+	// The option argument is a options object with both a predicate function
+	// and a timeout.
 	predicate, err := tb.runJavaScript(*op.predicate)
 	require.NoError(t, err)
 
