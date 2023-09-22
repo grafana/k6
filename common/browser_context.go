@@ -374,13 +374,14 @@ func (b *BrowserContext) waitForEvent(
 	}
 
 	evCancelCtx, evCancelFn := context.WithCancel(b.ctx)
+	defer evCancelFn() // This will remove the event handler once we return from here.
+
 	chEvHandler := make(chan Event)
 	ch := make(chan any)
 
-	go b.runWaitForEventHandler(evCancelCtx, evCancelFn, chEvHandler, ch, predicateFn)
+	go b.runWaitForEventHandler(evCancelCtx, chEvHandler, ch, predicateFn)
 
 	b.on(evCancelCtx, []string{EventBrowserContextPage}, chEvHandler)
-	defer evCancelFn() // Remove event handler
 
 	select {
 	case <-b.ctx.Done():
@@ -397,7 +398,7 @@ func (b *BrowserContext) waitForEvent(
 // runWaitForEventHandler can work with a nil predicateFn. If predicateFn is
 // nil it will return the response straight away.
 func (b *BrowserContext) runWaitForEventHandler(
-	ctx context.Context, evCancelFn func(), chEvHandler chan Event, out chan any, predicateFn goja.Callable,
+	ctx context.Context, chEvHandler chan Event, out chan any, predicateFn goja.Callable,
 ) {
 	b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():starts", "bctxid:%v", b.id)
 	defer b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():returns", "bctxid:%v", b.id)
@@ -406,10 +407,6 @@ func (b *BrowserContext) runWaitForEventHandler(
 	defer func() {
 		out <- p
 		close(out)
-
-		// We wait for one matching event only, then remove event handler by
-		// cancelling context and stopping goroutine.
-		evCancelFn()
 	}()
 
 	for {
