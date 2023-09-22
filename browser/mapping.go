@@ -652,6 +652,7 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 			ctx := vu.Context()
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				resp, err := bc.WaitForEvent(event, optsOrPredicate)
+				panicIfFatalError(ctx, err)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}

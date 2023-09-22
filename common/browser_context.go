@@ -378,8 +378,9 @@ func (b *BrowserContext) waitForEvent(
 
 	chEvHandler := make(chan Event)
 	ch := make(chan any)
+	errCh := make(chan error)
 
-	go b.runWaitForEventHandler(evCancelCtx, chEvHandler, ch, predicateFn)
+	go b.runWaitForEventHandler(evCancelCtx, chEvHandler, ch, errCh, predicateFn)
 
 	b.on(evCancelCtx, []string{EventBrowserContextPage}, chEvHandler)
 
@@ -392,19 +393,23 @@ func (b *BrowserContext) waitForEvent(
 	case evData := <-ch:
 		b.logger.Debugf("BrowserContext:WaitForEvent:evData", "bctxid:%v event:%q", b.id, event)
 		return evData, nil
+	case err := <-errCh:
+		b.logger.Debugf("BrowserContext:WaitForEvent:err", "bctxid:%v event:%q, err:%v", b.id, event, err)
+		return nil, err
 	}
 }
 
 // runWaitForEventHandler can work with a nil predicateFn. If predicateFn is
 // nil it will return the response straight away.
 func (b *BrowserContext) runWaitForEventHandler(
-	ctx context.Context, chEvHandler chan Event, out chan<- any, predicateFn goja.Callable,
+	ctx context.Context, chEvHandler chan Event, out chan<- any, errOut chan<- error, predicateFn goja.Callable,
 ) {
 	b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():starts", "bctxid:%v", b.id)
 	defer b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():returns", "bctxid:%v", b.id)
 
 	defer func() {
 		close(out)
+		close(errOut)
 	}()
 
 	for {
@@ -423,7 +428,11 @@ func (b *BrowserContext) runWaitForEventHandler(
 			}
 
 			b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage", "bctxid:%v", b.id)
-			p, _ := ev.data.(*Page)
+			p, ok := ev.data.(*Page)
+			if !ok {
+				errOut <- fmt.Errorf("on create page event failed to return a page: %w", k6error.ErrFatal)
+				return
+			}
 
 			if predicateFn == nil {
 				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
