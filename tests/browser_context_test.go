@@ -726,7 +726,7 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 			// Fails when an event other than "page" is passed in.
 			name:    "fails_incorrect_event",
 			event:   "browser",
-			wantErr: "incorrect event \"browser\", \"page\" is the only event supported",
+			wantErr: `incorrect event "browser", "page" is the only event supported`,
 		},
 		{
 			// Fails when the timeout fires while waiting on waitForEvent.
