@@ -41,6 +41,19 @@ type Config struct {
 	// Password is the Password for the Basic Auth.
 	Password null.String `json:"password"`
 
+	// ClientCertificate is the public key of the SSL certificate.
+	// It is expected the path of the certificate on the file system.
+	// If it is required a dedicated Certifacate Authority then it should be added
+	// to the conventional folders defined by the operating system's registry.
+	ClientCertificate null.String `json:"clientCertificate"`
+
+	// ClientCertificateKey is the private key of the SSL certificate.
+	// It is expected the path of the certificate on the file system.
+	ClientCertificateKey null.String `json:"clientCertificateKey"`
+
+	// BearerToken if set is the token used for the `Authorization` header.
+	BearerToken null.String `json:"bearerToken"`
+
 	// PushInterval defines the time between flushes. The Output will wait the set time
 	// before push a new set of time series to the endpoint.
 	PushInterval types.NullDuration `json:"pushInterval"`
@@ -89,12 +102,28 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool, //nolint:gosec
 	}
 
+	if conf.ClientCertificate.Valid && conf.ClientCertificateKey.Valid {
+		cert, err := tls.LoadX509KeyPair(conf.ClientCertificate.String, conf.ClientCertificateKey.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load the TLS certificate: %w", err)
+		}
+		hc.TLSConfig.Certificates = []tls.Certificate{cert}
+	}
+
 	if len(conf.Headers) > 0 {
 		hc.Headers = make(http.Header)
 		for k, v := range conf.Headers {
 			hc.Headers.Add(k, v)
 		}
 	}
+
+	if conf.BearerToken.String != "" {
+		if hc.Headers == nil {
+			hc.Headers = make(http.Header)
+		}
+		hc.Headers.Set("Authorization", "Bearer "+conf.BearerToken.String)
+	}
+
 	return &hc, nil
 }
 
@@ -139,13 +168,21 @@ func (conf Config) Apply(applied Config) Config {
 		copy(conf.TrendStats, applied.TrendStats)
 	}
 
+	if applied.ClientCertificate.Valid {
+		conf.ClientCertificate = applied.ClientCertificate
+	}
+
+	if applied.ClientCertificateKey.Valid {
+		conf.ClientCertificateKey = applied.ClientCertificateKey
+	}
+
 	return conf
 }
 
 // GetConsolidatedConfig combines the options' values from the different sources
 // and returns the merged options. The Order of precedence used is documented
 // in the k6 Documentation https://k6.io/docs/using-k6/k6-options/how-to/#order-of-precedence.
-func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, url string) (Config, error) {
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _ string) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
 		jsonConf, err := parseJSON(jsonRawConf)
@@ -165,6 +202,7 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, u
 
 	// TODO: define a way for defining Output's options
 	// then support them.
+	// url is the third GetConsolidatedConfig's argument which is omitted for now
 	//nolint:gocritic
 	//
 	//if url != "" {
@@ -178,30 +216,32 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, u
 	return result, nil
 }
 
-func parseEnvs(env map[string]string) (Config, error) {
-	var c Config
-
-	getEnvBool := func(env map[string]string, name string) (null.Bool, error) {
-		if v, vDefined := env[name]; vDefined {
-			b, err := strconv.ParseBool(v)
-			if err != nil {
-				return null.NewBool(false, false), err
-			}
-
-			return null.BoolFrom(b), nil
+func envBool(env map[string]string, name string) (null.Bool, error) {
+	if v, vDefined := env[name]; vDefined {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return null.NewBool(false, false), err
 		}
-		return null.NewBool(false, false), nil
+
+		return null.BoolFrom(b), nil
 	}
+	return null.NewBool(false, false), nil
+}
 
-	getEnvMap := func(env map[string]string, prefix string) map[string]string {
-		result := make(map[string]string)
-		for ek, ev := range env {
-			if strings.HasPrefix(ek, prefix) {
-				k := strings.TrimPrefix(ek, prefix)
-				result[k] = ev
-			}
+func envMap(env map[string]string, prefix string) map[string]string {
+	result := make(map[string]string)
+	for ek, ev := range env {
+		if strings.HasPrefix(ek, prefix) {
+			k := strings.TrimPrefix(ek, prefix)
+			result[k] = ev
 		}
-		return result
+	}
+	return result
+}
+
+func parseEnvs(env map[string]string) (Config, error) {
+	c := Config{
+		Headers: make(map[string]string),
 	}
 
 	if pushInterval, pushIntervalDefined := env["K6_PROMETHEUS_RW_PUSH_INTERVAL"]; pushIntervalDefined {
@@ -214,7 +254,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 		c.ServerURL = null.StringFrom(url)
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
+	if b, err := envBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
 		return c, err
 	} else if b.Valid {
 		c.InsecureSkipTLSVerify = b
@@ -228,21 +268,36 @@ func parseEnvs(env map[string]string) (Config, error) {
 		c.Password = null.StringFrom(password)
 	}
 
-	envHeaders := getEnvMap(env, "K6_PROMETHEUS_RW_HEADERS_")
+	if clientCertificate, certDefined := env["K6_PROMETHEUS_RW_CLIENT_CERTIFICATE"]; certDefined {
+		c.ClientCertificate = null.StringFrom(clientCertificate)
+	}
+
+	if clientCertificateKey, certDefined := env["K6_PROMETHEUS_RW_CLIENT_CERTIFICATE_KEY"]; certDefined {
+		c.ClientCertificateKey = null.StringFrom(clientCertificateKey)
+	}
+
+	envHeaders := envMap(env, "K6_PROMETHEUS_RW_HEADERS_")
 	for k, v := range envHeaders {
-		if c.Headers == nil {
-			c.Headers = make(map[string]string)
-		}
 		c.Headers[k] = v
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
+	if headers, headersDefined := env["K6_PROMETHEUS_RW_HTTP_HEADERS"]; headersDefined {
+		for _, kvPair := range strings.Split(headers, ",") {
+			header := strings.Split(kvPair, ":")
+			if len(header) != 2 {
+				return c, fmt.Errorf("the provided header (%s) does not respect the expected format <header key>:<value>", kvPair)
+			}
+			c.Headers[header[0]] = header[1]
+		}
+	}
+
+	if b, err := envBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
 		return c, err
 	} else if b.Valid {
 		c.TrendAsNativeHistogram = b
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_STALE_MARKERS"); err != nil {
+	if b, err := envBool(env, "K6_PROMETHEUS_RW_STALE_MARKERS"); err != nil {
 		return c, err
 	} else if b.Valid {
 		c.StaleMarkers = b
@@ -302,6 +357,11 @@ func parseArg(text string) (Config, error) {
 		//if v, ok := params["trendStats"].(string); ok && len(v) > 0 {
 		//c.TrendStats = strings.Split(v, ",")
 		//}
+
+		case "clientCertificate":
+			c.ClientCertificate = null.StringFrom(v)
+		case "clientCertificateKey":
+			c.ClientCertificateKey = null.StringFrom(v)
 
 		default:
 			if !strings.HasPrefix(key, "headers.") {

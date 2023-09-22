@@ -12,7 +12,7 @@ import (
 	"time"
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
-	"github.com/golang/snappy"
+	"github.com/klauspost/compress/snappy"
 	"google.golang.org/protobuf/proto"
 )
 
