@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net/url"
 	"reflect"
@@ -386,7 +385,7 @@ func (b *BrowserContext) waitForEvent(
 
 	select {
 	case <-b.ctx.Done():
-		return nil, errors.New("test iteration ended")
+		return nil, b.ctx.Err() //nolint:wrapcheck
 	case <-time.After(timeout):
 		b.logger.Debugf("BrowserContext:WaitForEvent:timeout", "bctxid:%v event:%q", b.id, event)
 		return nil, fmt.Errorf("waitForEvent timed out after %v", timeout)
