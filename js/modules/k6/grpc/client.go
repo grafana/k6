@@ -465,7 +465,7 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 				return result, fmt.Errorf("invalid timeout value: %w", err)
 			}
 		case "headers":
-			return result, errors.New("you should use metadata param instead of headers")
+			return result, errors.New("headers param is not supported anymore. Please, use metadata param instead")
 		default:
 			return result, fmt.Errorf("unknown param: %q", k)
 		}
