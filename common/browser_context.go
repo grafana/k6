@@ -398,14 +398,12 @@ func (b *BrowserContext) waitForEvent(
 // runWaitForEventHandler can work with a nil predicateFn. If predicateFn is
 // nil it will return the response straight away.
 func (b *BrowserContext) runWaitForEventHandler(
-	ctx context.Context, chEvHandler chan Event, out chan any, predicateFn goja.Callable,
+	ctx context.Context, chEvHandler chan Event, out chan<- any, predicateFn goja.Callable,
 ) {
 	b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():starts", "bctxid:%v", b.id)
 	defer b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():returns", "bctxid:%v", b.id)
 
-	var p *Page
 	defer func() {
-		out <- p
 		close(out)
 	}()
 
@@ -425,10 +423,11 @@ func (b *BrowserContext) runWaitForEventHandler(
 			}
 
 			b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage", "bctxid:%v", b.id)
-			p, _ = ev.data.(*Page)
+			p, _ := ev.data.(*Page)
 
 			if predicateFn == nil {
 				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:return", "bctxid:%v", b.id)
+				out <- p
 				return
 			}
 
@@ -437,6 +436,8 @@ func (b *BrowserContext) runWaitForEventHandler(
 					"BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:predicateFn:return",
 					"bctxid:%v", b.id,
 				)
+				out <- p
+				return
 			}
 		}
 	}
