@@ -61,11 +61,15 @@ func TestConfigRemoteConfig(t *testing.T) {
 		Password:              null.StringFrom("mypass"),
 		Headers: map[string]string{
 			"X-MYCUSTOM-HEADER": "val1",
+			// it asserts that Authz header is overwritten if the token is set
+			"Authorization": "pre-set-token",
 		},
+		BearerToken: null.StringFrom("my-fake-token"),
 	}
 
 	headers := http.Header{}
 	headers.Set("X-MYCUSTOM-HEADER", "val1")
+	headers.Set("Authorization", "Bearer my-fake-token")
 	exprcc := &remote.HTTPConfig{
 		Timeout: 5 * time.Second,
 		TLSConfig: &tls.Config{
