@@ -41,6 +41,9 @@ type Config struct {
 	// Password is the Password for the Basic Auth.
 	Password null.String `json:"password"`
 
+	// BearerToken if set is the token used for the `Authorization` header.
+	BearerToken null.String `json:"bearerToken"`
+
 	// PushInterval defines the time between flushes. The Output will wait the set time
 	// before push a new set of time series to the endpoint.
 	PushInterval types.NullDuration `json:"pushInterval"`
@@ -95,6 +98,14 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 			hc.Headers.Add(k, v)
 		}
 	}
+
+	if conf.BearerToken.String != "" {
+		if hc.Headers == nil {
+			hc.Headers = make(http.Header)
+		}
+		hc.Headers.Set("Authorization", "Bearer "+conf.BearerToken.String)
+	}
+
 	return &hc, nil
 }
 
