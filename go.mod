@@ -5,6 +5,7 @@ go 1.18
 require (
 	buf.build/gen/go/prometheus/prometheus/protocolbuffers/go v1.31.0-20230627135113-9a12bc2590d2.1
 	github.com/golang/snappy v0.0.4
+	github.com/klauspost/compress v1.16.7
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/prometheus/client_golang v1.16.0
 	github.com/prometheus/client_model v0.4.0
