@@ -19,7 +19,6 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -1127,43 +1126,6 @@ func TestDebugStat(t *testing.T) {
 			assert.Contains(t, b.String(), tt.expected)
 		})
 	}
-}
-
-func TestClientInvokeHeadersDeprecated(t *testing.T) {
-	t.Parallel()
-
-	ts := newTestState(t)
-	reflection.Register(ts.httpBin.ServerGRPC)
-
-	ts.httpBin.GRPCStub.EmptyCallFunc = func(_ context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
-		return &grpc_testing.Empty{}, nil
-	}
-
-	initString := codeBlock{
-		code: `var client = new grpc.Client();`,
-	}
-	vuString := codeBlock{
-		code: `
-		client.connect("GRPCBIN_ADDR", {reflect:true});
-		var resp = client.invoke("grpc.testing.TestService/EmptyCall", {}, { headers: { "X-Load-Tester": "k6" } })
-		if (resp.status !== grpc.StatusOK) {
-			throw new Error("failed to send a request")
-		}
-		`,
-	}
-
-	val, err := ts.Run(initString.code)
-	assertResponse(t, initString, err, val, ts)
-
-	ts.ToVUContext()
-
-	val, err = ts.Run(vuString.code)
-	assertResponse(t, vuString, err, val, ts)
-
-	entries := ts.loggerHook.Drain()
-
-	require.Len(t, entries, 1)
-	require.Contains(t, entries[0].Message, "headers property is deprecated")
 }
 
 func TestClientLoadProto(t *testing.T) {

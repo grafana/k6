@@ -446,9 +446,6 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 	params := paramsVal.ToObject(rt)
 	for _, k := range params.Keys() {
 		switch k {
-		case "headers":
-			c.vu.State().Logger.Warn("The headers property is deprecated, replace it with the metadata property, please.")
-			fallthrough
 		case "metadata":
 			md, err := newMetadata(params.Get(k))
 			if err != nil {
@@ -467,6 +464,8 @@ func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) 
 			if err != nil {
 				return result, fmt.Errorf("invalid timeout value: %w", err)
 			}
+		case "headers":
+			return result, errors.New("you should use metadata param instead of headers")
 		default:
 			return result, fmt.Errorf("unknown param: %q", k)
 		}
