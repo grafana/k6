@@ -180,7 +180,9 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _
 }
 
 func parseEnvs(env map[string]string) (Config, error) {
-	var c Config
+	c := Config{
+		Headers: make(map[string]string),
+	}
 
 	getEnvBool := func(env map[string]string, name string) (null.Bool, error) {
 		if v, vDefined := env[name]; vDefined {
@@ -231,10 +233,17 @@ func parseEnvs(env map[string]string) (Config, error) {
 
 	envHeaders := getEnvMap(env, "K6_PROMETHEUS_RW_HEADERS_")
 	for k, v := range envHeaders {
-		if c.Headers == nil {
-			c.Headers = make(map[string]string)
-		}
 		c.Headers[k] = v
+	}
+
+	if headers, headersDefined := env["K6_PROMETHEUS_RW_HTTP_HEADERS"]; headersDefined {
+		for _, kvPair := range strings.Split(headers, ",") {
+			header := strings.Split(kvPair, ":")
+			if len(header) != 2 {
+				return c, fmt.Errorf("the provided header (%s) does not respect the expected format <header key>:<value>", kvPair)
+			}
+			c.Headers[header[0]] = header[1]
+		}
 	}
 
 	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
