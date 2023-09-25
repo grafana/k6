@@ -255,8 +255,15 @@ func TestOptionHeaders(t *testing.T) {
 		env     map[string]string
 		jsonRaw json.RawMessage
 	}{
-		"JSON": {jsonRaw: json.RawMessage(`{"headers":{"X-MY-HEADER1":"hval1","X-MY-HEADER2":"hval2"}}`)},
-		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_HEADERS_X-MY-HEADER1": "hval1", "K6_PROMETHEUS_RW_HEADERS_X-MY-HEADER2": "hval2"}},
+		"JSON": {jsonRaw: json.RawMessage(
+			`{"headers":{"X-MY-HEADER1":"hval1","X-MY-HEADER2":"hval2","X-Scope-OrgID":"my-org-id","another-header":"true","empty":""}}`)},
+		"Env": {env: map[string]string{
+			"K6_PROMETHEUS_RW_HEADERS_X-MY-HEADER1": "hval1",
+			"K6_PROMETHEUS_RW_HEADERS_X-MY-HEADER2": "hval2",
+			// it assert that the new method using HTTP_HEADERS overwrites it
+			"K6_PROMETHEUS_RW_HEADERS_X-Scope-OrgID": "my-org-id-old-method",
+			"K6_PROMETHEUS_RW_HTTP_HEADERS":          "X-Scope-OrgID:my-org-id,another-header:true,empty:",
+		}},
 		//nolint:gocritic
 		//"Arg":  {arg: "headers.X-MY-HEADER1=hval1,headers.X-MY-HEADER2=hval2"},
 	}
@@ -266,8 +273,11 @@ func TestOptionHeaders(t *testing.T) {
 		InsecureSkipTLSVerify: null.BoolFrom(false),
 		PushInterval:          types.NullDurationFrom(5 * time.Second),
 		Headers: map[string]string{
-			"X-MY-HEADER1": "hval1",
-			"X-MY-HEADER2": "hval2",
+			"X-MY-HEADER1":   "hval1",
+			"X-MY-HEADER2":   "hval2",
+			"X-Scope-OrgID":  "my-org-id",
+			"another-header": "true",
+			"empty":          "",
 		},
 		TrendStats:   []string{"p(99)"},
 		StaleMarkers: null.BoolFrom(false),
