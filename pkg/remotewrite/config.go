@@ -216,32 +216,32 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string, _
 	return result, nil
 }
 
+func envBool(env map[string]string, name string) (null.Bool, error) {
+	if v, vDefined := env[name]; vDefined {
+		b, err := strconv.ParseBool(v)
+		if err != nil {
+			return null.NewBool(false, false), err
+		}
+
+		return null.BoolFrom(b), nil
+	}
+	return null.NewBool(false, false), nil
+}
+
+func envMap(env map[string]string, prefix string) map[string]string {
+	result := make(map[string]string)
+	for ek, ev := range env {
+		if strings.HasPrefix(ek, prefix) {
+			k := strings.TrimPrefix(ek, prefix)
+			result[k] = ev
+		}
+	}
+	return result
+}
+
 func parseEnvs(env map[string]string) (Config, error) {
 	c := Config{
 		Headers: make(map[string]string),
-	}
-
-	getEnvBool := func(env map[string]string, name string) (null.Bool, error) {
-		if v, vDefined := env[name]; vDefined {
-			b, err := strconv.ParseBool(v)
-			if err != nil {
-				return null.NewBool(false, false), err
-			}
-
-			return null.BoolFrom(b), nil
-		}
-		return null.NewBool(false, false), nil
-	}
-
-	getEnvMap := func(env map[string]string, prefix string) map[string]string {
-		result := make(map[string]string)
-		for ek, ev := range env {
-			if strings.HasPrefix(ek, prefix) {
-				k := strings.TrimPrefix(ek, prefix)
-				result[k] = ev
-			}
-		}
-		return result
 	}
 
 	if pushInterval, pushIntervalDefined := env["K6_PROMETHEUS_RW_PUSH_INTERVAL"]; pushIntervalDefined {
@@ -254,7 +254,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 		c.ServerURL = null.StringFrom(url)
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
+	if b, err := envBool(env, "K6_PROMETHEUS_RW_INSECURE_SKIP_TLS_VERIFY"); err != nil {
 		return c, err
 	} else if b.Valid {
 		c.InsecureSkipTLSVerify = b
@@ -276,7 +276,7 @@ func parseEnvs(env map[string]string) (Config, error) {
 		c.ClientCertificateKey = null.StringFrom(clientCertificateKey)
 	}
 
-	envHeaders := getEnvMap(env, "K6_PROMETHEUS_RW_HEADERS_")
+	envHeaders := envMap(env, "K6_PROMETHEUS_RW_HEADERS_")
 	for k, v := range envHeaders {
 		c.Headers[k] = v
 	}
@@ -291,13 +291,13 @@ func parseEnvs(env map[string]string) (Config, error) {
 		}
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
+	if b, err := envBool(env, "K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM"); err != nil {
 		return c, err
 	} else if b.Valid {
 		c.TrendAsNativeHistogram = b
 	}
 
-	if b, err := getEnvBool(env, "K6_PROMETHEUS_RW_STALE_MARKERS"); err != nil {
+	if b, err := envBool(env, "K6_PROMETHEUS_RW_STALE_MARKERS"); err != nil {
 		return c, err
 	} else if b.Valid {
 		c.StaleMarkers = b
