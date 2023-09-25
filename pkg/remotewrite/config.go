@@ -41,6 +41,16 @@ type Config struct {
 	// Password is the Password for the Basic Auth.
 	Password null.String `json:"password"`
 
+	// ClientCertificate is the public key of the SSL certificate.
+	// It is expected the path of the certificate on the file system.
+	// If it is required a dedicated Certifacate Authority then it should be added
+	// to the conventional folders defined by the operating system's registry.
+	ClientCertificate null.String `json:"clientCertificate"`
+
+	// ClientCertificateKey is the private key of the SSL certificate.
+	// It is expected the path of the certificate on the file system.
+	ClientCertificateKey null.String `json:"clientCertificateKey"`
+
 	// BearerToken if set is the token used for the `Authorization` header.
 	BearerToken null.String `json:"bearerToken"`
 
@@ -90,6 +100,14 @@ func (conf Config) RemoteConfig() (*remote.HTTPConfig, error) {
 
 	hc.TLSConfig = &tls.Config{
 		InsecureSkipVerify: conf.InsecureSkipTLSVerify.Bool, //nolint:gosec
+	}
+
+	if conf.ClientCertificate.Valid && conf.ClientCertificateKey.Valid {
+		cert, err := tls.LoadX509KeyPair(conf.ClientCertificate.String, conf.ClientCertificateKey.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to load the TLS certificate: %w", err)
+		}
+		hc.TLSConfig.Certificates = []tls.Certificate{cert}
 	}
 
 	if len(conf.Headers) > 0 {
@@ -148,6 +166,14 @@ func (conf Config) Apply(applied Config) Config {
 	if len(applied.TrendStats) > 0 {
 		conf.TrendStats = make([]string, len(applied.TrendStats))
 		copy(conf.TrendStats, applied.TrendStats)
+	}
+
+	if applied.ClientCertificate.Valid {
+		conf.ClientCertificate = applied.ClientCertificate
+	}
+
+	if applied.ClientCertificateKey.Valid {
+		conf.ClientCertificateKey = applied.ClientCertificateKey
 	}
 
 	return conf
@@ -242,6 +268,14 @@ func parseEnvs(env map[string]string) (Config, error) {
 		c.Password = null.StringFrom(password)
 	}
 
+	if clientCertificate, certDefined := env["K6_PROMETHEUS_RW_CLIENT_CERTIFICATE"]; certDefined {
+		c.ClientCertificate = null.StringFrom(clientCertificate)
+	}
+
+	if clientCertificateKey, certDefined := env["K6_PROMETHEUS_RW_CLIENT_CERTIFICATE_KEY"]; certDefined {
+		c.ClientCertificateKey = null.StringFrom(clientCertificateKey)
+	}
+
 	envHeaders := getEnvMap(env, "K6_PROMETHEUS_RW_HEADERS_")
 	for k, v := range envHeaders {
 		c.Headers[k] = v
@@ -323,6 +357,11 @@ func parseArg(text string) (Config, error) {
 		//if v, ok := params["trendStats"].(string); ok && len(v) > 0 {
 		//c.TrendStats = strings.Split(v, ",")
 		//}
+
+		case "clientCertificate":
+			c.ClientCertificate = null.StringFrom(v)
+		case "clientCertificateKey":
+			c.ClientCertificateKey = null.StringFrom(v)
 
 		default:
 			if !strings.HasPrefix(key, "headers.") {

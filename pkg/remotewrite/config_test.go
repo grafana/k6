@@ -86,6 +86,19 @@ func TestConfigRemoteConfig(t *testing.T) {
 	assert.Equal(t, exprcc, rcc)
 }
 
+func TestConfigRemoteConfigClientCertificateError(t *testing.T) {
+	t.Parallel()
+
+	config := Config{
+		ClientCertificate:    null.StringFrom("bad-cert-value"),
+		ClientCertificateKey: null.StringFrom("bad-cert-key"),
+	}
+
+	rcc, err := config.RemoteConfig()
+	assert.ErrorContains(t, err, "TLS certificate")
+	assert.Nil(t, rcc)
+}
+
 func TestGetConsolidatedConfig(t *testing.T) {
 	t.Parallel()
 
@@ -369,6 +382,41 @@ func TestOptionBasicAuth(t *testing.T) {
 	}
 }
 
+func TestOptionClientCertificate(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"clientCertificate":"client.crt","clientCertificateKey":"client.key"}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_CLIENT_CERTIFICATE": "client.crt", "K6_PROMETHEUS_RW_CLIENT_CERTIFICATE_KEY": "client.key"}},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		ClientCertificate:     null.StringFrom("client.crt"),
+		ClientCertificateKey:  null.StringFrom("client.key"),
+		StaleMarkers:          null.BoolFrom(false),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
 func TestOptionTrendAsNativeHistogram(t *testing.T) {
 	t.Parallel()
 
@@ -417,8 +465,6 @@ func TestOptionPushInterval(t *testing.T) {
 	}{
 		"JSON": {jsonRaw: json.RawMessage(`{"pushInterval":"1m2s"}`)},
 		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_PUSH_INTERVAL": "1m2s"}},
-		//nolint:gocritic
-		//"Arg":  {arg: "pushInterval=1m2s"},
 	}
 
 	expconfig := Config{
