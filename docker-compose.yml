@@ -2,28 +2,23 @@ version: '3.8'
 
 networks:
   k6:
-  grafana:
-  prometheus:
 
 services:
   prometheus:
-    image: prom/prometheus:v2.45.0
+    image: prom/prometheus:v2.47.0
     command:
       - --web.enable-remote-write-receiver
       - --enable-feature=native-histograms
       - --config.file=/etc/prometheus/prometheus.yml
     networks:
       - k6
-      - grafana
-      - prometheus
     ports:
       - "9090:9090"
 
   grafana:
-    image: grafana/grafana:10.0.1
+    image: grafana/grafana:10.1.2
     networks:
-      - grafana
-      - prometheus
+      - k6
     ports:
       - "3000:3000"
     environment:
@@ -32,18 +27,3 @@ services:
       - GF_AUTH_BASIC_ENABLED=false
     volumes:
       - ./grafana:/etc/grafana/provisioning/
-
-  k6:
-    build: .
-    networks:
-      - k6
-    ports:
-      - "6565:6565"
-    environment:
-      - K6_PROMETHEUS_RW_SERVER_URL=http://prometheus:9090/api/v1/write
-      - K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM=true
-      - K6_OUT=xk6-prometheus-rw
-    depends_on:
-      - prometheus
-    volumes:
-      - ./samples:/scripts
