@@ -1,0 +1,15 @@
+<html lang="en">
+    <head></head>
+    <body>
+        <div id='my-div' style='display: none;'>My DIV</div>
+        <script>
+            function showDiv() {
+                setTimeout(function() {
+                    document.getElementById('my-div').style.display = 'block';
+                }, 200);
+            }
+            
+            showDiv();
+        </script>
+    </body>
+</html>

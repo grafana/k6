@@ -1044,3 +1044,55 @@ func TestPageTimeout(t *testing.T) {
 		})
 	}
 }
+
+func TestPageWaitForSelector(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name      string
+		url       string
+		opts      map[string]any
+		selector  string
+		errAssert func(*testing.T, error)
+	}{
+		{
+			name:     "should wait for selector",
+			url:      "wait_for.html",
+			selector: "#my-div",
+			errAssert: func(t *testing.T, e error) {
+				t.Helper()
+				assert.Nil(t, e)
+			},
+		},
+		{
+			name: "should TO waiting for selector",
+			url:  "wait_for.html",
+			opts: map[string]any{
+				// set a timeout smaller than the time
+				// it takes the element to show up
+				"timeout": "50",
+			},
+			selector: "#my-div",
+			errAssert: func(t *testing.T, e error) {
+				t.Helper()
+				assert.ErrorContains(t, e, "timed out after")
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+
+			page := tb.NewPage(nil)
+			_, err := page.Goto(tb.staticURL(tc.url), nil)
+			require.NoError(t, err)
+
+			_, err = page.WaitForSelector(tc.selector, tb.toGojaValue(tc.opts))
+			tc.errAssert(t, err)
+		})
+	}
+}
