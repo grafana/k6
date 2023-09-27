@@ -3,6 +3,8 @@ package fs
 import (
 	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestFileImpl(t *testing.T) {
@@ -96,6 +98,53 @@ func TestFileImpl(t *testing.T) {
 
 				if gotN != tc.wantN || gotErr != tc.wantErr {
 					t.Errorf("Read() = %d, %v, want %d, %v", gotN, gotErr, tc.wantN, tc.wantErr)
+				}
+			})
+		}
+	})
+
+	t.Run("seek", func(t *testing.T) {
+		t.Parallel()
+
+		type args struct {
+			offset int
+			whence SeekMode
+		}
+
+		tests := []struct {
+			name       string
+			fileOffset int
+			args       args
+			want       int
+			wantError  bool
+		}{
+			{"StartSeekWithinBounds", 0, args{50, SeekModeStart}, 50, false},
+			{"StartSeekTooFar", 0, args{150, SeekModeStart}, 0, true},
+			{"StartSeekNegative", 0, args{-50, SeekModeStart}, 0, true},
+			{"CurrentSeekWithinBounds", 0, args{10, SeekModeCurrent}, 10, false},
+			{"CurrentSeekNegativeWithinBounds", 20, args{-20, SeekModeCurrent}, 0, false},
+			{"CurrentSeekNegativeTooFar", 20, args{-40, SeekModeCurrent}, 0, true},
+			{"CurrentSeekTooFar", 0, args{150, SeekModeCurrent}, 0, true},
+			{"EndSeekPositiveOffset", 0, args{20, SeekModeEnd}, 80, true}, // Cannot seek beyond the end of the file
+			{"EndSeekWithinBounds", 0, args{-20, SeekModeEnd}, 80, false},
+			{"EndSeekTooFar", 0, args{120, SeekModeEnd}, 0, true},
+			{"InvalidWhence", 0, args{10, SeekMode(42)}, 0, true},
+		}
+
+		for _, tt := range tests {
+			tt := tt
+
+			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
+
+				f := &file{data: make([]byte, 100), offset: tt.fileOffset}
+
+				got, err := f.Seek(tt.args.offset, tt.args.whence)
+				if tt.wantError {
+					assert.Error(t, err, tt.name)
+				} else {
+					assert.NoError(t, err, tt.name)
+					assert.Equal(t, tt.want, got, tt.name)
 				}
 			})
 		}
