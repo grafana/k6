@@ -32,7 +32,7 @@ func (b *Barrier) AddFrameNavigation(frame *Frame) {
 		atomic.AddInt64(&b.count, 1)
 		select {
 		case <-frame.ctx.Done():
-		case <-time.After(time.Duration(frame.manager.timeoutSettings.navigationTimeout()) * time.Second):
+		case <-time.After(frame.manager.timeoutSettings.navigationTimeout()):
 			b.errCh <- ErrTimedOut
 		case <-ch:
 			b.ch <- true

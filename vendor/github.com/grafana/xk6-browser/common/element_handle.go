@@ -249,7 +249,7 @@ func (h *ElementHandle) dblClick(p *Position, opts *MouseClickOptions) error {
 }
 
 func (h *ElementHandle) defaultTimeout() time.Duration {
-	return time.Duration(h.frame.manager.timeoutSettings.timeout()) * time.Second
+	return h.frame.manager.timeoutSettings.timeout()
 }
 
 func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit goja.Value) (any, error) {

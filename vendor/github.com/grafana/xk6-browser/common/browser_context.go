@@ -3,7 +3,9 @@ package common
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"reflect"
+	"strings"
 	"time"
 
 	"github.com/grafana/xk6-browser/api"
@@ -66,9 +68,13 @@ func NewBrowserContext(
 	}
 
 	rt := b.vu.Runtime()
+	k6Obj := rt.ToValue(js.K6ObjectScript)
 	wv := rt.ToValue(js.WebVitalIIFEScript)
 	wvi := rt.ToValue(js.WebVitalInitScript)
 
+	if err := b.AddInitScript(k6Obj, nil); err != nil {
+		return nil, fmt.Errorf("adding k6 object to new browser context: %w", err)
+	}
 	if err := b.AddInitScript(wv, nil); err != nil {
 		return nil, fmt.Errorf("adding web vital script to new browser context: %w", err)
 	}
@@ -77,17 +83,6 @@ func NewBrowserContext(
 	}
 
 	return &b, nil
-}
-
-// AddCookies adds cookies into this browser context.
-// All pages within this context will have these cookies installed.
-func (b *BrowserContext) AddCookies(cookies goja.Value) {
-	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
-
-	err := b.addCookies(cookies)
-	if err != nil {
-		k6ext.Panic(b.ctx, "adding cookies: %w", err)
-	}
 }
 
 // AddInitScript adds a script that will be initialized on all new pages.
@@ -145,16 +140,6 @@ func (b *BrowserContext) Browser() api.Browser {
 	return b.browser
 }
 
-// ClearCookies clears cookies.
-func (b *BrowserContext) ClearCookies() {
-	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
-
-	action := storage.ClearCookies().WithBrowserContextID(b.id)
-	if err := action.Do(b.ctx); err != nil {
-		k6ext.Panic(b.ctx, "clearing cookies: %w", err)
-	}
-}
-
 // ClearPermissions clears any permission overrides.
 func (b *BrowserContext) ClearPermissions() {
 	b.logger.Debugf("BrowserContext:ClearPermissions", "bctxid:%v", b.id)
@@ -175,11 +160,6 @@ func (b *BrowserContext) Close() {
 	if err := b.browser.disposeContext(b.id); err != nil {
 		k6ext.Panic(b.ctx, "disposing browser context: %w", err)
 	}
-}
-
-// Cookies is not implemented.
-func (b *BrowserContext) Cookies() ([]any, error) {
-	return nil, fmt.Errorf("BrowserContext.cookies() has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // ExposeBinding is not implemented.
@@ -285,14 +265,14 @@ func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
 func (b *BrowserContext) SetDefaultNavigationTimeout(timeout int64) {
 	b.logger.Debugf("BrowserContext:SetDefaultNavigationTimeout", "bctxid:%v timeout:%d", b.id, timeout)
 
-	b.timeoutSettings.setDefaultNavigationTimeout(timeout)
+	b.timeoutSettings.setDefaultNavigationTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetDefaultTimeout sets the default maximum timeout in milliseconds.
 func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 	b.logger.Debugf("BrowserContext:SetDefaultTimeout", "bctxid:%v timeout:%d", b.id, timeout)
 
-	b.timeoutSettings.setDefaultTimeout(timeout)
+	b.timeoutSettings.setDefaultTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetExtraHTTPHeaders is not implemented.
@@ -463,48 +443,236 @@ func (b *BrowserContext) getSession(id target.SessionID) *Session {
 	return b.browser.conn.getSession(id)
 }
 
-func (b *BrowserContext) addCookies(cookies goja.Value) error {
-	var cookieParams []network.CookieParam
-	if !gojaValueExists(cookies) {
-		return Error("cookies value is not set")
+// AddCookies adds cookies into this browser context.
+// All pages within this context will have these cookies installed.
+func (b *BrowserContext) AddCookies(cookies []*api.Cookie) error {
+	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
+
+	// skip work if no cookies provided.
+	if len(cookies) == 0 {
+		return fmt.Errorf("no cookies provided")
 	}
 
-	rt := b.vu.Runtime()
-	err := rt.ExportTo(cookies, &cookieParams)
-	if err != nil {
-		return fmt.Errorf("unable to export cookies value to cookieParams. %w", err)
-	}
-
-	// Create new array of pointers to items in cookieParams
-	var cookieParamsPointers []*network.CookieParam
-	for i := 0; i < len(cookieParams); i++ {
-		cookieParam := cookieParams[i]
-
-		if cookieParam.Name == "" {
-			return fmt.Errorf("cookie name is not set. %#v", cookieParam)
+	cookiesToSet := make([]*network.CookieParam, 0, len(cookies))
+	for _, c := range cookies {
+		if c.Name == "" {
+			return fmt.Errorf("cookie name must be set: %#v", c)
 		}
-
-		if cookieParam.Value == "" {
-			return fmt.Errorf("cookie value is not set. %#v", cookieParam)
+		if c.Value == "" {
+			return fmt.Errorf("cookie value must be set: %#v", c)
 		}
-
 		// if URL is not set, both Domain and Path must be provided
-		if cookieParam.URL == "" {
-			if cookieParam.Domain == "" || cookieParam.Path == "" {
-				return fmt.Errorf(
-					"if cookie url is not provided, both domain and path must be specified. %#v",
-					cookieParam,
-				)
-			}
+		if c.URL == "" && (c.Domain == "" || c.Path == "") {
+			const msg = "if cookie URL is not provided, both domain and path must be specified: %#v"
+			return fmt.Errorf(msg, c)
 		}
-
-		cookieParamsPointers = append(cookieParamsPointers, &cookieParam)
+		// calculate the cookie expiration date, session cookie if not set.
+		var ts *cdp.TimeSinceEpoch
+		if c.Expires > 0 {
+			t := cdp.TimeSinceEpoch(time.Unix(c.Expires, 0))
+			ts = &t
+		}
+		cookiesToSet = append(cookiesToSet, &network.CookieParam{
+			Name:     c.Name,
+			Value:    c.Value,
+			Domain:   c.Domain,
+			Path:     c.Path,
+			URL:      c.URL,
+			Expires:  ts,
+			HTTPOnly: c.HTTPOnly,
+			Secure:   c.Secure,
+			SameSite: network.CookieSameSite(c.SameSite),
+		})
 	}
 
-	action := storage.SetCookies(cookieParamsPointers).WithBrowserContextID(b.id)
-	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
-		return fmt.Errorf("unable to execute SetCookies action: %w", err)
+	setCookies := storage.
+		SetCookies(cookiesToSet).
+		WithBrowserContextID(b.id)
+	if err := setCookies.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		return fmt.Errorf("cannot set cookies: %w", err)
 	}
 
 	return nil
+}
+
+// ClearCookies clears cookies.
+func (b *BrowserContext) ClearCookies() error {
+	b.logger.Debugf("BrowserContext:ClearCookies", "bctxid:%v", b.id)
+
+	clearCookies := storage.
+		ClearCookies().
+		WithBrowserContextID(b.id)
+	if err := clearCookies.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
+		return fmt.Errorf("clearing cookies: %w", err)
+	}
+	return nil
+}
+
+// Cookies returns all cookies.
+// Some of them can be added with the AddCookies method and some of them are
+// automatically taken from the browser context when it is created. And some of
+// them are set by the page, i.e., using the Set-Cookie HTTP header or via
+// JavaScript like document.cookie.
+func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) {
+	b.logger.Debugf("BrowserContext:Cookies", "bctxid:%v", b.id)
+
+	// get cookies from this browser context.
+	getCookies := storage.
+		GetCookies().
+		WithBrowserContextID(b.id)
+	networkCookies, err := getCookies.Do(
+		cdp.WithExecutor(b.ctx, b.browser.conn),
+	)
+	if err != nil {
+		return nil, fmt.Errorf("retrieving cookies: %w", err)
+	}
+	// return if no cookies found so we don't have to needlessly convert them.
+	// users can still work with cookies using the empty slice.
+	// like this: cookies.length === 0.
+	if len(networkCookies) == 0 {
+		return nil, nil
+	}
+
+	// convert the received CDP cookies to the browser API format.
+	cookies := make([]*api.Cookie, len(networkCookies))
+	for i, c := range networkCookies {
+		cookies[i] = &api.Cookie{
+			Name:     c.Name,
+			Value:    c.Value,
+			Domain:   c.Domain,
+			Path:     c.Path,
+			Expires:  int64(c.Expires),
+			HTTPOnly: c.HTTPOnly,
+			Secure:   c.Secure,
+			SameSite: api.CookieSameSite(c.SameSite),
+		}
+	}
+	// filter cookies by the provided URLs.
+	cookies, err = filterCookies(cookies, urls...)
+	if err != nil {
+		return nil, fmt.Errorf("filtering cookies: %w", err)
+	}
+	if len(cookies) == 0 {
+		return nil, nil
+	}
+
+	return cookies, nil
+}
+
+// filterCookies filters the given cookies based on URLs.
+// If an error occurs while parsing the cookie URLs, the error is returned.
+func filterCookies(cookies []*api.Cookie, urls ...string) ([]*api.Cookie, error) {
+	if len(urls) == 0 || len(cookies) == 0 {
+		return cookies, nil
+	}
+
+	purls, err := parseURLs(urls...)
+	if err != nil {
+		return nil, fmt.Errorf("parsing urls: %w", err)
+	}
+
+	// the following algorithm is like a sorting algorithm,
+	// but instead of sorting, it filters the cookies slice
+	// in place, without allocating a new slice. this is
+	// done to avoid unnecessary allocations and copying
+	// of data.
+	//
+	// n is used to remember the last cookie that should be
+	// kept in the cookies slice. all cookies before n should
+	// be kept, all cookies after n should be removed. it
+	// constantly shifts cookies to be kept to the left in the
+	// slice, overwriting cookies that should be removed.
+	//
+	// if a cookie should not be kept, it will be overwritten
+	// by the next cookie that should be kept. if no cookies
+	// should be kept, a nil slice is returned. otherwise,
+	// the slice is truncated to the last cookie that should
+	// be kept.
+
+	var n int
+
+	for _, c := range cookies {
+		var keep bool
+
+		for _, uri := range purls {
+			if shouldKeepCookie(c, uri) {
+				keep = true
+				break
+			}
+		}
+		if !keep {
+			continue
+		}
+		cookies[n] = c
+		n++
+	}
+	// if no cookies should be kept, return nil instead of
+	// an empty slice to conform with the API error behavior.
+	// also makes tests concise.
+	if n == 0 {
+		return nil, nil
+	}
+
+	// remove all cookies after the last cookie that should be kept.
+	return cookies[:n], nil
+}
+
+// shouldKeepCookie determines whether a cookie should be kept,
+// based on its compatibility with a specific URL.
+// Returns true if the cookie should be kept, false otherwise.
+func shouldKeepCookie(c *api.Cookie, uri *url.URL) bool {
+	// Ensure consistent domain formatting for easier comparison.
+	// A leading dot means the cookie is valid across subdomains.
+	// For example, if the domain is example.com, then adding a
+	// dot turns it into .example.com, making the cookie valid
+	// for sub.example.com, another.example.com, etc.
+	domain := c.Domain
+	if !strings.HasPrefix(domain, ".") {
+		domain = "." + domain
+	}
+	// Confirm that the cookie's domain is a suffix of the URL's
+	// hostname, emulating how a browser would scope cookies to
+	// specific domains.
+	if !strings.HasSuffix(domain, "."+uri.Hostname()) {
+		return false
+	}
+	// Follow RFC 6265 for cookies: an empty or missing path should
+	// be treated as "/".
+	//
+	// See: https://datatracker.ietf.org/doc/html/rfc6265#section-5.1.4
+	path := c.Path
+	if path == "" {
+		path = "/"
+	}
+	// Ensure that the cookie applies to the specific path of the
+	// URL, emulating how a browser would scope cookies to specific
+	// paths within a domain.
+	if !strings.HasPrefix(path, uri.Path) {
+		return false
+	}
+	// Emulate browser behavior: Don't include secure cookies when
+	// the scheme is not HTTPS, unless it's localhost.
+	if uri.Scheme != "https" && uri.Hostname() != "localhost" && c.Secure {
+		return false
+	}
+
+	// Keep the cookie.
+	return true
+}
+
+// parseURLs parses the given URLs.
+// If an error occurs while parsing a URL, the error is returned.
+func parseURLs(urls ...string) ([]*url.URL, error) {
+	purls := make([]*url.URL, len(urls))
+	for i, u := range urls {
+		uri, err := url.ParseRequestURI(
+			strings.TrimSpace(u),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("%q: %w", u, err)
+		}
+		purls[i] = uri
+	}
+
+	return purls, nil
 }

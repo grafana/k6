@@ -1084,3 +1084,16 @@ func (fs *FrameSession) updateViewport() error {
 
 	return nil
 }
+
+func (fs *FrameSession) executionContextForID(
+	executionContextID cdpruntime.ExecutionContextID,
+) (*ExecutionContext, error) {
+	fs.contextIDToContextMu.Lock()
+	defer fs.contextIDToContextMu.Unlock()
+
+	if exc, ok := fs.contextIDToContext[executionContextID]; ok {
+		return exc, nil
+	}
+
+	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
+}
