@@ -15,7 +15,7 @@
       }
     ]
   },
-  "description": "Visualize k6 OSS results stored in Prometheus with Native Histogram. K6_PROMETHEUS_RW_TREND_AS_NATIVE_HISTOGRAM option must be true. ",
+  "description": "Visualize k6 OSS results stored in Prometheus with Native Histograms.",
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
