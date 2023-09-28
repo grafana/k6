@@ -28,8 +28,12 @@ Check [the documentation](https://k6.io/docs/results-output/real-time/prometheus
 
 ## Dashboards
 
-[<img src="./images/prometheus-dashboard-k6-test-result.png" width="500"/>](./images/prometheus-dashboard-k6-test-result.png)
+<p>&nbsp;</p>
 
-Pre-built Grafana dashboards are available. Check the [dashboard guide](https://k6.io/docs/results-output/real-time/prometheus-remote-write/#time-series-visualization) how to import and use it from the source code or directly from [Grafana.com](https://grafana.com/grafana/dashboards/18030-test-result).
+[<img src="./images/dashboard-k6-prometheus-upper-section.png" width="500"/>](./images/dashboard-k6-prometheus.png)
 
->Note: The dashboards work with the Native Histogram mapping so it is required to enable it.
+This repo contains the [source code](./grafana/dashboards) of two Grafana dashboards designed to visualize test results: [`k6 Prometheus`](https://grafana.com/grafana/dashboards/19665-k6-prometheus/) and [k6 Prometheus (Native Histograms)](https://grafana.com/grafana/dashboards/18030-k6-prometheus-native-histograms/). 
+
+Refer to the [documentation](https://k6.io/docs/results-output/real-time/prometheus-remote-write/#time-series-visualization) to learn more about these dashboards. You can import them to your Grafana instance or with the docker-compose example on this repo. 
+
+🌟 Special thanks to [jwcastillo](https://github.com/jwcastillo) for his contributions and dedication to improving the dashboards. 
