@@ -506,7 +506,15 @@ func mapPage(vu moduleVU, p api.Page) mapping {
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"mouse":  rt.ToValue(p.GetMouse()).ToObject(rt),
+		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
+		"on": func(event string, handler goja.Callable) error {
+			mapMsgAndHandleEvent := func(m *api.ConsoleMessage) error {
+				mapping := mapConsoleMessage(vu, m)
+				_, err := handler(goja.Undefined(), vu.Runtime().ToValue(mapping))
+				return err
+			}
+			return p.On(event, mapMsgAndHandleEvent) //nolint:wrapcheck
+		},
 		"opener": p.Opener,
 		"pause":  p.Pause,
 		"pdf":    p.Pdf,
@@ -613,18 +621,13 @@ func mapWorker(vu moduleVU, w api.Worker) mapping {
 func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"addCookies":       bc.AddCookies,
-		"addInitScript":    bc.AddInitScript,
-		"browser":          bc.Browser,
-		"clearCookies":     bc.ClearCookies,
-		"clearPermissions": bc.ClearPermissions,
-		"close":            bc.Close,
-		"cookies": func() ([]any, error) {
-			cc, err := bc.Cookies()
-			ctx := vu.Context()
-			panicIfFatalError(ctx, err)
-			return cc, err //nolint:wrapcheck
-		},
+		"addCookies":                  bc.AddCookies,
+		"addInitScript":               bc.AddInitScript,
+		"browser":                     bc.Browser,
+		"clearCookies":                bc.ClearCookies,
+		"clearPermissions":            bc.ClearPermissions,
+		"close":                       bc.Close,
+		"cookies":                     bc.Cookies,
 		"exposeBinding":               bc.ExposeBinding,
 		"exposeFunction":              bc.ExposeFunction,
 		"grantPermissions":            bc.GrantPermissions,
@@ -667,6 +670,37 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
 				return nil, err //nolint:wrapcheck
 			}
 			return mapPage(vu, page), nil
+		},
+	}
+}
+
+// mapConsoleMessage to the JS module.
+func mapConsoleMessage(vu moduleVU, cm *api.ConsoleMessage) mapping {
+	rt := vu.Runtime()
+	return mapping{
+		"args": func() *goja.Object {
+			var (
+				margs []mapping
+				args  = cm.Args
+			)
+			for _, arg := range args {
+				a := mapJSHandle(vu, arg)
+				margs = append(margs, a)
+			}
+
+			return rt.ToValue(margs).ToObject(rt)
+		},
+		// page(), text() and type() are defined as
+		// functions in order to match Playwright's API
+		"page": func() *goja.Object {
+			mp := mapPage(vu, cm.Page)
+			return rt.ToValue(mp).ToObject(rt)
+		},
+		"text": func() *goja.Object {
+			return rt.ToValue(cm.Text).ToObject(rt)
+		},
+		"type": func() *goja.Object {
+			return rt.ToValue(cm.Type).ToObject(rt)
 		},
 	}
 }

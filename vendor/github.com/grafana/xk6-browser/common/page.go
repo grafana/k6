@@ -8,29 +8,38 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
-
+	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
+	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/log"
+
+	k6modules "go.k6.io/k6/js/modules"
 )
 
-const webVitalBinding = "k6browserSendWebVitalMetric"
+const (
+	webVitalBinding = "k6browserSendWebVitalMetric"
+
+	eventPageConsoleAPICalled = "console"
+)
 
 // Ensure page implements the EventEmitter, Target and Page interfaces.
 var (
 	_ EventEmitter = &Page{}
 	_ api.Page     = &Page{}
 )
+
+type consoleEventHandlerFunc func(*api.ConsoleMessage) error
 
 // Page stores Page/tab related context.
 type Page struct {
@@ -69,12 +78,18 @@ type Page struct {
 
 	backgroundPage bool
 
+	eventCh         chan Event
+	eventHandlers   map[string][]consoleEventHandlerFunc
+	eventHandlersMu sync.RWMutex
+
 	mainFrameSession *FrameSession
-	// TODO: FrameSession changes by attachFrameSession (mutex?)
-	frameSessions map[cdp.FrameID]*FrameSession
-	workers       map[target.SessionID]*Worker
-	routes        []api.Route
-	vu            k6modules.VU
+	frameSessions    map[cdp.FrameID]*FrameSession
+	frameSessionsMu  sync.RWMutex
+	workers          map[target.SessionID]*Worker
+	routes           []api.Route
+	vu               k6modules.VU
+
+	tq *taskqueue.TaskQueue
 
 	logger *log.Logger
 }
@@ -104,6 +119,8 @@ func NewPage(
 		timeoutSettings:  NewTimeoutSettings(bctx.timeoutSettings),
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
+		eventCh:          make(chan Event),
+		eventHandlers:    make(map[string][]consoleEventHandlerFunc),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		routes:           make([]api.Route, 0),
@@ -121,7 +138,7 @@ func NewPage(
 	}
 
 	var err error
-	p.frameManager = NewFrameManager(ctx, s, &p, bctx.timeoutSettings, p.logger)
+	p.frameManager = NewFrameManager(ctx, s, &p, p.timeoutSettings, p.logger)
 	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger)
 	if err != nil {
 		p.logger.Debugf("Page:NewPage:NewFrameSession:return", "sid:%v tid:%v err:%v",
@@ -129,9 +146,13 @@ func NewPage(
 
 		return nil, err
 	}
+	p.frameSessionsMu.Lock()
 	p.frameSessions[cdp.FrameID(tid)] = p.mainFrameSession
+	p.frameSessionsMu.Unlock()
 	p.Mouse = NewMouse(ctx, s, p.frameManager.MainFrame(), bctx.timeoutSettings, p.Keyboard)
 	p.Touchscreen = NewTouchscreen(ctx, s, p.Keyboard)
+
+	p.initEvents()
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
@@ -150,6 +171,48 @@ func NewPage(
 	return &p, nil
 }
 
+func (p *Page) initEvents() {
+	p.logger.Debugf("Page:initEvents",
+		"sid:%v tid:%v", p.session.ID(), p.targetID)
+
+	events := []string{
+		cdproto.EventRuntimeConsoleAPICalled,
+	}
+	p.session.on(p.ctx, events, p.eventCh)
+
+	go func() {
+		p.logger.Debugf("Page:initEvents:go",
+			"sid:%v tid:%v", p.session.ID(), p.targetID)
+		defer func() {
+			p.logger.Debugf("Page:initEvents:go:return",
+				"sid:%v tid:%v", p.session.ID(), p.targetID)
+			// TaskQueue is only initialized when calling page.on() method
+			// so users are not always required to close the page in order
+			// to let the iteration finish.
+			if p.tq != nil {
+				p.tq.Close()
+			}
+		}()
+
+		for {
+			select {
+			case <-p.session.Done():
+				p.logger.Debugf("Page:initEvents:go:session.done",
+					"sid:%v tid:%v", p.session.ID(), p.targetID)
+				return
+			case <-p.ctx.Done():
+				p.logger.Debugf("Page:initEvents:go:ctx.Done",
+					"sid:%v tid:%v", p.session.ID(), p.targetID)
+				return
+			case event := <-p.eventCh:
+				if ev, ok := event.data.(*cdpruntime.EventConsoleAPICalled); ok {
+					p.onConsoleAPICalled(ev)
+				}
+			}
+		}
+	}()
+}
+
 func (p *Page) closeWorker(sessionID target.SessionID) {
 	p.logger.Debugf("Page:closeWorker", "sid:%v", sessionID)
 
@@ -160,7 +223,7 @@ func (p *Page) closeWorker(sessionID target.SessionID) {
 }
 
 func (p *Page) defaultTimeout() time.Duration {
-	return time.Duration(p.timeoutSettings.timeout()) * time.Second
+	return p.timeoutSettings.timeout()
 }
 
 func (p *Page) didClose() {
@@ -275,12 +338,15 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
 	p.logger.Debugf("Page:attachFrameSession", "sid:%v fid=%v", p.session.ID(), fid)
+	p.frameSessionsMu.Lock()
+	defer p.frameSessionsMu.Unlock()
 	fs.page.frameSessions[fid] = fs
 }
 
 func (p *Page) getFrameSession(frameID cdp.FrameID) *FrameSession {
 	p.logger.Debugf("Page:getFrameSession", "sid:%v fid:%v", p.sessionID(), frameID)
-
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 	return p.frameSessions[frameID]
 }
 
@@ -320,6 +386,9 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 func (p *Page) updateExtraHTTPHeaders() {
 	p.logger.Debugf("Page:updateExtraHTTPHeaders", "sid:%v", p.sessionID())
 
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+
 	for _, fs := range p.frameSessions {
 		fs.updateExtraHTTPHeaders(false)
 	}
@@ -327,6 +396,9 @@ func (p *Page) updateExtraHTTPHeaders() {
 
 func (p *Page) updateGeolocation() error {
 	p.logger.Debugf("Page:updateGeolocation", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
 		p.logger.Debugf("Page:updateGeolocation:frameSession",
@@ -341,11 +413,15 @@ func (p *Page) updateGeolocation() error {
 			return err
 		}
 	}
+
 	return nil
 }
 
 func (p *Page) updateOffline() {
 	p.logger.Debugf("Page:updateOffline", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
 		fs.updateOffline(false)
@@ -354,6 +430,9 @@ func (p *Page) updateOffline() {
 
 func (p *Page) updateHttpCredentials() {
 	p.logger.Debugf("Page:updateHttpCredentials", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
 		fs.updateHTTPCredentials(false)
@@ -503,11 +582,14 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 	p.colorScheme = parsedOpts.ColorScheme
 	p.reducedMotion = parsedOpts.ReducedMotion
 
+	p.frameSessionsMu.RLock()
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
+			p.frameSessionsMu.RUnlock()
 			k6ext.Panic(p.ctx, "emulating media: %w", err)
 		}
 	}
+	p.frameSessionsMu.RUnlock()
 
 	applySlowMo(p.ctx)
 }
@@ -712,6 +794,32 @@ func (p *Page) MainFrame() api.Frame {
 	return mf
 }
 
+// On subscribes to a page event for which the given handler will be executed
+// passing in the ConsoleMessage associated with the event.
+// The only accepted event value is 'console'.
+func (p *Page) On(event string, handler func(*api.ConsoleMessage) error) error {
+	if event != eventPageConsoleAPICalled {
+		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
+	}
+
+	// Once the TaskQueue is initialized, it has to be closed so the event loop can finish.
+	// Therefore, instead of doing it in the constructor, we initialize it only when page.on()
+	// is called, so the user is only required to close the page it using this method.
+	if p.tq == nil {
+		p.tq = taskqueue.New(p.vu.RegisterCallback)
+	}
+
+	p.eventHandlersMu.Lock()
+	defer p.eventHandlersMu.Unlock()
+
+	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
+		p.eventHandlers[eventPageConsoleAPICalled] = make([]consoleEventHandlerFunc, 0, 1)
+	}
+	p.eventHandlers[eventPageConsoleAPICalled] = append(p.eventHandlers[eventPageConsoleAPICalled], handler)
+
+	return nil
+}
+
 // Opener returns the opener of the target.
 func (p *Page) Opener() api.Page {
 	return p.opener
@@ -752,7 +860,10 @@ func (p *Page) QueryAll(selector string) ([]api.ElementHandle, error) {
 func (p *Page) Reload(opts goja.Value) api.Response {
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 
-	parsedOpts := NewPageReloadOptions(LifecycleEventLoad, p.defaultTimeout())
+	parsedOpts := NewPageReloadOptions(
+		LifecycleEventLoad,
+		p.timeoutSettings.navigationTimeout(),
+	)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
 		k6ext.Panic(p.ctx, "parsing reload options: %w", err)
 	}
@@ -860,14 +971,14 @@ func (p *Page) SetContent(html string, opts goja.Value) {
 func (p *Page) SetDefaultNavigationTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultNavigationTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
-	p.timeoutSettings.setDefaultNavigationTimeout(timeout)
+	p.timeoutSettings.setDefaultNavigationTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetDefaultTimeout sets the default maximum timeout in milliseconds.
 func (p *Page) SetDefaultTimeout(timeout int64) {
 	p.logger.Debugf("Page:SetDefaultTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
-	p.timeoutSettings.setDefaultTimeout(timeout)
+	p.timeoutSettings.setDefaultTimeout(time.Duration(timeout) * time.Millisecond)
 }
 
 // SetExtraHTTPHeaders sets default HTTP headers for page and whole frame hierarchy.
@@ -1017,6 +1128,87 @@ func (p *Page) Workers() []api.Worker {
 	return workers
 }
 
+func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
+	// If there are no handlers for EventConsoleAPICalled, return
+	p.eventHandlersMu.RLock()
+	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
+		p.eventHandlersMu.RUnlock()
+		return
+	}
+	p.eventHandlersMu.RUnlock()
+
+	m, err := p.consoleMsgFromConsoleEvent(event)
+	if err != nil {
+		p.logger.Errorf("Page:onConsoleAPICalled", "building console message: %v", err)
+		return
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[eventPageConsoleAPICalled] {
+		h := h
+		// Use TaskQueue in order to synchronize handlers execution in the event loop,
+		// as it is not thread safe and events are processed from a background goroutine
+		p.tq.Queue(func() error {
+			if err := h(m); err != nil {
+				return fmt.Errorf("executing onConsoleAPICalled handler: %w", err)
+			}
+			return nil
+		})
+	}
+}
+
+func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*api.ConsoleMessage, error) {
+	execCtx, err := p.executionContextForID(e.ExecutionContextID)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		l = p.logger.WithTime(e.Timestamp.Time()).
+			WithField("source", "browser").
+			WithField("browser_source", "console-api")
+
+		objects       = make([]any, 0, len(e.Args))
+		objectHandles = make([]api.JSHandle, 0, len(e.Args))
+	)
+
+	for _, robj := range e.Args {
+		i, err := parseRemoteObject(robj)
+		if err != nil {
+			handleParseRemoteObjectErr(p.ctx, err, l)
+		}
+
+		objects = append(objects, i)
+		objectHandles = append(objectHandles, NewJSHandle(
+			p.ctx, p.session, execCtx, execCtx.Frame(), robj, p.logger,
+		))
+	}
+
+	return &api.ConsoleMessage{
+		Args: objectHandles,
+		Page: p,
+		Text: textForConsoleEvent(e, objects),
+		Type: e.Type.String(),
+	}, nil
+}
+
+// executionContextForID returns the page ExecutionContext for the given ID.
+func (p *Page) executionContextForID(
+	executionContextID cdpruntime.ExecutionContextID,
+) (*ExecutionContext, error) {
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+
+	for _, fs := range p.frameSessions {
+		if exc, err := fs.executionContextForID(executionContextID); err == nil {
+			return exc, nil
+		}
+	}
+
+	return nil, fmt.Errorf("no execution context found for id: %v", executionContextID)
+}
+
 // sessionID returns the Page's session ID.
 // It should be used internally in the Page.
 func (p *Page) sessionID() (sid target.SessionID) {
@@ -1024,4 +1216,31 @@ func (p *Page) sessionID() (sid target.SessionID) {
 		sid = p.session.ID()
 	}
 	return sid
+}
+
+// textForConsoleEvent generates the text representation for a consoleAPICalled event
+// mimicking Playwright's behavior.
+func textForConsoleEvent(e *cdpruntime.EventConsoleAPICalled, args []any) string {
+	if e.Type.String() == "dir" || e.Type.String() == "dirxml" ||
+		e.Type.String() == "table" {
+		if len(e.Args) > 0 {
+			// These commands accept a single arg
+			return e.Args[0].Description
+		}
+		return ""
+	}
+
+	// args is a mix of string and non strings, so using fmt.Sprint(args...)
+	// might not add spaces between all elements, therefore use a strings.Builder
+	// and handle format and concatenation
+	var b strings.Builder
+	for i, a := range args {
+		format := " %v"
+		if i == 0 {
+			format = "%v"
+		}
+		b.WriteString(fmt.Sprintf(format, a))
+	}
+
+	return b.String()
 }
