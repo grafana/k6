@@ -29,7 +29,7 @@ type PageAPI interface {
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() KeyboardAPI
 	GetMouse() MouseAPI
-	GetTouchscreen() Touchscreen
+	GetTouchscreen() TouchscreenAPI
 	GoBack(opts goja.Value) ResponseAPI
 	GoForward(opts goja.Value) ResponseAPI
 	Goto(url string, opts goja.Value) (ResponseAPI, error)

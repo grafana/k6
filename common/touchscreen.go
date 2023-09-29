@@ -12,7 +12,7 @@ import (
 
 // Ensure Touchscreen implements the EventEmitter and api.Touchscreen interfaces.
 var _ EventEmitter = &Touchscreen{}
-var _ api.Touchscreen = &Touchscreen{}
+var _ api.TouchscreenAPI = &Touchscreen{}
 
 // Touchscreen represents a touchscreen.
 type Touchscreen struct {
