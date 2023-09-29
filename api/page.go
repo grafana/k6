@@ -47,7 +47,7 @@ type Page interface {
 	// Locator creates and returns a new locator for this page (main frame).
 	Locator(selector string, opts goja.Value) Locator
 	MainFrame() Frame
-	On(event string, handler func(*ConsoleMessage) error) error
+	On(event string, handler func(*ConsoleMessageAPI) error) error
 	Opener() Page
 	Pause()
 	Pdf(opts goja.Value) []byte
