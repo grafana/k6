@@ -9,7 +9,7 @@ type ElementHandleAPI interface {
 	BoundingBox() *Rect
 	Check(opts goja.Value)
 	Click(opts goja.Value) error
-	ContentFrame() (Frame, error)
+	ContentFrame() (FrameAPI, error)
 	Dblclick(opts goja.Value)
 	DispatchEvent(typ string, props goja.Value)
 	Fill(value string, opts goja.Value)
@@ -25,7 +25,7 @@ type ElementHandleAPI interface {
 	IsEnabled() bool
 	IsHidden() bool
 	IsVisible() bool
-	OwnerFrame() (Frame, error)
+	OwnerFrame() (FrameAPI, error)
 	Press(key string, opts goja.Value)
 	Query(selector string) (ElementHandleAPI, error)
 	QueryAll(selector string) ([]ElementHandleAPI, error)

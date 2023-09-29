@@ -401,11 +401,11 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	}
 	fs.isolatedWorlds[name] = true
 
-	var frames []api.Frame
+	var frames []api.FrameAPI
 	if fs.isMainFrame() {
 		frames = fs.manager.Frames()
 	} else {
-		frames = []api.Frame{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
+		frames = []api.FrameAPI{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
 	}
 	for _, frame := range frames {
 		// A frame could have been removed before we execute this, so don't wait around for a reply.

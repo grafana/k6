@@ -6,7 +6,7 @@ import "github.com/dop251/goja"
 type Request interface {
 	AllHeaders() map[string]string
 	Failure() goja.Value
-	Frame() Frame
+	Frame() FrameAPI
 	HeaderValue(string) goja.Value
 	Headers() map[string]string
 	HeadersArray() []HTTPHeader

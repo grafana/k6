@@ -26,8 +26,8 @@ func customMappings() map[string]string {
 		// wildcards
 		"Page.query":                "$",
 		"Page.queryAll":             "$$",
-		"Frame.query":               "$",
-		"Frame.queryAll":            "$$",
+		"FrameAPI.query":            "$",
+		"FrameAPI.queryAll":         "$$",
 		"ElementHandleAPI.query":    "$",
 		"ElementHandleAPI.queryAll": "$$",
 		// getters
@@ -35,12 +35,12 @@ func customMappings() map[string]string {
 		"Page.getMouse":       "mouse",
 		"Page.getTouchscreen": "touchscreen",
 		// internal methods
-		"ElementHandleAPI.objectID": "",
-		"Frame.id":                  "",
-		"Frame.loaderID":            "",
-		"JSHandle.objectID":         "",
-		"BrowserAPI.close":          "",
-		"Frame.evaluateWithContext": "",
+		"ElementHandleAPI.objectID":    "",
+		"FrameAPI.id":                  "",
+		"FrameAPI.loaderID":            "",
+		"JSHandle.objectID":            "",
+		"BrowserAPI.close":             "",
+		"FrameAPI.evaluateWithContext": "",
 		// TODO: browser.on method is unexposed until more event
 		// types other than 'disconnect' are supported.
 		// See: https://github.com/grafana/xk6-browser/issues/913
@@ -158,7 +158,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"frame": {
-			apiInterface: (*api.Frame)(nil),
+			apiInterface: (*api.FrameAPI)(nil),
 			mapp: func() mapping {
 				return mapFrame(moduleVU{VU: vu}, &common.Frame{})
 			},

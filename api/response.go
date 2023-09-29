@@ -7,7 +7,7 @@ type Response interface {
 	AllHeaders() map[string]string
 	Body() goja.ArrayBuffer
 	Finished() bool
-	Frame() Frame
+	Frame() FrameAPI
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string
 	Headers() map[string]string

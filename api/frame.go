@@ -6,12 +6,12 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Frame is the interface of a CDP target frame.
-type Frame interface {
+// FrameAPI is the interface of a CDP target frame.
+type FrameAPI interface {
 	AddScriptTag(opts goja.Value)
 	AddStyleTag(opts goja.Value)
 	Check(selector string, opts goja.Value)
-	ChildFrames() []Frame
+	ChildFrames() []FrameAPI
 	Click(selector string, opts goja.Value) error
 	Content() string
 	Dblclick(selector string, opts goja.Value)
@@ -44,7 +44,7 @@ type Frame interface {
 	Query(selector string) (ElementHandleAPI, error)
 	QueryAll(selector string) ([]ElementHandleAPI, error)
 	Page() Page
-	ParentFrame() Frame
+	ParentFrame() FrameAPI
 	Press(selector string, key string, opts goja.Value)
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
 	SetContent(html string, opts goja.Value)

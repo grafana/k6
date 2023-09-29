@@ -532,10 +532,10 @@ func (m *FrameManager) requestStarted(req *Request) {
 }
 
 // Frames returns a list of frames on the page.
-func (m *FrameManager) Frames() []api.Frame {
+func (m *FrameManager) Frames() []api.FrameAPI {
 	m.framesMu.RLock()
 	defer m.framesMu.RUnlock()
-	frames := make([]api.Frame, 0)
+	frames := make([]api.FrameAPI, 0)
 	for _, frame := range m.frames {
 		frames = append(frames, frame)
 	}

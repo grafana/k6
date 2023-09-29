@@ -24,8 +24,8 @@ type Page interface {
 	ExposeFunction(name string, callback goja.Callable)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	Frame(frameSelector goja.Value) Frame
-	Frames() []Frame
+	Frame(frameSelector goja.Value) FrameAPI
+	Frames() []FrameAPI
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() Keyboard
 	GetMouse() Mouse
@@ -46,7 +46,7 @@ type Page interface {
 	IsVisible(selector string, opts goja.Value) bool
 	// Locator creates and returns a new locator for this page (main frame).
 	Locator(selector string, opts goja.Value) Locator
-	MainFrame() Frame
+	MainFrame() FrameAPI
 	On(event string, handler func(*ConsoleMessageAPI) error) error
 	Opener() Page
 	Pause()
