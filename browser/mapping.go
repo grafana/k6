@@ -433,7 +433,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 				return nil, err //nolint:wrapcheck
 			})
 		},
-		"close":                   p.Close,
+		"close": func(opts goja.Value) error {
+			if vu.tq != nil {
+				vu.tq.Close()
+			}
+			return p.Close(opts) //nolint:wrapcheck
+		},
 		"content":                 p.Content,
 		"context":                 p.Context,
 		"dblclick":                p.Dblclick,
@@ -504,20 +509,22 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
 		"on": func(event string, handler goja.Callable) error {
+			if vu.tq == nil {
+				vu.tq = taskqueue.New(vu.RegisterCallback)
+			}
+
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
 				_, err := handler(goja.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
 			runInTaskQueue := func(m *common.ConsoleMessage) {
-				tq := taskqueue.New(vu.RegisterCallback)
-				tq.Queue(func() error {
+				vu.tq.Queue(func() error {
 					if err := mapMsgAndHandleEvent(m); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
 					return nil
 				})
-				tq.Close()
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck

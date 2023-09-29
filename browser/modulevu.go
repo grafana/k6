@@ -3,6 +3,8 @@ package browser
 import (
 	"context"
 
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 
@@ -18,6 +20,8 @@ type moduleVU struct {
 
 	*pidRegistry
 	*browserRegistry
+
+	tq *taskqueue.TaskQueue
 }
 
 // browser returns the VU browser instance for the current iteration.
