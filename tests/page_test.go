@@ -8,7 +8,6 @@ import (
 	"image/png"
 	"net/http"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -916,70 +915,55 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 
 			// Use withSkipClose() opt as we will close it
 			// manually to force the page.TaskQueue closing
-			tb := newTestBrowser(t, withSkipClose())
+			tb := newTestBrowser(t)
 			p := tb.NewPage(nil)
 
 			var (
 				assertOne, assertTwo bool
-				wg                   sync.WaitGroup
+				done1                = make(chan bool)
+				done2                = make(chan bool)
 
 				assertTO bool
-				testTO   = 5 * time.Second
+				testTO   = 2500 * time.Millisecond
 			)
 
 			// Console Messages should be multiplexed for every registered handler
-			eventHandlerOne := func(cm *common.ConsoleMessage) error { //nolint:unparam
-				defer wg.Done()
+			eventHandlerOne := func(cm *common.ConsoleMessage) {
+				defer close(done1)
 				assertOne = tc.assertFn(cm)
-				return nil
 			}
 
-			eventHandlerTwo := func(cm *common.ConsoleMessage) error { //nolint:unparam
-				defer wg.Done()
+			eventHandlerTwo := func(cm *common.ConsoleMessage) {
+				defer close(done2)
 				assertTwo = tc.assertFn(cm)
-				return nil
 			}
 
-			wg.Add(2)
-
-			err := tb.vu.Loop.Start(func() error {
-				r := tb.vu.Loop.RegisterCallback()
-				go func() {
-					// Wait for handlers to be called
-					// or for the test to time out
-					done := make(chan struct{})
-					go func() {
-						wg.Wait()
-						close(done)
-					}()
-
-					select {
-					case <-done:
-					case <-time.After(testTO):
-						assertTO = true
-					}
-
-					r(func() error {
-						tb.Close()
-						return nil
-					})
-				}()
-				err := p.On("console", eventHandlerOne)
-				if err != nil {
-					return err
-				}
-				err = p.On("console", eventHandlerTwo)
-				if err != nil {
-					return err
-				}
-				p.Evaluate(tb.toGojaValue(tc.consoleFn))
-
-				return nil
-			})
+			// eventHandlerOne and eventHandlerTwo will be called from a
+			// separate goroutine from within the page's async event loop.
+			// This is why we need to wait on done1 and done2 to be closed.
+			err := p.On("console", eventHandlerOne)
 			require.NoError(t, err)
 
+			err = p.On("console", eventHandlerTwo)
+			require.NoError(t, err)
+
+			p.Evaluate(tb.toGojaValue(tc.consoleFn))
+
+			select {
+			case <-done1:
+			case <-time.After(testTO):
+				assertTO = true
+			}
+
+			select {
+			case <-done2:
+			case <-time.After(testTO):
+				assertTO = true
+			}
+
 			assert.False(t, assertTO, "test timed out before event handlers were called")
-			assert.True(t, assertOne && assertTwo, "error asserting console message")
+			assert.True(t, assertOne, "error asserting console message for assertOne")
+			assert.True(t, assertTwo, "error asserting console message for assertTwo")
 		})
 	}
 }

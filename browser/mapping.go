@@ -509,7 +509,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 				_, err := handler(goja.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
-			runInTaskQueue := func(m *api.ConsoleMessage) error {
+			runInTaskQueue := func(m *common.ConsoleMessage) {
 				tq := taskqueue.New(vu.RegisterCallback)
 				tq.Queue(func() error {
 					if err := mapMsgAndHandleEvent(m); err != nil {
@@ -518,7 +518,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 					return nil
 				})
 				tq.Close()
-				return nil
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck

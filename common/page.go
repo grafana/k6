@@ -179,7 +179,7 @@ func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
 	}
 }
 
-type consoleEventHandlerFunc func(*ConsoleMessage) error
+type consoleEventHandlerFunc func(*ConsoleMessage)
 
 // ConsoleMessage represents a page console message.
 type ConsoleMessage struct {
@@ -946,7 +946,7 @@ func (p *Page) MainFrame() *Frame {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event string, handler func(*ConsoleMessage) error) error {
+func (p *Page) On(event string, handler func(*ConsoleMessage)) error {
 	if event != eventPageConsoleAPICalled {
 		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
 	}
