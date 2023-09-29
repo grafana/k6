@@ -86,7 +86,7 @@ type Page struct {
 	frameSessions    map[cdp.FrameID]*FrameSession
 	frameSessionsMu  sync.RWMutex
 	workers          map[target.SessionID]*Worker
-	routes           []api.Route
+	routes           []api.RouteAPI
 	vu               k6modules.VU
 
 	tq *taskqueue.TaskQueue
@@ -123,7 +123,7 @@ func NewPage(
 		eventHandlers:    make(map[string][]consoleEventHandlerFunc),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
-		routes:           make([]api.Route, 0),
+		routes:           make([]api.RouteAPI, 0),
 		vu:               k6ext.GetVU(ctx),
 		logger:           logger,
 	}
