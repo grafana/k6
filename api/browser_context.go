@@ -16,7 +16,7 @@ type BrowserContextAPI interface {
 	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
 	ExposeFunction(name string, callback goja.Callable)
 	GrantPermissions(permissions []string, opts goja.Value)
-	NewCDPSession() CDPSession
+	NewCDPSession() CDPSessionAPI
 	NewPage() (Page, error)
 	Pages() []Page
 	Route(url goja.Value, handler goja.Callable)
