@@ -6,7 +6,7 @@ import (
 )
 
 // Ensure Browser implements the api.Browser interface.
-var _ api.Browser = &Browser{}
+var _ api.BrowserAPI = &Browser{}
 
 // Browser is the public interface of a CDP browser.
 type Browser struct {

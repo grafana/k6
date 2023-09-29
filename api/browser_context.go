@@ -8,7 +8,7 @@ import (
 type BrowserContextAPI interface {
 	AddCookies(cookies []*Cookie) error
 	AddInitScript(script goja.Value, arg goja.Value) error
-	Browser() Browser
+	Browser() BrowserAPI
 	ClearCookies() error
 	ClearPermissions()
 	Close()

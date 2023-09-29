@@ -98,7 +98,7 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(ctx context.Context, wsEndpoint string) (api.Browser, error) {
+func (b *BrowserType) Connect(ctx context.Context, wsEndpoint string) (api.BrowserAPI, error) {
 	ctx, browserOpts, logger, err := b.init(ctx, true)
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
@@ -153,7 +153,7 @@ func (b *BrowserType) link(
 
 // Launch allocates a new Chrome browser process and returns a new api.Browser value,
 // which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch(ctx context.Context) (_ api.Browser, browserProcessID int, _ error) {
+func (b *BrowserType) Launch(ctx context.Context) (_ api.BrowserAPI, browserProcessID int, _ error) {
 	ctx, browserOpts, logger, err := b.init(ctx, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
@@ -212,7 +212,7 @@ func (b *BrowserType) tmpdir() string {
 }
 
 // LaunchPersistentContext launches the browser with persistent storage.
-func (b *BrowserType) LaunchPersistentContext(userDataDir string, opts goja.Value) api.Browser {
+func (b *BrowserType) LaunchPersistentContext(_ string, _ goja.Value) api.BrowserAPI {
 	rt := b.vu.Runtime()
 	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet"))
 	return nil

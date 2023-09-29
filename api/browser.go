@@ -2,8 +2,8 @@ package api
 
 import "github.com/dop251/goja"
 
-// Browser is the public interface of a CDP browser.
-type Browser interface {
+// BrowserAPI is the public interface of a CDP browser.
+type BrowserAPI interface {
 	Close()
 	Context() BrowserContextAPI
 	IsConnected() bool

@@ -39,12 +39,12 @@ func customMappings() map[string]string {
 		"Frame.id":                  "",
 		"Frame.loaderID":            "",
 		"JSHandle.objectID":         "",
-		"Browser.close":             "",
+		"BrowserAPI.close":          "",
 		"Frame.evaluateWithContext": "",
 		// TODO: browser.on method is unexposed until more event
 		// types other than 'disconnect' are supported.
 		// See: https://github.com/grafana/xk6-browser/issues/913
-		"Browser.on": "",
+		"BrowserAPI.on": "",
 	}
 }
 
@@ -124,7 +124,7 @@ func TestMappings(t *testing.T) {
 
 	for name, tt := range map[string]test{
 		"browser": {
-			apiInterface: (*api.Browser)(nil),
+			apiInterface: (*api.BrowserAPI)(nil),
 			mapp: func() mapping {
 				return mapBrowser(moduleVU{VU: vu})
 			},

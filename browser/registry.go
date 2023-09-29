@@ -169,21 +169,21 @@ type browserRegistry struct {
 	vu k6modules.VU
 
 	mu sync.RWMutex
-	m  map[int64]api.Browser
+	m  map[int64]api.BrowserAPI
 
 	buildFn browserBuildFunc
 
 	stopped atomic.Bool // testing purposes
 }
 
-type browserBuildFunc func(ctx context.Context) (api.Browser, error)
+type browserBuildFunc func(ctx context.Context) (api.BrowserAPI, error)
 
 func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
-	builder := func(ctx context.Context) (api.Browser, error) {
+	builder := func(ctx context.Context) (api.BrowserAPI, error) {
 		var (
 			err                    error
-			b                      api.Browser
+			b                      api.BrowserAPI
 			wsURL, isRemoteBrowser = remote.isRemoteBrowser()
 		)
 
@@ -206,7 +206,7 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 
 	r := &browserRegistry{
 		vu:      vu,
-		m:       make(map[int64]api.Browser),
+		m:       make(map[int64]api.BrowserAPI),
 		buildFn: builder,
 	}
 
@@ -298,14 +298,14 @@ func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscr
 	r.clear()
 }
 
-func (r *browserRegistry) setBrowser(id int64, b api.Browser) {
+func (r *browserRegistry) setBrowser(id int64, b api.BrowserAPI) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.m[id] = b
 }
 
-func (r *browserRegistry) getBrowser(id int64) (api.Browser, error) {
+func (r *browserRegistry) getBrowser(id int64) (api.BrowserAPI, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
