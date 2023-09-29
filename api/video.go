@@ -1,6 +1,6 @@
 package api
 
-// Video is the interface of a recorded video.
-type Video interface {
+// VideoAPI is the interface of a recorded video.
+type VideoAPI interface {
 	Path() string
 }

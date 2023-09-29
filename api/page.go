@@ -71,7 +71,7 @@ type PageAPI interface {
 	Uncheck(selector string, opts goja.Value)
 	Unroute(url goja.Value, handler goja.Callable)
 	URL() string
-	Video() Video
+	Video() VideoAPI
 	ViewportSize() map[string]float64
 	WaitForEvent(event string, optsOrPredicate goja.Value) any
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
