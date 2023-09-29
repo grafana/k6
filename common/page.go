@@ -36,7 +36,7 @@ const (
 // Ensure page implements the EventEmitter, Target and Page interfaces.
 var (
 	_ EventEmitter = &Page{}
-	_ api.Page     = &Page{}
+	_ api.PageAPI  = &Page{}
 )
 
 type consoleEventHandlerFunc func(*api.ConsoleMessageAPI) error
@@ -821,7 +821,7 @@ func (p *Page) On(event string, handler func(*api.ConsoleMessageAPI) error) erro
 }
 
 // Opener returns the opener of the target.
-func (p *Page) Opener() api.Page {
+func (p *Page) Opener() api.PageAPI {
 	return p.opener
 }
 

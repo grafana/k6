@@ -2,8 +2,8 @@ package api
 
 import "github.com/dop251/goja"
 
-// Page is the interface of a single browser tab.
-type Page interface {
+// PageAPI is the interface of a single browser tab.
+type PageAPI interface {
 	AddInitScript(script goja.Value, arg goja.Value)
 	AddScriptTag(opts goja.Value)
 	AddStyleTag(opts goja.Value)
@@ -48,7 +48,7 @@ type Page interface {
 	Locator(selector string, opts goja.Value) LocatorAPI
 	MainFrame() FrameAPI
 	On(event string, handler func(*ConsoleMessageAPI) error) error
-	Opener() Page
+	Opener() PageAPI
 	Pause()
 	Pdf(opts goja.Value) []byte
 	Press(selector string, key string, opts goja.Value)

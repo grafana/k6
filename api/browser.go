@@ -8,7 +8,7 @@ type BrowserAPI interface {
 	Context() BrowserContextAPI
 	IsConnected() bool
 	NewContext(opts goja.Value) (BrowserContextAPI, error)
-	NewPage(opts goja.Value) (Page, error)
+	NewPage(opts goja.Value) (PageAPI, error)
 	On(string) (bool, error)
 	UserAgent() string
 	Version() string

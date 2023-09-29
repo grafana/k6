@@ -6,7 +6,7 @@ type ConsoleMessageAPI struct {
 	Args []JSHandleAPI
 
 	// Page is the page that produced the console message, if any.
-	Page Page
+	Page PageAPI
 
 	// Text represents the text of the console message.
 	Text string

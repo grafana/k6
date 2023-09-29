@@ -17,8 +17,8 @@ type BrowserContextAPI interface {
 	ExposeFunction(name string, callback goja.Callable)
 	GrantPermissions(permissions []string, opts goja.Value)
 	NewCDPSession() CDPSessionAPI
-	NewPage() (Page, error)
-	Pages() []Page
+	NewPage() (PageAPI, error)
+	Pages() []PageAPI
 	Route(url goja.Value, handler goja.Callable)
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)

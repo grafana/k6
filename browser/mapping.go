@@ -423,7 +423,7 @@ func mapFrame(vu moduleVU, f api.FrameAPI) mapping {
 // mapPage to the JS module.
 //
 //nolint:funlen
-func mapPage(vu moduleVU, p api.Page) mapping {
+func mapPage(vu moduleVU, p api.PageAPI) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"addInitScript": p.AddInitScript,
@@ -657,7 +657,7 @@ func mapBrowserContext(vu moduleVU, bc api.BrowserContextAPI) mapping { //nolint
 					return nil, err //nolint:wrapcheck
 				}
 
-				p, ok := resp.(api.Page)
+				p, ok := resp.(api.PageAPI)
 				if !ok {
 					panicIfFatalError(ctx, fmt.Errorf("response object is not a page: %w", k6error.ErrFatal))
 				}

@@ -43,7 +43,7 @@ type FrameAPI interface {
 	Name() string
 	Query(selector string) (ElementHandleAPI, error)
 	QueryAll(selector string) ([]ElementHandleAPI, error)
-	Page() Page
+	Page() PageAPI
 	ParentFrame() FrameAPI
 	Press(selector string, key string, opts goja.Value)
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string

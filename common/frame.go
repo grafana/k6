@@ -1330,7 +1330,7 @@ func (f *Frame) QueryAll(selector string) ([]api.ElementHandleAPI, error) {
 }
 
 // Page returns page that owns frame.
-func (f *Frame) Page() api.Page {
+func (f *Frame) Page() api.PageAPI {
 	return f.manager.page
 }
 
