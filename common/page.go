@@ -678,7 +678,7 @@ func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.
 }
 
 // GetKeyboard returns the keyboard for the page.
-func (p *Page) GetKeyboard() api.Keyboard {
+func (p *Page) GetKeyboard() api.KeyboardAPI {
 	return p.Keyboard
 }
 

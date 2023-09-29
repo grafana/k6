@@ -2,8 +2,8 @@ package api
 
 import "github.com/dop251/goja"
 
-// Keyboard is the interface of a keyboard input device.
-type Keyboard interface {
+// KeyboardAPI is the interface of a keyboard input device.
+type KeyboardAPI interface {
 	Down(key string)
 	InsertText(char string)
 	Press(key string, opts goja.Value)
