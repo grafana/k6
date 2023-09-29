@@ -77,7 +77,7 @@ type PageAPI interface {
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (Response, error)
-	WaitForRequest(urlOrPredicate, opts goja.Value) Request
+	WaitForRequest(urlOrPredicate, opts goja.Value) RequestAPI
 	WaitForResponse(urlOrPredicate, opts goja.Value) Response
 	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 	WaitForTimeout(timeout int64)

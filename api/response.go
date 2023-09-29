@@ -14,7 +14,7 @@ type Response interface {
 	HeadersArray() []HTTPHeader
 	JSON() goja.Value
 	Ok() bool
-	Request() Request
+	Request() RequestAPI
 	SecurityDetails() goja.Value
 	ServerAddr() goja.Value
 	Size() HTTPMessageSize

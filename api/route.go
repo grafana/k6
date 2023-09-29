@@ -7,5 +7,5 @@ type Route interface {
 	Abort(errorCode string)
 	Continue(opts goja.Value)
 	Fulfill(opts goja.Value)
-	Request() Request
+	Request() RequestAPI
 }

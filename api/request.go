@@ -2,8 +2,8 @@ package api
 
 import "github.com/dop251/goja"
 
-// Request is the interface of an HTTP request.
-type Request interface {
+// RequestAPI is the interface of an HTTP request.
+type RequestAPI interface {
 	AllHeaders() map[string]string
 	Failure() goja.Value
 	Frame() FrameAPI
@@ -15,8 +15,8 @@ type Request interface {
 	PostData() string
 	PostDataBuffer() goja.ArrayBuffer
 	PostDataJSON() string
-	RedirectedFrom() Request
-	RedirectedTo() Request
+	RedirectedFrom() RequestAPI
+	RedirectedTo() RequestAPI
 	ResourceType() string
 	Response() Response
 	Size() HTTPMessageSize
