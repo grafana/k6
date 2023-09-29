@@ -45,7 +45,7 @@ type Page interface {
 	IsHidden(selector string, opts goja.Value) bool
 	IsVisible(selector string, opts goja.Value) bool
 	// Locator creates and returns a new locator for this page (main frame).
-	Locator(selector string, opts goja.Value) Locator
+	Locator(selector string, opts goja.Value) LocatorAPI
 	MainFrame() FrameAPI
 	On(event string, handler func(*ConsoleMessageAPI) error) error
 	Opener() Page

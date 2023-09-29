@@ -39,7 +39,7 @@ type FrameAPI interface {
 	ID() string
 	LoaderID() string
 	// Locator creates and returns a new locator for this frame.
-	Locator(selector string, opts goja.Value) Locator
+	Locator(selector string, opts goja.Value) LocatorAPI
 	Name() string
 	Query(selector string) (ElementHandleAPI, error)
 	QueryAll(selector string) ([]ElementHandleAPI, error)

@@ -773,7 +773,7 @@ func (p *Page) IsVisible(selector string, opts goja.Value) bool {
 }
 
 // Locator creates and returns a new locator for this page (main frame).
-func (p *Page) Locator(selector string, opts goja.Value) api.Locator {
+func (p *Page) Locator(selector string, opts goja.Value) api.LocatorAPI {
 	p.logger.Debugf("Page:Locator", "sid:%s sel: %q opts:%+v", p.sessionID(), selector, opts)
 
 	return p.MainFrame().Locator(selector, opts)

@@ -182,7 +182,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapLocator": {
-			apiInterface: (*api.Locator)(nil),
+			apiInterface: (*api.LocatorAPI)(nil),
 			mapp: func() mapping {
 				return mapLocator(moduleVU{VU: vu}, &common.Locator{})
 			},
