@@ -81,5 +81,5 @@ type PageAPI interface {
 	WaitForResponse(urlOrPredicate, opts goja.Value) ResponseAPI
 	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 	WaitForTimeout(timeout int64)
-	Workers() []Worker
+	Workers() []WorkerAPI
 }

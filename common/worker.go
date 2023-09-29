@@ -17,7 +17,7 @@ import (
 
 // Ensure Worker implements the EventEmitter, Target and api.Worker interfaces.
 var _ EventEmitter = &Worker{}
-var _ api.Worker = &Worker{}
+var _ api.WorkerAPI = &Worker{}
 
 type Worker struct {
 	BaseEventEmitter

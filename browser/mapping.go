@@ -602,7 +602,7 @@ func mapPage(vu moduleVU, p api.PageAPI) mapping {
 }
 
 // mapWorker to the JS module.
-func mapWorker(vu moduleVU, w api.Worker) mapping {
+func mapWorker(vu moduleVU, w api.WorkerAPI) mapping {
 	return mapping{
 		"evaluate": w.Evaluate,
 		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {

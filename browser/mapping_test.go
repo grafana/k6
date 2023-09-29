@@ -176,7 +176,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapWorker": {
-			apiInterface: (*api.Worker)(nil),
+			apiInterface: (*api.WorkerAPI)(nil),
 			mapp: func() mapping {
 				return mapWorker(moduleVU{VU: vu}, &common.Worker{})
 			},
