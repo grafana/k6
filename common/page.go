@@ -548,7 +548,7 @@ func (p *Page) Content() string {
 }
 
 // Context closes the page.
-func (p *Page) Context() api.BrowserContext {
+func (p *Page) Context() api.BrowserContextAPI {
 	return p.browserCtx
 }
 

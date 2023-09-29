@@ -130,7 +130,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"browserContext": {
-			apiInterface: (*api.BrowserContext)(nil),
+			apiInterface: (*api.BrowserContextAPI)(nil),
 			mapp: func() mapping {
 				return mapBrowserContext(moduleVU{VU: vu}, &common.BrowserContext{})
 			},

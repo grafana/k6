@@ -4,8 +4,8 @@ import (
 	"github.com/dop251/goja"
 )
 
-// BrowserContext is the public interface of a CDP browser context.
-type BrowserContext interface {
+// BrowserContextAPI is the public interface of a CDP browser context.
+type BrowserContextAPI interface {
 	AddCookies(cookies []*Cookie) error
 	AddInitScript(script goja.Value, arg goja.Value) error
 	Browser() Browser

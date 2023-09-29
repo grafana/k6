@@ -26,8 +26,8 @@ import (
 
 // Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces.
 var (
-	_ EventEmitter       = &BrowserContext{}
-	_ api.BrowserContext = &BrowserContext{}
+	_ EventEmitter          = &BrowserContext{}
+	_ api.BrowserContextAPI = &BrowserContext{}
 )
 
 // waitForEventType represents the event types that can be used when working

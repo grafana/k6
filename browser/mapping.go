@@ -618,7 +618,7 @@ func mapWorker(vu moduleVU, w api.Worker) mapping {
 }
 
 // mapBrowserContext to the JS module.
-func mapBrowserContext(vu moduleVU, bc api.BrowserContext) mapping {
+func mapBrowserContext(vu moduleVU, bc api.BrowserContextAPI) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies":                  bc.AddCookies,
@@ -725,7 +725,7 @@ func mapConsoleMessage(vu moduleVU, cm *api.ConsoleMessage) mapping {
 func mapBrowser(vu moduleVU) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"context": func() (api.BrowserContext, error) {
+		"context": func() (api.BrowserContextAPI, error) {
 			b, err := vu.browser()
 			if err != nil {
 				return nil, err

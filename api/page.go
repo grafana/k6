@@ -12,7 +12,7 @@ type Page interface {
 	Click(selector string, opts goja.Value) error
 	Close(opts goja.Value) error
 	Content() string
-	Context() BrowserContext
+	Context() BrowserContextAPI
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	DragAndDrop(source string, target string, opts goja.Value)
