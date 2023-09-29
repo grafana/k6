@@ -52,8 +52,8 @@ type Page interface {
 	Pause()
 	Pdf(opts goja.Value) []byte
 	Press(selector string, key string, opts goja.Value)
-	Query(selector string) (ElementHandle, error)
-	QueryAll(selector string) ([]ElementHandle, error)
+	Query(selector string) (ElementHandleAPI, error)
+	QueryAll(selector string) ([]ElementHandleAPI, error)
 	Reload(opts goja.Value) Response
 	Route(url goja.Value, handler goja.Callable)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
@@ -79,7 +79,7 @@ type Page interface {
 	WaitForNavigation(opts goja.Value) (Response, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) Request
 	WaitForResponse(urlOrPredicate, opts goja.Value) Response
-	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
+	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 	WaitForTimeout(timeout int64)
 	Workers() []Worker
 }

@@ -2,8 +2,8 @@ package api
 
 import "github.com/dop251/goja"
 
-// ElementHandle is the interface of an in-page DOM element.
-type ElementHandle interface {
+// ElementHandleAPI is the interface of an in-page DOM element.
+type ElementHandleAPI interface {
 	JSHandle
 
 	BoundingBox() *Rect
@@ -27,8 +27,8 @@ type ElementHandle interface {
 	IsVisible() bool
 	OwnerFrame() (Frame, error)
 	Press(key string, opts goja.Value)
-	Query(selector string) (ElementHandle, error)
-	QueryAll(selector string) ([]ElementHandle, error)
+	Query(selector string) (ElementHandleAPI, error)
+	QueryAll(selector string) ([]ElementHandleAPI, error)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
 	ScrollIntoViewIfNeeded(opts goja.Value)
 	SelectOption(values goja.Value, opts goja.Value) []string
@@ -39,5 +39,5 @@ type ElementHandle interface {
 	Type(text string, opts goja.Value)
 	Uncheck(opts goja.Value)
 	WaitForElementState(state string, opts goja.Value)
-	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
+	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 }

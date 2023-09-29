@@ -7,7 +7,7 @@ import (
 
 // JSHandle is the interface of an in-page JS object.
 type JSHandle interface {
-	AsElement() ElementHandle
+	AsElement() ElementHandleAPI
 	Dispose()
 	Evaluate(pageFunc goja.Value, args ...goja.Value) any
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)

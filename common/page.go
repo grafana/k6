@@ -843,14 +843,14 @@ func (p *Page) Press(selector string, key string, opts goja.Value) {
 }
 
 // Query returns the first element matching the specified selector.
-func (p *Page) Query(selector string) (api.ElementHandle, error) {
+func (p *Page) Query(selector string) (api.ElementHandleAPI, error) {
 	p.logger.Debugf("Page:Query", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.frameManager.MainFrame().Query(selector)
 }
 
 // QueryAll returns all elements matching the specified selector.
-func (p *Page) QueryAll(selector string) ([]api.ElementHandle, error) {
+func (p *Page) QueryAll(selector string) ([]api.ElementHandleAPI, error) {
 	p.logger.Debugf("Page:QueryAll", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.frameManager.MainFrame().QueryAll(selector)
@@ -1104,7 +1104,7 @@ func (p *Page) WaitForResponse(urlOrPredicate, opts goja.Value) api.Response {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (p *Page) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
+func (p *Page) WaitForSelector(selector string, opts goja.Value) (api.ElementHandleAPI, error) {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
 		p.sessionID(), p.session.TargetID(), p.targetID, selector)

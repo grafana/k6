@@ -24,18 +24,18 @@ import (
 func customMappings() map[string]string {
 	return map[string]string{
 		// wildcards
-		"Page.query":             "$",
-		"Page.queryAll":          "$$",
-		"Frame.query":            "$",
-		"Frame.queryAll":         "$$",
-		"ElementHandle.query":    "$",
-		"ElementHandle.queryAll": "$$",
+		"Page.query":                "$",
+		"Page.queryAll":             "$$",
+		"Frame.query":               "$",
+		"Frame.queryAll":            "$$",
+		"ElementHandleAPI.query":    "$",
+		"ElementHandleAPI.queryAll": "$$",
 		// getters
 		"Page.getKeyboard":    "keyboard",
 		"Page.getMouse":       "mouse",
 		"Page.getTouchscreen": "touchscreen",
 		// internal methods
-		"ElementHandle.objectID":    "",
+		"ElementHandleAPI.objectID": "",
 		"Frame.id":                  "",
 		"Frame.loaderID":            "",
 		"JSHandle.objectID":         "",
@@ -146,7 +146,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"elementHandle": {
-			apiInterface: (*api.ElementHandle)(nil),
+			apiInterface: (*api.ElementHandleAPI)(nil),
 			mapp: func() mapping {
 				return mapElementHandle(moduleVU{VU: vu}, &common.ElementHandle{})
 			},

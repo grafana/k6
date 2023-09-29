@@ -22,7 +22,7 @@ type Frame interface {
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	FrameElement() (ElementHandle, error)
+	FrameElement() (ElementHandleAPI, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	Goto(url string, opts goja.Value) (Response, error)
 	Hover(selector string, opts goja.Value)
@@ -41,8 +41,8 @@ type Frame interface {
 	// Locator creates and returns a new locator for this frame.
 	Locator(selector string, opts goja.Value) Locator
 	Name() string
-	Query(selector string) (ElementHandle, error)
-	QueryAll(selector string) ([]ElementHandle, error)
+	Query(selector string) (ElementHandleAPI, error)
+	QueryAll(selector string) ([]ElementHandleAPI, error)
 	Page() Page
 	ParentFrame() Frame
 	Press(selector string, key string, opts goja.Value)
@@ -58,6 +58,6 @@ type Frame interface {
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (Response, error)
-	WaitForSelector(selector string, opts goja.Value) (ElementHandle, error)
+	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 	WaitForTimeout(timeout int64)
 }
