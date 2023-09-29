@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6error"
@@ -508,7 +509,19 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 				_, err := handler(goja.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
-			return p.On(event, mapMsgAndHandleEvent) //nolint:wrapcheck
+			runInTaskQueue := func(m *api.ConsoleMessage) error {
+				tq := taskqueue.New(vu.RegisterCallback)
+				tq.Queue(func() error {
+					if err := mapMsgAndHandleEvent(m); err != nil {
+						return fmt.Errorf("executing page.on handler: %w", err)
+					}
+					return nil
+				})
+				tq.Close()
+				return nil
+			}
+
+			return p.On(event, runInTaskQueue) //nolint:wrapcheck
 		},
 		"opener": p.Opener,
 		"pause":  p.Pause,

@@ -20,7 +20,6 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -248,8 +247,6 @@ type Page struct {
 	routes           []any // TODO: Implement
 	vu               k6modules.VU
 
-	tq *taskqueue.TaskQueue
-
 	logger *log.Logger
 }
 
@@ -344,12 +341,6 @@ func (p *Page) initEvents() {
 		defer func() {
 			p.logger.Debugf("Page:initEvents:go:return",
 				"sid:%v tid:%v", p.session.ID(), p.targetID)
-			// TaskQueue is only initialized when calling page.on() method
-			// so users are not always required to close the page in order
-			// to let the iteration finish.
-			if p.tq != nil {
-				p.tq.Close()
-			}
 		}()
 
 		for {
@@ -960,13 +951,6 @@ func (p *Page) On(event string, handler func(*ConsoleMessage) error) error {
 		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
 	}
 
-	// Once the TaskQueue is initialized, it has to be closed so the event loop can finish.
-	// Therefore, instead of doing it in the constructor, we initialize it only when page.on()
-	// is called, so the user is only required to close the page it using this method.
-	if p.tq == nil {
-		p.tq = taskqueue.New(p.vu.RegisterCallback)
-	}
-
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
@@ -1305,14 +1289,7 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	defer p.eventHandlersMu.RUnlock()
 	for _, h := range p.eventHandlers[eventPageConsoleAPICalled] {
 		h := h
-		// Use TaskQueue in order to synchronize handlers execution in the event loop,
-		// as it is not thread safe and events are processed from a background goroutine
-		p.tq.Queue(func() error {
-			if err := h(m); err != nil {
-				return fmt.Errorf("executing onConsoleAPICalled handler: %w", err)
-			}
-			return nil
-		})
+		h(m)
 	}
 }
 
