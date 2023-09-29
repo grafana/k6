@@ -2,8 +2,8 @@ package api
 
 import "github.com/dop251/goja"
 
-// Response is the interface of an HTTP response.
-type Response interface {
+// ResponseAPI is the interface of an HTTP response.
+type ResponseAPI interface {
 	AllHeaders() map[string]string
 	Body() goja.ArrayBuffer
 	Finished() bool

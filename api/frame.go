@@ -24,7 +24,7 @@ type FrameAPI interface {
 	Focus(selector string, opts goja.Value)
 	FrameElement() (ElementHandleAPI, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
-	Goto(url string, opts goja.Value) (Response, error)
+	Goto(url string, opts goja.Value) (ResponseAPI, error)
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
@@ -57,7 +57,7 @@ type FrameAPI interface {
 	URL() string
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
-	WaitForNavigation(opts goja.Value) (Response, error)
+	WaitForNavigation(opts goja.Value) (ResponseAPI, error)
 	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 	WaitForTimeout(timeout int64)
 }

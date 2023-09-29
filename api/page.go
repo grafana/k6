@@ -30,9 +30,9 @@ type PageAPI interface {
 	GetKeyboard() KeyboardAPI
 	GetMouse() MouseAPI
 	GetTouchscreen() Touchscreen
-	GoBack(opts goja.Value) Response
-	GoForward(opts goja.Value) Response
-	Goto(url string, opts goja.Value) (Response, error)
+	GoBack(opts goja.Value) ResponseAPI
+	GoForward(opts goja.Value) ResponseAPI
+	Goto(url string, opts goja.Value) (ResponseAPI, error)
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
@@ -54,7 +54,7 @@ type PageAPI interface {
 	Press(selector string, key string, opts goja.Value)
 	Query(selector string) (ElementHandleAPI, error)
 	QueryAll(selector string) ([]ElementHandleAPI, error)
-	Reload(opts goja.Value) Response
+	Reload(opts goja.Value) ResponseAPI
 	Route(url goja.Value, handler goja.Callable)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
@@ -76,9 +76,9 @@ type PageAPI interface {
 	WaitForEvent(event string, optsOrPredicate goja.Value) any
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
-	WaitForNavigation(opts goja.Value) (Response, error)
+	WaitForNavigation(opts goja.Value) (ResponseAPI, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) RequestAPI
-	WaitForResponse(urlOrPredicate, opts goja.Value) Response
+	WaitForResponse(urlOrPredicate, opts goja.Value) ResponseAPI
 	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 	WaitForTimeout(timeout int64)
 	Workers() []Worker

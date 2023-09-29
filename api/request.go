@@ -18,7 +18,7 @@ type RequestAPI interface {
 	RedirectedFrom() RequestAPI
 	RedirectedTo() RequestAPI
 	ResourceType() string
-	Response() Response
+	Response() ResponseAPI
 	Size() HTTPMessageSize
 	Timing() goja.Value
 	URL() string

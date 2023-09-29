@@ -877,7 +877,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
-func (f *Frame) Goto(url string, opts goja.Value) (api.Response, error) {
+func (f *Frame) Goto(url string, opts goja.Value) (api.ResponseAPI, error) {
 	var (
 		netMgr         = f.manager.page.mainFrameSession.getNetworkManager()
 		defaultReferer = netMgr.extraHTTPHeaders["referer"]
@@ -1733,7 +1733,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 //
 //nolint:funlen,cyclop
-func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
+func (f *Frame) WaitForNavigation(opts goja.Value) (api.ResponseAPI, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
 	defer f.log.Debugf("Frame:WaitForNavigation:return",

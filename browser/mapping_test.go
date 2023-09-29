@@ -170,7 +170,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapResponse": {
-			apiInterface: (*api.Response)(nil),
+			apiInterface: (*api.ResponseAPI)(nil),
 			mapp: func() mapping {
 				return mapResponse(moduleVU{VU: vu}, &common.Response{})
 			},

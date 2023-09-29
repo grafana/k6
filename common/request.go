@@ -241,7 +241,7 @@ func (r *Request) ResourceType() string {
 }
 
 // Response returns the response for the request, if received.
-func (r *Request) Response() api.Response {
+func (r *Request) Response() api.ResponseAPI {
 	return r.response
 }
 
