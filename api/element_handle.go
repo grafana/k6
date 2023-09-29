@@ -4,7 +4,7 @@ import "github.com/dop251/goja"
 
 // ElementHandleAPI is the interface of an in-page DOM element.
 type ElementHandleAPI interface {
-	JSHandle
+	JSHandleAPI
 
 	BoundingBox() *Rect
 	Check(opts goja.Value)

@@ -153,7 +153,7 @@ func mapResponse(vu moduleVU, r api.Response) mapping {
 }
 
 // mapJSHandle to the JS module.
-func mapJSHandle(vu moduleVU, jsh api.JSHandle) mapping {
+func mapJSHandle(vu moduleVU, jsh api.JSHandleAPI) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"asElement": func() *goja.Object {

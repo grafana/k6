@@ -3,7 +3,7 @@ package api
 // ConsoleMessageAPI represents a page console message.
 type ConsoleMessageAPI struct {
 	// Args represent the list of arguments passed to a console function call.
-	Args []JSHandle
+	Args []JSHandleAPI
 
 	// Page is the page that produced the console message, if any.
 	Page Page

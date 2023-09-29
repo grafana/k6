@@ -86,8 +86,8 @@ func TestQueryAll(t *testing.T) {
 				handles := &jsHandleStub{
 					asElementFn: nilHandle,
 				}
-				handles.getPropertiesFn = func() (map[string]api.JSHandle, error) {
-					return map[string]api.JSHandle{
+				handles.getPropertiesFn = func() (map[string]api.JSHandleAPI, error) {
+					return map[string]api.JSHandleAPI{
 						"1": handles,
 						"2": handles,
 					}, nil
@@ -101,13 +101,13 @@ func TestQueryAll(t *testing.T) {
 		"returns_elems": {
 			selector: "*",
 			returnHandle: func() any {
-				childHandles := map[string]api.JSHandle{
+				childHandles := map[string]api.JSHandleAPI{
 					"1": &jsHandleStub{asElementFn: nonNilHandle},
 					"2": &jsHandleStub{asElementFn: nonNilHandle},
 					"3": &jsHandleStub{asElementFn: nilHandle},
 				}
 				return &jsHandleStub{
-					getPropertiesFn: func() (map[string]api.JSHandle, error) {
+					getPropertiesFn: func() (map[string]api.JSHandleAPI, error) {
 						return childHandles, nil
 					},
 				}
@@ -118,7 +118,7 @@ func TestQueryAll(t *testing.T) {
 			selector: "*",
 			returnHandle: func() any {
 				return &jsHandleStub{
-					getPropertiesFn: func() (map[string]api.JSHandle, error) {
+					getPropertiesFn: func() (map[string]api.JSHandleAPI, error) {
 						return nil, errors.New("any error")
 					},
 				}
@@ -183,12 +183,12 @@ func TestQueryAll(t *testing.T) {
 }
 
 type jsHandleStub struct {
-	api.JSHandle
+	api.JSHandleAPI
 
 	disposeCalls int
 
 	asElementFn     func() api.ElementHandleAPI
-	getPropertiesFn func() (map[string]api.JSHandle, error)
+	getPropertiesFn func() (map[string]api.JSHandleAPI, error)
 }
 
 func (s *jsHandleStub) AsElement() api.ElementHandleAPI {
@@ -202,7 +202,7 @@ func (s *jsHandleStub) Dispose() {
 	s.disposeCalls++
 }
 
-func (s *jsHandleStub) GetProperties() (map[string]api.JSHandle, error) {
+func (s *jsHandleStub) GetProperties() (map[string]api.JSHandleAPI, error) {
 	if s.getPropertiesFn == nil {
 		return nil, nil //nolint:nilnil
 	}

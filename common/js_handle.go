@@ -14,7 +14,7 @@ import (
 )
 
 type jsHandle interface {
-	api.JSHandle
+	api.JSHandleAPI
 	dispose() error
 	getProperties() (map[string]jsHandle, error)
 }
@@ -101,7 +101,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
+func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandleAPI, error) {
 	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 
@@ -114,13 +114,13 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (
 }
 
 // GetProperties retreives the JS handle's properties.
-func (h *BaseJSHandle) GetProperties() (map[string]api.JSHandle, error) {
+func (h *BaseJSHandle) GetProperties() (map[string]api.JSHandleAPI, error) {
 	handles, err := h.getProperties()
 	if err != nil {
 		return nil, err
 	}
 
-	jsHandles := make(map[string]api.JSHandle, len(handles))
+	jsHandles := make(map[string]api.JSHandleAPI, len(handles))
 	for k, v := range handles {
 		jsHandles[k] = v
 	}
@@ -149,7 +149,7 @@ func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
 }
 
 // GetProperty retreves a single property of the JS handle.
-func (h *BaseJSHandle) GetProperty(propertyName string) api.JSHandle {
+func (h *BaseJSHandle) GetProperty(_ string) api.JSHandleAPI {
 	return nil
 }
 

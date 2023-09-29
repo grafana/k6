@@ -70,7 +70,7 @@ func (w *Worker) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle evaluates a page function in the context of the web worker and returns a JS handle.
-func (w *Worker) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
+func (w *Worker) EvaluateHandle(_ goja.Value, _ ...goja.Value) (api.JSHandleAPI, error) {
 	// TODO: implement
 	return nil, fmt.Errorf("Worker.EvaluateHandle has not been implemented yet: %w", k6error.ErrFatal)
 }

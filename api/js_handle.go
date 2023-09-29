@@ -5,14 +5,14 @@ import (
 	"github.com/dop251/goja"
 )
 
-// JSHandle is the interface of an in-page JS object.
-type JSHandle interface {
+// JSHandleAPI is the interface of an in-page JS object.
+type JSHandleAPI interface {
 	AsElement() ElementHandleAPI
 	Dispose()
 	Evaluate(pageFunc goja.Value, args ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)
-	GetProperties() (map[string]JSHandle, error)
-	GetProperty(propertyName string) JSHandle
+	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error)
+	GetProperties() (map[string]JSHandleAPI, error)
+	GetProperty(propertyName string) JSHandleAPI
 	JSONValue() goja.Value
 	ObjectID() cdpruntime.RemoteObjectID
 }

@@ -627,7 +627,7 @@ func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle runs JS code within the execution context of the main frame of the page.
-func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
+func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandleAPI, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
 	h, err := p.MainFrame().EvaluateHandle(pageFunc, args...)
@@ -1170,7 +1170,7 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 			WithField("browser_source", "console-api")
 
 		objects       = make([]any, 0, len(e.Args))
-		objectHandles = make([]api.JSHandle, 0, len(e.Args))
+		objectHandles = make([]api.JSHandleAPI, 0, len(e.Args))
 	)
 
 	for _, robj := range e.Args {

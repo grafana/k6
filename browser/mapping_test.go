@@ -38,7 +38,7 @@ func customMappings() map[string]string {
 		"ElementHandleAPI.objectID":    "",
 		"FrameAPI.id":                  "",
 		"FrameAPI.loaderID":            "",
-		"JSHandle.objectID":            "",
+		"JSHandleAPI.objectID":         "",
 		"BrowserAPI.close":             "",
 		"FrameAPI.evaluateWithContext": "",
 		// TODO: browser.on method is unexposed until more event
@@ -152,7 +152,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"jsHandle": {
-			apiInterface: (*api.JSHandle)(nil),
+			apiInterface: (*api.JSHandleAPI)(nil),
 			mapp: func() mapping {
 				return mapJSHandle(moduleVU{VU: vu}, &common.BaseJSHandle{})
 			},
@@ -189,7 +189,7 @@ func TestMappings(t *testing.T) {
 		},
 		"mapConsoleMessage": {
 			apiInterface: (*interface {
-				Args() []api.JSHandle
+				Args() []api.JSHandleAPI
 				Page() api.Page
 				Text() string
 				Type() string

@@ -19,7 +19,7 @@ type FrameAPI interface {
 	// EvaluateWithContext for internal use only
 	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)
 	Evaluate(pageFunc goja.Value, args ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandle, error)
+	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
 	FrameElement() (ElementHandleAPI, error)
