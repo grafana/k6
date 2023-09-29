@@ -11,13 +11,13 @@ type ResponseAPI interface {
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string
 	Headers() map[string]string
-	HeadersArray() []HTTPHeader
+	HeadersArray() []HTTPHeaderAPI
 	JSON() goja.Value
 	Ok() bool
 	Request() RequestAPI
 	SecurityDetails() goja.Value
 	ServerAddr() goja.Value
-	Size() HTTPMessageSize
+	Size() HTTPMessageSizeAPI
 	Status() int64
 	StatusText() string
 	URL() string

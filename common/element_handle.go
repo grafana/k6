@@ -732,12 +732,12 @@ func (h *ElementHandle) AsElement() api.ElementHandleAPI {
 }
 
 // BoundingBox returns this element's bounding box.
-func (h *ElementHandle) BoundingBox() *api.Rect {
+func (h *ElementHandle) BoundingBox() *api.RectAPI {
 	bbox, err := h.boundingBox()
 	if err != nil {
 		return nil // Don't panic here, just return nil
 	}
-	return bbox.toApiRect()
+	return bbox.toAPIRect()
 }
 
 // Click scrolls element into view and clicks in the center of the element

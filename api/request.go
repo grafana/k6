@@ -9,7 +9,7 @@ type RequestAPI interface {
 	Frame() FrameAPI
 	HeaderValue(string) goja.Value
 	Headers() map[string]string
-	HeadersArray() []HTTPHeader
+	HeadersArray() []HTTPHeaderAPI
 	IsNavigationRequest() bool
 	Method() string
 	PostData() string
@@ -19,7 +19,7 @@ type RequestAPI interface {
 	RedirectedTo() RequestAPI
 	ResourceType() string
 	Response() ResponseAPI
-	Size() HTTPMessageSize
+	Size() HTTPMessageSizeAPI
 	Timing() goja.Value
 	URL() string
 }

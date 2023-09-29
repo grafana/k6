@@ -6,7 +6,7 @@ import "github.com/dop251/goja"
 type ElementHandleAPI interface {
 	JSHandleAPI
 
-	BoundingBox() *Rect
+	BoundingBox() *RectAPI
 	Check(opts goja.Value)
 	Click(opts goja.Value) error
 	ContentFrame() (FrameAPI, error)
