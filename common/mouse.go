@@ -13,7 +13,7 @@ import (
 )
 
 // Ensure Mouse implements the api.Mouse interface.
-var _ api.Mouse = &Mouse{}
+var _ api.MouseAPI = &Mouse{}
 
 // Mouse represents a mouse input device.
 type Mouse struct {

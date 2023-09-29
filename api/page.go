@@ -28,7 +28,7 @@ type Page interface {
 	Frames() []FrameAPI
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() KeyboardAPI
-	GetMouse() Mouse
+	GetMouse() MouseAPI
 	GetTouchscreen() Touchscreen
 	GoBack(opts goja.Value) Response
 	GoForward(opts goja.Value) Response
