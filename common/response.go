@@ -278,7 +278,7 @@ func (r *Response) Ok() bool {
 }
 
 // Request returns the request that led to this response.
-func (r *Response) Request() api.RequestAPI {
+func (r *Response) Request() RequestAPI {
 	return r.request
 }
 

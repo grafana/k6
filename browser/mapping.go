@@ -80,7 +80,7 @@ func mapLocator(vu moduleVU, lo common.LocatorAPI) mapping {
 }
 
 // mapRequest to the JS module.
-func mapRequest(vu moduleVU, r api.RequestAPI) mapping {
+func mapRequest(vu moduleVU, r common.RequestAPI) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"allHeaders": r.AllHeaders,
