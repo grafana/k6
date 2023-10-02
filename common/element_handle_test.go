@@ -40,8 +40,8 @@ func TestQueryAll(t *testing.T) {
 	t.Parallel()
 
 	var (
-		nilHandle    = func() api.ElementHandleAPI { return nil }
-		nonNilHandle = func() api.ElementHandleAPI { return &ElementHandle{} }
+		nilHandle    = func() ElementHandleAPI { return nil }
+		nonNilHandle = func() ElementHandleAPI { return &ElementHandle{} }
 	)
 
 	for name, tt := range map[string]struct {
@@ -187,11 +187,11 @@ type jsHandleStub struct {
 
 	disposeCalls int
 
-	asElementFn     func() api.ElementHandleAPI
+	asElementFn     func() ElementHandleAPI
 	getPropertiesFn func() (map[string]api.JSHandleAPI, error)
 }
 
-func (s *jsHandleStub) AsElement() api.ElementHandleAPI {
+func (s *jsHandleStub) AsElement() ElementHandleAPI {
 	if s.asElementFn == nil {
 		return nil
 	}

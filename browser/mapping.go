@@ -196,7 +196,7 @@ func mapJSHandle(vu moduleVU, jsh api.JSHandleAPI) mapping {
 // mapElementHandle to the JS module.
 //
 //nolint:funlen
-func mapElementHandle(vu moduleVU, eh api.ElementHandleAPI) mapping {
+func mapElementHandle(vu moduleVU, eh common.ElementHandleAPI) mapping {
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,
 		"check":       eh.Check,

@@ -146,7 +146,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"elementHandle": {
-			apiInterface: (*api.ElementHandleAPI)(nil),
+			apiInterface: (*common.ElementHandleAPI)(nil),
 			mapp: func() mapping {
 				return mapElementHandle(moduleVU{VU: vu}, &common.ElementHandle{})
 			},

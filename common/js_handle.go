@@ -60,7 +60,7 @@ func NewJSHandle(
 }
 
 // AsElement returns an element handle if this JSHandle is a reference to a JS HTML element.
-func (h *BaseJSHandle) AsElement() api.ElementHandleAPI {
+func (h *BaseJSHandle) AsElement() ElementHandleAPI {
 	return nil
 }
 
