@@ -136,7 +136,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"page": {
-			apiInterface: (*api.PageAPI)(nil),
+			apiInterface: (*common.PageAPI)(nil),
 			mapp: func() mapping {
 				return mapPage(moduleVU{VU: vu}, &common.Page{
 					Keyboard:    &common.Keyboard{},
@@ -190,7 +190,7 @@ func TestMappings(t *testing.T) {
 		"mapConsoleMessage": {
 			apiInterface: (*interface {
 				Args() []common.JSHandleAPI
-				Page() api.PageAPI
+				Page() common.PageAPI
 				Text() string
 				Type() string
 			})(nil),

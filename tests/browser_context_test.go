@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestBrowserContextAddCookies(t *testing.T) {
@@ -750,7 +751,7 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 			ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
 			defer cancel()
 
-			var p1, p2 api.PageAPI
+			var p1, p2 common.PageAPI
 			// We need to run waitForEvent in parallel to the page creation.
 			// If we run them synchronously then waitForEvent will wait
 			// indefinitely and eventually the test will timeout.
@@ -761,7 +762,7 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 					resp, err := bc.WaitForEvent(tc.event, op)
 					if resp != nil {
 						var ok bool
-						p1, ok = resp.(api.PageAPI)
+						p1, ok = resp.(common.PageAPI)
 						require.True(t, ok)
 					}
 					return err

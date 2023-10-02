@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 )
 
@@ -70,7 +69,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 		waitUntil             common.LifecycleEvent
 		pingRequestTextAssert func(result string, pingCount int)
 		pingJSTextAssert      func(result string)
-		assertFunc            func(tb *testBrowser, p api.PageAPI) error
+		assertFunc            func(tb *testBrowser, p common.PageAPI) error
 		wantError             string
 	}{
 		{
@@ -125,7 +124,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 			pingSlowness: 0,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventNetworkIdle,
-			assertFunc: func(tb *testBrowser, p api.PageAPI) error {
+			assertFunc: func(tb *testBrowser, p common.PageAPI) error {
 				result := p.TextContent("#pingRequestText", nil)
 				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 
@@ -214,7 +213,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 		waitUntil             common.LifecycleEvent
 		pingRequestTextAssert func(result string)
 		pingJSTextAssert      func(result string)
-		assertFunc            func(p api.PageAPI)
+		assertFunc            func(p common.PageAPI)
 	}{
 		{
 			name:         "load",
@@ -267,7 +266,7 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			pingSlowness: 100 * time.Millisecond,
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventDOMContentLoad,
-			assertFunc: func(p api.PageAPI) {
+			assertFunc: func(p common.PageAPI) {
 				p.WaitForLoadState(common.LifecycleEventNetworkIdle.String(), nil)
 
 				result := p.TextContent("#pingRequestText", nil)
@@ -704,7 +703,7 @@ func withPingJSHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool, w
 
 func assertHome(
 	t *testing.T,
-	tb *testBrowser, p api.PageAPI,
+	tb *testBrowser, p common.PageAPI,
 	waitUntil common.LifecycleEvent,
 	check func() error, secondCheck func(), wantError string,
 ) {

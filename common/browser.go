@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -534,7 +533,7 @@ func (b *Browser) NewContext(opts goja.Value) (BrowserContextAPI, error) {
 }
 
 // NewPage creates a new tab in the browser window.
-func (b *Browser) NewPage(opts goja.Value) (api.PageAPI, error) {
+func (b *Browser) NewPage(opts goja.Value) (PageAPI, error) {
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
 		return nil, fmt.Errorf("new page: %w", err)

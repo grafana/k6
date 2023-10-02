@@ -7,7 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -682,7 +681,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 }
 
 // Page returns the page that this frame manager belongs to.
-func (m *FrameManager) Page() api.PageAPI {
+func (m *FrameManager) Page() PageAPI {
 	if m.page != nil {
 		return m.page
 	}

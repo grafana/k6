@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 )
 
@@ -29,10 +28,10 @@ func TestLocator(t *testing.T) {
 
 	tests := []struct {
 		name string
-		do   func(*testBrowser, api.PageAPI)
+		do   func(*testBrowser, common.PageAPI)
 	}{
 		{
-			"Check", func(tb *testBrowser, p api.PageAPI) {
+			"Check", func(tb *testBrowser, p common.PageAPI) {
 				t.Run("check", func(t *testing.T) {
 					check := func() bool {
 						v := p.Evaluate(tb.toGojaValue(`() => window.check`))
@@ -55,7 +54,7 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Click", func(tb *testBrowser, p api.PageAPI) {
+			"Click", func(tb *testBrowser, p common.PageAPI) {
 				err := p.Locator("#link", nil).Click(nil)
 				require.NoError(t, err)
 				v := p.Evaluate(tb.toGojaValue(`() => window.result`))
@@ -63,14 +62,14 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"DblClick", func(tb *testBrowser, p api.PageAPI) {
+			"DblClick", func(tb *testBrowser, p common.PageAPI) {
 				p.Locator("#linkdbl", nil).Dblclick(nil)
 				v := p.Evaluate(tb.toGojaValue(`() => window.dblclick`))
 				require.True(t, tb.asGojaBool(v), "cannot not double click the link")
 			},
 		},
 		{
-			"DispatchEvent", func(tb *testBrowser, p api.PageAPI) {
+			"DispatchEvent", func(tb *testBrowser, p common.PageAPI) {
 				result := func() bool {
 					v := p.Evaluate(tb.toGojaValue(`() => window.result`))
 					return tb.asGojaBool(v)
@@ -81,14 +80,14 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Fill", func(tb *testBrowser, p api.PageAPI) {
+			"Fill", func(tb *testBrowser, p common.PageAPI) {
 				const value = "fill me up"
 				p.Locator("#inputText", nil).Fill(value, nil)
 				require.Equal(t, value, p.InputValue("#inputText", nil))
 			},
 		},
 		{
-			"Focus", func(tb *testBrowser, p api.PageAPI) {
+			"Focus", func(tb *testBrowser, p common.PageAPI) {
 				focused := func() bool {
 					v := p.Evaluate(tb.toGojaValue(
 						`() => document.activeElement == document.getElementById('inputText')`,
@@ -102,7 +101,7 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"GetAttribute", func(tb *testBrowser, p api.PageAPI) {
+			"GetAttribute", func(tb *testBrowser, p common.PageAPI) {
 				l := p.Locator("#inputText", nil)
 				v := l.GetAttribute("value", nil)
 				require.NotNil(t, v)
@@ -110,7 +109,7 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Hover", func(tb *testBrowser, p api.PageAPI) {
+			"Hover", func(tb *testBrowser, p common.PageAPI) {
 				result := func() bool {
 					v := p.Evaluate(tb.toGojaValue(`() => window.result`))
 					return tb.asGojaBool(v)
@@ -121,17 +120,17 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"InnerHTML", func(tb *testBrowser, p api.PageAPI) {
+			"InnerHTML", func(tb *testBrowser, p common.PageAPI) {
 				require.Equal(t, `<span>hello</span>`, p.Locator("#divHello", nil).InnerHTML(nil))
 			},
 		},
 		{
-			"InnerText", func(tb *testBrowser, p api.PageAPI) {
+			"InnerText", func(tb *testBrowser, p common.PageAPI) {
 				require.Equal(t, `hello`, p.Locator("#divHello > span", nil).InnerText(nil))
 			},
 		},
 		{
-			"InputValue", func(tb *testBrowser, p api.PageAPI) {
+			"InputValue", func(tb *testBrowser, p common.PageAPI) {
 				t.Run("input", func(t *testing.T) {
 					require.Equal(t, "something", p.Locator("#inputText", nil).InputValue(nil))
 				})
@@ -144,13 +143,13 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Press", func(tb *testBrowser, p api.PageAPI) {
+			"Press", func(tb *testBrowser, p common.PageAPI) {
 				p.Locator("#inputText", nil).Press("x", nil)
 				require.Equal(t, "xsomething", p.InputValue("#inputText", nil))
 			},
 		},
 		{
-			"SelectOption", func(tb *testBrowser, p api.PageAPI) {
+			"SelectOption", func(tb *testBrowser, p common.PageAPI) {
 				l := p.Locator("#selectElement", nil)
 				rv := l.SelectOption(tb.toGojaValue(`option text 2`), nil)
 				require.Len(t, rv, 1)
@@ -158,7 +157,7 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Tap", func(tb *testBrowser, p api.PageAPI) {
+			"Tap", func(tb *testBrowser, p common.PageAPI) {
 				result := func() bool {
 					v := p.Evaluate(tb.toGojaValue(`() => window.result`))
 					return tb.asGojaBool(v)
@@ -169,24 +168,24 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"TextContent", func(tb *testBrowser, p api.PageAPI) {
+			"TextContent", func(tb *testBrowser, p common.PageAPI) {
 				require.Equal(t, `hello`, p.Locator("#divHello", nil).TextContent(nil))
 			},
 		},
 		{
-			"Type", func(tb *testBrowser, p api.PageAPI) {
+			"Type", func(tb *testBrowser, p common.PageAPI) {
 				p.Locator("#inputText", nil).Type("real ", nil)
 				require.Equal(t, "real something", p.InputValue("#inputText", nil))
 			},
 		},
 		{
-			"WaitFor state:visible", func(tb *testBrowser, p api.PageAPI) {
+			"WaitFor state:visible", func(tb *testBrowser, p common.PageAPI) {
 				opts := tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
 				require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(opts) })
 			},
 		},
 		{
-			"WaitFor state:attached", func(tb *testBrowser, p api.PageAPI) {
+			"WaitFor state:attached", func(tb *testBrowser, p common.PageAPI) {
 				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "attached",
@@ -195,7 +194,7 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"WaitFor state:hidden", func(tb *testBrowser, p api.PageAPI) {
+			"WaitFor state:hidden", func(tb *testBrowser, p common.PageAPI) {
 				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "hidden",
@@ -204,7 +203,7 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"WaitFor state:detached", func(tb *testBrowser, p api.PageAPI) {
+			"WaitFor state:detached", func(tb *testBrowser, p common.PageAPI) {
 				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "detached",
