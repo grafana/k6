@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
@@ -57,8 +56,8 @@ func TestFilterCookies(t *testing.T) {
 
 	tests := map[string]struct {
 		filterByURLs []string
-		cookies      []*api.Cookie
-		wantCookies  []*api.Cookie
+		cookies      []*Cookie
+		wantCookies  []*Cookie
 		wantErr      bool
 	}{
 		"no_cookies": {
@@ -68,7 +67,7 @@ func TestFilterCookies(t *testing.T) {
 		},
 		"filter_none": {
 			filterByURLs: nil,
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -76,7 +75,7 @@ func TestFilterCookies(t *testing.T) {
 					Domain: "bar.com",
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -89,7 +88,7 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"https://foo.com",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -100,7 +99,7 @@ func TestFilterCookies(t *testing.T) {
 					Domain: "baz.com",
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -111,7 +110,7 @@ func TestFilterCookies(t *testing.T) {
 				"https://foo.com",
 				"https://baz.com",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -122,7 +121,7 @@ func TestFilterCookies(t *testing.T) {
 					Domain: "baz.com",
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -135,7 +134,7 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"https://sub.foo.com",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "sub.foo.com",
 				},
@@ -143,7 +142,7 @@ func TestFilterCookies(t *testing.T) {
 					Domain: ".foo.com",
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: "sub.foo.com",
 				},
@@ -153,12 +152,12 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"https://foo.com",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: ".foo.com",
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: ".foo.com",
 				},
@@ -168,13 +167,13 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"https://foo.com",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 					Secure: true,
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: "foo.com",
 					Secure: true,
@@ -185,13 +184,13 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"https://foo.com",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain:   "foo.com",
 					HTTPOnly: true,
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain:   "foo.com",
 					HTTPOnly: true,
@@ -202,7 +201,7 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"https://foo.com/bar",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 					Path:   "/bar",
@@ -212,7 +211,7 @@ func TestFilterCookies(t *testing.T) {
 					Path:   "/baz",
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: "foo.com",
 					Path:   "/bar",
@@ -223,13 +222,13 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"http://localhost",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "localhost",
 					Secure: true,
 				},
 			},
-			wantCookies: []*api.Cookie{
+			wantCookies: []*Cookie{
 				{
 					Domain: "localhost",
 					Secure: true,
@@ -240,7 +239,7 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"http://foo.com",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 					Secure: true,
@@ -252,7 +251,7 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"HELLO WORLD!",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -264,7 +263,7 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},
@@ -276,7 +275,7 @@ func TestFilterCookies(t *testing.T) {
 			filterByURLs: []string{
 				"https://foo.com", "", "HELLO WORLD",
 			},
-			cookies: []*api.Cookie{
+			cookies: []*Cookie{
 				{
 					Domain: "foo.com",
 				},

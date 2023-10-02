@@ -14,7 +14,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure Worker implements the EventEmitter, Target and api.Worker interfaces.
+// Ensure Worker implements the EventEmitter, Target and Worker interfaces.
 var _ EventEmitter = &Worker{}
 var _ WorkerAPI = &Worker{}
 

@@ -11,7 +11,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure Mouse implements the api.Mouse interface.
+// Ensure Mouse implements the Mouse interface.
 var _ MouseAPI = &Mouse{}
 
 // Mouse represents a mouse input device.

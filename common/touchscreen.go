@@ -9,7 +9,7 @@ import (
 	"github.com/chromedp/cdproto/input"
 )
 
-// Ensure Touchscreen implements the EventEmitter and api.Touchscreen interfaces.
+// Ensure Touchscreen implements the EventEmitter and Touchscreen interfaces.
 var _ EventEmitter = &Touchscreen{}
 var _ TouchscreenAPI = &Touchscreen{}
 

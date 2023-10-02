@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -457,7 +456,7 @@ func (b *BrowserContext) getSession(id target.SessionID) *Session {
 
 // AddCookies adds cookies into this browser context.
 // All pages within this context will have these cookies installed.
-func (b *BrowserContext) AddCookies(cookies []*api.Cookie) error {
+func (b *BrowserContext) AddCookies(cookies []*Cookie) error {
 	b.logger.Debugf("BrowserContext:AddCookies", "bctxid:%v", b.id)
 
 	// skip work if no cookies provided.
@@ -525,7 +524,7 @@ func (b *BrowserContext) ClearCookies() error {
 // automatically taken from the browser context when it is created. And some of
 // them are set by the page, i.e., using the Set-Cookie HTTP header or via
 // JavaScript like document.cookie.
-func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) {
+func (b *BrowserContext) Cookies(urls ...string) ([]*Cookie, error) {
 	b.logger.Debugf("BrowserContext:Cookies", "bctxid:%v", b.id)
 
 	// get cookies from this browser context.
@@ -546,9 +545,9 @@ func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) {
 	}
 
 	// convert the received CDP cookies to the browser API format.
-	cookies := make([]*api.Cookie, len(networkCookies))
+	cookies := make([]*Cookie, len(networkCookies))
 	for i, c := range networkCookies {
-		cookies[i] = &api.Cookie{
+		cookies[i] = &Cookie{
 			Name:     c.Name,
 			Value:    c.Value,
 			Domain:   c.Domain,
@@ -556,7 +555,7 @@ func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) {
 			Expires:  int64(c.Expires),
 			HTTPOnly: c.HTTPOnly,
 			Secure:   c.Secure,
-			SameSite: api.CookieSameSite(c.SameSite),
+			SameSite: CookieSameSite(c.SameSite),
 		}
 	}
 	// filter cookies by the provided URLs.
@@ -573,7 +572,7 @@ func (b *BrowserContext) Cookies(urls ...string) ([]*api.Cookie, error) {
 
 // filterCookies filters the given cookies based on URLs.
 // If an error occurs while parsing the cookie URLs, the error is returned.
-func filterCookies(cookies []*api.Cookie, urls ...string) ([]*api.Cookie, error) {
+func filterCookies(cookies []*Cookie, urls ...string) ([]*Cookie, error) {
 	if len(urls) == 0 || len(cookies) == 0 {
 		return cookies, nil
 	}
@@ -632,7 +631,7 @@ func filterCookies(cookies []*api.Cookie, urls ...string) ([]*api.Cookie, error)
 // shouldKeepCookie determines whether a cookie should be kept,
 // based on its compatibility with a specific URL.
 // Returns true if the cookie should be kept, false otherwise.
-func shouldKeepCookie(c *api.Cookie, uri *url.URL) bool {
+func shouldKeepCookie(c *Cookie, uri *url.URL) bool {
 	// Ensure consistent domain formatting for easier comparison.
 	// A leading dot means the cookie is valid across subdomains.
 	// For example, if the domain is example.com, then adding a

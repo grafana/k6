@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 )
 
@@ -27,19 +26,19 @@ func TestBrowserContextAddCookies(t *testing.T) {
 
 	tests := map[string]struct {
 		name             string
-		cookies          []*api.Cookie
-		wantCookiesToSet []*api.Cookie
+		cookies          []*common.Cookie
+		wantCookiesToSet []*common.Cookie
 		wantErr          bool
 	}{
 		"cookie": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Name:  "test_cookie_name",
 					Value: "test_cookie_value",
 					URL:   "http://test.go",
 				},
 			},
-			wantCookiesToSet: []*api.Cookie{
+			wantCookiesToSet: []*common.Cookie{
 				{
 					Name:     "test_cookie_name",
 					Value:    "test_cookie_value",
@@ -54,14 +53,14 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: false,
 		},
 		"cookie_with_url": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Name:  "test_cookie_name",
 					Value: "test_cookie_value",
 					URL:   "http://test.go",
 				},
 			},
-			wantCookiesToSet: []*api.Cookie{
+			wantCookiesToSet: []*common.Cookie{
 				{
 					Name:     "test_cookie_name",
 					Value:    "test_cookie_value",
@@ -76,7 +75,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: false,
 		},
 		"cookie_with_domain_and_path": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Name:   "test_cookie_name",
 					Value:  "test_cookie_value",
@@ -84,7 +83,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					Path:   "/to/page",
 				},
 			},
-			wantCookiesToSet: []*api.Cookie{
+			wantCookiesToSet: []*common.Cookie{
 				{
 					Name:     "test_cookie_name",
 					Value:    "test_cookie_value",
@@ -99,7 +98,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: false,
 		},
 		"cookie_with_expiration": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				// session cookie
 				{
 					Name:  "session_cookie",
@@ -121,7 +120,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 					URL:     "http://test.go",
 				},
 			},
-			wantCookiesToSet: []*api.Cookie{
+			wantCookiesToSet: []*common.Cookie{
 				{
 					Name:    "session_cookie",
 					Value:   "session_cookie_value",
@@ -144,7 +143,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: true,
 		},
 		"cookie_missing_name": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Value: "test_cookie_value",
 					URL:   "http://test.go",
@@ -153,7 +152,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: true,
 		},
 		"cookie_missing_value": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Name: "test_cookie_name",
 					URL:  "http://test.go",
@@ -162,7 +161,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: true,
 		},
 		"cookie_missing_url": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Name:  "test_cookie_name",
 					Value: "test_cookie_value",
@@ -171,7 +170,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: true,
 		},
 		"cookies_missing_path": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Name:   "test_cookie_name",
 					Value:  "test_cookie_value",
@@ -181,7 +180,7 @@ func TestBrowserContextAddCookies(t *testing.T) {
 			wantErr: true,
 		},
 		"cookies_missing_domain": {
-			cookies: []*api.Cookie{
+			cookies: []*common.Cookie{
 				{
 					Name:  "test_cookie_name",
 					Value: "test_cookie_value",
@@ -241,7 +240,7 @@ func TestBrowserContextCookies(t *testing.T) {
 		// addCookies is a list of cookies that will be added to the
 		// browser context using the AddCookies method.
 		// if empty, no cookies will be added.
-		addCookies []*api.Cookie
+		addCookies []*common.Cookie
 
 		// filterCookiesByURLs allows to filter cookies by URLs.
 		// if nil, all cookies will be returned.
@@ -253,7 +252,7 @@ func TestBrowserContextCookies(t *testing.T) {
 
 		// wantContextCookies is a list of cookies that are expected
 		// to be set in the browser context.
-		wantContextCookies []*api.Cookie
+		wantContextCookies []*common.Cookie
 
 		wantErr bool
 	}{
@@ -278,7 +277,7 @@ func TestBrowserContextCookies(t *testing.T) {
 			`,
 			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
-			wantContextCookies: []*api.Cookie{
+			wantContextCookies: []*common.Cookie{
 				{
 					Name:     "name",
 					Value:    "value",
@@ -302,7 +301,7 @@ func TestBrowserContextCookies(t *testing.T) {
 			`,
 			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value; name2=value2",
-			wantContextCookies: []*api.Cookie{
+			wantContextCookies: []*common.Cookie{
 				{
 					Name:     "name",
 					Value:    "value",
@@ -335,7 +334,7 @@ func TestBrowserContextCookies(t *testing.T) {
 			`,
 			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
-			wantContextCookies: []*api.Cookie{
+			wantContextCookies: []*common.Cookie{
 				{
 					Name:     "name",
 					Value:    "value",
@@ -371,7 +370,7 @@ func TestBrowserContextCookies(t *testing.T) {
 			`,
 			filterCookiesByURLs: nil,
 			wantDocumentCookies: "",
-			wantContextCookies: []*api.Cookie{
+			wantContextCookies: []*common.Cookie{
 				{
 					HTTPOnly: true,
 					Name:     "name",
@@ -395,9 +394,9 @@ func TestBrowserContextCookies(t *testing.T) {
 			`,
 			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
-			wantContextCookies: []*api.Cookie{
+			wantContextCookies: []*common.Cookie{
 				{
-					SameSite: api.CookieSameSiteStrict,
+					SameSite: common.CookieSameSiteStrict,
 					Name:     "name",
 					Value:    "value",
 					Domain:   "127.0.0.1",
@@ -419,9 +418,9 @@ func TestBrowserContextCookies(t *testing.T) {
 			`,
 			filterCookiesByURLs: nil,
 			wantDocumentCookies: "name=value",
-			wantContextCookies: []*api.Cookie{
+			wantContextCookies: []*common.Cookie{
 				{
-					SameSite: api.CookieSameSiteLax,
+					SameSite: common.CookieSameSiteLax,
 					Name:     "name",
 					Value:    "value",
 					Domain:   "127.0.0.1",
@@ -439,24 +438,24 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
-			addCookies: []*api.Cookie{
+			addCookies: []*common.Cookie{
 				{
 					Name:     "fooCookie",
 					Value:    "fooValue",
 					URL:      "https://foo.com",
-					SameSite: api.CookieSameSiteNone,
+					SameSite: common.CookieSameSiteNone,
 				},
 				{
 					Name:     "barCookie",
 					Value:    "barValue",
 					URL:      "https://bar.com",
-					SameSite: api.CookieSameSiteLax,
+					SameSite: common.CookieSameSiteLax,
 				},
 				{
 					Name:     "bazCookie",
 					Value:    "bazValue",
 					URL:      "https://baz.com",
-					SameSite: api.CookieSameSiteLax,
+					SameSite: common.CookieSameSiteLax,
 				},
 			},
 			filterCookiesByURLs: []string{
@@ -464,7 +463,7 @@ func TestBrowserContextCookies(t *testing.T) {
 				"https://baz.com",
 			},
 			wantDocumentCookies: "",
-			wantContextCookies: []*api.Cookie{
+			wantContextCookies: []*common.Cookie{
 				{
 					Name:     "fooCookie",
 					Value:    "fooValue",
@@ -473,7 +472,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					HTTPOnly: false,
 					Path:     "/",
 					Secure:   true,
-					SameSite: api.CookieSameSiteNone,
+					SameSite: common.CookieSameSiteNone,
 				},
 				{
 					Name:     "bazCookie",
@@ -483,7 +482,7 @@ func TestBrowserContextCookies(t *testing.T) {
 					HTTPOnly: false,
 					Path:     "/",
 					Secure:   true,
-					SameSite: api.CookieSameSiteLax,
+					SameSite: common.CookieSameSiteLax,
 				},
 			},
 		},
@@ -494,18 +493,18 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
-			addCookies: []*api.Cookie{
+			addCookies: []*common.Cookie{
 				{
 					Name:     "fooCookie",
 					Value:    "fooValue",
 					URL:      "https://foo.com",
-					SameSite: api.CookieSameSiteNone,
+					SameSite: common.CookieSameSiteNone,
 				},
 				{
 					Name:     "barCookie",
 					Value:    "barValue",
 					URL:      "https://bar.com",
-					SameSite: api.CookieSameSiteLax,
+					SameSite: common.CookieSameSiteLax,
 				},
 			},
 			filterCookiesByURLs: []string{
@@ -521,12 +520,12 @@ func TestBrowserContextCookies(t *testing.T) {
 					return document.cookie;
 				}
 			`,
-			addCookies: []*api.Cookie{
+			addCookies: []*common.Cookie{
 				{
 					Name:     "fooCookie",
 					Value:    "fooValue",
 					URL:      "https://foo.com",
-					SameSite: api.CookieSameSiteNone,
+					SameSite: common.CookieSameSiteNone,
 				},
 			},
 			filterCookiesByURLs: []string{
@@ -603,7 +602,7 @@ func TestBrowserContextClearCookies(t *testing.T) {
 	bctx := p.Context()
 
 	err := bctx.AddCookies(
-		[]*api.Cookie{
+		[]*common.Cookie{
 			{
 				Name:  "test_cookie_name",
 				Value: "test_cookie_value",
