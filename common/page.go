@@ -688,7 +688,7 @@ func (p *Page) GetMouse() MouseAPI {
 }
 
 // GetTouchscreen returns the touchscreen for the page.
-func (p *Page) GetTouchscreen() api.TouchscreenAPI {
+func (p *Page) GetTouchscreen() TouchscreenAPI {
 	return p.Touchscreen
 }
 
