@@ -228,7 +228,7 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 }
 
 // NewCDPSession returns a new CDP session attached to this target.
-func (b *BrowserContext) NewCDPSession() api.CDPSessionAPI {
+func (b *BrowserContext) NewCDPSession() CDPSessionAPI {
 	k6ext.Panic(b.ctx, "BrowserContext.newCDPSession() has not been implemented yet")
 	return nil
 }
