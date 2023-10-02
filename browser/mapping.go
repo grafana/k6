@@ -7,7 +7,6 @@ import (
 
 	"github.com/dop251/goja"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -603,7 +602,7 @@ func mapPage(vu moduleVU, p common.PageAPI) mapping {
 }
 
 // mapWorker to the JS module.
-func mapWorker(vu moduleVU, w api.WorkerAPI) mapping {
+func mapWorker(vu moduleVU, w common.WorkerAPI) mapping {
 	return mapping{
 		"evaluate": w.Evaluate,
 		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {

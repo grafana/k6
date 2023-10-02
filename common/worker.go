@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6error"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -17,7 +16,7 @@ import (
 
 // Ensure Worker implements the EventEmitter, Target and api.Worker interfaces.
 var _ EventEmitter = &Worker{}
-var _ api.WorkerAPI = &Worker{}
+var _ WorkerAPI = &Worker{}
 
 type Worker struct {
 	BaseEventEmitter

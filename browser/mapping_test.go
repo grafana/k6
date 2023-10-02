@@ -8,7 +8,6 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 
 	k6common "go.k6.io/k6/js/common"
@@ -176,7 +175,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapWorker": {
-			apiInterface: (*api.WorkerAPI)(nil),
+			apiInterface: (*common.WorkerAPI)(nil),
 			mapp: func() mapping {
 				return mapWorker(moduleVU{VU: vu}, &common.Worker{})
 			},
