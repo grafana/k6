@@ -8,6 +8,7 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/api"
+	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 
@@ -618,7 +619,7 @@ func mapWorker(vu moduleVU, w api.WorkerAPI) mapping {
 }
 
 // mapBrowserContext to the JS module.
-func mapBrowserContext(vu moduleVU, bc api.BrowserContextAPI) mapping { //nolint:funlen
+func mapBrowserContext(vu moduleVU, bc common.BrowserContextAPI) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies":                  bc.AddCookies,
@@ -725,7 +726,7 @@ func mapConsoleMessage(vu moduleVU, cm *api.ConsoleMessageAPI) mapping {
 func mapBrowser(vu moduleVU) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"context": func() (api.BrowserContextAPI, error) {
+		"context": func() (common.BrowserContextAPI, error) {
 			b, err := vu.browser()
 			if err != nil {
 				return nil, err
