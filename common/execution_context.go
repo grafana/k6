@@ -52,7 +52,7 @@ type ExecutionContext struct {
 	frame          *Frame
 	id             runtime.ExecutionContextID
 	isMutex        sync.RWMutex
-	injectedScript common.JSHandleAPI
+	injectedScript JSHandleAPI
 	vu             k6modules.VU
 
 	// Used for logging
@@ -242,7 +242,7 @@ func (e *ExecutionContext) eval(
 var injectedScriptSource string
 
 // getInjectedScript returns a JS handle to the injected script of helper functions.
-func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (common.JSHandleAPI, error) {
+func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAPI, error) {
 	e.logger.Debugf(
 		"ExecutionContext:getInjectedScript",
 		"sid:%s stid:%s fid:%s ectxid:%d efurl:%s",
@@ -276,7 +276,7 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (common.JSH
 	if handle == nil {
 		return nil, errors.New("handle is nil")
 	}
-	injectedScript, ok := handle.(common.JSHandleAPI)
+	injectedScript, ok := handle.(JSHandleAPI)
 	if !ok {
 		return nil, ErrJSHandleInvalid
 	}
@@ -307,7 +307,7 @@ func (e *ExecutionContext) Eval(
 // and returns a JSHandle.
 func (e *ExecutionContext) EvalHandle(
 	apiCtx context.Context, js goja.Value, args ...goja.Value,
-) (common.JSHandleAPI, error) {
+) (JSHandleAPI, error) {
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
@@ -324,7 +324,7 @@ func (e *ExecutionContext) EvalHandle(
 		return nil, errors.New("nil result")
 	}
 
-	r, ok := res.(common.JSHandleAPI)
+	r, ok := res.(JSHandleAPI)
 	if !ok {
 		return nil, ErrJSHandleInvalid
 	}

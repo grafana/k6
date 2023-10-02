@@ -744,7 +744,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle common.JSHandleAPI, _ error) {
+func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle JSHandleAPI, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -1909,7 +1909,7 @@ type frameExecutionContext interface {
 
 	// getInjectedScript returns a JS handle to the injected script of helper
 	// functions.
-	getInjectedScript(apiCtx context.Context) (common.JSHandleAPI, error)
+	getInjectedScript(apiCtx context.Context) (JSHandleAPI, error)
 
 	// Eval evaluates the provided JavaScript within this execution context and
 	// returns a value or handle.
@@ -1917,7 +1917,7 @@ type frameExecutionContext interface {
 
 	// EvalHandle evaluates the provided JavaScript within this execution
 	// context and returns a JSHandle.
-	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
+	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (JSHandleAPI, error)
 
 	// Frame returns the frame that this execution context belongs to.
 	Frame() *Frame

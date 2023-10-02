@@ -1055,7 +1055,7 @@ func (h *ElementHandle) Query(selector string) (ElementHandleAPI, error) {
 	if result == nil {
 		return nil, fmt.Errorf("querying selector %q", selector)
 	}
-	handle, ok := result.(common.JSHandleAPI)
+	handle, ok := result.(JSHandleAPI)
 	if !ok {
 		return nil, fmt.Errorf("querying selector %q, wrong type %T", selector, result)
 	}
@@ -1100,7 +1100,7 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]ElementHandl
 		return nil, nil
 	}
 
-	handles, ok := result.(common.JSHandleAPI)
+	handles, ok := result.(JSHandleAPI)
 	if !ok {
 		return nil, fmt.Errorf("getting element handle for selector %q: %w", selector, ErrJSHandleInvalid)
 	}

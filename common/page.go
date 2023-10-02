@@ -627,7 +627,7 @@ func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle runs JS code within the execution context of the main frame of the page.
-func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error) {
+func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
 	h, err := p.MainFrame().EvaluateHandle(pageFunc, args...)
@@ -678,7 +678,7 @@ func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.
 }
 
 // GetKeyboard returns the keyboard for the page.
-func (p *Page) GetKeyboard() api.KeyboardAPI {
+func (p *Page) GetKeyboard() KeyboardAPI {
 	return p.Keyboard
 }
 
@@ -1170,7 +1170,7 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 			WithField("browser_source", "console-api")
 
 		objects       = make([]any, 0, len(e.Args))
-		objectHandles = make([]common.JSHandleAPI, 0, len(e.Args))
+		objectHandles = make([]JSHandleAPI, 0, len(e.Args))
 	)
 
 	for _, robj := range e.Args {
