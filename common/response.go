@@ -20,7 +20,7 @@ import (
 )
 
 // Ensure Response implements the api.Response interface.
-var _ api.ResponseAPI = &Response{}
+var _ ResponseAPI = &Response{}
 
 // RemoteAddress contains informationa about a remote target.
 type RemoteAddress struct {

@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -877,7 +876,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
-func (f *Frame) Goto(url string, opts goja.Value) (api.ResponseAPI, error) {
+func (f *Frame) Goto(url string, opts goja.Value) (ResponseAPI, error) {
 	var (
 		netMgr         = f.manager.page.mainFrameSession.getNetworkManager()
 		defaultReferer = netMgr.extraHTTPHeaders["referer"]
@@ -1733,7 +1732,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 //
 //nolint:funlen,cyclop
-func (f *Frame) WaitForNavigation(opts goja.Value) (api.ResponseAPI, error) {
+func (f *Frame) WaitForNavigation(opts goja.Value) (ResponseAPI, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
 	defer f.log.Debugf("Frame:WaitForNavigation:return",

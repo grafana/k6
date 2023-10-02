@@ -693,19 +693,19 @@ func (p *Page) GetTouchscreen() api.TouchscreenAPI {
 }
 
 // GoBack is not implemented.
-func (p *Page) GoBack(_ goja.Value) api.ResponseAPI {
+func (p *Page) GoBack(_ goja.Value) ResponseAPI {
 	k6ext.Panic(p.ctx, "Page.goBack(opts) has not been implemented yet")
 	return nil
 }
 
 // GoForward is not implemented.
-func (p *Page) GoForward(_ goja.Value) api.ResponseAPI {
+func (p *Page) GoForward(_ goja.Value) ResponseAPI {
 	k6ext.Panic(p.ctx, "Page.goForward(opts) has not been implemented yet")
 	return nil
 }
 
 // Goto will navigate the page to the specified URL and return a HTTP response object.
-func (p *Page) Goto(url string, opts goja.Value) (api.ResponseAPI, error) {
+func (p *Page) Goto(url string, opts goja.Value) (ResponseAPI, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
 
 	return p.MainFrame().Goto(url, opts)
@@ -857,7 +857,7 @@ func (p *Page) QueryAll(selector string) ([]ElementHandleAPI, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts goja.Value) api.ResponseAPI { //nolint:funlen,cyclop
+func (p *Page) Reload(opts goja.Value) ResponseAPI { //nolint:funlen,cyclop
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 
 	parsedOpts := NewPageReloadOptions(
@@ -1085,7 +1085,7 @@ func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (p *Page) WaitForNavigation(opts goja.Value) (api.ResponseAPI, error) {
+func (p *Page) WaitForNavigation(opts goja.Value) (ResponseAPI, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 
 	return p.frameManager.MainFrame().WaitForNavigation(opts)
@@ -1098,7 +1098,7 @@ func (p *Page) WaitForRequest(_, _ goja.Value) RequestAPI {
 }
 
 // WaitForResponse is not implemented.
-func (p *Page) WaitForResponse(_, _ goja.Value) api.ResponseAPI {
+func (p *Page) WaitForResponse(_, _ goja.Value) ResponseAPI {
 	k6ext.Panic(p.ctx, "Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet")
 	return nil
 }

@@ -119,7 +119,7 @@ func mapRequest(vu moduleVU, r common.RequestAPI) mapping {
 }
 
 // mapResponse to the JS module.
-func mapResponse(vu moduleVU, r api.ResponseAPI) mapping {
+func mapResponse(vu moduleVU, r common.ResponseAPI) mapping {
 	if r == nil {
 		return nil
 	}

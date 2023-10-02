@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 
 	k6lib "go.k6.io/k6/lib"
@@ -80,7 +79,7 @@ func TestBasicAuth(t *testing.T) {
 		validPassword = "validpass"
 	)
 
-	auth := func(tb testing.TB, user, pass string) api.ResponseAPI {
+	auth := func(tb testing.TB, user, pass string) common.ResponseAPI {
 		tb.Helper()
 
 		browser := newTestBrowser(t, withHTTPServer())
