@@ -9,7 +9,6 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	"github.com/dop251/goja"
@@ -385,8 +384,8 @@ func (r *Rect) enclosingIntRect() *Rect {
 	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
 }
 
-func (r *Rect) toAPIRect() *api.RectAPI {
-	return &api.RectAPI{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height}
+func (r *Rect) toAPIRect() *RectAPI {
+	return &RectAPI{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height}
 }
 
 // ReducedMotion represents a browser reduce-motion setting.

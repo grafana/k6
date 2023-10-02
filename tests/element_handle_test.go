@@ -7,7 +7,6 @@ import (
 	"image/png"
 	"testing"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 
 	"github.com/stretchr/testify/assert"
@@ -84,7 +83,7 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
         const rect = e.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
-	var r api.RectAPI
+	var r common.RectAPI
 	webBbox := p.Evaluate(tb.toGojaValue(pageFn), tb.toGojaValue(element))
 	wb := tb.asGojaValue(webBbox)
 	err = tb.runtime().ExportTo(wb, &r)

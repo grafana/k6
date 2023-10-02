@@ -8,7 +8,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -240,11 +239,11 @@ func (r *Response) Headers() map[string]string {
 }
 
 // HeadersArray returns the response headers as an array of objects.
-func (r *Response) HeadersArray() []api.HTTPHeaderAPI {
-	headers := make([]api.HTTPHeaderAPI, 0)
+func (r *Response) HeadersArray() []HTTPHeaderAPI {
+	headers := make([]HTTPHeaderAPI, 0)
 	for n, vals := range r.headers {
 		for _, v := range vals {
-			headers = append(headers, api.HTTPHeaderAPI{Name: n, Value: v})
+			headers = append(headers, HTTPHeaderAPI{Name: n, Value: v})
 		}
 	}
 	return headers
@@ -294,8 +293,8 @@ func (r *Response) ServerAddr() goja.Value {
 }
 
 // Size returns the size in bytes of the response.
-func (r *Response) Size() api.HTTPMessageSizeAPI {
-	return api.HTTPMessageSizeAPI{
+func (r *Response) Size() HTTPMessageSizeAPI {
+	return HTTPMessageSizeAPI{
 		Body:    r.bodySize(),
 		Headers: r.headersSize(),
 	}

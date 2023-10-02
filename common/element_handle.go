@@ -9,7 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6ext"
 
@@ -732,7 +731,7 @@ func (h *ElementHandle) AsElement() ElementHandleAPI {
 }
 
 // BoundingBox returns this element's bounding box.
-func (h *ElementHandle) BoundingBox() *api.RectAPI {
+func (h *ElementHandle) BoundingBox() *RectAPI {
 	bbox, err := h.boundingBox()
 	if err != nil {
 		return nil // Don't panic here, just return nil

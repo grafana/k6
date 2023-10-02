@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
@@ -187,11 +186,11 @@ func (r *Request) Headers() map[string]string {
 }
 
 // HeadersArray returns the request headers as an array of objects.
-func (r *Request) HeadersArray() []api.HTTPHeaderAPI {
-	headers := make([]api.HTTPHeaderAPI, 0)
+func (r *Request) HeadersArray() []HTTPHeaderAPI {
+	headers := make([]HTTPHeaderAPI, 0)
 	for n, vals := range r.headers {
 		for _, v := range vals {
-			headers = append(headers, api.HTTPHeaderAPI{Name: n, Value: v})
+			headers = append(headers, HTTPHeaderAPI{Name: n, Value: v})
 		}
 	}
 	return headers
@@ -247,8 +246,8 @@ func (r *Request) Response() ResponseAPI {
 }
 
 // Size returns the size of the request.
-func (r *Request) Size() api.HTTPMessageSizeAPI {
-	return api.HTTPMessageSizeAPI{
+func (r *Request) Size() HTTPMessageSizeAPI {
+	return HTTPMessageSizeAPI{
 		Body:    int64(len(r.postData)),
 		Headers: r.headersSize(),
 	}

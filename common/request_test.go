@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -67,7 +66,7 @@ func TestRequest(t *testing.T) {
 
 	t.Run("HeadersArray()", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, []api.HTTPHeaderAPI{
+		assert.Equal(t, []HTTPHeaderAPI{
 			{Name: "key", Value: "value"},
 		}, req.HeadersArray())
 	})
@@ -80,7 +79,7 @@ func TestRequest(t *testing.T) {
 	t.Run("Size()", func(t *testing.T) {
 		t.Parallel()
 		assert.Equal(t,
-			api.HTTPMessageSizeAPI{Headers: int64(33), Body: int64(5)},
+			HTTPMessageSizeAPI{Headers: int64(33), Body: int64(5)},
 			req.Size())
 	})
 }
