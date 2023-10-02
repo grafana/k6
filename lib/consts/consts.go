@@ -8,7 +8,7 @@ import (
 )
 
 // Version contains the current semantic version of k6.
-const Version = "0.46.0"
+const Version = "0.47.0"
 
 // FullVersion returns the maximally full version and build information for
 // the currently running k6 executable.
