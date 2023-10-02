@@ -124,7 +124,7 @@ func TestMappings(t *testing.T) {
 
 	for name, tt := range map[string]test{
 		"browser": {
-			apiInterface: (*api.BrowserAPI)(nil),
+			apiInterface: (*common.BrowserAPI)(nil),
 			mapp: func() mapping {
 				return mapBrowser(moduleVU{VU: vu})
 			},

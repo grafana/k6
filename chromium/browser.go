@@ -1,12 +1,11 @@
 package chromium
 
 import (
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common"
 )
 
-// Ensure Browser implements the api.Browser interface.
-var _ api.BrowserAPI = &Browser{}
+// Ensure Browser implements the Browser interface.
+var _ common.BrowserAPI = &Browser{}
 
 // Browser is the public interface of a CDP browser.
 type Browser struct {

@@ -25,7 +25,7 @@ import (
 
 // Ensure Browser implements the EventEmitter and Browser interfaces.
 var (
-	_ api.BrowserAPI = &Browser{}
+	_ BrowserAPI = &Browser{}
 )
 
 const (
