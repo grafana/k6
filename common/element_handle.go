@@ -24,7 +24,7 @@ const resultDone = "done"
 // Ensure ElementHandle implements the api.ElementHandle and api.JSHandle interfaces.
 var (
 	_ ElementHandleAPI = &ElementHandle{}
-	_ api.JSHandleAPI  = &ElementHandle{}
+	_ JSHandleAPI      = &ElementHandle{}
 )
 
 type (
@@ -1055,7 +1055,7 @@ func (h *ElementHandle) Query(selector string) (ElementHandleAPI, error) {
 	if result == nil {
 		return nil, fmt.Errorf("querying selector %q", selector)
 	}
-	handle, ok := result.(api.JSHandleAPI)
+	handle, ok := result.(common.JSHandleAPI)
 	if !ok {
 		return nil, fmt.Errorf("querying selector %q, wrong type %T", selector, result)
 	}
@@ -1100,7 +1100,7 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]ElementHandl
 		return nil, nil
 	}
 
-	handles, ok := result.(api.JSHandleAPI)
+	handles, ok := result.(common.JSHandleAPI)
 	if !ok {
 		return nil, fmt.Errorf("getting element handle for selector %q: %w", selector, ErrJSHandleInvalid)
 	}

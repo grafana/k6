@@ -152,7 +152,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"jsHandle": {
-			apiInterface: (*api.JSHandleAPI)(nil),
+			apiInterface: (*common.JSHandleAPI)(nil),
 			mapp: func() mapping {
 				return mapJSHandle(moduleVU{VU: vu}, &common.BaseJSHandle{})
 			},
@@ -189,7 +189,7 @@ func TestMappings(t *testing.T) {
 		},
 		"mapConsoleMessage": {
 			apiInterface: (*interface {
-				Args() []api.JSHandleAPI
+				Args() []common.JSHandleAPI
 				Page() api.PageAPI
 				Text() string
 				Type() string

@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -14,7 +13,7 @@ import (
 )
 
 type jsHandle interface {
-	api.JSHandleAPI
+	common.JSHandleAPI
 	dispose() error
 	getProperties() (map[string]jsHandle, error)
 }
@@ -101,7 +100,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandleAPI, error) {
+func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error) {
 	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 
@@ -114,13 +113,13 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (
 }
 
 // GetProperties retreives the JS handle's properties.
-func (h *BaseJSHandle) GetProperties() (map[string]api.JSHandleAPI, error) {
+func (h *BaseJSHandle) GetProperties() (map[string]common.JSHandleAPI, error) {
 	handles, err := h.getProperties()
 	if err != nil {
 		return nil, err
 	}
 
-	jsHandles := make(map[string]api.JSHandleAPI, len(handles))
+	jsHandles := make(map[string]common.JSHandleAPI, len(handles))
 	for k, v := range handles {
 		jsHandles[k] = v
 	}
@@ -149,7 +148,7 @@ func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
 }
 
 // GetProperty retreves a single property of the JS handle.
-func (h *BaseJSHandle) GetProperty(_ string) api.JSHandleAPI {
+func (h *BaseJSHandle) GetProperty(_ string) common.JSHandleAPI {
 	return nil
 }
 

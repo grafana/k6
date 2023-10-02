@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/common/js"
 
 	"github.com/stretchr/testify/assert"
@@ -86,8 +85,8 @@ func TestQueryAll(t *testing.T) {
 				handles := &jsHandleStub{
 					asElementFn: nilHandle,
 				}
-				handles.getPropertiesFn = func() (map[string]api.JSHandleAPI, error) {
-					return map[string]api.JSHandleAPI{
+				handles.getPropertiesFn = func() (map[string]JSHandleAPI, error) {
+					return map[string]JSHandleAPI{
 						"1": handles,
 						"2": handles,
 					}, nil
@@ -101,13 +100,13 @@ func TestQueryAll(t *testing.T) {
 		"returns_elems": {
 			selector: "*",
 			returnHandle: func() any {
-				childHandles := map[string]api.JSHandleAPI{
+				childHandles := map[string]JSHandleAPI{
 					"1": &jsHandleStub{asElementFn: nonNilHandle},
 					"2": &jsHandleStub{asElementFn: nonNilHandle},
 					"3": &jsHandleStub{asElementFn: nilHandle},
 				}
 				return &jsHandleStub{
-					getPropertiesFn: func() (map[string]api.JSHandleAPI, error) {
+					getPropertiesFn: func() (map[string]JSHandleAPI, error) {
 						return childHandles, nil
 					},
 				}
@@ -118,7 +117,7 @@ func TestQueryAll(t *testing.T) {
 			selector: "*",
 			returnHandle: func() any {
 				return &jsHandleStub{
-					getPropertiesFn: func() (map[string]api.JSHandleAPI, error) {
+					getPropertiesFn: func() (map[string]JSHandleAPI, error) {
 						return nil, errors.New("any error")
 					},
 				}
@@ -183,12 +182,12 @@ func TestQueryAll(t *testing.T) {
 }
 
 type jsHandleStub struct {
-	api.JSHandleAPI
+	JSHandleAPI
 
 	disposeCalls int
 
 	asElementFn     func() ElementHandleAPI
-	getPropertiesFn func() (map[string]api.JSHandleAPI, error)
+	getPropertiesFn func() (map[string]JSHandleAPI, error)
 }
 
 func (s *jsHandleStub) AsElement() ElementHandleAPI {
@@ -202,7 +201,7 @@ func (s *jsHandleStub) Dispose() {
 	s.disposeCalls++
 }
 
-func (s *jsHandleStub) GetProperties() (map[string]api.JSHandleAPI, error) {
+func (s *jsHandleStub) GetProperties() (map[string]JSHandleAPI, error) {
 	if s.getPropertiesFn == nil {
 		return nil, nil //nolint:nilnil
 	}
