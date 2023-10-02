@@ -23,7 +23,7 @@ import (
 const maxRetry = 1
 
 // Ensure frame implements the Frame interface.
-var _ api.FrameAPI = &Frame{}
+var _ FrameAPI = &Frame{}
 
 type DocumentInfo struct {
 	documentID string
@@ -40,7 +40,7 @@ type Frame struct {
 	parentFrame *Frame
 
 	childFramesMu sync.RWMutex
-	childFrames   map[api.FrameAPI]bool
+	childFrames   map[FrameAPI]bool
 
 	propertiesMu sync.RWMutex
 	id           cdp.FrameID
@@ -94,7 +94,7 @@ func NewFrame(
 		page:              m.page,
 		manager:           m,
 		parentFrame:       parentFrame,
-		childFrames:       make(map[api.FrameAPI]bool),
+		childFrames:       make(map[FrameAPI]bool),
 		id:                frameID,
 		vu:                k6ext.GetVU(ctx),
 		lifecycleEvents:   make(map[LifecycleEvent]bool),
@@ -486,11 +486,11 @@ func (f *Frame) AddStyleTag(opts goja.Value) {
 }
 
 // ChildFrames returns a list of child frames.
-func (f *Frame) ChildFrames() []api.FrameAPI {
+func (f *Frame) ChildFrames() []FrameAPI {
 	f.childFramesMu.RLock()
 	defer f.childFramesMu.RUnlock()
 
-	l := make([]api.FrameAPI, 0, len(f.childFrames))
+	l := make([]FrameAPI, 0, len(f.childFrames))
 	for child := range f.childFrames {
 		l = append(l, child)
 	}
@@ -1335,7 +1335,7 @@ func (f *Frame) Page() api.PageAPI {
 }
 
 // ParentFrame returns the parent frame, if one exists.
-func (f *Frame) ParentFrame() api.FrameAPI {
+func (f *Frame) ParentFrame() FrameAPI {
 	return f.parentFrame
 }
 

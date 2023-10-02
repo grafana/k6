@@ -163,7 +163,7 @@ func (r *Request) Failure() goja.Value {
 }
 
 // Frame returns the frame within which the request was made.
-func (r *Request) Frame() api.FrameAPI {
+func (r *Request) Frame() FrameAPI {
 	return r.frame
 }
 

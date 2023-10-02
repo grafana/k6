@@ -158,7 +158,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"frame": {
-			apiInterface: (*api.FrameAPI)(nil),
+			apiInterface: (*common.FrameAPI)(nil),
 			mapp: func() mapping {
 				return mapFrame(moduleVU{VU: vu}, &common.Frame{})
 			},

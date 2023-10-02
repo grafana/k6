@@ -286,7 +286,7 @@ func mapElementHandle(vu moduleVU, eh common.ElementHandleAPI) mapping {
 // mapFrame to the JS module.
 //
 //nolint:funlen
-func mapFrame(vu moduleVU, f api.FrameAPI) mapping {
+func mapFrame(vu moduleVU, f common.FrameAPI) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"addScriptTag": f.AddScriptTag,

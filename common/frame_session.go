@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -401,11 +400,11 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	}
 	fs.isolatedWorlds[name] = true
 
-	var frames []api.FrameAPI
+	var frames []FrameAPI
 	if fs.isMainFrame() {
 		frames = fs.manager.Frames()
 	} else {
-		frames = []api.FrameAPI{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
+		frames = []FrameAPI{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
 	}
 	for _, frame := range frames {
 		// A frame could have been removed before we execute this, so don't wait around for a reply.

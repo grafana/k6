@@ -763,7 +763,7 @@ func (h *ElementHandle) Click(opts goja.Value) error {
 }
 
 // ContentFrame returns the frame that contains this element.
-func (h *ElementHandle) ContentFrame() (api.FrameAPI, error) {
+func (h *ElementHandle) ContentFrame() (FrameAPI, error) {
 	var (
 		node *cdp.Node
 		err  error
@@ -977,7 +977,7 @@ func (h *ElementHandle) IsVisible() bool {
 }
 
 // OwnerFrame returns the frame containing this element.
-func (h *ElementHandle) OwnerFrame() (api.FrameAPI, error) {
+func (h *ElementHandle) OwnerFrame() (FrameAPI, error) {
 	fn := `
 		(node, injected) => {
 			return injected.getDocumentElement(node);

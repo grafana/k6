@@ -196,7 +196,7 @@ func (r *Response) Finished() bool {
 }
 
 // Frame returns the frame within which the response was received.
-func (r *Response) Frame() api.FrameAPI {
+func (r *Response) Frame() FrameAPI {
 	return r.request.frame
 }
 
