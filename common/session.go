@@ -12,10 +12,6 @@ import (
 	"github.com/grafana/xk6-browser/log"
 )
 
-// Ensure Session implements the EventEmitter and Executor interfaces.
-var _ EventEmitter = &Session{}
-var _ cdp.Executor = &Session{}
-
 // Session represents a CDP session to a target.
 type Session struct {
 	BaseEventEmitter

@@ -70,8 +70,6 @@ func (lc *logCache) contains(msg string) bool {
 	return false
 }
 
-var _ logrus.Hook = &logCache{}
-
 // attachLogCache sets logger to DebugLevel, attaches a LogCache hook and
 // returns it.
 func attachLogCache(tb testing.TB, fl logrus.FieldLogger) *logCache {

@@ -14,8 +14,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-var _ KeyboardAPI = &Keyboard{}
-
 const (
 	ModifierKeyAlt int64 = 1 << iota
 	ModifierKeyControl

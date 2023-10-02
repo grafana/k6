@@ -28,9 +28,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure NetworkManager implements the EventEmitter interface.
-var _ EventEmitter = &NetworkManager{}
-
 // NetworkManager manages all frames in HTML document.
 type NetworkManager struct {
 	BaseEventEmitter

@@ -18,9 +18,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure Response implements the api.Response interface.
-var _ ResponseAPI = &Response{}
-
 // RemoteAddress contains informationa about a remote target.
 type RemoteAddress struct {
 	IPAddress string `json:"ipAddress"`

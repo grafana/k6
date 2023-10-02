@@ -14,10 +14,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure Worker implements the EventEmitter, Target and Worker interfaces.
-var _ EventEmitter = &Worker{}
-var _ WorkerAPI = &Worker{}
-
 type Worker struct {
 	BaseEventEmitter
 

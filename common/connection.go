@@ -24,10 +24,6 @@ import (
 
 const wsWriteBufferSize = 1 << 20
 
-// Ensure Connection implements the EventEmitter and Executor interfaces.
-var _ EventEmitter = &Connection{}
-var _ cdp.Executor = &Connection{}
-
 // Each connection needs its own msgID. A msgID will be used by the
 // connection and associated sessions. When a CDP request is made to
 // chrome, it's best to work with unique ids to avoid the Execute

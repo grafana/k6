@@ -21,9 +21,6 @@ import (
 // maxRetry controls how many times to retry if an action fails.
 const maxRetry = 1
 
-// Ensure frame implements the Frame interface.
-var _ FrameAPI = &Frame{}
-
 type DocumentInfo struct {
 	documentID string
 	request    *Request

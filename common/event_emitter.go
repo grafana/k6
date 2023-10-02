@@ -5,9 +5,6 @@ import (
 	"sync"
 )
 
-// Ensure BaseEventEmitter implements the EventEmitter interface.
-var _ EventEmitter = &BaseEventEmitter{}
-
 const (
 	// Browser
 

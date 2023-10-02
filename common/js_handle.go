@@ -18,8 +18,6 @@ type jsHandle interface {
 	getProperties() (map[string]jsHandle, error)
 }
 
-var _ jsHandle = &BaseJSHandle{}
-
 // BaseJSHandle represents a JS object in an execution context.
 type BaseJSHandle struct {
 	ctx          context.Context

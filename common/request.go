@@ -18,9 +18,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure Request implements the api.Request interface.
-var _ RequestAPI = &Request{}
-
 // Request represents a browser HTTP request.
 type Request struct {
 	ctx                 context.Context
