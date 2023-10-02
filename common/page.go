@@ -39,7 +39,7 @@ var (
 	_ api.PageAPI  = &Page{}
 )
 
-type consoleEventHandlerFunc func(*api.ConsoleMessageAPI) error
+type consoleEventHandlerFunc func(*ConsoleMessageAPI) error
 
 // Page stores Page/tab related context.
 type Page struct {
@@ -797,7 +797,7 @@ func (p *Page) MainFrame() api.FrameAPI {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event string, handler func(*api.ConsoleMessageAPI) error) error {
+func (p *Page) On(event string, handler func(*ConsoleMessageAPI) error) error {
 	if event != eventPageConsoleAPICalled {
 		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
 	}
@@ -1158,7 +1158,7 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	}
 }
 
-func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*api.ConsoleMessageAPI, error) {
+func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*ConsoleMessageAPI, error) {
 	execCtx, err := p.executionContextForID(e.ExecutionContextID)
 	if err != nil {
 		return nil, err
@@ -1185,7 +1185,7 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 		))
 	}
 
-	return &api.ConsoleMessageAPI{
+	return &ConsoleMessageAPI{
 		Args: objectHandles,
 		Page: p,
 		Text: textForConsoleEvent(e, objects),

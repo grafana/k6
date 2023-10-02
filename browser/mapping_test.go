@@ -195,7 +195,7 @@ func TestMappings(t *testing.T) {
 				Type() string
 			})(nil),
 			mapp: func() mapping {
-				return mapConsoleMessage(moduleVU{VU: vu}, &api.ConsoleMessageAPI{})
+				return mapConsoleMessage(moduleVU{VU: vu}, &common.ConsoleMessageAPI{})
 			},
 		},
 	} {
