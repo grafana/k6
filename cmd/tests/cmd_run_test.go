@@ -100,10 +100,6 @@ func TestBinaryNameHelpStdout(t *testing.T) {
 			containsOutput: fmt.Sprintf("%s cloud script.js", ts.BinaryName),
 		},
 		{
-			cmdName:        "convert",
-			containsOutput: fmt.Sprintf("%s convert -O har-session.js session.har", ts.BinaryName),
-		},
-		{
 			cmdName:        "login",
 			extraCmd:       "cloud",
 			containsOutput: fmt.Sprintf("%s login cloud -t YOUR_TOKEN", ts.BinaryName),
