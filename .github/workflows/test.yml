@@ -37,12 +37,6 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          # Run with less concurrency on Windows/MacOS to minimize flakiness.
-          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == macos* ]]; then
-            unset args[2]
-            args[1]="1"
-            export GOMAXPROCS=1
-          fi
           go test "${args[@]}" -timeout 800s ./...
 
   test-tip:
