@@ -665,7 +665,40 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"waitForEvent": func(event string, optsOrPredicate goja.Value) *goja.Promise {
 			ctx := vu.Context()
 			return k6ext.Promise(ctx, func() (result any, reason error) {
-				resp, err := bc.WaitForEvent(event, optsOrPredicate)
+				if vu.tq == nil {
+					vu.tq = taskqueue.New(vu.RegisterCallback)
+				}
+
+				parsedOpts := common.NewWaitForEventOptions(
+					bc.Timeout(),
+				)
+				if err := parsedOpts.Parse(ctx, optsOrPredicate); err != nil {
+					return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
+				}
+
+				var runInTaskQueue func(p *common.Page) (bool, error)
+				if parsedOpts.PredicateFn != nil {
+					runInTaskQueue = func(p *common.Page) (bool, error) {
+						var rtn bool
+						var err error
+						// The function on the taskqueue runs in its own goroutine
+						// so we need to use a channel to wait for it to complete
+						// before returning the result to the caller.
+						c := make(chan bool)
+						vu.tq.Queue(func() error {
+							var resp goja.Value
+							resp, err = parsedOpts.PredicateFn(vu.Runtime().ToValue(p))
+							rtn = resp.ToBoolean()
+							close(c)
+							return nil
+						})
+						<-c
+
+						return rtn, err //nolint:wrapcheck
+					}
+				}
+
+				resp, err := bc.WaitForEvent(event, runInTaskQueue, parsedOpts.Timeout)
 				panicIfFatalError(ctx, err)
 				if err != nil {
 					return nil, err //nolint:wrapcheck

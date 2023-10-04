@@ -386,22 +386,15 @@ func (b *BrowserContext) Timeout() time.Duration {
 }
 
 // WaitForEvent waits for event.
-func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) (any, error) {
+func (b *BrowserContext) WaitForEvent(event string, f func(p *Page) (bool, error), timeout time.Duration) (any, error) {
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
 
-	parsedOpts := NewWaitForEventOptions(
-		b.timeoutSettings.timeout(),
-	)
-	if err := parsedOpts.Parse(b.ctx, optsOrPredicate); err != nil {
-		return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
-	}
-
-	return b.waitForEvent(waitForEventType(event), parsedOpts.PredicateFn, parsedOpts.Timeout)
+	return b.waitForEvent(waitForEventType(event), f, timeout)
 }
 
 func (b *BrowserContext) waitForEvent(
 	event waitForEventType,
-	predicateFn goja.Callable,
+	predicateFn func(p *Page) (bool, error),
 	timeout time.Duration,
 ) (any, error) {
 	if event != waitForEventTypePage {
@@ -437,7 +430,7 @@ func (b *BrowserContext) waitForEvent(
 // runWaitForEventHandler can work with a nil predicateFn. If predicateFn is
 // nil it will return the response straight away.
 func (b *BrowserContext) runWaitForEventHandler(
-	ctx context.Context, chEvHandler chan Event, out chan<- any, errOut chan<- error, predicateFn goja.Callable,
+	ctx context.Context, chEvHandler chan Event, out chan<- any, errOut chan<- error, predicateFn func(p *Page) (bool, error),
 ) {
 	b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():starts", "bctxid:%v", b.id)
 	defer b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():returns", "bctxid:%v", b.id)
@@ -475,7 +468,7 @@ func (b *BrowserContext) runWaitForEventHandler(
 				return
 			}
 
-			if retVal, err := predicateFn(b.vu.Runtime().ToValue(p)); err == nil && retVal.ToBoolean() {
+			if retVal, err := predicateFn(p); err == nil && retVal {
 				b.logger.Debugf(
 					"BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:predicateFn:return",
 					"bctxid:%v", b.id,
