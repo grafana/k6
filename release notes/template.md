@@ -23,7 +23,7 @@ _what, why, and what this means for the user_
 
 _what, why, and what this means for the user_
 
-### UX improvements and enhancements
+## UX improvements and enhancements
 
 _Format as `<number> <present_verb> <object>. <credit>`_:
 
