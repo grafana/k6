@@ -380,6 +380,11 @@ func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
 	k6ext.Panic(b.ctx, "BrowserContext.unroute(url, handler) has not been implemented yet")
 }
 
+// Timeout will return the default timeout or the one set by the user.
+func (b *BrowserContext) Timeout() time.Duration {
+	return b.timeoutSettings.timeout()
+}
+
 // WaitForEvent waits for event.
 func (b *BrowserContext) WaitForEvent(event string, optsOrPredicate goja.Value) (any, error) {
 	b.logger.Debugf("BrowserContext:WaitForEvent", "bctxid:%v event:%q", b.id, event)
