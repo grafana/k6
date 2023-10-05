@@ -1,9 +1,12 @@
+// Package api contains the REST API implementation for k6.
+// It also registers the services endpoints like pprof
 package api
 
 import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof" //nolint:gosec // Register pprof handlers
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -20,6 +23,8 @@ func newHandler(cs *v1.ControlSurface) http.Handler {
 	mux.Handle("/v1/", v1.NewHandler(cs))
 	mux.Handle("/ping", handlePing(cs.RunState.Logger))
 	mux.Handle("/", handlePing(cs.RunState.Logger))
+	mux.Handle("/debug/pprof/", http.DefaultServeMux)
+
 	return mux
 }
 
