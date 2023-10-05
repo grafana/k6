@@ -270,10 +270,20 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		srvCtx, srvCancel := context.WithCancel(globalCtx)
 		defer srvCancel()
 
-		srv := api.GetServer(runCtx, c.gs.Flags.Address, testRunState, samples, metricsEngine, execScheduler)
+		srv := api.GetServer(
+			runCtx,
+			c.gs.Flags.Address, c.gs.Flags.ProfilingEnabled,
+			testRunState,
+			samples,
+			metricsEngine,
+			execScheduler,
+		)
 		go func() {
 			defer apiWG.Done()
 			logger.Debugf("Starting the REST API server on %s", c.gs.Flags.Address)
+			if c.gs.Flags.ProfilingEnabled {
+				logger.Debugf("Profiling exposed on http://%s/debug/pprof/", c.gs.Flags.Address)
+			}
 			if aerr := srv.ListenAndServe(); aerr != nil && !errors.Is(aerr, http.ErrServerClosed) {
 				// Only exit k6 if the user has explicitly set the REST API address
 				if cmd.Flags().Lookup("address").Changed {

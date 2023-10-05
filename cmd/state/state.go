@@ -134,21 +134,23 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 
 // GlobalFlags contains global config values that apply for all k6 sub-commands.
 type GlobalFlags struct {
-	ConfigFilePath string
-	Quiet          bool
-	NoColor        bool
-	Address        string
-	LogOutput      string
-	LogFormat      string
-	Verbose        bool
+	ConfigFilePath   string
+	Quiet            bool
+	NoColor          bool
+	Address          string
+	ProfilingEnabled bool
+	LogOutput        string
+	LogFormat        string
+	Verbose          bool
 }
 
 // GetDefaultFlags returns the default global flags.
 func GetDefaultFlags(homeDir string) GlobalFlags {
 	return GlobalFlags{
-		Address:        "localhost:6565",
-		ConfigFilePath: filepath.Join(homeDir, "loadimpact", "k6", defaultConfigFileName),
-		LogOutput:      "stderr",
+		Address:          "localhost:6565",
+		ProfilingEnabled: false,
+		ConfigFilePath:   filepath.Join(homeDir, "loadimpact", "k6", defaultConfigFileName),
+		LogOutput:        "stderr",
 	}
 }
 
