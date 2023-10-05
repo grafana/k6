@@ -1,9 +1,12 @@
+// Package api contains the REST API implementation for k6.
+// It also registers the services endpoints like pprof
 package api
 
 import (
 	"context"
 	"fmt"
 	"net/http"
+	_ "net/http/pprof" //nolint:gosec // Register pprof handlers
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -15,18 +18,41 @@ import (
 	"go.k6.io/k6/metrics/engine"
 )
 
-func newHandler(cs *v1.ControlSurface) http.Handler {
+func newHandler(cs *v1.ControlSurface, profilingEnabled bool) http.Handler {
 	mux := http.NewServeMux()
 	mux.Handle("/v1/", v1.NewHandler(cs))
 	mux.Handle("/ping", handlePing(cs.RunState.Logger))
 	mux.Handle("/", handlePing(cs.RunState.Logger))
+
+	injectProfilerHandler(mux, profilingEnabled)
+
 	return mux
+}
+
+func injectProfilerHandler(mux *http.ServeMux, profilingEnabled bool) {
+	var handler http.Handler
+
+	handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+		rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
+		_, _ = rw.Write([]byte("To enable profiling, please run k6 with the --profiling-enabled flag"))
+	})
+
+	if profilingEnabled {
+		handler = http.DefaultServeMux
+	}
+
+	mux.Handle("/debug/pprof/", handler)
 }
 
 // GetServer returns a http.Server instance that can serve k6's REST API.
 func GetServer(
-	runCtx context.Context, addr string, runState *lib.TestRunState,
-	samples chan metrics.SampleContainer, me *engine.MetricsEngine, es *execution.Scheduler,
+	runCtx context.Context,
+	addr string,
+	profilingEnabled bool,
+	runState *lib.TestRunState,
+	samples chan metrics.SampleContainer,
+	me *engine.MetricsEngine,
+	es *execution.Scheduler,
 ) *http.Server {
 	// TODO: reduce the control surface as much as possible? For example, if
 	// we refactor the Runner API, we won't need to send the Samples channel.
@@ -38,7 +64,7 @@ func GetServer(
 		RunState:      runState,
 	}
 
-	mux := withLoggingHandler(runState.Logger, newHandler(cs))
+	mux := withLoggingHandler(runState.Logger, newHandler(cs, profilingEnabled))
 	return &http.Server{Addr: addr, Handler: mux, ReadHeaderTimeout: 10 * time.Second}
 }
 
