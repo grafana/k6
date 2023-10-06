@@ -21,7 +21,7 @@ type moduleVU struct {
 }
 
 // browser returns the VU browser instance for the current iteration.
-func (vu moduleVU) browser() (common.BrowserAPI, error) {
+func (vu moduleVU) browser() (*common.Browser, error) {
 	return vu.browserRegistry.getBrowser(vu.State().Iteration)
 }
 

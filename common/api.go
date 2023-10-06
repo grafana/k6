@@ -43,18 +43,6 @@ const (
 	CookieSameSiteNone CookieSameSite = "None"
 )
 
-// BrowserAPI is the public interface of a CDP browser.
-type BrowserAPI interface {
-	Close()
-	Context() *BrowserContext
-	IsConnected() bool
-	NewContext(opts goja.Value) (*BrowserContext, error)
-	NewPage(opts goja.Value) (PageAPI, error)
-	On(string) (bool, error)
-	UserAgent() string
-	Version() string
-}
-
 // ConsoleMessageAPI represents a page console message.
 type ConsoleMessageAPI struct {
 	// Args represent the list of arguments passed to a console function call.

@@ -22,11 +22,6 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-// Ensure Browser implements the EventEmitter and Browser interfaces.
-var (
-	_ BrowserAPI = &Browser{}
-)
-
 const (
 	BrowserStateOpen int64 = iota
 	BrowserStateClosed

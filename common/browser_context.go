@@ -139,7 +139,7 @@ func (b *BrowserContext) applyAllInitScripts(p *Page) error {
 }
 
 // Browser returns the browser instance that this browser context belongs to.
-func (b *BrowserContext) Browser() BrowserAPI {
+func (b *BrowserContext) Browser() *Browser {
 	return b.browser
 }
 

@@ -38,12 +38,12 @@ func customMappings() map[string]string {
 		"FrameAPI.id":                  "",
 		"FrameAPI.loaderID":            "",
 		"JSHandleAPI.objectID":         "",
-		"BrowserAPI.close":             "",
+		"browserAPI.close":             "",
 		"FrameAPI.evaluateWithContext": "",
 		// TODO: browser.on method is unexposed until more event
 		// types other than 'disconnect' are supported.
 		// See: https://github.com/grafana/xk6-browser/issues/913
-		"BrowserAPI.on": "",
+		"browserAPI.on": "",
 	}
 }
 
@@ -123,7 +123,7 @@ func TestMappings(t *testing.T) {
 
 	for name, tt := range map[string]test{
 		"browser": {
-			apiInterface: (*common.BrowserAPI)(nil),
+			apiInterface: (*browserAPI)(nil),
 			mapp: func() mapping {
 				return mapBrowser(moduleVU{VU: vu})
 			},
@@ -244,11 +244,23 @@ func isCustomMapping(customMappings map[string]string, typ, method string) (stri
 // JavaScript API definitions.
 // ----------------------------------------------------------------------------
 
+// browserAPI is the public interface of a CDP browser.
+type browserAPI interface {
+	Close()
+	Context() *common.BrowserContext
+	IsConnected() bool
+	NewContext(opts goja.Value) (*common.BrowserContext, error)
+	NewPage(opts goja.Value) (common.PageAPI, error)
+	On(string) (bool, error)
+	UserAgent() string
+	Version() string
+}
+
 // browserContextAPI is the public interface of a CDP browser context.
 type browserContextAPI interface {
 	AddCookies(cookies []*common.Cookie) error
 	AddInitScript(script goja.Value, arg goja.Value) error
-	Browser() common.BrowserAPI
+	Browser() *common.Browser
 	ClearCookies() error
 	ClearPermissions()
 	Close()

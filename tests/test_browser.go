@@ -83,20 +83,16 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	if err != nil {
 		tb.Fatalf("testBrowser: %v", err)
 	}
-	cb, ok := b.(*common.Browser)
-	if !ok {
-		tb.Fatalf("testBrowser: unexpected browser %T", b)
-	}
-	tbr.Browser = cb
+	tbr.Browser = b
 	tbr.ctx = tbr.browserType.Ctx
 	tbr.pid = pid
-	tbr.wsURL = cb.WsURL()
+	tbr.wsURL = b.WsURL()
 	tb.Cleanup(func() {
 		select {
 		case <-tbr.vu.Context().Done():
 		default:
 			if !tbr.skipClose {
-				cb.Close()
+				b.Close()
 			}
 		}
 	})
