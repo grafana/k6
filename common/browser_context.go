@@ -227,7 +227,7 @@ func (b *BrowserContext) NewCDPSession() any { // TODO: implement
 }
 
 // NewPage creates a new page inside this browser context.
-func (b *BrowserContext) NewPage() (PageAPI, error) {
+func (b *BrowserContext) NewPage() (*Page, error) {
 	b.logger.Debugf("BrowserContext:NewPage", "bctxid:%v", b.id)
 
 	p, err := b.browser.newPageInContext(b.id)
@@ -251,8 +251,8 @@ func (b *BrowserContext) NewPage() (PageAPI, error) {
 }
 
 // Pages returns a list of pages inside this browser context.
-func (b *BrowserContext) Pages() []PageAPI {
-	pages := make([]PageAPI, 1)
+func (b *BrowserContext) Pages() []*Page {
+	pages := make([]*Page, 1)
 	for _, p := range b.browser.getPages() {
 		pages = append(pages, p)
 	}

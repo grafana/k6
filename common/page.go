@@ -32,12 +32,6 @@ const (
 	eventPageConsoleAPICalled = "console"
 )
 
-// Ensure page implements the EventEmitter, Target and Page interfaces.
-var (
-	_ EventEmitter = &Page{}
-	_ PageAPI      = &Page{}
-)
-
 type consoleEventHandlerFunc func(*ConsoleMessageAPI) error
 
 // Page stores Page/tab related context.
@@ -819,7 +813,7 @@ func (p *Page) On(event string, handler func(*ConsoleMessageAPI) error) error {
 }
 
 // Opener returns the opener of the target.
-func (p *Page) Opener() PageAPI {
+func (p *Page) Opener() *Page {
 	return p.opener
 }
 

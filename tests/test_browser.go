@@ -258,10 +258,7 @@ func (b *testBrowser) NewPage(opts goja.Value) *common.Page {
 	p, err := b.Browser.NewPage(opts)
 	require.NoError(b.t, err)
 
-	pp, ok := p.(*common.Page)
-	require.Truef(b.t, ok, "want *common.Page, got %T", p)
-
-	return pp
+	return p
 }
 
 // url returns the listening HTTP test server's url combined with the given path.

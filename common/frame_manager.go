@@ -681,7 +681,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 }
 
 // Page returns the page that this frame manager belongs to.
-func (m *FrameManager) Page() PageAPI {
+func (m *FrameManager) Page() *Page {
 	if m.page != nil {
 		return m.page
 	}
