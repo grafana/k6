@@ -220,15 +220,6 @@ type JSHandleAPI interface {
 	ObjectID() cdpruntime.RemoteObjectID
 }
 
-// KeyboardAPI is the interface of a keyboard input device.
-type KeyboardAPI interface {
-	Down(key string)
-	InsertText(char string)
-	Press(key string, opts goja.Value)
-	Type(text string, opts goja.Value)
-	Up(key string)
-}
-
 // Strict mode:
 // All operations on locators throw an exception if more
 // than one element matches the locator's selector.
@@ -339,7 +330,7 @@ type PageAPI interface {
 	Frame(frameSelector goja.Value) FrameAPI
 	Frames() []FrameAPI
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
-	GetKeyboard() KeyboardAPI
+	GetKeyboard() *Keyboard
 	GetMouse() MouseAPI
 	GetTouchscreen() TouchscreenAPI
 	GoBack(opts goja.Value) ResponseAPI

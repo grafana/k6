@@ -239,3 +239,17 @@ func isCustomMapping(customMappings map[string]string, typ, method string) (stri
 
 	return "", false
 }
+
+// ----------------------------------------------------------------------------
+// JavaScript API definitions.
+// ----------------------------------------------------------------------------
+
+// keyboardAPI is the interface of a keyboard input device.
+// TODO: map this to page.GetKeyboard().
+type keyboardAPI interface { //nolint: unused
+	Down(key string)
+	InsertText(char string)
+	Press(key string, opts goja.Value)
+	Type(text string, opts goja.Value)
+	Up(key string)
+}
