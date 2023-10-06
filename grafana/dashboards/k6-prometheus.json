@@ -411,7 +411,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"true\"})",
+          "expr": "sum(k6_http_reqs_total{testid=~\"$testid\", expected_response=\"false\"})",
           "instant": false,
           "legendFormat": "__auto",
           "range": true,
