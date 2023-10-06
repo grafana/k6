@@ -358,9 +358,9 @@ jobs:
           set -x
           assets=()
           for asset in ./dist/*; do
-            assets+=("-a" "$asset")
+            assets+=("$asset")
           done
-          hub release create "${assets[@]}" -m "$VERSION" -m "$(cat ./release\ notes/${VERSION}.md)" "$VERSION"
+          gh release create "$VERSION" "${assets[@]}" --target "$VERSION" -F "./release\ notes/${VERSION}.md"
 
   publish-packages:
     runs-on: ubuntu-latest
