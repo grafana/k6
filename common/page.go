@@ -1118,8 +1118,8 @@ func (p *Page) WaitForTimeout(timeout int64) {
 }
 
 // Workers returns all WebWorkers of page.
-func (p *Page) Workers() []WorkerAPI {
-	workers := make([]WorkerAPI, 0, len(p.workers))
+func (p *Page) Workers() []*Worker {
+	workers := make([]*Worker, 0, len(p.workers))
 	for _, w := range p.workers {
 		workers = append(workers, w)
 	}

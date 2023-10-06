@@ -175,7 +175,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapWorker": {
-			apiInterface: (*common.WorkerAPI)(nil),
+			apiInterface: (*workerAPI)(nil),
 			mapp: func() mapping {
 				return mapWorker(moduleVU{VU: vu}, &common.Worker{})
 			},
@@ -288,4 +288,11 @@ type routeAPI interface { //nolint: unused
 	Continue(opts goja.Value)
 	Fulfill(opts goja.Value)
 	Request() common.RequestAPI
+}
+
+// workerAPI is the interface of a web worker.
+type workerAPI interface {
+	Evaluate(pageFunc goja.Value, args ...goja.Value) any
+	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
+	URL() string
 }

@@ -368,7 +368,7 @@ type PageAPI interface {
 	WaitForResponse(urlOrPredicate, opts goja.Value) ResponseAPI
 	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
 	WaitForTimeout(timeout int64)
-	Workers() []WorkerAPI
+	Workers() []*Worker
 }
 
 // RequestAPI is the interface of an HTTP request.
@@ -437,11 +437,4 @@ type RectAPI struct {
 	Y      float64 `js:"y"`
 	Width  float64 `js:"width"`
 	Height float64 `js:"height"`
-}
-
-// WorkerAPI is the interface of a web worker.
-type WorkerAPI interface {
-	Evaluate(pageFunc goja.Value, args ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error)
-	URL() string
 }
