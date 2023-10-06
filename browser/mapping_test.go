@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"context"
 	"reflect"
 	"strings"
 	"testing"
@@ -25,8 +26,8 @@ func customMappings() map[string]string {
 		// wildcards
 		"pageAPI.query":             "$",
 		"pageAPI.queryAll":          "$$",
-		"FrameAPI.query":            "$",
-		"FrameAPI.queryAll":         "$$",
+		"frameAPI.query":            "$",
+		"frameAPI.queryAll":         "$$",
 		"elementHandleAPI.query":    "$",
 		"elementHandleAPI.queryAll": "$$",
 		// getters
@@ -35,11 +36,11 @@ func customMappings() map[string]string {
 		"pageAPI.getTouchscreen": "touchscreen",
 		// internal methods
 		"elementHandleAPI.objectID":    "",
-		"FrameAPI.id":                  "",
-		"FrameAPI.loaderID":            "",
+		"frameAPI.id":                  "",
+		"frameAPI.loaderID":            "",
 		"JSHandleAPI.objectID":         "",
 		"browserAPI.close":             "",
-		"FrameAPI.evaluateWithContext": "",
+		"frameAPI.evaluateWithContext": "",
 		// TODO: browser.on method is unexposed until more event
 		// types other than 'disconnect' are supported.
 		// See: https://github.com/grafana/xk6-browser/issues/913
@@ -157,7 +158,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"frame": {
-			apiInterface: (*common.FrameAPI)(nil),
+			apiInterface: (*frameAPI)(nil),
 			mapp: func() mapping {
 				return mapFrame(moduleVU{VU: vu}, &common.Frame{})
 			},
@@ -311,8 +312,8 @@ type pageAPI interface {
 	ExposeFunction(name string, callback goja.Callable)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	Frame(frameSelector goja.Value) common.FrameAPI
-	Frames() []common.FrameAPI
+	Frame(frameSelector goja.Value) *common.Frame
+	Frames() []*common.Frame
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
@@ -333,7 +334,7 @@ type pageAPI interface {
 	IsVisible(selector string, opts goja.Value) bool
 	// Locator creates and returns a new locator for this page (main frame).
 	Locator(selector string, opts goja.Value) common.LocatorAPI
-	MainFrame() common.FrameAPI
+	MainFrame() *common.Frame
 	On(event string, handler func(*common.ConsoleMessageAPI) error) error
 	Opener() pageAPI
 	Pause()
@@ -371,6 +372,62 @@ type pageAPI interface {
 	Workers() []*common.Worker
 }
 
+// frameAPI is the interface of a CDP target frame.
+type frameAPI interface {
+	AddScriptTag(opts goja.Value)
+	AddStyleTag(opts goja.Value)
+	Check(selector string, opts goja.Value)
+	ChildFrames() []*common.Frame
+	Click(selector string, opts goja.Value) error
+	Content() string
+	Dblclick(selector string, opts goja.Value)
+	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
+	// EvaluateWithContext for internal use only
+	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)
+	Evaluate(pageFunc goja.Value, args ...goja.Value) any
+	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
+	Fill(selector string, value string, opts goja.Value)
+	Focus(selector string, opts goja.Value)
+	FrameElement() (*common.ElementHandle, error)
+	GetAttribute(selector string, name string, opts goja.Value) goja.Value
+	Goto(url string, opts goja.Value) (common.ResponseAPI, error)
+	Hover(selector string, opts goja.Value)
+	InnerHTML(selector string, opts goja.Value) string
+	InnerText(selector string, opts goja.Value) string
+	InputValue(selector string, opts goja.Value) string
+	IsChecked(selector string, opts goja.Value) bool
+	IsDetached() bool
+	IsDisabled(selector string, opts goja.Value) bool
+	IsEditable(selector string, opts goja.Value) bool
+	IsEnabled(selector string, opts goja.Value) bool
+	IsHidden(selector string, opts goja.Value) bool
+	IsVisible(selector string, opts goja.Value) bool
+	ID() string
+	LoaderID() string
+	// Locator creates and returns a new locator for this frame.
+	Locator(selector string, opts goja.Value) common.LocatorAPI
+	Name() string
+	Query(selector string) (*common.ElementHandle, error)
+	QueryAll(selector string) ([]*common.ElementHandle, error)
+	Page() *common.Page
+	ParentFrame() *common.Frame
+	Press(selector string, key string, opts goja.Value)
+	SelectOption(selector string, values goja.Value, opts goja.Value) []string
+	SetContent(html string, opts goja.Value)
+	SetInputFiles(selector string, files goja.Value, opts goja.Value)
+	Tap(selector string, opts goja.Value)
+	TextContent(selector string, opts goja.Value) string
+	Title() string
+	Type(selector string, text string, opts goja.Value)
+	Uncheck(selector string, opts goja.Value)
+	URL() string
+	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
+	WaitForLoadState(state string, opts goja.Value)
+	WaitForNavigation(opts goja.Value) (common.ResponseAPI, error)
+	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
+	WaitForTimeout(timeout int64)
+}
+
 // elementHandleAPI is the interface of an in-page DOM element.
 type elementHandleAPI interface {
 	common.JSHandleAPI
@@ -378,7 +435,7 @@ type elementHandleAPI interface {
 	BoundingBox() *common.RectAPI
 	Check(opts goja.Value)
 	Click(opts goja.Value) error
-	ContentFrame() (common.FrameAPI, error)
+	ContentFrame() (*common.Frame, error)
 	Dblclick(opts goja.Value)
 	DispatchEvent(typ string, props goja.Value)
 	Fill(value string, opts goja.Value)
@@ -394,7 +451,7 @@ type elementHandleAPI interface {
 	IsEnabled() bool
 	IsHidden() bool
 	IsVisible() bool
-	OwnerFrame() (common.FrameAPI, error)
+	OwnerFrame() (*common.Frame, error)
 	Press(key string, opts goja.Value)
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)

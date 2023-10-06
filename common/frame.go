@@ -36,7 +36,7 @@ type Frame struct {
 	parentFrame *Frame
 
 	childFramesMu sync.RWMutex
-	childFrames   map[FrameAPI]bool
+	childFrames   map[*Frame]bool
 
 	propertiesMu sync.RWMutex
 	id           cdp.FrameID
@@ -90,7 +90,7 @@ func NewFrame(
 		page:              m.page,
 		manager:           m,
 		parentFrame:       parentFrame,
-		childFrames:       make(map[FrameAPI]bool),
+		childFrames:       make(map[*Frame]bool),
 		id:                frameID,
 		vu:                k6ext.GetVU(ctx),
 		lifecycleEvents:   make(map[LifecycleEvent]bool),
@@ -482,11 +482,11 @@ func (f *Frame) AddStyleTag(opts goja.Value) {
 }
 
 // ChildFrames returns a list of child frames.
-func (f *Frame) ChildFrames() []FrameAPI {
+func (f *Frame) ChildFrames() []*Frame {
 	f.childFramesMu.RLock()
 	defer f.childFramesMu.RUnlock()
 
-	l := make([]FrameAPI, 0, len(f.childFrames))
+	l := make([]*Frame, 0, len(f.childFrames))
 	for child := range f.childFrames {
 		l = append(l, child)
 	}
@@ -1331,7 +1331,7 @@ func (f *Frame) Page() *Page {
 }
 
 // ParentFrame returns the parent frame, if one exists.
-func (f *Frame) ParentFrame() FrameAPI {
+func (f *Frame) ParentFrame() *Frame {
 	return f.parentFrame
 }
 

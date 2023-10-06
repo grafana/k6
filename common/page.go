@@ -652,13 +652,13 @@ func (p *Page) Focus(selector string, opts goja.Value) {
 }
 
 // Frame is not implemented.
-func (p *Page) Frame(_ goja.Value) FrameAPI {
+func (p *Page) Frame(_ goja.Value) *Frame {
 	k6ext.Panic(p.ctx, "Page.frame(frameSelector) has not been implemented yet")
 	return nil
 }
 
 // Frames returns a list of frames on the page.
-func (p *Page) Frames() []FrameAPI {
+func (p *Page) Frames() []*Frame {
 	return p.frameManager.Frames()
 }
 
@@ -772,7 +772,7 @@ func (p *Page) Locator(selector string, opts goja.Value) LocatorAPI {
 }
 
 // MainFrame returns the main frame on the page.
-func (p *Page) MainFrame() FrameAPI {
+func (p *Page) MainFrame() *Frame {
 	mf := p.frameManager.MainFrame()
 
 	if mf == nil {
