@@ -332,7 +332,7 @@ type PageAPI interface {
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() *Keyboard
 	GetMouse() MouseAPI
-	GetTouchscreen() TouchscreenAPI
+	GetTouchscreen() *Touchscreen
 	GoBack(opts goja.Value) ResponseAPI
 	GoForward(opts goja.Value) ResponseAPI
 	Goto(url string, opts goja.Value) (ResponseAPI, error)
@@ -436,11 +436,6 @@ type RouteAPI interface {
 	Continue(opts goja.Value)
 	Fulfill(opts goja.Value)
 	Request() RequestAPI
-}
-
-// TouchscreenAPI is the interface of a touchscreen.
-type TouchscreenAPI interface {
-	Tap(x float64, y float64)
 }
 
 // HTTPHeaderAPI is a single HTTP header.

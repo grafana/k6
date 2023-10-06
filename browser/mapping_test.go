@@ -253,3 +253,9 @@ type keyboardAPI interface { //nolint: unused
 	Type(text string, opts goja.Value)
 	Up(key string)
 }
+
+// touchscreenAPI is the interface of a touchscreen.
+// TODO: map this to page.GetTouchscreen().
+type touchscreenAPI interface { //nolint: unused
+	Tap(x float64, y float64)
+}
