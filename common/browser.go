@@ -492,7 +492,7 @@ func (b *Browser) Close() {
 }
 
 // Context returns the current browser context or nil.
-func (b *Browser) Context() BrowserContextAPI {
+func (b *Browser) Context() *BrowserContext {
 	return b.context
 }
 
@@ -503,7 +503,7 @@ func (b *Browser) IsConnected() bool {
 }
 
 // NewContext creates a new incognito-like browser context.
-func (b *Browser) NewContext(opts goja.Value) (BrowserContextAPI, error) {
+func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 	if b.context != nil {
 		return nil, errors.New("existing browser context must be closed before creating a new one")
 	}

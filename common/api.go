@@ -7,39 +7,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// BrowserContextAPI is the public interface of a CDP browser context.
-type BrowserContextAPI interface {
-	AddCookies(cookies []*Cookie) error
-	AddInitScript(script goja.Value, arg goja.Value) error
-	Browser() BrowserAPI
-	ClearCookies() error
-	ClearPermissions()
-	Close()
-	Cookies(urls ...string) ([]*Cookie, error)
-	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
-	ExposeFunction(name string, callback goja.Callable)
-	GrantPermissions(permissions []string, opts goja.Value)
-	NewCDPSession() any
-	NewPage() (PageAPI, error)
-	Pages() []PageAPI
-	Route(url goja.Value, handler goja.Callable)
-	SetDefaultNavigationTimeout(timeout int64)
-	SetDefaultTimeout(timeout int64)
-	SetExtraHTTPHeaders(headers map[string]string) error
-	SetGeolocation(geolocation goja.Value)
-	// SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
-	//
-	// Deprecated: Create a new BrowserContext with httpCredentials instead.
-	// See for details:
-	// - https://github.com/microsoft/playwright/issues/2196#issuecomment-627134837
-	// - https://github.com/microsoft/playwright/pull/2763
-	SetHTTPCredentials(httpCredentials goja.Value)
-	SetOffline(offline bool)
-	StorageState(opts goja.Value)
-	Unroute(url goja.Value, handler goja.Callable)
-	WaitForEvent(event string, optsOrPredicate goja.Value) (any, error)
-}
-
 // Cookie represents a browser cookie.
 //
 // https://datatracker.ietf.org/doc/html/rfc6265.
@@ -79,9 +46,9 @@ const (
 // BrowserAPI is the public interface of a CDP browser.
 type BrowserAPI interface {
 	Close()
-	Context() BrowserContextAPI
+	Context() *BrowserContext
 	IsConnected() bool
-	NewContext(opts goja.Value) (BrowserContextAPI, error)
+	NewContext(opts goja.Value) (*BrowserContext, error)
 	NewPage(opts goja.Value) (PageAPI, error)
 	On(string) (bool, error)
 	UserAgent() string
@@ -299,7 +266,7 @@ type PageAPI interface {
 	Click(selector string, opts goja.Value) error
 	Close(opts goja.Value) error
 	Content() string
-	Context() BrowserContextAPI
+	Context() *BrowserContext
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	DragAndDrop(source string, target string, opts goja.Value)

@@ -23,12 +23,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure BrowserContext implements the EventEmitter and api.BrowserContext interfaces.
-var (
-	_ EventEmitter      = &BrowserContext{}
-	_ BrowserContextAPI = &BrowserContext{}
-)
-
 // waitForEventType represents the event types that can be used when working
 // with the browserContext.waitForEvent API.
 type waitForEventType string
