@@ -170,7 +170,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapResponse": {
-			apiInterface: (*common.ResponseAPI)(nil),
+			apiInterface: (*responseAPI)(nil),
 			mapp: func() mapping {
 				return mapResponse(moduleVU{VU: vu}, &common.Response{})
 			},
@@ -318,9 +318,9 @@ type pageAPI interface {
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
-	GoBack(opts goja.Value) common.ResponseAPI
-	GoForward(opts goja.Value) common.ResponseAPI
-	Goto(url string, opts goja.Value) (common.ResponseAPI, error)
+	GoBack(opts goja.Value) *common.Response
+	GoForward(opts goja.Value) *common.Response
+	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
@@ -342,7 +342,7 @@ type pageAPI interface {
 	Press(selector string, key string, opts goja.Value)
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
-	Reload(opts goja.Value) common.ResponseAPI
+	Reload(opts goja.Value) *common.Response
 	Route(url goja.Value, handler goja.Callable)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
@@ -364,9 +364,9 @@ type pageAPI interface {
 	WaitForEvent(event string, optsOrPredicate goja.Value) any
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
-	WaitForNavigation(opts goja.Value) (common.ResponseAPI, error)
+	WaitForNavigation(opts goja.Value) (*common.Response, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) *common.Request
-	WaitForResponse(urlOrPredicate, opts goja.Value) common.ResponseAPI
+	WaitForResponse(urlOrPredicate, opts goja.Value) *common.Response
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []*common.Worker
@@ -390,7 +390,7 @@ type frameAPI interface {
 	Focus(selector string, opts goja.Value)
 	FrameElement() (*common.ElementHandle, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
-	Goto(url string, opts goja.Value) (common.ResponseAPI, error)
+	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
@@ -423,7 +423,7 @@ type frameAPI interface {
 	URL() string
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
-	WaitForNavigation(opts goja.Value) (common.ResponseAPI, error)
+	WaitForNavigation(opts goja.Value) (*common.Response, error)
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 }
@@ -484,9 +484,30 @@ type requestAPI interface {
 	RedirectedFrom() requestAPI
 	RedirectedTo() requestAPI
 	ResourceType() string
-	Response() common.ResponseAPI
+	Response() *common.Response
 	Size() common.HTTPMessageSizeAPI
 	Timing() goja.Value
+	URL() string
+}
+
+// responseAPI is the interface of an HTTP response.
+type responseAPI interface {
+	AllHeaders() map[string]string
+	Body() goja.ArrayBuffer
+	Finished() bool
+	Frame() *common.Frame
+	HeaderValue(string) goja.Value
+	HeaderValues(string) []string
+	Headers() map[string]string
+	HeadersArray() []common.HTTPHeaderAPI
+	JSON() goja.Value
+	Ok() bool
+	Request() *common.Request
+	SecurityDetails() goja.Value
+	ServerAddr() goja.Value
+	Size() common.HTTPMessageSizeAPI
+	Status() int64
+	StatusText() string
 	URL() string
 }
 

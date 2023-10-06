@@ -79,7 +79,7 @@ func TestBasicAuth(t *testing.T) {
 		validPassword = "validpass"
 	)
 
-	auth := func(tb testing.TB, user, pass string) common.ResponseAPI {
+	auth := func(tb testing.TB, user, pass string) *common.Response {
 		tb.Helper()
 
 		browser := newTestBrowser(t, withHTTPServer())
