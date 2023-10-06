@@ -747,12 +747,12 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 	testCases := []struct {
 		name      string
 		consoleFn string
-		assertFn  func(*common.ConsoleMessageAPI) bool
+		assertFn  func(*common.ConsoleMessage) bool
 	}{
 		{
 			name:      "on console.log",
 			consoleFn: "() => console.log('this is a log message')",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "log" &&
 					cm.Text == "this is a log message" &&
 					cm.Args[0].JSONValue().String() == "this is a log message" &&
@@ -762,7 +762,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.debug",
 			consoleFn: "() => console.debug('this is a debug message')",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "debug" &&
 					cm.Text == "this is a debug message" &&
 					cm.Args[0].JSONValue().String() == "this is a debug message" &&
@@ -772,7 +772,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.info",
 			consoleFn: "() => console.info('this is an info message')",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "info" &&
 					cm.Text == "this is an info message" &&
 					cm.Args[0].JSONValue().String() == "this is an info message" &&
@@ -782,7 +782,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.error",
 			consoleFn: "() => console.error('this is an error message')",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "error" &&
 					cm.Text == "this is an error message" &&
 					cm.Args[0].JSONValue().String() == "this is an error message" &&
@@ -792,7 +792,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.warn",
 			consoleFn: "() => console.warn('this is a warning message')",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "warning" &&
 					cm.Text == "this is a warning message" &&
 					cm.Args[0].JSONValue().String() == "this is a warning message" &&
@@ -802,7 +802,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.dir",
 			consoleFn: "() => console.dir(document.location)",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "dir" &&
 					cm.Text == "Location" &&
 					cm.Page.URL() == blankPage
@@ -811,7 +811,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.dirxml",
 			consoleFn: "() => console.dirxml(document.location)",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "dirxml" &&
 					cm.Text == "Location" &&
 					cm.Page.URL() == blankPage
@@ -820,7 +820,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.table",
 			consoleFn: "() => console.table([['Grafana', 'k6'], ['Grafana', 'Mimir']])",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "table" &&
 					cm.Text == "Array(2)" &&
 					cm.Args[0].JSONValue().String() == "Grafana,k6,Grafana,Mimir" &&
@@ -830,7 +830,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.trace",
 			consoleFn: "() => console.trace('trace example')",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "trace" &&
 					cm.Text == "trace example" &&
 					cm.Args[0].JSONValue().String() == "trace example" &&
@@ -840,7 +840,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.clear",
 			consoleFn: "() => console.clear()",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "clear" &&
 					cm.Page.URL() == blankPage
 			},
@@ -848,7 +848,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.group",
 			consoleFn: "() => console.group()",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "startGroup" &&
 					cm.Text == "console.group" &&
 					cm.Page.URL() == blankPage
@@ -857,7 +857,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.groupCollapsed",
 			consoleFn: "() => console.groupCollapsed()",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "startGroupCollapsed" &&
 					cm.Text == "console.groupCollapsed" &&
 					cm.Page.URL() == blankPage
@@ -866,7 +866,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.groupEnd",
 			consoleFn: "() => console.groupEnd()",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "endGroup" &&
 					cm.Text == "console.groupEnd" &&
 					cm.Page.URL() == blankPage
@@ -875,7 +875,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.assert",
 			consoleFn: "() => console.assert(2 == 3)", // Only writes to console if assertion is false
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "assert" &&
 					cm.Text == "console.assert" &&
 					cm.Page.URL() == blankPage
@@ -884,7 +884,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.count (default label)",
 			consoleFn: "() => console.count()", // default label
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "count" &&
 					cm.Text == "default: 1" &&
 					cm.Page.URL() == blankPage
@@ -893,7 +893,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.count",
 			consoleFn: "() => console.count('k6')",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "count" &&
 					cm.Text == "k6: 1" &&
 					cm.Page.URL() == blankPage
@@ -902,7 +902,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 		{
 			name:      "on console.time",
 			consoleFn: "() => { console.time('k6'); console.timeEnd('k6'); }",
-			assertFn: func(cm *common.ConsoleMessageAPI) bool {
+			assertFn: func(cm *common.ConsoleMessage) bool {
 				return cm.Type == "timeEnd" && strings.HasPrefix(cm.Text, "k6: 0.0") &&
 					cm.Page.URL() == blankPage
 			},
@@ -928,13 +928,13 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 			)
 
 			// Console Messages should be multiplexed for every registered handler
-			eventHandlerOne := func(cm *common.ConsoleMessageAPI) error { //nolint:unparam
+			eventHandlerOne := func(cm *common.ConsoleMessage) error { //nolint:unparam
 				defer wg.Done()
 				assertOne = tc.assertFn(cm)
 				return nil
 			}
 
-			eventHandlerTwo := func(cm *common.ConsoleMessageAPI) error { //nolint:unparam
+			eventHandlerTwo := func(cm *common.ConsoleMessage) error { //nolint:unparam
 				defer wg.Done()
 				assertTwo = tc.assertFn(cm)
 				return nil

@@ -188,14 +188,9 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapConsoleMessage": {
-			apiInterface: (*interface {
-				Args() []common.JSHandleAPI
-				Page() *common.Page
-				Text() string
-				Type() string
-			})(nil),
+			apiInterface: (*consoleMessageAPI)(nil),
 			mapp: func() mapping {
-				return mapConsoleMessage(moduleVU{VU: vu}, &common.ConsoleMessageAPI{})
+				return mapConsoleMessage(moduleVU{VU: vu}, &common.ConsoleMessage{})
 			},
 		},
 	} {
@@ -335,7 +330,7 @@ type pageAPI interface {
 	// Locator creates and returns a new locator for this page (main frame).
 	Locator(selector string, opts goja.Value) *common.Locator
 	MainFrame() *common.Frame
-	On(event string, handler func(*common.ConsoleMessageAPI) error) error
+	On(event string, handler func(*common.ConsoleMessage) error) error
 	Opener() pageAPI
 	Pause()
 	Pdf(opts goja.Value) []byte
@@ -370,6 +365,14 @@ type pageAPI interface {
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []*common.Worker
+}
+
+// consoleMessageAPI is the interface of a console message.
+type consoleMessageAPI interface {
+	Args() []common.JSHandleAPI
+	Page() *common.Page
+	Text() string
+	Type() string
 }
 
 // frameAPI is the interface of a CDP target frame.

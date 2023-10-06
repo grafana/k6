@@ -508,7 +508,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
 		"on": func(event string, handler goja.Callable) error {
-			mapMsgAndHandleEvent := func(m *common.ConsoleMessageAPI) error {
+			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
 				_, err := handler(goja.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
@@ -690,7 +690,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 }
 
 // mapConsoleMessage to the JS module.
-func mapConsoleMessage(vu moduleVU, cm *common.ConsoleMessageAPI) mapping {
+func mapConsoleMessage(vu moduleVU, cm *common.ConsoleMessage) mapping {
 	rt := vu.Runtime()
 	return mapping{
 		"args": func() *goja.Object {

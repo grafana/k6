@@ -32,7 +32,25 @@ const (
 	eventPageConsoleAPICalled = "console"
 )
 
-type consoleEventHandlerFunc func(*ConsoleMessageAPI) error
+type consoleEventHandlerFunc func(*ConsoleMessage) error
+
+// ConsoleMessage represents a page console message.
+type ConsoleMessage struct {
+	// Args represent the list of arguments passed to a console function call.
+	Args []JSHandleAPI
+
+	// Page is the page that produced the console message, if any.
+	Page *Page
+
+	// Text represents the text of the console message.
+	Text string
+
+	// Type is the type of the console message.
+	// It can be one of 'log', 'debug', 'info', 'error', 'warning', 'dir', 'dirxml',
+	// 'table', 'trace', 'clear', 'startGroup', 'startGroupCollapsed', 'endGroup',
+	// 'assert', 'profile', 'profileEnd', 'count', 'timeEnd'.
+	Type string
+}
 
 // Page stores Page/tab related context.
 type Page struct {
@@ -789,7 +807,7 @@ func (p *Page) MainFrame() *Frame {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event string, handler func(*ConsoleMessageAPI) error) error {
+func (p *Page) On(event string, handler func(*ConsoleMessage) error) error {
 	if event != eventPageConsoleAPICalled {
 		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
 	}
@@ -1150,7 +1168,7 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	}
 }
 
-func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*ConsoleMessageAPI, error) {
+func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*ConsoleMessage, error) {
 	execCtx, err := p.executionContextForID(e.ExecutionContextID)
 	if err != nil {
 		return nil, err
@@ -1177,7 +1195,7 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 		))
 	}
 
-	return &ConsoleMessageAPI{
+	return &ConsoleMessage{
 		Args: objectHandles,
 		Page: p,
 		Text: textForConsoleEvent(e, objects),
