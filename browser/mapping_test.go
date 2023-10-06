@@ -265,3 +265,14 @@ type cdpSessionAPI interface { //nolint: unused
 	Detach()
 	Send(method string, params goja.Value) goja.Value
 }
+
+// mouseAPI is the interface of a mouse input device.
+// TODO: map this to page.GetMouse().
+type mouseAPI interface { //nolint: unused
+	Click(x float64, y float64, opts goja.Value)
+	DblClick(x float64, y float64, opts goja.Value)
+	Down(x float64, y float64, opts goja.Value)
+	Move(x float64, y float64, opts goja.Value)
+	Up(x float64, y float64, opts goja.Value)
+	// Wheel(opts goja.Value)
+}

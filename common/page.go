@@ -682,7 +682,7 @@ func (p *Page) GetKeyboard() *Keyboard {
 }
 
 // GetMouse returns the mouse for the page.
-func (p *Page) GetMouse() MouseAPI {
+func (p *Page) GetMouse() *Mouse {
 	return p.Mouse
 }
 

@@ -289,16 +289,6 @@ type LocatorAPI interface {
 	WaitFor(opts goja.Value)
 }
 
-// MouseAPI is the interface of a mouse input device.
-type MouseAPI interface {
-	Click(x float64, y float64, opts goja.Value)
-	DblClick(x float64, y float64, opts goja.Value)
-	Down(x float64, y float64, opts goja.Value)
-	Move(x float64, y float64, opts goja.Value)
-	Up(x float64, y float64, opts goja.Value)
-	// Wheel(opts goja.Value)
-}
-
 // PageAPI is the interface of a single browser tab.
 type PageAPI interface {
 	AddInitScript(script goja.Value, arg goja.Value)
@@ -325,7 +315,7 @@ type PageAPI interface {
 	Frames() []FrameAPI
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() *Keyboard
-	GetMouse() MouseAPI
+	GetMouse() *Mouse
 	GetTouchscreen() *Touchscreen
 	GoBack(opts goja.Value) ResponseAPI
 	GoForward(opts goja.Value) ResponseAPI
