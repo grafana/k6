@@ -164,7 +164,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"mapRequest": {
-			apiInterface: (*common.RequestAPI)(nil),
+			apiInterface: (*requestAPI)(nil),
 			mapp: func() mapping {
 				return mapRequest(moduleVU{VU: vu}, &common.Request{})
 			},
@@ -365,7 +365,7 @@ type pageAPI interface {
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (common.ResponseAPI, error)
-	WaitForRequest(urlOrPredicate, opts goja.Value) common.RequestAPI
+	WaitForRequest(urlOrPredicate, opts goja.Value) *common.Request
 	WaitForResponse(urlOrPredicate, opts goja.Value) common.ResponseAPI
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
@@ -468,6 +468,28 @@ type elementHandleAPI interface {
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 }
 
+// requestAPI is the interface of an HTTP request.
+type requestAPI interface {
+	AllHeaders() map[string]string
+	Failure() goja.Value
+	Frame() *common.Frame
+	HeaderValue(string) goja.Value
+	Headers() map[string]string
+	HeadersArray() []common.HTTPHeaderAPI
+	IsNavigationRequest() bool
+	Method() string
+	PostData() string
+	PostDataBuffer() goja.ArrayBuffer
+	PostDataJSON() string
+	RedirectedFrom() requestAPI
+	RedirectedTo() requestAPI
+	ResourceType() string
+	Response() common.ResponseAPI
+	Size() common.HTTPMessageSizeAPI
+	Timing() goja.Value
+	URL() string
+}
+
 // keyboardAPI is the interface of a keyboard input device.
 // TODO: map this to page.GetKeyboard().
 type keyboardAPI interface { //nolint: unused
@@ -511,7 +533,7 @@ type routeAPI interface { //nolint: unused
 	Abort(errorCode string)
 	Continue(opts goja.Value)
 	Fulfill(opts goja.Value)
-	Request() common.RequestAPI
+	Request() *common.Request
 }
 
 // workerAPI is the interface of a web worker.

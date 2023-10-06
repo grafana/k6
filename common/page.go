@@ -1084,7 +1084,7 @@ func (p *Page) WaitForNavigation(opts goja.Value) (ResponseAPI, error) {
 }
 
 // WaitForRequest is not implemented.
-func (p *Page) WaitForRequest(_, _ goja.Value) RequestAPI {
+func (p *Page) WaitForRequest(_, _ goja.Value) *Request {
 	k6ext.Panic(p.ctx, "Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet")
 	return nil
 }

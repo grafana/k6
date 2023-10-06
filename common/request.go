@@ -221,13 +221,13 @@ func (r *Request) PostDataJSON() string {
 }
 
 // RedirectedFrom returns the request that redirected to this one, if any.
-func (r *Request) RedirectedFrom() RequestAPI {
+func (r *Request) RedirectedFrom() *Request {
 	k6ext.Panic(r.ctx, "Request.redirectedFrom() has not been implemented yet")
 	return nil
 }
 
 // RedirectedTo returns the request that this one redirected to, if any.
-func (r *Request) RedirectedTo() RequestAPI {
+func (r *Request) RedirectedTo() *Request {
 	k6ext.Panic(r.ctx, "Request.redirectedTo() has not been implemented yet")
 	return nil
 }

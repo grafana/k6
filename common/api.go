@@ -146,28 +146,6 @@ type LocatorAPI interface {
 	WaitFor(opts goja.Value)
 }
 
-// RequestAPI is the interface of an HTTP request.
-type RequestAPI interface {
-	AllHeaders() map[string]string
-	Failure() goja.Value
-	Frame() *Frame
-	HeaderValue(string) goja.Value
-	Headers() map[string]string
-	HeadersArray() []HTTPHeaderAPI
-	IsNavigationRequest() bool
-	Method() string
-	PostData() string
-	PostDataBuffer() goja.ArrayBuffer
-	PostDataJSON() string
-	RedirectedFrom() RequestAPI
-	RedirectedTo() RequestAPI
-	ResourceType() string
-	Response() ResponseAPI
-	Size() HTTPMessageSizeAPI
-	Timing() goja.Value
-	URL() string
-}
-
 // ResponseAPI is the interface of an HTTP response.
 type ResponseAPI interface {
 	AllHeaders() map[string]string
@@ -180,7 +158,7 @@ type ResponseAPI interface {
 	HeadersArray() []HTTPHeaderAPI
 	JSON() goja.Value
 	Ok() bool
-	Request() RequestAPI
+	Request() *Request
 	SecurityDetails() goja.Value
 	ServerAddr() goja.Value
 	Size() HTTPMessageSizeAPI
