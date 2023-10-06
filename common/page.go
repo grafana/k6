@@ -1047,7 +1047,7 @@ func (p *Page) URL() string {
 }
 
 // Video returns information of recorded video.
-func (p *Page) Video() VideoAPI {
+func (p *Page) Video() any { // TODO: implement
 	k6ext.Panic(p.ctx, "Page.video() has not been implemented yet")
 	return nil
 }

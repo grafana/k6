@@ -276,3 +276,8 @@ type mouseAPI interface { //nolint: unused
 	Up(x float64, y float64, opts goja.Value)
 	// Wheel(opts goja.Value)
 }
+
+// videoAPI is the interface of a recorded video.
+type videoAPI interface { //nolint: unused
+	Path() string
+}

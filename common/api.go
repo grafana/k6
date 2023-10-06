@@ -358,7 +358,7 @@ type PageAPI interface {
 	Uncheck(selector string, opts goja.Value)
 	Unroute(url goja.Value, handler goja.Callable)
 	URL() string
-	Video() VideoAPI
+	Video() any
 	ViewportSize() map[string]float64
 	WaitForEvent(event string, optsOrPredicate goja.Value) any
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
@@ -445,11 +445,6 @@ type RectAPI struct {
 	Y      float64 `js:"y"`
 	Width  float64 `js:"width"`
 	Height float64 `js:"height"`
-}
-
-// VideoAPI is the interface of a recorded video.
-type VideoAPI interface {
-	Path() string
 }
 
 // WorkerAPI is the interface of a web worker.
