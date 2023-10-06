@@ -22,8 +22,8 @@ const resultDone = "done"
 
 // Ensure ElementHandle implements the api.ElementHandle and api.JSHandle interfaces.
 var (
-	_ ElementHandleAPI = &ElementHandle{}
-	_ JSHandleAPI      = &ElementHandle{}
+	_ *ElementHandle = &ElementHandle{}
+	_ JSHandleAPI    = &ElementHandle{}
 )
 
 type (
@@ -72,11 +72,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		if err != nil {
 			return false, err
 		}
-		element, ok := el.(*ElementHandle)
-		if !ok {
-			return false, fmt.Errorf("unexpected type %T", el)
-		}
-		box, err := element.boundingBox()
+		box, err := el.boundingBox()
 		if err != nil {
 			return false, err
 		}
@@ -726,7 +722,7 @@ func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string,
 }
 
 // AsElement returns this element handle.
-func (h *ElementHandle) AsElement() ElementHandleAPI {
+func (h *ElementHandle) AsElement() *ElementHandle {
 	return h
 }
 
@@ -1033,7 +1029,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
-func (h *ElementHandle) Query(selector string) (ElementHandleAPI, error) {
+func (h *ElementHandle) Query(selector string) (*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
@@ -1069,7 +1065,7 @@ func (h *ElementHandle) Query(selector string) (ElementHandleAPI, error) {
 
 // QueryAll queries element subtree for matching elements.
 // If no element matches the selector, the return value resolves to "null".
-func (h *ElementHandle) QueryAll(selector string) ([]ElementHandleAPI, error) {
+func (h *ElementHandle) QueryAll(selector string) ([]*ElementHandle, error) {
 	defer applySlowMo(h.ctx)
 
 	handles, err := h.queryAll(selector, h.evalWithScript)
@@ -1080,7 +1076,7 @@ func (h *ElementHandle) QueryAll(selector string) ([]ElementHandleAPI, error) {
 	return handles, nil
 }
 
-func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]ElementHandleAPI, error) {
+func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
@@ -1111,7 +1107,7 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]ElementHandl
 		return nil, err //nolint:wrapcheck
 	}
 
-	els := make([]ElementHandleAPI, 0, len(props))
+	els := make([]*ElementHandle, 0, len(props))
 	for _, prop := range props {
 		if el := prop.AsElement(); el != nil {
 			els = append(els, el)
@@ -1315,7 +1311,7 @@ func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
 }
 
 // WaitForSelector waits for the selector to appear in the DOM.
-func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error) {
+func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) (*ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)

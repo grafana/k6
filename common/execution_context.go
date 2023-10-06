@@ -111,7 +111,7 @@ func (e *ExecutionContext) adoptBackendNodeID(backendNodeID cdp.BackendNodeID) (
 		return nil, fmt.Errorf("resolving DOM node: %w", err)
 	}
 
-	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement().(*ElementHandle), nil
+	return NewJSHandle(e.ctx, e.session, e, e.frame, remoteObj, e.logger).AsElement(), nil
 }
 
 // Adopts the specified element handle into this execution context from another execution context.

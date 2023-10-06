@@ -27,14 +27,14 @@ func customMappings() map[string]string {
 		"pageAPI.queryAll":          "$$",
 		"FrameAPI.query":            "$",
 		"FrameAPI.queryAll":         "$$",
-		"ElementHandleAPI.query":    "$",
-		"ElementHandleAPI.queryAll": "$$",
+		"elementHandleAPI.query":    "$",
+		"elementHandleAPI.queryAll": "$$",
 		// getters
 		"pageAPI.getKeyboard":    "keyboard",
 		"pageAPI.getMouse":       "mouse",
 		"pageAPI.getTouchscreen": "touchscreen",
 		// internal methods
-		"ElementHandleAPI.objectID":    "",
+		"elementHandleAPI.objectID":    "",
 		"FrameAPI.id":                  "",
 		"FrameAPI.loaderID":            "",
 		"JSHandleAPI.objectID":         "",
@@ -145,7 +145,7 @@ func TestMappings(t *testing.T) {
 			},
 		},
 		"elementHandle": {
-			apiInterface: (*common.ElementHandleAPI)(nil),
+			apiInterface: (*elementHandleAPI)(nil),
 			mapp: func() mapping {
 				return mapElementHandle(moduleVU{VU: vu}, &common.ElementHandle{})
 			},
@@ -339,8 +339,8 @@ type pageAPI interface {
 	Pause()
 	Pdf(opts goja.Value) []byte
 	Press(selector string, key string, opts goja.Value)
-	Query(selector string) (common.ElementHandleAPI, error)
-	QueryAll(selector string) ([]common.ElementHandleAPI, error)
+	Query(selector string) (*common.ElementHandle, error)
+	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts goja.Value) common.ResponseAPI
 	Route(url goja.Value, handler goja.Callable)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
@@ -366,9 +366,49 @@ type pageAPI interface {
 	WaitForNavigation(opts goja.Value) (common.ResponseAPI, error)
 	WaitForRequest(urlOrPredicate, opts goja.Value) common.RequestAPI
 	WaitForResponse(urlOrPredicate, opts goja.Value) common.ResponseAPI
-	WaitForSelector(selector string, opts goja.Value) (common.ElementHandleAPI, error)
+	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []*common.Worker
+}
+
+// elementHandleAPI is the interface of an in-page DOM element.
+type elementHandleAPI interface {
+	common.JSHandleAPI
+
+	BoundingBox() *common.RectAPI
+	Check(opts goja.Value)
+	Click(opts goja.Value) error
+	ContentFrame() (common.FrameAPI, error)
+	Dblclick(opts goja.Value)
+	DispatchEvent(typ string, props goja.Value)
+	Fill(value string, opts goja.Value)
+	Focus()
+	GetAttribute(name string) goja.Value
+	Hover(opts goja.Value)
+	InnerHTML() string
+	InnerText() string
+	InputValue(opts goja.Value) string
+	IsChecked() bool
+	IsDisabled() bool
+	IsEditable() bool
+	IsEnabled() bool
+	IsHidden() bool
+	IsVisible() bool
+	OwnerFrame() (common.FrameAPI, error)
+	Press(key string, opts goja.Value)
+	Query(selector string) (*common.ElementHandle, error)
+	QueryAll(selector string) ([]*common.ElementHandle, error)
+	Screenshot(opts goja.Value) goja.ArrayBuffer
+	ScrollIntoViewIfNeeded(opts goja.Value)
+	SelectOption(values goja.Value, opts goja.Value) []string
+	SelectText(opts goja.Value)
+	SetInputFiles(files goja.Value, opts goja.Value)
+	Tap(opts goja.Value)
+	TextContent() string
+	Type(text string, opts goja.Value)
+	Uncheck(opts goja.Value)
+	WaitForElementState(state string, opts goja.Value)
+	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 }
 
 // keyboardAPI is the interface of a keyboard input device.

@@ -824,7 +824,7 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 }
 
 // FrameElement returns the element handle for the frame.
-func (f *Frame) FrameElement() (ElementHandleAPI, error) {
+func (f *Frame) FrameElement() (*ElementHandle, error) {
 	f.log.Debugf("Frame:FrameElement", "fid:%s furl:%q", f.ID(), f.URL())
 
 	element, err := f.page.getFrameElement(f)
@@ -1304,7 +1304,7 @@ func (f *Frame) Name() string {
 
 // Query runs a selector query against the document tree, returning the first matching element or
 // "null" if no match is found.
-func (f *Frame) Query(selector string) (ElementHandleAPI, error) {
+func (f *Frame) Query(selector string) (*ElementHandle, error) {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
@@ -1315,7 +1315,7 @@ func (f *Frame) Query(selector string) (ElementHandleAPI, error) {
 }
 
 // QueryAll runs a selector query against the document tree, returning all matching elements.
-func (f *Frame) QueryAll(selector string) ([]ElementHandleAPI, error) {
+func (f *Frame) QueryAll(selector string) ([]*ElementHandle, error) {
 	f.log.Debugf("Frame:QueryAll", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
@@ -1821,7 +1821,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (ResponseAPI, error) {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (f *Frame) WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error) {
+func (f *Frame) WaitForSelector(selector string, opts goja.Value) (*ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)

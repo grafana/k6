@@ -61,46 +61,6 @@ type ConsoleMessageAPI struct {
 	Type string
 }
 
-// ElementHandleAPI is the interface of an in-page DOM element.
-type ElementHandleAPI interface {
-	JSHandleAPI
-
-	BoundingBox() *RectAPI
-	Check(opts goja.Value)
-	Click(opts goja.Value) error
-	ContentFrame() (FrameAPI, error)
-	Dblclick(opts goja.Value)
-	DispatchEvent(typ string, props goja.Value)
-	Fill(value string, opts goja.Value)
-	Focus()
-	GetAttribute(name string) goja.Value
-	Hover(opts goja.Value)
-	InnerHTML() string
-	InnerText() string
-	InputValue(opts goja.Value) string
-	IsChecked() bool
-	IsDisabled() bool
-	IsEditable() bool
-	IsEnabled() bool
-	IsHidden() bool
-	IsVisible() bool
-	OwnerFrame() (FrameAPI, error)
-	Press(key string, opts goja.Value)
-	Query(selector string) (ElementHandleAPI, error)
-	QueryAll(selector string) ([]ElementHandleAPI, error)
-	Screenshot(opts goja.Value) goja.ArrayBuffer
-	ScrollIntoViewIfNeeded(opts goja.Value)
-	SelectOption(values goja.Value, opts goja.Value) []string
-	SelectText(opts goja.Value)
-	SetInputFiles(files goja.Value, opts goja.Value)
-	Tap(opts goja.Value)
-	TextContent() string
-	Type(text string, opts goja.Value)
-	Uncheck(opts goja.Value)
-	WaitForElementState(state string, opts goja.Value)
-	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
-}
-
 // FrameAPI is the interface of a CDP target frame.
 type FrameAPI interface {
 	AddScriptTag(opts goja.Value)
@@ -117,7 +77,7 @@ type FrameAPI interface {
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	FrameElement() (ElementHandleAPI, error)
+	FrameElement() (*ElementHandle, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	Goto(url string, opts goja.Value) (ResponseAPI, error)
 	Hover(selector string, opts goja.Value)
@@ -136,8 +96,8 @@ type FrameAPI interface {
 	// Locator creates and returns a new locator for this frame.
 	Locator(selector string, opts goja.Value) LocatorAPI
 	Name() string
-	Query(selector string) (ElementHandleAPI, error)
-	QueryAll(selector string) ([]ElementHandleAPI, error)
+	Query(selector string) (*ElementHandle, error)
+	QueryAll(selector string) ([]*ElementHandle, error)
 	Page() *Page
 	ParentFrame() FrameAPI
 	Press(selector string, key string, opts goja.Value)
@@ -153,13 +113,13 @@ type FrameAPI interface {
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (ResponseAPI, error)
-	WaitForSelector(selector string, opts goja.Value) (ElementHandleAPI, error)
+	WaitForSelector(selector string, opts goja.Value) (*ElementHandle, error)
 	WaitForTimeout(timeout int64)
 }
 
 // JSHandleAPI is the interface of an in-page JS object.
 type JSHandleAPI interface {
-	AsElement() ElementHandleAPI
+	AsElement() *ElementHandle
 	Dispose()
 	Evaluate(pageFunc goja.Value, args ...goja.Value) any
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error)
