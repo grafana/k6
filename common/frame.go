@@ -1280,7 +1280,7 @@ func (f *Frame) ID() string {
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) Locator(selector string, opts goja.Value) LocatorAPI {
+func (f *Frame) Locator(selector string, opts goja.Value) *Locator {
 	f.log.Debugf("Frame:Locator", "fid:%s furl:%q selector:%q opts:%+v", f.ID(), f.URL(), selector, opts)
 
 	return NewLocator(f.ctx, selector, f, f.log)

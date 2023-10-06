@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // TestPageLocator can be removed later on when we add integration
@@ -26,9 +25,7 @@ func TestPageLocator(t *testing.T) {
 			mainFrame: &Frame{id: wantMainFrameID, ctx: ctx},
 		},
 	}
-	v := p.Locator(wantSelector, nil)
-	require.IsType(t, v, &Locator{})
-	l, _ := v.(*Locator)
+	l := p.Locator(wantSelector, nil)
 	assert.Equal(t, wantSelector, l.selector)
 	assert.Equal(t, wantMainFrameID, string(l.frame.id))
 

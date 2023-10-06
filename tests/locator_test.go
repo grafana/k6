@@ -230,13 +230,13 @@ func TestLocator(t *testing.T) {
 	}
 	sanityTests := []struct {
 		name string
-		do   func(common.LocatorAPI, *testBrowser)
+		do   func(*common.Locator, *testBrowser)
 	}{
 		{
-			"Check", func(l common.LocatorAPI, tb *testBrowser) { l.Check(timeout(tb)) },
+			"Check", func(l *common.Locator, tb *testBrowser) { l.Check(timeout(tb)) },
 		},
 		{
-			"Click", func(l common.LocatorAPI, tb *testBrowser) {
+			"Click", func(l *common.Locator, tb *testBrowser) {
 				err := l.Click(timeout(tb))
 				if err != nil {
 					// TODO: remove panic and update tests when all locator methods return error.
@@ -245,54 +245,54 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Dblclick", func(l common.LocatorAPI, tb *testBrowser) { l.Dblclick(timeout(tb)) },
+			"Dblclick", func(l *common.Locator, tb *testBrowser) { l.Dblclick(timeout(tb)) },
 		},
 		{
-			"DispatchEvent", func(l common.LocatorAPI, tb *testBrowser) {
+			"DispatchEvent", func(l *common.Locator, tb *testBrowser) {
 				l.DispatchEvent("click", tb.toGojaValue("mouseevent"), timeout(tb))
 			},
 		},
 		{
-			"Focus", func(l common.LocatorAPI, tb *testBrowser) { l.Focus(timeout(tb)) },
+			"Focus", func(l *common.Locator, tb *testBrowser) { l.Focus(timeout(tb)) },
 		},
 		{
-			"Fill", func(l common.LocatorAPI, tb *testBrowser) { l.Fill("fill me up", timeout(tb)) },
+			"Fill", func(l *common.Locator, tb *testBrowser) { l.Fill("fill me up", timeout(tb)) },
 		},
 		{
-			"GetAttribute", func(l common.LocatorAPI, tb *testBrowser) { l.GetAttribute("value", timeout(tb)) },
+			"GetAttribute", func(l *common.Locator, tb *testBrowser) { l.GetAttribute("value", timeout(tb)) },
 		},
 		{
-			"Hover", func(l common.LocatorAPI, tb *testBrowser) { l.Hover(timeout(tb)) },
+			"Hover", func(l *common.Locator, tb *testBrowser) { l.Hover(timeout(tb)) },
 		},
 		{
-			"InnerHTML", func(l common.LocatorAPI, tb *testBrowser) { l.InnerHTML(timeout(tb)) },
+			"InnerHTML", func(l *common.Locator, tb *testBrowser) { l.InnerHTML(timeout(tb)) },
 		},
 		{
-			"InnerText", func(l common.LocatorAPI, tb *testBrowser) { l.InnerText(timeout(tb)) },
+			"InnerText", func(l *common.Locator, tb *testBrowser) { l.InnerText(timeout(tb)) },
 		},
 		{
-			"InputValue", func(l common.LocatorAPI, tb *testBrowser) { l.InputValue(timeout(tb)) },
+			"InputValue", func(l *common.Locator, tb *testBrowser) { l.InputValue(timeout(tb)) },
 		},
 		{
-			"Press", func(l common.LocatorAPI, tb *testBrowser) { l.Press("a", timeout(tb)) },
+			"Press", func(l *common.Locator, tb *testBrowser) { l.Press("a", timeout(tb)) },
 		},
 		{
-			"SelectOption", func(l common.LocatorAPI, tb *testBrowser) { l.SelectOption(tb.toGojaValue(""), timeout(tb)) },
+			"SelectOption", func(l *common.Locator, tb *testBrowser) { l.SelectOption(tb.toGojaValue(""), timeout(tb)) },
 		},
 		{
-			"Tap", func(l common.LocatorAPI, tb *testBrowser) { l.Tap(timeout(tb)) },
+			"Tap", func(l *common.Locator, tb *testBrowser) { l.Tap(timeout(tb)) },
 		},
 		{
-			"Type", func(l common.LocatorAPI, tb *testBrowser) { l.Type("a", timeout(tb)) },
+			"Type", func(l *common.Locator, tb *testBrowser) { l.Type("a", timeout(tb)) },
 		},
 		{
-			"TextContent", func(l common.LocatorAPI, tb *testBrowser) { l.TextContent(timeout(tb)) },
+			"TextContent", func(l *common.Locator, tb *testBrowser) { l.TextContent(timeout(tb)) },
 		},
 		{
-			"Uncheck", func(l common.LocatorAPI, tb *testBrowser) { l.Uncheck(timeout(tb)) },
+			"Uncheck", func(l *common.Locator, tb *testBrowser) { l.Uncheck(timeout(tb)) },
 		},
 		{
-			"WaitFor", func(l common.LocatorAPI, tb *testBrowser) { l.WaitFor(timeout(tb)) },
+			"WaitFor", func(l *common.Locator, tb *testBrowser) { l.WaitFor(timeout(tb)) },
 		},
 	}
 	for _, tt := range sanityTests {
@@ -329,32 +329,32 @@ func TestLocatorElementState(t *testing.T) {
 
 	tests := []struct {
 		state, eval string
-		query       func(common.LocatorAPI) bool
+		query       func(*common.Locator) bool
 	}{
 		{
 			"disabled",
 			`() => document.getElementById('inputText').disabled = true`,
-			func(l common.LocatorAPI) bool { return !l.IsDisabled(nil) },
+			func(l *common.Locator) bool { return !l.IsDisabled(nil) },
 		},
 		{
 			"enabled",
 			`() => document.getElementById('inputText').disabled = true`,
-			func(l common.LocatorAPI) bool { return l.IsEnabled(nil) },
+			func(l *common.Locator) bool { return l.IsEnabled(nil) },
 		},
 		{
 			"hidden",
 			`() => document.getElementById('inputText').style.visibility = 'hidden'`,
-			func(l common.LocatorAPI) bool { return !l.IsHidden(nil) },
+			func(l *common.Locator) bool { return !l.IsHidden(nil) },
 		},
 		{
 			"readOnly",
 			`() => document.getElementById('inputText').readOnly = true`,
-			func(l common.LocatorAPI) bool { return l.IsEditable(nil) },
+			func(l *common.Locator) bool { return l.IsEditable(nil) },
 		},
 		{
 			"visible",
 			`() => document.getElementById('inputText').style.visibility = 'hidden'`,
-			func(l common.LocatorAPI) bool { return l.IsVisible(nil) },
+			func(l *common.Locator) bool { return l.IsVisible(nil) },
 		},
 	}
 
@@ -383,25 +383,25 @@ func TestLocatorElementState(t *testing.T) {
 	}
 	sanityTests := []struct {
 		name string
-		do   func(common.LocatorAPI, *testBrowser)
+		do   func(*common.Locator, *testBrowser)
 	}{
 		{
-			"IsChecked", func(l common.LocatorAPI, tb *testBrowser) { l.IsChecked(timeout(tb)) },
+			"IsChecked", func(l *common.Locator, tb *testBrowser) { l.IsChecked(timeout(tb)) },
 		},
 		{
-			"IsEditable", func(l common.LocatorAPI, tb *testBrowser) { l.IsEditable(timeout(tb)) },
+			"IsEditable", func(l *common.Locator, tb *testBrowser) { l.IsEditable(timeout(tb)) },
 		},
 		{
-			"IsEnabled", func(l common.LocatorAPI, tb *testBrowser) { l.IsEnabled(timeout(tb)) },
+			"IsEnabled", func(l *common.Locator, tb *testBrowser) { l.IsEnabled(timeout(tb)) },
 		},
 		{
-			"IsDisabled", func(l common.LocatorAPI, tb *testBrowser) { l.IsDisabled(timeout(tb)) },
+			"IsDisabled", func(l *common.Locator, tb *testBrowser) { l.IsDisabled(timeout(tb)) },
 		},
 		{
-			"IsVisible", func(l common.LocatorAPI, tb *testBrowser) { l.IsVisible(timeout(tb)) },
+			"IsVisible", func(l *common.Locator, tb *testBrowser) { l.IsVisible(timeout(tb)) },
 		},
 		{
-			"IsHidden", func(l common.LocatorAPI, tb *testBrowser) { l.IsHidden(timeout(tb)) },
+			"IsHidden", func(l *common.Locator, tb *testBrowser) { l.IsHidden(timeout(tb)) },
 		},
 	}
 	for _, tt := range sanityTests {
