@@ -66,7 +66,7 @@ func TestRequest(t *testing.T) {
 
 	t.Run("HeadersArray()", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, []HTTPHeaderAPI{
+		assert.Equal(t, []HTTPHeader{
 			{Name: "key", Value: "value"},
 		}, req.HeadersArray())
 	})
@@ -79,7 +79,7 @@ func TestRequest(t *testing.T) {
 	t.Run("Size()", func(t *testing.T) {
 		t.Parallel()
 		assert.Equal(t,
-			HTTPMessageSizeAPI{Headers: int64(33), Body: int64(5)},
+			HTTPMessageSize{Headers: int64(33), Body: int64(5)},
 			req.Size())
 	})
 }

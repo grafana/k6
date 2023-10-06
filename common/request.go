@@ -183,11 +183,11 @@ func (r *Request) Headers() map[string]string {
 }
 
 // HeadersArray returns the request headers as an array of objects.
-func (r *Request) HeadersArray() []HTTPHeaderAPI {
-	headers := make([]HTTPHeaderAPI, 0)
+func (r *Request) HeadersArray() []HTTPHeader {
+	headers := make([]HTTPHeader, 0)
 	for n, vals := range r.headers {
 		for _, v := range vals {
-			headers = append(headers, HTTPHeaderAPI{Name: n, Value: v})
+			headers = append(headers, HTTPHeader{Name: n, Value: v})
 		}
 	}
 	return headers
@@ -243,8 +243,8 @@ func (r *Request) Response() *Response {
 }
 
 // Size returns the size of the request.
-func (r *Request) Size() HTTPMessageSizeAPI {
-	return HTTPMessageSizeAPI{
+func (r *Request) Size() HTTPMessageSize {
+	return HTTPMessageSize{
 		Body:    int64(len(r.postData)),
 		Headers: r.headersSize(),
 	}

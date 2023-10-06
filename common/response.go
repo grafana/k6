@@ -236,11 +236,11 @@ func (r *Response) Headers() map[string]string {
 }
 
 // HeadersArray returns the response headers as an array of objects.
-func (r *Response) HeadersArray() []HTTPHeaderAPI {
-	headers := make([]HTTPHeaderAPI, 0)
+func (r *Response) HeadersArray() []HTTPHeader {
+	headers := make([]HTTPHeader, 0)
 	for n, vals := range r.headers {
 		for _, v := range vals {
-			headers = append(headers, HTTPHeaderAPI{Name: n, Value: v})
+			headers = append(headers, HTTPHeader{Name: n, Value: v})
 		}
 	}
 	return headers
@@ -290,8 +290,8 @@ func (r *Response) ServerAddr() goja.Value {
 }
 
 // Size returns the size in bytes of the response.
-func (r *Response) Size() HTTPMessageSizeAPI {
-	return HTTPMessageSizeAPI{
+func (r *Response) Size() HTTPMessageSize {
+	return HTTPMessageSize{
 		Body:    r.bodySize(),
 		Headers: r.headersSize(),
 	}

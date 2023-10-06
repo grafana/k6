@@ -475,7 +475,7 @@ type requestAPI interface {
 	Frame() *common.Frame
 	HeaderValue(string) goja.Value
 	Headers() map[string]string
-	HeadersArray() []common.HTTPHeaderAPI
+	HeadersArray() []common.HTTPHeader
 	IsNavigationRequest() bool
 	Method() string
 	PostData() string
@@ -485,7 +485,7 @@ type requestAPI interface {
 	RedirectedTo() requestAPI
 	ResourceType() string
 	Response() *common.Response
-	Size() common.HTTPMessageSizeAPI
+	Size() common.HTTPMessageSize
 	Timing() goja.Value
 	URL() string
 }
@@ -499,13 +499,13 @@ type responseAPI interface {
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string
 	Headers() map[string]string
-	HeadersArray() []common.HTTPHeaderAPI
+	HeadersArray() []common.HTTPHeader
 	JSON() goja.Value
 	Ok() bool
 	Request() *common.Request
 	SecurityDetails() goja.Value
 	ServerAddr() goja.Value
-	Size() common.HTTPMessageSizeAPI
+	Size() common.HTTPMessageSize
 	Status() int64
 	StatusText() string
 	URL() string
