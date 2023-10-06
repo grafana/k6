@@ -70,11 +70,3 @@ type JSHandleAPI interface {
 	JSONValue() goja.Value
 	ObjectID() cdpruntime.RemoteObjectID
 }
-
-// RectAPI is a rectangle.
-type RectAPI struct {
-	X      float64 `js:"x"`
-	Y      float64 `js:"y"`
-	Width  float64 `js:"width"`
-	Height float64 `js:"height"`
-}

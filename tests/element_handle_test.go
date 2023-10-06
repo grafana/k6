@@ -83,7 +83,7 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
         const rect = e.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
-	var r common.RectAPI
+	var r common.Rect
 	webBbox := p.Evaluate(tb.toGojaValue(pageFn), tb.toGojaValue(element))
 	wb := tb.asGojaValue(webBbox)
 	err = tb.runtime().ExportTo(wb, &r)

@@ -384,10 +384,6 @@ func (r *Rect) enclosingIntRect() *Rect {
 	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
 }
 
-func (r *Rect) toAPIRect() *RectAPI {
-	return &RectAPI{X: r.X, Y: r.Y, Width: r.Width, Height: r.Height}
-}
-
 // ReducedMotion represents a browser reduce-motion setting.
 type ReducedMotion string
 
