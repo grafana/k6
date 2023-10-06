@@ -148,6 +148,10 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.0
 ## explicit; go 1.12
 github.com/gorilla/websocket
+# github.com/grafana/pyroscope-go/godeltaprof v0.1.5
+## explicit; go 1.16
+github.com/grafana/pyroscope-go/godeltaprof
+github.com/grafana/pyroscope-go/godeltaprof/internal/pprof
 # github.com/grafana/xk6-browser v1.1.0
 ## explicit; go 1.19
 github.com/grafana/xk6-browser/api

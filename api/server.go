@@ -9,6 +9,7 @@ import (
 	_ "net/http/pprof" //nolint:gosec // Register pprof handlers
 	"time"
 
+	_ "github.com/grafana/pyroscope-go/godeltaprof" // Register delta pprof handlers
 	"github.com/sirupsen/logrus"
 
 	v1 "go.k6.io/k6/api/v1"
