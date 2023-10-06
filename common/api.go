@@ -19,7 +19,7 @@ type BrowserContextAPI interface {
 	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
 	ExposeFunction(name string, callback goja.Callable)
 	GrantPermissions(permissions []string, opts goja.Value)
-	NewCDPSession() CDPSessionAPI
+	NewCDPSession() any
 	NewPage() (PageAPI, error)
 	Pages() []PageAPI
 	Route(url goja.Value, handler goja.Callable)
@@ -86,12 +86,6 @@ type BrowserAPI interface {
 	On(string) (bool, error)
 	UserAgent() string
 	Version() string
-}
-
-// CDPSessionAPI is the interface of a raw CDP session.
-type CDPSessionAPI interface {
-	Detach()
-	Send(method string, params goja.Value) goja.Value
 }
 
 // ConsoleMessageAPI represents a page console message.

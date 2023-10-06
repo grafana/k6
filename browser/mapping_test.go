@@ -259,3 +259,9 @@ type keyboardAPI interface { //nolint: unused
 type touchscreenAPI interface { //nolint: unused
 	Tap(x float64, y float64)
 }
+
+// cdpSessionAPI is the interface of a raw CDP session.
+type cdpSessionAPI interface { //nolint: unused
+	Detach()
+	Send(method string, params goja.Value) goja.Value
+}
