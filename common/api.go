@@ -414,14 +414,6 @@ type ResponseAPI interface {
 	URL() string
 }
 
-// RouteAPI is the interface of a route for managing request interception.
-type RouteAPI interface {
-	Abort(errorCode string)
-	Continue(opts goja.Value)
-	Fulfill(opts goja.Value)
-	Request() RequestAPI
-}
-
 // HTTPHeaderAPI is a single HTTP header.
 type HTTPHeaderAPI struct {
 	Name  string `json:"name"`

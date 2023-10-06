@@ -281,3 +281,11 @@ type mouseAPI interface { //nolint: unused
 type videoAPI interface { //nolint: unused
 	Path() string
 }
+
+// routeAPI is the interface of a route for managing request interception.
+type routeAPI interface { //nolint: unused
+	Abort(errorCode string)
+	Continue(opts goja.Value)
+	Fulfill(opts goja.Value)
+	Request() common.RequestAPI
+}
