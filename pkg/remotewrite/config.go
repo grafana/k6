@@ -145,6 +145,10 @@ func (conf Config) Apply(applied Config) Config {
 		conf.Password = applied.Password
 	}
 
+	if applied.BearerToken.Valid {
+		conf.BearerToken = applied.BearerToken
+	}
+
 	if applied.PushInterval.Valid {
 		conf.PushInterval = applied.PushInterval
 	}
@@ -274,6 +278,10 @@ func parseEnvs(env map[string]string) (Config, error) {
 
 	if clientCertificateKey, certDefined := env["K6_PROMETHEUS_RW_CLIENT_CERTIFICATE_KEY"]; certDefined {
 		c.ClientCertificateKey = null.StringFrom(clientCertificateKey)
+	}
+
+	if token, tokenDefined := env["K6_PROMETHEUS_RW_BEARER_TOKEN"]; tokenDefined {
+		c.BearerToken = null.StringFrom(token)
 	}
 
 	envHeaders := envMap(env, "K6_PROMETHEUS_RW_HEADERS_")
