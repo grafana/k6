@@ -382,6 +382,40 @@ func TestOptionBasicAuth(t *testing.T) {
 	}
 }
 
+func TestOptionBearerToken(t *testing.T) {
+	t.Parallel()
+
+	cases := map[string]struct {
+		arg     string
+		env     map[string]string
+		jsonRaw json.RawMessage
+	}{
+		"JSON": {jsonRaw: json.RawMessage(`{"bearerToken":"my-bearer-token"}`)},
+		"Env":  {env: map[string]string{"K6_PROMETHEUS_RW_BEARER_TOKEN": "my-bearer-token"}},
+	}
+
+	expconfig := Config{
+		ServerURL:             null.StringFrom("http://localhost:9090/api/v1/write"),
+		InsecureSkipTLSVerify: null.BoolFrom(false),
+		BearerToken:           null.StringFrom("my-bearer-token"),
+		PushInterval:          types.NullDurationFrom(5 * time.Second),
+		Headers:               make(map[string]string),
+		TrendStats:            []string{"p(99)"},
+		StaleMarkers:          null.BoolFrom(false),
+	}
+
+	for name, tc := range cases {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			c, err := GetConsolidatedConfig(
+				tc.jsonRaw, tc.env, tc.arg)
+			require.NoError(t, err)
+			assert.Equal(t, expconfig, c)
+		})
+	}
+}
+
 func TestOptionClientCertificate(t *testing.T) {
 	t.Parallel()
 
