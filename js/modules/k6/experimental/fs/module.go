@@ -256,32 +256,38 @@ func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 	promise, resolve, reject := promises.New(f.vu)
 
 	if common.IsNullish(offset) {
-		reject(newFsError(TypeError, "seek() failed; reason: offset cannot be null or undefined"))
+		reject(newFsError(TypeError, "seek() failed; reason: the offset argument cannot be null or undefined"))
 		return promise
 	}
 
-	offsetInt := offset.ToInteger()
-	if offsetInt < 0 {
-		reject(newFsError(TypeError, "seek() failed; reason: offset cannot be negative"))
+	var intOffset int64
+	if err := f.vu.Runtime().ExportTo(offset, &intOffset); err != nil {
+		reject(newFsError(TypeError, "seek() failed; reason: the offset argument cannot be interpreted as integer"))
 		return promise
 	}
 
 	if common.IsNullish(whence) {
-		reject(newFsError(TypeError, "seek() failed; reason: whence cannot be null or undefined"))
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument cannot be null or undefined"))
 		return promise
 	}
 
-	seekMode := SeekMode(whence.ToInteger())
+	var intWhence int64
+	if err := f.vu.Runtime().ExportTo(whence, &intWhence); err != nil {
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument cannot be interpreted as integer"))
+		return promise
+	}
+
+	seekMode := SeekMode(intWhence)
 	switch seekMode {
 	case SeekModeStart, SeekModeCurrent, SeekModeEnd:
 		// Valid modes, do nothing.
 	default:
-		reject(newFsError(TypeError, "seek() failed; reason: whence must be a SeekMode"))
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument must be a SeekMode"))
 		return promise
 	}
 
 	go func() {
-		newOffset, err := f.file.Seek(int(offsetInt), seekMode)
+		newOffset, err := f.file.Seek(int(intOffset), seekMode)
 		if err != nil {
 			reject(err)
 			return
