@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/andybalholm/brotli"
@@ -143,6 +144,7 @@ func readResponseBody(
 	contentEncodings := strings.Split(resp.Header.Get("Content-Encoding"), ",")
 	// Transparently decompress the body if it's has a content-encoding we
 	// support. If not, simply return it as it is.
+	var unprocessedEncodings []string
 	for i := len(contentEncodings) - 1; i >= 0; i-- {
 		contentEncoding := strings.TrimSpace(contentEncodings[i])
 		if compression, err := CompressionTypeString(contentEncoding); err == nil {
@@ -168,12 +170,16 @@ func readResponseBody(
 				return nil, newDecompressionError(err)
 			}
 			rc = &readCloser{decoder}
+		} else {
+			// if there is a content-encoding we don't support, stop decompress and just return the left part as it is.
+			unprocessedEncodings = contentEncodings[:i+1]
+			break
 		}
 	}
 
 	buf := state.BufferPool.Get()
 	defer state.BufferPool.Put(buf)
-	_, err := io.Copy(buf, rc.Reader)
+	n, err := io.Copy(buf, rc.Reader)
 	if err != nil {
 		respErr = wrapDecompressionError(err)
 	}
@@ -182,6 +188,13 @@ func readResponseBody(
 	if err != nil && respErr == nil { // Don't overwrite previous errors
 		respErr = wrapDecompressionError(err)
 	}
+
+	if len(unprocessedEncodings) == 0 {
+		resp.Header.Del("Content-Encoding")
+	} else {
+		resp.Header.Set("Content-Encoding", strings.Join(unprocessedEncodings, ","))
+	}
+	resp.Header.Set("Content-Length", strconv.FormatInt(n, 10))
 
 	var result interface{}
 	// Binary or string
