@@ -13,10 +13,10 @@ labels: ["release"]
 
 ### At the beginning of the cycle
 
-- [ ] Get from `@k6-browser` team the Release coordinator on their side and co-assign the issue.
+- [ ] Obtain the Release coordinator's contact from the `@k6-browser` team and co-assign the issue to them.
 - [ ] Create a new `release-notes-v0.4x.0` long-lived branch and add a new release notes file using the available [template](/grafana/k6/tree/master/release%20notes/template.md) to the [repository's `release notes` folder](/grafana/k6/tree/master/release%20notes).
 - [ ] Go through the potential [dependencies updates](Dependencies.md) and create a dedicated PR if any of them is relevant to this release.
-- [ ] Create a new `release-v0.4x.0` long-lived branch on the [k6-docs](https://github.com/grafana/k6-docs) repository. Try to keep the branch synced with `main` during the cycle for not getting an outdated branch and get a lot of conflicts.
+- [ ] Create a new `release-v0.4x.0` long-lived branch on the [k6-docs](https://github.com/grafana/k6-docs) repository. Try to keep it synchronized with `main` throughout the development cycle to prevent it from becoming outdated and to avoid numerous conflicts.
 - [ ] Create a new `release-v0.4x.0` long-lived branch on the [grafana/k6-DefinitelyTyped](https://github.com/grafana/k6-DefinitelyTyped) fork repository.
 
 ### Release Preparation
@@ -33,14 +33,14 @@ labels: ["release"]
 #### ~ 1 day before the release date.
 
 - [ ] Open a PR from `main` in the `k6-docs` repository, archiving the current k6's JavaScript API version as per the following [instructions](https://github.com/grafana/k6-docs/wiki/Add-version-for-Javascript-API-documentation).
-- [ ] Open a PR in `k6-docs` repository for the release branch containing all the merged PRs for the upcoming version. If any, resolve the conflicts with `main` branch.
+- [ ] Open a PR in `k6-docs` repository for the release branch containing all the merged PRs for the upcoming version. If any, resolve the conflicts with the `main` branch.
 
 ### Release Day
 
 #### Documentation
 
 - [ ] Merge the `k6-docs` repository's Javascript API archiving PR and rebase the rest of the branches meant for the release on top of the new state of the `main` branch.
-- [ ] Merge the release PR for `k6-docs` containing all the changes related to the release. The order with the the previous PR is relevant otherwise the new changes will be included in the previous versions.
+- [ ] Merge the release PR for `k6-docs` containing all the changes related to the release. The order in which this PR is merged relative to the previous one is crucial; otherwise, the new changes might inadvertently be incorporated into previous versions.
 - [ ] Ensure the last resulting k6-docs GitHub action targetting the `main` branch sees its "Check broken links" job pass.
 - [ ] Publish the new [vX.Y.Z version of docs](https://github.com/grafana/k6-docs/releases/new).
 - [ ] Ensure the k6 repository release notes PR contains the correct links to the docs.
