@@ -37,6 +37,10 @@ const (
 
 	// EOFError is emitted when the end of a file has been reached.
 	EOFError
+
+	// BadResourceError indicates the underlying IO resource is either invalid
+	// or closed, and so the operation could not be performed.
+	BadResourceError
 )
 
 // fsError represents a custom error object emitted by the fs module.

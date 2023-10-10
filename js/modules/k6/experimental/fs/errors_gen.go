@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-const _errorKindName = "NotFoundErrorInvalidResourceErrorForbiddenErrorTypeErrorEOFError"
+const _errorKindName = "NotFoundErrorInvalidResourceErrorForbiddenErrorTypeErrorEOFErrorBadResourceError"
 
-var _errorKindIndex = [...]uint8{0, 13, 33, 47, 56, 64}
+var _errorKindIndex = [...]uint8{0, 13, 33, 47, 56, 64, 80}
 
-const _errorKindLowerName = "notfounderrorinvalidresourceerrorforbiddenerrortypeerroreoferror"
+const _errorKindLowerName = "notfounderrorinvalidresourceerrorforbiddenerrortypeerroreoferrorbadresourceerror"
 
 func (i errorKind) String() string {
 	i -= 1
@@ -30,9 +30,10 @@ func _errorKindNoOp() {
 	_ = x[ForbiddenError-(3)]
 	_ = x[TypeError-(4)]
 	_ = x[EOFError-(5)]
+	_ = x[BadResourceError-(6)]
 }
 
-var _errorKindValues = []errorKind{NotFoundError, InvalidResourceError, ForbiddenError, TypeError, EOFError}
+var _errorKindValues = []errorKind{NotFoundError, InvalidResourceError, ForbiddenError, TypeError, EOFError, BadResourceError}
 
 var _errorKindNameToValueMap = map[string]errorKind{
 	_errorKindName[0:13]:       NotFoundError,
@@ -45,6 +46,8 @@ var _errorKindNameToValueMap = map[string]errorKind{
 	_errorKindLowerName[47:56]: TypeError,
 	_errorKindName[56:64]:      EOFError,
 	_errorKindLowerName[56:64]: EOFError,
+	_errorKindName[64:80]:      BadResourceError,
+	_errorKindLowerName[64:80]: BadResourceError,
 }
 
 var _errorKindNames = []string{
@@ -53,6 +56,7 @@ var _errorKindNames = []string{
 	_errorKindName[33:47],
 	_errorKindName[47:56],
 	_errorKindName[56:64],
+	_errorKindName[64:80],
 }
 
 // errorKindString retrieves an enum value from the enum constants string name.
