@@ -21,9 +21,13 @@ type file struct {
 }
 
 // Stat returns a FileInfo describing the named file.
-func (f *file) stat() *FileInfo {
+func (f *file) stat() (*FileInfo, error) {
+	if f.closed.Load() {
+		return nil, newFsError(BadResourceError, "cannot stat closed file")
+	}
+
 	filename := filepath.Base(f.path)
-	return &FileInfo{Name: filename, Size: len(f.data)}
+	return &FileInfo{Name: filename, Size: len(f.data)}, nil
 }
 
 // FileInfo holds information about a file.
@@ -42,6 +46,10 @@ type FileInfo struct {
 //
 // If the end of the file has been reached, it returns EOFError.
 func (f *file) Read(into []byte) (n int, err error) {
+	if f.closed.Load() {
+		return 0, newFsError(BadResourceError, "cannot read from closed file")
+	}
+
 	start := f.offset
 	if start == len(f.data) {
 		return 0, newFsError(EOFError, "EOF")
@@ -76,6 +84,10 @@ var _ io.Reader = (*file)(nil)
 // When using SeekModeStart, the offset must be positive.
 // Negative offsets are allowed when using `SeekModeCurrent` or `SeekModeEnd`.
 func (f *file) Seek(offset int, whence SeekMode) (int, error) {
+	if f.closed.Load() {
+		return 0, newFsError(BadResourceError, "cannot seek in closed file")
+	}
+
 	newOffset := f.offset
 
 	switch whence {

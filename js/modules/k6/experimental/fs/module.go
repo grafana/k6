@@ -170,10 +170,16 @@ type File struct {
 // Stat returns a promise that will resolve to a [FileInfo] instance describing
 // the file.
 func (f *File) Stat() *goja.Promise {
-	promise, resolve, _ := promises.New(f.vu)
+	promise, resolve, reject := promises.New(f.vu)
 
 	go func() {
-		resolve(f.file.stat())
+		fileInfo, err := f.file.stat()
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(fileInfo)
 	}()
 
 	return promise

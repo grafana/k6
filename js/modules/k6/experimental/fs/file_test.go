@@ -3,6 +3,7 @@ package fs
 import (
 	"bytes"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -11,6 +12,29 @@ import (
 
 func TestFileImpl(t *testing.T) {
 	t.Parallel()
+
+	t.Run("stat on closed file should fail", func(t *testing.T) {
+		t.Parallel()
+
+		f := &file{
+			path:   "/bonjour.txt",
+			data:   []byte("hello"),
+			offset: 0,
+			closed: atomic.Bool{},
+		}
+
+		err := f.Close()
+		require.NoError(t, err)
+
+		gotInfo, gotErr := f.stat()
+
+		assert.Nil(t, gotInfo)
+		assert.Error(t, gotErr)
+
+		var fsErr *fsError
+		assert.ErrorAs(t, gotErr, &fsErr)
+		assert.Equal(t, BadResourceError, fsErr.kind)
+	})
 
 	t.Run("read", func(t *testing.T) {
 		t.Parallel()
@@ -135,6 +159,29 @@ func TestFileImpl(t *testing.T) {
 		}
 	})
 
+	t.Run("read from closed file should fail", func(t *testing.T) {
+		t.Parallel()
+
+		f := &file{
+			path:   "/bonjour.txt",
+			data:   []byte("hello"),
+			offset: 0,
+			closed: atomic.Bool{},
+		}
+
+		err := f.Close()
+		require.NoError(t, err)
+
+		gotN, gotErr := f.Read(make([]byte, 10))
+
+		assert.Equal(t, 0, gotN)
+		assert.Error(t, gotErr)
+
+		var fsErr *fsError
+		assert.ErrorAs(t, gotErr, &fsErr)
+		assert.Equal(t, BadResourceError, fsErr.kind)
+	})
+
 	t.Run("seek", func(t *testing.T) {
 		t.Parallel()
 
@@ -254,6 +301,29 @@ func TestFileImpl(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("seek on closed file should fail", func(t *testing.T) {
+		t.Parallel()
+
+		f := &file{
+			path:   "/bonjour.txt",
+			data:   []byte("hello"),
+			offset: 0,
+			closed: atomic.Bool{},
+		}
+
+		err := f.Close()
+		require.NoError(t, err)
+
+		gotN, gotErr := f.Seek(0, SeekModeStart)
+
+		assert.Equal(t, 0, gotN)
+		assert.Error(t, gotErr)
+
+		var fsErr *fsError
+		assert.ErrorAs(t, gotErr, &fsErr)
+		assert.Equal(t, BadResourceError, fsErr.kind)
 	})
 
 	t.Run("close", func(t *testing.T) {
