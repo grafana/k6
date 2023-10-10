@@ -309,7 +309,7 @@ type Options struct {
 
 	// Cloud is the config for the cloud
 	// formally known as ext.loadimpact
-	Cloud json.RawMessage `json:"cloud,omitempty" ignored:"true"`
+	Cloud json.RawMessage `json:"cloud,omitempty"`
 
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
@@ -471,6 +471,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.NoCookiesReset.Valid {
 		o.NoCookiesReset = opts.NoCookiesReset
+	}
+	if opts.Cloud != nil {
+		o.Cloud = opts.Cloud
 	}
 	if opts.External != nil {
 		o.External = opts.External
