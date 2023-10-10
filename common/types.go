@@ -14,55 +14,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// DOMElementState represents a DOM element state.
-type DOMElementState int
-
-// Valid DOM element states.
-const (
-	DOMElementStateAttached DOMElementState = iota
-	DOMElementStateDetached
-	DOMElementStateVisible
-	DOMElementStateHidden
-)
-
-func (s DOMElementState) String() string {
-	return domElementStateToString[s]
-}
-
-var domElementStateToString = map[DOMElementState]string{
-	DOMElementStateAttached: "attached",
-	DOMElementStateDetached: "detached",
-	DOMElementStateVisible:  "visible",
-	DOMElementStateHidden:   "hidden",
-}
-
-var domElementStateToID = map[string]DOMElementState{
-	"attached": DOMElementStateAttached,
-	"detached": DOMElementStateDetached,
-	"visible":  DOMElementStateVisible,
-	"hidden":   DOMElementStateHidden,
-}
-
-// MarshalJSON marshals the enum as a quoted JSON string.
-func (s DOMElementState) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(domElementStateToString[s])
-	buffer.WriteString(`"`)
-	return buffer.Bytes(), nil
-}
-
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
-func (s *DOMElementState) UnmarshalJSON(b []byte) error {
-	var j string
-	err := json.Unmarshal(b, &j)
-	if err != nil {
-		return err
-	}
-	// Note that if the string cannot be found then it will be set to the zero value.
-	*s = domElementStateToID[j]
-	return nil
-}
-
 type Geolocation struct {
 	Latitude  float64 `js:"latitude"`
 	Longitude float64 `js:"longitude"`
@@ -243,50 +194,6 @@ func (l *LifecycleEvent) UnmarshalText(text []byte) error {
 			val, strings.Join(valid, ", "))
 	}
 
-	return nil
-}
-
-type PollingType int
-
-const (
-	PollingRaf PollingType = iota
-	PollingMutation
-	PollingInterval
-)
-
-func (p PollingType) String() string {
-	return pollingTypeToString[p]
-}
-
-var pollingTypeToString = map[PollingType]string{
-	PollingRaf:      "raf",
-	PollingMutation: "mutation",
-	PollingInterval: "interval",
-}
-
-var pollingTypeToID = map[string]PollingType{
-	"raf":      PollingRaf,
-	"mutation": PollingMutation,
-	"interval": PollingInterval,
-}
-
-// MarshalJSON marshals the enum as a quoted JSON string.
-func (p PollingType) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(pollingTypeToString[p])
-	buffer.WriteString(`"`)
-	return buffer.Bytes(), nil
-}
-
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
-func (p *PollingType) UnmarshalJSON(b []byte) error {
-	var j string
-	err := json.Unmarshal(b, &j)
-	if err != nil {
-		return err
-	}
-	// Note that if the string cannot be found then it will be set to the zero value.
-	*p = pollingTypeToID[j]
 	return nil
 }
 

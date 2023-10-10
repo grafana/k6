@@ -1,7 +1,9 @@
 package common
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
@@ -24,6 +26,55 @@ const maxRetry = 1
 type DocumentInfo struct {
 	documentID string
 	request    *Request
+}
+
+// DOMElementState represents a DOM element state.
+type DOMElementState int
+
+// Valid DOM element states.
+const (
+	DOMElementStateAttached DOMElementState = iota
+	DOMElementStateDetached
+	DOMElementStateVisible
+	DOMElementStateHidden
+)
+
+func (s DOMElementState) String() string {
+	return domElementStateToString[s]
+}
+
+var domElementStateToString = map[DOMElementState]string{ //nolint:gochecknoglobals
+	DOMElementStateAttached: "attached",
+	DOMElementStateDetached: "detached",
+	DOMElementStateVisible:  "visible",
+	DOMElementStateHidden:   "hidden",
+}
+
+var domElementStateToID = map[string]DOMElementState{ //nolint:gochecknoglobals
+	"attached": DOMElementStateAttached,
+	"detached": DOMElementStateDetached,
+	"visible":  DOMElementStateVisible,
+	"hidden":   DOMElementStateHidden,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string.
+func (s DOMElementState) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(domElementStateToString[s])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
+func (s *DOMElementState) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return fmt.Errorf("unmarshaling DOM element state: %w", err)
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*s = domElementStateToID[j]
+	return nil
 }
 
 // Frame represents a frame in an HTML document.
