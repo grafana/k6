@@ -14,55 +14,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-// BlankPage represents a blank page.
-const BlankPage = "about:blank"
-
-// ColorScheme represents a browser color scheme.
-type ColorScheme string
-
-// Valid color schemes.
-const (
-	ColorSchemeLight        ColorScheme = "light"
-	ColorSchemeDark         ColorScheme = "dark"
-	ColorSchemeNoPreference ColorScheme = "no-preference"
-)
-
-func (c ColorScheme) String() string {
-	return colorSchemeToString[c]
-}
-
-var colorSchemeToString = map[ColorScheme]string{
-	ColorSchemeLight:        "light",
-	ColorSchemeDark:         "dark",
-	ColorSchemeNoPreference: "no-preference",
-}
-
-var colorSchemeToID = map[string]ColorScheme{
-	"light":         ColorSchemeLight,
-	"dark":          ColorSchemeDark,
-	"no-preference": ColorSchemeNoPreference,
-}
-
-// MarshalJSON marshals the enum as a quoted JSON string.
-func (c ColorScheme) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(colorSchemeToString[c])
-	buffer.WriteString(`"`)
-	return buffer.Bytes(), nil
-}
-
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
-func (c *ColorScheme) UnmarshalJSON(b []byte) error {
-	var j string
-	err := json.Unmarshal(b, &j)
-	if err != nil {
-		return err
-	}
-	// Note that if the string cannot be found then it will be set to the zero value.
-	*c = colorSchemeToID[j]
-	return nil
-}
-
 // DOMElementState represents a DOM element state.
 type DOMElementState int
 
@@ -110,18 +61,6 @@ func (s *DOMElementState) UnmarshalJSON(b []byte) error {
 	// Note that if the string cannot be found then it will be set to the zero value.
 	*s = domElementStateToID[j]
 	return nil
-}
-
-type EmulatedSize struct {
-	Viewport *Viewport
-	Screen   *Screen
-}
-
-func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
-	return &EmulatedSize{
-		Viewport: viewport,
-		Screen:   screen,
-	}
 }
 
 type Geolocation struct {
@@ -307,13 +246,6 @@ func (l *LifecycleEvent) UnmarshalText(text []byte) error {
 	return nil
 }
 
-type MediaType string
-
-const (
-	MediaTypeScreen MediaType = "screen"
-	MediaTypePrint  MediaType = "print"
-)
-
 type PollingType int
 
 const (
@@ -378,49 +310,6 @@ func (r *Rect) enclosingIntRect() *Rect {
 	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
 }
 
-// ReducedMotion represents a browser reduce-motion setting.
-type ReducedMotion string
-
-// Valid reduce-motion options.
-const (
-	ReducedMotionReduce       ReducedMotion = "reduce"
-	ReducedMotionNoPreference ReducedMotion = "no-preference"
-)
-
-func (r ReducedMotion) String() string {
-	return reducedMotionToString[r]
-}
-
-var reducedMotionToString = map[ReducedMotion]string{
-	ReducedMotionReduce:       "reduce",
-	ReducedMotionNoPreference: "no-preference",
-}
-
-var reducedMotionToID = map[string]ReducedMotion{
-	"reduce":        ReducedMotionReduce,
-	"no-preference": ReducedMotionNoPreference,
-}
-
-// MarshalJSON marshals the enum as a quoted JSON string.
-func (r ReducedMotion) MarshalJSON() ([]byte, error) {
-	buffer := bytes.NewBufferString(`"`)
-	buffer.WriteString(reducedMotionToString[r])
-	buffer.WriteString(`"`)
-	return buffer.Bytes(), nil
-}
-
-// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
-func (r *ReducedMotion) UnmarshalJSON(b []byte) error {
-	var j string
-	err := json.Unmarshal(b, &j)
-	if err != nil {
-		return err
-	}
-	// Note that if the string cannot be found then it will be set to the zero value.
-	*r = reducedMotionToID[j]
-	return nil
-}
-
 type ResourceTiming struct {
 	StartTime             float64 `js:"startTime"`
 	DomainLookupStart     float64 `js:"domainLookupStart"`
@@ -431,28 +320,6 @@ type ResourceTiming struct {
 	RequestStart          float64 `js:"requestStart"`
 	ResponseStart         float64 `js:"responseStart"`
 	ResponseEnd           float64 `js:"responseEnd"`
-}
-
-// Screen represents a device screen.
-type Screen struct {
-	Width  int64 `js:"width"`
-	Height int64 `js:"height"`
-}
-
-func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if screen != nil && !goja.IsUndefined(screen) && !goja.IsNull(screen) {
-		screen := screen.ToObject(rt)
-		for _, k := range screen.Keys() {
-			switch k {
-			case "width":
-				s.Width = screen.Get(k).ToInteger()
-			case "height":
-				s.Height = screen.Get(k).ToInteger()
-			}
-		}
-	}
-	return nil
 }
 
 type SelectOption struct {

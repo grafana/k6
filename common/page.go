@@ -1,7 +1,9 @@
 package common
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -26,11 +28,157 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 )
 
+// BlankPage represents a blank page.
+const BlankPage = "about:blank"
+
 const (
 	webVitalBinding = "k6browserSendWebVitalMetric"
 
 	eventPageConsoleAPICalled = "console"
 )
+
+// MediaType represents the type of media to emulate.
+type MediaType string
+
+const (
+	// MediaTypeScreen represents the screen media type.
+	MediaTypeScreen MediaType = "screen"
+
+	// MediaTypePrint represents the print media type.
+	MediaTypePrint MediaType = "print"
+)
+
+// ReducedMotion represents a browser reduce-motion setting.
+type ReducedMotion string
+
+// Valid reduce-motion options.
+const (
+	ReducedMotionReduce       ReducedMotion = "reduce"
+	ReducedMotionNoPreference ReducedMotion = "no-preference"
+)
+
+func (r ReducedMotion) String() string {
+	return reducedMotionToString[r]
+}
+
+var reducedMotionToString = map[ReducedMotion]string{ //nolint:gochecknoglobals
+	ReducedMotionReduce:       "reduce",
+	ReducedMotionNoPreference: "no-preference",
+}
+
+var reducedMotionToID = map[string]ReducedMotion{ //nolint:gochecknoglobals
+	"reduce":        ReducedMotionReduce,
+	"no-preference": ReducedMotionNoPreference,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string.
+func (r ReducedMotion) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(reducedMotionToString[r])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
+func (r *ReducedMotion) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return fmt.Errorf("unmarshaling %q to ReducedMotion: %w", b, err)
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*r = reducedMotionToID[j]
+	return nil
+}
+
+// Screen represents a device screen.
+type Screen struct {
+	Width  int64 `js:"width"`
+	Height int64 `js:"height"`
+}
+
+const (
+	screenWidth  = "width"
+	screenHeight = "height"
+)
+
+// Parse parses the given screen options.
+func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
+	rt := k6ext.Runtime(ctx)
+	if screen != nil && !goja.IsUndefined(screen) && !goja.IsNull(screen) {
+		screen := screen.ToObject(rt)
+		for _, k := range screen.Keys() {
+			switch k {
+			case screenWidth:
+				s.Width = screen.Get(k).ToInteger()
+			case screenHeight:
+				s.Height = screen.Get(k).ToInteger()
+			}
+		}
+	}
+
+	return nil
+}
+
+// ColorScheme represents a browser color scheme.
+type ColorScheme string
+
+// Valid color schemes.
+const (
+	ColorSchemeLight        ColorScheme = "light"
+	ColorSchemeDark         ColorScheme = "dark"
+	ColorSchemeNoPreference ColorScheme = "no-preference"
+)
+
+func (c ColorScheme) String() string {
+	return colorSchemeToString[c]
+}
+
+var colorSchemeToString = map[ColorScheme]string{ //nolint:gochecknoglobals
+	ColorSchemeLight:        "light",
+	ColorSchemeDark:         "dark",
+	ColorSchemeNoPreference: "no-preference",
+}
+
+var colorSchemeToID = map[string]ColorScheme{ //nolint:gochecknoglobals
+	"light":         ColorSchemeLight,
+	"dark":          ColorSchemeDark,
+	"no-preference": ColorSchemeNoPreference,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string.
+func (c ColorScheme) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(colorSchemeToString[c])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
+func (c *ColorScheme) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return fmt.Errorf("unmarshaling %q to ColorScheme: %w", b, err)
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*c = colorSchemeToID[j]
+	return nil
+}
+
+// EmulatedSize represents the emulated viewport and screen sizes.
+type EmulatedSize struct {
+	Viewport *Viewport
+	Screen   *Screen
+}
+
+// NewEmulatedSize creates and returns a new EmulatedSize.
+func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
+	return &EmulatedSize{
+		Viewport: viewport,
+		Screen:   screen,
+	}
+}
 
 type consoleEventHandlerFunc func(*ConsoleMessage) error
 
