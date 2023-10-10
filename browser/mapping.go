@@ -14,14 +14,9 @@ import (
 	k6common "go.k6.io/k6/js/common"
 )
 
-// mapping is a type of mapping between our API (api/) and the JS
-// module. It acts like a bridge and allows adding wildcard methods
+// mapping is a type for mapping our module API to Goja.
+// It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
-//
-// TODO
-// We should put this type back in when the following issue is resolved
-// on the Goja side:
-// https://github.com/dop251/goja/issues/469
 type mapping = map[string]any
 
 // mapBrowserToGoja maps the browser API to the JS module.

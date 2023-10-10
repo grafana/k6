@@ -17,7 +17,7 @@ import (
 	k6metrics "go.k6.io/k6/metrics"
 )
 
-// customMappings is a list of custom mappings for our API (api/).
+// customMappings is a list of custom mappings for our module API.
 // Some of them are wildcards, such as query to $ mapping; and
 // others are for publicly accessible fields, such as mapping
 // of page.keyboard to Page.getKeyboard.
