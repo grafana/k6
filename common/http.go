@@ -274,9 +274,22 @@ func (r *Request) Size() HTTPMessageSize {
 
 // Timing returns the request timing information.
 func (r *Request) Timing() goja.Value {
+	type resourceTiming struct {
+		StartTime             float64 `js:"startTime"`
+		DomainLookupStart     float64 `js:"domainLookupStart"`
+		DomainLookupEnd       float64 `js:"domainLookupEnd"`
+		ConnectStart          float64 `js:"connectStart"`
+		SecureConnectionStart float64 `js:"secureConnectionStart"`
+		ConnectEnd            float64 `js:"connectEnd"`
+		RequestStart          float64 `js:"requestStart"`
+		ResponseStart         float64 `js:"responseStart"`
+		ResponseEnd           float64 `js:"responseEnd"`
+	}
+
 	rt := r.vu.Runtime()
 	timing := r.response.timing
-	return rt.ToValue(&ResourceTiming{
+
+	return rt.ToValue(&resourceTiming{
 		StartTime:             (timing.RequestTime - float64(r.timestamp.Unix()) + float64(r.wallTime.Unix())) * 1000,
 		DomainLookupStart:     timing.DNSStart,
 		DomainLookupEnd:       timing.DNSEnd,

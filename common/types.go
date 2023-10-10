@@ -310,18 +310,6 @@ func (r *Rect) enclosingIntRect() *Rect {
 	return &Rect{X: x, Y: y, Width: x2 - x, Height: y2 - y}
 }
 
-type ResourceTiming struct {
-	StartTime             float64 `js:"startTime"`
-	DomainLookupStart     float64 `js:"domainLookupStart"`
-	DomainLookupEnd       float64 `js:"domainLookupEnd"`
-	ConnectStart          float64 `js:"connectStart"`
-	SecureConnectionStart float64 `js:"secureConnectionStart"`
-	ConnectEnd            float64 `js:"connectEnd"`
-	RequestStart          float64 `js:"requestStart"`
-	ResponseStart         float64 `js:"responseStart"`
-	ResponseEnd           float64 `js:"responseEnd"`
-}
-
 type SelectOption struct {
 	Value *string `json:"value"`
 	Label *string `json:"label"`
