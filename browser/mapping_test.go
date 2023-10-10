@@ -554,12 +554,6 @@ type touchscreenAPI interface { //nolint: unused
 	Tap(x float64, y float64)
 }
 
-// cdpSessionAPI is the interface of a raw CDP session.
-type cdpSessionAPI interface { //nolint: unused
-	Detach()
-	Send(method string, params goja.Value) goja.Value
-}
-
 // mouseAPI is the interface of a mouse input device.
 // TODO: map this to page.GetMouse(). Currently, the common.Mouse type
 // mapping is not tested using this interface. We use the concrete type
@@ -571,19 +565,6 @@ type mouseAPI interface { //nolint: unused
 	Move(x float64, y float64, opts goja.Value)
 	Up(x float64, y float64, opts goja.Value)
 	// Wheel(opts goja.Value)
-}
-
-// videoAPI is the interface of a recorded video.
-type videoAPI interface { //nolint: unused
-	Path() string
-}
-
-// routeAPI is the interface of a route for managing request interception.
-type routeAPI interface { //nolint: unused
-	Abort(errorCode string)
-	Continue(opts goja.Value)
-	Fulfill(opts goja.Value)
-	Request() *common.Request
 }
 
 // workerAPI is the interface of a web worker.
