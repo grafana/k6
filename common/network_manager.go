@@ -28,6 +28,35 @@ import (
 	"github.com/dop251/goja"
 )
 
+// Credentials holds HTTP authentication credentials.
+type Credentials struct {
+	Username string `js:"username"`
+	Password string `js:"password"`
+}
+
+// NewCredentials return a new Credentials.
+func NewCredentials() *Credentials {
+	return &Credentials{}
+}
+
+// Parse credentials details from a given goja credentials value.
+func (c *Credentials) Parse(ctx context.Context, credentials goja.Value) error {
+	rt := k6ext.Runtime(ctx)
+	if credentials != nil && !goja.IsUndefined(credentials) && !goja.IsNull(credentials) {
+		credentials := credentials.ToObject(rt)
+		for _, k := range credentials.Keys() {
+			switch k {
+			case "username":
+				c.Username = credentials.Get(k).String()
+			case "password":
+				c.Password = credentials.Get(k).String()
+			}
+		}
+	}
+
+	return nil
+}
+
 // NetworkManager manages all frames in HTML document.
 type NetworkManager struct {
 	BaseEventEmitter
