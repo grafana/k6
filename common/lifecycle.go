@@ -17,11 +17,17 @@ type FrameLifecycleEvent struct {
 	Event LifecycleEvent
 }
 
+// LifecycleEvent is a lifecycle event.
 type LifecycleEvent int
 
 const (
+	// LifecycleEventLoad is emitted when the page load event is fired.
 	LifecycleEventLoad LifecycleEvent = iota
+
+	// LifecycleEventDOMContentLoad is emitted when the DOMContentLoaded event is fired.
 	LifecycleEventDOMContentLoad
+
+	// LifecycleEventNetworkIdle is emitted when there are no more than 2 network connections for at least 500 ms.
 	LifecycleEventNetworkIdle
 )
 
@@ -29,13 +35,13 @@ func (l LifecycleEvent) String() string {
 	return lifecycleEventToString[l]
 }
 
-var lifecycleEventToString = map[LifecycleEvent]string{
+var lifecycleEventToString = map[LifecycleEvent]string{ //nolint:gochecknoglobals
 	LifecycleEventLoad:           "load",
 	LifecycleEventDOMContentLoad: "domcontentloaded",
 	LifecycleEventNetworkIdle:    "networkidle",
 }
 
-var lifecycleEventToID = map[string]LifecycleEvent{
+var lifecycleEventToID = map[string]LifecycleEvent{ //nolint:gochecknoglobals
 	"load":             LifecycleEventLoad,
 	"domcontentloaded": LifecycleEventDOMContentLoad,
 	"networkidle":      LifecycleEventNetworkIdle,
@@ -54,7 +60,7 @@ func (l *LifecycleEvent) UnmarshalJSON(b []byte) error {
 	var j string
 	err := json.Unmarshal(b, &j)
 	if err != nil {
-		return err
+		return fmt.Errorf("unmarshaling %q to lifecycle event: %w", b, err)
 	}
 	// Note that if the string cannot be found then it will be set to the zero value.
 	*l = lifecycleEventToID[j]
