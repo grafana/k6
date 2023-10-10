@@ -14,52 +14,6 @@ import (
 	"github.com/dop251/goja"
 )
 
-type Geolocation struct {
-	Latitude  float64 `js:"latitude"`
-	Longitude float64 `js:"longitude"`
-	Accurracy float64 `js:"accurracy"`
-}
-
-func NewGeolocation() *Geolocation {
-	return &Geolocation{}
-}
-
-func (g *Geolocation) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
-	longitude := 0.0
-	latitude := 0.0
-	accuracy := 0.0
-
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "accuracy":
-				accuracy = opts.Get(k).ToFloat()
-			case "latitude":
-				latitude = opts.Get(k).ToFloat()
-			case "longitude":
-				longitude = opts.Get(k).ToFloat()
-			}
-		}
-	}
-
-	if longitude < -180 || longitude > 180 {
-		return fmt.Errorf(`invalid longitude "%.2f": precondition -180 <= LONGITUDE <= 180 failed`, longitude)
-	}
-	if latitude < -90 || latitude > 90 {
-		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, latitude)
-	}
-	if accuracy < 0 {
-		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, accuracy)
-	}
-
-	g.Accurracy = accuracy
-	g.Latitude = latitude
-	g.Longitude = longitude
-	return nil
-}
-
 // ImageFormat represents an image file format.
 type ImageFormat string
 
