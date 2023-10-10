@@ -360,7 +360,7 @@ jobs:
           for asset in ./dist/*; do
             assets+=("$asset")
           done
-          gh release create "$VERSION" "${assets[@]}" --target "$VERSION" -F "./release\ notes/${VERSION}.md"
+          gh release create "$VERSION" "${assets[@]}" --target "$VERSION" -F "./release notes/${VERSION}.md"
 
   publish-packages:
     runs-on: ubuntu-latest
