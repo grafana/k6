@@ -142,24 +142,98 @@ func TestFileImpl(t *testing.T) {
 			whence SeekMode
 		}
 
+		// The test file is 100 bytes long
 		tests := []struct {
 			name       string
 			fileOffset int
 			args       args
-			want       int
+			wantOffset int
 			wantError  bool
 		}{
-			{"StartSeekWithinBounds", 0, args{50, SeekModeStart}, 50, false},
-			{"StartSeekTooFar", 0, args{150, SeekModeStart}, 0, true},
-			{"StartSeekNegative", 0, args{-50, SeekModeStart}, 0, true},
-			{"CurrentSeekWithinBounds", 0, args{10, SeekModeCurrent}, 10, false},
-			{"CurrentSeekNegativeWithinBounds", 20, args{-20, SeekModeCurrent}, 0, false},
-			{"CurrentSeekNegativeTooFar", 20, args{-40, SeekModeCurrent}, 0, true},
-			{"CurrentSeekTooFar", 0, args{150, SeekModeCurrent}, 0, true},
-			{"EndSeekPositiveOffset", 0, args{20, SeekModeEnd}, 80, true}, // Cannot seek beyond the end of the file
-			{"EndSeekWithinBounds", 0, args{-20, SeekModeEnd}, 80, false},
-			{"EndSeekTooFar", 0, args{120, SeekModeEnd}, 0, true},
-			{"InvalidWhence", 0, args{10, SeekMode(42)}, 0, true},
+			{
+				name:       "seek using SeekModeStart within file bounds should succeed",
+				fileOffset: 0,
+				args:       args{50, SeekModeStart},
+				wantOffset: 50,
+				wantError:  false,
+			},
+			{
+				name:       "seek using SeekModeStart beyond file boundaries should fail",
+				fileOffset: 0,
+				args:       args{150, SeekModeStart},
+				wantOffset: 0,
+				wantError:  true,
+			},
+			{
+				name:       "seek using SeekModeStart and a negative offset should fail",
+				fileOffset: 0,
+				args:       args{-50, SeekModeStart},
+				wantOffset: 0,
+				wantError:  true,
+			},
+			{
+				name:       "seek using SeekModeCurrent within file bounds at offset 0 should succeed",
+				fileOffset: 0,
+				args:       args{10, SeekModeCurrent},
+				wantOffset: 10,
+				wantError:  false,
+			},
+			{
+				name:       "seek using SeekModeCurrent within file bounds at non-zero offset should succeed",
+				fileOffset: 20,
+				args:       args{10, SeekModeCurrent},
+				wantOffset: 30,
+				wantError:  false,
+			},
+			{
+				name:       "seek using SeekModeCurrent beyond file boundaries should fail",
+				fileOffset: 20,
+				args:       args{100, SeekModeCurrent},
+				wantOffset: 20,
+				wantError:  true,
+			},
+			{
+				name:       "seek using SeekModeCurrent and a negative offset should succeed",
+				fileOffset: 20,
+				args:       args{-10, SeekModeCurrent},
+				wantOffset: 10,
+				wantError:  false,
+			},
+			{
+				name:       "seek using SeekModeCurrent and an out of bound negative offset should fail",
+				fileOffset: 20,
+				args:       args{-40, SeekModeCurrent},
+				wantOffset: 20,
+				wantError:  true,
+			},
+			{
+				name:       "seek using SeekModeEnd within file bounds should succeed",
+				fileOffset: 20,
+				args:       args{-20, SeekModeEnd},
+				wantOffset: 80,
+				wantError:  false,
+			},
+			{
+				name:       "seek using SeekModeEnd beyond file start should fail",
+				fileOffset: 20,
+				args:       args{-110, SeekModeEnd},
+				wantOffset: 20,
+				wantError:  true, // File is 100 bytes long
+			},
+			{
+				name:       "seek using SeekModeEnd and a positive offset should fail",
+				fileOffset: 20,
+				args:       args{10, SeekModeEnd},
+				wantOffset: 20,
+				wantError:  true,
+			},
+			{
+				name:       "seek with invalid whence should fail",
+				fileOffset: 0,
+				args:       args{10, SeekMode(42)},
+				wantOffset: 0,
+				wantError:  true,
+			},
 		}
 
 		for _, tt := range tests {
@@ -175,7 +249,7 @@ func TestFileImpl(t *testing.T) {
 					assert.Error(t, err, tt.name)
 				} else {
 					assert.NoError(t, err, tt.name)
-					assert.Equal(t, tt.want, got, tt.name)
+					assert.Equal(t, tt.wantOffset, got, tt.name)
 				}
 			})
 		}
