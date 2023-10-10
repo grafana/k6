@@ -39,7 +39,6 @@ jobs:
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* ]]; then
-            unset args[2]
             args[1]="1"
             export GOMAXPROCS=1
           fi
@@ -77,7 +76,6 @@ jobs:
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* ]]; then
-            unset args[2]
             args[1]="1"
             export GOMAXPROCS=1
           fi
@@ -105,7 +103,6 @@ jobs:
           args=("-p" "2" "-race")
           # Run with less concurrency on Windows to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* ]]; then
-            unset args[2]
             args[1]="1"
             export GOMAXPROCS=1
           fi
