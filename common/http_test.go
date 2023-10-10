@@ -4,12 +4,12 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6ext/k6test"
-
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
 func TestRequest(t *testing.T) {
