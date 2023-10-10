@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestFileImpl(t *testing.T) {
@@ -253,5 +254,44 @@ func TestFileImpl(t *testing.T) {
 				}
 			})
 		}
+	})
+
+	t.Run("close", func(t *testing.T) {
+		t.Parallel()
+
+		t.Run("closing a file should succeed", func(t *testing.T) {
+			t.Parallel()
+
+			f := &file{
+				path:   "/bonjour.txt",
+				data:   []byte("hello"),
+				offset: 0,
+				// defaults to closed == false
+			}
+
+			gotErr := f.Close()
+
+			assert.NoError(t, gotErr)
+			assert.Equal(t, true, f.closed.Load())
+		})
+
+		t.Run("double closing a file should fail", func(t *testing.T) {
+			t.Parallel()
+
+			f := &file{
+				path:   "/bonjour.txt",
+				data:   []byte("hello"),
+				offset: 0,
+				closed: atomic.Bool{},
+			}
+
+			err := f.Close()
+			require.NoError(t, err)
+			gotErr := f.Close()
+
+			var fsErr *fsError
+			assert.ErrorAs(t, gotErr, &fsErr)
+			assert.Equal(t, BadResourceError, fsErr.kind)
+		})
 	})
 }

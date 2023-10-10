@@ -3,6 +3,7 @@ package fs
 import (
 	"io"
 	"path/filepath"
+	"sync/atomic"
 )
 
 // file is an abstraction for interacting with files.
@@ -14,6 +15,9 @@ type file struct {
 
 	// offset holds the current offset in the file
 	offset int
+
+	// closed indicates whether the file has been closed
+	closed atomic.Bool
 }
 
 // Stat returns a FileInfo describing the named file.
@@ -125,3 +129,14 @@ const (
 	// the end of the file.
 	SeekModeEnd
 )
+
+// Close closes the file instance, and marks it as closed.
+func (f *file) Close() error {
+	if f.closed.Load() {
+		return newFsError(BadResourceError, "file already closed")
+	}
+
+	f.closed.Store(true)
+
+	return nil
+}
