@@ -20,12 +20,6 @@ import (
 
 const resultDone = "done"
 
-// Ensure ElementHandle implements the api.ElementHandle and api.JSHandle interfaces.
-var (
-	_ *ElementHandle = &ElementHandle{}
-	_ JSHandleAPI    = &ElementHandle{}
-)
-
 type (
 	elementHandleActionFunc        func(context.Context, *ElementHandle) (any, error)
 	elementHandlePointerActionFunc func(context.Context, *ElementHandle, *Position) (any, error)
