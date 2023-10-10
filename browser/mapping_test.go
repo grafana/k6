@@ -590,7 +590,9 @@ type locatorAPI interface {
 }
 
 // keyboardAPI is the interface of a keyboard input device.
-// TODO: map this to page.GetKeyboard().
+// TODO: map this to page.GetKeyboard(). Currently, the common.Keyboard type
+// mapping is not tested using this interface. We use the concrete type
+// without testing its exported methods.
 type keyboardAPI interface { //nolint: unused
 	Down(key string)
 	InsertText(char string)
@@ -600,7 +602,9 @@ type keyboardAPI interface { //nolint: unused
 }
 
 // touchscreenAPI is the interface of a touchscreen.
-// TODO: map this to page.GetTouchscreen().
+// TODO: map this to page.GetTouchscreen(). Currently, the common.TouchscreenAPI type
+// mapping is not tested using this interface. We use the concrete type
+// without testing its exported methods.
 type touchscreenAPI interface { //nolint: unused
 	Tap(x float64, y float64)
 }
@@ -612,7 +616,9 @@ type cdpSessionAPI interface { //nolint: unused
 }
 
 // mouseAPI is the interface of a mouse input device.
-// TODO: map this to page.GetMouse().
+// TODO: map this to page.GetMouse(). Currently, the common.Mouse type
+// mapping is not tested using this interface. We use the concrete type
+// without testing its exported methods.
 type mouseAPI interface { //nolint: unused
 	Click(x float64, y float64, opts goja.Value)
 	DblClick(x float64, y float64, opts goja.Value)
