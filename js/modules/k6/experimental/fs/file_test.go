@@ -1,6 +1,7 @@
 package fs
 
 import (
+	"bytes"
 	"errors"
 	"testing"
 
@@ -18,54 +19,80 @@ func TestFileImpl(t *testing.T) {
 			into     []byte
 			fileData []byte
 			offset   int
+			wantInto []byte
 			wantN    int
 			wantErr  errorKind
 		}{
 			{
-				name:     "empty file data should fail",
-				into:     make([]byte, 10),
-				fileData: []byte{},
-				offset:   0,
-				wantN:    0,
-				wantErr:  EOFError,
-			},
-			{
-				name:     "non-empty file data, and empty into should succeed",
-				into:     []byte{},
-				fileData: []byte("hello"),
-				offset:   0,
-				wantN:    0,
-				wantErr:  0, // No error expected
-			},
-			{
-				name:     "non-empty file data, and non-empty into should succeed",
+				name:     "reading the entire file into a buffer fitting the whole file should succeed",
 				into:     make([]byte, 5),
 				fileData: []byte("hello"),
 				offset:   0,
+				wantInto: []byte("hello"),
 				wantN:    5,
 				wantErr:  0, // No error expected
 			},
 			{
-				name:     "non-empty file data, non-empty into, at an offset should succeed",
+				name:     "reading a file larger than the provided buffer should succeed",
 				into:     make([]byte, 3),
 				fileData: []byte("hello"),
-				offset:   1,
+				offset:   0,
+				wantInto: []byte("hel"),
 				wantN:    3,
 				wantErr:  0, // No error expected
 			},
 			{
-				name:     "non-empty file data, non-empty into reading till the end should succeed",
-				into:     make([]byte, 5),
+				name:     "reading a file larger than the provided buffer at an offset should succeed",
+				into:     make([]byte, 3),
 				fileData: []byte("hello"),
 				offset:   2,
+				wantInto: []byte("llo"),
 				wantN:    3,
-				wantErr:  EOFError, // No error expected
+				wantErr:  0, // No error expected
 			},
 			{
-				name:     "non-empty file data, non-empty into with offset at the end should fail",
-				into:     make([]byte, 5),
+				name:     "reading file data into a zero sized buffer should succeed",
+				into:     []byte{},
+				fileData: []byte("hello"),
+				offset:   0,
+				wantInto: []byte{},
+				wantN:    0,
+				wantErr:  0, // No error expected
+			},
+			{
+				name:     "reading past the end of the file should fill the buffer and fail with EOF",
+				into:     make([]byte, 10),
+				fileData: []byte("hello"),
+				offset:   0,
+				wantInto: []byte{'h', 'e', 'l', 'l', 'o', 0, 0, 0, 0, 0},
+				wantN:    5,
+				wantErr:  EOFError,
+			},
+			{
+				name:     "reading into a prefilled buffer overrides its content",
+				into:     []byte("world!"),
+				fileData: []byte("hello"),
+				offset:   0,
+				wantInto: []byte("hello!"),
+				wantN:    5,
+				wantErr:  EOFError,
+			},
+			{
+				name:     "reading an empty file should fail with EOF",
+				into:     make([]byte, 10),
+				fileData: []byte{},
+				offset:   0,
+				wantInto: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
+				wantN:    0,
+				wantErr:  EOFError,
+			},
+			{
+				name: "reading from the end of a file should fail with EOF",
+				into: make([]byte, 10),
+				// Note that the offset is larger than the file size
 				fileData: []byte("hello"),
 				offset:   5,
+				wantInto: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 				wantN:    0,
 				wantErr:  EOFError,
 			},
@@ -98,6 +125,10 @@ func TestFileImpl(t *testing.T) {
 
 				if gotN != tc.wantN || gotErr != tc.wantErr {
 					t.Errorf("Read() = %d, %v, want %d, %v", gotN, gotErr, tc.wantN, tc.wantErr)
+				}
+
+				if !bytes.Equal(tc.into, tc.wantInto) {
+					t.Errorf("Read() into = %v, want %v", tc.into, tc.wantInto)
 				}
 			})
 		}

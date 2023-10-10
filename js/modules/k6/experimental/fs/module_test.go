@@ -269,6 +269,38 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("read called when end of file reached should return null and succeed", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q);
+			let buffer = new Uint8Array(5);
+
+			// Reading the whole file should return 5.
+			let bytesRead = await file.read(buffer);
+			if (bytesRead !== 5) {
+				throw 'expected read to return 5, got ' + bytesRead + ' instead';
+			}
+
+			// Reading from the end of the file should return null.
+			bytesRead = await file.read(buffer);
+			if (bytesRead !== null) {
+				throw 'expected read to return null got ' + bytesRead + ' instead';
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("read called with invalid argument should fail", func(t *testing.T) {
 		t.Parallel()
 
@@ -328,38 +360,6 @@ func TestFile(t *testing.T) {
 				if (err.name !== 'TypeError') {
 					throw 'unexpected error: ' + err;
 				}
-			}
-		`, testFilePath)))
-
-		assert.NoError(t, err)
-	})
-
-	t.Run("read called when end of file reached should return null and succeed", func(t *testing.T) {
-		t.Parallel()
-
-		runtime, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
-
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
-		})
-		runtime.VU.InitEnvField.FileSystems["file"] = fs
-
-		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
-			const file = await fs.open(%q);
-			let buffer = new Uint8Array(5);
-
-			// Reading the whole file should return 5.
-			let bytesRead = await file.read(buffer);
-			if (bytesRead !== 5) {
-				throw 'expected read to return 5, got ' + bytesRead + ' instead';
-			}
-
-			// Reading from the end of the file should return null.
-			bytesRead = await file.read(buffer);
-			if (bytesRead !== null) {
-				throw 'expected read to return null got ' + bytesRead + ' instead';
 			}
 		`, testFilePath)))
 
