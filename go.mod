@@ -11,7 +11,7 @@ require (
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
-	go.k6.io/k6 v0.46.1-0.20230926095547-6fa8abddf10c
+	go.k6.io/k6 v0.47.0
 	golang.org/x/net v0.14.0
 	golang.org/x/sync v0.3.0
 	gopkg.in/guregu/null.v3 v3.3.0
