@@ -307,12 +307,12 @@ github.com/tidwall/pretty
 ## explicit; go 1.18
 go.uber.org/goleak
 go.uber.org/goleak/internal/stack
-# golang.org/x/crypto v0.12.0
+# golang.org/x/crypto v0.14.0
 ## explicit; go 1.17
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/net v0.14.0
+# golang.org/x/net v0.17.0
 ## explicit; go 1.17
 golang.org/x/net/html
 golang.org/x/net/html/atom
@@ -325,16 +325,15 @@ golang.org/x/net/trace
 # golang.org/x/sync v0.3.0
 ## explicit; go 1.17
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.11.0
+# golang.org/x/sys v0.13.0
 ## explicit; go 1.17
-golang.org/x/sys/internal/unsafeheader
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
-# golang.org/x/term v0.11.0
+# golang.org/x/term v0.13.0
 ## explicit; go 1.17
 golang.org/x/term
-# golang.org/x/text v0.12.0
+# golang.org/x/text v0.13.0
 ## explicit; go 1.17
 golang.org/x/text/cases
 golang.org/x/text/collate
