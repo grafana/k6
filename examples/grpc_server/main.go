@@ -28,11 +28,11 @@ import (
 	"flag"
 	"fmt"
 	"io"
-	"os"
 	"log"
 	"math"
 	"math/rand"
 	"net"
+	"os"
 	"sync"
 	"time"
 
