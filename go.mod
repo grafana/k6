@@ -37,7 +37,7 @@ require (
 	github.com/spf13/cobra v1.4.0
 	github.com/spf13/pflag v1.0.5
 	github.com/stretchr/testify v1.8.4
-	github.com/tidwall/gjson v1.16.0
+	github.com/tidwall/gjson v1.17.0
 	go.uber.org/goleak v1.2.1
 	golang.org/x/crypto v0.12.0
 	golang.org/x/net v0.14.0

@@ -3410,7 +3410,7 @@ func (t Result) Path(json string) string {
 		if !rcomp.Exists() {
 			goto fail
 		}
-		comp := escapeComp(rcomp.String())
+		comp := Escape(rcomp.String())
 		path = append(path, '.')
 		path = append(path, comp...)
 	}
@@ -3425,17 +3425,31 @@ fail:
 // isSafePathKeyChar returns true if the input character is safe for not
 // needing escaping.
 func isSafePathKeyChar(c byte) bool {
-	return c <= ' ' || c > '~' || c == '_' || c == '-' || c == ':' ||
-		(c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
-		(c >= '0' && c <= '9')
+	return (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') ||
+		(c >= '0' && c <= '9') || c <= ' ' || c > '~' || c == '_' ||
+		c == '-' || c == ':'
 }
 
-// escapeComp escaped a path compontent, making it safe for generating a
-// path for later use.
-func escapeComp(comp string) string {
+// Escape returns an escaped path component.
+//
+//	json := `{
+//	  "user":{
+//	     "first.name": "Janet",
+//	     "last.name": "Prichard"
+//	   }
+//	}`
+//	user := gjson.Get(json, "user")
+//	println(user.Get(gjson.Escape("first.name"))
+//	println(user.Get(gjson.Escape("last.name"))
+//	// Output:
+//	// Janet
+//	// Prichard
+func Escape(comp string) string {
 	for i := 0; i < len(comp); i++ {
 		if !isSafePathKeyChar(comp[i]) {
-			ncomp := []byte(comp[:i])
+			ncomp := make([]byte, len(comp)+1)
+			copy(ncomp, comp[:i])
+			ncomp = ncomp[:i]
 			for ; i < len(comp); i++ {
 				if !isSafePathKeyChar(comp[i]) {
 					ncomp = append(ncomp, '\\')
