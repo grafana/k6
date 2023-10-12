@@ -511,24 +511,22 @@ func IndexStream(r io.Reader) ([]byte, error) {
 
 // JSON returns the index as JSON text.
 func (i *Index) JSON() []byte {
+	type offset struct {
+		CompressedOffset   int64 `json:"compressed"`
+		UncompressedOffset int64 `json:"uncompressed"`
+	}
 	x := struct {
-		TotalUncompressed int64 `json:"total_uncompressed"` // Total Uncompressed size if known. Will be -1 if unknown.
-		TotalCompressed   int64 `json:"total_compressed"`   // Total Compressed size if known. Will be -1 if unknown.
-		Offsets           []struct {
-			CompressedOffset   int64 `json:"compressed"`
-			UncompressedOffset int64 `json:"uncompressed"`
-		} `json:"offsets"`
-		EstBlockUncomp int64 `json:"est_block_uncompressed"`
+		TotalUncompressed int64    `json:"total_uncompressed"` // Total Uncompressed size if known. Will be -1 if unknown.
+		TotalCompressed   int64    `json:"total_compressed"`   // Total Compressed size if known. Will be -1 if unknown.
+		Offsets           []offset `json:"offsets"`
+		EstBlockUncomp    int64    `json:"est_block_uncompressed"`
 	}{
 		TotalUncompressed: i.TotalUncompressed,
 		TotalCompressed:   i.TotalCompressed,
 		EstBlockUncomp:    i.estBlockUncomp,
 	}
 	for _, v := range i.info {
-		x.Offsets = append(x.Offsets, struct {
-			CompressedOffset   int64 `json:"compressed"`
-			UncompressedOffset int64 `json:"uncompressed"`
-		}{CompressedOffset: v.compressedOffset, UncompressedOffset: v.uncompressedOffset})
+		x.Offsets = append(x.Offsets, offset{CompressedOffset: v.compressedOffset, UncompressedOffset: v.uncompressedOffset})
 	}
 	b, _ := json.MarshalIndent(x, "", "  ")
 	return b
