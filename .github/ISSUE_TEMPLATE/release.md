@@ -25,8 +25,8 @@ labels: ["release"]
 
 - [ ] Ensure all PRs in the `k6-docs` repository, related to new or modified functionalities introduced by the new version have been created and merged to the release branch.
 - [ ] Ensure all PRs in the k6 repository, part of the current [milestone](https://github.com/grafana/k6/milestones), have been merged.
-- [ ] Open a PR with the release notes for the new version, and ask teams who might have contributed to the release (@k6-browser, @k6-chaos, @devrel teams, etc.) to contribute their notes and review the existing ones.
-- [ ] Share the release notes PR with the k6 open-source teams. Request contributions from all affected teams (browser, chaos, devrel, docs, etc.) and any other stakeholders involved in the new release.
+- [ ] Open a PR with the release notes for the new version, and ask teams who might have contributed to the release (k6-browser, k6-chaos, k6-docs, k6-devrel teams, etc.) to contribute their notes and review the existing ones.
+- [ ] Share the release notes PR with the k6 open-source teams. Request contributions from all affected teams (k6-browser, k6-chaos, k6-docs, k6-devrel, etc.) and any other stakeholders involved in the new release.
 - [ ] Open a separate PR for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/9fa50b2d1f259cdccff5cc7bc18a236d31c345ac/lib/consts/consts.go#L11).
 - [ ] Open a PR in the `DefinitelyTyped/DefinitelyTyped` repository, using the release branch created in the grafana/k6-DefinitelyTyped fork, to update the k6 type definitions for the new release.
 
@@ -39,9 +39,9 @@ labels: ["release"]
 
 #### Documentation
 
-- [ ] Merge the `k6-docs` repository's Javascript API archiving PR and rebase the rest of the branches meant for the release on top of the new state of the `main` branch.
+- [ ] Merge the `k6-docs` repository's JavaScript API archiving PR and rebase the rest of the branches meant for the release on top of the new state of the `main` branch.
 - [ ] Merge the release PR for `k6-docs` containing all the changes related to the release. The order in which this PR is merged relative to the previous one is crucial; otherwise, the new changes might inadvertently be incorporated into previous versions.
-- [ ] Ensure the last resulting k6-docs GitHub action targetting the `main` branch sees its "Check broken links" job pass.
+- [ ] Ensure the last resulting k6-docs GitHub action targeting the `main` branch sees its "Check broken links" job pass.
 - [ ] Publish the new [vX.Y.Z version of docs](https://github.com/grafana/k6-docs/releases/new).
 - [ ] Ensure the k6 repository release notes PR contains the correct links to the docs.
 
