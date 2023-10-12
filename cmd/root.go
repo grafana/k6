@@ -167,11 +167,6 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
 	flags.Lookup("log-output").DefValue = gs.DefaultFlags.LogOutput
 
-	flags.StringVar(&gs.Flags.LogFormat, "logformat", gs.Flags.LogFormat, "log output format")
-	oldLogFormat := flags.Lookup("logformat")
-	oldLogFormat.Hidden = true
-	oldLogFormat.Deprecated = "log-format"
-	oldLogFormat.DefValue = gs.DefaultFlags.LogFormat
 	flags.StringVar(&gs.Flags.LogFormat, "log-format", gs.Flags.LogFormat, "log output format")
 	flags.Lookup("log-format").DefValue = gs.DefaultFlags.LogFormat
 
