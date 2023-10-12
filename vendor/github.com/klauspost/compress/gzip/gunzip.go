@@ -106,6 +106,7 @@ func (z *Reader) Reset(r io.Reader) error {
 	*z = Reader{
 		decompressor: z.decompressor,
 		multistream:  true,
+		br:           z.br,
 	}
 	if rr, ok := r.(flate.Reader); ok {
 		z.r = rr

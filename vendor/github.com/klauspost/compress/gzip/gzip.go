@@ -74,6 +74,27 @@ func NewWriterLevel(w io.Writer, level int) (*Writer, error) {
 	return z, nil
 }
 
+// MinCustomWindowSize is the minimum window size that can be sent to NewWriterWindow.
+const MinCustomWindowSize = flate.MinCustomWindowSize
+
+// MaxCustomWindowSize is the maximum custom window that can be sent to NewWriterWindow.
+const MaxCustomWindowSize = flate.MaxCustomWindowSize
+
+// NewWriterWindow returns a new Writer compressing data with a custom window size.
+// windowSize must be from MinCustomWindowSize to MaxCustomWindowSize.
+func NewWriterWindow(w io.Writer, windowSize int) (*Writer, error) {
+	if windowSize < MinCustomWindowSize {
+		return nil, errors.New("gzip: requested window size less than MinWindowSize")
+	}
+	if windowSize > MaxCustomWindowSize {
+		return nil, errors.New("gzip: requested window size bigger than MaxCustomWindowSize")
+	}
+
+	z := new(Writer)
+	z.init(w, -windowSize)
+	return z, nil
+}
+
 func (z *Writer) init(w io.Writer, level int) {
 	compressor := z.compressor
 	if level != StatelessCompression {
