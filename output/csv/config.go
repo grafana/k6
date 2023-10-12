@@ -15,10 +15,9 @@ import (
 
 // Config is the config for the csv output
 type Config struct {
-	// Samples.
-	FileName     null.String        `json:"file_name" envconfig:"K6_CSV_FILENAME"`
-	SaveInterval types.NullDuration `json:"save_interval" envconfig:"K6_CSV_SAVE_INTERVAL"`
-	TimeFormat   null.String        `json:"time_format" envconfig:"K6_CSV_TIME_FORMAT"`
+	FileName     null.String        `json:"fileName" envconfig:"K6_CSV_FILENAME"`
+	SaveInterval types.NullDuration `json:"saveInterval" envconfig:"K6_CSV_SAVE_INTERVAL"`
+	TimeFormat   null.String        `json:"timeFormat" envconfig:"K6_CSV_TIME_FORMAT"`
 }
 
 // TimeFormat custom enum type
@@ -75,17 +74,11 @@ func ParseArg(arg string, logger logrus.FieldLogger) (Config, error) {
 			return c, fmt.Errorf("couldn't parse %q as argument for csv output", arg)
 		}
 		switch r[0] {
-		case "save_interval":
-			logger.Warnf("CSV output argument '%s' is deprecated, please use 'saveInterval' instead.", r[0])
-			fallthrough
 		case "saveInterval":
 			err := c.SaveInterval.UnmarshalText([]byte(r[1]))
 			if err != nil {
 				return c, err
 			}
-		case "file_name":
-			logger.Warnf("CSV output argument '%s' is deprecated, please use 'fileName' instead.", r[0])
-			fallthrough
 		case "fileName":
 			c.FileName = null.StringFrom(r[1])
 		case "timeFormat":

@@ -80,16 +80,6 @@ func TestParseArg(t *testing.T) {
 				TimeFormat:   null.NewString("unix", false),
 			},
 		},
-		"save_interval=5s": {
-			config: Config{
-				FileName:     null.NewString("file.csv", false),
-				SaveInterval: types.NullDurationFrom(5 * time.Second),
-				TimeFormat:   null.NewString("unix", false),
-			},
-			expectedLogEntries: []string{
-				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
-			},
-		},
 		"saveInterval=5s": {
 			config: Config{
 				FileName:     null.NewString("file.csv", false),
@@ -97,28 +87,7 @@ func TestParseArg(t *testing.T) {
 				TimeFormat:   null.NewString("unix", false),
 			},
 		},
-		"file_name=test.csv,save_interval=5s": {
-			config: Config{
-				FileName:     null.StringFrom("test.csv"),
-				SaveInterval: types.NullDurationFrom(5 * time.Second),
-				TimeFormat:   null.NewString("unix", false),
-			},
-			expectedLogEntries: []string{
-				"CSV output argument 'file_name' is deprecated, please use 'fileName' instead.",
-				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
-			},
-		},
-		"fileName=test.csv,save_interval=5s": {
-			config: Config{
-				FileName:     null.StringFrom("test.csv"),
-				SaveInterval: types.NullDurationFrom(5 * time.Second),
-				TimeFormat:   null.NewString("unix", false),
-			},
-			expectedLogEntries: []string{
-				"CSV output argument 'save_interval' is deprecated, please use 'saveInterval' instead.",
-			},
-		},
-		"filename=test.csv,save_interval=5s": {
+		"filename=test.csv,saveInterval=5s": {
 			expectedErr: true,
 		},
 		"fileName=test.csv,timeFormat=rfc3339": {
