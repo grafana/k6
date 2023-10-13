@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"path"
 	"text/template"
@@ -13,7 +14,10 @@ import (
 
 const defaultNewScriptName = "script.js"
 
-var defaultNewScriptTemplate = template.Must(template.New("init").Parse(`import http from 'k6/http';
+//nolint:gochecknoglobals
+var (
+	errFileExists            = errors.New("file already exists")
+	defaultNewScriptTemplate = template.Must(template.New("init").Parse(`import http from 'k6/http';
 import { sleep } from 'k6';
 
 export const options = {
@@ -69,6 +73,7 @@ export default function() {
   sleep(1);
 }
 `))
+)
 
 type initScriptTemplateArgs struct {
 	ScriptName string
@@ -88,7 +93,7 @@ func (c *initCmd) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func (c *initCmd) run(cmd *cobra.Command, args []string) error {
+func (c *initCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
 	target := defaultNewScriptName
 	if len(args) > 0 {
 		target = args[0]
@@ -101,14 +106,14 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error {
 
 	if fileExists && !c.overwriteFiles {
 		c.gs.Logger.Errorf("%s already exists", target)
-		return err
+		return errFileExists
 	}
 
 	fd, err := c.gs.FS.Create(target)
 	if err != nil {
 		return err
 	}
-	defer fd.Close()
+	defer fd.Close() //nolint:errcheck
 
 	if err := defaultNewScriptTemplate.Execute(fd, initScriptTemplateArgs{
 		ScriptName: path.Base(target),
