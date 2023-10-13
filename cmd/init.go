@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"path"
+	"text/template"
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -9,17 +11,68 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-const (
-	defaultNewScriptName = "script.js"
-	defaultNewScript     = `import http from 'k6/http';
+const defaultNewScriptName = "script.js"
+
+var defaultNewScriptTemplate = template.Must(template.New("init").Parse(`import http from 'k6/http';
 import { sleep } from 'k6';
 
-export default function () {
-  http.get('https://grafana.com');
+export const options = {
+  // A number specifying the number of VUs to run concurrently.
+  vus: 10,
+  // A string specifying the total duration of the test run.
+  duration: '30s',
+
+  // The following section contains configuration options for execution of this
+  // test script in Grafana Cloud.
+  //
+  // See https://grafana.com/docs/grafana-cloud/k6/get-started/run-cloud-tests-from-the-cli/
+  // to learn about authoring and running k6 test scripts in Grafana Cloud.
+  //
+  // cloud: {
+  //   // The ID of the project to which the test is assigned in the k6 Cloud UI.
+  //   // By default tests are executed in default project.
+  //   projectID: "",
+  //   // The name of the test in the k6 Cloud UI.
+  //   // Test runs with the same name will be grouped.
+  //   name: "{{ .ScriptName }}"
+  // },
+
+  // Uncomment this section to enable the use of Browser API in your tests.
+  //
+  // See https://k6.io/docs/using-k6-browser/running-browser-tests/ to learn more
+  // about using Browser API in your test scripts.
+  //
+  // scenarios: {
+  //   // The scenario name appears in the result summary, tags, and so on.
+  //   SCENARIO NAME: {
+  //     // Mandatory parameter for browser-based tests.
+  //     executor: 'shared-iterations',
+  //     options: {
+  //       browser: {
+  //         // This is a mandatory parameter that instructs k6 to launch and
+  //         // connect to a chromium-based browser, and use it to run UI-based
+  //         // tests.
+  //         type: 'chromium',
+  //       },
+  //     },
+  //   },
+  // }
+};
+
+// The function that defines VU logic.
+//
+// See https://k6.io/docs/examples/tutorials/get-started-with-k6/ to learn more
+// about authoring k6 scripts.
+//
+export default function() {
+  http.get('http://test.k6.io');
   sleep(1);
 }
-`
-)
+`))
+
+type initScriptTemplateArgs struct {
+	ScriptName string
+}
 
 // initCmd represents the `k6 init` command
 type initCmd struct {
@@ -57,8 +110,9 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error {
 	}
 	defer fd.Close()
 
-	_, err = fd.Write([]byte(defaultNewScript))
-	if err != nil {
+	if err := defaultNewScriptTemplate.Execute(fd, initScriptTemplateArgs{
+		ScriptName: path.Base(target),
+	}); err != nil {
 		return err
 	}
 
