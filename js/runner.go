@@ -430,18 +430,19 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 }
 
 func (r *Runner) checkDeadline(ctx context.Context, name string, result goja.Value, err error) error {
-	// deadline is reached so we have timeouted but this might've not been registered correctly
-	if deadline, ok := ctx.Deadline(); ok && time.Now().After(deadline) {
-		// we could have an error that is not context.Canceled in which case we should return it instead
-		//nolint:errorlint
-		if err, ok := err.(*goja.InterruptedError); ok && result != nil && err.Value() != context.Canceled {
-			// TODO: silence this error?
-			return err
-		}
-		// otherwise we have timeouted
-		return newTimeoutError(name, r.getTimeoutFor(name))
+	if deadline, ok := ctx.Deadline(); !(ok && time.Now().After(deadline)) {
+		return nil
 	}
-	return nil
+
+	// deadline is reached so we have timeouted but this might've not been registered correctly
+	// we could have an error that is not context.Canceled in which case we should return it instead
+	//nolint:errorlint
+	if err, ok := err.(*goja.InterruptedError); ok && result != nil && err.Value() != context.Canceled {
+		// TODO: silence this error?
+		return err
+	}
+	// otherwise we have timeouted
+	return newTimeoutError(name, r.getTimeoutFor(name))
 }
 
 // SetOptions sets the test Options to the provided data and makes necessary changes to the Runner.
