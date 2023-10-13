@@ -85,7 +85,12 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 // TODO: remove the need for this function, see https://github.com/grafana/k6/issues/2968
 //
 //nolint:forbidigo
-func extractLogger(fl logrus.FieldLogger) *logrus.Logger {
+func extractLogger(vu lib.ActiveVU) *logrus.Logger {
+	vuSpecific, ok := vu.(*ActiveVU)
+	if !ok {
+		panic("lib.ActiveVU can't be caset to *ActiveVU")
+	}
+	fl := vuSpecific.Console.logger
 	switch e := fl.(type) {
 	case *logrus.Entry:
 		return e.Logger
@@ -219,7 +224,7 @@ func TestConsoleLog(t *testing.T) {
 
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
-			logger := extractLogger(vu.(*ActiveVU).Console.logger) //nolint:forcetypeassert
+			logger := extractLogger(vu)
 
 			logger.Out = io.Discard
 			logger.Level = logrus.DebugLevel
@@ -277,7 +282,7 @@ func TestConsoleLevels(t *testing.T) {
 
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
-					logger := extractLogger(vu.(*ActiveVU).Console.logger) //nolint:forcetypeassert
+					logger := extractLogger(vu)
 
 					logger.Out = io.Discard
 					logger.Level = logrus.DebugLevel
@@ -370,7 +375,7 @@ func TestFileConsole(t *testing.T) {
 							require.NoError(t, err)
 
 							vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-							logger := extractLogger(vu.(*ActiveVU).Console.logger) //nolint:forcetypeassert
+							logger := extractLogger(vu)
 
 							logger.Level = logrus.DebugLevel
 							hook := logtest.NewLocal(logger)
