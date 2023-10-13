@@ -7,7 +7,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
 )
 
 func BenchmarkEmptyIteration(b *testing.B) {
@@ -16,12 +15,9 @@ func BenchmarkEmptyIteration(b *testing.B) {
 	r, err := getSimpleRunner(b, "/script.js", `exports.default = function() { }`)
 	require.NoError(b, err)
 
-	ch := make(chan metrics.SampleContainer, 100)
+	ch := newDevNullSampleChannel()
 	defer close(ch)
-	go func() { // read the channel so it doesn't block
-		for range ch {
-		}
-	}()
+
 	initVU, err := r.NewVU(context.Background(), 1, 1, ch)
 	require.NoError(b, err)
 	ctx, cancel := context.WithCancel(context.Background())

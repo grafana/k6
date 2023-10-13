@@ -89,7 +89,7 @@ func TestNewBundle(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		t.Parallel()
 		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)
-		exception := new(scriptException)
+		exception := new(scriptExceptionError)
 		require.ErrorAs(t, err, &exception)
 		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:2:7(3)\n")
 	})
@@ -453,7 +453,7 @@ func TestNewBundle(t *testing.T) {
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.WarnLevel, entries[0].Level)
 			assert.Contains(t, entries[0].Message, "There were unknown fields")
-			assert.Contains(t, entries[0].Data["error"].(error).Error(), "unknown field \"something\"")
+			assert.Contains(t, entries[0].Data["error"].(error).Error(), "unknown field \"something\"") //nolint:forcetypeassert
 		})
 	})
 }
@@ -579,6 +579,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 }
 
 func TestOpen(t *testing.T) {
+	t.Parallel()
 	testCases := [...]struct {
 		name           string
 		openPath       string
@@ -667,7 +668,7 @@ func TestOpen(t *testing.T) {
 			if isWindows {
 				fs = fsext.NewTrimFilePathSeparatorFs(fs)
 			}
-			return fs, prefix, func() { require.NoError(t, os.RemoveAll(prefix)) }
+			return fs, prefix, func() { require.NoError(t, os.RemoveAll(prefix)) } //nolint:forbidigo
 		},
 	}
 
@@ -691,7 +692,7 @@ func TestOpen(t *testing.T) {
 						openPath = filepath.Join(prefix, openPath)
 					}
 					if isWindows {
-						openPath = strings.Replace(openPath, `\`, `\\`, -1)
+						openPath = strings.ReplaceAll(openPath, `\`, `\\`)
 					}
 					pwd := tCase.pwd
 					if pwd == "" {
@@ -727,8 +728,8 @@ func TestOpen(t *testing.T) {
 				t.Run(tCase.name, testFunc)
 				if isWindows {
 					// windowsify the testcase
-					tCase.openPath = strings.Replace(tCase.openPath, `/`, `\`, -1)
-					tCase.pwd = strings.Replace(tCase.pwd, `/`, `\`, -1)
+					tCase.openPath = strings.ReplaceAll(tCase.openPath, `/`, `\`)
+					tCase.pwd = strings.ReplaceAll(tCase.pwd, `/`, `\`)
 					t.Run(tCase.name+" with windows slash", testFunc)
 				}
 			}
@@ -856,7 +857,7 @@ func TestBundleNotSharable(t *testing.T) {
 				bi, err := b.Instantiate(context.Background(), uint64(i))
 				require.NoError(t, err)
 				for j := 0; j < iters; j++ {
-					bi.Runtime.Set("__ITER", j)
+					require.NoError(t, bi.Runtime.Set("__ITER", j))
 					_, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
 					require.NoError(t, err)
 				}

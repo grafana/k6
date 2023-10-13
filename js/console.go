@@ -21,7 +21,8 @@ func newConsole(logger logrus.FieldLogger) *console {
 
 // Creates a console logger with its output set to the file at the provided `filepath`.
 func newFileConsole(filepath string, formatter logrus.Formatter, level logrus.Level) (*console, error) {
-	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644) //nolint:gosec
+	//nolint:gosec,forbidigo // see https://github.com/grafana/k6/issues/2565
+	f, err := os.OpenFile(filepath, os.O_WRONLY|os.O_APPEND|os.O_CREATE, 0o644)
 	if err != nil {
 		return nil, err
 	}
