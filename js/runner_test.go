@@ -128,10 +128,10 @@ func TestRunnerOptions(t *testing.T) {
 			t.Parallel()
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
 			assert.Equal(t, null.NewBool(false, false), r.Bundle.Options.Paused)
-			r.SetOptions(lib.Options{Paused: null.BoolFrom(true)})
+			require.NoError(t, r.SetOptions(lib.Options{Paused: null.BoolFrom(true)}))
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
 			assert.Equal(t, null.NewBool(true, true), r.Bundle.Options.Paused)
-			r.SetOptions(lib.Options{Paused: null.BoolFrom(false)})
+			require.NoError(t, r.SetOptions(lib.Options{Paused: null.BoolFrom(false)}))
 			assert.Equal(t, r.Bundle.Options, r.GetOptions())
 			assert.Equal(t, null.NewBool(false, true), r.Bundle.Options.Paused)
 		})
@@ -213,7 +213,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 			newOptions := lib.Options{
 				TeardownTimeout: types.NullDurationFrom(4 * time.Second),
 			}
-			r.SetOptions(newOptions)
+			require.NoError(t, r.SetOptions(newOptions))
 			require.Equal(t, newOptions, r.GetOptions())
 
 			samples := make(chan metrics.SampleContainer, 100)
@@ -636,7 +636,7 @@ func TestVURunContext(t *testing.T) {
 		exports.default = function() { fn(); }
 	`)
 	require.NoError(t, err)
-	r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)}))
+	require.NoError(t, r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)})))
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -660,7 +660,7 @@ func TestVURunContext(t *testing.T) {
 			require.NoError(t, err)
 
 			fnCalled := false
-			vu.Runtime.Set("fn", func() {
+			require.NoError(t, vu.Runtime.Set("fn", func() {
 				fnCalled = true
 
 				require.NotNil(t, vu.moduleVUImpl.Runtime())
@@ -673,7 +673,7 @@ func TestVURunContext(t *testing.T) {
 				assert.NotNil(t, state.Logger)
 				assert.Equal(t, r.GetDefaultGroup(), state.Group)
 				assert.Equal(t, vu.Transport, state.Transport)
-			})
+			}))
 
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
@@ -705,13 +705,8 @@ func TestVURunInterrupt(t *testing.T) {
 		name, r := name, r
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			samples := make(chan metrics.SampleContainer, 100)
+			samples := newDevNullSampleChannel()
 			defer close(samples)
-			go func() {
-				for range samples {
-				}
-			}()
-
 			ctx, cancel := context.WithTimeout(context.Background(), 20*time.Millisecond)
 			defer cancel()
 
@@ -749,12 +744,8 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 			t.Parallel()
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
-			samples := make(chan metrics.SampleContainer, 100)
+			samples := newDevNullSampleChannel()
 			defer close(samples)
-			go func() {
-				for range samples {
-				}
-			}()
 			var wg sync.WaitGroup
 
 			initVU, err := r.newVU(ctx, 1, 1, samples)
@@ -822,23 +813,23 @@ func TestVUIntegrationGroups(t *testing.T) {
 			fnOuterCalled := false
 			fnInnerCalled := false
 			fnNestedCalled := false
-			vu.Runtime.Set("fnOuter", func() {
+			require.NoError(t, vu.Runtime.Set("fnOuter", func() {
 				fnOuterCalled = true
 				assert.Equal(t, r.GetDefaultGroup(), vu.state.Group)
-			})
-			vu.Runtime.Set("fnInner", func() {
+			}))
+			require.NoError(t, vu.Runtime.Set("fnInner", func() {
 				fnInnerCalled = true
 				g := vu.state.Group
 				assert.Equal(t, "my group", g.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent)
-			})
-			vu.Runtime.Set("fnNested", func() {
+			}))
+			require.NoError(t, vu.Runtime.Set("fnNested", func() {
 				fnNestedCalled = true
 				g := vu.state.Group
 				assert.Equal(t, "nested group", g.Name)
 				assert.Equal(t, "my group", g.Parent.Name)
 				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
-			})
+			}))
 
 			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
 			err = activeVU.RunOnce()
@@ -1296,7 +1287,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 				`))
 	require.NoError(t, err)
 
-	r1.SetOptions(lib.Options{
+	require.NoError(t, r1.SetOptions(lib.Options{
 		Throw: null.BoolFrom(true),
 		Hosts: func() types.NullHosts {
 			hosts, er := types.NewNullHosts(map[string]types.Host{
@@ -1306,7 +1297,7 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 			return hosts
 		}(),
-	})
+	}))
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1385,7 +1376,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			"",
 		},
 		"UnsupportedVersion": {
-			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
+			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}}, //nolint:staticcheck
 			unsupportedVersionErrorMsg,
 		},
 	}
@@ -1632,12 +1623,12 @@ func TestVUIntegrationCookiesNoReset(t *testing.T) {
 			}
 		`))
 	require.NoError(t, err)
-	r1.SetOptions(lib.Options{
+	require.NoError(t, r1.SetOptions(lib.Options{
 		Throw:          null.BoolFrom(true),
 		MaxRedirects:   null.IntFrom(10),
 		Hosts:          types.NullHosts{Trie: tb.Dialer.Hosts},
 		NoCookiesReset: null.BoolFrom(true),
-	})
+	}))
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -1772,13 +1763,13 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 		"WithoutDomains":   {true, false, true, ""},
 	}
 
-	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{
+	listener, err := tls.Listen("tcp", "127.0.0.1:0", &tls.Config{ //nolint:gosec
 		Certificates: []tls.Certificate{serverCert},
 		ClientAuth:   tls.RequireAndVerifyClientCert,
 		ClientCAs:    clientCAPool,
 	})
 	require.NoError(t, err)
-	srv := &http.Server{
+	srv := &http.Server{ //nolint:gosec
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 			_, _ = fmt.Fprintf(w, "ok")
 		}),
@@ -2292,10 +2283,12 @@ func TestVUPanic(t *testing.T) {
 			logger.AddHook(hook)
 
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-			vu.(*ActiveVU).Runtime.Set("panic", func(str string) { panic(str) })
-			vu.(*ActiveVU).state.Logger = logger
+			activeVU, ok := vu.(*ActiveVU)
+			require.True(t, ok)
+			require.NoError(t, activeVU.Runtime.Set("panic", func(str string) { panic(str) }))
+			activeVU.state.Logger = logger
 
-			vu.(*ActiveVU).Console.logger = logger.WithField("source", "console")
+			activeVU.Console.logger = logger.WithField("source", "console")
 			err = vu.RunOnce()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "a panic occurred during JS execution: here we panic")

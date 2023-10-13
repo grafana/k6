@@ -39,12 +39,8 @@ func BenchmarkHTTPRequests(b *testing.B) {
 	})
 	require.NoError(b, err)
 
-	ch := make(chan metrics.SampleContainer, 100)
+	ch := newDevNullSampleChannel()
 	defer close(ch)
-	go func() { // read the channel so it doesn't block
-		for range ch {
-		}
-	}()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	initVU, err := r.NewVU(ctx, 1, 1, ch)
@@ -77,12 +73,8 @@ func BenchmarkHTTPRequestsBase(b *testing.B) {
 	})
 	require.NoError(b, err)
 
-	ch := make(chan metrics.SampleContainer, 100)
+	ch := newDevNullSampleChannel()
 	defer close(ch)
-	go func() { // read the channel so it doesn't block
-		for range ch {
-		}
-	}()
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	initVU, err := r.NewVU(ctx, 1, 1, ch)

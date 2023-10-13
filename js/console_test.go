@@ -83,7 +83,14 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 }
 
 // TODO: remove the need for this function, see https://github.com/grafana/k6/issues/2968
-func extractLogger(fl logrus.FieldLogger) *logrus.Logger {
+//
+//nolint:forbidigo
+func extractLogger(vu lib.ActiveVU) *logrus.Logger {
+	vuSpecific, ok := vu.(*ActiveVU)
+	if !ok {
+		panic("lib.ActiveVU can't be caset to *ActiveVU")
+	}
+	fl := vuSpecific.Console.logger
 	switch e := fl.(type) {
 	case *logrus.Entry:
 		return e.Logger
@@ -217,7 +224,7 @@ func TestConsoleLog(t *testing.T) {
 
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
-			logger := extractLogger(vu.(*ActiveVU).Console.logger)
+			logger := extractLogger(vu)
 
 			logger.Out = io.Discard
 			logger.Level = logrus.DebugLevel
@@ -275,7 +282,7 @@ func TestConsoleLevels(t *testing.T) {
 
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 
-					logger := extractLogger(vu.(*ActiveVU).Console.logger)
+					logger := extractLogger(vu)
 
 					logger.Out = io.Discard
 					logger.Level = logrus.DebugLevel
@@ -334,26 +341,19 @@ func TestFileConsole(t *testing.T) {
 						msg, deleteFile := msg, deleteFile
 						t.Run(msg, func(t *testing.T) {
 							t.Parallel()
-							f, err := os.CreateTemp("", "") //nolint:forbidigo
-							if err != nil {
-								t.Fatalf("Couldn't create temporary file for testing: %s", err)
-							}
+							f, err := os.CreateTemp("", "") //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
+							require.NoError(t, err)
 							logFilename := f.Name()
-							defer os.Remove(logFilename)
+							defer os.Remove(logFilename) //nolint:errcheck,forbidigo // fix with https://github.com/grafana/k6/issues/2565
 							// close it as we will want to reopen it and maybe remove it
 							if deleteFile {
-								f.Close()
-								if err := os.Remove(logFilename); err != nil {
-									t.Fatalf("Couldn't remove tempfile: %s", err)
-								}
+								require.NoError(t, f.Close())
+								require.NoError(t, os.Remove(logFilename)) //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
 							} else {
 								// TODO: handle case where the string was no written in full ?
 								_, err = f.WriteString(preExistingText)
-								_ = f.Close()
-								if err != nil {
-									t.Fatalf("Error while writing text to preexisting logfile: %s", err)
-								}
-
+								assert.NoError(t, f.Close())
+								require.NoError(t, err)
 							}
 							r, err := getSimpleRunner(t, "/script",
 								fmt.Sprintf(
@@ -375,7 +375,7 @@ func TestFileConsole(t *testing.T) {
 							require.NoError(t, err)
 
 							vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-							logger := extractLogger(vu.(*ActiveVU).Console.logger)
+							logger := extractLogger(vu)
 
 							logger.Level = logrus.DebugLevel
 							hook := logtest.NewLocal(logger)
@@ -384,7 +384,7 @@ func TestFileConsole(t *testing.T) {
 							require.NoError(t, err)
 
 							// Test if the file was created.
-							_, err = os.Stat(logFilename)
+							_, err = os.Stat(logFilename) //nolint:forbidigo // fix with https://github.com/grafana/k6/issues/2565
 							require.NoError(t, err)
 
 							entry := hook.LastEntry()
@@ -403,7 +403,7 @@ func TestFileConsole(t *testing.T) {
 							entryStr, err := entry.String()
 							require.NoError(t, err)
 
-							f, err = os.Open(logFilename) //nolint:gosec
+							f, err = os.Open(logFilename) //nolint:forbidigo,gosec // fix with https://github.com/grafana/k6/issues/2565
 							require.NoError(t, err)
 
 							fileContent, err := io.ReadAll(f)

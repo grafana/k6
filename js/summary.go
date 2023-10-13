@@ -140,7 +140,7 @@ func exportGroup(group *lib.Group) map[string]interface{} {
 
 func getSummaryResult(rawResult goja.Value) (map[string]io.Reader, error) {
 	if goja.IsNull(rawResult) || goja.IsUndefined(rawResult) {
-		return nil, nil
+		return nil, nil //nolint:nilnil // this is actually valid result in this case
 	}
 
 	rawResultMap, ok := rawResult.Export().(map[string]interface{})

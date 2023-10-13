@@ -333,7 +333,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 	if err != nil {
 		var exception *goja.Exception
 		if errors.As(err, &exception) {
-			err = &scriptException{inner: exception}
+			err = &scriptExceptionError{inner: exception}
 		}
 		return nil, err
 	}

@@ -22,7 +22,7 @@ import (
 func newDevNullSampleChannel() chan metrics.SampleContainer {
 	ch := make(chan metrics.SampleContainer, 100)
 	go func() {
-		for range ch {
+		for range ch { //nolint:revive
 		}
 	}()
 	return ch
