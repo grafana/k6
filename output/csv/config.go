@@ -15,9 +15,10 @@ import (
 
 // Config is the config for the csv output
 type Config struct {
-	FileName     null.String        `json:"fileName" envconfig:"K6_CSV_FILENAME"`
-	SaveInterval types.NullDuration `json:"saveInterval" envconfig:"K6_CSV_SAVE_INTERVAL"`
-	TimeFormat   null.String        `json:"timeFormat" envconfig:"K6_CSV_TIME_FORMAT"`
+	// Samples.
+	FileName     null.String        `json:"file_name" envconfig:"K6_CSV_FILENAME"`
+	SaveInterval types.NullDuration `json:"save_interval" envconfig:"K6_CSV_SAVE_INTERVAL"`
+	TimeFormat   null.String        `json:"time_format" envconfig:"K6_CSV_TIME_FORMAT"`
 }
 
 // TimeFormat custom enum type
@@ -83,7 +84,6 @@ func ParseArg(arg string, logger logrus.FieldLogger) (Config, error) {
 			c.FileName = null.StringFrom(r[1])
 		case "timeFormat":
 			c.TimeFormat = null.StringFrom(r[1])
-
 		default:
 			return c, fmt.Errorf("unknown key %q as argument for csv output", r[0])
 		}
