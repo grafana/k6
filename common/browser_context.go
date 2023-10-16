@@ -468,7 +468,13 @@ func (b *BrowserContext) runWaitForEventHandler(
 				return
 			}
 
-			if retVal, err := predicateFn(p); err == nil && retVal {
+			retVal, err := predicateFn(p)
+			if err != nil {
+				errOut <- fmt.Errorf("predicate function failed: %w", err)
+				return
+			}
+
+			if retVal {
 				b.logger.Debugf(
 					"BrowserContext:runWaitForEventHandler:go():EventBrowserContextPage:predicateFn:return",
 					"bctxid:%v", b.id,
