@@ -399,6 +399,18 @@ func (e *Exception) Value() Value {
 	return e.val
 }
 
+func (e *Exception) Unwrap() error {
+	if obj, ok := e.val.(*Object); ok {
+		if obj.runtime.getGoError().self.hasInstance(obj) {
+			if val := obj.Get("value"); val != nil {
+				e1, _ := val.Export().(error)
+				return e1
+			}
+		}
+	}
+	return nil
+}
+
 func (r *Runtime) createIterProto(val *Object) objectImpl {
 	o := newBaseObjectObj(val, r.global.ObjectPrototype, classObject)
 
