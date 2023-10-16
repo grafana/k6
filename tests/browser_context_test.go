@@ -694,33 +694,24 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
-		name            string
-		event           string
-		optsOrPredicate *optsOrPredicate
-		wantErr         string
+		name      string
+		event     string
+		predicate func(p *common.Page) (bool, error)
+		timeout   time.Duration
+		wantErr   string
 	}{
 		{
-			// No predicate or options.
-			name:  "success",
-			event: "page",
+			// No predicate and default timeout.
+			name:    "success",
+			event:   "page",
+			timeout: 30 * time.Second,
 		},
 		{
-			// With a predicate function but not options.
-			name:            "success_with_predicate",
-			event:           "page",
-			optsOrPredicate: &optsOrPredicate{justPredicate: stringPtr("() => true;")},
-		},
-		{
-			// With a predicate function in an option object.
-			name:            "success_with_option_predicate",
-			event:           "page",
-			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => true;")},
-		},
-		{
-			// With a predicate function and a new timeout in an option object.
-			name:            "success_with_option_predicate_timeout",
-			event:           "page",
-			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => true;"), timeout: int64Ptr(1000)},
+			// With a predicate function and default timeout.
+			name:      "success_with_predicate",
+			event:     "page",
+			predicate: func(p *common.Page) (bool, error) { return true, nil },
+			timeout:   30 * time.Second,
 		},
 		{
 			// Fails when an event other than "page" is passed in.
@@ -730,10 +721,11 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 		},
 		{
 			// Fails when the timeout fires while waiting on waitForEvent.
-			name:            "fails_timeout",
-			event:           "page",
-			optsOrPredicate: &optsOrPredicate{predicate: stringPtr("() => false;"), timeout: int64Ptr(10)},
-			wantErr:         "waitForEvent timed out after 10ms",
+			name:      "fails_timeout",
+			event:     "page",
+			predicate: func(p *common.Page) (bool, error) { return false, nil },
+			timeout:   10 * time.Millisecond,
+			wantErr:   "waitForEvent timed out after 10ms",
 		},
 	}
 
@@ -742,6 +734,9 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Parallel()
 
+			// Use withSkipClose() opt as we will close it manually to force the
+			// page.TaskQueue closing, which seems to be a requirement otherwise
+			// it doesn't complete the test.
 			tb := newTestBrowser(t)
 
 			bc, err := tb.NewContext(nil)
@@ -750,119 +745,50 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 			ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
 			defer cancel()
 
-			var p1, p2 *common.Page
-			// We need to run waitForEvent in parallel to the page creation.
-			// If we run them synchronously then waitForEvent will wait
-			// indefinitely and eventually the test will timeout.
-			err = tb.run(
-				ctx,
-				func() error {
-					op := optsOrPredicateToGojaValue(t, tb, tc.optsOrPredicate)
-					resp, err := bc.WaitForEvent(tc.event, op)
-					if resp != nil {
-						var ok bool
-						p1, ok = resp.(*common.Page)
-						require.True(t, ok)
-					}
-					return err
-				},
-				func() error {
-					var err error
-					p2, err = bc.NewPage()
-					return err
-				},
+			var (
+				aboutToCallWait = make(chan bool)
+				waitDone        = make(chan bool)
+				p1ID, p2ID      string
 			)
+
+			go func() {
+				defer close(waitDone)
+
+				var resp any
+				close(aboutToCallWait)
+				resp, err = bc.WaitForEvent(tc.event, tc.predicate, tc.timeout)
+				if resp != nil {
+					p, ok := resp.(*common.Page)
+					require.True(t, ok)
+
+					p1ID = p.MainFrame().ID()
+				}
+			}()
+
+			<-aboutToCallWait
+
+			if tc.wantErr == "" {
+				p, err := bc.NewPage()
+				require.NoError(t, err)
+
+				p2ID = p.MainFrame().ID()
+			}
+
+			select {
+			case <-waitDone:
+			case <-ctx.Done():
+				err = ctx.Err()
+			}
 
 			if tc.wantErr == "" {
 				assert.NoError(t, err)
 				// We want to make sure that the page that was created with
 				// newPage matches the return value from waitForEvent.
-				assert.Equal(t, p1.MainFrame().ID(), p2.MainFrame().ID())
+				assert.Equal(t, p1ID, p2ID)
 				return
 			}
 
 			assert.ErrorContains(t, err, tc.wantErr)
 		})
 	}
-}
-
-// optsOrPredicate is a helper type to enable us to package up the optional
-// arguments which could either be a predicate function, or the options object
-// which contains a predicate function and a timeout.
-type optsOrPredicate struct {
-	predicate     *string
-	timeout       *int64
-	justPredicate *string
-}
-
-func stringPtr(value string) *string {
-	strPointer := new(string)
-	*strPointer = value
-	return strPointer
-}
-
-func int64Ptr(value int64) *int64 {
-	int64Pointer := new(int64)
-	*int64Pointer = value
-	return int64Pointer
-}
-
-// optsOrPredicateToGojaValue will take optsOrPredicate and correctly define the
-// optional options where necessary. It will either return nil, a predicate
-// function or an options object.
-func optsOrPredicateToGojaValue(t *testing.T, tb *testBrowser, op *optsOrPredicate) goja.Value {
-	t.Helper()
-
-	// Options or predicate are undefined.
-	if op == nil {
-		return nil
-	}
-
-	// The optional argument is a predicate function.
-	if op.justPredicate != nil {
-		predicate, err := tb.runJavaScript(*op.justPredicate)
-		require.NoError(t, err)
-		return predicate
-	}
-
-	// The option argument is a options object with only the predicate function
-	// defined but no timeout.
-	if op.predicate != nil && op.timeout == nil {
-		predicate, err := tb.runJavaScript(*op.predicate)
-		require.NoError(t, err)
-
-		opts := tb.toGojaValue(struct {
-			Predicate goja.Value
-		}{
-			Predicate: predicate,
-		})
-
-		return opts.ToObject(tb.runtime())
-	}
-
-	// The option argument is a options object with only timeout.
-	if op.predicate == nil && op.timeout != nil {
-		opts := tb.toGojaValue(struct {
-			Timeout int64
-		}{
-			Timeout: *op.timeout,
-		})
-
-		return opts.ToObject(tb.runtime())
-	}
-
-	// The option argument is a options object with both a predicate function
-	// and a timeout.
-	predicate, err := tb.runJavaScript(*op.predicate)
-	require.NoError(t, err)
-
-	opts := tb.toGojaValue(struct {
-		Predicate goja.Value
-		Timeout   int64
-	}{
-		Predicate: predicate,
-		Timeout:   *op.timeout,
-	})
-
-	return opts.ToObject(tb.runtime())
 }
