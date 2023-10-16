@@ -169,7 +169,7 @@ func NewConfig() Config {
 		MetricPushInterval:    types.NewNullDuration(1*time.Second, false),
 		MetricPushConcurrency: null.NewInt(1, false),
 
-		TracesEnabled:         null.NewBool(false, false),
+		TracesEnabled:         null.NewBool(true, false),
 		TracesHost:            null.NewString("insights.k6.io:4443", false),
 		TracesPushInterval:    types.NewNullDuration(1*time.Second, false),
 		TracesPushConcurrency: null.NewInt(1, false),
