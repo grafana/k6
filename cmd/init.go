@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"path"
 	"text/template"
@@ -15,9 +14,7 @@ import (
 const defaultNewScriptName = "script.js"
 
 //nolint:gochecknoglobals
-var (
-	errFileExists            = errors.New("file already exists")
-	defaultNewScriptTemplate = template.Must(template.New("init").Parse(`import http from 'k6/http';
+var defaultNewScriptTemplate = template.Must(template.New("init").Parse(`import http from 'k6/http';
 import { sleep } from 'k6';
 
 export const options = {
@@ -30,7 +27,7 @@ export const options = {
   // test script in Grafana Cloud.
   //
   // See https://grafana.com/docs/grafana-cloud/k6/get-started/run-cloud-tests-from-the-cli/
-  // to learn about authoring and running k6 test scripts in Grafana Cloud.
+  // to learn about authoring and running k6 test scripts in Grafana k6 Cloud.
   //
   // cloud: {
   //   // The ID of the project to which the test is assigned in the k6 Cloud UI.
@@ -69,11 +66,10 @@ export const options = {
 // about authoring k6 scripts.
 //
 export default function() {
-  http.get('http://test.k6.io');
+  http.get('https://test.k6.io');
   sleep(1);
 }
 `))
-)
 
 type initScriptTemplateArgs struct {
 	ScriptName string
@@ -105,15 +101,16 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
 	}
 
 	if fileExists && !c.overwriteFiles {
-		c.gs.Logger.Errorf("%s already exists", target)
-		return errFileExists
+		return fmt.Errorf("%s already exists, please use the `--force` flag if you want overwrite it", target)
 	}
 
 	fd, err := c.gs.FS.Create(target)
 	if err != nil {
 		return err
 	}
-	defer fd.Close() //nolint:errcheck
+	defer func() {
+		_ = fd.Close() // we may think to check the error and log
+	}()
 
 	if err := defaultNewScriptTemplate.Execute(fd, initScriptTemplateArgs{
 		ScriptName: path.Base(target),
@@ -121,8 +118,7 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
 		return err
 	}
 
-	printToStdout(c.gs, fmt.Sprintf("Initialized a new k6 test script in %s.\n", target))
-	printToStdout(c.gs, fmt.Sprintf("You can now execute it by running `%s run %s`.\n", c.gs.BinaryName, target))
+	printToStdout(c.gs, fmt.Sprintf("Initialized a new k6 test script in %s. You can now execute it by running `%s run %s`.\n", target, c.gs.BinaryName, target))
 
 	return nil
 }
@@ -142,7 +138,7 @@ func getCmdInit(gs *state.GlobalState) *cobra.Command {
 
 	initCmd := &cobra.Command{
 		Use:   "init",
-		Short: "Initialize a new k6 script.",
+		Short: "Initialize a new k6 script",
 		Long: `Initialize a new k6 script.
 
 This command will create a minimal k6 script in the current directory and
