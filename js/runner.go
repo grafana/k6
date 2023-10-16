@@ -420,7 +420,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
-		return nil, err
+		return nil, deadlineError
 	}
 
 	if err != nil {
@@ -573,7 +573,7 @@ func (r *Runner) runPart(
 	v, _, _, err := vu.runFn(ctx, false, fn, nil, vu.Runtime.ToValue(arg))
 
 	if deadlineError := r.checkDeadline(ctx, name, v, err); deadlineError != nil {
-		return nil, err
+		return nil, deadlineError
 	}
 
 	return v, err

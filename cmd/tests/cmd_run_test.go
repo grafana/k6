@@ -2223,3 +2223,35 @@ func TestBrowserPermissions(t *testing.T) {
 		})
 	}
 }
+
+func TestSetupTimeout(t *testing.T) {
+	t.Parallel()
+	ts := NewGlobalTestState(t)
+	ts.ExpectedExitCode = int(exitcodes.SetupTimeout)
+	ts.CmdArgs = []string{"k6", "run", "-"}
+	ts.Stdin = bytes.NewBufferString(`
+		import { sleep } from 'k6';
+
+		export const options = {
+			setupTimeout: '1s',
+		};
+
+		export function setup() { sleep(100000); };
+		export default function() {}
+	`)
+
+	start := time.Now()
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	elapsed := time.Since(start)
+	assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of setupTimeout")
+	assert.Less(
+		t, elapsed, 2*time.Second,
+		"expected less time to have passed because setupTimeout ",
+	)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
+}
