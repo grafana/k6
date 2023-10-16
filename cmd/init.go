@@ -5,6 +5,7 @@ import (
 	"path"
 	"text/template"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.k6.io/k6/cmd/state"
@@ -118,7 +119,13 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
 		return err
 	}
 
-	printToStdout(c.gs, fmt.Sprintf("Initialized a new k6 test script in %s. You can now execute it by running `%s run %s`.\n", target, c.gs.BinaryName, target))
+	valueColor := getColor(c.gs.Flags.NoColor || !c.gs.Stdout.IsTTY, color.Bold)
+	printToStdout(c.gs, fmt.Sprintf(
+		"Initialized a new k6 test script in %s. You can now execute it by running `%s run %s`.\n",
+		valueColor.Sprint(target),
+		c.gs.BinaryName,
+		target,
+	))
 
 	return nil
 }
