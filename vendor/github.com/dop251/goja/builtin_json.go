@@ -316,7 +316,7 @@ func (ctx *_builtinJSON_stringifyContext) str(key Value, holder *Object) bool {
 			} else if v, ok := o1.origValue.Interface().(json.Marshaler); ok {
 				b, err := v.MarshalJSON()
 				if err != nil {
-					panic(err)
+					panic(ctx.r.NewGoError(err))
 				}
 				ctx.buf.Write(b)
 				ctx.allAscii = false
