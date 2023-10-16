@@ -99,7 +99,7 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 "reference_id": "cloud-create-test",
 "config": {
 	"metricPushInterval": "10ms",
-	"aggregationPeriod": "30ms"
+	"aggregationPeriod": "1s"
 }
 }`)
 		case "/v1/tests/cloud-create-test":
@@ -126,7 +126,7 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 	require.NoError(t, out.Start())
 
 	assert.Equal(t, types.NullDurationFrom(10*time.Millisecond), out.config.MetricPushInterval)
-	assert.Equal(t, types.NullDurationFrom(30*time.Millisecond), out.config.AggregationPeriod)
+	assert.Equal(t, types.NullDurationFrom(1*time.Second), out.config.AggregationPeriod)
 
 	// Assert that it overwrites only the provided values
 	expTimeout := types.NewNullDuration(60*time.Second, false)
