@@ -408,7 +408,7 @@ func (b *BrowserContext) waitForEvent(
 	ch := make(chan any)
 	errCh := make(chan error)
 
-	go b.runWaitForEventHandler(evCancelCtx, chEvHandler, ch, errCh, predicateFn)
+	go b.runWaitForEventHandler(evCancelCtx, chEvHandler, predicateFn, ch, errCh)
 
 	b.on(evCancelCtx, []string{EventBrowserContextPage}, chEvHandler)
 
@@ -430,7 +430,9 @@ func (b *BrowserContext) waitForEvent(
 // runWaitForEventHandler can work with a nil predicateFn. If predicateFn is
 // nil it will return the response straight away.
 func (b *BrowserContext) runWaitForEventHandler(
-	ctx context.Context, chEvHandler chan Event, out chan<- any, errOut chan<- error, predicateFn func(p *Page) (bool, error),
+	ctx context.Context,
+	chEvHandler chan Event, predicateFn func(p *Page) (bool, error),
+	out chan<- any, errOut chan<- error,
 ) {
 	b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():starts", "bctxid:%v", b.id)
 	defer b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():returns", "bctxid:%v", b.id)
