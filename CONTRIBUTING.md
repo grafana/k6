@@ -53,12 +53,6 @@ We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) to
 make lint
 ```
 
-You can also run the linter inside the docker container, which will benefit from the version of the linter being the same as it will be in CI.
-
-```bash
-make ci-like-lint
-```
-
 #### Running the test suite
 
 To exercise the entire test suite, please run the following command
