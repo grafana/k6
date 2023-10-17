@@ -162,7 +162,7 @@ type Config struct {
 
 // NewConfig creates a new Config instance with default values for some fields.
 func NewConfig() Config {
-	return Config{
+	c := Config{
 		Host:                  null.NewString("https://ingest.k6.io", false),
 		LogsTailURL:           null.NewString("wss://cloudlogs.k6.io/api/v1/tail", false),
 		WebAppURL:             null.NewString("https://app.k6.io", false),
@@ -176,26 +176,42 @@ func NewConfig() Config {
 
 		MaxMetricSamplesPerPackage: null.NewInt(100000, false),
 		Timeout:                    types.NewNullDuration(1*time.Minute, false),
-		APIVersion:                 null.NewInt(1, false),
+		APIVersion:                 null.NewInt(2, false),
 
 		// The set value (1000) is selected for performance reasons.
 		// Any change to this value should be first discussed with internal stakeholders.
 		MaxTimeSeriesInBatch: null.NewInt(1000, false),
+		// TODO: the following values were used by the previous default version (v1).
+		// We decided to keep the same values mostly for having a smoother migration to v2.
+		// Because the previous version's aggregation config, a few lines below, is overwritten
+		// by the remote service with the same values that we are now setting here for v2.
+		// When the migration will be completed we may evaluate to re-discuss them
+		// as we may evaluate to reduce these values - especially the waiting period.
+		// A more specific request about waiting period is mentioned in the link below:
+		// https://github.com/grafana/k6/blob/44e1e63aadb66784ff0a12b8d9821a0fdc9e7467/output/cloud/expv2/collect.go#L72-L77
+		AggregationPeriod:     types.NewNullDuration(3*time.Second, false),
+		AggregationWaitPeriod: types.NewNullDuration(8*time.Second, false),
+	}
 
-		// Aggregation is disabled by default, since AggregationPeriod has no default value
-		// but if it's enabled manually or from the cloud service, those are the default values it will use:
-		AggregationCalcInterval:         types.NewNullDuration(3*time.Second, false),
-		AggregationWaitPeriod:           types.NewNullDuration(5*time.Second, false),
-		AggregationMinSamples:           null.NewInt(25, false),
-		AggregationOutlierAlgoThreshold: null.NewInt(75, false),
-		AggregationOutlierIqrRadius:     null.NewFloat(0.25, false),
+	if c.APIVersion.Int64 == 1 {
+		// Aggregation is disabled by default for legacy version, since AggregationPeriod has no default value
+		// but if it's enabled manually or from the cloud service and the cloud doesn't override the config then
+		// those are the default values it will use.
+		c.AggregationPeriod = types.NewNullDuration(0, false)
+		c.AggregationCalcInterval = types.NewNullDuration(3*time.Second, false)
+		c.AggregationWaitPeriod = types.NewNullDuration(5*time.Second, false)
+		c.AggregationMinSamples = null.NewInt(25, false)
+		c.AggregationOutlierAlgoThreshold = null.NewInt(75, false)
+		c.AggregationOutlierIqrRadius = null.NewFloat(0.25, false)
 
 		// Since we're measuring durations, the upper coefficient is slightly
 		// lower, since outliers from that side are more interesting than ones
 		// close to zero.
-		AggregationOutlierIqrCoefLower: null.NewFloat(1.5, false),
-		AggregationOutlierIqrCoefUpper: null.NewFloat(1.3, false),
+		c.AggregationOutlierIqrCoefLower = null.NewFloat(1.5, false)
+		c.AggregationOutlierIqrCoefUpper = null.NewFloat(1.3, false)
 	}
+
+	return c
 }
 
 // Apply saves config non-zero config values from the passed config in the receiver.
