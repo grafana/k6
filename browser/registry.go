@@ -13,11 +13,14 @@ import (
 	"sync/atomic"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
+	browsertrace "github.com/grafana/xk6-browser/trace"
 
 	k6event "go.k6.io/k6/event"
 	k6modules "go.k6.io/k6/js/modules"
@@ -346,6 +349,71 @@ func isBrowserIter(vu k6modules.VU) bool {
 	opts := k6ext.GetScenarioOpts(vu.Context(), vu)
 	_, ok := opts["type"] // Check if browser type option is set
 	return ok
+}
+
+// trace represents a traces registry entry which holds the
+// root span for the trace and a context that wraps that span.
+type trace struct {
+	ctx      context.Context
+	rootSpan oteltrace.Span
+}
+
+// tracesRegistry holds the traces for all iterations of a single VU.
+type tracesRegistry struct {
+	tracer *browsertrace.Tracer
+
+	mu sync.Mutex
+	m  map[int64]*trace
+}
+
+func newTracesRegistry(tracer *browsertrace.Tracer) *tracesRegistry {
+	return &tracesRegistry{
+		tracer: tracer,
+		m:      make(map[int64]*trace),
+	}
+}
+
+func (r *tracesRegistry) startIterationTrace(ctx context.Context, data k6event.IterData) context.Context {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if t, ok := r.m[data.Iteration]; ok {
+		return t.ctx
+	}
+
+	spanCtx, span := r.tracer.Start(ctx, "iteration", oteltrace.WithAttributes(
+		attribute.Int64("number", data.Iteration),
+		attribute.Int64("vu", int64(data.VUID)),
+		attribute.String("scenario", data.ScenarioName),
+	))
+
+	r.m[data.Iteration] = &trace{
+		ctx:      spanCtx,
+		rootSpan: span,
+	}
+
+	return spanCtx
+}
+
+func (r *tracesRegistry) endIterationTrace(iter int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if t, ok := r.m[iter]; ok {
+		t.rootSpan.End()
+		delete(r.m, iter)
+	}
+}
+
+func (r *tracesRegistry) stop() {
+	// End all iteration traces
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for k, v := range r.m {
+		v.rootSpan.End()
+		delete(r.m, k)
+	}
 }
 
 type taskQueueRegistry struct {
