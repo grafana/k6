@@ -23,7 +23,7 @@ type moduleVU struct {
 	*browserRegistry
 
 	tqMu *sync.RWMutex
-	tq   *taskqueue.TaskQueue
+	tq   map[string]*taskqueue.TaskQueue
 }
 
 // browser returns the VU browser instance for the current iteration.

@@ -435,8 +435,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		},
 		"close": func(opts goja.Value) error {
 			vu.tqMu.Lock()
-			if vu.tq != nil {
-				vu.tq.Close()
+			tq := vu.tq[p.GetTargetID()]
+			if tq != nil {
+				tq.Close()
+				delete(vu.tq, p.GetTargetID())
 			}
 			vu.tqMu.Unlock()
 
@@ -513,8 +515,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
 		"on": func(event string, handler goja.Callable) error {
 			vu.tqMu.Lock()
-			if vu.tq == nil {
-				vu.tq = taskqueue.New(vu.RegisterCallback)
+			tq := vu.tq[p.GetTargetID()]
+			if tq == nil {
+				tq = taskqueue.New(vu.RegisterCallback)
+				vu.tq[p.GetTargetID()] = tq
 			}
 			vu.tqMu.Unlock()
 
@@ -525,7 +529,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			}
 			runInTaskQueue := func(m *common.ConsoleMessage) {
 				vu.tqMu.RLock()
-				vu.tq.Queue(func() error {
+				tq.Queue(func() error {
 					if err := mapMsgAndHandleEvent(m); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
@@ -672,12 +676,6 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"waitForEvent": func(event string, optsOrPredicate goja.Value) *goja.Promise {
 			ctx := vu.Context()
 			return k6ext.Promise(ctx, func() (result any, reason error) {
-				vu.tqMu.Lock()
-				if vu.tq == nil {
-					vu.tq = taskqueue.New(vu.RegisterCallback)
-				}
-				vu.tqMu.Unlock()
-
 				parsedOpts := common.NewWaitForEventOptions(
 					bc.Timeout(),
 				)
@@ -688,6 +686,14 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if parsedOpts.PredicateFn != nil {
 					runInTaskQueue = func(p *common.Page) (bool, error) {
+						vu.tqMu.Lock()
+						tq := vu.tq[p.GetTargetID()]
+						if tq == nil {
+							tq = taskqueue.New(vu.RegisterCallback)
+							vu.tq[p.GetTargetID()] = tq
+						}
+						vu.tqMu.Unlock()
+
 						var rtn bool
 						var err error
 						// The function on the taskqueue runs in its own goroutine
@@ -695,7 +701,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 						// before returning the result to the caller.
 						c := make(chan bool)
 						vu.tqMu.RLock()
-						vu.tq.Queue(func() error {
+						tq.Queue(func() error {
 							var resp goja.Value
 							resp, err = parsedOpts.PredicateFn(vu.Runtime().ToValue(p))
 							rtn = resp.ToBoolean()

@@ -1270,6 +1270,12 @@ func (p *Page) Workers() []*Worker {
 	return workers
 }
 
+// GetTargetID retrieve the unique id that is associated to this page.
+// For internal use only.
+func (p *Page) GetTargetID() string {
+	return p.targetID.String()
+}
+
 func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	// If there are no handlers for EventConsoleAPICalled, return
 	p.eventHandlersMu.RLock()
