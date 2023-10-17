@@ -15,7 +15,7 @@ and code of conduct https://github.com/grafana/k6/blob/master/CODE_OF_CONDUCT.md
 
 - [ ] I have performed a self-review of my code.
 - [ ] I have added tests for my changes.
-- [ ] I have run linter locally (`make ci-like-lint`) and all checks pass.
+- [ ] I have run linter locally (`make lint`) and all checks pass.
 - [ ] I have run tests locally (`make tests`) and all tests pass.
 - [ ] I have commented on my code, particularly in hard-to-understand areas.
 <!-- - [ ] Any other relevant item -->
