@@ -67,6 +67,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 				VU:              vu,
 				pidRegistry:     m.PidRegistry,
 				browserRegistry: newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
+				tqMu:            &sync.RWMutex{},
 			}),
 			Devices: common.GetDevices(),
 		},

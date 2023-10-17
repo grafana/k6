@@ -434,9 +434,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			})
 		},
 		"close": func(opts goja.Value) error {
+			vu.tqMu.Lock()
 			if vu.tq != nil {
 				vu.tq.Close()
 			}
+			vu.tqMu.Unlock()
+
 			return p.Close(opts) //nolint:wrapcheck
 		},
 		"content":                 p.Content,
@@ -509,9 +512,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
 		"on": func(event string, handler goja.Callable) error {
+			vu.tqMu.Lock()
 			if vu.tq == nil {
 				vu.tq = taskqueue.New(vu.RegisterCallback)
 			}
+			vu.tqMu.Unlock()
 
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
@@ -519,12 +524,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 				return err
 			}
 			runInTaskQueue := func(m *common.ConsoleMessage) {
+				vu.tqMu.RLock()
 				vu.tq.Queue(func() error {
 					if err := mapMsgAndHandleEvent(m); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
 					return nil
 				})
+				vu.tqMu.RUnlock()
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck
@@ -665,9 +672,11 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"waitForEvent": func(event string, optsOrPredicate goja.Value) *goja.Promise {
 			ctx := vu.Context()
 			return k6ext.Promise(ctx, func() (result any, reason error) {
+				vu.tqMu.Lock()
 				if vu.tq == nil {
 					vu.tq = taskqueue.New(vu.RegisterCallback)
 				}
+				vu.tqMu.Unlock()
 
 				parsedOpts := common.NewWaitForEventOptions(
 					bc.Timeout(),
@@ -685,6 +694,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 						// so we need to use a channel to wait for it to complete
 						// before returning the result to the caller.
 						c := make(chan bool)
+						vu.tqMu.RLock()
 						vu.tq.Queue(func() error {
 							var resp goja.Value
 							resp, err = parsedOpts.PredicateFn(vu.Runtime().ToValue(p))
@@ -692,6 +702,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 							close(c)
 							return nil
 						})
+						vu.tqMu.RUnlock()
 						<-c
 
 						return rtn, err //nolint:wrapcheck

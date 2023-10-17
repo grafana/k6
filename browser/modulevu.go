@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"sync"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
@@ -21,7 +22,8 @@ type moduleVU struct {
 	*pidRegistry
 	*browserRegistry
 
-	tq *taskqueue.TaskQueue
+	tqMu *sync.RWMutex
+	tq   *taskqueue.TaskQueue
 }
 
 // browser returns the VU browser instance for the current iteration.
