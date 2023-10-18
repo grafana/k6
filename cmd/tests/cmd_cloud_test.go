@@ -3,8 +3,10 @@ package tests
 import (
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"path/filepath"
 	"testing"
 
@@ -13,6 +15,7 @@ import (
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/testutils"
 )
 
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
@@ -193,4 +196,97 @@ func TestCloudWithConfigOverride(t *testing.T) {
 	assert.Contains(t, stdout, `level=error msg="test debug message" source=grafana-k6-cloud`)
 	assert.Contains(t, stdout, `level=warning msg="test warning" source=grafana-k6-cloud`)
 	assert.Contains(t, stdout, `level=error msg="test error" source=grafana-k6-cloud`)
+}
+
+// TestCloudWithArchive tests that if k6 uses a static archive with the script inside that has cloud options like:
+//
+//	export let options = {
+//		ext: {
+//			loadimpact: {
+//				name: "my load test",
+//				projectID: 124,
+//				note: "lorem ipsum",
+//			},
+//		}
+//	};
+//
+// actually sends to the cloud the archive with the correct metadata (metadata.json), like:
+//
+//	"ext": {
+//		"loadimpact": {
+//	        "name": "my load test",
+//	        "note": "lorem ipsum",
+//	        "projectID": 124
+//	      }
+//	}
+func TestCloudWithArchive(t *testing.T) {
+	t.Parallel()
+
+	testRunID := 123
+	ts := NewGlobalTestState(t)
+
+	archiveUpload := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		// check the archive
+		file, _, err := req.FormFile("file")
+		assert.NoError(t, err)
+		assert.NotNil(t, file)
+
+		// temporary write the archive for file system
+		data, err := io.ReadAll(file)
+		assert.NoError(t, err)
+
+		tmpPath := filepath.Join(ts.Cwd, "archive_to_cloud.tar")
+		require.NoError(t, fsext.WriteFile(ts.FS, tmpPath, data, 0o644))
+
+		// check what inside
+		require.NoError(t, testutils.Untar(t, ts.FS, tmpPath, "tmp/"))
+
+		metadataRaw, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
+		require.NoError(t, err)
+
+		metadata := struct {
+			Options struct {
+				Ext struct {
+					LoadImpact struct {
+						Name      string `json:"name"`
+						Note      string `json:"note"`
+						ProjectID int    `json:"projectID"`
+					} `json:"loadimpact"`
+				} `json:"ext"`
+			} `json:"options"`
+		}{}
+
+		// then unpacked metadata should not contain any environment variables passed at the moment of archive creation
+		require.NoError(t, json.Unmarshal(metadataRaw, &metadata))
+		require.Equal(t, "my load test", metadata.Options.Ext.LoadImpact.Name)
+		require.Equal(t, "lorem ipsum", metadata.Options.Ext.LoadImpact.Note)
+		require.Equal(t, 124, metadata.Options.Ext.LoadImpact.ProjectID)
+
+		// respond with the test run ID
+		resp.WriteHeader(http.StatusOK)
+		_, err = fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
+		assert.NoError(t, err)
+	})
+
+	srv := getMockCloud(t, testRunID, archiveUpload, nil)
+
+	data, err := os.ReadFile(filepath.Join("testdata/archives", "archive_v0.46.0_with_loadimpact_option.tar")) //nolint:forbidigo // it's a test
+	require.NoError(t, err)
+
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "archive.tar"), data, 0o644))
+
+	ts.CmdArgs = []string{"k6", "cloud", "--verbose", "--log-output=stdout", "archive.tar"}
+	ts.Env["K6_SHOW_CLOUD_LOGS"] = "false" // no mock for the logs yet
+	ts.Env["K6_CLOUD_HOST"] = srv.URL
+	ts.Env["K6_CLOUD_TOKEN"] = "foo" // doesn't matter, we mock the cloud
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stdout := ts.Stdout.String()
+	t.Log(stdout)
+	assert.NotContains(t, stdout, `Not logged in`)
+	assert.Contains(t, stdout, `execution: cloud`)
+	assert.Contains(t, stdout, `hello world from archive`)
+	assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
+	assert.Contains(t, stdout, `test status: Finished`)
 }
