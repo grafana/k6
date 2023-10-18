@@ -716,7 +716,7 @@ func mapConsoleMessage(vu moduleVU, cm *common.ConsoleMessage) mapping {
 }
 
 // mapBrowser to the JS module.
-func mapBrowser(vu moduleVU) mapping {
+func mapBrowser(vu moduleVU) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
 		"context": func() (*common.BrowserContext, error) {
@@ -725,6 +725,13 @@ func mapBrowser(vu moduleVU) mapping {
 				return nil, err
 			}
 			return b.Context(), nil
+		},
+		"closeContext": func() error {
+			b, err := vu.browser()
+			if err != nil {
+				return err
+			}
+			return b.CloseContext() //nolint:wrapcheck
 		},
 		"isConnected": func() (bool, error) {
 			b, err := vu.browser()

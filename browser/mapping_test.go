@@ -244,6 +244,7 @@ func isCustomMapping(customMappings map[string]string, typ, method string) (stri
 type browserAPI interface {
 	Close()
 	Context() *common.BrowserContext
+	CloseContext()
 	IsConnected() bool
 	NewContext(opts goja.Value) (*common.BrowserContext, error)
 	NewPage(opts goja.Value) (*common.Page, error)
