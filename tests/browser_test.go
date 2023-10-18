@@ -343,3 +343,30 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 	err = p2.Close(nil)
 	require.NoError(t, err, "failed to close page #2")
 }
+
+func TestCloseContext(t *testing.T) {
+	t.Parallel()
+
+	t.Run("close_context", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		_, err := tb.NewContext(nil)
+		require.NoError(t, err)
+
+		assert.NotNil(t, tb.Context())
+
+		err = tb.CloseContext()
+		require.NoError(t, err)
+
+		assert.Nil(t, tb.Context())
+	})
+
+	t.Run("err_no_context", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		assert.Nil(t, tb.Context())
+		assert.Error(t, tb.CloseContext())
+	})
+}
