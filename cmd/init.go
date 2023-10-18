@@ -46,8 +46,12 @@ export const options = {
   //
   // scenarios: {
   //   // The scenario name appears in the result summary, tags, and so on.
-  //   SCENARIO NAME: {
-  //     // Mandatory parameter for browser-based tests.
+  //   // You can give the scenario any name, as long as each name in the script is unique.
+  //   ui: {
+  //     // Executor is a mandatory parameter for browser-based tests.
+  //     // Shared iterations in this case tells k6 to reuse VUs to execute iterations.
+  //     //
+  //     // See https://k6.io/docs/using-k6/scenarios/executors/ for other executor types.
   //     executor: 'shared-iterations',
   //     options: {
   //       browser: {
