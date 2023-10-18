@@ -65,11 +65,12 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
 		mod: &JSModule{
 			Browser: mapBrowserToGoja(moduleVU{
-				VU:              vu,
-				pidRegistry:     m.PidRegistry,
-				browserRegistry: newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
-				tqMu:            &sync.RWMutex{},
-				tq:              make(map[string]*taskqueue.TaskQueue),
+				VU:                vu,
+				pidRegistry:       m.PidRegistry,
+				browserRegistry:   newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
+				tqMu:              &sync.RWMutex{},
+				tq:                make(map[string]*taskqueue.TaskQueue),
+				taskQueueRegistry: newTaskQueueRegistry(vu),
 			}),
 			Devices: common.GetDevices(),
 		},
