@@ -30,13 +30,15 @@ export const options = {
   // See https://grafana.com/docs/grafana-cloud/k6/get-started/run-cloud-tests-from-the-cli/
   // to learn about authoring and running k6 test scripts in Grafana k6 Cloud.
   //
-  // cloud: {
-  //   // The ID of the project to which the test is assigned in the k6 Cloud UI.
-  //   // By default tests are executed in default project.
-  //   projectID: "",
-  //   // The name of the test in the k6 Cloud UI.
-  //   // Test runs with the same name will be grouped.
-  //   name: "{{ .ScriptName }}"
+  // ext: {
+  //   loadimpact: {
+  //     // The ID of the project to which the test is assigned in the k6 Cloud UI.
+  //     // By default tests are executed in default project.
+  //     projectID: "",
+  //     // The name of the test in the k6 Cloud UI.
+  //     // Test runs with the same name will be grouped.
+  //     name: "{{ .ScriptName }}"
+  //   }
   // },
 
   // Uncomment this section to enable the use of Browser API in your tests.
