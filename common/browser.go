@@ -486,6 +486,16 @@ func (b *Browser) Close() {
 	b.conn.Close()
 }
 
+// CloseContext is a short-cut function to close the current browser's context.
+// If there is no active browser context, it returns an error.
+func (b *Browser) CloseContext() error {
+	if b.context == nil {
+		return errors.New("cannot close context as none is active in browser")
+	}
+	b.context.Close()
+	return nil
+}
+
 // Context returns the current browser context or nil.
 func (b *Browser) Context() *BrowserContext {
 	return b.context
