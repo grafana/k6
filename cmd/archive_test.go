@@ -1,21 +1,16 @@
 package cmd
 
 import (
-	"archive/tar"
-	"bytes"
 	"encoding/json"
-	"errors"
-	"io"
-	"io/fs"
 	"os"
 	"path/filepath"
-	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/cmd/tests"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/testutils"
 )
 
 func TestArchiveThresholds(t *testing.T) {
@@ -108,7 +103,7 @@ func TestArchiveContainsEnv(t *testing.T) {
 	ts.CmdArgs = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", fileName}
 
 	newRootCommand(ts.GlobalState).execute()
-	require.NoError(t, untar(t, ts.FS, "archive.tar", "tmp/"))
+	require.NoError(t, testutils.Untar(t, ts.FS, "archive.tar", "tmp/"))
 
 	data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
 	require.NoError(t, err)
@@ -141,7 +136,7 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 	ts.CmdArgs = []string{"k6", "--env", "ENV1=lorem", "--env", "ENV2=ipsum", "archive", "--exclude-env-vars", fileName}
 
 	newRootCommand(ts.GlobalState).execute()
-	require.NoError(t, untar(t, ts.FS, "archive.tar", "tmp/"))
+	require.NoError(t, testutils.Untar(t, ts.FS, "archive.tar", "tmp/"))
 
 	data, err := fsext.ReadFile(ts.FS, "tmp/metadata.json")
 	require.NoError(t, err)
@@ -153,57 +148,4 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 	// then unpacked metadata should not contain any environment variables passed at the moment of archive creation
 	require.NoError(t, json.Unmarshal(data, &metadata))
 	require.Len(t, metadata.Env, 0)
-}
-
-// untar untars a `fileName` file to a `destination` path
-func untar(t *testing.T, fileSystem fsext.Fs, fileName string, destination string) error {
-	t.Helper()
-
-	archiveFile, err := fsext.ReadFile(fileSystem, fileName)
-	if err != nil {
-		return err
-	}
-
-	reader := bytes.NewBuffer(archiveFile)
-
-	tr := tar.NewReader(reader)
-
-	for {
-		header, err := tr.Next()
-		switch {
-		case errors.Is(err, io.EOF):
-			return nil
-		case err != nil:
-			return err
-		case header == nil:
-			continue
-		}
-
-		// as long as this code in a test helper, we can safely
-		// omit G305: File traversal when extracting zip/tar archive
-		target := filepath.Join(destination, header.Name) //nolint:gosec
-
-		switch header.Typeflag {
-		case tar.TypeDir:
-			if _, err := fileSystem.Stat(target); err != nil && !errors.Is(err, fs.ErrNotExist) {
-				return err
-			}
-
-			if err := fileSystem.MkdirAll(target, 0o755); err != nil {
-				return err
-			}
-		case tar.TypeReg:
-			f, err := fileSystem.OpenFile(target, syscall.O_CREAT|syscall.O_RDWR, fs.FileMode(header.Mode))
-			if err != nil {
-				return err
-			}
-			defer func() { _ = f.Close() }()
-
-			// as long as this code in a test helper, we can safely
-			// omit G110: Potential DoS vulnerability via decompression bomb
-			if _, err := io.Copy(f, tr); err != nil { //nolint:gosec
-				return err
-			}
-		}
-	}
 }
