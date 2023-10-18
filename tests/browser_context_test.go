@@ -794,3 +794,50 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 		})
 	}
 }
+
+func TestBrowserContextGrantPermissions(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name       string
+		permission string
+		wantErr    string
+	}{
+		{name: "geolocation", permission: "geolocation"},
+		{name: "midi", permission: "midi"},
+		{name: "midi-sysex", permission: "midi-sysex"},
+		{name: "notifications", permission: "notifications"},
+		{name: "camera", permission: "camera"},
+		{name: "microphone", permission: "microphone"},
+		{name: "background-sync", permission: "background-sync"},
+		{name: "ambient-light-sensor", permission: "ambient-light-sensor"},
+		{name: "accelerometer", permission: "accelerometer"},
+		{name: "gyroscope", permission: "gyroscope"},
+		{name: "magnetometer", permission: "magnetometer"},
+		{name: "accessibility-events", permission: "accessibility-events"},
+		{name: "clipboard-read", permission: "clipboard-read"},
+		{name: "clipboard-write", permission: "clipboard-write"},
+		{name: "payment-handler", permission: "payment-handler"},
+		{name: "fake-permission", permission: "fake-permission", wantErr: `"fake-permission" is an invalid permission`},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t)
+			bCtx, err := tb.NewContext(nil)
+			require.NoError(t, err)
+
+			err = bCtx.GrantPermissions([]string{tc.permission}, common.NewGrantPermissionsOptions())
+
+			if tc.wantErr == "" {
+				assert.NoError(t, err)
+				return
+			}
+
+			assert.EqualError(t, err, tc.wantErr)
+		})
+	}
+}
