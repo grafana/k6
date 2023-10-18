@@ -12,6 +12,8 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
@@ -344,4 +346,43 @@ func isBrowserIter(vu k6modules.VU) bool {
 	opts := k6ext.GetScenarioOpts(vu.Context(), vu)
 	_, ok := opts["type"] // Check if browser type option is set
 	return ok
+}
+
+type taskQueueRegistry struct {
+	vu k6modules.VU
+
+	tqMu sync.Mutex
+	tq   map[string]*taskqueue.TaskQueue
+}
+
+func newTaskQueueRegistry(vu k6modules.VU) *taskQueueRegistry {
+	return &taskQueueRegistry{
+		vu:   vu,
+		tqMu: sync.Mutex{},
+		tq:   make(map[string]*taskqueue.TaskQueue),
+	}
+}
+
+func (t *taskQueueRegistry) get(targetID string) *taskqueue.TaskQueue {
+	t.tqMu.Lock()
+	defer t.tqMu.Unlock()
+
+	tq := t.tq[targetID]
+	if tq == nil {
+		tq = taskqueue.New(t.vu.RegisterCallback)
+		t.tq[targetID] = tq
+	}
+
+	return tq
+}
+
+func (t *taskQueueRegistry) close(targetID string) {
+	t.tqMu.Lock()
+	defer t.tqMu.Unlock()
+
+	tq := t.tq[targetID]
+	if tq != nil {
+		tq.Close()
+		delete(t.tq, targetID)
+	}
 }
