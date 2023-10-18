@@ -234,25 +234,16 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 		"clipboard-write":      cdpbrowser.PermissionTypeClipboardSanitizedWrite,
 		"payment-handler":      cdpbrowser.PermissionTypePaymentHandler,
 	}
-	origin := ""
 
-	rt := b.vu.Runtime()
-	if gojaValueExists(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "origin" {
-				origin = opts.Get(k).String()
-				break
-			}
-		}
-	}
+	parsedOpts := NewGrantPermissionsOptions()
+	parsedOpts.Parse(b.ctx, opts)
 
 	perms := make([]cdpbrowser.PermissionType, 0, len(permissions))
 	for _, p := range permissions {
 		perms = append(perms, permsToProtocol[p])
 	}
 
-	action := cdpbrowser.GrantPermissions(perms).WithOrigin(origin).WithBrowserContextID(b.id)
+	action := cdpbrowser.GrantPermissions(perms).WithOrigin(parsedOpts.Origin).WithBrowserContextID(b.id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
 		k6ext.Panic(b.ctx, "internal error while granting browser permissions: %w", err)
 	}

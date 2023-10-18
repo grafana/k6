@@ -232,3 +232,29 @@ func (w *WaitForEventOptions) Parse(ctx context.Context, optsOrPredicate goja.Va
 
 	return nil
 }
+
+// GrantPermissionsOptions are the options used by the browserContext.grantPermissions
+// API.
+type GrantPermissionsOptions struct {
+	Origin string
+}
+
+// NewGrantPermissionsOptions creates a new instance of GrantPermissionsOptions.
+func NewGrantPermissionsOptions() *GrantPermissionsOptions {
+	return &GrantPermissionsOptions{}
+}
+
+// Parse will parse the options. It can parse origin out of the supplied object.
+func (g *GrantPermissionsOptions) Parse(ctx context.Context, opts goja.Value) {
+	rt := k6ext.Runtime(ctx)
+
+	if gojaValueExists(opts) {
+		opts := opts.ToObject(rt)
+		for _, k := range opts.Keys() {
+			if k == "origin" {
+				g.Origin = opts.Get(k).String()
+				break
+			}
+		}
+	}
+}
