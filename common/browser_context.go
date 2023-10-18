@@ -180,13 +180,15 @@ func (b *BrowserContext) Browser() *Browser {
 }
 
 // ClearPermissions clears any permission overrides.
-func (b *BrowserContext) ClearPermissions() {
+func (b *BrowserContext) ClearPermissions() error {
 	b.logger.Debugf("BrowserContext:ClearPermissions", "bctxid:%v", b.id)
 
 	action := cdpbrowser.ResetPermissions().WithBrowserContextID(b.id)
 	if err := action.Do(b.ctx); err != nil {
-		k6ext.Panic(b.ctx, "clearing permissions: %w", err)
+		return fmt.Errorf("clearing permissions: %w", err)
 	}
+
+	return nil
 }
 
 // Close shuts down the browser context.
