@@ -6,7 +6,6 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6error"
@@ -434,13 +433,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			})
 		},
 		"close": func(opts goja.Value) error {
-			vu.tqMu.Lock()
-			tq := vu.tq[p.GetTargetID()]
-			if tq != nil {
-				tq.Close()
-				delete(vu.tq, p.GetTargetID())
-			}
-			vu.tqMu.Unlock()
+			vu.taskQueueRegistry.close(p.GetTargetID())
 
 			return p.Close(opts) //nolint:wrapcheck
 		},
@@ -514,13 +507,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
 		"on": func(event string, handler goja.Callable) error {
-			vu.tqMu.Lock()
-			tq := vu.tq[p.GetTargetID()]
-			if tq == nil {
-				tq = taskqueue.New(vu.RegisterCallback)
-				vu.tq[p.GetTargetID()] = tq
-			}
-			vu.tqMu.Unlock()
+			tq := vu.taskQueueRegistry.get(p.GetTargetID())
 
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
@@ -528,14 +515,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 				return err
 			}
 			runInTaskQueue := func(m *common.ConsoleMessage) {
-				vu.tqMu.RLock()
 				tq.Queue(func() error {
 					if err := mapMsgAndHandleEvent(m); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
 					return nil
 				})
-				vu.tqMu.RUnlock()
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck
@@ -686,13 +671,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if parsedOpts.PredicateFn != nil {
 					runInTaskQueue = func(p *common.Page) (bool, error) {
-						vu.tqMu.Lock()
-						tq := vu.tq[p.GetTargetID()]
-						if tq == nil {
-							tq = taskqueue.New(vu.RegisterCallback)
-							vu.tq[p.GetTargetID()] = tq
-						}
-						vu.tqMu.Unlock()
+						tq := vu.taskQueueRegistry.get(p.GetTargetID())
 
 						var rtn bool
 						var err error
@@ -700,7 +679,6 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 						// so we need to use a channel to wait for it to complete
 						// before returning the result to the caller.
 						c := make(chan bool)
-						vu.tqMu.RLock()
 						tq.Queue(func() error {
 							var resp goja.Value
 							resp, err = parsedOpts.PredicateFn(vu.Runtime().ToValue(p))
@@ -708,7 +686,6 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 							close(c)
 							return nil
 						})
-						vu.tqMu.RUnlock()
 						<-c
 
 						return rtn, err //nolint:wrapcheck

@@ -8,7 +8,6 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
@@ -68,8 +67,6 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 				VU:                vu,
 				pidRegistry:       m.PidRegistry,
 				browserRegistry:   newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
-				tqMu:              &sync.RWMutex{},
-				tq:                make(map[string]*taskqueue.TaskQueue),
 				taskQueueRegistry: newTaskQueueRegistry(vu),
 			}),
 			Devices: common.GetDevices(),

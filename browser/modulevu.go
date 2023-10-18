@@ -2,9 +2,6 @@ package browser
 
 import (
 	"context"
-	"sync"
-
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -21,9 +18,6 @@ type moduleVU struct {
 
 	*pidRegistry
 	*browserRegistry
-
-	tqMu *sync.RWMutex
-	tq   map[string]*taskqueue.TaskQueue
 
 	*taskQueueRegistry
 }
