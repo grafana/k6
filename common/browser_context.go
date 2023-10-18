@@ -103,7 +103,10 @@ func NewBrowserContext(
 	}
 
 	if opts != nil && len(opts.Permissions) > 0 {
-		b.GrantPermissions(opts.Permissions, nil)
+		err := b.GrantPermissions(opts.Permissions, NewGrantPermissionsOptions())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	rt := b.vu.Runtime()
@@ -214,7 +217,7 @@ func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
-func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value) error {
+func (b *BrowserContext) GrantPermissions(permissions []string, parsedOpts *GrantPermissionsOptions) error {
 	b.logger.Debugf("BrowserContext:GrantPermissions", "bctxid:%v", b.id)
 
 	permsToProtocol := map[string]cdpbrowser.PermissionType{
@@ -234,9 +237,6 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 		"clipboard-write":      cdpbrowser.PermissionTypeClipboardSanitizedWrite,
 		"payment-handler":      cdpbrowser.PermissionTypePaymentHandler,
 	}
-
-	parsedOpts := NewGrantPermissionsOptions()
-	parsedOpts.Parse(b.ctx, opts)
 
 	perms := make([]cdpbrowser.PermissionType, 0, len(permissions))
 	for _, p := range permissions {

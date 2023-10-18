@@ -631,16 +631,21 @@ func mapWorker(vu moduleVU, w *common.Worker) mapping {
 func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
-		"addCookies":                  bc.AddCookies,
-		"addInitScript":               bc.AddInitScript,
-		"browser":                     bc.Browser,
-		"clearCookies":                bc.ClearCookies,
-		"clearPermissions":            bc.ClearPermissions,
-		"close":                       bc.Close,
-		"cookies":                     bc.Cookies,
-		"exposeBinding":               bc.ExposeBinding,
-		"exposeFunction":              bc.ExposeFunction,
-		"grantPermissions":            bc.GrantPermissions,
+		"addCookies":       bc.AddCookies,
+		"addInitScript":    bc.AddInitScript,
+		"browser":          bc.Browser,
+		"clearCookies":     bc.ClearCookies,
+		"clearPermissions": bc.ClearPermissions,
+		"close":            bc.Close,
+		"cookies":          bc.Cookies,
+		"exposeBinding":    bc.ExposeBinding,
+		"exposeFunction":   bc.ExposeFunction,
+		"grantPermissions": func(permissions []string, opts goja.Value) error {
+			parsedOpts := common.NewGrantPermissionsOptions()
+			parsedOpts.Parse(vu.Context(), opts)
+
+			return bc.GrantPermissions(permissions, parsedOpts) //nolint:wrapcheck
+		},
 		"newCDPSession":               bc.NewCDPSession,
 		"route":                       bc.Route,
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
