@@ -240,7 +240,11 @@ func (b *BrowserContext) GrantPermissions(permissions []string, parsedOpts *Gran
 
 	perms := make([]cdpbrowser.PermissionType, 0, len(permissions))
 	for _, p := range permissions {
-		perms = append(perms, permsToProtocol[p])
+		proto, ok := permsToProtocol[p]
+		if !ok {
+			return fmt.Errorf("%q is an invalid permission", p)
+		}
+		perms = append(perms, proto)
 	}
 
 	action := cdpbrowser.GrantPermissions(perms).WithOrigin(parsedOpts.Origin).WithBrowserContextID(b.id)
