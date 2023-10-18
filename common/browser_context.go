@@ -237,7 +237,7 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts goja.Value)
 	origin := ""
 
 	rt := b.vu.Runtime()
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if gojaValueExists(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "origin" {
