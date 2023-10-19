@@ -62,8 +62,8 @@ github.com/stretchr/objx v0.1.0/go.mod h1:HFkY916IF+rwdDfMAkV7OtwuqBVzrE8GR6GFx+
 github.com/stretchr/testify v1.7.0/go.mod h1:6Fq8oRcR53rry900zMqJjRRixrwX3KX962/h/Wwjteg=
 github.com/stretchr/testify v1.8.4 h1:CcVxjf3Q8PM0mHUKJCdn+eZZtm5yQwehR5yeSVQQcUk=
 github.com/stretchr/testify v1.8.4/go.mod h1:sz/lmYIOXD/1dqDmKjjqLyZ2RngseejIcXlSw2iwfAo=
-go.k6.io/k6 v0.46.1-0.20230921075448-d1c5ee8fb28d h1:kdmclPz24aZHg5cnsQiZ532zbxznLakCCgRCRCYIA+0=
-go.k6.io/k6 v0.46.1-0.20230921075448-d1c5ee8fb28d/go.mod h1:1KMBrxk7F8b5qj/2tVZ8jAOl1cAg8x7B2mbHo+9HnpI=
+go.k6.io/k6 v0.47.0 h1:o5rmxpFbdxzdL0xNqBtaGkHGzEnbnt8ixfBOxEGsHQY=
+go.k6.io/k6 v0.47.0/go.mod h1:ulXsmMVRoCZzqV/ZgMeifJ9A484pKadqGT2sfR3eKQg=
 golang.org/x/crypto v0.12.0 h1:tFM/ta59kqch6LlvYnPa0yx5a83cL2nHflFhYKvv9Yk=
 golang.org/x/net v0.14.0 h1:BONx9s002vGdD9umnlX1Po8vOZmrgH34qlHcD1MfK14=
 golang.org/x/sync v0.0.0-20181221193216-37e7f081c4d4/go.mod h1:RxMgew5VJxzue5/jJTE5uejpjVlOe/izrB70Jof72aM=
