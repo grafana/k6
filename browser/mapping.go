@@ -641,10 +641,10 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"exposeBinding":    bc.ExposeBinding,
 		"exposeFunction":   bc.ExposeFunction,
 		"grantPermissions": func(permissions []string, opts goja.Value) error {
-			parsedOpts := common.NewGrantPermissionsOptions()
-			parsedOpts.Parse(vu.Context(), opts)
+			pOpts := common.NewGrantPermissionsOptions()
+			pOpts.Parse(vu.Context(), opts)
 
-			return bc.GrantPermissions(permissions, parsedOpts) //nolint:wrapcheck
+			return bc.GrantPermissions(permissions, pOpts) //nolint:wrapcheck
 		},
 		"newCDPSession":               bc.NewCDPSession,
 		"route":                       bc.Route,
