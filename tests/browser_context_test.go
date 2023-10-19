@@ -777,7 +777,8 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 			select {
 			case <-waitDone:
 			case <-ctx.Done():
-				err = ctx.Err()
+				err := ctx.Err()
+				require.NoError(t, err)
 			}
 
 			if tc.wantErr == "" {
