@@ -841,3 +841,32 @@ func TestBrowserContextGrantPermissions(t *testing.T) {
 		})
 	}
 }
+
+func TestBrowserContextClearPermissions(t *testing.T) {
+	t.Parallel()
+
+	t.Run("no_permissions_set", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		bCtx, err := tb.NewContext(nil)
+		require.NoError(t, err)
+
+		err = bCtx.ClearPermissions()
+		assert.NoError(t, err)
+	})
+
+	t.Run("permissions_set", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		bCtx, err := tb.NewContext(nil)
+		require.NoError(t, err)
+
+		err = bCtx.GrantPermissions([]string{"geolocation"}, common.NewGrantPermissionsOptions())
+		require.NoError(t, err)
+
+		err = bCtx.ClearPermissions()
+		assert.NoError(t, err)
+	})
+}
