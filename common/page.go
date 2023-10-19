@@ -1270,9 +1270,9 @@ func (p *Page) Workers() []*Worker {
 	return workers
 }
 
-// GetTargetID retrieve the unique id that is associated to this page.
+// TargetID retrieve the unique id that is associated to this page.
 // For internal use only.
-func (p *Page) GetTargetID() string {
+func (p *Page) TargetID() string {
 	return p.targetID.String()
 }
 

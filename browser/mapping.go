@@ -433,7 +433,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			})
 		},
 		"close": func(opts goja.Value) error {
-			vu.taskQueueRegistry.close(p.GetTargetID())
+			vu.taskQueueRegistry.close(p.TargetID())
 
 			return p.Close(opts) //nolint:wrapcheck
 		},
@@ -507,7 +507,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
 		"on": func(event string, handler goja.Callable) error {
-			tq := vu.taskQueueRegistry.get(p.GetTargetID())
+			tq := vu.taskQueueRegistry.get(p.TargetID())
 
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
@@ -671,7 +671,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if parsedOpts.PredicateFn != nil {
 					runInTaskQueue = func(p *common.Page) (bool, error) {
-						tq := vu.taskQueueRegistry.get(p.GetTargetID())
+						tq := vu.taskQueueRegistry.get(p.TargetID())
 
 						var rtn bool
 						var err error
