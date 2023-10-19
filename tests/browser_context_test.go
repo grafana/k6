@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"testing"
@@ -748,18 +749,23 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 			var (
 				aboutToCallWait = make(chan bool)
 				waitDone        = make(chan bool)
+				errChan         = make(chan error)
 				p1ID, p2ID      string
 			)
 
 			go func() {
 				defer close(waitDone)
+				defer close(errChan)
 
 				var resp any
 				close(aboutToCallWait)
 				resp, err = bc.WaitForEvent(tc.event, tc.predicate, tc.timeout)
 				if resp != nil {
 					p, ok := resp.(*common.Page)
-					require.True(t, ok)
+					if !ok {
+						errChan <- errors.New("response from waitForEvent is not a page")
+						return
+					}
 
 					p1ID = p.MainFrame().ID()
 				}
@@ -776,6 +782,8 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 
 			select {
 			case <-waitDone:
+			case err := <-errChan:
+				require.NoError(t, err)
 			case <-ctx.Done():
 				err := ctx.Err()
 				require.NoError(t, err)
