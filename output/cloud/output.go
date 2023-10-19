@@ -77,7 +77,7 @@ func New(params output.Params) (output.Output, error) {
 
 // New creates a new cloud output.
 func newOutput(params output.Params) (*Output, error) {
-	conf, _, err := cloudapi.GetConsolidatedConfig(
+	conf, warn, err := cloudapi.GetConsolidatedConfig(
 		params.JSONConfig,
 		params.Environment,
 		params.ConfigArgument,
@@ -86,6 +86,10 @@ func newOutput(params output.Params) (*Output, error) {
 	)
 	if err != nil {
 		return nil, err
+	}
+
+	if warn != "" {
+		params.Logger.Warn(warn)
 	}
 
 	if err := validateRequiredSystemTags(params.ScriptOptions.SystemTags); err != nil {
@@ -98,7 +102,7 @@ func newOutput(params output.Params) (*Output, error) {
 		scriptPath := params.ScriptPath.String()
 		if scriptPath == "" {
 			// Script from stdin without a name, likely from stdin
-			return nil, errors.New("script name not set, please specify K6_CLOUD_NAME or options.ext.loadimpact.name")
+			return nil, errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
 		}
 
 		conf.Name = null.StringFrom(filepath.Base(scriptPath))
