@@ -111,13 +111,18 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 
 	// Cloud config
-	cloudConfig, _, err := cloudapi.GetConsolidatedConfig(
+	cloudConfig, warn, err := cloudapi.GetConsolidatedConfig(
 		test.derivedConfig.Collectors["cloud"], c.gs.Env, "", arc.Options.Cloud, arc.Options.External)
 	if err != nil {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
 		return errors.New("Not logged in, please use `k6 login cloud`.") //nolint:golint,revive,stylecheck
+	}
+
+	// Display config warning if needed
+	if warn != "" {
+		modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Warning: "+warn))
 	}
 
 	if cloudConfig.Token.Valid {

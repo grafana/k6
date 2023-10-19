@@ -55,10 +55,14 @@ This will set the default token used when just "k6 run -o cloud" is passed.`,
 
 			// We want to use this fully consolidated config for things like
 			// host addresses, so users can overwrite them with env vars.
-			consolidatedCurrentConfig, _, err := cloudapi.GetConsolidatedConfig(
+			consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
 				currentJSONConfigRaw, gs.Env, "", nil, nil)
 			if err != nil {
 				return err
+			}
+
+			if warn != "" {
+				gs.Logger.Warn(warn)
 			}
 
 			// But we don't want to save them back to the JSON file, we only
