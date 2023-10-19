@@ -233,8 +233,7 @@ func (w *WaitForEventOptions) Parse(ctx context.Context, optsOrPredicate goja.Va
 	return nil
 }
 
-// GrantPermissionsOptions are the options used by the browserContext.grantPermissions
-// API.
+// GrantPermissionsOptions is used by BrowserContext.GrantPermissions.
 type GrantPermissionsOptions struct {
 	Origin string
 }
