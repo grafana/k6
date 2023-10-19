@@ -187,7 +187,7 @@ func (b *BrowserContext) ClearPermissions() error {
 	b.logger.Debugf("BrowserContext:ClearPermissions", "bctxid:%v", b.id)
 
 	action := cdpbrowser.ResetPermissions().WithBrowserContextID(b.id)
-	if err := action.Do(b.ctx); err != nil {
+	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
 		return fmt.Errorf("clearing permissions: %w", err)
 	}
 
