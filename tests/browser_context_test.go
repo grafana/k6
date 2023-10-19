@@ -748,56 +748,49 @@ func TestBrowserContextWaitForEvent(t *testing.T) {
 
 			var (
 				aboutToCallWait = make(chan bool)
-				waitDone        = make(chan bool)
-				errChan         = make(chan error)
 				p1ID, p2ID      string
 			)
 
-			go func() {
-				defer close(waitDone)
-				defer close(errChan)
-
-				var resp any
-				close(aboutToCallWait)
-				resp, err = bc.WaitForEvent(tc.event, tc.predicate, tc.timeout)
-				if resp != nil {
-					p, ok := resp.(*common.Page)
-					if !ok {
-						errChan <- errors.New("response from waitForEvent is not a page")
-						return
+			err = tb.run(ctx,
+				func() error {
+					var resp any
+					close(aboutToCallWait)
+					resp, err := bc.WaitForEvent(tc.event, tc.predicate, tc.timeout)
+					if err != nil {
+						return err
 					}
 
+					p, ok := resp.(*common.Page)
+					if !ok {
+						return errors.New("response from waitForEvent is not a page")
+					}
 					p1ID = p.MainFrame().ID()
-				}
-			}()
 
-			<-aboutToCallWait
+					return nil
+				},
+				func() error {
+					<-aboutToCallWait
 
-			if tc.wantErr == "" {
-				p, err := bc.NewPage()
-				require.NoError(t, err)
+					if tc.wantErr == "" {
+						p, err := bc.NewPage()
+						require.NoError(t, err)
 
-				p2ID = p.MainFrame().ID()
-			}
+						p2ID = p.MainFrame().ID()
+					}
 
-			select {
-			case <-waitDone:
-			case err := <-errChan:
-				require.NoError(t, err)
-			case <-ctx.Done():
-				err := ctx.Err()
-				require.NoError(t, err)
-			}
+					return nil
+				},
+			)
 
-			if tc.wantErr == "" {
-				assert.NoError(t, err)
-				// We want to make sure that the page that was created with
-				// newPage matches the return value from waitForEvent.
-				assert.Equal(t, p1ID, p2ID)
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
 				return
 			}
 
-			assert.ErrorContains(t, err, tc.wantErr)
+			assert.NoError(t, err)
+			// We want to make sure that the page that was created with
+			// newPage matches the return value from waitForEvent.
+			assert.Equal(t, p1ID, p2ID)
 		})
 	}
 }
