@@ -217,7 +217,7 @@ func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
-func (b *BrowserContext) GrantPermissions(permissions []string, parsedOpts *GrantPermissionsOptions) error {
+func (b *BrowserContext) GrantPermissions(permissions []string, opts *GrantPermissionsOptions) error {
 	b.logger.Debugf("BrowserContext:GrantPermissions", "bctxid:%v", b.id)
 
 	permsToProtocol := map[string]cdpbrowser.PermissionType{
@@ -247,9 +247,9 @@ func (b *BrowserContext) GrantPermissions(permissions []string, parsedOpts *Gran
 		perms = append(perms, proto)
 	}
 
-	action := cdpbrowser.GrantPermissions(perms).WithOrigin(parsedOpts.Origin).WithBrowserContextID(b.id)
+	action := cdpbrowser.GrantPermissions(perms).WithOrigin(opts.Origin).WithBrowserContextID(b.id)
 	if err := action.Do(cdp.WithExecutor(b.ctx, b.browser.conn)); err != nil {
-		return fmt.Errorf("error granting browser permissions: %w", err)
+		return fmt.Errorf("granting browser permissions: %w", err)
 	}
 
 	return nil

@@ -239,12 +239,12 @@ type GrantPermissionsOptions struct {
 	Origin string
 }
 
-// NewGrantPermissionsOptions creates a new instance of GrantPermissionsOptions.
+// NewGrantPermissionsOptions returns a new GrantPermissionsOptions.
 func NewGrantPermissionsOptions() *GrantPermissionsOptions {
 	return &GrantPermissionsOptions{}
 }
 
-// Parse will parse the options. It can parse origin out of the supplied object.
+// Parse parses the options from opts if opts exists in the Goja runtime.
 func (g *GrantPermissionsOptions) Parse(ctx context.Context, opts goja.Value) {
 	rt := k6ext.Runtime(ctx)
 
