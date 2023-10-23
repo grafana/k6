@@ -240,7 +240,6 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 	var (
 		ok   bool
 		data k6event.IterData
-		ctx  = context.Background()
 	)
 
 	for e := range eventsCh {
@@ -279,7 +278,12 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 			// we have to initialize traces registry on the first VU iteration
 			// so we can get access to the k6 TracerProvider.
 			r.initTracesRegistry()
-			tracedCtx := r.tr.startIterationTrace(ctx, data)
+
+			// Wrap the tracer into the browser context to make it accessible for the other
+			// components that inherit the context so these can use it to trace their actions.
+			tracerCtx := common.WithTracer(context.Background(), r.tr.tracer)
+			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
+
 			b, err := r.buildFn(tracedCtx)
 			if err != nil {
 				e.Done()
