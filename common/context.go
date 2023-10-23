@@ -2,6 +2,8 @@ package common
 
 import (
 	"context"
+
+	browsertrace "github.com/grafana/xk6-browser/trace"
 )
 
 type ctxKey int
@@ -10,6 +12,7 @@ const (
 	ctxKeyBrowserOptions ctxKey = iota
 	ctxKeyHooks
 	ctxKeyIterationID
+	ctxKeyTracer
 )
 
 func WithHooks(ctx context.Context, hooks *Hooks) context.Context {
@@ -48,6 +51,23 @@ func GetBrowserOptions(ctx context.Context) *BrowserOptions {
 	}
 	if bo, ok := v.(*BrowserOptions); ok {
 		return bo
+	}
+	return nil
+}
+
+// WithTracer adds the given tracer to the context.
+func WithTracer(ctx context.Context, tracer *browsertrace.Tracer) context.Context {
+	return context.WithValue(ctx, ctxKeyTracer, tracer)
+}
+
+// GetTracer returns the tracer attached to the context, or nil if not found.
+func GetTracer(ctx context.Context) *browsertrace.Tracer {
+	v := ctx.Value(ctxKeyTracer)
+	if v == nil {
+		return nil
+	}
+	if tracer, ok := v.(*browsertrace.Tracer); ok {
+		return tracer
 	}
 	return nil
 }
