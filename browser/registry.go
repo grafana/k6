@@ -279,7 +279,8 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 			// we have to initialize traces registry on the first VU iteration
 			// so we can get access to the k6 TracerProvider.
 			r.initTracesRegistry()
-			b, err := r.buildFn(ctx)
+			tracedCtx := r.tr.startIterationTrace(ctx, data)
+			b, err := r.buildFn(tracedCtx)
 			if err != nil {
 				e.Done()
 				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
@@ -291,6 +292,7 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 			r.setBrowser(data.Iteration, b)
 		case k6event.IterEnd:
 			r.deleteBrowser(data.Iteration)
+			r.tr.endIterationTrace(data.Iteration)
 		default:
 			r.vu.State().Logger.Warnf("received unexpected event type: %v", e.Type)
 		}
