@@ -845,15 +845,33 @@ func TestBrowserContextGrantPermissions(t *testing.T) {
 func TestBrowserContextClearPermissions(t *testing.T) {
 	t.Parallel()
 
+	hasPermission := func(tb *testBrowser, p *common.Page, perm string) bool {
+		t.Helper()
+
+		js := fmt.Sprintf(`
+			(perm) => navigator.permissions.query(
+				{ name: %q }
+			).then(result => result.state)
+		`, perm)
+		v := p.Evaluate(tb.toGojaValue(js))
+
+		return tb.asGojaValue(v).String() == "granted"
+	}
+
 	t.Run("no_permissions_set", func(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t)
 		bCtx, err := tb.NewContext(nil)
 		require.NoError(t, err)
+		p, err := bCtx.NewPage()
+		require.NoError(t, err)
+
+		require.False(t, hasPermission(tb, p, "geolocation"))
 
 		err = bCtx.ClearPermissions()
 		assert.NoError(t, err)
+		require.False(t, hasPermission(tb, p, "geolocation"))
 	})
 
 	t.Run("permissions_set", func(t *testing.T) {
@@ -862,11 +880,17 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 		tb := newTestBrowser(t)
 		bCtx, err := tb.NewContext(nil)
 		require.NoError(t, err)
+		p, err := bCtx.NewPage()
+		require.NoError(t, err)
+
+		require.False(t, hasPermission(tb, p, "geolocation"))
 
 		err = bCtx.GrantPermissions([]string{"geolocation"}, common.NewGrantPermissionsOptions())
 		require.NoError(t, err)
+		require.True(t, hasPermission(tb, p, "geolocation"))
 
 		err = bCtx.ClearPermissions()
 		assert.NoError(t, err)
+		require.False(t, hasPermission(tb, p, "geolocation"))
 	})
 }
