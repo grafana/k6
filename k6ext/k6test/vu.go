@@ -19,6 +19,7 @@ import (
 	k6lib "go.k6.io/k6/lib"
 	k6executor "go.k6.io/k6/lib/executor"
 	k6testutils "go.k6.io/k6/lib/testutils"
+	k6trace "go.k6.io/k6/lib/trace"
 	k6metrics "go.k6.io/k6/metrics"
 )
 
@@ -131,7 +132,7 @@ type WithSamples chan k6metrics.SampleContainer
 // opts can be one of the following:
 //   - WithSamplesListener: a bidirectional channel that will be used to emit metrics.
 //   - env.LookupFunc: a lookup function that will be used to lookup environment variables.
-func NewVU(tb testing.TB, opts ...any) *VU {
+func NewVU(tb testing.TB, opts ...any) *VU { //nolint:funlen
 	tb.Helper()
 
 	var (
@@ -188,6 +189,7 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 		Samples:        samples,
 		Tags:           k6lib.NewVUStateTags(tags.With("group", root.Path)),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
+		TracerProvider: k6trace.NewNoopTracerProvider(),
 	}
 
 	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)

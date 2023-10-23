@@ -173,6 +173,9 @@ func (r *remoteRegistry) isRemoteBrowser() (string, bool) {
 type browserRegistry struct {
 	vu k6modules.VU
 
+	tr     *tracesRegistry
+	trInit sync.Once
+
 	mu sync.RWMutex
 	m  map[int64]*common.Browser
 
@@ -272,6 +275,10 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 
 		switch e.Type { //nolint:exhaustive
 		case k6event.IterStart:
+			// Because VU.State is nil when browser registry is initialized,
+			// we have to initialize traces registry on the first VU iteration
+			// so we can get access to the k6 TracerProvider.
+			r.initTracesRegistry()
 			b, err := r.buildFn(ctx)
 			if err != nil {
 				e.Done()
@@ -339,6 +346,17 @@ func (r *browserRegistry) clear() {
 		b.Close()
 		delete(r.m, id)
 	}
+}
+
+// initTracesRegistry must only be called within an iteration execution,
+// as it requires access to the k6 TracerProvider which is only accessible
+// through the VU.State during the iteration execution time span.
+func (r *browserRegistry) initTracesRegistry() {
+	// Use a sync.Once so the traces registry is only initialized once
+	// per VU, as that is the scope for both browser and traces registry.
+	r.trInit.Do(func() {
+		r.tr = newTracesRegistry(browsertrace.NewTracer(r.vu.State().TracerProvider))
+	})
 }
 
 func (r *browserRegistry) stop() {
