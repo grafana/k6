@@ -314,6 +314,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		NumEntries     json.Number
 		NavigationType string
 		URL            string
+		SpanID         string
 	}{}
 
 	if err := json.Unmarshal([]byte(object), &wv); err != nil {
@@ -348,6 +349,11 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 			},
 		},
 	})
+
+	_, span := GetTracer(fs.ctx).TraceEvent(
+		fs.ctx, fs.targetID.String(), "web_vital", wv.SpanID,
+		trace.WithAttributes(attribute.Float64(wv.Name, value), attribute.String("rating", wv.Rating)))
+	defer span.End()
 
 	return nil
 }
