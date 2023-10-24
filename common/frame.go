@@ -790,6 +790,24 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	return result
 }
 
+// EvaluateGlobal will evaluate the given JS code in the global object.
+func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
+	action := runtime.Evaluate(js).WithAwaitPromise(true)
+
+	var (
+		exceptionDetails *runtime.ExceptionDetails
+		err              error
+	)
+	if _, exceptionDetails, err = action.Do(cdp.WithExecutor(ctx, f.manager.session)); err != nil {
+		return fmt.Errorf("evaluating JS in global context: %w", err)
+	}
+	if exceptionDetails != nil {
+		return fmt.Errorf("%s", parseExceptionDetails(exceptionDetails))
+	}
+
+	return nil
+}
+
 // EvaluateHandle will evaluate provided page function within an execution context.
 func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle JSHandleAPI, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
