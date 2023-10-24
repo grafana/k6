@@ -20,6 +20,8 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -656,6 +658,8 @@ func (p *Page) Click(selector string, opts goja.Value) error {
 // Close closes the page.
 func (p *Page) Close(opts goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
+	_, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.close")
+	defer span.End()
 
 	// forcing the pagehide event to trigger web vitals metrics.
 	v := p.vu.Runtime().ToValue(`() => window.dispatchEvent(new Event('pagehide'))`)
@@ -860,6 +864,13 @@ func (p *Page) GoForward(_ goja.Value) *Response {
 // Goto will navigate the page to the specified URL and return a HTTP response object.
 func (p *Page) Goto(url string, opts goja.Value) (*Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
+	_, span := GetTracer(p.ctx).TraceAPICall(
+		p.ctx,
+		p.targetID.String(),
+		"page.goto",
+		trace.WithAttributes(attribute.String("url", url)),
+	)
+	defer span.End()
 
 	return p.MainFrame().Goto(url, opts)
 }
@@ -1010,6 +1021,8 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 // Reload will reload the current page.
 func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
+	_, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
+	defer span.End()
 
 	parsedOpts := NewPageReloadOptions(
 		LifecycleEventLoad,
@@ -1277,6 +1290,8 @@ func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 func (p *Page) WaitForNavigation(opts goja.Value) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
+	_, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
+	defer span.End()
 
 	return p.frameManager.MainFrame().WaitForNavigation(opts)
 }
