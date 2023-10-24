@@ -59,24 +59,13 @@
         return JSON.stringify(results, null, 4);
     };
 
-    return function (exportedSummaryCallback, jsonSummaryPath, data) {
-        var getDefaultSummary = function () {
+    return function (summaryCallbackResult, jsonSummaryPath, data) {
+        var result = summaryCallbackResult;
+        if (!result) {
             var enableColors = (!data.options.noColor && data.state.isStdOutTTY);
-            return {
-                'stdout': '\n' + jslib.textSummary(data, { indent: ' ', enableColors: enableColors }) + '\n\n',
+            result = {
+                'stdout': '\n' + jslib.textSummary(data, {indent: ' ', enableColors: enableColors}) + '\n\n',
             };
-        };
-
-        var result = {};
-        if (exportedSummaryCallback) {
-            try {
-                result = exportedSummaryCallback(data);
-            } catch (e) {
-                console.error('handleSummary() failed with error "' + e + '", falling back to the default summary');
-                result = getDefaultSummary();
-            }
-        } else {
-            result = getDefaultSummary();
         }
 
         // TODO: ensure we're returning a map of strings or null/undefined...

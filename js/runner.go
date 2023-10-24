@@ -388,19 +388,25 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		return nil, err
 	}
 
-	handleSummaryFn := goja.Undefined()
-	fn := vu.getExported(consts.HandleSummaryFn)
-	if _, ok := goja.AssertFunction(fn); ok {
-		handleSummaryFn = fn
-	} else if fn != nil {
-		return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
-	}
-
 	go func() {
 		<-summaryCtx.Done()
 		vu.Runtime.Interrupt(context.Canceled)
 	}()
 	vu.moduleVUImpl.ctx = summaryCtx
+
+	callbackResult := goja.Undefined()
+	fn := vu.getExported(consts.HandleSummaryFn)
+	if fn != nil {
+		if handleSummaryFn, ok := goja.AssertFunction(fn); ok {
+			callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
+			if err != nil {
+				errext.Fprint(r.preInitState.Logger, err)
+
+			}
+		} else if fn != nil {
+			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
+		}
+	}
 
 	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", jslibSummaryCode, 1)
 	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
@@ -413,7 +419,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 	}
 
 	wrapperArgs := []goja.Value{
-		handleSummaryFn,
+		callbackResult,
 		vu.Runtime.ToValue(r.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
 		vu.Runtime.ToValue(summaryDataForJS),
 	}
