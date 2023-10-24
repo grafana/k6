@@ -401,7 +401,6 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 			callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
 			if err != nil {
 				errext.Fprint(r.preInitState.Logger, err)
-
 			}
 		} else if fn != nil {
 			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
