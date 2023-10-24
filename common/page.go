@@ -658,7 +658,7 @@ func (p *Page) Click(selector string, opts goja.Value) error {
 // Close closes the page.
 func (p *Page) Close(opts goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
-	_, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.close")
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
 	defer span.End()
 
 	// forcing the pagehide event to trigger web vitals metrics.
@@ -864,7 +864,7 @@ func (p *Page) GoForward(_ goja.Value) *Response {
 // Goto will navigate the page to the specified URL and return a HTTP response object.
 func (p *Page) Goto(url string, opts goja.Value) (*Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
-	_, span := GetTracer(p.ctx).TraceAPICall(
+	_, span := TraceAPICall(
 		p.ctx,
 		p.targetID.String(),
 		"page.goto",
@@ -1021,7 +1021,7 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 // Reload will reload the current page.
 func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
-	_, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
 
 	parsedOpts := NewPageReloadOptions(
@@ -1106,7 +1106,7 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
-	spanCtx, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.screenshot")
+	spanCtx, span := TraceAPICall(p.ctx, p.targetID.String(), "page.screenshot")
 	defer span.End()
 
 	parsedOpts := NewPageScreenshotOptions()
@@ -1290,7 +1290,7 @@ func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 func (p *Page) WaitForNavigation(opts goja.Value) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
-	_, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
 	return p.frameManager.MainFrame().WaitForNavigation(opts)

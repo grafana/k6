@@ -39,7 +39,7 @@ func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *
 // Click on an element using locator's selector with strict mode on.
 func (l *Locator) Click(opts goja.Value) error {
 	l.log.Debugf("Locator:Click", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
-	_, span := GetTracer(l.ctx).TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.click")
+	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.click")
 	defer span.End()
 
 	copts := NewFrameClickOptions(l.frame.defaultTimeout())
@@ -497,7 +497,7 @@ func (l *Locator) Type(text string, opts goja.Value) {
 		"Locator:Type", "fid:%s furl:%q sel:%q text:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
 	)
-	_, span := GetTracer(l.ctx).TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.type")
+	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.type")
 	defer span.End()
 
 	var err error

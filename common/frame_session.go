@@ -350,7 +350,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		},
 	})
 
-	_, span := GetTracer(fs.ctx).TraceEvent(
+	_, span := TraceEvent(
 		fs.ctx, fs.targetID.String(), "web_vital", wv.SpanID,
 		trace.WithAttributes(attribute.Float64(wv.Name, value), attribute.String("rating", wv.Rating)))
 	defer span.End()
@@ -751,7 +751,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 	// Trace navigation only for the main frame.
 	// TODO: How will this affect sub frames such as iframes?
 	if isMainFrame := frame.ParentID == ""; isMainFrame {
-		_, fs.mainFrameSpan = GetTracer(fs.ctx).TraceNavigation(
+		_, fs.mainFrameSpan = TraceNavigation(
 			fs.ctx, fs.targetID.String(), frame.URL,
 			trace.WithAttributes(attribute.String("url", frame.URL)),
 		)

@@ -1171,7 +1171,7 @@ func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Posi
 }
 
 func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
-	spanCtx, span := GetTracer(h.ctx).TraceAPICall(
+	spanCtx, span := TraceAPICall(
 		h.ctx,
 		h.frame.page.targetID.String(),
 		"elementHandle.screenshot",

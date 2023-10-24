@@ -264,7 +264,7 @@ func (b *BrowserContext) NewCDPSession() any { // TODO: implement
 // NewPage creates a new page inside this browser context.
 func (b *BrowserContext) NewPage() (*Page, error) {
 	b.logger.Debugf("BrowserContext:NewPage", "bctxid:%v", b.id)
-	_, span := GetTracer(b.ctx).TraceAPICall(b.ctx, "", "browserContext.newPage")
+	_, span := TraceAPICall(b.ctx, "", "browserContext.newPage")
 	defer span.End()
 
 	p, err := b.browser.newPageInContext(b.id)
