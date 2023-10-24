@@ -301,6 +301,62 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("read called concurrently should safely modify the buffer read into", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			let file = await fs.open(%q);
+
+			let buffer = new Uint8Array(4)
+			let p1 = file.read(buffer);
+			let p2 = file.read(buffer);
+
+			await Promise.all([p1, p2]);
+
+			throw buffer
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
+	// t.Run("read shouldn't be affected by buffer changes before resolution", func(t *testing.T) {
+	// 	t.Parallel()
+
+	// 	runtime, err := newConfiguredRuntime(t)
+	// 	require.NoError(t, err)
+
+	// 	testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+	// 	fs := newTestFs(t, func(fs afero.Fs) error {
+	// 		return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+	// 	})
+	// 	runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+	// 	_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+	// 		let file = await fs.open(%q);
+
+	// 		let buffer = new Uint8Array(5);
+	// 		let p1 = file.read(buffer);
+	// 		buffer[0] = 3;
+
+	// 		const bufferCopy = buffer;
+
+	// 		await p1;
+
+	// 		throw 'buffer before awaited read:' + bufferCopy + ', buffer after await: ' + buffer
+	// 	`, testFilePath)))
+
+	// 	assert.NoError(t, err)
+	// })
+
 	t.Run("read called with invalid argument should fail", func(t *testing.T) {
 		t.Parallel()
 

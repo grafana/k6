@@ -133,12 +133,14 @@ func (mi *ModuleInstance) openImpl(path string) (*File, error) {
 		return nil, err
 	}
 
+	file := file{
+		path: path,
+		data: data,
+	}
+
 	return &File{
-		Path: path,
-		file: file{
-			path: path,
-			data: data,
-		},
+		Path:     path,
+		file:     file,
 		vu:       mi.vu,
 		registry: mi.cache,
 	}, nil
@@ -187,7 +189,16 @@ func (f *File) Stat() *goja.Promise {
 // It is possible for a read to successfully return with 0 bytes.
 // This does not indicate EOF.
 func (f *File) Read(into goja.Value) *goja.Promise {
-	promise, resolve, reject := promises.New(f.vu)
+	// FIXME: HACK?!
+	promise, resolveFunc, rejectFunc := f.vu.Runtime().NewPromise()
+	callback := f.vu.RegisterCallback()
+
+	reject := func(reason any) {
+		callback(func() error {
+			rejectFunc(reason)
+			return nil
+		})
+	}
 
 	if common.IsNullish(into) {
 		reject(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
@@ -214,10 +225,21 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	// in place.
 	buffer := ab.Bytes()
 
+	intoCopy := make([]byte, len(buffer))
+	_ = copy(intoCopy, buffer)
+
 	go func() {
-		n, err := f.file.Read(buffer)
+		n, err := f.file.Read(intoCopy)
 		if err == nil {
-			resolve(n)
+			// RESOLVE
+			func(result any) {
+				callback(func() error {
+					_ = copy(buffer, intoCopy)
+					resolveFunc(result)
+					return nil
+				})
+			}(n)
+
 			return
 		}
 
@@ -235,9 +257,22 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 		isFsErr := errors.As(err, &fsErr)
 		if isFsErr {
 			if fsErr.kind == EOFError && n == 0 {
-				resolve(nil)
+				// RESOLVE
+				func(result any) {
+					callback(func() error {
+						resolveFunc(result)
+						return nil
+					})
+				}(nil)
+				// resolve(nil)
 			} else {
-				resolve(n)
+				// RESOLVE
+				func(result any) {
+					callback(func() error {
+						resolveFunc(result)
+						return nil
+					})
+				}(n)
 			}
 		} else {
 			reject(err)
@@ -287,7 +322,7 @@ func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 	}
 
 	go func() {
-		newOffset, err := f.file.Seek(int(intOffset), seekMode)
+		newOffset, err := f.file.Seek(intOffset, seekMode)
 		if err != nil {
 			reject(err)
 			return
