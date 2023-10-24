@@ -749,6 +749,33 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 			fs.ctx, fs.targetID.String(), frame.URL,
 			trace.WithAttributes(attribute.String("url", frame.URL)),
 		)
+
+		var (
+			spanID   = fs.mainFrameSpan.SpanContext().SpanID().String()
+			newFrame = fs.manager.getFrameByID(frame.ID)
+		)
+		// Set k6SpanId property in the page so it can be retrieved when pushing
+		// the Web Vitals events from the page execution context and used to
+		// correlate them with the navigation span to which they belong to.
+		if newFrame != nil {
+			// Executing a CDP command in the event parsing goroutine might deadlock in some cases.
+			// For example a deadlock happens if the content loaded in the frame that has navigated
+			// includes a JavaScript initiated dialog which we have to explicitly accept or dismiss
+			// (see onEventJavascriptDialogOpening). In that case our EvaluateGlobal call can't be
+			// executed, as the browser is waiting for us to accept/dismiss the JS dialog, but we
+			// can't act on that because the event parsing goroutine is stuck in onFrameNavigated.
+			// Because in this case the action is to set an attribute to the global object (window)
+			// it should be safe to just execute this in a separate goroutine.
+			go func() {
+				js := fmt.Sprintf("window.k6SpanId = '%s';", spanID)
+				err := newFrame.EvaluateGlobal(fs.ctx, js)
+				if err != nil {
+					fs.logger.Errorf(
+						"FrameSession:onFrameNavigated", "error on evaluating window.k6SpanId: %v", err,
+					)
+				}
+			}()
+		}
 	}
 }
 
