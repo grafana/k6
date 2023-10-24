@@ -509,6 +509,9 @@ func (b *Browser) IsConnected() bool {
 
 // NewContext creates a new incognito-like browser context.
 func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
+	_, span := GetTracer(b.ctx).TraceAPICall(b.ctx, "", "browser.newContext")
+	defer span.End()
+
 	if b.context != nil {
 		return nil, errors.New("existing browser context must be closed before creating a new one")
 	}
@@ -539,6 +542,9 @@ func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 
 // NewPage creates a new tab in the browser window.
 func (b *Browser) NewPage(opts goja.Value) (*Page, error) {
+	_, span := GetTracer(b.ctx).TraceAPICall(b.ctx, "", "browser.newPage")
+	defer span.End()
+
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
 		return nil, fmt.Errorf("new page: %w", err)
