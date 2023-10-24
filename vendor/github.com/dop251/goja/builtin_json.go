@@ -359,7 +359,7 @@ func (ctx *_builtinJSON_stringifyContext) str(key Value, holder *Object) bool {
 		ctx.buf.WriteString("null")
 	case *Object:
 		for _, object := range ctx.stack {
-			if value1 == object {
+			if value1.SameAs(object) {
 				ctx.r.typeErrorResult(true, "Converting circular structure to JSON")
 			}
 		}
