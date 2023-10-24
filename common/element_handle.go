@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/common/js"
-	"github.com/grafana/xk6-browser/k6ext"
-
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/grafana/xk6-browser/common/js"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 const resultDone = "done"
@@ -1170,13 +1171,21 @@ func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Posi
 }
 
 func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
+	spanCtx, span := GetTracer(h.ctx).TraceAPICall(
+		h.ctx,
+		h.frame.page.targetID.String(),
+		"elementHandle.screenshot",
+	)
+	defer span.End()
+
 	rt := h.execCtx.vu.Runtime()
 	parsedOpts := NewElementHandleScreenshotOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
 		k6ext.Panic(h.ctx, "parsing screenshot options: %w", err)
 	}
+	span.SetAttributes(attribute.String("path", parsedOpts.Path))
 
-	s := newScreenshotter(h.ctx)
+	s := newScreenshotter(spanCtx)
 	buf, err := s.screenshotElement(h, parsedOpts)
 	if err != nil {
 		k6ext.Panic(h.ctx, "taking screenshot: %w", err)

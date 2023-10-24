@@ -1093,11 +1093,16 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
+	spanCtx, span := GetTracer(p.ctx).TraceAPICall(p.ctx, p.targetID.String(), "page.screenshot")
+	defer span.End()
+
 	parsedOpts := NewPageScreenshotOptions()
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
 		k6ext.Panic(p.ctx, "parsing screenshot options: %w", err)
 	}
-	s := newScreenshotter(p.ctx)
+	span.SetAttributes(attribute.String("path", parsedOpts.Path))
+
+	s := newScreenshotter(spanCtx)
 	buf, err := s.screenshotPage(p, parsedOpts)
 	if err != nil {
 		k6ext.Panic(p.ctx, "capturing screenshot: %w", err)
