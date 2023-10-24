@@ -698,5 +698,6 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	assert.Equal(t, 1, len(logErrors))
 	errMsg, err := logErrors[0].String()
 	require.NoError(t, err)
-	assert.Contains(t, errMsg, "intentional error")
+	assert.Contains(t, errMsg, "\"Error: intentional error\\n\\tat file:///script.js:5:11(3)\\n")
+	assert.Equal(t, logErrors[0].Data, logrus.Fields{"hint": "script exception"})
 }

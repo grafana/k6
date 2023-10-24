@@ -112,9 +112,10 @@ func (c *rootCommand) execute() {
 		exitCode = int(ecerr.ExitCode())
 	}
 
-	errext.Fprint(c.globalState.Logger, err)
+	errText, fields := errext.Format(err)
+	c.globalState.Logger.WithFields(fields).Error(errText)
 	if c.loggerIsRemote {
-		errext.Fprint(c.globalState.FallbackLogger, err)
+		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
 	}
 }
 

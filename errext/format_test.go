@@ -1,61 +1,53 @@
 package errext_test
 
 import (
-	"bytes"
 	"errors"
 	"testing"
 
-	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
+
 	"go.k6.io/k6/errext"
 )
 
-func TestFprint(t *testing.T) {
+func TestFormat(t *testing.T) {
 	t.Parallel()
-
-	init := func() (*bytes.Buffer, logrus.FieldLogger) {
-		var buf bytes.Buffer
-		logger := logrus.New()
-		logger.Out = &buf
-		return &buf, logger
-	}
 
 	t.Run("Nil", func(t *testing.T) {
 		t.Parallel()
-		buf, logger := init()
-		errext.Fprint(logger, nil)
-		assert.Equal(t, "", buf.String())
+		errorText, fields := errext.Format(nil)
+		assert.Equal(t, "", errorText)
+		assert.Empty(t, fields)
 	})
 
 	t.Run("Simple", func(t *testing.T) {
 		t.Parallel()
-		buf, logger := init()
-		errext.Fprint(logger, errors.New("simple error"))
-		assert.Contains(t, buf.String(), "level=error msg=\"simple error\"")
+		errorText, fields := errext.Format(errors.New("simple error"))
+		assert.Equal(t, "simple error", errorText)
+		assert.Empty(t, fields)
 	})
 
 	t.Run("Exception", func(t *testing.T) {
 		t.Parallel()
-		buf, logger := init()
 		err := fakeException{error: errors.New("simple error"), stack: "stack trace"}
-		errext.Fprint(logger, err)
-		assert.Contains(t, buf.String(), "level=error msg=\"stack trace\"")
+		errorText, fields := errext.Format(err)
+		assert.Equal(t, "stack trace", errorText)
+		assert.Empty(t, fields)
 	})
 
 	t.Run("Hint", func(t *testing.T) {
 		t.Parallel()
-		buf, logger := init()
 		err := errext.WithHint(errors.New("error with hint"), "hint message")
-		errext.Fprint(logger, err)
-		assert.Contains(t, buf.String(), "level=error msg=\"error with hint\" hint=\"hint message\"")
+		errorText, fields := errext.Format(err)
+		assert.Equal(t, "error with hint", errorText)
+		assert.Equal(t, map[string]interface{}{"hint": "hint message"}, fields)
 	})
 
 	t.Run("ExceptionWithHint", func(t *testing.T) {
 		t.Parallel()
-		buf, logger := init()
 		err := fakeException{error: errext.WithHint(errors.New("error with hint"), "hint message"), stack: "stack trace"}
-		errext.Fprint(logger, err)
-		assert.Contains(t, buf.String(), "level=error msg=\"stack trace\" hint=\"hint message\"")
+		errorText, fields := errext.Format(err)
+		assert.Equal(t, "stack trace", errorText)
+		assert.Equal(t, map[string]interface{}{"hint": "hint message"}, fields)
 	})
 }
 

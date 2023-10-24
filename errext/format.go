@@ -2,16 +2,14 @@ package errext
 
 import (
 	"errors"
-
-	"github.com/sirupsen/logrus"
 )
 
-// Fprint formats the given error and writes it to l.
+// Format formats the given error and writes it to l.
 // In case of Exception, it uses the stack trace as the error message.
 // In case of HasHint, it also adds the hint as a field.
-func Fprint(l logrus.FieldLogger, err error) {
+func Format(err error) (string, map[string]interface{}) {
 	if err == nil {
-		return
+		return "", nil
 	}
 
 	errText := err.Error()
@@ -20,11 +18,11 @@ func Fprint(l logrus.FieldLogger, err error) {
 		errText = xerr.StackTrace()
 	}
 
-	fields := logrus.Fields{}
+	fields := make(map[string]interface{})
 	var herr HasHint
 	if errors.As(err, &herr) {
 		fields["hint"] = herr.Hint()
 	}
 
-	l.WithFields(fields).Error(errText)
+	return errText, fields
 }

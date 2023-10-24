@@ -397,13 +397,15 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 	callbackResult := goja.Undefined()
 	fn := vu.getExported(consts.HandleSummaryFn)
 	if fn != nil {
-		if handleSummaryFn, ok := goja.AssertFunction(fn); ok {
-			callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
-			if err != nil {
-				errext.Fprint(r.preInitState.Logger, err)
-			}
-		} else if fn != nil {
+		handleSummaryFn, ok := goja.AssertFunction(fn)
+		if !ok {
 			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
+		}
+
+		callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
+		if err != nil {
+			errText, fields := errext.Format(err)
+			r.preInitState.Logger.WithFields(fields).Error(errText)
 		}
 	}
 
