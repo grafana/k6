@@ -12,6 +12,8 @@ import (
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6metrics "go.k6.io/k6/metrics"
@@ -71,6 +73,10 @@ type FrameSession struct {
 	logger *log.Logger
 	// logger that will properly serialize RemoteObject instances
 	serializer *log.Logger
+
+	// Keep a reference to the main frame span so we can end it
+	// when FrameSession.ctx is Done
+	mainFrameSpan trace.Span
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
@@ -216,8 +222,16 @@ func (fs *FrameSession) initEvents() {
 	go func() {
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
-		defer fs.logger.Debugf("NewFrameSession:initEvents:go:return",
-			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		defer func() {
+			// If there is an active span for main frame,
+			// end it before exiting so it can be flushed
+			if fs.mainFrameSpan != nil {
+				fs.mainFrameSpan.End()
+				fs.mainFrameSpan = nil
+			}
+			fs.logger.Debugf("NewFrameSession:initEvents:go:return",
+				"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		}()
 
 		for {
 			select {
@@ -726,6 +740,15 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 	if err != nil {
 		k6ext.Panic(fs.ctx, "handling frameNavigated event to %q: %w",
 			frame.URL+frame.URLFragment, err)
+	}
+
+	// Trace navigation only for the main frame.
+	// TODO: How will this affect sub frames such as iframes?
+	if isMainFrame := frame.ParentID == ""; isMainFrame {
+		_, fs.mainFrameSpan = GetTracer(fs.ctx).TraceNavigation(
+			fs.ctx, fs.targetID.String(), frame.URL,
+			trace.WithAttributes(attribute.String("url", frame.URL)),
+		)
 	}
 }
 
