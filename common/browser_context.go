@@ -445,11 +445,6 @@ func (b *BrowserContext) runWaitForEventHandler(
 			b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():ctx:done", "bctxid:%v", b.id)
 			return
 		case ev := <-chEvHandler:
-			if ev.typ == EventBrowserContextClose {
-				b.logger.Debugf("BrowserContext:runWaitForEventHandler:go():EventBrowserContextClose:return", "bctxid:%v", b.id)
-				return
-			}
-
 			if ev.typ != EventBrowserContextPage {
 				continue
 			}
