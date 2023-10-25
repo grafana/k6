@@ -58,7 +58,7 @@ func (f *file) Read(into []byte) (n int, err error) {
 
 	n = copy(into, f.data[start:end])
 
-	f.offset.Store(int64(n))
+	f.offset.Store(offset + int64(n))
 
 	return n, err
 }
