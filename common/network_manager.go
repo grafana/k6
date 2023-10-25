@@ -394,14 +394,33 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 		}
 	}
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
+	m.deleteRequestByID(event.RequestID)
+	m.frameManager.requestFinished(req)
+
 	// Skip data and blob URLs when emitting metrics, since they're internal to the browser.
-	if !isInternalURL(req.url) {
+	if isInternalURL(req.url) {
+		return
+	}
+
+	emitResponseMetrics := func() {
 		req.responseMu.RLock()
 		m.emitResponseMetrics(req.response, req)
 		req.responseMu.RUnlock()
 	}
-	m.deleteRequestByID(event.RequestID)
-	m.frameManager.requestFinished(req)
+	if req.allowInterception {
+		// When request interception is enabled, we need to process requestPaused messages
+		// from CDP in order to get the response for the request. However, we can't process
+		// them until the request is unblocked. Since we're blocking the NetworkManager
+		// goroutine here, we need to spawn a new goroutine to allow the requestPaused
+		// messages to be processed by the NetworkManager.
+		//
+		// This happens when the main page request redirection before it finishes loading.
+		// So the new redirect request will be blocked until the main page finishes loading.
+		// The main page will wait forever since its subrequest is blocked.
+		go emitResponseMetrics()
+		return
+	}
+	emitResponseMetrics()
 }
 
 func isInternalURL(u *url.URL) bool {
