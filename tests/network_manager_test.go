@@ -1,9 +1,11 @@
 package tests
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -122,4 +124,78 @@ func TestBasicAuth(t *testing.T) {
 		require.NotNil(t, resp)
 		assert.Equal(t, http.StatusUnauthorized, int(resp.Status()))
 	})
+}
+
+// See issue #1072 for more details.
+func TestInterceptBeforePageLoad(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+
+	// changing the main frame to another URL will trigger a redirect
+	// before the page is loaded. this will cause a deadlock because
+	// the page's response body won't be available yet due to request
+	// interception.
+	//
+	// the reason for this is that the browser will intercept the
+	// request and pause it, but the response body won't be available
+	// until the page is loaded, which won't happen because the
+	// request is paused.
+	tb.withHandler("/neverFinishesLoading", func(w http.ResponseWriter, r *http.Request) {
+		const runBeforePageOnLoad = `
+			// immediately redirect to another page before the page is
+			// loaded. browsers wait for scripts to finish executing
+			// before firing the load event, so this will cause the
+			// page to never finish loading.
+			window.location.href='/trap';
+		`
+		fmt.Fprintf(w, `
+			<html>
+				<head>
+					<script>
+						%s
+					</script>
+				</head>
+				<body />
+			</html>
+		`, runBeforePageOnLoad)
+	})
+
+	// this handler will be called before the main page is loaded
+	tb.withHandler("/trap", func(w http.ResponseWriter, r *http.Request) {
+		fmt.Fprint(w, "ok")
+	})
+
+	// go to the main page and wait for the redirect to happen
+	// before the page is loaded (LifecycleEventDOMContentLoad).
+	gotoPage := func() error {
+		p := tb.NewPage(nil)
+
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventDOMContentLoad,
+			Timeout:   common.DefaultTimeout,
+		}
+		_, err := p.Goto(
+			tb.url("/neverFinishesLoading"),
+			tb.toGojaValue(opts),
+		)
+
+		return err
+	}
+
+	// enable interception to pause the redirect in the main page
+	blocked, err := k6types.NewNullHostnameTrie([]string{"foo.com"})
+	require.NoError(t, err)
+	tb.vu.State().Options.BlockedHostnames = blocked
+
+	// go to the main page and cut short with a timeout
+	// if it takes too long. in a buggy case, this will
+	// deadlock and never return.
+	//
+	// a five seconds timeout is plenty for this bug to
+	// manifest.
+	ctx, cancel := context.WithTimeout(tb.ctx, 5*time.Second)
+	defer cancel()
+	err = tb.run(ctx, gotoPage)
+	require.NoError(t, err)
 }
