@@ -3,8 +3,8 @@ module github.com/grafana/xk6-output-test
 go 1.19
 
 require (
-	github.com/spf13/afero v1.9.2
-	go.k6.io/k6 v0.46.0
+	github.com/spf13/afero v1.1.2
+	go.k6.io/k6 v0.47.0
 )
 
 require (
@@ -15,8 +15,8 @@ require (
 	github.com/mattn/go-isatty v0.0.19 // indirect
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd // indirect
 	github.com/sirupsen/logrus v1.9.3 // indirect
-	golang.org/x/sys v0.9.0 // indirect
-	golang.org/x/text v0.10.0 // indirect
+	golang.org/x/sys v0.11.0 // indirect
+	golang.org/x/text v0.12.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	gopkg.in/guregu/null.v3 v3.3.0 // indirect
 )
