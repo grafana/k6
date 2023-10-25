@@ -3,6 +3,7 @@ package fs
 import (
 	"io"
 	"path/filepath"
+	"sync/atomic"
 )
 
 // file is an abstraction for interacting with files.
@@ -13,7 +14,7 @@ type file struct {
 	data []byte
 
 	// offset holds the current offset in the file
-	offset int
+	offset atomic.Int64
 }
 
 // Stat returns a FileInfo describing the named file.
@@ -38,14 +39,16 @@ type FileInfo struct {
 //
 // If the end of the file has been reached, it returns EOFError.
 func (f *file) Read(into []byte) (n int, err error) {
-	start := f.offset
-	if start == len(f.data) {
+	offset := f.offset.Load()
+
+	start := offset
+	if start == f.size() {
 		return 0, newFsError(EOFError, "EOF")
 	}
 
-	end := f.offset + len(into)
-	if end > len(f.data) {
-		end = len(f.data)
+	end := offset + int64(len(into))
+	if end > f.size() {
+		end = f.size()
 		// We align with the [io.Reader.Read] method's behavior
 		// and return EOFError when we reach the end of the
 		// file, regardless of how much data we were able to
@@ -55,7 +58,7 @@ func (f *file) Read(into []byte) (n int, err error) {
 
 	n = copy(into, f.data[start:end])
 
-	f.offset += n
+	f.offset.Store(int64(n))
 
 	return n, err
 }
@@ -71,9 +74,10 @@ var _ io.Reader = (*file)(nil)
 //
 // When using SeekModeStart, the offset must be positive.
 // Negative offsets are allowed when using `SeekModeCurrent` or `SeekModeEnd`.
-func (f *file) Seek(offset int, whence SeekMode) (int, error) {
-	newOffset := f.offset
+func (f *file) Seek(offset int64, whence SeekMode) (int64, error) {
+	startingOffset := f.offset.Load()
 
+	newOffset := startingOffset
 	switch whence {
 	case SeekModeStart:
 		if offset < 0 {
@@ -88,7 +92,7 @@ func (f *file) Seek(offset int, whence SeekMode) (int, error) {
 			return 0, newFsError(TypeError, "offset cannot be positive when using SeekModeEnd")
 		}
 
-		newOffset = len(f.data) + offset
+		newOffset = f.size() + offset
 	default:
 		return 0, newFsError(TypeError, "invalid seek mode")
 	}
@@ -97,17 +101,19 @@ func (f *file) Seek(offset int, whence SeekMode) (int, error) {
 		return 0, newFsError(TypeError, "seeking before start of file")
 	}
 
-	if newOffset > len(f.data) {
+	if newOffset > f.size() {
 		return 0, newFsError(TypeError, "seeking beyond end of file")
 	}
 
 	// Note that the implementation assumes one `file` instance per file/vu.
 	// If that assumption was invalidated, we would need to atomically update
 	// the offset instead.
-	f.offset = newOffset
+	f.offset.Store(newOffset)
 
 	return newOffset, nil
 }
+
+var _ io.Seeker = (*file)(nil)
 
 // SeekMode is used to specify the seek mode when seeking in a file.
 type SeekMode = int
@@ -125,3 +131,7 @@ const (
 	// the end of the file.
 	SeekModeEnd
 )
+
+func (f *file) size() int64 {
+	return int64(len(f.data))
+}

@@ -18,7 +18,7 @@ func TestFileImpl(t *testing.T) {
 			name     string
 			into     []byte
 			fileData []byte
-			offset   int
+			offset   int64
 			wantInto []byte
 			wantN    int
 			wantErr  errorKind
@@ -105,10 +105,10 @@ func TestFileImpl(t *testing.T) {
 				t.Parallel()
 
 				f := &file{
-					path:   "",
-					data:   tc.fileData,
-					offset: tc.offset,
+					path: "",
+					data: tc.fileData,
 				}
+				f.offset.Store(tc.offset)
 
 				gotN, err := f.Read(tc.into)
 
@@ -138,16 +138,16 @@ func TestFileImpl(t *testing.T) {
 		t.Parallel()
 
 		type args struct {
-			offset int
+			offset int64
 			whence SeekMode
 		}
 
 		// The test file is 100 bytes long
 		tests := []struct {
 			name       string
-			fileOffset int
+			fileOffset int64
 			args       args
-			wantOffset int
+			wantOffset int64
 			wantError  bool
 		}{
 			{
@@ -242,7 +242,8 @@ func TestFileImpl(t *testing.T) {
 			t.Run(tt.name, func(t *testing.T) {
 				t.Parallel()
 
-				f := &file{data: make([]byte, 100), offset: tt.fileOffset}
+				f := &file{data: make([]byte, 100)}
+				f.offset.Store(tt.fileOffset)
 
 				got, err := f.Seek(tt.args.offset, tt.args.whence)
 				if tt.wantError {
