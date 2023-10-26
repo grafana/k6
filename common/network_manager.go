@@ -404,7 +404,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 	// goroutine here, we need to spawn a new goroutine to allow the requestPaused
 	// messages to be processed by the NetworkManager.
 	//
-	// This happens when the main page request redirection before it finishes loading.
+	// This happens when the main page request redirects before it finishes loading.
 	// So the new redirect request will be blocked until the main page finishes loading.
 	// The main page will wait forever since its subrequest is blocked.
 	go emitResponseMetrics()
