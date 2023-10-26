@@ -2,6 +2,8 @@ package influxdb
 
 import (
 	"fmt"
+	"net/http"
+	"net/url"
 	"strings"
 
 	client "github.com/influxdata/influxdb1-client/v2"
@@ -18,13 +20,21 @@ func MakeClient(conf Config) (client.Client, error) {
 	if conf.Addr.String == "" {
 		conf.Addr = null.StringFrom("http://localhost:8086")
 	}
-	return client.NewHTTPClient(client.HTTPConfig{
+	clientHTTPConfig := client.HTTPConfig{
 		Addr:               conf.Addr.String,
 		Username:           conf.Username.String,
 		Password:           conf.Password.String,
 		UserAgent:          "k6",
 		InsecureSkipVerify: conf.Insecure.Bool,
-	})
+	}
+	if conf.Proxy.Valid {
+		parsedProxyURL, err := url.Parse(conf.Proxy.String)
+		if err != nil {
+			return nil, fmt.Errorf("failed to parse the http proxy URL: %w", err)
+		}
+		clientHTTPConfig.Proxy = http.ProxyURL(parsedProxyURL)
+	}
+	return client.NewHTTPClient(clientHTTPConfig)
 }
 
 func MakeBatchConfig(conf Config) client.BatchPointsConfig {

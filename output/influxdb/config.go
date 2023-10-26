@@ -17,6 +17,7 @@ import (
 type Config struct {
 	// Connection.
 	Addr             null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
+	Proxy            null.String        `json:"proxy,omitempty" envconfig:"K6_INFLUXDB_PROXY"`
 	Username         null.String        `json:"username,omitempty" envconfig:"K6_INFLUXDB_USERNAME"`
 	Password         null.String        `json:"password,omitempty" envconfig:"K6_INFLUXDB_PASSWORD"`
 	Insecure         null.Bool          `json:"insecure,omitempty" envconfig:"K6_INFLUXDB_INSECURE"`
@@ -56,6 +57,9 @@ func NewConfig() Config {
 func (c Config) Apply(cfg Config) Config {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
+	}
+	if cfg.Proxy.Valid {
+		c.Proxy = cfg.Proxy
 	}
 	if cfg.Username.Valid {
 		c.Username = cfg.Username
