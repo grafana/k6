@@ -51,3 +51,26 @@ func TestParseURL(t *testing.T) {
 		})
 	}
 }
+
+func TestGetConsolidatedConfigHTTPProxy(t *testing.T) {
+	t.Parallel()
+	t.Run("Valid Proxy URL", func(t *testing.T) {
+		t.Parallel()
+		testdata := map[string]string{
+			"K6_INFLUXDB_PROXY": "http://localhost:3128",
+		}
+		config, err := GetConsolidatedConfig(nil, testdata, "")
+		assert.NoError(t, err)
+		assert.Equal(t, "http://localhost:3128", config.Proxy.String)
+	})
+	t.Run("Invalid Proxy URL", func(t *testing.T) {
+		t.Parallel()
+		testdata := map[string]string{
+			"K6_INFLUXDB_PROXY": "http://foo\x7f.com/",
+		}
+		config, err := GetConsolidatedConfig(nil, testdata, "")
+		assert.NoError(t, err)
+		_, err = MakeClient(config)
+		assert.Error(t, err)
+	})
+}
