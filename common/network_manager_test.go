@@ -66,11 +66,12 @@ func newTestNetworkManager(t *testing.T, k6opts k6lib.Options) (*NetworkManager,
 	st.Options = k6opts
 	logger := log.New(st.Logger, "")
 	nm := &NetworkManager{
-		ctx:      vu.Context(),
-		logger:   logger,
-		session:  session,
-		resolver: mr,
-		vu:       vu,
+		ctx:            vu.Context(),
+		logger:         logger,
+		session:        session,
+		resolver:       mr,
+		vu:             vu,
+		reqIDToRequest: map[network.RequestID]*Request{},
 	}
 
 	return nm, session
@@ -296,6 +297,93 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 				assert.Equalf(t, tt.wantRes.wt, s.Time, "timing skew in %s", s.Metric.Name)
 			})
 			assert.Equalf(t, 3, n, "should emit 8 response metrics")
+		})
+	}
+}
+
+func TestRequestForOnLoadingFinished(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		ID      network.RequestID
+		request *Request
+		parent  *Request
+		want    *Request
+	}{
+		"non_nil_request": {
+			ID: "1234",
+			request: &Request{
+				requestID:  "1234",
+				documentID: "1234",
+			},
+			want: &Request{
+				requestID:  "1234",
+				documentID: "1234",
+			},
+		},
+		"non_nil_request_with_parent": {
+			ID: "1234",
+			request: &Request{
+				requestID:  "1234",
+				documentID: "1234",
+			},
+			parent: &Request{
+				documentID: "3421",
+			},
+			want: &Request{
+				requestID:  "1234",
+				documentID: "1234",
+			},
+		},
+		"nil_request": {
+			request: nil,
+			want:    nil,
+		},
+		"nil_request_with_non_nil_parent_with_matching_document_id": {
+			ID:      "1234",
+			request: nil,
+			parent: &Request{
+				requestID:  "1234",
+				documentID: "1234",
+			},
+			want: &Request{
+				requestID:  "1234",
+				documentID: "1234",
+			},
+		},
+		"nil_request_with_non_nil_parent_with_non_matching_document_id": {
+			ID:      "1234",
+			request: nil,
+			parent: &Request{
+				requestID:  "1234",
+				documentID: "4321",
+			},
+			want: nil,
+		},
+	}
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			nm, _ := newTestNetworkManager(t, k6lib.Options{})
+			nm.parent, _ = newTestNetworkManager(t, k6lib.Options{})
+
+			if tt.request != nil {
+				tt.request.requestID = tt.ID
+				nm.reqIDToRequest[tt.ID] = tt.request
+			}
+			if tt.parent != nil {
+				nm.parent.reqIDToRequest[tt.parent.requestID] = tt.parent
+			}
+
+			r := nm.requestForOnLoadingFinished(tt.ID)
+			if tt.want == nil {
+				require.Nil(t, r)
+				return
+			}
+			require.NotNil(t, r)
+			assert.Equal(t, tt.want, r)
 		})
 	}
 }
