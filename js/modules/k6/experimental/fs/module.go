@@ -50,7 +50,8 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
-			"open": mi.Open,
+			"open":    mi.Open,
+			"readAll": mi.ReadAll,
 			"SeekMode": map[string]any{
 				"Start":   SeekModeStart,
 				"Current": SeekModeCurrent,
@@ -95,53 +96,64 @@ func (mi *ModuleInstance) Open(path goja.Value) *goja.Promise {
 	return promise
 }
 
-func (mi *ModuleInstance) openImpl(path string) (*File, error) {
-	initEnv := mi.vu.InitEnv()
+// ReadAll reads the provide file object's content until EOF (`null`) and resolves to
+// the content as an `ArrayBuffer`.
+//
+// Note that this method will read the file's content from the current offset, and will
+// move the offset to the end of the file.
+func (mi *ModuleInstance) ReadAll(file goja.Value) *goja.Promise {
+	promise, resolve, reject := promises.New(mi.vu)
 
-	// We resolve the path relative to the entrypoint script, as opposed to
-	// the current working directory (the k6 command is called from).
-	//
-	// This is done on purpose, although it diverges in some respect with
-	// how files are handled in different k6 contexts, so that we cater to
-	// and intuitive user experience.
-	//
-	// See #2781 and #2674.
-	path = fsext.Abs(initEnv.CWD.Path, path)
-
-	fs, ok := initEnv.FileSystems["file"]
-	if !ok {
-		common.Throw(mi.vu.Runtime(), errors.New("open() failed; reason: unable to access the file system"))
+	if common.IsNullish(file) {
+		reject(newFsError(TypeError, "readAll() failed; reason: the file argument cannot be null or undefined"))
+		return promise
 	}
 
-	if exists, err := fsext.Exists(fs, path); err != nil {
-		return nil, fmt.Errorf("open() failed, unable to verify if %q exists; reason: %w", path, err)
-	} else if !exists {
-		return nil, newFsError(NotFoundError, fmt.Sprintf("no such file or directory %q", path))
+	var fileInstance File
+	if err := mi.vu.Runtime().ExportTo(file, &fileInstance); err != nil {
+		reject(newFsError(TypeError, "readAll() failed; reason: the file argument cannot be interpreted as a File"))
+		return promise
 	}
 
-	if isDir, err := fsext.IsDir(fs, path); err != nil {
-		return nil, fmt.Errorf("open() failed, unable to verify if %q is a directory; reason: %w", path, err)
-	} else if isDir {
-		return nil, newFsError(
-			InvalidResourceError,
-			fmt.Sprintf("cannot open %q: opening a directory is not supported", path),
-		)
-	}
+	go func() {
+		bytesLeft := len(fileInstance.file.data) - fileInstance.file.offset
+		data := make([]byte, bytesLeft)
 
-	data, err := mi.cache.open(path, fs)
-	if err != nil {
-		return nil, err
-	}
+		n, err := fileInstance.file.Read(data)
+		if err != nil {
+			errMsg := "readAll() failed; reason: %w"
 
-	return &File{
-		Path: path,
-		file: file{
-			path: path,
-			data: data,
-		},
-		vu:       mi.vu,
-		registry: mi.cache,
-	}, nil
+			var fsErr *fsError
+			isFsErr := errors.As(err, &fsErr)
+			if !isFsErr {
+				reject(fmt.Errorf(errMsg, err))
+				return
+			}
+
+			// If we reached the end of the file, we resolve to null.
+			if fsErr.kind == EOFError {
+				resolve(goja.Null())
+			} else {
+				reject(fmt.Errorf(errMsg, err))
+			}
+
+			return
+		}
+
+		if n != bytesLeft {
+			reject(newFsError(
+				TypeError,
+				fmt.Sprintf("readAll() failed; reason: read %d bytes, expected %d",
+					n,
+					len(fileInstance.file.data))),
+			)
+			return
+		}
+
+		resolve(mi.vu.Runtime().NewArrayBuffer(data))
+	}()
+
+	return promise
 }
 
 // File represents a file and exposes methods to interact with it.
@@ -153,7 +165,7 @@ type File struct {
 	Path string `json:"path"`
 
 	// file contains the actual implementation for the file system.
-	file
+	*file
 
 	// vu holds a reference to the VU this file is associated with.
 	//
@@ -297,4 +309,53 @@ func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 	}()
 
 	return promise
+}
+
+func (mi *ModuleInstance) openImpl(path string) (*File, error) {
+	initEnv := mi.vu.InitEnv()
+
+	// We resolve the path relative to the entrypoint script, as opposed to
+	// the current working directory (the k6 command is called from).
+	//
+	// This is done on purpose, although it diverges in some respect with
+	// how files are handled in different k6 contexts, so that we cater to
+	// and intuitive user experience.
+	//
+	// See #2781 and #2674.
+	path = fsext.Abs(initEnv.CWD.Path, path)
+
+	fs, ok := initEnv.FileSystems["file"]
+	if !ok {
+		common.Throw(mi.vu.Runtime(), errors.New("open() failed; reason: unable to access the file system"))
+	}
+
+	if exists, err := fsext.Exists(fs, path); err != nil {
+		return nil, fmt.Errorf("open() failed, unable to verify if %q exists; reason: %w", path, err)
+	} else if !exists {
+		return nil, newFsError(NotFoundError, fmt.Sprintf("no such file or directory %q", path))
+	}
+
+	if isDir, err := fsext.IsDir(fs, path); err != nil {
+		return nil, fmt.Errorf("open() failed, unable to verify if %q is a directory; reason: %w", path, err)
+	} else if isDir {
+		return nil, newFsError(
+			InvalidResourceError,
+			fmt.Sprintf("cannot open %q: opening a directory is not supported", path),
+		)
+	}
+
+	data, err := mi.cache.open(path, fs)
+	if err != nil {
+		return nil, err
+	}
+
+	return &File{
+		Path: path,
+		file: &file{
+			path: path,
+			data: data,
+		},
+		vu:       mi.vu,
+		registry: mi.cache,
+	}, nil
 }

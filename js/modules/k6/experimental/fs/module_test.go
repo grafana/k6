@@ -195,6 +195,102 @@ func TestOpen(t *testing.T) {
 	})
 }
 
+func TestReadAll(t *testing.T) {
+	t.Parallel()
+
+	t.Run("reading all bytes from a file should succeed", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+			const fileContent = await fs.readAll(file)
+
+			if (fileContent.byteLength !== 5) {
+				throw 'unexpected file content length ' + fileContent.length + '; expected 5';
+			}
+
+			// transform the ArrayBuffer into a string
+			const uint8Array = new Uint8Array(fileContent);
+			const str = String.fromCharCode.apply(null, uint8Array)
+
+			if (str !== 'hello') {
+				throw 'unexpected file content ' + str + '; expected hello';
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("reading all bytes from the middle of a file should succeed", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+
+			// Seek to the middle of the file and read all bytes left.
+			await file.seek(2, fs.SeekMode.Start);
+			const fileContent = await fs.readAll(file)
+
+			if (fileContent.byteLength !== 3) {
+				throw 'unexpected file content length ' + fileContent.length + '; expected 3';
+			}
+
+			// The file content should be 'llo'.
+			const uint8Array = new Uint8Array(fileContent);
+			const str = String.fromCharCode.apply(null, uint8Array)
+
+			if (str !== 'llo') {
+				throw 'unexpected file content ' + str + '; expected llo';
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
+	t.Run("reading all bytes from EOF should return null and succeed", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+
+			// Reading the whole file to move the offset to EOF.
+			await fs.readAll(file)
+
+			// Reading from EOF should return null.
+			const fileContent = await fs.readAll(file)
+			if (fileContent !== null) {
+				throw 'expected readAll to return null, got ' + fileContent + ' instead';
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+}
+
 func TestFile(t *testing.T) {
 	t.Parallel()
 
