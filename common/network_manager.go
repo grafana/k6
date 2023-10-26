@@ -399,7 +399,7 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 func (m *NetworkManager) requestForOnLoadingFinished(rid network.RequestID) *Request {
 	r := m.requestFromID(rid)
 
-	// Immediately return if the request is not found.
+	// Immediately return if the request is found.
 	if r != nil {
 		return r
 	}
@@ -408,7 +408,7 @@ func (m *NetworkManager) requestForOnLoadingFinished(rid network.RequestID) *Req
 	if m.parent == nil {
 		return nil
 	}
-	// Main requests have matching loaderID and requestID.
+	// Requests eminating from the parent have matching requestIDs.
 	pr := m.parent.requestFromID(rid)
 	if pr == nil || pr.getDocumentID() != rid.String() {
 		return nil
