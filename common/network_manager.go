@@ -373,9 +373,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 }
 
 func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) {
-	rid := event.RequestID
-	req := m.requestForOnLoadingFinished(rid)
-
+	req := m.requestForOnLoadingFinished(event.RequestID)
 	// the request was not created yet.
 	if req == nil {
 		return
