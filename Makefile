@@ -1,7 +1,7 @@
 MAKEFLAGS += --silent
 GOLANGCI_LINT_VERSION = $(shell head -n 1 .golangci.yml | tr -d '\# ')
 
-all: clean format test build
+all: clean format tests build
 
 ## build: Builds the 'k6' binary.
 build:
