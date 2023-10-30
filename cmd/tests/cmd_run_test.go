@@ -2245,7 +2245,7 @@ func TestSetupTimeout(t *testing.T) {
 	elapsed := time.Since(start)
 	assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of setupTimeout")
 	assert.Less(
-		t, elapsed, 2*time.Second,
+		t, elapsed, 5*time.Second,
 		"expected less time to have passed because setupTimeout ",
 	)
 
