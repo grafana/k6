@@ -5,8 +5,8 @@ import (
 )
 
 // Format formats the given error as a message (string) and a map of fields.
-// In case of Exception, it uses the stack trace as the error message.
-// In case of HasHint, it also adds the hint as a field.
+// In case of [Exception], it uses the stack trace as the error message.
+// In case of [HasHint], it also adds the hint as a field.
 func Format(err error) (string, map[string]interface{}) {
 	if err == nil {
 		return "", nil
