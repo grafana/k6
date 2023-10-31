@@ -4,6 +4,8 @@ import (
 	"io"
 	"path/filepath"
 	"sync/atomic"
+
+	"go.k6.io/k6/lib"
 )
 
 // file is an abstraction for interacting with files.
@@ -39,26 +41,27 @@ type FileInfo struct {
 //
 // If the end of the file has been reached, it returns EOFError.
 func (f *file) Read(into []byte) (n int, err error) {
-	offset := f.offset.Load()
+	currentOffset := f.offset.Load()
+	fileSize := f.size()
 
-	start := offset
-	if start == f.size() {
+	// Check if we have reached the end of the file
+	if currentOffset == fileSize {
 		return 0, newFsError(EOFError, "EOF")
 	}
 
-	end := offset + int64(len(into))
-	if end > f.size() {
-		end = f.size()
-		// We align with the [io.Reader.Read] method's behavior
-		// and return EOFError when we reach the end of the
-		// file, regardless of how much data we were able to
-		// read.
+	// Calculate the effective new offset
+	targetOffset := currentOffset + int64(len(into))
+	newOffset := lib.Min(targetOffset, fileSize)
+
+	// Read the data into the provided slice, and update
+	// the offset accordingly
+	n = copy(into, f.data[currentOffset:newOffset])
+	f.offset.Store(newOffset)
+
+	// If we've reached or surpassed the end, set the error to EOF
+	if targetOffset > fileSize {
 		err = newFsError(EOFError, "EOF")
 	}
-
-	n = copy(into, f.data[start:end])
-
-	f.offset.Store(offset + int64(n))
 
 	return n, err
 }
