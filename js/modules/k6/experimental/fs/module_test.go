@@ -16,6 +16,8 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+const testFileName = "bonjour.txt"
+
 func TestOpen(t *testing.T) {
 	t.Parallel()
 
@@ -29,18 +31,18 @@ func TestOpen(t *testing.T) {
 		}{
 			{
 				name:     "open absolute path",
-				openPath: fsext.FilePathSeparator + "bonjour.txt",
-				wantPath: fsext.FilePathSeparator + "bonjour.txt",
+				openPath: fsext.FilePathSeparator + testFileName,
+				wantPath: fsext.FilePathSeparator + testFileName,
 			},
 			{
 				name:     "open relative path",
-				openPath: filepath.Join(".", fsext.FilePathSeparator, "bonjour.txt"),
-				wantPath: fsext.FilePathSeparator + "bonjour.txt",
+				openPath: filepath.Join(".", fsext.FilePathSeparator, testFileName),
+				wantPath: fsext.FilePathSeparator + testFileName,
 			},
 			{
 				name:     "open path with ..",
-				openPath: fsext.FilePathSeparator + "dir" + fsext.FilePathSeparator + ".." + fsext.FilePathSeparator + "bonjour.txt",
-				wantPath: fsext.FilePathSeparator + "bonjour.txt",
+				openPath: fsext.FilePathSeparator + "dir" + fsext.FilePathSeparator + ".." + fsext.FilePathSeparator + testFileName,
+				wantPath: fsext.FilePathSeparator + testFileName,
 			},
 		}
 
@@ -204,7 +206,7 @@ func TestFile(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
 			return afero.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
 		})
@@ -232,7 +234,7 @@ func TestFile(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
 			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
 		})
@@ -275,7 +277,7 @@ func TestFile(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
 			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
 		})
@@ -307,7 +309,7 @@ func TestFile(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
 			return afero.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
 		})
@@ -372,7 +374,7 @@ func TestFile(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
 			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
 		})
@@ -397,7 +399,7 @@ func TestFile(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
 			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
 		})
@@ -424,7 +426,7 @@ func TestFile(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		testFilePath := fsext.FilePathSeparator + "bonjour.txt"
+		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
 			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
 		})
@@ -517,7 +519,7 @@ func TestOpenImpl(t *testing.T) {
 
 		assert.Panics(t, func() {
 			//nolint:errcheck,gosec
-			mi.openImpl("bonjour.txt")
+			mi.openImpl(testFileName)
 		})
 	})
 
@@ -532,7 +534,7 @@ func TestOpenImpl(t *testing.T) {
 			cache: &cache{},
 		}
 
-		_, err = mi.openImpl("bonjour.txt")
+		_, err = mi.openImpl(testFileName)
 		assert.Error(t, err)
 		var fsError *fsError
 		assert.ErrorAs(t, err, &fsError)
