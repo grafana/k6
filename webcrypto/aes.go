@@ -454,7 +454,7 @@ func (agp *AESGCMParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error
 	// 1.
 	// As described in section 8 of AES-GCM [NIST SP800-38D].
 	// [NIST SP800-38D] https://nvlpubs.nist.gov/nistpubs/Legacy/SP/nistspecialpublication800-38d.pdf
-	if len(plaintext) > maxAESGCMPlaintextLength {
+	if uint64(len(plaintext)) > maxAESGCMPlaintextLength {
 		return nil, NewError(OperationError, "plaintext length is too long")
 	}
 
@@ -589,19 +589,19 @@ func (agp *AESGCMParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, erro
 // The [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
 //
 // [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
-const maxAESGCMPlaintextLength int = 549755813632
+const maxAESGCMPlaintextLength uint64 = (1 << 39) - 256
 
 // maxAESGcmAdditionalDataLength holds the value 2 ^ 64 - 1 as specified in
 // the [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
 //
 // [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
-const maxAESGcmAdditionalDataLength uint64 = 18446744073709551615
+const maxAESGcmAdditionalDataLength uint64 = (1 << 64) - 1
 
 // maxAESGcmIvLength holds the value 2 ^ 64 - 1 as specified in
 // the [Web Crypto API spec] for the AES-GCM algorithm encryption operation.
 //
 // [Web Crypto API spec]: https://www.w3.org/TR/WebCryptoAPI/#aes-gcm-encryption-operation
-const maxAESGcmIvLength uint64 = 18446744073709551615
+const maxAESGcmIvLength uint64 = (1 << 64) - 1
 
 var (
 	// ErrInvalidBlockSize is returned when the given block size is invalid.
