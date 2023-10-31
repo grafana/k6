@@ -16,6 +16,10 @@ type file struct {
 	data []byte
 
 	// offset holds the current offset in the file
+	//
+	// TODO: using an atomic here does not guarantee ordering of reads and seeks, and leaves
+	// the behavior not strictly defined. This is something we might want to address in the future, and
+	// is tracked as part of #3433.
 	offset atomic.Int64
 }
 
@@ -108,9 +112,7 @@ func (f *file) Seek(offset int64, whence SeekMode) (int64, error) {
 		return 0, newFsError(TypeError, "seeking beyond end of file")
 	}
 
-	// Note that the implementation assumes one `file` instance per file/vu.
-	// If that assumption was invalidated, we would need to atomically update
-	// the offset instead.
+	// Update the file instance's offset to the new selected position
 	f.offset.Store(newOffset)
 
 	return newOffset, nil

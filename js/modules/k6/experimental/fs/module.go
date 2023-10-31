@@ -237,7 +237,6 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	// running into concurrency issues (data race).
 	intoBytes := ab.Bytes()
 	buffer := make([]byte, len(intoBytes))
-	_ = copy(buffer, intoBytes)
 
 	go func() {
 		n, err := f.file.Read(buffer)
