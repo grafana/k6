@@ -186,8 +186,31 @@ func (f *File) Stat() *goja.Promise {
 //
 // It is possible for a read to successfully return with 0 bytes.
 // This does not indicate EOF.
+//
+//nolint:funlen
 func (f *File) Read(into goja.Value) *goja.Promise {
-	promise, resolve, reject := promises.New(f.vu)
+	// This method performs an asynchronous read operation and modifies the provided Uint8Array in place.
+	// To ensure thread safety and avoid concurrency issues, we take special precautions when creating the promise:
+	//
+	// 1. Instead of using the standard [promises.New] method, we manually create a promise.
+	// 2. We register a callback to be executed by the VU's runtime. This ensures that the modification
+	//    of the JS runtime's `buffer` occurs on the main thread during the promise's resolution.
+	promise, resolveFunc, rejectFunc := f.vu.Runtime().NewPromise()
+	callback := f.vu.RegisterCallback()
+
+	resolve := func(result any) {
+		callback(func() error {
+			resolveFunc(result)
+			return nil
+		})
+	}
+
+	reject := func(reason any) {
+		callback(func() error {
+			rejectFunc(reason)
+			return nil
+		})
+	}
 
 	if common.IsNullish(into) {
 		reject(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
@@ -209,15 +232,27 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 		return promise
 	}
 
-	// Obtain the underlying byte slice from the ArrayBuffer.
-	// Note that this is not a copy, and will be modified by the Read operation
-	// in place.
-	buffer := ab.Bytes()
+	// Copy the ArrayBuffer into a byte slice, so that we can pass it to the
+	// [file.Read] method without risking to modify the original ArrayBuffer, and
+	// running into concurrency issues (data race).
+	intoBytes := ab.Bytes()
+	buffer := make([]byte, len(intoBytes))
 
 	go func() {
 		n, err := f.file.Read(buffer)
 		if err == nil {
-			resolve(n)
+			// Although the read operation happens as part of the goroutine, we
+			// still need to make sure that:
+			//   1. Any side effects, like modifying the `buffer`, are deferred and
+			//   executed on the main thread via the registered callback.
+			//   2. This approach ensures that while the file read operation can proceed
+			//   asynchronously, any side effects that might interfere with the JS runtime
+			//   are executed in a controlled and sequential manner on the main thread.
+			callback(func() error {
+				_ = copy(intoBytes, buffer)
+				resolveFunc(n)
+				return nil
+			})
 			return
 		}
 
@@ -287,7 +322,7 @@ func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 	}
 
 	go func() {
-		newOffset, err := f.file.Seek(int(intOffset), seekMode)
+		newOffset, err := f.file.Seek(intOffset, seekMode)
 		if err != nil {
 			reject(err)
 			return
