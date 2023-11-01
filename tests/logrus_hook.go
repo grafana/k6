@@ -1,7 +1,7 @@
 package tests
 
 import (
-	"io/ioutil"
+	"io"
 	"strings"
 	"sync"
 	"testing"
@@ -86,7 +86,7 @@ func attachLogCache(tb testing.TB, fl logrus.FieldLogger) *logCache {
 	lc := &logCache{HookedLevels: []logrus.Level{logrus.DebugLevel, logrus.WarnLevel}}
 	logger.SetLevel(logrus.DebugLevel)
 	logger.AddHook(lc)
-	logger.SetOutput(ioutil.Discard)
+	logger.SetOutput(io.Discard)
 
 	return lc
 }
