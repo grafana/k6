@@ -112,18 +112,7 @@ func (c *rootCommand) execute() {
 		exitCode = int(ecerr.ExitCode())
 	}
 
-	errText := err.Error()
-	var xerr errext.Exception
-	if errors.As(err, &xerr) {
-		errText = xerr.StackTrace()
-	}
-
-	fields := logrus.Fields{}
-	var herr errext.HasHint
-	if errors.As(err, &herr) {
-		fields["hint"] = herr.Hint()
-	}
-
+	errText, fields := errext.Format(err)
 	c.globalState.Logger.WithFields(fields).Error(errText)
 	if c.loggerIsRemote {
 		c.globalState.FallbackLogger.WithFields(fields).Error(errText)
