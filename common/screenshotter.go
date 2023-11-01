@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"os"
 	"path/filepath"
@@ -227,7 +226,7 @@ func (s *screenshotter) screenshot(
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			return nil, fmt.Errorf("creating screenshot directory %q: %w", dir, err)
 		}
-		if err := ioutil.WriteFile(path, buf, 0o644); err != nil {
+		if err := os.WriteFile(path, buf, 0o644); err != nil {
 			return nil, fmt.Errorf("saving screenshot to %q: %w", path, err)
 		}
 	}
