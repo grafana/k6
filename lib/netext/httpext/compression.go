@@ -140,6 +140,13 @@ func readResponseBody(
 		_ = respBody.Close()
 	}(resp.Body)
 
+	if (resp.StatusCode >= 100 && resp.StatusCode <= 199) || // 1xx
+		resp.StatusCode == http.StatusNoContent || resp.StatusCode == http.StatusNotModified {
+		// for all three of this status code there is always no content
+		// https://www.rfc-editor.org/rfc/rfc9110.html#section-6.4.1-8
+		// this also prevents trying to read
+		return nil, nil //nolint:nilnil
+	}
 	contentEncodings := strings.Split(resp.Header.Get("Content-Encoding"), ",")
 	// Transparently decompress the body if it's has a content-encoding we
 	// support. If not, simply return it as it is.

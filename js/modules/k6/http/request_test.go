@@ -2386,3 +2386,26 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIds .
 	s.Listener = tls.NewListener(s.Listener, s.TLS)
 	return s, client
 }
+
+func TestGzipped204Response(t *testing.T) {
+	t.Parallel()
+	ts := newTestCase(t)
+	tb := ts.tb
+	rt := ts.runtime.VU.Runtime()
+	state := ts.runtime.VU.State()
+	state.Options.Throw = null.BoolFrom(true)
+	sr := tb.Replacer.Replace
+	// We should not try to decode it
+	tb.Mux.HandleFunc("/gzipempty", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Encoding", "gzip")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+
+	_, err := rt.RunString(sr(`
+				var res = http.get("HTTPBIN_URL/gzipempty");
+				if (res.status != 204) {
+					throw new Error("unexpected status code: " + res.status)
+				}
+			`))
+	assert.NoError(t, err)
+}
