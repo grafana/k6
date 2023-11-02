@@ -170,7 +170,7 @@ func NewConfig() Config {
 		MetricPushConcurrency: null.NewInt(1, false),
 
 		TracesEnabled:         null.NewBool(true, false),
-		TracesHost:            null.NewString("insights.k6.io:4443", false),
+		TracesHost:            null.NewString("grpc-k6-api-prod-prod-us-east-0.grafana.net:443", false),
 		TracesPushInterval:    types.NewNullDuration(1*time.Second, false),
 		TracesPushConcurrency: null.NewInt(1, false),
 
