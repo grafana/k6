@@ -43,7 +43,7 @@ export const options = {
 
   // Uncomment this section to enable the use of Browser API in your tests.
   //
-  // See https://k6.io/docs/using-k6-browser/running-browser-tests/ to learn more
+  // See https://grafana.com/docs/k6/latest/using-k6-browser/running-browser-tests/ to learn more
   // about using Browser API in your test scripts.
   //
   // scenarios: {
@@ -53,7 +53,7 @@ export const options = {
   //     // Executor is a mandatory parameter for browser-based tests.
   //     // Shared iterations in this case tells k6 to reuse VUs to execute iterations.
   //     //
-  //     // See https://k6.io/docs/using-k6/scenarios/executors/ for other executor types.
+  //     // See https://grafana.com/docs/k6/latest/using-k6/scenarios/executors/ for other executor types.
   //     executor: 'shared-iterations',
   //     options: {
   //       browser: {
@@ -69,7 +69,7 @@ export const options = {
 
 // The function that defines VU logic.
 //
-// See https://k6.io/docs/examples/tutorials/get-started-with-k6/ to learn more
+// See https://grafana.com/docs/k6/latest/examples/get-started-with-k6/ to learn more
 // about authoring k6 scripts.
 //
 export default function() {
