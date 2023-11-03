@@ -310,6 +310,11 @@ func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscr
 	}
 	defer e.Done()
 	r.clear()
+
+	// Stop traces registry before calling e.Done()
+	// so we avoid a race condition between active spans
+	// being flushed and test exiting
+	r.stopTracesRegistry()
 }
 
 func (r *browserRegistry) setBrowser(id int64, b *common.Browser) {
@@ -359,6 +364,15 @@ func (r *browserRegistry) initTracesRegistry() {
 	r.trInit.Do(func() {
 		r.tr = newTracesRegistry(browsertrace.NewTracer(r.vu.State().TracerProvider))
 	})
+}
+
+func (r *browserRegistry) stopTracesRegistry() {
+	// Because traces registry is initialized on iterStart event, it is not
+	// initialized for the initial NewModuleInstance call, whose VU does not
+	// execute any iteration.
+	if r.tr != nil {
+		r.tr.stop()
+	}
 }
 
 func (r *browserRegistry) stop() {
