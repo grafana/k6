@@ -1,13 +1,17 @@
 package redis
 
 import (
+	"context"
+	"crypto/tls"
 	"fmt"
+	"net"
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/go-redis/redis/v8"
+	"github.com/redis/go-redis/v9"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/lib"
 )
 
 // Client represents the Client constructor (i.e. `new redis.Client()`) and
@@ -346,6 +350,7 @@ func (c *Client) Expire(key string, seconds int) *goja.Promise {
 }
 
 // Ttl returns the remaining time to live of a key that has a timeout.
+//
 //nolint:revive,stylecheck
 func (c *Client) Ttl(key string) *goja.Promise {
 	promise, resolve, reject := c.makeHandledPromise()
@@ -1076,15 +1081,38 @@ func (c *Client) connect() error {
 		return nil
 	}
 
-	// If k6 has a TLSConfig set in its state, use
-	// it has redis' client TLSConfig too.
-	if vuState.TLSConfig != nil {
-		c.redisOptions.TLSConfig = vuState.TLSConfig
-	}
+	tlsCfg := c.redisOptions.TLSConfig
+	if tlsCfg != nil && vuState.TLSConfig != nil {
+		// Merge k6 TLS configuration with the one we received from the
+		// Client constructor. This will need adjusting depending on which
+		// options we want to expose in the Redis module, and how we want
+		// the override to work.
+		tlsCfg.InsecureSkipVerify = vuState.TLSConfig.InsecureSkipVerify
+		tlsCfg.CipherSuites = vuState.TLSConfig.CipherSuites
+		tlsCfg.MinVersion = vuState.TLSConfig.MinVersion
+		tlsCfg.MaxVersion = vuState.TLSConfig.MaxVersion
+		tlsCfg.Renegotiation = vuState.TLSConfig.Renegotiation
+		tlsCfg.KeyLogWriter = vuState.TLSConfig.KeyLogWriter
+		tlsCfg.Certificates = append(tlsCfg.Certificates, vuState.TLSConfig.Certificates...)
 
-	// use k6's lib.DialerContexter function has redis'
-	// client Dialer
-	c.redisOptions.Dialer = vuState.Dialer.DialContext
+		// TODO: Merge vuState.TLSConfig.RootCAs with
+		// c.redisOptions.TLSConfig. k6 currently doesn't allow setting
+		// this, so it doesn't matter right now, but these should be merged.
+		// I couldn't find a way to do this with the x509.CertPool API
+		// though...
+
+		// In order to preserve the underlying effects of the [netext.Dialer], such
+		// as handling blocked hostnames, or handling hostname resolution, we override
+		// the redis client's dialer with our own function which uses the VU's [netext.Dialer]
+		// and manually upgrades the connection to TLS.
+		//
+		// See Pull Request's #17 [discussion] for more details.
+		//
+		// [discussion]: https://github.com/grafana/xk6-redis/pull/17#discussion_r1369707388
+		c.redisOptions.Dialer = c.upgradeDialerToTLS(vuState.Dialer, tlsCfg)
+	} else {
+		c.redisOptions.Dialer = vuState.Dialer.DialContext
+	}
 
 	// Replace the internal redis client instance with a new
 	// one using our custom options.
@@ -1124,4 +1152,40 @@ func (c *Client) isSupportedType(offset int, args ...interface{}) error {
 	}
 
 	return nil
+}
+
+// DialContextFunc is a function that can be used to dial a connection to a redis server.
+type DialContextFunc func(ctx context.Context, network, addr string) (net.Conn, error)
+
+// upgradeDialerToTLS returns a DialContextFunc that uses the provided dialer to
+// establish a connection, and then upgrades it to TLS using the provided config.
+//
+// We use this function to make sure the k6 [netext.Dialer], our redis module uses to establish
+// the connection and handle network-related options such as blocked hostnames,
+// or hostname resolution, but we also want to use the TLS configuration provided
+// by the user.
+func (c *Client) upgradeDialerToTLS(dialer lib.DialContexter, config *tls.Config) DialContextFunc {
+	return func(ctx context.Context, network string, addr string) (net.Conn, error) {
+		// Use netext.Dialer to establish the connection
+		rawConn, err := dialer.DialContext(ctx, network, addr)
+		if err != nil {
+			return nil, err
+		}
+
+		// Upgrade the connection to TLS if needed
+		tlsConn := tls.Client(rawConn, config)
+		err = tlsConn.Handshake()
+		if err != nil {
+			if closeErr := rawConn.Close(); closeErr != nil {
+				return nil, fmt.Errorf("failed to close connection after TLS handshake error: %w", closeErr)
+			}
+
+			return nil, err
+		}
+
+		// Overwrite rawConn with the TLS connection
+		rawConn = tlsConn
+
+		return rawConn, nil
+	}
 }
