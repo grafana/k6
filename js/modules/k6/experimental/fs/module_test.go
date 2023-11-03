@@ -368,6 +368,44 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	// Regression test for [#3309]
+	//
+	// [#3309]: https://github.com/grafana/k6/pull/3309#discussion_r1378528010
+	t.Run("read with a buffer of the size of the file + 1 should succeed ", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + testFileName
+		fs := newTestFs(t, func(fs afero.Fs) error {
+			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			// file size is 3 
+			const file = await fs.open(%q);
+
+			// Create a buffer of size fileSize + 1
+			let buffer = new Uint8Array(4); 
+			let n = await file.read(buffer)
+			if (n !== 3) {
+				throw 'expected read to return 10, got ' + n + ' instead';
+			}
+
+			if (buffer[0] !== 48 || buffer[1] !== 49 || buffer[2] !== 50) {
+				throw 'expected buffer to be [48, 49, 50], got ' + buffer + ' instead';
+			}
+
+			if (buffer[3] !== 0) {
+				throw 'expected buffer to be [48, 49, 50, 0], got ' + buffer + ' instead';
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("read called concurrently and later resolved should safely modify the buffer read into", func(t *testing.T) {
 		t.Parallel()
 

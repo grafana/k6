@@ -198,22 +198,11 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	promise, resolveFunc, rejectFunc := f.vu.Runtime().NewPromise()
 	callback := f.vu.RegisterCallback()
 
-	resolve := func(result any) {
-		callback(func() error {
-			resolveFunc(result)
-			return nil
-		})
-	}
-
-	reject := func(reason any) {
-		callback(func() error {
-			rejectFunc(reason)
-			return nil
-		})
-	}
-
 	if common.IsNullish(into) {
-		reject(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
+		callback(func() error {
+			rejectFunc(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
+			return nil
+		})
 		return promise
 	}
 
@@ -221,14 +210,20 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	intoObj := into.ToObject(f.vu.Runtime())
 	uint8ArrayConstructor := f.vu.Runtime().Get("Uint8Array")
 	if isUint8Array := intoObj.Get("constructor").SameAs(uint8ArrayConstructor); !isUint8Array {
-		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+		callback(func() error {
+			rejectFunc(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+			return nil
+		})
 		return promise
 	}
 
 	// Obtain the underlying ArrayBuffer from the Uint8Array
 	ab, ok := intoObj.Get("buffer").Export().(goja.ArrayBuffer)
 	if !ok {
-		reject(newFsError(TypeError, "read() failed; reason: into argument cannot be interpreted as ArrayBuffer"))
+		callback(func() error {
+			rejectFunc(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+			return nil
+		})
 		return promise
 	}
 
@@ -240,43 +235,47 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 
 	go func() {
 		n, err := f.file.Read(buffer)
-		if err == nil {
-			// Although the read operation happens as part of the goroutine, we
-			// still need to make sure that:
-			//   1. Any side effects, like modifying the `buffer`, are deferred and
-			//   executed on the main thread via the registered callback.
-			//   2. This approach ensures that while the file read operation can proceed
-			//   asynchronously, any side effects that might interfere with the JS runtime
-			//   are executed in a controlled and sequential manner on the main thread.
-			callback(func() error {
+		callback(func() error {
+			if err == nil {
+				// Although the read operation happens as part of the goroutine, we
+				// still need to make sure that:
+				//   1. Any side effects, like modifying the `buffer`, are deferred and
+				//   executed on the main thread via the registered callback.
+				//   2. This approach ensures that while the file read operation can proceed
+				//   asynchronously, any side effects that might interfere with the JS runtime
+				//   are executed in a controlled and sequential manner on the main thread.
 				_ = copy(intoBytes, buffer)
 				resolveFunc(n)
 				return nil
-			})
-			return
-		}
-
-		// The [file.Read] method will return an EOFError as soon as it reached
-		// the end of the file.
-		//
-		// However, following deno's behavior, we express
-		// EOF to users by returning null, when and only when there aren't any
-		// more bytes to read.
-		//
-		// Thus, although the [file.Read] method will return an EOFError, and
-		// an n > 0, we make sure to take the EOFError returned into consideration
-		// only when n == 0.
-		var fsErr *fsError
-		isFsErr := errors.As(err, &fsErr)
-		if isFsErr {
-			if fsErr.kind == EOFError && n == 0 {
-				resolve(nil)
-			} else {
-				resolve(n)
 			}
-		} else {
-			reject(err)
-		}
+
+			// The [file.Read] method will return an EOFError as soon as it reached
+			// the end of the file.
+			//
+			// However, following deno's behavior, we express
+			// EOF to users by returning null, when and only when there aren't any
+			// more bytes to read.
+			//
+			// Thus, although the [file.Read] method will return an EOFError, and
+			// an n > 0, we make sure to take the EOFError returned into consideration
+			// only when n == 0.
+			var fsErr *fsError
+			isFsErr := errors.As(err, &fsErr)
+
+			if !isFsErr {
+				rejectFunc(err)
+				return nil
+			}
+
+			_ = copy(intoBytes, buffer)
+			if fsErr.kind == EOFError && n == 0 {
+				resolveFunc(nil)
+			} else {
+				resolveFunc(n)
+			}
+
+			return nil
+		})
 	}()
 
 	return promise
