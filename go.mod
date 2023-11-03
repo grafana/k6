@@ -46,6 +46,7 @@ require (
 	go.opentelemetry.io/otel/trace v1.19.0
 	go.uber.org/goleak v1.2.1
 	golang.org/x/crypto v0.14.0
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20231030152948-74c2ba9521f1
 	golang.org/x/net v0.17.0
 	golang.org/x/term v0.13.0
 	golang.org/x/time v0.3.0

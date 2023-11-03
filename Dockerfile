@@ -9,8 +9,7 @@ RUN CGO_ENABLED=0 GOOS=$TARGETOS GOARCH=$TARGETARCH go build -trimpath -o /usr/b
 FROM alpine:3.18 as release
 
 # hadolint ignore=DL3018
-RUN apk add --no-cache ca-certificates && \
-    adduser -D -u 12345 -g 12345 k6
+RUN adduser -D -u 12345 -g 12345 k6
 COPY --from=builder /usr/bin/k6 /usr/bin/k6
 
 USER k6

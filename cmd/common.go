@@ -14,6 +14,14 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/types"
+
+	// Blank-importing golang.org/x/crypto/x509roots/fallback bundles a set of
+	// root fallback certificates from Mozilla into the resulting binary. This
+	// allows the program to run in environments where the system root
+	// certificates are not available, for example inside a minimal container.
+	// These are _fallbacks_, meaning that if the system _does have_ a set of
+	// root certificates, those will be given priority.
+	_ "golang.org/x/crypto/x509roots/fallback"
 )
 
 // Panic if the given error is not nil.
