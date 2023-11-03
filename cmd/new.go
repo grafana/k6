@@ -15,7 +15,7 @@ import (
 const defaultNewScriptName = "script.js"
 
 //nolint:gochecknoglobals
-var defaultNewScriptTemplate = template.Must(template.New("init").Parse(`import http from 'k6/http';
+var defaultNewScriptTemplate = template.Must(template.New("new").Parse(`import http from 'k6/http';
 import { sleep } from 'k6';
 
 export const options = {
@@ -82,13 +82,13 @@ type initScriptTemplateArgs struct {
 	ScriptName string
 }
 
-// initCmd represents the `k6 init` command
-type initCmd struct {
+// newScriptCmd represents the `k6 new` command
+type newScriptCmd struct {
 	gs             *state.GlobalState
 	overwriteFiles bool
 }
 
-func (c *initCmd) flagSet() *pflag.FlagSet {
+func (c *newScriptCmd) flagSet() *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
 	flags.SortFlags = false
 	flags.BoolVarP(&c.overwriteFiles, "force", "f", false, "Overwrite existing files")
@@ -96,7 +96,7 @@ func (c *initCmd) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func (c *initCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
+func (c *newScriptCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
 	target := defaultNewScriptName
 	if len(args) > 0 {
 		target = args[0]
@@ -136,23 +136,23 @@ func (c *initCmd) run(cmd *cobra.Command, args []string) error { //nolint:revive
 	return nil
 }
 
-func getCmdInit(gs *state.GlobalState) *cobra.Command {
-	c := &initCmd{gs: gs}
+func getCmdNewScript(gs *state.GlobalState) *cobra.Command {
+	c := &newScriptCmd{gs: gs}
 
 	exampleText := getExampleText(gs, `
   # Create a minimal k6 script in the current directory. By default, k6 creates script.js.
-  {{.}} init
+  {{.}} new
 
   # Create a minimal k6 script in the current directory and store it in test.js
-  {{.}} init test.js
+  {{.}} new test.js
 
   # Overwrite existing test.js with a minimal k6 script
-  {{.}} init -f test.js`[1:])
+  {{.}} new -f test.js`[1:])
 
 	initCmd := &cobra.Command{
-		Use:   "init",
-		Short: "Initialize a new k6 script",
-		Long: `Initialize a new k6 script.
+		Use:   "new",
+		Short: "Create and initialize a new k6 script",
+		Long: `Create and initialize a new k6 script.
 
 This command will create a minimal k6 script in the current directory and
 store it in the file specified by the first argument. If no argument is

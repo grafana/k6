@@ -10,7 +10,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-func TestInitScript(t *testing.T) {
+func TestNewScriptCmd(t *testing.T) {
 	t.Parallel()
 
 	testCases := []struct {
@@ -44,7 +44,7 @@ func TestInitScript(t *testing.T) {
 			t.Parallel()
 
 			ts := tests.NewGlobalTestState(t)
-			ts.CmdArgs = []string{"k6", "init"}
+			ts.CmdArgs = []string{"k6", "new"}
 			if testCase.scriptNameArg != "" {
 				ts.CmdArgs = append(ts.CmdArgs, testCase.scriptNameArg)
 			}
@@ -62,13 +62,13 @@ func TestInitScript(t *testing.T) {
 	}
 }
 
-func TestInitScript_FileExists_NoOverwrite(t *testing.T) {
+func TestNewScriptCmd_FileExists_NoOverwrite(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
 	require.NoError(t, fsext.WriteFile(ts.FS, defaultNewScriptName, []byte("untouched"), 0o644))
 
-	ts.CmdArgs = []string{"k6", "init"}
+	ts.CmdArgs = []string{"k6", "new"}
 	ts.ExpectedExitCode = -1
 
 	newRootCommand(ts.GlobalState).execute()
@@ -79,13 +79,13 @@ func TestInitScript_FileExists_NoOverwrite(t *testing.T) {
 	assert.Contains(t, string(data), "untouched")
 }
 
-func TestInitScript_FileExists_Overwrite(t *testing.T) {
+func TestNewScriptCmd_FileExists_Overwrite(t *testing.T) {
 	t.Parallel()
 
 	ts := tests.NewGlobalTestState(t)
 	require.NoError(t, fsext.WriteFile(ts.FS, defaultNewScriptName, []byte("untouched"), 0o644))
 
-	ts.CmdArgs = []string{"k6", "init", "-f"}
+	ts.CmdArgs = []string{"k6", "new", "-f"}
 
 	newRootCommand(ts.GlobalState).execute()
 
