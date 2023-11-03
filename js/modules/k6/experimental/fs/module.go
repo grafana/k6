@@ -196,13 +196,9 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	// 2. We register a callback to be executed by the VU's runtime. This ensures that the modification
 	//    of the JS runtime's `buffer` occurs on the main thread during the promise's resolution.
 	promise, resolveFunc, rejectFunc := f.vu.Runtime().NewPromise()
-	callback := f.vu.RegisterCallback()
 
 	if common.IsNullish(into) {
-		callback(func() error {
-			rejectFunc(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
-			return nil
-		})
+		rejectFunc(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
 		return promise
 	}
 
@@ -210,20 +206,14 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	intoObj := into.ToObject(f.vu.Runtime())
 	uint8ArrayConstructor := f.vu.Runtime().Get("Uint8Array")
 	if isUint8Array := intoObj.Get("constructor").SameAs(uint8ArrayConstructor); !isUint8Array {
-		callback(func() error {
-			rejectFunc(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
-			return nil
-		})
+		rejectFunc(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
 		return promise
 	}
 
 	// Obtain the underlying ArrayBuffer from the Uint8Array
 	ab, ok := intoObj.Get("buffer").Export().(goja.ArrayBuffer)
 	if !ok {
-		callback(func() error {
-			rejectFunc(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
-			return nil
-		})
+		rejectFunc(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
 		return promise
 	}
 
@@ -233,6 +223,7 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	intoBytes := ab.Bytes()
 	buffer := make([]byte, len(intoBytes))
 
+	callback := f.vu.RegisterCallback()
 	go func() {
 		n, err := f.file.Read(buffer)
 		callback(func() error {
