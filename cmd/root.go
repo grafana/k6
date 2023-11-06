@@ -48,6 +48,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
+		Version:           versionString(),
 	}
 
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
