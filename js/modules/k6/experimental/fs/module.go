@@ -51,6 +51,11 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]any{
 			"open": mi.Open,
+			"SeekMode": map[string]any{
+				"Start":   SeekModeStart,
+				"Current": SeekModeCurrent,
+				"End":     SeekModeEnd,
+			},
 		},
 	}
 }
@@ -172,4 +177,151 @@ func (f *File) Stat() *goja.Promise {
 	}()
 
 	return promise
+}
+
+// Read the file's content, and writes it into the provided Uint8Array.
+//
+// Resolves to either the number of bytes read during the operation
+// or EOF (null) if there was nothing more to read.
+//
+// It is possible for a read to successfully return with 0 bytes.
+// This does not indicate EOF.
+func (f *File) Read(into goja.Value) *goja.Promise {
+	promise, resolve, reject := f.vu.Runtime().NewPromise()
+
+	if common.IsNullish(into) {
+		reject(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
+		return promise
+	}
+
+	// We expect the into argument to be a `Uint8Array` instance
+
+	// intoObj := into.ToObject(f.vu.Runtime())
+	// uint8ArrayConstructor := f.vu.Runtime().Get("Uint8Array")
+	// if isUint8Array := intoObj.Get("constructor").SameAs(uint8ArrayConstructor); !isUint8Array {
+	intoObj := into.ToObject(f.vu.Runtime())
+	if !isUint8Array(f.vu.Runtime(), intoObj) {
+		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+		return promise
+	}
+
+	// Obtain the underlying ArrayBuffer from the Uint8Array
+	ab, ok := intoObj.Get("buffer").Export().(goja.ArrayBuffer)
+	if !ok {
+		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
+		return promise
+	}
+
+	// To avoid concurrency linked to modifying the runtime's `into` buffer from multiple
+	// goroutines we make sure to work on a separate copy, and will copy the bytes back
+	// into the runtime's `into` buffer once the promise is resolved.
+	intoBytes := ab.Bytes()
+	buffer := make([]byte, len(intoBytes))
+
+	// We register a callback to be executed by the VU's runtime.
+	// This ensures that the modification of the JS runtime's `into` buffer
+	// occurs on the main thread, during the promise's resolution.
+	callback := f.vu.RegisterCallback()
+	go func() {
+		n, readErr := f.file.Read(buffer)
+		callback(func() error {
+			_ = copy(intoBytes[0:n], buffer)
+
+			// Read was successful, resolve early with the number of
+			// bytes read.
+			if readErr == nil {
+				resolve(n)
+				return nil
+			}
+
+			// The [file.Read] method will return an EOFError as soon as it reached
+			// the end of the file.
+			//
+			// However, following deno's behavior, we express
+			// EOF to users by returning null, when and only when there aren't any
+			// more bytes to read.
+			var fsErr *fsError
+			isFSErr := errors.As(readErr, &fsErr)
+
+			if !isFSErr {
+				reject(readErr)
+				return nil
+			}
+
+			if fsErr.kind == EOFError && n == 0 {
+				resolve(goja.Null())
+			} else {
+				resolve(n)
+			}
+
+			return nil
+		})
+	}()
+
+	return promise
+}
+
+// Seek seeks to the given `offset` in the file, under the given `whence` mode.
+//
+// The returned promise resolves to the new `offset` (position) within the file, which
+// is expressed in bytes from the selected start, current, or end position depending
+// the provided `whence`.
+func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
+	promise, resolve, reject := f.vu.Runtime().NewPromise()
+
+	if common.IsNullish(offset) {
+		reject(newFsError(TypeError, "seek() failed; reason: the offset argument cannot be null or undefined"))
+		return promise
+	}
+
+	var intOffset int64
+	if err := f.vu.Runtime().ExportTo(offset, &intOffset); err != nil {
+		reject(newFsError(TypeError, "seek() failed; reason: the offset argument cannot be interpreted as integer"))
+		return promise
+	}
+
+	if common.IsNullish(whence) {
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument cannot be null or undefined"))
+		return promise
+	}
+
+	var intWhence int64
+	if err := f.vu.Runtime().ExportTo(whence, intWhence); err != nil {
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument cannot be interpreted as integer"))
+		return promise
+	}
+
+	seekMode := SeekMode(intWhence)
+	switch seekMode {
+	case SeekModeStart, SeekModeCurrent, SeekModeEnd:
+		// Valid modes, do nothing.
+	default:
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument must be a SeekMode"))
+		return promise
+	}
+
+	callback := f.vu.RegisterCallback()
+	go func() {
+		newOffset, err := f.file.Seek(intOffset, seekMode)
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return err
+			}
+
+			resolve(newOffset)
+			return nil
+		})
+	}()
+
+	return promise
+}
+
+func isUint8Array(rt *goja.Runtime, o *goja.Object) bool {
+	uint8ArrayConstructor := rt.Get("Uint8Array")
+	if isUint8Array := o.Get("constructor").SameAs(uint8ArrayConstructor); !isUint8Array {
+		return false
+	}
+
+	return true
 }
