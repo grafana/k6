@@ -196,6 +196,10 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 		"enable profiling (pprof) endpoints, k6's REST API should be enabled as well",
 	)
 
+	flags.StringVar(&gs.Flags.TracesOutput, "traces-output", gs.Flags.TracesOutput,
+		"set the output for k6 traces, possible values are none,otel[=host:port]")
+	flags.Lookup("traces-output").DefValue = gs.DefaultFlags.TracesOutput
+
 	return flags
 }
 
