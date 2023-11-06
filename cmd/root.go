@@ -24,7 +24,10 @@ import (
 	"go.k6.io/k6/log"
 )
 
-const waitLoggerCloseTimeout = time.Second * 5
+const (
+	waitLoggerCloseTimeout           = time.Second * 5
+	waitForTracerProviderStopTimeout = time.Second * 5
+)
 
 // This is to keep all fields needed for the main/root k6 command
 type rootCommand struct {
@@ -97,7 +100,21 @@ func (c *rootCommand) execute() {
 	exitCode := -1
 	defer func() {
 		cancel()
-		c.stopLoggers()
+
+		// Wait for loggers and tracer provider to stop.
+		// As both methods already use a timeout, just wait.
+		var wg sync.WaitGroup
+		ff := [...]func(){c.stopLoggers, c.stopTracerProvider}
+		wg.Add(len(ff))
+		for _, f := range ff {
+			f := f
+			go func() {
+				f()
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
 		c.globalState.OSExit(exitCode)
 	}()
 
@@ -155,6 +172,17 @@ func (c *rootCommand) stopLoggers() {
 	case <-done:
 	case <-time.After(waitLoggerCloseTimeout):
 		c.globalState.FallbackLogger.Errorf("The logger didn't stop in %s", waitLoggerCloseTimeout)
+	}
+}
+
+func (c *rootCommand) stopTracerProvider() {
+	ctx, cancel := context.WithTimeout(context.Background(), waitForTracerProviderStopTimeout)
+	defer cancel()
+
+	if err := c.globalState.TracerProvider.Shutdown(ctx); err != nil {
+		c.globalState.FallbackLogger.Errorf(
+			"The tracer provider didn't stop gracefully: %v", err,
+		)
 	}
 }
 
