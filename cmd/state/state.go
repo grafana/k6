@@ -14,6 +14,7 @@ import (
 
 	"go.k6.io/k6/event"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/trace"
 	"go.k6.io/k6/ui/console"
 )
 
@@ -35,12 +36,13 @@ const defaultConfigFileName = "config.json"
 type GlobalState struct {
 	Ctx context.Context
 
-	FS         fsext.Fs
-	Getwd      func() (string, error)
-	BinaryName string
-	CmdArgs    []string
-	Env        map[string]string
-	Events     *event.System
+	FS             fsext.Fs
+	Getwd          func() (string, error)
+	BinaryName     string
+	CmdArgs        []string
+	Env            map[string]string
+	Events         *event.System
+	TracerProvider *trace.TracerProvider
 
 	DefaultFlags, Flags GlobalFlags
 
@@ -106,23 +108,24 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 	defaultFlags := GetDefaultFlags(confDir)
 
 	return &GlobalState{
-		Ctx:          ctx,
-		FS:           fsext.NewOsFs(),
-		Getwd:        os.Getwd,
-		BinaryName:   filepath.Base(binary),
-		CmdArgs:      os.Args,
-		Env:          env,
-		Events:       event.NewEventSystem(100, logger),
-		DefaultFlags: defaultFlags,
-		Flags:        getFlags(defaultFlags, env),
-		OutMutex:     outMutex,
-		Stdout:       stdout,
-		Stderr:       stderr,
-		Stdin:        os.Stdin,
-		OSExit:       os.Exit,
-		SignalNotify: signal.Notify,
-		SignalStop:   signal.Stop,
-		Logger:       logger,
+		Ctx:            ctx,
+		FS:             fsext.NewOsFs(),
+		Getwd:          os.Getwd,
+		BinaryName:     filepath.Base(binary),
+		CmdArgs:        os.Args,
+		Env:            env,
+		Events:         event.NewEventSystem(100, logger),
+		TracerProvider: trace.NewNoopTracerProvider(),
+		DefaultFlags:   defaultFlags,
+		Flags:          getFlags(defaultFlags, env),
+		OutMutex:       outMutex,
+		Stdout:         stdout,
+		Stderr:         stderr,
+		Stdin:          os.Stdin,
+		OSExit:         os.Exit,
+		SignalNotify:   signal.Notify,
+		SignalStop:     signal.Stop,
+		Logger:         logger,
 		FallbackLogger: &logrus.Logger{ // we may modify the other one
 			Out:       stderr,
 			Formatter: new(logrus.TextFormatter), // no fancy formatting here

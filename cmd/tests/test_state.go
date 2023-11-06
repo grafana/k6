@@ -18,6 +18,7 @@ import (
 	"go.k6.io/k6/event"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/lib/trace"
 	"go.k6.io/k6/ui/console"
 )
 
@@ -85,16 +86,17 @@ func NewGlobalTestState(tb testing.TB) *GlobalTestState {
 	defaultFlags.Address = getFreeBindAddr(tb)
 
 	ts.GlobalState = &state.GlobalState{
-		Ctx:          ctx,
-		FS:           fs,
-		Getwd:        func() (string, error) { return ts.Cwd, nil },
-		BinaryName:   "k6",
-		CmdArgs:      []string{},
-		Env:          map[string]string{"K6_NO_USAGE_REPORT": "true"},
-		Events:       event.NewEventSystem(100, logger),
-		DefaultFlags: defaultFlags,
-		Flags:        defaultFlags,
-		OutMutex:     outMutex,
+		Ctx:            ctx,
+		FS:             fs,
+		Getwd:          func() (string, error) { return ts.Cwd, nil },
+		BinaryName:     "k6",
+		CmdArgs:        []string{},
+		Env:            map[string]string{"K6_NO_USAGE_REPORT": "true"},
+		Events:         event.NewEventSystem(100, logger),
+		TracerProvider: trace.NewNoopTracerProvider(),
+		DefaultFlags:   defaultFlags,
+		Flags:          defaultFlags,
+		OutMutex:       outMutex,
 		Stdout: &console.Writer{
 			Mutex:  outMutex,
 			Writer: ts.Stdout,
