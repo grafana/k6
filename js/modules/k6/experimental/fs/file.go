@@ -125,16 +125,16 @@ type SeekMode = int
 
 const (
 	// SeekModeStart sets the offset relative to the start of the file.
-	SeekModeStart SeekMode = iota + 1
+	SeekModeStart SeekMode = 0
 
 	// SeekModeCurrent seeks relative to the current offset.
-	SeekModeCurrent
+	SeekModeCurrent = 1
 
 	// SeekModeEnd seeks relative to the end of the file.
 	//
 	// When using this mode the seek operation will move backwards from
 	// the end of the file.
-	SeekModeEnd
+	SeekModeEnd = 2
 )
 
 func (f *file) size() int64 {

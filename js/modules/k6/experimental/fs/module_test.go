@@ -236,7 +236,7 @@ func TestFile(t *testing.T) {
 
 		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+			return afero.WriteFile(fs, testFilePath, []byte("01234"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -253,6 +253,12 @@ func TestFile(t *testing.T) {
 				throw 'expected read to return 3, got ' + bytesRead + ' instead';
 			}
 
+			// We expect the buffer to be filled with the three first
+			// bytes of the file, namely '012'.
+			if (buffer[0] !== 48 || buffer[1] !== 49 || buffer[2] !== 50) {
+				throw 'expected buffer to be [48, 49, 50], got ' + buffer + ' instead';
+			}
+
 			fileContent.set(buffer, 0);
 
 			bytesRead = await file.read(buffer)
@@ -260,11 +266,23 @@ func TestFile(t *testing.T) {
 				throw 'expected read to return 2, got ' + bytesRead + ' instead';
 			}
 
+			// We expect the buffer to hold the two last bytes of the
+			// file, namely '34', and as we read only two bytes, its last
+			// one is expected to be untouched from the previous read.
+			if (buffer[0] !== 51 || buffer[1] !== 52 || buffer[2] !== 50) {
+				throw 'expected buffer to be [51, 52, 50], got ' + buffer + ' instead';
+			}
+
 			fileContent.set(buffer.subarray(0, bytesRead), 3);
 
 			bytesRead = await file.read(buffer)
 			if (bytesRead !== null) {
 				throw 'expected read to return null, got ' + bytesRead + ' instead';
+			}
+
+			// We expect the buffer to be untouched.
+			if (buffer[0] !== 51 || buffer[1] !== 52 || buffer[2] !== 50) {
+				throw 'expected buffer to be [51, 52, 50], got ' + buffer + ' instead';
 			}
 		`, testFilePath)))
 
@@ -279,24 +297,29 @@ func TestFile(t *testing.T) {
 
 		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
 		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
 			const file = await fs.open(%q);
-			let buffer = new Uint8Array(5);
+			let buffer = new Uint8Array(3);
 
-			// Reading the whole file should return 5.
+			// Reading the whole file should return 3.
 			let bytesRead = await file.read(buffer);
-			if (bytesRead !== 5) {
-				throw 'expected read to return 5, got ' + bytesRead + ' instead';
+			if (bytesRead !== 3) {
+				throw 'expected read to return 3, got ' + bytesRead + ' instead';
 			}
 
-			// Reading from the end of the file should return null.
+			// Reading from the end of the file should return null and
+			// leave the buffer untouched.
 			bytesRead = await file.read(buffer);
 			if (bytesRead !== null) {
 				throw 'expected read to return null got ' + bytesRead + ' instead';
+			}
+
+			if (buffer[0] !== 48 || buffer[1] !== 49 || buffer[2] !== 50) {
+				throw 'expected buffer to be [48, 49, 50], got ' + buffer + ' instead';
 			}
 		`, testFilePath)))
 
@@ -414,7 +437,7 @@ func TestFile(t *testing.T) {
 
 		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -439,7 +462,7 @@ func TestFile(t *testing.T) {
 
 		testFilePath := fsext.FilePathSeparator + testFileName
 		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
