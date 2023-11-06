@@ -20,6 +20,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/lib/trace"
 	"go.k6.io/k6/log"
 )
 
@@ -80,6 +81,12 @@ func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error
 		return err
 	}
 	c.globalState.Logger.Debugf("k6 version: v%s", consts.FullVersion())
+
+	err = c.setupTracerProvider()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -298,4 +305,20 @@ func (c *rootCommand) setLoggerHook(ctx context.Context, h log.AsyncHook) {
 	}()
 	c.globalState.Logger.AddHook(h)
 	c.globalState.Logger.SetOutput(io.Discard) // don't output to anywhere else
+}
+
+func (c *rootCommand) setupTracerProvider() error {
+	switch line := c.globalState.Flags.TracesOutput; {
+	case line == "none":
+		// Use globalState default NoopTracerProvider.
+		return nil
+	default:
+		tp, err := trace.TracerProviderFromConfigLine(c.globalState.Ctx, line)
+		if err != nil {
+			return err
+		}
+		c.globalState.TracerProvider = tp
+	}
+
+	return nil
 }
