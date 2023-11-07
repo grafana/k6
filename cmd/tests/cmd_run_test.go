@@ -42,7 +42,7 @@ func TestVersion(t *testing.T) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 	stdout := ts.Stdout.String()
-	assert.Contains(t, stdout, "k6 version "+consts.Version)
+	assert.Contains(t, stdout, "k6 v"+consts.Version)
 	assert.Contains(t, stdout, runtime.Version())
 	assert.Contains(t, stdout, runtime.GOOS)
 	assert.Contains(t, stdout, runtime.GOARCH)
