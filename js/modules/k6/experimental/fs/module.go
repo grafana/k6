@@ -64,9 +64,8 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 func (mi *ModuleInstance) Open(path goja.Value) *goja.Promise {
 	promise, resolve, reject := promises.New(mi.vu)
 
-	// Files can only be opened in the init context.
 	if mi.vu.State() != nil {
-		reject(newFsError(ForbiddenError, "open() failed; reason: opening a file in the VU context is forbidden"))
+		reject(newFsError(ForbiddenError, "open() failed; reason: opening a file is allowed only in the Init context"))
 		return promise
 	}
 
@@ -190,7 +189,7 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	promise, resolve, reject := f.vu.Runtime().NewPromise()
 
 	if common.IsNullish(into) {
-		reject(newFsError(TypeError, "read() failed; reason: into cannot be null or undefined"))
+		reject(newFsError(TypeError, "read() failed; reason: into argument cannot be null or undefined"))
 		return promise
 	}
 

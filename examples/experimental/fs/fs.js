@@ -33,7 +33,6 @@ export default async function () {
 		}
 
 		// Do something useful with the content of the buffer
-
 		totalBytesRead += bytesRead;
 
 		// If bytesRead is less than the buffer size, we've read the whole file
