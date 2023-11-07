@@ -24,9 +24,9 @@ As the stability of any k6 release is pretty essential, this should be done only
 
 The latter also serves as a time to open/close issues that are related to the updates. There might be a bug fix for an open issue - we should test it and close the issue. Or there might be new functionality that can be used - probably an issue should be open.
 
-## Golang versions
+## Go versions
 
-We aim to support a building of the k6 binary with the two latest versions of golang, which reflects the support [policy](https://go.dev/doc/devel/release#policy) of the go team.
+We aim to support a building of the k6 binary with the two latest versions of golang, which reflects the support [policy](https://go.dev/doc/devel/release#policy) of the Go team.
 
 ## Exceptions
 
