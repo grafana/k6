@@ -193,11 +193,6 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 		return promise
 	}
 
-	// We expect the into argument to be a `Uint8Array` instance
-
-	// intoObj := into.ToObject(f.vu.Runtime())
-	// uint8ArrayConstructor := f.vu.Runtime().Get("Uint8Array")
-	// if isUint8Array := intoObj.Get("constructor").SameAs(uint8ArrayConstructor); !isUint8Array {
 	intoObj := into.ToObject(f.vu.Runtime())
 	if !isUint8Array(f.vu.Runtime(), intoObj) {
 		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
@@ -233,12 +228,6 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 				return nil
 			}
 
-			// The [file.Read] method will return an EOFError as soon as it reached
-			// the end of the file.
-			//
-			// However, following deno's behavior, we express
-			// EOF to users by returning null, when and only when there aren't any
-			// more bytes to read.
 			var fsErr *fsError
 			isFSErr := errors.As(readErr, &fsErr)
 

@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"sync"
 
-	"github.com/spf13/afero"
+	"go.k6.io/k6/lib/fsext"
 )
 
 // cache is a cache of opened files.
@@ -40,14 +40,14 @@ type cache struct {
 //
 // Parameters:
 //   - filename: The name of the file to be retrieved. This should be a relative or absolute path.
-//   - fromFs: The filesystem (from the afero package) from which the file should be read if not already cached.
+//   - fromFs: The filesystem (from the fsext package) from which the file should be read if not already cached.
 //
 // Returns:
 //   - A byte slice containing the content of the specified file.
 //   - An error if there's any issue opening or reading the file. If the file content is
 //     successfully cached and returned once, subsequent calls will not produce
 //     file-related errors for the same file, as the cached value will be used.
-func (fr *cache) open(filename string, fromFs afero.Fs) (data []byte, err error) {
+func (fr *cache) open(filename string, fromFs fsext.Fs) (data []byte, err error) {
 	filename = filepath.Clean(filename)
 
 	if f, ok := fr.openedFiles.Load(filename); ok {
@@ -59,9 +59,9 @@ func (fr *cache) open(filename string, fromFs afero.Fs) (data []byte, err error)
 		return data, nil
 	}
 
-	// The underlying afero.Fs.Open method will cache the file content during this
+	// The underlying fsext.Fs.Open method will cache the file content during this
 	// operation. Which will lead to effectively holding the content of the file in memory twice.
-	// However, as per #1079, we plan to eventually reduce our dependency on afero, and
+	// However, as per #1079, we plan to eventually reduce our dependency on fsext, and
 	// expect this issue to be resolved at that point.
 	// TODO: re-evaluate opening from the FS this once #1079 is resolved.
 	f, err := fromFs.Open(filename)
@@ -77,7 +77,7 @@ func (fr *cache) open(filename string, fromFs afero.Fs) (data []byte, err error)
 
 	data, err = io.ReadAll(f)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to read the content of file %s: %w", filename, err)
 	}
 
 	fr.openedFiles.Store(filename, data)
