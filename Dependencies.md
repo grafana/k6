@@ -26,7 +26,7 @@ The latter also serves as a time to open/close issues that are related to the up
 
 ## Golang versions
 
-We aim to support a building of the k6 binary with the two latest versions of golang, which reflects the support policy of the go team.
+We aim to support a building of the k6 binary with the two latest versions of golang, which reflects the support [policy](https://go.dev/doc/devel/release#policy) of the go team.
 
 ## Exceptions
 
