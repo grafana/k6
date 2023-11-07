@@ -24,6 +24,10 @@ As the stability of any k6 release is pretty essential, this should be done only
 
 The latter also serves as a time to open/close issues that are related to the updates. There might be a bug fix for an open issue - we should test it and close the issue. Or there might be new functionality that can be used - probably an issue should be open.
 
+## Go versions
+
+We aim to support a building of the k6 binary with the two latest versions of golang, which reflects the support [policy](https://go.dev/doc/devel/release#policy) of the Go team.
+
 ## Exceptions
 
 There are some dependencies that we really don't use all that much, intend on removing and as a general note don't need anything else from them. Given that we currently have no problems that updates will fix - we prefer to not update them as not to introduce bugs. Also, for some they bring additional dependencies that we do not want, which is just one more reason not to update them.
@@ -40,8 +44,7 @@ List (as of March 2022):
 
 ## How to do it
 
-
-Currently, I will recommend using [modtools](https://github.com/dop251/modtools).
+For updating dependencies we recommend to use [modtools](https://github.com/dop251/modtools).
 
 Running `modtools check --direct-only` will give you a list of packages that aren't frozen (the ones above in the exceptions). Alternatively just running `go get <dependency>` for each direct dependency, which also will tell you if there was an update.
 
