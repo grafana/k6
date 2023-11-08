@@ -3,8 +3,8 @@ package fs
 import (
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
+	"go.k6.io/k6/lib/fsext"
 )
 
 func TestFileCacheOpen(t *testing.T) {
@@ -14,8 +14,8 @@ func TestFileCacheOpen(t *testing.T) {
 		t.Parallel()
 
 		cache := &cache{}
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, "bonjour.txt", []byte("Bonjour, le monde"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, "bonjour.txt", []byte("Bonjour, le monde"), 0o644)
 		})
 
 		_, gotBeforeOk := cache.openedFiles.Load("bonjour.txt")
@@ -32,8 +32,8 @@ func TestFileCacheOpen(t *testing.T) {
 		t.Parallel()
 
 		cache := &cache{}
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, "bonjour.txt", []byte("Bonjour, le monde"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, "bonjour.txt", []byte("Bonjour, le monde"), 0o644)
 		})
 
 		firstData, firstErr := cache.open("bonjour.txt", fs)
