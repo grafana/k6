@@ -109,7 +109,7 @@ func (mi *ModuleInstance) openImpl(path string) (*File, error) {
 
 	fs, ok := initEnv.FileSystems["file"]
 	if !ok {
-		return nil,  errors.New("open() failed; reason: unable to access the file system")
+		return nil, errors.New("open() failed; reason: unable to access the file system")
 	}
 
 	if exists, err := fsext.Exists(fs, path); err != nil {
