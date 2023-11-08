@@ -1,9 +1,10 @@
-package log
+package parseutils
 
 import "fmt"
 
-type token struct {
-	key, value string
+// Token represents a key-value token.
+type Token struct {
+	Key, Value string
 	inside     rune // shows whether it's inside a given collection, currently [ means it's an array
 }
 
@@ -64,8 +65,10 @@ func (t *tokenizer) readArray() (string, error) {
 	return t.s[start:], fmt.Errorf("array value for key `%s` didn't end", t.currentKey)
 }
 
-func tokenize(s string) ([]token, error) {
-	result := []token{}
+// Tokenize parses the input string into key-value tokens according to format:
+// key1=value1,key2=value2,...,keyN=valueN.
+func Tokenize(s string) ([]Token, error) {
+	result := []Token{}
 	t := &tokenizer{s: s}
 
 	var err error
@@ -79,9 +82,9 @@ func tokenize(s string) ([]token, error) {
 			t.i++
 			value, err = t.readArray()
 
-			result = append(result, token{
-				key:    t.currentKey,
-				value:  value,
+			result = append(result, Token{
+				Key:    t.currentKey,
+				Value:  value,
 				inside: '[',
 			})
 			if err != nil {
@@ -89,9 +92,9 @@ func tokenize(s string) ([]token, error) {
 			}
 		} else {
 			value = t.readValue()
-			result = append(result, token{
-				key:   t.currentKey,
-				value: value,
+			result = append(result, Token{
+				Key:   t.currentKey,
+				Value: value,
 			})
 		}
 	}
