@@ -577,10 +577,10 @@ func TestOpenImpl(t *testing.T) {
 			cache: &cache{},
 		}
 
-		assert.Panics(t, func() {
-			//nolint:errcheck,gosec
-			mi.openImpl(testFileName)
-		})
+		f, gotErr := mi.openImpl(testFileName)
+
+		assert.Error(t, gotErr)
+		assert.Nil(t, f)
 	})
 
 	t.Run("should return an error if the file does not exist", func(t *testing.T) {

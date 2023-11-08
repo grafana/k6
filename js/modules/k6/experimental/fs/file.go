@@ -35,7 +35,7 @@ type FileInfo struct {
 	Name string `json:"name"`
 
 	// Size holds the size of the file in bytes.
-	Size int `json:"size"`
+	Size int64 `json:"size"`
 }
 
 // Read reads up to len(into) bytes into the provided byte slice.
