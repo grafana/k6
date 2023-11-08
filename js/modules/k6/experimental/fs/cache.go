@@ -61,7 +61,7 @@ func (fr *cache) open(filename string, fromFs fsext.Fs) (data []byte, err error)
 
 	// The underlying fsext.Fs.Open method will cache the file content during this
 	// operation. Which will lead to effectively holding the content of the file in memory twice.
-	// However, as per #1079, we plan to eventually reduce our dependency on fsext, and
+	// However, as per #1079, we plan to eventually reduce our dependency on afero, and
 	// expect this issue to be resolved at that point.
 	// TODO: re-evaluate opening from the FS this once #1079 is resolved.
 	f, err := fromFs.Open(filename)
