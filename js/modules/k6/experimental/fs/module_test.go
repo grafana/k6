@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/spf13/afero"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/compiler"
@@ -55,8 +54,8 @@ func TestOpen(t *testing.T) {
 				runtime, err := newConfiguredRuntime(t)
 				require.NoError(t, err)
 
-				fs := newTestFs(t, func(fs afero.Fs) error {
-					fileErr := afero.WriteFile(fs, tt.wantPath, []byte("Bonjour, le monde"), 0o644)
+				fs := newTestFs(t, func(fs fsext.Fs) error {
+					fileErr := fsext.WriteFile(fs, tt.wantPath, []byte("Bonjour, le monde"), 0o644)
 					if fileErr != nil {
 						return fileErr
 					}
@@ -156,7 +155,7 @@ func TestOpen(t *testing.T) {
 		require.NoError(t, err)
 
 		testDirPath := fsext.FilePathSeparator + "dir"
-		fs := newTestFs(t, func(fs afero.Fs) error {
+		fs := newTestFs(t, func(fs fsext.Fs) error {
 			return fs.Mkdir(testDirPath, 0o644)
 		})
 
@@ -207,8 +206,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -235,8 +234,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("01234"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("01234"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -254,7 +253,7 @@ func TestFile(t *testing.T) {
 			}
 
 			// We expect the buffer to be filled with the three first
-			// bytes of the file, namely '012'.
+			// bytes of the file.
 			if (buffer[0] !== 48 || buffer[1] !== 49 || buffer[2] !== 50) {
 				throw 'expected buffer to be [48, 49, 50], got ' + buffer + ' instead';
 			}
@@ -267,7 +266,7 @@ func TestFile(t *testing.T) {
 			}
 
 			// We expect the buffer to hold the two last bytes of the
-			// file, namely '34', and as we read only two bytes, its last
+			// file, and as we read only two bytes, its last
 			// one is expected to be untouched from the previous read.
 			if (buffer[0] !== 51 || buffer[1] !== 52 || buffer[2] !== 50) {
 				throw 'expected buffer to be [51, 52, 50], got ' + buffer + ' instead';
@@ -296,8 +295,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("012"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -333,8 +332,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("Bonjour, le monde"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -401,8 +400,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("012"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -436,8 +435,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("012"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -461,8 +460,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("012"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("012"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -488,8 +487,8 @@ func TestFile(t *testing.T) {
 		require.NoError(t, err)
 
 		testFilePath := fsext.FilePathSeparator + testFileName
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("hello"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
@@ -608,7 +607,7 @@ func TestOpenImpl(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		fs := newTestFs(t, func(fs afero.Fs) error {
+		fs := newTestFs(t, func(fs fsext.Fs) error {
 			return fs.Mkdir("/dir", 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
@@ -631,8 +630,8 @@ func TestOpenImpl(t *testing.T) {
 		runtime, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
 
-		fs := newTestFs(t, func(fs afero.Fs) error {
-			return afero.WriteFile(fs, "/bonjour.txt", []byte("Bonjour, le monde"), 0o644)
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, "/bonjour.txt", []byte("Bonjour, le monde"), 0o644)
 		})
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 		runtime.VU.InitEnvField.CWD = &url.URL{Scheme: "file", Path: "/dir"}
@@ -674,10 +673,10 @@ func newConfiguredRuntime(t testing.TB) (*modulestest.Runtime, error) {
 // newTestFs is a helper function that creates a new in-memory file system and calls the provided
 // function with it. The provided function is expected to use the file system to create files and
 // directories.
-func newTestFs(t *testing.T, fn func(fs afero.Fs) error) afero.Fs {
+func newTestFs(t *testing.T, fn func(fs fsext.Fs) error) fsext.Fs {
 	t.Helper()
 
-	fs := afero.NewMemMapFs()
+	fs := fsext.NewMemMapFs()
 
 	err := fn(fs)
 	if err != nil {
