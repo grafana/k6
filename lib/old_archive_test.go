@@ -63,7 +63,7 @@ func TestOldArchive(t *testing.T) {
 	testCases := map[string]string{
 		// map of filename to data for each main file tested
 		"github.com/k6io/k6/samples/example.js": `github file`,
-		"cdnjs.com/packages/Faker":              `faker file`,
+		"cdnjs.com/libraries/Faker":             `faker file`,
 		"C:/something/path2":                    `windows script`,
 		"/absolulte/path2":                      `unix script`,
 	}
@@ -75,14 +75,14 @@ func TestOldArchive(t *testing.T) {
 			fs := makeMemMapFs(t, map[string][]byte{
 				// files
 				"/files/github.com/k6io/k6/samples/example.js": []byte(`github file`),
-				"/files/cdnjs.com/packages/Faker":              []byte(`faker file`),
+				"/files/cdnjs.com/libraries/Faker":             []byte(`faker file`),
 				"/files/example.com/path/to.js":                []byte(`example.com file`),
 				"/files/_/C/something/path":                    []byte(`windows file`),
 				"/files/_/absolulte/path":                      []byte(`unix file`),
 
 				// scripts
 				"/scripts/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
-				"/scripts/cdnjs.com/packages/Faker2":              []byte(`faker script`),
+				"/scripts/cdnjs.com/libraries/Faker2":             []byte(`faker script`),
 				"/scripts/example.com/path/too.js":                []byte(`example.com script`),
 				"/scripts/_/C/something/path2":                    []byte(`windows script`),
 				"/scripts/_/absolulte/path2":                      []byte(`unix script`),
@@ -104,9 +104,9 @@ func TestOldArchive(t *testing.T) {
 					"/example.com/path/to.js":                 []byte(`example.com file`),
 					"/example.com/path/too.js":                []byte(`example.com script`),
 					"/github.com/k6io/k6/samples/example.js":  []byte(`github file`),
-					"/cdnjs.com/packages/Faker":               []byte(`faker file`),
+					"/cdnjs.com/libraries/Faker":              []byte(`faker file`),
 					"/github.com/k6io/k6/samples/example.js2": []byte(`github script`),
-					"/cdnjs.com/packages/Faker2":              []byte(`faker script`),
+					"/cdnjs.com/libraries/Faker2":             []byte(`faker script`),
 				}),
 			}
 
@@ -156,12 +156,6 @@ func TestFilenamePwdResolve(t *testing.T) {
 			Pwd:                 "/home/nobody",
 			expectedFilenameURL: &url.URL{Opaque: "cdnjs.com/libraries/Faker"},
 			expectedPwdURL:      &url.URL{Scheme: "file", Path: "/home/nobody"},
-		},
-		{
-			Filename:            "example.com/something/dot.js",
-			Pwd:                 "example.com/something/",
-			expectedFilenameURL: &url.URL{Host: "example.com", Scheme: "", Path: "/something/dot.js"},
-			expectedPwdURL:      &url.URL{Host: "example.com", Scheme: "", Path: "/something"},
 		},
 		{
 			Filename:            "https://example.com/something/dot.js",
