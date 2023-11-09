@@ -1173,6 +1173,17 @@ func (p *Page) Title() string {
 // ThrottleNetwork will slow the network down to simulate a slow network e.g.
 // simulating a slow 3G connection.
 func (p *Page) ThrottleNetwork(networkProfile NetworkProfile) error {
+	p.logger.Debugf("Page:ThrottleNetwork", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+
+	for _, fs := range p.frameSessions {
+		if err := fs.throttleNetwork(networkProfile); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
