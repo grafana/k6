@@ -742,6 +742,22 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 	}
 }
 
+// ThrottleNetwork changes the network attributes in chrome to simulate slower
+// networks e.g. a slow 3G connection.
+func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
+	action := network.EmulateNetworkConditions(
+		m.offline,
+		networkProfile.Latency,
+		networkProfile.DownloadThroughput,
+		networkProfile.UploadThroughput,
+	)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("throttling network: %w", err)
+	}
+
+	return nil
+}
+
 // SetUserAgent overrides the browser user agent string.
 func (m *NetworkManager) SetUserAgent(userAgent string) {
 	action := emulation.SetUserAgentOverride(userAgent)
