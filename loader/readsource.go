@@ -46,19 +46,12 @@ func ReadSource(
 	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd)) + "/"}
 	srcURL, err := Resolve(pwdURL, filepath.ToSlash(src))
 	if err != nil {
-		var noSchemeError noSchemeRemoteModuleResolutionError
-		if errors.As(err, &noSchemeError) {
-			// TODO maybe try to wrap the original error here as well, without butchering the message
-			return nil, fmt.Errorf(nothingWorkedLoadedMsg, noSchemeError.moduleSpecifier, noSchemeError.err)
+		var unresolvedError unresolvableURLError
+		if errors.As(err, &unresolvedError) {
+			//nolint:stylecheck
+			return nil, fmt.Errorf(fileSchemeCouldntBeLoadedMsg, (string)(unresolvedError))
 		}
 		return nil, err
 	}
-	result, err := Load(logger, filesystems, srcURL, src)
-	var noSchemeError noSchemeRemoteModuleResolutionError
-	if errors.As(err, &noSchemeError) {
-		// TODO maybe try to wrap the original error here as well, without butchering the message
-		return nil, fmt.Errorf(nothingWorkedLoadedMsg, noSchemeError.moduleSpecifier, noSchemeError.err)
-	}
-
-	return result, err
+	return Load(logger, filesystems, srcURL, src)
 }

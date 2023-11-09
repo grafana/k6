@@ -697,7 +697,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *g
 			return fs.ReadFile(currentFS, specifier.Path[1:])
 		},
 		comp)
-	u := &url.URL{Path: path.Join(ctx.base, name)}
+	u := &url.URL{Scheme: "file", Path: path.Join(ctx.base, name)}
 
 	base := u.JoinPath("..")
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)

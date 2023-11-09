@@ -49,9 +49,8 @@ func TestResolve(t *testing.T) {
 		t.Run("Missing", func(t *testing.T) {
 			t.Parallel()
 			u, err := loader.Resolve(root, "example.com/html")
-			require.NoError(t, err)
-			assert.Equal(t, u.String(), "//example.com/html")
-			// TODO: check that warning will be emitted if Loaded
+			require.ErrorContains(t, err, "The moduleSpecifier \"example.com/html\" couldn't be recognised as something k6 supports")
+			require.Nil(t, u)
 		})
 		t.Run("WS", func(t *testing.T) {
 			t.Parallel()
@@ -245,18 +244,11 @@ func TestLoad(t *testing.T) {
 		root, err := url.Parse("file:///")
 		require.NoError(t, err)
 
-		t.Run("IP URL", func(t *testing.T) {
-			t.Parallel()
-			_, err := loader.Resolve(root, "192.168.0.%31")
-			require.Error(t, err)
-			require.Contains(t, err.Error(), `invalid URL escape "%31"`)
-		})
-
 		testData := [...]struct {
 			name, moduleSpecifier string
 		}{
 			{"URL", sr("HTTPSBIN_URL/invalid")},
-			{"HOST", "some-path-that-doesnt-exist.js"},
+			{"HOST", "https://some-path-that-doesnt-exist.js"},
 		}
 
 		filesystems := map[string]fsext.Fs{"https": fsext.NewMemMapFs()}
