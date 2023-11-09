@@ -6,7 +6,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"image/png"
+	"io"
 	"net/http"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -1076,6 +1078,102 @@ func TestPageWaitForSelector(t *testing.T) {
 
 			_, err = page.WaitForSelector(tc.selector, tb.toGojaValue(tc.opts))
 			tc.errAssert(t, err)
+		})
+	}
+}
+
+func TestPageThrottleNetwork(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name                     string
+		networkProfile           common.NetworkProfile
+		wantMinRoundTripDuration int64
+	}{
+		{
+			name: "none",
+			networkProfile: common.NetworkProfile{
+				Latency:            0,
+				DownloadThroughput: -1,
+				UploadThroughput:   -1,
+			},
+		},
+		{
+			// In the ping.html file, an async ping request is made. The time it takes
+			// to perform the roundtrip of calling ping and getting the response is
+			// measured and used to assert that Latency has been correctly used.
+			name: "latency",
+			networkProfile: common.NetworkProfile{
+				Latency:            100,
+				DownloadThroughput: -1,
+				UploadThroughput:   -1,
+			},
+			wantMinRoundTripDuration: 100,
+		},
+		{
+			// In the ping.html file, an async ping request is made, the ping response
+			// returns the request body (around a 1MB). The time it takes to perform the
+			// roundtrip of calling ping and getting the response body is measured and
+			// used to assert that DownloadThroughput has been correctly used.
+			name: "download_throughput",
+			networkProfile: common.NetworkProfile{
+				Latency:            0,
+				DownloadThroughput: 1000,
+				UploadThroughput:   -1,
+			},
+			wantMinRoundTripDuration: 1000,
+		},
+		{
+			// In the ping.html file, an async ping request is made with around a 1MB body.
+			// The time it takes to perform the roundtrip of calling ping is measured
+			// and used to assert that UploadThroughput has been correctly used.
+			name: "upload_throughput",
+			networkProfile: common.NetworkProfile{
+				Latency:            0,
+				DownloadThroughput: -1,
+				UploadThroughput:   1000,
+			},
+			wantMinRoundTripDuration: 1000,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+
+			tb.withHandler("/ping", func(w http.ResponseWriter, req *http.Request) {
+				defer func() {
+					err := req.Body.Close()
+					require.NoError(t, err)
+				}()
+				bb, err := io.ReadAll(req.Body)
+				require.NoError(t, err)
+
+				fmt.Fprint(w, string(bb))
+			})
+
+			page := tb.NewPage(nil)
+
+			err := page.ThrottleNetwork(tc.networkProfile)
+			require.NoError(t, err)
+
+			_, err = page.Goto(tb.staticURL("ping.html"), nil)
+			require.NoError(t, err)
+
+			selector := `div[id="result"]`
+
+			// result selector only appears once the page gets a response
+			// from the async ping request.
+			_, err = page.WaitForSelector(selector, nil)
+			require.NoError(t, err)
+
+			resp := page.InnerText(selector, nil)
+			ms, err := strconv.ParseInt(resp, 10, 64)
+			require.NoError(t, err)
+			assert.GreaterOrEqual(t, ms, tc.wantMinRoundTripDuration)
 		})
 	}
 }
