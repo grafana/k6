@@ -14,6 +14,8 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/sirupsen/logrus"
+	"github.com/sirupsen/logrus/hooks/writer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -32,6 +34,51 @@ type jsFrameBaseOpts struct {
 }
 
 const sampleHTML = `<div><b>Test</b><ol><li><i>One</i></li></ol></div>`
+
+func TestNestedFrames(t *testing.T) {
+	t.Parallel()
+
+	buf := bytes.NewBufferString("")
+	tb := newTestBrowser(t,
+		withFileServer(),
+		func(tb *testBrowser) {
+			if !tb.isBrowserTypeInitialized {
+				return
+			}
+			tb.vu.StateField.Logger.(*logrus.Logger).AddHook(&writer.Hook{Writer: buf, LogLevels: []logrus.Level{logrus.InfoLevel}})
+		},
+	)
+	defer tb.Browser.Close()
+
+	page := tb.NewPage(nil)
+	_, err := page.Goto(tb.staticURL("iframe_test_main.html"), nil)
+	require.NoError(t, err)
+
+	frame1Handle, err := page.WaitForSelector("iframe[id='iframe1']", nil)
+	assert.Nil(t, err)
+	assert.NotNil(t, frame1Handle)
+
+	frame1, err := frame1Handle.ContentFrame()
+	assert.Nil(t, err)
+	assert.NotNil(t, frame1)
+
+	frame2Handle, err := frame1.WaitForSelector("iframe[id='iframe2']", nil)
+	assert.Nil(t, err)
+	assert.NotNil(t, frame2Handle)
+
+	frame2, err := frame2Handle.ContentFrame()
+	assert.Nil(t, err)
+	assert.NotNil(t, frame2)
+
+	button1Handle, err := frame2.WaitForSelector("button[id='button1']", nil)
+	assert.Nil(t, err)
+	assert.NotNil(t, button1Handle)
+
+	err = button1Handle.Click(nil)
+	assert.Nil(t, err)
+
+	assert.Contains(t, buf.String(), "button1 clicked")
+}
 
 func TestPageEmulateMedia(t *testing.T) {
 	t.Parallel()
