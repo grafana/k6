@@ -28,6 +28,18 @@ import (
 	"github.com/dop251/goja"
 )
 
+// NetworkProfile is used in ThrottleNetwork.
+type NetworkProfile struct {
+	// Minimum latency from request sent to response headers received (ms).
+	Latency float64
+
+	// Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
+	DownloadThroughput float64
+
+	// Maximal aggregated upload throughput (bytes/sec). -1 disables upload throttling.
+	UploadThroughput float64
+}
+
 // Credentials holds HTTP authentication credentials.
 type Credentials struct {
 	Username string `js:"username"`

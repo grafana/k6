@@ -1170,6 +1170,12 @@ func (p *Page) Title() string {
 	return gojaValueToString(p.ctx, p.Evaluate(v))
 }
 
+// ThrottleNetwork will slow the network down to simulate a slow network e.g.
+// simulating a slow 3G connection.
+func (p *Page) ThrottleNetwork(networkProfile NetworkProfile) error {
+	return nil
+}
+
 func (p *Page) Type(selector string, text string, opts goja.Value) {
 	p.logger.Debugf("Page:Type", "sid:%v selector:%s text:%s", p.sessionID(), selector, text)
 

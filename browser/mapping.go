@@ -544,6 +544,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"setViewportSize":             p.SetViewportSize,
 		"tap":                         p.Tap,
 		"textContent":                 p.TextContent,
+		"throttleNetwork":             p.ThrottleNetwork,
 		"title":                       p.Title,
 		"touchscreen":                 rt.ToValue(p.GetTouchscreen()).ToObject(rt),
 		"type":                        p.Type,

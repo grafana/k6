@@ -343,6 +343,7 @@ type pageAPI interface {
 	SetViewportSize(viewportSize goja.Value)
 	Tap(selector string, opts goja.Value)
 	TextContent(selector string, opts goja.Value) string
+	ThrottleNetwork(common.NetworkProfile) error
 	Title() string
 	Type(selector string, text string, opts goja.Value)
 	Uncheck(selector string, opts goja.Value)
