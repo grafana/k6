@@ -1173,6 +1173,17 @@ func (p *Page) Title() string {
 // ThrottleCPU will slow the CPU down from chrome's perspective to simulate
 // a test being run on a slower device.
 func (p *Page) ThrottleCPU(cpuProfile CPUProfile) error {
+	p.logger.Debugf("Page:ThrottleCPU", "sid:%v", p.sessionID())
+
+	p.frameSessionsMu.RLock()
+	defer p.frameSessionsMu.RUnlock()
+
+	for _, fs := range p.frameSessions {
+		if err := fs.throttleCPU(cpuProfile); err != nil {
+			return err
+		}
+	}
+
 	return nil
 }
 
