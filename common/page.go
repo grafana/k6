@@ -1170,6 +1170,12 @@ func (p *Page) Title() string {
 	return gojaValueToString(p.ctx, p.Evaluate(v))
 }
 
+// ThrottleCPU will slow the CPU down from chrome's perspective to simulate
+// a test being run on a slower device.
+func (p *Page) ThrottleCPU(cpuProfile CPUProfile) error {
+	return nil
+}
+
 // ThrottleNetwork will slow the network down to simulate a slow network e.g.
 // simulating a slow 3G connection.
 func (p *Page) ThrottleNetwork(networkProfile NetworkProfile) error {

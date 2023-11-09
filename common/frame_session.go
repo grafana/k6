@@ -32,6 +32,12 @@ import (
 
 const utilityWorldName = "__k6_browser_utility_world__"
 
+// CPUProfile is used in throttleCPU.
+type CPUProfile struct {
+	// rate as a slowdown factor (1 is no throttle, 2 is 2x slowdown, etc).
+	Rate float64
+}
+
 /*
 FrameSession is used for managing a frame's life-cycle, or in other words its full session.
 It manages all the event listening while deferring the state storage to the Frame and FrameManager
