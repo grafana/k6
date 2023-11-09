@@ -47,7 +47,6 @@ func TestVersion(t *testing.T) {
 	ts := NewGlobalTestState(t)
 
 	for _, tc := range tests {
-
 		ts.CmdArgs = []string{"k6", tc.args}
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
