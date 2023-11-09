@@ -1022,6 +1022,12 @@ func (fs *FrameSession) updateOffline(initial bool) {
 	}
 }
 
+func (fs *FrameSession) throttleNetwork(networkProfile NetworkProfile) error {
+	fs.logger.Debugf("NewFrameSession:throttleNetwork", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
+
+	return fs.networkManager.ThrottleNetwork(networkProfile)
+}
+
 func (fs *FrameSession) updateRequestInterception(enable bool) error {
 	fs.logger.Debugf("NewFrameSession:updateRequestInterception",
 		"sid:%v tid:%v on:%v",
