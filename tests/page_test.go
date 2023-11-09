@@ -1177,3 +1177,61 @@ func TestPageThrottleNetwork(t *testing.T) {
 		})
 	}
 }
+
+// This test will first navigate to the ping.html site a few times, record the
+// average time it takes to run the test. Next it will repeat the steps but
+// first apply CPU throttling. The average duration with CPU throttling
+// enabled should be longer than without it.
+func TestPageThrottleCPU(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withFileServer())
+
+	tb.withHandler("/ping", func(w http.ResponseWriter, req *http.Request) {
+		defer func() {
+			err := req.Body.Close()
+			require.NoError(t, err)
+		}()
+		bb, err := io.ReadAll(req.Body)
+		require.NoError(t, err)
+
+		fmt.Fprint(w, string(bb))
+	})
+
+	page := tb.NewPage(nil)
+	const iterations = 5
+
+	noCPUThrottle := performPingTest(t, tb, page, iterations)
+
+	err := page.ThrottleCPU(common.CPUProfile{
+		Rate: 50,
+	})
+	require.NoError(t, err)
+
+	withCPUThrottle := performPingTest(t, tb, page, iterations)
+
+	assert.Greater(t, withCPUThrottle, noCPUThrottle)
+}
+
+func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iterations int) int64 {
+	t.Helper()
+
+	var ms int64
+	for i := 0; i < iterations; i++ {
+		start := time.Now()
+
+		_, err := page.Goto(tb.staticURL("ping.html"), nil)
+		require.NoError(t, err)
+
+		selector := `div[id="result"]`
+
+		// result selector only appears once the page gets a response
+		// from the async ping request.
+		_, err = page.WaitForSelector(selector, nil)
+		require.NoError(t, err)
+
+		ms += time.Since(start).Abs().Milliseconds()
+	}
+
+	return ms / int64(iterations)
+}
