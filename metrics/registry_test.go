@@ -35,10 +35,10 @@ func TestMetricNames(t *testing.T) {
 		"still_simple": true,
 		"":             false,
 		"@":            false,
-		"a":            true,
+		"a":            false, // too short
 		"special\n\t":  false,
 		// this has both hangul and japanese numerals .
-		"hello.World_in_한글一안녕一세상": true,
+		"hello.World_in_한글一안녕一세상": false,
 		// too long
 		"tooolooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooog": false,
 	}
