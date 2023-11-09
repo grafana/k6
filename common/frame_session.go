@@ -1034,6 +1034,15 @@ func (fs *FrameSession) throttleNetwork(networkProfile NetworkProfile) error {
 	return fs.networkManager.ThrottleNetwork(networkProfile)
 }
 
+func (fs *FrameSession) throttleCPU(cpuProfile CPUProfile) error {
+	action := emulation.SetCPUThrottlingRate(cpuProfile.Rate)
+	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return fmt.Errorf("throttling CPU: %w", err)
+	}
+
+	return nil
+}
+
 func (fs *FrameSession) updateRequestInterception(enable bool) error {
 	fs.logger.Debugf("NewFrameSession:updateRequestInterception",
 		"sid:%v tid:%v on:%v",
