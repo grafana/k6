@@ -9,6 +9,7 @@ import (
 	"sync"
 
 	"github.com/sirupsen/logrus"
+	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/metrics"
@@ -17,6 +18,11 @@ import (
 // DialContexter is an interface that can dial with a context
 type DialContexter interface {
 	DialContext(ctx context.Context, network, addr string) (net.Conn, error)
+}
+
+// TracerProvider provides methods for OTEL tracers initialization.
+type TracerProvider interface {
+	Tracer(name string, options ...trace.TracerOption) trace.Tracer
 }
 
 // State provides the volatile state for a VU.
@@ -75,6 +81,9 @@ type State struct {
 	// unique globally across k6 instances (taking into account execution
 	// segments).
 	GetScenarioGlobalVUIter func() uint64
+
+	// Tracing instrumentation.
+	TracerProvider TracerProvider
 }
 
 // VUStateTags wraps the current VU's tags and ensures a thread-safe way to

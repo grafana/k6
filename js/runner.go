@@ -251,6 +251,7 @@ func (r *Runner) newVU(
 		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
 		Group:          r.defaultGroup,
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
+		TracerProvider: r.preInitState.TracerProvider,
 	}
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
