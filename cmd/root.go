@@ -52,7 +52,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	}
 
 	rootCmd.SetVersionTemplate(
-		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s" .Version}}\n`,
+		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s\n" .Version}}`,
 	)
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.CmdArgs[1:])
