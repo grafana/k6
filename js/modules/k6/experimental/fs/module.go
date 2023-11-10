@@ -140,8 +140,8 @@ func (mi *ModuleInstance) openImpl(path string) (*File, error) {
 			path: path,
 			data: data,
 		},
-		vu:       mi.vu,
-		registry: mi.cache,
+		vu:    mi.vu,
+		cache: mi.cache,
 	}, nil
 }
 
@@ -162,10 +162,10 @@ type File struct {
 	// promises that are handled by the VU's runtime.
 	vu modules.VU
 
-	// registry holds a pointer to the file registry this file is associated
+	// cache holds a pointer to the file cache this file is associated
 	// with. That way we are able to close the file when it's not needed
 	// anymore.
-	registry *cache
+	cache *cache
 }
 
 // Stat returns a promise that will resolve to a [FileInfo] instance describing

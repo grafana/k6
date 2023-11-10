@@ -54,7 +54,7 @@ type cache struct {
 }
 
 // open retrieves the content of a given file from the specified filesystem (fromFs) and
-// stores it in the registry's internal `openedFiles` map.
+// stores it in the cache's internal `openedFiles` map.
 //
 // The function cleans the provided filename using filepath.Clean before using it.
 //
@@ -81,7 +81,7 @@ func (fr *cache) open(filename string, fromFs fsext.Fs) (data []byte, err error)
 	if f, ok := fr.openedFiles.Load(filename); ok {
 		data, ok = f.([]byte)
 		if !ok {
-			panic(fmt.Errorf("registry's file %s is not stored as a byte slice", filename))
+			panic(fmt.Errorf("cache's file %s is not stored as a byte slice", filename))
 		}
 
 		return data, nil
