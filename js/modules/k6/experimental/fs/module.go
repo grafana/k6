@@ -7,6 +7,7 @@ package fs
 import (
 	"errors"
 	"fmt"
+	"reflect"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
@@ -259,13 +260,13 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 	promise, resolve, reject := f.vu.Runtime().NewPromise()
 
-	intOffset, err := exportInt(f.vu.Runtime(), offset)
+	intOffset, err := exportInt(offset)
 	if err != nil {
 		reject(newFsError(TypeError, "seek() failed; reason: the offset argument "+err.Error()))
 		return promise
 	}
 
-	intWhence, err := exportInt(f.vu.Runtime(), whence)
+	intWhence, err := exportInt(whence)
 	if err != nil {
 		reject(newFsError(TypeError, "seek() failed; reason: the whence argument "+err.Error()))
 		return promise
@@ -306,15 +307,18 @@ func isUint8Array(rt *goja.Runtime, o *goja.Object) bool {
 	return true
 }
 
-func exportInt(rt *goja.Runtime, v goja.Value) (int64, error) {
+func exportInt(v goja.Value) (int64, error) {
 	if common.IsNullish(v) {
 		return 0, errors.New("cannot be null or undefined")
 	}
 
-	var i int64
-	if err := rt.ExportTo(v, &i); err != nil {
-		return 0, errors.New("cannot be interpreted as integer")
+	// We initially tried using `ExportTo` with a int64 value argument, however
+	// this led to a string passed as argument not being an error.
+	// Thus, we explicitly check that the value is a number, by comparing
+	// its export type to the type of an int64.
+	if v.ExportType().Kind() != reflect.Int64 {
+		return 0, errors.New("must be a number")
 	}
 
-	return i, nil
+	return v.ToInteger(), nil
 }
