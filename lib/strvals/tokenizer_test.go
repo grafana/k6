@@ -1,4 +1,4 @@
-package parseutils
+package strvals
 
 import (
 	"testing"

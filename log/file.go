@@ -13,7 +13,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/parseutils"
+	strvals "go.k6.io/k6/lib/strvals"
 )
 
 // fileHookBufferSize is a default size for the fileHook's loglines channel.
@@ -56,7 +56,7 @@ func FileHookFromConfigLine(
 }
 
 func (h *fileHook) parseArgs(line string) error {
-	tokens, err := parseutils.Tokenize(line)
+	tokens, err := strvals.Tokenize(line)
 	if err != nil {
 		return fmt.Errorf("error while parsing logfile configuration %w", err)
 	}

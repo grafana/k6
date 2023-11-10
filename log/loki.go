@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib/parseutils"
+	strvals "go.k6.io/k6/lib/strvals"
 )
 
 // lokiHook is a Logrus hook for flushing to Loki.
@@ -78,7 +78,7 @@ func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHo
 }
 
 func (h *lokiHook) parseArgs(line string) error {
-	tokens, err := parseutils.Tokenize(line)
+	tokens, err := strvals.Tokenize(line)
 	if err != nil {
 		return fmt.Errorf("error while parsing loki configuration %w", err)
 	}
