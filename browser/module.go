@@ -24,6 +24,7 @@ type (
 		PidRegistry    *pidRegistry
 		remoteRegistry *remoteRegistry
 		initOnce       *sync.Once
+		tracesMetadata map[string]string
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -93,6 +94,10 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	m.remoteRegistry, err = newRemoteRegistry(initEnv.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create remote registry: %v", err)
+	}
+	m.tracesMetadata, err = parseTracesMetadata(initEnv.LookupEnv)
+	if err != nil {
+		k6ext.Abort(vu.Context(), "parsing browser traces metadata: %v", err)
 	}
 	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
 		go startDebugServer()

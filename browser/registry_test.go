@@ -297,3 +297,86 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.True(t, browserRegistry.stopped.Load())
 	})
 }
+
+func TestParseTracesMetadata(t *testing.T) {
+	testCases := []struct {
+		name        string
+		env         map[string]string
+		expMetadata map[string]string
+		expErrMssg  string
+	}{
+		{
+			name:        "no metadata",
+			env:         make(map[string]string),
+			expMetadata: make(map[string]string),
+		},
+		{
+			name: "one metadata field",
+			env: map[string]string{
+				"K6_BROWSER_TRACES_METADATA": "meta=value",
+			},
+			expMetadata: map[string]string{
+				"meta": "value",
+			},
+		},
+		{
+			name: "one metadata field finishing in comma",
+			env: map[string]string{
+				"K6_BROWSER_TRACES_METADATA": "meta=value,",
+			},
+			expMetadata: map[string]string{
+				"meta": "value",
+			},
+		},
+		{
+			name: "multiple metadata fields",
+			env: map[string]string{
+				"K6_BROWSER_TRACES_METADATA": "meta1=value1,meta2=value2",
+			},
+			expMetadata: map[string]string{
+				"meta1": "value1",
+				"meta2": "value2",
+			},
+		},
+		{
+			name: "multiple metadata fields finishing in comma",
+			env: map[string]string{
+				"K6_BROWSER_TRACES_METADATA": "meta1=value1,meta2=value2,",
+			},
+			expMetadata: map[string]string{
+				"meta1": "value1",
+				"meta2": "value2",
+			},
+		},
+		{
+			name: "invalid metadata",
+			env: map[string]string{
+				"K6_BROWSER_TRACES_METADATA": "thisIsInvalid",
+			},
+			expErrMssg: "is not a valid key=value metadata",
+		},
+		{
+			name: "invalid metadata void",
+			env: map[string]string{
+				"K6_BROWSER_TRACES_METADATA": "",
+			},
+			expErrMssg: "is not a valid key=value metadata",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			lookup := func(key string) (string, bool) {
+				v, ok := tc.env[key]
+				return v, ok
+			}
+			metadata, err := parseTracesMetadata(lookup)
+			if err != nil {
+				assert.ErrorContains(t, err, tc.expErrMssg)
+				return
+			}
+			assert.Equal(t, tc.expMetadata, metadata)
+		})
+	}
+}

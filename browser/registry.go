@@ -458,6 +458,27 @@ func (r *tracesRegistry) stop() {
 	}
 }
 
+func parseTracesMetadata(envLookup env.LookupFunc) (map[string]string, error) {
+	var (
+		ok bool
+		v  string
+		m  = make(map[string]string)
+	)
+	if v, ok = envLookup(env.TracesMetadata); !ok {
+		return m, nil
+	}
+
+	for _, elem := range strings.Split(v, ",") {
+		kv := strings.Split(elem, "=")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("%q is not a valid key=value metadata", elem)
+		}
+		m[kv[0]] = kv[1]
+	}
+
+	return m, nil
+}
+
 type taskQueueRegistry struct {
 	vu k6modules.VU
 
