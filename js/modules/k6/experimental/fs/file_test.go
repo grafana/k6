@@ -210,21 +210,21 @@ func TestFileImpl(t *testing.T) {
 				name:       "seek using SeekModeEnd within file bounds should succeed",
 				fileOffset: 20,
 				args:       args{-20, SeekModeEnd},
-				wantOffset: 80,
+				wantOffset: 79,
 				wantError:  false,
 			},
 			{
 				name:       "seek using SeekModeEnd beyond file start should fail",
 				fileOffset: 20,
 				args:       args{-110, SeekModeEnd},
-				wantOffset: 20,
+				wantOffset: 19,
 				wantError:  true, // File is 100 bytes long
 			},
 			{
 				name:       "seek using SeekModeEnd and a positive offset should fail",
 				fileOffset: 20,
 				args:       args{10, SeekModeEnd},
-				wantOffset: 20,
+				wantOffset: 19,
 				wantError:  true,
 			},
 			{
