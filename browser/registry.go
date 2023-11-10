@@ -173,8 +173,9 @@ func (r *remoteRegistry) isRemoteBrowser() (string, bool) {
 type browserRegistry struct {
 	vu k6modules.VU
 
-	tr     *tracesRegistry
-	trInit sync.Once
+	tr             *tracesRegistry
+	trInit         sync.Once
+	tracesMetadata map[string]string
 
 	mu sync.RWMutex
 	m  map[int64]*common.Browser
@@ -187,7 +188,7 @@ type browserRegistry struct {
 type browserBuildFunc func(ctx context.Context) (*common.Browser, error)
 
 func newBrowserRegistry(
-	ctx context.Context, vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry,
+	ctx context.Context, vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry, tracesMetadata map[string]string,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
 	builder := func(ctx context.Context) (*common.Browser, error) {
@@ -215,9 +216,10 @@ func newBrowserRegistry(
 	}
 
 	r := &browserRegistry{
-		vu:      vu,
-		m:       make(map[int64]*common.Browser),
-		buildFn: builder,
+		vu:             vu,
+		tracesMetadata: tracesMetadata,
+		m:              make(map[int64]*common.Browser),
+		buildFn:        builder,
 	}
 
 	exitSubID, exitCh := vu.Events().Global.Subscribe(
@@ -370,7 +372,9 @@ func (r *browserRegistry) initTracesRegistry() {
 	// Use a sync.Once so the traces registry is only initialized once
 	// per VU, as that is the scope for both browser and traces registry.
 	r.trInit.Do(func() {
-		r.tr = newTracesRegistry(browsertrace.NewTracer(r.vu.State().TracerProvider))
+		r.tr = newTracesRegistry(
+			browsertrace.NewTracer(r.vu.State().TracerProvider, r.tracesMetadata),
+		)
 	})
 }
 

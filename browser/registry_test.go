@@ -206,7 +206,7 @@ func TestBrowserRegistry(t *testing.T) {
 		var (
 			ctx             = context.Background()
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{})
+			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -248,7 +248,7 @@ func TestBrowserRegistry(t *testing.T) {
 		var (
 			ctx             = context.Background()
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{})
+			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -283,7 +283,7 @@ func TestBrowserRegistry(t *testing.T) {
 		var (
 			ctx             = context.Background()
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{})
+			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
