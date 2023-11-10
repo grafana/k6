@@ -26,14 +26,14 @@ func NewNetworkProfile() NetworkProfile {
 func GetNetworkProfiles() map[string]NetworkProfile {
 	return map[string]NetworkProfile{
 		"Slow 3G": {
-			DownloadThroughput: ((500 * 1000) / 8) * 0.8,
-			UploadThroughput:   ((500 * 1000) / 8) * 0.8,
-			Latency:            400 * 5,
+			Download: ((500 * 1000) / 8) * 0.8,
+			Upload:   ((500 * 1000) / 8) * 0.8,
+			Latency:  400 * 5,
 		},
 		"Fast 3G": {
-			DownloadThroughput: ((1.6 * 1000 * 1000) / 8) * 0.9,
-			UploadThroughput:   ((750 * 1000) / 8) * 0.9,
-			Latency:            150 * 3.75,
+			Download: ((1.6 * 1000 * 1000) / 8) * 0.9,
+			Upload:   ((750 * 1000) / 8) * 0.9,
+			Latency:  150 * 3.75,
 		},
 	}
 }

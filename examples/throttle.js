@@ -1,4 +1,4 @@
-import { browser } from 'k6/x/browser';
+import { browser, networkProfiles } from 'k6/x/browser';
 
 export const options = {
   scenarios: {
@@ -32,7 +32,7 @@ export const options = {
   },
   thresholds: {
     'browser_http_req_duration{scenario:normal}': ['p(99)<500'],
-    'browser_http_req_duration{scenario:networkThrottled}': ['p(99)<1500'],
+    'browser_http_req_duration{scenario:networkThrottled}': ['p(99)<3000'],
     'iteration_duration{scenario:normal}': ['p(99)<4000'],
     'iteration_duration{scenario:cpuThrottled}': ['p(99)<10000'],
   },
@@ -54,11 +54,7 @@ export async function networkThrottled() {
   const page = context.newPage();
 
   try {
-    page.throttleNetwork({
-      latency: 750,
-      download: 250,
-      upload: 250,
-    });
+    page.throttleNetwork(networkProfiles['Slow 3G']);
 
     await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
   } finally {
