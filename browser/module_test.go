@@ -20,4 +20,5 @@ func TestModuleNew(t *testing.T) {
 	require.NotNil(t, m.mod, "Module should be set")
 	require.NotNil(t, m.mod.Browser, "Browser should be set")
 	require.NotNil(t, m.mod.Devices, "Devices should be set")
+	require.NotNil(t, m.mod.NetworkProfiles, "Profiles should be set")
 }
