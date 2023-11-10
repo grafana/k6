@@ -432,6 +432,27 @@ class InjectedScript {
     node.dispatchEvent(event);
   }
 
+  setInputFiles(node, payloads) {
+    if (node.nodeType !== 1)
+      return "error:notelement";
+    if (node.nodeName.toLowerCase() !== "input")
+      return 'error:not input element';
+    const type = (node.getAttribute('type') || '').toLowerCase();
+    if (type !== 'file')
+      return 'error:Not an input[type=file] element';
+
+    const files = payloads.map(file => {
+      const bytes = Uint8Array.from(atob(file.buffer), c => c.charCodeAt(0));
+      return new File([bytes], file.name, { type: file.mimeType, lastModified: file.lastModifiedMs });
+    });
+    const dt = new DataTransfer();
+    for (const file of files)
+      dt.items.add(file);
+    node.files = dt.files;
+    node.dispatchEvent(new Event('input', { 'bubbles': true }));
+    node.dispatchEvent(new Event('change', { 'bubbles': true }));
+  }
+
   getElementBorderWidth(node) {
     if (
       node.nodeType !== 1 /*Node.ELEMENT_NODE*/ ||

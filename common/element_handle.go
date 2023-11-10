@@ -1238,10 +1238,44 @@ func (h *ElementHandle) SelectText(opts goja.Value) {
 	applySlowMo(h.ctx)
 }
 
-// SetInputFiles is not implemented.
-func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) {
-	// TODO: implement
-	k6ext.Panic(h.ctx, "ElementHandle.setInputFiles() has not been implemented yet")
+// SetInputFiles sets the Files given in the opts into the <input type="file"> element.
+func (h *ElementHandle) SetInputFiles(opts goja.Value) {
+	actionOpts := NewElementHandleSetInputFilesOptions(h.defaultTimeout())
+	if err := actionOpts.Parse(h.ctx, opts); err != nil {
+		k6ext.Panic(h.ctx, "parsing setInputFiles options: %w", err)
+	}
+
+	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return nil, handle.setInputFiles(apiCtx, actionOpts.Payload)
+	}
+	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
+	_, err := call(h.ctx, actFn, actionOpts.Timeout)
+	if err != nil {
+		k6ext.Panic(h.ctx, "setting input files: %w", err)
+	}
+}
+
+func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []File) error {
+	fn := `
+		(node, injected, payload) => {
+			return injected.setInputFiles(node, payload);
+		}
+	`
+	evalOpts := evalOptions{
+		forceCallable: true,
+		returnByValue: true,
+	}
+
+	result, err := h.evalWithScript(apiCtx, evalOpts, fn, payload)
+	if err != nil {
+		return err
+	}
+	if res, ok := result.(string); ok && res != "done" {
+		// Either we're done or an error happened (returned as "error:..." from JS)
+		return errorFromDOMError(res)
+	}
+
+	return nil
 }
 
 func (h *ElementHandle) Tap(opts goja.Value) {

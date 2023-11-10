@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -72,6 +73,19 @@ type ElementHandleDblclickOptions struct {
 type ElementHandleHoverOptions struct {
 	ElementHandleBasePointerOptions
 	Modifiers []string `json:"modifiers"`
+}
+
+// File is the descriptor of a single file.
+type File struct {
+	Name   string `json:"name"`
+	Buffer string `json:"buffer"`
+	Mime   string `json:"mime"`
+}
+
+// ElementHandleSetInputFilesOption are options for ElementHandle.SetInputFiles.
+type ElementHandleSetInputFilesOption struct {
+	ElementHandleBaseOptions
+	Payload []File `json:"payload"`
 }
 
 type ElementHandlePressOptions struct {
@@ -175,6 +189,38 @@ func NewElementHandleCheckOptions(defaultTimeout time.Duration) *ElementHandleCh
 
 func (o *ElementHandleCheckOptions) Parse(ctx context.Context, opts goja.Value) error {
 	return o.ElementHandleBasePointerOptions.Parse(ctx, opts)
+}
+
+// NewElementHandleSetInputFilesOptions creates a new ElementHandleSetInputFilesOption.
+func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *ElementHandleSetInputFilesOption {
+	return &ElementHandleSetInputFilesOption{
+		ElementHandleBaseOptions: *NewElementHandleBaseOptions(defaultTimeout),
+	}
+}
+
+// Parse parses the ElementHandleSetInputFilesOption from the given opts.
+func (o *ElementHandleSetInputFilesOption) Parse(ctx context.Context, opts goja.Value) error {
+	rt := k6ext.Runtime(ctx)
+	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
+		return err
+	}
+	if !gojaValueExists(opts) {
+		return nil
+	}
+	gopts := opts.ToObject(rt)
+	for _, k := range gopts.Keys() {
+		if k != "payload" {
+			continue
+		}
+		var p []File
+		if err := rt.ExportTo(gopts.Get(k), &p); err != nil {
+			return fmt.Errorf("unable to parse SetInputFileOptions; reason: %w", err)
+		}
+		o.Payload = p
+
+	}
+
+	return nil
 }
 
 func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleClickOptions {
