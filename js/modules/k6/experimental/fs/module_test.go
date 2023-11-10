@@ -480,6 +480,41 @@ func TestFile(t *testing.T) {
 		assert.NoError(t, err)
 	})
 
+	t.Run("seek", func(t *testing.T) {
+		t.Parallel()
+
+		runtime, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		testFilePath := fsext.FilePathSeparator + testFileName
+		fs := newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte("012"), 0o644)
+		})
+		runtime.VU.InitEnvField.FileSystems["file"] = fs
+
+		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q)
+
+			let newOffset = await file.seek(1, fs.SeekMode.Start)
+
+			if (newOffset != 1) {
+				throw "file.seek(1, fs.SeekMode.Start) returned unexpected offset: " + newOffset;
+			}
+
+			newOffset = await file.seek(-1, fs.SeekMode.Current)
+			if (newOffset != 0) {
+				throw "file.seek(-1, fs.SeekMode.Current) returned unexpected offset: " + newOffset;
+			}
+
+			newOffset = await file.seek(0, fs.SeekMode.End)
+			if (newOffset != 2) {
+				throw "file.seek(0, fs.SeekMode.End) returned unexpected offset: " + newOffset;
+			}
+		`, testFilePath)))
+
+		assert.NoError(t, err)
+	})
+
 	t.Run("seek with invalid arguments should fail", func(t *testing.T) {
 		t.Parallel()
 

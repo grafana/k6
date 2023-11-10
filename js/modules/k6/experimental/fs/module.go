@@ -306,14 +306,13 @@ func isUint8Array(rt *goja.Runtime, o *goja.Object) bool {
 	return true
 }
 
-//nolint:unparam
 func exportInt(rt *goja.Runtime, v goja.Value) (int64, error) {
 	if common.IsNullish(v) {
 		return 0, errors.New("cannot be null or undefined")
 	}
 
 	var i int64
-	if err := rt.ExportTo(v, i); err != nil {
+	if err := rt.ExportTo(v, &i); err != nil {
 		return 0, errors.New("cannot be interpreted as integer")
 	}
 

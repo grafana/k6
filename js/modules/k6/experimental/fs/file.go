@@ -99,7 +99,7 @@ func (f *file) Seek(offset int64, whence SeekMode) (int64, error) {
 			return 0, newFsError(TypeError, "offset cannot be positive when using SeekModeEnd")
 		}
 
-		newOffset = f.size() + offset
+		newOffset = (f.size() - 1) + offset
 	default:
 		return 0, newFsError(TypeError, "invalid seek mode")
 	}
