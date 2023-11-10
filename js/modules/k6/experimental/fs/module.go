@@ -259,25 +259,15 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 	promise, resolve, reject := f.vu.Runtime().NewPromise()
 
-	if common.IsNullish(offset) {
-		reject(newFsError(TypeError, "seek() failed; reason: the offset argument cannot be null or undefined"))
+	intOffset, err := exportInt(f.vu.Runtime(), offset)
+	if err != nil {
+		reject(newFsError(TypeError, "seek() failed; reason: the offset argument "+err.Error()))
 		return promise
 	}
 
-	var intOffset int64
-	if err := f.vu.Runtime().ExportTo(offset, &intOffset); err != nil {
-		reject(newFsError(TypeError, "seek() failed; reason: the offset argument cannot be interpreted as integer"))
-		return promise
-	}
-
-	if common.IsNullish(whence) {
-		reject(newFsError(TypeError, "seek() failed; reason: the whence argument cannot be null or undefined"))
-		return promise
-	}
-
-	var intWhence int64
-	if err := f.vu.Runtime().ExportTo(whence, intWhence); err != nil {
-		reject(newFsError(TypeError, "seek() failed; reason: the whence argument cannot be interpreted as integer"))
+	intWhence, err := exportInt(f.vu.Runtime(), whence)
+	if err != nil {
+		reject(newFsError(TypeError, "seek() failed; reason: the whence argument "+err.Error()))
 		return promise
 	}
 
@@ -314,4 +304,18 @@ func isUint8Array(rt *goja.Runtime, o *goja.Object) bool {
 	}
 
 	return true
+}
+
+//nolint:unparam
+func exportInt(rt *goja.Runtime, v goja.Value) (int64, error) {
+	if common.IsNullish(v) {
+		return 0, errors.New("cannot be null or undefined")
+	}
+
+	var i int64
+	if err := rt.ExportTo(v, i); err != nil {
+		return 0, errors.New("cannot be interpreted as integer")
+	}
+
+	return i, nil
 }
