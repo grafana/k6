@@ -1,4 +1,4 @@
-package log
+package strvals
 
 import (
 	"testing"
@@ -7,26 +7,26 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTokenizer(t *testing.T) {
+func TestParser(t *testing.T) {
 	t.Parallel()
 
 	input := "loki=something,s.e=2231,s=12,12=3,a=[1,2,3],b=[1],s=c"
-	tokens, err := tokenize(input)
+	tokens, err := Parse(input)
 	require.NoError(t, err)
 
-	expected := []token{
-		{key: "loki", value: "something"},
-		{key: "s.e", value: "2231"},
-		{key: "s", value: "12"},
-		{key: "12", value: "3"},
-		{key: "a", value: "1,2,3", inside: '['},
-		{key: "b", value: "1", inside: '['},
-		{key: "s", value: "c"},
+	expected := []Token{
+		{Key: "loki", Value: "something"},
+		{Key: "s.e", Value: "2231"},
+		{Key: "s", Value: "12"},
+		{Key: "12", Value: "3"},
+		{Key: "a", Value: "1,2,3", inside: '['},
+		{Key: "b", Value: "1", inside: '['},
+		{Key: "s", Value: "c"},
 	}
 	assert.Equal(t, expected, tokens)
 }
 
-func TestTokenizerInvalid(t *testing.T) {
+func TestParserInvalid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -61,7 +61,7 @@ func TestTokenizerInvalid(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := tokenize(test.input)
+			_, err := Parse(test.input)
 			require.EqualError(t, err, test.errorMsg)
 		})
 	}
