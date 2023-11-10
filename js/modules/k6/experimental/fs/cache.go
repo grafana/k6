@@ -30,7 +30,7 @@ type cache struct {
 //
 // The function cleans the provided filename using filepath.Clean before using it.
 //
-// If the file was previously "opened" (and thus cached) by the registry, it
+// If the file was previously "opened" (and thus cached), it
 // returns the cached content. Otherwise, it reads the file from the
 // filesystem, caches its content, and then returns it.
 //
