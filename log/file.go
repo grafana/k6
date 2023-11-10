@@ -56,7 +56,7 @@ func FileHookFromConfigLine(
 }
 
 func (h *fileHook) parseArgs(line string) error {
-	tokens, err := strvals.Tokenize(line)
+	tokens, err := strvals.Parse(line)
 	if err != nil {
 		return fmt.Errorf("error while parsing logfile configuration %w", err)
 	}

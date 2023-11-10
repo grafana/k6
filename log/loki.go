@@ -78,7 +78,7 @@ func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHo
 }
 
 func (h *lokiHook) parseArgs(line string) error {
-	tokens, err := strvals.Tokenize(line)
+	tokens, err := strvals.Parse(line)
 	if err != nil {
 		return fmt.Errorf("error while parsing loki configuration %w", err)
 	}

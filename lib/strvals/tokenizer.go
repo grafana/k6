@@ -65,9 +65,9 @@ func (t *tokenizer) readArray() (string, error) {
 	return t.s[start:], fmt.Errorf("array value for key `%s` didn't end", t.currentKey)
 }
 
-// Tokenize parses the input string into key-value tokens according to format:
-// key1=value1,key2=value2,...,keyN=valueN.
-func Tokenize(s string) ([]Token, error) {
+// Parse parses the input string into key-value tokens following strvals format:
+// name=value,topname.subname=value.
+func Parse(s string) ([]Token, error) {
 	result := []Token{}
 	t := &tokenizer{s: s}
 

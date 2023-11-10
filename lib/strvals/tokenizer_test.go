@@ -7,11 +7,11 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestTokenizer(t *testing.T) {
+func TestParser(t *testing.T) {
 	t.Parallel()
 
 	input := "loki=something,s.e=2231,s=12,12=3,a=[1,2,3],b=[1],s=c"
-	tokens, err := Tokenize(input)
+	tokens, err := Parse(input)
 	require.NoError(t, err)
 
 	expected := []Token{
@@ -26,7 +26,7 @@ func TestTokenizer(t *testing.T) {
 	assert.Equal(t, expected, tokens)
 }
 
-func TestTokenizerInvalid(t *testing.T) {
+func TestParserInvalid(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -61,7 +61,7 @@ func TestTokenizerInvalid(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := Tokenize(test.input)
+			_, err := Parse(test.input)
 			require.EqualError(t, err, test.errorMsg)
 		})
 	}
