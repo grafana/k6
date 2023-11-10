@@ -37,15 +37,25 @@ import (
 func TestVersion(t *testing.T) {
 	t.Parallel()
 
-	ts := NewGlobalTestState(t)
-	ts.CmdArgs = []string{"k6", "version"}
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	tests := map[string]struct {
+		args string
+	}{
+		"flag":       {"--version"},
+		"subcommand": {"version"},
+	}
 
-	stdout := ts.Stdout.String()
-	assert.Contains(t, stdout, "k6 v"+consts.Version)
-	assert.Contains(t, stdout, runtime.Version())
-	assert.Contains(t, stdout, runtime.GOOS)
-	assert.Contains(t, stdout, runtime.GOARCH)
+	ts := NewGlobalTestState(t)
+
+	for _, tc := range tests {
+		ts.CmdArgs = []string{"k6", tc.args}
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		assert.Contains(t, stdout, "k6 v"+consts.Version)
+		assert.Contains(t, stdout, runtime.Version())
+		assert.Contains(t, stdout, runtime.GOOS)
+		assert.Contains(t, stdout, runtime.GOARCH)
+	}
 
 	assert.Empty(t, ts.Stderr.Bytes())
 	assert.Empty(t, ts.LoggerHook.Drain())

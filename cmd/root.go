@@ -48,8 +48,12 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 		SilenceUsage:      true,
 		SilenceErrors:     true,
 		PersistentPreRunE: c.persistentPreRunE,
+		Version:           versionString(),
 	}
 
+	rootCmd.SetVersionTemplate(
+		`{{with .Name}}{{printf "%s " .}}{{end}}{{printf "v%s\n" .Version}}`,
+	)
 	rootCmd.PersistentFlags().AddFlagSet(rootCmdPersistentFlagSet(gs))
 	rootCmd.SetArgs(gs.CmdArgs[1:])
 	rootCmd.SetOut(gs.Stdout)
