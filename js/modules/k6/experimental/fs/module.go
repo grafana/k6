@@ -1,5 +1,7 @@
 // Package fs provides a k6 module that allows users to interact with files from the
-// local filesystem.
+// local filesystem as per the [File API design document].
+//
+// [File API design document]: https://github.com/grafana/k6/blob/master/docs/design/019-file-api.md#proposed-solution
 package fs
 
 import (

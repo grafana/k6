@@ -9,7 +9,35 @@ import (
 	"go.k6.io/k6/lib/fsext"
 )
 
-// cache is a cache of opened files.
+// cache is a cache of opened files, designed to minimize redundant file reads, and
+// avoid replicating the content of the files in memory as much as possible.
+//
+// Unlike the underlying [fsext.Fs] which also caches file contents, this cache minimizes
+// synchronization overhead. [fsext.Fs], using `afero`, employs a [sync.RWMutex] for each
+// file access, involving lock/unlock operations. Our cache, however, utilizes a concurrent-safe
+// map (openedFiles), bypassing the need for these locks and enhancing performance.
+//
+// This cache could be seen as redundant, as the underlying [fsext.Fs] implementation
+// already caches the content of the files it opens. However, the current implementation of
+// [fsext.Fs] relies on `afero` under the hood, which in turn relies on a [sync.RWMutex] to
+// protect access to the cached file content. This means that every time a file is opened,
+// the `fsext.Fs` cache is accessed, and the [sync.RWMutex] is locked and unlocked.
+//
+// This cache is designed to avoid this synchronization overhead, by caching the content of
+// the files in a map that is safe for concurrent use, and thus avoid the need for a lock.
+//
+// This leads to a performance improvement, at the cost of holding the content of the files
+// in memory twice, once in the cache's `openedFiles` map, and once in the `fsext.Fs` cache.
+//
+// Note that the current implementation of the cache diverges from the guarantees expressed in the
+// [design document] defining the `fs` module, as it we effectively hold the file's content in memory
+// twice as opposed to once.
+//
+// Future updates (see [#1079](https://github.com/grafana/k6/issues/1079)) may phase out reliance on `afero`.
+// Depending on our new choice for [fsext] implementation, this cache might become obsolete, allowing us
+// to solely depend on [fsext.Fs.Open].
+//
+// [#1079]: https://github.com/grafana/k6/issues/1079
 type cache struct {
 	// openedFiles holds a safe for concurrent use map, holding the content
 	// of the files that were opened by the user.
@@ -59,10 +87,6 @@ func (fr *cache) open(filename string, fromFs fsext.Fs) (data []byte, err error)
 		return data, nil
 	}
 
-	// The underlying fsext.Fs.Open method will cache the file content during this
-	// operation. Which will lead to effectively holding the content of the file in memory twice.
-	// However, as per #1079, we plan to eventually reduce our dependency on afero, and
-	// expect this issue to be resolved at that point.
 	// TODO: re-evaluate opening from the FS this once #1079 is resolved.
 	f, err := fromFs.Open(filename)
 	if err != nil {
