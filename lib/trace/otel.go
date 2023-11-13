@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	stdurl "net/url"
+	"net/url"
 	"strings"
 
 	"go.opentelemetry.io/otel"
@@ -216,8 +216,8 @@ func tracerProviderParamsFromConfigLine(line string) (tracerProviderParams, erro
 	return params, nil
 }
 
-func (p *tracerProviderParams) parseURL(url string) error {
-	u, err := stdurl.Parse(url)
+func (p *tracerProviderParams) parseURL(s string) error {
+	u, err := url.Parse(s)
 	if err != nil {
 		return err
 	}
