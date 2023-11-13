@@ -29,6 +29,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/trace"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
@@ -40,11 +41,17 @@ type cmdRun struct {
 	gs *state.GlobalState
 }
 
-// We use an excessively high timeout to wait for event processing to complete,
-// since prematurely proceeding before it is done could create bigger problems.
-// In practice, this effectively acts as no timeout, and the user will have to
-// kill k6 if a hang happens, which is the behavior without events anyway.
-const waitEventDoneTimeout = 30 * time.Minute
+const (
+	// We use an excessively high timeout to wait for event processing to complete,
+	// since prematurely proceeding before it is done could create bigger problems.
+	// In practice, this effectively acts as no timeout, and the user will have to
+	// kill k6 if a hang happens, which is the behavior without events anyway.
+	waitEventDoneTimeout = 30 * time.Minute
+
+	// This timeout should be long enough to flush all remaining traces, but still
+	// provides a safeguard to not block indefinitely.
+	waitForTracerProviderStopTimeout = 3 * time.Minute
+)
 
 // TODO: split apart some more
 //
@@ -92,6 +99,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		waitExitDone()
 		c.gs.Events.UnsubscribeAll()
 	}()
+
+	if err = c.setupTracerProvider(); err != nil {
+		return err
+	}
+	waitTracesFlushed := func() {
+		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
+		defer cancel()
+		if tpErr := c.gs.TracerProvider.Shutdown(ctx); tpErr != nil {
+			logger.Errorf("The tracer provider didn't stop gracefully: %v", tpErr)
+		}
+	}
 
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
 	if err != nil {
@@ -252,7 +270,22 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	defer func() {
 		logger.Debug("Waiting for metric processing to finish...")
 		close(samples)
-		waitOutputsFlushed()
+
+		ww := [...]func(){
+			waitOutputsFlushed,
+			waitTracesFlushed,
+		}
+		var wg sync.WaitGroup
+		wg.Add(len(ww))
+		for _, w := range ww {
+			w := w
+			go func() {
+				w()
+				wg.Done()
+			}()
+		}
+		wg.Wait()
+
 		logger.Debug("Metrics processing finished!")
 	}()
 
@@ -405,6 +438,21 @@ func (c *cmdRun) flagSet() *pflag.FlagSet {
 	flags.AddFlagSet(runtimeOptionFlagSet(true))
 	flags.AddFlagSet(configFlagSet())
 	return flags
+}
+
+func (c *cmdRun) setupTracerProvider() error {
+	if c.gs.Flags.TracesOutput == "none" {
+		c.gs.TracerProvider = trace.NewNoopTracerProvider()
+		return nil
+	}
+
+	tp, err := trace.TracerProviderFromConfigLine(c.gs.Ctx, c.gs.Flags.TracesOutput)
+	if err != nil {
+		return err
+	}
+	c.gs.TracerProvider = tp
+
+	return nil
 }
 
 func getCmdRun(gs *state.GlobalState) *cobra.Command {
