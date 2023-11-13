@@ -40,6 +40,15 @@ type NetworkProfile struct {
 	UploadThroughput float64
 }
 
+// NewNetworkProfile creates a non-throttled network profile.
+func NewNetworkProfile() NetworkProfile {
+	return NetworkProfile{
+		Latency:            0,
+		DownloadThroughput: -1,
+		UploadThroughput:   -1,
+	}
+}
+
 // Credentials holds HTTP authentication credentials.
 type Credentials struct {
 	Username string `js:"username"`
@@ -92,6 +101,7 @@ type NetworkManager struct {
 
 	extraHTTPHeaders               map[string]string
 	offline                        bool
+	networkProfile                 NetworkProfile
 	userCacheDisabled              bool
 	userReqInterceptionEnabled     bool
 	protocolReqInterceptionEnabled bool
@@ -124,6 +134,7 @@ func NewNetworkManager(
 		reqIDToRequest:   make(map[network.RequestID]*Request),
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
+		networkProfile:   NewNetworkProfile(),
 	}
 	m.initEvents()
 	if err := m.initDomains(); err != nil {
@@ -736,7 +747,12 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 	}
 	m.offline = offline
 
-	action := network.EmulateNetworkConditions(m.offline, 0, -1, -1)
+	action := network.EmulateNetworkConditions(
+		m.offline,
+		m.networkProfile.Latency,
+		m.networkProfile.DownloadThroughput,
+		m.networkProfile.UploadThroughput,
+	)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		k6ext.Panic(m.ctx, "setting offline mode: %w", err)
 	}
@@ -745,11 +761,16 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 // ThrottleNetwork changes the network attributes in chrome to simulate slower
 // networks e.g. a slow 3G connection.
 func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
+	if m.networkProfile == networkProfile {
+		return nil
+	}
+	m.networkProfile = networkProfile
+
 	action := network.EmulateNetworkConditions(
 		m.offline,
-		networkProfile.Latency,
-		networkProfile.DownloadThroughput,
-		networkProfile.UploadThroughput,
+		m.networkProfile.Latency,
+		m.networkProfile.DownloadThroughput,
+		m.networkProfile.UploadThroughput,
 	)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		return fmt.Errorf("throttling network: %w", err)
