@@ -1093,9 +1093,9 @@ func TestPageThrottleNetwork(t *testing.T) {
 		{
 			name: "none",
 			networkProfile: common.NetworkProfile{
-				Latency:            0,
-				DownloadThroughput: -1,
-				UploadThroughput:   -1,
+				Latency:  0,
+				Download: -1,
+				Upload:   -1,
 			},
 		},
 		{
@@ -1104,9 +1104,9 @@ func TestPageThrottleNetwork(t *testing.T) {
 			// measured and used to assert that Latency has been correctly used.
 			name: "latency",
 			networkProfile: common.NetworkProfile{
-				Latency:            100,
-				DownloadThroughput: -1,
-				UploadThroughput:   -1,
+				Latency:  100,
+				Download: -1,
+				Upload:   -1,
 			},
 			wantMinRoundTripDuration: 100,
 		},
@@ -1114,24 +1114,24 @@ func TestPageThrottleNetwork(t *testing.T) {
 			// In the ping.html file, an async ping request is made, the ping response
 			// returns the request body (around a 1MB). The time it takes to perform the
 			// roundtrip of calling ping and getting the response body is measured and
-			// used to assert that DownloadThroughput has been correctly used.
-			name: "download_throughput",
+			// used to assert that Download has been correctly used.
+			name: "download",
 			networkProfile: common.NetworkProfile{
-				Latency:            0,
-				DownloadThroughput: 1000,
-				UploadThroughput:   -1,
+				Latency:  0,
+				Download: 1000,
+				Upload:   -1,
 			},
 			wantMinRoundTripDuration: 1000,
 		},
 		{
 			// In the ping.html file, an async ping request is made with around a 1MB body.
 			// The time it takes to perform the roundtrip of calling ping is measured
-			// and used to assert that UploadThroughput has been correctly used.
-			name: "upload_throughput",
+			// and used to assert that Upload has been correctly used.
+			name: "upload",
 			networkProfile: common.NetworkProfile{
-				Latency:            0,
-				DownloadThroughput: -1,
-				UploadThroughput:   1000,
+				Latency:  0,
+				Download: -1,
+				Upload:   1000,
 			},
 			wantMinRoundTripDuration: 1000,
 		},

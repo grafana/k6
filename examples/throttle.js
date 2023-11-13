@@ -45,8 +45,8 @@ export async function throttled() {
   try {
     page.throttleNetwork({
       latency: 750,
-      downloadThroughput: 250,
-      uploadThroughput: 250,
+      download: 250,
+      upload: 250,
     });
 
     await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });

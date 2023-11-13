@@ -34,18 +34,18 @@ type NetworkProfile struct {
 	Latency float64
 
 	// Maximal aggregated download throughput (bytes/sec). -1 disables download throttling.
-	DownloadThroughput float64
+	Download float64
 
 	// Maximal aggregated upload throughput (bytes/sec). -1 disables upload throttling.
-	UploadThroughput float64
+	Upload float64
 }
 
 // NewNetworkProfile creates a non-throttled network profile.
 func NewNetworkProfile() NetworkProfile {
 	return NetworkProfile{
-		Latency:            0,
-		DownloadThroughput: -1,
-		UploadThroughput:   -1,
+		Latency:  0,
+		Download: -1,
+		Upload:   -1,
 	}
 }
 
@@ -750,8 +750,8 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 	action := network.EmulateNetworkConditions(
 		m.offline,
 		m.networkProfile.Latency,
-		m.networkProfile.DownloadThroughput,
-		m.networkProfile.UploadThroughput,
+		m.networkProfile.Download,
+		m.networkProfile.Upload,
 	)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		k6ext.Panic(m.ctx, "setting offline mode: %w", err)
@@ -769,8 +769,8 @@ func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
 	action := network.EmulateNetworkConditions(
 		m.offline,
 		m.networkProfile.Latency,
-		m.networkProfile.DownloadThroughput,
-		m.networkProfile.UploadThroughput,
+		m.networkProfile.Download,
+		m.networkProfile.Upload,
 	)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		return fmt.Errorf("throttling network: %w", err)
