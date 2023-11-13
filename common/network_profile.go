@@ -25,6 +25,11 @@ func NewNetworkProfile() NetworkProfile {
 // throttle the network with page.throttleNetwork.
 func GetNetworkProfiles() map[string]NetworkProfile {
 	return map[string]NetworkProfile{
+		"No Throttling": {
+			Download: -1,
+			Upload:   -1,
+			Latency:  0,
+		},
 		"Slow 3G": {
 			Download: ((500 * 1000) / 8) * 0.8,
 			Upload:   ((500 * 1000) / 8) * 0.8,
