@@ -236,6 +236,10 @@ func (c *Client) Connect(addr string, params goja.Value) (bool, error) {
 	}
 	opts = append(opts, grpc.WithTransportCredentials(tcred))
 
+	if len(p.Authority) > 0 {
+		opts = append(opts, grpc.WithAuthority(p.Authority))
+	}
+
 	if ua := state.Options.UserAgent; ua.Valid {
 		opts = append(opts, grpc.WithUserAgent(ua.ValueOrZero()))
 	}
@@ -518,6 +522,7 @@ type connectParams struct {
 	MaxReceiveSize        int64
 	MaxSendSize           int64
 	TLS                   map[string]interface{}
+	Authority             string
 }
 
 func newConnectParams(rt *goja.Runtime, input goja.Value) (connectParams, error) { //nolint:funlen,gocognit,cyclop
@@ -528,6 +533,7 @@ func newConnectParams(rt *goja.Runtime, input goja.Value) (connectParams, error)
 		Timeout:               time.Minute,
 		MaxReceiveSize:        0,
 		MaxSendSize:           0,
+		Authority:             "",
 	}
 
 	if common.IsNullish(input) {
@@ -618,6 +624,12 @@ func newConnectParams(rt *goja.Runtime, input goja.Value) (connectParams, error)
 					return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
 						" it needs to be a string or an array of PEM formatted strings", v)
 				}
+			}
+		case "authority":
+			var ok bool
+			params.Authority, ok = v.(string)
+			if !ok {
+				return params, fmt.Errorf("invalid authority value: '%#v', it needs to be a string", v)
 			}
 		default:
 			return params, fmt.Errorf("unknown connect param: %q", k)
