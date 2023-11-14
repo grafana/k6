@@ -268,7 +268,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	defer func() {
-		logger.Debug("Waiting for metric processing to finish...")
+		logger.Debug("Waiting for metrics and traces processing to finish...")
 		close(samples)
 
 		ww := [...]func(){
@@ -286,7 +286,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}
 		wg.Wait()
 
-		logger.Debug("Metrics processing finished!")
+		logger.Debug("Metrics and traces processing finished!")
 	}()
 
 	// Spin up the REST API server, if not disabled.
