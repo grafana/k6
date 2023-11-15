@@ -28,7 +28,8 @@ func NewRegistry() *Registry {
 
 const (
 	nameRegexString = "^[a-zA-Z_][a-zA-Z0-9_]{1,128}$"
-	badNameWarning  = "Metric names should start with a letter or an underscore and only include up to 128 ASCII letters, numbers, or underscores."
+	badNameWarning  = "Metric names must only include up to 128 ASCII letters, numbers, or underscores " +
+		"and start with a letter or an underscore."
 )
 
 var compileNameRegex = regexp.MustCompile(nameRegexString)
