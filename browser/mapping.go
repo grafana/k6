@@ -253,6 +253,12 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 		if err != nil {
 			return nil, err //nolint:wrapcheck
 		}
+		// ElementHandle can be null when the selector does not match any elements.
+		// We do not want to map nil elementHandles since the expectation is a
+		// null result in the test script for this case.
+		if eh == nil {
+			return nil, nil //nolint:nilnil
+		}
 		ehm := mapElementHandle(vu, eh)
 		return ehm, nil
 	}
@@ -395,6 +401,12 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		eh, err := f.Query(selector)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
+		}
+		// ElementHandle can be null when the selector does not match any elements.
+		// We do not want to map nil elementHandles since the expectation is a
+		// null result in the test script for this case.
+		if eh == nil {
+			return nil, nil //nolint:nilnil
 		}
 		ehm := mapElementHandle(vu, eh)
 		return ehm, nil
@@ -593,6 +605,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		eh, err := p.Query(selector)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
+		}
+		// ElementHandle can be null when the selector does not match any elements.
+		// We do not want to map nil elementHandles since the expectation is a
+		// null result in the test script for this case.
+		if eh == nil {
+			return nil, nil //nolint:nilnil
 		}
 		ehm := mapElementHandle(vu, eh)
 		return ehm, nil
