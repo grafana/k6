@@ -1042,7 +1042,7 @@ func (h *ElementHandle) Query(selector string) (*ElementHandle, error) {
 		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
 	if result == nil {
-		return nil, fmt.Errorf("querying selector %q", selector)
+		return nil, nil //nolint:nilnil
 	}
 	handle, ok := result.(JSHandleAPI)
 	if !ok {
