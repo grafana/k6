@@ -2001,7 +2001,7 @@ func (f *Frame) newAction(
 			}
 			return
 		}
-		f := handle.newAction(states, fn, false, false, timeout)
+		f := handle.newAction(states, fn, force, noWaitAfter, timeout)
 		f(apiCtx, resultCh, errCh)
 	}
 }
