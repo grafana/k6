@@ -127,17 +127,22 @@ func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, op
 // so that the test can read the metrics being emitted to the channel.
 type WithSamples chan k6metrics.SampleContainer
 
+// WithTracerProvider allows to set the VU TracerProvider.
+type WithTracerProvider k6lib.TracerProvider
+
 // NewVU returns a mock k6 VU.
 //
 // opts can be one of the following:
-//   - WithSamplesListener: a bidirectional channel that will be used to emit metrics.
+//   - WithSamples: a bidirectional channel that will be used to emit metrics.
 //   - env.LookupFunc: a lookup function that will be used to lookup environment variables.
-func NewVU(tb testing.TB, opts ...any) *VU { //nolint:funlen
+//   - WithTracerProvider: a TracerProvider that will be set as the VU TracerProvider.
+func NewVU(tb testing.TB, opts ...any) *VU {
 	tb.Helper()
 
 	var (
-		samples    = make(chan k6metrics.SampleContainer, 1000)
-		lookupFunc = env.EmptyLookup
+		samples                             = make(chan k6metrics.SampleContainer, 1000)
+		lookupFunc                          = env.EmptyLookup
+		tracerProvider k6lib.TracerProvider = k6trace.NewNoopTracerProvider()
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -145,6 +150,8 @@ func NewVU(tb testing.TB, opts ...any) *VU { //nolint:funlen
 			samples = opt
 		case env.LookupFunc:
 			lookupFunc = opt
+		case WithTracerProvider:
+			tracerProvider = opt
 		}
 	}
 
@@ -189,7 +196,7 @@ func NewVU(tb testing.TB, opts ...any) *VU { //nolint:funlen
 		Samples:        samples,
 		Tags:           k6lib.NewVUStateTags(tags.With("group", root.Path)),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
-		TracerProvider: k6trace.NewNoopTracerProvider(),
+		TracerProvider: tracerProvider,
 	}
 
 	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)
