@@ -438,7 +438,18 @@ func (o Options) Apply(opts Options) Options {
 		o.Thresholds = opts.Thresholds
 	}
 	if opts.BlacklistIPs != nil {
-		o.BlacklistIPs = opts.BlacklistIPs
+		var ips []*IPNet
+		for _, ip := range opts.BlacklistIPs {
+			if ip == nil {
+				// let's skip cases where the IP is nil
+				// e.g. It could happen with the following JSON {"blacklistIPs": [null]}
+				continue
+			}
+			ips = append(ips, ip)
+		}
+		if len(ips) > 0 {
+			o.BlacklistIPs = ips
+		}
 	}
 	if opts.BlockedHostnames.Valid {
 		o.BlockedHostnames = opts.BlockedHostnames

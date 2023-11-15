@@ -444,6 +444,21 @@ func TestOptions(t *testing.T) {
 			require.Len(t, uopts.BlacklistIPs, 1)
 			require.Equal(t, "255.255.255.254/31", uopts.BlacklistIPs[0].String())
 		})
+		t.Run("JSONWithNull", func(t *testing.T) {
+			t.Parallel()
+			var opts Options
+
+			jsonStr := `{"blacklistIPs": [null]}`
+			assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
+
+			// In this case JSON initializes the slice with one item
+			require.NotNil(t, opts.BlacklistIPs)
+			require.Len(t, opts.BlacklistIPs, 1)
+
+			// But the apply will skip them as the entire tree is null
+			applied := Options{}.Apply(opts)
+			assert.Nil(t, applied.BlacklistIPs)
+		})
 	})
 	t.Run("BlockedHostnames", func(t *testing.T) {
 		t.Parallel()
