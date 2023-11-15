@@ -439,3 +439,15 @@ func TestElementHandlePress(t *testing.T) {
 
 	require.Equal(t, "AbC", el.InputValue(nil))
 }
+
+func TestElementHandleQuery(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	p.SetContent(`<div id="foo">hello</div>`, nil)
+
+	element, err := p.Query("bar")
+
+	require.NoError(t, err)
+	require.Nil(t, element)
+}
