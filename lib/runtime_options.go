@@ -41,6 +41,7 @@ type RuntimeOptions struct {
 	NoSummary     null.Bool   `json:"noSummary"`
 	SummaryExport null.String `json:"summaryExport"`
 	KeyWriter     null.String `json:"-"`
+	TracesOutput  null.String `json:"tracesOutput"`
 }
 
 // ValidateCompatibilityMode checks if the provided val is a valid compatibility mode
