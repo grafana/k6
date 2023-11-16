@@ -100,17 +100,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		c.gs.Events.UnsubscribeAll()
 	}()
 
-	if err = c.setupTracerProvider(); err != nil {
-		return err
-	}
-	waitTracesFlushed := func() {
-		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
-		defer cancel()
-		if tpErr := c.gs.TracerProvider.Shutdown(ctx); tpErr != nil {
-			logger.Errorf("The tracer provider didn't stop gracefully: %v", tpErr)
-		}
-	}
-
 	test, err := loadAndConfigureTest(c.gs, cmd, args, getConfig)
 	if err != nil {
 		return err
@@ -121,6 +110,17 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				logger.WithError(klErr).Warn("Error while closing the SSLKEYLOGFILE")
 			}
 		}()
+	}
+
+	if err = c.setupTracerProvider(test); err != nil {
+		return err
+	}
+	waitTracesFlushed := func() {
+		ctx, cancel := context.WithTimeout(globalCtx, waitForTracerProviderStopTimeout)
+		defer cancel()
+		if tpErr := test.preInitState.TracerProvider.Shutdown(ctx); tpErr != nil {
+			logger.Errorf("The tracer provider didn't stop gracefully: %v", tpErr)
+		}
 	}
 
 	// Write the full consolidated *and derived* options back to the Runner.
@@ -440,17 +440,18 @@ func (c *cmdRun) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func (c *cmdRun) setupTracerProvider() error {
-	if c.gs.Flags.TracesOutput == "none" {
-		c.gs.TracerProvider = trace.NewNoopTracerProvider()
+func (c *cmdRun) setupTracerProvider(test *loadedAndConfiguredTest) error {
+	ro := test.preInitState.RuntimeOptions
+	if ro.TracesOutput.String == "none" {
+		test.preInitState.TracerProvider = trace.NewNoopTracerProvider()
 		return nil
 	}
 
-	tp, err := trace.TracerProviderFromConfigLine(c.gs.Ctx, c.gs.Flags.TracesOutput)
+	tp, err := trace.TracerProviderFromConfigLine(c.gs.Ctx, ro.TracesOutput.String)
 	if err != nil {
 		return err
 	}
-	c.gs.TracerProvider = tp
+	test.preInitState.TracerProvider = tp
 
 	return nil
 }
