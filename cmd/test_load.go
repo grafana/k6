@@ -75,7 +75,6 @@ func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loaded
 			val, ok := gs.Env[key]
 			return val, ok
 		},
-		TracerProvider: gs.TracerProvider,
 	}
 
 	test := &loadedTest{

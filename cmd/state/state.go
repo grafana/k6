@@ -14,7 +14,6 @@ import (
 
 	"go.k6.io/k6/event"
 	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/trace"
 	"go.k6.io/k6/ui/console"
 )
 
@@ -36,13 +35,12 @@ const defaultConfigFileName = "config.json"
 type GlobalState struct {
 	Ctx context.Context
 
-	FS             fsext.Fs
-	Getwd          func() (string, error)
-	BinaryName     string
-	CmdArgs        []string
-	Env            map[string]string
-	Events         *event.System
-	TracerProvider *trace.TracerProvider
+	FS         fsext.Fs
+	Getwd      func() (string, error)
+	BinaryName string
+	CmdArgs    []string
+	Env        map[string]string
+	Events     *event.System
 
 	DefaultFlags, Flags GlobalFlags
 
