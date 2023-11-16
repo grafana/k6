@@ -119,13 +119,16 @@ github.com/dop251/goja/unistring
 github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.5.4
 ## explicit; go 1.16
-# github.com/go-logr/logr v1.2.4
-## explicit; go 1.16
-github.com/go-logr/logr
-github.com/go-logr/logr/funcr
-# github.com/go-logr/stdr v1.2.2
-## explicit; go 1.16
-github.com/go-logr/stdr
+# github.com/go-redis/redis/v8 v8.11.5
+## explicit; go 1.17
+github.com/go-redis/redis/v8
+github.com/go-redis/redis/v8/internal
+github.com/go-redis/redis/v8/internal/hashtag
+github.com/go-redis/redis/v8/internal/hscan
+github.com/go-redis/redis/v8/internal/pool
+github.com/go-redis/redis/v8/internal/proto
+github.com/go-redis/redis/v8/internal/rand
+github.com/go-redis/redis/v8/internal/util
 # github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 ## explicit
 github.com/go-sourcemap/sourcemap
@@ -139,7 +142,7 @@ github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
-# github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6
+# github.com/google/pprof v0.0.0-20230207041349-798e818bf904
 ## explicit; go 1.19
 github.com/google/pprof/profile
 # github.com/google/uuid v1.3.0
@@ -170,8 +173,8 @@ github.com/grafana/xk6-grpc/lib/netext/grpcext
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
 github.com/grafana/xk6-output-prometheus-remote/pkg/stale
-# github.com/grafana/xk6-redis v0.2.0
-## explicit; go 1.19
+# github.com/grafana/xk6-redis v0.1.1
+## explicit; go 1.17
 github.com/grafana/xk6-redis/redis
 # github.com/grafana/xk6-timers v0.1.2
 ## explicit; go 1.17
@@ -278,16 +281,6 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
-# github.com/redis/go-redis/v9 v9.0.5
-## explicit; go 1.18
-github.com/redis/go-redis/v9
-github.com/redis/go-redis/v9/internal
-github.com/redis/go-redis/v9/internal/hashtag
-github.com/redis/go-redis/v9/internal/hscan
-github.com/redis/go-redis/v9/internal/pool
-github.com/redis/go-redis/v9/internal/proto
-github.com/redis/go-redis/v9/internal/rand
-github.com/redis/go-redis/v9/internal/util
 # github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 ## explicit
 github.com/serenize/snaker
@@ -419,10 +412,7 @@ golang.org/x/text/unicode/rangetable
 # golang.org/x/time v0.3.0
 ## explicit
 golang.org/x/time/rate
-# google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98
-## explicit; go 1.19
-google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20230731193218-e0aa005b6bdf
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
