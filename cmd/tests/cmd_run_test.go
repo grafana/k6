@@ -1552,7 +1552,7 @@ func TestMinIterationDuration(t *testing.T) {
 	assert.Contains(t, stdout, "✓ test_counter.........: 3")
 }
 
-func TestMetricNameWarning(t *testing.T) {
+func TestMetricNameError(t *testing.T) {
 	t.Parallel()
 	script := `
 		import { Counter } from 'k6/metrics';
@@ -1566,14 +1566,14 @@ func TestMetricNameWarning(t *testing.T) {
 		};
 
 		var c = new Counter('test counter');
-		new Counter('test_counter_#');
+		new Counter('test_counter_#'); // this is also bad but we error on the one above
 
 		export function setup() { c.add(1); };
 		export default function () { c.add(1); };
 		export function teardown() { c.add(1); };
 	`
 
-	ts := getSimpleCloudOutputTestState(t, script, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed, 0)
+	ts := getSingleFileTestState(t, script, nil, exitcodes.ScriptException)
 
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
@@ -1581,13 +1581,10 @@ func TestMetricNameWarning(t *testing.T) {
 	t.Log(stdout)
 
 	logEntries := ts.LoggerHook.Drain()
-	expectedMsg := `Metric name should only include up to 128 ASCII letters, numbers and/or underscores.`
-	filteredEntries := testutils.FilterEntries(logEntries, logrus.WarnLevel, expectedMsg)
-	require.Len(t, filteredEntries, 2)
-	// we do it this way as ordering is not guaranteed
-	names := []interface{}{filteredEntries[0].Data["name"], filteredEntries[1].Data["name"]}
-	require.Contains(t, names, "test counter")
-	require.Contains(t, names, "test_counter_#")
+	expectedMsg := `Metric names must only include up to 128 ASCII letters, numbers, or underscores`
+	filteredEntries := testutils.FilterEntries(logEntries, logrus.ErrorLevel, expectedMsg)
+	require.Len(t, filteredEntries, 1)
+	require.Contains(t, filteredEntries[0].Message, "'test counter'")
 }
 
 func TestRunTags(t *testing.T) {

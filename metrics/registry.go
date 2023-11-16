@@ -26,7 +26,11 @@ func NewRegistry() *Registry {
 	}
 }
 
-const nameRegexString = "^[\\p{L}\\p{N}\\._ !\\?/&#\\(\\)<>%-]{1,128}$"
+const (
+	nameRegexString = "^[a-zA-Z_][a-zA-Z0-9_]{1,128}$"
+	badNameWarning  = "Metric names must only include up to 128 ASCII letters, numbers, or underscores " +
+		"and start with a letter or an underscore."
+)
 
 var compileNameRegex = regexp.MustCompile(nameRegexString)
 
@@ -41,7 +45,7 @@ func (r *Registry) NewMetric(name string, typ MetricType, t ...ValueType) (*Metr
 	defer r.l.Unlock()
 
 	if !checkName(name) {
-		return nil, fmt.Errorf("Invalid metric name: '%s'", name) //nolint:golint,stylecheck
+		return nil, fmt.Errorf("Invalid metric name: '%s'. %s", name, badNameWarning) //nolint:golint,stylecheck
 	}
 	oldMetric, ok := r.metrics[name]
 
