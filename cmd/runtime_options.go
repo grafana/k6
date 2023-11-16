@@ -37,6 +37,8 @@ extended: base + Babel with parts of ES2015 preset
 		"",
 		"output the end-of-test summary report to JSON file",
 	)
+	flags.String("traces-output", "none",
+		"set the output for k6 traces, possible values are none,otel[=host:port]")
 	return flags
 }
 
@@ -66,6 +68,7 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 		NoThresholds:         getNullBool(flags, "no-thresholds"),
 		NoSummary:            getNullBool(flags, "no-summary"),
 		SummaryExport:        getNullString(flags, "summary-export"),
+		TracesOutput:         getNullString(flags, "traces-output"),
 		Env:                  make(map[string]string),
 	}
 
@@ -101,6 +104,12 @@ func getRuntimeOptions(flags *pflag.FlagSet, environment map[string]string) (lib
 	if envVar, ok := environment["SSLKEYLOGFILE"]; ok {
 		if !opts.KeyWriter.Valid {
 			opts.KeyWriter = null.StringFrom(envVar)
+		}
+	}
+
+	if envVar, ok := environment["K6_TRACES_OUTPUT"]; ok {
+		if !opts.TracesOutput.Valid {
+			opts.TracesOutput = null.StringFrom(envVar)
 		}
 	}
 
