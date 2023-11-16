@@ -112,7 +112,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
-	if err = c.setupTracerProvider(test); err != nil {
+	if err = c.setupTracerProvider(globalCtx, test); err != nil {
 		return err
 	}
 	waitTracesFlushed := func() {
@@ -440,14 +440,14 @@ func (c *cmdRun) flagSet() *pflag.FlagSet {
 	return flags
 }
 
-func (c *cmdRun) setupTracerProvider(test *loadedAndConfiguredTest) error {
+func (c *cmdRun) setupTracerProvider(ctx context.Context, test *loadedAndConfiguredTest) error {
 	ro := test.preInitState.RuntimeOptions
 	if ro.TracesOutput.String == "none" {
 		test.preInitState.TracerProvider = trace.NewNoopTracerProvider()
 		return nil
 	}
 
-	tp, err := trace.TracerProviderFromConfigLine(c.gs.Ctx, ro.TracesOutput.String)
+	tp, err := trace.TracerProviderFromConfigLine(ctx, ro.TracesOutput.String)
 	if err != nil {
 		return err
 	}
