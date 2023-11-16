@@ -140,7 +140,6 @@ type GlobalFlags struct {
 	Address          string
 	ProfilingEnabled bool
 	LogOutput        string
-	TracesOutput     string
 	LogFormat        string
 	Verbose          bool
 }
@@ -152,7 +151,6 @@ func GetDefaultFlags(homeDir string) GlobalFlags {
 		ProfilingEnabled: false,
 		ConfigFilePath:   filepath.Join(homeDir, "loadimpact", "k6", defaultConfigFileName),
 		LogOutput:        "stderr",
-		TracesOutput:     "none",
 	}
 }
 
@@ -178,9 +176,6 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
 	// color output from k6.
 	if _, ok := env["NO_COLOR"]; ok {
 		result.NoColor = true
-	}
-	if val, ok := env["K6_TRACES_OUTPUT"]; ok {
-		result.TracesOutput = val
 	}
 	return result
 }
