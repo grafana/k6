@@ -584,7 +584,9 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		func(data any) bool {
 			newDocID := <-newDocIDCh
 			if evt, ok := data.(*NavigationEvent); ok {
-				return evt.newDocument.documentID == newDocID
+				if evt.newDocument != nil {
+					return evt.newDocument.documentID == newDocID
+				}
 			}
 			return false
 		})
