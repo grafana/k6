@@ -87,65 +87,47 @@ func (c *Crypto) randomBytes(size int) (*goja.ArrayBuffer, error) {
 
 // md4 returns the MD4 hash of input in the given encoding.
 func (c *Crypto) md4(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("md4")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("md4", input, outputEncoding)
 }
 
 // md5 returns the MD5 hash of input in the given encoding.
 func (c *Crypto) md5(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("md5")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("md5", input, outputEncoding)
 }
 
 // sha1 returns the SHA1 hash of input in the given encoding.
 func (c *Crypto) sha1(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("sha1")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("sha1", input, outputEncoding)
 }
 
 // sha256 returns the SHA256 hash of input in the given encoding.
 func (c *Crypto) sha256(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("sha256")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("sha256", input, outputEncoding)
 }
 
 // sha384 returns the SHA384 hash of input in the given encoding.
 func (c *Crypto) sha384(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("sha384")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("sha384", input, outputEncoding)
 }
 
 // sha512 returns the SHA512 hash of input in the given encoding.
 func (c *Crypto) sha512(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("sha512")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("sha512", input, outputEncoding)
 }
 
 // sha512_224 returns the SHA512/224 hash of input in the given encoding.
 func (c *Crypto) sha512_224(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("sha512_224")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("sha512_224", input, outputEncoding)
 }
 
 // shA512_256 returns the SHA512/256 hash of input in the given encoding.
 func (c *Crypto) sha512_256(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("sha512_256")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("sha512_256", input, outputEncoding)
 }
 
 // ripemd160 returns the RIPEMD160 hash of input in the given encoding.
 func (c *Crypto) ripemd160(input interface{}, outputEncoding string) (interface{}, error) {
-	hasher := c.createHash("ripemd160")
-	hasher.Update(input)
-	return hasher.Digest(outputEncoding)
+	return c.buildInputsDigest("ripemd160", input, outputEncoding)
 }
 
 // createHash returns a Hasher instance that uses the given algorithm.
@@ -155,6 +137,17 @@ func (c *Crypto) createHash(algorithm string) *Hasher {
 		runtime: c.vu.Runtime(),
 		hash:    hashfn(),
 	}
+}
+
+// buildInputsDigest implements basic digest calculation for given algorithm and input/output
+func (c *Crypto) buildInputsDigest(alg string, input interface{}, outputEncoding string) (interface{}, error) {
+	hasher := c.createHash(alg)
+
+	if err := hasher.Update(input); err != nil {
+		return nil, fmt.Errorf("%s failed: %w", alg, err)
+	}
+
+	return hasher.Digest(outputEncoding)
 }
 
 // hexEncode returns a string with the hex representation of the provided byte
