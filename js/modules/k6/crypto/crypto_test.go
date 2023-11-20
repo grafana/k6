@@ -2,7 +2,6 @@ package crypto
 
 import (
 	"context"
-	"crypto/rand"
 	"errors"
 	"fmt"
 	"testing"
@@ -74,13 +73,23 @@ func TestCryptoAlgorithms(t *testing.T) {
 	t.Run("RandomBytesFailure", func(t *testing.T) {
 		t.Parallel()
 
-		rt := makeRuntime(t)
+		rt := goja.New()
+		rt.SetFieldNameMapper(common.FieldNameMapper{})
 
-		SavedReader := rand.Reader
-		rand.Reader = MockReader{}
+		m, ok := New().NewModuleInstance(
+			&modulestest.VU{
+				RuntimeField: rt,
+				InitEnvField: &common.InitEnvironment{},
+				CtxField:     context.Background(),
+				StateField:   nil,
+			},
+		).(*Crypto)
+		require.True(t, ok)
+		require.NoError(t, rt.Set("crypto", m.Exports().Named))
+
+		m.randReader = MockReader{}.Read
 		_, err := rt.RunString(`
 		crypto.randomBytes(5);`)
-		rand.Reader = SavedReader
 
 		assert.Error(t, err)
 	})
