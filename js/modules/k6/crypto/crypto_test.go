@@ -13,20 +13,15 @@ import (
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
 )
 
 type MockReader struct{}
 
-func (MockReader) Read(p []byte) (n int, err error) {
+func (MockReader) Read(_ []byte) (int, error) {
 	return -1, errors.New("Contrived failure")
 }
 
-func TestCryptoAlgorithms(t *testing.T) {
-	if testing.Short() {
-		return
-	}
-
+func makeRuntime(t *testing.T) *goja.Runtime {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
@@ -41,7 +36,21 @@ func TestCryptoAlgorithms(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, rt.Set("crypto", m.Exports().Named))
 
+	return rt
+}
+
+func TestCryptoAlgorithms(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		return
+	}
+
 	t.Run("RandomBytesSuccess", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var buf = crypto.randomBytes(5);
 		if (buf.byteLength !== 5) {
@@ -52,6 +61,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("RandomBytesInvalidSize", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		crypto.randomBytes(-1);`)
 
@@ -59,6 +72,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("RandomBytesFailure", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		SavedReader := rand.Reader
 		rand.Reader = MockReader{}
 		_, err := rt.RunString(`
@@ -69,6 +86,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("MD4", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correct = "aa010fbc1d14c795d86ef98c95479d17";
 		var hash = crypto.md4("hello world", "hex");
@@ -79,6 +100,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("MD5", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correct = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 		var hash = crypto.md5("hello world", "hex");
@@ -90,6 +115,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA1", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correct = "2aae6c35c94fcfb415dbe95f408b9ce91ee846ed";
 		var hash = crypto.sha1("hello world", "hex");
@@ -101,6 +130,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA256", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correct = "b94d27b9934d3e08a52e52d7da7dabfac484efe37a5380ee9088f7ace2efcde9";
 		var hash = crypto.sha256("hello world", "hex");
@@ -112,6 +145,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA384", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correct = "fdbd8e75a67f29f701a4e040385e2e23986303ea10239211af907fcbb83578b3e417cb71ce646efd0819dd8c088de1bd";
 		var hash = crypto.sha384("hello world", "hex");
@@ -123,6 +160,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA512", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correct = "309ecc489c12d6eb4cc40f50c902f2b4d0ed77ee511a7c7a9bcd3ca86d4cd86f989dd35bc5ff499670da34255b45b0cfd830e81f605dcf7dc5542e93ae9cd76f";
 		var hash = crypto.sha512("hello world", "hex");
@@ -134,6 +175,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA512_224", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var hash = crypto.sha512_224("hello world", "hex");
 		var correct = "22e0d52336f64a998085078b05a6e37b26f8120f43bf4db4c43a64ee";
@@ -145,6 +190,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("SHA512_256", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var hash = crypto.sha512_256("hello world", "hex");
 		var correct = "0ac561fac838104e3f2e4ad107b4bee3e938bf15f2b15f009ccccd61a913f017";
@@ -156,6 +205,10 @@ func TestCryptoAlgorithms(t *testing.T) {
 	})
 
 	t.Run("RIPEMD160", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var hash = crypto.ripemd160("hello world", "hex");
 		var correct = "98c615784ccb5fe5936fbc0cbe9dfdb408d92f0f";
@@ -168,31 +221,18 @@ func TestCryptoAlgorithms(t *testing.T) {
 }
 
 func TestStreamingApi(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		return
 	}
 
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-	root, _ := lib.NewGroup("", nil)
-	state := &lib.State{Group: root}
-
-	ctx := context.Background()
-
-	m, ok := New().NewModuleInstance(
-		&modulestest.VU{
-			RuntimeField: rt,
-			InitEnvField: &common.InitEnvironment{},
-			CtxField:     ctx,
-			StateField:   state,
-		},
-	).(*Crypto)
-	require.True(t, ok)
-	require.NoError(t, rt.Set("crypto", m.Exports().Named))
-
 	// Empty strings are still hashable
 	t.Run("Empty", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correctHex = "d41d8cd98f00b204e9800998ecf8427e";
 
@@ -207,6 +247,10 @@ func TestStreamingApi(t *testing.T) {
 	})
 
 	t.Run("UpdateOnce", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 
@@ -222,6 +266,10 @@ func TestStreamingApi(t *testing.T) {
 	})
 
 	t.Run("UpdateMultiple", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 
@@ -240,25 +288,17 @@ func TestStreamingApi(t *testing.T) {
 }
 
 func TestOutputEncoding(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		return
 	}
 
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-	m, ok := New().NewModuleInstance(
-		&modulestest.VU{
-			RuntimeField: rt,
-			InitEnvField: &common.InitEnvironment{},
-			CtxField:     context.Background(),
-			StateField:   nil,
-		},
-	).(*Crypto)
-	require.True(t, ok)
-	require.NoError(t, rt.Set("crypto", m.Exports().Named))
-
 	t.Run("Valid", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var correctHex = "5eb63bbbe01eeed093cb22bb8f5acdc3";
 		var correctBase64 = "XrY7u+Ae7tCTyyK7j1rNww==";
@@ -311,6 +351,10 @@ func TestOutputEncoding(t *testing.T) {
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
+		t.Parallel()
+
+		rt := makeRuntime(t)
+
 		_, err := rt.RunString(`
 		var hasher = crypto.createHash("md5");
 		hasher.update("hello world");
@@ -321,23 +365,11 @@ func TestOutputEncoding(t *testing.T) {
 }
 
 func TestHMac(t *testing.T) {
+	t.Parallel()
+
 	if testing.Short() {
 		return
 	}
-
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-
-	m, ok := New().NewModuleInstance(
-		&modulestest.VU{
-			RuntimeField: rt,
-			InitEnvField: &common.InitEnvironment{},
-			CtxField:     context.Background(),
-			StateField:   nil,
-		},
-	).(*Crypto)
-	require.True(t, ok)
-	require.NoError(t, rt.Set("crypto", m.Exports().Named))
 
 	testData := map[string]string{
 		"md4":        "92d8f5c302cf04cca0144d7a9feb1596",
@@ -351,9 +383,17 @@ func TestHMac(t *testing.T) {
 		"ripemd160":  "00bb4ce0d6afd4c7424c9d01b8a6caa3e749b08b",
 	}
 	for algorithm, value := range testData {
-		rt.Set("correctHex", rt.ToValue(value))
-		rt.Set("algorithm", rt.ToValue(algorithm))
+		algorithm := algorithm
+		value := value
+
 		t.Run(algorithm+" hasher: valid", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
+
+			_ = rt.Set("correctHex", rt.ToValue(value))
+			_ = rt.Set("algorithm", rt.ToValue(algorithm))
+
 			_, err := rt.RunString(`
 			var hasher = crypto.createHMAC(algorithm, "a secret");
 			hasher.update("some data to hash");
@@ -367,6 +407,12 @@ func TestHMac(t *testing.T) {
 		})
 
 		t.Run(algorithm+" wrapper: valid", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
+			_ = rt.Set("correctHex", rt.ToValue(value))
+			_ = rt.Set("algorithm", rt.ToValue(algorithm))
+
 			_, err := rt.RunString(`
 			var resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
 			if (resultHex !== correctHex) {
@@ -377,6 +423,12 @@ func TestHMac(t *testing.T) {
 		})
 
 		t.Run(algorithm+" ArrayBuffer: valid", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
+			_ = rt.Set("correctHex", rt.ToValue(value))
+			_ = rt.Set("algorithm", rt.ToValue(algorithm))
+
 			_, err := rt.RunString(`
 			var data = new Uint8Array([115,111,109,101,32,100,97,116,97,32,116,
 										111,32,104,97,115,104]).buffer;
@@ -397,9 +449,15 @@ func TestHMac(t *testing.T) {
 	}
 	for algorithm, value := range invalidData {
 		algorithm := algorithm
-		rt.Set("correctHex", rt.ToValue(value))
-		rt.Set("algorithm", rt.ToValue(algorithm))
+		value := value
+
 		t.Run(algorithm+" hasher: invalid", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
+			_ = rt.Set("correctHex", rt.ToValue(value))
+			_ = rt.Set("algorithm", rt.ToValue(algorithm))
+
 			_, err := rt.RunString(`
 			var hasher = crypto.createHMAC(algorithm, "a secret");
 			hasher.update("some data to hash");
@@ -413,6 +471,12 @@ func TestHMac(t *testing.T) {
 		})
 
 		t.Run(algorithm+" wrapper: invalid", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
+			_ = rt.Set("correctHex", rt.ToValue(value))
+			_ = rt.Set("algorithm", rt.ToValue(algorithm))
+
 			_, err := rt.RunString(`
 			var resultHex = crypto.hmac(algorithm, "a secret", "some data to hash", "hex");
 			if (resultHex !== correctHex) {
@@ -458,6 +522,8 @@ func TestHexEncode(t *testing.T) {
 }
 
 func TestAWSv4(t *testing.T) {
+	t.Parallel()
+
 	// example values from https://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
