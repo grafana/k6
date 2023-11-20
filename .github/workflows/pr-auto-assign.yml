@@ -14,7 +14,7 @@ jobs:
       - uses: actions/github-script@v6
         with:
           script: |
-            const reviewers = ['mstoykov', 'codebien', 'olegbespalov', 'oleiade'];
+            const reviewers = ['mstoykov', 'codebien', 'olegbespalov', 'oleiade', 'joanlopez'];
             const reviewerCount = 2;
             const crypto = require("node:crypto");
 
