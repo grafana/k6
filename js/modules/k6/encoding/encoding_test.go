@@ -12,13 +12,7 @@ import (
 	"go.k6.io/k6/js/modulestest"
 )
 
-func TestEncodingAlgorithms(t *testing.T) {
-	t.Parallel()
-
-	if testing.Short() {
-		return
-	}
-
+func makeRuntime(t *testing.T) *goja.Runtime {
 	rt := goja.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	m, ok := New().NewModuleInstance(
@@ -32,8 +26,23 @@ func TestEncodingAlgorithms(t *testing.T) {
 	require.True(t, ok)
 	require.NoError(t, rt.Set("encoding", m.Exports().Named))
 
+	return rt
+}
+
+func TestEncodingAlgorithms(t *testing.T) {
+	t.Parallel()
+
+	if testing.Short() {
+		return
+	}
+
 	t.Run("Base64", func(t *testing.T) {
+		t.Parallel()
+
 		t.Run("DefaultEnc", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "aGVsbG8gd29ybGQ=";
 			var encoded = encoding.b64encode("hello world");
@@ -43,6 +52,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultDec", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "hello world";
 			var decBin = encoding.b64decode("aGVsbG8gd29ybGQ=");
@@ -55,6 +67,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultArrayBufferEnc", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var exp = "aGVsbG8=";
 			var input = new Uint8Array([104, 101, 108, 108, 111]); // "hello"
@@ -64,7 +79,10 @@ func TestEncodingAlgorithms(t *testing.T) {
 			}`)
 			assert.NoError(t, err)
 		})
-		t.Run("DefaultArrayBufferDec", func(t *testing.T) { //nolint:paralleltest // weird that it triggers here, and these tests can't be parallel
+		t.Run("DefaultArrayBufferDec", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var exp = "hello";
 			var decBin = encoding.b64decode("aGVsbG8=");
@@ -76,6 +94,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultUnicodeEnc", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "44GT44KT44Gr44Gh44Gv5LiW55WM";
 			var encoded = encoding.b64encode("こんにちは世界", "std");
@@ -85,6 +106,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("DefaultUnicodeDec", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "こんにちは世界";
 			var decBin = encoding.b64decode("44GT44KT44Gr44Gh44Gv5LiW55WM");
@@ -96,6 +120,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("StdEnc", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "aGVsbG8gd29ybGQ=";
 			var encoded = encoding.b64encode("hello world", "std");
@@ -105,6 +132,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("StdDec", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "hello world";
 			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ=", "std", "s");
@@ -114,6 +144,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawStdEnc", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "aGVsbG8gd29ybGQ";
 			var encoded = encoding.b64encode("hello world", "rawstd");
@@ -123,6 +156,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawStdDec", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "hello world";
 			var decoded = encoding.b64decode("aGVsbG8gd29ybGQ", "rawstd", "s");
@@ -132,6 +168,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("URLEnc", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "5bCP6aO85by-Li4=";
 			var encoded = encoding.b64encode("小飼弾..", "url");
@@ -141,6 +180,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("URLDec", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "小飼弾..";
 			var decoded = encoding.b64decode("5bCP6aO85by-Li4=", "url", "s");
@@ -150,6 +192,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawURLEnc", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "5bCP6aO85by-Li4";
 			var encoded = encoding.b64encode("小飼弾..", "rawurl");
@@ -159,6 +204,9 @@ func TestEncodingAlgorithms(t *testing.T) {
 			assert.NoError(t, err)
 		})
 		t.Run("RawURLDec", func(t *testing.T) {
+			t.Parallel()
+
+			rt := makeRuntime(t)
 			_, err := rt.RunString(`
 			var correct = "小飼弾..";
 			var decoded = encoding.b64decode("5bCP6aO85by-Li4", "rawurl", "s");
