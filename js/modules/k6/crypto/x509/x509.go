@@ -1,7 +1,8 @@
+// Package x509 provides X.509 certificate parsing for the k6
 package x509
 
 import (
-	"crypto/dsa"
+	"crypto/dsa" //nolint:staticcheck // #nosec G505 // DSA is weak, but we need it for compatibility
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha1" // #nosec G505
