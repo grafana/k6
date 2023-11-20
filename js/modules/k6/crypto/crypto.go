@@ -30,7 +30,8 @@ type (
 
 	// Crypto represents an instance of the crypto module.
 	Crypto struct {
-		vu modules.VU
+		randReader func(b []byte) (n int, err error)
+		vu         modules.VU
 	}
 )
 
@@ -47,7 +48,7 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	return &Crypto{vu: vu}
+	return &Crypto{vu: vu, randReader: rand.Read}
 }
 
 // Exports returns the exports of the execution module.
@@ -78,7 +79,7 @@ func (c *Crypto) randomBytes(size int) (*goja.ArrayBuffer, error) {
 		return nil, errors.New("invalid size")
 	}
 	bytes := make([]byte, size)
-	_, err := rand.Read(bytes)
+	_, err := c.randReader(bytes)
 	if err != nil {
 		return nil, err
 	}
