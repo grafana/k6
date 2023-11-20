@@ -1,3 +1,4 @@
+// Package encoding provides encoding/decoding functionality for the k6
 package encoding
 
 import (

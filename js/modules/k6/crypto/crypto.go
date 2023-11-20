@@ -1,10 +1,11 @@
+// Package crypto provides common hashing function for the k6
 package crypto
 
 import (
 	"crypto/hmac"
-	"crypto/md5"
+	"crypto/md5" // #nosec G501 // MD5 is weak, but we need it for compatibility
 	"crypto/rand"
-	"crypto/sha1"
+	"crypto/sha1" // #nosec G505 // SHA1 is weak, but we need it for compatibility
 	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/base64"
@@ -13,8 +14,8 @@ import (
 	"fmt"
 	"hash"
 
-	"golang.org/x/crypto/md4"
-	"golang.org/x/crypto/ripemd160"
+	"golang.org/x/crypto/md4"       //nolint:staticcheck // #nosec G501 // MD4 is weak, but we need it for compatibility
+	"golang.org/x/crypto/ripemd160" // no lint:staticcheck // #nosec G501 // RIPEMD160 is weak, but we need it for compatibility
 
 	"github.com/dop251/goja"
 
