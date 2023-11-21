@@ -15,7 +15,7 @@ jobs:
       - uses: actions/github-script@v6
         with:
           script: |
-            const assignees = ['mstoykov', 'codebien', 'olegbespalov', 'oleiade'];
+            const assignees = ['mstoykov', 'codebien', 'olegbespalov', 'oleiade', 'joanlopez'];
             const assigneeCount = 1;
 
             // Do not automatically assign users if someone was already assigned or it was opened by a maintainer
