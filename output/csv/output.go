@@ -5,7 +5,6 @@ import (
 	"compress/gzip"
 	"encoding/csv"
 	"fmt"
-	"os"
 	"sort"
 	"strconv"
 	"strings"
@@ -44,39 +43,16 @@ func New(params output.Params) (output.Output, error) {
 }
 
 func newOutput(params output.Params) (*Output, error) {
-	resTags := []string{}
-	ignoredTags := []string{}
-	tags := params.ScriptOptions.SystemTags.Map()
-	for tag, flag := range tags {
-		systemTag, err := metrics.SystemTagString(tag)
-		if err != nil {
-			return nil, err
-		}
-
-		// The non-indexable system tags are neither a "resTag"
-		// nor an "ignoreTag". They aren't a "resTag" as they
-		// aren't added as a column in the CSV. Yet they also
-		// shouldn't be ignored as they are added to the
-		// "metadata" column
-		if metrics.NonIndexableSystemTags.Has(systemTag) {
-			continue
-		}
-
-		if flag {
-			resTags = append(resTags, tag)
-		} else {
-			ignoredTags = append(ignoredTags, tag)
-		}
+	resTags, ignoredTags, err := buildTagSets(params)
+	if err != nil {
+		return nil, err
 	}
-
-	sort.Strings(resTags)
-	sort.Strings(ignoredTags)
 
 	logger := params.Logger.WithFields(logrus.Fields{
 		"output":   "csv",
 		"filename": params.ConfigArgument,
 	})
-	config, err := GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument, logger.Logger)
+	config, err := GetConsolidatedConfig(params.JSONConfig, params.Environment, params.ConfigArgument)
 	if err != nil {
 		return nil, err
 	}
@@ -89,7 +65,7 @@ func newOutput(params output.Params) (*Output, error) {
 	fname := config.FileName.String
 
 	if fname == "" || fname == "-" {
-		stdoutWriter := csv.NewWriter(os.Stdout)
+		stdoutWriter := csv.NewWriter(params.StdOut)
 		return &Output{
 			fname:        "-",
 			resTags:      resTags,
@@ -135,6 +111,40 @@ func newOutput(params output.Params) (*Output, error) {
 	}
 
 	return &c, nil
+}
+
+// buildTagSets builds trackable and ignored tag sets from the
+// output params
+func buildTagSets(params output.Params) ([]string, []string, error) {
+	resTags := []string{}
+	ignoredTags := []string{}
+	tags := params.ScriptOptions.SystemTags.Map()
+	for tag, flag := range tags {
+		systemTag, err := metrics.SystemTagString(tag)
+		if err != nil {
+			return nil, nil, err
+		}
+
+		// The non-indexable system tags are neither a "resTag"
+		// nor an "ignoreTag". They aren't a "resTag" as they
+		// aren't added as a column in the CSV. Yet they also
+		// shouldn't be ignored as they are added to the
+		// "metadata" column
+		if metrics.NonIndexableSystemTags.Has(systemTag) {
+			continue
+		}
+
+		if flag {
+			resTags = append(resTags, tag)
+		} else {
+			ignoredTags = append(ignoredTags, tag)
+		}
+	}
+
+	sort.Strings(resTags)
+	sort.Strings(ignoredTags)
+
+	return resTags, ignoredTags, nil
 }
 
 // Description returns a human-readable description of the output.

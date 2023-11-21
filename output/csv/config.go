@@ -9,7 +9,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"github.com/mstoykov/envconfig"
-	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -60,7 +59,7 @@ func (c Config) Apply(cfg Config) Config {
 }
 
 // ParseArg takes an arg string and converts it to a config
-func ParseArg(arg string, logger logrus.FieldLogger) (Config, error) {
+func ParseArg(arg string) (Config, error) {
 	c := NewConfig()
 
 	if !strings.Contains(arg, "=") {
@@ -95,7 +94,7 @@ func ParseArg(arg string, logger logrus.FieldLogger) (Config, error) {
 // GetConsolidatedConfig combines {default config values + JSON config +
 // environment vars + arg config values}, and returns the final result.
 func GetConsolidatedConfig(
-	jsonRawConf json.RawMessage, env map[string]string, arg string, logger logrus.FieldLogger,
+	jsonRawConf json.RawMessage, env map[string]string, arg string,
 ) (Config, error) {
 	result := NewConfig()
 	if jsonRawConf != nil {
@@ -117,7 +116,7 @@ func GetConsolidatedConfig(
 	result = result.Apply(envConfig)
 
 	if arg != "" {
-		urlConf, err := ParseArg(arg, logger)
+		urlConf, err := ParseArg(arg)
 		if err != nil {
 			return result, err
 		}
