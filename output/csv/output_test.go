@@ -22,6 +22,8 @@ import (
 )
 
 func TestMakeHeader(t *testing.T) {
+	t.Parallel()
+
 	testdata := map[string][]string{
 		"One tag": {
 			"tag1",
@@ -33,7 +35,10 @@ func TestMakeHeader(t *testing.T) {
 
 	for testname, tags := range testdata {
 		testname, tags := testname, tags
+
 		t.Run(testname, func(t *testing.T) {
+			t.Parallel()
+
 			header := MakeHeader(tags)
 			assert.Equal(t, len(tags)+5, len(header))
 			assert.Equal(t, "metric_name", header[0])
@@ -46,6 +51,8 @@ func TestMakeHeader(t *testing.T) {
 }
 
 func TestSampleToRow(t *testing.T) {
+	t.Parallel()
+
 	registry := metrics.NewRegistry()
 	testMetric, err := registry.NewMetric("my_metric", metrics.Gauge)
 	require.NoError(t, err)
@@ -306,6 +313,8 @@ func TestSampleToRow(t *testing.T) {
 		expectedRow := expected[i]
 
 		t.Run(testname, func(t *testing.T) {
+			t.Parallel()
+
 			row := SampleToRow(sample, resTags, ignoredTags, make([]string, 3+len(resTags)+2), timeFormat)
 			for ind, cell := range expectedRow.baseRow {
 				assert.Equal(t, cell, row[ind])
@@ -323,7 +332,7 @@ func readUnCompressedFile(fileName string, fs fsext.Fs) string {
 		return err.Error()
 	}
 
-	return fmt.Sprintf("%s", csvbytes)
+	return string(csvbytes)
 }
 
 func readCompressedFile(fileName string, fs fsext.Fs) string {
@@ -342,7 +351,7 @@ func readCompressedFile(fileName string, fs fsext.Fs) string {
 		return err.Error()
 	}
 
-	return fmt.Sprintf("%s", csvbytes)
+	return string(csvbytes)
 }
 
 func TestRun(t *testing.T) {
