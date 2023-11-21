@@ -1,3 +1,4 @@
+// Package client provides a simple go-client for the k6's REST API.
 package client
 
 import (
