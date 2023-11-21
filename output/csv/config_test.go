@@ -4,15 +4,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/sirupsen/logrus"
-
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/types"
 )
 
@@ -103,11 +99,8 @@ func TestParseArg(t *testing.T) {
 		arg := arg
 		testCase := testCase
 
-		testLogger, hook := test.NewNullLogger()
-		testLogger.SetOutput(testutils.NewTestOutput(t))
-
 		t.Run(arg, func(t *testing.T) {
-			config, err := ParseArg(arg, testLogger)
+			config, err := ParseArg(arg)
 
 			if testCase.expectedErr {
 				assert.Error(t, err)
@@ -116,13 +109,6 @@ func TestParseArg(t *testing.T) {
 
 			require.NoError(t, err)
 			assert.Equal(t, testCase.config, config)
-
-			var entries []string
-			for _, v := range hook.AllEntries() {
-				assert.Equal(t, v.Level, logrus.WarnLevel)
-				entries = append(entries, v.Message)
-			}
-			assert.ElementsMatch(t, entries, testCase.expectedLogEntries)
 		})
 	}
 }
