@@ -6,6 +6,7 @@ import (
 	"go.k6.io/k6/lib"
 )
 
+// Status represents the current status of the test run.
 type Status struct {
 	Status lib.ExecutionStatus `json:"status" yaml:"status"`
 
