@@ -22,7 +22,8 @@ export default function () {
  * overwrites existing files).
  *
  * You can return multiple summary outputs in a script.
- * In this example, we return statement sends a report and writes the data object to different JSON files.
+ * In this example, we return statement sends a report and writes the data
+ * object to different JSON files.
  */
 
 export function handleSummary(data) {
