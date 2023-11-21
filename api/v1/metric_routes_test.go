@@ -31,6 +31,9 @@ func TestGetMetrics(t *testing.T) {
 	rw := httptest.NewRecorder()
 	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics", nil))
 	res := rw.Result()
+	t.Cleanup(func() {
+		assert.NoError(t, res.Body.Close())
+	})
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Run("document", func(t *testing.T) {
@@ -90,6 +93,9 @@ func TestGetMetric(t *testing.T) {
 		rw := httptest.NewRecorder()
 		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics/notreal", nil))
 		res := rw.Result()
+		t.Cleanup(func() {
+			assert.NoError(t, res.Body.Close())
+		})
 		assert.Equal(t, http.StatusNotFound, res.StatusCode)
 	})
 
@@ -99,6 +105,9 @@ func TestGetMetric(t *testing.T) {
 		rw := httptest.NewRecorder()
 		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/metrics/my_metric", nil))
 		res := rw.Result()
+		t.Cleanup(func() {
+			assert.NoError(t, res.Body.Close())
+		})
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 
 		t.Run("document", func(t *testing.T) {

@@ -171,6 +171,9 @@ func TestSetupData(t *testing.T) {
 				rw := httptest.NewRecorder()
 				handler.ServeHTTP(rw, httptest.NewRequest(method, "/v1/setup", bytes.NewBufferString(body)))
 				res := rw.Result()
+				t.Cleanup(func() {
+					assert.NoError(t, res.Body.Close())
+				})
 				if !assert.Equal(t, http.StatusOK, res.StatusCode) {
 					t.Logf("body: %s\n", rw.Body.String())
 					return

@@ -74,6 +74,9 @@ func TestGetGroups(t *testing.T) {
 		rw := httptest.NewRecorder()
 		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups", nil))
 		res := rw.Result()
+		t.Cleanup(func() {
+			assert.NoError(t, res.Body.Close())
+		})
 		body := rw.Body.Bytes()
 		assert.Equal(t, http.StatusOK, res.StatusCode)
 		assert.NotEmpty(t, body)
@@ -122,6 +125,9 @@ func TestGetGroups(t *testing.T) {
 			rw := httptest.NewRecorder()
 			NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups/"+gp.ID, nil))
 			res := rw.Result()
+			t.Cleanup(func() {
+				assert.NoError(t, res.Body.Close())
+			})
 			assert.Equal(t, http.StatusOK, res.StatusCode)
 		})
 	}
