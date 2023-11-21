@@ -61,6 +61,8 @@ func getControlSurface(tb testing.TB, testState *lib.TestRunState) *ControlSurfa
 }
 
 func TestGetGroups(t *testing.T) {
+	t.Parallel()
+
 	g0, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 	g1, err := g0.Group("group 1")
@@ -71,6 +73,8 @@ func TestGetGroups(t *testing.T) {
 	cs := getControlSurface(t, getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{Group: g0}))
 
 	t.Run("list", func(t *testing.T) {
+		t.Parallel()
+
 		rw := httptest.NewRecorder()
 		NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups", nil))
 		res := rw.Result()
@@ -82,6 +86,8 @@ func TestGetGroups(t *testing.T) {
 		assert.NotEmpty(t, body)
 
 		t.Run("document", func(t *testing.T) {
+			t.Parallel()
+
 			var doc groupsJSONAPI
 			assert.NoError(t, json.Unmarshal(body, &doc))
 			if assert.NotEmpty(t, doc.Data) {
@@ -90,6 +96,8 @@ func TestGetGroups(t *testing.T) {
 		})
 
 		t.Run("groups", func(t *testing.T) {
+			t.Parallel()
+
 			var envelop groupsJSONAPI
 			require.NoError(t, json.Unmarshal(body, &envelop))
 			require.Len(t, envelop.Data, 3)
@@ -121,7 +129,9 @@ func TestGetGroups(t *testing.T) {
 		})
 	})
 	for _, gp := range []*lib.Group{g0, g1, g2} {
+		gp := gp
 		t.Run(gp.Name, func(t *testing.T) {
+			t.Parallel()
 			rw := httptest.NewRecorder()
 			NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/groups/"+gp.ID, nil))
 			res := rw.Result()
