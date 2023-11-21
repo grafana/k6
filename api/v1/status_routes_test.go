@@ -32,6 +32,9 @@ func TestGetStatus(t *testing.T) {
 	rw := httptest.NewRecorder()
 	NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodGet, "/v1/status", nil))
 	res := rw.Result()
+	t.Cleanup(func() {
+		assert.NoError(t, res.Body.Close())
+	})
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 
 	t.Run("document", func(t *testing.T) {
@@ -160,6 +163,9 @@ func TestPatchStatus(t *testing.T) {
 			rw := httptest.NewRecorder()
 			NewHandler(cs).ServeHTTP(rw, httptest.NewRequest(http.MethodPatch, "/v1/status", bytes.NewReader(testCase.Payload)))
 			res := rw.Result()
+			t.Cleanup(func() {
+				assert.NoError(t, res.Body.Close())
+			})
 
 			require.Equal(t, "application/json; charset=utf-8", rw.Header().Get("Content-Type"))
 
