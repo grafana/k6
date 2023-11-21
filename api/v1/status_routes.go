@@ -52,10 +52,13 @@ func handlePatchStatus(cs *ControlSurface, rw http.ResponseWriter, r *http.Reque
 	status := statusEnvelop.Status()
 
 	if status.Stopped { //nolint:nestif
-		execution.AbortTestRun(cs.RunCtx, errext.WithAbortReasonIfNone(
-			errext.WithExitCodeIfNone(fmt.Errorf("test run stopped from REST API"), exitcodes.ScriptStoppedFromRESTAPI),
-			errext.AbortedByUser,
-		))
+		execution.AbortTestRun( //nolint:contextcheck // false-positive cs.RunCtx a right way of passing context there
+			cs.RunCtx,
+			errext.WithAbortReasonIfNone(
+				errext.WithExitCodeIfNone(fmt.Errorf("test run stopped from REST API"), exitcodes.ScriptStoppedFromRESTAPI),
+				errext.AbortedByUser,
+			),
+		)
 	} else {
 		if status.Paused.Valid {
 			if err = cs.Scheduler.SetPaused(status.Paused.Bool); err != nil {
