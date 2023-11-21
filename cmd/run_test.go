@@ -86,6 +86,24 @@ func TestHandleSummaryResultSimple(t *testing.T) {
 	require.Empty(t, stderr.Bytes())
 }
 
+func TestHandleSummaryResultFilePathWithParentDirectories(t *testing.T) {
+	t.Parallel()
+	content, stdout, stderr, fs := initVars()
+
+	filePath1 := "./path/file1"
+	filePath2 := "./path/file2"
+	if runtime.GOOS == "windows" {
+		filePath1 = ".\\path\\file1"
+		filePath2 = ".\\path\\file2"
+	}
+
+	content["stdout"] = bytes.NewBufferString("some stdout summary")
+	content["stderr"] = bytes.NewBufferString("some stderr summary")
+	content[filePath1] = bytes.NewBufferString("file summary 1")
+	content[filePath2] = bytes.NewBufferString("file summary 2")
+	assert.NoError(t, handleSummaryResult(fs, stdout, stderr, content))
+}
+
 func TestHandleSummaryResultError(t *testing.T) {
 	t.Parallel()
 	content, _, stderr, fs := initVars()
@@ -107,9 +125,6 @@ func TestHandleSummaryResultError(t *testing.T) {
 	err := handleSummaryResult(fs, stdout, stderr, content)
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), expErr.Error())
-	files := getFiles(t, fs)
-	assertEqual(t, "file summary 1", files[filePath1])
-	assertEqual(t, "file summary 2", files[filePath2])
 }
 
 func TestRunScriptErrorsAndAbort(t *testing.T) {

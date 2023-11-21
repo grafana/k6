@@ -3,6 +3,7 @@
 /dist
 /pkg-build
 /js/tc39/TestTC39
+/data
 
 .vscode
 *.sublime-workspace

@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"sync"
@@ -541,6 +542,9 @@ func handleSummaryResult(fs fsext.Fs, stdOut, stdErr io.Writer, result map[strin
 		case "stderr":
 			return stdErr, nil
 		default:
+			if err := fs.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+				return nil, err
+			}
 			return fs.OpenFile(path, syscall.O_WRONLY|syscall.O_CREAT|syscall.O_TRUNC, 0o666)
 		}
 	}
