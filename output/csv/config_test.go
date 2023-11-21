@@ -13,6 +13,8 @@ import (
 )
 
 func TestNewConfig(t *testing.T) {
+	t.Parallel()
+
 	config := NewConfig()
 	assert.Equal(t, "file.csv", config.FileName.String)
 	assert.Equal(t, "1s", config.SaveInterval.String())
@@ -20,6 +22,8 @@ func TestNewConfig(t *testing.T) {
 }
 
 func TestApply(t *testing.T) {
+	t.Parallel()
+
 	configs := []Config{
 		{
 			FileName:     null.StringFrom(""),
@@ -52,7 +56,10 @@ func TestApply(t *testing.T) {
 	for i := range configs {
 		config := configs[i]
 		expected := expected[i]
+
 		t.Run(expected.FileName+"_"+expected.SaveInterval, func(t *testing.T) {
+			t.Parallel()
+
 			baseConfig := NewConfig()
 			baseConfig = baseConfig.Apply(config)
 
@@ -64,6 +71,8 @@ func TestApply(t *testing.T) {
 }
 
 func TestParseArg(t *testing.T) {
+	t.Parallel()
+
 	cases := map[string]struct {
 		config             Config
 		expectedLogEntries []string
@@ -100,6 +109,8 @@ func TestParseArg(t *testing.T) {
 		testCase := testCase
 
 		t.Run(arg, func(t *testing.T) {
+			t.Parallel()
+
 			config, err := ParseArg(arg)
 
 			if testCase.expectedErr {
