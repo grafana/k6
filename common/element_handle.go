@@ -1029,15 +1029,15 @@ func (h *ElementHandle) Query(selector string) (*ElementHandle, error) {
 		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
 	}
 	fn := `
-		(node, injected, selector) => {
-			return injected.querySelector(selector, node || document, false);
+		(node, injected, selector, strict) => {
+			return injected.querySelector(selector, strict, node || document);
 		}
 	`
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
+	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector, false)
 	if err != nil {
 		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
