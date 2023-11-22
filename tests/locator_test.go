@@ -344,7 +344,7 @@ func TestLocatorElementState(t *testing.T) {
 		{
 			"hidden",
 			`() => document.getElementById('inputText').style.visibility = 'hidden'`,
-			func(l *common.Locator) bool { return !l.IsHidden(nil) },
+			func(l *common.Locator) bool { resp, _ := l.IsHidden(nil); return !resp },
 		},
 		{
 			"readOnly",
@@ -398,7 +398,11 @@ func TestLocatorElementState(t *testing.T) {
 			"IsDisabled", func(l *common.Locator, tb *testBrowser) { l.IsDisabled(timeout(tb)) },
 		},
 		{
-			"IsHidden", func(l *common.Locator, tb *testBrowser) { l.IsHidden(timeout(tb)) },
+			"IsHidden", func(l *common.Locator, tb *testBrowser) {
+				if _, err := l.IsHidden(timeout(tb)); err != nil {
+					panic(err)
+				}
+			},
 		},
 	}
 	for _, tt := range sanityTests {
