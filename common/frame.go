@@ -1242,19 +1242,19 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 
 // IsHidden returns true if the first element that matches the selector
 // is hidden. Otherwise, returns false.
-func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
+func (f *Frame) IsHidden(selector string, opts goja.Value) (bool, error) {
 	f.log.Debugf("Frame:IsHidden", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsHiddenOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is hidden options: %w", err)
+		return false, fmt.Errorf("parsing is hidden options: %w", err)
 	}
 	hidden, err := f.isHidden(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q hidden: %w", selector, err)
+		return false, fmt.Errorf("checking is %q hidden: %w", selector, err)
 	}
 
-	return hidden
+	return hidden, nil
 }
 
 func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, error) {

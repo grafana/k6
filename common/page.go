@@ -913,7 +913,10 @@ func (p *Page) IsEnabled(selector string, opts goja.Value) bool {
 	return p.MainFrame().IsEnabled(selector, opts)
 }
 
-func (p *Page) IsHidden(selector string, opts goja.Value) bool {
+// IsHidden will look for an element in the dom with given selector and see if
+// the element is hidden. It will not wait for a match to occur. If no elements
+// match `false` will be returned.
+func (p *Page) IsHidden(selector string, opts goja.Value) (bool, error) {
 	p.logger.Debugf("Page:IsHidden", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsHidden(selector, opts)
