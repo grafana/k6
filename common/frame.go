@@ -1973,6 +1973,31 @@ type frameExecutionContext interface {
 	ID() runtime.ExecutionContextID
 }
 
+func (f *Frame) runActionOnSelector(
+	ctx context.Context, selector string, strict bool, fn elementHandleActionFunc,
+) (bool, error) {
+	handle, err := f.Query(selector, strict)
+	if err != nil {
+		return false, fmt.Errorf("query: %w", err)
+	}
+	if handle == nil {
+		f.log.Debugf("Frame:runActionOnSelector:nilHandler", "fid:%s furl:%q selector:%s", f.ID(), f.URL(), selector)
+		return false, nil
+	}
+
+	v, err := fn(ctx, handle)
+	if err != nil {
+		return false, fmt.Errorf("calling function: %w", err)
+	}
+
+	bv, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("unexpected type %T", v)
+	}
+
+	return bv, nil
+}
+
 //nolint:unparam
 func (f *Frame) newAction(
 	selector string, state DOMElementState, strict bool, fn elementHandleActionFunc, states []string,
