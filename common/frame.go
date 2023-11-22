@@ -1306,7 +1306,7 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 		}
 		return v, err
 	}
-	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isVisible)
+	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isVisible, func() bool { return false })
 	if err != nil {
 		return false, fmt.Errorf("checking is %q visible: %w", selector, err)
 	}
@@ -1966,7 +1966,7 @@ type frameExecutionContext interface {
 }
 
 func (f *Frame) runActionOnSelector(
-	ctx context.Context, selector string, strict bool, fn elementHandleActionFunc,
+	ctx context.Context, selector string, strict bool, fn elementHandleActionFunc, nullResponder func() bool,
 ) (bool, error) {
 	handle, err := f.Query(selector, strict)
 	if err != nil {
@@ -1974,7 +1974,7 @@ func (f *Frame) runActionOnSelector(
 	}
 	if handle == nil {
 		f.log.Debugf("Frame:runActionOnSelector:nilHandler", "fid:%s furl:%q selector:%s", f.ID(), f.URL(), selector)
-		return false, nil
+		return nullResponder(), err
 	}
 
 	v, err := fn(ctx, handle)
