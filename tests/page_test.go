@@ -1274,3 +1274,70 @@ func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iteration
 
 	return ms / int64(iterations)
 }
+
+func TestPageIsVisible(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		name     string
+		selector string
+		options  common.FrameIsVisibleOptions
+		want     bool
+		wantErr  string
+	}{
+		{
+			name:     "visible",
+			selector: "div[id=my-div]",
+			want:     true,
+		},
+		{
+			name:     "not_visible",
+			selector: "div[id=my-div-3]",
+			want:     false,
+		},
+		{
+			name:     "not_found",
+			selector: "div[id=does-not-exist]",
+			want:     false,
+		},
+		{
+			name:     "first_div",
+			selector: "div",
+			want:     true,
+		},
+		{
+			name:     "first_div",
+			selector: "div",
+			options: common.FrameIsVisibleOptions{
+				FrameBaseOptions: common.FrameBaseOptions{
+					Strict: true,
+				},
+			},
+			wantErr: "error:strictmodeviolation",
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+
+			page := tb.NewPage(nil)
+
+			_, err := page.Goto(tb.staticURL("visible.html"), nil)
+			require.NoError(t, err)
+
+			got, err := page.IsVisible(tc.selector, tb.toGojaValue(tc.options))
+
+			if tc.wantErr != "" {
+				assert.ErrorContains(t, err, tc.wantErr)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.Equal(t, tc.want, got)
+		})
+	}
+}
