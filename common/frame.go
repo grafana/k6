@@ -1265,20 +1265,12 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 		}
 		return v, err
 	}
-	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isHidden, []string{}, false, true, opts.Timeout,
-	)
-	v, err := call(f.ctx, act, opts.Timeout)
+	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isHidden, func() bool { return true })
 	if err != nil {
-		return false, errorFromDOMError(err)
+		return false, fmt.Errorf("checking is %q hidden: %w", selector, err)
 	}
 
-	bv, ok := v.(bool)
-	if !ok {
-		return false, fmt.Errorf("checking is %q hidden: unexpected type %T", selector, v)
-	}
-
-	return bv, nil
+	return v, nil
 }
 
 // IsVisible returns true if the first element that matches the selector

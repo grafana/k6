@@ -397,13 +397,6 @@ func TestLocatorElementState(t *testing.T) {
 		{
 			"IsDisabled", func(l *common.Locator, tb *testBrowser) { l.IsDisabled(timeout(tb)) },
 		},
-		{
-			"IsHidden", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.IsHidden(timeout(tb)); err != nil {
-					panic(err)
-				}
-			},
-		},
 	}
 	for _, tt := range sanityTests {
 		tt := tt
