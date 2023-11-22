@@ -1251,7 +1251,7 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) (bool, error) {
 	}
 	hidden, err := f.isHidden(selector, popts)
 	if err != nil {
-		return false, fmt.Errorf("checking is %q hidden: %w", selector, err)
+		return false, err
 	}
 
 	return hidden, nil
