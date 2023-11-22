@@ -1306,20 +1306,12 @@ func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, e
 		}
 		return v, err
 	}
-	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isVisible, []string{}, false, true, opts.Timeout,
-	)
-	v, err := call(f.ctx, act, opts.Timeout)
+	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isVisible)
 	if err != nil {
-		return false, errorFromDOMError(err)
+		return false, fmt.Errorf("checking is %q visible: %w", selector, err)
 	}
 
-	bv, ok := v.(bool)
-	if !ok {
-		return false, fmt.Errorf("checking is %q visible: unexpected type %T", selector, v)
-	}
-
-	return bv, nil
+	return v, nil
 }
 
 // ID returns the frame id.

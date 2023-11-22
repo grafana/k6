@@ -398,9 +398,6 @@ func TestLocatorElementState(t *testing.T) {
 			"IsDisabled", func(l *common.Locator, tb *testBrowser) { l.IsDisabled(timeout(tb)) },
 		},
 		{
-			"IsVisible", func(l *common.Locator, tb *testBrowser) { l.IsVisible(timeout(tb)) },
-		},
-		{
 			"IsHidden", func(l *common.Locator, tb *testBrowser) { l.IsHidden(timeout(tb)) },
 		},
 	}
