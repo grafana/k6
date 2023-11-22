@@ -1283,19 +1283,19 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 
 // IsVisible returns true if the first element that matches the selector
 // is visible. Otherwise, returns false.
-func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
+func (f *Frame) IsVisible(selector string, opts goja.Value) (bool, error) {
 	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsVisibleOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is visible options: %w", err)
+		return false, fmt.Errorf("parsing is visible options: %w", err)
 	}
 	visible, err := f.isVisible(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q visible: %w", selector, err)
+		return false, err
 	}
 
-	return visible
+	return visible, nil
 }
 
 func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
