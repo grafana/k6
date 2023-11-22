@@ -249,7 +249,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 		},
 	}
 	maps["$"] = func(selector string) (mapping, error) {
-		eh, err := eh.Query(selector)
+		eh, err := eh.Query(selector, false)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
 		}
@@ -398,7 +398,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"waitForTimeout": f.WaitForTimeout,
 	}
 	maps["$"] = func(selector string) (mapping, error) {
-		eh, err := f.Query(selector)
+		eh, err := f.Query(selector, false)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
 		}

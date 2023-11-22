@@ -1023,7 +1023,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
-func (h *ElementHandle) Query(selector string) (*ElementHandle, error) {
+func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
@@ -1037,7 +1037,7 @@ func (h *ElementHandle) Query(selector string) (*ElementHandle, error) {
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector, false)
+	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector, strict)
 	if err != nil {
 		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}

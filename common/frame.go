@@ -1355,14 +1355,14 @@ func (f *Frame) Name() string {
 
 // Query runs a selector query against the document tree, returning the first matching element or
 // "null" if no match is found.
-func (f *Frame) Query(selector string) (*ElementHandle, error) {
+func (f *Frame) Query(selector string, strict bool) (*ElementHandle, error) {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
 	if err != nil {
 		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
-	return document.Query(selector)
+	return document.Query(selector, strict)
 }
 
 // QueryAll runs a selector query against the document tree, returning all matching elements.
