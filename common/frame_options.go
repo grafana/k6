@@ -223,19 +223,10 @@ func NewFrameCheckOptions(defaultTimeout time.Duration) *FrameCheckOptions {
 }
 
 func (o *FrameCheckOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -247,19 +238,10 @@ func NewFrameClickOptions(defaultTimeout time.Duration) *FrameClickOptions {
 }
 
 func (o *FrameClickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleClickOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -271,19 +253,10 @@ func NewFrameDblClickOptions(defaultTimeout time.Duration) *FrameDblclickOptions
 }
 
 func (o *FrameDblclickOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleDblclickOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -295,19 +268,10 @@ func NewFrameFillOptions(defaultTimeout time.Duration) *FrameFillOptions {
 }
 
 func (o *FrameFillOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -348,19 +312,10 @@ func NewFrameHoverOptions(defaultTimeout time.Duration) *FrameHoverOptions {
 }
 
 func (o *FrameHoverOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleHoverOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -461,16 +416,7 @@ func NewFrameIsHiddenOptions() *FrameIsHiddenOptions {
 }
 
 func (o *FrameIsHiddenOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -480,16 +426,7 @@ func NewFrameIsVisibleOptions() *FrameIsVisibleOptions {
 }
 
 func (o *FrameIsVisibleOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -514,19 +451,10 @@ func NewFrameSelectOptionOptions(defaultTimeout time.Duration) *FrameSelectOptio
 }
 
 func (o *FrameSelectOptionOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
@@ -623,19 +551,10 @@ func NewFrameUncheckOptions(defaultTimeout time.Duration) *FrameUncheckOptions {
 }
 
 func (o *FrameUncheckOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
-				o.Strict = opts.Get(k).ToBoolean()
-			}
-		}
-	}
+	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
 
