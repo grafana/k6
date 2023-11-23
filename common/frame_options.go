@@ -773,3 +773,19 @@ func NewFrameDispatchEventOptions(defaultTimeout time.Duration) *FrameDispatchEv
 		FrameBaseOptions: NewFrameBaseOptions(defaultTimeout),
 	}
 }
+
+func parseStrict(ctx context.Context, opts goja.Value) bool {
+	var strict bool
+
+	rt := k6ext.Runtime(ctx)
+	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+		opts := opts.ToObject(rt)
+		for _, k := range opts.Keys() {
+			if k == "strict" {
+				strict = opts.Get(k).ToBoolean()
+			}
+		}
+	}
+
+	return strict
+}
