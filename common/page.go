@@ -992,7 +992,7 @@ func (p *Page) Press(selector string, key string, opts goja.Value) {
 func (p *Page) Query(selector string) (*ElementHandle, error) {
 	p.logger.Debugf("Page:Query", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.frameManager.MainFrame().Query(selector, false)
+	return p.frameManager.MainFrame().Query(selector, StrictModeOff)
 }
 
 // QueryAll returns all elements matching the specified selector.

@@ -13,4 +13,8 @@ const (
 	// Life-cycle consts
 
 	LifeCycleNetworkIdleTimeout time.Duration = 500 * time.Millisecond
+
+	// API default consts.
+
+	StrictModeOff = false
 )
