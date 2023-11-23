@@ -1278,7 +1278,7 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 func (f *Frame) IsVisible(selector string, opts goja.Value) (bool, error) {
 	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsVisibleOptions(f.defaultTimeout())
+	popts := NewFrameIsVisibleOptions()
 	if err := popts.Parse(f.ctx, opts); err != nil {
 		return false, fmt.Errorf("parsing is visible options: %w", err)
 	}

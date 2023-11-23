@@ -236,7 +236,7 @@ func (l *Locator) isDisabled(opts *FrameIsDisabledOptions) (bool, error) {
 func (l *Locator) IsVisible(opts goja.Value) bool {
 	l.log.Debugf("Locator:IsVisible", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameIsVisibleOptions(l.frame.defaultTimeout())
+	copts := NewFrameIsVisibleOptions()
 	if err := copts.Parse(l.ctx, opts); err != nil {
 		k6ext.Panic(l.ctx, "parsing is visible options: %w", err)
 	}
