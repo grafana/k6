@@ -249,7 +249,7 @@ func (l *Locator) IsVisible() (bool, error) {
 func (l *Locator) IsHidden(opts goja.Value) (bool, error) {
 	l.log.Debugf("Locator:IsHidden", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	copts := NewFrameIsHiddenOptions(l.frame.defaultTimeout())
+	copts := NewFrameIsHiddenOptions()
 	if err := copts.Parse(l.ctx, opts); err != nil {
 		return false, fmt.Errorf("parsing is hidden options: %w", err)
 	}

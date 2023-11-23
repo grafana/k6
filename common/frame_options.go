@@ -78,7 +78,7 @@ type FrameIsEnabledOptions struct {
 }
 
 type FrameIsHiddenOptions struct {
-	FrameBaseOptions
+	Strict bool `json:"strict"`
 }
 
 type FrameIsVisibleOptions struct {
@@ -455,15 +455,21 @@ func (o *FrameIsEnabledOptions) Parse(ctx context.Context, opts goja.Value) erro
 	return nil
 }
 
-func NewFrameIsHiddenOptions(defaultTimeout time.Duration) *FrameIsHiddenOptions {
-	return &FrameIsHiddenOptions{
-		FrameBaseOptions: *NewFrameBaseOptions(defaultTimeout),
-	}
+// NewFrameIsHiddenOptions creates and returns a new instance of FrameIsHiddenOptions.
+func NewFrameIsHiddenOptions() *FrameIsHiddenOptions {
+	return &FrameIsHiddenOptions{}
 }
 
 func (o *FrameIsHiddenOptions) Parse(ctx context.Context, opts goja.Value) error {
-	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
-		return err
+	rt := k6ext.Runtime(ctx)
+	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+		opts := opts.ToObject(rt)
+		for _, k := range opts.Keys() {
+			switch k {
+			case "strict":
+				o.Strict = opts.Get(k).ToBoolean()
+			}
+		}
 	}
 	return nil
 }
