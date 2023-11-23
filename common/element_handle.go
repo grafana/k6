@@ -386,8 +386,8 @@ func (h *ElementHandle) isHidden(apiCtx context.Context, timeout time.Duration) 
 	return h.waitForElementState(apiCtx, []string{"hidden"}, timeout)
 }
 
-func (h *ElementHandle) isVisible(apiCtx context.Context, timeout time.Duration) (bool, error) {
-	return h.waitForElementState(apiCtx, []string{"visible"}, timeout)
+func (h *ElementHandle) isVisible(apiCtx context.Context) (bool, error) {
+	return h.waitForElementState(apiCtx, []string{"visible"}, 0)
 }
 
 func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position) (*Position, error) {
@@ -958,7 +958,7 @@ func (h *ElementHandle) IsHidden() bool {
 
 // IsVisible checks if the element is visible.
 func (h *ElementHandle) IsVisible() bool {
-	result, err := h.isVisible(h.ctx, 0)
+	result, err := h.isVisible(h.ctx)
 	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is visible: %w", err)
 	}

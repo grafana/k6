@@ -1292,8 +1292,8 @@ func (f *Frame) IsVisible(selector string, opts goja.Value) (bool, error) {
 
 func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
 	isVisible := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		v, err := handle.isVisible(apiCtx, 0) // Zero timeout when checking state
-		if errors.Is(err, ErrTimedOut) {      // We don't care about timeout errors here!
+		v, err := handle.isVisible(apiCtx) // Zero timeout when checking state
+		if errors.Is(err, ErrTimedOut) {   // We don't care about timeout errors here!
 			return v, nil
 		}
 		return v, err
