@@ -233,15 +233,15 @@ func (l *Locator) isDisabled(opts *FrameIsDisabledOptions) (bool, error) {
 
 // IsVisible returns true if the element matches the locator's
 // selector and is visible. Otherwise, returns false.
-func (l *Locator) IsVisible() bool {
+func (l *Locator) IsVisible() (bool, error) {
 	l.log.Debugf("Locator:IsVisible", "fid:%s furl:%q sel:%q", l.frame.ID(), l.frame.URL(), l.selector)
 
 	visible, err := l.frame.isVisible(l.selector, &FrameIsVisibleOptions{Strict: true})
 	if err != nil {
-		k6ext.Panic(l.ctx, "checking is %q visible: %w", l.selector, err)
+		return false, fmt.Errorf("checking is %q visible: %w", l.selector, err)
 	}
 
-	return visible
+	return visible, nil
 }
 
 // IsHidden returns true if the element matches the locator's

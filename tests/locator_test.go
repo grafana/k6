@@ -354,7 +354,7 @@ func TestLocatorElementState(t *testing.T) {
 		{
 			"visible",
 			`() => document.getElementById('inputText').style.visibility = 'hidden'`,
-			func(l *common.Locator) bool { return l.IsVisible() },
+			func(l *common.Locator) bool { resp, _ := l.IsVisible(); return resp },
 		},
 	}
 
