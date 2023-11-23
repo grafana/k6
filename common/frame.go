@@ -1259,8 +1259,8 @@ func (f *Frame) IsHidden(selector string, opts goja.Value) (bool, error) {
 
 func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, error) {
 	isHidden := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		v, err := handle.isHidden(apiCtx, 0) // Zero timeout when checking state
-		if errors.Is(err, ErrTimedOut) {     // We don't care about timeout errors here!
+		v, err := handle.isHidden(apiCtx) // Zero timeout when checking state
+		if errors.Is(err, ErrTimedOut) {  // We don't care about timeout errors here!
 			return v, nil
 		}
 		return v, err
