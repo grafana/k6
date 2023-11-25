@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"math/big"
 	"time"
 
@@ -21,6 +22,29 @@ func sumStagesDuration(stages []Stage) (result time.Duration) {
 		result += s.Duration.TimeDuration()
 	}
 	return
+}
+
+func sumTotalNumberOfUpAndDonwShifts(startVus int64, stages []Stage) int64 {
+	totalShifts := big.NewInt(startVus)
+	prevNumVus := totalShifts
+
+	for _, s := range stages {
+		current := big.NewInt(s.Target.Int64)
+		shiftDelta := new(big.Int).Sub(current, prevNumVus)
+		shiftDelta.Abs(shiftDelta)
+
+		totalShifts.Add(totalShifts, shiftDelta)
+
+		prevNumVus = current
+	}
+
+	totalShifts.Add(totalShifts, prevNumVus)
+
+	if totalShifts.IsInt64() {
+		return totalShifts.Int64()
+	}
+
+	return math.MaxInt64
 }
 
 func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 {
@@ -52,6 +76,8 @@ func validateStages(stages []Stage) []error {
 			errors = append(errors, fmt.Errorf("stage %d doesn't have a target", stageNum))
 		} else if s.Target.Int64 < 0 {
 			errors = append(errors, fmt.Errorf("the target for stage %d can't be negative", stageNum))
+		} else if s.Target.Int64 > 100000000 {
+			errors = append(errors, fmt.Errorf("the target for stage %d is too large", stageNum))
 		}
 	}
 	return errors
