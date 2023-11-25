@@ -76,8 +76,6 @@ func validateStages(stages []Stage) []error {
 			errors = append(errors, fmt.Errorf("stage %d doesn't have a target", stageNum))
 		} else if s.Target.Int64 < 0 {
 			errors = append(errors, fmt.Errorf("the target for stage %d can't be negative", stageNum))
-		} else if s.Target.Int64 > 100000000 {
-			errors = append(errors, fmt.Errorf("the target for stage %d is too large", stageNum))
 		}
 	}
 	return errors
