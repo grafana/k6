@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"math/rand"
 	"sync/atomic"
@@ -50,7 +51,7 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 	errs = c.Validate()
 	assert.Contains(t, errs[0].Error(), "number of VU shift is too large")
 
-	c.StartVUs = null.IntFrom(9223372036854775807)
+	c.StartVUs = null.IntFrom(math.MaxInt64)
 	c.Stages = []Stage{
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(12 * time.Second)},
 	}
