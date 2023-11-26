@@ -41,7 +41,7 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 	c.StartVUs = null.IntFrom(100000001)
 	errs = c.Validate()
 	require.NotEmpty(t, errs)
-	assert.Contains(t, errs[0].Error(), "number of VU shift is too large")
+	assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
 
 	c.StartVUs = null.IntFrom(60000000)
 	c.Stages = []Stage{
@@ -49,14 +49,14 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 		{Target: null.IntFrom(50000000), Duration: types.NullDurationFrom(12 * time.Second)},
 	}
 	errs = c.Validate()
-	assert.Contains(t, errs[0].Error(), "number of VU shift is too large")
+	assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
 
 	c.StartVUs = null.IntFrom(math.MaxInt64)
 	c.Stages = []Stage{
 		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(12 * time.Second)},
 	}
 	errs = c.Validate()
-	assert.Contains(t, errs[0].Error(), "number of VU shift is too large")
+	assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
 }
 
 func TestRampingVUsRun(t *testing.T) {

@@ -87,7 +87,7 @@ func (vlvc RampingVUsConfig) Validate() []error {
 	}
 
 	if sumTotalNumberOfUpAndDonwShifts(vlvc.StartVUs.Int64, vlvc.Stages) > 100000000 {
-		errors = append(errors, fmt.Errorf("total number of VU shift is too large"))
+		errors = append(errors, fmt.Errorf("total number of VU shifts is too large"))
 	}
 
 	return append(errors, validateStages(vlvc.Stages)...)
