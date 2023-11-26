@@ -30,10 +30,10 @@ func sumTotalNumberOfUpAndDonwShifts(startVus int64, stages []Stage) int64 {
 
 	for _, s := range stages {
 		current := big.NewInt(s.Target.Int64)
-		shiftDelta := new(big.Int).Sub(current, prevNumVus)
-		shiftDelta.Abs(shiftDelta)
+		vuDelta := new(big.Int).Sub(current, prevNumVus)
+		vuDelta.Abs(vuDelta)
 
-		totalShifts.Add(totalShifts, shiftDelta)
+		totalShifts.Add(totalShifts, vuDelta)
 
 		prevNumVus = current
 	}
