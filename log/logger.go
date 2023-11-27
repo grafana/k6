@@ -1,3 +1,4 @@
+// Package log provides logging for the browser module.
 package log
 
 import (
