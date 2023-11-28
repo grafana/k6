@@ -148,7 +148,7 @@ type GlobalFlags struct {
 func GetDefaultFlags(homeDir string) GlobalFlags {
 	return GlobalFlags{
 		Address:          "localhost:6565",
-		ProfilingEnabled: false,
+		ProfilingEnabled: true,
 		ConfigFilePath:   filepath.Join(homeDir, "loadimpact", "k6", defaultConfigFileName),
 		LogOutput:        "stderr",
 	}
