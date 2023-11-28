@@ -22,6 +22,7 @@ labels: ["release"]
 
 #### ~ 1 week before the release date.
 
+- [ ] Ensure that all merged pull-requests referenced in the release notes are linked to the release milestone.
 - [ ] Ensure all PRs in the `k6-docs` repository, related to new or modified functionalities introduced by the new version have been created.
 - [ ] Ensure all PRs in the k6 repository, part of the current [milestone](https://github.com/grafana/k6/milestones), have been merged.
 - [ ] Open a PR with the release notes for the new version, and ask teams who might have contributed to the release (k6-browser, k6-chaos, k6-docs, k6-devrel teams, etc.) to contribute their notes and review the existing ones.
