@@ -69,7 +69,7 @@ func TestNestedFrames(t *testing.T) {
 	assert.Nil(t, err)
 
 	v := frame2.Evaluate(tb.toGojaValue(`() => window.buttonClicked`))
-	assert.True(t, tb.asGojaBool(v), "cannot not click the button")
+	assert.True(t, tb.asGojaBool(v), "button hasn't been clicked")
 }
 
 func TestPageEmulateMedia(t *testing.T) {
