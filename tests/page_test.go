@@ -14,8 +14,6 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"github.com/sirupsen/logrus"
-	"github.com/sirupsen/logrus/hooks/writer"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -38,15 +36,8 @@ const sampleHTML = `<div><b>Test</b><ol><li><i>One</i></li></ol></div>`
 func TestNestedFrames(t *testing.T) {
 	t.Parallel()
 
-	buf := bytes.NewBufferString("")
 	tb := newTestBrowser(t,
 		withFileServer(),
-		func(tb *testBrowser) {
-			if !tb.isBrowserTypeInitialized {
-				return
-			}
-			tb.vu.StateField.Logger.(*logrus.Logger).AddHook(&writer.Hook{Writer: buf, LogLevels: []logrus.Level{logrus.InfoLevel}})
-		},
 	)
 	defer tb.Browser.Close()
 
@@ -77,7 +68,8 @@ func TestNestedFrames(t *testing.T) {
 	err = button1Handle.Click(nil)
 	assert.Nil(t, err)
 
-	assert.Contains(t, buf.String(), "button1 clicked")
+	v := frame2.Evaluate(tb.toGojaValue(`() => window.buttonClicked`))
+	assert.True(t, tb.asGojaBool(v), "cannot not click the button")
 }
 
 func TestPageEmulateMedia(t *testing.T) {
