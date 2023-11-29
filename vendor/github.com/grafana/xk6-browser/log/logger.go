@@ -3,7 +3,7 @@ package log
 import (
 	"encoding/json"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"regexp"
 	"runtime"
 	"strings"
@@ -25,7 +25,7 @@ type Logger struct {
 // be discarded and not logged anywhere.
 func NewNullLogger() *Logger {
 	log := logrus.New()
-	log.SetOutput(ioutil.Discard)
+	log.SetOutput(io.Discard)
 	return New(log, "")
 }
 

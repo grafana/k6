@@ -248,6 +248,8 @@ class InjectedScript {
       );
       result = result.concat(shadowRootResults);
     }
+
+    if (!root.hasChildNodes()) return result;
     
     for (let i = 0; i < root.children.length; i++) {
       const childElement = root.children[i];

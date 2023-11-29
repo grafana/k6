@@ -3,16 +3,11 @@ package common
 import (
 	"context"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 )
-
-// Ensure Touchscreen implements the EventEmitter and api.Touchscreen interfaces.
-var _ EventEmitter = &Touchscreen{}
-var _ api.Touchscreen = &Touchscreen{}
 
 // Touchscreen represents a touchscreen.
 type Touchscreen struct {

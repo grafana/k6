@@ -27,8 +27,9 @@ type (
 
 	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
-		Browser *goja.Object
-		Devices map[string]common.Device
+		Browser         *goja.Object
+		Devices         map[string]common.Device
+		NetworkProfiles map[string]common.NetworkProfile `js:"networkProfiles"`
 	}
 
 	// ModuleInstance represents an instance of the JS module.
@@ -64,11 +65,13 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
 		mod: &JSModule{
 			Browser: mapBrowserToGoja(moduleVU{
-				VU:              vu,
-				pidRegistry:     m.PidRegistry,
-				browserRegistry: newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
+				VU:                vu,
+				pidRegistry:       m.PidRegistry,
+				browserRegistry:   newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
+				taskQueueRegistry: newTaskQueueRegistry(vu),
 			}),
-			Devices: common.GetDevices(),
+			Devices:         common.GetDevices(),
+			NetworkProfiles: common.GetNetworkProfiles(),
 		},
 	}
 }

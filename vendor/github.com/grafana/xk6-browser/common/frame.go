@@ -1,13 +1,14 @@
 package common
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -22,12 +23,58 @@ import (
 // maxRetry controls how many times to retry if an action fails.
 const maxRetry = 1
 
-// Ensure frame implements the Frame interface.
-var _ api.Frame = &Frame{}
-
 type DocumentInfo struct {
 	documentID string
 	request    *Request
+}
+
+// DOMElementState represents a DOM element state.
+type DOMElementState int
+
+// Valid DOM element states.
+const (
+	DOMElementStateAttached DOMElementState = iota
+	DOMElementStateDetached
+	DOMElementStateVisible
+	DOMElementStateHidden
+)
+
+func (s DOMElementState) String() string {
+	return domElementStateToString[s]
+}
+
+var domElementStateToString = map[DOMElementState]string{ //nolint:gochecknoglobals
+	DOMElementStateAttached: "attached",
+	DOMElementStateDetached: "detached",
+	DOMElementStateVisible:  "visible",
+	DOMElementStateHidden:   "hidden",
+}
+
+var domElementStateToID = map[string]DOMElementState{ //nolint:gochecknoglobals
+	"attached": DOMElementStateAttached,
+	"detached": DOMElementStateDetached,
+	"visible":  DOMElementStateVisible,
+	"hidden":   DOMElementStateHidden,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string.
+func (s DOMElementState) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(domElementStateToString[s])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
+func (s *DOMElementState) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return fmt.Errorf("unmarshaling DOM element state: %w", err)
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*s = domElementStateToID[j]
+	return nil
 }
 
 // Frame represents a frame in an HTML document.
@@ -40,7 +87,7 @@ type Frame struct {
 	parentFrame *Frame
 
 	childFramesMu sync.RWMutex
-	childFrames   map[api.Frame]bool
+	childFrames   map[*Frame]bool
 
 	propertiesMu sync.RWMutex
 	id           cdp.FrameID
@@ -94,7 +141,7 @@ func NewFrame(
 		page:              m.page,
 		manager:           m,
 		parentFrame:       parentFrame,
-		childFrames:       make(map[api.Frame]bool),
+		childFrames:       make(map[*Frame]bool),
 		id:                frameID,
 		vu:                k6ext.GetVU(ctx),
 		lifecycleEvents:   make(map[LifecycleEvent]bool),
@@ -486,11 +533,11 @@ func (f *Frame) AddStyleTag(opts goja.Value) {
 }
 
 // ChildFrames returns a list of child frames.
-func (f *Frame) ChildFrames() []api.Frame {
+func (f *Frame) ChildFrames() []*Frame {
 	f.childFramesMu.RLock()
 	defer f.childFramesMu.RUnlock()
 
-	l := make([]api.Frame, 0, len(f.childFrames))
+	l := make([]*Frame, 0, len(f.childFrames))
 	for child := range f.childFrames {
 		l = append(l, child)
 	}
@@ -744,7 +791,7 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle api.JSHandle, _ error) {
+func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle JSHandleAPI, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -828,7 +875,7 @@ func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
 }
 
 // FrameElement returns the element handle for the frame.
-func (f *Frame) FrameElement() (api.ElementHandle, error) {
+func (f *Frame) FrameElement() (*ElementHandle, error) {
 	f.log.Debugf("Frame:FrameElement", "fid:%s furl:%q", f.ID(), f.URL())
 
 	element, err := f.page.getFrameElement(f)
@@ -877,7 +924,7 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
-func (f *Frame) Goto(url string, opts goja.Value) (api.Response, error) {
+func (f *Frame) Goto(url string, opts goja.Value) (*Response, error) {
 	var (
 		netMgr         = f.manager.page.mainFrameSession.getNetworkManager()
 		defaultReferer = netMgr.extraHTTPHeaders["referer"]
@@ -1284,7 +1331,7 @@ func (f *Frame) ID() string {
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) Locator(selector string, opts goja.Value) api.Locator {
+func (f *Frame) Locator(selector string, opts goja.Value) *Locator {
 	f.log.Debugf("Frame:Locator", "fid:%s furl:%q selector:%q opts:%+v", f.ID(), f.URL(), selector, opts)
 
 	return NewLocator(f.ctx, selector, f, f.log)
@@ -1308,7 +1355,7 @@ func (f *Frame) Name() string {
 
 // Query runs a selector query against the document tree, returning the first matching element or
 // "null" if no match is found.
-func (f *Frame) Query(selector string) (api.ElementHandle, error) {
+func (f *Frame) Query(selector string) (*ElementHandle, error) {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
@@ -1319,7 +1366,7 @@ func (f *Frame) Query(selector string) (api.ElementHandle, error) {
 }
 
 // QueryAll runs a selector query against the document tree, returning all matching elements.
-func (f *Frame) QueryAll(selector string) ([]api.ElementHandle, error) {
+func (f *Frame) QueryAll(selector string) ([]*ElementHandle, error) {
 	f.log.Debugf("Frame:QueryAll", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
@@ -1330,12 +1377,12 @@ func (f *Frame) QueryAll(selector string) ([]api.ElementHandle, error) {
 }
 
 // Page returns page that owns frame.
-func (f *Frame) Page() api.Page {
+func (f *Frame) Page() *Page {
 	return f.manager.page
 }
 
 // ParentFrame returns the parent frame, if one exists.
-func (f *Frame) ParentFrame() api.Frame {
+func (f *Frame) ParentFrame() *Frame {
 	return f.parentFrame
 }
 
@@ -1733,7 +1780,7 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 //
 //nolint:funlen,cyclop
-func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
+func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
@@ -1825,7 +1872,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (api.Response, error) {
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (f *Frame) WaitForSelector(selector string, opts goja.Value) (api.ElementHandle, error) {
+func (f *Frame) WaitForSelector(selector string, opts goja.Value) (*ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)
@@ -1909,7 +1956,7 @@ type frameExecutionContext interface {
 
 	// getInjectedScript returns a JS handle to the injected script of helper
 	// functions.
-	getInjectedScript(apiCtx context.Context) (api.JSHandle, error)
+	getInjectedScript(apiCtx context.Context) (JSHandleAPI, error)
 
 	// Eval evaluates the provided JavaScript within this execution context and
 	// returns a value or handle.
@@ -1917,7 +1964,7 @@ type frameExecutionContext interface {
 
 	// EvalHandle evaluates the provided JavaScript within this execution
 	// context and returns a JSHandle.
-	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (api.JSHandle, error)
+	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (JSHandleAPI, error)
 
 	// Frame returns the frame that this execution context belongs to.
 	Frame() *Frame

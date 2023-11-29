@@ -28,8 +28,34 @@ import (
 	"github.com/dop251/goja"
 )
 
-// Ensure NetworkManager implements the EventEmitter interface.
-var _ EventEmitter = &NetworkManager{}
+// Credentials holds HTTP authentication credentials.
+type Credentials struct {
+	Username string `js:"username"`
+	Password string `js:"password"`
+}
+
+// NewCredentials return a new Credentials.
+func NewCredentials() *Credentials {
+	return &Credentials{}
+}
+
+// Parse credentials details from a given goja credentials value.
+func (c *Credentials) Parse(ctx context.Context, credentials goja.Value) error {
+	rt := k6ext.Runtime(ctx)
+	if credentials != nil && !goja.IsUndefined(credentials) && !goja.IsNull(credentials) {
+		credentials := credentials.ToObject(rt)
+		for _, k := range credentials.Keys() {
+			switch k {
+			case "username":
+				c.Username = credentials.Get(k).String()
+			case "password":
+				c.Password = credentials.Get(k).String()
+			}
+		}
+	}
+
+	return nil
+}
 
 // NetworkManager manages all frames in HTML document.
 type NetworkManager struct {
@@ -54,6 +80,7 @@ type NetworkManager struct {
 
 	extraHTTPHeaders               map[string]string
 	offline                        bool
+	networkProfile                 NetworkProfile
 	userCacheDisabled              bool
 	userReqInterceptionEnabled     bool
 	protocolReqInterceptionEnabled bool
@@ -86,6 +113,7 @@ func NewNetworkManager(
 		reqIDToRequest:   make(map[network.RequestID]*Request),
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
+		networkProfile:   NewNetworkProfile(),
 	}
 	m.initEvents()
 	if err := m.initDomains(); err != nil {
@@ -347,9 +375,7 @@ func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
 }
 
 func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) {
-	rid := event.RequestID
-	req := m.requestForOnLoadingFinished(rid)
-
+	req := m.requestForOnLoadingFinished(event.RequestID)
 	// the request was not created yet.
 	if req == nil {
 		return
@@ -700,10 +726,36 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 	}
 	m.offline = offline
 
-	action := network.EmulateNetworkConditions(m.offline, 0, -1, -1)
+	action := network.EmulateNetworkConditions(
+		m.offline,
+		m.networkProfile.Latency,
+		m.networkProfile.Download,
+		m.networkProfile.Upload,
+	)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		k6ext.Panic(m.ctx, "setting offline mode: %w", err)
 	}
+}
+
+// ThrottleNetwork changes the network attributes in chrome to simulate slower
+// networks e.g. a slow 3G connection.
+func (m *NetworkManager) ThrottleNetwork(networkProfile NetworkProfile) error {
+	if m.networkProfile == networkProfile {
+		return nil
+	}
+	m.networkProfile = networkProfile
+
+	action := network.EmulateNetworkConditions(
+		m.offline,
+		m.networkProfile.Latency,
+		m.networkProfile.Download,
+		m.networkProfile.Upload,
+	)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("throttling network: %w", err)
+	}
+
+	return nil
 }
 
 // SetUserAgent overrides the browser user agent string.

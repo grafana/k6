@@ -10,7 +10,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -32,6 +31,12 @@ import (
 )
 
 const utilityWorldName = "__k6_browser_utility_world__"
+
+// CPUProfile is used in throttleCPU.
+type CPUProfile struct {
+	// rate as a slowdown factor (1 is no throttle, 2 is 2x slowdown, etc).
+	Rate float64
+}
 
 /*
 FrameSession is used for managing a frame's life-cycle, or in other words its full session.
@@ -401,11 +406,11 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	}
 	fs.isolatedWorlds[name] = true
 
-	var frames []api.Frame
+	var frames []*Frame
 	if fs.isMainFrame() {
 		frames = fs.manager.Frames()
 	} else {
-		frames = []api.Frame{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
+		frames = []*Frame{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
 	}
 	for _, frame := range frames {
 		// A frame could have been removed before we execute this, so don't wait around for a reply.
@@ -1021,6 +1026,21 @@ func (fs *FrameSession) updateOffline(initial bool) {
 	if !initial || offline {
 		fs.networkManager.SetOfflineMode(offline)
 	}
+}
+
+func (fs *FrameSession) throttleNetwork(networkProfile NetworkProfile) error {
+	fs.logger.Debugf("NewFrameSession:throttleNetwork", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
+
+	return fs.networkManager.ThrottleNetwork(networkProfile)
+}
+
+func (fs *FrameSession) throttleCPU(cpuProfile CPUProfile) error {
+	action := emulation.SetCPUThrottlingRate(cpuProfile.Rate)
+	if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return fmt.Errorf("throttling CPU: %w", err)
+	}
+
+	return nil
 }
 
 func (fs *FrameSession) updateRequestInterception(enable bool) error {
