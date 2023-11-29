@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6error"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -14,10 +13,6 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 )
-
-// Ensure Worker implements the EventEmitter, Target and api.Worker interfaces.
-var _ EventEmitter = &Worker{}
-var _ api.Worker = &Worker{}
 
 type Worker struct {
 	BaseEventEmitter
@@ -70,7 +65,7 @@ func (w *Worker) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle evaluates a page function in the context of the web worker and returns a JS handle.
-func (w *Worker) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
+func (w *Worker) EvaluateHandle(_ goja.Value, _ ...goja.Value) (JSHandleAPI, error) {
 	// TODO: implement
 	return nil, fmt.Errorf("Worker.EvaluateHandle has not been implemented yet: %w", k6error.ErrFatal)
 }

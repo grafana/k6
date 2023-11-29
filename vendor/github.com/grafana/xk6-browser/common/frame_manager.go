@@ -7,7 +7,6 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -240,7 +239,7 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 	if frame != nil {
 		m.framesMu.Unlock()
 		for _, child := range frame.ChildFrames() {
-			m.removeFramesRecursively(child.(*Frame))
+			m.removeFramesRecursively(child)
 		}
 		m.framesMu.Lock()
 	}
@@ -399,7 +398,7 @@ func (m *FrameManager) getFrameByID(id cdp.FrameID) *Frame {
 
 func (m *FrameManager) removeChildFramesRecursively(frame *Frame) {
 	for _, child := range frame.ChildFrames() {
-		m.removeFramesRecursively(child.(*Frame))
+		m.removeFramesRecursively(child)
 	}
 }
 
@@ -409,7 +408,7 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) {
 			"fmid:%d cfid:%v pfid:%v cfname:%s cfurl:%s",
 			m.ID(), child.ID(), frame.ID(), child.Name(), child.URL())
 
-		m.removeFramesRecursively(child.(*Frame))
+		m.removeFramesRecursively(child)
 	}
 
 	frame.detach()
@@ -532,10 +531,10 @@ func (m *FrameManager) requestStarted(req *Request) {
 }
 
 // Frames returns a list of frames on the page.
-func (m *FrameManager) Frames() []api.Frame {
+func (m *FrameManager) Frames() []*Frame {
 	m.framesMu.RLock()
 	defer m.framesMu.RUnlock()
-	frames := make([]api.Frame, 0)
+	frames := make([]*Frame, 0)
 	for _, frame := range m.frames {
 		frames = append(frames, frame)
 	}
@@ -585,7 +584,9 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		func(data any) bool {
 			newDocID := <-newDocIDCh
 			if evt, ok := data.(*NavigationEvent); ok {
-				return evt.newDocument.documentID == newDocID
+				if evt.newDocument != nil {
+					return evt.newDocument.documentID == newDocID
+				}
 			}
 			return false
 		})
@@ -682,7 +683,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 }
 
 // Page returns the page that this frame manager belongs to.
-func (m *FrameManager) Page() api.Page {
+func (m *FrameManager) Page() *Page {
 	if m.page != nil {
 		return m.page
 	}

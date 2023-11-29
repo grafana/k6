@@ -5,9 +5,6 @@ import (
 	"sync"
 )
 
-// Ensure BaseEventEmitter implements the EventEmitter interface.
-var _ EventEmitter = &BaseEventEmitter{}
-
 const (
 	// Browser
 
@@ -15,8 +12,7 @@ const (
 
 	// BrowserContext
 
-	EventBrowserContextClose string = "close"
-	EventBrowserContextPage  string = "page"
+	EventBrowserContextPage string = "page"
 
 	// Connection
 

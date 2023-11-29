@@ -10,6 +10,12 @@ import (
 	"github.com/dop251/goja"
 )
 
+// Strict mode:
+// All operations on locators throw an exception if more
+// than one element matches the locator's selector.
+//
+// See Issue #100 for more details.
+
 // Locator represent a way to find element(s) on the page at any moment.
 type Locator struct {
 	selector string

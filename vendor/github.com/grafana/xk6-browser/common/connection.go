@@ -24,10 +24,6 @@ import (
 
 const wsWriteBufferSize = 1 << 20
 
-// Ensure Connection implements the EventEmitter and Executor interfaces.
-var _ EventEmitter = &Connection{}
-var _ cdp.Executor = &Connection{}
-
 // Each connection needs its own msgID. A msgID will be used by the
 // connection and associated sessions. When a CDP request is made to
 // chrome, it's best to work with unique ids to avoid the Execute
@@ -81,42 +77,38 @@ func (f ActionFunc) Do(ctx context.Context) error {
 	return f(ctx)
 }
 
-/*
-		Connection represents a WebSocket connection and the root "Browser Session".
-
-		                                      ┌───────────────────────────────────────────────────────────────────┐
-	                                          │                                                                   │
-	                                          │                          Browser Process                          │
-	                                          │                                                                   │
-	                                          └───────────────────────────────────────────────────────────────────┘
-
-┌───────────────────────────┐                                           │      ▲
-│Reads JSON-RPC CDP messages│                                           │      │
-│from WS connection and puts│                                           ▼      │
-│ them on incoming queue of │             ┌───────────────────────────────────────────────────────────────────┐
-│    target session, as     ├─────────────■                                                                   │
-│   identified by message   │             │                       WebSocket Connection                        │
-│   session ID. Messages    │             │                                                                   │
-│ without a session ID are  │             └───────────────────────────────────────────────────────────────────┘
-│considered to belong to the│                    │      ▲                                       │      ▲
-│  root "Browser Session".  │                    │      │                                       │      │
-└───────────────────────────┘                    ▼      │                                       ▼      │
-┌───────────────────────────┐             ┌────────────────────┐                         ┌────────────────────┐
-│  Handles CDP messages on  ├─────────────■                    │                         │                    │
-│incoming queue and puts CDP│             │      Session       │      *  *  *  *  *      │      Session       │
-│   messages on outgoing    │             │                    │                         │                    │
-│ channel of WS connection. │             └────────────────────┘                         └────────────────────┘
-└───────────────────────────┘                    │      ▲                                       │      ▲
-
-	│      │                                       │      │
-	▼      │                                       ▼      │
-
-┌───────────────────────────┐             ┌────────────────────┐                         ┌────────────────────┐
-│Registers with session as a├─────────────■                    │                         │                    │
-│handler for a specific CDP │             │   Event Listener   │      *  *  *  *  *      │   Event Listener   │
-│       Domain event.       │             │                    │                         │                    │
-└───────────────────────────┘             └────────────────────┘                         └────────────────────┘.
-*/
+// Connection represents a WebSocket connection and the root "Browser Session".
+//
+//	                                          ┌───────────────────────────────────────────────────────────────────┐
+//	                                          │                                                                   │
+//	                                          │                          Browser Process                          │
+//	                                          │                                                                   │
+//	                                          └───────────────────────────────────────────────────────────────────┘
+//	┌───────────────────────────┐                                           │      ▲
+//	│Reads JSON-RPC CDP messages│                                           │      │
+//	│from WS connection and puts│                                           ▼      │
+//	│ them on incoming queue of │             ┌───────────────────────────────────────────────────────────────────┐
+//	│    target session, as     ├─────────────■                                                                   │
+//	│   identified by message   │             │                       WebSocket Connection                        │
+//	│   session ID. Messages    │             │                                                                   │
+//	│ without a session ID are  │             └───────────────────────────────────────────────────────────────────┘
+//	│considered to belong to the│                    │      ▲                                       │      ▲
+//	│  root "Browser Session".  │                    │      │                                       │      │
+//	└───────────────────────────┘                    ▼      │                                       ▼      │
+//	┌───────────────────────────┐             ┌────────────────────┐                         ┌────────────────────┐
+//	│  Handles CDP messages on  ├─────────────■                    │                         │                    │
+//	│incoming queue and puts CDP│             │      Session       │      *  *  *  *  *      │      Session       │
+//	│   messages on outgoing    │             │                    │                         │                    │
+//	│ channel of WS connection. │             └────────────────────┘                         └────────────────────┘
+//	└───────────────────────────┘                    │      ▲                                       │      ▲
+//	  │      │                                       │      │                                       │      │
+//	  ▼      │                                       ▼      │                                       ▼      │
+//
+//	┌───────────────────────────┐             ┌────────────────────┐                         ┌────────────────────┐
+//	│Registers with session as a├─────────────■                    │                         │                    │
+//	│handler for a specific CDP │             │   Event Listener   │      *  *  *  *  *      │   Event Listener   │
+//	│       Domain event.       │             │                    │                         │                    │
+//	└───────────────────────────┘             └────────────────────┘                         └────────────────────┘
 type Connection struct {
 	BaseEventEmitter
 

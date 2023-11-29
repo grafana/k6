@@ -9,7 +9,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -21,11 +20,6 @@ import (
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
-)
-
-// Ensure Browser implements the EventEmitter and Browser interfaces.
-var (
-	_ api.Browser = &Browser{}
 )
 
 const (
@@ -492,8 +486,18 @@ func (b *Browser) Close() {
 	b.conn.Close()
 }
 
+// CloseContext is a short-cut function to close the current browser's context.
+// If there is no active browser context, it returns an error.
+func (b *Browser) CloseContext() error {
+	if b.context == nil {
+		return errors.New("cannot close context as none is active in browser")
+	}
+	b.context.Close()
+	return nil
+}
+
 // Context returns the current browser context or nil.
-func (b *Browser) Context() api.BrowserContext {
+func (b *Browser) Context() *BrowserContext {
 	return b.context
 }
 
@@ -504,7 +508,7 @@ func (b *Browser) IsConnected() bool {
 }
 
 // NewContext creates a new incognito-like browser context.
-func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
+func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 	if b.context != nil {
 		return nil, errors.New("existing browser context must be closed before creating a new one")
 	}
@@ -534,7 +538,7 @@ func (b *Browser) NewContext(opts goja.Value) (api.BrowserContext, error) {
 }
 
 // NewPage creates a new tab in the browser window.
-func (b *Browser) NewPage(opts goja.Value) (api.Page, error) {
+func (b *Browser) NewPage(opts goja.Value) (*Page, error) {
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
 		return nil, fmt.Errorf("new page: %w", err)

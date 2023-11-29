@@ -4,16 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
 )
-
-// Ensure Mouse implements the api.Mouse interface.
-var _ api.Mouse = &Mouse{}
 
 // Mouse represents a mouse input device.
 type Mouse struct {

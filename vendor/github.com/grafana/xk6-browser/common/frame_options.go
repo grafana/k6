@@ -1,7 +1,9 @@
 package common
 
 import (
+	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"reflect"
 	"time"
@@ -116,6 +118,56 @@ type FrameTypeOptions struct {
 type FrameUncheckOptions struct {
 	ElementHandleBasePointerOptions
 	Strict bool `json:"strict"`
+}
+
+// PollingType is the type of polling to use.
+type PollingType int
+
+const (
+	// PollingRaf is the requestAnimationFrame polling type.
+	PollingRaf PollingType = iota
+
+	// PollingMutation is the mutation polling type.
+	PollingMutation
+
+	// PollingInterval is the interval polling type.
+	PollingInterval
+)
+
+func (p PollingType) String() string {
+	return pollingTypeToString[p]
+}
+
+var pollingTypeToString = map[PollingType]string{ //nolint:gochecknoglobals
+	PollingRaf:      "raf",
+	PollingMutation: "mutation",
+	PollingInterval: "interval",
+}
+
+var pollingTypeToID = map[string]PollingType{ //nolint:gochecknoglobals
+	"raf":      PollingRaf,
+	"mutation": PollingMutation,
+	"interval": PollingInterval,
+}
+
+// MarshalJSON marshals the enum as a quoted JSON string.
+func (p PollingType) MarshalJSON() ([]byte, error) {
+	buffer := bytes.NewBufferString(`"`)
+	buffer.WriteString(pollingTypeToString[p])
+	buffer.WriteString(`"`)
+	return buffer.Bytes(), nil
+}
+
+// UnmarshalJSON unmarshals a quoted JSON string to the enum value.
+func (p *PollingType) UnmarshalJSON(b []byte) error {
+	var j string
+	err := json.Unmarshal(b, &j)
+	if err != nil {
+		return fmt.Errorf("unmarshaling polling type: %w", err)
+	}
+	// Note that if the string cannot be found then it will be set to the zero value.
+	*p = pollingTypeToID[j]
+	return nil
 }
 
 type FrameWaitForFunctionOptions struct {

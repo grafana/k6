@@ -12,8 +12,10 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/grafana/xk6-browser/api"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+
 	"github.com/grafana/xk6-browser/chromium"
+	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
 
@@ -169,21 +171,21 @@ type browserRegistry struct {
 	vu k6modules.VU
 
 	mu sync.RWMutex
-	m  map[int64]api.Browser
+	m  map[int64]*common.Browser
 
 	buildFn browserBuildFunc
 
 	stopped atomic.Bool // testing purposes
 }
 
-type browserBuildFunc func(ctx context.Context) (api.Browser, error)
+type browserBuildFunc func(ctx context.Context) (*common.Browser, error)
 
 func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
-	builder := func(ctx context.Context) (api.Browser, error) {
+	builder := func(ctx context.Context) (*common.Browser, error) {
 		var (
 			err                    error
-			b                      api.Browser
+			b                      *common.Browser
 			wsURL, isRemoteBrowser = remote.isRemoteBrowser()
 		)
 
@@ -206,7 +208,7 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 
 	r := &browserRegistry{
 		vu:      vu,
-		m:       make(map[int64]api.Browser),
+		m:       make(map[int64]*common.Browser),
 		buildFn: builder,
 	}
 
@@ -298,14 +300,14 @@ func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscr
 	r.clear()
 }
 
-func (r *browserRegistry) setBrowser(id int64, b api.Browser) {
+func (r *browserRegistry) setBrowser(id int64, b *common.Browser) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
 	r.m[id] = b
 }
 
-func (r *browserRegistry) getBrowser(id int64) (api.Browser, error) {
+func (r *browserRegistry) getBrowser(id int64) (*common.Browser, error) {
 	r.mu.RLock()
 	defer r.mu.RUnlock()
 
@@ -344,4 +346,43 @@ func isBrowserIter(vu k6modules.VU) bool {
 	opts := k6ext.GetScenarioOpts(vu.Context(), vu)
 	_, ok := opts["type"] // Check if browser type option is set
 	return ok
+}
+
+type taskQueueRegistry struct {
+	vu k6modules.VU
+
+	tqMu sync.Mutex
+	tq   map[string]*taskqueue.TaskQueue
+}
+
+func newTaskQueueRegistry(vu k6modules.VU) *taskQueueRegistry {
+	return &taskQueueRegistry{
+		vu:   vu,
+		tqMu: sync.Mutex{},
+		tq:   make(map[string]*taskqueue.TaskQueue),
+	}
+}
+
+func (t *taskQueueRegistry) get(targetID string) *taskqueue.TaskQueue {
+	t.tqMu.Lock()
+	defer t.tqMu.Unlock()
+
+	tq := t.tq[targetID]
+	if tq == nil {
+		tq = taskqueue.New(t.vu.RegisterCallback)
+		t.tq[targetID] = tq
+	}
+
+	return tq
+}
+
+func (t *taskQueueRegistry) close(targetID string) {
+	t.tqMu.Lock()
+	defer t.tqMu.Unlock()
+
+	tq := t.tq[targetID]
+	if tq != nil {
+		tq.Close()
+		delete(t.tq, targetID)
+	}
 }

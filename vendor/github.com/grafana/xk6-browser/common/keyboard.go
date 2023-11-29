@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/keyboardlayout"
 
@@ -14,8 +13,6 @@ import (
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
 )
-
-var _ api.Keyboard = &Keyboard{}
 
 const (
 	ModifierKeyAlt int64 = 1 << iota

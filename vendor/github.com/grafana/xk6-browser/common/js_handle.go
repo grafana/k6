@@ -4,22 +4,36 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/grafana/xk6-browser/api"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 )
 
+// JSHandleAPI is the interface of an in-page JS object.
+//
+// TODO: Find a way to move this to a concrete type. It's too difficult to
+// do that right now because of the tests and the way we're using the
+// JSHandleAPI interface.
+type JSHandleAPI interface {
+	AsElement() *ElementHandle
+	Dispose()
+	Evaluate(pageFunc goja.Value, args ...goja.Value) any
+	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error)
+	GetProperties() (map[string]JSHandleAPI, error)
+	GetProperty(propertyName string) JSHandleAPI
+	JSONValue() goja.Value
+	ObjectID() cdpruntime.RemoteObjectID
+}
+
 type jsHandle interface {
-	api.JSHandle
+	JSHandleAPI
 	dispose() error
 	getProperties() (map[string]jsHandle, error)
 }
-
-var _ jsHandle = &BaseJSHandle{}
 
 // BaseJSHandle represents a JS object in an execution context.
 type BaseJSHandle struct {
@@ -60,7 +74,7 @@ func NewJSHandle(
 }
 
 // AsElement returns an element handle if this JSHandle is a reference to a JS HTML element.
-func (h *BaseJSHandle) AsElement() api.ElementHandle {
+func (h *BaseJSHandle) AsElement() *ElementHandle {
 	return nil
 }
 
@@ -101,7 +115,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (api.JSHandle, error) {
+func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error) {
 	rt := h.execCtx.vu.Runtime()
 	args = append([]goja.Value{rt.ToValue(h)}, args...)
 
@@ -114,13 +128,13 @@ func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (
 }
 
 // GetProperties retreives the JS handle's properties.
-func (h *BaseJSHandle) GetProperties() (map[string]api.JSHandle, error) {
+func (h *BaseJSHandle) GetProperties() (map[string]JSHandleAPI, error) {
 	handles, err := h.getProperties()
 	if err != nil {
 		return nil, err
 	}
 
-	jsHandles := make(map[string]api.JSHandle, len(handles))
+	jsHandles := make(map[string]JSHandleAPI, len(handles))
 	for k, v := range handles {
 		jsHandles[k] = v
 	}
@@ -149,7 +163,7 @@ func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
 }
 
 // GetProperty retreves a single property of the JS handle.
-func (h *BaseJSHandle) GetProperty(propertyName string) api.JSHandle {
+func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
 	return nil
 }
 
