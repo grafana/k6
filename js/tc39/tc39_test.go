@@ -368,7 +368,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	vm := goja.New()
 	_262 := vm.NewObject()
 	ignorableTestError := vm.NewGoError(fmt.Errorf(""))
-	vm.Set("IgnorableTestError", ignorableTestError)
+	_ = vm.Set("IgnorableTestError", ignorableTestError)
 	_ = _262.Set("detachArrayBuffer", ctx.detachArrayBuffer)
 	_ = _262.Set("createRealm", func(goja.FunctionCall) goja.Value {
 		panic(ignorableTestError)
@@ -382,8 +382,8 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 		return result
 	})
 
-	vm.Set("$262", _262)
-	vm.Set("print", t.Log)
+	_ = vm.Set("$262", _262)
+	_ = vm.Set("print", t.Log)
 	_, err := vm.RunProgram(sabStub)
 	if err != nil {
 		panic(err)
@@ -426,7 +426,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	}
 
 	if meta.Negative.Type == "" {
-		if err, ok := err.(*goja.Exception); ok {
+		if err, ok := err.(*goja.Exception); ok { //nolint:errorlint
 			if err.Value() == ignorableTestError {
 				t.Skip("Test threw IgnorableTestError")
 			}
@@ -477,24 +477,21 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 }
 
 func getErrType(name string, err error, failf func(str string, args ...interface{})) string {
-	switch err := err.(type) {
+	switch err := err.(type) { //nolint:errorlint
 	case *goja.Exception:
-		if o, ok := err.Value().(*goja.Object); ok { //nolint:nestif
+		if o, ok := err.Value().(*goja.Object); ok {
 			if c := o.Get("constructor"); c != nil {
 				if c, ok := c.(*goja.Object); ok {
 					return c.Get("name").String()
-				} else {
-					failf("%s: error constructor is not an object (%v)", name, o)
-					return ""
 				}
-			} else {
-				failf("%s: error does not have a constructor (%v)", name, o)
+				failf("%s: error constructor is not an object (%v)", name, o)
 				return ""
 			}
-		} else {
-			failf("%s: error is not an object (%v)", name, err.Value())
+			failf("%s: error does not have a constructor (%v)", name, o)
 			return ""
 		}
+		failf("%s: error is not an object (%v)", name, err.Value())
+		return ""
 	case *goja.CompilerSyntaxError, *parser.Error, parser.ErrorList:
 		return "SyntaxError"
 	case *goja.CompilerReferenceError:
@@ -625,18 +622,18 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
-		return
+		return early, origErr, err
 	}
 
 	err = ctx.runFile(ctx.base, path.Join("harness", "sta.js"), vm)
 	if err != nil {
-		return
+		return early, origErr, err
 	}
 
 	for _, include := range includes {
 		err = ctx.runFile(ctx.base, path.Join("harness", include), vm)
 		if err != nil {
-			return
+			return early, origErr, err
 		}
 	}
 
@@ -654,7 +651,7 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	}
 
 	if err != nil {
-		return
+		return early, origErr, err
 	}
 
 	early = false
@@ -673,18 +670,18 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *g
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
-		return
+		return early, origErr, err
 	}
 
 	err = ctx.runFile(ctx.base, path.Join("harness", "sta.js"), vm)
 	if err != nil {
-		return
+		return early, origErr, err
 	}
 
 	for _, include := range includes {
 		err = ctx.runFile(ctx.base, path.Join("harness", include), vm)
 		if err != nil {
-			return
+			return early, origErr, err
 		}
 	}
 
@@ -752,6 +749,7 @@ outer:
 }
 
 func TestTC39(t *testing.T) {
+	t.Parallel()
 	if testing.Short() {
 		t.Skip()
 	}
@@ -768,6 +766,7 @@ func TestTC39(t *testing.T) {
 	// ctx.enableBench = true
 
 	t.Run("test262", func(t *testing.T) {
+		t.Parallel()
 		ctx.t = t
 		ctx.runTC39Tests("test/language")
 		ctx.runTC39Tests("test/built-ins")
@@ -793,6 +792,9 @@ func TestTC39(t *testing.T) {
 		enc := json.NewEncoder(os.Stdout)
 		enc.SetIndent("", "  ")
 		enc.SetEscapeHTML(false)
-		_ = enc.Encode(ctx.errors)
+		err := enc.Encode(ctx.errors)
+		if err != nil {
+			t.Logf("Error while json encoding errors: %s", err)
+		}
 	}
 }
