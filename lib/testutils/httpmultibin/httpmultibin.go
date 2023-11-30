@@ -332,7 +332,7 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	// Initialize the HTTP2 server, with a copy of the https tls config
 	http2Srv := httptest.NewUnstartedServer(cmux)
 	http2Srv.EnableHTTP2 = true
-	http2Srv.TLS = &(*tlsConfig) // copy it
+	http2Srv.TLS = tlsConfig
 	http2Srv.TLS.NextProtos = []string{http2.NextProtoTLS}
 	require.NoError(t, err)
 	http2Srv.StartTLS()

@@ -1,3 +1,4 @@
+// Package mockresolver provides a mock implementation of netext.Resolver.
 package mockresolver
 
 import (
