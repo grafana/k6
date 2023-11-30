@@ -1,3 +1,4 @@
+// Package mockoutput implements a mock output for testing purposes.
 package mockoutput
 
 import (
