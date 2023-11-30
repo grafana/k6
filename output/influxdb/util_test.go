@@ -10,13 +10,17 @@ import (
 )
 
 func TestMakeBatchConfig(t *testing.T) {
+	t.Parallel()
+
 	t.Run("Empty", func(t *testing.T) {
+		t.Parallel()
 		assert.Equal(t,
 			client.BatchPointsConfig{Database: "k6"},
 			MakeBatchConfig(Config{}),
 		)
 	})
 	t.Run("DB Set", func(t *testing.T) {
+		t.Parallel()
 		assert.Equal(t,
 			client.BatchPointsConfig{Database: "dbname"},
 			MakeBatchConfig(Config{DB: null.StringFrom("dbname")}),
@@ -25,6 +29,8 @@ func TestMakeBatchConfig(t *testing.T) {
 }
 
 func TestFieldKinds(t *testing.T) {
+	t.Parallel()
+
 	var fieldKinds map[string]FieldKind
 	var err error
 
@@ -36,7 +42,7 @@ func TestFieldKinds(t *testing.T) {
 	_, err = MakeFieldKinds(conf)
 	require.Error(t, err)
 
-	// Error case 2 (duplicated fields in bool and float ields)
+	// Error case 2 (duplicated fields in bool and float fields)
 	conf.TagsAsFields = []string{"vu", "iter", "url", "boolField:bool", "boolField:float"}
 	_, err = MakeFieldKinds(conf)
 	require.Error(t, err)

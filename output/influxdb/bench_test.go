@@ -29,7 +29,8 @@ func benchmarkInfluxdb(b *testing.B, t time.Duration) {
 		}
 		rw.WriteHeader(http.StatusNoContent)
 	}, func(tb testing.TB, c *Output) {
-		b = tb.(*testing.B)
+		b, _ := tb.(*testing.B)
+
 		b.ResetTimer()
 
 		samples := make(metrics.Samples, 10)

@@ -10,6 +10,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 )
 
+// MakeClient returns a new InfluxDB client based on the given Config.
 func MakeClient(conf Config) (client.Client, error) {
 	if strings.HasPrefix(conf.Addr.String, "udp://") {
 		return client.NewUDPClient(client.UDPConfig{
@@ -37,6 +38,7 @@ func MakeClient(conf Config) (client.Client, error) {
 	return client.NewHTTPClient(clientHTTPConfig)
 }
 
+// MakeBatchConfig returns a new InfluxDB BatchPointsConfig based on the given
 func MakeBatchConfig(conf Config) client.BatchPointsConfig {
 	if !conf.DB.Valid || conf.DB.String == "" {
 		conf.DB = null.StringFrom("k6")

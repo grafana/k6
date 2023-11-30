@@ -55,9 +55,10 @@ func TestBadConcurrentWrites(t *testing.T) {
 
 func testOutputCycle(t testing.TB, handler http.HandlerFunc, body func(testing.TB, *Output)) {
 	s := &http.Server{
-		Addr:           ":",
-		Handler:        handler,
-		MaxHeaderBytes: 1 << 20,
+		Addr:              ":",
+		Handler:           handler,
+		MaxHeaderBytes:    1 << 20,
+		ReadHeaderTimeout: time.Second,
 	}
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
