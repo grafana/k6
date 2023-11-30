@@ -1,3 +1,5 @@
+// Package compiler implements additional functionality for k6 to compile js code.
+// more specifically transpiling through babel in case that is needed.
 package compiler
 
 import (
@@ -22,7 +24,7 @@ import (
 var babelSrc string
 
 var (
-	DefaultOpts = map[string]interface{}{
+	defaultOpts = map[string]interface{}{ //nolint:gochecknoglobals
 		// "presets": []string{"latest"},
 		"plugins": []interface{}{
 			// es2015 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2015/src/index.js
@@ -111,13 +113,13 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 		c.babel = globalBabel
 	}
 	if err != nil {
-		return
+		return "", nil, err
 	}
 
 	sourceMapEnabled := c.Options.SourceMapLoader != nil
 	maxSrcLenForBabelSourceMapOnce.Do(func() {
 		// TODO: drop this code and everything it's connected to when babel is dropped
-		v := os.Getenv(maxSrcLenForBabelSourceMapVarName)
+		v := os.Getenv(maxSrcLenForBabelSourceMapVarName) //nolint:forbidigo
 		if len(v) > 0 {
 			i, err := strconv.Atoi(v) //nolint:govet // we shadow err on purpose
 			if err != nil {
@@ -145,8 +147,7 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 					" not be accepted by Babel, so it was disabled", filename)
 		}
 	}
-	code, srcMap, err = c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
-	return
+	return c.babel.transformImpl(c.logger, src, filename, sourceMapEnabled, inputSrcMap)
 }
 
 // Options are options to the compiler
@@ -307,7 +308,7 @@ func (b *babel) transformImpl(
 	b.m.Lock()
 	defer b.m.Unlock()
 	opts := make(map[string]interface{})
-	for k, v := range DefaultOpts {
+	for k, v := range defaultOpts {
 		opts[k] = v
 	}
 	if sourceMapsEnabled {
