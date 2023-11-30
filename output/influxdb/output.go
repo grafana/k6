@@ -1,3 +1,7 @@
+// Package influxdb provides an output plugin for sending results
+// directly to InfluxDB v1.
+// for the InfluxDB v2 please see an extension
+// https://github.com/grafana/xk6-output-influxdb
 package influxdb
 
 import (

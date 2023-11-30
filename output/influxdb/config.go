@@ -14,6 +14,7 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
+// Config represents a k6's influxdb output configuration.
 type Config struct {
 	// Connection.
 	Addr             null.String        `json:"addr" envconfig:"K6_INFLUXDB_ADDR"`
@@ -54,6 +55,7 @@ func NewConfig() Config {
 	return c
 }
 
+// Apply applies a valid config options to the receiver.
 func (c Config) Apply(cfg Config) Config {
 	if cfg.Addr.Valid {
 		c.Addr = cfg.Addr
