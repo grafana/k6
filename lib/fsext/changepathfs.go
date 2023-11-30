@@ -52,7 +52,7 @@ func (f *ChangePathFile) Name() string {
 }
 
 // Chown changes the uid and gid of the named file.
-func (b *ChangePathFs) Chown(name string, uid, gid int) error {
+func (b *ChangePathFs) Chown(_ string, _, _ int) error {
 	return errors.New("unimplemented Chown")
 }
 
