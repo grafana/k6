@@ -56,7 +56,7 @@ func GetTLSClientConfig(t testing.TB, srv *httptest.Server) *tls.Config {
 		RootCAs:            certs,
 		InsecureSkipVerify: false,
 		Renegotiation:      tls.RenegotiateFreelyAsClient,
-		MinVersion:         tls.VersionTLS10,
+		MinVersion:         tls.VersionTLS13,
 	}
 }
 
@@ -67,7 +67,8 @@ const httpDomain = "httpbin.local"
 // https://golang.org/src/net/http/internal/testcert.go?s=399:410#L10
 const httpsDomain = "example.com"
 
-// HTTPMultiBin can be used as a local alternative of httpbin.org. It offers both http and https servers, as well as real domains
+// HTTPMultiBin can be used as a local alternative of httpbin.org.
+// It offers both http and https servers, as well as real domains
 type HTTPMultiBin struct {
 	Mux             *http.ServeMux
 	ServerHTTP      *httptest.Server
@@ -377,24 +378,24 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 		Replacer: strings.NewReplacer(
 			"HTTPBIN_IP_URL", httpSrv.URL,
 			"HTTPBIN_DOMAIN", httpDomain,
-			"HTTPBIN_URL", fmt.Sprintf("http://%s:%s", httpDomain, httpURL.Port()),
-			"WSBIN_URL", fmt.Sprintf("ws://%s:%s", httpDomain, httpURL.Port()),
+			"HTTPBIN_URL", fmt.Sprintf("http://%s", net.JoinHostPort(httpDomain, httpURL.Port())),
+			"WSBIN_URL", fmt.Sprintf("ws://%s", net.JoinHostPort(httpDomain, httpURL.Port())),
 			"HTTPBIN_IP", httpIP.String(),
 			"HTTPBIN_PORT", httpURL.Port(),
 			"HTTPSBIN_IP_URL", httpsSrv.URL,
 			"HTTPSBIN_DOMAIN", httpsDomain,
-			"HTTPSBIN_URL", fmt.Sprintf("https://%s:%s", httpsDomain, httpsURL.Port()),
-			"WSSBIN_URL", fmt.Sprintf("wss://%s:%s", httpsDomain, httpsURL.Port()),
+			"HTTPSBIN_URL", fmt.Sprintf("https://%s", net.JoinHostPort(httpsDomain, httpsURL.Port())),
+			"WSSBIN_URL", fmt.Sprintf("wss://%s", net.JoinHostPort(httpsDomain, httpsURL.Port())),
 			"HTTPSBIN_IP", httpsIP.String(),
 			"HTTPSBIN_PORT", httpsURL.Port(),
 
 			"HTTP2BIN_IP_URL", http2Srv.URL,
 			"HTTP2BIN_DOMAIN", httpsDomain,
-			"HTTP2BIN_URL", fmt.Sprintf("https://%s:%s", httpsDomain, http2URL.Port()),
+			"HTTP2BIN_URL", fmt.Sprintf("https://%s", net.JoinHostPort(httpsDomain, http2URL.Port())),
 			"HTTP2BIN_IP", http2IP.String(),
 			"HTTP2BIN_PORT", http2URL.Port(),
 
-			"GRPCBIN_ADDR", fmt.Sprintf("%s:%s", httpsDomain, http2URL.Port()),
+			"GRPCBIN_ADDR", net.JoinHostPort(httpsDomain, http2URL.Port()),
 		),
 		TLSClientConfig: tlsConfig,
 		Dialer:          dialer,
