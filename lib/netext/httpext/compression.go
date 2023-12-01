@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"compress/gzip"
 	"compress/zlib"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -104,7 +105,7 @@ func wrapDecompressionError(err error) error {
 	// we don't use it... maybe the code that builds the decompression readers
 	// could also add an appropriate error-wrapper layer?
 	for _, decErr := range &decompressionErrors {
-		if err == decErr {
+		if errors.Is(err, decErr) {
 			return newDecompressionError(err)
 		}
 	}
@@ -127,10 +128,8 @@ func readResponseBody(
 	if respType == ResponseTypeNone {
 		_, err := io.Copy(io.Discard, resp.Body)
 		_ = resp.Body.Close()
-		if err != nil {
-			respErr = err
-		}
-		return nil, respErr
+
+		return nil, err
 	}
 
 	rc := &readCloser{resp.Body}
@@ -153,27 +152,11 @@ func readResponseBody(
 	for i := len(contentEncodings) - 1; i >= 0; i-- {
 		contentEncoding := strings.TrimSpace(contentEncodings[i])
 		if compression, err := CompressionTypeString(contentEncoding); err == nil {
-			var decoder io.Reader
-			var err error
-			switch compression {
-			case CompressionTypeDeflate:
-				decoder, err = zlib.NewReader(rc)
-			case CompressionTypeGzip:
-				decoder, err = gzip.NewReader(rc)
-			case CompressionTypeZstd:
-				decoder, err = zstd.NewReader(rc)
-			case CompressionTypeBr:
-				decoder = brotli.NewReader(rc)
-			default:
-				// We have not implemented a compression ... :(
-				err = fmt.Errorf(
-					"unsupported compression type %s - this is a bug in k6, please report it",
-					compression,
-				)
-			}
+			decoder, err := pickDecoder(compression, rc)
 			if err != nil {
 				return nil, newDecompressionError(err)
 			}
+
 			rc = &readCloser{decoder}
 		}
 	}
@@ -208,4 +191,27 @@ func readResponseBody(
 	}
 
 	return result, respErr
+}
+
+func pickDecoder(compression CompressionType, rc *readCloser) (io.Reader, error) {
+	var decoder io.Reader
+	var err error
+	switch compression {
+	case CompressionTypeDeflate:
+		decoder, err = zlib.NewReader(rc)
+	case CompressionTypeGzip:
+		decoder, err = gzip.NewReader(rc)
+	case CompressionTypeZstd:
+		decoder, err = zstd.NewReader(rc)
+	case CompressionTypeBr:
+		decoder = brotli.NewReader(rc)
+	default:
+		// We have not implemented a compression ... :(
+		err = fmt.Errorf(
+			"unsupported compression type %s - this is a bug in k6, please report it",
+			compression,
+		)
+	}
+
+	return decoder, err
 }
