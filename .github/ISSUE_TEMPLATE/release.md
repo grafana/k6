@@ -7,7 +7,7 @@ labels: ["release"]
 
 **Release Date**:
 
-25th May 2023 <<  TODO: WRITE HERE THE UPDATED RELEASE DATE
+25th May 2024 <<  TODO: WRITE HERE THE UPDATED RELEASE DATE
 
 ## Release Activities
 
@@ -20,7 +20,12 @@ labels: ["release"]
 
 ### Release Preparation
 
-#### ~ 1 week before the release date.
+#### ~ 2 weeks before the release date
+
+- [ ] Ensure that all pull-request from a release milestone are merged.
+- [ ] Ensure that browser and other experimental modules (if needed) have been updated to their latest version.
+
+#### ~ 1 week before the release date
 
 - [ ] Ensure that all merged pull-requests referenced in the release notes are linked to the release milestone.
 - [ ] Ensure all PRs in the `k6-docs` repository, related to new or modified functionalities introduced by the new version have been created.
@@ -30,7 +35,7 @@ labels: ["release"]
 - [ ] Open a separate PR for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/lib/consts/consts.go#L11).
 - [ ] Open a PR in the `DefinitelyTyped/DefinitelyTyped` repository, using the release branch created in the grafana/k6-DefinitelyTyped fork, to update the k6 type definitions for the new release.
 
-#### ~ 1 day before the release date.
+#### ~ 1 day before the release date
 
 - [ ] Ensure all PRs in the `k6-docs` repository, related to new or modified functionalities introduced by the new version have been merged.
 
