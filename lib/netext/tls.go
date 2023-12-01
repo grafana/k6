@@ -1,3 +1,4 @@
+// Package netext provides extensions to the standard net package
 package netext
 
 import (
@@ -8,7 +9,7 @@ import (
 	"go.k6.io/k6/lib"
 )
 
-//nolint:golint
+//nolint:golint,revive,stylecheck // we want to keep these constants as they are
 const (
 	OCSP_STATUS_GOOD                   = "good"
 	OCSP_STATUS_REVOKED                = "revoked"
@@ -30,10 +31,13 @@ const (
 	TLS_1_3                            = "tls1.3"
 )
 
+// TLSInfo keeps TLS details
 type TLSInfo struct {
 	Version     string
 	CipherSuite string
 }
+
+// OCSP keeps Online Certificate Status Protocol (OCSP) details
 type OCSP struct {
 	ProducedAt       int64  `json:"produced_at"`
 	ThisUpdate       int64  `json:"this_update"`
@@ -43,6 +47,7 @@ type OCSP struct {
 	Status           string `json:"status"`
 }
 
+// ParseTLSConnState parses tls.ConnectionState and returns TLS and OCSP details
 func ParseTLSConnState(tlsState *tls.ConnectionState) (TLSInfo, OCSP) {
 	tlsInfo := TLSInfo{}
 	switch tlsState.Version {

@@ -244,7 +244,7 @@ func TestTracerError(t *testing.T) {
 	req, err := http.NewRequest(http.MethodGet, srv.URL+"/get", nil)
 	require.NoError(t, err)
 
-	_, err = http.DefaultTransport.RoundTrip(
+	_, err = http.DefaultTransport.RoundTrip( //nolint:bodyclose
 		req.WithContext(
 			httptrace.WithClientTrace(
 				context.Background(),

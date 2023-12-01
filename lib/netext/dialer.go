@@ -205,7 +205,7 @@ func (d *Dialer) getConfiguredHost(addr, host, port string) (*types.Host, error)
 		return &newRemote, nil
 	}
 
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 // NetTrail contains information about the exchanged data size and length of a

@@ -16,8 +16,8 @@ func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	defer close(samples)
-	go func() {
-		for range samples {
+	go func() { // discard all metrics
+		for range samples { //nolint:revive
 		}
 	}()
 	logger := logrus.New()

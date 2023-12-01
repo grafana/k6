@@ -1,3 +1,4 @@
+// Package httpext provides extensions to the standard net/http package
 package httpext
 
 import (

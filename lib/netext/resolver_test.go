@@ -73,7 +73,8 @@ func TestResolver(t *testing.T) {
 
 				if tc.ttl > 0 {
 					require.IsType(t, &cacheResolver{}, r)
-					cr := r.(*cacheResolver)
+					cr, ok := r.(*cacheResolver)
+					assert.True(t, ok)
 					assert.Len(t, cr.cache, 1)
 					assert.Equal(t, tc.ttl, cr.ttl)
 					firstLookup := cr.cache[host].lastLookup
