@@ -5,10 +5,10 @@ If you think you have found a security vulnerability, please send a report to [s
 Please encrypt your message to us; please use our PGP key. The key fingerprint is:
 
 ```
-F988 7BEA 027A 049F AE8E 5CAA D125 8932 BE24 C5CA
+225E 6A9B BB15 A37E 95EB 6312 C66A 51CC B44C 27E0
 ```
 
-The key is available from [keyserver.ubuntu.com](https://keyserver.ubuntu.com/pks/lookup?search=0xF9887BEA027A049FAE8E5CAAD1258932BE24C5CA&fingerprint=on&op=index).
+The key is available from [keyserver.ubuntu.com](https://keyserver.ubuntu.com/pks/lookup?search=0x225E6A9BBB15A37E95EB6312C66A51CCB44C27E0&fingerprint=on&op=index).
 
 Grafana Labs will send you a response indicating the next steps in handling your report. After the initial reply to your report, the security team will keep you informed of the progress towards a fix and full announcement, and may ask for additional information or guidance.
 
