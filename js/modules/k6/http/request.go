@@ -495,7 +495,6 @@ func (c *Client) Batch(reqsV ...goja.Value) (interface{}, error) {
 	errs := httpext.MakeBatchRequests(
 		c.moduleInstance.vu.Context(), state, batchReqs, reqCount,
 		int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
-		c.processResponse,
 	)
 
 	for i := 0; i < reqCount; i++ {
