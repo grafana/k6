@@ -73,15 +73,15 @@ type wrappedResponseWriter struct {
 	status int
 }
 
-func (w wrappedResponseWriter) WriteHeader(status int) {
+func (w *wrappedResponseWriter) WriteHeader(status int) {
 	w.status = status
-	w.ResponseWriter.WriteHeader(status)
+	w.ResponseWriter.WriteHeader(w.status)
 }
 
 // withLoggingHandler returns the middleware which logs response status for request.
 func withLoggingHandler(l logrus.FieldLogger, next http.Handler) http.HandlerFunc {
 	return func(rw http.ResponseWriter, r *http.Request) {
-		wrapped := wrappedResponseWriter{ResponseWriter: rw, status: 200} // The default status code is 200 if it's not set
+		wrapped := &wrappedResponseWriter{ResponseWriter: rw, status: 200} // The default status code is 200 if it's not set
 		next.ServeHTTP(wrapped, r)
 
 		l.WithField("status", wrapped.status).Debugf("%s %s", r.Method, r.URL.Path)

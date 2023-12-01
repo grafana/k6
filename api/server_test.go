@@ -13,7 +13,7 @@ import (
 	"go.k6.io/k6/lib/testutils"
 )
 
-func testHTTPHandler(rw http.ResponseWriter, r *http.Request) {
+func testHTTPHandler(rw http.ResponseWriter, _ *http.Request) {
 	rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
 	if _, err := fmt.Fprint(rw, "ok"); err != nil {
 		panic(err.Error())
@@ -21,10 +21,15 @@ func testHTTPHandler(rw http.ResponseWriter, r *http.Request) {
 }
 
 func TestLogger(t *testing.T) {
+	t.Parallel()
 	for _, method := range []string{"GET", "POST", "PUT", "PATCH"} {
+		method := method
 		t.Run("method="+method, func(t *testing.T) {
+			t.Parallel()
 			for _, path := range []string{"/", "/test", "/test/path"} {
+				path := path
 				t.Run("path="+path, func(t *testing.T) {
+					t.Parallel()
 					rw := httptest.NewRecorder()
 					r := httptest.NewRequest(method, "http://example.com"+path, nil)
 
@@ -35,6 +40,7 @@ func TestLogger(t *testing.T) {
 					res := rw.Result()
 					assert.Equal(t, http.StatusOK, res.StatusCode)
 					assert.Equal(t, "text/plain; charset=utf-8", res.Header.Get("Content-Type"))
+					assert.NoError(t, res.Body.Close())
 
 					if !assert.Len(t, hook.Entries, 1) {
 						return
@@ -51,6 +57,7 @@ func TestLogger(t *testing.T) {
 }
 
 func TestPing(t *testing.T) {
+	t.Parallel()
 	logger := logrus.New()
 	logger.SetOutput(testutils.NewTestOutput(t))
 	mux := handlePing(logger)
@@ -62,4 +69,5 @@ func TestPing(t *testing.T) {
 	res := rw.Result()
 	assert.Equal(t, http.StatusOK, res.StatusCode)
 	assert.Equal(t, []byte{'o', 'k'}, rw.Body.Bytes())
+	assert.NoError(t, res.Body.Close())
 }
