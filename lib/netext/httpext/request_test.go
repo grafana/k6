@@ -351,7 +351,10 @@ func TestTrailFailed(t *testing.T) {
 			require.NotNil(t, res)
 			require.Len(t, samples, 1)
 			sample := <-samples
-			trail := sample.(*Trail)
+
+			trail, ok := sample.(*Trail)
+			require.True(t, ok)
+
 			require.Equal(t, failed, trail.Failed)
 
 			var httpReqFailedSampleValue null.Bool

@@ -8,6 +8,6 @@ import (
 	"os"
 )
 
-func getOSSyscallErrorCode(e *net.OpError, se *os.SyscallError) (errCode, string) {
+func getOSSyscallErrorCode(_ *net.OpError, _ *os.SyscallError) (errCode, string) {
 	return 0, ""
 }

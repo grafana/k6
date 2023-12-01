@@ -184,7 +184,11 @@ func TestHTTP2StreamError(t *testing.T) {
 		rw.Header().Set("Content-Length", "100000")
 		rw.WriteHeader(http.StatusOK)
 
-		rw.(http.Flusher).Flush()
+		f, ok := rw.(http.Flusher)
+		if !ok {
+			panic("expected http.ResponseWriter to be http.Flusher")
+		}
+		f.Flush()
 		time.Sleep(time.Millisecond * 2)
 		panic("expected internal error")
 	})
@@ -376,7 +380,7 @@ func getHTTP2ServerWithCustomConnContext(t *testing.T) *httpmultibin.HTTPMultiBi
 		Replacer: strings.NewReplacer(
 			"HTTP2BIN_IP_URL", http2Srv.URL,
 			"HTTP2BIN_DOMAIN", http2Domain,
-			"HTTP2BIN_URL", fmt.Sprintf("https://%s:%s", http2Domain, http2URL.Port()),
+			"HTTP2BIN_URL", fmt.Sprintf("https://%s", net.JoinHostPort(http2Domain, http2URL.Port())),
 			"HTTP2BIN_IP", http2IP.String(),
 			"HTTP2BIN_PORT", http2URL.Port(),
 		),
