@@ -344,14 +344,15 @@ func (t *Tracer) Done() *Trail {
 		trail.TLSHandshaking = time.Duration(tlsHandshakeDone - tlsHandshakeStart)
 	}
 	if wroteRequest != 0 {
-		if tlsHandshakeDone != 0 {
+		switch {
+		case tlsHandshakeDone != 0:
 			// If the request was sent over TLS, we need to use
 			// TLS Handshake Done time to calculate sending duration
 			trail.Sending = time.Duration(wroteRequest - tlsHandshakeDone)
-		} else if connectDone != 0 {
+		case connectDone != 0:
 			// Otherwise, use the end of the normal connection
 			trail.Sending = time.Duration(wroteRequest - connectDone)
-		} else {
+		default:
 			// Finally, this handles the strange HTTP/2 case where the GotConn() hook
 			// gets called first, but with Reused=false
 			trail.Sending = time.Duration(wroteRequest - gotConn)
