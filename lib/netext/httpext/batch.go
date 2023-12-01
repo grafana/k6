@@ -22,13 +22,10 @@ type BatchParsedHTTPRequest struct {
 // pre-initialized. In addition, each processed request would emit either a nil
 // value, or an error, via the returned errors channel. The goroutines exit when
 // the requests channel is closed.
-// The processResponse callback can be used to modify the response, e.g.
-// to replace the body.
 func MakeBatchRequests(
 	ctx context.Context, state *lib.State,
 	requests []BatchParsedHTTPRequest,
 	reqCount, globalLimit, perHostLimit int,
-	processResponse func(*Response, ResponseType),
 ) <-chan error {
 	workers := globalLimit
 	if reqCount < workers {
