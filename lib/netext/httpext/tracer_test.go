@@ -176,13 +176,12 @@ func TestTracer(t *testing.T) { //nolint:tparallel
 
 type failingConn struct {
 	net.Conn
+	failOnConnWrite bool
 }
 
-var failOnConnWrite = false
-
-func (c failingConn) Write(b []byte) (int, error) {
-	if failOnConnWrite {
-		failOnConnWrite = false
+func (c *failingConn) Write(b []byte) (int, error) {
+	if c.failOnConnWrite {
+		c.failOnConnWrite = false
 		return 0, errors.New("write error")
 	}
 
@@ -198,9 +197,11 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 	assert.True(t, ok)
 
 	dialer := &net.Dialer{}
+	var connection *failingConn
 	transport.DialContext = func(ctx context.Context, proto, addr string) (net.Conn, error) {
 		conn, err := dialer.DialContext(ctx, proto, addr)
-		return failingConn{conn}, err
+		connection = &failingConn{conn, false}
+		return connection, err
 	}
 
 	req, err := http.NewRequest(http.MethodGet, srv.URL+"/get", nil)
@@ -217,7 +218,7 @@ func TestTracerNegativeHttpSendingValues(t *testing.T) {
 	}
 
 	// make the next connection write fail
-	failOnConnWrite = true
+	connection.failOnConnWrite = true
 
 	{
 		tracer := &Tracer{}
