@@ -113,9 +113,9 @@ func newOutput(params output.Params) (*Output, error) {
 			conf.MetricPushConcurrency.Int64)
 	}
 
-	if conf.MaxMetricSamplesPerPackage.Int64 < 1 {
+	if conf.MaxMetricSamplesPerPackage.Int64 < 1 { //nolint:staticcheck
 		return nil, fmt.Errorf("metric samples per package must be a positive number but is %d",
-			conf.MaxMetricSamplesPerPackage.Int64)
+			conf.MaxMetricSamplesPerPackage.Int64) //nolint:staticcheck
 	}
 
 	if conf.MaxTimeSeriesInBatch.Int64 < 1 {

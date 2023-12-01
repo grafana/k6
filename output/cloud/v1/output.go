@@ -159,7 +159,7 @@ func (out *Output) Start() error {
 // StopWithTestError gracefully stops all metric emission from the output: when
 // all metric samples are emitted, it makes a cloud API call to finish the test
 // run. If testErr was specified, it extracts the RunStatus from it.
-func (out *Output) StopWithTestError(testErr error) error {
+func (out *Output) StopWithTestError(_ error) error {
 	out.logger.Debug("Stopping the cloud output...")
 	close(out.stopAggregation)
 	out.aggregationDone.Wait() // could be a no-op, if we have never started the aggregation
@@ -454,7 +454,7 @@ func (out *Output) pushMetrics() {
 	}).Debug("Pushing metrics to cloud")
 	start := time.Now()
 
-	numberOfPackages := ceilDiv(len(buffer), int(out.config.MaxMetricSamplesPerPackage.Int64))
+	numberOfPackages := ceilDiv(len(buffer), int(out.config.MaxMetricSamplesPerPackage.Int64)) //nolint:staticcheck
 	numberOfWorkers := int(out.config.MetricPushConcurrency.Int64)
 	if numberOfWorkers > numberOfPackages {
 		numberOfWorkers = numberOfPackages
@@ -477,8 +477,8 @@ func (out *Output) pushMetrics() {
 
 	for len(buffer) > 0 {
 		size := len(buffer)
-		if size > int(out.config.MaxMetricSamplesPerPackage.Int64) {
-			size = int(out.config.MaxMetricSamplesPerPackage.Int64)
+		if size > int(out.config.MaxMetricSamplesPerPackage.Int64) { //nolint:staticcheck
+			size = int(out.config.MaxMetricSamplesPerPackage.Int64) //nolint:staticcheck
 		}
 		job := pushJob{done: make(chan error, 1), samples: buffer[:size]}
 		ch <- job
