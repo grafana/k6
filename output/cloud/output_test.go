@@ -353,7 +353,7 @@ func (o versionedOutputMock) Start() error {
 	return nil
 }
 
-func (o versionedOutputMock) StopWithTestError(testRunErr error) error {
+func (o versionedOutputMock) StopWithTestError(_ error) error {
 	o.callback("StopWithTestError")
 	return nil
 }
@@ -362,10 +362,10 @@ func (o versionedOutputMock) SetTestRunStopCallback(_ func(error)) {
 	o.callback("SetTestRunStopCallback")
 }
 
-func (o versionedOutputMock) SetTestRunID(id string) {
+func (o versionedOutputMock) SetTestRunID(_ string) {
 	o.callback("SetTestRunID")
 }
 
-func (o versionedOutputMock) AddMetricSamples(samples []metrics.SampleContainer) {
+func (o versionedOutputMock) AddMetricSamples(_ []metrics.SampleContainer) {
 	o.callback("AddMetricSamples")
 }

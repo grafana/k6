@@ -292,7 +292,7 @@ func TestCloudOutputMaxPerPacket(t *testing.T) {
 	out.SetTestRunID("12")
 
 	maxMetricSamplesPerPackage := 20
-	out.config.MaxMetricSamplesPerPackage = null.IntFrom(int64(maxMetricSamplesPerPackage))
+	out.config.MaxMetricSamplesPerPackage = null.IntFrom(int64(maxMetricSamplesPerPackage)) //nolint:staticcheck
 
 	now := time.Now()
 	registry := metrics.NewRegistry()

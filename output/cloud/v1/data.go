@@ -239,7 +239,7 @@ func (d durations) SortGetNormalBounds(
 	radius, iqrLowerCoef, iqrUpperCoef float64, interpolate bool,
 ) (min, max time.Duration) {
 	if len(d) == 0 {
-		return
+		return 0, 0
 	}
 	sort.Sort(d)
 	last := float64(len(d) - 1)
@@ -280,7 +280,7 @@ func (d durations) SortGetNormalBounds(
 // that only depends on the sort.Interface methods, but that would
 // probably introduce some performance overhead because of the
 // dynamic dispatch.
-func (d durations) quickSelect(k int) time.Duration { //nolint:gocognit
+func (d durations) quickSelect(k int) time.Duration {
 	n := len(d)
 	l := 0
 	ir := n - 1
@@ -307,9 +307,9 @@ func (d durations) quickSelect(k int) time.Duration { //nolint:gocognit
 		i = l + 1
 		j = ir
 		for {
-			for i++; d[i] < d[l+1]; i++ {
+			for i++; d[i] < d[l+1]; i++ { //nolint:revive
 			}
-			for j--; d[j] > d[l+1]; j-- {
+			for j--; d[j] > d[l+1]; j-- { //nolint:revive
 			}
 			if j < i {
 				break
