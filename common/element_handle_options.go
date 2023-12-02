@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"strings"
 	"time"
 
@@ -77,15 +78,16 @@ type ElementHandleHoverOptions struct {
 
 // File is the descriptor of a single file.
 type File struct {
-	Name   string `json:"name"`
-	Buffer string `json:"buffer"`
-	Mime   string `json:"mime"`
+	Path     string `json:"-"`
+	Name     string `json:"name"`
+	Mimetype string `json:"mimeType"`
+	Buffer   string `json:"buffer"`
 }
 
 // ElementHandleSetInputFilesOption are options for ElementHandle.SetInputFiles.
 type ElementHandleSetInputFilesOption struct {
 	ElementHandleBaseOptions
-	Payload []File `json:"payload"`
+	Payload []*File `json:"payload"`
 }
 
 type ElementHandlePressOptions struct {
@@ -198,6 +200,29 @@ func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *Element
 	}
 }
 
+// addFile to the option. Input value can be a path, or a file descriptor object.
+func (o *ElementHandleSetInputFilesOption) addFile(ctx context.Context, opts goja.Value) error {
+	if !gojaValueExists(opts) {
+		return nil
+	}
+	rt := k6ext.Runtime(ctx)
+	optsType := opts.ExportType()
+	switch optsType.Kind() {
+	case reflect.Map: // file descriptor object
+		var file File
+		if err := rt.ExportTo(opts, &file); err != nil {
+			return fmt.Errorf("unable to parse SetInputFileOptions; reason: %w", err)
+		}
+		o.Payload = append(o.Payload, &file)
+	case reflect.String: // file path
+		o.Payload = append(o.Payload, &File{Path: opts.Export().(string)})
+	default:
+		return fmt.Errorf("Cannot parse setInputFiles parameter")
+	}
+
+	return nil
+}
+
 // Parse parses the ElementHandleSetInputFilesOption from the given opts.
 func (o *ElementHandleSetInputFilesOption) Parse(ctx context.Context, opts goja.Value) error {
 	rt := k6ext.Runtime(ctx)
@@ -207,17 +232,19 @@ func (o *ElementHandleSetInputFilesOption) Parse(ctx context.Context, opts goja.
 	if !gojaValueExists(opts) {
 		return nil
 	}
-	gopts := opts.ToObject(rt)
-	for _, k := range gopts.Keys() {
-		if k != "payload" {
-			continue
-		}
-		var p []File
-		if err := rt.ExportTo(gopts.Get(k), &p); err != nil {
-			return fmt.Errorf("unable to parse SetInputFileOptions; reason: %w", err)
-		}
-		o.Payload = p
 
+	optsType := opts.ExportType()
+	switch optsType.Kind() {
+	case reflect.Slice: // array of filePaths or array of file descriptor objects
+		gopts := opts.ToObject(rt)
+		for _, k := range gopts.Keys() {
+			err := o.addFile(ctx, gopts.Get(k))
+			if err != nil {
+				return err
+			}
+		}
+	default: // filePath or file descriptor object
+		return o.addFile(ctx, opts)
 	}
 
 	return nil
