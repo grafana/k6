@@ -1243,14 +1243,19 @@ func (h *ElementHandle) SelectText(opts goja.Value) {
 }
 
 // SetInputFiles sets the Files given in the opts into the <input type="file"> element.
-func (h *ElementHandle) SetInputFiles(opts goja.Value) {
+func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) {
 	actionOpts := NewElementHandleSetInputFilesOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
 		k6ext.Panic(h.ctx, "parsing setInputFiles options: %w", err)
 	}
 
+	actionParam := &Files{}
+	if err := actionParam.Parse(h.ctx, files); err != nil {
+		k6ext.Panic(h.ctx, "parsing setInputFiles parameter: %w", err)
+	}
+
 	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return nil, handle.setInputFiles(apiCtx, actionOpts.Payload)
+		return nil, handle.setInputFiles(apiCtx, actionParam.Payload)
 	}
 	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
 	_, err := call(h.ctx, actFn, actionOpts.Timeout)

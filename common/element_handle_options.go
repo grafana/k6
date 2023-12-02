@@ -84,10 +84,14 @@ type File struct {
 	Buffer   string `json:"buffer"`
 }
 
+// Files is the input parameter for ElementHandle.SetInputFiles
+type Files struct {
+	Payload []*File `json:"payload"`
+}
+
 // ElementHandleSetInputFilesOption are options for ElementHandle.SetInputFiles.
 type ElementHandleSetInputFilesOption struct {
 	ElementHandleBaseOptions
-	Payload []*File `json:"payload"`
 }
 
 type ElementHandlePressOptions struct {
@@ -200,24 +204,48 @@ func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *Element
 	}
 }
 
-// addFile to the option. Input value can be a path, or a file descriptor object.
-func (o *ElementHandleSetInputFilesOption) addFile(ctx context.Context, opts goja.Value) error {
-	if !gojaValueExists(opts) {
+// addFile to the struct. Input value can be a path, or a file descriptor object.
+func (f *Files) addFile(ctx context.Context, file goja.Value) error {
+	if !gojaValueExists(file) {
 		return nil
 	}
 	rt := k6ext.Runtime(ctx)
-	optsType := opts.ExportType()
-	switch optsType.Kind() {
+	fileType := file.ExportType()
+	switch fileType.Kind() {
 	case reflect.Map: // file descriptor object
-		var file File
-		if err := rt.ExportTo(opts, &file); err != nil {
-			return fmt.Errorf("unable to parse SetInputFileOptions; reason: %w", err)
+		var parsedFile File
+		if err := rt.ExportTo(file, &parsedFile); err != nil {
+			return fmt.Errorf("Unable to parse SetInputFiles parameter; reason: %w", err)
 		}
-		o.Payload = append(o.Payload, &file)
+		f.Payload = append(f.Payload, &parsedFile)
 	case reflect.String: // file path
-		o.Payload = append(o.Payload, &File{Path: opts.Export().(string)})
+		f.Payload = append(f.Payload, &File{Path: file.Export().(string)})
 	default:
-		return fmt.Errorf("Cannot parse setInputFiles parameter")
+		return fmt.Errorf("Unable to parse setInputFiles parameter")
+	}
+
+	return nil
+}
+
+// Parse parses the Files struct from the given goja.Value
+func (f *Files) Parse(ctx context.Context, files goja.Value) error {
+	rt := k6ext.Runtime(ctx)
+	if !gojaValueExists(files) {
+		return nil
+	}
+
+	optsType := files.ExportType()
+	switch optsType.Kind() {
+	case reflect.Slice: // array of filePaths or array of file descriptor objects
+		gopts := files.ToObject(rt)
+		for _, k := range gopts.Keys() {
+			err := f.addFile(ctx, gopts.Get(k))
+			if err != nil {
+				return err
+			}
+		}
+	default: // filePath or file descriptor object
+		return f.addFile(ctx, files)
 	}
 
 	return nil
@@ -225,26 +253,8 @@ func (o *ElementHandleSetInputFilesOption) addFile(ctx context.Context, opts goj
 
 // Parse parses the ElementHandleSetInputFilesOption from the given opts.
 func (o *ElementHandleSetInputFilesOption) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
-	}
-	if !gojaValueExists(opts) {
-		return nil
-	}
-
-	optsType := opts.ExportType()
-	switch optsType.Kind() {
-	case reflect.Slice: // array of filePaths or array of file descriptor objects
-		gopts := opts.ToObject(rt)
-		for _, k := range gopts.Keys() {
-			err := o.addFile(ctx, gopts.Get(k))
-			if err != nil {
-				return err
-			}
-		}
-	default: // filePath or file descriptor object
-		return o.addFile(ctx, opts)
 	}
 
 	return nil
