@@ -1171,8 +1171,9 @@ func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
 
 // SetInputFiles is not implemented.
 func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.textContent(selector, opts) has not been implemented yet")
-	// TODO: needs slowMo
+	p.logger.Debugf("Page:SetInputFiles", "sid:%v selector:%s", p.sessionID(), selector)
+
+	p.MainFrame().SetInputFiles(selector, files, opts) //nolint:wrapcheck
 }
 
 // SetViewportSize will update the viewport width and height.

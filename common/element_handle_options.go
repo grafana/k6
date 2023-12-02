@@ -84,13 +84,13 @@ type File struct {
 	Buffer   string `json:"buffer"`
 }
 
-// Files is the input parameter for ElementHandle.SetInputFiles
+// Files is the input parameter for ElementHandle.SetInputFiles.
 type Files struct {
 	Payload []*File `json:"payload"`
 }
 
-// ElementHandleSetInputFilesOption are options for ElementHandle.SetInputFiles.
-type ElementHandleSetInputFilesOption struct {
+// ElementHandleSetInputFilesOptions are options for ElementHandle.SetInputFiles.
+type ElementHandleSetInputFilesOptions struct {
 	ElementHandleBaseOptions
 }
 
@@ -198,8 +198,8 @@ func (o *ElementHandleCheckOptions) Parse(ctx context.Context, opts goja.Value) 
 }
 
 // NewElementHandleSetInputFilesOptions creates a new ElementHandleSetInputFilesOption.
-func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *ElementHandleSetInputFilesOption {
-	return &ElementHandleSetInputFilesOption{
+func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *ElementHandleSetInputFilesOptions {
+	return &ElementHandleSetInputFilesOptions{
 		ElementHandleBaseOptions: *NewElementHandleBaseOptions(defaultTimeout),
 	}
 }
@@ -227,7 +227,7 @@ func (f *Files) addFile(ctx context.Context, file goja.Value) error {
 	return nil
 }
 
-// Parse parses the Files struct from the given goja.Value
+// Parse parses the Files struct from the given goja.Value.
 func (f *Files) Parse(ctx context.Context, files goja.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if !gojaValueExists(files) {
@@ -252,7 +252,7 @@ func (f *Files) Parse(ctx context.Context, files goja.Value) error {
 }
 
 // Parse parses the ElementHandleSetInputFilesOption from the given opts.
-func (o *ElementHandleSetInputFilesOption) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleSetInputFilesOptions) Parse(ctx context.Context, opts goja.Value) error {
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}

@@ -1527,8 +1527,23 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 
 // SetInputFiles is not implemented.
 func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
-	k6ext.Panic(f.ctx, "Frame.setInputFiles(selector, files, opts) has not been implemented yet")
-	// TODO: needs slowMo
+	f.log.Debugf("Frame:SetInputFiles", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	popts := NewFrameSetInputFilesOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		k6ext.Panic(f.ctx, "parsing setInputFiles options: %w", err)
+	}
+
+	pfiles := &Files{}
+	if err := pfiles.Parse(f.ctx, files); err != nil {
+		k6ext.Panic(f.ctx, "parsing setInputFiles parameter: %w", err)
+	}
+
+	if err := f.setInputFiles(selector, pfiles, popts); err != nil {
+		k6ext.Panic(f.ctx, "setting input files on %q: %w", selector, err)
+	}
+
+	applySlowMo(f.ctx)
 }
 
 // Tap the first element that matches the selector.
@@ -1544,6 +1559,23 @@ func (f *Frame) Tap(selector string, opts goja.Value) {
 	}
 
 	applySlowMo(f.ctx)
+}
+
+func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInputFilesOptions) error {
+	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+		return nil, handle.setInputFiles(apiCtx, files.Payload)
+	}
+	act := f.newAction(
+		selector, DOMElementStateAttached, opts.Strict,
+		setInputFiles, []string{},
+		opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+
+	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err)
+	}
+
+	return nil
 }
 
 func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
