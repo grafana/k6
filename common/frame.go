@@ -1525,25 +1525,27 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 	applySlowMo(f.ctx)
 }
 
-// SetInputFiles is not implemented.
-func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) {
+// SetInputFiles sets input files for the selected element.
+func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) error {
 	f.log.Debugf("Frame:SetInputFiles", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameSetInputFilesOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing setInputFiles options: %w", err)
+		return fmt.Errorf("parsing setInputFiles options: %w", err)
 	}
 
 	pfiles := &Files{}
 	if err := pfiles.Parse(f.ctx, files); err != nil {
-		k6ext.Panic(f.ctx, "parsing setInputFiles parameter: %w", err)
+		return fmt.Errorf("parsing setInputFiles parameter: %w", err)
 	}
 
 	if err := f.setInputFiles(selector, pfiles, popts); err != nil {
-		k6ext.Panic(f.ctx, "setting input files on %q: %w", selector, err)
+		return fmt.Errorf("setting input files on %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 // Tap the first element that matches the selector.

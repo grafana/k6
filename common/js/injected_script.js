@@ -433,16 +433,16 @@ class InjectedScript {
   }
 
   setInputFiles(node, payloads) {
-    if (node.nodeType !== 1)
+    if (node.nodeType !== Node.ELEMENT_NODE)
       return "error:notelement";
     if (node.nodeName.toLowerCase() !== "input")
-      return 'error:not input element';
+      return 'error:notinputelement';
     const type = (node.getAttribute('type') || '').toLowerCase();
     if (type !== 'file')
-      return 'error:Not an input[type=file] element';
+      return 'error:notinputfileelement';
 
     const dt = new DataTransfer();
-    if (payloads != null) {
+    if (payloads) {
       const files = payloads.map(file => {
         const bytes = Uint8Array.from(atob(file.buffer), c => c.charCodeAt(0));
         return new File([bytes], file.name, { type: file.mimeType, lastModified: file.lastModifiedMs });
@@ -453,6 +453,7 @@ class InjectedScript {
     node.files = dt.files;
     node.dispatchEvent(new Event('input', { 'bubbles': true }));
     node.dispatchEvent(new Event('change', { 'bubbles': true }));
+    return "done";
   }
 
   getElementBorderWidth(node) {

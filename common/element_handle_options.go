@@ -211,17 +211,19 @@ func (f *Files) addFile(ctx context.Context, file goja.Value) error {
 	}
 	rt := k6ext.Runtime(ctx)
 	fileType := file.ExportType()
-	switch fileType.Kind() {
+	switch fileType.Kind() { //nolint:exhaustive
 	case reflect.Map: // file descriptor object
 		var parsedFile File
 		if err := rt.ExportTo(file, &parsedFile); err != nil {
-			return fmt.Errorf("Unable to parse SetInputFiles parameter; reason: %w", err)
+			return fmt.Errorf("parsing file descriptor: %w", err)
 		}
 		f.Payload = append(f.Payload, &parsedFile)
 	case reflect.String: // file path
-		f.Payload = append(f.Payload, &File{Path: file.Export().(string)})
+		if v, ok := file.Export().(string); ok {
+			f.Payload = append(f.Payload, &File{Path: v})
+		}
 	default:
-		return fmt.Errorf("Unable to parse setInputFiles parameter")
+		return fmt.Errorf("invalid parameter type : %s", fileType.Kind().String())
 	}
 
 	return nil
@@ -235,7 +237,7 @@ func (f *Files) Parse(ctx context.Context, files goja.Value) error {
 	}
 
 	optsType := files.ExportType()
-	switch optsType.Kind() {
+	switch optsType.Kind() { //nolint:exhaustive
 	case reflect.Slice: // array of filePaths or array of file descriptor objects
 		gopts := files.ToObject(rt)
 		for _, k := range gopts.Keys() {
