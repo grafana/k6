@@ -186,7 +186,9 @@ type browserRegistry struct {
 
 type browserBuildFunc func(ctx context.Context) (*common.Browser, error)
 
-func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry) *browserRegistry {
+func newBrowserRegistry(
+	ctx context.Context, vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry,
+) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
 	builder := func(ctx context.Context) (*common.Browser, error) {
 		var (
@@ -231,12 +233,14 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 	}
 
 	go r.handleExitEvent(exitCh, unsubscribe)
-	go r.handleIterEvents(eventsCh, unsubscribe)
+	go r.handleIterEvents(ctx, eventsCh, unsubscribe)
 
 	return r
 }
 
-func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsubscribeFn func()) {
+func (r *browserRegistry) handleIterEvents( //nolint:funlen
+	ctx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
+) {
 	var (
 		ok   bool
 		data k6event.IterData
@@ -281,7 +285,7 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 
 			// Wrap the tracer into the browser context to make it accessible for the other
 			// components that inherit the context so these can use it to trace their actions.
-			tracerCtx := common.WithTracer(context.Background(), r.tr.tracer)
+			tracerCtx := common.WithTracer(ctx, r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
 
 			b, err := r.buildFn(tracedCtx)

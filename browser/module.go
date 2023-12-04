@@ -2,6 +2,7 @@
 package browser
 
 import (
+	"context"
 	"log"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec
@@ -67,7 +68,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 			Browser: mapBrowserToGoja(moduleVU{
 				VU:                vu,
 				pidRegistry:       m.PidRegistry,
-				browserRegistry:   newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
+				browserRegistry:   newBrowserRegistry(context.Background(), vu, m.remoteRegistry, m.PidRegistry),
 				taskQueueRegistry: newTaskQueueRegistry(vu),
 			}),
 			Devices:         common.GetDevices(),
