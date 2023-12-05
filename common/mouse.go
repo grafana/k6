@@ -40,19 +40,21 @@ func (m *Mouse) click(x float64, y float64, opts *MouseClickOptions) error {
 	if err := m.move(x, y, NewMouseMoveOptions()); err != nil {
 		return err
 	}
-	if err := m.down(x, y, mouseDownUpOpts); err != nil {
-		return err
-	}
-	if opts.Delay != 0 {
-		t := time.NewTimer(time.Duration(opts.Delay) * time.Millisecond)
-		select {
-		case <-m.ctx.Done():
-			t.Stop()
-		case <-t.C:
+	for i := 0; i < int(mouseDownUpOpts.ClickCount); i++ {
+		if err := m.down(x, y, mouseDownUpOpts); err != nil {
+			return err
 		}
-	}
-	if err := m.up(x, y, mouseDownUpOpts); err != nil {
-		return err
+		if opts.Delay != 0 {
+			t := time.NewTimer(time.Duration(opts.Delay) * time.Millisecond)
+			select {
+			case <-m.ctx.Done():
+				t.Stop()
+			case <-t.C:
+			}
+		}
+		if err := m.up(x, y, mouseDownUpOpts); err != nil {
+			return err
+		}
 	}
 	return nil
 }
