@@ -4,6 +4,7 @@ package grpc
 import (
 	"errors"
 	"fmt"
+	"sync"
 
 	"github.com/dop251/goja"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
@@ -15,7 +16,9 @@ import (
 type (
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
-	RootModule struct{}
+	RootModule struct {
+		warnAboutExperimental *sync.Once
+	}
 
 	// ModuleInstance represents an instance of the GRPC module for every VU.
 	ModuleInstance struct {
@@ -35,12 +38,28 @@ func New() *RootModule {
 	return &RootModule{}
 }
 
+// NewExperimental returns a pointer to a new RootModule instance.
+func NewExperimental() *RootModule {
+	return &RootModule{
+		warnAboutExperimental: &sync.Once{},
+	}
+}
+
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
-func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	metrics, err := registerMetrics(vu.InitEnv().Registry)
 	if err != nil {
 		common.Throw(vu.Runtime(), fmt.Errorf("failed to register GRPC module metrics: %w", err))
+	}
+
+	if r.warnAboutExperimental != nil {
+		r.warnAboutExperimental.Do(func() {
+			vu.InitEnv().Logger.Warn(
+				"k6/experimental/grpc is now part of the k6 core, please change your imports to use k6/net/grpc instead." +
+					" The k6/experimental/grpc will be removed in k6 v0.51.0",
+			)
+		})
 	}
 
 	mi := &ModuleInstance{
