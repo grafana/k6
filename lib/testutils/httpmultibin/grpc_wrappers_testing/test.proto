@@ -6,6 +6,7 @@ package grpc.wrappers.testing;
 // https://github.com/protocolbuffers/protobuf/blob/main/src/google/protobuf/wrappers.proto
 
 import "google/protobuf/wrappers.proto";
+import "google/protobuf/struct.proto";
 
 option go_package ="./grpc_wrappers_testing";
 
@@ -14,4 +15,7 @@ service Service {
    rpc TestInteger(google.protobuf.Int64Value) returns (google.protobuf.Int64Value);
    rpc TestBoolean(google.protobuf.BoolValue) returns (google.protobuf.BoolValue);
    rpc TestDouble(google.protobuf.DoubleValue) returns (google.protobuf.DoubleValue);
+   rpc TestValue(google.protobuf.Value) returns (google.protobuf.Value);
+
+   rpc TestStream(stream google.protobuf.StringValue) returns (google.protobuf.StringValue);
 }

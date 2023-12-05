@@ -95,8 +95,6 @@ github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
 github.com/grafana/xk6-browser v1.2.1 h1:O2fuHHvmmhXvWTPXzD+jsnt1XkVgVjx0+Lj1hsGIWMM=
 github.com/grafana/xk6-browser v1.2.1/go.mod h1:D3k9/MQHnNKfyzU3fh32pHlrh3GY2LAlkY4wYt/Vn4Y=
-github.com/grafana/xk6-grpc v0.1.4-0.20230919144024-6ed5daf33509 h1:9ujE4S5cA3WDhRJnwNuUDtfk3w9FeWx6PaZ+lb3o46M=
-github.com/grafana/xk6-grpc v0.1.4-0.20230919144024-6ed5daf33509/go.mod h1:sFTwAsHAtp2f1PNiq0wPjJ7HrAIKploI7Y5mOYo+zIQ=
 github.com/grafana/xk6-output-prometheus-remote v0.3.1 h1:X23rQzlJD8dXWB31DkxR4uPnuRFo8L0Y0H22fSG9xl0=
 github.com/grafana/xk6-output-prometheus-remote v0.3.1/go.mod h1:0JLAm4ONsNUlNoxJXAwOCfA6GtDwTPs557OplAvE+3o=
 github.com/grafana/xk6-redis v0.2.0 h1:iXmAKVlAxafZ/h8ptuXTFhGu63IFsyDI8QjUgWm66BU=

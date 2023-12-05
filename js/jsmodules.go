@@ -17,7 +17,6 @@ import (
 	"go.k6.io/k6/js/modules/k6/ws"
 
 	"github.com/grafana/xk6-browser/browser"
-	expGrpc "github.com/grafana/xk6-grpc/grpc"
 	"github.com/grafana/xk6-redis/redis"
 	"github.com/grafana/xk6-timers/timers"
 	"github.com/grafana/xk6-webcrypto/webcrypto"
@@ -35,7 +34,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
-		"k6/experimental/grpc":       expGrpc.New(),
+		"k6/experimental/grpc":       grpc.New(), // TODO: make warning
 		"k6/experimental/timers":     timers.New(),
 		"k6/experimental/tracing":    tracing.New(),
 		"k6/experimental/browser":    browser.New(),

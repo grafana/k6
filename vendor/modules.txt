@@ -137,6 +137,7 @@ github.com/golang/protobuf/proto
 github.com/golang/protobuf/ptypes
 github.com/golang/protobuf/ptypes/any
 github.com/golang/protobuf/ptypes/duration
+github.com/golang/protobuf/ptypes/struct
 github.com/golang/protobuf/ptypes/timestamp
 github.com/golang/protobuf/ptypes/wrappers
 # github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6
@@ -160,10 +161,6 @@ github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
-# github.com/grafana/xk6-grpc v0.1.4-0.20230919144024-6ed5daf33509
-## explicit; go 1.19
-github.com/grafana/xk6-grpc/grpc
-github.com/grafana/xk6-grpc/lib/netext/grpcext
 # github.com/grafana/xk6-output-prometheus-remote v0.3.1
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
