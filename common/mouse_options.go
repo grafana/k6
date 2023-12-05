@@ -84,9 +84,12 @@ func (o *MouseDblClickOptions) Parse(ctx context.Context, opts goja.Value) error
 	return nil
 }
 
-func (o *MouseDblClickOptions) ToMouseDownUpOptions() *MouseDownUpOptions {
-	o2 := NewMouseDownUpOptions()
+// ToMouseClickOptions converts MouseDblClickOptions to a MouseClickOptions.
+func (o *MouseDblClickOptions) ToMouseClickOptions() *MouseClickOptions {
+	o2 := NewMouseClickOptions()
 	o2.Button = o.Button
+	o2.ClickCount = 2
+	o2.Delay = o.Delay
 	return o2
 }
 
