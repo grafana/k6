@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>Clickable link test</title>
+</head>
+
+<body>
+    <a id="linkdbl" href="#" ondblclick="event.preventDefault()" onclick="incrementCounter()">Dblclick</a>
+    Counter: <span id="counter">0</span>
+
+    <script>
+        window.dblclick = false;
+
+        document.querySelector('#linkdbl').addEventListener(
+            'dblclick', e => { window.dblclick = true }, false
+        );
+
+        var counter = 0;
+        function incrementCounter() {
+            document.getElementById("counter").textContent = ++counter;
+        }
+    </script>
+</body>
+
+</html>
