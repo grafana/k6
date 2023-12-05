@@ -112,13 +112,11 @@ func (m *Mouse) move(x float64, y float64, opts *MouseMoveOptions) error {
 }
 
 func (m *Mouse) up(x float64, y float64, opts *MouseDownUpOptions) error {
-	var button input.MouseButton = input.Left
-	var clickCount int64 = 1
 	m.button = input.None
 	action := input.DispatchMouseEvent(input.MouseReleased, m.x, m.y).
-		WithButton(button).
+		WithButton(input.MouseButton(opts.Button)).
 		WithModifiers(input.Modifier(m.keyboard.modifiers)).
-		WithClickCount(clickCount)
+		WithClickCount(opts.ClickCount)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		return err
 	}
