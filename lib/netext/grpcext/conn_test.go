@@ -213,7 +213,7 @@ message Empty {
 // invokemock is a mock for the grpc connection supporting only unary requests.
 type invokemock func(in, out *dynamicpb.Message, opts ...grpc.CallOption) error
 
-func (im invokemock) Invoke(ctx context.Context, url string, payload interface{}, reply interface{}, opts ...grpc.CallOption) error {
+func (im invokemock) Invoke(_ context.Context, _ string, payload interface{}, reply interface{}, opts ...grpc.CallOption) error {
 	in, ok := payload.(*dynamicpb.Message)
 	if !ok {
 		return fmt.Errorf("unexpected type for payload")
@@ -225,12 +225,10 @@ func (im invokemock) Invoke(ctx context.Context, url string, payload interface{}
 	return im(in, out, opts...)
 }
 
-func (invokemock) NewStream(ctx context.Context, desc *grpc.StreamDesc, method string, opts ...grpc.CallOption) (grpc.ClientStream, error) {
+func (invokemock) NewStream(_ context.Context, _ *grpc.StreamDesc, _ string, _ ...grpc.CallOption) (grpc.ClientStream, error) {
 	panic("not implemented")
 }
 
 func (invokemock) Close() error {
 	return nil
 }
-
-// TODO: add a test for the ip metric tag

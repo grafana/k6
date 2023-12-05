@@ -1,28 +1,25 @@
 package grpc_test
 
 import (
-	"errors"
 	"io"
 	"net/url"
 	"os"
 	"runtime"
-	"strings"
+	"sync"
 	"testing"
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"gopkg.in/guregu/null.v3"
-
-	k6grpc "go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/metrics"
+	"gopkg.in/guregu/null.v3"
+
+	xk6grpc "go.k6.io/k6/js/modules/k6/grpc"
 )
 
 const isWindows = runtime.GOOS == "windows"
@@ -43,24 +40,71 @@ type testcase struct {
 	vuString   codeBlock // runs in the vu context
 }
 
-type testState struct {
-	*modulestest.Runtime
-	httpBin    *httpmultibin.HTTPMultiBin
-	samples    chan metrics.SampleContainer
-	logger     logrus.FieldLogger
-	loggerHook *testutils.SimpleLogrusHook
+// callRecorder a helper type that records all calls
+type callRecorder struct {
+	sync.Mutex
+	calls []string
 }
 
+// Call records a call
+func (r *callRecorder) Call(text string) {
+	r.Lock()
+	defer r.Unlock()
+
+	r.calls = append(r.calls, text)
+}
+
+// Len just returns the length of the calls
+func (r *callRecorder) Len() int {
+	r.Lock()
+	defer r.Unlock()
+
+	return len(r.calls)
+}
+
+// Recorded returns the recorded calls
+func (r *callRecorder) Recorded() []string {
+	r.Lock()
+	defer r.Unlock()
+
+	result := []string{}
+	result = append(result, r.calls...)
+
+	return result
+}
+
+type testState struct {
+	*modulestest.Runtime
+	httpBin      *httpmultibin.HTTPMultiBin
+	samples      chan metrics.SampleContainer
+	logger       logrus.FieldLogger
+	loggerHook   *testutils.SimpleLogrusHook
+	callRecorder *callRecorder
+}
+
+// Run replaces the httpbin address and runs the code.
+func (ts *testState) Run(code string) (goja.Value, error) {
+	return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
+}
+
+// RunOnEventLoop replaces the httpbin address and run the code on event loop
+func (ts *testState) RunOnEventLoop(code string) (goja.Value, error) {
+	return ts.Runtime.RunOnEventLoop(ts.httpBin.Replacer.Replace(code))
+}
+
+// newTestState creates a new test state.
 func newTestState(t *testing.T) testState {
 	t.Helper()
 
 	tb := httpmultibin.NewHTTPMultiBin(t)
+
 	samples := make(chan metrics.SampleContainer, 1000)
 	testRuntime := modulestest.NewRuntime(t)
 
-	cwd, err := os.Getwd() //nolint:golint,forbidigo
+	cwd, err := os.Getwd() //nolint:forbidigo
 	require.NoError(t, err)
 	fs := fsext.NewOsFs()
+
 	if isWindows {
 		fs = fsext.NewTrimFilePathSeparatorFs(fs)
 	}
@@ -74,17 +118,23 @@ func newTestState(t *testing.T) testState {
 	hook := testutils.NewLogHook()
 	logger.AddHook(hook)
 
-	ts := testState{
-		Runtime:    testRuntime,
-		httpBin:    tb,
-		samples:    samples,
-		logger:     logger,
-		loggerHook: hook,
+	recorder := &callRecorder{
+		calls: make([]string, 0),
 	}
 
-	m, ok := k6grpc.New().NewModuleInstance(ts.VU).(*k6grpc.ModuleInstance)
+	ts := testState{
+		Runtime:      testRuntime,
+		httpBin:      tb,
+		samples:      samples,
+		logger:       logger,
+		loggerHook:   hook,
+		callRecorder: recorder,
+	}
+
+	m, ok := xk6grpc.New().NewModuleInstance(ts.VU).(*xk6grpc.ModuleInstance)
 	require.True(t, ok)
 	require.NoError(t, ts.VU.Runtime().Set("grpc", m.Exports().Named))
+	require.NoError(t, ts.VU.Runtime().Set("call", recorder.Call))
 
 	return ts
 }
@@ -115,50 +165,4 @@ func (ts *testState) ToVUContext() {
 	}
 
 	ts.MoveToVUContext(state)
-}
-
-// Run replaces the httpbin address and runs the code.
-func (ts *testState) Run(code string) (goja.Value, error) {
-	return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
-}
-
-func assertMetricEmitted(
-	t *testing.T,
-	metricName string, //nolint:unparam
-	sampleContainers []metrics.SampleContainer,
-	url string,
-) {
-	seenMetric := false
-
-	for _, sampleContainer := range sampleContainers {
-		for _, sample := range sampleContainer.GetSamples() {
-			surl, ok := sample.Tags.Get("url")
-			assert.True(t, ok)
-			if surl == url {
-				if sample.Metric.Name == metricName {
-					seenMetric = true
-				}
-			}
-		}
-	}
-	assert.True(t, seenMetric, "url %s didn't emit %s", url, metricName)
-}
-
-func assertResponse(t *testing.T, cb codeBlock, err error, val goja.Value, ts testState) {
-	if isWindows && cb.windowsErr != "" && err != nil {
-		err = errors.New(strings.ReplaceAll(err.Error(), cb.windowsErr, cb.err))
-	}
-	if cb.err == "" {
-		assert.NoError(t, err)
-	} else {
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), cb.err)
-	}
-	if cb.val != nil {
-		require.NotNil(t, val)
-		assert.Equal(t, cb.val, val.Export())
-	}
-	if cb.asserts != nil {
-		cb.asserts(t, ts.httpBin, ts.samples, err)
-	}
 }

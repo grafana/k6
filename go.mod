@@ -14,7 +14,6 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/websocket v1.5.0
 	github.com/grafana/xk6-browser v1.2.1
-	github.com/grafana/xk6-grpc v0.1.4-0.20230919144024-6ed5daf33509
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0
 	github.com/grafana/xk6-timers v0.1.2
@@ -30,6 +29,7 @@ require (
 	github.com/mccutchen/go-httpbin v1.1.2-0.20190116014521-c5cb2f4802fa
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
+	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.3
@@ -77,7 +77,6 @@ require (
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
-	github.com/mstoykov/k6-taskqueue-lib v0.1.0 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/prometheus/client_golang v1.16.0 // indirect
 	github.com/prometheus/client_model v0.4.0 // indirect

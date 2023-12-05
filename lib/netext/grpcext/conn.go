@@ -9,11 +9,11 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -32,6 +32,14 @@ type Request struct {
 	MethodDescriptor protoreflect.MethodDescriptor
 	TagsAndMeta      *metrics.TagsAndMeta
 	Message          []byte
+}
+
+// StreamRequest represents a gRPC stream request.
+type StreamRequest struct {
+	Method           string
+	MethodDescriptor protoreflect.MethodDescriptor
+	TagsAndMeta      *metrics.TagsAndMeta
+	Metadata         metadata.MD
 }
 
 // Response represents a gRPC response.
@@ -146,26 +154,40 @@ func (c *Conn) Invoke(
 	}
 
 	if resp != nil {
-		// (rogchap) there is a lot of marshaling/unmarshaling here, but if we just pass the dynamic message
-		// the default Marshaller would be used, which would strip any zero/default values from the JSON.
-		// eg. given this message:
-		// message Point {
-		//    double x = 1;
-		// 	  double y = 2;
-		// 	  double z = 3;
-		// }
-		// and a value like this:
-		// msg := Point{X: 6, Y: 4, Z: 0}
-		// would result in JSON output:
-		// {"x":6,"y":4}
-		// rather than the desired:
-		// {"x":6,"y":4,"z":0}
-		raw, _ := marshaler.Marshal(resp)
-		var msg interface{}
-		_ = json.Unmarshal(raw, &msg)
+		msg, err := convert(marshaler, resp)
+		if err != nil {
+			return nil, fmt.Errorf("unable to convert response object to JSON: %w", err)
+		}
+
 		response.Message = msg
 	}
 	return &response, nil
+}
+
+// NewStream creates a new gRPC stream.
+func (c *Conn) NewStream(
+	ctx context.Context,
+	req StreamRequest,
+	opts ...grpc.CallOption,
+) (*Stream, error) {
+	ctx = metadata.NewOutgoingContext(ctx, req.Metadata)
+
+	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta})
+
+	stream, err := c.raw.NewStream(ctx, &grpc.StreamDesc{
+		StreamName:    string(req.MethodDescriptor.Name()),
+		ServerStreams: req.MethodDescriptor.IsStreamingServer(),
+		ClientStreams: req.MethodDescriptor.IsStreamingClient(),
+	}, req.Method, opts...)
+	if err != nil {
+		return nil, err
+	}
+
+	return &Stream{
+		raw:              stream,
+		method:           req.Method,
+		methodDescriptor: req.MethodDescriptor,
+	}, nil
 }
 
 // Close closes the underhood connection.

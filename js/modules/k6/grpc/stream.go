@@ -9,13 +9,14 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja"
-	"github.com/grafana/xk6-grpc/lib/netext/grpcext"
-	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
-	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/lib/netext/grpcext"
 	"go.k6.io/k6/metrics"
+
+	"github.com/dop251/goja"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/reflect/protoreflect"

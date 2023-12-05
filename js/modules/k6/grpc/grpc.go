@@ -1,7 +1,13 @@
+// Package grpc is the root module of the k6-grpc extension.
 package grpc
 
 import (
+	"errors"
+	"fmt"
+
 	"github.com/dop251/goja"
+	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"google.golang.org/grpc/codes"
 )
@@ -15,6 +21,7 @@ type (
 	ModuleInstance struct {
 		vu      modules.VU
 		exports map[string]interface{}
+		metrics *instanceMetrics
 	}
 )
 
@@ -31,18 +38,26 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface to return
 // a new instance for each VU.
 func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	metrics, err := registerMetrics(vu.InitEnv().Registry)
+	if err != nil {
+		common.Throw(vu.Runtime(), fmt.Errorf("failed to register GRPC module metrics: %w", err))
+	}
+
 	mi := &ModuleInstance{
 		vu:      vu,
 		exports: make(map[string]interface{}),
+		metrics: metrics,
 	}
 
 	mi.exports["Client"] = mi.NewClient
 	mi.defineConstants()
+	mi.exports["Stream"] = mi.stream
+
 	return mi
 }
 
 // NewClient is the JS constructor for the grpc Client.
-func (mi *ModuleInstance) NewClient(call goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) NewClient(_ goja.ConstructorCall) *goja.Object {
 	rt := mi.vu.Runtime()
 	return rt.ToValue(&Client{vu: mi.vu}).ToObject(rt)
 }
@@ -78,4 +93,79 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	return modules.Exports{
 		Named: mi.exports,
 	}
+}
+
+// stream returns a new stream object
+func (mi *ModuleInstance) stream(c goja.ConstructorCall) *goja.Object {
+	rt := mi.vu.Runtime()
+
+	client, err := extractClient(c.Argument(0), rt)
+	if err != nil {
+		common.Throw(rt, fmt.Errorf("invalid GRPC Stream's client: %w", err))
+	}
+
+	methodName := sanitizeMethodName(c.Argument(1).String())
+	methodDescriptor, err := client.getMethodDescriptor(methodName)
+	if err != nil {
+		common.Throw(rt, fmt.Errorf("invalid GRPC Stream's method: %w", err))
+	}
+
+	p, err := newCallParams(mi.vu, c.Argument(2))
+	if err != nil {
+		common.Throw(rt, fmt.Errorf("invalid GRPC Stream's parameters: %w", err))
+	}
+
+	p.SetSystemTags(mi.vu.State(), client.addr, methodName)
+
+	logger := mi.vu.State().Logger.WithField("streamMethod", methodName)
+
+	s := &stream{
+		vu:               mi.vu,
+		client:           client,
+		methodDescriptor: methodDescriptor,
+		method:           methodName,
+		logger:           logger,
+
+		tq: taskqueue.New(mi.vu.RegisterCallback),
+
+		instanceMetrics: mi.metrics,
+		builtinMetrics:  mi.vu.State().BuiltinMetrics,
+		done:            make(chan struct{}),
+		writingState:    opened,
+
+		writeQueueCh: make(chan message),
+
+		eventListeners: newEventListeners(),
+		obj:            rt.NewObject(),
+		tagsAndMeta:    &p.TagsAndMeta,
+	}
+
+	defineStream(rt, s)
+
+	err = s.beginStream(p)
+	if err != nil {
+		s.tq.Close()
+
+		common.Throw(rt, err)
+	}
+
+	return s.obj
+}
+
+// extractClient extracts & validates a grpc.Client from a goja.Value.
+func extractClient(v goja.Value, rt *goja.Runtime) (*Client, error) {
+	if common.IsNullish(v) {
+		return nil, errors.New("empty gRPC client")
+	}
+
+	client, ok := v.ToObject(rt).Export().(*Client)
+	if !ok {
+		return nil, errors.New("not a gRPC client")
+	}
+
+	if client.conn == nil {
+		return nil, errors.New("no gRPC connection, you must call connect first")
+	}
+
+	return client, nil
 }

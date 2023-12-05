@@ -14,8 +14,6 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/netext/grpcext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
 
 	"github.com/dop251/goja"
 	"github.com/jhump/protoreflect/desc"
@@ -213,7 +211,7 @@ func (c *Client) Connect(addr string, params goja.Value) (bool, error) {
 		return false, common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
 	}
 
-	p, err := newConnectParams(c.vu.Runtime(), params)
+	p, err := newConnectParams(c.vu, params)
 	if err != nil {
 		return false, fmt.Errorf("invalid grpc.connect() parameters: %w", err)
 	}
@@ -299,9 +297,14 @@ func (c *Client) Invoke(
 		return nil, fmt.Errorf("method %q not found in file descriptors", method)
 	}
 
-	p, err := c.parseInvokeParams(params)
+	p, err := newCallParams(c.vu, params)
 	if err != nil {
-		return nil, fmt.Errorf("invalid grpc.invoke() parameters: %w", err)
+		return nil, fmt.Errorf("invalid GRPC's client.invoke() parameters: %w", err)
+	}
+
+	// k6 GRPC Invoke's default timeout is 2 minutes
+	if p.Timeout == time.Duration(0) {
+		p.Timeout = 2 * time.Minute
 	}
 
 	if req == nil {
@@ -315,17 +318,7 @@ func (c *Client) Invoke(
 	ctx, cancel := context.WithTimeout(c.vu.Context(), p.Timeout)
 	defer cancel()
 
-	if state.Options.SystemTags.Has(metrics.TagURL) {
-		p.TagsAndMeta.SetSystemTagOrMeta(metrics.TagURL, fmt.Sprintf("%s%s", c.addr, method))
-	}
-	parts := strings.Split(method[1:], "/")
-	p.TagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagService, parts[0])
-	p.TagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagMethod, parts[1])
-
-	// Only set the name system tag if the user didn't explicitly set it beforehand
-	if _, ok := p.TagsAndMeta.Tags.Get("name"); !ok {
-		p.TagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagName, method)
-	}
+	p.SetSystemTags(state, c.addr, method)
 
 	reqmsg := grpcext.Request{
 		MethodDescriptor: methodDesc,
@@ -394,6 +387,7 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 				appendMethodInfo(fd, sd, md)
 			}
 		}
+
 		messages := fd.Messages()
 
 		stack := make([]protoreflect.MessageDescriptor, 0, messages.Len())
@@ -427,205 +421,6 @@ func (c *Client) convertToMethodInfo(fdset *descriptorpb.FileDescriptorSet) ([]M
 	return rtn, nil
 }
 
-type invokeParams struct {
-	Metadata    metadata.MD
-	TagsAndMeta metrics.TagsAndMeta
-	Timeout     time.Duration
-}
-
-func (c *Client) parseInvokeParams(paramsVal goja.Value) (*invokeParams, error) {
-	result := &invokeParams{
-		Timeout:     1 * time.Minute,
-		TagsAndMeta: c.vu.State().Tags.GetCurrentValues(),
-		Metadata:    metadata.New(nil),
-	}
-	if paramsVal == nil || goja.IsUndefined(paramsVal) || goja.IsNull(paramsVal) {
-		return result, nil
-	}
-	rt := c.vu.Runtime()
-	params := paramsVal.ToObject(rt)
-	for _, k := range params.Keys() {
-		switch k {
-		case "metadata":
-			md, err := newMetadata(params.Get(k))
-			if err != nil {
-				return result, fmt.Errorf("invalid metadata param: %w", err)
-			}
-
-			result.Metadata = md
-		case "tags":
-			if err := common.ApplyCustomUserTags(rt, &result.TagsAndMeta, params.Get(k)); err != nil {
-				return result, fmt.Errorf("metric tags: %w", err)
-			}
-		case "timeout":
-			var err error
-			v := params.Get(k).Export()
-			result.Timeout, err = types.GetDurationValue(v)
-			if err != nil {
-				return result, fmt.Errorf("invalid timeout value: %w", err)
-			}
-		case "headers":
-			return result, errors.New("headers param is not supported anymore. Please, use metadata param instead")
-		default:
-			return result, fmt.Errorf("unknown param: %q", k)
-		}
-	}
-	return result, nil
-}
-
-// newMetadata constructs a metadata.MD from the input value.
-func newMetadata(input goja.Value) (metadata.MD, error) {
-	md := metadata.New(nil)
-
-	if common.IsNullish(input) {
-		return md, nil
-	}
-
-	v := input.Export()
-
-	raw, ok := v.(map[string]interface{})
-	if !ok {
-		return md, errors.New("must be an object with key-value pairs")
-	}
-
-	for hk, kv := range raw {
-		var val string
-		// The gRPC spec defines that Binary-valued keys end in -bin
-		// https://grpc.io/docs/what-is-grpc/core-concepts/#metadata
-		if strings.HasSuffix(hk, "-bin") {
-			var binVal []byte
-			if binVal, ok = kv.([]byte); !ok {
-				return md, fmt.Errorf("%q value must be binary", hk)
-			}
-
-			// https://github.com/grpc/grpc-go/blob/v1.57.0/Documentation/grpc-metadata.md#storing-binary-data-in-metadata
-			val = string(binVal)
-		} else if val, ok = kv.(string); !ok {
-			return md, fmt.Errorf("%q value must be a string", hk)
-		}
-
-		md.Append(hk, val)
-	}
-
-	return md, nil
-}
-
-type connectParams struct {
-	IsPlaintext           bool
-	ReflectionMetadata    metadata.MD
-	UseReflectionProtocol bool
-	Timeout               time.Duration
-	MaxReceiveSize        int64
-	MaxSendSize           int64
-	TLS                   map[string]interface{}
-}
-
-func newConnectParams(rt *goja.Runtime, input goja.Value) (connectParams, error) { //nolint:funlen,gocognit,cyclop
-	params := connectParams{
-		IsPlaintext:           false,
-		UseReflectionProtocol: false,
-		ReflectionMetadata:    metadata.New(nil),
-		Timeout:               time.Minute,
-		MaxReceiveSize:        0,
-		MaxSendSize:           0,
-	}
-
-	if common.IsNullish(input) {
-		return params, nil
-	}
-
-	raw := input.ToObject(rt)
-
-	for _, k := range raw.Keys() {
-		v := raw.Get(k).Export()
-
-		switch k {
-		case "plaintext":
-			var ok bool
-			params.IsPlaintext, ok = v.(bool)
-			if !ok {
-				return params, fmt.Errorf("invalid plaintext value: '%#v', it needs to be boolean", v)
-			}
-		case "timeout":
-			var err error
-			params.Timeout, err = types.GetDurationValue(v)
-			if err != nil {
-				return params, fmt.Errorf("invalid timeout value: %w", err)
-			}
-		case "reflect":
-			var ok bool
-			params.UseReflectionProtocol, ok = v.(bool)
-			if !ok {
-				return params, fmt.Errorf("invalid reflect value: '%#v', it needs to be boolean", v)
-			}
-		case "reflectMetadata":
-			md, err := newMetadata(raw.Get(k))
-			if err != nil {
-				return params, fmt.Errorf("invalid reflectMetadata param: %w", err)
-			}
-			params.ReflectionMetadata = md
-		case "maxReceiveSize":
-			var ok bool
-			params.MaxReceiveSize, ok = v.(int64)
-			if !ok {
-				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v', it needs to be an integer", v)
-			}
-			if params.MaxReceiveSize < 0 {
-				return params, fmt.Errorf("invalid maxReceiveSize value: '%#v, it needs to be a positive integer", v)
-			}
-		case "maxSendSize":
-			var ok bool
-			params.MaxSendSize, ok = v.(int64)
-			if !ok {
-				return params, fmt.Errorf("invalid maxSendSize value: '%#v', it needs to be an integer", v)
-			}
-			if params.MaxSendSize < 0 {
-				return params, fmt.Errorf("invalid maxSendSize value: '%#v, it needs to be a positive integer", v)
-			}
-		case "tls":
-			var ok bool
-			params.TLS, ok = v.(map[string]interface{})
-
-			if !ok {
-				return params, fmt.Errorf("invalid tls value: '%#v', expected (optional) keys: cert, key, password, and cacerts", v)
-			}
-			// optional map keys below
-			if cert, certok := params.TLS["cert"]; certok {
-				if _, ok = cert.(string); !ok {
-					return params, fmt.Errorf("invalid tls cert value: '%#v', it needs to be a PEM formatted string", v)
-				}
-			}
-			if key, keyok := params.TLS["key"]; keyok {
-				if _, ok = key.(string); !ok {
-					return params, fmt.Errorf("invalid tls key value: '%#v', it needs to be a PEM formatted string", v)
-				}
-			}
-			if pass, passok := params.TLS["password"]; passok {
-				if _, ok = pass.(string); !ok {
-					return params, fmt.Errorf("invalid tls password value: '%#v', it needs to be a string", v)
-				}
-			}
-			if cacerts, cacertsok := params.TLS["cacerts"]; cacertsok {
-				var cacertsArray []interface{}
-				if cacertsArray, ok = cacerts.([]interface{}); ok {
-					for _, cacertsArrayEntry := range cacertsArray {
-						if _, ok = cacertsArrayEntry.(string); !ok {
-							return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
-								" it needs to be a string or an array of PEM formatted strings", v)
-						}
-					}
-				} else if _, ok = cacerts.(string); !ok {
-					return params, fmt.Errorf("invalid tls cacerts value: '%#v',"+
-						" it needs to be a string or an array of PEM formatted strings", v)
-				}
-			}
-		default:
-			return params, fmt.Errorf("unknown connect param: %q", k)
-		}
-	}
-	return params, nil
-}
-
 func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*descriptorpb.FileDescriptorProto {
 	fds := []*descriptorpb.FileDescriptorProto{}
 
@@ -641,4 +436,34 @@ func walkFileDescriptors(seen map[string]struct{}, fd *desc.FileDescriptor) []*d
 	}
 
 	return fds
+}
+
+// sanitizeMethodName
+func sanitizeMethodName(name string) string {
+	if name == "" {
+		return name
+	}
+
+	if !strings.HasPrefix(name, "/") {
+		name = "/" + name
+	}
+
+	return name
+}
+
+// getMethodDescriptor sanitize it, and gets GRPC method descriptor or an error if not found
+func (c *Client) getMethodDescriptor(method string) (protoreflect.MethodDescriptor, error) {
+	method = sanitizeMethodName(method)
+
+	if method == "" {
+		return nil, errors.New("method to invoke cannot be empty")
+	}
+
+	methodDesc := c.mds[method]
+
+	if methodDesc == nil {
+		return nil, fmt.Errorf("method %q not found in file descriptors", method)
+	}
+
+	return methodDesc, nil
 }
