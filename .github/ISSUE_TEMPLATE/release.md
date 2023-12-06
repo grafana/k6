@@ -44,7 +44,6 @@ labels: ["release"]
 #### Documentation
 
 - [ ] Open and merge a PR from `main` in the `k6-docs` repository, copying the current k6's `next` to a folder named with the k6 version (e.g. `v0.48.x`).
-- [ ] Publish the new [vX.Y.Z version of docs](https://github.com/grafana/k6-docs/releases/new).
 - [ ] Ensure the k6 repository release notes PR contains the correct links to the docs.
 
 #### In k6 repository
