@@ -18,13 +18,6 @@ WORKDIR /home/k6
 
 ENTRYPOINT ["k6"]
 
-# Legacy loadimpact/k6 image
-FROM release as legacy
-
-COPY entrypoint-legacy.sh /usr/bin/
-
-ENTRYPOINT ["/usr/bin/entrypoint-legacy.sh"]
-
 # Browser-enabled bundle
 FROM release as with-browser
 
