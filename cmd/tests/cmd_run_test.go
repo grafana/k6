@@ -950,7 +950,7 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	assert.Contains(t, stdout, "bogus summary")
 }
 
-func runTestWithNoLinger(t *testing.T, ts *GlobalTestState) {
+func runTestWithNoLinger(_ *testing.T, ts *GlobalTestState) {
 	cmd.ExecuteWithGlobalState(ts.GlobalState)
 }
 
@@ -1791,6 +1791,7 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 func BenchmarkReadResponseBody(b *testing.B) {
 	httpSrv := httpmultibin.NewHTTPMultiBin(b)
 
+	//nolint:goconst
 	script := httpSrv.Replacer.Replace(`
 		import http from "k6/http";
 		import { check, sleep } from "k6";
