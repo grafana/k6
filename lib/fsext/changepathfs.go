@@ -1,7 +1,6 @@
 package fsext
 
 import (
-	"errors"
 	"io/fs"
 	"path/filepath"
 	"strings"
@@ -53,7 +52,7 @@ func (f *ChangePathFile) Name() string {
 
 // Chown changes the uid and gid of the named file.
 func (b *ChangePathFs) Chown(_ string, _, _ int) error {
-	return errors.New("unimplemented Chown")
+	panic("unimplemented Chown")
 }
 
 // Chtimes changes the access and modification times of the named file
