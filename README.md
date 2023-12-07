@@ -34,7 +34,7 @@ Special acknowledgment to the authors of [Playwright](https://playwright.dev/) a
 ## Goals
 
 - Bring browser automation to the k6 testing platform while supporting core k6 features like VU executors, scenarios, metrics, checks, thresholds, logging, DNS remapping, IP blocklists, etc.
-- Test stability as the top priority by supporting non-flaky [selectors](https://playwright.dev/docs/selectors) combined with [auto-waiting](https://playwright.dev/docs/actionability/) for actions just like Playwright.
+- Test stability as the top priority by supporting non-flaky [selectors](https://playwright.dev/docs/api/class-selectors) combined with [auto-waiting](https://playwright.dev/docs/actionability/) for actions just like Playwright.
 - Aim for rough API compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is two-fold; for one we don't want users to have to learn a completely new API just to use xk6-browser, and secondly, it opens up for using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for xk6-browser should we decide to support that in the future.
 - Support for Chromium compatible browsers first, and eventually Firefox and WebKit-based browsers.
 
