@@ -74,7 +74,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	return c
 }
 
-func (c *rootCommand) persistentPreRunE(cmd *cobra.Command, args []string) error {
+func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
 	err := c.setupLoggers(c.stopLoggersCh)
 	if err != nil {
 		return err

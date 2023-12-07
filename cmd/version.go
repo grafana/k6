@@ -24,7 +24,7 @@ func versionString() string {
 	return v
 }
 
-func getCmdVersion(gs *state.GlobalState) *cobra.Command {
+func getCmdVersion(_ *state.GlobalState) *cobra.Command {
 	// versionCmd represents the version command.
 	return &cobra.Command{
 		Use:   "version",

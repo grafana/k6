@@ -52,7 +52,7 @@ type GlobalState struct {
 	SignalNotify func(chan<- os.Signal, ...os.Signal)
 	SignalStop   func(chan<- os.Signal)
 
-	Logger         *logrus.Logger
+	Logger         *logrus.Logger //nolint:forbidigo //TODO:change to FieldLogger
 	FallbackLogger logrus.FieldLogger
 }
 
