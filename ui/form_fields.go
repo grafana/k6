@@ -103,7 +103,7 @@ func (f PasswordField) GetLabelExtra() string {
 
 // GetContents simply reads a string in cleartext from the supplied reader
 func (f PasswordField) GetContents(r io.Reader) (string, error) {
-	stdin, ok := r.(*os.File)
+	stdin, ok := r.(*os.File) //nolint:forbidigo
 	if !ok {
 		return "", errors.New("cannot read password from the supplied terminal")
 	}
