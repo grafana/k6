@@ -69,16 +69,16 @@ func NewGlobalState(ctx context.Context) *GlobalState {
 	stderrTTY := !isDumbTerm && (isatty.IsTerminal(os.Stderr.Fd()) || isatty.IsCygwinTerminal(os.Stderr.Fd()))
 	outMutex := &sync.Mutex{}
 	stdout := &console.Writer{
-		RawOut: os.Stdout,
-		Mutex:  outMutex,
-		Writer: colorable.NewColorable(os.Stdout),
-		IsTTY:  stdoutTTY,
+		RawOutFd: int(os.Stdout.Fd()),
+		Mutex:    outMutex,
+		Writer:   colorable.NewColorable(os.Stdout),
+		IsTTY:    stdoutTTY,
 	}
 	stderr := &console.Writer{
-		RawOut: os.Stderr,
-		Mutex:  outMutex,
-		Writer: colorable.NewColorable(os.Stderr),
-		IsTTY:  stderrTTY,
+		RawOutFd: int(os.Stderr.Fd()),
+		Mutex:    outMutex,
+		Writer:   colorable.NewColorable(os.Stderr),
+		IsTTY:    stderrTTY,
 	}
 
 	env := BuildEnvMap(os.Environ())
