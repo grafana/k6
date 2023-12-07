@@ -259,7 +259,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	var errTermGetSize bool
 	termWidth := defaultTermWidth
 	if gs.Stdout.IsTTY {
-		tw, _, err := term.GetSize(int(gs.Stdout.RawOut.Fd()))
+		tw, _, err := term.GetSize(gs.Stdout.RawOutFd)
 		if !(tw > 0) || err != nil {
 			errTermGetSize = true
 			logger.WithError(err).Warn("error getting terminal size")
@@ -314,7 +314,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	updateFreq := 1 * time.Second
 	var stdoutFD int
 	if gs.Stdout.IsTTY {
-		stdoutFD = int(gs.Stdout.RawOut.Fd())
+		stdoutFD = gs.Stdout.RawOutFd
 		updateFreq = 100 * time.Millisecond
 		gs.OutMutex.Lock()
 		gs.Stdout.PersistentText = printProgressBars

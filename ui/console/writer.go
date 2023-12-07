@@ -3,17 +3,16 @@ package console
 import (
 	"bytes"
 	"io"
-	"os"
 	"sync"
 )
 
 // Writer syncs writes with a mutex and, if the output is a TTY, clears before
 // newlines.
 type Writer struct {
-	RawOut *os.File
-	Mutex  *sync.Mutex
-	Writer io.Writer
-	IsTTY  bool
+	RawOutFd int
+	Mutex    *sync.Mutex
+	Writer   io.Writer
+	IsTTY    bool
 
 	// Used for flicker-free persistent objects like the progressbars
 	PersistentText func()
