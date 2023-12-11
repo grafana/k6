@@ -5,15 +5,15 @@
 
 <p align="center">
   <a href="https://github.com/grafana/xk6-browser/releases"><img src="https://img.shields.io/github/release/grafana/xk6-browser.svg" alt="Github release"></a>
-  <a href="https://github.com/grafana/xk6-browser/actions/workflows/all.yaml"><img src="https://github.com/grafana/xk6-browser/actions/workflows/all.yaml/badge.svg" alt="Build status"></a>
+  <a href="https://github.com/grafana/xk6-browser/actions/workflows/test.yml"><img src="https://github.com/grafana/xk6-browser/actions/workflows/test.yml/badge.svg" alt="Build status"></a>
   <a href="https://goreportcard.com/report/github.com/grafana/xk6-browser"><img src="https://goreportcard.com/badge/github.com/grafana/xk6-browser" alt="Go Report Card"></a>
   <br>
   <a href="https://twitter.com/k6_io"><img src="https://img.shields.io/badge/twitter-@k6_io-55acee.svg" alt="@k6_io on Twitter"></a>
   <a href="https://k6.io/slack"><img src="https://img.shields.io/badge/Slack-k6-ff69b4.svg" alt="Slack channel"></a>
 </p>
 <p align="center">
-    <a href="https://github.com/grafana/xk6-browser/releases">Download</a> ·
-    <a href="https://k6.io/docs/javascript-api/k6-x-browser/">Documentation</a> ·
+    <a href="https://github.com/grafana/k6/releases/latest">Download</a> ·
+    <a href="https://grafana.com/docs/k6/latest/javascript-api/k6-experimental/browser/">Documentation</a> ·
     <a href="https://community.grafana.com/c/grafana-k6/k6-browser/79">Community Forum</a>
 </p>
 
@@ -42,25 +42,25 @@ See our [project roadmap](ROADMAP.md) for more details.
 
 ## Get started
 
-- [Getting Started](https://k6.io/docs/javascript-api/xk6-browser/)
-- [Running xk6-browser](https://k6.io/docs/javascript-api/xk6-browser/get-started/running-xk6-browser/)
-- [Browser Metrics](https://k6.io/docs/javascript-api/xk6-browser/get-started/browser-metrics/)
-- [Selecting Elements](https://k6.io/docs/javascript-api/xk6-browser/get-started/selecting-elements/)
+- [Getting Started](https://grafana.com/docs/k6/latest/using-k6-browser/)
+- [Running xk6-browser](https://grafana.com/docs/k6/latest/using-k6-browser/running-browser-tests/)
+- [Browser Metrics](https://grafana.com/docs/k6/latest/using-k6-browser/metrics/)
+- [Selecting Elements](https://grafana.com/docs/k6/latest/using-k6-browser/recommended-practices/selecting-elements/)
 
 ## Documentation
 
 - [Releases](https://github.com/grafana/xk6-browser/releases)
-- [API Documentation](https://k6.io/docs/javascript-api/xk6-browser/api/) - This documents how to use our API and its current state with xk6-browser.
+- [API Documentation](https://grafana.com/docs/k6/latest/javascript-api/k6-experimental/browser/) - This documents how to use our API and its current state with xk6-browser.
 
 ## Get help
 
 - If you're having issues installing or running xk6-browser, refer to [TROUBLESHOOTING](/TROUBLESHOOTING.md).
 - To get help about usage, report bugs, suggest features, and discuss xk6-browser with other users see [SUPPORT.md](SUPPORT.md).
-- Community discussion happens at the [xk6-browser forum](https://community.k6.io/c/xk6-browser/14).
+- Community discussion happens at the [xk6-browser forum](https://community.grafana.com/c/grafana-k6/k6-browser/79).
 
 ## Additional resources
 
-To find out more about xk6-browser or browser testing in general, check out the following links. 
+To find out more about xk6-browser or browser testing in general, check out the following links.
 
 **Note:** since our API is still transitioning, some of the code snippets from the links below might be inaccurate, though the concepts should still be correct. For the latest, refer to our up-to-date [API documentation](https://k6.io/docs/javascript-api/xk6-browser/api/).
 
