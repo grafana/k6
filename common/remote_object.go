@@ -179,6 +179,9 @@ func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 		return math.Inf(-1), nil
 	}
 
+	// We should never get here, as previous switch statement should
+	// be exhaustive and contain all possible unserializable values.
+	// See: https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#type-UnserializableValue
 	return nil, UnserializableValueError{obj.UnserializableValue}
 }
 
