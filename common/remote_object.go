@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"encoding/json"
-	"errors"
 	"fmt"
 	"math"
 	"strconv"
@@ -14,7 +13,6 @@ import (
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
-	"github.com/sirupsen/logrus"
 )
 
 type objectOverflowError struct{}
@@ -190,29 +188,6 @@ func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (
 		return goja.Undefined(), err
 	}
 	return k6ext.Runtime(ctx).ToValue(val), err
-}
-
-func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.Entry) {
-	var (
-		ooe *objectOverflowError
-		ope *objectPropertyParseError
-	)
-	var merr *multiError
-	if !errors.As(err, &merr) {
-		// If this panics it's a bug :)
-		k6ext.Panic(ctx, "parsing remote object value: %w", err)
-	}
-	for _, e := range merr.Errors {
-		switch {
-		case errors.As(e, &ooe):
-			logger.Warn(ooe)
-		case errors.As(e, &ope):
-			logger.WithError(ope).Error()
-		default:
-			// If this panics it's a bug :)
-			k6ext.Panic(ctx, "parsing remote object value: %w", e)
-		}
-	}
 }
 
 func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) string {
