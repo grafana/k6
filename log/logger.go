@@ -195,5 +195,9 @@ func (f *consoleLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
 		entry.Message = strings.Join(msg, " ")
 		delete(entry.Data, "objects")
 	}
+	if stringObjects, ok := entry.Data["stringObjects"].([]string); ok {
+		entry.Message = strings.Join(stringObjects, " ")
+		delete(entry.Data, "stringObjects")
+	}
 	return f.Formatter.Format(entry)
 }
