@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/log"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
@@ -210,4 +211,76 @@ func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.E
 			k6ext.Panic(ctx, "parsing remote object value: %w", e)
 		}
 	}
+}
+
+//nolint:unused
+func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) string {
+	obj := make(map[string]string)
+	if op.Overflow {
+		logger.Warnf("parseConsoleRemoteObjectPreview", "object is too large and will be parsed partially")
+	}
+
+	for _, p := range op.Properties {
+		val := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		obj[p.Name] = val
+	}
+
+	bb, err := json.Marshal(obj)
+	if err != nil {
+		logger.Errorf("parseConsoleRemoteObjectPreview", "failed to marshal object to string: %v", err)
+	}
+
+	return string(bb)
+}
+
+//nolint:cyclop,unused
+func parseConsoleRemoteObjectValue(
+	logger *log.Logger,
+	t cdpruntime.Type,
+	st cdpruntime.Subtype,
+	val string,
+	op *cdpruntime.ObjectPreview,
+) string {
+	switch t {
+	case cdpruntime.TypeNumber:
+	case cdpruntime.TypeBoolean:
+	case cdpruntime.TypeSymbol:
+	case cdpruntime.TypeBigint:
+	case cdpruntime.TypeAccessor:
+		return "accessor"
+	case cdpruntime.TypeFunction:
+		return "function()"
+	case cdpruntime.TypeString:
+		if strings.HasPrefix(val, `"`) {
+			val = strings.TrimPrefix(val, `"`)
+			val = strings.TrimSuffix(val, `"`)
+		}
+	case cdpruntime.TypeObject:
+		if op != nil {
+			return parseConsoleRemoteObjectPreview(logger, op)
+		}
+		if val == "Object" {
+			return val
+		}
+		if st == "null" {
+			return "null"
+		}
+	case cdpruntime.TypeUndefined:
+		return "undefined"
+	}
+
+	return val
+}
+
+// parseConsoleRemoteObject is to be used by callers that are working with
+// console messages that are written to Chrome's console by the website under
+// test.
+//
+//nolint:unused
+func parseConsoleRemoteObject(logger *log.Logger, obj *cdpruntime.RemoteObject) string {
+	if obj.UnserializableValue != "" {
+		return obj.UnserializableValue.String()
+	}
+
+	return parseConsoleRemoteObjectValue(logger, obj.Type, obj.Subtype, string(obj.Value), obj.Preview)
 }
