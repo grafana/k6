@@ -33,14 +33,17 @@ type liveSpan struct {
 type Tracer struct {
 	trace.Tracer
 
+	metadata []attribute.KeyValue
+
 	liveSpansMu sync.RWMutex
 	liveSpans   map[string]*liveSpan
 }
 
 // NewTracer creates a new Tracer from the given TracerProvider.
-func NewTracer(tp k6lib.TracerProvider, options ...trace.TracerOption) *Tracer {
+func NewTracer(tp k6lib.TracerProvider, metadata map[string]string, options ...trace.TracerOption) *Tracer {
 	return &Tracer{
 		Tracer:    tp.Tracer(tracerName, options...),
+		metadata:  buildMetadataAttributes(metadata),
 		liveSpans: make(map[string]*liveSpan),
 	}
 }
@@ -55,6 +58,8 @@ func (t *Tracer) TraceAPICall(
 ) (context.Context, trace.Span) {
 	t.liveSpansMu.Lock()
 	defer t.liveSpansMu.Unlock()
+
+	opts = append(opts, trace.WithAttributes(t.metadata...))
 
 	ls := t.liveSpans[targetID]
 	if ls == nil {
@@ -88,6 +93,8 @@ func (t *Tracer) TraceNavigation(
 	} else {
 		ls = &liveSpan{}
 	}
+
+	opts = append(opts, trace.WithAttributes(t.metadata...))
 
 	ls.ctx, ls.span = t.Start(ctx, url, opts...)
 	t.liveSpans[targetID] = ls
@@ -127,7 +134,18 @@ func (t *Tracer) TraceEvent(
 		return ctx, NoopSpan{}
 	}
 
+	opts = append(opts, trace.WithAttributes(t.metadata...))
+
 	return t.Start(ls.ctx, eventName, opts...)
+}
+
+func buildMetadataAttributes(metadata map[string]string) []attribute.KeyValue {
+	meta := make([]attribute.KeyValue, 0, len(metadata))
+	for mk, mv := range metadata {
+		meta = append(meta, attribute.String(mk, mv))
+	}
+
+	return meta
 }
 
 // NoopSpan represents a noop span.
