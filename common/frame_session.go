@@ -616,16 +616,13 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 		}
 		*/
 
-	parsedObjects := make([]any, 0, len(event.Args))
+	parsedObjects := make([]string, 0, len(event.Args))
 	for _, robj := range event.Args {
-		i, err := parseRemoteObject(robj)
-		if err != nil {
-			handleParseRemoteObjectErr(fs.ctx, err, l)
-		}
+		i := parseConsoleRemoteObject(fs.logger, robj)
 		parsedObjects = append(parsedObjects, i)
 	}
 
-	l = l.WithField("objects", parsedObjects)
+	l = l.WithField("stringObjects", parsedObjects)
 
 	switch event.Type {
 	case "log", "info":

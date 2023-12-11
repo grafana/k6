@@ -215,7 +215,6 @@ func handleParseRemoteObjectErr(ctx context.Context, err error, logger *logrus.E
 	}
 }
 
-//nolint:unused
 func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) string {
 	obj := make(map[string]string)
 	if op.Overflow {
@@ -235,7 +234,7 @@ func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPr
 	return string(bb)
 }
 
-//nolint:cyclop,unused
+//nolint:cyclop
 func parseConsoleRemoteObjectValue(
 	logger *log.Logger,
 	t cdpruntime.Type,
@@ -277,8 +276,6 @@ func parseConsoleRemoteObjectValue(
 // parseConsoleRemoteObject is to be used by callers that are working with
 // console messages that are written to Chrome's console by the website under
 // test.
-//
-//nolint:unused
 func parseConsoleRemoteObject(logger *log.Logger, obj *cdpruntime.RemoteObject) string {
 	if obj.UnserializableValue != "" {
 		return obj.UnserializableValue.String()
