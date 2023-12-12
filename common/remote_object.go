@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"math"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -14,6 +15,8 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/dop251/goja"
 )
+
+var bigIntR = regexp.MustCompile("^[0-9]*n$")
 
 type objectOverflowError struct{}
 
@@ -166,6 +169,14 @@ func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
 func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	if obj.UnserializableValue == "" {
 		return parseRemoteObjectValue(obj.Type, obj.Subtype, string(obj.Value), obj.Preview)
+	}
+
+	if bigIntR.Match([]byte(obj.UnserializableValue)) {
+		n, err := strconv.ParseInt(strings.ReplaceAll(obj.UnserializableValue.String(), "n", ""), 10, 64)
+		if err != nil {
+			return nil, BigIntParseError{err}
+		}
+		return n, nil
 	}
 
 	switch obj.UnserializableValue.String() {

@@ -149,14 +149,12 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 		{
 			name: "undefined", eval: "undefined", want: goja.Undefined(),
 		},
-		// {
-		// 	// Commented out until fix applied
-		// 	name: "bigint", eval: `BigInt("2")`, want: "2n",
-		// },
-		// {
-		// 	// Commented out until fix applied
-		// 	name: "unwrapped_bigint", eval: "3n", want: "3n",
-		// },
+		{
+			name: "bigint", eval: `BigInt("2")`, want: 2,
+		},
+		{
+			name: "unwrapped_bigint", eval: "3n", want: 3,
+		},
 		{
 			name: "float", eval: "3.14", want: 3.14,
 		},
