@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -103,6 +104,90 @@ func TestConsoleLogParse(t *testing.T) {
 			case <-time.After(2500 * time.Millisecond):
 				assert.Fail(t, "test timed out before event handler was called")
 			}
+		})
+	}
+}
+
+func TestEvalRemoteObjectParse(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		eval string
+		want any
+	}{
+		{
+			name: "number", eval: "1", want: 1,
+		},
+		{
+			name: "string", eval: `"some string"`, want: "some string",
+		},
+		{
+			name: "bool", eval: "true", want: true,
+		},
+		{
+			name: "empty_array", eval: "[]", want: []any{},
+		},
+		{
+			name: "empty_object", eval: "{}", want: goja.Undefined(),
+		},
+		{
+			name: "filled_object", eval: `{return {foo:"bar"};}`, want: map[string]any{"foo": "bar"},
+		},
+		{
+			name: "filled_array", eval: `{return ["foo","bar"];}`, want: []interface{}{0: "foo", 1: "bar"},
+		},
+		{
+			name: "filled_array", eval: `() => true`, want: `function()`,
+		},
+		{
+			name: "empty", eval: "", want: "",
+		},
+		{
+			name: "null", eval: "null", want: "null",
+		},
+		{
+			name: "undefined", eval: "undefined", want: goja.Undefined(),
+		},
+		// {
+		// 	// Commented out until fix applied
+		// 	name: "bigint", eval: `BigInt("2")`, want: "2n",
+		// },
+		// {
+		// 	// Commented out until fix applied
+		// 	name: "unwrapped_bigint", eval: "3n", want: "3n",
+		// },
+		{
+			name: "float", eval: "3.14", want: 3.14,
+		},
+		{
+			name: "scientific_notation", eval: "123e-5", want: 0.00123,
+		},
+		// {
+		// 	// This test is ignored until https://github.com/grafana/xk6-browser/issues/1132
+		// 	// has been resolved.
+		// 	name: "partially_parsed",
+		// 	eval:  "window",
+		// 	want: `{"document":"#document","location":"Location","name":"","self":"Window","window":"Window"}`,
+		// },
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			tb := newTestBrowser(t, withFileServer())
+			p := tb.NewPage(nil)
+
+			var got any
+			if tt.eval == "" {
+				got = p.Evaluate(tb.toGojaValue(`() => ""`))
+			} else {
+				got = p.Evaluate(tb.toGojaValue(fmt.Sprintf("() => %s", tt.eval)))
+			}
+
+			assert.Equal(t, tb.toGojaValue(tt.want), got)
 		})
 	}
 }
