@@ -160,7 +160,12 @@ func parseRemoteObjectValue(
 
 	var v any
 	if err := json.Unmarshal([]byte(val), &v); err != nil {
-		return nil, err
+		return nil, &remoteObjectParseError{
+			error:   err,
+			typ:     string(t),
+			subType: string(st),
+			val:     val,
+		}
 	}
 
 	return v, nil
