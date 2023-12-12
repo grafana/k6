@@ -86,6 +86,24 @@ func multierror(err error, errs ...error) error {
 	return me
 }
 
+type remoteObjectParseError struct {
+	error
+	typ     string
+	subType string
+	val     string
+}
+
+// Error returns a string representation of the error.
+func (e *remoteObjectParseError) Error() string {
+	return fmt.Sprintf("parsing remote object with type: %s subtype: %s val: %s err: %s",
+		e.typ, e.subType, e.val, e.error.Error())
+}
+
+// Unwrap returns the wrapped parsing error.
+func (e *remoteObjectParseError) Unwrap() error {
+	return e.error
+}
+
 func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, error) {
 	obj := make(map[string]any)
 	var result error
