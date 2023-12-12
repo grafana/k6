@@ -30,7 +30,7 @@ func TestConsoleLogParse(t *testing.T) {
 			name: "bool", log: "true", want: "true",
 		},
 		{
-			name: "empty_array", log: "[]", want: "{}", // TODO: Improve this output
+			name: "empty_array", log: "[]", want: "[]",
 		},
 		{
 			name: "empty_object", log: "{}", want: "{}",
@@ -39,7 +39,7 @@ func TestConsoleLogParse(t *testing.T) {
 			name: "filled_object", log: `{"foo":{"bar1":"bar2"}}`, want: `{"foo":"Object"}`,
 		},
 		{
-			name: "filled_array", log: `["foo","bar"]`, want: `{"0":"foo","1":"bar"}`,
+			name: "filled_array", log: `["foo","bar"]`, want: `["foo","bar"]`,
 		},
 		{
 			name: "filled_array", log: `() => true`, want: `function()`,

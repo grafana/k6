@@ -287,6 +287,9 @@ func parseConsoleRemoteObjectValue(
 		}
 	case cdpruntime.TypeObject:
 		if op != nil {
+			if st == "array" {
+				return parseConsoleRemoteArrayPreview(logger, op)
+			}
 			return parseConsoleRemoteObjectPreview(logger, op)
 		}
 		if val == "Object" {
