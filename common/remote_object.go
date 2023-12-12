@@ -248,6 +248,25 @@ func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPr
 	return string(bb)
 }
 
+func parseConsoleRemoteArrayPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) string {
+	arr := make([]any, 0)
+	if op.Overflow {
+		logger.Warnf("parseConsoleRemoteArrayPreview", "array is too large and will be parsed partially")
+	}
+
+	for _, p := range op.Properties {
+		val := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		arr = append(arr, val)
+	}
+
+	bb, err := json.Marshal(arr)
+	if err != nil {
+		logger.Errorf("parseConsoleRemoteArrayPreview", "failed to marshal array to string: %v", err)
+	}
+
+	return string(bb)
+}
+
 //nolint:cyclop
 func parseConsoleRemoteObjectValue(
 	logger *log.Logger,
