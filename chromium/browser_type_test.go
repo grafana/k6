@@ -1,10 +1,13 @@
 package chromium
 
 import (
+	"io/fs"
 	"net"
+	"path/filepath"
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 
 	k6lib "go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
@@ -147,6 +150,89 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 			if tc.post != nil {
 				tc.post(t, flags)
 			}
+		})
+	}
+}
+
+func TestExecutablePath(t *testing.T) {
+	t.Parallel()
+
+	// we pick a random file name to look for in our tests
+	// this doesn't matter as long as it's in the paths we look for
+	// in ExecutablePath function.
+	const chromiumExecutable = "google-chrome"
+
+	tests := map[string]struct {
+		path        string                            // user provided path
+		lookPath    func(file string) (string, error) // determines if a file exists
+		userProfile env.LookupFunc
+
+		wantPath string
+		wantOK   bool
+	}{
+		"without_chromium": {
+			path: "", // user did not provide a path
+			lookPath: func(file string) (string, error) {
+				return "", fs.ErrNotExist
+			},
+			userProfile: env.EmptyLookup,
+			wantPath:    "", // no path should be returned
+			wantOK:      false,
+		},
+		"with_chromium": {
+			path: "",
+			lookPath: func(file string) (string, error) {
+				if file == chromiumExecutable {
+					return "", nil
+				}
+				return "", fs.ErrNotExist
+			},
+			userProfile: env.EmptyLookup,
+			wantPath:    chromiumExecutable,
+			wantOK:      true,
+		},
+		"path_override_without_chromium": {
+			path: filepath.Join("path", "to", "chromium"),
+			lookPath: func(file string) (string, error) {
+				return "", fs.ErrNotExist
+			},
+			userProfile: env.EmptyLookup,
+			wantPath:    filepath.Join("path", "to", "chromium"),
+			wantOK:      true,
+		},
+		"path_override_with_chromium": {
+			path: filepath.Join("path", "to", "chromium"),
+			lookPath: func(file string) (string, error) {
+				if file == chromiumExecutable {
+					return "", nil
+				}
+				return "", fs.ErrNotExist
+			},
+			userProfile: env.EmptyLookup,
+			wantPath:    filepath.Join("path", "to", "chromium"),
+			wantOK:      true,
+		},
+		"user_profile": {
+			path: "",
+			lookPath: func(file string) (string, error) { // we look chrome.exe in the user profile
+				if file == filepath.Join("home", `AppData\Local\Google\Chrome\Application\chrome.exe`) {
+					return "", nil
+				}
+				return "", fs.ErrNotExist
+			},
+			userProfile: env.ConstLookup("USERPROFILE", `home`),
+			wantPath:    filepath.Join("home", `AppData\Local\Google\Chrome\Application\chrome.exe`),
+			wantOK:      true,
+		},
+	}
+	for name, tt := range tests {
+		tt := tt
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			path, ok := ExecutablePath(tt.path, tt.userProfile, tt.lookPath)
+			assert.Equal(t, tt.wantPath, path)
+			assert.Equal(t, tt.wantOK, ok)
 		})
 	}
 }
