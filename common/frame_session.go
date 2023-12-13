@@ -619,8 +619,8 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 
 	parsedObjects := make([]string, 0, len(event.Args))
 	for _, robj := range event.Args {
-		i := parseConsoleRemoteObject(fs.logger, robj)
-		parsedObjects = append(parsedObjects, i)
+		s := parseConsoleRemoteObject(fs.logger, robj)
+		parsedObjects = append(parsedObjects, s)
 	}
 
 	l = l.WithField("stringObjects", parsedObjects)

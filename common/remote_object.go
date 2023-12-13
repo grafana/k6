@@ -162,7 +162,7 @@ func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
 }
 
 // parseRemoteObject is to be used by callers that require the string value
-// to be parsed to a go type.
+// to be parsed to a Go type.
 func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	if obj.UnserializableValue == "" {
 		return parseRemoteObjectValue(obj.Type, obj.Subtype, string(obj.Value), obj.Preview)

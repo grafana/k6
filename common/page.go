@@ -1374,9 +1374,9 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 	)
 
 	for _, robj := range e.Args {
-		i := parseConsoleRemoteObject(p.logger, robj)
+		s := parseConsoleRemoteObject(p.logger, robj)
 
-		objects = append(objects, i)
+		objects = append(objects, s)
 		objectHandles = append(objectHandles, NewJSHandle(
 			p.ctx, p.session, execCtx, execCtx.Frame(), robj, p.logger,
 		))
