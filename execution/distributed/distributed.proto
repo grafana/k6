@@ -9,6 +9,8 @@ service DistributedTest {
 
   rpc CommandAndControl(stream AgentMessage)
       returns (stream ControllerMessage) {};
+
+  rpc SendMetrics(MetricsDump) returns (MetricsDumpResponse) {};
 }
 
 message RegisterRequest {}
@@ -43,3 +45,15 @@ message DataPacket {
   bytes data = 2;
   string error = 3;
 }
+
+message MetricsDump {
+  uint32 instanceID = 1;
+  repeated MetricDump metrics = 2;
+}
+
+message MetricDump {
+  string name = 1;
+  bytes data = 2;
+}
+
+message MetricsDumpResponse {};

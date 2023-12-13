@@ -11,6 +11,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics/engine"
 )
 
 // CoordinatorServer coordinates multiple k6 agents.
@@ -21,6 +22,7 @@ type CoordinatorServer struct {
 	instanceCount int
 	test          *lib.Archive
 	logger        logrus.FieldLogger
+	metricsEngine *engine.MetricsEngine
 
 	testStartTimeLock sync.Mutex
 	testStartTime     *time.Time
@@ -34,7 +36,7 @@ type CoordinatorServer struct {
 
 // NewCoordinatorServer initializes and returns a new CoordinatorServer.
 func NewCoordinatorServer(
-	instanceCount int, test *lib.Archive, logger logrus.FieldLogger,
+	instanceCount int, test *lib.Archive, metricsEngine *engine.MetricsEngine, logger logrus.FieldLogger,
 ) (*CoordinatorServer, error) {
 	segments, err := test.Options.ExecutionSegment.Split(int64(instanceCount))
 	if err != nil {
@@ -58,6 +60,7 @@ func NewCoordinatorServer(
 	cs := &CoordinatorServer{
 		instanceCount: instanceCount,
 		test:          test,
+		metricsEngine: metricsEngine,
 		logger:        logger,
 		ess:           ess,
 		cc:            newCoordinatorController(instanceCount, logger),
@@ -142,6 +145,18 @@ func (cs *CoordinatorServer) CommandAndControl(stream DistributedTest_CommandAnd
 	}
 
 	return cs.cc.handleInstanceStream(initInstMsg.InitInstanceID, stream)
+}
+
+// SendMetrics accepts and imports the given metrics in the coordinator's MetricsEngine.
+func (cs *CoordinatorServer) SendMetrics(_ context.Context, dumpMsg *MetricsDump) (*MetricsDumpResponse, error) {
+	// TODO: something nicer?
+	for _, md := range dumpMsg.Metrics {
+		if err := cs.metricsEngine.ImportMetric(md.Name, md.Data); err != nil {
+			cs.logger.Errorf("Error merging sink for metric %s: %w", md.Name, err)
+			// return nil, err
+		}
+	}
+	return &MetricsDumpResponse{}, nil
 }
 
 // Wait blocks until all instances have disconnected.

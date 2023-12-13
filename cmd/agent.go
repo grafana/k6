@@ -2,8 +2,11 @@ package cmd
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
+	"time"
 
+	"github.com/sirupsen/logrus"
 	"github.com/spf13/afero"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
@@ -13,10 +16,75 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/metrics/engine"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"gopkg.in/guregu/null.v3"
 )
+
+// TODO: something cleaner
+func getMetricsHook(
+	ctx context.Context, instanceID uint32,
+	client distributed.DistributedTestClient, logger logrus.FieldLogger,
+) func(*engine.MetricsEngine) func() {
+	logger = logger.WithField("component", "metric-engine-hook")
+	return func(me *engine.MetricsEngine) func() {
+		stop := make(chan struct{})
+		done := make(chan struct{})
+
+		dumpMetrics := func() {
+			logger.Debug("Starting metric dump...")
+			me.MetricsLock.Lock()
+			defer me.MetricsLock.Unlock()
+
+			metrics := make([]*distributed.MetricDump, 0, len(me.ObservedMetrics))
+			for _, om := range me.ObservedMetrics {
+				data, err := om.Sink.Drain()
+				if err != nil {
+					logger.Errorf("There was a problem draining the sink for metric %s: %s", om.Name, err)
+				}
+				metrics = append(metrics, &distributed.MetricDump{
+					Name: om.Name,
+					Data: data,
+				})
+			}
+
+			data := &distributed.MetricsDump{
+				InstanceID: instanceID,
+				Metrics:    metrics,
+			}
+			_, err := client.SendMetrics(ctx, data)
+			if err != nil {
+				logger.Errorf("There was a problem dumping metrics: %s", err)
+			}
+		}
+
+		go func() {
+			defer close(done)
+			ticker := time.NewTicker(1 * time.Second)
+			defer ticker.Stop()
+
+			for {
+				select {
+				case <-ticker.C:
+					dumpMetrics()
+				case <-stop:
+					dumpMetrics()
+					return
+				}
+			}
+		}()
+
+		finalize := func() {
+			logger.Debug("Final metric dump...")
+			close(stop)
+			<-done
+			logger.Debug("Done!")
+		}
+
+		return finalize
+	}
+}
 
 // TODO: a whole lot of cleanup, refactoring, error handling and hardening
 func getCmdAgent(gs *state.GlobalState) *cobra.Command { //nolint: funlen
@@ -41,6 +109,8 @@ func getCmdAgent(gs *state.GlobalState) *cobra.Command { //nolint: funlen
 		if err != nil {
 			return nil, nil, err
 		}
+
+		c.metricsEngineHook = getMetricsHook(gs.Ctx, resp.InstanceID, client, gs.Logger)
 
 		controller, err := distributed.NewAgentController(gs.Ctx, resp.InstanceID, client, gs.Logger)
 		if err != nil {
