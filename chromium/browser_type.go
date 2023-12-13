@@ -34,7 +34,6 @@ type BrowserType struct {
 	vu           k6modules.VU
 	hooks        *common.Hooks
 	k6Metrics    *k6ext.CustomMetrics
-	execPath     string // path to the Chromium executable
 	randSrc      *rand.Rand
 	envLookupper env.LookupFunc
 }
@@ -240,22 +239,26 @@ func (b *BrowserType) allocate(
 		return nil, err
 	}
 
-	path := opts.ExecutablePath
-	if path == "" {
-		path = b.ExecutablePath()
+	path, ok := ExecutablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
+	if !ok {
+		return nil, ErrChromeNotInstalled
 	}
 
 	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
 }
 
+// ErrChromeNotInstalled is returned when the Chrome executable is not found.
+var ErrChromeNotInstalled = errors.New("chromium is not installed on this system")
+
 // ExecutablePath returns the path where the extension expects to find the browser executable.
-func (b *BrowserType) ExecutablePath() (execPath string) {
-	if b.execPath != "" {
-		return b.execPath
+func ExecutablePath(
+	path string,
+	env env.LookupFunc,
+	lookPath func(file string) (string, error), // os.LookPath
+) (outPath string, ok bool) {
+	if strings.TrimSpace(path) != "" {
+		return path, true
 	}
-	defer func() {
-		b.execPath = execPath
-	}()
 
 	paths := []string{
 		// Unix-like
@@ -277,16 +280,17 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		"/Applications/Chromium.app/Contents/MacOS/Chromium",
 	}
-	if userProfile, ok := b.envLookupper("USERPROFILE"); ok {
+	if userProfile, ok := env("USERPROFILE"); ok {
 		paths = append(paths, filepath.Join(userProfile, `AppData\Local\Google\Chrome\Application\chrome.exe`))
 	}
 	for _, path := range paths {
-		if _, err := exec.LookPath(path); err == nil {
-			return path
+		if _, err := lookPath(path); err == nil {
+			return path, true
 		}
 	}
 
-	return ""
+	// still empty?
+	return "", false
 }
 
 // parseArgs parses command-line arguments and returns them.
