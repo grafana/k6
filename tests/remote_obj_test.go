@@ -98,18 +98,11 @@ func TestConsoleLogParse(t *testing.T) {
 				p.Evaluate(tb.toGojaValue(fmt.Sprintf("() => console.log(%s)", tt.log)))
 			}
 
-			var (
-				assertTO bool
-				testTO   = 2500 * time.Millisecond
-			)
-
 			select {
 			case <-done:
-			case <-time.After(testTO):
-				assertTO = true
+			case <-time.After(2500 * time.Millisecond):
+				assert.Fail(t, "test timed out before event handler was called")
 			}
-
-			assert.False(t, assertTO, "test timed out before event handlers were called")
 		})
 	}
 }
