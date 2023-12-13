@@ -144,6 +144,17 @@ func (me *MetricsEngine) markObserved(metric *metrics.Metric) {
 	if !metric.Observed {
 		metric.Observed = true
 		me.ObservedMetrics[metric.Name] = metric
+	} else {
+		// TODO: remove
+		//
+		// This is huge HACK to clean up the metrics from a previous test run,
+		// it will no longer be needed once this issue is resolved:
+		// https://github.com/grafana/k6/issues/572
+		if _, ok := me.ObservedMetrics[metric.Name]; ok {
+			return // from this run, not a problem
+		}
+		_, _ = metric.Sink.Drain()
+		me.ObservedMetrics[metric.Name] = metric
 	}
 }
 

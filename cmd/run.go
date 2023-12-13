@@ -42,9 +42,9 @@ type cmdsRunAndAgent struct {
 	gs *state.GlobalState
 
 	// TODO: figure out something more elegant?
-	loadConfiguredTest func(cmd *cobra.Command, args []string) (*loadedAndConfiguredTest, execution.Controller, error)
-	metricsEngineHook  func(*engine.MetricsEngine) func()
-	testEndHook        func(err error)
+	loadConfiguredTests func(cmd *cobra.Command, args []string) ([]*loadedAndConfiguredTest, execution.Controller, error)
+	metricsEngineHook   func(*engine.MetricsEngine) func()
+	testEndHook         func(err error)
 }
 
 const (
@@ -62,20 +62,70 @@ const (
 // TODO: split apart some more
 //
 //nolint:funlen,gocognit,gocyclo,cyclop
-func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
+func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (runErr error) {
 	var logger logrus.FieldLogger = c.gs.Logger
 	defer func() {
-		if err == nil {
+		if runErr == nil {
 			logger.Debug("Everything has finished, exiting k6 normally!")
 		} else {
-			logger.WithError(err).Debug("Everything has finished, exiting k6 with an error!")
+			logger.WithError(runErr).Debug("Everything has finished, exiting k6 with an error!")
 		}
 		if c.testEndHook != nil {
-			c.testEndHook(err)
+			c.testEndHook(runErr)
 		}
 	}()
 	printBanner(c.gs)
 
+	// TODO: hadnle contexts, Ctrl+C, REST API and a lot of other things here
+
+	defer func() {
+		waitExitDone := c.emitEvent(c.gs.Ctx, &event.Event{
+			Type: event.Exit,
+			Data: &event.ExitData{Error: runErr},
+		})
+		waitExitDone()
+		c.gs.Events.UnsubscribeAll()
+	}()
+
+	tests, controller, err := c.loadConfiguredTests(cmd, args)
+	if err != nil {
+		return err
+	}
+
+	if err := execution.SignalAndWait(controller, "test-suite-start"); err != nil {
+		return err
+	}
+	defer func() {
+		runErr = execution.SignalErrorOrWait(controller, "test-suite-done", runErr)
+	}()
+	for i, test := range tests {
+		testName := fmt.Sprintf("%d", i) // TODO: something better but still unique
+		testController := execution.GetNamespacedController(testName, controller)
+
+		err := c.runTest(cmd, test, testController)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (c *cmdsRunAndAgent) emitEvent(ctx context.Context, evt *event.Event) func() {
+	waitDone := c.gs.Events.Emit(evt)
+	return func() {
+		waitCtx, waitCancel := context.WithTimeout(ctx, waitEventDoneTimeout)
+		defer waitCancel()
+		if werr := waitDone(waitCtx); werr != nil {
+			c.gs.Logger.WithError(werr).Warn()
+		}
+	}
+}
+
+//nolint:funlen,gocognit,gocyclo,cyclop
+func (c *cmdsRunAndAgent) runTest(
+	cmd *cobra.Command, test *loadedAndConfiguredTest, controller execution.Controller,
+) (runErr error) {
+	var logger logrus.FieldLogger = c.gs.Logger
 	globalCtx, globalCancel := context.WithCancel(c.gs.Ctx)
 	defer globalCancel()
 
@@ -84,35 +134,18 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 	lingerCtx, lingerCancel := context.WithCancel(globalCtx)
 	defer lingerCancel()
 
+	if err := execution.SignalAndWait(controller, "test-start"); err != nil {
+		return err
+	}
+	defer func() {
+		runErr = execution.SignalErrorOrWait(controller, "test-done", runErr)
+	}()
+
 	// runCtx is used for the test run execution and is created with the special
 	// execution.NewTestRunContext() function so that it can be aborted even
 	// from sub-contexts while also attaching a reason for the abort.
 	runCtx, runAbort := execution.NewTestRunContext(lingerCtx, logger)
 
-	emitEvent := func(evt *event.Event) func() {
-		waitDone := c.gs.Events.Emit(evt)
-		return func() {
-			waitCtx, waitCancel := context.WithTimeout(globalCtx, waitEventDoneTimeout)
-			defer waitCancel()
-			if werr := waitDone(waitCtx); werr != nil {
-				logger.WithError(werr).Warn()
-			}
-		}
-	}
-
-	defer func() {
-		waitExitDone := emitEvent(&event.Event{
-			Type: event.Exit,
-			Data: &event.ExitData{Error: err},
-		})
-		waitExitDone()
-		c.gs.Events.UnsubscribeAll()
-	}()
-
-	test, controller, err := c.loadConfiguredTest(cmd, args)
-	if err != nil {
-		return err
-	}
 	if test.keyLogger != nil {
 		defer func() {
 			if klErr := test.keyLogger.Close(); klErr != nil {
@@ -121,7 +154,7 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
-	if err = c.setupTracerProvider(globalCtx, test); err != nil {
+	if err := c.setupTracerProvider(globalCtx, test); err != nil {
 		return err
 	}
 	waitTracesFlushed := func() {
@@ -218,7 +251,7 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 		}()
 	}
 
-	waitInitDone := emitEvent(&event.Event{Type: event.Init})
+	waitInitDone := c.emitEvent(globalCtx, &event.Event{Type: event.Init})
 
 	// Create and start the outputs. We do it quite early to get any output URLs
 	// or other details below. It also allows us to ensure when they have
@@ -271,7 +304,7 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 				), errext.AbortedByThresholdsAfterTestEnd)
 
 			if err == nil {
-				err = tErr
+				runErr = tErr
 			} else {
 				logger.WithError(tErr).Debug("Crossed thresholds, but test already exited with another error")
 			}
@@ -353,7 +386,7 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 	}
 
 	printExecutionDescription(
-		c.gs, "local", args[0], "", conf, executionState.ExecutionTuple, executionPlan, outputs,
+		c.gs, "local", test.sourceRootPath, "", conf, executionState.ExecutionTuple, executionPlan, outputs,
 	)
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.
@@ -401,14 +434,14 @@ func (c *cmdsRunAndAgent) run(cmd *cobra.Command, args []string) (err error) {
 
 	waitInitDone()
 
-	waitTestStartDone := emitEvent(&event.Event{Type: event.TestStart})
+	waitTestStartDone := c.emitEvent(globalCtx, &event.Event{Type: event.TestStart})
 	waitTestStartDone()
 
 	// Start the test! However, we won't immediately return if there was an
 	// error, we still have things to do.
 	err = execScheduler.Run(globalCtx, runCtx, samples)
 
-	waitTestEndDone := emitEvent(&event.Event{Type: event.TestEnd})
+	waitTestEndDone := c.emitEvent(globalCtx, &event.Event{Type: event.TestEnd})
 	defer waitTestEndDone()
 
 	// Init has passed successfully, so unless disabled, make sure we send a
@@ -473,9 +506,11 @@ func (c *cmdsRunAndAgent) setupTracerProvider(ctx context.Context, test *loadedA
 func getCmdRun(gs *state.GlobalState) *cobra.Command {
 	c := &cmdsRunAndAgent{
 		gs: gs,
-		loadConfiguredTest: func(cmd *cobra.Command, args []string) (*loadedAndConfiguredTest, execution.Controller, error) {
-			test, err := loadAndConfigureLocalTest(gs, cmd, args, getConfig)
-			return test, local.NewController(), err
+		loadConfiguredTests: func(cmd *cobra.Command, args []string) (
+			[]*loadedAndConfiguredTest, execution.Controller, error,
+		) {
+			tests, err := loadAndConfigureLocalTests(gs, cmd, args, getConfig)
+			return tests, local.NewController(), err
 		},
 	}
 
@@ -506,7 +541,6 @@ func getCmdRun(gs *state.GlobalState) *cobra.Command {
 This also exposes a REST API to interact with it. Various k6 subcommands offer
 a commandline interface for interacting with it.`,
 		Example: exampleText,
-		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
 		RunE:    c.run,
 	}
 

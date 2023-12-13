@@ -419,6 +419,7 @@ func (e *Scheduler) Init(
 func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) (runErr error) {
 	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-run")
 
+	e.initProgress.Modify(pb.WithConstProgress(0, "Waiting to start..."))
 	if err := SignalAndWait(e.controller, "scheduler-run-start"); err != nil {
 		return err
 	}

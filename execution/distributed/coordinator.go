@@ -5,6 +5,8 @@ import (
 	context "context"
 	"encoding/json"
 	"fmt"
+	"path/filepath"
+	"strconv"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -14,57 +16,67 @@ import (
 	"go.k6.io/k6/metrics/engine"
 )
 
+type test struct {
+	archive     *lib.Archive
+	archiveData []byte
+	ess         lib.ExecutionSegmentSequence
+}
+
 // CoordinatorServer coordinates multiple k6 agents.
 //
 // TODO: something more robust and polished...
 type CoordinatorServer struct {
 	UnimplementedDistributedTestServer
 	instanceCount int
-	test          *lib.Archive
 	logger        logrus.FieldLogger
 	metricsEngine *engine.MetricsEngine
+
+	tests []test
 
 	testStartTimeLock sync.Mutex
 	testStartTime     *time.Time
 
 	cc              *coordinatorController
 	currentInstance int32 // TODO: something a bit better, support full execution plans from JSON?
-	ess             lib.ExecutionSegmentSequence
-	archive         []byte
 	wg              *sync.WaitGroup
 }
 
 // NewCoordinatorServer initializes and returns a new CoordinatorServer.
 func NewCoordinatorServer(
-	instanceCount int, test *lib.Archive, metricsEngine *engine.MetricsEngine, logger logrus.FieldLogger,
+	instanceCount int, testArchives []*lib.Archive, metricsEngine *engine.MetricsEngine, logger logrus.FieldLogger,
 ) (*CoordinatorServer, error) {
-	segments, err := test.Options.ExecutionSegment.Split(int64(instanceCount))
-	if err != nil {
-		return nil, err
-	}
-	ess, err := lib.NewExecutionSegmentSequence(segments...)
-	if err != nil {
-		return nil, err
+	tests := make([]test, len(testArchives))
+	for i, testArchive := range testArchives {
+		segments, err := testArchive.Options.ExecutionSegment.Split(int64(instanceCount))
+		if err != nil {
+			return nil, err
+		}
+		ess, err := lib.NewExecutionSegmentSequence(segments...)
+		if err != nil {
+			return nil, err
+		}
+		buf := &bytes.Buffer{}
+		if err = testArchive.Write(buf); err != nil {
+			return nil, err
+		}
+		tests[i] = test{
+			ess:         ess,
+			archive:     testArchive,
+			archiveData: buf.Bytes(),
+		}
 	}
 
 	// TODO: figure out some way to add metrics from the instance to the metricsEngine
-
-	buf := &bytes.Buffer{}
-	if err = test.Write(buf); err != nil {
-		return nil, err
-	}
 
 	wg := &sync.WaitGroup{}
 	wg.Add(instanceCount)
 
 	cs := &CoordinatorServer{
 		instanceCount: instanceCount,
-		test:          test,
+		tests:         tests,
 		metricsEngine: metricsEngine,
 		logger:        logger,
-		ess:           ess,
 		cc:            newCoordinatorController(instanceCount, logger),
-		archive:       buf.Bytes(),
 		wg:            wg,
 	}
 
@@ -74,25 +86,31 @@ func NewCoordinatorServer(
 }
 
 func (cs *CoordinatorServer) monitorProgress() {
-	wg := cs.cc.getSignalWG("test-start") // TODO: use constant when we refactor scheduler.go
+	wg := cs.cc.getSignalWG("test-suite-start") // TODO: use constant when we refactor scheduler.go
 	wg.Wait()
-	cs.logger.Info("All instances ready to start initializing VUs...")
+	cs.logger.Info("All instances ready!")
 
-	wg = cs.cc.getSignalWG("test-ready-to-run-setup") // TODO: use constant when we refactor scheduler.go
-	wg.Wait()
-	cs.logger.Info("VUs initialized, setup()...")
-	cs.testStartTimeLock.Lock()
-	t := time.Now()
-	cs.testStartTime = &t
-	cs.testStartTimeLock.Unlock()
+	for i, test := range cs.tests {
+		testName := fmt.Sprintf("%d", i)
+		wg = cs.cc.getSignalWG(testName + "/test-start") // TODO: use constant when we refactor scheduler.go
+		wg.Wait()
+		cs.logger.Infof("Test %d (%s) started...", i+1, filepath.Base(test.archive.FilenameURL.Path))
 
-	wg = cs.cc.getSignalWG("setup-done") // TODO: use constant when we refactor scheduler.go
-	wg.Wait()
-	cs.logger.Info("setup() done, starting test!")
+		cs.testStartTimeLock.Lock()
+		if cs.testStartTime == nil {
+			t := time.Now()
+			cs.testStartTime = &t
+		}
+		cs.testStartTimeLock.Unlock()
 
-	wg = cs.cc.getSignalWG("test-done") // TODO: use constant when we refactor scheduler.go
+		wg = cs.cc.getSignalWG(testName + "/test-done") // TODO: use constant when we refactor scheduler.go
+		wg.Wait()
+		cs.logger.Infof("Test %d (%s) ended!", i+1, filepath.Base(test.archive.FilenameURL.Path))
+	}
+
+	wg = cs.cc.getSignalWG("test-suite-done") // TODO: use constant when we refactor scheduler.go
 	wg.Wait()
-	cs.logger.Info("Instances finished with the test")
+	cs.logger.Info("Instances finished with the test suite")
 }
 
 // GetCurrentTestRunDuration returns how long the current test has been running.
@@ -115,18 +133,32 @@ func (cs *CoordinatorServer) Register(context.Context, *RegisterRequest) (*Regis
 	}
 	cs.logger.Infof("Instance %d of %d connected!", instanceID, cs.instanceCount)
 
-	instanceOptions := cs.test.Options
-	instanceOptions.ExecutionSegment = cs.ess[instanceID-1]
-	instanceOptions.ExecutionSegmentSequence = &cs.ess
-	options, err := json.Marshal(instanceOptions)
-	if err != nil {
-		return nil, err
+	instanceTests := make([]*Test, len(cs.tests))
+	for i, test := range cs.tests {
+		opts := test.archive.Options
+		opts.ExecutionSegment = test.ess[instanceID-1]
+		opts.ExecutionSegmentSequence = &test.ess //nolint: gosec
+
+		if opts.RunTags == nil {
+			opts.RunTags = make(map[string]string)
+		}
+		opts.RunTags["test_id"] = test.archive.Filename
+		opts.RunTags["instance_id"] = strconv.Itoa(int(instanceID))
+
+		jsonOpts, err := json.Marshal(opts)
+		if err != nil {
+			return nil, err
+		}
+
+		instanceTests[i] = &Test{
+			Archive: test.archiveData,
+			Options: jsonOpts,
+		}
 	}
 
 	return &RegisterResponse{
 		InstanceID: uint32(instanceID),
-		Archive:    cs.archive,
-		Options:    options,
+		Tests:      instanceTests,
 	}, nil
 }
 

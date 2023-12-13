@@ -19,9 +19,14 @@ func getCmdInspect(gs *state.GlobalState) *cobra.Command {
 		Use:   "inspect [file]",
 		Short: "Inspect a script or archive",
 		Long:  `Inspect a script or archive.`,
-		Args:  cobra.ExactArgs(1),
+		Args:  cobra.ExactArgs(1), // TODO: remove and support test suites?
 		RunE: func(cmd *cobra.Command, args []string) error {
-			test, err := loadLocalTest(gs, cmd, args)
+			preInitState, err := getPreInitState(gs, cmd)
+			if err != nil {
+				return err
+			}
+
+			test, err := loadLocalTest(gs, preInitState, args[0])
 			if err != nil {
 				return err
 			}

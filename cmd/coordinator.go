@@ -28,35 +28,52 @@ type cmdCoordinator struct {
 func (c *cmdCoordinator) run(cmd *cobra.Command, args []string) (err error) { //nolint: funlen
 	ctx, runAbort := execution.NewTestRunContext(c.gs.Ctx, c.gs.Logger)
 
-	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
+	tests, err := loadAndConfigureLocalTests(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
 	}
 
-	// Only consolidated options, not derived
-	testRunState, err := test.buildTestRunState(test.consolidatedConfig.Options)
+	// TODO: refactor at some point, this limits us to handleSummary() from the first test
+	firstTest := tests[0]
+	// TODO: refactor - this is safe, preInitState is the same for all tests,
+	// but it's still icky to get it that way
+	preInitState := firstTest.preInitState
+	metricsEngine, err := engine.NewMetricsEngine(preInitState.Registry, c.gs.Logger)
 	if err != nil {
 		return err
 	}
 
-	metricsEngine, err := engine.NewMetricsEngine(testRunState.Registry, c.gs.Logger)
-	if err != nil {
-		return err
+	testArchives := make([]*lib.Archive, len(tests))
+	for i, test := range tests {
+		runState, rsErr := test.buildTestRunState(test.consolidatedConfig.Options)
+		if rsErr != nil {
+			return rsErr
+		}
+
+		// We get the thresholds from all tests
+		testArchives[i] = runState.Runner.MakeArchive()
+		err = metricsEngine.InitSubMetricsAndThresholds(
+			test.derivedConfig.Options,
+			preInitState.RuntimeOptions.NoThresholds.Bool,
+		)
+		if err != nil {
+			return err
+		}
 	}
 
 	coordinator, err := distributed.NewCoordinatorServer(
-		c.instanceCount, test.initRunner.MakeArchive(), metricsEngine, c.gs.Logger,
+		c.instanceCount, testArchives, metricsEngine, c.gs.Logger,
 	)
 	if err != nil {
 		return err
 	}
 
-	if !testRunState.RuntimeOptions.NoSummary.Bool {
+	if !preInitState.RuntimeOptions.NoSummary.Bool {
 		defer func() {
 			c.gs.Logger.Debug("Generating the end-of-test summary...")
-			summaryResult, serr := test.initRunner.HandleSummary(ctx, &lib.Summary{
+			summaryResult, serr := firstTest.initRunner.HandleSummary(ctx, &lib.Summary{
 				Metrics:         metricsEngine.ObservedMetrics,
-				RootGroup:       test.initRunner.GetDefaultGroup(),
+				RootGroup:       firstTest.initRunner.GetDefaultGroup(),
 				TestRunDuration: coordinator.GetCurrentTestRunDuration(),
 				NoColor:         c.gs.Flags.NoColor,
 				UIState: lib.UIState{
@@ -73,7 +90,7 @@ func (c *cmdCoordinator) run(cmd *cobra.Command, args []string) (err error) { //
 		}()
 	}
 
-	if !testRunState.RuntimeOptions.NoThresholds.Bool {
+	if !preInitState.RuntimeOptions.NoThresholds.Bool {
 		getCurrentTestDuration := coordinator.GetCurrentTestRunDuration
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(nil, runAbort, getCurrentTestDuration)
 

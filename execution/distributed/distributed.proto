@@ -16,8 +16,12 @@ service DistributedTest {
 message RegisterRequest {}
 message RegisterResponse {
   uint32 instanceID = 1;
-  bytes archive = 2; // TODO: send this with a `stream` of bytes chunks
-  bytes options = 3;
+  repeated Test tests = 2;
+}
+
+message Test {
+  bytes archive = 1; // TODO: send this with a `stream` of bytes chunks
+  bytes options = 2;
 }
 
 message AgentMessage {

@@ -1,11 +1,12 @@
 package metrics
 
 import (
-	"encoding/json"
+	"bytes"
 	"fmt"
 	"math"
-	"sort"
 	"time"
+
+	"github.com/openhistogram/circonusllhist"
 )
 
 var (
@@ -159,89 +160,60 @@ func (g *GaugeSink) Merge(from []byte) error {
 
 // NewTrendSink makes a Trend sink with the OpenHistogram circllhist histogram.
 func NewTrendSink() *TrendSink {
-	return &TrendSink{}
+	return &TrendSink{
+		hist: circonusllhist.New(circonusllhist.NoLocks()),
+	}
 }
 
+// TrendSink uses the OpenHistogram circllhist histogram to store metrics data.
 type TrendSink struct {
-	values []float64
-	sorted bool
+	hist *circonusllhist.Histogram
+}
 
-	count    uint64
-	min, max float64
-	sum      float64
+func (t *TrendSink) nanToZero(val float64) float64 {
+	if math.IsNaN(val) {
+		return 0
+	}
+	return val
 }
 
 // IsEmpty indicates whether the TrendSink is empty.
-func (t *TrendSink) IsEmpty() bool { return t.count == 0 }
+func (t *TrendSink) IsEmpty() bool { return t.hist.Count() == 0 }
 
+// Add records the given sample value in the HDR histogram.
 func (t *TrendSink) Add(s Sample) {
-	if t.count == 0 {
-		t.max, t.min = s.Value, s.Value
-	} else {
-		if s.Value > t.max {
-			t.max = s.Value
-		}
-		if s.Value < t.min {
-			t.min = s.Value
-		}
-	}
-
-	t.values = append(t.values, s.Value)
-	t.sorted = false
-	t.count++
-	t.sum += s.Value
+	// TODO: handle the error, log something when there's an error
+	_ = t.hist.RecordValue(s.Value)
 }
 
-// P calculates the given percentile from sink values.
-func (t *TrendSink) P(pct float64) float64 {
-	switch t.count {
-	case 0:
-		return 0
-	case 1:
-		return t.values[0]
-	default:
-		if !t.sorted {
-			sort.Float64s(t.values)
-			t.sorted = true
-		}
-
-		// If percentile falls on a value in Values slice, we return that value.
-		// If percentile does not fall on a value in Values slice, we calculate (linear interpolation)
-		// the value that would fall at percentile, given the values above and below that percentile.
-		i := pct * (float64(t.count) - 1.0)
-		j := t.values[int(math.Floor(i))]
-		k := t.values[int(math.Ceil(i))]
-		f := i - math.Floor(i)
-		return j + (k-j)*f
-	}
-}
-
-// Min returns the minimum value.
+// Min returns the approximate minimum value from the histogram.
 func (t *TrendSink) Min() float64 {
-	return t.min
+	return t.nanToZero(t.hist.Min())
 }
 
-// Max returns the maximum value.
+// Max returns the approximate maximum value from the histogram.
 func (t *TrendSink) Max() float64 {
-	return t.max
+	return t.nanToZero(t.hist.Max())
 }
 
 // Count returns the number of recorded values.
 func (t *TrendSink) Count() uint64 {
-	return t.count
+	return t.hist.Count()
 }
 
-// Avg returns the average (i.e. mean) value.
+// Avg returns the approximate average (i.e. mean) value from the histogram.
 func (t *TrendSink) Avg() float64 {
-	if t.count > 0 {
-		return t.sum / float64(t.count)
-	}
-	return 0
+	return t.nanToZero(t.hist.ApproxMean())
 }
 
-// Total returns the total (i.e. "sum") value for all measurements.
+// Total returns the approximate total (i.e. "sum") value for all measurements.
 func (t *TrendSink) Total() float64 {
-	return t.sum
+	return t.nanToZero(t.hist.ApproxSum())
+}
+
+// P calculates the given percentile from sink values.
+func (t *TrendSink) P(pct float64) float64 {
+	return t.nanToZero(t.hist.ValueAtQuantile(pct))
 }
 
 func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
@@ -257,25 +229,27 @@ func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
 }
 
 // Drain encodes the current sink values and clears them.
-//
-// TODO: obviously use something more efficient (e.g. protobuf)
 func (t *TrendSink) Drain() ([]byte, error) {
-	res, err := json.Marshal(t.values)
-	*t = TrendSink{}
-	return res, err
+	b := &bytes.Buffer{} // TODO: reuse buffers?
+	if err := t.hist.Serialize(b); err != nil {
+		return nil, err
+	}
+	t.hist.Reset()
+	return b.Bytes(), nil
 }
 
 // Merge decoeds the given values and merges them with the values in the current sink.
 func (t *TrendSink) Merge(from []byte) error {
-	// TODO: obviously use something more efficient (e.g. protobuf), this is
-	// just for demo purposes
-	var values []float64
-	if err := json.Unmarshal(from, &values); err != nil {
+	b := bytes.NewBuffer(from)
+
+	hist, err := circonusllhist.DeserializeWithOptions(
+		b, circonusllhist.NoLocks(), // TODO: investigate circonusllhist.NoLookup
+	)
+	if err != nil {
 		return err
 	}
-	for _, v := range values {
-		t.Add(Sample{Value: v})
-	}
+
+	t.hist.Merge(hist)
 	return nil
 }
 

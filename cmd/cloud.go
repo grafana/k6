@@ -84,7 +84,11 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	)
 	printBar(c.gs, progressBar)
 
-	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
+	preInitState, err := getPreInitState(c.gs, cmd)
+	if err != nil {
+		return err
+	}
+	test, err := loadAndConfigureLocalTest(c.gs, preInitState, cmd, args[0], getPartialConfig)
 	if err != nil {
 		return err
 	}
