@@ -60,6 +60,7 @@ func Link(parsed parser.Result, dependencies Files, symbols *Symbols, handler *r
 	}
 
 	r := &result{
+		FileDescriptor:       noOpFile,
 		Result:               parsed,
 		deps:                 dependencies,
 		descriptors:          map[string]protoreflect.Descriptor{},
@@ -131,8 +132,8 @@ type Result interface {
 	// will be serialized in a canonical way. The "canonical" way matches
 	// the way that "protoc" emits option values, which is a way that
 	// mostly matches the way options are defined in source, including
-	// ordering and de-structuring. Unlike the FileDescriptorProto() method, this
-	// method is more expensive and results in a new descriptor proto
+	// ordering and de-structuring. Unlike the FileDescriptorProto() method,
+	// this method is more expensive and results in a new descriptor proto
 	// being constructed with each call.
 	//
 	// The returned value will have all options (fields of the various
@@ -140,6 +141,15 @@ type Result interface {
 	// fields. So the returned value will serialize as desired, but it
 	// is otherwise not useful since all option values are treated as
 	// unknown.
+	//
+	// Note that CanonicalProto is a no-op if the options in this file
+	// were not interpreted by this module (e.g. the underlying descriptor
+	// proto was provided, with options already interpreted, instead of
+	// parsed from source). If the underlying descriptor proto was provided,
+	// but with a mix of interpreted and uninterpreted options, this method
+	// will effectively clear the already-interpreted fields and only the
+	// options actually interpreted by the compile operation will be
+	// retained.
 	CanonicalProto() *descriptorpb.FileDescriptorProto
 
 	// RemoveAST drops the AST information from this result.

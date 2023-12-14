@@ -113,6 +113,7 @@ func newLexer(in io.Reader, filename string, handler *reporter.Handler) (*protoL
 
 var keywords = map[string]int{
 	"syntax":     _SYNTAX,
+	"edition":    _EDITION,
 	"import":     _IMPORT,
 	"weak":       _WEAK,
 	"public":     _PUBLIC,
@@ -741,7 +742,8 @@ func (l *protoLex) skipToEndOfBlockComment(lval *protoSymType) (ok, hasErr bool)
 func (l *protoLex) addSourceError(err error) (reporter.ErrorWithPos, bool) {
 	ewp, ok := err.(reporter.ErrorWithPos)
 	if !ok {
-		ewp = reporter.Error(l.prev(), err)
+		// TODO: Store the previous span instead of just the position.
+		ewp = reporter.Error(ast.NewSourceSpan(l.prev(), l.prev()), err)
 	}
 	handlerErr := l.handler.HandleError(ewp)
 	return ewp, handlerErr == nil
@@ -751,10 +753,19 @@ func (l *protoLex) Error(s string) {
 	_, _ = l.addSourceError(errors.New(s))
 }
 
+// TODO: Accept both a start and end offset, and use that to create a span.
 func (l *protoLex) errWithCurrentPos(err error, offset int) reporter.ErrorWithPos {
 	if ewp, ok := err.(reporter.ErrorWithPos); ok {
 		return ewp
 	}
 	pos := l.info.SourcePos(l.input.offset() + offset)
-	return reporter.Error(pos, err)
+	return reporter.Error(ast.NewSourceSpan(pos, pos), err)
+}
+
+func (l *protoLex) requireSemicolon(semicolons []*ast.RuneNode) (*ast.RuneNode, []*ast.RuneNode) {
+	if len(semicolons) == 0 {
+		l.Error("expected ';'")
+		return nil, nil
+	}
+	return semicolons[0], semicolons[1:]
 }

@@ -23,7 +23,7 @@ import (
 	"google.golang.org/protobuf/reflect/protoregistry"
 )
 
-// Unmarshal reads the given []byte into the given proto.Message.
+// Unmarshal reads the given []byte into the given [proto.Message].
 // The provided message must be mutable (e.g., a non-nil pointer to a message).
 func Unmarshal(b []byte, m proto.Message) error {
 	return UnmarshalOptions{}.Unmarshal(b, m)
@@ -37,7 +37,7 @@ type UnmarshalOptions struct {
 	// required fields will not return an error.
 	AllowPartial bool
 
-	// If DiscardUnknown is set, unknown fields are ignored.
+	// If DiscardUnknown is set, unknown fields and enum name values are ignored.
 	DiscardUnknown bool
 
 	// Resolver is used for looking up types when unmarshaling
@@ -49,7 +49,7 @@ type UnmarshalOptions struct {
 	}
 }
 
-// Unmarshal reads the given []byte and populates the given proto.Message
+// Unmarshal reads the given []byte and populates the given [proto.Message]
 // using options in the UnmarshalOptions object.
 // It will clear the message first before setting the fields.
 // If it returns an error, the given message may be partially set.
@@ -266,7 +266,9 @@ func (d decoder) unmarshalSingular(m protoreflect.Message, fd protoreflect.Field
 	if err != nil {
 		return err
 	}
-	m.Set(fd, val)
+	if val.IsValid() {
+		m.Set(fd, val)
+	}
 	return nil
 }
 
@@ -329,7 +331,7 @@ func (d decoder) unmarshalScalar(fd protoreflect.FieldDescriptor) (protoreflect.
 		}
 
 	case protoreflect.EnumKind:
-		if v, ok := unmarshalEnum(tok, fd); ok {
+		if v, ok := unmarshalEnum(tok, fd, d.opts.DiscardUnknown); ok {
 			return v, nil
 		}
 
@@ -474,13 +476,16 @@ func unmarshalBytes(tok json.Token) (protoreflect.Value, bool) {
 	return protoreflect.ValueOfBytes(b), true
 }
 
-func unmarshalEnum(tok json.Token, fd protoreflect.FieldDescriptor) (protoreflect.Value, bool) {
+func unmarshalEnum(tok json.Token, fd protoreflect.FieldDescriptor, discardUnknown bool) (protoreflect.Value, bool) {
 	switch tok.Kind() {
 	case json.String:
 		// Lookup EnumNumber based on name.
 		s := tok.ParsedString()
 		if enumVal := fd.Enum().Values().ByName(protoreflect.Name(s)); enumVal != nil {
 			return protoreflect.ValueOfEnum(enumVal.Number()), true
+		}
+		if discardUnknown {
+			return protoreflect.Value{}, true
 		}
 
 	case json.Number:
@@ -542,7 +547,9 @@ func (d decoder) unmarshalList(list protoreflect.List, fd protoreflect.FieldDesc
 			if err != nil {
 				return err
 			}
-			list.Append(val)
+			if val.IsValid() {
+				list.Append(val)
+			}
 		}
 	}
 
@@ -609,8 +616,9 @@ Loop:
 		if err != nil {
 			return err
 		}
-
-		mmap.Set(pkey, pval)
+		if pval.IsValid() {
+			mmap.Set(pkey, pval)
+		}
 	}
 
 	return nil

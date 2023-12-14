@@ -71,10 +71,13 @@ func NewOptionNode(keyword *KeywordNode, name *OptionNameNode, equals *RuneNode,
 	if val == nil {
 		panic("val is nil")
 	}
+	var children []Node
 	if semicolon == nil {
-		panic("semicolon is nil")
+		children = []Node{keyword, name, equals, val}
+	} else {
+		children = []Node{keyword, name, equals, val, semicolon}
 	}
-	children := []Node{keyword, name, equals, val, semicolon}
+
 	return &OptionNode{
 		compositeNode: compositeNode{
 			children: children,
@@ -97,13 +100,18 @@ func NewCompactOptionNode(name *OptionNameNode, equals *RuneNode, val ValueNode)
 	if name == nil {
 		panic("name is nil")
 	}
-	if equals == nil {
-		panic("equals is nil")
+	if equals == nil && val != nil {
+		panic("equals is nil but val is not")
 	}
-	if val == nil {
-		panic("val is nil")
+	if val == nil && equals != nil {
+		panic("val is nil but equals is not")
 	}
-	children := []Node{name, equals, val}
+	var children []Node
+	if equals == nil && val == nil {
+		children = []Node{name}
+	} else {
+		children = []Node{name, equals, val}
+	}
 	return &OptionNode{
 		compositeNode: compositeNode{
 			children: children,
@@ -332,10 +340,10 @@ func NewCompactOptionsNode(openBracket *RuneNode, opts []*OptionNode, commas []*
 	if closeBracket == nil {
 		panic("closeBracket is nil")
 	}
-	if len(opts) == 0 {
-		panic("must have at least one part")
+	if len(opts) == 0 && len(commas) != 0 {
+		panic("opts is empty but commas is not")
 	}
-	if len(commas) != len(opts)-1 {
+	if len(opts) > 0 && len(commas) != len(opts)-1 {
 		panic(fmt.Sprintf("%d opts requires %d commas, not %d", len(opts), len(opts)-1, len(commas)))
 	}
 	children := make([]Node, 0, len(opts)*2+1)

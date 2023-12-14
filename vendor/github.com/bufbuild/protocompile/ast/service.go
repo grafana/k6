@@ -141,10 +141,12 @@ func NewRPCNode(keyword *KeywordNode, name *IdentNode, input *RPCTypeNode, retur
 	if output == nil {
 		panic("output is nil")
 	}
+	var children []Node
 	if semicolon == nil {
-		panic("semicolon is nil")
+		children = []Node{keyword, name, input, returns, output}
+	} else {
+		children = []Node{keyword, name, input, returns, output, semicolon}
 	}
-	children := []Node{keyword, name, input, returns, output, semicolon}
 	return &RPCNode{
 		compositeNode: compositeNode{
 			children: children,

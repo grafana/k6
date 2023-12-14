@@ -139,6 +139,9 @@ func generateSourceInfoForFile(opts OptionIndex, sci *sourceCodeInfo, file *ast.
 	if file.Syntax != nil {
 		sci.newLocWithComments(file.Syntax, append(path, internal.FileSyntaxTag))
 	}
+	if file.Edition != nil {
+		sci.newLocWithComments(file.Edition, append(path, internal.FileEditionTag))
+	}
 
 	var depIndex, pubDepIndex, weakDepIndex, optIndex, msgIndex, enumIndex, extendIndex, svcIndex int32
 

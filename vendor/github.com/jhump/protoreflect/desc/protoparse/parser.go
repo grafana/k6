@@ -147,11 +147,11 @@ func (p Parser) ParseFiles(filenames ...string) ([]*desc.FileDescriptor, error) 
 		srcInfoMode = protocompile.SourceInfoExtraComments
 	}
 	rep := newReporter(p.ErrorReporter, p.WarningReporter)
-	res, srcPosAddr := p.getResolver(filenames)
+	res, srcSpanAddr := p.getResolver(filenames)
 
 	if p.InferImportPaths {
 		// we must first compile everything to protos
-		results, err := parseToProtosRecursive(res, filenames, reporter.NewHandler(rep), srcPosAddr)
+		results, err := parseToProtosRecursive(res, filenames, reporter.NewHandler(rep), srcSpanAddr)
 		if err != nil {
 			return nil, err
 		}
@@ -375,17 +375,17 @@ func parseToProtos(res protocompile.Resolver, filenames []string, rep *reporter.
 	return results, nil
 }
 
-func parseToProtosRecursive(res protocompile.Resolver, filenames []string, rep *reporter.Handler, srcPosAddr *SourcePos) (map[string]parser.Result, error) {
+func parseToProtosRecursive(res protocompile.Resolver, filenames []string, rep *reporter.Handler, srcSpanAddr *ast2.SourceSpan) (map[string]parser.Result, error) {
 	results := make(map[string]parser.Result, len(filenames))
 	for _, filename := range filenames {
-		if err := parseToProtoRecursive(res, filename, rep, srcPosAddr, results); err != nil {
+		if err := parseToProtoRecursive(res, filename, rep, srcSpanAddr, results); err != nil {
 			return results, err
 		}
 	}
 	return results, rep.Error()
 }
 
-func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *reporter.Handler, srcPosAddr *SourcePos, results map[string]parser.Result) error {
+func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *reporter.Handler, srcSpanAddr *ast2.SourceSpan, results map[string]parser.Result) error {
 	if _, ok := results[filename]; ok {
 		// already processed this one
 		return nil
@@ -412,13 +412,13 @@ func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *repo
 				continue
 			}
 			err := func() error {
-				orig := *srcPosAddr
-				*srcPosAddr = astRoot.NodeInfo(imp.Name).Start()
+				orig := *srcSpanAddr
+				*srcSpanAddr = astRoot.NodeInfo(imp.Name)
 				defer func() {
-					*srcPosAddr = orig
+					*srcSpanAddr = orig
 				}()
 
-				return parseToProtoRecursive(res, imp.Name.AsString(), rep, srcPosAddr, results)
+				return parseToProtoRecursive(res, imp.Name.AsString(), rep, srcSpanAddr, results)
 			}()
 			if err != nil {
 				return err
@@ -433,27 +433,42 @@ func parseToProtoRecursive(res protocompile.Resolver, filename string, rep *repo
 	for i, dep := range fd.Dependency {
 		path := []int32{internal.File_dependencyTag, int32(i)}
 		err := func() error {
-			orig := *srcPosAddr
+			orig := *srcSpanAddr
 			found := false
 			for _, loc := range fd.GetSourceCodeInfo().GetLocation() {
 				if pathsEqual(loc.Path, path) {
-					*srcPosAddr = SourcePos{
+					start := SourcePos{
 						Filename: dep,
 						Line:     int(loc.Span[0]),
 						Col:      int(loc.Span[1]),
 					}
+					var end SourcePos
+					if len(loc.Span) > 3 {
+						end = SourcePos{
+							Filename: dep,
+							Line:     int(loc.Span[2]),
+							Col:      int(loc.Span[3]),
+						}
+					} else {
+						end = SourcePos{
+							Filename: dep,
+							Line:     int(loc.Span[0]),
+							Col:      int(loc.Span[2]),
+						}
+					}
+					*srcSpanAddr = ast2.NewSourceSpan(start, end)
 					found = true
 					break
 				}
 			}
 			if !found {
-				*srcPosAddr = *ast.UnknownPos(dep)
+				*srcSpanAddr = ast2.UnknownSpan(dep)
 			}
 			defer func() {
-				*srcPosAddr = orig
+				*srcSpanAddr = orig
 			}()
 
-			return parseToProtoRecursive(res, dep, rep, srcPosAddr, results)
+			return parseToProtoRecursive(res, dep, rep, srcSpanAddr, results)
 		}()
 		if err != nil {
 			return err
@@ -496,8 +511,8 @@ func newReporter(errRep ErrorReporter, warnRep WarningReporter) reporter.Reporte
 	return reporter.NewReporter(errRep, warnRep)
 }
 
-func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *SourcePos) {
-	var srcPos SourcePos
+func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *ast2.SourceSpan) {
+	var srcSpan ast2.SourceSpan
 	accessor := p.Accessor
 	if accessor == nil {
 		accessor = func(name string) (io.ReadCloser, error) {
@@ -512,8 +527,8 @@ func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *SourceP
 					// errors that don't include the filename that failed are no bueno
 					err = errorWithFilename{filename: filename, underlying: err}
 				}
-				if srcPos.Filename != "" {
-					err = reporter.Error(srcPos, err)
+				if srcSpan != nil {
+					err = reporter.Error(srcSpan, err)
 				}
 			}
 			return in, err
@@ -552,7 +567,7 @@ func (p Parser) getResolver(filenames []string) (protocompile.Resolver, *SourceP
 			}
 			return backupResolver.FindFileByPath(path)
 		}),
-	}, &srcPos
+	}, &srcSpan
 }
 
 func fixupFilenames(protos map[string]parser.Result) (revisedProtos map[string]parser.Result, rewrittenPaths map[string]string) {

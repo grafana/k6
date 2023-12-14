@@ -32,7 +32,9 @@ func toStringValueNode(strs []*ast.StringLiteralNode) ast.StringValueNode {
 }
 
 type nameSlices struct {
+	// only names or idents will be set, never both
 	names  []ast.StringValueNode
+	idents []*ast.IdentNode
 	commas []*ast.RuneNode
 }
 
@@ -87,4 +89,114 @@ func (list *messageFieldList) toNodes() ([]*ast.MessageFieldNode, []*ast.RuneNod
 		}
 	}
 	return fields, delimiters
+}
+
+func newEmptyDeclNodes(semicolons []*ast.RuneNode) []*ast.EmptyDeclNode {
+	emptyDecls := make([]*ast.EmptyDeclNode, len(semicolons))
+	for i, semicolon := range semicolons {
+		emptyDecls[i] = ast.NewEmptyDeclNode(semicolon)
+	}
+	return emptyDecls
+}
+
+func newServiceElements(semicolons []*ast.RuneNode, elements []ast.ServiceElement) []ast.ServiceElement {
+	elems := make([]ast.ServiceElement, 0, len(semicolons)+len(elements))
+	for _, semicolon := range semicolons {
+		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
+	}
+	elems = append(elems, elements...)
+	return elems
+}
+
+func newMethodElements(semicolons []*ast.RuneNode, elements []ast.RPCElement) []ast.RPCElement {
+	elems := make([]ast.RPCElement, 0, len(semicolons)+len(elements))
+	for _, semicolon := range semicolons {
+		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
+	}
+	elems = append(elems, elements...)
+	return elems
+}
+
+func newFileElements(semicolons []*ast.RuneNode, elements []ast.FileElement) []ast.FileElement {
+	elems := make([]ast.FileElement, 0, len(semicolons)+len(elements))
+	for _, semicolon := range semicolons {
+		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
+	}
+	elems = append(elems, elements...)
+	return elems
+}
+
+func newEnumElements(semicolons []*ast.RuneNode, elements []ast.EnumElement) []ast.EnumElement {
+	elems := make([]ast.EnumElement, 0, len(semicolons)+len(elements))
+	for _, semicolon := range semicolons {
+		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
+	}
+	elems = append(elems, elements...)
+	return elems
+}
+
+func newMessageElements(semicolons []*ast.RuneNode, elements []ast.MessageElement) []ast.MessageElement {
+	elems := make([]ast.MessageElement, 0, len(semicolons)+len(elements))
+	for _, semicolon := range semicolons {
+		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
+	}
+	elems = append(elems, elements...)
+	return elems
+}
+
+type nodeWithEmptyDecls[T ast.Node] struct {
+	Node       T
+	EmptyDecls []*ast.EmptyDeclNode
+}
+
+func newNodeWithEmptyDecls[T ast.Node](node T, extraSemicolons []*ast.RuneNode) nodeWithEmptyDecls[T] {
+	return nodeWithEmptyDecls[T]{
+		Node:       node,
+		EmptyDecls: newEmptyDeclNodes(extraSemicolons),
+	}
+}
+
+func toServiceElements[T ast.ServiceElement](nodes nodeWithEmptyDecls[T]) []ast.ServiceElement {
+	elements := make([]ast.ServiceElement, 1+len(nodes.EmptyDecls))
+	elements[0] = nodes.Node
+	for i, emptyDecl := range nodes.EmptyDecls {
+		elements[i+1] = emptyDecl
+	}
+	return elements
+}
+
+func toMethodElements[T ast.RPCElement](nodes nodeWithEmptyDecls[T]) []ast.RPCElement {
+	elements := make([]ast.RPCElement, 1+len(nodes.EmptyDecls))
+	elements[0] = nodes.Node
+	for i, emptyDecl := range nodes.EmptyDecls {
+		elements[i+1] = emptyDecl
+	}
+	return elements
+}
+
+func toFileElements[T ast.FileElement](nodes nodeWithEmptyDecls[T]) []ast.FileElement {
+	elements := make([]ast.FileElement, 1+len(nodes.EmptyDecls))
+	elements[0] = nodes.Node
+	for i, emptyDecl := range nodes.EmptyDecls {
+		elements[i+1] = emptyDecl
+	}
+	return elements
+}
+
+func toEnumElements[T ast.EnumElement](nodes nodeWithEmptyDecls[T]) []ast.EnumElement {
+	elements := make([]ast.EnumElement, 1+len(nodes.EmptyDecls))
+	elements[0] = nodes.Node
+	for i, emptyDecl := range nodes.EmptyDecls {
+		elements[i+1] = emptyDecl
+	}
+	return elements
+}
+
+func toMessageElements[T ast.MessageElement](nodes nodeWithEmptyDecls[T]) []ast.MessageElement {
+	elements := make([]ast.MessageElement, 1+len(nodes.EmptyDecls))
+	elements[0] = nodes.Node
+	for i, emptyDecl := range nodes.EmptyDecls {
+		elements[i+1] = emptyDecl
+	}
+	return elements
 }

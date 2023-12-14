@@ -30,6 +30,10 @@ import (
 var pathElementType = reflect.TypeOf(protoreflect.SourcePath{}).Elem()
 
 func pathKey(p protoreflect.SourcePath) interface{} {
+	if p == nil {
+		// Reflection code below doesn't work with nil slices
+		return [0]int32{}
+	}
 	hdr := (*reflect.SliceHeader)(unsafe.Pointer(reflect.ValueOf(&p).Pointer()))
 	array := reflect.NewAt(reflect.ArrayOf(hdr.Len, pathElementType), unsafe.Pointer(hdr.Data))
 	return array.Elem().Interface()

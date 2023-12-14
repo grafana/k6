@@ -152,12 +152,12 @@ func (h *Handler) HandleError(err error) error {
 // If the handler has already aborted (by returning a non-nil error from a prior
 // call to HandleError or HandleErrorf), that same error is returned and the
 // given error is not reported.
-func (h *Handler) HandleErrorWithPos(pos ast.SourcePos, err error) error {
+func (h *Handler) HandleErrorWithPos(span ast.SourceSpan, err error) error {
 	if ewp, ok := err.(ErrorWithPos); ok {
 		// replace existing position with given one
-		err = errorWithSourcePos{pos: pos, underlying: ewp.Unwrap()}
+		err = errorWithSpan{SourceSpan: span, underlying: ewp.Unwrap()}
 	} else {
-		err = errorWithSourcePos{pos: pos, underlying: err}
+		err = errorWithSpan{SourceSpan: span, underlying: err}
 	}
 	return h.HandleError(err)
 }
@@ -168,8 +168,8 @@ func (h *Handler) HandleErrorWithPos(pos ast.SourcePos, err error) error {
 // If the handler has already aborted (by returning a non-nil error from a call
 // to HandleError or HandleErrorf), that same error is returned and the given
 // error is not reported.
-func (h *Handler) HandleErrorf(pos ast.SourcePos, format string, args ...interface{}) error {
-	return h.HandleError(Errorf(pos, format, args...))
+func (h *Handler) HandleErrorf(span ast.SourceSpan, format string, args ...interface{}) error {
+	return h.HandleError(Errorf(span, format, args...))
 }
 
 // HandleWarning handles the given warning. This will delegate to the handler's
@@ -190,21 +190,21 @@ func (h *Handler) HandleWarning(err ErrorWithPos) {
 
 // HandleWarningWithPos handles a warning with the given source position. This will
 // delegate to the handler's configured reporter.
-func (h *Handler) HandleWarningWithPos(pos ast.SourcePos, err error) {
+func (h *Handler) HandleWarningWithPos(span ast.SourceSpan, err error) {
 	ewp, ok := err.(ErrorWithPos)
 	if ok {
 		// replace existing position with given one
-		ewp = errorWithSourcePos{pos: pos, underlying: ewp.Unwrap()}
+		ewp = errorWithSpan{SourceSpan: span, underlying: ewp.Unwrap()}
 	} else {
-		ewp = errorWithSourcePos{pos: pos, underlying: err}
+		ewp = errorWithSpan{SourceSpan: span, underlying: err}
 	}
 	h.HandleWarning(ewp)
 }
 
 // HandleWarningf handles a warning with the given source position, creating the
 // actual error value using the given message format and arguments.
-func (h *Handler) HandleWarningf(pos ast.SourcePos, format string, args ...interface{}) {
-	h.HandleWarning(Errorf(pos, format, args...))
+func (h *Handler) HandleWarningf(span ast.SourceSpan, format string, args ...interface{}) {
+	h.HandleWarning(Errorf(span, format, args...))
 }
 
 // Error returns the handler result. If any errors have been reported then this

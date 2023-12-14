@@ -73,6 +73,9 @@ const (
 	// FileSyntaxTag is the tag number of the syntax element in a file
 	// descriptor proto.
 	FileSyntaxTag = 12
+	// FileEditionTag is the tag number of the edition element in a file
+	// descriptor proto.
+	FileEditionTag = 14
 	// MessageNameTag is the tag number of the name element in a message
 	// descriptor proto.
 	MessageNameTag = 1
