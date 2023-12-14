@@ -15,6 +15,7 @@ import (
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	semconv "go.opentelemetry.io/otel/semconv/v1.20.0"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	"go.k6.io/k6/lib/strvals"
 )
@@ -130,7 +131,7 @@ func newGRPCClient(endpoint string, insecure bool, headers map[string]string) ot
 
 // NewNoopTracerProvider creates a new noop TracerProvider.
 func NewNoopTracerProvider() *TracerProvider {
-	prov := trace.NewNoopTracerProvider()
+	prov := noop.NewTracerProvider()
 	noopShutdown := func(context.Context) error { return nil }
 
 	otel.SetTracerProvider(prov)
