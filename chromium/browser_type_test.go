@@ -162,25 +162,29 @@ func TestExecutablePath(t *testing.T) {
 	// in ExecutablePath function.
 	const chromiumExecutable = "google-chrome"
 
+	userProvidedPath := filepath.Join("path", "to", "chromium")
+
+	fileNotExists := func(file string) (string, error) {
+		return "", fs.ErrNotExist
+	}
+
 	tests := map[string]struct {
-		path        string                            // user provided path
-		lookPath    func(file string) (string, error) // determines if a file exists
-		userProfile env.LookupFunc
+		userProvidedPath string                            // user provided path
+		lookPath         func(file string) (string, error) // determines if a file exists
+		userProfile      env.LookupFunc                    // user profile folder lookup
 
 		wantPath string
-		wantOK   bool
+		wantErr  bool
 	}{
 		"without_chromium": {
-			path: "", // user did not provide a path
-			lookPath: func(file string) (string, error) {
-				return "", fs.ErrNotExist
-			},
-			userProfile: env.EmptyLookup,
-			wantPath:    "", // no path should be returned
-			wantOK:      false,
+			userProvidedPath: "",
+			lookPath:         fileNotExists,
+			userProfile:      env.EmptyLookup,
+			wantPath:         "",
+			wantErr:          true,
 		},
 		"with_chromium": {
-			path: "",
+			userProvidedPath: "",
 			lookPath: func(file string) (string, error) {
 				if file == chromiumExecutable {
 					return "", nil
@@ -189,31 +193,36 @@ func TestExecutablePath(t *testing.T) {
 			},
 			userProfile: env.EmptyLookup,
 			wantPath:    chromiumExecutable,
-			wantOK:      true,
+			wantErr:     false,
 		},
-		"path_override_without_chromium": {
-			path: filepath.Join("path", "to", "chromium"),
-			lookPath: func(file string) (string, error) {
-				return "", fs.ErrNotExist
-			},
-			userProfile: env.EmptyLookup,
-			wantPath:    filepath.Join("path", "to", "chromium"),
-			wantOK:      true,
+		"without_chromium_in_user_path": {
+			userProvidedPath: userProvidedPath,
+			lookPath:         fileNotExists,
+			userProfile:      env.EmptyLookup,
+			wantPath:         "",
+			wantErr:          true,
 		},
-		"path_override_with_chromium": {
-			path: filepath.Join("path", "to", "chromium"),
+		"with_chromium_in_user_path": {
+			userProvidedPath: userProvidedPath,
 			lookPath: func(file string) (string, error) {
-				if file == chromiumExecutable {
+				if file == userProvidedPath {
 					return "", nil
 				}
 				return "", fs.ErrNotExist
 			},
 			userProfile: env.EmptyLookup,
-			wantPath:    filepath.Join("path", "to", "chromium"),
-			wantOK:      true,
+			wantPath:    userProvidedPath,
+			wantErr:     false,
 		},
-		"user_profile": {
-			path: "",
+		"without_chromium_in_user_profile": {
+			userProvidedPath: "",
+			lookPath:         fileNotExists,
+			userProfile:      env.ConstLookup("USERPROFILE", `home`),
+			wantPath:         "",
+			wantErr:          true,
+		},
+		"with_chromium_in_user_profile": {
+			userProvidedPath: "",
 			lookPath: func(file string) (string, error) { // we look chrome.exe in the user profile
 				if file == filepath.Join("home", `AppData\Local\Google\Chrome\Application\chrome.exe`) {
 					return "", nil
@@ -222,7 +231,7 @@ func TestExecutablePath(t *testing.T) {
 			},
 			userProfile: env.ConstLookup("USERPROFILE", `home`),
 			wantPath:    filepath.Join("home", `AppData\Local\Google\Chrome\Application\chrome.exe`),
-			wantOK:      true,
+			wantErr:     false,
 		},
 	}
 	for name, tt := range tests {
@@ -230,9 +239,15 @@ func TestExecutablePath(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			path, ok := executablePath(tt.path, tt.userProfile, tt.lookPath)
+			path, err := executablePath(tt.userProvidedPath, tt.userProfile, tt.lookPath)
+
 			assert.Equal(t, tt.wantPath, path)
-			assert.Equal(t, tt.wantOK, ok)
+
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+			assert.NoError(t, err)
 		})
 	}
 }

@@ -239,9 +239,9 @@ func (b *BrowserType) allocate(
 		return nil, err
 	}
 
-	path, ok := executablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
-	if !ok {
-		return nil, ErrChromeNotInstalled
+	path, err := executablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
+	if err != nil {
+		return nil, fmt.Errorf("finding browser executable: %w", err)
 	}
 
 	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
@@ -255,11 +255,16 @@ func executablePath(
 	path string,
 	env env.LookupFunc,
 	lookPath func(file string) (string, error), // os.LookPath
-) (outPath string, ok bool) {
-	if strings.TrimSpace(path) != "" {
-		return path, true
+) (string, error) {
+	// find the browser executable in the user provided path
+	if path := strings.TrimSpace(path); path != "" {
+		if _, err := lookPath(path); err == nil {
+			return path, nil
+		}
+		return "", ErrChromeNotInstalled
 	}
 
+	// find the browser executable in the default paths below
 	paths := []string{
 		// Unix-like
 		"headless_shell",
@@ -280,17 +285,17 @@ func executablePath(
 		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		"/Applications/Chromium.app/Contents/MacOS/Chromium",
 	}
+	// find the browser executable in the user profile
 	if userProfile, ok := env("USERPROFILE"); ok {
 		paths = append(paths, filepath.Join(userProfile, `AppData\Local\Google\Chrome\Application\chrome.exe`))
 	}
 	for _, path := range paths {
 		if _, err := lookPath(path); err == nil {
-			return path, true
+			return path, nil
 		}
 	}
 
-	// still empty?
-	return "", false
+	return "", ErrChromeNotInstalled
 }
 
 // parseArgs parses command-line arguments and returns them.
