@@ -221,10 +221,6 @@ func parseConsoleRemoteObjectValue(
 	op *cdpruntime.ObjectPreview,
 ) string {
 	switch t {
-	case cdpruntime.TypeNumber:
-	case cdpruntime.TypeBoolean:
-	case cdpruntime.TypeSymbol:
-	case cdpruntime.TypeBigint:
 	case cdpruntime.TypeAccessor:
 		return "accessor"
 	case cdpruntime.TypeFunction:
@@ -246,6 +242,12 @@ func parseConsoleRemoteObjectValue(
 		}
 	case cdpruntime.TypeUndefined:
 		return "undefined"
+	// The following cases are here to clarify that all cases have been
+	// considered, but that the result will return val without processing it.
+	case cdpruntime.TypeNumber:
+	case cdpruntime.TypeBoolean:
+	case cdpruntime.TypeSymbol:
+	case cdpruntime.TypeBigint:
 	}
 
 	return val
