@@ -57,7 +57,7 @@ func Encode(dst, src []byte) []byte {
 // The function returns -1 if no improvement could be achieved.
 // Using actual compression will most often produce better compression than the estimate.
 func EstimateBlockSize(src []byte) (d int) {
-	if len(src) < 6 || int64(len(src)) > 0xffffffff {
+	if len(src) <= inputMargin || int64(len(src)) > 0xffffffff {
 		return -1
 	}
 	if len(src) <= 1024 {

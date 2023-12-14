@@ -157,6 +157,9 @@ func encodeBlockBest(dst, src []byte, dict *Dict) (d int) {
 				return m
 			}
 			matchDict := func(candidate, s int, first uint32, rep bool) match {
+				if s >= MaxDictSrcOffset {
+					return match{offset: candidate, s: s}
+				}
 				// Calculate offset as if in continuous array with s
 				offset := -len(dict.dict) + candidate
 				if best.length != 0 && best.s-best.offset == s-offset && !rep {
