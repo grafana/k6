@@ -247,8 +247,13 @@ func (b *BrowserType) allocate(
 	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
 }
 
-// ErrChromeNotInstalled is returned when the Chrome executable is not found.
-var ErrChromeNotInstalled = errors.New("neither chrome nor chromium is installed on this system")
+var (
+	// ErrChromeNotInstalled is returned when the Chrome executable is not found.
+	ErrChromeNotInstalled = errors.New("neither chrome nor chromium is installed on this system")
+
+	// ErrChromeNotFoundAtPath is returned when the Chrome executable is not found at the given path.
+	ErrChromeNotFoundAtPath = errors.New("neither chrome nor chromium found on the path")
+)
 
 // executablePath returns the path where the extension expects to find the browser executable.
 func executablePath(
@@ -261,7 +266,7 @@ func executablePath(
 		if _, err := lookPath(path); err == nil {
 			return path, nil
 		}
-		return "", ErrChromeNotInstalled
+		return "", fmt.Errorf("%w: %s", ErrChromeNotFoundAtPath, path)
 	}
 
 	// find the browser executable in the default paths below

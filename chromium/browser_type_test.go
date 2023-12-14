@@ -174,14 +174,14 @@ func TestExecutablePath(t *testing.T) {
 		userProfile      env.LookupFunc                    // user profile folder lookup
 
 		wantPath string
-		wantErr  bool
+		wantErr  error
 	}{
 		"without_chromium": {
 			userProvidedPath: "",
 			lookPath:         fileNotExists,
 			userProfile:      env.EmptyLookup,
 			wantPath:         "",
-			wantErr:          true,
+			wantErr:          ErrChromeNotInstalled,
 		},
 		"with_chromium": {
 			userProvidedPath: "",
@@ -193,14 +193,14 @@ func TestExecutablePath(t *testing.T) {
 			},
 			userProfile: env.EmptyLookup,
 			wantPath:    chromiumExecutable,
-			wantErr:     false,
+			wantErr:     nil,
 		},
 		"without_chromium_in_user_path": {
 			userProvidedPath: userProvidedPath,
 			lookPath:         fileNotExists,
 			userProfile:      env.EmptyLookup,
 			wantPath:         "",
-			wantErr:          true,
+			wantErr:          ErrChromeNotFoundAtPath,
 		},
 		"with_chromium_in_user_path": {
 			userProvidedPath: userProvidedPath,
@@ -212,14 +212,14 @@ func TestExecutablePath(t *testing.T) {
 			},
 			userProfile: env.EmptyLookup,
 			wantPath:    userProvidedPath,
-			wantErr:     false,
+			wantErr:     nil,
 		},
 		"without_chromium_in_user_profile": {
 			userProvidedPath: "",
 			lookPath:         fileNotExists,
 			userProfile:      env.ConstLookup("USERPROFILE", `home`),
 			wantPath:         "",
-			wantErr:          true,
+			wantErr:          ErrChromeNotInstalled,
 		},
 		"with_chromium_in_user_profile": {
 			userProvidedPath: "",
@@ -231,7 +231,7 @@ func TestExecutablePath(t *testing.T) {
 			},
 			userProfile: env.ConstLookup("USERPROFILE", `home`),
 			wantPath:    filepath.Join("home", `AppData\Local\Google\Chrome\Application\chrome.exe`),
-			wantErr:     false,
+			wantErr:     nil,
 		},
 	}
 	for name, tt := range tests {
@@ -243,8 +243,8 @@ func TestExecutablePath(t *testing.T) {
 
 			assert.Equal(t, tt.wantPath, path)
 
-			if tt.wantErr {
-				assert.Error(t, err)
+			if tt.wantErr != nil {
+				assert.ErrorIs(t, err, tt.wantErr)
 				return
 			}
 			assert.NoError(t, err)
