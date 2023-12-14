@@ -230,7 +230,7 @@ func TestExecutablePath(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 
-			path, ok := ExecutablePath(tt.path, tt.userProfile, tt.lookPath)
+			path, ok := executablePath(tt.path, tt.userProfile, tt.lookPath)
 			assert.Equal(t, tt.wantPath, path)
 			assert.Equal(t, tt.wantOK, ok)
 		})

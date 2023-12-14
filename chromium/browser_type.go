@@ -239,7 +239,7 @@ func (b *BrowserType) allocate(
 		return nil, err
 	}
 
-	path, ok := ExecutablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
+	path, ok := executablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
 	if !ok {
 		return nil, ErrChromeNotInstalled
 	}
@@ -250,8 +250,8 @@ func (b *BrowserType) allocate(
 // ErrChromeNotInstalled is returned when the Chrome executable is not found.
 var ErrChromeNotInstalled = errors.New("chromium is not installed on this system")
 
-// ExecutablePath returns the path where the extension expects to find the browser executable.
-func ExecutablePath(
+// executablePath returns the path where the extension expects to find the browser executable.
+func executablePath(
 	path string,
 	env env.LookupFunc,
 	lookPath func(file string) (string, error), // os.LookPath
