@@ -169,8 +169,8 @@ github.com/grafana/xk6-output-prometheus-remote/pkg/stale
 # github.com/grafana/xk6-redis v0.2.0
 ## explicit; go 1.19
 github.com/grafana/xk6-redis/redis
-# github.com/grafana/xk6-timers v0.1.2
-## explicit; go 1.17
+# github.com/grafana/xk6-timers v0.2.2
+## explicit; go 1.20
 github.com/grafana/xk6-timers/timers
 # github.com/grafana/xk6-webcrypto v0.1.0
 ## explicit; go 1.19
@@ -532,6 +532,8 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/guregu/null.v3 v3.3.0
 ## explicit
 gopkg.in/guregu/null.v3
+# gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
+## explicit
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3

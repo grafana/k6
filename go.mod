@@ -16,7 +16,7 @@ require (
 	github.com/grafana/xk6-browser v1.2.1
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0
-	github.com/grafana/xk6-timers v0.1.2
+	github.com/grafana/xk6-timers v0.2.2
 	github.com/grafana/xk6-webcrypto v0.1.0
 	github.com/grafana/xk6-websockets v0.2.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
@@ -93,4 +93,5 @@ require (
 	golang.org/x/text v0.14.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20231002182017-d307bd883b97 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97 // indirect
+	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
