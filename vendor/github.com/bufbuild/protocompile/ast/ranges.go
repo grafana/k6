@@ -207,13 +207,20 @@ func (n *RangeNode) EndValueAsInt32(min, max int32) (int32, bool) {
 //
 //	reserved 1, 10-12, 15;
 //	reserved "foo", "bar", "baz";
+//	reserved foo, bar, baz;
 type ReservedNode struct {
 	compositeNode
 	Keyword *KeywordNode
-	// If non-empty, this node represents reserved ranges and Names will be empty.
+	// If non-empty, this node represents reserved ranges, and Names and Identifiers
+	// will be empty.
 	Ranges []*RangeNode
-	// If non-empty, this node represents reserved names and Ranges will be empty.
+	// If non-empty, this node represents reserved names as string literals, and
+	// Ranges and Identifiers will be empty. String literals are used for reserved
+	// names in proto2 and proto3 syntax.
 	Names []StringValueNode
+	// If non-empty, this node represents reserved names as identifiers, and Ranges
+	// and Names will be empty. Identifiers are used for reserved names in editions.
+	Identifiers []*IdentNode
 	// Commas represent the separating ',' characters between options. The
 	// length of this slice must be exactly len(Ranges)-1 or len(Names)-1, depending
 	// on whether this node represents reserved ranges or reserved names. Each item
@@ -283,16 +290,17 @@ func NewReservedNamesNode(keyword *KeywordNode, names []StringValueNode, commas 
 	if keyword == nil {
 		panic("keyword is nil")
 	}
-	if semicolon == nil {
-		panic("semicolon is nil")
-	}
 	if len(names) == 0 {
 		panic("must have at least one name")
 	}
 	if len(commas) != len(names)-1 {
 		panic(fmt.Sprintf("%d names requires %d commas, not %d", len(names), len(names)-1, len(commas)))
 	}
-	children := make([]Node, 0, len(names)*2+1)
+	numChildren := len(names) * 2
+	if semicolon != nil {
+		numChildren++
+	}
+	children := make([]Node, 0, numChildren)
 	children = append(children, keyword)
 	for i, name := range names {
 		if i > 0 {
@@ -306,7 +314,9 @@ func NewReservedNamesNode(keyword *KeywordNode, names []StringValueNode, commas 
 		}
 		children = append(children, name)
 	}
-	children = append(children, semicolon)
+	if semicolon != nil {
+		children = append(children, semicolon)
+	}
 	return &ReservedNode{
 		compositeNode: compositeNode{
 			children: children,
@@ -315,5 +325,54 @@ func NewReservedNamesNode(keyword *KeywordNode, names []StringValueNode, commas 
 		Names:     names,
 		Commas:    commas,
 		Semicolon: semicolon,
+	}
+}
+
+// NewReservedIdentifiersNode creates a new *ReservedNode that represents reserved
+// names. All args must be non-nil.
+//   - keyword: The token corresponding to the "reserved" keyword.
+//   - names: One or more names.
+//   - commas: Tokens that represent the "," runes that delimit the names.
+//     The length of commas must be one less than the length of names.
+//   - semicolon The token corresponding to the ";" rune that ends the declaration.
+func NewReservedIdentifiersNode(keyword *KeywordNode, names []*IdentNode, commas []*RuneNode, semicolon *RuneNode) *ReservedNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if len(names) == 0 {
+		panic("must have at least one name")
+	}
+	if len(commas) != len(names)-1 {
+		panic(fmt.Sprintf("%d names requires %d commas, not %d", len(names), len(names)-1, len(commas)))
+	}
+	numChildren := len(names) * 2
+	if semicolon != nil {
+		numChildren++
+	}
+	children := make([]Node, 0, numChildren)
+	children = append(children, keyword)
+	for i, name := range names {
+		if i > 0 {
+			if commas[i-1] == nil {
+				panic(fmt.Sprintf("commas[%d] is nil", i-1))
+			}
+			children = append(children, commas[i-1])
+		}
+		if name == nil {
+			panic(fmt.Sprintf("names[%d] is nil", i))
+		}
+		children = append(children, name)
+	}
+	if semicolon != nil {
+		children = append(children, semicolon)
+	}
+	return &ReservedNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Keyword:     keyword,
+		Identifiers: names,
+		Commas:      commas,
+		Semicolon:   semicolon,
 	}
 }

@@ -30,9 +30,22 @@ import (
 
 func validateBasic(res *result, handler *reporter.Handler) {
 	fd := res.proto
-	isProto3 := fd.GetSyntax() == "proto3"
+	var syntax syntaxType
+	switch fd.GetSyntax() {
+	case "", "proto2":
+		syntax = syntaxProto2
+	case "proto3":
+		syntax = syntaxProto3
+	case "editions":
+		syntax = syntaxEditions
+		// TODO: default: error?
+	}
 
 	if err := validateImports(res, handler); err != nil {
+		return
+	}
+
+	if err := validateNoFeatures(res, syntax, "file options", fd.Options.GetUninterpretedOption(), handler); err != nil {
 		return
 	}
 
@@ -40,16 +53,32 @@ func validateBasic(res *result, handler *reporter.Handler) {
 		func(name protoreflect.FullName, d proto.Message) error {
 			switch d := d.(type) {
 			case *descriptorpb.DescriptorProto:
-				if err := validateMessage(res, isProto3, name, d, handler); err != nil {
+				if err := validateMessage(res, syntax, name, d, handler); err != nil {
 					// exit func is not called when enter returns error
 					return err
 				}
-			case *descriptorpb.EnumDescriptorProto:
-				if err := validateEnum(res, isProto3, name, d, handler); err != nil {
+			case *descriptorpb.FieldDescriptorProto:
+				if err := validateField(res, syntax, name, d, handler); err != nil {
 					return err
 				}
-			case *descriptorpb.FieldDescriptorProto:
-				if err := validateField(res, isProto3, name, d, handler); err != nil {
+			case *descriptorpb.OneofDescriptorProto:
+				if err := validateNoFeatures(res, syntax, fmt.Sprintf("oneof %s", name), d.Options.GetUninterpretedOption(), handler); err != nil {
+					return err
+				}
+			case *descriptorpb.EnumDescriptorProto:
+				if err := validateEnum(res, syntax, name, d, handler); err != nil {
+					return err
+				}
+			case *descriptorpb.EnumValueDescriptorProto:
+				if err := validateNoFeatures(res, syntax, fmt.Sprintf("enum value %s", name), d.Options.GetUninterpretedOption(), handler); err != nil {
+					return err
+				}
+			case *descriptorpb.ServiceDescriptorProto:
+				if err := validateNoFeatures(res, syntax, fmt.Sprintf("service %s", name), d.Options.GetUninterpretedOption(), handler); err != nil {
+					return err
+				}
+			case *descriptorpb.MethodDescriptorProto:
+				if err := validateNoFeatures(res, syntax, fmt.Sprintf("method %s", name), d.Options.GetUninterpretedOption(), handler); err != nil {
 					return err
 				}
 			}
@@ -68,23 +97,40 @@ func validateImports(res *result, handler *reporter.Handler) error {
 		if !ok {
 			continue
 		}
-		startPos := fileNode.NodeInfo(decl).Start()
+		info := fileNode.NodeInfo(decl)
 		name := imp.Name.AsString()
 		if prev, ok := imports[name]; ok {
-			return handler.HandleErrorf(startPos, "%q was already imported at %v", name, prev)
+			return handler.HandleErrorf(info, "%q was already imported at %v", name, prev)
 		}
-		imports[name] = startPos
+		imports[name] = info.Start()
 	}
 	return nil
 }
 
-func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md *descriptorpb.DescriptorProto, handler *reporter.Handler) error {
+func validateNoFeatures(res *result, syntax syntaxType, scope string, opts []*descriptorpb.UninterpretedOption, handler *reporter.Handler) error {
+	if syntax == syntaxEditions {
+		// Editions is allowed to use features
+		return nil
+	}
+	if index, err := internal.FindFirstOption(res, handler, scope, opts, "features"); err != nil {
+		return err
+	} else if index >= 0 {
+		optNode := res.OptionNode(opts[index])
+		optNameNodeInfo := res.file.NodeInfo(optNode.GetName())
+		if err := handler.HandleErrorf(optNameNodeInfo, "%s: option 'features' may only be used with editions but file uses %s syntax", scope, syntax); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateMessage(res *result, syntax syntaxType, name protoreflect.FullName, md *descriptorpb.DescriptorProto, handler *reporter.Handler) error {
 	scope := fmt.Sprintf("message %s", name)
 
-	if isProto3 && len(md.ExtensionRange) > 0 {
+	if syntax == syntaxProto3 && len(md.ExtensionRange) > 0 {
 		n := res.ExtensionRangeNode(md.ExtensionRange[0])
 		nInfo := res.file.NodeInfo(n)
-		if err := handler.HandleErrorf(nInfo.Start(), "%s: extension ranges are not allowed in proto3", scope); err != nil {
+		if err := handler.HandleErrorf(nInfo, "%s: extension ranges are not allowed in proto3", scope); err != nil {
 			return err
 		}
 	}
@@ -92,28 +138,15 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 	if index, err := internal.FindOption(res, handler, scope, md.Options.GetUninterpretedOption(), "map_entry"); err != nil {
 		return err
 	} else if index >= 0 {
-		opt := md.Options.UninterpretedOption[index]
-		optn := res.OptionNode(opt)
-		md.Options.UninterpretedOption = internal.RemoveOption(md.Options.UninterpretedOption, index)
-		valid := false
-		if opt.IdentifierValue != nil {
-			if opt.GetIdentifierValue() == "true" {
-				valid = true
-				optionNodeInfo := res.file.NodeInfo(optn.GetValue())
-				if err := handler.HandleErrorf(optionNodeInfo.Start(), "%s: map_entry option should not be set explicitly; use map type instead", scope); err != nil {
-					return err
-				}
-			} else if opt.GetIdentifierValue() == "false" {
-				valid = true
-				md.Options.MapEntry = proto.Bool(false)
-			}
+		optNode := res.OptionNode(md.Options.GetUninterpretedOption()[index])
+		optNameNodeInfo := res.file.NodeInfo(optNode.GetName())
+		if err := handler.HandleErrorf(optNameNodeInfo, "%s: map_entry option should not be set explicitly; use map type instead", scope); err != nil {
+			return err
 		}
-		if !valid {
-			optionNodeInfo := res.file.NodeInfo(optn.GetValue())
-			if err := handler.HandleErrorf(optionNodeInfo.Start(), "%s: expecting bool value for map_entry option", scope); err != nil {
-				return err
-			}
-		}
+	}
+
+	if err := validateNoFeatures(res, syntax, scope, md.Options.GetUninterpretedOption(), handler); err != nil {
+		return err
 	}
 
 	// reserved ranges should not overlap
@@ -126,7 +159,7 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 	for i := 1; i < len(rsvd); i++ {
 		if rsvd[i].start < rsvd[i-1].end {
 			rangeNodeInfo := res.file.NodeInfo(rsvd[i].node)
-			if err := handler.HandleErrorf(rangeNodeInfo.Start(), "%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1); err != nil {
+			if err := handler.HandleErrorf(rangeNodeInfo, "%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end-1, rsvd[i].start, rsvd[i].end-1); err != nil {
 				return err
 			}
 		}
@@ -135,6 +168,9 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 	// extensions ranges should not overlap
 	exts := make(tagRanges, len(md.ExtensionRange))
 	for i, r := range md.ExtensionRange {
+		if err := validateNoFeatures(res, syntax, scope, r.Options.GetUninterpretedOption(), handler); err != nil {
+			return err
+		}
 		n := res.ExtensionRangeNode(r)
 		exts[i] = tagRange{start: r.GetStart(), end: r.GetEnd(), node: n}
 	}
@@ -142,7 +178,7 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 	for i := 1; i < len(exts); i++ {
 		if exts[i].start < exts[i-1].end {
 			rangeNodeInfo := res.file.NodeInfo(exts[i].node)
-			if err := handler.HandleErrorf(rangeNodeInfo.Start(), "%s: extension ranges overlap: %d to %d and %d to %d", scope, exts[i-1].start, exts[i-1].end-1, exts[i].start, exts[i].end-1); err != nil {
+			if err := handler.HandleErrorf(rangeNodeInfo, "%s: extension ranges overlap: %d to %d and %d to %d", scope, exts[i-1].start, exts[i-1].end-1, exts[i].start, exts[i].end-1); err != nil {
 				return err
 			}
 		}
@@ -153,16 +189,16 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 	for i < len(rsvd) && j < len(exts) {
 		if rsvd[i].start >= exts[j].start && rsvd[i].start < exts[j].end ||
 			exts[j].start >= rsvd[i].start && exts[j].start < rsvd[i].end {
-			var pos ast.SourcePos
+			var span ast.SourceSpan
 			if rsvd[i].start >= exts[j].start && rsvd[i].start < exts[j].end {
 				rangeNodeInfo := res.file.NodeInfo(rsvd[i].node)
-				pos = rangeNodeInfo.Start()
+				span = rangeNodeInfo
 			} else {
 				rangeNodeInfo := res.file.NodeInfo(exts[j].node)
-				pos = rangeNodeInfo.Start()
+				span = rangeNodeInfo
 			}
 			// ranges overlap
-			if err := handler.HandleErrorf(pos, "%s: extension range %d to %d overlaps reserved range %d to %d", scope, exts[j].start, exts[j].end-1, rsvd[i].start, rsvd[i].end-1); err != nil {
+			if err := handler.HandleErrorf(span, "%s: extension range %d to %d overlaps reserved range %d to %d", scope, exts[j].start, exts[j].end-1, rsvd[i].start, rsvd[i].end-1); err != nil {
 				return err
 			}
 		}
@@ -181,7 +217,7 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 		if !isIdentifier(n) {
 			node := findMessageReservedNameNode(res.MessageNode(md), n)
 			nodeInfo := res.file.NodeInfo(node)
-			if err := handler.HandleErrorf(nodeInfo.Start(), "%s: reserved name %q is not a valid identifier", scope, n); err != nil {
+			if err := handler.HandleErrorf(nodeInfo, "%s: reserved name %q is not a valid identifier", scope, n); err != nil {
 				return err
 			}
 		}
@@ -192,13 +228,13 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 		fn := res.FieldNode(fld)
 		if _, ok := rsvdNames[fld.GetName()]; ok {
 			fieldNameNodeInfo := res.file.NodeInfo(fn.FieldName())
-			if err := handler.HandleErrorf(fieldNameNodeInfo.Start(), "%s: field %s is using a reserved name", scope, fld.GetName()); err != nil {
+			if err := handler.HandleErrorf(fieldNameNodeInfo, "%s: field %s is using a reserved name", scope, fld.GetName()); err != nil {
 				return err
 			}
 		}
 		if existing := fieldTags[fld.GetNumber()]; existing != "" {
 			fieldTagNodeInfo := res.file.NodeInfo(fn.FieldTag())
-			if err := handler.HandleErrorf(fieldTagNodeInfo.Start(), "%s: fields %s and %s both have the same tag %d", scope, existing, fld.GetName(), fld.GetNumber()); err != nil {
+			if err := handler.HandleErrorf(fieldTagNodeInfo, "%s: fields %s and %s both have the same tag %d", scope, existing, fld.GetName(), fld.GetNumber()); err != nil {
 				return err
 			}
 		}
@@ -207,7 +243,7 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end > fld.GetNumber() })
 		if r < len(rsvd) && rsvd[r].start <= fld.GetNumber() {
 			fieldTagNodeInfo := res.file.NodeInfo(fn.FieldTag())
-			if err := handler.HandleErrorf(fieldTagNodeInfo.Start(), "%s: field %s is using tag %d which is in reserved range %d to %d", scope, fld.GetName(), fld.GetNumber(), rsvd[r].start, rsvd[r].end-1); err != nil {
+			if err := handler.HandleErrorf(fieldTagNodeInfo, "%s: field %s is using tag %d which is in reserved range %d to %d", scope, fld.GetName(), fld.GetNumber(), rsvd[r].start, rsvd[r].end-1); err != nil {
 				return err
 			}
 		}
@@ -215,7 +251,7 @@ func validateMessage(res *result, isProto3 bool, name protoreflect.FullName, md 
 		e := sort.Search(len(exts), func(index int) bool { return exts[index].end > fld.GetNumber() })
 		if e < len(exts) && exts[e].start <= fld.GetNumber() {
 			fieldTagNodeInfo := res.file.NodeInfo(fn.FieldTag())
-			if err := handler.HandleErrorf(fieldTagNodeInfo.Start(), "%s: field %s is using tag %d which is in extension range %d to %d", scope, fld.GetName(), fld.GetNumber(), exts[e].start, exts[e].end-1); err != nil {
+			if err := handler.HandleErrorf(fieldTagNodeInfo, "%s: field %s is using tag %d which is in extension range %d to %d", scope, fld.GetName(), fld.GetNumber(), exts[e].start, exts[e].end-1); err != nil {
 				return err
 			}
 		}
@@ -278,15 +314,19 @@ func findReservedNameNode[T ast.Node](parent ast.Node, decls []T, name string) a
 	return parent
 }
 
-func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *descriptorpb.EnumDescriptorProto, handler *reporter.Handler) error {
+func validateEnum(res *result, syntax syntaxType, name protoreflect.FullName, ed *descriptorpb.EnumDescriptorProto, handler *reporter.Handler) error {
 	scope := fmt.Sprintf("enum %s", name)
 
 	if len(ed.Value) == 0 {
 		enNode := res.EnumNode(ed)
 		enNodeInfo := res.file.NodeInfo(enNode)
-		if err := handler.HandleErrorf(enNodeInfo.Start(), "%s: enums must define at least one value", scope); err != nil {
+		if err := handler.HandleErrorf(enNodeInfo, "%s: enums must define at least one value", scope); err != nil {
 			return err
 		}
+	}
+
+	if err := validateNoFeatures(res, syntax, scope, ed.Options.GetUninterpretedOption(), handler); err != nil {
+		return err
 	}
 
 	allowAlias := false
@@ -307,16 +347,16 @@ func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *de
 		if !valid {
 			optNode := res.OptionNode(allowAliasOpt)
 			optNodeInfo := res.file.NodeInfo(optNode.GetValue())
-			if err := handler.HandleErrorf(optNodeInfo.Start(), "%s: expecting bool value for allow_alias option", scope); err != nil {
+			if err := handler.HandleErrorf(optNodeInfo, "%s: expecting bool value for allow_alias option", scope); err != nil {
 				return err
 			}
 		}
 	}
 
-	if isProto3 && len(ed.Value) > 0 && ed.Value[0].GetNumber() != 0 {
+	if syntax == syntaxProto3 && len(ed.Value) > 0 && ed.Value[0].GetNumber() != 0 {
 		evNode := res.EnumValueNode(ed.Value[0])
 		evNodeInfo := res.file.NodeInfo(evNode.GetNumber())
-		if err := handler.HandleErrorf(evNodeInfo.Start(), "%s: proto3 requires that first value in enum have numeric value of 0", scope); err != nil {
+		if err := handler.HandleErrorf(evNodeInfo, "%s: proto3 requires that first value in enum have numeric value of 0", scope); err != nil {
 			return err
 		}
 	}
@@ -332,7 +372,7 @@ func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *de
 			} else {
 				evNode := res.EnumValueNode(evd)
 				evNodeInfo := res.file.NodeInfo(evNode.GetNumber())
-				if err := handler.HandleErrorf(evNodeInfo.Start(), "%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber()); err != nil {
+				if err := handler.HandleErrorf(evNodeInfo, "%s: values %s and %s both have the same numeric value %d; use allow_alias option if intentional", scope, existing, evd.GetName(), evd.GetNumber()); err != nil {
 					return err
 				}
 			}
@@ -342,7 +382,7 @@ func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *de
 	if allowAlias && !hasAlias {
 		optNode := res.OptionNode(allowAliasOpt)
 		optNodeInfo := res.file.NodeInfo(optNode.GetValue())
-		if err := handler.HandleErrorf(optNodeInfo.Start(), "%s: allow_alias is true but no values are aliases", scope); err != nil {
+		if err := handler.HandleErrorf(optNodeInfo, "%s: allow_alias is true but no values are aliases", scope); err != nil {
 			return err
 		}
 	}
@@ -357,7 +397,7 @@ func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *de
 	for i := 1; i < len(rsvd); i++ {
 		if rsvd[i].start <= rsvd[i-1].end {
 			rangeNodeInfo := res.file.NodeInfo(rsvd[i].node)
-			if err := handler.HandleErrorf(rangeNodeInfo.Start(), "%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end, rsvd[i].start, rsvd[i].end); err != nil {
+			if err := handler.HandleErrorf(rangeNodeInfo, "%s: reserved ranges overlap: %d to %d and %d to %d", scope, rsvd[i-1].start, rsvd[i-1].end, rsvd[i].start, rsvd[i].end); err != nil {
 				return err
 			}
 		}
@@ -371,7 +411,7 @@ func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *de
 		if !isIdentifier(n) {
 			node := findEnumReservedNameNode(res.EnumNode(ed), n)
 			nodeInfo := res.file.NodeInfo(node)
-			if err := handler.HandleErrorf(nodeInfo.Start(), "%s: reserved name %q is not a valid identifier", scope, n); err != nil {
+			if err := handler.HandleErrorf(nodeInfo, "%s: reserved name %q is not a valid identifier", scope, n); err != nil {
 				return err
 			}
 		}
@@ -381,7 +421,7 @@ func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *de
 		evn := res.EnumValueNode(ev)
 		if _, ok := rsvdNames[ev.GetName()]; ok {
 			enumValNodeInfo := res.file.NodeInfo(evn.GetName())
-			if err := handler.HandleErrorf(enumValNodeInfo.Start(), "%s: value %s is using a reserved name", scope, ev.GetName()); err != nil {
+			if err := handler.HandleErrorf(enumValNodeInfo, "%s: value %s is using a reserved name", scope, ev.GetName()); err != nil {
 				return err
 			}
 		}
@@ -389,7 +429,7 @@ func validateEnum(res *result, isProto3 bool, name protoreflect.FullName, ed *de
 		r := sort.Search(len(rsvd), func(index int) bool { return rsvd[index].end >= ev.GetNumber() })
 		if r < len(rsvd) && rsvd[r].start <= ev.GetNumber() {
 			enumValNodeInfo := res.file.NodeInfo(evn.GetNumber())
-			if err := handler.HandleErrorf(enumValNodeInfo.Start(), "%s: value %s is using number %d which is in reserved range %d to %d", scope, ev.GetName(), ev.GetNumber(), rsvd[r].start, rsvd[r].end); err != nil {
+			if err := handler.HandleErrorf(enumValNodeInfo, "%s: value %s is using number %d which is in reserved range %d to %d", scope, ev.GetName(), ev.GetNumber(), rsvd[r].start, rsvd[r].end); err != nil {
 				return err
 			}
 		}
@@ -407,47 +447,70 @@ func findEnumReservedNameNode(enumNode ast.Node, name string) ast.Node {
 	return findReservedNameNode(enumNode, decls, name)
 }
 
-func validateField(res *result, isProto3 bool, name protoreflect.FullName, fld *descriptorpb.FieldDescriptorProto, handler *reporter.Handler) error {
-	scope := fmt.Sprintf("field %s", name)
+func validateField(res *result, syntax syntaxType, name protoreflect.FullName, fld *descriptorpb.FieldDescriptorProto, handler *reporter.Handler) error {
+	var scope string
+	if fld.Extendee != nil {
+		scope = fmt.Sprintf("extension %s", name)
+	} else {
+		scope = fmt.Sprintf("field %s", name)
+	}
 
 	node := res.FieldNode(fld)
-	if isProto3 {
+	if syntax != syntaxProto2 {
 		if fld.GetType() == descriptorpb.FieldDescriptorProto_TYPE_GROUP {
 			groupNodeInfo := res.file.NodeInfo(node.GetGroupKeyword())
-			if err := handler.HandleErrorf(groupNodeInfo.Start(), "%s: groups are not allowed in proto3", scope); err != nil {
+			if err := handler.HandleErrorf(groupNodeInfo, "%s: groups are not allowed in proto3 or editions", scope); err != nil {
 				return err
 			}
 		} else if fld.Label != nil && fld.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REQUIRED {
 			fieldLabelNodeInfo := res.file.NodeInfo(node.FieldLabel())
-			if err := handler.HandleErrorf(fieldLabelNodeInfo.Start(), "%s: label 'required' is not allowed in proto3", scope); err != nil {
+			if err := handler.HandleErrorf(fieldLabelNodeInfo, "%s: label 'required' is not allowed in proto3 or editions", scope); err != nil {
 				return err
 			}
 		}
-		if index, err := internal.FindOption(res, handler, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
-			return err
-		} else if index >= 0 {
-			optNode := res.OptionNode(fld.Options.GetUninterpretedOption()[index])
-			optNameNodeInfo := res.file.NodeInfo(optNode.GetName())
-			if err := handler.HandleErrorf(optNameNodeInfo.Start(), "%s: default values are not allowed in proto3", scope); err != nil {
+		if syntax == syntaxEditions {
+			if fld.Label != nil && fld.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL {
+				fieldLabelNodeInfo := res.file.NodeInfo(node.FieldLabel())
+				if err := handler.HandleErrorf(fieldLabelNodeInfo, "%s: label 'optional' is not allowed in editions; use option features.field_presence instead", scope); err != nil {
+					return err
+				}
+			}
+			if index, err := internal.FindOption(res, handler, scope, fld.Options.GetUninterpretedOption(), "packed"); err != nil {
 				return err
+			} else if index >= 0 {
+				optNode := res.OptionNode(fld.Options.GetUninterpretedOption()[index])
+				optNameNodeInfo := res.file.NodeInfo(optNode.GetName())
+				if err := handler.HandleErrorf(optNameNodeInfo, "%s: packed option is not allowed in editions; use option features.repeated_field_encoding instead", scope); err != nil {
+					return err
+				}
+			}
+		} else if syntax == syntaxProto3 {
+			if index, err := internal.FindOption(res, handler, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
+				return err
+			} else if index >= 0 {
+				optNode := res.OptionNode(fld.Options.GetUninterpretedOption()[index])
+				optNameNodeInfo := res.file.NodeInfo(optNode.GetName())
+				if err := handler.HandleErrorf(optNameNodeInfo, "%s: default values are not allowed in proto3", scope); err != nil {
+					return err
+				}
 			}
 		}
 	} else {
 		if fld.Label == nil && fld.OneofIndex == nil {
 			fieldNameNodeInfo := res.file.NodeInfo(node.FieldName())
-			if err := handler.HandleErrorf(fieldNameNodeInfo.Start(), "%s: field has no label; proto2 requires explicit 'optional' label", scope); err != nil {
+			if err := handler.HandleErrorf(fieldNameNodeInfo, "%s: field has no label; proto2 requires explicit 'optional' label", scope); err != nil {
 				return err
 			}
 		}
 		if fld.GetExtendee() != "" && fld.Label != nil && fld.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REQUIRED {
 			fieldLabelNodeInfo := res.file.NodeInfo(node.FieldLabel())
-			if err := handler.HandleErrorf(fieldLabelNodeInfo.Start(), "%s: extension fields cannot be 'required'", scope); err != nil {
+			if err := handler.HandleErrorf(fieldLabelNodeInfo, "%s: extension fields cannot be 'required'", scope); err != nil {
 				return err
 			}
 		}
 	}
 
-	return nil
+	return validateNoFeatures(res, syntax, scope, fld.Options.GetUninterpretedOption(), handler)
 }
 
 type tagRange struct {

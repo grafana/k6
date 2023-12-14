@@ -20,6 +20,24 @@ func UnknownPos(filename string) SourcePos {
 	return SourcePos{Filename: filename}
 }
 
+// UnknownSpan is a placeholder span when only the source file
+// name is known.
+func UnknownSpan(filename string) SourceSpan {
+	return unknownSpan{filename: filename}
+}
+
+type unknownSpan struct {
+	filename string
+}
+
+func (s unknownSpan) Start() SourcePos {
+	return UnknownPos(s.filename)
+}
+
+func (s unknownSpan) End() SourcePos {
+	return UnknownPos(s.filename)
+}
+
 // NoSourceNode is a placeholder AST node that implements numerous
 // interfaces in this package. It can be used to represent an AST
 // element for a file whose source is not available.

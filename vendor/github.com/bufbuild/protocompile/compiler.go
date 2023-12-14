@@ -447,16 +447,16 @@ func (t *task) asFile(ctx context.Context, name string, r SearchResult) (linker.
 		results := make([]*result, len(fileDescriptorProto.Dependency))
 		checked := map[string]struct{}{}
 		for i, dep := range fileDescriptorProto.Dependency {
-			pos := findImportPos(parseRes, dep)
+			span := findImportSpan(parseRes, dep)
 			if name == dep {
 				// doh! file imports itself
-				handleImportCycle(t.h, pos, []string{name}, dep)
+				handleImportCycle(t.h, span, []string{name}, dep)
 				return nil, t.h.Error()
 			}
 
 			res := t.e.compile(ctx, dep)
 			// check for dependency cycle to prevent deadlock
-			if err := t.e.checkForDependencyCycle(res, []string{name, dep}, pos, checked); err != nil {
+			if err := t.e.checkForDependencyCycle(res, []string{name, dep}, span, checked); err != nil {
 				return nil, err
 			}
 			results[i] = res
@@ -481,7 +481,7 @@ func (t *task) asFile(ctx context.Context, name string, r SearchResult) (linker.
 						// it's usually considered immediately fatal. However, if the reason
 						// we were resolving is due to an import, turn this into an error with
 						// source position that pinpoints the import statement and report it.
-						return nil, reporter.Error(findImportPos(parseRes, res.name), rerr)
+						return nil, reporter.Error(findImportSpan(parseRes, res.name), rerr)
 					}
 					return nil, res.err
 				}
@@ -513,7 +513,7 @@ func (t *task) asFile(ctx context.Context, name string, r SearchResult) (linker.
 	return t.link(parseRes, deps, overrideDescriptorProto)
 }
 
-func (e *executor) checkForDependencyCycle(res *result, sequence []string, pos ast.SourcePos, checked map[string]struct{}) error {
+func (e *executor) checkForDependencyCycle(res *result, sequence []string, span ast.SourceSpan, checked map[string]struct{}) error {
 	if _, ok := checked[res.name]; ok {
 		// already checked this one
 		return nil
@@ -524,7 +524,7 @@ func (e *executor) checkForDependencyCycle(res *result, sequence []string, pos a
 		// is this a cycle?
 		for _, file := range sequence {
 			if file == dep {
-				handleImportCycle(e.h, pos, sequence, dep)
+				handleImportCycle(e.h, span, sequence, dep)
 				return e.h.Error()
 			}
 		}
@@ -535,14 +535,14 @@ func (e *executor) checkForDependencyCycle(res *result, sequence []string, pos a
 		if depRes == nil {
 			continue
 		}
-		if err := e.checkForDependencyCycle(depRes, append(sequence, dep), pos, checked); err != nil {
+		if err := e.checkForDependencyCycle(depRes, append(sequence, dep), span, checked); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func handleImportCycle(h *reporter.Handler, pos ast.SourcePos, importSequence []string, dep string) {
+func handleImportCycle(h *reporter.Handler, span ast.SourceSpan, importSequence []string, dep string) {
 	var buf bytes.Buffer
 	buf.WriteString("cycle found in imports: ")
 	for _, imp := range importSequence {
@@ -550,23 +550,23 @@ func handleImportCycle(h *reporter.Handler, pos ast.SourcePos, importSequence []
 	}
 	_, _ = fmt.Fprintf(&buf, "%q", dep)
 	// error is saved and returned in caller
-	_ = h.HandleErrorf(pos, buf.String())
+	_ = h.HandleErrorf(span, buf.String())
 }
 
-func findImportPos(res parser.Result, dep string) ast.SourcePos {
+func findImportSpan(res parser.Result, dep string) ast.SourceSpan {
 	root := res.AST()
 	if root == nil {
-		return ast.UnknownPos(res.FileNode().Name())
+		return ast.UnknownSpan(res.FileNode().Name())
 	}
 	for _, decl := range root.Decls {
 		if imp, ok := decl.(*ast.ImportNode); ok {
 			if imp.Name.AsString() == dep {
-				return root.NodeInfo(imp.Name).Start()
+				return root.NodeInfo(imp.Name)
 			}
 		}
 	}
 	// this should never happen...
-	return ast.UnknownPos(res.FileNode().Name())
+	return ast.UnknownSpan(res.FileNode().Name())
 }
 
 func (t *task) link(parseRes parser.Result, deps linker.Files, overrideDescriptorProtoRes linker.File) (linker.File, error) {
@@ -591,6 +591,9 @@ func (t *task) link(parseRes parser.Result, deps linker.Files, overrideDescripto
 	if t.r.explicitFile {
 		file.CheckForUnusedImports(t.h)
 	}
+	if err := t.h.Error(); err != nil {
+		return nil, err
+	}
 
 	if needsSourceInfo(parseRes, t.e.c.SourceInfoMode) {
 		var srcInfoOpts []sourceinfo.GenerateOption
@@ -601,6 +604,14 @@ func (t *task) link(parseRes parser.Result, deps linker.Files, overrideDescripto
 			srcInfoOpts = append(srcInfoOpts, sourceinfo.WithExtraOptionLocations())
 		}
 		parseRes.FileDescriptorProto().SourceCodeInfo = sourceinfo.GenerateSourceInfo(parseRes.AST(), optsIndex, srcInfoOpts...)
+	} else if t.e.c.SourceInfoMode == SourceInfoNone {
+		// If results came from unlinked FileDescriptorProto, it could have
+		// source info that we should strip.
+		parseRes.FileDescriptorProto().SourceCodeInfo = nil
+	}
+	if len(parseRes.FileDescriptorProto().GetSourceCodeInfo().GetLocation()) > 0 {
+		// If we have source code info in the descriptor proto at this point,
+		// we have to build the index of locations.
 		file.PopulateSourceCodeInfo()
 	}
 

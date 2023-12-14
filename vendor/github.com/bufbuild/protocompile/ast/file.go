@@ -21,7 +21,6 @@ import "fmt"
 type FileDeclNode interface {
 	Node
 	Name() string
-	GetSyntax() Node
 	NodeInfo(n Node) NodeInfo
 }
 
@@ -34,8 +33,13 @@ type FileNode struct {
 	compositeNode
 	fileInfo *FileInfo
 
-	Syntax *SyntaxNode // nil if file has no syntax declaration
-	Decls  []FileElement
+	// A file has either a Syntax or Edition node, never both.
+	// If both are nil, neither declaration is present and the
+	// file is assumed to use "proto2" syntax.
+	Syntax  *SyntaxNode
+	Edition *EditionNode
+
+	Decls []FileElement
 
 	// This synthetic node allows access to final comments and whitespace
 	EOF *RuneNode
@@ -47,13 +51,31 @@ type FileNode struct {
 // This function panics if the concrete type of any element of decls is not
 // from this package.
 func NewFileNode(info *FileInfo, syntax *SyntaxNode, decls []FileElement, eof Token) *FileNode {
+	return newFileNode(info, syntax, nil, decls, eof)
+}
+
+// NewFileNodeWithEdition creates a new *FileNode. The edition parameter is required. If a file
+// has no edition declaration, use NewFileNode instead.
+//
+// This function panics if the concrete type of any element of decls is not
+// from this package.
+func NewFileNodeWithEdition(info *FileInfo, edition *EditionNode, decls []FileElement, eof Token) *FileNode {
+	if edition == nil {
+		panic("edition is nil")
+	}
+	return newFileNode(info, nil, edition, decls, eof)
+}
+
+func newFileNode(info *FileInfo, syntax *SyntaxNode, edition *EditionNode, decls []FileElement, eof Token) *FileNode {
 	numChildren := len(decls) + 1
-	if syntax != nil {
+	if syntax != nil || edition != nil {
 		numChildren++
 	}
 	children := make([]Node, 0, numChildren)
 	if syntax != nil {
 		children = append(children, syntax)
+	} else if edition != nil {
+		children = append(children, edition)
 	}
 	for _, decl := range decls {
 		switch decl := decl.(type) {
@@ -74,6 +96,7 @@ func NewFileNode(info *FileInfo, syntax *SyntaxNode, decls []FileElement, eof To
 		},
 		fileInfo: info,
 		Syntax:   syntax,
+		Edition:  edition,
 		Decls:    decls,
 		EOF:      eofNode,
 	}
@@ -83,10 +106,6 @@ func NewFileNode(info *FileInfo, syntax *SyntaxNode, decls []FileElement, eof To
 func NewEmptyFileNode(filename string) *FileNode {
 	fileInfo := NewFileInfo(filename, []byte{})
 	return NewFileNode(fileInfo, nil, nil, fileInfo.AddToken(0, 0))
-}
-
-func (f *FileNode) GetSyntax() Node {
-	return f.Syntax
 }
 
 func (f *FileNode) Name() string {
@@ -162,10 +181,12 @@ func NewSyntaxNode(keyword *KeywordNode, equals *RuneNode, syntax StringValueNod
 	if syntax == nil {
 		panic("syntax is nil")
 	}
+	var children []Node
 	if semicolon == nil {
-		panic("semicolon is nil")
+		children = []Node{keyword, equals, syntax}
+	} else {
+		children = []Node{keyword, equals, syntax, semicolon}
 	}
-	children := []Node{keyword, equals, syntax, semicolon}
 	return &SyntaxNode{
 		compositeNode: compositeNode{
 			children: children,
@@ -173,6 +194,51 @@ func NewSyntaxNode(keyword *KeywordNode, equals *RuneNode, syntax StringValueNod
 		Keyword:   keyword,
 		Equals:    equals,
 		Syntax:    syntax,
+		Semicolon: semicolon,
+	}
+}
+
+// EditionNode represents an edition declaration, which if present must be
+// the first non-comment content. Example:
+//
+//	edition = "2023";
+//
+// Files may include either an edition node or a syntax node, but not both.
+// If neither are present, the file is assumed to use proto2 syntax.
+type EditionNode struct {
+	compositeNode
+	Keyword   *KeywordNode
+	Equals    *RuneNode
+	Edition   StringValueNode
+	Semicolon *RuneNode
+}
+
+// NewEditionNode creates a new *EditionNode. All four arguments must be non-nil:
+//   - keyword: The token corresponding to the "edition" keyword.
+//   - equals: The token corresponding to the "=" rune.
+//   - edition: The actual edition value, e.g. "2023".
+//   - semicolon: The token corresponding to the ";" rune that ends the declaration.
+func NewEditionNode(keyword *KeywordNode, equals *RuneNode, edition StringValueNode, semicolon *RuneNode) *EditionNode {
+	if keyword == nil {
+		panic("keyword is nil")
+	}
+	if equals == nil {
+		panic("equals is nil")
+	}
+	if edition == nil {
+		panic("edition is nil")
+	}
+	if semicolon == nil {
+		panic("semicolon is nil")
+	}
+	children := []Node{keyword, equals, edition, semicolon}
+	return &EditionNode{
+		compositeNode: compositeNode{
+			children: children,
+		},
+		Keyword:   keyword,
+		Equals:    equals,
+		Edition:   edition,
 		Semicolon: semicolon,
 	}
 }
@@ -209,10 +275,10 @@ func NewImportNode(keyword *KeywordNode, public *KeywordNode, weak *KeywordNode,
 	if name == nil {
 		panic("name is nil")
 	}
+	numChildren := 2
 	if semicolon == nil {
-		panic("semicolon is nil")
+		numChildren++
 	}
-	numChildren := 3
 	if public != nil || weak != nil {
 		numChildren++
 	}
@@ -223,7 +289,10 @@ func NewImportNode(keyword *KeywordNode, public *KeywordNode, weak *KeywordNode,
 	} else if weak != nil {
 		children = append(children, weak)
 	}
-	children = append(children, name, semicolon)
+	children = append(children, name)
+	if semicolon != nil {
+		children = append(children, semicolon)
+	}
 
 	return &ImportNode{
 		compositeNode: compositeNode{
@@ -262,10 +331,12 @@ func NewPackageNode(keyword *KeywordNode, name IdentValueNode, semicolon *RuneNo
 	if name == nil {
 		panic("name is nil")
 	}
+	var children []Node
 	if semicolon == nil {
-		panic("semicolon is nil")
+		children = []Node{keyword, name}
+	} else {
+		children = []Node{keyword, name, semicolon}
 	}
-	children := []Node{keyword, name, semicolon}
 	return &PackageNode{
 		compositeNode: compositeNode{
 			children: children,
