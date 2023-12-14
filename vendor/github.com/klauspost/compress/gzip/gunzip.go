@@ -238,6 +238,11 @@ func (z *Reader) readHeader() (hdr Header, err error) {
 		}
 	}
 
+	// Reserved FLG bits must be zero.
+	if flg>>5 != 0 {
+		return hdr, ErrHeader
+	}
+
 	z.digest = 0
 	if z.decompressor == nil {
 		z.decompressor = flate.NewReader(z.r)
