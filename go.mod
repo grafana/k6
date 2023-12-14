@@ -50,7 +50,7 @@ require (
 	golang.org/x/net v0.19.0
 	golang.org/x/term v0.15.0
 	golang.org/x/time v0.5.0
-	google.golang.org/grpc v1.58.3
+	google.golang.org/grpc v1.60.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
@@ -73,7 +73,7 @@ require (
 	github.com/go-logr/logr v1.2.4 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
-	github.com/google/uuid v1.3.0 // indirect
+	github.com/google/uuid v1.3.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
@@ -88,9 +88,9 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.19.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.0.0 // indirect
-	golang.org/x/sync v0.3.0 // indirect
+	golang.org/x/sync v0.4.0 // indirect
 	golang.org/x/sys v0.15.0 // indirect
 	golang.org/x/text v0.14.0 // indirect
-	google.golang.org/genproto/googleapis/api v0.0.0-20230711160842-782d3b101e98 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230731193218-e0aa005b6bdf // indirect
+	google.golang.org/genproto/googleapis/api v0.0.0-20231002182017-d307bd883b97 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20231002182017-d307bd883b97 // indirect
 )
