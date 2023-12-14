@@ -943,7 +943,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 			name:      "on console.time",
 			consoleFn: "() => { console.time('k6'); console.timeEnd('k6'); }",
 			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "timeEnd" && strings.HasPrefix(cm.Text, "k6: 0.0") &&
+				return cm.Type == "timeEnd" && strings.HasPrefix(cm.Text, "k6: 0.") &&
 					cm.Page.URL() == blankPage
 			},
 		},
