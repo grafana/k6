@@ -248,7 +248,7 @@ func (b *BrowserType) allocate(
 }
 
 // ErrChromeNotInstalled is returned when the Chrome executable is not found.
-var ErrChromeNotInstalled = errors.New("chrome or chromium is not installed on this system")
+var ErrChromeNotInstalled = errors.New("neither chrome nor chromium is installed on this system")
 
 // executablePath returns the path where the extension expects to find the browser executable.
 func executablePath(
