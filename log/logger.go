@@ -2,7 +2,6 @@
 package log
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"regexp"
@@ -184,17 +183,6 @@ type consoleLogFormatter struct {
 // Format assembles a message from marshalling elements in the "objects" field
 // to JSON separated by space, and deletes the field when done.
 func (f *consoleLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	if objects, ok := entry.Data["objects"].([]any); ok {
-		var msg []string
-		for _, obj := range objects {
-			// TODO: Log error?
-			if o, err := json.Marshal(obj); err == nil {
-				msg = append(msg, string(o))
-			}
-		}
-		entry.Message = strings.Join(msg, " ")
-		delete(entry.Data, "objects")
-	}
 	if stringObjects, ok := entry.Data["stringObjects"].([]string); ok {
 		entry.Message = strings.Join(stringObjects, " ")
 		delete(entry.Data, "stringObjects")
