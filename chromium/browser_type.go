@@ -183,7 +183,12 @@ func (b *BrowserType) launch(
 	}
 	flags["user-data-dir"] = dataDir.Dir
 
-	browserProc, err := b.allocate(ctx, opts, flags, dataDir, logger)
+	path, err := executablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("finding browser executable: %w", err)
+	}
+
+	browserProc, err := b.allocate(ctx, path, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -223,7 +228,7 @@ func (b *BrowserType) Name() string {
 
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
-	ctx context.Context, opts *common.BrowserOptions,
+	ctx context.Context, path string,
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
@@ -237,11 +242,6 @@ func (b *BrowserType) allocate(
 	args, err := parseArgs(flags)
 	if err != nil {
 		return nil, err
-	}
-
-	path, err := executablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
-	if err != nil {
-		return nil, fmt.Errorf("finding browser executable: %w", err)
 	}
 
 	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
