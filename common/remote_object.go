@@ -16,7 +16,7 @@ import (
 	"github.com/dop251/goja"
 )
 
-var bigIntR = regexp.MustCompile("^[0-9]*n$")
+var bigIntRegex = regexp.MustCompile("^[0-9]*n$")
 
 type objectOverflowError struct{}
 
@@ -167,19 +167,21 @@ func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
 // parseRemoteObject is to be used by callers that require the string value
 // to be parsed to a Go type.
 func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
-	if obj.UnserializableValue == "" {
+	uv := obj.UnserializableValue
+
+	if uv == "" {
 		return parseRemoteObjectValue(obj.Type, obj.Subtype, string(obj.Value), obj.Preview)
 	}
 
-	if bigIntR.Match([]byte(obj.UnserializableValue)) {
-		n, err := strconv.ParseInt(strings.ReplaceAll(obj.UnserializableValue.String(), "n", ""), 10, 64)
+	if bigIntRegex.Match([]byte(uv)) {
+		n, err := strconv.ParseInt(strings.ReplaceAll(uv.String(), "n", ""), 10, 64)
 		if err != nil {
 			return nil, BigIntParseError{err}
 		}
 		return n, nil
 	}
 
-	switch obj.UnserializableValue.String() {
+	switch uv.String() {
 	case "-0": // To handle +0 divided by negative number
 		return math.Float64frombits(0 | (1 << 63)), nil
 	case "NaN":
@@ -193,7 +195,7 @@ func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	// We should never get here, as previous switch statement should
 	// be exhaustive and contain all possible unserializable values.
 	// See: https://chromedevtools.github.io/devtools-protocol/tot/Runtime/#type-UnserializableValue
-	return nil, UnserializableValueError{obj.UnserializableValue}
+	return nil, UnserializableValueError{uv}
 }
 
 func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (goja.Value, error) {
