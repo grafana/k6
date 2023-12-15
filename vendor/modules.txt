@@ -146,6 +146,9 @@ github.com/google/pprof/profile
 # github.com/google/uuid v1.3.0
 ## explicit
 github.com/google/uuid
+# github.com/gorilla/schema v1.2.0
+## explicit
+github.com/gorilla/schema
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
@@ -161,6 +164,9 @@ github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
+# github.com/grafana/xk6-dashboard v0.6.1
+## explicit; go 1.19
+github.com/grafana/xk6-dashboard/dashboard
 # github.com/grafana/xk6-output-prometheus-remote v0.3.1
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
@@ -254,6 +260,9 @@ github.com/mstoykov/k6-taskqueue-lib/taskqueue
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 ## explicit
 github.com/nu7hatch/gouuid
+# github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
+## explicit; go 1.14
+github.com/pkg/browser
 # github.com/pmezard/go-difflib v1.0.0
 ## explicit
 github.com/pmezard/go-difflib/difflib
@@ -274,6 +283,9 @@ github.com/prometheus/common/model
 github.com/prometheus/procfs
 github.com/prometheus/procfs/internal/fs
 github.com/prometheus/procfs/internal/util
+# github.com/r3labs/sse/v2 v2.10.0
+## explicit; go 1.13
+github.com/r3labs/sse/v2
 # github.com/redis/go-redis/v9 v9.0.5
 ## explicit; go 1.18
 github.com/redis/go-redis/v9
@@ -380,6 +392,7 @@ golang.org/x/crypto/ripemd160
 golang.org/x/crypto/x509roots/fallback
 # golang.org/x/net v0.19.0
 ## explicit; go 1.18
+golang.org/x/net/context
 golang.org/x/net/html
 golang.org/x/net/html/atom
 golang.org/x/net/http/httpguts
@@ -527,6 +540,9 @@ google.golang.org/protobuf/types/known/timestamppb
 google.golang.org/protobuf/types/known/typepb
 google.golang.org/protobuf/types/known/wrapperspb
 google.golang.org/protobuf/types/pluginpb
+# gopkg.in/cenkalti/backoff.v1 v1.1.0
+## explicit
+gopkg.in/cenkalti/backoff.v1
 # gopkg.in/guregu/null.v3 v3.3.0
 ## explicit
 gopkg.in/guregu/null.v3

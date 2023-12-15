@@ -103,8 +103,8 @@ func printExecutionDescription(
 	valueColor := getColor(noColor, color.FgCyan)
 
 	buf := &strings.Builder{}
-	fmt.Fprintf(buf, "  execution: %s\n", valueColor.Sprint(execution))
-	fmt.Fprintf(buf, "     script: %s\n", valueColor.Sprint(filename))
+	fmt.Fprintf(buf, "    execution: %s\n", valueColor.Sprint(execution))
+	fmt.Fprintf(buf, "       script: %s\n", valueColor.Sprint(filename))
 
 	var outputDescriptions []string
 	switch {
@@ -114,18 +114,23 @@ func printExecutionDescription(
 		for _, out := range outputs {
 			desc := out.Description()
 			if desc == engine.IngesterDescription {
-				if len(outputs) != 1 {
-					continue
-				}
-				desc = "-"
+				continue
+			}
+			if ok, v := checkWebDashboardDescription(desc); ok {
+				fmt.Fprintf(buf, "web dashboard: %s\n", valueColor.Sprint(v))
+
+				continue
 			}
 			outputDescriptions = append(outputDescriptions, desc)
 		}
+		if len(outputDescriptions) == 0 {
+			outputDescriptions = append(outputDescriptions, "-")
+		}
 	}
 
-	fmt.Fprintf(buf, "     output: %s\n", valueColor.Sprint(strings.Join(outputDescriptions, ", ")))
+	fmt.Fprintf(buf, "       output: %s\n", valueColor.Sprint(strings.Join(outputDescriptions, ", ")))
 	if gs.Flags.ProfilingEnabled && gs.Flags.Address != "" {
-		fmt.Fprintf(buf, "  profiling: %s\n", valueColor.Sprintf("http://%s/debug/pprof/", gs.Flags.Address))
+		fmt.Fprintf(buf, "    profiling: %s\n", valueColor.Sprintf("http://%s/debug/pprof/", gs.Flags.Address))
 	}
 
 	fmt.Fprintf(buf, "\n")
@@ -138,13 +143,13 @@ func printExecutionDescription(
 		scenarioDesc = fmt.Sprintf("%d scenarios", len(executorConfigs))
 	}
 
-	fmt.Fprintf(buf, "  scenarios: %s\n", valueColor.Sprintf(
+	fmt.Fprintf(buf, "    scenarios: %s\n", valueColor.Sprintf(
 		"(%.2f%%) %s, %d max VUs, %s max duration (incl. graceful stop):",
 		conf.ExecutionSegment.FloatLength()*100, scenarioDesc,
 		lib.GetMaxPossibleVUs(execPlan), maxDuration.Round(100*time.Millisecond)),
 	)
 	for _, ec := range executorConfigs {
-		fmt.Fprintf(buf, "           * %s: %s\n",
+		fmt.Fprintf(buf, "             * %s: %s\n",
 			ec.GetName(), ec.GetDescription(et))
 	}
 	fmt.Fprintf(buf, "\n")
@@ -379,4 +384,14 @@ func yamlPrint(w io.Writer, v interface{}) error {
 		return fmt.Errorf("could flush the data to the output: %w", err)
 	}
 	return nil
+}
+
+// checkWebDashboardDescription returns true if desc contains web dashboard description.
+// The returned string contains info string (URL).
+func checkWebDashboardDescription(desc string) (bool, string) {
+	const webDashboardDescPrefix = webDashboardName + " "
+	if strings.HasPrefix(desc, webDashboardDescPrefix) {
+		return true, strings.TrimPrefix(desc, webDashboardDescPrefix)
+	}
+	return false, ""
 }

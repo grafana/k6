@@ -31,6 +31,7 @@ func configFlagSet() *pflag.FlagSet {
 	flags.StringArrayP("out", "o", []string{}, "`uri` for an external metrics database")
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
+	flags.Bool("no-web-dashboard", false, "disable web dashboard")
 	return flags
 }
 
@@ -38,9 +39,10 @@ func configFlagSet() *pflag.FlagSet {
 type Config struct {
 	lib.Options
 
-	Out           []string  `json:"out" envconfig:"K6_OUT"`
-	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
-	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
+	Out            []string  `json:"out" envconfig:"K6_OUT"`
+	Linger         null.Bool `json:"linger" envconfig:"K6_LINGER"`
+	NoUsageReport  null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
+	NoWebDashboard null.Bool `json:"noWebDashboard" envconfig:"K6_NO_WEB_DASHBOARD"`
 
 	// TODO: deprecate
 	Collectors map[string]json.RawMessage `json:"collectors"`
@@ -66,6 +68,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
+	}
+	if cfg.NoWebDashboard.Valid {
+		c.NoWebDashboard = cfg.NoWebDashboard
 	}
 	if len(cfg.Collectors) > 0 {
 		c.Collectors = cfg.Collectors
@@ -94,10 +99,11 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		return Config{}, err
 	}
 	return Config{
-		Options:       opts,
-		Out:           out,
-		Linger:        getNullBool(flags, "linger"),
-		NoUsageReport: getNullBool(flags, "no-usage-report"),
+		Options:        opts,
+		Out:            out,
+		Linger:         getNullBool(flags, "linger"),
+		NoUsageReport:  getNullBool(flags, "no-usage-report"),
+		NoWebDashboard: getNullBool(flags, "no-web-dashboard"),
 	}, nil
 }
 
