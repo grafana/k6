@@ -787,164 +787,182 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 	testCases := []struct {
 		name      string
 		consoleFn string
-		assertFn  func(*common.ConsoleMessage) bool
+		assertFn  func(*testing.T, *common.ConsoleMessage)
 	}{
 		{
 			name:      "on console.log",
 			consoleFn: "() => console.log('this is a log message')",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "log" &&
-					cm.Text == "this is a log message" &&
-					cm.Args[0].JSONValue().String() == "this is a log message" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "log", cm.Type)
+				assert.Equal(t, "this is a log message", cm.Text)
+				assert.Equal(t, "this is a log message", cm.Args[0].JSONValue().String())
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.debug",
 			consoleFn: "() => console.debug('this is a debug message')",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "debug" &&
-					cm.Text == "this is a debug message" &&
-					cm.Args[0].JSONValue().String() == "this is a debug message" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "debug", cm.Type)
+				assert.Equal(t, "this is a debug message", cm.Text)
+				assert.Equal(t, "this is a debug message", cm.Args[0].JSONValue().String())
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.info",
 			consoleFn: "() => console.info('this is an info message')",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "info" &&
-					cm.Text == "this is an info message" &&
-					cm.Args[0].JSONValue().String() == "this is an info message" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "info", cm.Type)
+				assert.Equal(t, "this is an info message", cm.Text)
+				assert.Equal(t, "this is an info message", cm.Args[0].JSONValue().String())
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.error",
 			consoleFn: "() => console.error('this is an error message')",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "error" &&
-					cm.Text == "this is an error message" &&
-					cm.Args[0].JSONValue().String() == "this is an error message" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "error", cm.Type)
+				assert.Equal(t, "this is an error message", cm.Text)
+				assert.Equal(t, "this is an error message", cm.Args[0].JSONValue().String())
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.warn",
 			consoleFn: "() => console.warn('this is a warning message')",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "warning" &&
-					cm.Text == "this is a warning message" &&
-					cm.Args[0].JSONValue().String() == "this is a warning message" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "warning", cm.Type)
+				assert.Equal(t, "this is a warning message", cm.Text)
+				assert.Equal(t, "this is a warning message", cm.Args[0].JSONValue().String())
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.dir",
 			consoleFn: "() => console.dir(document.location)",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "dir" &&
-					cm.Text == "Location" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "dir", cm.Type)
+				assert.Equal(t, "Location", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.dirxml",
 			consoleFn: "() => console.dirxml(document.location)",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "dirxml" &&
-					cm.Text == "Location" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "dirxml", cm.Type)
+				assert.Equal(t, "Location", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.table",
 			consoleFn: "() => console.table([['Grafana', 'k6'], ['Grafana', 'Mimir']])",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "table" &&
-					cm.Text == "Array(2)" &&
-					cm.Args[0].JSONValue().String() == "Grafana,k6,Grafana,Mimir" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "table", cm.Type)
+				assert.Equal(t, "Array(2)", cm.Text)
+				assert.Equal(t, "Grafana,k6,Grafana,Mimir", cm.Args[0].JSONValue().String())
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.trace",
 			consoleFn: "() => console.trace('trace example')",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "trace" &&
-					cm.Text == "trace example" &&
-					cm.Args[0].JSONValue().String() == "trace example" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "trace", cm.Type)
+				assert.Equal(t, "trace example", cm.Text)
+				assert.Equal(t, "trace example", cm.Args[0].JSONValue().String())
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.clear",
 			consoleFn: "() => console.clear()",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "clear" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "clear", cm.Type)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.group",
 			consoleFn: "() => console.group()",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "startGroup" &&
-					cm.Text == "console.group" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "startGroup", cm.Type)
+				assert.Equal(t, "console.group", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.groupCollapsed",
 			consoleFn: "() => console.groupCollapsed()",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "startGroupCollapsed" &&
-					cm.Text == "console.groupCollapsed" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "startGroupCollapsed", cm.Type)
+				assert.Equal(t, "console.groupCollapsed", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.groupEnd",
 			consoleFn: "() => console.groupEnd()",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "endGroup" &&
-					cm.Text == "console.groupEnd" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "endGroup", cm.Type)
+				assert.Equal(t, "console.groupEnd", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.assert",
 			consoleFn: "() => console.assert(2 == 3)", // Only writes to console if assertion is false
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "assert" &&
-					cm.Text == "console.assert" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "assert", cm.Type)
+				assert.Equal(t, "console.assert", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.count (default label)",
 			consoleFn: "() => console.count()", // default label
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "count" &&
-					cm.Text == "default: 1" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "count", cm.Type)
+				assert.Equal(t, "default: 1", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.count",
 			consoleFn: "() => console.count('k6')",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "count" &&
-					cm.Text == "k6: 1" &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "count", cm.Type)
+				assert.Equal(t, "k6: 1", cm.Text)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
 			name:      "on console.time",
 			consoleFn: "() => { console.time('k6'); console.timeEnd('k6'); }",
-			assertFn: func(cm *common.ConsoleMessage) bool {
-				return cm.Type == "timeEnd" && strings.HasPrefix(cm.Text, "k6: 0.") &&
-					cm.Page.URL() == blankPage
+			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
+				t.Helper()
+				assert.Equal(t, "timeEnd", cm.Type)
+				assert.True(t, strings.HasPrefix(cm.Text, "k6: 0."), `missing expected prefix "k6: 0."`)
+				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
 	}
@@ -960,23 +978,21 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 			p := tb.NewPage(nil)
 
 			var (
-				assertOne, assertTwo bool
-				done1                = make(chan bool)
-				done2                = make(chan bool)
+				done1 = make(chan bool)
+				done2 = make(chan bool)
 
-				assertTO bool
-				testTO   = 2500 * time.Millisecond
+				testTO = 2500 * time.Millisecond
 			)
 
 			// Console Messages should be multiplexed for every registered handler
 			eventHandlerOne := func(cm *common.ConsoleMessage) {
 				defer close(done1)
-				assertOne = tc.assertFn(cm)
+				tc.assertFn(t, cm)
 			}
 
 			eventHandlerTwo := func(cm *common.ConsoleMessage) {
 				defer close(done2)
-				assertTwo = tc.assertFn(cm)
+				tc.assertFn(t, cm)
 			}
 
 			// eventHandlerOne and eventHandlerTwo will be called from a
@@ -993,18 +1009,14 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 			select {
 			case <-done1:
 			case <-time.After(testTO):
-				assertTO = true
+				assert.Fail(t, "test timed out before eventHandlerOne completed")
 			}
 
 			select {
 			case <-done2:
 			case <-time.After(testTO):
-				assertTO = true
+				assert.Fail(t, "test timed out before eventHandlerTwo completed")
 			}
-
-			assert.False(t, assertTO, "test timed out before event handlers were called")
-			assert.True(t, assertOne, "error asserting console message for assertOne")
-			assert.True(t, assertTwo, "error asserting console message for assertTwo")
 		})
 	}
 }
