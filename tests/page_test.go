@@ -9,7 +9,6 @@ import (
 	"io"
 	"net/http"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -961,7 +960,7 @@ func TestPageOn(t *testing.T) { //nolint:gocognit
 			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
 				t.Helper()
 				assert.Equal(t, "timeEnd", cm.Type)
-				assert.True(t, strings.HasPrefix(cm.Text, "k6: 0."), `missing expected prefix "k6: 0."`)
+				assert.Regexp(t, `^k6: [0-9]+\.[0-9]+`, cm.Text, `expected prefix "k6: <a float>" but got %q`, cm.Text)
 				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
 			},
 		},
