@@ -99,7 +99,7 @@ func createOutputs(
 
 	outputs := test.derivedConfig.Out
 	if !test.derivedConfig.NoWebDashboard.Bool {
-		outputs = append(test.derivedConfig.Out, webDashboardName)
+		outputs = append(outputs, webDashboardName)
 	}
 
 	result := make([]output.Output, 0, len(outputs))
