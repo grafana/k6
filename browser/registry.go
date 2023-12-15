@@ -428,9 +428,9 @@ func (r *tracesRegistry) startIterationTrace(ctx context.Context, data k6event.I
 	}
 
 	spanCtx, span := r.tracer.Start(ctx, "iteration", oteltrace.WithAttributes(
-		attribute.Int64("number", data.Iteration),
-		attribute.Int64("vu", int64(data.VUID)),
-		attribute.String("scenario", data.ScenarioName),
+		attribute.Int64("test.iteration.number", data.Iteration),
+		attribute.Int64("test.vu", int64(data.VUID)),
+		attribute.String("test.scenario", data.ScenarioName),
 	))
 
 	r.m[data.Iteration] = &trace{

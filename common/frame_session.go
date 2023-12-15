@@ -352,8 +352,11 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	})
 
 	_, span := TraceEvent(
-		fs.ctx, fs.targetID.String(), "web_vital", wv.SpanID,
-		trace.WithAttributes(attribute.Float64(wv.Name, value), attribute.String("rating", wv.Rating)))
+		fs.ctx, fs.targetID.String(), "web_vital", wv.SpanID, trace.WithAttributes(
+			attribute.String("web_vital.name", wv.Name),
+			attribute.Float64("web_vital.value", value),
+			attribute.String("web_vital.rating", wv.Rating),
+		))
 	defer span.End()
 
 	return nil
@@ -754,7 +757,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 
 	_, fs.mainFrameSpan = TraceNavigation(
 		fs.ctx, fs.targetID.String(), frame.URL,
-		trace.WithAttributes(attribute.String("url", frame.URL)),
+		trace.WithAttributes(attribute.String("navigation.url", frame.URL)),
 	)
 
 	var (

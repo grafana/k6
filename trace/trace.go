@@ -12,7 +12,7 @@ import (
 	k6lib "go.k6.io/k6/lib"
 )
 
-const tracerName = "browser"
+const tracerName = "k6.browser"
 
 // liveSpan represents an active span associated with a page navigation.
 //

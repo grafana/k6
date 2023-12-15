@@ -868,7 +868,7 @@ func (p *Page) Goto(url string, opts goja.Value) (*Response, error) {
 		p.ctx,
 		p.targetID.String(),
 		"page.goto",
-		trace.WithAttributes(attribute.String("url", url)),
+		trace.WithAttributes(attribute.String("page.goto.url", url)),
 	)
 	defer span.End()
 
@@ -1113,7 +1113,7 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
 		k6ext.Panic(p.ctx, "parsing screenshot options: %w", err)
 	}
-	span.SetAttributes(attribute.String("path", parsedOpts.Path))
+	span.SetAttributes(attribute.String("screenshot.path", parsedOpts.Path))
 
 	s := newScreenshotter(spanCtx)
 	buf, err := s.screenshotPage(p, parsedOpts)

@@ -1183,7 +1183,7 @@ func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
 		k6ext.Panic(h.ctx, "parsing screenshot options: %w", err)
 	}
-	span.SetAttributes(attribute.String("path", parsedOpts.Path))
+	span.SetAttributes(attribute.String("screenshot.path", parsedOpts.Path))
 
 	s := newScreenshotter(spanCtx)
 	buf, err := s.screenshotElement(h, parsedOpts)
