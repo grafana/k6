@@ -756,8 +756,7 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 	}
 
 	_, fs.mainFrameSpan = TraceNavigation(
-		fs.ctx, fs.targetID.String(), frame.URL,
-		trace.WithAttributes(attribute.String("navigation.url", frame.URL)),
+		fs.ctx, fs.targetID.String(), trace.WithAttributes(attribute.String("navigation.url", frame.URL)),
 	)
 
 	var (

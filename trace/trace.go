@@ -77,7 +77,7 @@ func (t *Tracer) TraceAPICall(
 // Posterior calls to TraceEvent or TraceAPICall given the same targetID will try to
 // associate new spans for these actions to the liveSpan created in this call.
 func (t *Tracer) TraceNavigation(
-	ctx context.Context, targetID string, url string, opts ...trace.SpanStartOption,
+	ctx context.Context, targetID string, opts ...trace.SpanStartOption,
 ) (context.Context, trace.Span) {
 	t.liveSpansMu.Lock()
 	defer t.liveSpansMu.Unlock()
@@ -96,7 +96,7 @@ func (t *Tracer) TraceNavigation(
 
 	opts = append(opts, trace.WithAttributes(t.metadata...))
 
-	ls.ctx, ls.span = t.Start(ctx, url, opts...)
+	ls.ctx, ls.span = t.Start(ctx, "navigation", opts...)
 	t.liveSpans[targetID] = ls
 
 	return ls.ctx, ls.span

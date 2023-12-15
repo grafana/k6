@@ -14,7 +14,7 @@ type Tracer interface {
 		ctx context.Context, targetID string, spanName string, opts ...trace.SpanStartOption,
 	) (context.Context, trace.Span)
 	TraceNavigation(
-		ctx context.Context, targetID string, url string, opts ...trace.SpanStartOption,
+		ctx context.Context, targetID string, opts ...trace.SpanStartOption,
 	) (context.Context, trace.Span)
 	TraceEvent(
 		ctx context.Context, targetID string, eventName string, spanID string, opts ...trace.SpanStartOption,
@@ -37,10 +37,10 @@ func TraceAPICall(
 // calls its TraceNavigation implementation. If the Tracer is not present in the given
 // ctx, it returns a noopSpan and the given context.
 func TraceNavigation(
-	ctx context.Context, targetID string, url string, opts ...trace.SpanStartOption,
+	ctx context.Context, targetID string, opts ...trace.SpanStartOption,
 ) (context.Context, trace.Span) {
 	if tracer := GetTracer(ctx); tracer != nil {
-		return tracer.TraceNavigation(ctx, targetID, url, opts...)
+		return tracer.TraceNavigation(ctx, targetID, opts...)
 	}
 	return ctx, browsertrace.NoopSpan{}
 }

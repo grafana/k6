@@ -103,7 +103,7 @@ func TestTracing(t *testing.T) {
 			js:   fmt.Sprintf("page.goto('%s')", ts.URL),
 			spans: []string{
 				"page.goto",
-				fmt.Sprintf("%s/", ts.URL), // Navigation span
+				"navigation",
 			},
 		},
 		{
