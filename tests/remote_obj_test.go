@@ -135,7 +135,7 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 			name: "filled_object", eval: `{return {foo:"bar"};}`, want: map[string]any{"foo": "bar"},
 		},
 		{
-			name: "filled_array", eval: `{return ["foo","bar"];}`, want: []interface{}{0: "foo", 1: "bar"},
+			name: "filled_array", eval: `{return ["foo","bar"];}`, want: []any{0: "foo", 1: "bar"},
 		},
 		{
 			name: "filled_array", eval: `() => true`, want: `function()`,
@@ -161,6 +161,7 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 		{
 			name: "scientific_notation", eval: "123e-5", want: 0.00123,
 		},
+		// TODO:
 		// {
 		// 	// This test is ignored until https://github.com/grafana/xk6-browser/issues/1132
 		// 	// has been resolved.
