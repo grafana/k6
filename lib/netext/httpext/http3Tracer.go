@@ -1,6 +1,7 @@
 package httpext
 
 import (
+	"context"
 	"net"
 	"time"
 
@@ -32,7 +33,7 @@ type metricHandler struct {
 	streams           map[int64]*streamMetrics
 }
 
-func (mh *metricHandler) sendConnectionMetrics() {
+func (mh *metricHandler) sendConnectionMetrics(ctx context.Context) {
 	handshakeTime := mh.connectionMetrics.handshakeDone.Sub(mh.connectionMetrics.handshakeStart)
 	connectTime := mh.connectionMetrics.handshakeStart.Sub(mh.connectionMetrics.connectionStart)
 
@@ -56,12 +57,13 @@ func (mh *metricHandler) sendConnectionMetrics() {
 				Time:     mh.connectionMetrics.handshakeStart,
 				Value:    metrics.D(connectTime),
 			},
-		}}
+		},
+	}
 	mh.vu.State().Samples <- samples
-	mh.sendDataMetrics()
+	mh.sendDataMetrics(ctx)
 }
 
-func (mh *metricHandler) sendDataMetrics() {
+func (mh *metricHandler) sendDataMetrics(ctx context.Context) {
 	samples := metrics.ConnectedSamples{
 		Samples: []metrics.Sample{
 			{
@@ -82,13 +84,14 @@ func (mh *metricHandler) sendDataMetrics() {
 				Value:    float64(mh.connectionMetrics.dataSent),
 				Metadata: mh.vu.State().Tags.GetCurrentValues().Metadata,
 			},
-		}}
-	metrics.PushIfNotDone(mh.vu.Context(), mh.vu.State().Samples, samples)
+		},
+	}
+	metrics.PushIfNotDone(ctx, mh.vu.State().Samples, samples)
 	mh.connectionMetrics.dataReceived = 0
 	mh.connectionMetrics.dataSent = 0
 }
 
-func (mh *metricHandler) sendStreamMetrics(streamID int64) {
+func (mh *metricHandler) sendStreamMetrics(ctx context.Context, streamID int64) {
 	streamMetrics := mh.getStreamMetrics(streamID, false)
 	if streamMetrics == nil {
 		return
@@ -149,18 +152,19 @@ func (mh *metricHandler) sendStreamMetrics(streamID int64) {
 				Time:     streamMetrics.responseFin,
 				Value:    1,
 			},
-		}}
+		},
+	}
 	mh.vu.State().Samples <- samples
-	mh.sendDataMetrics()
+	mh.sendDataMetrics(ctx)
 }
 
-func (mh *metricHandler) handleFramesReceived(frames []logging.Frame) {
+func (mh *metricHandler) handleFramesReceived(ctx context.Context, frames []logging.Frame) {
 	for _, frame := range frames {
 		switch f := frame.(type) {
 		case *logging.HandshakeDoneFrame:
 			{
 				mh.connectionMetrics.handshakeDone = time.Now()
-				mh.sendConnectionMetrics()
+				mh.sendConnectionMetrics(ctx)
 			}
 		case *logging.StreamFrame:
 			{
@@ -175,7 +179,7 @@ func (mh *metricHandler) handleFramesReceived(frames []logging.Frame) {
 				}
 				if f.Fin {
 					streamMetrics.responseFin = time.Now()
-					mh.sendStreamMetrics(streamID)
+					mh.sendStreamMetrics(ctx, streamID)
 				}
 			}
 		}
@@ -184,23 +188,19 @@ func (mh *metricHandler) handleFramesReceived(frames []logging.Frame) {
 
 func (mh *metricHandler) handleFramesSent(frames []logging.Frame) {
 	for _, frame := range frames {
-		switch f := frame.(type) {
-		case *logging.StreamFrame:
-			{
-				streamID := int64(f.StreamID)
-				streamMetrics := mh.getStreamMetrics(streamID, true)
-				streamMetrics.sentBytes += int(f.Length)
-				if f.Fin {
-					streamMetrics.requestFin = time.Now()
-				}
+		if f, ok := frame.(*logging.StreamFrame); ok {
+			streamID := int64(f.StreamID)
+			streamMetrics := mh.getStreamMetrics(streamID, true)
+			streamMetrics.sentBytes += int(f.Length)
+			if f.Fin {
+				streamMetrics.requestFin = time.Now()
 			}
 		}
 	}
-
 }
 
-func (mh *metricHandler) packetReceived(bc logging.ByteCount, f []logging.Frame) {
-	mh.handleFramesReceived(f)
+func (mh *metricHandler) packetReceived(ctx context.Context, bc logging.ByteCount, f []logging.Frame) {
+	mh.handleFramesReceived(ctx, f)
 	mh.connectionMetrics.dataReceived += int(bc)
 }
 
@@ -221,7 +221,8 @@ func (mh *metricHandler) getStreamMetrics(streamID int64, createIfNotFound bool)
 	return m
 }
 
-func NewTracer(vu modules.VU, http3Metrics *HTTP3Metrics) *logging.ConnectionTracer {
+// NewTracer creates a new connection tracer for the given VU, that will measure and emit different metrics
+func NewTracer(ctx context.Context, vu modules.VU, http3Metrics *HTTP3Metrics) *logging.ConnectionTracer {
 	mh := &metricHandler{
 		vu:                vu,
 		metrics:           http3Metrics,
@@ -237,15 +238,25 @@ func NewTracer(vu modules.VU, http3Metrics *HTTP3Metrics) *logging.ConnectionTra
 			if mh.connectionMetrics.handshakeStart.IsZero() && eh.Type == 3 /*protocol.PacketTypeHandshake*/ {
 				mh.connectionMetrics.handshakeStart = time.Now()
 			}
-			mh.packetReceived(bc, f)
+			mh.packetReceived(ctx, bc, f)
 		},
 		ReceivedShortHeaderPacket: func(sh *logging.ShortHeader, bc logging.ByteCount, e logging.ECN, f []logging.Frame) {
-			mh.packetReceived(bc, f)
+			mh.packetReceived(ctx, bc, f)
 		},
-		SentLongHeaderPacket: func(eh *logging.ExtendedHeader, bc logging.ByteCount, e logging.ECN, af *logging.AckFrame, f []logging.Frame) {
+		SentLongHeaderPacket: func(eh *logging.ExtendedHeader,
+			bc logging.ByteCount,
+			e logging.ECN,
+			af *logging.AckFrame,
+			f []logging.Frame,
+		) {
 			mh.packetSent(bc, f)
 		},
-		SentShortHeaderPacket: func(sh *logging.ShortHeader, bc logging.ByteCount, e logging.ECN, af *logging.AckFrame, f []logging.Frame) {
+		SentShortHeaderPacket: func(sh *logging.ShortHeader,
+			bc logging.ByteCount,
+			e logging.ECN,
+			af *logging.AckFrame,
+			f []logging.Frame,
+		) {
 			mh.packetSent(bc, f)
 		},
 	}

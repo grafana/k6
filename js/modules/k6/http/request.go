@@ -13,6 +13,7 @@ import (
 	"net/textproto"
 	"net/url"
 	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -41,19 +42,19 @@ func (c *Client) getMethodClosure(method string) func(url goja.Value, args ...go
 	}
 }
 
-func (c *Client) getHTTP3Client() (*http.Client, error) {
+func (c *Client) configureHTTP3RoundTripper() {
 	qconf := quic.Config{
-
 		Tracer: func(ctx context.Context, p logging.Perspective, connID quic.ConnectionID) *logging.ConnectionTracer {
 			tracers := make([]*logging.ConnectionTracer, 0)
-			tracers = append(tracers, httpext.NewTracer(c.moduleInstance.vu, c.moduleInstance.metrics))
+			tracers = append(tracers, httpext.NewTracer(ctx, c.moduleInstance.vu, c.moduleInstance.metrics))
+			//nolint:forbidigo
 			if os.Getenv("HTTP3_QLOG") == "1" {
 				role := "server"
 				if p == logging.PerspectiveClient {
 					role = "client"
 				}
 				filename := fmt.Sprintf("./log_%s_%s.qlog", connID, role)
-				f, _ := os.Create(filename)
+				f, _ := os.Create(filepath.Clean(filename))
 				// TODO: handle the error
 				tracers = append(tracers, qlog.NewConnectionTracer(f, p, connID))
 			}
@@ -67,6 +68,7 @@ func (c *Client) getHTTP3Client() (*http.Client, error) {
 		}
 		insecure := false
 		c.http3RoundTripper = &http3.RoundTripper{
+			//nolint:gosec
 			TLSClientConfig: &tls.Config{
 				RootCAs:            pool,
 				InsecureSkipVerify: insecure,
@@ -74,7 +76,6 @@ func (c *Client) getHTTP3Client() (*http.Client, error) {
 			QuicConfig: &qconf,
 		}
 	}
-	return nil, nil
 }
 
 // Request makes an http request of the provided `method` and returns a corresponding response by
@@ -92,9 +93,14 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*Re
 	}
 
 	if req.Req.Proto == httpext.HTTP3Proto {
-		c.getHTTP3Client()
+		c.configureHTTP3RoundTripper()
 	}
-	resp, err := httpext.MakeRequest(context.WithValue(c.moduleInstance.vu.Context(), httpext.CtxKeyHTTP3RoundTripper, c.moduleInstance.defaultClient.http3RoundTripper), state, req)
+	contextWithRoundTripper := context.WithValue(
+		c.moduleInstance.vu.Context(),
+		httpext.CtxKeyHTTP3RoundTripper,
+		c.moduleInstance.defaultClient.http3RoundTripper,
+	)
+	resp, err := httpext.MakeRequest(contextWithRoundTripper, state, req)
 	if err != nil {
 		return nil, err
 	}
@@ -153,7 +159,12 @@ func (c *Client) asyncRequest(method string, url goja.Value, args ...goja.Value)
 	callback := c.moduleInstance.vu.RegisterCallback()
 
 	go func() {
-		resp, err := httpext.MakeRequest(context.WithValue(c.moduleInstance.vu.Context(), httpext.CtxKeyHTTP3RoundTripper, c.moduleInstance.defaultClient.http3RoundTripper), state, req)
+		contextWithRoundTripper := context.WithValue(
+			c.moduleInstance.vu.Context(),
+			httpext.CtxKeyHTTP3RoundTripper,
+			c.moduleInstance.defaultClient.http3RoundTripper,
+		)
+		resp, err := httpext.MakeRequest(contextWithRoundTripper, state, req)
 		callback(func() error {
 			if err != nil {
 				reject(err)
@@ -550,9 +561,18 @@ func (c *Client) Batch(reqsV ...goja.Value) (interface{}, error) {
 	}
 
 	reqCount := len(batchReqs)
+	contextWithRoundTripper := context.WithValue(
+		c.moduleInstance.vu.Context(),
+		httpext.CtxKeyHTTP3RoundTripper,
+		c.moduleInstance.defaultClient.http3RoundTripper,
+	)
 	errs := httpext.MakeBatchRequests(
-		context.WithValue(c.moduleInstance.vu.Context(), httpext.CtxKeyHTTP3RoundTripper, c.moduleInstance.defaultClient.http3RoundTripper), state, batchReqs, reqCount,
-		int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
+		contextWithRoundTripper,
+		state,
+		batchReqs,
+		reqCount,
+		int(state.Options.Batch.Int64),
+		int(state.Options.BatchPerHost.Int64),
 	)
 
 	for i := 0; i < reqCount; i++ {

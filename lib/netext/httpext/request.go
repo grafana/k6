@@ -183,7 +183,9 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)
 	var transport http.RoundTripper
 	if preq.Req.Proto == HTTP3Proto {
-		transport = newHttp3Transport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback, ctx.Value(CtxKeyHTTP3RoundTripper).(http.RoundTripper))
+		if http3RoundTripper, ok := ctx.Value(CtxKeyHTTP3RoundTripper).(http.RoundTripper); ok {
+			transport = newHTTP3Transport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback, http3RoundTripper)
+		}
 	} else {
 		transport = tracerTransport
 	}

@@ -20,11 +20,9 @@ type http3Transport struct {
 	roundTripper     http.RoundTripper
 }
 
-// newTransport returns a new http.RoundTripper implementation that wraps around
-// the provided state's Transport. It uses a httpext.Tracer to measure all HTTP
-// requests made through it and annotates and emits the recorded metric samples
-// through the state.Samples channel.
-func newHttp3Transport(
+// newHTTP3Transport returns a new http.RoundTripper implementation that wraps around
+// the provided RoundTripper.
+func newHTTP3Transport(
 	ctx context.Context,
 	state *lib.State,
 	tagsAndMeta *metrics.TagsAndMeta,
