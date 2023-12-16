@@ -84,7 +84,6 @@ func newTestState(t testing.TB) testState {
 
 	testRuntime := modulestest.NewRuntime(t)
 	samples := make(chan metrics.SampleContainer, 1000)
-
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
 	registry := metrics.NewRegistry()
@@ -109,6 +108,8 @@ func newTestState(t testing.TB) testState {
 
 	m := New().NewModuleInstance(testRuntime.VU)
 	require.NoError(t, testRuntime.VU.RuntimeField.Set("ws", m.Exports().Default))
+	require.NoError(t, testRuntime.VU.RuntimeField.Set("http", httpModule.New().NewModuleInstance(testRuntime.VU).Exports().Default))
+
 	testRuntime.MoveToVUContext(state)
 
 	return testState{
@@ -1152,11 +1153,9 @@ func TestCookieJar(t *testing.T) {
 		}
 	}))
 
-	err := ts.VU.Runtime().Set("http", httpModule.New().NewModuleInstance(ts.VU).Exports().Default)
-	require.NoError(t, err)
 	ts.VU.State().CookieJar, _ = cookiejar.New(nil)
 
-	_, err = ts.VU.Runtime().RunString(sr(`
+	_, err := ts.VU.Runtime().RunString(sr(`
 		var res = ws.connect("WSBIN_URL/ws-echo-someheader", function(socket){
 			socket.close()
 		})

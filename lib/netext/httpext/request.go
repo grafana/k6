@@ -118,7 +118,6 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		Cookies: stdCookiesToHTTPRequestCookies(preq.Req.Cookies()),
 		Headers: preq.Req.Header,
 	}
-
 	if preq.Body != nil {
 		// TODO: maybe hide this behind of flag in order for this to not happen for big post/puts?
 		// should we set this after the compression? what will be the point ?
@@ -182,7 +181,12 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 	}
 
 	tracerTransport := newTransport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback)
-	var transport http.RoundTripper = tracerTransport
+	var transport http.RoundTripper
+	if preq.Req.Proto == HTTP3Proto {
+		transport = newHttp3Transport(ctx, state, &preq.TagsAndMeta, preq.ResponseCallback, ctx.Value(CtxKeyHTTP3RoundTripper).(http.RoundTripper))
+	} else {
+		transport = tracerTransport
+	}
 
 	if state.Options.HTTPDebug.String != "" {
 		// Combine tags with common log fields
@@ -233,7 +237,6 @@ func MakeRequest(ctx context.Context, state *lib.State, preq *ParsedHTTPRequest)
 		Transport: transport,
 		CheckRedirect: func(req *http.Request, via []*http.Request) error {
 			resp.URL = req.URL.String()
-
 			// Update active jar with cookies found in "Set-Cookie" header(s) of redirect response
 			if preq.ActiveJar != nil {
 				if respCookies := req.Response.Cookies(); len(respCookies) > 0 {

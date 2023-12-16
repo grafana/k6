@@ -1,10 +1,12 @@
 package http
 
 import (
+	"log"
 	"net/http"
 	"net/http/cookiejar"
 
 	"github.com/dop251/goja"
+	http3 "github.com/quic-go/quic-go/http3"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/netext"
@@ -23,6 +25,7 @@ type ModuleInstance struct {
 	vu            modules.VU
 	rootModule    *RootModule
 	defaultClient *Client
+	metrics       *httpext.HTTP3Metrics
 	exports       *goja.Object
 }
 
@@ -39,9 +42,15 @@ func New() *RootModule {
 // NewModuleInstance returns an HTTP module instance for each VU.
 func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	rt := vu.Runtime()
+	metrics, err := httpext.RegisterMetrics(vu)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	mi := &ModuleInstance{
 		vu:         vu,
 		rootModule: r,
+		metrics:    metrics,
 		exports:    rt.NewObject(),
 	}
 	mi.defineConstants()
@@ -178,6 +187,7 @@ func (mi *ModuleInstance) URL(parts []string, pieces ...string) (httpext.URL, er
 //
 // TODO: move to its own file
 type Client struct {
-	moduleInstance   *ModuleInstance
-	responseCallback func(int) bool
+	moduleInstance    *ModuleInstance
+	responseCallback  func(int) bool
+	http3RoundTripper *http3.RoundTripper
 }

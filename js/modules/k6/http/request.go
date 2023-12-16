@@ -2,17 +2,26 @@ package http
 
 import (
 	"bytes"
+	"context"
+	"crypto/tls"
+	"crypto/x509"
 	"errors"
 	"fmt"
+	"log"
 	"mime/multipart"
 	"net/http"
 	"net/textproto"
 	"net/url"
+	"os"
 	"reflect"
 	"strings"
 	"time"
 
 	"github.com/dop251/goja"
+	"github.com/quic-go/quic-go"
+	http3 "github.com/quic-go/quic-go/http3"
+	"github.com/quic-go/quic-go/logging"
+	"github.com/quic-go/quic-go/qlog"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/common"
@@ -32,6 +41,42 @@ func (c *Client) getMethodClosure(method string) func(url goja.Value, args ...go
 	}
 }
 
+func (c *Client) getHTTP3Client() (*http.Client, error) {
+	qconf := quic.Config{
+
+		Tracer: func(ctx context.Context, p logging.Perspective, connID quic.ConnectionID) *logging.ConnectionTracer {
+			tracers := make([]*logging.ConnectionTracer, 0)
+			tracers = append(tracers, httpext.NewTracer(c.moduleInstance.vu, c.moduleInstance.metrics))
+			if os.Getenv("HTTP3_QLOG") == "1" {
+				role := "server"
+				if p == logging.PerspectiveClient {
+					role = "client"
+				}
+				filename := fmt.Sprintf("./log_%s_%s.qlog", connID, role)
+				f, _ := os.Create(filename)
+				// TODO: handle the error
+				tracers = append(tracers, qlog.NewConnectionTracer(f, p, connID))
+			}
+			return logging.NewMultiplexedConnectionTracer(tracers...)
+		},
+	}
+	if c.http3RoundTripper == nil {
+		pool, err := x509.SystemCertPool()
+		if err != nil {
+			log.Fatal(err)
+		}
+		insecure := false
+		c.http3RoundTripper = &http3.RoundTripper{
+			TLSClientConfig: &tls.Config{
+				RootCAs:            pool,
+				InsecureSkipVerify: insecure,
+			},
+			QuicConfig: &qconf,
+		}
+	}
+	return nil, nil
+}
+
 // Request makes an http request of the provided `method` and returns a corresponding response by
 // taking goja.Values as arguments
 func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*Response, error) {
@@ -46,7 +91,10 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*Re
 		return c.handleParseRequestError(err)
 	}
 
-	resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
+	if req.Req.Proto == httpext.HTTP3Proto {
+		c.getHTTP3Client()
+	}
+	resp, err := httpext.MakeRequest(context.WithValue(c.moduleInstance.vu.Context(), httpext.CtxKeyHTTP3RoundTripper, c.moduleInstance.defaultClient.http3RoundTripper), state, req)
 	if err != nil {
 		return nil, err
 	}
@@ -105,7 +153,7 @@ func (c *Client) asyncRequest(method string, url goja.Value, args ...goja.Value)
 	callback := c.moduleInstance.vu.RegisterCallback()
 
 	go func() {
-		resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
+		resp, err := httpext.MakeRequest(context.WithValue(c.moduleInstance.vu.Context(), "http3roundtripper", c.moduleInstance.defaultClient.http3RoundTripper), state, req)
 		callback(func() error {
 			if err != nil {
 				reject(err)
@@ -282,6 +330,16 @@ func (c *Client) parseRequest(
 		params := params.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch k {
+			case "proto":
+				protoV := params.Get(k)
+				if goja.IsUndefined(protoV) || goja.IsNull(protoV) {
+					continue
+				}
+				proto := protoV.String()
+				if proto == "" {
+					continue
+				}
+				result.Req.Proto = proto
 			case "cookies":
 				cookiesV := params.Get(k)
 				if goja.IsUndefined(cookiesV) || goja.IsNull(cookiesV) {
@@ -493,7 +551,7 @@ func (c *Client) Batch(reqsV ...goja.Value) (interface{}, error) {
 
 	reqCount := len(batchReqs)
 	errs := httpext.MakeBatchRequests(
-		c.moduleInstance.vu.Context(), state, batchReqs, reqCount,
+		context.WithValue(c.moduleInstance.vu.Context(), httpext.CtxKeyHTTP3RoundTripper, c.moduleInstance.defaultClient.http3RoundTripper), state, batchReqs, reqCount,
 		int(state.Options.Batch.Int64), int(state.Options.BatchPerHost.Int64),
 	)
 
