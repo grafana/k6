@@ -153,7 +153,7 @@ func (c *Client) asyncRequest(method string, url goja.Value, args ...goja.Value)
 	callback := c.moduleInstance.vu.RegisterCallback()
 
 	go func() {
-		resp, err := httpext.MakeRequest(context.WithValue(c.moduleInstance.vu.Context(), "http3roundtripper", c.moduleInstance.defaultClient.http3RoundTripper), state, req)
+		resp, err := httpext.MakeRequest(context.WithValue(c.moduleInstance.vu.Context(), httpext.CtxKeyHTTP3RoundTripper, c.moduleInstance.defaultClient.http3RoundTripper), state, req)
 		callback(func() error {
 			if err != nil {
 				reject(err)

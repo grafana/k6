@@ -7,5 +7,10 @@ export const options = {
   };
 
 export default function () {
-   http.get("https://www.cloudflare.com/",{proto: "HTTP/3"})
+    let resp;
+    resp = http.get('https://www.cloudflare.com/')
+    console.log(resp.proto) // Prints HTTP/2.0
+
+    resp = http.get('https://www.cloudflare.com/',{proto: "HTTP/3"})
+    console.log(resp.proto) // Prints HTTP/3.0
 }
