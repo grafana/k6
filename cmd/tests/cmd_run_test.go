@@ -1892,7 +1892,7 @@ func TestUIRenderWebDashboard(t *testing.T) {
 				ts.Env["K6_WEB_DASHBOARD"] = tc.env
 			}
 			ts.Env["K6_WEB_DASHBOARD_PORT"] = "0"
-			ts.CmdArgs = []string{"k6", "run"}
+			ts.CmdArgs = []string{"k6", "run", "--log-output=stdout"}
 			if tc.flag != "" {
 				ts.CmdArgs = append(ts.CmdArgs, tc.flag)
 			}
@@ -1900,12 +1900,10 @@ func TestUIRenderWebDashboard(t *testing.T) {
 			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-			stdout := ts.Stdout.String()
-			t.Logf("Stdout: %s", stdout)
 			if tc.active {
-				assert.Contains(t, stdout, tc.expRender)
+				assert.Contains(t, ts.Stdout.String(), tc.expRender)
 			} else {
-				assert.NotContains(t, stdout, tc.expRender)
+				assert.NotContains(t, ts.Stdout.String(), tc.expRender)
 			}
 		})
 	}
