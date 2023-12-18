@@ -116,8 +116,8 @@ func printExecutionDescription(
 			if desc == engine.IngesterDescription {
 				continue
 			}
-			if ok, v := checkWebDashboardDescription(desc); ok {
-				fmt.Fprintf(buf, "web dashboard: %s\n", valueColor.Sprint(v))
+			if strings.HasPrefix(desc, webDashboardName) {
+				fmt.Fprintf(buf, "web dashboard:%s\n", valueColor.Sprint(strings.TrimPrefix(desc, webDashboardName)))
 
 				continue
 			}
@@ -384,14 +384,4 @@ func yamlPrint(w io.Writer, v interface{}) error {
 		return fmt.Errorf("could flush the data to the output: %w", err)
 	}
 	return nil
-}
-
-// checkWebDashboardDescription returns true if desc contains web dashboard description.
-// The returned string contains info string (URL).
-func checkWebDashboardDescription(desc string) (bool, string) {
-	const webDashboardDescPrefix = webDashboardName + " "
-	if strings.HasPrefix(desc, webDashboardDescPrefix) {
-		return true, strings.TrimPrefix(desc, webDashboardDescPrefix)
-	}
-	return false, ""
 }
