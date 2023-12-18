@@ -1901,6 +1901,7 @@ func TestUIRenderWebDashboard(t *testing.T) {
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			stdout := ts.Stdout.String()
+			t.Logf("Stdout: %s", stdout)
 			if tc.active {
 				assert.Contains(t, stdout, tc.expRender)
 			} else {
