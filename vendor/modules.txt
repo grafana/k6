@@ -149,7 +149,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grafana/xk6-browser v1.2.1
+# github.com/grafana/xk6-browser v1.2.2
 ## explicit; go 1.19
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium

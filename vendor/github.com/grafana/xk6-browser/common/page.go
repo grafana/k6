@@ -1344,21 +1344,14 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 	}
 
 	var (
-		l = p.logger.WithTime(e.Timestamp.Time()).
-			WithField("source", "browser").
-			WithField("browser_source", "console-api")
-
-		objects       = make([]any, 0, len(e.Args))
+		objects       = make([]string, 0, len(e.Args))
 		objectHandles = make([]JSHandleAPI, 0, len(e.Args))
 	)
 
 	for _, robj := range e.Args {
-		i, err := parseRemoteObject(robj)
-		if err != nil {
-			handleParseRemoteObjectErr(p.ctx, err, l)
-		}
+		s := parseConsoleRemoteObject(p.logger, robj)
 
-		objects = append(objects, i)
+		objects = append(objects, s)
 		objectHandles = append(objectHandles, NewJSHandle(
 			p.ctx, p.session, execCtx, execCtx.Frame(), robj, p.logger,
 		))
@@ -1399,7 +1392,7 @@ func (p *Page) sessionID() (sid target.SessionID) {
 
 // textForConsoleEvent generates the text representation for a consoleAPICalled event
 // mimicking Playwright's behavior.
-func textForConsoleEvent(e *cdpruntime.EventConsoleAPICalled, args []any) string {
+func textForConsoleEvent(e *cdpruntime.EventConsoleAPICalled, args []string) string {
 	if e.Type.String() == "dir" || e.Type.String() == "dirxml" ||
 		e.Type.String() == "table" {
 		if len(e.Args) > 0 {
@@ -1409,17 +1402,5 @@ func textForConsoleEvent(e *cdpruntime.EventConsoleAPICalled, args []any) string
 		return ""
 	}
 
-	// args is a mix of string and non strings, so using fmt.Sprint(args...)
-	// might not add spaces between all elements, therefore use a strings.Builder
-	// and handle format and concatenation
-	var b strings.Builder
-	for i, a := range args {
-		format := " %v"
-		if i == 0 {
-			format = "%v"
-		}
-		b.WriteString(fmt.Sprintf(format, a))
-	}
-
-	return b.String()
+	return strings.Join(args, " ")
 }
