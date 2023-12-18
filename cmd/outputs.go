@@ -48,7 +48,7 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 		"experimental-prometheus-rw": func(params output.Params) (output.Output, error) {
 			return remotewrite.New(params)
 		},
-		webDashboardName: dashboard.New,
+		"web-dashboard": dashboard.New,
 	}
 
 	exts := ext.Get(ext.OutputExtension)
