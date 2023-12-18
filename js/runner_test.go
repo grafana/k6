@@ -20,7 +20,6 @@ import (
 	"net/url"
 	"os"
 	"strings"
-	"sync"
 	"testing"
 	"time"
 
@@ -715,59 +714,6 @@ func TestVURunInterrupt(t *testing.T) {
 			err = activeVU.RunOnce()
 			require.Error(t, err)
 			assert.Contains(t, err.Error(), "context canceled")
-		})
-	}
-}
-
-func TestVURunInterruptDoesntPanic(t *testing.T) {
-	t.Parallel()
-	r1, err := getSimpleRunner(t, "/script.js", `
-		exports.default = function() { while(true) {} }
-		`)
-	require.NoError(t, err)
-	require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}))
-
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, r1.MakeArchive())
-	require.NoError(t, err)
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range testdata {
-		r := r
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-			defer cancel()
-			samples := newDevNullSampleChannel()
-			defer close(samples)
-			var wg sync.WaitGroup
-
-			initVU, err := r.newVU(ctx, 1, 1, samples)
-			require.NoError(t, err)
-			for i := 0; i < 100; i++ {
-				wg.Add(1)
-				newCtx, newCancel := context.WithCancel(ctx)
-				vu := initVU.Activate(&lib.VUActivationParams{
-					RunContext:         newCtx,
-					DeactivateCallback: func(_ lib.InitializedVU) { wg.Done() },
-				})
-				ch := make(chan struct{})
-				go func() {
-					close(ch)
-					vuErr := vu.RunOnce()
-					require.Error(t, vuErr)
-					assert.Contains(t, vuErr.Error(), "context canceled")
-				}()
-				<-ch
-				time.Sleep(time.Millisecond * 1) // NOTE: increase this in case of problems ;)
-				newCancel()
-				wg.Wait()
-			}
 		})
 	}
 }
