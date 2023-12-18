@@ -58,7 +58,7 @@ func replay(input string, opts *options, assets *assets, proc *process) error {
 }
 
 func (rep *replayer) run() error {
-	rptr := newReporter(rep.options.Report, rep.assets, rep.proc)
+	rptr := newReporter(rep.options.Export, rep.assets, rep.proc)
 
 	rep.addEventListener(rptr)
 

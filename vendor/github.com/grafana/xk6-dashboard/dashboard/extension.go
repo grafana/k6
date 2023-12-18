@@ -54,7 +54,7 @@ func New(params output.Params) (output.Output, error) {
 }
 
 func newWithAssets(params output.Params, assets *assets) (*extension, error) {
-	opts, err := getopts(params.ConfigArgument)
+	opts, err := getopts(params.ConfigArgument, params.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -86,7 +86,7 @@ func (ext *extension) Description() string {
 		return ext.name
 	}
 
-	return fmt.Sprintf("%s (%s) %s", ext.name, ext.options.addr(), ext.options.url())
+	return fmt.Sprintf("%s %s", ext.name, ext.options.url())
 }
 
 // SetThresholds saves thresholds provided by k6 runtime.
@@ -100,7 +100,7 @@ func (ext *extension) Start() error {
 		ext.addEventListener(newRecorder(ext.options.Record, ext.proc))
 	}
 
-	brf := newReporter(ext.options.Report, ext.assets, ext.proc)
+	brf := newReporter(ext.options.Export, ext.assets, ext.proc)
 
 	ext.addEventListener(brf)
 

@@ -22,7 +22,7 @@ const (
 	flagPort   = "port"
 	flagPeriod = "period"
 	flagOpen   = "open"
-	flagReport = "report"
+	flagExport = "export"
 	flagTags   = "tags"
 )
 
@@ -98,9 +98,9 @@ The compressed file will be automatically decompressed if the file extension is 
 	)
 	flags.BoolVar(&opts.Open, flagOpen, defaultOpen, "Open browser window automatically")
 	flags.StringVar(
-		&opts.Report,
-		flagReport,
-		defaultReport,
+		&opts.Export,
+		flagExport,
+		defaultExport,
 		"Report file location (default: '', no report)",
 	)
 
@@ -151,7 +151,7 @@ The compressed events file will be automatically decompressed if the file extens
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Port = -1
-			opts.Report = args[1]
+			opts.Export = args[1]
 
 			if err := replay(args[0], opts, assets, proc); err != nil {
 				return err

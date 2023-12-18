@@ -14,7 +14,7 @@ require (
 	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/websocket v1.5.1
 	github.com/grafana/xk6-browser v1.2.1
-	github.com/grafana/xk6-dashboard v0.6.1
+	github.com/grafana/xk6-dashboard v0.7.0-alpha.1
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0
 	github.com/grafana/xk6-timers v0.1.2
@@ -75,7 +75,6 @@ require (
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
 	github.com/google/uuid v1.3.0 // indirect
-	github.com/gorilla/schema v1.2.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.16.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect

@@ -22,8 +22,6 @@ type eventEmitter struct {
 	logger  logrus.FieldLogger
 	channel string
 	wait    sync.WaitGroup
-	mu      sync.RWMutex
-	count   int
 	id      atomic.Int64
 }
 
@@ -36,30 +34,9 @@ func newEventEmitter(channel string, logger logrus.FieldLogger) *eventEmitter {
 		Server:  sse.New(),
 	}
 
-	emitter.Server.OnSubscribe = emitter.onSubscribe
-	emitter.Server.OnUnsubscribe = emitter.onUnsubscribe
-
 	emitter.CreateStream(channel)
 
 	return emitter
-}
-
-func (emitter *eventEmitter) onSubscribe(_ string, _ *sse.Subscriber) {
-	emitter.mu.Lock()
-	defer emitter.mu.Unlock()
-	emitter.count++
-	emitter.wait.Add(1)
-}
-
-func (emitter *eventEmitter) onUnsubscribe(_ string, _ *sse.Subscriber) {
-	emitter.mu.Lock()
-	defer emitter.mu.Unlock()
-
-	emitter.count--
-
-	if emitter.count >= 0 { // it seem onUnsubscribe sometimes called without onSubscribe...
-		emitter.wait.Done()
-	}
 }
 
 func (emitter *eventEmitter) onStart() error {
@@ -67,8 +44,6 @@ func (emitter *eventEmitter) onStart() error {
 }
 
 func (emitter *eventEmitter) onStop() error {
-	emitter.mu.RLock()
-	defer emitter.mu.RUnlock()
 	emitter.wait.Wait()
 
 	return nil
@@ -103,6 +78,9 @@ func (emitter *eventEmitter) ServeHTTP(res http.ResponseWriter, req *http.Reques
 	req.URL.RawQuery = values.Encode()
 
 	res.Header().Set("Access-Control-Allow-Origin", "*")
+
+	emitter.wait.Add(1)
+	defer emitter.wait.Done()
 
 	emitter.Server.ServeHTTP(res, req)
 }

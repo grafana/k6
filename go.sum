@@ -91,14 +91,12 @@ github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 h1:ZgoomqkdjGbQ3+qQXC
 github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6/go.mod h1:Jh3hGz2jkYak8qXPD19ryItVnUgpgeqzdkY/D0EaeuA=
 github.com/google/uuid v1.3.0 h1:t6JiXgmwXMjEs8VusXIJk2BXHsn+wx8BZdTaoZ5fu7I=
 github.com/google/uuid v1.3.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/gorilla/schema v1.2.0 h1:YufUaxZYCKGFuAq3c96BOhjgd5nmXiOY9NGzF247Tsc=
-github.com/gorilla/schema v1.2.0/go.mod h1:kgLaKoK1FELgZqMAVxx/5cbj0kT+57qxUrAlIO2eleU=
 github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/QY=
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
 github.com/grafana/xk6-browser v1.2.1 h1:O2fuHHvmmhXvWTPXzD+jsnt1XkVgVjx0+Lj1hsGIWMM=
 github.com/grafana/xk6-browser v1.2.1/go.mod h1:D3k9/MQHnNKfyzU3fh32pHlrh3GY2LAlkY4wYt/Vn4Y=
-github.com/grafana/xk6-dashboard v0.6.1 h1:qUHFId+7/K72VoDqTh5g5I/1SKYtHkav/B++lbpYl/c=
-github.com/grafana/xk6-dashboard v0.6.1/go.mod h1:9NoiyT5qcEhJWbIxY6LIkHtUUCbQcjl2cM7evUQ0Apc=
+github.com/grafana/xk6-dashboard v0.7.0-alpha.1 h1:dAIqIYvw0FSQE5l6TVIL8vJQ+KyIs29OIzXqXyv9Img=
+github.com/grafana/xk6-dashboard v0.7.0-alpha.1/go.mod h1:A1SIEX7kaC8RdER5J7l+bnkh54NV7chxA1VQncYBwqE=
 github.com/grafana/xk6-output-prometheus-remote v0.3.1 h1:X23rQzlJD8dXWB31DkxR4uPnuRFo8L0Y0H22fSG9xl0=
 github.com/grafana/xk6-output-prometheus-remote v0.3.1/go.mod h1:0JLAm4ONsNUlNoxJXAwOCfA6GtDwTPs557OplAvE+3o=
 github.com/grafana/xk6-redis v0.2.0 h1:iXmAKVlAxafZ/h8ptuXTFhGu63IFsyDI8QjUgWm66BU=

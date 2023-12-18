@@ -11,12 +11,9 @@ import (
 	"math"
 	"net"
 	"net/url"
-	"reflect"
 	"strconv"
 	"strings"
 	"time"
-
-	"github.com/gorilla/schema"
 )
 
 const (
@@ -24,7 +21,7 @@ const (
 	defaultPort   = 5665
 	defaultPeriod = time.Second * 10
 	defaultOpen   = false
-	defaultReport = ""
+	defaultExport = ""
 	defaultRecord = ""
 )
 
@@ -35,22 +32,75 @@ type options struct {
 	Host   string
 	Period time.Duration
 	Open   bool
-	Report string
+	Export string
 	Record string
-	Tags   []string `schema:"tag"`
-	TagsS  string   `schema:"tags"`
+	Tags   []string
+	TagsS  string
 }
 
-func getopts(query string) (opts *options, err error) { //nolint:nonamedreturns
-	opts = &options{
+func envopts(env map[string]string) (*options, error) {
+	opts := &options{
 		Port:   defaultPort,
 		Host:   defaultHost,
 		Period: defaultPeriod,
 		Open:   defaultOpen,
-		Report: defaultReport,
+		Export: defaultExport,
 		Record: defaultRecord,
 		Tags:   defaultTags(),
 		TagsS:  "",
+	}
+
+	if len(env) == 0 {
+		return opts, nil
+	}
+
+	if v, ok := env[envPort]; ok {
+		i, e := strconv.Atoi(v)
+		if e != nil {
+			return nil, e
+		}
+
+		opts.Port = i
+	}
+
+	if v, ok := env[envHost]; ok {
+		opts.Host = v
+	}
+
+	if v, ok := env[envExport]; ok {
+		opts.Export = v
+	} else if v, ok := env[envReport]; ok {
+		opts.Export = v
+	}
+
+	if v, ok := env[envRecord]; ok {
+		opts.Record = v
+	}
+
+	if v, ok := env[envPeriod]; ok {
+		d, e := time.ParseDuration(v)
+		if e != nil {
+			return nil, errInvalidDuration
+		}
+
+		opts.Period = d
+	}
+
+	if v, ok := env[envOpen]; ok && v == "true" {
+		opts.Open = true
+	}
+
+	if v, ok := env[envTags]; ok {
+		opts.Tags = strings.Split(v, ",")
+	}
+
+	return opts, nil
+}
+
+func getopts(query string, env map[string]string) (*options, error) {
+	opts, err := envopts(env)
+	if err != nil {
+		return nil, err
 	}
 
 	if query == "" {
@@ -62,35 +112,48 @@ func getopts(query string) (opts *options, err error) { //nolint:nonamedreturns
 		return nil, err
 	}
 
-	decoder := schema.NewDecoder()
-
-	decoder.IgnoreUnknownKeys(true)
-
-	decoder.RegisterConverter(time.Second, func(s string) reflect.Value {
-		v, eerr := time.ParseDuration(s)
-		if eerr != nil {
-			return reflect.ValueOf(err)
+	if v := value.Get(paramPort); len(v) != 0 {
+		i, e := strconv.Atoi(v)
+		if e != nil {
+			return nil, e
 		}
 
-		return reflect.ValueOf(v)
-	})
-
-	defer func() {
-		if r := recover(); r != nil {
-			err = errInvalidDuration
-		}
-	}()
-
-	if e := decoder.Decode(opts, value); e != nil {
-		err = e
+		opts.Port = i
 	}
 
-	if value.Has("open") && len(value.Get("open")) == 0 {
+	if v := value.Get(paramHost); len(v) != 0 {
+		opts.Host = v
+	}
+
+	if v := value.Get(paramExport); len(v) != 0 {
+		opts.Export = v
+	} else if v := value.Get(paramReport); len(v) != 0 {
+		opts.Export = v
+	}
+
+	if v := value.Get(paramRecord); len(v) != 0 {
+		opts.Record = v
+	}
+
+	if v := value.Get(paramPeriod); len(v) != 0 {
+		d, e := time.ParseDuration(v)
+		if e != nil {
+			return nil, errInvalidDuration
+		}
+
+		opts.Period = d
+	}
+
+	if v := value[paramTag]; len(v) != 0 {
+		opts.Tags = v
+	}
+
+	if value.Has(paramOpen) && (len(value.Get(paramOpen)) == 0 || value.Get(paramOpen) == "true") {
 		opts.Open = true
 	}
 
-	if len(opts.TagsS) != 0 {
-		opts.Tags = append(opts.Tags, strings.Split(opts.TagsS, ",")...)
+	if v := value.Get(paramTags); len(v) != 0 {
+		opts.Tags = append(opts.Tags, strings.Split(v, ",")...)
 	}
 
 	return opts, err
@@ -134,3 +197,31 @@ approx. 1MB max report size, 8 hours test run with 10sec event period.
 const points = 2880
 
 var errInvalidDuration = errors.New("invalid duration")
+
+const (
+	envPrefix = "K6_WEB_DASHBOARD_"
+
+	paramPort = "port"
+	envPort   = envPrefix + "PORT"
+
+	paramHost = "host"
+	envHost   = envPrefix + "HOST"
+
+	paramPeriod = "period"
+	envPeriod   = envPrefix + "PERIOD"
+
+	paramOpen = "open"
+	envOpen   = envPrefix + "OPEN"
+
+	paramReport = "report"
+	envReport   = envPrefix + "REPORT"
+	paramExport = "export"
+	envExport   = envPrefix + "EXPORT"
+
+	paramRecord = "record"
+	envRecord   = envPrefix + "RECORD"
+
+	paramTag  = "tag"
+	paramTags = "tags"
+	envTags   = envPrefix + "TAGS"
+)
