@@ -158,7 +158,16 @@ func (ext *extension) Stop() error {
 
 	ext.updateAndSend(nil, newMeter(ext.period, now, ext.options.Tags), stopEvent, now)
 
-	return ext.fireStop()
+	err := ext.fireStop()
+	if err != nil {
+		return err
+	}
+
+	if ext.server != nil {
+		return ext.server.stop()
+	}
+
+	return nil
 }
 
 // AddMetricSamples adds the given metric samples to the internal buffer.

@@ -7,6 +7,7 @@
 package dashboard
 
 import (
+	"errors"
 	"io/fs"
 	"net"
 	"net/http"
@@ -34,9 +35,14 @@ const (
 type webServer struct {
 	*eventEmitter
 	*http.ServeMux
+	server *http.Server
 }
 
-func newWebServer(uiFS fs.FS, reportHandler http.Handler, logger logrus.FieldLogger) *webServer { //nolint:ireturn
+func newWebServer(
+	uiFS fs.FS,
+	reportHandler http.Handler,
+	logger logrus.FieldLogger,
+) *webServer { //nolint:ireturn
 	srv := &webServer{
 		eventEmitter: newEventEmitter(eventChannel, logger),
 		ServeMux:     http.NewServeMux(),
@@ -48,6 +54,11 @@ func newWebServer(uiFS fs.FS, reportHandler http.Handler, logger logrus.FieldLog
 
 	srv.HandleFunc("/", rootHandler(pathUI))
 
+	srv.server = &http.Server{
+		Handler:           srv.ServeMux,
+		ReadHeaderTimeout: time.Second,
+	} //nolint:exhaustruct
+
 	return srv
 }
 
@@ -58,10 +69,9 @@ func (srv *webServer) listenAndServe(addr string) (*net.TCPAddr, error) {
 	}
 
 	go func() {
-		server := &http.Server{Handler: srv.ServeMux, ReadHeaderTimeout: time.Second} //nolint:exhaustruct
-
-		if err := server.Serve(listener); err != nil {
-			srv.logger.Error(err)
+		serr := srv.server.Serve(listener)
+		if serr != nil && !errors.Is(serr, http.ErrServerClosed) {
+			srv.logger.Error(serr)
 		}
 	}()
 
@@ -70,10 +80,26 @@ func (srv *webServer) listenAndServe(addr string) (*net.TCPAddr, error) {
 	return a, nil
 }
 
+func (srv *webServer) stop() error {
+	srv.eventEmitter.Close()
+
+	err := srv.server.Close()
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+
+	return nil
+}
+
 func rootHandler(uiPath string) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) { //nolint:varnamelen
 		if r.URL.Path == "/" {
-			http.Redirect(w, r, path.Join(uiPath, r.URL.Path)+"?endpoint=/", http.StatusTemporaryRedirect)
+			http.Redirect(
+				w,
+				r,
+				path.Join(uiPath, r.URL.Path)+"?endpoint=/",
+				http.StatusTemporaryRedirect,
+			)
 
 			return
 		}
