@@ -18,6 +18,8 @@ import (
 	"bytes"
 	"unicode"
 	"unicode/utf8"
+
+	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
 // JSONName returns the default JSON name for a field with the given name.
@@ -116,4 +118,110 @@ func WriteEscapedBytes(buf *bytes.Buffer, b []byte) {
 			}
 		}
 	}
+}
+
+// IsZeroLocation returns true if the given loc is a zero value
+// (which is returned from queries that have no result).
+func IsZeroLocation(loc protoreflect.SourceLocation) bool {
+	return loc.Path == nil &&
+		loc.StartLine == 0 &&
+		loc.StartColumn == 0 &&
+		loc.EndLine == 0 &&
+		loc.EndColumn == 0 &&
+		loc.LeadingDetachedComments == nil &&
+		loc.LeadingComments == "" &&
+		loc.TrailingComments == "" &&
+		loc.Next == 0
+}
+
+// ComputePath computes the source location path for the given descriptor.
+// The boolean value indicates whether the result is valid. If the path
+// cannot be computed for d, the function returns nil, false.
+func ComputePath(d protoreflect.Descriptor) (protoreflect.SourcePath, bool) {
+	_, ok := d.(protoreflect.FileDescriptor)
+	if ok {
+		return nil, true
+	}
+	var path protoreflect.SourcePath
+	for {
+		p := d.Parent()
+		switch d := d.(type) {
+		case protoreflect.FileDescriptor:
+			return reverse(path), true
+		case protoreflect.MessageDescriptor:
+			path = append(path, int32(d.Index()))
+			switch p.(type) {
+			case protoreflect.FileDescriptor:
+				path = append(path, FileMessagesTag)
+			case protoreflect.MessageDescriptor:
+				path = append(path, MessageNestedMessagesTag)
+			default:
+				return nil, false
+			}
+		case protoreflect.FieldDescriptor:
+			path = append(path, int32(d.Index()))
+			switch p.(type) {
+			case protoreflect.FileDescriptor:
+				if d.IsExtension() {
+					path = append(path, FileExtensionsTag)
+				} else {
+					return nil, false
+				}
+			case protoreflect.MessageDescriptor:
+				if d.IsExtension() {
+					path = append(path, MessageExtensionsTag)
+				} else {
+					path = append(path, MessageFieldsTag)
+				}
+			default:
+				return nil, false
+			}
+		case protoreflect.OneofDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.MessageDescriptor); ok {
+				path = append(path, MessageOneofsTag)
+			} else {
+				return nil, false
+			}
+		case protoreflect.EnumDescriptor:
+			path = append(path, int32(d.Index()))
+			switch p.(type) {
+			case protoreflect.FileDescriptor:
+				path = append(path, FileEnumsTag)
+			case protoreflect.MessageDescriptor:
+				path = append(path, MessageEnumsTag)
+			default:
+				return nil, false
+			}
+		case protoreflect.EnumValueDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.EnumDescriptor); ok {
+				path = append(path, EnumValuesTag)
+			} else {
+				return nil, false
+			}
+		case protoreflect.ServiceDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.FileDescriptor); ok {
+				path = append(path, FileServicesTag)
+			} else {
+				return nil, false
+			}
+		case protoreflect.MethodDescriptor:
+			path = append(path, int32(d.Index()))
+			if _, ok := p.(protoreflect.ServiceDescriptor); ok {
+				path = append(path, ServiceMethodsTag)
+			} else {
+				return nil, false
+			}
+		}
+		d = p
+	}
+}
+
+func reverse(p protoreflect.SourcePath) protoreflect.SourcePath {
+	for i, j := 0, len(p)-1; i < j; i, j = i+1, j-1 {
+		p[i], p[j] = p[j], p[i]
+	}
+	return p
 }

@@ -62,8 +62,12 @@ type ErrorWithPos = reporter.ErrorWithPos
 //
 // SourcePos should always be set and never nil.
 type ErrorWithSourcePos struct {
+	// These fields are present and exported for backwards-compatibility
+	// with v1.4 and earlier.
 	Underlying error
 	Pos        *SourcePos
+
+	reporter.ErrorWithPos
 }
 
 // Error implements the error interface
@@ -92,8 +96,9 @@ var _ ErrorWithPos = ErrorWithSourcePos{}
 func toErrorWithSourcePos(err ErrorWithPos) ErrorWithPos {
 	pos := err.GetPosition()
 	return ErrorWithSourcePos{
-		Underlying: err.Unwrap(),
-		Pos:        &pos,
+		ErrorWithPos: err,
+		Underlying:   err.Unwrap(),
+		Pos:          &pos,
 	}
 }
 

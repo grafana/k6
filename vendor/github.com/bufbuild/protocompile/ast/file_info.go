@@ -163,10 +163,10 @@ func (f *FileInfo) TokenInfo(t Token) NodeInfo {
 
 func (f *FileInfo) nodeInfo(start, end int) NodeInfo {
 	if start < 0 || start >= len(f.items) {
-		return NodeInfo{}
+		return NodeInfo{fileInfo: f}
 	}
 	if end < 0 || end >= len(f.items) {
-		return NodeInfo{}
+		return NodeInfo{fileInfo: f}
 	}
 	return NodeInfo{fileInfo: f, startIndex: start, endIndex: end}
 }
@@ -399,8 +399,7 @@ type Item int
 // ItemInfo provides details about an item's location in the source file and
 // its contents.
 type ItemInfo interface {
-	Start() SourcePos
-	End() SourcePos
+	SourceSpan
 	LeadingWhitespace() string
 	RawText() string
 }
@@ -597,6 +596,32 @@ func (pos SourcePos) String() string {
 	}
 	return fmt.Sprintf("%s:%d:%d", pos.Filename, pos.Line, pos.Col)
 }
+
+// SourceSpan represents a range of source positions.
+type SourceSpan interface {
+	Start() SourcePos
+	End() SourcePos
+}
+
+// NewSourceSpan creates a new span that covers the given range.
+func NewSourceSpan(start SourcePos, end SourcePos) SourceSpan {
+	return sourceSpan{StartPos: start, EndPos: end}
+}
+
+type sourceSpan struct {
+	StartPos SourcePos
+	EndPos   SourcePos
+}
+
+func (p sourceSpan) Start() SourcePos {
+	return p.StartPos
+}
+
+func (p sourceSpan) End() SourcePos {
+	return p.EndPos
+}
+
+var _ SourceSpan = sourceSpan{}
 
 // Comments represents a range of sequential comments in a source file
 // (e.g. no interleaving items or AST nodes).

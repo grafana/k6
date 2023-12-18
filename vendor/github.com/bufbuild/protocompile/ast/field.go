@@ -90,10 +90,10 @@ func NewFieldNode(label *KeywordNode, fieldType IdentValueNode, name *IdentNode,
 	if tag == nil {
 		panic("tag is nil")
 	}
-	if semicolon == nil {
-		panic("semicolon is nil")
+	numChildren := 4
+	if semicolon != nil {
+		numChildren++
 	}
-	numChildren := 5
 	if label != nil {
 		numChildren++
 	}
@@ -108,7 +108,9 @@ func NewFieldNode(label *KeywordNode, fieldType IdentValueNode, name *IdentNode,
 	if opts != nil {
 		children = append(children, opts)
 	}
-	children = append(children, semicolon)
+	if semicolon != nil {
+		children = append(children, semicolon)
+	}
 
 	return &FieldNode{
 		compositeNode: compositeNode{
@@ -541,11 +543,11 @@ func NewMapFieldNode(mapType *MapTypeNode, name *IdentNode, equals *RuneNode, ta
 	if tag == nil {
 		panic("tag is nil")
 	}
-	if semicolon == nil {
-		panic("semicolon is nil")
-	}
-	numChildren := 5
+	numChildren := 4
 	if opts != nil {
+		numChildren++
+	}
+	if semicolon != nil {
 		numChildren++
 	}
 	children := make([]Node, 0, numChildren)
@@ -553,7 +555,9 @@ func NewMapFieldNode(mapType *MapTypeNode, name *IdentNode, equals *RuneNode, ta
 	if opts != nil {
 		children = append(children, opts)
 	}
-	children = append(children, semicolon)
+	if semicolon != nil {
+		children = append(children, semicolon)
+	}
 
 	return &MapFieldNode{
 		compositeNode: compositeNode{
