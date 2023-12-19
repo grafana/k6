@@ -1,0 +1,12 @@
+sudo: false
+language: go
+
+go:
+  - 1.12.x
+  - 1.13.x
+  - 1.14.x
+  - tip
+
+matrix:
+  allow_failures:
+    - go: tip

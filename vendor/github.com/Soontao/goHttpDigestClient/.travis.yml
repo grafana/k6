@@ -1,0 +1,10 @@
+language: go
+go: 1.8
+before_install:
+  - go get github.com/mattn/goveralls
+install:
+  - go get github.com/tools/godep
+  - godep restore
+script:
+  - go test -v -covermode=count -coverprofile=coverage.out
+  - goveralls -coverprofile=coverage.out -service=travis-ci

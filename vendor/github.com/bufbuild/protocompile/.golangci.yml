@@ -1,0 +1,114 @@
+run:
+  skip-dirs-use-default: false
+  skip-files:
+    - ".*\\.y\\.go$"
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+  forbidigo:
+    forbid:
+      - '^fmt\.Print'
+      - '^log\.'
+      - '^print$'
+      - '^println$'
+      - '^panic$'
+  gci:
+    # Section configuration to compare against.
+    # Section names are case-insensitive and may contain parameters in ().
+    # The default order of sections is `standard > default > custom > blank > dot`,
+    # If `custom-order` is `true`, it follows the order of `sections` option.
+    # Default: ["standard", "default"]
+    sections:
+      - standard # Standard section: captures all standard packages.
+      - default # Default section: contains all imports that could not be matched to another section type.
+      - prefix(github.com/bufbuild/protocompile) # Custom section: groups all imports with the specified Prefix.
+  godox:
+    # TODO, OPT, etc. comments are fine to commit. Use FIXME comments for
+    # temporary hacks, and use godox to prevent committing them.
+    keywords: [FIXME]
+  govet:
+    enable:
+      - fieldalignment
+  varnamelen:
+    ignore-decls:
+      - T any
+      - i int
+      - wg sync.WaitGroup
+linters:
+  enable-all: true
+  disable:
+    # TODO: TCN-350 - initial exclusions for failing linters.
+    # Should enable all of these?
+    - depguard
+    - dupl
+    - errname
+    - errorlint
+    - exhaustive
+    - exhaustruct
+    - forbidigo
+    - forcetypeassert
+    - gochecknoglobals
+    - gochecknoinits
+    - goconst
+    - gocyclo
+    - goerr113
+    - interfacebloat
+    - nestif
+    - nilerr
+    - nilnil
+    - nonamedreturns
+    - thelper
+    - varnamelen
+    # Other disabled linters
+    - cyclop            # covered by gocyclo
+    - deadcode          # deprecated by author
+    - exhaustivestruct  # replaced by exhaustruct
+    - funlen            # rely on code review to limit function length
+    - gocognit          # dubious "cognitive overhead" quantification
+    - gofumpt           # prefer standard gofmt
+    - golint            # deprecated by Go team
+    - gomnd             # some unnamed constants are okay
+    - ifshort           # deprecated by author
+    - inamedparam       # named params in interface signatures are not always necessary
+    - interfacer        # deprecated by author
+    - ireturn           # "accept interfaces, return structs" isn't ironclad
+    - lll               # don't want hard limits for line length
+    - maintidx          # covered by gocyclo
+    - maligned          # readability trumps efficient struct packing
+    - nlreturn          # generous whitespace violates house style
+    - nosnakecase       # deprecated in https://github.com/golangci/golangci-lint/pull/3065
+    - protogetter       # lots of false positives: can't use getter to check if field is present
+    - rowserrcheck      # no SQL code in protocompile
+    - scopelint         # deprecated by author
+    - sqlclosecheck     # no SQL code in protocompile
+    - structcheck       # deprecated by author
+    - testpackage       # internal tests are fine
+    - varcheck          # deprecated by author
+    - wastedassign      # not supported with generics
+    - wrapcheck         # don't _always_ need to wrap errors
+    - wsl               # generous whitespace violates house style
+issues:
+  exclude:
+    # Don't ban use of fmt.Errorf to create new errors, but the remaining
+    # checks from err113 are useful.
+    - "err113: do not define dynamic errors.*"
+  exclude-rules:
+    # Benchmarks can't be run in parallel
+    - path: benchmark_test\.go
+      linters:
+        - paralleltest
+    # dupword reports several errors in .proto test fixtures
+    # gosec reports a few minor issues in tests
+    - path: _test\.go
+      linters:
+        - dupword
+        - gosec
+    # exclude field alignment linter in tests
+    - path: _test\.go
+      text: "fieldalignment:"
+      linters:
+        - govet
+    # exclude fieldalignment "pointer bytes" failures
+    - text: "pointer bytes"
+      linters:
+        - govet
