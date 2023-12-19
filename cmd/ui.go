@@ -11,6 +11,7 @@ import (
 	"unicode/utf8"
 
 	"github.com/fatih/color"
+	"github.com/grafana/xk6-dashboard/dashboard"
 	"github.com/sirupsen/logrus"
 	"golang.org/x/term"
 
@@ -116,8 +117,8 @@ func printExecutionDescription(
 			if desc == engine.IngesterDescription {
 				continue
 			}
-			if strings.HasPrefix(desc, webDashboardName) {
-				fmt.Fprintf(buf, " web dashboard:%s\n", valueColor.Sprint(strings.TrimPrefix(desc, webDashboardName)))
+			if strings.HasPrefix(desc, dashboard.OutputName) {
+				fmt.Fprintf(buf, " web dashboard:%s\n", valueColor.Sprint(strings.TrimPrefix(desc, dashboard.OutputName)))
 
 				continue
 			}
