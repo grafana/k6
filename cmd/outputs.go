@@ -20,7 +20,7 @@ import (
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite"
 )
 
-const webDashboardName = "web-dashboard"
+const webDashboardName = "internal-web-dashboard"
 
 // TODO: move this to an output sub-module after we get rid of the old collectors?
 func getAllOutputConstructors() (map[string]output.Constructor, error) {
@@ -48,7 +48,7 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 		"experimental-prometheus-rw": func(params output.Params) (output.Output, error) {
 			return remotewrite.New(params)
 		},
-		"web-dashboard": dashboard.New,
+		"internal-web-dashboard": dashboard.New,
 	}
 
 	exts := ext.Get(ext.OutputExtension)
