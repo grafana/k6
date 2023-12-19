@@ -12,6 +12,7 @@ import (
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/embedded"
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
@@ -209,6 +210,8 @@ func (m *mockTracerProvider) Tracer(
 }
 
 type mockTracer struct {
+	embedded.Tracer
+
 	mu    sync.Mutex
 	spans map[string]struct{}
 }
