@@ -1,0 +1,543 @@
+{
+  "title": "k6 dashboard",
+  "tabs": [
+    {
+      "sections": [
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "iterations[?!tags && rate]"
+                }
+              ],
+              "title": "Iteration Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-0",
+              "summary": "<placeholder panel summary>"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_reqs[?!tags && rate]"
+                }
+              ],
+              "title": "HTTP Request Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-1",
+              "summary": "<placeholder panel summary>"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_duration[?!tags && avg]"
+                }
+              ],
+              "title": "HTTP Request Duration",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-2",
+              "summary": "<placeholder panel summary>"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_failed[?!tags && rate ]"
+                }
+              ],
+              "title": "HTTP Request Failed",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-3",
+              "summary": "<placeholder panel summary>"
+            },
+            {
+              "series": [
+                {
+                  "query": "data_received[?!tags && rate]"
+                }
+              ],
+              "title": "Received Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-4",
+              "summary": "<placeholder panel summary>"
+            },
+            {
+              "series": [
+                {
+                  "query": "data_sent[?!tags && rate]"
+                }
+              ],
+              "title": "Sent Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-5",
+              "summary": "<placeholder panel summary>"
+            }
+          ],
+          "id": "tab-0.section-0"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "http_reqs[?!tags && rate]",
+                  "legend": "Request Rate"
+                },
+                {
+                  "query": "http_req_duration[?!tags && p95]",
+                  "legend": "Request Duration p(95)"
+                },
+                {
+                  "query": "http_req_failed[?!tags && rate ]",
+                  "legend": "Request Failed"
+                }
+              ],
+              "title": "HTTP Performance overview",
+              "id": "tab-0.section-1.panel-0",
+              "summary": "<placeholder panel summary>",
+              "fullWidth": true,
+              "kind": "chart"
+            }
+          ],
+          "id": "tab-0.section-1"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "vus[?!tags && value]"
+                },
+                {
+                  "query": "http_reqs[?!tags && rate ]"
+                }
+              ],
+              "title": "VUs",
+              "id": "tab-0.section-2.panel-0",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "data_received[?!tags && rate]"
+                },
+                {
+                  "query": "data_sent[?!tags && rate]"
+                }
+              ],
+              "title": "Transfer Rate",
+              "id": "tab-0.section-2.panel-1",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "HTTP Request Duration",
+              "id": "tab-0.section-2.panel-2",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "iteration_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Iteration Duration",
+              "id": "tab-0.section-2.panel-3",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            }
+          ],
+          "id": "tab-0.section-2"
+        }
+      ],
+      "title": "Overview",
+      "summary": "This chapter provides an overview of the most important metrics of the test run. Graphs plot the value of metrics over time.",
+      "id": "tab-0"
+    },
+    {
+      "sections": [
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "http_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Duration",
+              "id": "tab-1.section-0.panel-0",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_failed[?!tags && rate ]"
+                }
+              ],
+              "title": "Request Failed Rate",
+              "id": "tab-1.section-0.panel-1",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_reqs[?!tags && rate]"
+                }
+              ],
+              "title": "Request Rate",
+              "id": "tab-1.section-0.panel-2",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_waiting[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Waiting",
+              "id": "tab-1.section-0.panel-3",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_tls_handshaking[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "TLS handshaking",
+              "id": "tab-1.section-0.panel-4",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_sending[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Sending",
+              "id": "tab-1.section-0.panel-5",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_connecting[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Connecting",
+              "id": "tab-1.section-0.panel-6",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_receiving[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Receiving",
+              "id": "tab-1.section-0.panel-7",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_blocked[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Blocked",
+              "id": "tab-1.section-0.panel-8",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            }
+          ],
+          "title": "HTTP",
+          "summary": "These metrics are generated only when the test makes HTTP requests.",
+          "id": "tab-1.section-0"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "browser_http_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Duration",
+              "id": "tab-1.section-1.panel-0",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_http_req_failed[?!tags && rate ]"
+                }
+              ],
+              "title": "Request Failed Rate",
+              "id": "tab-1.section-1.panel-1",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_lcp[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Largest Contentful Paint",
+              "id": "tab-1.section-1.panel-2",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_fid[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "First Input Delay",
+              "id": "tab-1.section-1.panel-3",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_cls[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Cumulative Layout Shift",
+              "id": "tab-1.section-1.panel-4",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_ttfb[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Time to First Byte",
+              "id": "tab-1.section-1.panel-5",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_fcp[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "First Contentful Paint",
+              "id": "tab-1.section-1.panel-6",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_inp[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Interaction to Next Paint",
+              "id": "tab-1.section-1.panel-7",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            }
+          ],
+          "title": "Browser",
+          "summary": "The k6 browser module emits its own metrics based on the Core Web Vitals and Other Web Vitals.",
+          "id": "tab-1.section-1"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "ws_connecting[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Connect Duration",
+              "id": "tab-1.section-2.panel-0",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_session_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Session Duration",
+              "id": "tab-1.section-2.panel-1",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_ping[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Ping Duration",
+              "id": "tab-1.section-2.panel-2",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_msgs_sent[?!tags && rate]"
+                },
+                {
+                  "query": "ws_msgs_received[?!tags && rate]"
+                }
+              ],
+              "title": "Transfer Rate",
+              "id": "tab-1.section-2.panel-3",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_sessions[?!tags && rate]"
+                }
+              ],
+              "title": "Sessions Rate",
+              "id": "tab-1.section-2.panel-4",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            }
+          ],
+          "title": "WebSocket",
+          "summary": "k6 emits the following metrics when interacting with a WebSocket service through the experimental or legacy websockets API.",
+          "id": "tab-1.section-2"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "grpc_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Duration",
+              "id": "tab-1.section-3.panel-0",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "grpc_streams_msgs_sent[?!tags && rate]"
+                },
+                {
+                  "query": "grpc_streams_msgs_received[?!tags && rate]"
+                }
+              ],
+              "title": "Transfer Rate",
+              "id": "tab-1.section-3.panel-1",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "grpc_streams[?!tags && rate]"
+                }
+              ],
+              "title": "Streams Rate",
+              "id": "tab-1.section-3.panel-2",
+              "summary": "<placeholder panel summary>",
+              "kind": "chart"
+            }
+          ],
+          "title": "gRPC",
+          "summary": "k6 emits the following metrics when it interacts with a service through the gRPC API.",
+          "id": "tab-1.section-3"
+        }
+      ],
+      "title": "Timings",
+      "summary": "This chapter provides an overview of test run HTTP timing metrics. Graphs plot the value of metrics over time.",
+      "id": "tab-1"
+    },
+    {
+      "sections": [
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "[?!tags && trend]"
+                }
+              ],
+              "title": "Trends",
+              "kind": "summary",
+              "id": "tab-2.section-0.panel-0",
+              "summary": "<placeholder panel summary>"
+            }
+          ],
+          "title": "",
+          "id": "tab-2.section-0"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "[?!tags && counter]"
+                }
+              ],
+              "title": "Counters",
+              "kind": "summary",
+              "id": "tab-2.section-1.panel-0",
+              "summary": "<placeholder panel summary>"
+            },
+            {
+              "series": [
+                {
+                  "query": "[?!tags && rate]"
+                }
+              ],
+              "title": "Rates",
+              "kind": "summary",
+              "id": "tab-2.section-1.panel-1",
+              "summary": "<placeholder panel summary>"
+            },
+            {
+              "series": [
+                {
+                  "query": "[?!tags && gauge]"
+                }
+              ],
+              "title": "Gauges",
+              "kind": "summary",
+              "id": "tab-2.section-1.panel-2",
+              "summary": "<placeholder panel summary>"
+            }
+          ],
+          "title": "",
+          "id": "tab-2.section-1"
+        }
+      ],
+      "title": "Summary",
+      "summary": "This chapter provides a summary of the test run metrics. The tables contains the aggregated values of the metrics for the entire test run.",
+      "id": "tab-2"
+    }
+  ]
+}

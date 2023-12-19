@@ -28,6 +28,7 @@ script.js
 /vendor/**/*.y*ml
 /vendor/**/.*.y*ml
 /vendor/github.com/dlclark/regexp2/testoutput1
+!/vendor/github.com/grafana/xk6-dashboard/dashboard/assets/packages/config/dist/config.json
 
 /packaging/.env
 /packaging/*.gpg
