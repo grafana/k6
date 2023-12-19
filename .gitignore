@@ -15,19 +15,7 @@ script.js
 
 /versioninfo.json
 
-/vendor/**/.editorconfig
-/vendor/**/*.jpg
-/vendor/**/*.json
-/vendor/**/.*.json
-/vendor/**/Makefile
-/vendor/**/*.png
-/vendor/**/*.tmpl
-/vendor/**/*.txt
-!/vendor/**/*LICENSE*
-!/vendor/modules.txt
-/vendor/**/*.y*ml
-/vendor/**/.*.y*ml
-/vendor/github.com/dlclark/regexp2/testoutput1
+/vendor/**/testdata/**
 
 /packaging/.env
 /packaging/*.gpg
