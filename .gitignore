@@ -18,6 +18,7 @@ script.js
 /vendor/**/.editorconfig
 /vendor/**/*.jpg
 /vendor/**/*.json
+# Excluding as it is required (embedded) configuration file for web-dashboard
 !/vendor/github.com/grafana/xk6-dashboard/dashboard/assets/packages/config/dist/config.json
 /vendor/**/.*.json
 /vendor/**/Makefile
