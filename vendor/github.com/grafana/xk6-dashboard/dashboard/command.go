@@ -38,7 +38,7 @@ func NewCommand(gs *state.GlobalState) *cobra.Command {
 	}
 
 	dashboardCmd := &cobra.Command{ //nolint:exhaustruct
-		Use:   "dashboard",
+		Use:   OutputName,
 		Short: "xk6-dashboard commands",
 	}
 

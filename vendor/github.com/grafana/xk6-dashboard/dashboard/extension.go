@@ -46,6 +46,9 @@ type extension struct {
 
 var _ output.Output = (*extension)(nil)
 
+// OutputName defines the output name for dashnoard extension.
+const OutputName = "web-dashboard"
+
 // New creates new dashboard extension instance.
 func New(params output.Params) (output.Output, error) {
 	assets := newCustomizedAssets(new(process).fromParams(params))
