@@ -48,6 +48,14 @@ func NewTracer(tp k6lib.TracerProvider, metadata map[string]string, options ...t
 	}
 }
 
+// Start overrides the underlying OTEL tracer method to include the tracer metadata.
+func (t *Tracer) Start(
+	ctx context.Context, spanName string, opts ...trace.SpanStartOption,
+) (context.Context, trace.Span) {
+	opts = append(opts, trace.WithAttributes(t.metadata...))
+	return t.Tracer.Start(ctx, spanName, opts...)
+}
+
 // TraceAPICall adds a new span to the current liveSpan for the given targetID and returns it. It
 // is the caller's responsibility to close the generated span.
 // If there is not a liveSpan for the given targetID, the new span is created based on the given
