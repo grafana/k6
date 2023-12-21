@@ -17,16 +17,16 @@ func TestOpenPathResolution(t *testing.T) {
 		fs := fsext.NewMemMapFs()
 		err := writeToFs(fs, map[string]any{
 			"/path/to/data.txt": "data file",
-		})
-		require.NoError(t, err)
-		data := `
+			"/path/scripts/script.js": `
 		export let data = open("../to/data.txt");
 		if (data != "data file") {
 			throw new Error("wrong content " + data);
 		}
 		export default function() {}
-	`
-		b, err := getSimpleBundle(t, "/path/scripts/script.js", data, fs)
+	`,
+		})
+		require.NoError(t, err)
+		b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/scripts/script.js"`, fs)
 		require.NoError(t, err)
 
 		_, err = b.Instantiate(context.Background(), 0)
@@ -41,16 +41,16 @@ func TestOpenPathResolution(t *testing.T) {
 			"/path/another/script/script.js": `
             module.exports = open("../../to/data.txt");
         `,
-		})
-		require.NoError(t, err)
-		data := `
+			"/path/totally/different/directory/script.js": `
         let data = require("./../../../another/script/script.js")
 		if (data != "data file") {
 			throw new Error("wrong content " + data);
 		}
 		export default function() {}
-	`
-		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
+	`,
+		})
+		require.NoError(t, err)
+		b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/totally/different/directory/script.js"`, fs)
 		require.NoError(t, err)
 
 		_, err = b.Instantiate(context.Background(), 0)
@@ -68,16 +68,16 @@ func TestOpenPathResolution(t *testing.T) {
 			"/path/to/script/script.js": `
         module.exports = require("./../../another/script/script.js")();
         `,
-		})
-		require.NoError(t, err)
-		data := `
+			"/path/totally/different/directory/script.js": `
         let data = require("./../../../to/script/script.js");
 		if (data != "data file") {
 			throw new Error("wrong content " + data);
 		}
 		export default function() {}
-	`
-		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
+	`,
+		})
+		require.NoError(t, err)
+		b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/totally/different/directory/script.js"`, fs)
 		require.NoError(t, err)
 
 		_, err = b.Instantiate(context.Background(), 0)
@@ -92,16 +92,16 @@ func TestRequirePathResolution(t *testing.T) {
 		fs := fsext.NewMemMapFs()
 		err := writeToFs(fs, map[string]any{
 			"/path/to/data.js": "module.exports='export content'",
-		})
-		require.NoError(t, err)
-		data := `
+			"/path/scripts/script.js": `
 		let data = require("../to/data.js");
 		if (data != "export content") {
 			throw new Error("wrong content " + data);
 		}
 		export default function() {}
-	`
-		b, err := getSimpleBundle(t, "/path/scripts/script.js", data, fs)
+	`,
+		})
+		require.NoError(t, err)
+		b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/scripts/script.js"`, fs)
 		require.NoError(t, err)
 
 		_, err = b.Instantiate(context.Background(), 0)
@@ -116,16 +116,16 @@ func TestRequirePathResolution(t *testing.T) {
 			"/path/another/script/script.js": `
             module.exports = require("../../to/data.js");
         `,
-		})
-		require.NoError(t, err)
-		data := `
+			"/path/totally/different/directory/script.js": `
         let data = require("./../../../another/script/script.js")
 		if (data != "export content") {
 			throw new Error("wrong content " + data);
 		}
 		export default function() {}
-	`
-		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
+	`,
+		})
+		require.NoError(t, err)
+		b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/totally/different/directory/script.js"`, fs)
 		require.NoError(t, err)
 
 		_, err = b.Instantiate(context.Background(), 0)
@@ -143,16 +143,17 @@ func TestRequirePathResolution(t *testing.T) {
 			"/path/to/script/script.js": `
         module.exports = require("./../../another/script/script.js")();
         `,
-		})
-		require.NoError(t, err)
-		data := `
+			"/path/totally/different/directory/script.js": `
         let data = require("./../../../to/script/script.js");
 		if (data != "export content") {
 			throw new Error("wrong content " + data);
 		}
 		export default function() {}
-	`
-		b, err := getSimpleBundle(t, "/path/totally/different/directory/script.js", data, fs)
+		`,
+		})
+		require.NoError(t, err)
+
+		b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/totally/different/directory/script.js"`, fs)
 		require.NoError(t, err)
 
 		_, err = b.Instantiate(context.Background(), 0)
