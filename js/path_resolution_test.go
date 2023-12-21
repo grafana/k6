@@ -15,7 +15,10 @@ func TestOpenPathResolution(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/data.txt", []byte("data file"), 0o644))
+		err := writeToFs(fs, map[string]any{
+			"/path/to/data.txt": "data file",
+		})
+		require.NoError(t, err)
 		data := `
 		export let data = open("../to/data.txt");
 		if (data != "data file") {
@@ -33,10 +36,13 @@ func TestOpenPathResolution(t *testing.T) {
 	t.Run("intermediate", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/data.txt", []byte("data file"), 0o644))
-		require.NoError(t, fsext.WriteFile(fs, "/path/another/script/script.js", []byte(`
+		err := writeToFs(fs, map[string]any{
+			"/path/to/data.txt": "data file",
+			"/path/another/script/script.js": `
             module.exports = open("../../to/data.txt");
-        `), 0o644))
+        `,
+		})
+		require.NoError(t, err)
 		data := `
         let data = require("./../../../another/script/script.js")
 		if (data != "data file") {
@@ -54,13 +60,16 @@ func TestOpenPathResolution(t *testing.T) {
 	t.Run("complex", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/data.txt", []byte("data file"), 0o644))
-		require.NoError(t, fsext.WriteFile(fs, "/path/another/script/script.js", []byte(`
+		err := writeToFs(fs, map[string]any{
+			"/path/to/data.txt": "data file",
+			"/path/another/script/script.js": `
         module.exports = () =>  open("./../data.txt"); // Here the path is relative to this module but to the one calling
-        `), 0o644))
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/script/script.js", []byte(`
+        `,
+			"/path/to/script/script.js": `
         module.exports = require("./../../another/script/script.js")();
-        `), 0o644))
+        `,
+		})
+		require.NoError(t, err)
 		data := `
         let data = require("./../../../to/script/script.js");
 		if (data != "data file") {
@@ -81,7 +90,10 @@ func TestRequirePathResolution(t *testing.T) {
 	t.Run("simple", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/data.js", []byte("module.exports='export content'"), 0o644))
+		err := writeToFs(fs, map[string]any{
+			"/path/to/data.js": "module.exports='export content'",
+		})
+		require.NoError(t, err)
 		data := `
 		let data = require("../to/data.js");
 		if (data != "export content") {
@@ -99,10 +111,13 @@ func TestRequirePathResolution(t *testing.T) {
 	t.Run("intermediate", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/data.js", []byte("module.exports='export content'"), 0o644))
-		require.NoError(t, fsext.WriteFile(fs, "/path/another/script/script.js", []byte(`
+		err := writeToFs(fs, map[string]any{
+			"/path/to/data.js": "module.exports='export content'",
+			"/path/another/script/script.js": `
             module.exports = require("../../to/data.js");
-        `), 0o644))
+        `,
+		})
+		require.NoError(t, err)
 		data := `
         let data = require("./../../../another/script/script.js")
 		if (data != "export content") {
@@ -120,13 +135,16 @@ func TestRequirePathResolution(t *testing.T) {
 	t.Run("complex", func(t *testing.T) {
 		t.Parallel()
 		fs := fsext.NewMemMapFs()
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/data.js", []byte("module.exports='export content'"), 0o644))
-		require.NoError(t, fsext.WriteFile(fs, "/path/another/script/script.js", []byte(`
+		err := writeToFs(fs, map[string]any{
+			"/path/to/data.js": "module.exports='export content'",
+			"/path/another/script/script.js": `
         module.exports = () =>  require("./../data.js"); // Here the path is relative to this module but to the one calling
-        `), 0o644))
-		require.NoError(t, fsext.WriteFile(fs, "/path/to/script/script.js", []byte(`
+        `,
+			"/path/to/script/script.js": `
         module.exports = require("./../../another/script/script.js")();
-        `), 0o644))
+        `,
+		})
+		require.NoError(t, err)
 		data := `
         let data = require("./../../../to/script/script.js");
 		if (data != "export content") {
@@ -140,4 +158,24 @@ func TestRequirePathResolution(t *testing.T) {
 		_, err = b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
 	})
+}
+
+// writeToFs is a small helper to write a map of paths to contents to the filesystem provided.
+// the content can be either string or []byte anything else panics
+func writeToFs(fs fsext.Fs, in map[string]any) error {
+	for path, contentAny := range in {
+		var content []byte
+		switch contentAny := contentAny.(type) {
+		case []byte:
+			content = contentAny
+		case string:
+			content = []byte(contentAny)
+		default:
+			panic("content for " + path + " wasn't []byte or string")
+		}
+		if err := fsext.WriteFile(fs, path, content, 0o644); err != nil {
+			return err
+		}
+	}
+	return nil
 }
