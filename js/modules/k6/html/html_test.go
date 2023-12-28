@@ -269,6 +269,27 @@ func TestParseHTML(t *testing.T) {
 			assert.Equal(t, "form1", v.Export())
 		}
 	})
+	t.Run("FromElement", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTML)
+
+		_, err := rt.RunString(`var body = doc.find("body").get(0)`)
+		assert.NoError(t, err)
+
+		v, err := rt.RunString(`doc.fromElement(body).find('#top').text()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, "Lorem ipsum", v.String())
+		}
+	})
+	t.Run("Locator", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTML)
+
+		v, err := rt.RunString(`doc.locator("#top").text()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, "Lorem ipsum", v.String())
+		}
+	})
 	t.Run("Contents", func(t *testing.T) {
 		t.Parallel()
 		rt := getTestRuntimeWithDoc(t, testHTML)
