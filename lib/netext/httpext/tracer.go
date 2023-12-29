@@ -190,7 +190,7 @@ func (t *Tracer) GetConn(_ string) {
 
 // ConnectStart is called when a new connection's Dial begins.
 // If net.Dialer.DualStack (IPv6 "Happy Eyeballs") support is
-// enabled, this may be called multiple times.
+// enabled (default), this may be called multiple times.
 //
 // If the connection is reused, this won't be called. Otherwise,
 // it will be called after GetConn() and before ConnectDone().
@@ -203,9 +203,9 @@ func (t *Tracer) ConnectStart(_, _ string) {
 
 // ConnectDone is called when a new connection's Dial
 // completes. The provided err indicates whether the
-// connection completedly successfully.
+// connection completed successfully.
 // If net.Dialer.DualStack ("Happy Eyeballs") support is
-// enabled, this may be called multiple times.
+// enabled (default), this may be called multiple times.
 //
 // If the connection is reused, this won't be called. Otherwise,
 // it will be called after ConnectStart() and before either

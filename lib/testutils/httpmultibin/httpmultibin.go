@@ -1,4 +1,4 @@
-// Package httpmultibin is indended only for use in tests, do not import in production code!
+// Package httpmultibin is intended only for use in tests, do not import in production code!
 package httpmultibin
 
 import (
@@ -350,7 +350,6 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	dialer := netext.NewDialer(net.Dialer{
 		Timeout:   2 * time.Second,
 		KeepAlive: 10 * time.Second,
-		DualStack: true,
 	}, netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4))
 	dialer.Hosts, err = types.NewHosts(map[string]types.Host{
 		httpDomain:  *httpDomainValue,
