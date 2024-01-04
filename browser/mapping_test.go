@@ -511,6 +511,7 @@ type responseAPI interface {
 
 // locatorAPI represents a way to find element(s) on a page at any moment.
 type locatorAPI interface {
+	Clear(opts *common.FrameFillOptions) error
 	Click(opts goja.Value) error
 	Dblclick(opts goja.Value)
 	Check(opts goja.Value)
