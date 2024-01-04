@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -49,6 +50,11 @@ func (l *Locator) Clear(opts *FrameFillOptions) error {
 	}
 
 	return nil
+}
+
+// Timeout will return the default timeout or the one set by the user.
+func (l *Locator) Timeout() time.Duration {
+	return l.frame.defaultTimeout()
 }
 
 // Click on an element using locator's selector with strict mode on.
