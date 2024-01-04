@@ -2,6 +2,7 @@ package tests
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
@@ -51,6 +52,19 @@ func TestLocator(t *testing.T) {
 					l.Uncheck(nil)
 					require.False(t, l.IsChecked(nil))
 				})
+			},
+		},
+		{
+			"Clear", func(tb *testBrowser, p *common.Page) {
+				const value = "fill me up"
+				l := p.Locator("#inputText", nil)
+
+				l.Fill(value, nil)
+				require.Equal(t, value, p.InputValue("#inputText", nil))
+
+				err := l.Clear(common.NewFrameFillOptions(l.Timeout()))
+				assert.NoError(t, err)
+				assert.Equal(t, "", p.InputValue("#inputText", nil))
 			},
 		},
 		{
@@ -234,6 +248,15 @@ func TestLocator(t *testing.T) {
 	}{
 		{
 			"Check", func(l *common.Locator, tb *testBrowser) { l.Check(timeout(tb)) },
+		},
+		{
+			"Clear", func(l *common.Locator, tb *testBrowser) {
+				err := l.Clear(common.NewFrameFillOptions(100 * time.Millisecond))
+				if err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"Click", func(l *common.Locator, tb *testBrowser) {
