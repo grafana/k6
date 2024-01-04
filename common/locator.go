@@ -36,6 +36,21 @@ func NewLocator(ctx context.Context, selector string, f *Frame, l *log.Logger) *
 	}
 }
 
+// Clear will clear the input field.
+// This works with the Fill API and fills the input field with an empty string.
+func (l *Locator) Clear(opts *FrameFillOptions) error {
+	l.log.Debugf(
+		"Locator:Clear", "fid:%s furl:%q sel:%q opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, opts,
+	)
+
+	if err := l.fill("", opts); err != nil {
+		return fmt.Errorf("clearing %q: %w", l.selector, err)
+	}
+
+	return nil
+}
+
 // Click on an element using locator's selector with strict mode on.
 func (l *Locator) Click(opts goja.Value) error {
 	l.log.Debugf("Locator:Click", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
