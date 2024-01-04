@@ -360,7 +360,6 @@ func TestRequestWithBinaryFile(t *testing.T) {
 				net.Dialer{
 					Timeout:   10 * time.Second,
 					KeepAlive: 60 * time.Second,
-					DualStack: true,
 				},
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 			)).DialContext,
@@ -507,7 +506,6 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 				net.Dialer{
 					Timeout:   10 * time.Second,
 					KeepAlive: 60 * time.Second,
-					DualStack: true,
 				},
 				netext.NewResolver(net.LookupIP, 0, types.DNSfirst, types.DNSpreferIPv4),
 			)).DialContext,

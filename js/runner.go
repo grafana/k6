@@ -97,7 +97,6 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 		BaseDialer: net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
-			DualStack: true,
 		},
 		console: newConsole(piState.Logger),
 		Resolver: netext.NewResolver(
