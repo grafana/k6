@@ -38,25 +38,33 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 	require.NotEmpty(t, errs)
 	assert.Contains(t, errs[0].Error(), "greater than 0")
 
-	c.StartVUs = null.IntFrom(100000001)
-	errs = c.Validate()
-	require.NotEmpty(t, errs)
-	assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
+	t.Run("validate large VU shifts should fail", func(t *testing.T) {
+		t.Parallel()
 
-	c.StartVUs = null.IntFrom(60000000)
-	c.Stages = []Stage{
-		{Target: null.IntFrom(50000000), Duration: types.NullDurationFrom(12 * time.Second)},
-		{Target: null.IntFrom(50000000), Duration: types.NullDurationFrom(12 * time.Second)},
-	}
-	errs = c.Validate()
-	assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
+		const MaxRampingVUShift = 100000000
+		const HalfMaxRampingVUShift = MaxRampingVUShift / 2
+		const HalfMaxInt = math.MaxInt64 / 2
 
-	c.StartVUs = null.IntFrom(math.MaxInt64)
-	c.Stages = []Stage{
-		{Target: null.IntFrom(1), Duration: types.NullDurationFrom(12 * time.Second)},
-	}
-	errs = c.Validate()
-	assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
+		c.StartVUs = null.IntFrom(MaxRampingVUShift)
+		errs = c.Validate()
+		require.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
+
+		c.StartVUs = null.IntFrom(0)
+		c.Stages = []Stage{
+			{Target: null.IntFrom(HalfMaxRampingVUShift + 1), Duration: types.NullDurationFrom(12 * time.Second)},
+		}
+		errs = c.Validate()
+		assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
+
+		// Integer overflow is correctly handled
+		c.StartVUs = null.IntFrom(0)
+		c.Stages = []Stage{
+			{Target: null.IntFrom(HalfMaxInt + 1), Duration: types.NullDurationFrom(12 * time.Second)},
+		}
+		errs = c.Validate()
+		assert.Contains(t, errs[0].Error(), "number of VU shifts is too large")
+	})
 }
 
 func TestRampingVUsRun(t *testing.T) {

@@ -95,6 +95,7 @@ func (varc *RampingArrivalRateConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("the timeUnit must be more than 0"))
 	}
 
+	errors = append(errors, validateNumberOfVuShifts(varc.StartRate.Int64, varc.Stages)...)
 	errors = append(errors, validateStages(varc.Stages)...)
 
 	if !varc.PreAllocatedVUs.Valid {

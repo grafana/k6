@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"math"
 	"math/big"
 	"time"
 
@@ -24,7 +23,20 @@ func sumStagesDuration(stages []Stage) (result time.Duration) {
 	return
 }
 
-func sumTotalNumberOfUpAndDonwShifts(startVus int64, stages []Stage) int64 {
+func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 {
+	max := unscaledStartValue
+	for _, s := range stages {
+		if s.Target.Int64 > max {
+			max = s.Target.Int64
+		}
+	}
+	return max
+}
+
+func validateNumberOfVuShifts(startVus int64, stages []Stage) []error {
+	const MaxRampingVUShift = 100000000
+	
+	var errors []error
 	totalShifts := big.NewInt(startVus)
 	prevNumVus := totalShifts
 
@@ -40,21 +52,11 @@ func sumTotalNumberOfUpAndDonwShifts(startVus int64, stages []Stage) int64 {
 
 	totalShifts.Add(totalShifts, prevNumVus)
 
-	if totalShifts.IsInt64() {
-		return totalShifts.Int64()
+	if totalShifts.Cmp(big.NewInt(MaxRampingVUShift)) > 0 {
+		errors = append(errors, fmt.Errorf("total number of VU shifts is too large"))
 	}
 
-	return math.MaxInt64
-}
-
-func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 {
-	max := unscaledStartValue
-	for _, s := range stages {
-		if s.Target.Int64 > max {
-			max = s.Target.Int64
-		}
-	}
-	return max
+	return errors
 }
 
 // A helper function to avoid code duplication

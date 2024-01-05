@@ -86,11 +86,10 @@ func (vlvc RampingVUsConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("either startVUs or one of the stages' target values must be greater than 0"))
 	}
 
-	if sumTotalNumberOfUpAndDonwShifts(vlvc.StartVUs.Int64, vlvc.Stages) > 100000000 {
-		errors = append(errors, fmt.Errorf("total number of VU shifts is too large"))
-	}
+	errors = append(errors, validateNumberOfVuShifts(vlvc.StartVUs.Int64, vlvc.Stages)...)
+	errors = append(errors, validateStages(vlvc.Stages)...)
 
-	return append(errors, validateStages(vlvc.Stages)...)
+	return errors
 }
 
 // getRawExecutionSteps calculates and returns as execution steps the number of
