@@ -35,7 +35,7 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 
 func validateNumberOfVuShifts(startVus int64, stages []Stage) []error {
 	const MaxRampingVUShift = 100000000
-	
+
 	var errors []error
 	totalShifts := big.NewInt(startVus)
 	prevNumVus := totalShifts
