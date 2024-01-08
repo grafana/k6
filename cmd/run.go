@@ -1,9 +1,7 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -495,30 +493,6 @@ a commandline interface for interacting with it.`,
 	runCmd.Flags().AddFlagSet(c.flagSet())
 
 	return runCmd
-}
-
-func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
-	outputs := make([]string, 0, len(test.derivedConfig.Out))
-	for _, o := range test.derivedConfig.Out {
-		outputName, _ := parseOutputArgument(o)
-		outputs = append(outputs, outputName)
-	}
-
-	r := createReport(execScheduler, test.moduleResolver.Imported(), outputs)
-	body, err := json.Marshal(r)
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://reports.k6.io", bytes.NewBuffer(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err == nil {
-		_ = res.Body.Close()
-	}
-	return err
 }
 
 func handleSummaryResult(fs fsext.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {
