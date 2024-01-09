@@ -131,6 +131,51 @@ func TestRequirePathResolution(t *testing.T) {
 				`,
 			},
 		},
+		"ESM and require": {
+			fsMap: map[string]any{
+				"/A/B/data.js": "module.exports='export content'",
+				"/A/C/B/script.js": `
+					export default function () {
+						// Here the path is relative to this module but to the one calling
+						return require("./../data.js");
+					}
+				`,
+				"/A/B/B/script.js": `
+					import s from "./../../C/B/script.js"
+					export default require("./../../C/B/script.js").default();
+				`,
+				"/A/A/A/A/script.js": `
+					import data from "./../../../B/B/script.js"
+					if (data != "export content") {
+						throw new Error("wrong content " + data);
+					}
+					export default function() {}
+				`,
+			},
+		},
+		"full ESM": {
+			fsMap: map[string]any{
+				"/A/B/data.js": "export default 'export content'",
+				"/A/C/B/script.js": `
+					export default function () {
+						// Here the path is relative to this module but to the one calling
+						return require("./../data.js").default;
+					}
+				`,
+				"/A/B/B/script.js": `
+					import s from "./../../C/B/script.js"
+					let l = s();
+					export default l;
+				`,
+				"/A/A/A/A/script.js": `
+					import data from "./../../../B/B/script.js"
+					if (data != "export content") {
+						throw new Error("wrong content " + data);
+					}
+					export default function() {}
+				`,
+			},
+		},
 	}
 	for name, testCase := range testCases {
 		name, testCase := name, testCase
