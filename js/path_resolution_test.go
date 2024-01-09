@@ -17,9 +17,9 @@ func TestOpenPathResolution(t *testing.T) {
 	}{
 		"simple": {
 			fsMap: map[string]any{
-				"/path/to/data.txt": "data file",
-				"/path/totally/different/directory/script.js": `
-					export let data = open("../../../to/data.txt");
+				"/A/B/data.txt": "data file",
+				"/A/A/A/A/script.js": `
+					export let data = open("../../../B/data.txt");
 					if (data != "data file") {
 						throw new Error("wrong content " + data);
 					}
@@ -29,12 +29,12 @@ func TestOpenPathResolution(t *testing.T) {
 		},
 		"intermediate": {
 			fsMap: map[string]any{
-				"/path/to/data.txt": "data file",
-				"/path/another/script/script.js": `
-					module.exports = open("../../to/data.txt");
+				"/A/B/data.txt": "data file",
+				"/A/C/B/script.js": `
+					module.exports = open("../../B/data.txt");
 				`,
-				"/path/totally/different/directory/script.js": `
-					let data = require("./../../../another/script/script.js")
+				"/A/A/A/A/script.js": `
+					let data = require("./../../../C/B/script.js")
 					if (data != "data file") {
 						throw new Error("wrong content " + data);
 					}
@@ -44,16 +44,16 @@ func TestOpenPathResolution(t *testing.T) {
 		},
 		"complex": {
 			fsMap: map[string]any{
-				"/path/to/data.txt": "data file",
-				"/path/another/script/script.js": `
+				"/A/B/data.txt": "data file",
+				"/A/C/B/script.js": `
 					// Here the path is relative to this module but to the one calling
 					module.exports = () =>  open("./../data.txt");
 				`,
-				"/path/to/script/script.js": `
-					module.exports = require("./../../another/script/script.js")();
+				"/A/B/B/script.js": `
+					module.exports = require("./../../C/B/script.js")();
 				`,
-				"/path/totally/different/directory/script.js": `
-					let data = require("./../../../to/script/script.js");
+				"/A/A/A/A/script.js": `
+					let data = require("./../../../B/B/script.js");
 					if (data != "data file") {
 						throw new Error("wrong content " + data);
 					}
@@ -71,7 +71,7 @@ func TestOpenPathResolution(t *testing.T) {
 			fs := fsext.NewMemMapFs()
 			err := writeToFs(fs, testCase.fsMap)
 			require.NoError(t, err)
-			b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/totally/different/directory/script.js"`, fs)
+			b, err := getSimpleBundle(t, "/main.js", `export { default } from "/A/A/A/A/script.js"`, fs)
 			require.NoError(t, err)
 
 			_, err = b.Instantiate(context.Background(), 0)
@@ -87,9 +87,9 @@ func TestRequirePathResolution(t *testing.T) {
 	}{
 		"simple": {
 			fsMap: map[string]any{
-				"/path/to/data.js": "module.exports='export content'",
-				"/path/totally/different/directory/script.js": `
-					let data = require("../../../to/data.js");
+				"/A/B/data.js": "module.exports='export content'",
+				"/A/A/A/A/script.js": `
+					let data = require("../../../B/data.js");
 					if (data != "export content") {
 						throw new Error("wrong content " + data);
 					}
@@ -99,12 +99,12 @@ func TestRequirePathResolution(t *testing.T) {
 		},
 		"intermediate": {
 			fsMap: map[string]any{
-				"/path/to/data.js": "module.exports='export content'",
-				"/path/another/script/script.js": `
-					module.exports = require("../../to/data.js");
+				"/A/B/data.js": "module.exports='export content'",
+				"/A/C/B/script.js": `
+					module.exports = require("../../B/data.js");
 				`,
-				"/path/totally/different/directory/script.js": `
-					let data = require("./../../../another/script/script.js")
+				"/A/A/A/A/script.js": `
+					let data = require("./../../../C/B/script.js")
 					if (data != "export content") {
 						throw new Error("wrong content " + data);
 					}
@@ -114,16 +114,16 @@ func TestRequirePathResolution(t *testing.T) {
 		},
 		"complex": {
 			fsMap: map[string]any{
-				"/path/to/data.js": "module.exports='export content'",
-				"/path/another/script/script.js": `
+				"/A/B/data.js": "module.exports='export content'",
+				"/A/C/B/script.js": `
 					// Here the path is relative to this module but to the one calling
 					module.exports = () =>  require("./../data.js");
 				`,
-				"/path/to/script/script.js": `
-					module.exports = require("./../../another/script/script.js")();
+				"/A/B/B/script.js": `
+					module.exports = require("./../../C/B/script.js")();
 				`,
-				"/path/totally/different/directory/script.js": `
-					let data = require("./../../../to/script/script.js");
+				"/A/A/A/A/script.js": `
+					let data = require("./../../../B/B/script.js");
 					if (data != "export content") {
 						throw new Error("wrong content " + data);
 					}
@@ -140,7 +140,7 @@ func TestRequirePathResolution(t *testing.T) {
 			fs := fsext.NewMemMapFs()
 			err := writeToFs(fs, testCase.fsMap)
 			require.NoError(t, err)
-			b, err := getSimpleBundle(t, "/main.js", `export { default } from "/path/totally/different/directory/script.js"`, fs)
+			b, err := getSimpleBundle(t, "/main.js", `export { default } from "/A/A/A/A/script.js"`, fs)
 			require.NoError(t, err)
 
 			_, err = b.Instantiate(context.Background(), 0)
