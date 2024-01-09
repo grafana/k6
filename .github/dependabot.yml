@@ -8,7 +8,6 @@ updates:
       # Keep the experimental modules up-to-date
       - dependency-name: "github.com/grafana/xk6-*"
         dependency-type: "all"
-    target-branch: "master"
     commit-message:
       prefix: "Bump "
       include: "scope"
