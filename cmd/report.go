@@ -53,7 +53,7 @@ func createReport(execScheduler *execution.Scheduler, importedModules []string, 
 	}
 
 	// collect only the used outputs that are builtin
-	publicOutputs := make([]string, 0, len(outputs))
+	publicOutputs := make([]string, 0, len(builtinOutputs))
 	for _, o := range outputs {
 		if !builtinOutputs[o] {
 			continue
