@@ -9,7 +9,7 @@ updates:
       - dependency-name: "github.com/grafana/xk6-*"
         dependency-type: "all"
     commit-message:
-      prefix: "Bump "
+      prefix: "Upgrade experimental module "
       include: "scope"
     assignees:
       - "octocat"
