@@ -11,7 +11,5 @@ updates:
     commit-message:
       prefix: "Upgrade experimental module "
       include: "scope"
-    assignees:
-      - "octocat"
     reviewers:
       - "grafana/k6-core"
