@@ -434,7 +434,10 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	if fs.isMainFrame() {
 		frames = fs.manager.Frames()
 	} else {
-		frames = []*Frame{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
+		frame, found := fs.manager.getFrameByID(cdp.FrameID(fs.targetID))
+		if found {
+			frames = []*Frame{frame}
+		}
 	}
 	for _, frame := range frames {
 		// A frame could have been removed before we execute this, so don't wait around for a reply.
@@ -659,8 +662,8 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		k6ext.Panic(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
 	}
 	var world executionWorld
-	frame := fs.manager.getFrameByID(i.FrameID)
-	if frame != nil {
+	frame, found := fs.manager.getFrameByID(i.FrameID)
+	if found {
 		if i.IsDefault {
 			world = mainWorld
 		} else if event.Context.Name == utilityWorldName && !frame.hasContext(utilityWorld) {
@@ -760,12 +763,12 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 	)
 
 	var (
-		spanID   = fs.mainFrameSpan.SpanContext().SpanID().String()
-		newFrame = fs.manager.getFrameByID(frame.ID)
+		spanID          = fs.mainFrameSpan.SpanContext().SpanID().String()
+		newFrame, found = fs.manager.getFrameByID(frame.ID)
 	)
 
 	// Only set the k6SpanId reference if it's a new frame.
-	if newFrame == nil {
+	if !found {
 		return
 	}
 
@@ -851,8 +854,8 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		"sid:%v tid:%v fid:%v event:%s eventTime:%q",
 		fs.session.ID(), fs.targetID, event.FrameID, event.Name, event.Timestamp.Time())
 
-	frame := fs.manager.getFrameByID(event.FrameID)
-	if frame == nil {
+	_, found := fs.manager.getFrameByID(event.FrameID)
+	if !found {
 		return
 	}
 
@@ -953,8 +956,8 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.SessionID) error {
-	fr := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
-	if fr == nil {
+	fr, found := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
+	if !found {
 		// IFrame should be attached to fs.page with EventFrameAttached
 		// event before.
 		fs.logger.Debugf("FrameSession:attachIFrameToTarget:return",

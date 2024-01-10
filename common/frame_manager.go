@@ -165,8 +165,8 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDetachedReason) {
 	m.logger.Debugf("FrameManager:frameDetached", "fmid:%d fid:%v", m.ID(), frameID)
 
-	frame := m.getFrameByID(frameID)
-	if frame == nil {
+	frame, found := m.getFrameByID(frameID)
+	if !found {
 		m.logger.Debugf("FrameManager:frameDetached:return",
 			"fmid:%d fid:%v cannot find frame",
 			m.ID(), frameID)
@@ -190,8 +190,8 @@ func (m *FrameManager) frameLifecycleEvent(frameID cdp.FrameID, event LifecycleE
 		"fmid:%d fid:%v event:%s",
 		m.ID(), frameID, lifecycleEventToString[event])
 
-	frame := m.getFrameByID(frameID)
-	if frame != nil {
+	frame, found := m.getFrameByID(frameID)
+	if found {
 		frame.onLifecycleEvent(event)
 	}
 }
@@ -200,8 +200,8 @@ func (m *FrameManager) frameLoadingStarted(frameID cdp.FrameID) {
 	m.logger.Debugf("FrameManager:frameLoadingStarted",
 		"fmid:%d fid:%v", m.ID(), frameID)
 
-	frame := m.getFrameByID(frameID)
-	if frame != nil {
+	frame, found := m.getFrameByID(frameID)
+	if found {
 		frame.onLoadingStarted()
 	}
 }
@@ -210,8 +210,8 @@ func (m *FrameManager) frameLoadingStopped(frameID cdp.FrameID) {
 	m.logger.Debugf("FrameManager:frameLoadingStopped",
 		"fmid:%d fid:%v", m.ID(), frameID)
 
-	frame := m.getFrameByID(frameID)
-	if frame != nil {
+	frame, found := m.getFrameByID(frameID)
+	if found {
 		frame.onLoadingStopped()
 	}
 }
@@ -390,10 +390,16 @@ func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string,
 	return nil
 }
 
-func (m *FrameManager) getFrameByID(id cdp.FrameID) *Frame {
+// getFrameByID will attempt to find a frame with the given id. If one is found
+// the frame and true will be returned. If one isn't found nil and false will
+// be returned.
+func (m *FrameManager) getFrameByID(id cdp.FrameID) (*Frame, bool) {
 	m.framesMu.RLock()
 	defer m.framesMu.RUnlock()
-	return m.frames[id]
+
+	frame, ok := m.frames[id]
+
+	return frame, ok
 }
 
 func (m *FrameManager) removeChildFramesRecursively(frame *Frame) {

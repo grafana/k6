@@ -458,10 +458,11 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	}
 
 	var frame *Frame = nil
+	var found bool
 	if event.FrameID != "" {
-		frame = m.frameManager.getFrameByID(event.FrameID)
+		frame, found = m.frameManager.getFrameByID(event.FrameID)
 	}
-	if frame == nil {
+	if !found {
 		m.logger.Debugf("NetworkManager:onRequest", "url:%s method:%s type:%s fid:%s frame is nil",
 			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	}

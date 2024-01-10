@@ -440,13 +440,13 @@ func (h *ElementHandle) ownerFrame(apiCtx context.Context) *Frame {
 	if frameId == "" {
 		return nil
 	}
-	frame := h.frame.page.frameManager.getFrameByID(frameId)
-	if frame != nil {
+	frame, found := h.frame.page.frameManager.getFrameByID(frameId)
+	if found {
 		return frame
 	}
 	for _, page := range h.frame.page.browserCtx.browser.pages {
-		frame = page.frameManager.getFrameByID(frameId)
-		if frame != nil {
+		frame, found = page.frameManager.getFrameByID(frameId)
+		if found {
 			return frame
 		}
 	}
@@ -766,7 +766,12 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 		return nil, fmt.Errorf("element is not an iframe")
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID), nil
+	frame, found := h.frame.manager.getFrameByID(node.FrameID)
+	if !found {
+		return nil, fmt.Errorf("frame not found for id")
+	}
+
+	return frame, nil
 }
 
 func (h *ElementHandle) Dblclick(opts goja.Value) {
@@ -1003,7 +1008,12 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 		return nil, fmt.Errorf("no frame found for node: %w", err)
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID), nil
+	frame, found := h.frame.manager.getFrameByID(node.FrameID)
+	if !found {
+		return nil, fmt.Errorf("no frame found for id")
+	}
+
+	return frame, nil
 }
 
 func (h *ElementHandle) Press(key string, opts goja.Value) {
