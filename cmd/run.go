@@ -1,15 +1,12 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
-	"runtime"
 	"strings"
 	"sync"
 	"syscall"
@@ -27,7 +24,6 @@ import (
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/trace"
 	"go.k6.io/k6/metrics"
@@ -406,7 +402,8 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			reportCtx, reportCancel := context.WithTimeout(globalCtx, 3*time.Second)
 			defer reportCancel()
 			logger.Debug("Sending usage report...")
-			if rerr := reportUsage(reportCtx, execScheduler); rerr != nil {
+
+			if rerr := reportUsage(reportCtx, execScheduler, test); rerr != nil {
 				logger.WithError(rerr).Debug("Error sending usage report")
 			} else {
 				logger.Debug("Usage report sent successfully")
@@ -496,39 +493,6 @@ a commandline interface for interacting with it.`,
 	runCmd.Flags().AddFlagSet(c.flagSet())
 
 	return runCmd
-}
-
-func reportUsage(ctx context.Context, execScheduler *execution.Scheduler) error {
-	execState := execScheduler.GetState()
-	executorConfigs := execScheduler.GetExecutorConfigs()
-
-	executors := make(map[string]int)
-	for _, ec := range executorConfigs {
-		executors[ec.GetType()]++
-	}
-
-	body, err := json.Marshal(map[string]interface{}{
-		"k6_version": consts.Version,
-		"executors":  executors,
-		"vus_max":    execState.GetInitializedVUsCount(),
-		"iterations": execState.GetFullIterationCount(),
-		"duration":   execState.GetCurrentTestRunDuration().String(),
-		"goos":       runtime.GOOS,
-		"goarch":     runtime.GOARCH,
-	})
-	if err != nil {
-		return err
-	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://reports.k6.io/", bytes.NewBuffer(body))
-	if err != nil {
-		return err
-	}
-	req.Header.Set("Content-Type", "application/json")
-	res, err := http.DefaultClient.Do(req)
-	if err == nil {
-		_ = res.Body.Close()
-	}
-	return err
 }
 
 func handleSummaryResult(fs fsext.Fs, stdOut, stdErr io.Writer, result map[string]io.Reader) error {
