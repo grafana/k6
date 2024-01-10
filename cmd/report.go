@@ -47,15 +47,23 @@ func createReport(execScheduler *execution.Scheduler, importedModules []string, 
 		publicModules = append(publicModules, module)
 	}
 
-	builtinOutputs := map[string]bool{
-		"cloud": true, "csv": true, "experimental-prometheus-rw": true,
-		"influxdb": true, "json": true, "statsd": true,
+	builtinOutputs := builtinOutputStrings()
+
+	// TODO: migrate to slices.Contains as soon as the k6 support
+	// for Go1.20 will be over.
+	builtinOutputsIndex := make(map[string]bool, len(builtinOutputs))
+	for _, bo := range builtinOutputs {
+		builtinOutputsIndex[bo] = true
 	}
 
 	// collect only the used outputs that are builtin
 	publicOutputs := make([]string, 0, len(builtinOutputs))
 	for _, o := range outputs {
-		if !builtinOutputs[o] {
+		// TODO:
+		// if !slices.Contains(builtinOutputs, o) {
+		// 	continue
+		// }
+		if !builtinOutputsIndex[o] {
 			continue
 		}
 		publicOutputs = append(publicOutputs, o)
