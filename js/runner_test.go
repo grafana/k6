@@ -1714,7 +1714,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	t.Parallel()
 
 	// Generate CA key and certificate
-	caCertPem, caKeyPem := GenerateTLSCertificate(t, "ca.localhost", time.Now(), time.Hour)
+	caCertPem, caKeyPem := GenerateTLSCertificate(t, "127.0.0.1", time.Now(), time.Hour)
 
 	caCertBlock, _ := pem.Decode(caCertPem)
 	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
@@ -1727,10 +1727,10 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	require.True(t, ok)
 
 	// Generate server key and certificate
-	srvCertPem, srvKeyPem := GenerateTLSCertificateWithCA(t, "server.localhost", time.Now(), time.Hour, caCert, caKey)
+	srvCertPem, srvKeyPem := GenerateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
 
 	// Generate client Key and Certificate
-	clCertPem, clKeyPem := GenerateTLSCertificateWithCA(t, "client.localhost", time.Now(), time.Hour, caCert, caKey)
+	clCertPem, clKeyPem := GenerateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
 
 	clientCAPool := x509.NewCertPool()
 	assert.True(t, clientCAPool.AppendCertsFromPEM(caCertPem))
