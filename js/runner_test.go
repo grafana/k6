@@ -910,15 +910,11 @@ func TestVUIntegrationMetrics(t *testing.T) {
 	}
 }
 
-func GenerateTLSCertificateWithCA(t *testing.T, host string, notBefore time.Time, validFor time.Duration, caCert *x509.Certificate, caKey *rsa.PrivateKey) ([]byte, []byte) {
-	return generateTLSCertificate(t, host, notBefore, validFor, caCert, caKey)
+func generateTLSCertificate(t *testing.T, host string, notBefore time.Time, validFor time.Duration) ([]byte, []byte) {
+	return generateTLSCertificateWithCA(t, host, notBefore, validFor, nil, nil)
 }
 
-func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, validFor time.Duration) ([]byte, []byte) {
-	return generateTLSCertificate(t, host, notBefore, validFor, nil, nil)
-}
-
-func generateTLSCertificate(t *testing.T, host string, notBefore time.Time, validFor time.Duration, parent *x509.Certificate, ppriv *rsa.PrivateKey) ([]byte, []byte) {
+func generateTLSCertificateWithCA(t *testing.T, host string, notBefore time.Time, validFor time.Duration, parent *x509.Certificate, ppriv *rsa.PrivateKey) ([]byte, []byte) {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
@@ -978,7 +974,7 @@ func generateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 	return certPem, keyPem
 }
 
-func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
+func getTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -1026,8 +1022,8 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 
 func TestVUIntegrationInsecureRequests(t *testing.T) {
 	t.Parallel()
-	certPem, keyPem := GenerateTLSCertificate(t, "mybadssl.localhost", time.Now(), 0)
-	s := GetTestServerWithCertificate(t, certPem, keyPem)
+	certPem, keyPem := generateTLSCertificate(t, "mybadssl.localhost", time.Now(), 0)
+	s := getTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
 		_ = s.Config.Serve(s.Listener)
 	}()
@@ -1339,8 +1335,8 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 func TestVUIntegrationTLSConfig(t *testing.T) {
 	t.Parallel()
-	certPem, keyPem := GenerateTLSCertificate(t, "sha256-badssl.localhost", time.Now(), time.Hour)
-	s := GetTestServerWithCertificate(t, certPem, keyPem)
+	certPem, keyPem := generateTLSCertificate(t, "sha256-badssl.localhost", time.Now(), time.Hour)
+	s := getTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
 		_ = s.Config.Serve(s.Listener)
 	}()
@@ -1714,7 +1710,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	t.Parallel()
 
 	// Generate CA key and certificate
-	caCertPem, caKeyPem := GenerateTLSCertificate(t, "127.0.0.1", time.Now(), time.Hour)
+	caCertPem, caKeyPem := generateTLSCertificate(t, "127.0.0.1", time.Now(), time.Hour)
 
 	caCertBlock, _ := pem.Decode(caCertPem)
 	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
@@ -1727,10 +1723,10 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	require.True(t, ok)
 
 	// Generate server key and certificate
-	srvCertPem, srvKeyPem := GenerateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
+	srvCertPem, srvKeyPem := generateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
 
 	// Generate client Key and Certificate
-	clCertPem, clKeyPem := GenerateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
+	clCertPem, clKeyPem := generateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
 
 	clientCAPool := x509.NewCertPool()
 	assert.True(t, clientCAPool.AppendCertsFromPEM(caCertPem))
