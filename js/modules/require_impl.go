@@ -28,15 +28,19 @@ func NewLegacyRequireImpl(vu VU, ms *ModuleSystem, pwd url.URL) *LegacyRequireIm
 	}
 }
 
+const issueLink = "https://github.com/grafana/k6/issues/3534"
+
 // Require is the actual call that implements require
 func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
 	// TODO remove this in the future when we address https://github.com/grafana/k6/issues/2674
 	// This is currently needed as each time require is called we need to record it's new pwd
 	// to be used if a require *or* open is used within the file as they are relative to the
 	// latest call to require.
+	//
 	// This is *not* the actual require behaviour defined in commonJS as it is actually always relative
 	// to the file it is in. This is unlikely to be an issue but this code is here to keep backwards
 	// compatibility *for now*.
+	//
 	// With native ESM this won't even be possible as `require` might not be called - instead an import
 	// might be used in which case we won't be able to be doing this hack. In that case we either will
 	// need some goja specific helper or to use stack traces as goja_nodejs does.
@@ -48,6 +52,9 @@ func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
 		// In theory we can give that downwards, but this makes the code more tightly coupled
 		// plus as explained above this will be removed in the future so the code reflects more
 		// closely what will be needed then
+		if !r.modules.resolver.locked {
+			r.warnUserOnPathResolutionDifferences(specifier)
+		}
 		fileURL, err := loader.Resolve(r.currentlyRequiredModule, specifier)
 		if err != nil {
 			return nil, err
@@ -66,4 +73,82 @@ func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
 // It is mostly used for old and somewhat buggy behaviour of the `open` call
 func (r *LegacyRequireImpl) CurrentlyRequiredModule() url.URL {
 	return *r.currentlyRequiredModule
+}
+
+func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string) {
+	normalizePathToURL := func(path string) (*url.URL, error) {
+		u, err := url.Parse(path)
+		if err != nil {
+			return nil, err
+		}
+		return loader.Dir(u), nil
+	}
+	// Warn users on their require depending on the none standard k6 behaviour.
+	rt := r.vu.Runtime()
+	logger := r.vu.InitEnv().Logger
+	correct, err := normalizePathToURL(getCurrentModuleScript(rt))
+	if err != nil {
+		logger.Warningf("Couldn't get the \"correct\" path to resolve specifier %q against: %q"+
+			"Please report to issue %s. "+
+			"This will not currently break your script but might mean the future it won't work",
+			specifier, err, issueLink)
+	} else if r.currentlyRequiredModule.String() != correct.String() {
+		logger.Warningf("The \"wrong\" path (%q) and the actually used by k6 path (%q) to resolve %q are different. "+
+			"Please report to issue %s. "+
+			"This will not currently break your script but *WILL* in the future, please report this!!!",
+			correct, r.currentlyRequiredModule, specifier, issueLink)
+	}
+
+	k6behaviourString, err := getPreviousRequiringFile(rt)
+	if err != nil {
+		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
+			"Please report to issue %s. "+
+			"This will not currently break your script but might mean the future it won't work",
+			specifier, err, issueLink)
+		return
+	}
+	k6behaviour, err := normalizePathToURL(k6behaviourString)
+	if err != nil {
+		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
+			"Please report to issue %s. "+
+			"This will not currently break your script but might mean the future it won't work",
+			specifier, err, issueLink)
+		return
+	}
+	if r.currentlyRequiredModule.String() != k6behaviour.String() {
+		// this should always be equal, but check anyway to be certain we won't break something
+		logger.Warningf("The \"wrong\" path (%q) and the actually used by k6 path (%q) to resolve %q are different. "+
+			"Please report to issue %s. "+
+			"This will not currently break your script but might mean the future it won't work",
+			k6behaviour, r.currentlyRequiredModule, specifier, issueLink)
+	}
+}
+
+func getCurrentModuleScript(rt *goja.Runtime) string {
+	var parent string
+	var buf [2]goja.StackFrame
+	frames := rt.CaptureCallStack(2, buf[:0])
+	parent = frames[1].SrcName()
+
+	return parent
+}
+
+func getPreviousRequiringFile(rt *goja.Runtime) (string, error) {
+	var buf [1000]goja.StackFrame
+	frames := rt.CaptureCallStack(1000, buf[:0])
+
+	for i, frame := range frames[1:] { // first one should be the current require
+		// TODO have this precalculated automatically
+		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
+			// we need to get the one *before* but as we skip the first one the index matches ;)
+			return frames[i].SrcName(), nil
+		}
+	}
+	// hopefully nobody is calling `require` with 1000 big stack :crossedfingers:
+	if len(frames) == 1000 {
+		return "", errors.New("stack too big")
+	}
+
+	// fallback
+	return frames[len(frames)-1].SrcName(), nil
 }
