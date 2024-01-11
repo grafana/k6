@@ -126,11 +126,12 @@ jobs:
           CODECOV_BASH_SHA512SUM: d075b412a362a9a2b7aedfec3b8b9a9a927b3b99e98c7c15a2b76ef09862aeb005e91d76a5fd71b511141496d0fd23d1b42095f722ebcd509d768fba030f159e
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
-          if [ "$(uname)" = "Darwin" ]; then
-            alias sha256sum='shasum -a 256'
+          if [[ "${{ matrix.platform }}" == macos* ]]; then
+            shopt -s expand_aliases
+            alias sha512sum='shasum -a 512'
           fi
           curl -fsSLO "https://raw.githubusercontent.com/codecov/codecov-bash/${CODECOV_BASH_VERSION}/codecov"
-          echo "$CODECOV_BASH_SHA512SUM codecov" | sha512sum -c -
+          echo "$CODECOV_BASH_SHA512SUM  codecov" | sha512sum -c -
           platform="${{ matrix.platform }}"
           bash ./codecov -F "${platform%%-*}"
       - name: Generate coverage HTML report
