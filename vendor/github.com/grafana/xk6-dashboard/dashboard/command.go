@@ -14,7 +14,6 @@ import (
 	"github.com/pkg/browser"
 	"github.com/spf13/cobra"
 	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/consts"
 )
 
 const (
@@ -26,29 +25,22 @@ const (
 	flagTags   = "tags"
 )
 
-// NewCommand build dashboard command.
+// NewCommand build dashboard sub-command.
 func NewCommand(gs *state.GlobalState) *cobra.Command {
 	proc := new(process).fromGlobalState(gs)
 	assets := newCustomizedAssets(proc)
 
-	rootCmd := &cobra.Command{ //nolint:exhaustruct
-		Use:   "k6",
-		Short: "a next-generation load generator",
-		Long:  "\n" + consts.Banner(),
-	}
-
 	dashboardCmd := &cobra.Command{ //nolint:exhaustruct
 		Use:   OutputName,
-		Short: "xk6-dashboard commands",
+		Short: "Offline k6 web dashboard management",
+		Long:  `k6 web dashboard management that does not require running k6 (recording playback, creating a report from a recording, etc.).`, //nolint:lll
 	}
-
-	rootCmd.AddCommand(dashboardCmd)
 
 	dashboardCmd.AddCommand(newReplayCommand(assets, proc))
 	dashboardCmd.AddCommand(newAggregateCommand(proc))
 	dashboardCmd.AddCommand(newReportCommand(assets, proc))
 
-	return rootCmd
+	return dashboardCmd
 }
 
 func newReplayCommand(assets *assets, proc *process) *cobra.Command {
@@ -56,7 +48,7 @@ func newReplayCommand(assets *assets, proc *process) *cobra.Command {
 
 	cmd := &cobra.Command{ //nolint:exhaustruct
 		Use:   "replay file",
-		Short: "load the recorded dashboard events and replay it for the UI",
+		Short: "Load the recorded dashboard events and replay it for the UI",
 		Long: `The replay command load the recorded dashboard events (NDJSON format) and replay it for the dashboard UI.
 The compressed file will be automatically decompressed if the file extension is .gz`,
 		Args: cobra.ExactArgs(1),
@@ -111,7 +103,7 @@ func newAggregateCommand(proc *process) *cobra.Command {
 	opts := new(options)
 	cmd := &cobra.Command{ //nolint:exhaustruct
 		Use:   "aggregate input-file output-file",
-		Short: "convert saved json output to recorded dashboard events",
+		Short: "Convert saved json output to recorded dashboard events",
 		Long: `The aggregate command converts the file saved by json output to dashboard format events file.
 The files will be automatically compressed/decompressed if the file extension is .gz`,
 		Args: cobra.ExactArgs(2),
@@ -145,9 +137,21 @@ func newReportCommand(assets *assets, proc *process) *cobra.Command {
 
 	cmd := &cobra.Command{ //nolint:exhaustruct
 		Use:   "report events-file report-file",
-		Short: "create report from a recorded event file",
+		Short: "Create report from a recorded event file",
 		Long: `The report command loads recorded dashboard events (NDJSON format) and creates a report.
 The compressed events file will be automatically decompressed if the file extension is .gz`,
+		Example: `# Visualize the result of a previous test run (using events file):
+$ k6 run --` + OutputName + `=record=test_result.ndjson script.js
+$ k6 ` + OutputName + ` replay test_result.ndjson
+
+# Visualize the result of a previous test run (using json output):
+$ k6 run --out json=test_result.json script.js
+$ k6 ` + OutputName + ` aggregate test_result.json test_result.ndjson
+$ k6 ` + OutputName + ` replay test_result.ndjson
+
+# Generate report from previous test run (using events file):
+$ k6 run --out web-dashboard=record=test_result.ndjson script.js
+$ k6 ` + OutputName + ` report test_result.ndjson test_result_report.html`,
 		Args: cobra.ExactArgs(2),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			opts.Port = -1
