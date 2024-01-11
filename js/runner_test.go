@@ -766,7 +766,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 					assert.Contains(t, vuErr.Error(), "context canceled")
 				}()
 				<-ch
-				time.Sleep(time.Millisecond * 100) // NOTE: increase this in case of problems ;)
+				time.Sleep(time.Microsecond * 1) // NOTE: increase this in case of problems ;)
 				newCancel()
 				wg.Wait()
 			}
