@@ -32,6 +32,7 @@ func configFlagSet() *pflag.FlagSet {
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
 	flags.Bool("web-dashboard", false, "enable web dashboard")
+	flags.MarkHidden("web-dashboard") // we don't want to introduce it, in future releases logic may change
 	return flags
 }
 
