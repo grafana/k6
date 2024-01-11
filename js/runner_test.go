@@ -910,7 +910,11 @@ func TestVUIntegrationMetrics(t *testing.T) {
 	}
 }
 
-func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, validFor time.Duration) ([]byte, []byte) {
+func generateTLSCertificate(t *testing.T, host string, notBefore time.Time, validFor time.Duration) ([]byte, []byte) {
+	return generateTLSCertificateWithCA(t, host, notBefore, validFor, nil, nil)
+}
+
+func generateTLSCertificateWithCA(t *testing.T, host string, notBefore time.Time, validFor time.Duration, parent *x509.Certificate, ppriv *rsa.PrivateKey) ([]byte, []byte) {
 	priv, err := rsa.GenerateKey(rand.Reader, 2048)
 	require.NoError(t, err)
 
@@ -937,7 +941,6 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 		NotAfter:  notAfter,
 
 		KeyUsage:              keyUsage,
-		ExtKeyUsage:           []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
 		BasicConstraintsValid: true,
 		SignatureAlgorithm:    x509.SHA256WithRSA,
 	}
@@ -951,10 +954,14 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 		}
 	}
 
-	template.IsCA = true
-	template.KeyUsage |= x509.KeyUsageCertSign
+	if parent == nil {
+		template.IsCA = true
+		template.KeyUsage |= x509.KeyUsageCertSign
+		parent = &template
+		ppriv = priv
+	}
 
-	derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
+	derBytes, err := x509.CreateCertificate(rand.Reader, &template, parent, &priv.PublicKey, ppriv)
 	require.NoError(t, err)
 
 	certPem := pem.EncodeToMemory(&pem.Block{Type: "CERTIFICATE", Bytes: derBytes})
@@ -967,7 +974,7 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 	return certPem, keyPem
 }
 
-func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
+func getTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
 	server := &http.Server{
 		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusOK)
@@ -1015,8 +1022,8 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.S
 
 func TestVUIntegrationInsecureRequests(t *testing.T) {
 	t.Parallel()
-	certPem, keyPem := GenerateTLSCertificate(t, "mybadssl.localhost", time.Now(), 0)
-	s := GetTestServerWithCertificate(t, certPem, keyPem)
+	certPem, keyPem := generateTLSCertificate(t, "mybadssl.localhost", time.Now(), 0)
+	s := getTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
 		_ = s.Config.Serve(s.Listener)
 	}()
@@ -1328,8 +1335,8 @@ func TestVUIntegrationHosts(t *testing.T) {
 
 func TestVUIntegrationTLSConfig(t *testing.T) {
 	t.Parallel()
-	certPem, keyPem := GenerateTLSCertificate(t, "sha256-badssl.localhost", time.Now(), time.Hour)
-	s := GetTestServerWithCertificate(t, certPem, keyPem)
+	certPem, keyPem := generateTLSCertificate(t, "sha256-badssl.localhost", time.Now(), time.Hour)
+	s := getTestServerWithCertificate(t, certPem, keyPem)
 	go func() {
 		_ = s.Config.Serve(s.Listener)
 	}()
@@ -1699,56 +1706,32 @@ func TestVUIntegrationVUID(t *testing.T) {
 	}
 }
 
-/*
-CA key:
------BEGIN EC PRIVATE KEY-----
-MHcCAQEEIDEm8bxihqYfAsWP39o5DpkAksPBw+3rlDHNX+d69oYGoAoGCCqGSM49
-AwEHoUQDQgAEeeuCFQsdraFJr8JaKbAKfjYpZ2U+p3r/OzcmAsjFO8EckmV9uFZs
-Gq3JurKi9Z3dDKQcwinHQ1malicbwWhamQ==
------END EC PRIVATE KEY-----
-*/
 func TestVUIntegrationClientCerts(t *testing.T) {
 	t.Parallel()
+
+	// Generate CA key and certificate
+	caCertPem, caKeyPem := generateTLSCertificate(t, "127.0.0.1", time.Now(), time.Hour)
+
+	caCertBlock, _ := pem.Decode(caCertPem)
+	caCert, err := x509.ParseCertificate(caCertBlock.Bytes)
+	require.NoError(t, err)
+
+	caKeyBlock, _ := pem.Decode(caKeyPem)
+	caKeyAny, err := x509.ParsePKCS8PrivateKey(caKeyBlock.Bytes)
+	require.NoError(t, err)
+	caKey, ok := caKeyAny.(*rsa.PrivateKey)
+	require.True(t, ok)
+
+	// Generate server key and certificate
+	srvCertPem, srvKeyPem := generateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
+
+	// Generate client Key and Certificate
+	clCertPem, clKeyPem := generateTLSCertificateWithCA(t, "127.0.0.1", time.Now(), time.Hour, caCert, caKey)
+
 	clientCAPool := x509.NewCertPool()
-	assert.True(t, clientCAPool.AppendCertsFromPEM(
-		[]byte("-----BEGIN CERTIFICATE-----\n"+
-			"MIIBWzCCAQGgAwIBAgIJAIQMBgLi+DV6MAoGCCqGSM49BAMCMBAxDjAMBgNVBAMM\n"+
-			"BU15IENBMCAXDTIyMDEyMTEyMjkzNloYDzMwMjEwNTI0MTIyOTM2WjAQMQ4wDAYD\n"+
-			"VQQDDAVNeSBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHnrghULHa2hSa/C\n"+
-			"WimwCn42KWdlPqd6/zs3JgLIxTvBHJJlfbhWbBqtybqyovWd3QykHMIpx0NZmpYn\n"+
-			"G8FoWpmjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\n"+
-			"DgQWBBSkukBA8lgFvvBJAYKsoSUR+PX71jAKBggqhkjOPQQDAgNIADBFAiEAiFF7\n"+
-			"Y54CMNRSBSVMgd4mQgrzJInRH88KpLsQ7VeOAaQCIEa0vaLln9zxIDZQKocml4Db\n"+
-			"AEJr8tDzMKIds6sRTBT4\n"+
-			"-----END CERTIFICATE-----"),
-	))
-	serverCert, err := tls.X509KeyPair(
-		[]byte("-----BEGIN CERTIFICATE-----\n"+
-			"MIIBcTCCARigAwIBAgIJAIP0njRt16gbMAoGCCqGSM49BAMCMBAxDjAMBgNVBAMM\n"+
-			"BU15IENBMCAXDTIyMDEyMTE1MTA0OVoYDzMwMjEwNTI0MTUxMDQ5WjAZMRcwFQYD\n"+
-			"VQQDDA4xMjcuMC4wLjE6Njk2OTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABH8Y\n"+
-			"exy5LI9r+RNwVpf/5ZX86EigMYHp9YOyiUMmfUfvDig+BGhlwjm7Lh2941Gz4amO\n"+
-			"lpN2YAkcd0wnNLHkVOmjUDBOMA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAA\n"+
-			"MB0GA1UdDgQWBBQ9cIYUwwzfzBXPyRGB5tNpAgHWujAPBgNVHREECDAGhwR/AAAB\n"+
-			"MAoGCCqGSM49BAMCA0cAMEQCIDjRZlg+jKgI9K99HOM2wS9+URr6R1/FYLZYBtMc\n"+
-			"pq3hAiB9NQxNqV459fgN0BpbiLrEvJjquRFoUr9BWsG+hHrHtQ==\n"+
-			"-----END CERTIFICATE-----\n"+
-			"-----BEGIN CERTIFICATE-----\n"+
-			"MIIBWzCCAQGgAwIBAgIJAIQMBgLi+DV6MAoGCCqGSM49BAMCMBAxDjAMBgNVBAMM\n"+
-			"BU15IENBMCAXDTIyMDEyMTEyMjkzNloYDzMwMjEwNTI0MTIyOTM2WjAQMQ4wDAYD\n"+
-			"VQQDDAVNeSBDQTBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABHnrghULHa2hSa/C\n"+
-			"WimwCn42KWdlPqd6/zs3JgLIxTvBHJJlfbhWbBqtybqyovWd3QykHMIpx0NZmpYn\n"+
-			"G8FoWpmjQjBAMA4GA1UdDwEB/wQEAwIBBjAPBgNVHRMBAf8EBTADAQH/MB0GA1Ud\n"+
-			"DgQWBBSkukBA8lgFvvBJAYKsoSUR+PX71jAKBggqhkjOPQQDAgNIADBFAiEAiFF7\n"+
-			"Y54CMNRSBSVMgd4mQgrzJInRH88KpLsQ7VeOAaQCIEa0vaLln9zxIDZQKocml4Db\n"+
-			"AEJr8tDzMKIds6sRTBT4\n"+
-			"-----END CERTIFICATE-----"),
-		[]byte("-----BEGIN EC PRIVATE KEY-----\n"+
-			"MHcCAQEEIHNpjs0P9/ejoUYF5Agzf9clHR4PwBsVfZ+JgslfuBg1oAoGCCqGSM49\n"+
-			"AwEHoUQDQgAEfxh7HLksj2v5E3BWl//llfzoSKAxgen1g7KJQyZ9R+8OKD4EaGXC\n"+
-			"ObsuHb3jUbPhqY6Wk3ZgCRx3TCc0seRU6Q==\n"+
-			"-----END EC PRIVATE KEY-----"),
-	)
+	assert.True(t, clientCAPool.AppendCertsFromPEM(caCertPem))
+
+	serverCert, err := tls.X509KeyPair(append(srvCertPem, caCertPem...), srvKeyPem)
 	require.NoError(t, err)
 
 	testdata := map[string]struct {
@@ -1806,21 +1789,8 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 				opt.TLSAuth = []*lib.TLSAuth{
 					{
 						TLSAuthFields: lib.TLSAuthFields{
-							Cert: "-----BEGIN CERTIFICATE-----\n" +
-								"MIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\n" +
-								"TXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\n" +
-								"BAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\n" +
-								"gZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\n" +
-								"ABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\n" +
-								"BBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\n" +
-								"u/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\n" +
-								"zk9eWNHFXDA9U6U=\n" +
-								"-----END CERTIFICATE-----",
-							Key: "-----BEGIN EC PRIVATE KEY-----\n" +
-								"MHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\n" +
-								"AwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\n" +
-								"V71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\n" +
-								"-----END EC PRIVATE KEY-----",
+							Cert: string(clCertPem),
+							Key:  string(clKeyPem),
 						},
 					},
 				}
