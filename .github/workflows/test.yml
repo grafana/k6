@@ -37,7 +37,7 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          # Run with less concurrency on Windows to minimize flakiness.
+          # Run with less concurrency on Windows/MacOS to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == macos* ]]; then
             unset args[2]
             args[1]="1"
@@ -75,7 +75,7 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          # Run with less concurrency on Windows to minimize flakiness.
+          # Run with less concurrency on Windows/MacOS to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == macos* ]]; then
             unset args[2]
             args[1]="1"
@@ -103,7 +103,7 @@ jobs:
           go version
           export GOMAXPROCS=2
           args=("-p" "2" "-race")
-          # Run with less concurrency on Windows to minimize flakiness.
+          # Run with less concurrency on Windows/MacOS to minimize flakiness.
           if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == macos* ]]; then
             unset args[2]
             args[1]="1"
@@ -126,6 +126,9 @@ jobs:
           CODECOV_BASH_SHA512SUM: d075b412a362a9a2b7aedfec3b8b9a9a927b3b99e98c7c15a2b76ef09862aeb005e91d76a5fd71b511141496d0fd23d1b42095f722ebcd509d768fba030f159e
           CODECOV_TOKEN: ${{ secrets.CODECOV_TOKEN }}
         run: |
+          if [ "$(uname)" = "Darwin" ]; then
+            alias sha256sum='shasum -a 256'
+          fi
           curl -fsSLO "https://raw.githubusercontent.com/codecov/codecov-bash/${CODECOV_BASH_VERSION}/codecov"
           echo "$CODECOV_BASH_SHA512SUM codecov" | sha512sum -c -
           platform="${{ matrix.platform }}"
