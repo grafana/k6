@@ -1,9 +1,11 @@
 package js
 
 import (
+	"errors"
 	"sync"
 
 	"go.k6.io/k6/ext"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modules/k6"
 	"go.k6.io/k6/js/modules/k6/crypto"
@@ -38,7 +40,6 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
-		"k6/experimental/grpc":       grpc.NewExperimental(),
 		"k6/experimental/timers": newWarnExperimentalModule(timers.New(),
 			"k6/experimental/timers is now part of the k6 core, please change your imports to use k6/timers instead."+
 				" The k6/experimental/timers will be removed in k6 v0.52.0"),
@@ -50,6 +51,10 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/http":                 http.New(),
 		"k6/metrics":              metrics.New(),
 		"k6/ws":                   ws.New(),
+		"k6/experimental/grpc": newRemovedModule(
+			"k6/experimental/grpc has been removed, please use k6/net/grpc instead." +
+				" See https://grafana.com/docs/k6/latest/javascript-api/k6-net-grpc/ for more information.",
+		),
 	}
 }
 
@@ -82,4 +87,18 @@ func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
 func (w *warnExperimentalModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	w.once.Do(func() { vu.InitEnv().Logger.Warn(w.msg) })
 	return w.base.NewModuleInstance(vu)
+}
+
+type removedModule struct {
+	errMsg string
+}
+
+func newRemovedModule(errMsg string) modules.Module {
+	return &removedModule{errMsg: errMsg}
+}
+
+func (rm *removedModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	common.Throw(vu.Runtime(), errors.New(rm.errMsg))
+
+	return nil
 }
