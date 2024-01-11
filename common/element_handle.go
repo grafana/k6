@@ -440,13 +440,13 @@ func (h *ElementHandle) ownerFrame(apiCtx context.Context) *Frame {
 	if frameId == "" {
 		return nil
 	}
-	frame, found := h.frame.page.frameManager.getFrameByID(frameId)
-	if found {
+	frame, ok := h.frame.page.frameManager.getFrameByID(frameId)
+	if ok {
 		return frame
 	}
 	for _, page := range h.frame.page.browserCtx.browser.pages {
-		frame, found = page.frameManager.getFrameByID(frameId)
-		if found {
+		frame, ok = page.frameManager.getFrameByID(frameId)
+		if ok {
 			return frame
 		}
 	}
@@ -766,8 +766,8 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 		return nil, fmt.Errorf("element is not an iframe")
 	}
 
-	frame, found := h.frame.manager.getFrameByID(node.FrameID)
-	if !found {
+	frame, ok := h.frame.manager.getFrameByID(node.FrameID)
+	if !ok {
 		return nil, fmt.Errorf("frame not found for id %s", node.FrameID)
 	}
 
@@ -1008,8 +1008,8 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 		return nil, fmt.Errorf("no frame found for node: %w", err)
 	}
 
-	frame, found := h.frame.manager.getFrameByID(node.FrameID)
-	if !found {
+	frame, ok := h.frame.manager.getFrameByID(node.FrameID)
+	if !ok {
 		return nil, fmt.Errorf("no frame found for id %s", node.FrameID)
 	}
 

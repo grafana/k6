@@ -165,8 +165,8 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDetachedReason) {
 	m.logger.Debugf("FrameManager:frameDetached", "fmid:%d fid:%v", m.ID(), frameID)
 
-	frame, found := m.getFrameByID(frameID)
-	if !found {
+	frame, ok := m.getFrameByID(frameID)
+	if !ok {
 		m.logger.Debugf("FrameManager:frameDetached:return",
 			"fmid:%d fid:%v cannot find frame",
 			m.ID(), frameID)
@@ -190,8 +190,8 @@ func (m *FrameManager) frameLifecycleEvent(frameID cdp.FrameID, event LifecycleE
 		"fmid:%d fid:%v event:%s",
 		m.ID(), frameID, lifecycleEventToString[event])
 
-	frame, found := m.getFrameByID(frameID)
-	if found {
+	frame, ok := m.getFrameByID(frameID)
+	if ok {
 		frame.onLifecycleEvent(event)
 	}
 }
@@ -200,8 +200,8 @@ func (m *FrameManager) frameLoadingStarted(frameID cdp.FrameID) {
 	m.logger.Debugf("FrameManager:frameLoadingStarted",
 		"fmid:%d fid:%v", m.ID(), frameID)
 
-	frame, found := m.getFrameByID(frameID)
-	if found {
+	frame, ok := m.getFrameByID(frameID)
+	if ok {
 		frame.onLoadingStarted()
 	}
 }
@@ -210,8 +210,8 @@ func (m *FrameManager) frameLoadingStopped(frameID cdp.FrameID) {
 	m.logger.Debugf("FrameManager:frameLoadingStopped",
 		"fmid:%d fid:%v", m.ID(), frameID)
 
-	frame, found := m.getFrameByID(frameID)
-	if found {
+	frame, ok := m.getFrameByID(frameID)
+	if ok {
 		frame.onLoadingStopped()
 	}
 }

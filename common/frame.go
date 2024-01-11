@@ -377,8 +377,8 @@ func (f *Frame) onLoadingStopped() {
 }
 
 func (f *Frame) position() (*Position, error) {
-	frame, found := f.manager.getFrameByID(cdp.FrameID(f.page.targetID))
-	if !found {
+	frame, ok := f.manager.getFrameByID(cdp.FrameID(f.page.targetID))
+	if !ok {
 		return nil, fmt.Errorf("could not find frame with id %s", f.page.targetID)
 	}
 	if frame == f.page.frameManager.MainFrame() {

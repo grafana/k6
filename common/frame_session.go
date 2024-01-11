@@ -434,8 +434,8 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	if fs.isMainFrame() {
 		frames = fs.manager.Frames()
 	} else {
-		frame, found := fs.manager.getFrameByID(cdp.FrameID(fs.targetID))
-		if found {
+		frame, ok := fs.manager.getFrameByID(cdp.FrameID(fs.targetID))
+		if ok {
 			frames = []*Frame{frame}
 		}
 	}
@@ -662,8 +662,8 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		k6ext.Panic(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
 	}
 	var world executionWorld
-	frame, found := fs.manager.getFrameByID(i.FrameID)
-	if found {
+	frame, ok := fs.manager.getFrameByID(i.FrameID)
+	if ok {
 		if i.IsDefault {
 			world = mainWorld
 		} else if event.Context.Name == utilityWorldName && !frame.hasContext(utilityWorld) {
@@ -763,12 +763,12 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 	)
 
 	var (
-		spanID          = fs.mainFrameSpan.SpanContext().SpanID().String()
-		newFrame, found = fs.manager.getFrameByID(frame.ID)
+		spanID       = fs.mainFrameSpan.SpanContext().SpanID().String()
+		newFrame, ok = fs.manager.getFrameByID(frame.ID)
 	)
 
 	// Only set the k6SpanId reference if it's a new frame.
-	if !found {
+	if !ok {
 		return
 	}
 
@@ -854,8 +854,8 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		"sid:%v tid:%v fid:%v event:%s eventTime:%q",
 		fs.session.ID(), fs.targetID, event.FrameID, event.Name, event.Timestamp.Time())
 
-	_, found := fs.manager.getFrameByID(event.FrameID)
-	if !found {
+	_, ok := fs.manager.getFrameByID(event.FrameID)
+	if !ok {
 		return
 	}
 
@@ -956,8 +956,8 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.SessionID) error {
-	fr, found := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
-	if !found {
+	fr, ok := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
+	if !ok {
 		// IFrame should be attached to fs.page with EventFrameAttached
 		// event before.
 		fs.logger.Debugf("FrameSession:attachIFrameToTarget:return",
