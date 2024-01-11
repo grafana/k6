@@ -280,38 +280,6 @@ func (s Selection) Last() Selection {
 	return Selection{s.rt, s.sel.Last(), s.URL}
 }
 
-// FromElement creates a new Selection based on a specified Element.
-//
-// This function is useful for creating a new Selection object that
-// encapsulates the same HTML structure as the provided Element. It
-// is particularly helpful when you need to perform further operations
-// or manipulations on the HTML content within the scope of this Element.
-// If the provided value is not an Element, an empty Selection is returned.
-//
-// Example:
-// sel := existingSelection.FromElement(jsElement)
-func (s Selection) FromElement(v goja.Value) Selection {
-	elm, ok := v.Export().(Element)
-	if !ok {
-		// Return an empty Selection if the value is not an Element
-		return s.emptySelection()
-	}
-
-	return Selection{rt: s.rt, sel: elm.sel.sel, URL: s.URL}
-}
-
-// Locator selects HTML elements based on a CSS selector or XPath.
-//
-// This method is designed to provide a consistent way of selecting elements,
-// similar to how 'page.locator' works in the 'k6-browser'. It uses goquery
-// to perform the selection based on the given selector string.
-//
-// Example:
-// sel := mySelection.Locator(".myClass")
-func (s Selection) Locator(selector string) Selection {
-	return Selection{s.rt, s.sel.Find(selector), s.URL}
-}
-
 func (s Selection) Contents() Selection {
 	return Selection{s.rt, s.sel.Contents(), s.URL}
 }

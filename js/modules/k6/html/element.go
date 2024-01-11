@@ -255,7 +255,7 @@ func (e Element) IsSameNode(v goja.Value) bool {
 // Example:
 // sel := element.Selection()
 func (e Element) Selection() Selection {
-	return Selection{rt: e.sel.rt, sel: e.sel.sel, URL: e.sel.URL}
+	return *e.sel
 }
 
 func (e Element) GetElementsByClassName(name string) []goja.Value {
