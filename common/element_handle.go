@@ -768,7 +768,7 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 
 	frame, found := h.frame.manager.getFrameByID(node.FrameID)
 	if !found {
-		return nil, fmt.Errorf("frame not found for id")
+		return nil, fmt.Errorf("frame not found for id %s", node.FrameID)
 	}
 
 	return frame, nil
@@ -1010,7 +1010,7 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 
 	frame, found := h.frame.manager.getFrameByID(node.FrameID)
 	if !found {
-		return nil, fmt.Errorf("no frame found for id")
+		return nil, fmt.Errorf("no frame found for id %s", node.FrameID)
 	}
 
 	return frame, nil

@@ -390,9 +390,8 @@ func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string,
 	return nil
 }
 
-// getFrameByID will attempt to find a frame with the given id. If one is found
-// the frame and true will be returned. If one isn't found nil and false will
-// be returned.
+// getFrameByID finds a frame with id. If found, it returns the frame and true,
+// otherwise, it returns nil and false.
 func (m *FrameManager) getFrameByID(id cdp.FrameID) (*Frame, bool) {
 	m.framesMu.RLock()
 	defer m.framesMu.RUnlock()
