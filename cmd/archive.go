@@ -16,7 +16,7 @@ type cmdArchive struct {
 }
 
 func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
-	test, err := loadAndConfigureTest(c.gs, cmd, args, getPartialConfig)
+	test, err := loadAndConfigureLocalTest(c.gs, cmd, args, getPartialConfig)
 	if err != nil {
 		return err
 	}
