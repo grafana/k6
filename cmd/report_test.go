@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/execution"
+	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/executor"
@@ -42,7 +43,7 @@ func TestCreateReport(t *testing.T) {
 			Logger: logger,
 		},
 		Options: opts,
-	})
+	}, local.NewController())
 	require.NoError(t, err)
 	s.GetState().ModInitializedVUsCount(6)
 	s.GetState().AddFullIterations(uint64(opts.Iterations.Int64))
