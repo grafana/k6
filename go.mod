@@ -31,6 +31,7 @@ require (
 	github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
+	github.com/prometheus/client_golang v1.16.0
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spf13/afero v1.1.2
@@ -54,7 +55,6 @@ require (
 	google.golang.org/protobuf v1.31.1-0.20231027082548-f4a6c1f6e5c1
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
-	github.com/prometheus/client_golang v1.16.0
 )
 
 require (
