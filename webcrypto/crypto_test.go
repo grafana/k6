@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"fmt"
+	"github.com/stretchr/testify/require"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -10,10 +11,10 @@ import (
 func TestGetRandomValues(t *testing.T) {
 	t.Parallel()
 
-	ts := newTestSetup(t)
+	ts, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
 
-	gotScriptErr := ts.EventLoop.Start(func() error {
-		_, err := ts.VU.Runtime().RunString(`
+	_, gotScriptErr := ts.RunOnEventLoop(`
 		var input = new Uint8Array(10);
 		var output = crypto.getRandomValues(input);
 
@@ -26,10 +27,7 @@ func TestGetRandomValues(t *testing.T) {
 		if (input !== output) {
 			throw new Error("input !== output");
 		}
-		`)
-
-		return err
-	})
+	`)
 
 	assert.NoError(t, gotScriptErr)
 }
@@ -53,7 +51,8 @@ func TestGetRandomValues(t *testing.T) {
 func TestGetRandomValuesSupportedTypedArrays(t *testing.T) {
 	t.Parallel()
 
-	ts := newTestSetup(t)
+	ts, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
 
 	type testCase struct {
 		name       string
@@ -122,19 +121,14 @@ func TestGetRandomValuesSupportedTypedArrays(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		gotScriptErr := ts.EventLoop.Start(func() error {
-			script := fmt.Sprintf(`
+		_, gotScriptErr := ts.RunOnEventLoop(fmt.Sprintf(`
 				var buf = new %s(10);
 				crypto.getRandomValues(buf);
 
 				if (buf.length != 10) {
 					throw new Error("buf.length != 10");
 				}
-			`, tc.typedArray)
-
-			_, err := ts.VU.Runtime().RunString(script)
-			return err
-		})
+			`, tc.typedArray))
 
 		if tc.wantErr != (gotScriptErr != nil) {
 			t.Fatalf("unexpected error: %v", gotScriptErr)
@@ -155,16 +149,13 @@ func TestGetRandomValuesSupportedTypedArrays(t *testing.T) {
 func TestGetRandomValuesQuotaExceeded(t *testing.T) {
 	t.Parallel()
 
-	ts := newTestSetup(t)
+	ts, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
 
-	gotScriptErr := ts.EventLoop.Start(func() error {
-		_, err := ts.VU.Runtime().RunString(`
+	_, gotScriptErr := ts.RunOnEventLoop(`
 		var buf = new Uint8Array(1000000000);
 		crypto.getRandomValues(buf);
-		`)
-
-		return err
-	})
+	`)
 
 	assert.Error(t, gotScriptErr)
 	assert.Contains(t, gotScriptErr.Error(), "QuotaExceededError")
@@ -179,10 +170,10 @@ func TestGetRandomValuesQuotaExceeded(t *testing.T) {
 func TestRandomUUIDIsInTheNamespaceFormat(t *testing.T) {
 	t.Parallel()
 
-	ts := newTestSetup(t)
+	ts, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
 
-	gotScriptErr := ts.EventLoop.Start(func() error {
-		_, err := ts.VU.Runtime().RunString(`
+	_, gotScriptErr := ts.RunOnEventLoop(`
 		const iterations = 256;
 		const uuids = new Set();
 
@@ -201,10 +192,7 @@ func TestRandomUUIDIsInTheNamespaceFormat(t *testing.T) {
 			// that it is unique.
 			UUIDRegex.test(randomUUID());
 		}
-		`)
-
-		return err
-	})
+	`)
 
 	assert.NoError(t, gotScriptErr)
 }
@@ -219,10 +207,10 @@ func TestRandomUUIDIsInTheNamespaceFormat(t *testing.T) {
 func TestRandomUUIDVersion(t *testing.T) {
 	t.Parallel()
 
-	ts := newTestSetup(t)
+	ts, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
 
-	gotScriptErr := ts.EventLoop.Start(func() error {
-		_, err := ts.VU.Runtime().RunString(`
+	_, gotScriptErr := ts.RunOnEventLoop(`
 		const iterations = 256;
 		const uuids = new Set();
 
@@ -242,10 +230,7 @@ func TestRandomUUIDVersion(t *testing.T) {
 				throw new Error("UUID version is not 4: " + value);
 			}
 		}
-		`)
-
-		return err
-	})
+	`)
 
 	assert.NoError(t, gotScriptErr)
 }
@@ -260,10 +245,10 @@ func TestRandomUUIDVersion(t *testing.T) {
 func TestRandomUUIDVariant(t *testing.T) {
 	t.Parallel()
 
-	ts := newTestSetup(t)
+	ts, err := newConfiguredRuntime(t)
+	require.NoError(t, err)
 
-	gotScriptErr := ts.EventLoop.Start(func() error {
-		_, err := ts.VU.Runtime().RunString(`
+	_, gotScriptErr := ts.RunOnEventLoop(`
 		const iterations = 256;
 		const uuids = new Set();
 
@@ -283,10 +268,7 @@ func TestRandomUUIDVariant(t *testing.T) {
 				throw new Error("UUID variant is not 1: " + value);
 			}
 		}
-		`)
-
-		return err
-	})
+	`)
 
 	assert.NoError(t, gotScriptErr)
 }

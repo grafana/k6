@@ -1,6 +1,7 @@
 package webcrypto
 
 import (
+	"go.k6.io/k6/js/compiler"
 	"io"
 	"os"
 	"path"
@@ -8,41 +9,70 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/modulestest"
 )
 
-// newTestSetup initializes a new test setup.
+const initGlobals = `
+	globalThis.CryptoKey = require("k6/x/webcrypto").CryptoKey;
+`
+
+// newConfiguredRuntime initializes a new test setup.
 // It prepares a test setup with a mocked redis server and a goja runtime,
 // and event loop, ready to execute scripts as if being executed in the
 // main context of k6.
-func newTestSetup(t testing.TB) *modulestest.Runtime {
-	ts := modulestest.NewRuntime(t)
+func newConfiguredRuntime(t testing.TB) (*modulestest.Runtime, error) {
+	var err error
+	runtime := modulestest.NewRuntime(t)
+
+	err = runtime.SetupModuleSystem(
+		map[string]interface{}{"k6/x/webcrypto": New()},
+		nil,
+		compiler.New(runtime.VU.InitEnv().Logger),
+	)
+	if err != nil {
+		return nil, err
+	}
 
 	// We compile the Web Platform testharness script into a goja.Program
 	harnessProgram, err := CompileFile("./tests/util", "testharness.js")
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
 
 	// We execute the harness script in the goja runtime
 	// in order to make the Web Platform assertion functions available
 	// to the tests.
-	_, err = ts.VU.Runtime().RunProgram(harnessProgram)
-	require.NoError(t, err)
+	_, err = runtime.VU.Runtime().RunProgram(harnessProgram)
+	if err != nil {
+		return nil, err
+	}
 
 	// We compile the Web Platform helpers script into a goja.Program
 	helpersProgram, err := CompileFile("./tests/util", "helpers.js")
-	require.NoError(t, err)
+	if err != nil {
+		return nil, err
+	}
+
 	// We execute the helpers script in the goja runtime
 	// in order to make the Web Platform helpers available
 	// to the tests.
-	_, err = ts.VU.Runtime().RunProgram(helpersProgram)
-	require.NoError(t, err)
+	_, err = runtime.VU.Runtime().RunProgram(helpersProgram)
+	if err != nil {
+		return nil, err
+	}
 
-	m := new(RootModule).NewModuleInstance(ts.VU)
-	require.NoError(t, ts.VU.Runtime().Set("crypto", m.Exports().Named["crypto"]))
-	require.NoError(t, ts.VU.Runtime().GlobalObject().Set("CryptoKey", CryptoKey{}))
+	m := new(RootModule).NewModuleInstance(runtime.VU)
 
-	return ts
+	if err = runtime.VU.Runtime().Set("crypto", m.Exports().Named["crypto"]); err != nil {
+		return nil, err
+	}
+
+	_, err = runtime.VU.Runtime().RunString(initGlobals)
+	if err != nil {
+		return nil, err
+	}
+
+	return runtime, nil
 }
 
 // CompileFile compiles a javascript file as a goja.Program.
