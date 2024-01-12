@@ -54,7 +54,7 @@ func TestOutputFlush(t *testing.T) {
 	// init and start the output
 	o, err := expv2.New(logger, conf, cc)
 	require.NoError(t, err)
-	o.SetTestRunID("my-test-run-id-123")
+	o.SetTestRunID("123")
 	require.NoError(t, o.Start())
 
 	// collect and flush samples

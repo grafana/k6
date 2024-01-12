@@ -300,7 +300,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 	o, err := New(logger, config, cc)
 	require.NoError(t, err)
 
-	o.SetTestRunID("ref-id-123")
+	o.SetTestRunID("1234")
 	require.NoError(t, o.Start())
 	require.NoError(t, o.StopWithTestError(errors.New("an error")))
 }
