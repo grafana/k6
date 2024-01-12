@@ -1,3 +1,4 @@
+// Package storage provides data storage for the extension and user specific data.
 package storage
 
 import (

@@ -34,7 +34,6 @@ type BrowserType struct {
 	vu           k6modules.VU
 	hooks        *common.Hooks
 	k6Metrics    *k6ext.CustomMetrics
-	execPath     string // path to the Chromium executable
 	randSrc      *rand.Rand
 	envLookupper env.LookupFunc
 }
@@ -184,7 +183,12 @@ func (b *BrowserType) launch(
 	}
 	flags["user-data-dir"] = dataDir.Dir
 
-	browserProc, err := b.allocate(ctx, opts, flags, dataDir, logger)
+	path, err := executablePath(opts.ExecutablePath, b.envLookupper, exec.LookPath)
+	if err != nil {
+		return nil, 0, fmt.Errorf("finding browser executable: %w", err)
+	}
+
+	browserProc, err := b.allocate(ctx, path, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -224,7 +228,7 @@ func (b *BrowserType) Name() string {
 
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
-	ctx context.Context, opts *common.BrowserOptions,
+	ctx context.Context, path string,
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
@@ -240,23 +244,36 @@ func (b *BrowserType) allocate(
 		return nil, err
 	}
 
-	path := opts.ExecutablePath
-	if path == "" {
-		path = b.ExecutablePath()
-	}
-
 	return common.NewLocalBrowserProcess(bProcCtx, path, args, dataDir, bProcCtxCancel, logger) //nolint: wrapcheck
 }
 
-// ExecutablePath returns the path where the extension expects to find the browser executable.
-func (b *BrowserType) ExecutablePath() (execPath string) {
-	if b.execPath != "" {
-		return b.execPath
-	}
-	defer func() {
-		b.execPath = execPath
-	}()
+var (
+	// ErrChromeNotInstalled is returned when the Chrome executable is not found.
+	ErrChromeNotInstalled = errors.New(
+		"k6 couldn't detect google chrome or a chromium-supported browser on this system",
+	)
 
+	// ErrChromeNotFoundAtPath is returned when the Chrome executable is not found at the given path.
+	ErrChromeNotFoundAtPath = errors.New(
+		"k6 couldn't detect google chrome or a chromium-supported browser on the given path",
+	)
+)
+
+// executablePath returns the path where the extension expects to find the browser executable.
+func executablePath(
+	path string,
+	env env.LookupFunc,
+	lookPath func(file string) (string, error), // os.LookPath
+) (string, error) {
+	// find the browser executable in the user provided path
+	if path := strings.TrimSpace(path); path != "" {
+		if _, err := lookPath(path); err == nil {
+			return path, nil
+		}
+		return "", fmt.Errorf("%w: %s", ErrChromeNotFoundAtPath, path)
+	}
+
+	// find the browser executable in the default paths below
 	paths := []string{
 		// Unix-like
 		"headless_shell",
@@ -277,16 +294,17 @@ func (b *BrowserType) ExecutablePath() (execPath string) {
 		"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
 		"/Applications/Chromium.app/Contents/MacOS/Chromium",
 	}
-	if userProfile, ok := b.envLookupper("USERPROFILE"); ok {
+	// find the browser executable in the user profile
+	if userProfile, ok := env("USERPROFILE"); ok {
 		paths = append(paths, filepath.Join(userProfile, `AppData\Local\Google\Chrome\Application\chrome.exe`))
 	}
 	for _, path := range paths {
-		if _, err := exec.LookPath(path); err == nil {
-			return path
+		if _, err := lookPath(path); err == nil {
+			return path, nil
 		}
 	}
 
-	return ""
+	return "", ErrChromeNotInstalled
 }
 
 // parseArgs parses command-line arguments and returns them.

@@ -377,8 +377,8 @@ func (f *Frame) onLoadingStopped() {
 }
 
 func (f *Frame) position() (*Position, error) {
-	frame := f.manager.getFrameByID(cdp.FrameID(f.page.targetID))
-	if frame == nil {
+	frame, ok := f.manager.getFrameByID(cdp.FrameID(f.page.targetID))
+	if !ok {
 		return nil, fmt.Errorf("could not find frame with id %s", f.page.targetID)
 	}
 	if frame == f.page.frameManager.MainFrame() {
@@ -788,6 +788,24 @@ func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 	}
 
 	return result
+}
+
+// EvaluateGlobal will evaluate the given JS code in the global object.
+func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
+	action := runtime.Evaluate(js).WithAwaitPromise(true)
+
+	var (
+		exceptionDetails *runtime.ExceptionDetails
+		err              error
+	)
+	if _, exceptionDetails, err = action.Do(cdp.WithExecutor(ctx, f.manager.session)); err != nil {
+		return fmt.Errorf("evaluating JS in global context: %w", err)
+	}
+	if exceptionDetails != nil {
+		return fmt.Errorf("%s", parseExceptionDetails(exceptionDetails))
+	}
+
+	return nil
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
@@ -1242,84 +1260,68 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 
 // IsHidden returns true if the first element that matches the selector
 // is hidden. Otherwise, returns false.
-func (f *Frame) IsHidden(selector string, opts goja.Value) bool {
+func (f *Frame) IsHidden(selector string, opts goja.Value) (bool, error) {
 	f.log.Debugf("Frame:IsHidden", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsHiddenOptions(f.defaultTimeout())
+	popts := NewFrameIsHiddenOptions()
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is hidden options: %w", err)
+		return false, fmt.Errorf("parsing is hidden options: %w", err)
 	}
 	hidden, err := f.isHidden(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q hidden: %w", selector, err)
+		return false, err
 	}
 
-	return hidden
+	return hidden, nil
 }
 
 func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, error) {
 	isHidden := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		v, err := handle.isHidden(apiCtx, 0) // Zero timeout when checking state
-		if errors.Is(err, ErrTimedOut) {     // We don't care about timeout errors here!
+		v, err := handle.isHidden(apiCtx) // Zero timeout when checking state
+		if errors.Is(err, ErrTimedOut) {  // We don't care about timeout errors here!
 			return v, nil
 		}
 		return v, err
 	}
-	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isHidden, []string{}, false, true, opts.Timeout,
-	)
-	v, err := call(f.ctx, act, opts.Timeout)
+	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isHidden, func() bool { return true })
 	if err != nil {
-		return false, errorFromDOMError(err)
+		return false, fmt.Errorf("checking is %q hidden: %w", selector, err)
 	}
 
-	bv, ok := v.(bool)
-	if !ok {
-		return false, fmt.Errorf("checking is %q hidden: unexpected type %T", selector, v)
-	}
-
-	return bv, nil
+	return v, nil
 }
 
 // IsVisible returns true if the first element that matches the selector
 // is visible. Otherwise, returns false.
-func (f *Frame) IsVisible(selector string, opts goja.Value) bool {
+func (f *Frame) IsVisible(selector string, opts goja.Value) (bool, error) {
 	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameIsVisibleOptions(f.defaultTimeout())
+	popts := NewFrameIsVisibleOptions()
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is visible options: %w", err)
+		return false, fmt.Errorf("parsing is visible options: %w", err)
 	}
 	visible, err := f.isVisible(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q visible: %w", selector, err)
+		return false, err
 	}
 
-	return visible
+	return visible, nil
 }
 
 func (f *Frame) isVisible(selector string, opts *FrameIsVisibleOptions) (bool, error) {
 	isVisible := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		v, err := handle.isVisible(apiCtx, 0) // Zero timeout when checking state
-		if errors.Is(err, ErrTimedOut) {      // We don't care about timeout errors here!
+		v, err := handle.isVisible(apiCtx) // Zero timeout when checking state
+		if errors.Is(err, ErrTimedOut) {   // We don't care about timeout errors here!
 			return v, nil
 		}
 		return v, err
 	}
-	act := f.newAction(
-		selector, DOMElementStateAttached, opts.Strict, isVisible, []string{}, false, true, opts.Timeout,
-	)
-	v, err := call(f.ctx, act, opts.Timeout)
+	v, err := f.runActionOnSelector(f.ctx, selector, opts.Strict, isVisible, func() bool { return false })
 	if err != nil {
-		return false, errorFromDOMError(err)
+		return false, fmt.Errorf("checking is %q visible: %w", selector, err)
 	}
 
-	bv, ok := v.(bool)
-	if !ok {
-		return false, fmt.Errorf("checking is %q visible: unexpected type %T", selector, v)
-	}
-
-	return bv, nil
+	return v, nil
 }
 
 // ID returns the frame id.
@@ -1355,14 +1357,14 @@ func (f *Frame) Name() string {
 
 // Query runs a selector query against the document tree, returning the first matching element or
 // "null" if no match is found.
-func (f *Frame) Query(selector string) (*ElementHandle, error) {
+func (f *Frame) Query(selector string, strict bool) (*ElementHandle, error) {
 	f.log.Debugf("Frame:Query", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
 	if err != nil {
 		k6ext.Panic(f.ctx, "getting document: %w", err)
 	}
-	return document.Query(selector)
+	return document.Query(selector, strict)
 }
 
 // QueryAll runs a selector query against the document tree, returning all matching elements.
@@ -1973,6 +1975,31 @@ type frameExecutionContext interface {
 	ID() runtime.ExecutionContextID
 }
 
+func (f *Frame) runActionOnSelector(
+	ctx context.Context, selector string, strict bool, fn elementHandleActionFunc, nullResponder func() bool,
+) (bool, error) {
+	handle, err := f.Query(selector, strict)
+	if err != nil {
+		return false, fmt.Errorf("query: %w", err)
+	}
+	if handle == nil {
+		f.log.Debugf("Frame:runActionOnSelector:nilHandler", "fid:%s furl:%q selector:%s", f.ID(), f.URL(), selector)
+		return nullResponder(), err
+	}
+
+	v, err := fn(ctx, handle)
+	if err != nil {
+		return false, fmt.Errorf("calling function: %w", err)
+	}
+
+	bv, ok := v.(bool)
+	if !ok {
+		return false, fmt.Errorf("unexpected type %T", v)
+	}
+
+	return bv, nil
+}
+
 //nolint:unparam
 func (f *Frame) newAction(
 	selector string, state DOMElementState, strict bool, fn elementHandleActionFunc, states []string,
@@ -2001,7 +2028,7 @@ func (f *Frame) newAction(
 			}
 			return
 		}
-		f := handle.newAction(states, fn, false, false, timeout)
+		f := handle.newAction(states, fn, force, noWaitAfter, timeout)
 		f(apiCtx, resultCh, errCh)
 	}
 }

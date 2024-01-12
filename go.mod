@@ -13,7 +13,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/websocket v1.5.1
-	github.com/grafana/xk6-browser v1.2.2
+	github.com/grafana/xk6-browser v1.3.0
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0
 	github.com/grafana/xk6-timers v0.2.3

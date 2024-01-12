@@ -149,7 +149,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grafana/xk6-browser v1.2.2
+# github.com/grafana/xk6-browser v1.3.0
 ## explicit; go 1.19
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium
@@ -161,6 +161,7 @@ github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
+github.com/grafana/xk6-browser/trace
 # github.com/grafana/xk6-output-prometheus-remote v0.3.1
 ## explicit; go 1.18
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote

@@ -40,29 +40,7 @@ func (m *Mouse) click(x float64, y float64, opts *MouseClickOptions) error {
 	if err := m.move(x, y, NewMouseMoveOptions()); err != nil {
 		return err
 	}
-	if err := m.down(x, y, mouseDownUpOpts); err != nil {
-		return err
-	}
-	if opts.Delay != 0 {
-		t := time.NewTimer(time.Duration(opts.Delay) * time.Millisecond)
-		select {
-		case <-m.ctx.Done():
-			t.Stop()
-		case <-t.C:
-		}
-	}
-	if err := m.up(x, y, mouseDownUpOpts); err != nil {
-		return err
-	}
-	return nil
-}
-
-func (m *Mouse) dblClick(x float64, y float64, opts *MouseDblClickOptions) error {
-	mouseDownUpOpts := opts.ToMouseDownUpOptions()
-	if err := m.move(x, y, NewMouseMoveOptions()); err != nil {
-		return err
-	}
-	for i := 0; i < 2; i++ {
+	for i := 0; i < int(mouseDownUpOpts.ClickCount); i++ {
 		if err := m.down(x, y, mouseDownUpOpts); err != nil {
 			return err
 		}
@@ -112,13 +90,11 @@ func (m *Mouse) move(x float64, y float64, opts *MouseMoveOptions) error {
 }
 
 func (m *Mouse) up(x float64, y float64, opts *MouseDownUpOptions) error {
-	var button input.MouseButton = input.Left
-	var clickCount int64 = 1
 	m.button = input.None
 	action := input.DispatchMouseEvent(input.MouseReleased, m.x, m.y).
-		WithButton(button).
+		WithButton(input.MouseButton(opts.Button)).
 		WithModifiers(input.Modifier(m.keyboard.modifiers)).
-		WithClickCount(clickCount)
+		WithClickCount(opts.ClickCount)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
 		return err
 	}
@@ -141,7 +117,7 @@ func (m *Mouse) DblClick(x float64, y float64, opts goja.Value) {
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
 		k6ext.Panic(m.ctx, "parsing double click options: %w", err)
 	}
-	if err := m.dblClick(x, y, mouseOpts); err != nil {
+	if err := m.click(x, y, mouseOpts.ToMouseClickOptions()); err != nil {
 		k6ext.Panic(m.ctx, "double clicking on x:%f y:%f: %w", x, y, err)
 	}
 }
