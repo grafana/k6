@@ -36,7 +36,7 @@ func newTestSetup(t testing.TB) testSetup {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	rt := goja.New()
-	rt.SetFieldNameMapper(goja.TagFieldNameMapper("json", true))
+	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	// We compile the Web Platform testharness script into a goja.Program
 	harnessProgram, err := CompileFile("./tests/util", "testharness.js")
@@ -105,6 +105,7 @@ func newTestSetup(t testing.TB) testSetup {
 func CompileFile(base, name string) (*goja.Program, error) {
 	fname := path.Join(base, name)
 
+	//nolint:forbidigo // Allow os.Open in tests
 	f, err := os.Open(filepath.Clean(fname))
 	if err != nil {
 		return nil, err
