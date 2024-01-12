@@ -137,7 +137,7 @@ func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
 		return handle, nil
 	default:
 		// FIXME: note that we do not support JWK format, yet.
-		return nil, NewError(NotSupportedError, "unsupported key format "+format)
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
 	}
 }
 
@@ -184,7 +184,7 @@ func (aip *AESImportParams) ImportKey(
 			return nil, NewError(DataError, "invalid key length")
 		}
 	default:
-		return nil, NewError(NotSupportedError, "unsupported key format "+format)
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
 	}
 
 	key := &CryptoKey{
@@ -629,3 +629,9 @@ func pKCS7Pad(plaintext []byte, blockSize int) ([]byte, error) {
 	paddingText := bytes.Repeat([]byte{byte(padding)}, padding)
 	return append(plaintext, paddingText...), nil
 }
+
+// unsupportedKeyFormatErrorMsg is the error message returned when an unsupported
+// key format is passed to a function.
+//
+// This is defined as a constant to cater to linter warnings.
+const unsupportedKeyFormatErrorMsg = "unsupported key format"
