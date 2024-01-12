@@ -7,6 +7,7 @@ import (
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/promises"
 )
 
 // FIXME: SubtleCrypto is described as an "interface", should it be a nested module
@@ -37,7 +38,7 @@ type SubtleCrypto struct {
 // The `data` parameter should contain the data to be encryption.
 func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 
 	// 2.
 	// We obtain a copy of the key data, because we might need to modify it.
@@ -129,7 +130,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 // The `data` parameter should contain the data to be decrypted.
 func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 
 	// 2.
 	// We obtain a copy of the key data, because we might need to modify it.
@@ -219,7 +220,7 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 // The `data` parameter should contain the data to be signed.
 func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 
 	// 2.
 	// We obtain a copy of the key data, because we might need to modify it.
@@ -322,7 +323,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 // The `data` parameter should contain the original signed data.
 func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 
 	// 2.
 	signatureData, err := exportArrayBuffer(sc.vu.Runtime(), signature)
@@ -421,7 +422,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 //
 // The `data` parameter should contain the data to be digested.
 func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Promise {
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 	rt := sc.vu.Runtime()
 
 	// Validate that the value we received is either an ArrayBuffer, TypedArray, or DataView
@@ -488,7 +489,7 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
 func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyUsages []CryptoKeyUsage) *goja.Promise {
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 
 	normalized, err := normalizeAlgorithm(sc.vu.Runtime(), algorithm, OperationIdentifierGenerateKey)
 	if err != nil {
@@ -630,7 +631,7 @@ func (sc *SubtleCrypto) ImportKey(
 	keyUsages []CryptoKeyUsage,
 ) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 
 	// 2.
 	ab, err := exportArrayBuffer(rt, keyData)
@@ -703,7 +704,7 @@ func (sc *SubtleCrypto) ImportKey(
 // TODO @oleiade: implement support for JWK format
 func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := sc.makeHandledPromise()
+	promise, resolve, reject := promises.New(sc.vu)
 
 	var algorithm Algorithm
 	algValue := key.ToObject(rt).Get("algorithm")

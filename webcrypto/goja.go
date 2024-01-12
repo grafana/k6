@@ -155,26 +155,3 @@ const (
 	// BigUint64ArrayConstructor is the name of the BigUint64ArrayConstructor constructor
 	BigUint64ArrayConstructor = "BigUint64Array"
 )
-
-// makeHandledPromise will create a promise and return its resolve and reject methods,
-// wrapped in such a way that it will block the eventloop from exiting before they are
-// called even if the promise isn't resolved by the time the current script ends executing.
-func (sc *SubtleCrypto) makeHandledPromise() (*goja.Promise, func(interface{}), func(interface{})) {
-	runtime := sc.vu.Runtime()
-	callback := sc.vu.RegisterCallback()
-	p, resolve, reject := runtime.NewPromise()
-
-	return p, func(i interface{}) {
-			// more stuff
-			callback(func() error {
-				resolve(i)
-				return nil
-			})
-		}, func(i interface{}) {
-			// more stuff
-			callback(func() error {
-				reject(i)
-				return nil
-			})
-		}
-}
