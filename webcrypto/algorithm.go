@@ -9,7 +9,7 @@ import (
 
 // Algorithm represents
 type Algorithm struct {
-	Name AlgorithmIdentifier `json:"name"`
+	Name AlgorithmIdentifier `js:"name"`
 }
 
 // AlgorithmIdentifier represents the name of an algorithm.

@@ -15,8 +15,8 @@ import (
 type Crypto struct {
 	vu modules.VU
 
-	Subtle    *SubtleCrypto `json:"subtle"`
-	CryptoKey *CryptoKey    `json:"CryptoKey"`
+	Subtle    *SubtleCrypto `js:"subtle"`
+	CryptoKey *CryptoKey    `js:"CryptoKey"`
 }
 
 // GetRandomValues lets you get cryptographically strong random values.
