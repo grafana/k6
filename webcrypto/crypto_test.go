@@ -12,8 +12,8 @@ func TestGetRandomValues(t *testing.T) {
 
 	ts := newTestSetup(t)
 
-	gotScriptErr := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(`
+	gotScriptErr := ts.EventLoop.Start(func() error {
+		_, err := ts.VU.Runtime().RunString(`
 		var input = new Uint8Array(10);
 		var output = crypto.getRandomValues(input);
 
@@ -122,7 +122,7 @@ func TestGetRandomValuesSupportedTypedArrays(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		gotScriptErr := ts.ev.Start(func() error {
+		gotScriptErr := ts.EventLoop.Start(func() error {
 			script := fmt.Sprintf(`
 				var buf = new %s(10);
 				crypto.getRandomValues(buf);
@@ -132,7 +132,7 @@ func TestGetRandomValuesSupportedTypedArrays(t *testing.T) {
 				}
 			`, tc.typedArray)
 
-			_, err := ts.rt.RunString(script)
+			_, err := ts.VU.Runtime().RunString(script)
 			return err
 		})
 
@@ -157,8 +157,8 @@ func TestGetRandomValuesQuotaExceeded(t *testing.T) {
 
 	ts := newTestSetup(t)
 
-	gotScriptErr := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(`
+	gotScriptErr := ts.EventLoop.Start(func() error {
+		_, err := ts.VU.Runtime().RunString(`
 		var buf = new Uint8Array(1000000000);
 		crypto.getRandomValues(buf);
 		`)
@@ -181,8 +181,8 @@ func TestRandomUUIDIsInTheNamespaceFormat(t *testing.T) {
 
 	ts := newTestSetup(t)
 
-	gotScriptErr := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(`
+	gotScriptErr := ts.EventLoop.Start(func() error {
+		_, err := ts.VU.Runtime().RunString(`
 		const iterations = 256;
 		const uuids = new Set();
 
@@ -221,8 +221,8 @@ func TestRandomUUIDVersion(t *testing.T) {
 
 	ts := newTestSetup(t)
 
-	gotScriptErr := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(`
+	gotScriptErr := ts.EventLoop.Start(func() error {
+		_, err := ts.VU.Runtime().RunString(`
 		const iterations = 256;
 		const uuids = new Set();
 
@@ -262,8 +262,8 @@ func TestRandomUUIDVariant(t *testing.T) {
 
 	ts := newTestSetup(t)
 
-	gotScriptErr := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(`
+	gotScriptErr := ts.EventLoop.Start(func() error {
+		_, err := ts.VU.Runtime().RunString(`
 		const iterations = 256;
 		const uuids = new Set();
 
