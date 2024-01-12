@@ -9,13 +9,14 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/common/js"
-	"github.com/grafana/xk6-browser/k6ext"
-
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
+	"go.opentelemetry.io/otel/attribute"
+
+	"github.com/grafana/xk6-browser/common/js"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 const resultDone = "done"
@@ -382,12 +383,12 @@ func (h *ElementHandle) isEnabled(apiCtx context.Context, timeout time.Duration)
 	return h.waitForElementState(apiCtx, []string{"enabled"}, timeout)
 }
 
-func (h *ElementHandle) isHidden(apiCtx context.Context, timeout time.Duration) (bool, error) {
-	return h.waitForElementState(apiCtx, []string{"hidden"}, timeout)
+func (h *ElementHandle) isHidden(apiCtx context.Context) (bool, error) {
+	return h.waitForElementState(apiCtx, []string{"hidden"}, 0)
 }
 
-func (h *ElementHandle) isVisible(apiCtx context.Context, timeout time.Duration) (bool, error) {
-	return h.waitForElementState(apiCtx, []string{"visible"}, timeout)
+func (h *ElementHandle) isVisible(apiCtx context.Context) (bool, error) {
+	return h.waitForElementState(apiCtx, []string{"visible"}, 0)
 }
 
 func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position) (*Position, error) {
@@ -439,13 +440,13 @@ func (h *ElementHandle) ownerFrame(apiCtx context.Context) *Frame {
 	if frameId == "" {
 		return nil
 	}
-	frame := h.frame.page.frameManager.getFrameByID(frameId)
-	if frame != nil {
+	frame, ok := h.frame.page.frameManager.getFrameByID(frameId)
+	if ok {
 		return frame
 	}
 	for _, page := range h.frame.page.browserCtx.browser.pages {
-		frame = page.frameManager.getFrameByID(frameId)
-		if frame != nil {
+		frame, ok = page.frameManager.getFrameByID(frameId)
+		if ok {
 			return frame
 		}
 	}
@@ -765,7 +766,12 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 		return nil, fmt.Errorf("element is not an iframe")
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID), nil
+	frame, ok := h.frame.manager.getFrameByID(node.FrameID)
+	if !ok {
+		return nil, fmt.Errorf("frame not found for id %s", node.FrameID)
+	}
+
+	return frame, nil
 }
 
 func (h *ElementHandle) Dblclick(opts goja.Value) {
@@ -949,7 +955,7 @@ func (h *ElementHandle) IsEnabled() bool {
 
 // IsHidden checks if the element is hidden.
 func (h *ElementHandle) IsHidden() bool {
-	result, err := h.isHidden(h.ctx, 0)
+	result, err := h.isHidden(h.ctx)
 	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is hidden: %w", err)
 	}
@@ -958,7 +964,7 @@ func (h *ElementHandle) IsHidden() bool {
 
 // IsVisible checks if the element is visible.
 func (h *ElementHandle) IsVisible() bool {
-	result, err := h.isVisible(h.ctx, 0)
+	result, err := h.isVisible(h.ctx)
 	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
 		k6ext.Panic(h.ctx, "checking element is visible: %w", err)
 	}
@@ -1002,7 +1008,12 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 		return nil, fmt.Errorf("no frame found for node: %w", err)
 	}
 
-	return h.frame.manager.getFrameByID(node.FrameID), nil
+	frame, ok := h.frame.manager.getFrameByID(node.FrameID)
+	if !ok {
+		return nil, fmt.Errorf("no frame found for id %s", node.FrameID)
+	}
+
+	return frame, nil
 }
 
 func (h *ElementHandle) Press(key string, opts goja.Value) {
@@ -1023,21 +1034,21 @@ func (h *ElementHandle) Press(key string, opts goja.Value) {
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
-func (h *ElementHandle) Query(selector string) (*ElementHandle, error) {
+func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
 	}
 	fn := `
-		(node, injected, selector) => {
-			return injected.querySelector(selector, node || document, false);
+		(node, injected, selector, strict) => {
+			return injected.querySelector(selector, strict, node || document);
 		}
 	`
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector)
+	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector, strict)
 	if err != nil {
 		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
@@ -1170,13 +1181,21 @@ func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Posi
 }
 
 func (h *ElementHandle) Screenshot(opts goja.Value) goja.ArrayBuffer {
+	spanCtx, span := TraceAPICall(
+		h.ctx,
+		h.frame.page.targetID.String(),
+		"elementHandle.screenshot",
+	)
+	defer span.End()
+
 	rt := h.execCtx.vu.Runtime()
 	parsedOpts := NewElementHandleScreenshotOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
 		k6ext.Panic(h.ctx, "parsing screenshot options: %w", err)
 	}
+	span.SetAttributes(attribute.String("screenshot.path", parsedOpts.Path))
 
-	s := newScreenshotter(h.ctx)
+	s := newScreenshotter(spanCtx)
 	buf, err := s.screenshotElement(h, parsedOpts)
 	if err != nil {
 		k6ext.Panic(h.ctx, "taking screenshot: %w", err)

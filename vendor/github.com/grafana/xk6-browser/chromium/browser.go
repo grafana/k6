@@ -1,3 +1,4 @@
+// Package chromium is responsible for launching a Chrome browser process and managing its lifetime.
 package chromium
 
 import (

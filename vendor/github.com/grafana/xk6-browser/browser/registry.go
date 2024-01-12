@@ -13,11 +13,14 @@ import (
 	"sync/atomic"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+	"go.opentelemetry.io/otel/attribute"
+	oteltrace "go.opentelemetry.io/otel/trace"
 
 	"github.com/grafana/xk6-browser/chromium"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
+	browsertrace "github.com/grafana/xk6-browser/trace"
 
 	k6event "go.k6.io/k6/event"
 	k6modules "go.k6.io/k6/js/modules"
@@ -170,6 +173,10 @@ func (r *remoteRegistry) isRemoteBrowser() (string, bool) {
 type browserRegistry struct {
 	vu k6modules.VU
 
+	tr             *tracesRegistry
+	trInit         sync.Once
+	tracesMetadata map[string]string
+
 	mu sync.RWMutex
 	m  map[int64]*common.Browser
 
@@ -180,7 +187,9 @@ type browserRegistry struct {
 
 type browserBuildFunc func(ctx context.Context) (*common.Browser, error)
 
-func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry) *browserRegistry {
+func newBrowserRegistry(
+	ctx context.Context, vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry, tracesMetadata map[string]string,
+) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
 	builder := func(ctx context.Context) (*common.Browser, error) {
 		var (
@@ -207,9 +216,10 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 	}
 
 	r := &browserRegistry{
-		vu:      vu,
-		m:       make(map[int64]*common.Browser),
-		buildFn: builder,
+		vu:             vu,
+		tracesMetadata: tracesMetadata,
+		m:              make(map[int64]*common.Browser),
+		buildFn:        builder,
 	}
 
 	exitSubID, exitCh := vu.Events().Global.Subscribe(
@@ -225,16 +235,17 @@ func newBrowserRegistry(vu k6modules.VU, remote *remoteRegistry, pids *pidRegist
 	}
 
 	go r.handleExitEvent(exitCh, unsubscribe)
-	go r.handleIterEvents(eventsCh, unsubscribe)
+	go r.handleIterEvents(ctx, eventsCh, unsubscribe)
 
 	return r
 }
 
-func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsubscribeFn func()) {
+func (r *browserRegistry) handleIterEvents( //nolint:funlen
+	ctx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
+) {
 	var (
 		ok   bool
 		data k6event.IterData
-		ctx  = context.Background()
 	)
 
 	for e := range eventsCh {
@@ -269,7 +280,17 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 
 		switch e.Type { //nolint:exhaustive
 		case k6event.IterStart:
-			b, err := r.buildFn(ctx)
+			// Because VU.State is nil when browser registry is initialized,
+			// we have to initialize traces registry on the first VU iteration
+			// so we can get access to the k6 TracerProvider.
+			r.initTracesRegistry()
+
+			// Wrap the tracer into the browser context to make it accessible for the other
+			// components that inherit the context so these can use it to trace their actions.
+			tracerCtx := common.WithTracer(ctx, r.tr.tracer)
+			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
+
+			b, err := r.buildFn(tracedCtx)
 			if err != nil {
 				e.Done()
 				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
@@ -281,6 +302,7 @@ func (r *browserRegistry) handleIterEvents(eventsCh <-chan *k6event.Event, unsub
 			r.setBrowser(data.Iteration, b)
 		case k6event.IterEnd:
 			r.deleteBrowser(data.Iteration)
+			r.tr.endIterationTrace(data.Iteration)
 		default:
 			r.vu.State().Logger.Warnf("received unexpected event type: %v", e.Type)
 		}
@@ -298,6 +320,11 @@ func (r *browserRegistry) handleExitEvent(exitCh <-chan *k6event.Event, unsubscr
 	}
 	defer e.Done()
 	r.clear()
+
+	// Stop traces registry before calling e.Done()
+	// so we avoid a race condition between active spans
+	// being flushed and test exiting
+	r.stopTracesRegistry()
 }
 
 func (r *browserRegistry) setBrowser(id int64, b *common.Browser) {
@@ -338,6 +365,28 @@ func (r *browserRegistry) clear() {
 	}
 }
 
+// initTracesRegistry must only be called within an iteration execution,
+// as it requires access to the k6 TracerProvider which is only accessible
+// through the VU.State during the iteration execution time span.
+func (r *browserRegistry) initTracesRegistry() {
+	// Use a sync.Once so the traces registry is only initialized once
+	// per VU, as that is the scope for both browser and traces registry.
+	r.trInit.Do(func() {
+		r.tr = newTracesRegistry(
+			browsertrace.NewTracer(r.vu.State().TracerProvider, r.tracesMetadata),
+		)
+	})
+}
+
+func (r *browserRegistry) stopTracesRegistry() {
+	// Because traces registry is initialized on iterStart event, it is not
+	// initialized for the initial NewModuleInstance call, whose VU does not
+	// execute any iteration.
+	if r.tr != nil {
+		r.tr.stop()
+	}
+}
+
 func (r *browserRegistry) stop() {
 	r.stopped.Store(true)
 }
@@ -346,6 +395,92 @@ func isBrowserIter(vu k6modules.VU) bool {
 	opts := k6ext.GetScenarioOpts(vu.Context(), vu)
 	_, ok := opts["type"] // Check if browser type option is set
 	return ok
+}
+
+// trace represents a traces registry entry which holds the
+// root span for the trace and a context that wraps that span.
+type trace struct {
+	ctx      context.Context
+	rootSpan oteltrace.Span
+}
+
+// tracesRegistry holds the traces for all iterations of a single VU.
+type tracesRegistry struct {
+	tracer *browsertrace.Tracer
+
+	mu sync.Mutex
+	m  map[int64]*trace
+}
+
+func newTracesRegistry(tracer *browsertrace.Tracer) *tracesRegistry {
+	return &tracesRegistry{
+		tracer: tracer,
+		m:      make(map[int64]*trace),
+	}
+}
+
+func (r *tracesRegistry) startIterationTrace(ctx context.Context, data k6event.IterData) context.Context {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if t, ok := r.m[data.Iteration]; ok {
+		return t.ctx
+	}
+
+	spanCtx, span := r.tracer.Start(ctx, "iteration", oteltrace.WithAttributes(
+		attribute.Int64("test.iteration.number", data.Iteration),
+		attribute.Int64("test.vu", int64(data.VUID)),
+		attribute.String("test.scenario", data.ScenarioName),
+	))
+
+	r.m[data.Iteration] = &trace{
+		ctx:      spanCtx,
+		rootSpan: span,
+	}
+
+	return spanCtx
+}
+
+func (r *tracesRegistry) endIterationTrace(iter int64) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	if t, ok := r.m[iter]; ok {
+		t.rootSpan.End()
+		delete(r.m, iter)
+	}
+}
+
+func (r *tracesRegistry) stop() {
+	// End all iteration traces
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	for k, v := range r.m {
+		v.rootSpan.End()
+		delete(r.m, k)
+	}
+}
+
+func parseTracesMetadata(envLookup env.LookupFunc) (map[string]string, error) {
+	var (
+		ok bool
+		v  string
+		m  = make(map[string]string)
+	)
+	if v, ok = envLookup(env.TracesMetadata); !ok {
+		return m, nil
+	}
+
+	for _, elem := range strings.Split(v, ",") {
+		kv := strings.Split(elem, "=")
+		if len(kv) != 2 {
+			return nil, fmt.Errorf("%q is not a valid key=value metadata", elem)
+		}
+		m[kv[0]] = kv[1]
+	}
+
+	return m, nil
 }
 
 type taskQueueRegistry struct {
