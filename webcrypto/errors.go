@@ -45,10 +45,10 @@ const (
 // Web Crypto API.
 type Error struct {
 	// Name contains one of the strings associated with an error name.
-	Name string `json:"name"`
+	Name string `js:"name"`
 
 	// Message represents message or description associated with the given error name.
-	Message string `json:"message"`
+	Message string `js:"message"`
 }
 
 // Error implements the `error` interface, so WebCryptoError are normal Go errors.

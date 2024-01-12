@@ -20,14 +20,14 @@ type HMACKeyGenParams struct {
 	// Hash represents the name of the digest function to use. You can
 	// use any of the following: [Sha256], [Sha384],
 	// or [Sha512].
-	Hash Algorithm `json:"hash"`
+	Hash Algorithm `js:"hash"`
 
 	// Length holds (a Number) the length of the key, in bits.
 	// If this is omitted, the length of the key is equal to the block size
 	// of the hash function you have chosen.
 	// Unless you have a good reason to use a different length, omit
 	// use the default.
-	Length null.Int `json:"length"`
+	Length null.Int `js:"length"`
 }
 
 // newHMACKeyGenParams creates a new HMACKeyGenParams object, from the normalized
@@ -163,10 +163,10 @@ type HMACKeyAlgorithm struct {
 	KeyAlgorithm
 
 	// Hash represents the inner hash function to use.
-	Hash KeyAlgorithm `json:"hash"`
+	Hash KeyAlgorithm `js:"hash"`
 
 	// Length represents he length (in bits) of the key.
-	Length int64 `json:"length"`
+	Length int64 `js:"length"`
 }
 
 func exportHMACKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
@@ -209,14 +209,14 @@ type HMACImportParams struct {
 	// Hash represents the name of the digest function to use. You can
 	// use any of the following: [Sha256], [Sha384],
 	// or [Sha512].
-	Hash Algorithm `json:"hash"`
+	Hash Algorithm `js:"hash"`
 
 	// Length holds (a Number) the length of the key, in bits.
 	// If this is omitted, the length of the key is equal to the block size
 	// of the hash function you have chosen.
 	// Unless you have a good reason to use a different length, omit
 	// use the default.
-	Length null.Int `json:"length"`
+	Length null.Int `js:"length"`
 }
 
 // newHMACImportParams creates a new HMACImportParams object from the given

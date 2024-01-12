@@ -20,7 +20,7 @@ type AESKeyGenParams struct {
 	Algorithm
 
 	// The length, in bits, of the key.
-	Length bitLength `json:"length"`
+	Length bitLength `js:"length"`
 }
 
 // newAESKeyGenParams creates a new AESKeyGenParams object, from the
@@ -111,7 +111,7 @@ var _ KeyGenerator = &AESKeyGenParams{}
 type AESKeyAlgorithm struct {
 	Algorithm
 
-	Length int64 `json:"length"`
+	Length int64 `js:"length"`
 }
 
 // exportAESKey exports an AES key to its raw representation.
@@ -213,12 +213,12 @@ type AESCBCParams struct {
 	Algorithm
 
 	// Name should be set to AES-CBC.
-	Name string `json:"name"`
+	Name string `js:"name"`
 
 	// Iv holds (an ArrayBuffer, a TypedArray, or a DataView) the initialization vector.
 	// Must be 16 bytes, unpredictable, and preferably cryptographically random.
 	// However, it need not be secret (for example, it may be transmitted unencrypted along with the ciphertext).
-	Iv []byte `json:"iv"`
+	Iv []byte `js:"iv"`
 }
 
 // Encrypt encrypts the given plaintext using the AES-CBC algorithm, and returns the ciphertext.
@@ -317,7 +317,7 @@ type AESCTRParams struct {
 	//
 	// For example, if length is set to 64, then the first half of counter is
 	// the nonce and the second half is used for the counter.
-	Counter []byte `json:"counter"`
+	Counter []byte `js:"counter"`
 
 	// Length holds (a Number) the number of bits in the counter block that are used for the actual counter.
 	// The counter must be big enough that it doesn't wrap: if the message is n blocks and the counter is m bits long, then
@@ -325,7 +325,7 @@ type AESCTRParams struct {
 	//
 	// The NIST SP800-38A standard, which defines CTR, suggests that the counter should occupy half of the counter
 	// block (see Appendix B.2), so for AES it would be 64.
-	Length int `json:"length"`
+	Length int `js:"length"`
 }
 
 // Encrypt encrypts the given plaintext using the AES-CTR algorithm, and returns the ciphertext.
@@ -417,7 +417,7 @@ type AESGCMParams struct {
 	// Section 8.2 of the specification outlines methods for constructing IVs.
 	// Note that the IV does not have to be secret, just unique: so it is OK, for example, to
 	// transmit it in the clear alongside the encrypted message.
-	Iv []byte `json:"iv"`
+	Iv []byte `js:"iv"`
 
 	// AdditionalData (an ArrayBuffer, a TypedArray, or a DataView) contains additional data that will
 	// not be encrypted but will be authenticated along with the encrypted data.
@@ -431,7 +431,7 @@ type AESGCMParams struct {
 	//
 	// The additionalData property is optional and may be omitted without compromising the
 	// security of the encryption operation.
-	AdditionalData []byte `json:"additionalData"`
+	AdditionalData []byte `js:"additionalData"`
 
 	// TagLength (a Number) determines the size in bits of the authentication tag generated in
 	// the encryption operation and used for authentication in the corresponding decryption.
@@ -443,7 +443,7 @@ type AESGCMParams struct {
 	// in some applications: Appendix C of the specification provides additional guidance here.
 	//
 	// tagLength is optional and defaults to 128 if it is not specified.
-	TagLength bitLength `json:"tagLength"`
+	TagLength bitLength `js:"tagLength"`
 }
 
 // Encrypt encrypts the given plaintext using the AES-GCM algorithm, and returns the ciphertext.
