@@ -14,7 +14,7 @@
               "title": "Iteration Rate",
               "kind": "stat",
               "id": "tab-0.section-0.panel-0",
-              "summary": "<placeholder panel summary>"
+              "summary": "The iteration rate represents the number of times a VU has executed a test script (the `default` function) over a period of time. The panel can help you ensure that your test iteration rate matches the configuration you have specified in your test script, and that the number of VUs you have allocated matches the test capacity."
             },
             {
               "series": [
@@ -25,7 +25,7 @@
               "title": "HTTP Request Rate",
               "kind": "stat",
               "id": "tab-0.section-0.panel-1",
-              "summary": "<placeholder panel summary>"
+              "summary": "The HTTP request rate represents the number of requests over a period of time."
             },
             {
               "series": [
@@ -36,7 +36,7 @@
               "title": "HTTP Request Duration",
               "kind": "stat",
               "id": "tab-0.section-0.panel-2",
-              "summary": "<placeholder panel summary>"
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test."
             },
             {
               "series": [
@@ -47,7 +47,7 @@
               "title": "HTTP Request Failed",
               "kind": "stat",
               "id": "tab-0.section-0.panel-3",
-              "summary": "<placeholder panel summary>"
+              "summary": "The rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details."
             },
             {
               "series": [
@@ -58,7 +58,7 @@
               "title": "Received Rate",
               "kind": "stat",
               "id": "tab-0.section-0.panel-4",
-              "summary": "<placeholder panel summary>"
+              "summary": "The amount of data received over a period of time."
             },
             {
               "series": [
@@ -69,7 +69,7 @@
               "title": "Sent Rate",
               "kind": "stat",
               "id": "tab-0.section-0.panel-5",
-              "summary": "<placeholder panel summary>"
+              "summary": "The amount of data sent to the system under test.   "
             }
           ],
           "id": "tab-0.section-0"
@@ -87,13 +87,13 @@
                   "legend": "Request Duration p(95)"
                 },
                 {
-                  "query": "http_req_failed[?!tags && rate ]",
+                  "query": "http_req_failed[?!tags && rate]",
                   "legend": "Request Failed"
                 }
               ],
               "title": "HTTP Performance overview",
               "id": "tab-0.section-1.panel-0",
-              "summary": "<placeholder panel summary>",
+              "summary": "The HTTP request rate represents the number of requests over a period of time. The HTTP request duration 95 percentile represents the total time for 95% of the requests observed. The HTTP request failed rate represents the rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details.",
               "fullWidth": true,
               "kind": "chart"
             }
@@ -113,7 +113,7 @@
               ],
               "title": "VUs",
               "id": "tab-0.section-2.panel-0",
-              "summary": "<placeholder panel summary>",
+              "summary": "The number of VUs and the number of requests throughout the test run. This is an indication of how the two metrics correlate, and can help you visualize if you need to increase or decrease the number of VUs for your test.",
               "kind": "chart"
             },
             {
@@ -127,7 +127,7 @@
               ],
               "title": "Transfer Rate",
               "id": "tab-0.section-2.panel-1",
-              "summary": "<placeholder panel summary>",
+              "summary": "The rate at which data is sent to and received from the system under test.",
               "kind": "chart"
             },
             {
@@ -138,7 +138,7 @@
               ],
               "title": "HTTP Request Duration",
               "id": "tab-0.section-2.panel-2",
-              "summary": "<placeholder panel summary>",
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test.",
               "kind": "chart"
             },
             {
@@ -149,7 +149,7 @@
               ],
               "title": "Iteration Duration",
               "id": "tab-0.section-2.panel-3",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time to complete one full iteration of the test, including time spent in setup and teardown.",
               "kind": "chart"
             }
           ],
@@ -172,7 +172,7 @@
               ],
               "title": "Request Duration",
               "id": "tab-1.section-0.panel-0",
-              "summary": "<placeholder panel summary>",
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test.",
               "kind": "chart"
             },
             {
@@ -183,7 +183,7 @@
               ],
               "title": "Request Failed Rate",
               "id": "tab-1.section-0.panel-1",
-              "summary": "<placeholder panel summary>",
+              "summary": "The rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details.",
               "kind": "chart"
             },
             {
@@ -194,7 +194,7 @@
               ],
               "title": "Request Rate",
               "id": "tab-1.section-0.panel-2",
-              "summary": "<placeholder panel summary>",
+              "summary": "The HTTP request rate represents the number of requests over a period of time.",
               "kind": "chart"
             },
             {
@@ -205,7 +205,7 @@
               ],
               "title": "Request Waiting",
               "id": "tab-1.section-0.panel-3",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time between k6 sending a request and receiving the first byte of information from the remote host. Also known as 'time to first byte' or 'TTFB'.",
               "kind": "chart"
             },
             {
@@ -216,7 +216,7 @@
               ],
               "title": "TLS handshaking",
               "id": "tab-1.section-0.panel-4",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time it takes to complete the TLS handshake for the requests.",
               "kind": "chart"
             },
             {
@@ -227,7 +227,7 @@
               ],
               "title": "Request Sending",
               "id": "tab-1.section-0.panel-5",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time k6 spends sending data to the remote host.",
               "kind": "chart"
             },
             {
@@ -238,7 +238,7 @@
               ],
               "title": "Request Connecting",
               "id": "tab-1.section-0.panel-6",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time k6 spends establishing a TCP connection to the remote host.",
               "kind": "chart"
             },
             {
@@ -249,7 +249,7 @@
               ],
               "title": "Request Receiving",
               "id": "tab-1.section-0.panel-7",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time k6 spends receiving data from the remote host.",
               "kind": "chart"
             },
             {
@@ -260,7 +260,7 @@
               ],
               "title": "Request Blocked",
               "id": "tab-1.section-0.panel-8",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time k6 spends waiting for a free TCP connection slot before initiating a request.",
               "kind": "chart"
             }
           ],
@@ -278,7 +278,7 @@
               ],
               "title": "Request Duration",
               "id": "tab-1.section-1.panel-0",
-              "summary": "<placeholder panel summary>",
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test.",
               "kind": "chart"
             },
             {
@@ -289,7 +289,7 @@
               ],
               "title": "Request Failed Rate",
               "id": "tab-1.section-1.panel-1",
-              "summary": "<placeholder panel summary>",
+              "summary": "The rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details.",
               "kind": "chart"
             },
             {
@@ -300,7 +300,7 @@
               ],
               "title": "Largest Contentful Paint",
               "id": "tab-1.section-1.panel-2",
-              "summary": "<placeholder panel summary>",
+              "summary": "Largest Contentful Paint (LCP) measures the time it takes for the largest content element on a page to become visible.",
               "kind": "chart"
             },
             {
@@ -311,7 +311,7 @@
               ],
               "title": "First Input Delay",
               "id": "tab-1.section-1.panel-3",
-              "summary": "<placeholder panel summary>",
+              "summary": "First Input Delay (FID) measures the responsiveness of a web page by quantifying the delay between a user's first interaction, such as clicking a button, and the browser's response.",
               "kind": "chart"
             },
             {
@@ -322,7 +322,7 @@
               ],
               "title": "Cumulative Layout Shift",
               "id": "tab-1.section-1.panel-4",
-              "summary": "<placeholder panel summary>",
+              "summary": "Cumulative Layout Shift (CLS) measures visual stability on a webpage by quantifying the amount of unexpected layout shift of visible page content.",
               "kind": "chart"
             },
             {
@@ -333,7 +333,7 @@
               ],
               "title": "Time to First Byte",
               "id": "tab-1.section-1.panel-5",
-              "summary": "<placeholder panel summary>",
+              "summary": "Time to First Byte (TTFB) measures the time between the request for a resource and when the first byte of a response begins to arrive.",
               "kind": "chart"
             },
             {
@@ -344,7 +344,7 @@
               ],
               "title": "First Contentful Paint",
               "id": "tab-1.section-1.panel-6",
-              "summary": "<placeholder panel summary>",
+              "summary": "First Contentful Paint (FCP) measures the time it takes for the first content element to be painted on the screen.",
               "kind": "chart"
             },
             {
@@ -355,7 +355,7 @@
               ],
               "title": "Interaction to Next Paint",
               "id": "tab-1.section-1.panel-7",
-              "summary": "<placeholder panel summary>",
+              "summary": "Interaction to Next Paint (INP) measures a page's overall responsiveness to user interactions by observing the latency of all click, tap, and keyboard interactions that occur throughout the lifespan of a user's visit to a page.",
               "kind": "chart"
             }
           ],
@@ -373,7 +373,7 @@
               ],
               "title": "Connect Duration",
               "id": "tab-1.section-2.panel-0",
-              "summary": "<placeholder panel summary>",
+              "summary": "The duration of the WebSocket connection request. This is an indication of the latency experienced when connecting to a WebSocket server.",
               "kind": "chart"
             },
             {
@@ -384,7 +384,7 @@
               ],
               "title": "Session Duration",
               "id": "tab-1.section-2.panel-1",
-              "summary": "<placeholder panel summary>",
+              "summary": "The time between the start of the connection and the end of the VU execution.",
               "kind": "chart"
             },
             {
@@ -395,7 +395,7 @@
               ],
               "title": "Ping Duration",
               "id": "tab-1.section-2.panel-2",
-              "summary": "<placeholder panel summary>",
+              "summary": "The duration between a ping request and its pong reception. This is an indication of the latency experienced during the roundtrip of sending a ping message to a WebSocket server, and waiting for the pong response message to come back.",
               "kind": "chart"
             },
             {
@@ -409,7 +409,7 @@
               ],
               "title": "Transfer Rate",
               "id": "tab-1.section-2.panel-3",
-              "summary": "<placeholder panel summary>",
+              "summary": "The total number of WebSocket messages sent, and the total number of WebSocket messages received.",
               "kind": "chart"
             },
             {
@@ -420,7 +420,7 @@
               ],
               "title": "Sessions Rate",
               "id": "tab-1.section-2.panel-4",
-              "summary": "<placeholder panel summary>",
+              "summary": "The total number of WebSocket sessions started.",
               "kind": "chart"
             }
           ],
@@ -438,7 +438,7 @@
               ],
               "title": "Request Duration",
               "id": "tab-1.section-3.panel-0",
-              "summary": "<placeholder panel summary>",
+              "summary": "The gRPC request duration represents the total time for a gRPC request. This is an indication of the latency experienced when making gRPC requests against the system under test.",
               "kind": "chart"
             },
             {
@@ -452,7 +452,7 @@
               ],
               "title": "Transfer Rate",
               "id": "tab-1.section-3.panel-1",
-              "summary": "<placeholder panel summary>",
+              "summary": "The total number of messages sent to gRPC streams, and the total number of messages received from a gRPC stream.",
               "kind": "chart"
             },
             {
@@ -463,7 +463,7 @@
               ],
               "title": "Streams Rate",
               "id": "tab-1.section-3.panel-2",
-              "summary": "<placeholder panel summary>",
+              "summary": "The total number of gRPC streams started.",
               "kind": "chart"
             }
           ],
@@ -488,8 +488,7 @@
               ],
               "title": "Trends",
               "kind": "summary",
-              "id": "tab-2.section-0.panel-0",
-              "summary": "<placeholder panel summary>"
+              "id": "tab-2.section-0.panel-0"
             }
           ],
           "title": "",
@@ -505,8 +504,7 @@
               ],
               "title": "Counters",
               "kind": "summary",
-              "id": "tab-2.section-1.panel-0",
-              "summary": "<placeholder panel summary>"
+              "id": "tab-2.section-1.panel-0"
             },
             {
               "series": [
@@ -516,8 +514,7 @@
               ],
               "title": "Rates",
               "kind": "summary",
-              "id": "tab-2.section-1.panel-1",
-              "summary": "<placeholder panel summary>"
+              "id": "tab-2.section-1.panel-1"
             },
             {
               "series": [
@@ -527,8 +524,7 @@
               ],
               "title": "Gauges",
               "kind": "summary",
-              "id": "tab-2.section-1.panel-2",
-              "summary": "<placeholder panel summary>"
+              "id": "tab-2.section-1.panel-2"
             }
           ],
           "title": "",
