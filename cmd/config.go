@@ -31,9 +31,6 @@ func configFlagSet() *pflag.FlagSet {
 	flags.StringArrayP("out", "o", []string{}, "`uri` for an external metrics database")
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
 	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
-	flags.Bool("web-dashboard", false, "enable web dashboard")
-	// we don't want to introduce it, in future releases logic may change
-	flags.MarkHidden("web-dashboard") //nolint:errcheck,gosec
 	return flags
 }
 
@@ -105,7 +102,6 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Out:           out,
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
-		WebDashboard:  getNullBool(flags, "web-dashboard"),
 	}, nil
 }
 
