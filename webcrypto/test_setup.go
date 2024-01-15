@@ -1,7 +1,6 @@
 package webcrypto
 
 import (
-	"github.com/stretchr/testify/require"
 	"io"
 	"os"
 	"path"
@@ -11,6 +10,7 @@ import (
 	"go.k6.io/k6/js/compiler"
 
 	"github.com/dop251/goja"
+	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/modulestest"
 )
 
@@ -66,10 +66,10 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 
 // CompileFile compiles a javascript file as a goja.Program.
 func CompileFile(base, name string) (*goja.Program, error) {
-	fname := path.Join(base, name)
+	filename := path.Join(base, name)
 
 	//nolint:forbidigo // Allow os.Open in tests
-	f, err := os.Open(filepath.Clean(fname))
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}
