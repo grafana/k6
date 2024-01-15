@@ -149,7 +149,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grafana/xk6-browser v1.2.2
+# github.com/grafana/xk6-browser v1.3.0
 ## explicit; go 1.19
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium
@@ -161,6 +161,7 @@ github.com/grafana/xk6-browser/k6ext
 github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
+github.com/grafana/xk6-browser/trace
 # github.com/grafana/xk6-dashboard v0.7.0-alpha.5
 ## explicit; go 1.19
 github.com/grafana/xk6-dashboard/dashboard
@@ -172,10 +173,10 @@ github.com/grafana/xk6-output-prometheus-remote/pkg/stale
 # github.com/grafana/xk6-redis v0.2.0
 ## explicit; go 1.19
 github.com/grafana/xk6-redis/redis
-# github.com/grafana/xk6-timers v0.2.2
+# github.com/grafana/xk6-timers v0.2.3
 ## explicit; go 1.20
 github.com/grafana/xk6-timers/timers
-# github.com/grafana/xk6-webcrypto v0.1.0
+# github.com/grafana/xk6-webcrypto v0.1.1
 ## explicit; go 1.19
 github.com/grafana/xk6-webcrypto/webcrypto
 # github.com/grafana/xk6-websockets v0.2.1
@@ -381,12 +382,12 @@ go.opentelemetry.io/proto/otlp/trace/v1
 ## explicit; go 1.20
 go.uber.org/goleak
 go.uber.org/goleak/internal/stack
-# golang.org/x/crypto v0.16.0
+# golang.org/x/crypto v0.17.0
 ## explicit; go 1.18
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/crypto/x509roots/fallback v0.0.0-20231129163542-152cdb1503eb
+# golang.org/x/crypto/x509roots/fallback v0.0.0-20231218163308-9d2ee975ef9f
 ## explicit; go 1.20
 golang.org/x/crypto/x509roots/fallback
 # golang.org/x/net v0.19.0

@@ -9,7 +9,7 @@ import (
 
 // Algorithm represents
 type Algorithm struct {
-	Name AlgorithmIdentifier `json:"name"`
+	Name AlgorithmIdentifier `js:"name"`
 }
 
 // AlgorithmIdentifier represents the name of an algorithm.
@@ -60,17 +60,17 @@ const (
 type HashAlgorithmIdentifier = AlgorithmIdentifier
 
 const (
-	// Sha1 represents the SHA-1 algorithm.
-	Sha1 HashAlgorithmIdentifier = "SHA-1"
+	// SHA1 represents the SHA-1 algorithm.
+	SHA1 HashAlgorithmIdentifier = "SHA-1"
 
-	// Sha256 represents the SHA-256 algorithm.
-	Sha256 = "SHA-256"
+	// SHA256 represents the SHA-256 algorithm.
+	SHA256 = "SHA-256"
 
-	// Sha384 represents the SHA-384 algorithm.
-	Sha384 = "SHA-384"
+	// SHA384 represents the SHA-384 algorithm.
+	SHA384 = "SHA-384"
 
-	// Sha512 represents the SHA-512 algorithm.
-	Sha512 = "SHA-512"
+	// SHA512 represents the SHA-512 algorithm.
+	SHA512 = "SHA-512"
 )
 
 // OperationIdentifier represents the name of an operation.
@@ -130,19 +130,19 @@ func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) 
 	if v.ExportType().Kind() == reflect.String {
 		algorithmString, ok := v.Export().(string)
 		if !ok {
-			return Algorithm{}, NewError(0, ImplementationError, "algorithm cannot be interpreted as a string")
+			return Algorithm{}, NewError(ImplementationError, "algorithm cannot be interpreted as a string")
 		}
 
 		algorithmObject := rt.NewObject()
 		if err := algorithmObject.Set("name", algorithmString); err != nil {
-			return Algorithm{}, NewError(0, ImplementationError, "unable to transform algorithm string into an object")
+			return Algorithm{}, NewError(ImplementationError, "unable to transform algorithm string into an object")
 		}
 
 		return normalizeAlgorithm(rt, algorithmObject, op)
 	}
 
 	if err := rt.ExportTo(v, &algorithm); err != nil {
-		return Algorithm{}, NewError(0, SyntaxError, "algorithm cannot be interpreted as a string or an object")
+		return Algorithm{}, NewError(SyntaxError, "algorithm cannot be interpreted as a string or an object")
 	}
 
 	// Algorithm identifers are always upper cased.
@@ -151,7 +151,7 @@ func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) 
 	algorithm.Name = strings.ToUpper(algorithm.Name)
 
 	if !isRegisteredAlgorithm(algorithm.Name, op) {
-		return Algorithm{}, NewError(0, NotSupportedError, "unsupported algorithm: "+algorithm.Name)
+		return Algorithm{}, NewError(NotSupportedError, "unsupported algorithm: "+algorithm.Name)
 	}
 
 	return algorithm, nil
@@ -185,5 +185,5 @@ func isAesAlgorithm(algorithmName string) bool {
 }
 
 func isHashAlgorithm(algorithmName string) bool {
-	return algorithmName == Sha1 || algorithmName == Sha256 || algorithmName == Sha384 || algorithmName == Sha512
+	return algorithmName == SHA1 || algorithmName == SHA256 || algorithmName == SHA384 || algorithmName == SHA512
 }

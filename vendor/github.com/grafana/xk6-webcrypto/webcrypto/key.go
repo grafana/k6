@@ -123,9 +123,9 @@ func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) 
 
 	switch normalized.Name {
 	case AESCbc, AESCtr, AESGcm, AESKw:
-		kg, err = newAesKeyGenParams(rt, normalized, params)
+		kg, err = newAESKeyGenParams(rt, normalized, params)
 	case HMAC:
-		kg, err = newHmacKeyGenParams(rt, normalized, params)
+		kg, err = newHMACKeyGenParams(rt, normalized, params)
 	}
 
 	if err != nil {
@@ -147,9 +147,9 @@ func newKeyImporter(rt *goja.Runtime, normalized Algorithm, params goja.Value) (
 
 	switch normalized.Name {
 	case AESCbc, AESCtr, AESGcm, AESKw:
-		ki = newAesImportParams(normalized)
+		ki = newAESImportParams(normalized)
 	case HMAC:
-		ki, err = newHmacImportParams(rt, normalized, params)
+		ki, err = newHMACImportParams(rt, normalized, params)
 	}
 
 	if err != nil {

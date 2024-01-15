@@ -96,13 +96,13 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 		switch r.URL.Path {
 		case "/v1/tests":
 			fmt.Fprintf(w, `{
-"reference_id": "cloud-create-test",
+"reference_id": "12345",
 "config": {
 	"metricPushInterval": "10ms",
 	"aggregationPeriod": "1s"
 }
 }`)
-		case "/v1/tests/cloud-create-test":
+		case "/v1/tests/12345":
 			w.WriteHeader(http.StatusOK)
 		default:
 			http.Error(w, "not expected path", http.StatusInternalServerError)
@@ -216,7 +216,7 @@ func TestOutputStartWithTestRunID(t *testing.T) {
 		Logger: testutils.NewLogger(t),
 		Environment: map[string]string{
 			"K6_CLOUD_HOST":        ts.URL,
-			"K6_CLOUD_PUSH_REF_ID": "my-passed-id",
+			"K6_CLOUD_PUSH_REF_ID": "12345",
 		},
 		ScriptOptions: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
@@ -252,7 +252,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/tests/test-ref-id-1234":
+		case "/v1/tests/1234":
 			b, err := io.ReadAll(r.Body)
 			require.NoError(t, err)
 
@@ -282,7 +282,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 	require.NoError(t, err)
 
 	calledStopFn := false
-	out.testRunID = "test-ref-id-1234"
+	out.testRunID = "1234"
 	out.versionedOutput = versionedOutputMock{
 		callback: func(fn string) {
 			if fn == "StopWithTestError" {

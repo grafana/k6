@@ -1,3 +1,4 @@
+// Package keyboardlayout provides keyboard key interpretation and layout validation.
 package keyboardlayout
 
 import (

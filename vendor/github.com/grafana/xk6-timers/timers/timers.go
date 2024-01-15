@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
+	"github.com/sirupsen/logrus"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
@@ -212,10 +213,21 @@ func (e *Timers) closeTaskQueue() {
 	// so that we do not execute it twice
 	e.taskQueueCh = nil
 
-	// wait for this to happen so we don't need to hit the event loop again
-	// instead this just closes the queue
-	ch <- struct{}{}
-	<-ch
+	select {
+	case ch <- struct{}{}:
+		// wait for this to happen so we don't need to hit the event loop again
+		// instead this just closes the queue
+		<-ch
+	case <-e.vu.Context().Done(): // still shortcircuit if the context is done as we might block otherwise
+	}
+}
+
+// logger is helper to get a logger either from the state or the initenv
+func (e *Timers) logger() logrus.FieldLogger {
+	if state := e.vu.State(); state != nil {
+		return state.Logger
+	}
+	return e.vu.InitEnv().Logger
 }
 
 func (e *Timers) setupTaskQueueCloserOnIterationEnd() {
@@ -229,23 +241,28 @@ func (e *Timers) setupTaskQueueCloserOnIterationEnd() {
 			// lets report timers won't be executed and clean the fields for the next execution
 			// we need to do this on the event loop as we don't want to have a race
 			q.Queue(func() error {
-				logger := e.vu.State().Logger
+				logger := e.logger()
 				for _, timer := range e.queue.queue {
-					logger.Warnf("%s %d was stopped because the VU iteration was interrupted", timer.name, timer.id)
+					logger.Warnf("%s %d was stopped because the VU iteration was interrupted",
+						timer.name, timer.id)
 				}
 
 				// TODO: use `clear` when we only support go 1.21 and above
 				e.timers = make(map[uint64]time.Time)
+				e.queue.stopTimer()
 				e.queue = new(timerQueue)
 				e.taskQueue = nil
 				return nil
 			})
+			q.Close()
 		case <-ch:
+			e.timers = make(map[uint64]time.Time)
+			e.queue.stopTimer()
+			e.queue = new(timerQueue)
 			e.taskQueue = nil
+			q.Close()
 			close(ch)
 		}
-		e.queue.stopTimer()
-		q.Close()
 	}()
 }
 

@@ -228,6 +228,15 @@ func TestElement(t *testing.T) {
 			assert.Contains(t, nodes[3].Export().(Element).TextContent(), "Maecenas augue ligula")
 		}
 	})
+	t.Run("Selection", func(t *testing.T) {
+		t.Parallel()
+		rt := getTestRuntimeWithDoc(t, testHTMLElem)
+
+		v, err := rt.RunString(`doc.find('div').get(0).selection().find('h2').text()`)
+		if assert.NoError(t, err) {
+			assert.Equal(t, "Nullam id nisi eget ex pharetra imperdiet.", v.String())
+		}
+	})
 	t.Run("ClassList", func(t *testing.T) {
 		t.Parallel()
 		rt := getTestRuntimeWithDoc(t, testHTMLElem)

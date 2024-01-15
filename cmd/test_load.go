@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/js"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
@@ -39,9 +40,10 @@ type loadedTest struct {
 	preInitState   *lib.TestPreInitState
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
+	moduleResolver *modules.ModuleResolver
 }
 
-func loadTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
+func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
 	if len(args) < 1 {
 		return nil, fmt.Errorf("k6 needs at least one argument to load the test")
 	}
@@ -130,6 +132,7 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 			return fmt.Errorf("could not load JS test '%s': %w", testPath, err)
 		}
 		lt.initRunner = runner
+		lt.moduleResolver = runner.Bundle.ModuleResolver
 		return nil
 
 	case testTypeArchive:
@@ -145,10 +148,12 @@ func (lt *loadedTest) initializeFirstRunner(gs *state.GlobalState) error {
 		switch arc.Type {
 		case testTypeJS:
 			logger.Debug("Evaluating JS from archive bundle...")
-			lt.initRunner, err = js.NewFromArchive(lt.preInitState, arc)
+			runner, err := js.NewFromArchive(lt.preInitState, arc)
 			if err != nil {
 				return fmt.Errorf("could not load JS from test archive bundle '%s': %w", testPath, err)
 			}
+			lt.initRunner = runner
+			lt.moduleResolver = runner.Bundle.ModuleResolver
 			return nil
 		default:
 			return fmt.Errorf("archive '%s' has an unsupported test type '%s'", testPath, arc.Type)
@@ -236,11 +241,11 @@ type loadedAndConfiguredTest struct {
 	derivedConfig      Config
 }
 
-func loadAndConfigureTest(
+func loadAndConfigureLocalTest(
 	gs *state.GlobalState, cmd *cobra.Command, args []string,
 	cliConfigGetter func(flags *pflag.FlagSet) (Config, error),
 ) (*loadedAndConfiguredTest, error) {
-	test, err := loadTest(gs, cmd, args)
+	test, err := loadLocalTest(gs, cmd, args)
 	if err != nil {
 		return nil, err
 	}

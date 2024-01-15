@@ -115,6 +115,19 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 	}
 }
 
+// Imported returns the list of imported and resolved modules.
+// Each string represents the path as used for importing.
+func (mr *ModuleResolver) Imported() []string {
+	if len(mr.cache) < 1 {
+		return nil
+	}
+	modules := make([]string, 0, len(mr.cache))
+	for name := range mr.cache {
+		modules = append(modules, name)
+	}
+	return modules
+}
+
 // ModuleSystem is implementing an ESM like module system to resolve js modules for k6 usage
 type ModuleSystem struct {
 	vu            VU

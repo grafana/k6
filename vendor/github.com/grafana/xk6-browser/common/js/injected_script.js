@@ -601,7 +601,7 @@ class InjectedScript {
     );
   }
 
-  querySelector(selector, root, strict) {
+  querySelector(selector, strict, root) {
     if (!root["querySelector"]) {
       return "error:notqueryablenode";
     }

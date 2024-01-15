@@ -1,0 +1,15 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    allow:
+      # Keep the experimental modules up-to-date
+      - dependency-name: "github.com/grafana/xk6-*"
+        dependency-type: "all"
+    commit-message:
+      prefix: "Upgrade experimental module "
+      include: "scope"
+    reviewers:
+      - "grafana/k6-core"

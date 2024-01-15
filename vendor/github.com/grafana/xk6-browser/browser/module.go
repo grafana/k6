@@ -2,6 +2,7 @@
 package browser
 
 import (
+	"context"
 	"log"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec
@@ -23,6 +24,7 @@ type (
 		PidRegistry    *pidRegistry
 		remoteRegistry *remoteRegistry
 		initOnce       *sync.Once
+		tracesMetadata map[string]string
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -65,9 +67,15 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	return &ModuleInstance{
 		mod: &JSModule{
 			Browser: mapBrowserToGoja(moduleVU{
-				VU:                vu,
-				pidRegistry:       m.PidRegistry,
-				browserRegistry:   newBrowserRegistry(vu, m.remoteRegistry, m.PidRegistry),
+				VU:          vu,
+				pidRegistry: m.PidRegistry,
+				browserRegistry: newBrowserRegistry(
+					context.Background(),
+					vu,
+					m.remoteRegistry,
+					m.PidRegistry,
+					m.tracesMetadata,
+				),
 				taskQueueRegistry: newTaskQueueRegistry(vu),
 			}),
 			Devices:         common.GetDevices(),
@@ -92,6 +100,10 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	m.remoteRegistry, err = newRemoteRegistry(initEnv.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create remote registry: %v", err)
+	}
+	m.tracesMetadata, err = parseTracesMetadata(initEnv.LookupEnv)
+	if err != nil {
+		k6ext.Abort(vu.Context(), "parsing browser traces metadata: %v", err)
 	}
 	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
 		go startDebugServer()

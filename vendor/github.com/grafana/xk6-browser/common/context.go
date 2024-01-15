@@ -10,6 +10,7 @@ const (
 	ctxKeyBrowserOptions ctxKey = iota
 	ctxKeyHooks
 	ctxKeyIterationID
+	ctxKeyTracer
 )
 
 func WithHooks(ctx context.Context, hooks *Hooks) context.Context {
@@ -48,6 +49,23 @@ func GetBrowserOptions(ctx context.Context) *BrowserOptions {
 	}
 	if bo, ok := v.(*BrowserOptions); ok {
 		return bo
+	}
+	return nil
+}
+
+// WithTracer adds the given tracer to the context.
+func WithTracer(ctx context.Context, tracer Tracer) context.Context {
+	return context.WithValue(ctx, ctxKeyTracer, tracer)
+}
+
+// GetTracer returns the tracer attached to the context, or nil if not found.
+func GetTracer(ctx context.Context) Tracer {
+	v := ctx.Value(ctxKeyTracer)
+	if v == nil {
+		return nil
+	}
+	if tracer, ok := v.(Tracer); ok {
+		return tracer
 	}
 	return nil
 }

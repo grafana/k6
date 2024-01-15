@@ -13,12 +13,12 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4-0.20211119122758-180fcef48034+incompatible
 	github.com/golang/protobuf v1.5.3
 	github.com/gorilla/websocket v1.5.1
-	github.com/grafana/xk6-browser v1.2.2
+	github.com/grafana/xk6-browser v1.3.0
 	github.com/grafana/xk6-dashboard v0.7.0-alpha.5
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0
-	github.com/grafana/xk6-timers v0.2.2
-	github.com/grafana/xk6-webcrypto v0.1.0
+	github.com/grafana/xk6-timers v0.2.3
+	github.com/grafana/xk6-webcrypto v0.1.1
 	github.com/grafana/xk6-websockets v0.2.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
@@ -46,8 +46,8 @@ require (
 	go.opentelemetry.io/otel/sdk v1.21.0
 	go.opentelemetry.io/otel/trace v1.21.0
 	go.uber.org/goleak v1.3.0
-	golang.org/x/crypto v0.16.0
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20231129163542-152cdb1503eb
+	golang.org/x/crypto v0.17.0
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20231218163308-9d2ee975ef9f
 	golang.org/x/net v0.19.0
 	golang.org/x/term v0.15.0
 	golang.org/x/time v0.5.0

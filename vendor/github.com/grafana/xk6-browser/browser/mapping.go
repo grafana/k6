@@ -41,6 +41,16 @@ func mapBrowserToGoja(vu moduleVU) *goja.Object {
 // mapLocator API to the JS module.
 func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	return mapping{
+		"clear": func(opts goja.Value) error {
+			ctx := vu.Context()
+
+			copts := common.NewFrameFillOptions(lo.Timeout())
+			if err := copts.Parse(ctx, opts); err != nil {
+				return fmt.Errorf("parsing clear options: %w", err)
+			}
+
+			return lo.Clear(copts) //nolint:wrapcheck
+		},
 		"click": func(opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				err := lo.Click(opts)
@@ -249,7 +259,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 		},
 	}
 	maps["$"] = func(selector string) (mapping, error) {
-		eh, err := eh.Query(selector)
+		eh, err := eh.Query(selector, common.StrictModeOff)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
 		}
@@ -398,7 +408,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"waitForTimeout": f.WaitForTimeout,
 	}
 	maps["$"] = func(selector string) (mapping, error) {
-		eh, err := f.Query(selector)
+		eh, err := f.Query(selector, common.StrictModeOff)
 		if err != nil {
 			return nil, err //nolint:wrapcheck
 		}

@@ -2248,7 +2248,7 @@ func TestBrowserPermissions(t *testing.T) {
 				},
 			}`,
 			expectedExitCode: 108,
-			expectedError:    "error building browser on IterStart: launching browser: exec: \"k6-browser-fake-cmd\": executable file not found",
+			expectedError:    "k6-browser-fake-cmd",
 		},
 	}
 
