@@ -20,13 +20,13 @@ func TestSubtleDigest(t *testing.T) {
 	digestTestScript, err := CompileFile("./tests", "digest.js")
 	assert.NoError(t, err)
 
-	ts, err := newConfiguredRuntime(t)
-	gotScriptErr := ts.EventLoop.Start(func() error {
-		_, err := ts.VU.Runtime().RunProgram(digestTestScript)
-		return err
+	ts := newConfiguredRuntime(t)
+	gotErr := ts.EventLoop.Start(func() error {
+		_, programErr := ts.VU.Runtime().RunProgram(digestTestScript)
+		return programErr
 	})
 
-	assert.NoError(t, gotScriptErr)
+	assert.NoError(t, gotErr)
 }
 
 func TestSubtleCryptoGenerateKey(t *testing.T) {
@@ -35,10 +35,9 @@ func TestSubtleCryptoGenerateKey(t *testing.T) {
 	t.Run("successes", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
+		ts := newConfiguredRuntime(t)
 
-		gotScriptErr := ts.EventLoop.Start(func() error {
+		gotErr := ts.EventLoop.Start(func() error {
 			err := executeTestScripts(ts.VU.Runtime(), "./tests/generateKey", "successes.js")
 			require.NoError(t, err)
 
@@ -47,16 +46,15 @@ func TestSubtleCryptoGenerateKey(t *testing.T) {
 			return err
 		})
 
-		assert.NoError(t, gotScriptErr)
+		assert.NoError(t, gotErr)
 	})
 
 	t.Run("failures", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
+		ts := newConfiguredRuntime(t)
 
-		gotScriptErr := ts.EventLoop.Start(func() error {
+		gotErr := ts.EventLoop.Start(func() error {
 			err := executeTestScripts(ts.VU.Runtime(), "./tests/generateKey", "failures.js")
 			require.NoError(t, err)
 
@@ -65,7 +63,7 @@ func TestSubtleCryptoGenerateKey(t *testing.T) {
 			return err
 		})
 
-		assert.NoError(t, gotScriptErr)
+		assert.NoError(t, gotErr)
 	})
 }
 
@@ -75,16 +73,15 @@ func TestSubtleCryptoImportExportKey(t *testing.T) {
 	t.Run("symmetric", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
+		ts := newConfiguredRuntime(t)
 
-		gotScriptErr := ts.EventLoop.Start(func() error {
+		gotErr := ts.EventLoop.Start(func() error {
 			err := executeTestScripts(ts.VU.Runtime(), "./tests/import_export", "symmetric.js")
 
 			return err
 		})
 
-		assert.NoError(t, gotScriptErr)
+		assert.NoError(t, gotErr)
 	})
 }
 
@@ -94,10 +91,9 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 	t.Run("AES CBC", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
+		ts := newConfiguredRuntime(t)
 
-		gotScriptErr := ts.EventLoop.Start(func() error {
+		gotErr := ts.EventLoop.Start(func() error {
 			err := executeTestScripts(ts.VU.Runtime(), "./tests/encrypt_decrypt", "aes_cbc_vectors.js", "aes.js")
 			require.NoError(t, err)
 
@@ -106,16 +102,15 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 			return err
 		})
 
-		assert.NoError(t, gotScriptErr)
+		assert.NoError(t, gotErr)
 	})
 
 	t.Run("AES CTR", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
+		ts := newConfiguredRuntime(t)
 
-		gotScriptErr := ts.EventLoop.Start(func() error {
+		gotErr := ts.EventLoop.Start(func() error {
 			err := executeTestScripts(ts.VU.Runtime(), "./tests/encrypt_decrypt", "aes_ctr_vectors.js", "aes.js")
 			require.NoError(t, err)
 
@@ -124,20 +119,19 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 			return err
 		})
 
-		assert.NoError(t, gotScriptErr)
+		assert.NoError(t, gotErr)
 	})
 
 	// Note @oleiade: although the specification targets support
 	// for various iv sizes, go AES GCM cipher only supports 96bits.
-	// Thus, alghought the official WebPlatform test suite contains
+	// Thus, although the official WebPlatform test suite contains
 	// vectors for various iv sizes, we only test the 96bits one.
 	t.Run("AES GCM 96bits iv", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
+		ts := newConfiguredRuntime(t)
 
-		gotScriptErr := ts.EventLoop.Start(func() error {
+		gotErr := ts.EventLoop.Start(func() error {
 			err := executeTestScripts(ts.VU.Runtime(), "./tests/encrypt_decrypt", "aes_gcm_96_iv_fixtures.js", "aes_gcm_vectors.js", "aes.js")
 			require.NoError(t, err)
 
@@ -146,7 +140,7 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 			return err
 		})
 
-		assert.NoError(t, gotScriptErr)
+		assert.NoError(t, gotErr)
 	})
 }
 
@@ -156,10 +150,9 @@ func TestSubtleCryptoSignVerify(t *testing.T) {
 	t.Run("HMAC", func(t *testing.T) {
 		t.Parallel()
 
-		ts, err := newConfiguredRuntime(t)
-		require.NoError(t, err)
+		ts := newConfiguredRuntime(t)
 
-		gotScriptErr := ts.EventLoop.Start(func() error {
+		gotErr := ts.EventLoop.Start(func() error {
 			err := executeTestScripts(ts.VU.Runtime(), "./tests/sign_verify", "hmac_vectors.js", "hmac.js")
 			require.NoError(t, err)
 
@@ -168,7 +161,7 @@ func TestSubtleCryptoSignVerify(t *testing.T) {
 			return err
 		})
 
-		assert.NoError(t, gotScriptErr)
+		assert.NoError(t, gotErr)
 	})
 }
 
