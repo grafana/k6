@@ -1865,6 +1865,44 @@ func TestUIRenderOutput(t *testing.T) {
 	}
 }
 
+func TestUIRenderWebDashboard(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		env       string
+		active    bool
+		expRender string
+	}{
+		{expRender: "web dashboard:"},
+		{env: "false", expRender: "web dashboard:"},
+		{env: "true", active: true, expRender: "web dashboard: http://127.0.0.1:"},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+
+		t.Run(tc.expRender, func(t *testing.T) {
+			t.Parallel()
+
+			ts := NewGlobalTestState(t)
+			if tc.env != "" {
+				ts.Env["K6_WEB_DASHBOARD"] = tc.env
+			}
+			ts.Env["K6_WEB_DASHBOARD_PORT"] = "0"
+			ts.CmdArgs = []string{"k6", "run", "--log-output=stdout"}
+			ts.CmdArgs = append(ts.CmdArgs, "-")
+			ts.Stdin = bytes.NewBufferString(`export default function() {};`)
+			cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+			if tc.active {
+				assert.Contains(t, ts.Stdout.String(), tc.expRender)
+			} else {
+				assert.NotContains(t, ts.Stdout.String(), tc.expRender)
+			}
+		})
+	}
+}
+
 // TestRunStaticArchives tests that the static archives are working as expected.
 // each archive contains the following files/catalogs:
 // ├── a.js

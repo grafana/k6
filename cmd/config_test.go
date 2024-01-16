@@ -86,6 +86,11 @@ func TestConfigEnv(t *testing.T) {
 			"true":  func(c Config) { assert.Equal(t, null.BoolFrom(true), c.NoUsageReport) },
 			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.NoUsageReport) },
 		},
+		{"WebDashboard", "K6_WEB_DASHBOARD"}: {
+			"":      func(c Config) { assert.Equal(t, null.Bool{}, c.WebDashboard) },
+			"true":  func(c Config) { assert.Equal(t, null.BoolFrom(true), c.WebDashboard) },
+			"false": func(c Config) { assert.Equal(t, null.BoolFrom(false), c.WebDashboard) },
+		},
 		{"Out", "K6_OUT"}: {
 			"":         func(c Config) { assert.Equal(t, []string{}, c.Out) },
 			"influxdb": func(c Config) { assert.Equal(t, []string{"influxdb"}, c.Out) },

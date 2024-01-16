@@ -41,6 +41,7 @@ type Config struct {
 	Out           []string  `json:"out" envconfig:"K6_OUT"`
 	Linger        null.Bool `json:"linger" envconfig:"K6_LINGER"`
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
+	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
 	// TODO: deprecate
 	Collectors map[string]json.RawMessage `json:"collectors"`
@@ -66,6 +67,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.NoUsageReport.Valid {
 		c.NoUsageReport = cfg.NoUsageReport
+	}
+	if cfg.WebDashboard.Valid {
+		c.WebDashboard = cfg.WebDashboard
 	}
 	if len(cfg.Collectors) > 0 {
 		c.Collectors = cfg.Collectors
