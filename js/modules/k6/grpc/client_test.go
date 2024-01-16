@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	k6grpc "go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/lib/netext/grpcext"
@@ -1144,6 +1145,9 @@ func TestClient_TlsParameters(t *testing.T) {
 				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 					return &grpc_testing.Empty{}, nil
 				}
+				// Set a timeout higher than the default one to
+				// prevent it failing for a non-expected reason.
+				tb.Dialer.Dialer.Timeout = 5 * time.Second
 			},
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
