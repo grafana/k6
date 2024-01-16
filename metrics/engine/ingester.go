@@ -113,7 +113,10 @@ func (oi *OutputIngester) flushMetrics() {
 				"and could cause high memory usage. "+
 				"Consider not using high-cardinality values like unique IDs as metric tags "+
 				"or, if you need them in the URL, use the name metric tag or URL grouping. "+
-				"See https://k6.io/docs/using-k6/tags-and-groups for details.", oi.cardinality.Count(), timeSeriesFirstLimit)
+				"See https://grafana.com/docs/k6/latest/using-k6/tags-and-groups/ for details.",
+			oi.cardinality.Count(),
+			timeSeriesFirstLimit,
+		)
 	}
 }
 

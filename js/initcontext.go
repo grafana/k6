@@ -13,7 +13,7 @@ import (
 )
 
 const cantBeUsedOutsideInitContextMsg = `the "%s" function is only available in the init stage ` +
-	`(i.e. the global scope), see https://k6.io/docs/using-k6/test-life-cycle for more information`
+	`(i.e. the global scope), see https://grafana.com/docs/k6/latest/using-k6/test-lifecycle/ for more information`
 
 // openImpl implements openImpl() in the init context and will read and return the
 // contents of a file. If the second argument is "b" it returns an ArrayBuffer
