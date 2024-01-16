@@ -152,7 +152,14 @@ func (ext *extension) Start() error {
 }
 
 // Stop flushes any remaining metrics and stops the extension.
+// k6 core will call WithStopWithTestError instead of this one.
 func (ext *extension) Stop() error {
+	return ext.StopWithTestError(nil)
+}
+
+// WithStopWithTestError allows output to receive the error value that the test finished with.
+// Flushes any remaining metrics and stops the extension.
+func (ext *extension) StopWithTestError(testRunErr error) error {
 	ext.noFlush.Store(true)
 
 	ext.flusher.Stop()
@@ -161,7 +168,7 @@ func (ext *extension) Stop() error {
 
 	ext.updateAndSend(nil, newMeter(ext.period, now, ext.options.Tags), stopEvent, now)
 
-	err := ext.fireStop()
+	err := ext.fireStop(testRunErr)
 	if err != nil {
 		return err
 	}

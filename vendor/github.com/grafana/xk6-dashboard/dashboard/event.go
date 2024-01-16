@@ -9,7 +9,7 @@ package dashboard
 type eventListener interface {
 	onEvent(event string, data interface{})
 	onStart() error
-	onStop() error
+	onStop(reason error) error
 }
 
 type eventSource struct {
@@ -36,9 +36,9 @@ func (src *eventSource) fireStart() error {
 	return nil
 }
 
-func (src *eventSource) fireStop() error {
+func (src *eventSource) fireStop(reason error) error {
 	for _, e := range src.listeners {
-		if err := e.onStop(); err != nil {
+		if err := e.onStop(reason); err != nil {
 			return err
 		}
 	}

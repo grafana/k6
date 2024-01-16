@@ -48,7 +48,7 @@ func (rec *recorder) onStart() error {
 	return nil
 }
 
-func (rec *recorder) onStop() error {
+func (rec *recorder) onStop(_ error) error {
 	return rec.writer.Close()
 }
 

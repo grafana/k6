@@ -103,7 +103,7 @@ func (rep *replayer) run() error {
 		rep.fireEvent(input.Name, input.Data)
 	}
 
-	return rep.fireStop()
+	return rep.fireStop(nil)
 }
 
 type replayerEnvelope struct {

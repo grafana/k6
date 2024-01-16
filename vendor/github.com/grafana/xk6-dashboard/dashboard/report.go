@@ -46,7 +46,7 @@ func (rep *reporter) onStart() error {
 	return nil
 }
 
-func (rep *reporter) onStop() error {
+func (rep *reporter) onStop(_ error) error {
 	if len(rep.output) == 0 {
 		return nil
 	}

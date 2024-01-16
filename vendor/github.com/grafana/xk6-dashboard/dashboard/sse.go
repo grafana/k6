@@ -8,6 +8,7 @@ package dashboard
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"sync"
@@ -15,6 +16,7 @@ import (
 
 	"github.com/r3labs/sse/v2"
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/errext"
 )
 
 type eventEmitter struct {
@@ -43,8 +45,12 @@ func (emitter *eventEmitter) onStart() error {
 	return nil
 }
 
-func (emitter *eventEmitter) onStop() error {
-	emitter.wait.Wait()
+func (emitter *eventEmitter) onStop(reason error) error {
+	var err errext.HasAbortReason
+
+	if !errors.As(reason, &err) {
+		emitter.wait.Wait()
+	}
 
 	return nil
 }
