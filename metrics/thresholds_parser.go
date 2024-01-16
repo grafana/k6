@@ -9,7 +9,7 @@ import (
 )
 
 // thresholdExpression holds the parsed result of a threshold expression,
-// as described in: https://k6.io/docs/using-k6/thresholds/#threshold-syntax
+// as described in: https://grafana.com/docs/k6/latest/using-k6/thresholds/#threshold-syntax
 type thresholdExpression struct {
 	// AggregationMethod holds the aggregation method parsed
 	// from the threshold expression. Possible values are described
