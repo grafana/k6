@@ -4,6 +4,8 @@ on:
   workflow_call:
   issues:
     types: [opened]
+  issue_comment:
+    types: [created]
 
 permissions:
   issues: write
@@ -11,6 +13,7 @@ permissions:
 jobs:
   assign-user:
     runs-on: ubuntu-latest
+    if: ${{ !github.event.issue.pull_request }}
     steps:
       - uses: actions/github-script@v6
         with:
