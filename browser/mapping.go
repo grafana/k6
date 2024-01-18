@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/dop251/goja"
 
@@ -81,6 +82,16 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		"dispatchEvent": lo.DispatchEvent,
 		"waitFor":       lo.WaitFor,
 	}
+}
+
+func parseFrameClickOptions(
+	ctx context.Context, opts goja.Value, defaultTimeout time.Duration,
+) (*common.FrameClickOptions, error) {
+	copts := common.NewFrameClickOptions(defaultTimeout)
+	if err := copts.Parse(ctx, opts); err != nil {
+		return nil, fmt.Errorf("parsing click options: %w", err)
+	}
+	return copts, nil
 }
 
 // mapRequest to the JS module.
