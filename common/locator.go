@@ -58,16 +58,12 @@ func (l *Locator) Timeout() time.Duration {
 }
 
 // Click on an element using locator's selector with strict mode on.
-func (l *Locator) Click(opts goja.Value) error {
+func (l *Locator) Click(opts *FrameClickOptions) error {
 	l.log.Debugf("Locator:Click", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.click")
 	defer span.End()
 
-	copts := NewFrameClickOptions(l.frame.defaultTimeout())
-	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing click options: %w", err)
-	}
-	if err := l.click(copts); err != nil {
+	if err := l.click(opts); err != nil {
 		return fmt.Errorf("clicking on %q: %w", l.selector, err)
 	}
 

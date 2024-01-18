@@ -69,7 +69,8 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Click", func(tb *testBrowser, p *common.Page) {
-				err := p.Locator("#link", nil).Click(nil)
+				l := p.Locator("#link", nil)
+				err := l.Click(common.NewFrameClickOptions(l.Timeout()))
 				require.NoError(t, err)
 				v := p.Evaluate(tb.toGojaValue(`() => window.result`))
 				require.True(t, tb.asGojaBool(v), "cannot not click the link")
@@ -260,7 +261,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"Click", func(l *common.Locator, tb *testBrowser) {
-				err := l.Click(timeout(tb))
+				err := l.Click(common.NewFrameClickOptions(100 * time.Millisecond))
 				if err != nil {
 					// TODO: remove panic and update tests when all locator methods return error.
 					panic(err)

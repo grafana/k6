@@ -53,8 +53,14 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			return lo.Clear(copts) //nolint:wrapcheck
 		},
 		"click": func(opts goja.Value) *goja.Promise {
+			popts, err := parseFrameClickOptions(vu.Context(), opts, lo.Timeout())
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				err := lo.Click(opts)
+				if err != nil {
+					return nil, err
+				}
+
+				err = lo.Click(popts)
 				return nil, err //nolint:wrapcheck
 			})
 		},
