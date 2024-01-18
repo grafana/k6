@@ -404,7 +404,7 @@ func (f *Frame) removeChildFrame(child *Frame) {
 	delete(f.childFrames, child)
 }
 
-func (f *Frame) requestByID(reqID network.RequestID) *Request {
+func (f *Frame) requestByID(reqID network.RequestID) (*Request, bool) {
 	frameSession := f.page.getFrameSession(cdp.FrameID(f.ID()))
 	if frameSession == nil {
 		frameSession = f.page.mainFrameSession
