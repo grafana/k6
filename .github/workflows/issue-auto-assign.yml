@@ -13,6 +13,8 @@ permissions:
 jobs:
   assign-user:
     runs-on: ubuntu-latest
+    # issue_comment triggers for both, issues and prs,
+    # as we need to run only on issues, it filter out prs.
     if: ${{ !github.event.issue.pull_request }}
     steps:
       - uses: actions/github-script@v6
