@@ -1195,6 +1195,12 @@ func (p *Page) TextContent(selector string, opts goja.Value) string {
 	return p.MainFrame().TextContent(selector, opts)
 }
 
+// Timeout will return the default timeout or the one set by the user.
+// It's an internal method not to be exposed as a JS API.
+func (p *Page) Timeout() time.Duration {
+	return p.defaultTimeout()
+}
+
 func (p *Page) Title() string {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
