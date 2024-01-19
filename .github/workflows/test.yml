@@ -56,11 +56,10 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v3
       - name: Download Go tip
-        uses: robinraju/release-downloader@efa4cd07bd0195e6cc65e9e30c251b49ce4d3e51 # v1.8
-        with:
-          repository: "grafana/gotip"
-          tag: "${{ matrix.platform }}"
-          fileName: go.zip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download ${{ matrix.platform }} --repo grafana/gotip --pattern 'go.zip'
       - name: Install Go tip
         run: |
           unzip go.zip -d $HOME/sdk
