@@ -1582,6 +1582,12 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	return gv.String(), nil
 }
 
+// Timeout will return the default timeout or the one set by the user.
+// It's an internal method not to be exposed as a JS API.
+func (f *Frame) Timeout() time.Duration {
+	return f.defaultTimeout()
+}
+
 // Title returns the title of the frame.
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
