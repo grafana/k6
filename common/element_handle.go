@@ -733,18 +733,14 @@ func (h *ElementHandle) BoundingBox() *Rect {
 // Click scrolls element into view and clicks in the center of the element
 // TODO: look into making more robust using retries
 // (see: https://github.com/microsoft/playwright/blob/master/src/server/dom.ts#L298)
-func (h *ElementHandle) Click(opts goja.Value) error {
-	actionOpts := NewElementHandleClickOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element click options: %v", err)
-	}
+func (h *ElementHandle) Click(opts *ElementHandleClickOptions) error {
 	click := h.newPointerAction(
 		func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
-			return nil, handle.click(p, actionOpts.ToMouseClickOptions())
+			return nil, handle.click(p, opts.ToMouseClickOptions())
 		},
-		&actionOpts.ElementHandleBasePointerOptions,
+		&opts.ElementHandleBasePointerOptions,
 	)
-	if _, err := call(h.ctx, click, actionOpts.Timeout); err != nil {
+	if _, err := call(h.ctx, click, opts.Timeout); err != nil {
 		return fmt.Errorf("clicking on element: %w", err)
 	}
 	applySlowMo(h.ctx)

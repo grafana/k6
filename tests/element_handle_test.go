@@ -103,13 +103,11 @@ func TestElementHandleClick(t *testing.T) {
 	button, err := p.Query("button")
 	require.NoError(t, err)
 
-	err = button.Click(tb.toGojaValue(struct {
-		NoWaitAfter bool `js:"noWaitAfter"`
-	}{
-		// FIX: this is just a workaround because navigation is never triggered
-		// and we'd be waiting for it to happen otherwise!
-		NoWaitAfter: true,
-	}))
+	opts := common.NewElementHandleClickOptions(button.Timeout())
+	// FIX: this is just a workaround because navigation is never triggered
+	// and we'd be waiting for it to happen otherwise!
+	opts.NoWaitAfter = true
+	err = button.Click(opts)
 	require.NoError(t, err)
 
 	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
@@ -130,13 +128,11 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	button, err := p.Query("button")
 	require.NoError(t, err)
 
-	err = button.Click(tb.toGojaValue(struct {
-		NoWaitAfter bool `js:"noWaitAfter"`
-	}{
-		// FIX: this is just a workaround because navigation is never triggered
-		// and we'd be waiting for it to happen otherwise!
-		NoWaitAfter: true,
-	}))
+	opts := common.NewElementHandleClickOptions(button.Timeout())
+	// FIX: this is just a workaround because navigation is never triggered
+	// and we'd be waiting for it to happen otherwise!
+	opts.NoWaitAfter = true
+	err = button.Click(opts)
 	require.NoError(t, err)
 
 	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
@@ -156,13 +152,11 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	// Detach node to panic when clicked
 	p.Evaluate(tb.toGojaValue("button => button.remove()"), tb.toGojaValue(button))
 
-	err = button.Click(tb.toGojaValue(struct {
-		NoWaitAfter bool `js:"noWaitAfter"`
-	}{
-		// FIX: this is just a workaround because navigation is never triggered and we'd be waiting for
-		// it to happen otherwise!
-		NoWaitAfter: true,
-	}))
+	opts := common.NewElementHandleClickOptions(button.Timeout())
+	// FIX: this is just a workaround because navigation is never triggered
+	// and we'd be waiting for it to happen otherwise!
+	opts.NoWaitAfter = true
+	err = button.Click(opts)
 	assert.ErrorContains(
 		t, err,
 		"element is not attached to the DOM",

@@ -219,11 +219,18 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,
 		"check":       eh.Check,
-		"click": func(opts goja.Value) *goja.Promise {
+		"click": func(opts goja.Value) (*goja.Promise, error) {
+			ctx := vu.Context()
+
+			popts := common.NewElementHandleClickOptions(eh.Timeout())
+			if err := popts.Parse(ctx, opts); err != nil {
+				return nil, fmt.Errorf("parsing element click options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				err := eh.Click(opts)
+				err := eh.Click(popts)
 				return nil, err //nolint:wrapcheck
-			})
+			}), nil
 		},
 		"contentFrame": func() (mapping, error) {
 			f, err := eh.ContentFrame()

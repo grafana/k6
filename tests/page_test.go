@@ -64,7 +64,7 @@ func TestNestedFrames(t *testing.T) {
 	assert.Nil(t, err)
 	assert.NotNil(t, button1Handle)
 
-	err = button1Handle.Click(nil)
+	err = button1Handle.Click(common.NewElementHandleClickOptions(button1Handle.Timeout()))
 	assert.Nil(t, err)
 
 	v := frame2.Evaluate(tb.toGojaValue(`() => window.buttonClicked`))
