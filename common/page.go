@@ -1398,7 +1398,10 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 	)
 
 	for _, robj := range e.Args {
-		s := parseConsoleRemoteObject(p.logger, robj)
+		s, err := parseConsoleRemoteObject(p.logger, robj)
+		if err != nil {
+			p.logger.Errorf("consoleMsgFromConsoleEvent", "failed to parse console message %v", err)
+		}
 
 		objects = append(objects, s)
 		objectHandles = append(objectHandles, NewJSHandle(
