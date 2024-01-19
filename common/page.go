@@ -652,7 +652,12 @@ func (p *Page) IsChecked(selector string, opts goja.Value) bool {
 func (p *Page) Click(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:Click", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Click(selector, opts) //nolint:wrapcheck
+	popts := NewFrameClickOptions(p.defaultTimeout())
+	if err := popts.Parse(p.ctx, opts); err != nil {
+		k6ext.Panic(p.ctx, "parsing click options %q: %w", selector, err)
+	}
+
+	return p.MainFrame().Click(selector, popts)
 }
 
 // Close closes the page.

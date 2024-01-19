@@ -545,14 +545,10 @@ func (f *Frame) ChildFrames() []*Frame {
 }
 
 // Click clicks the first element found that matches selector.
-func (f *Frame) Click(selector string, opts goja.Value) error {
+func (f *Frame) Click(selector string, opts *FrameClickOptions) error {
 	f.log.Debugf("Frame:Click", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameClickOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing click options %q: %w", selector, err)
-	}
-	if err := f.click(selector, popts); err != nil {
+	if err := f.click(selector, opts); err != nil {
 		return fmt.Errorf("clicking on %q: %w", selector, err)
 	}
 

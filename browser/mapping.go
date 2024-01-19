@@ -334,11 +334,16 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			}
 			return rt.ToValue(mcfs).ToObject(rt)
 		},
-		"click": func(selector string, opts goja.Value) *goja.Promise {
+		"click": func(selector string, opts goja.Value) (*goja.Promise, error) {
+			popts, err := parseFrameClickOptions(vu.Context(), opts, f.Timeout())
+			if err != nil {
+				return nil, err
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				err := f.Click(selector, opts)
+				err := f.Click(selector, popts)
 				return nil, err //nolint:wrapcheck
-			})
+			}), nil
 		},
 		"content":       f.Content,
 		"dblclick":      f.Dblclick,
