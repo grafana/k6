@@ -24,7 +24,7 @@ type JSHandleAPI interface {
 	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
 	GetProperty(propertyName string) JSHandleAPI
-	JSONValue() string
+	JSONValue() (string, error)
 	ObjectID() cdpruntime.RemoteObjectID
 }
 
@@ -162,7 +162,7 @@ func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
 }
 
 // JSONValue returns a JSON version of this JS handle.
-func (h *BaseJSHandle) JSONValue() string {
+func (h *BaseJSHandle) JSONValue() (string, error) {
 	if h.remoteObject.ObjectID != "" {
 		var result *runtime.RemoteObject
 		var err error
@@ -175,15 +175,17 @@ func (h *BaseJSHandle) JSONValue() string {
 		}
 		res, err := parseConsoleRemoteObject(h.logger, result)
 		if err != nil {
-			k6ext.Panic(h.ctx, "extracting value from remote object: %w", err)
+			return "", fmt.Errorf("extracting value from result: %w", err)
 		}
-		return res
+
+		return res, nil
 	}
 	res, err := parseConsoleRemoteObject(h.logger, h.remoteObject)
 	if err != nil {
-		k6ext.Panic(h.ctx, "extracting value from remote object: %w", err)
+		return "", fmt.Errorf("extracting value from remote object: %w", err)
 	}
-	return res
+
+	return res, nil
 }
 
 // ObjectID returns the remote object ID.

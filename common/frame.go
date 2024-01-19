@@ -1455,7 +1455,11 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 	}
 	vals := make([]string, 0, len(optHandles))
 	for _, oh := range optHandles {
-		vals = append(vals, oh.JSONValue())
+		val, err := oh.JSONValue()
+		if err != nil {
+			return nil, fmt.Errorf("reading value: %w", err)
+		}
+		vals = append(vals, val)
 		if err := oh.dispose(); err != nil {
 			return nil, fmt.Errorf("optionHandle.dispose: %w", err)
 		}
