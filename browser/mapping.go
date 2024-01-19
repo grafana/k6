@@ -52,17 +52,15 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 
 			return lo.Clear(copts) //nolint:wrapcheck
 		},
-		"click": func(opts goja.Value) *goja.Promise {
+		"click": func(opts goja.Value) (*goja.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, lo.Timeout())
+			if err != nil {
+				return nil, err
+			}
 
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				if err != nil {
-					return nil, err
-				}
-
-				err = lo.Click(popts)
-				return nil, err //nolint:wrapcheck
-			})
+				return nil, lo.Click(popts) //nolint:wrapcheck
+			}), nil
 		},
 		"dblclick":      lo.Dblclick,
 		"check":         lo.Check,
