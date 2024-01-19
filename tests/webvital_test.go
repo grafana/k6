@@ -8,6 +8,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/common"
+
 	k6metrics "go.k6.io/k6/metrics"
 )
 
@@ -61,7 +63,7 @@ func TestWebVitalMetric(t *testing.T) {
 	// also helps the web vital library to measure CLS.
 	err = browser.run(
 		ctx,
-		func() error { return page.Click("#clickMe", nil) },
+		func() error { return page.Click("#clickMe", common.NewFrameClickOptions(page.Timeout())) },
 		func() error { _, err := page.WaitForNavigation(nil); return err },
 	)
 	require.NoError(t, err)

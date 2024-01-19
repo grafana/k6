@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
 )
 
@@ -60,7 +61,7 @@ func TestFrameDismissDialogBox(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt == "beforeunload" {
-				err = p.Click("#clickHere", nil)
+				err = p.Click("#clickHere", common.NewFrameClickOptions(p.Timeout()))
 				require.NoError(t, err)
 			}
 
@@ -136,7 +137,7 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 
 	err = tb.run(
 		ctx,
-		func() error { return p.Click(`a[href="/iframeSignIn"]`, nil) },
+		func() error { return p.Click(`a[href="/iframeSignIn"]`, common.NewFrameClickOptions(p.Timeout())) },
 		func() error { _, err := p.WaitForNavigation(nil); return err },
 	)
 	require.NoError(t, err)

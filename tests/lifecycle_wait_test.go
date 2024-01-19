@@ -175,7 +175,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 					return err
 				}
 				click := func() error {
-					return p.Click(`a`, nil)
+					return p.Click(`a`, common.NewFrameClickOptions(p.Timeout()))
 				}
 
 				ctx, cancel := context.WithTimeout(tb.ctx, 5*time.Second)

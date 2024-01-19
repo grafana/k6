@@ -199,7 +199,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, wantBefore, clickResult())
 
-	err = p.Click("#concealed", nil)
+	err = p.Click("#concealed", common.NewFrameClickOptions(p.Timeout()))
 	require.NoError(t, err)
 	require.Equal(t, wantAfter, clickResult())
 }
@@ -218,7 +218,7 @@ func TestElementHandleNonClickable(t *testing.T) {
 	require.NotNil(t, resp)
 	require.NoError(t, err)
 
-	err = p.Click("#non-clickable", nil)
+	err = p.Click("#non-clickable", common.NewFrameClickOptions(p.Timeout()))
 	require.Errorf(t, err, "element should not be clickable")
 }
 

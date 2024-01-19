@@ -49,7 +49,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 				return err
 			}
 			click := func() error {
-				return p.Click(tc.selector, nil)
+				return p.Click(tc.selector, common.NewFrameClickOptions(p.Timeout()))
 			}
 			ctx, cancel := context.WithTimeout(tb.ctx, timeout)
 			defer cancel()
@@ -105,7 +105,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		return err
 	}
 	click := func() error {
-		return p.Click(`a`, nil)
+		return p.Click(`a`, common.NewFrameClickOptions(p.Timeout()))
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()

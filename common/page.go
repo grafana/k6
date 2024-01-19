@@ -649,15 +649,10 @@ func (p *Page) IsChecked(selector string, opts goja.Value) bool {
 }
 
 // Click clicks an element matching provided selector.
-func (p *Page) Click(selector string, opts goja.Value) error {
+func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 	p.logger.Debugf("Page:Click", "sid:%v selector:%s", p.sessionID(), selector)
 
-	popts := NewFrameClickOptions(p.defaultTimeout())
-	if err := popts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "parsing click options %q: %w", selector, err)
-	}
-
-	return p.MainFrame().Click(selector, popts)
+	return p.MainFrame().Click(selector, opts)
 }
 
 // Close closes the page.

@@ -475,11 +475,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"addStyleTag":   p.AddStyleTag,
 		"bringToFront":  p.BringToFront,
 		"check":         p.Check,
-		"click": func(selector string, opts goja.Value) *goja.Promise {
+		"click": func(selector string, opts goja.Value) (*goja.Promise, error) {
+			popts, err := parseFrameClickOptions(vu.Context(), opts, p.Timeout())
+			if err != nil {
+				return nil, err
+			}
+
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				err := p.Click(selector, opts)
+				err := p.Click(selector, popts)
 				return nil, err //nolint:wrapcheck
-			})
+			}), nil
 		},
 		"close": func(opts goja.Value) error {
 			vu.taskQueueRegistry.close(p.TargetID())
