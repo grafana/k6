@@ -642,6 +642,8 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 	case "error":
 		l.Error()
 	default:
+		// this is where debug & other console.* apis will default to (such as
+		// console.table).
 		l.Debug()
 	}
 }
