@@ -1294,6 +1294,12 @@ func (h *ElementHandle) TextContent() string {
 	return gojaValueToString(h.ctx, v)
 }
 
+// Timeout will return the default timeout or the one set by the user.
+// It's an internal method not to be exposed as a JS API.
+func (h *ElementHandle) Timeout() time.Duration {
+	return h.defaultTimeout()
+}
+
 // Type scrolls element into view, focuses element and types text.
 func (h *ElementHandle) Type(text string, opts goja.Value) {
 	parsedOpts := NewElementHandleTypeOptions(h.defaultTimeout())
