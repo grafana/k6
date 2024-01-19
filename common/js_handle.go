@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/grafana/xk6-browser/k6ext"
@@ -163,25 +162,8 @@ func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
 }
 
 // JSONValue returns a JSON version of this JS handle.
-func (h *BaseJSHandle) JSONValue() string { // TODO: return error
-	convertToString := func(ro *cdpruntime.RemoteObject) string {
-		res, err := valueFromRemoteObject(h.ctx, ro)
-		if err != nil {
-			k6ext.Panic(h.ctx, "extracting value from remote object: %w", err)
-		}
-		switch v := res.(type) {
-		case string:
-			return v
-		default:
-			buf, err := json.Marshal(v)
-			if err != nil {
-				k6ext.Panic(h.ctx, "marshaling value: %w", err)
-			}
-			return string(buf)
-		}
-	}
-	remoteObject := h.remoteObject
-	if remoteObject.ObjectID != "" {
+func (h *BaseJSHandle) JSONValue() string {
+	if h.remoteObject.ObjectID != "" {
 		var result *runtime.RemoteObject
 		var err error
 		action := runtime.CallFunctionOn("function() { return this; }").
@@ -191,10 +173,17 @@ func (h *BaseJSHandle) JSONValue() string { // TODO: return error
 		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
 			k6ext.Panic(h.ctx, "getting properties for JS handle: %w", err)
 		}
-		remoteObject = result
+		res, err := parseConsoleRemoteObject(h.logger, result)
+		if err != nil {
+			k6ext.Panic(h.ctx, "extracting value from remote object: %w", err)
+		}
+		return res
 	}
-
-	return convertToString(remoteObject)
+	res, err := parseConsoleRemoteObject(h.logger, h.remoteObject)
+	if err != nil {
+		k6ext.Panic(h.ctx, "extracting value from remote object: %w", err)
+	}
+	return res
 }
 
 // ObjectID returns the remote object ID.
