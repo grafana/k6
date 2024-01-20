@@ -86,8 +86,8 @@ func (vlvc RampingVUsConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("either startVUs or one of the stages' target values must be greater than 0"))
 	}
 
-	errors = append(errors, validateNumberOfVuShifts(vlvc.StartVUs.Int64, vlvc.Stages)...)
 	errors = append(errors, validateStages(vlvc.Stages)...)
+	errors = append(errors, validateMaxDeltaVu(vlvc.StartVUs.Int64, vlvc.Stages)...)
 
 	return errors
 }

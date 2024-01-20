@@ -16,6 +16,11 @@ import (
 	"go.k6.io/k6/ui/pb"
 )
 
+const (
+	// this value is an arbitrary limit. It pervenets VU shifts from being too large.
+	maxDeltaVuShifts int = 100_000_000
+)
+
 func sumStagesDuration(stages []Stage) (result time.Duration) {
 	for _, s := range stages {
 		result += s.Duration.TimeDuration()
@@ -33,27 +38,27 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 	return max
 }
 
-func validateNumberOfVuShifts(startVus int64, stages []Stage) []error {
-	const MaxRampingVUShift = 100000000
-
+// Validates all the VU up and down shifts. For any shift that is larger than maxDeltaVuShifts it will append an error.
+// This includes the shift from 0 to the startVus and the shift from the last stage to 0.
+// It takes the startVus and the stages as input.
+// Each Stage needs a Target value. The stages array can be empty. The Targes could be negative.
+func validateMaxDeltaVu(startVus int64, stages []Stage) []error {
 	var errors []error
-	totalShifts := big.NewInt(startVus)
-	prevNumVus := totalShifts
 
+	vuTargets := []int64{0, startVus}
 	for _, s := range stages {
-		current := big.NewInt(s.Target.Int64)
-		vuDelta := new(big.Int).Sub(current, prevNumVus)
-		vuDelta.Abs(vuDelta)
-
-		totalShifts.Add(totalShifts, vuDelta)
-
-		prevNumVus = current
+		vuTargets = append(vuTargets, s.Target.Int64)
 	}
+	vuTargets = append(vuTargets, 0)
 
-	totalShifts.Add(totalShifts, prevNumVus)
+	for i := 0; i < len(vuTargets)-1; i++ {
+		currentVus := vuTargets[i]
+		nextVus := vuTargets[i+1]
 
-	if totalShifts.Cmp(big.NewInt(MaxRampingVUShift)) > 0 {
-		errors = append(errors, fmt.Errorf("total number of VU shifts is too large"))
+		if absInt64(currentVus-nextVus) > int64(maxDeltaVuShifts) {
+			errors = append(errors, fmt.Errorf(
+				"the VU shifts from %d to %d is larger than the maximum allowed %d", currentVus, nextVus, maxDeltaVuShifts))
+		}
 	}
 
 	return errors
