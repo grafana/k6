@@ -37,64 +37,64 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 	require.NotEmpty(t, errs)
 	assert.Contains(t, errs[0].Error(), "greater than 0")
 
-	const maxDeltaVuShifts = 100_000_000
+	const maxDeltaVUShifts = 100_000_000
 
-	t.Run("VU up shift larger than maxDeltaVuShifts should fail", func(t *testing.T) {
+	t.Run("VU up shift larger than maxDeltaVUShifts should fail", func(t *testing.T) {
 		t.Parallel()
 
 		c = NewRampingVUsConfig("stage")
-		// the largest upshift will be from 0 to maxDeltaVuShifts + 1 which is larger than maxDeltaVuShifts
-		c.StartVUs = null.IntFrom(maxDeltaVuShifts + 1)
+		// the largest upshift will be from 0 to maxDeltaVUShifts + 1 which is larger than maxDeltaVUShifts
+		c.StartVUs = null.IntFrom(maxDeltaVUShifts + 1)
 		c.Stages = []Stage{
-			// the largest downshift will be just below maxDeltaVuShifts
+			// the largest downshift will be just below maxDeltaVUShifts
 			{Target: null.IntFrom(100_000), Duration: types.NullDurationFrom(1 * time.Second)},
 		}
 
 		errs = c.Validate()
 		require.NotEmpty(t, errs)
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", 0, maxDeltaVuShifts+1))
+		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", 0, maxDeltaVUShifts+1))
 	})
 
-	t.Run("VU down shift larger than maxDeltaVuShifts should fail", func(t *testing.T) {
+	t.Run("VU down shift larger than maxDeltaVUShifts should fail", func(t *testing.T) {
 		t.Parallel()
 
 		c = NewRampingVUsConfig("stage")
 		c.StartVUs = null.IntFrom(100_000)
 		c.Stages = []Stage{
-			// the largest upshift will be just below maxDeltaVuShifts
-			{Target: null.IntFrom(maxDeltaVuShifts + 2), Duration: types.NullDurationFrom(1 * time.Second)},
-			// the largest downshift will be from maxDeltaVuShifts + 1 to 0 which is larger than maxDeltaVuShifts
+			// the largest upshift will be just below maxDeltaVUShifts
+			{Target: null.IntFrom(maxDeltaVUShifts + 2), Duration: types.NullDurationFrom(1 * time.Second)},
+			// the largest downshift will be from maxDeltaVUShifts + 1 to 0 which is larger than maxDeltaVUShifts
 		}
 
 		errs = c.Validate()
 		require.NotEmpty(t, errs)
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", maxDeltaVuShifts+2, 0))
+		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", maxDeltaVUShifts+2, 0))
 	})
 
-	t.Run("Multiple VU shifts are larger than maxDeltaVuShifts, multiple errors are returned", func(t *testing.T) {
+	t.Run("Multiple VU shifts are larger than maxDeltaVUShifts, multiple errors are returned", func(t *testing.T) {
 		t.Parallel()
 
 		c = NewRampingVUsConfig("stage")
 		c.StartVUs = null.IntFrom(0)
 		c.Stages = []Stage{
-			// up and down shifts are larger than maxDeltaVuShifts. Multiple errors are returned
-			{Target: null.IntFrom(maxDeltaVuShifts + 3), Duration: types.NullDurationFrom(1 * time.Second)},
+			// up and down shifts are larger than maxDeltaVUShifts. Multiple errors are returned
+			{Target: null.IntFrom(maxDeltaVUShifts + 3), Duration: types.NullDurationFrom(1 * time.Second)},
 		}
 
 		errs = c.Validate()
 		require.Equal(t, 2, len(errs))
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", 0, maxDeltaVuShifts+3))
-		assert.Contains(t, errs[1].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", maxDeltaVuShifts+3, 0))
+		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", 0, maxDeltaVUShifts+3))
+		assert.Contains(t, errs[1].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", maxDeltaVUShifts+3, 0))
 	})
 
-	t.Run("VU shifts smaller than maxDeltaVuShifts will pass", func(t *testing.T) {
+	t.Run("VU shifts smaller than maxDeltaVUShifts will pass", func(t *testing.T) {
 		t.Parallel()
 
 		c = NewRampingVUsConfig("stage")
 		c.StartVUs = null.IntFrom(0)
 		c.Stages = []Stage{
-			// up and down shifts are smaller than maxDeltaVuShifts
-			{Target: null.IntFrom(maxDeltaVuShifts - 1), Duration: types.NullDurationFrom(1 * time.Second)},
+			// up and down shifts are smaller than maxDeltaVUShifts
+			{Target: null.IntFrom(maxDeltaVUShifts - 1), Duration: types.NullDurationFrom(1 * time.Second)},
 		}
 
 		errs = c.Validate()
