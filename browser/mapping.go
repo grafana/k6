@@ -424,8 +424,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
 			}
 
+			js := pageFunc.ToString().String()
+			_, isCallable := goja.AssertFunction(pageFunc)
+			if !isCallable {
+				js = fmt.Sprintf("() => (%s)", js)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				return f.WaitForFunction(pageFunc, popts, args...) //nolint:wrapcheck
+				return f.WaitForFunction(js, popts, args...) //nolint:wrapcheck
 			}), nil
 		},
 		"waitForLoadState": f.WaitForLoadState,

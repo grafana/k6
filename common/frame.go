@@ -1646,14 +1646,8 @@ func (f *Frame) setURL(url string) {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (f *Frame) WaitForFunction(fn goja.Value, opts *FrameWaitForFunctionOptions, jsArgs ...goja.Value) (any, error) {
+func (f *Frame) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsArgs ...goja.Value) (any, error) {
 	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
-
-	js := fn.ToString().String()
-	_, isCallable := goja.AssertFunction(fn)
-	if !isCallable {
-		js = fmt.Sprintf("() => (%s)", js)
-	}
 
 	args := make([]any, 0, len(jsArgs))
 	for _, a := range jsArgs {

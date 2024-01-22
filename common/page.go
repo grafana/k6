@@ -1302,7 +1302,13 @@ func (p *Page) WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, er
 		return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
 	}
 
-	return p.frameManager.MainFrame().WaitForFunction(fn, popts, args...)
+	js := fn.ToString().String()
+	_, isCallable := goja.AssertFunction(fn)
+	if !isCallable {
+		js = fmt.Sprintf("() => (%s)", js)
+	}
+
+	return p.frameManager.MainFrame().WaitForFunction(js, popts, args...)
 }
 
 // WaitForLoadState waits for the specified page life cycle event.
