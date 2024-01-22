@@ -493,6 +493,29 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	return maps
 }
 
+func parseWaitForFunctionArgs(
+	ctx context.Context, timeout time.Duration, pageFunc, opts goja.Value, args ...goja.Value,
+) (string, *common.FrameWaitForFunctionOptions, []any, error) {
+	popts := common.NewFrameWaitForFunctionOptions(timeout)
+	err := popts.Parse(ctx, opts)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("parsing waitForFunction options: %w", err)
+	}
+
+	js := pageFunc.ToString().String()
+	_, isCallable := goja.AssertFunction(pageFunc)
+	if !isCallable {
+		js = fmt.Sprintf("() => (%s)", js)
+	}
+
+	pargs := make([]any, 0, len(args))
+	for _, arg := range args {
+		pargs = append(pargs, arg.Export())
+	}
+
+	return js, popts, pargs, nil
+}
+
 // mapPage to the JS module.
 //
 //nolint:funlen
