@@ -69,20 +69,20 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	// wrappers (facades) that convert the old k6 idiosyncratic APIs to the new
 	// proper Client ones that accept Request objects and don't suck
 	mustExport("get", func(url goja.Value, args ...goja.Value) (*Response, error) {
-		// http.get(url, params) doesn't have a body argument, so we add undefined
-		// as the third argument to http.request(method, url, body, params)
 		if checkQuantityParameter(args...) {
 			vu.State().Logger.Warningf("GET method has more than two arguments")
 		}
+		// http.get(url, params) doesn't have a body argument, so we add undefined
+		// as the third argument to http.request(method, url, body, params)
 		args = append([]goja.Value{goja.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodGet, url, args...)
 	})
 	mustExport("head", func(url goja.Value, args ...goja.Value) (*Response, error) {
-		// http.head(url, params) doesn't have a body argument, so we add undefined
-		// as the third argument to http.request(method, url, body, params)
 		if checkQuantityParameter(args...) {
 			vu.State().Logger.Warningf("Head method has more than two arguments")
 		}
+		// http.head(url, params) doesn't have a body argument, so we add undefined
+		// as the third argument to http.request(method, url, body, params)
 		args = append([]goja.Value{goja.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
 	})
@@ -106,15 +106,6 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	// https://github.com/grafana/k6/issues?q=is%3Aopen+is%3Aissue+label%3Anew-http
 
 	return mi
-}
-
-func checkQuantityParameter(args ...goja.Value) bool {
-	for i := range args {
-		if i >= 1 {
-			return true
-		}
-	}
-	return false
 }
 
 // Exports returns the JS values this module exports.
@@ -195,4 +186,13 @@ func (mi *ModuleInstance) URL(parts []string, pieces ...string) (httpext.URL, er
 type Client struct {
 	moduleInstance   *ModuleInstance
 	responseCallback func(int) bool
+}
+
+func checkQuantityParameter(args ...goja.Value) bool {
+	for i := range args {
+		if i >= 1 {
+			return true
+		}
+	}
+	return false
 }
