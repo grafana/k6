@@ -18,7 +18,7 @@ import (
 
 const (
 	// this value is an arbitrary limit. It pervenets VU shifts from being too large.
-	maxDeltaVUShifts int = 100_000_000
+	maxVUShift int = 100_000_000
 )
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {
@@ -38,11 +38,11 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 	return max
 }
 
-// Validates all the VU up and down shifts. For any shift that is larger than maxDeltaVUShifts it will append an error.
+// Validates all the VU up and down shifts. For any shift that is larger than maxVUShift it will append an error.
 // This includes the shift from 0 to the startVUs and the shift from the last stage to 0.
 // It takes the startVUs and the stages as input.
 // Each Stage needs a Target value. The stages array can be empty. The Targes could be negative.
-func validateMaxDeltaVU(startVUs int64, stages []Stage) []error {
+func validateVUShifts(startVUs int64, stages []Stage) []error {
 	var errors []error
 
 	TargetVUs := []int64{0, startVUs}
@@ -55,9 +55,9 @@ func validateMaxDeltaVU(startVUs int64, stages []Stage) []error {
 		currentVUs := TargetVUs[i]
 		nextVUs := TargetVUs[i+1]
 
-		if absInt64(currentVUs-nextVUs) > int64(maxDeltaVUShifts) {
+		if absInt64(currentVUs-nextVUs) > int64(maxVUShift) {
 			errors = append(errors, fmt.Errorf(
-				"the VU shifts from %d to %d is larger than the maximum allowed %d", currentVUs, nextVUs, maxDeltaVUShifts))
+				"the VU shifts from %d to %d is larger than the maximum allowed %d", currentVUs, nextVUs, maxVUShift))
 		}
 	}
 

@@ -87,7 +87,7 @@ func (vlvc RampingVUsConfig) Validate() []error {
 	}
 
 	errors = append(errors, validateStages(vlvc.Stages)...)
-	errors = append(errors, validateMaxDeltaVU(vlvc.StartVUs.Int64, vlvc.Stages)...)
+	errors = append(errors, validateVUShifts(vlvc.StartVUs.Int64, vlvc.Stages)...)
 
 	return errors
 }

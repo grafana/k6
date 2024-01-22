@@ -96,7 +96,7 @@ func (varc *RampingArrivalRateConfig) Validate() []error {
 	}
 
 	errors = append(errors, validateStages(varc.Stages)...)
-	errors = append(errors, validateMaxDeltaVU(varc.StartRate.Int64, varc.Stages)...)
+	errors = append(errors, validateVUShifts(varc.StartRate.Int64, varc.Stages)...)
 
 	if !varc.PreAllocatedVUs.Valid {
 		errors = append(errors, fmt.Errorf("the number of preAllocatedVUs isn't specified"))
