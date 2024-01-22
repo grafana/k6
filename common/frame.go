@@ -937,20 +937,27 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 	return gv, nil
 }
 
+// Referrer returns the referrer of the frame from the network manager
+// of the frame's session.
+// It's an internal method not to be exposed as a JS API.
+func (f *Frame) Referrer() string {
+	nm := f.manager.page.mainFrameSession.getNetworkManager()
+	return nm.extraHTTPHeaders["referer"]
+}
+
+// NavigationTimeout returns the navigation timeout of the frame.
+// It's an internal method not to be exposed as a JS API.
+func (f *Frame) NavigationTimeout() time.Duration {
+	return f.manager.timeoutSettings.navigationTimeout()
+}
+
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
 func (f *Frame) Goto(url string, opts goja.Value) (*Response, error) {
-	var (
-		netMgr         = f.manager.page.mainFrameSession.getNetworkManager()
-		defaultReferer = netMgr.extraHTTPHeaders["referer"]
-		parsedOpts     = NewFrameGotoOptions(
-			defaultReferer,
-			f.manager.timeoutSettings.navigationTimeout(),
-		)
-	)
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
+	popts := NewFrameGotoOptions(f.Referrer(), f.NavigationTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing frame navigation options to %q: %w", url, err)
 	}
-	resp, err := f.manager.NavigateFrame(f, url, parsedOpts)
+	resp, err := f.manager.NavigateFrame(f, url, popts)
 	if err != nil {
 		return nil, fmt.Errorf("navigating frame to %q: %w", url, err)
 	}
@@ -959,7 +966,7 @@ func (f *Frame) Goto(url string, opts goja.Value) (*Response, error) {
 	// Since response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	return resp, nil
