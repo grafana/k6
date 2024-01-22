@@ -1296,7 +1296,13 @@ func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) any {
 func (p *Page) WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error) {
 	p.logger.Debugf("Page:WaitForFunction", "sid:%v", p.sessionID())
 
-	return p.frameManager.MainFrame().WaitForFunction(fn, opts, args...)
+	popts := NewFrameWaitForFunctionOptions(p.Timeout())
+	err := popts.Parse(p.ctx, opts)
+	if err != nil {
+		return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
+	}
+
+	return p.frameManager.MainFrame().WaitForFunction(fn, popts, args...)
 }
 
 // WaitForLoadState waits for the specified page life cycle event.

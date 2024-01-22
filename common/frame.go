@@ -1646,14 +1646,8 @@ func (f *Frame) setURL(url string) {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.Value) (any, error) {
+func (f *Frame) WaitForFunction(fn goja.Value, opts *FrameWaitForFunctionOptions, jsArgs ...goja.Value) (any, error) {
 	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
-
-	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
-	}
 
 	js := fn.ToString().String()
 	_, isCallable := goja.AssertFunction(fn)
@@ -1666,13 +1660,13 @@ func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.V
 		args = append(args, a.Export())
 	}
 
-	var polling any = parsedOpts.Polling
-	if parsedOpts.Polling == PollingInterval {
-		polling = parsedOpts.Interval
+	var polling any = opts.Polling
+	if opts.Polling == PollingInterval {
+		polling = opts.Interval
 	}
 
 	result, err := f.waitForFunction(f.ctx, mainWorld, js,
-		polling, parsedOpts.Timeout, args...)
+		polling, opts.Timeout, args...)
 	if err != nil {
 		return nil, err
 	}
