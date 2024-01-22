@@ -22,11 +22,20 @@ func TestURLSkipRequest(t *testing.T) {
 	tb := newTestBrowser(t, withLogCache())
 	p := tb.NewPage(nil)
 
-	_, err := p.Goto("data:text/html,hello", nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		"data:text/html,hello",
+		opts,
+	)
 	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of data URL")
 
-	_, err = p.Goto("blob:something", nil)
+	_, err = p.Goto(
+		"blob:something",
+		opts,
+	)
 	require.NoError(t, err)
 	tb.logCache.assertContains(t, "skipping request handling of blob URL")
 }
@@ -42,12 +51,21 @@ func TestBlockHostnames(t *testing.T) {
 
 	p := tb.NewPage(nil)
 
-	res, err := p.Goto("http://host.test/", nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	res, err := p.Goto(
+		"http://host.test/",
+		opts,
+	)
 	require.NoError(t, err)
 	require.Nil(t, res)
 	tb.logCache.assertContains(t, "was interrupted: hostname host.test is in a blocked pattern")
 
-	res, err = p.Goto(tb.url("/get"), nil)
+	res, err = p.Goto(
+		tb.url("/get"),
+		opts,
+	)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -62,13 +80,22 @@ func TestBlockIPs(t *testing.T) {
 	tb.vu.State().Options.BlacklistIPs = []*k6lib.IPNet{ipnet}
 
 	p := tb.NewPage(nil)
-	res, err := p.Goto("http://10.0.0.1:8000/", nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	res, err := p.Goto(
+		"http://10.0.0.1:8000/",
+		opts,
+	)
 	require.NoError(t, err)
 	require.Nil(t, res)
 	tb.logCache.assertContains(t, `was interrupted: IP 10.0.0.1 is in a blacklisted range "10.0.0.0/8"`)
 
 	// Ensure other requests go through
-	res, err = p.Goto(tb.url("/get"), nil)
+	res, err = p.Goto(
+		tb.url("/get"),
+		opts,
+	)
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -98,12 +125,13 @@ func TestBasicAuth(t *testing.T) {
 		p, err := bc.NewPage()
 		require.NoError(t, err)
 
-		opts := browser.toGojaValue(struct {
-			WaitUntil string `js:"waitUntil"`
-		}{
-			WaitUntil: "load",
-		})
-		url := browser.url(fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword))
+		url := browser.url(
+			fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword),
+		)
+		opts := &common.FrameGotoOptions{
+			WaitUntil: common.LifecycleEventLoad,
+			Timeout:   common.DefaultTimeout,
+		}
 		res, err := p.Goto(url, opts)
 		require.NoError(t, err)
 
@@ -177,7 +205,7 @@ func TestInterceptBeforePageLoad(t *testing.T) {
 		}
 		_, err := p.Goto(
 			tb.url("/neverFinishesLoading"),
-			tb.toGojaValue(opts),
+			opts,
 		)
 
 		return err

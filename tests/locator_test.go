@@ -234,7 +234,13 @@ func TestLocator(t *testing.T) {
 
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
-			_, err := p.Goto(tb.staticURL("locators.html"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("locators.html"),
+				opts,
+			)
 			tt.do(tb, p)
 			require.NoError(t, err)
 		})
@@ -338,7 +344,13 @@ func TestLocator(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			_, err := p.Goto(tb.staticURL("locators.html"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("locators.html"),
+				opts,
+			)
 			require.NoError(t, err)
 
 			assert.Panics(t, func() {
@@ -390,7 +402,13 @@ func TestLocatorElementState(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			_, err := p.Goto(tb.staticURL("locators.html"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("locators.html"),
+				opts,
+			)
 			require.NoError(t, err)
 
 			l := p.Locator("#inputText", nil)
@@ -442,7 +460,13 @@ func TestLocatorElementState(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			_, err := p.Goto(tb.staticURL("locators.html"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.staticURL("locators.html"),
+				opts,
+			)
 			assert.Panics(t, func() {
 				tt.do(p.Locator("a", nil), tb)
 			})
@@ -475,7 +499,13 @@ func TestLocatorShadowDOM(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
 	p := tb.NewPage(nil)
 
-	_, err := p.Goto(tb.staticURL("shadow_dom_link.html"), nil)
+	popts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("shadow_dom_link.html"),
+		popts,
+	)
 	require.NoError(t, err)
 	err = p.Click("#inner-link", common.NewFrameClickOptions(time.Second))
 	require.NoError(t, err)

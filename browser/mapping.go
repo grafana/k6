@@ -366,15 +366,22 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			return mapElementHandle(vu, fe), nil
 		},
 		"getAttribute": f.GetAttribute,
-		"goto": func(url string, opts goja.Value) *goja.Promise {
+		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
+			gopts := common.NewFrameGotoOptions(
+				f.Referrer(),
+				f.NavigationTimeout(),
+			)
+			if err := gopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing frame navigation options to %q: %w", url, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				resp, err := f.Goto(url, opts)
+				resp, err := f.Goto(url, gopts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 
 				return mapResponse(vu, resp), nil
-			})
+			}), nil
 		},
 		"hover":      f.Hover,
 		"innerHTML":  f.InnerHTML,
@@ -529,15 +536,22 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			})
 		},
 		"goForward": p.GoForward,
-		"goto": func(url string, opts goja.Value) *goja.Promise {
+		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
+			gopts := common.NewFrameGotoOptions(
+				p.MainFrame().Referrer(),
+				p.MainFrame().NavigationTimeout(),
+			)
+			if err := gopts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing page navigation options to %q: %w", url, err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				resp, err := p.Goto(url, opts)
+				resp, err := p.Goto(url, gopts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 
 				return mapResponse(vu, resp), nil
-			})
+			}), nil
 		},
 		"hover":      p.Hover,
 		"innerHTML":  p.InnerHTML,

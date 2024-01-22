@@ -194,7 +194,13 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 		cr := p.Evaluate(tb.toGojaValue(cmd))
 		return tb.asGojaValue(cr).String()
 	}
-	resp, err := p.Goto(tb.staticURL("/concealed_link.html"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	resp, err := p.Goto(
+		tb.staticURL("/concealed_link.html"),
+		opts,
+	)
 	require.NotNil(t, resp)
 	require.NoError(t, err)
 	require.Equal(t, wantBefore, clickResult())
@@ -214,7 +220,13 @@ func TestElementHandleNonClickable(t *testing.T) {
 	p, err := bctx.NewPage()
 	require.NoError(t, err)
 
-	resp, err := p.Goto(tb.staticURL("/non_clickable.html"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	resp, err := p.Goto(
+		tb.staticURL("/non_clickable.html"),
+		opts,
+	)
 	require.NotNil(t, resp)
 	require.NoError(t, err)
 

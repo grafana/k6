@@ -33,10 +33,10 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 			p := tb.NewPage(nil)
 
-			opts := tb.toGojaValue(&common.FrameGotoOptions{
+			opts := &common.FrameGotoOptions{
 				WaitUntil: common.LifecycleEventNetworkIdle,
-				Timeout:   time.Duration(timeout.Milliseconds()), // interpreted as ms
-			})
+				Timeout:   timeout,
+			}
 			resp, err := p.Goto(tb.staticURL("/nav_in_doc.html"), opts)
 			require.NoError(t, err)
 			require.NotNil(t, resp)
@@ -90,10 +90,10 @@ func TestWaitForFrameNavigation(t *testing.T) {
 		`)
 	})
 
-	opts := tb.toGojaValue(&common.FrameGotoOptions{
+	opts := &common.FrameGotoOptions{
 		WaitUntil: common.LifecycleEventNetworkIdle,
 		Timeout:   common.DefaultTimeout,
-	})
+	}
 	_, err := p.Goto(tb.url("/first"), opts)
 	require.NoError(t, err)
 

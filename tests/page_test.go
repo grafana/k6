@@ -41,7 +41,13 @@ func TestNestedFrames(t *testing.T) {
 	defer tb.Browser.Close()
 
 	page := tb.NewPage(nil)
-	_, err := page.Goto(tb.staticURL("iframe_test_main.html"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := page.Goto(
+		tb.staticURL("iframe_test_main.html"),
+		opts,
+	)
 	require.NoError(t, err)
 
 	frame1Handle, err := page.WaitForSelector("iframe[id='iframe1']", nil)
@@ -177,7 +183,13 @@ func TestPageGoto(t *testing.T) {
 	p := b.NewPage(nil)
 
 	url := b.staticURL("empty.html")
-	r, err := p.Goto(url, nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	r, err := p.Goto(
+		url,
+		opts,
+	)
 	require.NoError(t, err)
 	require.NotNil(t, r)
 	assert.Equal(t, url, r.URL(), `expected URL to be %q, result of navigation was %q`, url, r.URL())
@@ -189,7 +201,13 @@ func TestPageGotoDataURI(t *testing.T) {
 	b := newTestBrowser(t)
 	p := b.NewPage(nil)
 
-	r, err := p.Goto("data:text/html,hello", nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	r, err := p.Goto(
+		"data:text/html,hello",
+		opts,
+	)
 	require.NoError(t, err)
 	assert.Nil(t, r, `expected response to be nil`)
 	require.NoError(t, err)
@@ -201,11 +219,10 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 	b := newTestBrowser(t, withFileServer())
 	p := b.NewPage(nil)
 
-	opts := b.toGojaValue(struct {
-		WaitUntil string `js:"waitUntil"`
-	}{
-		WaitUntil: "load",
-	})
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventLoad,
+		Timeout:   common.DefaultTimeout,
+	}
 	_, err := p.Goto(b.staticURL("wait_until.html"), opts)
 	require.NoError(t, err)
 	var (
@@ -226,11 +243,10 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	b := newTestBrowser(t, withFileServer())
 	p := b.NewPage(nil)
 
-	opts := b.toGojaValue(struct {
-		WaitUntil string `js:"waitUntil"`
-	}{
-		WaitUntil: "domcontentloaded",
-	})
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventDOMContentLoad,
+		Timeout:   common.DefaultTimeout,
+	}
 	_, err := p.Goto(b.staticURL("wait_until.html"), opts)
 	require.NoError(t, err)
 	var (
@@ -501,7 +517,13 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	}
 	p.SetExtraHTTPHeaders(headers)
 
-	resp, err := p.Goto(b.url("/get"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	resp, err := p.Goto(
+		b.url("/get"),
+		opts,
+	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -743,7 +765,13 @@ func TestPageURL(t *testing.T) {
 	p := b.NewPage(nil)
 	assert.Equal(t, common.BlankPage, p.URL())
 
-	resp, err := p.Goto(b.url("/get"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	resp, err := p.Goto(
+		b.url("/get"),
+		opts,
+	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 	assert.Regexp(t, "http://.*/get", p.URL())
@@ -1066,14 +1094,23 @@ func TestPageTimeout(t *testing.T) {
 
 			p := tb.NewPage(nil)
 
+			var timeout time.Duration
 			if tc.defaultTimeout != 0 {
+				timeout = tc.defaultTimeout
 				p.SetDefaultTimeout(tc.defaultTimeout.Milliseconds())
 			}
 			if tc.defaultNavigationTimeout != 0 {
+				timeout = tc.defaultNavigationTimeout
 				p.SetDefaultNavigationTimeout(tc.defaultNavigationTimeout.Milliseconds())
 			}
 
-			res, err := p.Goto(tb.url("/slow"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: timeout,
+			}
+			res, err := p.Goto(
+				tb.url("/slow"),
+				opts,
+			)
 			require.Nil(t, res)
 			assert.ErrorContains(t, err, "timed out after")
 		})
@@ -1123,7 +1160,13 @@ func TestPageWaitForSelector(t *testing.T) {
 			tb := newTestBrowser(t, withFileServer())
 
 			page := tb.NewPage(nil)
-			_, err := page.Goto(tb.staticURL(tc.url), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := page.Goto(
+				tb.staticURL(tc.url),
+				opts,
+			)
 			require.NoError(t, err)
 
 			_, err = page.WaitForSelector(tc.selector, tb.toGojaValue(tc.opts))
@@ -1210,7 +1253,13 @@ func TestPageThrottleNetwork(t *testing.T) {
 			err := page.ThrottleNetwork(tc.networkProfile)
 			require.NoError(t, err)
 
-			_, err = page.Goto(tb.staticURL("ping.html"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err = page.Goto(
+				tb.staticURL("ping.html"),
+				opts,
+			)
 			require.NoError(t, err)
 
 			selector := `div[id="result"]`
@@ -1270,7 +1319,13 @@ func performPingTest(t *testing.T, tb *testBrowser, page *common.Page, iteration
 	for i := 0; i < iterations; i++ {
 		start := time.Now()
 
-		_, err := page.Goto(tb.staticURL("ping.html"), nil)
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
+		}
+		_, err := page.Goto(
+			tb.staticURL("ping.html"),
+			opts,
+		)
 		require.NoError(t, err)
 
 		selector := `div[id="result"]`
@@ -1335,7 +1390,13 @@ func TestPageIsVisible(t *testing.T) {
 
 			page := tb.NewPage(nil)
 
-			_, err := page.Goto(tb.staticURL("visible.html"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := page.Goto(
+				tb.staticURL("visible.html"),
+				opts,
+			)
 			require.NoError(t, err)
 
 			got, err := page.IsVisible(tc.selector, tb.toGojaValue(tc.options))
@@ -1400,7 +1461,13 @@ func TestPageIsHidden(t *testing.T) {
 
 			page := tb.NewPage(nil)
 
-			_, err := page.Goto(tb.staticURL("visible.html"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := page.Goto(
+				tb.staticURL("visible.html"),
+				opts,
+			)
 			require.NoError(t, err)
 
 			got, err := page.IsHidden(tc.selector, tb.toGojaValue(tc.options))

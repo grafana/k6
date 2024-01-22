@@ -862,7 +862,7 @@ func (p *Page) GoForward(_ goja.Value) *Response {
 }
 
 // Goto will navigate the page to the specified URL and return a HTTP response object.
-func (p *Page) Goto(url string, opts goja.Value) (*Response, error) {
+func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
 	_, span := TraceAPICall(
 		p.ctx,

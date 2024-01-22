@@ -54,7 +54,13 @@ func TestWebVitalMetric(t *testing.T) {
 		}
 	}()
 
-	resp, err := page.Goto(browser.staticURL("/web_vitals.html"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	resp, err := page.Goto(
+		browser.staticURL("/web_vitals.html"),
+		opts,
+	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
@@ -113,13 +119,15 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 		}
 	}()
 
+	// wait until the page is completely loaded.
 	page := browser.NewPage(nil)
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventDOMContentLoad,
+		Timeout:   common.DefaultTimeout,
+	}
 	resp, err := page.Goto(
 		browser.staticURL("web_vitals.html"),
-		browser.toGojaValue(map[string]any{
-			// wait until the page is completely loaded.
-			"waitUntil": "networkidle",
-		}),
+		opts,
 	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)

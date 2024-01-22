@@ -5,6 +5,8 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 func TestMouseDblClick(t *testing.T) {
@@ -12,7 +14,13 @@ func TestMouseDblClick(t *testing.T) {
 
 	b := newTestBrowser(t, withFileServer())
 	p := b.NewPage(nil)
-	_, err := p.Goto(b.staticURL("dbl_click.html"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		b.staticURL("dbl_click.html"),
+		opts,
+	)
 	require.NoError(t, err)
 
 	p.Mouse.DblClick(35, 17, nil)

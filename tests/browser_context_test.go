@@ -551,7 +551,13 @@ func TestBrowserContextCookies(t *testing.T) {
 			// the setupHandler can set some cookies
 			// that will be received by the browser context.
 			tb.withHandler("/empty", tt.setupHandler)
-			_, err := p.Goto(tb.url("/empty"), nil)
+			opts := &common.FrameGotoOptions{
+				Timeout: common.DefaultTimeout,
+			}
+			_, err := p.Goto(
+				tb.url("/empty"),
+				opts,
+			)
 			require.NoErrorf(t,
 				err, "failed to open an empty page",
 			)
@@ -626,7 +632,13 @@ func TestK6Object(t *testing.T) {
 	p := b.NewPage(nil)
 
 	url := b.staticURL("empty.html")
-	r, err := p.Goto(url, nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	r, err := p.Goto(
+		url,
+		opts,
+	)
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
@@ -674,17 +686,24 @@ func TestBrowserContextTimeout(t *testing.T) {
 			bc, err := tb.NewContext(nil)
 			require.NoError(t, err)
 
-			if tc.defaultTimeout != 0 {
-				bc.SetDefaultTimeout(tc.defaultTimeout.Milliseconds())
-			}
-			if tc.defaultNavigationTimeout != 0 {
-				bc.SetDefaultNavigationTimeout(tc.defaultNavigationTimeout.Milliseconds())
-			}
-
 			p, err := bc.NewPage()
 			require.NoError(t, err)
 
-			res, err := p.Goto(tb.url("/slow"), nil)
+			var timeout time.Duration
+			if tc.defaultTimeout != 0 {
+				timeout = tc.defaultTimeout
+				bc.SetDefaultTimeout(tc.defaultTimeout.Milliseconds())
+			}
+			if tc.defaultNavigationTimeout != 0 {
+				timeout = tc.defaultNavigationTimeout
+				bc.SetDefaultNavigationTimeout(tc.defaultNavigationTimeout.Milliseconds())
+			}
+			res, err := p.Goto(
+				tb.url("/slow"),
+				&common.FrameGotoOptions{
+					Timeout: timeout,
+				},
+			)
 			require.Nil(t, res)
 			assert.ErrorContains(t, err, "timed out after")
 		})

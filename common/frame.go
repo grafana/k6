@@ -952,12 +952,8 @@ func (f *Frame) NavigationTimeout() time.Duration {
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
-func (f *Frame) Goto(url string, opts goja.Value) (*Response, error) {
-	popts := NewFrameGotoOptions(f.Referrer(), f.NavigationTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing frame navigation options to %q: %w", url, err)
-	}
-	resp, err := f.manager.NavigateFrame(f, url, popts)
+func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
+	resp, err := f.manager.NavigateFrame(f, url, opts)
 	if err != nil {
 		return nil, fmt.Errorf("navigating frame to %q: %w", url, err)
 	}

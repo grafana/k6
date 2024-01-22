@@ -711,10 +711,10 @@ func assertHome(
 
 	var resolved, rejected bool
 	err := func() error {
-		opts := tb.toGojaValue(common.FrameGotoOptions{
+		opts := &common.FrameGotoOptions{
 			WaitUntil: waitUntil,
-			Timeout:   30 * time.Second,
-		})
+			Timeout:   common.DefaultTimeout,
+		}
 		_, err := p.Goto(tb.url("/home"), opts)
 		if err == nil {
 			resolved = true

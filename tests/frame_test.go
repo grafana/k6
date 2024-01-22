@@ -49,15 +49,11 @@ func TestFrameDismissDialogBox(t *testing.T) {
 				p  = tb.NewPage(nil)
 			)
 
-			opts := tb.toGojaValue(struct {
-				WaitUntil string `js:"waitUntil"`
-			}{
-				WaitUntil: "networkidle",
-			})
-			_, err := p.Goto(
-				tb.staticURL("dialog.html?dialogType="+tt),
-				opts,
-			)
+			opts := &common.FrameGotoOptions{
+				WaitUntil: common.LifecycleEventNetworkIdle,
+				Timeout:   common.DefaultTimeout,
+			}
+			_, err := p.Goto(tb.staticURL("dialog.html?dialogType="+tt), opts)
 			require.NoError(t, err)
 
 			if tt == "beforeunload" {
@@ -91,14 +87,11 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	)
 
 	p := tb.NewPage(nil)
-	_, err := p.Goto(
-		tb.staticURL("embedded_iframe.html"),
-		tb.toGojaValue(struct {
-			WaitUntil string `js:"waitUntil"`
-		}{
-			WaitUntil: "load",
-		}),
-	)
+	opts := &common.FrameGotoOptions{
+		WaitUntil: common.LifecycleEventDOMContentLoad,
+		Timeout:   common.DefaultTimeout,
+	}
+	_, err := p.Goto(tb.staticURL("embedded_iframe.html"), opts)
 	require.NoError(t, err)
 
 	result := p.TextContent("#doneDiv", nil)
@@ -129,7 +122,13 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 		http.Redirect(w, r, tb.staticURL("iframe_signin.html"), http.StatusMovedPermanently)
 	})
 
-	_, err := p.Goto(tb.staticURL("iframe_home.html"), nil)
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	_, err := p.Goto(
+		tb.staticURL("iframe_home.html"),
+		opts,
+	)
 	require.NoError(t, err)
 
 	ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
