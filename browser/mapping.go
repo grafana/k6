@@ -418,21 +418,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"uncheck":       f.Uncheck,
 		"url":           f.URL,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
-			popts := common.NewFrameWaitForFunctionOptions(f.Timeout())
-			err := popts.Parse(vu.Context(), opts)
+			js, popts, pargs, err := parseWaitForFunctionArgs(
+				vu.Context(), f.Timeout(), pageFunc, opts, args...,
+			)
 			if err != nil {
-				return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
-			}
-
-			js := pageFunc.ToString().String()
-			_, isCallable := goja.AssertFunction(pageFunc)
-			if !isCallable {
-				js = fmt.Sprintf("() => (%s)", js)
-			}
-
-			pargs := make([]any, 0, len(args))
-			for _, arg := range args {
-				pargs = append(pargs, arg.Export())
+				return nil, fmt.Errorf("frame waitForFunction: %w", err)
 			}
 
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
