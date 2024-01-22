@@ -5,12 +5,13 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 )
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
 // and returns a copy of the underlying byte slice.
 func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
-	if isNullish(v) {
+	if common.IsNullish(v) {
 		return nil, NewError(TypeError, "data is null or undefined")
 	}
 
@@ -45,18 +46,18 @@ func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
 // traverseObject traverses the given object using the given fields and returns the value
 // at the end of the traversal. It assumes that all the traversed fields are Objects.
 func traverseObject(rt *goja.Runtime, src goja.Value, fields ...string) (goja.Value, error) {
-	if isNullish(src) {
+	if common.IsNullish(src) {
 		return nil, NewError(TypeError, "Object is null or undefined")
 	}
 
 	obj := src.ToObject(rt)
-	if isNullish(obj) {
+	if common.IsNullish(obj) {
 		return nil, NewError(TypeError, "Object is null or undefined")
 	}
 
 	for idx, field := range fields {
 		src = obj.Get(field)
-		if isNullish(src) {
+		if common.IsNullish(src) {
 			return nil, NewError(
 				TypeError,
 				fmt.Sprintf("field %s is null or undefined", strings.Join(fields[:idx+1], ".")),
@@ -64,7 +65,7 @@ func traverseObject(rt *goja.Runtime, src goja.Value, fields ...string) (goja.Va
 		}
 
 		obj = src.ToObject(rt)
-		if isNullish(obj) {
+		if common.IsNullish(obj) {
 			return nil, NewError(
 				TypeError,
 				fmt.Sprintf("field %s is not an Object", strings.Join(fields[:idx+1], ".")),
@@ -154,32 +155,3 @@ const (
 	// BigUint64ArrayConstructor is the name of the BigUint64ArrayConstructor constructor
 	BigUint64ArrayConstructor = "BigUint64Array"
 )
-
-// IsNullish checks if the given value is nullish, i.e. nil, undefined or null.
-// FIXME @oleiade: this declaration can be removed once the k6 version including it is released
-func isNullish(v goja.Value) bool {
-	return v == nil || goja.IsUndefined(v) || goja.IsNull(v)
-}
-
-// makeHandledPromise will create a promise and return its resolve and reject methods,
-// wrapped in such a way that it will block the eventloop from exiting before they are
-// called even if the promise isn't resolved by the time the current script ends executing.
-func (sc *SubtleCrypto) makeHandledPromise() (*goja.Promise, func(interface{}), func(interface{})) {
-	runtime := sc.vu.Runtime()
-	callback := sc.vu.RegisterCallback()
-	p, resolve, reject := runtime.NewPromise()
-
-	return p, func(i interface{}) {
-			// more stuff
-			callback(func() error {
-				resolve(i)
-				return nil
-			})
-		}, func(i interface{}) {
-			// more stuff
-			callback(func() error {
-				reject(i)
-				return nil
-			})
-		}
-}
