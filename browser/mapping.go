@@ -430,8 +430,13 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				js = fmt.Sprintf("() => (%s)", js)
 			}
 
+			pargs := make([]any, 0, len(args))
+			for _, arg := range args {
+				pargs = append(pargs, arg.Export())
+			}
+
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				return f.WaitForFunction(js, popts, args...) //nolint:wrapcheck
+				return f.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
 			}), nil
 		},
 		"waitForLoadState": f.WaitForLoadState,

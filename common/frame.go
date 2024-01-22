@@ -1646,13 +1646,8 @@ func (f *Frame) setURL(url string) {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (f *Frame) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsArgs ...goja.Value) (any, error) {
+func (f *Frame) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsArgs ...any) (any, error) {
 	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
-
-	args := make([]any, 0, len(jsArgs))
-	for _, a := range jsArgs {
-		args = append(args, a.Export())
-	}
 
 	var polling any = opts.Polling
 	if opts.Polling == PollingInterval {
@@ -1660,7 +1655,7 @@ func (f *Frame) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, js
 	}
 
 	result, err := f.waitForFunction(f.ctx, mainWorld, js,
-		polling, opts.Timeout, args...)
+		polling, opts.Timeout, jsArgs...)
 	if err != nil {
 		return nil, err
 	}
