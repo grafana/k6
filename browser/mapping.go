@@ -749,16 +749,16 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"setOffline":         bc.SetOffline,
 		"storageState":       bc.StorageState,
 		"unroute":            bc.Unroute,
-		"waitForEvent": func(event string, optsOrPredicate goja.Value) *goja.Promise {
+		"waitForEvent": func(event string, optsOrPredicate goja.Value) (*goja.Promise, error) {
 			ctx := vu.Context()
-			return k6ext.Promise(ctx, func() (result any, reason error) {
-				parsedOpts := common.NewWaitForEventOptions(
-					bc.Timeout(),
-				)
-				if err := parsedOpts.Parse(ctx, optsOrPredicate); err != nil {
-					return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
-				}
+			parsedOpts := common.NewWaitForEventOptions(
+				bc.Timeout(),
+			)
+			if err := parsedOpts.Parse(ctx, optsOrPredicate); err != nil {
+				return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
+			}
 
+			return k6ext.Promise(ctx, func() (result any, reason error) {
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if parsedOpts.PredicateFn != nil {
 					runInTaskQueue = func(p *common.Page) (bool, error) {
@@ -794,7 +794,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				}
 
 				return mapPage(vu, p), nil
-			})
+			}), nil
 		},
 		"pages": func() *goja.Object {
 			var (
