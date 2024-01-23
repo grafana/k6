@@ -155,7 +155,9 @@ func TestTracing(t *testing.T) {
 	}
 
 	for _, tc := range testCases {
-		assertJSInEventLoop(t, vu, tc.js)
+		err := assertJSInEventLoop(t, vu, tc.js)
+		require.NoError(t, err)
+
 		require.NoError(t, tracer.verifySpans(tc.spans...))
 	}
 }
@@ -176,7 +178,7 @@ func setupTestTracing(t *testing.T, rt *goja.Runtime) {
 	require.NoError(t, err)
 }
 
-func assertJSInEventLoop(t *testing.T, vu *k6test.VU, js string) {
+func assertJSInEventLoop(t *testing.T, vu *k6test.VU, js string) error {
 	t.Helper()
 
 	f := fmt.Sprintf(
@@ -194,7 +196,8 @@ func assertJSInEventLoop(t *testing.T, vu *k6test.VU, js string) {
 		_, err := test(goja.Undefined())
 		return err
 	})
-	require.NoError(t, err)
+
+	return err
 }
 
 type mockTracerProvider struct {
