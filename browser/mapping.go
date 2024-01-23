@@ -634,14 +634,19 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			})
 		},
 		"waitForLoadState": p.WaitForLoadState,
-		"waitForNavigation": func(opts goja.Value) *goja.Promise {
+		"waitForNavigation": func(opts goja.Value) (*goja.Promise, error) {
+			popts := common.NewFrameWaitForNavigationOptions(p.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing page wait for navigation options: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				resp, err := p.WaitForNavigation(opts)
+				resp, err := p.WaitForNavigation(popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 				return mapResponse(vu, resp), nil
-			})
+			}), nil
 		},
 		"waitForRequest":  p.WaitForRequest,
 		"waitForResponse": p.WaitForResponse,

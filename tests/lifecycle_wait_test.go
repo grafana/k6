@@ -128,10 +128,10 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 				result := p.TextContent("#pingRequestText", nil)
 				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 
-				opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-					Timeout:   1000,
+				opts := &common.FrameWaitForNavigationOptions{
+					Timeout:   1000 * time.Millisecond,
 					WaitUntil: common.LifecycleEventNetworkIdle,
-				})
+				}
 				_, err := p.WaitForNavigation(opts)
 
 				return err
@@ -167,10 +167,10 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 				tt.pingJSTextAssert(result)
 
 				waitForNav := func() error {
-					opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-						Timeout:   30000,
+					opts := &common.FrameWaitForNavigationOptions{
+						Timeout:   30000 * time.Millisecond,
 						WaitUntil: tt.waitUntil,
-					})
+					}
 					_, err := p.WaitForNavigation(opts)
 					return err
 				}

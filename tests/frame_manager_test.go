@@ -42,9 +42,7 @@ func TestWaitForFrameNavigationWithinDocument(t *testing.T) {
 			require.NotNil(t, resp)
 
 			waitForNav := func() error {
-				opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-					Timeout: time.Duration(timeout.Milliseconds()), // interpreted as ms
-				})
+				opts := &common.FrameWaitForNavigationOptions{Timeout: timeout}
 				_, err := p.WaitForNavigation(opts)
 				return err
 			}
@@ -98,9 +96,9 @@ func TestWaitForFrameNavigation(t *testing.T) {
 	require.NoError(t, err)
 
 	waitForNav := func() error {
-		opts := tb.toGojaValue(&common.FrameWaitForNavigationOptions{
-			Timeout: 5000, // interpreted as ms
-		})
+		opts := &common.FrameWaitForNavigationOptions{
+			Timeout: 5000 * time.Millisecond,
+		}
 		_, err := p.WaitForNavigation(opts)
 		return err
 	}

@@ -1307,17 +1307,12 @@ func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (p *Page) WaitForNavigation(opts goja.Value) (*Response, error) {
+func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	popts := NewFrameWaitForNavigationOptions(p.frameManager.timeoutSettings.timeout())
-	if err := popts.Parse(p.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing page wait for navigation options: %w", err)
-	}
-
-	return p.frameManager.MainFrame().WaitForNavigation(popts)
+	return p.frameManager.MainFrame().WaitForNavigation(opts)
 }
 
 // WaitForRequest is not implemented.

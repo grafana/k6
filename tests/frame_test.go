@@ -137,7 +137,12 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 	err = tb.run(
 		ctx,
 		func() error { return p.Click(`a[href="/iframeSignIn"]`, common.NewFrameClickOptions(p.Timeout())) },
-		func() error { _, err := p.WaitForNavigation(nil); return err },
+		func() error {
+			_, err := p.WaitForNavigation(
+				common.NewFrameWaitForNavigationOptions(p.Timeout()),
+			)
+			return err
+		},
 	)
 	require.NoError(t, err)
 
