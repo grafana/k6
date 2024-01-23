@@ -1293,27 +1293,9 @@ func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) any {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (p *Page) WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error) {
+func (p *Page) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsArgs ...any) (any, error) {
 	p.logger.Debugf("Page:WaitForFunction", "sid:%v", p.sessionID())
-
-	popts := NewFrameWaitForFunctionOptions(p.Timeout())
-	err := popts.Parse(p.ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
-	}
-
-	js := fn.ToString().String()
-	_, isCallable := goja.AssertFunction(fn)
-	if !isCallable {
-		js = fmt.Sprintf("() => (%s)", js)
-	}
-
-	jsArgs := make([]any, 0, len(args))
-	for _, a := range args {
-		jsArgs = append(jsArgs, a.Export())
-	}
-
-	return p.frameManager.MainFrame().WaitForFunction(js, popts, jsArgs...)
+	return p.frameManager.MainFrame().WaitForFunction(js, opts, jsArgs...)
 }
 
 // WaitForLoadState waits for the specified page life cycle event.

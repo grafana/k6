@@ -669,10 +669,17 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"video":                       p.Video,
 		"viewportSize":                p.ViewportSize,
 		"waitForEvent":                p.WaitForEvent,
-		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) *goja.Promise {
+		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
+			js, popts, pargs, err := parseWaitForFunctionArgs(
+				vu.Context(), p.Timeout(), pageFunc, opts, args...,
+			)
+			if err != nil {
+				return nil, fmt.Errorf("page waitForFunction: %w", err)
+			}
+
 			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				return p.WaitForFunction(pageFunc, opts, args...) //nolint:wrapcheck
-			})
+				return p.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
+			}), nil
 		},
 		"waitForLoadState": p.WaitForLoadState,
 		"waitForNavigation": func(opts goja.Value) (*goja.Promise, error) {
