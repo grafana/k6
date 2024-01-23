@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 
 	k6common "go.k6.io/k6/js/common"
+	k6modules "go.k6.io/k6/js/modules"
 )
 
 // mapping is a type for mapping our module API to Goja.
@@ -504,6 +505,16 @@ func parseWaitForFunctionArgs(
 	}
 
 	return js, popts, pargs, nil
+}
+
+// MapPage will map a page for an integration test. It is only to be used for
+// internal testing purposes.
+func MapPage(vu k6modules.VU, p *common.Page) mapping {
+	ivu, ok := vu.(moduleVU)
+	if !ok {
+		ivu = moduleVU{VU: vu}
+	}
+	return mapPage(ivu, p)
 }
 
 // mapPage to the JS module.
