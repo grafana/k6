@@ -963,6 +963,19 @@ func (p *Page) MainFrame() *Frame {
 	return mf
 }
 
+// Referrer returns the page's referrer.
+// It's an internal method not to be exposed as a JS API.
+func (p *Page) Referrer() string {
+	nm := p.mainFrameSession.getNetworkManager()
+	return nm.extraHTTPHeaders["referer"]
+}
+
+// NavigationTimeout returns the page's navigation timeout.
+// It's an internal method not to be exposed as a JS API.
+func (p *Page) NavigationTimeout() time.Duration {
+	return p.frameManager.timeoutSettings.navigationTimeout()
+}
+
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.

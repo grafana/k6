@@ -538,8 +538,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"goForward": p.GoForward,
 		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
-				p.MainFrame().Referrer(),
-				p.MainFrame().NavigationTimeout(),
+				p.Referrer(),
+				p.NavigationTimeout(),
 			)
 			if err := gopts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page navigation options to %q: %w", url, err)
