@@ -1787,19 +1787,13 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 //
 //nolint:funlen,cyclop
-func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
+func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
 		"fid:%s furl:%s", f.ID(), f.URL())
 
-	parsedOpts := NewFrameWaitForNavigationOptions(
-		f.manager.timeoutSettings.timeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing wait for navigation options: %w", err)
-	}
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, parsedOpts.Timeout)
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
 	navEvtCh, navEvtCancel := createWaitForEventHandler(timeoutCtx, f, []string{EventFrameNavigation},
 		func(data any) bool {
@@ -1810,7 +1804,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == parsedOpts.WaitUntil
+				return le.Event == opts.WaitUntil
 			}
 			return false
 		})
@@ -1821,7 +1815,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
 		if err != nil {
 			e := &k6ext.UserFriendlyError{
 				Err:     err,
-				Timeout: parsedOpts.Timeout,
+				Timeout: opts.Timeout,
 			}
 			return fmt.Errorf("waiting for navigation: %w", e)
 		}
@@ -1861,7 +1855,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
 	// A lifecycle event won't be received when navigating within the same
 	// document, so don't wait for it. The event might've also already been
 	// fired once we're here, so also skip waiting in that case.
-	if !sameDocNav && !f.hasLifecycleEventFired(parsedOpts.WaitUntil) {
+	if !sameDocNav && !f.hasLifecycleEventFired(opts.WaitUntil) {
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():

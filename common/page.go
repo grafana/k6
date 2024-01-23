@@ -1312,7 +1312,12 @@ func (p *Page) WaitForNavigation(opts goja.Value) (*Response, error) {
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	return p.frameManager.MainFrame().WaitForNavigation(opts)
+	popts := NewFrameWaitForNavigationOptions(p.frameManager.timeoutSettings.timeout())
+	if err := popts.Parse(p.ctx, opts); err != nil {
+		return nil, fmt.Errorf("parsing page wait for navigation options: %w", err)
+	}
+
+	return p.frameManager.MainFrame().WaitForNavigation(popts)
 }
 
 // WaitForRequest is not implemented.
