@@ -1,3 +1,4 @@
+// Package main is just the place where k6 cli executable is put together
 package main
 
 import (
