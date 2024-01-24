@@ -35,8 +35,8 @@ func TestLocator(t *testing.T) {
 			"Check", func(tb *testBrowser, p *common.Page) {
 				t.Run("check", func(t *testing.T) {
 					check := func() bool {
-						v := p.Evaluate(tb.toGojaValue(`() => window.check`))
-						return tb.asGojaBool(v)
+						v := p.Evaluate(`() => window.check`)
+						return asBool(t, v)
 					}
 					l := p.Locator("#inputCheckbox", nil)
 					require.False(t, check(), "should be unchecked first")
@@ -72,22 +72,22 @@ func TestLocator(t *testing.T) {
 				l := p.Locator("#link", nil)
 				err := l.Click(common.NewFrameClickOptions(l.Timeout()))
 				require.NoError(t, err)
-				v := p.Evaluate(tb.toGojaValue(`() => window.result`))
-				require.True(t, tb.asGojaBool(v), "cannot not click the link")
+				v := p.Evaluate(`() => window.result`)
+				require.True(t, asBool(t, v), "cannot not click the link")
 			},
 		},
 		{
 			"DblClick", func(tb *testBrowser, p *common.Page) {
 				p.Locator("#linkdbl", nil).Dblclick(nil)
-				v := p.Evaluate(tb.toGojaValue(`() => window.dblclick`))
-				require.True(t, tb.asGojaBool(v), "cannot not double click the link")
+				v := p.Evaluate(`() => window.dblclick`)
+				require.True(t, asBool(t, v), "cannot not double click the link")
 			},
 		},
 		{
 			"DispatchEvent", func(tb *testBrowser, p *common.Page) {
 				result := func() bool {
-					v := p.Evaluate(tb.toGojaValue(`() => window.result`))
-					return tb.asGojaBool(v)
+					v := p.Evaluate(`() => window.result`)
+					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be clicked first")
 				p.Locator("#link", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil)
@@ -104,10 +104,10 @@ func TestLocator(t *testing.T) {
 		{
 			"Focus", func(tb *testBrowser, p *common.Page) {
 				focused := func() bool {
-					v := p.Evaluate(tb.toGojaValue(
+					v := p.Evaluate(
 						`() => document.activeElement == document.getElementById('inputText')`,
-					))
-					return tb.asGojaBool(v)
+					)
+					return asBool(t, v)
 				}
 				l := p.Locator("#inputText", nil)
 				require.False(t, focused(), "should not be focused first")
@@ -120,14 +120,14 @@ func TestLocator(t *testing.T) {
 				l := p.Locator("#inputText", nil)
 				v := l.GetAttribute("value", nil)
 				require.NotNil(t, v)
-				require.Equal(t, "something", v.ToString().String())
+				require.Equal(t, "something", v)
 			},
 		},
 		{
 			"Hover", func(tb *testBrowser, p *common.Page) {
 				result := func() bool {
-					v := p.Evaluate(tb.toGojaValue(`() => window.result`))
-					return tb.asGojaBool(v)
+					v := p.Evaluate(`() => window.result`)
+					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be hovered first")
 				p.Locator("#inputText", nil).Hover(nil)
@@ -174,8 +174,8 @@ func TestLocator(t *testing.T) {
 		{
 			"Tap", func(tb *testBrowser, p *common.Page) {
 				result := func() bool {
-					v := p.Evaluate(tb.toGojaValue(`() => window.result`))
-					return tb.asGojaBool(v)
+					v := p.Evaluate(`() => window.result`)
+					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be tapped first")
 				p.Locator("#inputText", nil).Tap(nil)
@@ -414,7 +414,7 @@ func TestLocatorElementState(t *testing.T) {
 			l := p.Locator("#inputText", nil)
 			require.True(t, tt.query(l))
 
-			p.Evaluate(tb.toGojaValue(tt.eval))
+			p.Evaluate(tt.eval)
 			require.False(t, tt.query(l))
 			require.NoError(t, err)
 		})

@@ -182,8 +182,12 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 		},
 		"dispose":  jsh.Dispose,
 		"evaluate": jsh.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
-			h, err := jsh.EvaluateHandle(pageFunc, args...)
+		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
+			args := make([]any, 0, len(gargs))
+			for _, a := range gargs {
+				args = append(args, a)
+			}
+			h, err := jsh.EvaluateHandle(pageFunc.String(), args...)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -349,8 +353,12 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"dblclick":      f.Dblclick,
 		"dispatchEvent": f.DispatchEvent,
 		"evaluate":      f.Evaluate,
-		"evaluateHandle": func(pageFunction goja.Value, args ...goja.Value) (mapping, error) {
-			jsh, err := f.EvaluateHandle(pageFunction, args...)
+		"evaluateHandle": func(pageFunction goja.Value, gargs ...goja.Value) (mapping, error) {
+			args := make([]any, 0, len(gargs))
+			for _, a := range gargs {
+				args = append(args, a)
+			}
+			jsh, err := f.EvaluateHandle(pageFunction.String(), args...)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -541,8 +549,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
 		"evaluate":                p.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
-			jsh, err := p.EvaluateHandle(pageFunc, args...)
+		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
+			args := make([]any, 0, len(gargs))
+			for _, a := range gargs {
+				args = append(args, a)
+			}
+			jsh, err := p.EvaluateHandle(pageFunc.String(), args...)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}

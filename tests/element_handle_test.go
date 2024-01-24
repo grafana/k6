@@ -83,13 +83,9 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
         const rect = e.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
-	var r common.Rect
-	webBbox := p.Evaluate(tb.toGojaValue(pageFn), tb.toGojaValue(element))
-	wb := tb.asGojaValue(webBbox)
-	err = tb.runtime().ExportTo(wb, &r)
-	require.NoError(t, err)
-
-	require.EqualValues(t, bbox, &r)
+	box := p.Evaluate(pageFn, element)
+	rect := convert(t, box, &common.Rect{})
+	require.EqualValues(t, bbox, rect)
 }
 
 func TestElementHandleClick(t *testing.T) {
@@ -110,8 +106,8 @@ func TestElementHandleClick(t *testing.T) {
 	err = button.Click(opts)
 	require.NoError(t, err)
 
-	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
-	assert.Equal(t, res.String(), "Clicked")
+	res := p.Evaluate(`() => window['result']`)
+	assert.Equal(t, res, "Clicked")
 }
 
 func TestElementHandleClickWithNodeRemoved(t *testing.T) {
@@ -123,7 +119,7 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	p.SetContent(htmlInputButton, nil)
 
 	// Remove all nodes
-	p.Evaluate(tb.toGojaValue("() => delete window['Node']"))
+	p.Evaluate(`() => delete window['Node']`)
 
 	button, err := p.Query("button")
 	require.NoError(t, err)
@@ -135,8 +131,8 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	err = button.Click(opts)
 	require.NoError(t, err)
 
-	res := tb.asGojaValue(p.Evaluate(tb.toGojaValue("() => window['result']")))
-	assert.Equal(t, res.String(), "Clicked")
+	res := p.Evaluate(`() => window['result']`)
+	assert.Equal(t, res, "Clicked")
 }
 
 func TestElementHandleClickWithDetachedNode(t *testing.T) {
@@ -150,7 +146,7 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	require.NoError(t, err)
 
 	// Detach node to panic when clicked
-	p.Evaluate(tb.toGojaValue("button => button.remove()"), tb.toGojaValue(button))
+	p.Evaluate(`button => button.remove()`, button)
 
 	opts := common.NewElementHandleClickOptions(button.Timeout())
 	// FIX: this is just a workaround because navigation is never triggered
@@ -187,12 +183,12 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	p, err := bc.NewPage()
 	require.NoError(t, err)
 
-	clickResult := func() string {
+	clickResult := func() any {
 		const cmd = `
 			() => window.clickResult
 		`
-		cr := p.Evaluate(tb.toGojaValue(cmd))
-		return tb.asGojaValue(cr).String()
+		cr := p.Evaluate(cmd)
+		return cr
 	}
 	opts := &common.FrameGotoOptions{
 		Timeout: common.DefaultTimeout,
@@ -247,7 +243,7 @@ func TestElementHandleGetAttribute(t *testing.T) {
 	el, err := p.Query("#dark-mode-toggle-X")
 	require.NoError(t, err)
 
-	got := el.GetAttribute("href").String()
+	got := el.GetAttribute("href")
 	assert.Equal(t, want, got)
 }
 
@@ -357,7 +353,7 @@ func TestElementHandleScreenshot(t *testing.T) {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
-	p.Evaluate(tb.toGojaValue(`
+	p.Evaluate(`
 		() => {
 			document.body.style.margin = '0';
 			document.body.style.padding = '0';
@@ -373,7 +369,7 @@ func TestElementHandleScreenshot(t *testing.T) {
 
 			document.body.appendChild(div);
 		}
-    	`))
+    	`)
 
 	elem, err := p.Query("div")
 	require.NoError(t, err)
@@ -407,7 +403,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 	root, err := p.Query(".root")
 	require.NoError(t, err)
 
-	p.Evaluate(tb.toGojaValue(`
+	p.Evaluate(`
         () => {
 		setTimeout(() => {
 			const div = document.createElement('div');
@@ -417,7 +413,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 			root.appendChild(div);
 			}, 100);
 		}
-	`))
+	`)
 	element, err := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))

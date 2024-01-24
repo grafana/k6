@@ -683,7 +683,9 @@ func (f *Frame) Content() string {
 		return content;
 	}`
 
-	return gojaValueToString(f.ctx, f.Evaluate(js))
+	// TODO: return error
+
+	return f.Evaluate(js).(string) //nolint:forcetypeassert
 }
 
 // Dblclick double clicks an element matching provided selector.
@@ -804,7 +806,7 @@ func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle JSHandleAPI, _ error) {
+func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -899,7 +901,7 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 }
 
 // GetAttribute of the first element found that matches the selector.
-func (f *Frame) GetAttribute(selector, name string, opts goja.Value) goja.Value {
+func (f *Frame) GetAttribute(selector, name string, opts goja.Value) any {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
@@ -916,7 +918,7 @@ func (f *Frame) GetAttribute(selector, name string, opts goja.Value) goja.Value 
 	return v
 }
 
-func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goja.Value, error) {
+func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (any, error) {
 	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
@@ -926,14 +928,10 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return nil, errorFromDOMError(err)
-	}
-	gv, ok := v.(goja.Value)
-	if !ok {
-		return nil, fmt.Errorf("getting %q attribute of %q: unexpected type %T", name, selector, v)
+		return "", errorFromDOMError(err)
 	}
 
-	return gv, nil
+	return v, nil
 }
 
 // Referrer returns the referrer of the frame from the network manager
@@ -1030,12 +1028,12 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	if v == nil {
 		return "", nil
 	}
-	gv, ok := v.(goja.Value)
+	gv, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting inner html of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return gv, nil
 }
 
 // InnerText returns the inner text of the first element found
@@ -1072,12 +1070,12 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	if v == nil {
 		return "", nil
 	}
-	gv, ok := v.(goja.Value)
+	gv, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting inner text of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return gv, nil
 }
 
 // InputValue returns the input value of the first element found
@@ -1109,12 +1107,12 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	if err != nil {
 		return "", errorFromDOMError(err)
 	}
-	gv, ok := v.(goja.Value)
+	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting input value of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return s, nil
 }
 
 // IsDetached returns whether the frame is detached or not.
@@ -1459,7 +1457,7 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 	}
 	vals := make([]string, 0, len(optHandles))
 	for _, oh := range optHandles {
-		vals = append(vals, oh.JSONValue().String())
+		vals = append(vals, oh.JSONValue())
 		if err := oh.dispose(); err != nil {
 			return nil, fmt.Errorf("optionHandle.dispose: %w", err)
 		}
@@ -1571,12 +1569,12 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	if v == nil {
 		return "", nil
 	}
-	gv, ok := v.(goja.Value)
+	gv, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting text content of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return gv, nil
 }
 
 // Timeout will return the default timeout or the one set by the user.
@@ -1590,7 +1588,10 @@ func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
 	v := `() => document.title`
-	return gojaValueToString(f.ctx, f.Evaluate(v))
+
+	// TODO: return error
+
+	return f.Evaluate(v).(string) //nolint:forcetypeassert
 }
 
 // Type text on the first element found matches the selector.
@@ -1657,6 +1658,7 @@ func (f *Frame) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, js
 	if err != nil {
 		return nil, err
 	}
+
 	// prevent passing a non-nil interface to the upper layers.
 	if result == nil {
 		return nil, nil
@@ -1938,11 +1940,11 @@ type frameExecutionContext interface {
 
 	// Eval evaluates the provided JavaScript within this execution context and
 	// returns a value or handle.
-	Eval(apiCtx context.Context, js goja.Value, args ...goja.Value) (any, error)
+	Eval(apiCtx context.Context, js string, args ...any) (any, error)
 
 	// EvalHandle evaluates the provided JavaScript within this execution
 	// context and returns a JSHandle.
-	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (JSHandleAPI, error)
+	EvalHandle(apiCtx context.Context, js string, args ...any) (JSHandleAPI, error)
 
 	// Frame returns the frame that this execution context belongs to.
 	Frame() *Frame

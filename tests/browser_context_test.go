@@ -8,7 +8,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -563,10 +562,10 @@ func TestBrowserContextCookies(t *testing.T) {
 			)
 
 			// setting document.cookie into the page
-			cookie := p.Evaluate(tb.toGojaValue(tt.documentCookiesSnippet))
+			cookie := p.Evaluate(tt.documentCookiesSnippet)
 			require.Equalf(t,
 				tt.wantDocumentCookies,
-				tb.asGojaValue(cookie).String(),
+				cookie,
 				"incorrect document.cookie received",
 			)
 
@@ -642,10 +641,8 @@ func TestK6Object(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, r)
 
-	k6Obj := p.Evaluate(b.toGojaValue(`() => window.k6`))
-	k6ObjGoja := b.toGojaValue(k6Obj)
-
-	assert.False(t, k6ObjGoja.Equals(goja.Null()))
+	k6Obj := p.Evaluate(`() => window.k6`)
+	assert.NotNil(t, k6Obj)
 }
 
 func TestBrowserContextTimeout(t *testing.T) {
@@ -872,9 +869,9 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 				{ name: %q }
 			).then(result => result.state)
 		`, perm)
-		v := p.Evaluate(tb.toGojaValue(js))
-
-		return tb.asGojaValue(v).String() == "granted"
+		v := p.Evaluate(js)
+		require.IsType(t, "", v)
+		return v.(string) == "granted" //nolint:forcetypeassert
 	}
 
 	t.Run("no_permissions_set", func(t *testing.T) {

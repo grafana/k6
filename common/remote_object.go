@@ -9,11 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
-	"github.com/dop251/goja"
 )
 
 var bigIntRegex = regexp.MustCompile("^[0-9]*n$")
@@ -221,12 +219,12 @@ func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	return nil, UnserializableValueError{uv}
 }
 
-func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (goja.Value, error) {
+func valueFromRemoteObject(_ context.Context, robj *cdpruntime.RemoteObject) (any, error) {
 	val, err := parseRemoteObject(robj)
 	if val == "undefined" {
-		return goja.Undefined(), err
+		return nil, err
 	}
-	return k6ext.Runtime(ctx).ToValue(val), err
+	return val, err
 }
 
 func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) string {

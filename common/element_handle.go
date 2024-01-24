@@ -94,11 +94,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 
 	// Either we're done or an error happened (returned as "error:..." from JS)
 	const done = "done"
-	v, ok := result.(goja.Value)
-	if !ok {
-		return false, fmt.Errorf("unexpected type %T", result)
-	}
-	if v.ExportType().Kind() != reflect.String {
+	if v, ok := result.(string); !ok {
 		// We got a { hitTargetDescription: ... } result
 		// Meaning: Another element is preventing pointer events.
 		//
@@ -107,8 +103,8 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 		// because we don't need any more functionality from this JS function
 		// right now.
 		return false, errorFromDOMError("error:intercept")
-	} else if v.String() != done {
-		return false, errorFromDOMError(v.String())
+	} else if v != done {
+		return false, errorFromDOMError(v)
 	}
 
 	return true, nil
@@ -128,18 +124,11 @@ func (h *ElementHandle) checkElementState(_ context.Context, state string) (*boo
 	if err != nil {
 		return nil, err
 	}
-	v, ok := result.(goja.Value)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type %T", result)
-	}
-	//nolint:exhaustive
-	switch v.ExportType().Kind() {
-	case reflect.String: // An error happened (returned as "error:..." from JS)
-		return nil, errorFromDOMError(v.String())
-	case reflect.Bool:
-		returnVal := new(bool)
-		*returnVal = v.ToBoolean()
-		return returnVal, nil
+	switch v := result.(type) {
+	case string: // An error happened (returned as "error:..." from JS)
+		return nil, errorFromDOMError(v)
+	case bool:
+		return &v, nil
 	}
 
 	return nil, fmt.Errorf(
@@ -273,11 +262,8 @@ func (h *ElementHandle) fill(_ context.Context, value string) error {
 	if err != nil {
 		return err
 	}
-	v, ok := result.(goja.Value)
-	if !ok {
-		return fmt.Errorf("unexpected type %T", result)
-	}
-	if s := v.String(); s != resultDone {
+	s, ok := result.(string)
+	if ok && s != resultDone {
 		// Either we're done or an error happened (returned as "error:..." from JS)
 		return errorFromDOMError(s)
 	}
@@ -299,12 +285,15 @@ func (h *ElementHandle) focus(apiCtx context.Context, resetSelectionIfNotFocused
 	if err != nil {
 		return err
 	}
-	switch result := result.(type) {
-	case string: // Either we're done or an error happened (returned as "error:..." from JS)
-		if result != "done" {
-			return errorFromDOMError(result)
-		}
+	s, ok := result.(string)
+	if !ok {
+		return fmt.Errorf("unexpected type %T", result)
 	}
+	if s != resultDone {
+		// Either we're done or an error happened (returned as "error:..." from JS)
+		return errorFromDOMError(s)
+	}
+
 	return nil
 }
 
@@ -321,7 +310,7 @@ func (h *ElementHandle) getAttribute(apiCtx context.Context, name string) (any, 
 	return h.eval(apiCtx, opts, js)
 }
 
-func (h *ElementHandle) hover(apiCtx context.Context, p *Position) error {
+func (h *ElementHandle) hover(_ context.Context, p *Position) error {
 	return h.frame.page.Mouse.move(p.X, p.Y, NewMouseMoveOptions())
 }
 
@@ -348,6 +337,7 @@ func (h *ElementHandle) innerText(apiCtx context.Context) (any, error) {
 		forceCallable: true,
 		returnByValue: true,
 	}
+
 	return h.eval(apiCtx, opts, js)
 }
 
@@ -667,19 +657,14 @@ func (h *ElementHandle) waitForElementState(
 	if err != nil {
 		return false, errorFromDOMError(err)
 	}
-	v, ok := result.(goja.Value)
-	if !ok {
-		return false, fmt.Errorf("unexpected type %T", result)
-	}
-	//nolint:exhaustive
-	switch v.ExportType().Kind() {
-	case reflect.String: // Either we're done or an error happened (returned as "error:..." from JS)
-		if v.String() == "done" {
+	switch v := result.(type) {
+	case string: // Either we're done or an error happened (returned as "error:..." from JS)
+		if v == "done" {
 			return true, nil
 		}
-		return false, errorFromDOMError(v.String())
-	case reflect.Bool:
-		return v.ToBoolean(), nil
+		return false, errorFromDOMError(v)
+	case bool:
+		return v, nil
 	}
 
 	return false, fmt.Errorf(
@@ -831,7 +816,7 @@ func (h *ElementHandle) Focus() {
 }
 
 // GetAttribute retrieves the value of specified element attribute.
-func (h *ElementHandle) GetAttribute(name string) goja.Value {
+func (h *ElementHandle) GetAttribute(name string) any {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
@@ -843,7 +828,9 @@ func (h *ElementHandle) GetAttribute(name string) goja.Value {
 	}
 	applySlowMo(h.ctx)
 
-	return asGojaValue(h.ctx, v)
+	// TODO: return any with error
+
+	return v
 }
 
 // Hover scrolls element into view and hovers over its center point.
@@ -876,7 +863,9 @@ func (h *ElementHandle) InnerHTML() string {
 	}
 	applySlowMo(h.ctx)
 
-	return gojaValueToString(h.ctx, v)
+	// TODO: handle error
+
+	return v.(string) //nolint:forcetypeassert
 }
 
 // InnerText returns the inner text of the element.
@@ -892,7 +881,9 @@ func (h *ElementHandle) InnerText() string {
 	}
 	applySlowMo(h.ctx)
 
-	return gojaValueToString(h.ctx, v)
+	// TODO: handle error
+
+	return v.(string) //nolint:forcetypeassert
 }
 
 func (h *ElementHandle) InputValue(opts goja.Value) string {
@@ -910,7 +901,9 @@ func (h *ElementHandle) InputValue(opts goja.Value) string {
 	}
 	applySlowMo(h.ctx)
 
-	return gojaValueToString(h.ctx, v)
+	// TODO: return error
+
+	return v.(string) //nolint:forcetypeassert
 }
 
 // IsChecked checks if a checkbox or radio is checked.
@@ -1212,7 +1205,6 @@ func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) {
 }
 
 func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []string {
-	rt := h.execCtx.vu.Runtime()
 	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
 	if err := actionOpts.Parse(h.ctx, opts); err != nil {
 		k6ext.Panic(h.ctx, "parsing selectOption options: %w", err)
@@ -1226,7 +1218,7 @@ func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []strin
 		k6ext.Panic(h.ctx, "selecting options: %w", err)
 	}
 	var returnVal []string
-	if err := rt.ExportTo(asGojaValue(h.ctx, selectedOptions), &returnVal); err != nil {
+	if err := convert(selectedOptions, &returnVal); err != nil {
 		k6ext.Panic(h.ctx, "unpacking selected options: %w", err)
 	}
 
@@ -1287,7 +1279,9 @@ func (h *ElementHandle) TextContent() string {
 	}
 	applySlowMo(h.ctx)
 
-	return gojaValueToString(h.ctx, v)
+	// TODO: handle error
+
+	return v.(string) //nolint:forcetypeassert
 }
 
 // Timeout will return the default timeout or the one set by the user.

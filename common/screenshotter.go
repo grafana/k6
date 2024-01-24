@@ -69,7 +69,6 @@ func newScreenshotter(ctx context.Context) *screenshotter {
 }
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
-	rt := p.vu.Runtime()
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
@@ -95,16 +94,12 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 	if err != nil {
 		return nil, err
 	}
-	v, ok := result.(goja.Value)
-	if !ok {
-		return nil, fmt.Errorf("unexpected type %T", result)
+	var size Size
+	if err := convert(result, &size); err != nil {
+		return nil, fmt.Errorf("converting result to size: %w", err)
 	}
-	o := v.ToObject(rt)
 
-	return &Size{
-		Width:  o.Get("width").ToFloat(),
-		Height: o.Get("height").ToFloat(),
-	}, nil
+	return &size, nil
 }
 
 func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
@@ -286,7 +281,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 
 	documentRect := bbox
 	rt := h.execCtx.vu.Runtime()
-	scrollOffset := h.Evaluate(rt.ToValue(`() => { return {x: window.scrollX, y: window.scrollY};}`))
+	scrollOffset := h.Evaluate(`() => { return {x: window.scrollX, y: window.scrollY};}`)
 	switch s := scrollOffset.(type) {
 	case goja.Value:
 		documentRect.X += s.ToObject(rt).Get("x").ToFloat()

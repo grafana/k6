@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -364,4 +365,25 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 	case <-t.C:
 		return fmt.Errorf("test timed out after %s", timeout)
 	}
+}
+
+// convert is a helper function to convert any value to a given type.
+// returns a pointer to the converted value for convenience.
+//
+// underneath, it uses json.Marshal and json.Unmarshal to do the conversion.
+func convert[T any](t *testing.T, from any, to *T) *T {
+	t.Helper()
+	buf, err := json.Marshal(from)
+	require.NoError(t, err)
+	require.NoError(t, json.Unmarshal(buf, to))
+	return to
+}
+
+// asBool asserts that v is a boolean and returns v as a boolean.
+func asBool(t *testing.T, v any) bool {
+	t.Helper()
+	require.IsType(t, true, v)
+	b, ok := v.(bool)
+	require.True(t, ok)
+	return b
 }

@@ -784,7 +784,7 @@ func (p *Page) Evaluate(pageFunc string, args ...any) any {
 }
 
 // EvaluateHandle runs JS code within the execution context of the main frame of the page.
-func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error) {
+func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
 	h, err := p.MainFrame().EvaluateHandle(pageFunc, args...)
@@ -827,7 +827,8 @@ func (p *Page) Frames() []*Frame {
 	return p.frameManager.Frames()
 }
 
-func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.Value {
+// GetAttribute returns the attribute value of the element matching the provided selector.
+func (p *Page) GetAttribute(selector string, name string, opts goja.Value) any {
 	p.logger.Debugf("Page:GetAttribute", "sid:%v selector:%s name:%s",
 		p.sessionID(), selector, name)
 
@@ -1212,8 +1213,10 @@ func (p *Page) Timeout() time.Duration {
 func (p *Page) Title() string {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
+	// TODO: return error
+
 	v := `() => document.title`
-	return gojaValueToString(p.ctx, p.Evaluate(v))
+	return p.Evaluate(v).(string) //nolint:forcetypeassert
 }
 
 // ThrottleCPU will slow the CPU down from chrome's perspective to simulate
@@ -1265,8 +1268,10 @@ func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
 func (p *Page) URL() string {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
 
+	// TODO: return error
+
 	v := `() => document.location.toString()`
-	return gojaValueToString(p.ctx, p.Evaluate(v))
+	return p.Evaluate(v).(string) //nolint:forcetypeassert
 }
 
 // Video returns information of recorded video.

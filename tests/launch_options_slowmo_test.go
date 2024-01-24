@@ -64,14 +64,15 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				p.Evaluate(tb.toGojaValue("() => void 0"))
+				p.Evaluate(`() => void 0`)
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				p.EvaluateHandle(tb.toGojaValue("() => window"))
+				_, err := p.EvaluateHandle(`() => window`)
+				require.NoError(t, err)
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
@@ -200,14 +201,15 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				f.Evaluate(tb.toGojaValue("() => void 0"))
+				f.Evaluate(`() => void 0`)
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				f.EvaluateHandle(tb.toGojaValue("() => window"))
+				_, err := f.EvaluateHandle(`() => window`)
+				require.NoError(t, err)
 			})
 		})
 		t.Run("fill", func(t *testing.T) {
@@ -348,9 +350,10 @@ func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser,
 	`
 
 	h, err := p.EvaluateHandle(
-		tb.toGojaValue(pageFn),
-		tb.toGojaValue("frame1"),
-		tb.toGojaValue(tb.staticURL("empty.html")))
+		pageFn,
+		"frame1",
+		tb.staticURL("empty.html"),
+	)
 	require.NoError(tb.t, err)
 
 	f, err := h.AsElement().ContentFrame()

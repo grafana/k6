@@ -7,13 +7,13 @@ import (
 	"math"
 	"testing"
 
-	"github.com/grafana/xk6-browser/k6ext/k6test"
-
 	"github.com/chromedp/cdproto/runtime"
-	"github.com/dop251/goja"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
 func TestValueFromRemoteObject(t *testing.T) {
@@ -30,7 +30,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 		}
 
 		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
-		require.True(t, goja.IsNull(arg))
+		require.Nil(t, arg)
 		require.ErrorIs(t, UnserializableValueError{unserializableValue}, err)
 	})
 
@@ -46,7 +46,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 
 		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
 
-		require.True(t, goja.IsNull(arg))
+		require.Nil(t, arg)
 		assert.ErrorIs(t, UnserializableValueError{unserializableValue}, err)
 	})
 
@@ -84,12 +84,26 @@ func TestValueFromRemoteObject(t *testing.T) {
 			arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
 			require.NoError(t, err)
 			require.NotNil(t, arg)
+			require.IsType(t, float64(0), arg)
 			if v.value == "NaN" {
-				require.True(t, math.IsNaN(arg.ToFloat()))
+				require.True(t, math.IsNaN(arg.(float64))) //nolint:forcetypeassert
 			} else {
-				require.Equal(t, v.expected, arg.ToFloat())
+				require.Equal(t, v.expected, arg.(float64)) //nolint:forcetypeassert
 			}
 		}
+	})
+
+	t.Run("undefined", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		remoteObject := &runtime.RemoteObject{
+			Type: cdpruntime.TypeUndefined,
+		}
+
+		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
+		require.NoError(t, err)
+		require.Nil(t, arg)
 	})
 
 	t.Run("primitive types", func(t *testing.T) {
@@ -98,27 +112,22 @@ func TestValueFromRemoteObject(t *testing.T) {
 		primitiveTypes := []struct {
 			typ   runtime.Type
 			value any
-			toFn  func(goja.Value) any
 		}{
 			{
 				typ:   "number",
-				value: int64(777),
-				toFn:  func(v goja.Value) any { return v.ToInteger() },
+				value: float64(777), // js numbers are float64
 			},
 			{
 				typ:   "number",
 				value: float64(777.0),
-				toFn:  func(v goja.Value) any { return v.ToFloat() },
 			},
 			{
 				typ:   "string",
 				value: "hello world",
-				toFn:  func(v goja.Value) any { return v.String() },
 			},
 			{
 				typ:   "boolean",
 				value: true,
-				toFn:  func(v goja.Value) any { return v.ToBoolean() },
 			},
 		}
 
@@ -133,7 +142,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 			arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
 
 			require.Nil(t, err)
-			require.Equal(t, p.value, p.toFn(arg))
+			require.IsType(t, p.value, arg)
 		}
 	})
 
@@ -155,7 +164,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 		vu := k6test.NewVU(t)
 		val, err := valueFromRemoteObject(vu.Context(), remoteObject)
 		require.NoError(t, err)
-		assert.Equal(t, vu.ToGojaValue(map[string]any{"num": float64(1)}), val)
+		assert.Equal(t, map[string]any{"num": float64(1)}, val)
 	})
 }
 

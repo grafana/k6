@@ -9,18 +9,17 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/log"
 )
 
-func newExecCtx() (*ExecutionContext, context.Context, *goja.Runtime) {
+func newExecCtx() (*ExecutionContext, context.Context) {
 	ctx := context.Background()
 	logger := log.NewNullLogger()
 	execCtx := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789), logger)
 
-	return execCtx, ctx, goja.New()
+	return execCtx, ctx
 }
 
 func TestConvertArgument(t *testing.T) {
@@ -29,9 +28,9 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("int64", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 		var value int64 = 777
-		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
+		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
 		result, _ := json.Marshal(value)
@@ -43,10 +42,10 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("int64 maxint", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 
 		var value int64 = math.MaxInt32 + 1
-		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
+		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
 		require.Equal(t, fmt.Sprintf("%dn", value), string(arg.UnserializableValue))
@@ -57,10 +56,10 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("float64", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 
 		var value float64 = 777.0
-		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
+		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
 		result, _ := json.Marshal(value)
@@ -72,7 +71,7 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("float64 unserializable values", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 
 		unserializableValues := []struct {
 			value    float64
@@ -97,7 +96,7 @@ func TestConvertArgument(t *testing.T) {
 		}
 
 		for _, v := range unserializableValues {
-			arg, _ := convertArgument(ctx, execCtx, rt.ToValue(v.value))
+			arg, _ := convertArgument(ctx, execCtx, v.value)
 			require.NotNil(t, arg)
 			require.Equal(t, v.expected, string(arg.UnserializableValue))
 			require.Empty(t, arg.Value)
@@ -108,10 +107,10 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("bool", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 
-		var value bool = true
-		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
+		value := true
+		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
 		result, _ := json.Marshal(value)
@@ -123,9 +122,9 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("string", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
-		var value string = "hello world"
-		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
+		execCtx, ctx := newExecCtx()
+		value := "hello world"
+		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
 		result, _ := json.Marshal(value)
@@ -137,7 +136,7 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("*BaseJSHandle", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 		log := log.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
@@ -151,7 +150,7 @@ func TestConvertArgument(t *testing.T) {
 		}
 
 		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject, execCtx.logger)
-		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
+		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
 		require.Equal(t, result, []byte(arg.Value))
@@ -162,7 +161,7 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("*BaseJSHandle wrong context", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 		log := log.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
@@ -177,7 +176,7 @@ func TestConvertArgument(t *testing.T) {
 		execCtx2 := NewExecutionContext(ctx, nil, nil, runtime.ExecutionContextID(123456789), execCtx.logger)
 
 		value := NewJSHandle(ctx, nil, execCtx2, frame, remoteObject, execCtx.logger)
-		arg, err := convertArgument(ctx, execCtx, rt.ToValue(value))
+		arg, err := convertArgument(ctx, execCtx, value)
 
 		require.Nil(t, arg)
 		require.ErrorIs(t, ErrWrongExecutionContext, err)
@@ -186,7 +185,7 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("*BaseJSHandle is disposed", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 		log := log.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
@@ -201,7 +200,7 @@ func TestConvertArgument(t *testing.T) {
 
 		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject, execCtx.logger)
 		value.(*BaseJSHandle).disposed = true
-		arg, err := convertArgument(ctx, execCtx, rt.ToValue(value))
+		arg, err := convertArgument(ctx, execCtx, value)
 
 		require.Nil(t, arg)
 		require.ErrorIs(t, ErrJSHandleDisposed, err)
@@ -210,7 +209,7 @@ func TestConvertArgument(t *testing.T) {
 	t.Run("*BaseJSHandle as *ElementHandle", func(t *testing.T) {
 		t.Parallel()
 
-		execCtx, ctx, rt := newExecCtx()
+		execCtx, ctx := newExecCtx()
 		log := log.NewNullLogger()
 
 		timeoutSettings := NewTimeoutSettings(nil)
@@ -224,7 +223,7 @@ func TestConvertArgument(t *testing.T) {
 		}
 
 		value := NewJSHandle(ctx, nil, execCtx, frame, remoteObject, execCtx.logger)
-		arg, _ := convertArgument(ctx, execCtx, rt.ToValue(value))
+		arg, _ := convertArgument(ctx, execCtx, value)
 
 		require.NotNil(t, arg)
 		require.Equal(t, remoteObjectID, arg.ObjectID)

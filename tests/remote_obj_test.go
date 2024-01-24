@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -94,9 +93,9 @@ func TestConsoleLogParse(t *testing.T) {
 			require.NoError(t, err)
 
 			if tt.log == "" {
-				p.Evaluate(tb.toGojaValue(`() => console.log("")`))
+				p.Evaluate(`() => console.log("")`)
 			} else {
-				p.Evaluate(tb.toGojaValue(fmt.Sprintf("() => console.log(%s)", tt.log)))
+				p.Evaluate(fmt.Sprintf("() => console.log(%s)", tt.log))
 			}
 
 			select {
@@ -117,7 +116,7 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 		want any
 	}{
 		{
-			name: "number", eval: "1", want: 1,
+			name: "number", eval: "1", want: float64(1),
 		},
 		{
 			name: "string", eval: `"some string"`, want: "some string",
@@ -129,7 +128,7 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 			name: "empty_array", eval: "[]", want: []any{},
 		},
 		{
-			name: "empty_object", eval: "{}", want: goja.Undefined(),
+			name: "empty_object", eval: "{}", want: nil,
 		},
 		{
 			name: "filled_object", eval: `{return {foo:"bar"};}`, want: map[string]any{"foo": "bar"},
@@ -147,13 +146,13 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 			name: "null", eval: "null", want: "null",
 		},
 		{
-			name: "undefined", eval: "undefined", want: goja.Undefined(),
+			name: "undefined", eval: "undefined", want: nil,
 		},
 		{
-			name: "bigint", eval: `BigInt("2")`, want: 2,
+			name: "bigint", eval: `BigInt("2")`, want: int64(2),
 		},
 		{
-			name: "unwrapped_bigint", eval: "3n", want: 3,
+			name: "unwrapped_bigint", eval: "3n", want: int64(3),
 		},
 		{
 			name: "float", eval: "3.14", want: 3.14,
@@ -181,12 +180,12 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 
 			var got any
 			if tt.eval == "" {
-				got = p.Evaluate(tb.toGojaValue(`() => ""`))
+				got = p.Evaluate(`() => ""`)
 			} else {
-				got = p.Evaluate(tb.toGojaValue(fmt.Sprintf("() => %s", tt.eval)))
+				got = p.Evaluate(fmt.Sprintf("() => %s", tt.eval))
 			}
 
-			assert.Equal(t, tb.toGojaValue(tt.want), got)
+			assert.EqualValues(t, tt.want, got)
 		})
 	}
 }

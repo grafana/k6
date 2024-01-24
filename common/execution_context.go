@@ -18,7 +18,6 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
-	"github.com/dop251/goja"
 )
 
 const evaluationScriptURL = "__xk6_browser_evaluation_script__"
@@ -289,34 +288,30 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAP
 
 // Eval evaluates the provided JavaScript within this execution context and
 // returns a value or handle.
-func (e *ExecutionContext) Eval(
-	apiCtx context.Context, js goja.Value, args ...goja.Value,
-) (any, error) {
+func (e *ExecutionContext) Eval(apiCtx context.Context, js string, args ...any) (any, error) {
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
 	evalArgs := make([]any, 0, len(args))
 	for _, a := range args {
-		evalArgs = append(evalArgs, a.Export())
+		evalArgs = append(evalArgs, a)
 	}
-	return e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
+	return e.eval(apiCtx, opts, js, evalArgs...)
 }
 
 // EvalHandle evaluates the provided JavaScript within this execution context
 // and returns a JSHandle.
-func (e *ExecutionContext) EvalHandle(
-	apiCtx context.Context, js goja.Value, args ...goja.Value,
-) (JSHandleAPI, error) {
+func (e *ExecutionContext) EvalHandle(apiCtx context.Context, js string, args ...any) (JSHandleAPI, error) {
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
 	evalArgs := make([]any, 0, len(args))
 	for _, a := range args {
-		evalArgs = append(evalArgs, a.Export())
+		evalArgs = append(evalArgs, a)
 	}
-	res, err := e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
+	res, err := e.eval(apiCtx, opts, js, evalArgs...)
 	if err != nil {
 		return nil, err
 	}

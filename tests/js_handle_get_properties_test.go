@@ -14,7 +14,7 @@ func TestJSHandleGetProperties(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	handle, err := p.EvaluateHandle(tb.toGojaValue(`
+	handle, err := p.EvaluateHandle(`
 	() => {
 		return {
 			prop1: "one",
@@ -22,12 +22,12 @@ func TestJSHandleGetProperties(t *testing.T) {
 			prop3: "three"
 		};
 	}
-	`))
+	`)
 	require.NoError(t, err, "expected no error when evaluating handle")
 
 	props, err := handle.GetProperties()
 	require.NoError(t, err, "expected no error when getting properties")
 
-	value := props["prop1"].JSONValue().String()
+	value := props["prop1"].JSONValue()
 	assert.Equal(t, value, "one", `expected property value of "one", got %q`, value)
 }
