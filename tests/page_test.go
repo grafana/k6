@@ -552,6 +552,7 @@ func TestPageWaitForFunction(t *testing.T) {
 			let resp = await page.waitForFunction(%s, %s, %s);
 			log('ok: '+resp);
 		}
+		test();
 		`
 
 	t.Run("ok_func_raf_default", func(t *testing.T) {
@@ -568,7 +569,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		}`)
 		require.NoError(t, err)
 
-		err = runJSInEventLoop(t, vu, fmt.Sprintf(script, "fn", "{}", "null"))
+		_, err = vu.TestRT.RunOnEventLoop(fmt.Sprintf(script, "fn", "{}", "null"))
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 	})
@@ -586,7 +587,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 
 		arg := "raf_arg"
-		err = runJSInEventLoop(t, vu, fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("%q", arg)))
+		_, err = vu.TestRT.RunOnEventLoop(fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("%q", arg)))
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 
@@ -614,7 +615,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		argsJS, err := json.Marshal(args)
 		require.NoError(t, err)
 
-		err = runJSInEventLoop(t, vu, fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS))))
+		_, err = vu.TestRT.RunOnEventLoop(fmt.Sprintf(script, "fn", "{}", fmt.Sprintf("...%s", string(argsJS))))
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 
@@ -632,7 +633,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, _, _, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		err := runJSInEventLoop(t, vu, fmt.Sprintf(script, "false", "{ polling: 'raf', timeout: 500, }", "null"))
+		_, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(script, "false", "{ polling: 'raf', timeout: 500, }", "null"))
 		require.ErrorContains(t, err, "timed out after 500ms")
 	})
 
@@ -642,7 +643,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, _, _, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		err := runJSInEventLoop(t, vu, fmt.Sprintf(script, "false", "{ polling: 'blah' }", "null"))
+		_, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(script, "false", "{ polling: 'blah' }", "null"))
 		require.Error(t, err)
 		assert.Contains(t, err.Error(),
 			`parsing waitForFunction options: wrong polling option value:`,
@@ -674,10 +675,11 @@ func TestPageWaitForFunction(t *testing.T) {
 			} else {
 				log('err: '+err);
 			}
-		}`
+		}
+		test();`
 
 		s := fmt.Sprintf(script, `"document.querySelector('h1')"`, "{ polling: 100, timeout: 2000, }", "null")
-		err = runJSInEventLoop(t, vu, s)
+		_, err = vu.TestRT.RunOnEventLoop(s)
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: Hello")
 	})
@@ -688,10 +690,9 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, rt, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		_, err := rt.RunString(`fn = () => document.querySelector('h1') !== null`)
-		require.NoError(t, err)
+		_, err := rt.RunString(`
+		fn = () => document.querySelector('h1') !== null
 
-		_, err = rt.RunString(`
 		const page = browser.newPage();
 		page.evaluate(() => {
 			console.log('calling setTimeout...');
@@ -708,10 +709,11 @@ func TestPageWaitForFunction(t *testing.T) {
 		const test = async function() {
 			let resp = await page.waitForFunction(%s, %s, %s);
 			log('ok: '+resp);
-		}`
+		}
+		test();`
 
 		s := fmt.Sprintf(script, "fn", "{ polling: 'mutation', timeout: 2000, }", "null")
-		err = runJSInEventLoop(t, vu, s)
+		_, err = vu.TestRT.RunOnEventLoop(s)
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 	})
@@ -743,24 +745,6 @@ func startIteration(t *testing.T) (*k6test.VU, *goja.Runtime, *[]string, func())
 	vu.StartIteration(t)
 
 	return vu, rt, &log, func() { t.Helper(); vu.EndIteration(t) }
-}
-
-func runJSInEventLoop(t *testing.T, vu *k6test.VU, js string) error {
-	t.Helper()
-
-	rt := vu.Runtime()
-	_, err := rt.RunString(js)
-	require.NoError(t, err)
-
-	test, ok := goja.AssertFunction(rt.Get("test"))
-	require.True(t, ok)
-
-	err = vu.Loop.Start(func() error {
-		_, err := test(goja.Undefined())
-		return err
-	})
-
-	return err
 }
 
 func TestPageWaitForLoadState(t *testing.T) {
