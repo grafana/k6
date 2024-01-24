@@ -79,7 +79,7 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 	return req, nil
 }
 
-// Do is simpler to http.Do but also unmarshals the response in hte provided v
+// Do is simpler to http.Do but also unmarshals the response in the provided v
 func (c *Client) Do(req *http.Request, v interface{}) error {
 	if req.Body != nil && req.GetBody == nil {
 		originalBody, err := io.ReadAll(req.Body)
