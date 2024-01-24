@@ -1,3 +1,4 @@
+// Package execution implements k6/execution which lets script find out more about it is execution.
 package execution
 
 import (
