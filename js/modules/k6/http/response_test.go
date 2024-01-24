@@ -87,7 +87,7 @@ func myFormHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-func jsonHandler(w http.ResponseWriter, r *http.Request) {
+func jsonHandler(w http.ResponseWriter, _ *http.Request) {
 	body := []byte(jsonData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
@@ -95,7 +95,7 @@ func jsonHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-func invalidJSONHandler(w http.ResponseWriter, r *http.Request) {
+func invalidJSONHandler(w http.ResponseWriter, _ *http.Request) {
 	body := []byte(invalidJSONData)
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Content-Length", fmt.Sprintf("%d", len(body)))
@@ -103,7 +103,6 @@ func invalidJSONHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(body)
 }
 
-//nolint:paralleltest
 func TestResponse(t *testing.T) {
 	ts := newTestCase(t)
 	tb := ts.tb

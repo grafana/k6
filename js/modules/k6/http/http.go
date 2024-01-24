@@ -141,7 +141,7 @@ func (mi *ModuleInstance) defineConstants() {
 	mustAddProp("OCSP_REASON_AA_COMPROMISE", netext.OCSP_REASON_AA_COMPROMISE)
 }
 
-func (mi *ModuleInstance) newCookieJar(call goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) newCookieJar(_ goja.ConstructorCall) *goja.Object {
 	rt := mi.vu.Runtime()
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -151,7 +151,7 @@ func (mi *ModuleInstance) newCookieJar(call goja.ConstructorCall) *goja.Object {
 }
 
 // getVUCookieJar returns the active cookie jar for the current VU.
-func (mi *ModuleInstance) getVUCookieJar(call goja.FunctionCall) goja.Value {
+func (mi *ModuleInstance) getVUCookieJar(_ goja.FunctionCall) goja.Value {
 	rt := mi.vu.Runtime()
 	if state := mi.vu.State(); state != nil {
 		return rt.ToValue(&CookieJar{mi, state.CookieJar})
