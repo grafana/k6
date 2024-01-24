@@ -14,7 +14,7 @@ var (
 	_ Sink = &RateSink{}
 )
 
-// Sink is a sample sink which will accumualte data in specific way
+// Sink is a sample sink which will accumulate data in specific way
 type Sink interface {
 	Add(s Sample)                              // Add a sample to the sink.
 	Format(t time.Duration) map[string]float64 // Data for thresholds.
