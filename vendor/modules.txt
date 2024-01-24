@@ -162,7 +162,7 @@ github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
 github.com/grafana/xk6-browser/trace
-# github.com/grafana/xk6-dashboard v0.7.1
+# github.com/grafana/xk6-dashboard v0.7.2
 ## explicit; go 1.19
 github.com/grafana/xk6-dashboard/dashboard
 # github.com/grafana/xk6-output-prometheus-remote v0.3.1
