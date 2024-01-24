@@ -9,6 +9,7 @@ import (
 )
 
 func TestSampleImplementations(t *testing.T) {
+	t.Parallel()
 	r := NewRegistry()
 	sampleTags := r.RootTagSet().With("key1", "val1").With("key2", "val2")
 	now := time.Now()
@@ -37,6 +38,7 @@ func TestSampleImplementations(t *testing.T) {
 }
 
 func TestGetResolversForTrendColumnsValidation(t *testing.T) {
+	t.Parallel()
 	validateTests := []struct {
 		stats  []string
 		expErr bool
@@ -58,6 +60,7 @@ func TestGetResolversForTrendColumnsValidation(t *testing.T) {
 	for _, tc := range validateTests {
 		tc := tc
 		t.Run(fmt.Sprintf("%v", tc.stats), func(t *testing.T) {
+			t.Parallel()
 			_, err := GetResolversForTrendColumns(tc.stats)
 			if tc.expErr {
 				assert.Error(t, err)
