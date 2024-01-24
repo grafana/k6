@@ -656,13 +656,13 @@ func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 }
 
 // Close closes the page.
-func (p *Page) Close(opts goja.Value) error {
+func (p *Page) Close(_ goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
 	defer span.End()
 
 	// forcing the pagehide event to trigger web vitals metrics.
-	v := p.vu.Runtime().ToValue(`() => window.dispatchEvent(new Event('pagehide'))`)
+	v := `() => window.dispatchEvent(new Event('pagehide'))`
 	ctx, cancel := context.WithTimeout(p.ctx, p.defaultTimeout())
 	defer cancel()
 	_, err := p.MainFrame().EvaluateWithContext(ctx, v)
@@ -777,7 +777,7 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 }
 
 // Evaluate runs JS code within the execution context of the main frame of the page.
-func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
+func (p *Page) Evaluate(pageFunc string, args ...any) any {
 	p.logger.Debugf("Page:Evaluate", "sid:%v", p.sessionID())
 
 	return p.MainFrame().Evaluate(pageFunc, args...)
@@ -1212,7 +1212,7 @@ func (p *Page) Timeout() time.Duration {
 func (p *Page) Title() string {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
-	v := p.vu.Runtime().ToValue(`() => document.title`)
+	v := `() => document.title`
 	return gojaValueToString(p.ctx, p.Evaluate(v))
 }
 
@@ -1265,7 +1265,7 @@ func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
 func (p *Page) URL() string {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
 
-	v := p.vu.Runtime().ToValue(`() => document.location.toString()`)
+	v := `() => document.location.toString()`
 	return gojaValueToString(p.ctx, p.Evaluate(v))
 }
 

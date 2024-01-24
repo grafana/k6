@@ -288,7 +288,7 @@ func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
 			forceCallable: false,
 			returnByValue: false,
 		},
-		f.vu.Runtime().ToValue("document"),
+		"document",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("getting document element handle: %w", err)
@@ -672,7 +672,6 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 func (f *Frame) Content() string {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := f.vu.Runtime()
 	js := `() => {
 		let content = '';
 		if (document.doctype) {
@@ -684,7 +683,7 @@ func (f *Frame) Content() string {
 		return content;
 	}`
 
-	return gojaValueToString(f.ctx, f.Evaluate(rt.ToValue(js)))
+	return gojaValueToString(f.ctx, f.Evaluate(js))
 }
 
 // Dblclick double clicks an element matching provided selector.
@@ -755,7 +754,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *
 // EvaluateWithContext will evaluate provided page function within an execution context.
 // The passed in context will be used instead of the frame's context. The context must
 // be a derivative of one that contains the goja runtime.
-func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error) {
+func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc string, args ...any) (any, error) {
 	f.log.Debugf("Frame:EvaluateWithContext", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -775,7 +774,7 @@ func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc goja.Value, ar
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
+func (f *Frame) Evaluate(pageFunc string, args ...any) any {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
 	result, err := f.EvaluateWithContext(f.ctx, pageFunc, args...)
@@ -1496,8 +1495,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	rt := f.vu.Runtime()
-	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
+	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, js, html); err != nil {
 		k6ext.Panic(f.ctx, "setting content: %w", err)
 	}
 
@@ -1591,7 +1589,7 @@ func (f *Frame) Timeout() time.Duration {
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	v := f.vu.Runtime().ToValue(`() => document.title`)
+	v := `() => document.title`
 	return gojaValueToString(f.ctx, f.Evaluate(v))
 }
 
@@ -1898,7 +1896,7 @@ func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (
 func (f *Frame) evaluate(
 	apiCtx context.Context,
 	world executionWorld,
-	opts evalOptions, pageFunc goja.Value, args ...goja.Value,
+	opts evalOptions, pageFunc string, args ...any,
 ) (any, error) {
 	f.log.Debugf("Frame:evaluate", "fid:%s furl:%q world:%s opts:%s", f.ID(), f.URL(), world, opts)
 
@@ -1910,11 +1908,7 @@ func (f *Frame) evaluate(
 		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 
-	evalArgs := make([]any, 0, len(args))
-	for _, a := range args {
-		evalArgs = append(evalArgs, a.Export())
-	}
-	eh, err := ec.eval(apiCtx, opts, pageFunc.ToString().String(), evalArgs...)
+	eh, err := ec.eval(apiCtx, opts, pageFunc, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%w", err)
 	}

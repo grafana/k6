@@ -74,7 +74,7 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := p.frameManager.MainFrame().evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
+	result, err := p.frameManager.MainFrame().evaluate(s.ctx, mainWorld, opts, `
         () => {
             if (!document.body || !document.documentElement) {
                 return null;
@@ -91,7 +91,7 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
                     document.body.clientHeight, document.documentElement.clientHeight
                 ),
             };
-        }`))
+        }`)
 	if err != nil {
 		return nil, err
 	}
@@ -108,7 +108,6 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 }
 
 func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
-	rt := p.vu.Runtime()
 	originalViewportSize := p.viewportSize()
 	viewportSize := originalViewportSize
 	if viewportSize.Width != 0 || viewportSize.Height != 0 {
@@ -119,10 +118,10 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	result, err := p.frameManager.MainFrame().evaluate(s.ctx, mainWorld, opts, rt.ToValue(`
+	result, err := p.frameManager.MainFrame().evaluate(s.ctx, mainWorld, opts, `
 	() => (
 		{ width: window.innerWidth, height: window.innerHeight }
-	)`))
+	)`)
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting viewport dimensions: %w", err)
 	}
@@ -132,6 +131,7 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 	}
 	viewportSize.Width = r.Get("width").ToFloat()
 	viewportSize.Height = r.Get("height").ToFloat()
+
 	return &viewportSize, &originalViewportSize, nil
 }
 
