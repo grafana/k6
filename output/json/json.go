@@ -1,3 +1,5 @@
+// Package json is implements an output to put metrics in a json file.
+// Actually a multi line json file.
 package json
 
 import (
