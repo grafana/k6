@@ -749,6 +749,24 @@ func startIteration(t *testing.T) (*k6test.VU, *goja.Runtime, *[]string, func())
 	return vu, rt, &log, func() { t.Helper(); vu.EndIteration(t) }
 }
 
+func runJSInEventLoop(t *testing.T, vu *k6test.VU, js string) error {
+	t.Helper()
+
+	rt := vu.Runtime()
+	_, err := rt.RunString(js)
+	require.NoError(t, err)
+
+	test, ok := goja.AssertFunction(rt.Get("test"))
+	require.True(t, ok)
+
+	err = vu.Loop.Start(func() error {
+		_, err := test(goja.Undefined())
+		return err
+	})
+
+	return err
+}
+
 func TestPageWaitForLoadState(t *testing.T) {
 	t.Parallel()
 
