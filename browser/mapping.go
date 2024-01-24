@@ -180,12 +180,18 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			m := mapElementHandle(vu, jsh.AsElement())
 			return rt.ToValue(m).ToObject(rt)
 		},
-		"dispose":  jsh.Dispose,
-		"evaluate": jsh.Evaluate,
+		"dispose": jsh.Dispose,
+		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) any {
+			args := make([]any, 0, len(gargs))
+			for _, a := range gargs {
+				args = append(args, a.Export())
+			}
+			return jsh.Evaluate(pageFunc.String(), args...)
+		},
 		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
 			args := make([]any, 0, len(gargs))
 			for _, a := range gargs {
-				args = append(args, a)
+				args = append(args, a.Export())
 			}
 			h, err := jsh.EvaluateHandle(pageFunc.String(), args...)
 			if err != nil {
@@ -352,11 +358,17 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"content":       f.Content,
 		"dblclick":      f.Dblclick,
 		"dispatchEvent": f.DispatchEvent,
-		"evaluate":      f.Evaluate,
+		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) any {
+			args := make([]any, 0, len(gargs))
+			for _, a := range gargs {
+				args = append(args, a.Export())
+			}
+			return f.Evaluate(pageFunction.String(), args...)
+		},
 		"evaluateHandle": func(pageFunction goja.Value, gargs ...goja.Value) (mapping, error) {
 			args := make([]any, 0, len(gargs))
 			for _, a := range gargs {
-				args = append(args, a)
+				args = append(args, a.Export())
 			}
 			jsh, err := f.EvaluateHandle(pageFunction.String(), args...)
 			if err != nil {
@@ -548,11 +560,17 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"dragAndDrop":             p.DragAndDrop,
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
-		"evaluate":                p.Evaluate,
+		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) any {
+			args := make([]any, 0, len(gargs))
+			for _, a := range gargs {
+				args = append(args, a.Export())
+			}
+			return p.Evaluate(pageFunction.String(), args...)
+		},
 		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
 			args := make([]any, 0, len(gargs))
 			for _, a := range gargs {
-				args = append(args, a)
+				args = append(args, a.Export())
 			}
 			jsh, err := p.EvaluateHandle(pageFunc.String(), args...)
 			if err != nil {
