@@ -18,6 +18,7 @@ import (
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
 type emulateMediaOpts struct {
@@ -718,6 +719,34 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, log, "ok: null")
 	})
+}
+
+// startIteration will work with the event system to start chrome and
+// (more importantly) set browser as the mapped browser instance which will
+// force all tests that work with this to go through the mapping layer.
+// This returns a cleanup function which should be deferred.
+func startIteration(t *testing.T) (*k6test.VU, *goja.Runtime, *[]string, func()) {
+	t.Helper()
+
+	vu := k6test.NewVU(t)
+	rt := vu.Runtime()
+
+	mod := browser.New().NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+
+	// Setting the mapped browser into the vu's goja runtime.
+	require.NoError(t, rt.Set("browser", jsMod.Browser))
+
+	// Setting log, which is used by the callers to assert that certain actions
+	// have been made.
+	var log []string
+	require.NoError(t, rt.Set("log", func(s string) { log = append(log, s) }))
+
+	vu.ActivateVU()
+	vu.StartIteration(t)
+
+	return vu, rt, &log, func() { t.Helper(); vu.EndIteration(t) }
 }
 
 func TestPageWaitForLoadState(t *testing.T) {
