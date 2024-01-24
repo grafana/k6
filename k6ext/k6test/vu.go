@@ -33,6 +33,7 @@ type VU struct {
 	Loop      *k6eventloop.EventLoop
 	toBeState *k6lib.State
 	samples   chan k6metrics.SampleContainer
+	TestRT    *k6modulestest.Runtime
 }
 
 // ToGojaValue is a convenience method for converting any value to a goja value.
@@ -203,5 +204,5 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	ctx = k6lib.WithScenarioState(ctx, &k6lib.ScenarioState{Name: "default"})
 	testRT.VU.CtxField = ctx
 
-	return &VU{VU: testRT.VU, Loop: testRT.EventLoop, toBeState: state, samples: samples}
+	return &VU{VU: testRT.VU, Loop: testRT.EventLoop, toBeState: state, samples: samples, TestRT: testRT}
 }
