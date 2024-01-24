@@ -25,6 +25,7 @@ import (
 )
 
 func TestMsgParsing(t *testing.T) {
+	t.Parallel()
 	m := `{
   "streams": [
     {
@@ -71,6 +72,7 @@ func TestMsgParsing(t *testing.T) {
 }
 
 func TestMSGLog(t *testing.T) {
+	t.Parallel()
 	expectMsg := msg{
 		Streams: []msgStreams{
 			{
@@ -148,7 +150,9 @@ func TestRetry(t *testing.T) {
 		}
 
 		for _, tt := range tests {
+			tt := tt
 			t.Run(tt.name, func(t *testing.T) {
+				t.Parallel()
 				var sleepRequests []time.Duration
 				// sleepCollector tracks the request duration value for sleep requests.
 				sleepCollector := sleeperFunc(func(d time.Duration) {

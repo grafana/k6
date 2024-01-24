@@ -159,7 +159,7 @@ func TestOutputHandleFlushError(t *testing.T) {
 		},
 		{
 			name: "error code equals 4 but no abort",
-			err: cloudapi.ErrorResponse{
+			err: cloudapi.ResponseError{
 				Response: &http.Response{StatusCode: http.StatusForbidden},
 				Code:     4,
 			},
@@ -169,7 +169,7 @@ func TestOutputHandleFlushError(t *testing.T) {
 		},
 		{
 			name: "error code equals 4 and abort",
-			err: cloudapi.ErrorResponse{
+			err: cloudapi.ResponseError{
 				Response: &http.Response{StatusCode: http.StatusForbidden},
 				Code:     4,
 			},
@@ -235,7 +235,7 @@ func TestOutputHandleFlushErrorMultipleTimes(t *testing.T) {
 	}
 	o.config.StopOnError = null.BoolFrom(true)
 
-	er := cloudapi.ErrorResponse{
+	er := cloudapi.ResponseError{
 		Response: &http.Response{
 			StatusCode: http.StatusForbidden,
 		},

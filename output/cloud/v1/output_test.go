@@ -402,10 +402,10 @@ func testCloudOutputStopSendingMetric(t *testing.T, stopOnError bool) {
 		count++
 		if count == max {
 			type payload struct {
-				Error cloudapi.ErrorResponse `json:"error"`
+				Error cloudapi.ResponseError `json:"error"`
 			}
 			res := &payload{}
-			res.Error = cloudapi.ErrorResponse{Code: 4}
+			res.Error = cloudapi.ResponseError{Code: 4}
 			w.Header().Set("Content-Type", "application/json")
 			data, err := json.Marshal(res)
 			if err != nil {

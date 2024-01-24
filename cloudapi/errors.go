@@ -13,8 +13,8 @@ var (
 	errUnknown          = errors.New("an error occurred communicating with k6 Cloud")
 )
 
-// ErrorResponse represents an error cause by talking to the API
-type ErrorResponse struct {
+// ResponseError represents an error cause by talking to the API
+type ResponseError struct {
 	Response *http.Response `json:"-"`
 
 	Code        int                 `json:"code"`
@@ -33,7 +33,7 @@ func contains(s []string, e string) bool {
 	return false
 }
 
-func (e ErrorResponse) Error() string {
+func (e ResponseError) Error() string {
 	msg := e.Message
 
 	for _, v := range e.Errors {
@@ -46,7 +46,7 @@ func (e ErrorResponse) Error() string {
 
 	// `e.Details` is the old API version
 	// TODO: do not handle `details` when the old API becomes obsolete
-	var details []string
+	var details []string //nolint:prealloc
 	var detail string
 	for k, v := range e.Details {
 		detail = k + ": " + strings.Join(v, ", ")
@@ -66,11 +66,12 @@ func (e ErrorResponse) Error() string {
 	}
 
 	var code string
-	if e.Code > 0 && e.Response != nil {
+	switch {
+	case e.Code > 0 && e.Response != nil:
 		code = fmt.Sprintf("%d/E%d", e.Response.StatusCode, e.Code)
-	} else if e.Response != nil {
+	case e.Response != nil:
 		code = fmt.Sprintf("%d", e.Response.StatusCode)
-	} else if e.Code > 0 {
+	case e.Code > 0:
 		code = fmt.Sprintf("E%d", e.Code)
 	}
 
