@@ -22,7 +22,8 @@ func GetExecutionState(ctx context.Context) *ExecutionState {
 	if v == nil {
 		return nil
 	}
-	return v.(*ExecutionState)
+
+	return v.(*ExecutionState) //nolint:forcetypeassert
 }
 
 // WithScenarioState embeds a ScenarioState in ctx.
@@ -36,5 +37,5 @@ func GetScenarioState(ctx context.Context) *ScenarioState {
 	if v == nil {
 		return nil
 	}
-	return v.(*ScenarioState)
+	return v.(*ScenarioState) //nolint:forcetypeassert
 }

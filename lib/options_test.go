@@ -160,11 +160,11 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("TLSVersion", func(t *testing.T) {
 		t.Parallel()
-		versions := TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
+		versions := TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionTLS12} //nolint:staticcheck
 		opts := Options{}.Apply(Options{TLSVersion: &versions})
 
 		assert.NotNil(t, opts.TLSVersion)
-		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30))
+		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30)) //nolint:staticcheck
 		assert.Equal(t, opts.TLSVersion.Max, TLSVersion(tls.VersionTLS12))
 
 		t.Run("JSON", func(t *testing.T) {
@@ -239,11 +239,11 @@ func TestOptions(t *testing.T) {
 					"CgYIKoZIzj0EAwIDSAAwRQIgSGxnJ+/cLUNTzt7fhr/mjJn7ShsTW33dAdfLM7H2\n" +
 					"z/gCIQDyVf8DePtxlkMBScTxZmIlMQdNc6+6VGZQ4QscruVLmg==\n" +
 					"-----END CERTIFICATE-----",
-				Key: "-----BEGIN EC PRIVATE KEY-----\n" +
+				Key: "-----BEGIN EC PRIVATE KEY-----\n" + //nolint:goconst
 					"MHcCAQEEIAfJeoc+XgcqmYV0b4owmofx0LXwPRqOPXMO+PUKxZSgoAoGCCqGSM49\n" +
 					"AwEHoUQDQgAEtp/EQ6YEeTNup33/RVlf/f2o7bJCrYbPl9pF2/LfyS4swJX70dit\n" +
 					"8zHoZgJnNNQirqHxBc6uWBhOLG5RV+Ek1Q==\n" +
-					"-----END EC PRIVATE KEY-----",
+					"-----END EC PRIVATE KEY-----", //nolint:goconst
 			}, nil},
 			{TLSAuthFields{
 				Domains: []string{"sub.example.com"},

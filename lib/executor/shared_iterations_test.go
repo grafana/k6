@@ -74,7 +74,7 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 
 	var totalIters uint64
 	result.Range(func(key, value interface{}) bool {
-		totalIters += value.(uint64)
+		totalIters += value.(uint64) //nolint:forcetypeassert
 		return true
 	})
 
