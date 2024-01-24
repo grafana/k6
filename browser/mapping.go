@@ -751,16 +751,16 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"unroute":            bc.Unroute,
 		"waitForEvent": func(event string, optsOrPredicate goja.Value) (*goja.Promise, error) {
 			ctx := vu.Context()
-			parsedOpts := common.NewWaitForEventOptions(
+			popts := common.NewWaitForEventOptions(
 				bc.Timeout(),
 			)
-			if err := parsedOpts.Parse(ctx, optsOrPredicate); err != nil {
+			if err := popts.Parse(ctx, optsOrPredicate); err != nil {
 				return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
 			}
 
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				var runInTaskQueue func(p *common.Page) (bool, error)
-				if parsedOpts.PredicateFn != nil {
+				if popts.PredicateFn != nil {
 					runInTaskQueue = func(p *common.Page) (bool, error) {
 						tq := vu.taskQueueRegistry.get(p.TargetID())
 
@@ -772,7 +772,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 						c := make(chan bool)
 						tq.Queue(func() error {
 							var resp goja.Value
-							resp, err = parsedOpts.PredicateFn(vu.Runtime().ToValue(p))
+							resp, err = popts.PredicateFn(vu.Runtime().ToValue(p))
 							rtn = resp.ToBoolean()
 							close(c)
 							return nil
@@ -783,7 +783,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 					}
 				}
 
-				resp, err := bc.WaitForEvent(event, runInTaskQueue, parsedOpts.Timeout)
+				resp, err := bc.WaitForEvent(event, runInTaskQueue, popts.Timeout)
 				panicIfFatalError(ctx, err)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
