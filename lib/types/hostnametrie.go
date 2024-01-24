@@ -110,7 +110,7 @@ func NewHostnameTrie(source []string) (*HostnameTrie, error) {
 // Based on regex from https://stackoverflow.com/a/106223/5427244
 //
 //nolint:lll
-var validHostnamePattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?$`)
+var validHostnamePattern = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?$`)
 
 func isValidHostnamePattern(s string) error {
 	if len(validHostnamePattern.FindString(s)) != len(s) {

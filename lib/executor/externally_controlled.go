@@ -225,7 +225,7 @@ func (mex ExternallyControlled) GetLogger() *logrus.Entry {
 }
 
 // Init doesn't do anything...
-func (mex ExternallyControlled) Init(ctx context.Context) error {
+func (mex ExternallyControlled) Init(_ context.Context) error {
 	return nil
 }
 
@@ -480,7 +480,7 @@ func (rs *externallyControlledRunState) handleConfigChange(oldCfg, newCfg Extern
 // until the test is manually stopped.
 //
 //nolint:funlen,gocognit
-func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- metrics.SampleContainer) (err error) {
+func (mex *ExternallyControlled) Run(parentCtx context.Context, _ chan<- metrics.SampleContainer) (err error) {
 	mex.configLock.RLock()
 	// Safely get the current config - it's important that the close of the
 	// hasStarted channel is inside of the lock, so that there are no data races
@@ -528,7 +528,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- metri
 	ss.ProgressFn = runState.progressFn
 
 	*runState.maxVUs = startMaxVUs
-	if err = runState.retrieveStartMaxVUs(); err != nil {
+	if err = runState.retrieveStartMaxVUs(); err != nil { //nolint:contextcheck
 		return err
 	}
 
@@ -537,7 +537,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- metri
 		trackProgress(parentCtx, ctx, ctx, mex, runState.progressFn)
 		close(waitOnProgressChannel)
 	}()
-
+	//nolint:contextcheck
 	err = runState.handleConfigChange( // Start by setting MaxVUs to the starting MaxVUs
 		ExternallyControlledConfigParams{MaxVUs: mex.config.MaxVUs}, currentControlConfig,
 	)
@@ -553,10 +553,10 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, out chan<- metri
 		case <-ctx.Done():
 			return nil
 		case updateConfigEvent := <-mex.newControlConfigs:
-			err := runState.handleConfigChange(currentControlConfig, updateConfigEvent.newConfig)
+			err := runState.handleConfigChange(currentControlConfig, updateConfigEvent.newConfig) //nolint:contextcheck
 			if err != nil {
 				updateConfigEvent.err <- err
-				if ctx.Err() == err {
+				if errors.Is(ctx.Err(), err) {
 					return nil // we've already returned an error to the API client, but k6 should stop normally
 				}
 				return err

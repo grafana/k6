@@ -1,6 +1,7 @@
 package lib
 
-// Returns the maximum value of a and b.
+// Max returns the maximum value of a and b.
+// TODO: replace after 1.21 is the minimal supported version.
 func Max(a, b int64) int64 {
 	if a > b {
 		return a
@@ -8,7 +9,8 @@ func Max(a, b int64) int64 {
 	return b
 }
 
-// Returns the minimum value of a and b.
+// Min returns the minimum value of a and b.
+// TODO: replace after 1.21 is the minimal supported version.
 func Min(a, b int64) int64 {
 	if a < b {
 		return a

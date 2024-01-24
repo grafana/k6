@@ -161,7 +161,7 @@ type RampingArrivalRate struct {
 var _ lib.Executor = &RampingArrivalRate{}
 
 // Init values needed for the execution
-func (varr *RampingArrivalRate) Init(ctx context.Context) error {
+func (varr *RampingArrivalRate) Init(_ context.Context) error {
 	// err should always be nil, because Init() won't be called for executors
 	// with no work, as determined by their config's HasWork() method.
 	et, err := varr.BaseExecutor.executionState.ExecutionTuple.GetNewExecutionTupleFromValue(varr.config.MaxVUs.Int64)

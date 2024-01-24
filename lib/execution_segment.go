@@ -78,7 +78,7 @@ func stringToRat(s string) (*big.Rat, error) {
 		}
 		return new(big.Rat).SetFrac(num, big.NewInt(100)), nil
 	}
-	rat, ok := new(big.Rat).SetString(s)
+	rat, ok := new(big.Rat).SetString(s) //nolint:gosec // the vulnerability was patched in 1.16
 	if !ok {
 		return nil, fmt.Errorf("'%s' is not a valid percentage, decimal, fraction or interval value", s)
 	}
@@ -417,7 +417,7 @@ func gcd(a, b int64) int64 {
 // IsFull returns whether the sequences is full, that is, whether it starts at 0
 // and ends at 1. Use GetFilledExecutionSegmentSequence() to get a full sequence.
 func (ess ExecutionSegmentSequence) IsFull() bool {
-	return ess != nil && len(ess) != 0 && ess[0].from.Cmp(zeroRat) == 0 && ess[len(ess)-1].to.Cmp(oneRat) == 0
+	return len(ess) != 0 && ess[0].from.Cmp(zeroRat) == 0 && ess[len(ess)-1].to.Cmp(oneRat) == 0
 }
 
 // FindSegmentPosition returns the index of the supplied execution segment in

@@ -24,13 +24,15 @@ const DefaultScenarioName = "default"
 //nolint:gochecknoglobals
 var DefaultSummaryTrendStats = []string{"avg", "min", "med", "max", "p(90)", "p(95)"}
 
-// Describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
+// TLSVersion describes a TLS version. Serialised to/from JSON as a string, eg. "tls1.2".
 type TLSVersion int
 
+// MarshalJSON implements the json.Marshaler interface
 func (v TLSVersion) MarshalJSON() ([]byte, error) {
 	return []byte(`"` + SupportedTLSVersionsToString[v] + `"`), nil
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface
 func (v *TLSVersion) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := StrictJSONUnmarshal(data, &str); err != nil {
@@ -49,16 +51,17 @@ func (v *TLSVersion) UnmarshalJSON(data []byte) error {
 }
 
 // Fields for TLSVersions. Unmarshalling hack.
-type TLSVersionsFields struct {
+type tlsVersionsFields struct {
 	Min TLSVersion `json:"min" ignored:"true"` // Minimum allowed version, 0 = any.
 	Max TLSVersion `json:"max" ignored:"true"` // Maximum allowed version, 0 = any.
 }
 
-// Describes a set (min/max) of TLS versions.
-type TLSVersions TLSVersionsFields
+// TLSVersions describes a set (min/max) of TLS versions.
+type TLSVersions tlsVersionsFields
 
+// UnmarshalJSON implements the json.Unmarshaler interface
 func (v *TLSVersions) UnmarshalJSON(data []byte) error {
-	var fields TLSVersionsFields
+	var fields tlsVersionsFields
 	if err := StrictJSONUnmarshal(data, &fields); err != nil {
 		var ver TLSVersion
 		if err2 := StrictJSONUnmarshal(data, &ver); err2 != nil {
@@ -71,7 +74,7 @@ func (v *TLSVersions) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// A list of TLS cipher suites.
+// TLSCipherSuites represents a list of TLS cipher suites.
 // Marshals and unmarshals from a list of names, eg. "TLS_ECDHE_RSA_WITH_RC4_128_SHA".
 type TLSCipherSuites []uint16
 
@@ -89,6 +92,7 @@ func (s *TLSCipherSuites) MarshalJSON() ([]byte, error) {
 	return json.Marshal(suiteNames)
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface
 func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 	var suiteNames []string
 	if err := StrictJSONUnmarshal(data, &suiteNames); err != nil {
@@ -109,7 +113,7 @@ func (s *TLSCipherSuites) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-// Fields for TLSAuth. Unmarshalling hack.
+// TLSAuthFields for TLSAuth. Unmarshalling hack.
 type TLSAuthFields struct {
 	// Certificate and key as a PEM-encoded string, including "-----BEGIN CERTIFICATE-----".
 	Cert     string      `json:"cert"`
@@ -120,12 +124,13 @@ type TLSAuthFields struct {
 	Domains []string `json:"domains"`
 }
 
-// Defines a TLS client certificate to present to certain hosts.
+// TLSAuth defines a TLS client certificate to present to certain hosts.
 type TLSAuth struct {
 	TLSAuthFields
 	certificate *tls.Certificate
 }
 
+// UnmarshalJSON implements the json.Unmarshaler interface
 func (c *TLSAuth) UnmarshalJSON(data []byte) error {
 	if err := StrictJSONUnmarshal(data, &c.TLSAuthFields); err != nil {
 		return err
@@ -136,6 +141,8 @@ func (c *TLSAuth) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+// Certificate returns a certificate based on the TLSAuth
+// not thread safe
 func (c *TLSAuth) Certificate() (*tls.Certificate, error) {
 	key := []byte(c.Key)
 	var err error
@@ -216,6 +223,7 @@ func ParseCIDR(s string) (*IPNet, error) {
 	return &parsedIPNet, nil
 }
 
+// Options represent configure options for k6.
 type Options struct {
 	// Should the test start in a paused state?
 	Paused null.Bool `json:"paused" envconfig:"K6_PAUSED"`
@@ -332,13 +340,15 @@ type Options struct {
 	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
 }
 
-// Returns the result of overwriting any fields with any that are set on the argument.
+// Apply returns the result of overwriting any fields with any that are set on the argument.
 //
 // Example:
 //
 //	a := Options{VUs: null.IntFrom(10)}
 //	b := Options{VUs: null.IntFrom(5)}
 //	a.Apply(b) // Options{VUs: null.IntFrom(5)}
+//
+//nolint:funlen,gocognit,cyclop
 func (o Options) Apply(opts Options) Options {
 	if opts.Paused.Valid {
 		o.Paused = opts.Paused
@@ -531,7 +541,7 @@ func (o Options) ForEachSpecified(structTag string, callback func(key string, va
 		fieldVal := structVal.Field(i)
 		value := fieldVal.Interface()
 
-		shouldCall := false
+		var shouldCall bool
 		switch fieldType.Type.Kind() {
 		case reflect.Struct:
 			// Unpack any guregu/null values

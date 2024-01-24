@@ -31,7 +31,7 @@ func TestExecutionSegmentEquals(t *testing.T) {
 	t.Run("To it's self", func(t *testing.T) {
 		t.Parallel()
 		es := stringToES(t, "1/2:2/3")
-		require.True(t, es.Equal(es))
+		require.True(t, es.Equal(es)) //nolint:gocritic
 	})
 }
 
@@ -422,6 +422,14 @@ func TestExecutionSegmentStringSequences(t *testing.T) {
 	}
 }
 
+func getTestRand(t testing.TB) *rand.Rand {
+	t.Helper()
+	seed := time.Now().UnixNano()
+	r := rand.New(rand.NewSource(seed)) //nolint:gosec
+	t.Logf("Random source seeded with %d\n", seed)
+	return r
+}
+
 // Return a randomly distributed sequence of n amount of
 // execution segments whose length totals 1.
 func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) ExecutionSegmentSequence {
@@ -449,13 +457,11 @@ func generateRandomSequence(t testing.TB, n, m int64, r *rand.Rand) ExecutionSeg
 func TestExecutionSegmentScaleConsistency(t *testing.T) {
 	t.Parallel()
 
-	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed))
-	t.Logf("Random source seeded with %d\n", seed)
+	r := getTestRand(t)
 
 	const numTests = 10
 	for i := 0; i < numTests; i++ {
-		scale := rand.Int31n(99) + 2
+		scale := r.Int31n(99) + 2
 		seq := generateRandomSequence(t, r.Int63n(9)+2, 100, r)
 
 		t.Run(fmt.Sprintf("%d_%s", scale, seq), func(t *testing.T) {
@@ -474,13 +480,10 @@ func TestExecutionSegmentScaleConsistency(t *testing.T) {
 func TestExecutionTupleScaleConsistency(t *testing.T) {
 	t.Parallel()
 
-	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed))
-	t.Logf("Random source seeded with %d\n", seed)
-
+	r := getTestRand(t)
 	const numTests = 10
 	for i := 0; i < numTests; i++ {
-		scale := rand.Int31n(99) + 2
+		scale := r.Int31n(99) + 2
 		seq := generateRandomSequence(t, r.Int63n(9)+2, 200, r)
 
 		et, err := NewExecutionTuple(seq[0], &seq)
@@ -517,16 +520,14 @@ func TestExecutionSegmentScaleNoWobble(t *testing.T) {
 		requireSegmentScaleGreater(t, et)
 	})
 
-	seed := time.Now().UnixNano()
-	r := rand.New(rand.NewSource(seed))
-	t.Logf("Random source seeded with %d\n", seed)
+	r := getTestRand(t)
 
 	// Random segments
 	const numTests = 10
 	for i := 0; i < numTests; i++ {
 		seq := generateRandomSequence(t, r.Int63n(9)+2, 100, r)
 
-		es := seq[rand.Intn(len(seq))]
+		es := seq[r.Intn(len(seq))]
 
 		et, err := NewExecutionTuple(seq[0], &seq)
 		require.NoError(t, err)
@@ -623,7 +624,7 @@ func TestSequenceLCD(t *testing.T) {
 func BenchmarkGetStripedOffsets(b *testing.B) {
 	lengths := [...]int64{10, 100}
 	const seed = 777
-	r := rand.New(rand.NewSource(seed))
+	r := rand.New(rand.NewSource(seed)) //nolint:gosec
 
 	for _, length := range lengths {
 		length := length

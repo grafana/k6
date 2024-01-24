@@ -4,6 +4,7 @@ import (
 	"archive/tar"
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"io/fs"
@@ -20,18 +21,20 @@ import (
 )
 
 var (
-	volumeRE  = regexp.MustCompile(`^[/\\]?([a-zA-Z]):(.*)`)
-	sharedRE  = regexp.MustCompile(`^\\\\([^\\]+)`) // matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
+	volumeRE = regexp.MustCompile(`^[/\\]?([a-zA-Z]):(.*)`)
+	// matches a shared folder in Windows before backslack replacement. i.e \\VMBOXSVR\k6\script.js
+	sharedRE  = regexp.MustCompile(`^\\\\([^\\]+)`)
 	homeDirRE = regexp.MustCompile(`(?i)^(/[a-zA-Z])?/(Users|home|Documents and Settings)/(?:[^/]+)`)
 )
 
-// NormalizeAndAnonymizePath Normalizes (to use a / path separator) and anonymizes a file path, by scrubbing usernames from home directories.
+// NormalizeAndAnonymizePath Normalizes (to use a / path separator) and anonymizes a file path,
+// by scrubbing usernames from home directories.
 func NormalizeAndAnonymizePath(path string) string {
 	path = filepath.Clean(path)
 
 	p := volumeRE.ReplaceAllString(path, `/$1$2`)
 	p = sharedRE.ReplaceAllString(p, `/nobody`)
-	p = strings.Replace(p, "\\", "/", -1)
+	p = strings.ReplaceAll(p, "\\", "/")
 	return homeDirRE.ReplaceAllString(p, `$1/$2/nobody`)
 }
 
@@ -106,6 +109,8 @@ func (arc *Archive) loadMetadataJSON(data []byte) (err error) {
 }
 
 // ReadArchive reads an archive created by Archive.Write from a reader.
+//
+//nolint:gocognit
 func ReadArchive(in io.Reader) (*Archive, error) {
 	r := tar.NewReader(in)
 	arc := &Archive{Filesystems: make(map[string]fsext.Fs, 2)}
@@ -115,12 +120,12 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 	for {
 		hdr, err := r.Next()
 		if err != nil {
-			if err == io.EOF {
+			if errors.Is(err, io.EOF) {
 				break
 			}
 			return nil, err
 		}
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
+		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA { //nolint:staticcheck
 			continue
 		}
 
@@ -161,12 +166,10 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 		case "https", "file":
 			fileSystem := arc.getFs(pfx)
 			name = filepath.FromSlash(name)
-			err = fsext.WriteFile(fileSystem, name, data, fs.FileMode(hdr.Mode))
-			if err != nil {
+			if err = fsext.WriteFile(fileSystem, name, data, fs.FileMode(hdr.Mode)); err != nil {
 				return nil, err
 			}
-			err = fileSystem.Chtimes(name, hdr.AccessTime, hdr.ModTime)
-			if err != nil {
+			if err = fileSystem.Chtimes(name, hdr.AccessTime, hdr.ModTime); err != nil {
 				return nil, err
 			}
 		default:
@@ -218,6 +221,8 @@ func getURLtoString(u *url.URL) string {
 // The format should be treated as opaque; currently it is simply a TAR rollup, but this may
 // change. If it does change, ReadArchive must be able to handle all previous formats as well as
 // the current one.
+//
+//nolint:funlen,gocognit
 func (arc *Archive) Write(out io.Writer) error {
 	w := tar.NewWriter(out)
 
