@@ -24,6 +24,12 @@ issues:
        - gocognit
        - funlen
        - lll
+   - path: js\/modules\/k6\/http\/.*_test\.go
+     linters:
+       # k6/http module's tests are quite complex because they often have several nested levels.
+       # The module is in maintainance mode, so we don't intend to port the tests to a parallel version.
+       - paralleltest
+       - tparallel
    - linters:
      - staticcheck # Tracked in https://github.com/grafana/xk6-grpc/issues/14
      text: "The entire proto file grpc/reflection/v1alpha/reflection.proto is marked as deprecated."
