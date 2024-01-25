@@ -861,7 +861,7 @@ func TestBrowserContextGrantPermissions(t *testing.T) {
 func TestBrowserContextClearPermissions(t *testing.T) {
 	t.Parallel()
 
-	hasPermission := func(tb *testBrowser, p *common.Page, perm string) bool {
+	hasPermission := func(_ *testBrowser, p *common.Page, perm string) bool {
 		t.Helper()
 
 		js := fmt.Sprintf(`
@@ -870,8 +870,8 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 			).then(result => result.state)
 		`, perm)
 		v := p.Evaluate(js)
-		require.IsType(t, "", v)
-		return v.(string) == "granted" //nolint:forcetypeassert
+		s := asString(t, v)
+		return s == "granted"
 	}
 
 	t.Run("no_permissions_set", func(t *testing.T) {

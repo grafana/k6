@@ -76,8 +76,8 @@ func TestNestedFrames(t *testing.T) {
 	assert.Nil(t, err)
 
 	v := frame2.Evaluate(`() => window.buttonClicked`)
-	assert.IsType(t, true, v)
-	assert.True(t, v.(bool), "button hasn't been clicked") //nolint:forcetypeassert
+	bv := asBool(t, v)
+	assert.True(t, bv, "button hasn't been clicked")
 }
 
 func TestPageEmulateMedia(t *testing.T) {
@@ -127,9 +127,8 @@ func TestPageEvaluate(t *testing.T) {
 			`(v) => { window.v = v; return window.v }`,
 			"test",
 		)
-
-		require.IsType(t, "", got)
-		assert.Equal(t, "test", got)
+		s := asString(t, got)
+		assert.Equal(t, "test", s)
 	})
 
 	t.Run("ok/void_func", func(t *testing.T) {

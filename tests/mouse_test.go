@@ -26,8 +26,8 @@ func TestMouseDblClick(t *testing.T) {
 	p.Mouse.DblClick(35, 17, nil)
 
 	v := p.Evaluate(`() => window.dblclick`)
-	require.IsType(t, true, v)
-	assert.True(t, v.(bool), "failed to double click the link") //nolint:forcetypeassert
+	bv := asBool(t, v)
+	assert.True(t, bv, "failed to double click the link")
 
 	got := p.InnerText("#counter", nil)
 	assert.Equal(t, "2", got)
