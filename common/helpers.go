@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -35,6 +36,9 @@ func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, ob
 func convertArgument(
 	ctx context.Context, execCtx *ExecutionContext, arg any,
 ) (*cdpruntime.CallArgument, error) {
+	if escapesGojaValues(arg) {
+		return nil, errors.New("goja.Value escaped")
+	}
 	switch a := arg.(type) {
 	case int64:
 		if a > math.MaxInt32 {
@@ -246,4 +250,16 @@ func convert[T any](from any, to *T) error {
 		return err //nolint:wrapcheck
 	}
 	return json.Unmarshal(buf, to) //nolint:wrapcheck
+}
+
+// TODO:
+// remove this temporary helper after ensuring the goja-free
+// business logic works.
+func escapesGojaValues(args ...any) bool {
+	for _, arg := range args {
+		if _, ok := arg.(goja.Value); ok {
+			return true
+		}
+	}
+	return false
 }
