@@ -614,11 +614,7 @@ func TestSourceMap3556Panic(t *testing.T) {
 `[1:]), 0o644))
 
 	data := `
-console.log(awsConfig);
-function createRequests() {
-  return [model];
-}
-exports.createRequests = createRequests;
+console.log(nah);
 //# sourceMappingURL=script.js.map`
 	_, err := getSimpleBundle(t, "/script.js", data, fs)
 	require.NoError(t, err)
