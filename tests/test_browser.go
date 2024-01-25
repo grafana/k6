@@ -355,20 +355,20 @@ func (b *testBrowser) awaitWithTimeout(timeout time.Duration, fn func() error) e
 // returns a pointer to the converted value for convenience.
 //
 // underneath, it uses json.Marshal and json.Unmarshal to do the conversion.
-func convert[T any](t *testing.T, from any, to *T) *T {
-	t.Helper()
+func convert[T any](tb testing.TB, from any, to *T) *T {
+	tb.Helper()
 	buf, err := json.Marshal(from)
-	require.NoError(t, err)
-	require.NoError(t, json.Unmarshal(buf, to))
+	require.NoError(tb, err)
+	require.NoError(tb, json.Unmarshal(buf, to))
 	return to
 }
 
 // asBool asserts that v is a boolean and returns v as a boolean.
-func asBool(t *testing.T, v any) bool {
-	t.Helper()
-	require.IsType(t, true, v)
+func asBool(tb testing.TB, v any) bool {
+	tb.Helper()
+	require.IsType(tb, true, v)
 	b, ok := v.(bool)
-	require.True(t, ok)
+	require.True(tb, ok)
 	return b
 }
 
