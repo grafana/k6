@@ -610,7 +610,7 @@ func TestSourceMap3556Panic(t *testing.T) {
 	t.Parallel()
 	fs := fsext.NewMemMapFs()
 	require.NoError(t, fsext.WriteFile(fs, "/script.js.map", []byte(`
-{"version":3,"sources":[],"sourcesContent":[],"names":[],"mappings":";;"}
+{"mappings":";;"}
 `[1:]), 0o644))
 
 	data := `
