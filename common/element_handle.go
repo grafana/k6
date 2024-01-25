@@ -263,6 +263,9 @@ func (h *ElementHandle) fill(_ context.Context, value string) error {
 		return err
 	}
 	s, ok := result.(string)
+	if !ok {
+		return fmt.Errorf("unexpected type %T", result)
+	}
 	if ok && s != resultDone {
 		// Either we're done or an error happened (returned as "error:..." from JS)
 		return errorFromDOMError(s)
