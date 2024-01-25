@@ -93,7 +93,7 @@ func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position)
 	}
 
 	// Either we're done or an error happened (returned as "error:..." from JS)
-	const done = "done"
+	const done = resultDone
 	if v, ok := result.(string); !ok {
 		// We got a { hitTargetDescription: ... } result
 		// Meaning: Another element is preventing pointer events.
@@ -565,7 +565,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 	}
 	switch result := result.(type) {
 	case string: // An error happened (returned as "error:..." from JS)
-		if result != "done" {
+		if result != resultDone {
 			return nil, errorFromDOMError(result)
 		}
 	}
@@ -588,7 +588,7 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 	}
 	switch result := result.(type) {
 	case string: // Either we're done or an error happened (returned as "error:..." from JS)
-		if result != "done" {
+		if result != resultDone {
 			return errorFromDOMError(result)
 		}
 	}
@@ -662,7 +662,7 @@ func (h *ElementHandle) waitForElementState(
 	}
 	switch v := result.(type) {
 	case string: // Either we're done or an error happened (returned as "error:..." from JS)
-		if v == "done" {
+		if v == resultDone {
 			return true, nil
 		}
 		return false, errorFromDOMError(v)
