@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -13,7 +12,6 @@ import (
 
 func TestBrowserOptionsSlowMo(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO: fix goja escape")
 
 	if testing.Short() {
 		t.Skip()
@@ -47,7 +45,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				p.DispatchEvent("button", "click", goja.Null(), nil)
+				err := p.DispatchEvent("button", "click", nil, common.NewFrameDispatchEventOptions(p.Timeout()))
+				require.NoError(t, err)
 			})
 		})
 		t.Run("emulateMedia", func(t *testing.T) {
@@ -195,7 +194,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				f.DispatchEvent("button", "click", goja.Null(), nil)
+				err := f.DispatchEvent("button", "click", nil, common.NewFrameDispatchEventOptions(f.Timeout()))
+				require.NoError(t, err)
 			})
 		})
 		t.Run("evaluate", func(t *testing.T) {
