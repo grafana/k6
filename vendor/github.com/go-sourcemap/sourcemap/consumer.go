@@ -192,6 +192,10 @@ func (c *Consumer) source(
 		return int(m.genLine) >= genLine
 	})
 
+	if i == 0 && i == len(m.mappings) {
+		return
+	}
+
 	var match *mapping
 	// Mapping not found
 	if i == len(m.mappings) {
