@@ -303,6 +303,7 @@ func (e *ExecutionContext) Eval(apiCtx context.Context, js string, args ...any) 
 	for _, a := range args {
 		evalArgs = append(evalArgs, a)
 	}
+
 	return e.eval(apiCtx, opts, js, evalArgs...)
 }
 
