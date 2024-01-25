@@ -371,3 +371,12 @@ func asBool(t *testing.T, v any) bool {
 	require.True(t, ok)
 	return b
 }
+
+// asString asserts that v is a boolean and returns v as a boolean.
+func asString(tb testing.TB, v any) string {
+	tb.Helper()
+	require.IsType(tb, "", v)
+	s, ok := v.(string)
+	require.True(tb, ok)
+	return s
+}
