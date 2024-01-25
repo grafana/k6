@@ -96,7 +96,7 @@ func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
 	}
 	var size Size
 	if err := convert(result, &size); err != nil {
-		return nil, fmt.Errorf("converting result to size: %w", err)
+		return nil, fmt.Errorf("converting result (%v of type %t) to size: %w", result, result, err)
 	}
 
 	return &size, nil
