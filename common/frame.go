@@ -719,22 +719,20 @@ func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
 }
 
 // DispatchEvent dispatches an event for the first element matching the selector.
-func (f *Frame) DispatchEvent(selector, typ string, eventInit, opts goja.Value) {
+func (f *Frame) DispatchEvent(selector, typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	f.log.Debugf("Frame:DispatchEvent", "fid:%s furl:%q sel:%q typ:%q", f.ID(), f.URL(), selector, typ)
 
-	popts := NewFrameDispatchEventOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing dispatch event options: %w", err)
-	}
-	if err := f.dispatchEvent(selector, typ, eventInit, popts); err != nil {
-		k6ext.Panic(f.ctx, "dispatching event %q to %q: %w", typ, selector, err)
+	if err := f.dispatchEvent(selector, typ, eventInit, opts); err != nil {
+		return fmt.Errorf("dispatching frame event %q to %q: %w", typ, selector, err)
 	}
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 // dispatchEvent is like DispatchEvent but takes parsed options and neither throws
 // an error, or applies slow motion.
-func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *FrameDispatchEventOptions) error {
+func (f *Frame) dispatchEvent(selector, typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	dispatchEvent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}

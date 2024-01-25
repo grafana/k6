@@ -716,10 +716,11 @@ func (p *Page) Dblclick(selector string, opts goja.Value) {
 	p.MainFrame().Dblclick(selector, opts)
 }
 
-func (p *Page) DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) {
+// DispatchEvent dispatches an event on the page to the element that matches the provided selector.
+func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	p.logger.Debugf("Page:DispatchEvent", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
+	return p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
 }
 
 // DragAndDrop is not implemented.

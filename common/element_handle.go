@@ -233,7 +233,7 @@ func (h *ElementHandle) defaultTimeout() time.Duration {
 	return h.frame.manager.timeoutSettings.timeout()
 }
 
-func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit goja.Value) (any, error) {
+func (h *ElementHandle) dispatchEvent(_ context.Context, typ string, eventInit any) (any, error) {
 	fn := `
 		(node, injected, type, eventInit) => {
 			injected.dispatchEvent(node, type, eventInit);
@@ -774,7 +774,8 @@ func (h *ElementHandle) Dblclick(opts goja.Value) {
 	applySlowMo(h.ctx)
 }
 
-func (h *ElementHandle) DispatchEvent(typ string, eventInit goja.Value) {
+// DispatchEvent dispatches a DOM event to the element.
+func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
 	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
@@ -782,9 +783,12 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit goja.Value) {
 	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
 	_, err := call(h.ctx, actFn, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "dispatching element event: %w", err)
+		return fmt.Errorf("dispatching element event %q: %w", typ, err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 func (h *ElementHandle) Fill(value string, opts goja.Value) {

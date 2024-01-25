@@ -585,7 +585,7 @@ func (l *Locator) tap(opts *FrameTapOptions) error {
 
 // DispatchEvent dispatches an event for the element matching the
 // locator's selector with strict mode on.
-func (l *Locator) DispatchEvent(typ string, eventInit, opts goja.Value) {
+func (l *Locator) DispatchEvent(typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	l.log.Debugf(
 		"Locator:DispatchEvent", "fid:%s furl:%q sel:%q typ:%q eventInit:%+v opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, typ, eventInit, opts,
@@ -594,18 +594,14 @@ func (l *Locator) DispatchEvent(typ string, eventInit, opts goja.Value) {
 	var err error
 	defer func() { panicOrSlowMo(l.ctx, err) }()
 
-	popts := NewFrameDispatchEventOptions(l.frame.defaultTimeout())
-	if err = popts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing dispatch event options: %w", err)
-		return
+	if err = l.dispatchEvent(typ, eventInit, opts); err != nil {
+		return fmt.Errorf("dispatching locator event %q to %q: %w", typ, l.selector, err)
 	}
-	if err = l.dispatchEvent(typ, eventInit, popts); err != nil {
-		err = fmt.Errorf("dispatching event %q to %q: %w", typ, l.selector, err)
-		return
-	}
+
+	return nil
 }
 
-func (l *Locator) dispatchEvent(typ string, eventInit goja.Value, opts *FrameDispatchEventOptions) error {
+func (l *Locator) dispatchEvent(typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	opts.Strict = true
 	return l.frame.dispatchEvent(l.selector, typ, eventInit, opts)
 }
@@ -626,4 +622,10 @@ func (l *Locator) WaitFor(opts goja.Value) {
 func (l *Locator) waitFor(opts *FrameWaitForSelectorOptions) error {
 	opts.Strict = true
 	return l.frame.waitFor(l.selector, opts)
+}
+
+// DefaultTimeout returns the default timeout for the locator.
+// This is an internal API and should not be used by users.
+func (l *Locator) DefaultTimeout() time.Duration {
+	return l.frame.defaultTimeout()
 }

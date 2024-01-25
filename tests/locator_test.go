@@ -26,7 +26,6 @@ type jsFrameWaitForSelectorOpts struct {
 
 func TestLocator(t *testing.T) {
 	t.Parallel()
-	t.Skip("TODO: fix goja escape")
 
 	tests := []struct {
 		name string
@@ -91,7 +90,11 @@ func TestLocator(t *testing.T) {
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be clicked first")
-				p.Locator("#link", nil).DispatchEvent("click", tb.toGojaValue("mouseevent"), nil)
+				opts := &common.FrameDispatchEventOptions{
+					FrameBaseOptions: &common.FrameBaseOptions{},
+				}
+				err := p.Locator("#link", nil).DispatchEvent("click", "mouseevent", opts)
+				require.NoError(t, err)
 				require.True(t, result(), "cannot not dispatch event")
 			},
 		},
@@ -280,7 +283,11 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"DispatchEvent", func(l *common.Locator, tb *testBrowser) {
-				l.DispatchEvent("click", tb.toGojaValue("mouseevent"), timeout(tb))
+				err := l.DispatchEvent("click", "mouseevent", common.NewFrameDispatchEventOptions(100*time.Millisecond))
+				if err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
 			},
 		},
 		{

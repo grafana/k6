@@ -62,29 +62,35 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Click(popts) //nolint:wrapcheck
 			}), nil
 		},
-		"dblclick":      lo.Dblclick,
-		"check":         lo.Check,
-		"uncheck":       lo.Uncheck,
-		"isChecked":     lo.IsChecked,
-		"isEditable":    lo.IsEditable,
-		"isEnabled":     lo.IsEnabled,
-		"isDisabled":    lo.IsDisabled,
-		"isVisible":     lo.IsVisible,
-		"isHidden":      lo.IsHidden,
-		"fill":          lo.Fill,
-		"focus":         lo.Focus,
-		"getAttribute":  lo.GetAttribute,
-		"innerHTML":     lo.InnerHTML,
-		"innerText":     lo.InnerText,
-		"textContent":   lo.TextContent,
-		"inputValue":    lo.InputValue,
-		"selectOption":  lo.SelectOption,
-		"press":         lo.Press,
-		"type":          lo.Type,
-		"hover":         lo.Hover,
-		"tap":           lo.Tap,
-		"dispatchEvent": lo.DispatchEvent,
-		"waitFor":       lo.WaitFor,
+		"dblclick":     lo.Dblclick,
+		"check":        lo.Check,
+		"uncheck":      lo.Uncheck,
+		"isChecked":    lo.IsChecked,
+		"isEditable":   lo.IsEditable,
+		"isEnabled":    lo.IsEnabled,
+		"isDisabled":   lo.IsDisabled,
+		"isVisible":    lo.IsVisible,
+		"isHidden":     lo.IsHidden,
+		"fill":         lo.Fill,
+		"focus":        lo.Focus,
+		"getAttribute": lo.GetAttribute,
+		"innerHTML":    lo.InnerHTML,
+		"innerText":    lo.InnerText,
+		"textContent":  lo.TextContent,
+		"inputValue":   lo.InputValue,
+		"selectOption": lo.SelectOption,
+		"press":        lo.Press,
+		"type":         lo.Type,
+		"hover":        lo.Hover,
+		"tap":          lo.Tap,
+		"dispatchEvent": func(typ string, eventInit, opts goja.Value) error {
+			popts := common.NewFrameDispatchEventOptions(lo.DefaultTimeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return fmt.Errorf("parsing locator dispatch event options: %w", err)
+			}
+			return lo.DispatchEvent(typ, eventInit.Export(), popts) //nolint:wrapcheck
+		},
+		"waitFor": lo.WaitFor,
 	}
 }
 
@@ -249,21 +255,23 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 			}
 			return mapFrame(vu, f), nil
 		},
-		"dblclick":      eh.Dblclick,
-		"dispatchEvent": eh.DispatchEvent,
-		"fill":          eh.Fill,
-		"focus":         eh.Focus,
-		"getAttribute":  eh.GetAttribute,
-		"hover":         eh.Hover,
-		"innerHTML":     eh.InnerHTML,
-		"innerText":     eh.InnerText,
-		"inputValue":    eh.InputValue,
-		"isChecked":     eh.IsChecked,
-		"isDisabled":    eh.IsDisabled,
-		"isEditable":    eh.IsEditable,
-		"isEnabled":     eh.IsEnabled,
-		"isHidden":      eh.IsHidden,
-		"isVisible":     eh.IsVisible,
+		"dblclick": eh.Dblclick,
+		"dispatchEvent": func(typ string, eventInit goja.Value) error {
+			return eh.DispatchEvent(typ, eventInit.Export()) //nolint:wrapcheck
+		},
+		"fill":         eh.Fill,
+		"focus":        eh.Focus,
+		"getAttribute": eh.GetAttribute,
+		"hover":        eh.Hover,
+		"innerHTML":    eh.InnerHTML,
+		"innerText":    eh.InnerText,
+		"inputValue":   eh.InputValue,
+		"isChecked":    eh.IsChecked,
+		"isDisabled":   eh.IsDisabled,
+		"isEditable":   eh.IsEditable,
+		"isEnabled":    eh.IsEnabled,
+		"isHidden":     eh.IsHidden,
+		"isVisible":    eh.IsVisible,
 		"ownerFrame": func() (mapping, error) {
 			f, err := eh.OwnerFrame()
 			if err != nil {
@@ -355,9 +363,15 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
-		"content":       f.Content,
-		"dblclick":      f.Dblclick,
-		"dispatchEvent": f.DispatchEvent,
+		"content":  f.Content,
+		"dblclick": f.Dblclick,
+		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) error {
+			popts := common.NewFrameDispatchEventOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return fmt.Errorf("parsing frame dispatch event options: %w", err)
+			}
+			return f.DispatchEvent(selector, typ, eventInit.Export(), popts) //nolint:wrapcheck
+		},
 		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) any {
 			args := make([]any, 0, len(gargs))
 			for _, a := range gargs {
@@ -553,10 +567,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 
 			return p.Close(opts) //nolint:wrapcheck
 		},
-		"content":                 p.Content,
-		"context":                 p.Context,
-		"dblclick":                p.Dblclick,
-		"dispatchEvent":           p.DispatchEvent,
+		"content":  p.Content,
+		"context":  p.Context,
+		"dblclick": p.Dblclick,
+		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) error {
+			popts := common.NewFrameDispatchEventOptions(p.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return fmt.Errorf("parsing page dispatch event options: %w", err)
+			}
+			return p.DispatchEvent(selector, typ, eventInit.Export(), popts) //nolint:wrapcheck
+		},
 		"dragAndDrop":             p.DragAndDrop,
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
