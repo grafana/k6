@@ -606,6 +606,24 @@ export default function () {
 	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat webpack:///./test1.ts:5:4(3)\n\tat file:///script.js:4:2(4)\n", exception.String())
 }
 
+func TestSourceMap3556Panic(t *testing.T) {
+	t.Parallel()
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/script.js.map", []byte(`
+{"version":3,"sources":[],"sourcesContent":[],"names":[],"mappings":";;"}
+`[1:]), 0o644))
+
+	data := `
+console.log(awsConfig);
+function createRequests() {
+  return [model];
+}
+exports.createRequests = createRequests;
+//# sourceMappingURL=script.js.map`
+	_, err := getSimpleBundle(t, "/script.js", data, fs)
+	require.NoError(t, err)
+}
+
 func TestSourceMapsExternalExtented(t *testing.T) {
 	t.Parallel()
 	fs := fsext.NewMemMapFs()
