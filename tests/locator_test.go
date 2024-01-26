@@ -90,9 +90,7 @@ func TestLocator(t *testing.T) {
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be clicked first")
-				opts := &common.FrameDispatchEventOptions{
-					FrameBaseOptions: &common.FrameBaseOptions{},
-				}
+				opts := common.NewFrameDispatchEventOptions(0) // no timeout
 				err := p.Locator("#link", nil).DispatchEvent("click", "mouseevent", opts)
 				require.NoError(t, err)
 				require.True(t, result(), "cannot not dispatch event")
