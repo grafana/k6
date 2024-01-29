@@ -232,6 +232,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 //
 //nolint:funlen
 func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
+	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,
 		"check":       eh.Check,
@@ -280,8 +281,22 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 			return mapFrame(vu, f), nil
 		},
 		"press": eh.Press,
-		"screenshot": func(opts goja.Value) goja.ArrayBuffer {
-			return eh.Screenshot(opts, vu.LocalFilePersister)
+		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
+			ctx := vu.Context()
+
+			popts := common.NewElementHandleScreenshotOptions(eh.Timeout())
+			if err := popts.Parse(ctx, opts); err != nil {
+				return nil, fmt.Errorf("parsing frame screenshot options: %w", err)
+			}
+
+			bb, err := eh.Screenshot(popts, vu.LocalFilePersister)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+
+			ab := rt.NewArrayBuffer(bb)
+
+			return &ab, nil
 		},
 		"scrollIntoViewIfNeeded": eh.ScrollIntoViewIfNeeded,
 		"selectOption":           eh.SelectOption,

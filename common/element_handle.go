@@ -1178,7 +1178,10 @@ func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Posi
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current element and save it to specified file.
-func (h *ElementHandle) Screenshot(opts goja.Value, fp *storage.LocalFilePersister) goja.ArrayBuffer {
+func (h *ElementHandle) Screenshot(
+	opts *ElementHandleScreenshotOptions,
+	fp *storage.LocalFilePersister,
+) (*[]byte, error) {
 	spanCtx, span := TraceAPICall(
 		h.ctx,
 		h.frame.page.targetID.String(),
@@ -1186,19 +1189,15 @@ func (h *ElementHandle) Screenshot(opts goja.Value, fp *storage.LocalFilePersist
 	)
 	defer span.End()
 
-	rt := h.execCtx.vu.Runtime()
-	parsedOpts := NewElementHandleScreenshotOptions(h.defaultTimeout())
-	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing screenshot options: %w", err)
-	}
-	span.SetAttributes(attribute.String("screenshot.path", parsedOpts.Path))
+	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
 	s := newScreenshotter(spanCtx, fp)
-	buf, err := s.screenshotElement(h, parsedOpts)
+	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
-		k6ext.Panic(h.ctx, "taking screenshot: %w", err)
+		return nil, fmt.Errorf("taking screenshot of elementHandle: %w", err)
 	}
-	return rt.NewArrayBuffer(*buf)
+
+	return buf, err
 }
 
 func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) {

@@ -375,9 +375,13 @@ func TestElementHandleScreenshot(t *testing.T) {
 	elem, err := p.Query("div")
 	require.NoError(t, err)
 
-	buf := elem.Screenshot(nil, &storage.LocalFilePersister{})
+	buf, err := elem.Screenshot(
+		common.NewElementHandleScreenshotOptions(elem.Timeout()),
+		&storage.LocalFilePersister{},
+	)
+	require.NoError(t, err)
 
-	reader := bytes.NewReader(buf.Bytes())
+	reader := bytes.NewReader(*buf)
 	img, err := png.Decode(reader)
 	assert.Nil(t, err)
 
