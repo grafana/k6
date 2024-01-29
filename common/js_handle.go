@@ -163,7 +163,8 @@ func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
 
 // JSONValue returns a JSON version of this JS handle.
 func (h *BaseJSHandle) JSONValue() (string, error) {
-	if h.remoteObject.ObjectID != "" {
+	remoteObject := h.remoteObject
+	if remoteObject.ObjectID != "" {
 		var result *runtime.RemoteObject
 		var err error
 		action := runtime.CallFunctionOn("function() { return this; }").
@@ -173,16 +174,12 @@ func (h *BaseJSHandle) JSONValue() (string, error) {
 		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
 			return "", fmt.Errorf("retrieving json value: %w", err)
 		}
-		res, err := parseConsoleRemoteObject(h.logger, result)
-		if err != nil {
-			return "", fmt.Errorf("extracting value from result: %w", err)
-		}
-
-		return res, nil
+		remoteObject = result
 	}
-	res, err := parseConsoleRemoteObject(h.logger, h.remoteObject)
+
+	res, err := parseConsoleRemoteObject(h.logger, remoteObject)
 	if err != nil {
-		return "", fmt.Errorf("extracting value from remote object: %w", err)
+		return "", fmt.Errorf("extracting json value: %w", err)
 	}
 
 	return res, nil
