@@ -474,13 +474,12 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	}
     `)
 
-	buf := p.Screenshot(tb.toGojaValue(struct {
-		FullPage bool `js:"fullPage"`
-	}{
-		FullPage: true,
-	}), &storage.LocalFilePersister{})
+	opts := common.NewPageScreenshotOptions()
+	opts.FullPage = true
+	buf, err := p.Screenshot(opts, &storage.LocalFilePersister{})
+	require.NoError(t, err)
 
-	reader := bytes.NewReader(buf.Bytes())
+	reader := bytes.NewReader(*buf)
 	img, err := png.Decode(reader)
 	assert.Nil(t, err)
 

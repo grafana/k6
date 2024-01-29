@@ -704,8 +704,22 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			return rt.ToValue(r).ToObject(rt)
 		},
 		"route": p.Route,
-		"screenshot": func(opts goja.Value) goja.ArrayBuffer {
-			return p.Screenshot(opts, vu.LocalFilePersister)
+		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
+			ctx := vu.Context()
+
+			popts := common.NewPageScreenshotOptions()
+			if err := popts.Parse(ctx, opts); err != nil {
+				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
+			}
+
+			bb, err := p.Screenshot(popts, vu.LocalFilePersister)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+
+			ab := rt.NewArrayBuffer(bb)
+
+			return &ab, nil
 		},
 		"selectOption":                p.SelectOption,
 		"setContent":                  p.SetContent,
