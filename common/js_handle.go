@@ -171,7 +171,7 @@ func (h *BaseJSHandle) JSONValue() (string, error) {
 			WithAwaitPromise(true).
 			WithObjectID(h.remoteObject.ObjectID)
 		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-			k6ext.Panic(h.ctx, "getting properties for JS handle: %w", err)
+			return "", fmt.Errorf("retrieving json value: %w", err)
 		}
 		res, err := parseConsoleRemoteObject(h.logger, result)
 		if err != nil {
