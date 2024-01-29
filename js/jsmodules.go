@@ -14,6 +14,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modules/k6/metrics"
+	"go.k6.io/k6/js/modules/k6/streams"
 	"go.k6.io/k6/js/modules/k6/ws"
 
 	"github.com/grafana/xk6-browser/browser"
@@ -43,6 +44,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/html":                    html.New(),
 		"k6/http":                    http.New(),
 		"k6/metrics":                 metrics.New(),
+		"k6/streams":                 streams.New(),
 		"k6/ws":                      ws.New(),
 	}
 }
