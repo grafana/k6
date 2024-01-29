@@ -19,7 +19,7 @@ jobs:
       DOCKER_IMAGE_ID: ghcr.io/grafana/k6packager
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       - name: Build
         run: |
           cd packaging
