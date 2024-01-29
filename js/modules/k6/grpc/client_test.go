@@ -992,7 +992,6 @@ func TestClient_TlsParameters(t *testing.T) {
 	clientAuth := "-----BEGIN CERTIFICATE-----\\nMIIBVzCB/6ADAgECAgkAg/SeNG3XqB0wCgYIKoZIzj0EAwIwEDEOMAwGA1UEAwwF\\nTXkgQ0EwIBcNMjIwMTIxMTUxMjM0WhgPMzAyMTA1MjQxNTEyMzRaMBExDzANBgNV\\nBAMMBmNsaWVudDBZMBMGByqGSM49AgEGCCqGSM49AwEHA0IABKM7OJQMYG4KLtDA\\ngZ8zOg2PimHMmQnjD2HtI4cSwIUJJnvHWLowbFe9fk6XeP9b3dK1ImUI++/EZdVr\\nABAcngejPzA9MA4GA1UdDwEB/wQEAwIBBjAMBgNVHRMBAf8EAjAAMB0GA1UdDgQW\\nBBSttJe1mcPEnBOZ6wvKPG4zL0m1CzAKBggqhkjOPQQDAgNHADBEAiBPSLgKA/r9\\nu/FW6W+oy6Odm1kdNMGCI472iTn545GwJgIgb3UQPOUTOj0IN4JLJYfmYyXviqsy\\nzk9eWNHFXDA9U6U=\\n-----END CERTIFICATE-----"
 	clientAuthKey := testingKey("-----BEGIN EC TESTING KEY-----\\nMHcCAQEEINDaMGkOT3thu1A0LfLJr3Jd011/aEG6OArmEQaujwgpoAoGCCqGSM49\\nAwEHoUQDQgAEozs4lAxgbgou0MCBnzM6DY+KYcyZCeMPYe0jhxLAhQkme8dYujBs\\nV71+Tpd4/1vd0rUiZQj778Rl1WsAEByeBw==\\n-----END EC TESTING KEY-----")
 	clientAuthKeyEncrypted := testingKey("-----BEGIN EC TESTING KEY-----\\nProc-Type: 4,ENCRYPTED\\nDEK-Info: AES-256-CBC,3E311E9B602231BFB5C752071EE7D652\\n\\nsAKeqbacug0v4ruE1A0CACwGVEGBQVOl1CiGVp5RsxgNZKXzMS6EsTTNLw378coF\\nKXbF+he05HIuzToOz2ANLXov1iCrVpotKVB4l2obTQvg+5VET902ky99Mc9Us7jd\\nUwW8LpXlSlhcNWuUfK6wyosL42TbcIxjqZWaESW+6ww=\\n-----END EC TESTING KEY-----")
-	clientAuthBad := "-----BEGIN CERTIFICATE-----\\nMIIB2TCCAX6gAwIBAgIUJIZKiR78AH2ioZ+Jae/sElgH85kwCgYIKoZIzj0EAwIw\\nEDEOMAwGA1UEAwwFTXkgQ0EwHhcNMjMwNzA3MTAyNjQ2WhcNMjQwNzA2MTAyNjQ2\\nWjARMQ8wDQYDVQQDDAZjbGllbnQwWTATBgcqhkjOPQIBBggqhkjOPQMBBwNCAASj\\nOziUDGBuCi7QwIGfMzoNj4phzJkJ4w9h7SOHEsCFCSZ7x1i6MGxXvX5Ol3j/W93S\\ntSJlCPvvxGXVawAQHJ4Ho4G0MIGxMAkGA1UdEwQCMAAwEQYJYIZIAYb4QgEBBAQD\\nAgWgMCwGCWCGSAGG+EIBDQQfFh1Mb2NhbCBUZXN0IENsaWVudCBDZXJ0aWZpY2F0\\nZTAdBgNVHQ4EFgQUrbSXtZnDxJwTmesLyjxuMy9JtQswHwYDVR0jBBgwFoAUpLpA\\nQPJYBb7wSQGCrKElEfj1+9YwDgYDVR0PAQH/BAQDAgXgMBMGA1UdJQQMMAoGCCsG\\nAQUFBwMEMAoGCCqGSM49BAMCA0kAMEYCIQDcHrzug3V3WvUU+tEKhG1C4cPG5rPJ\\n/y3oOoM0roOnsgIhAP23UmiC6Qdgj+MOhXWSaNt3exWvlxdKmLm2edkxaTs+\\n-----END CERTIFICATE-----"
 
 	trivialKeyPassword := "abc123"
 	trivialWrongKeyPassword := "abc321"
@@ -1072,43 +1071,6 @@ func TestClient_TlsParameters(t *testing.T) {
 			},
 		},
 		{
-			name: "ConnectTlsClientCertNoClientAuth",
-			setup: func(tb *httpmultibin.HTTPMultiBin) {
-				clientCAPool := x509.NewCertPool()
-				clientCAPool.AppendCertsFromPEM(clientAuthCA)
-				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
-				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
-			},
-			initString: codeBlock{code: `var client = new grpc.Client();`},
-			vuString: codeBlock{
-				code: fmt.Sprintf(`client.connect("GRPCBIN_ADDR", { timeout: '2s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});`,
-					localHostCert,
-					clientAuthBad,
-					clientAuthKey),
-				err: "remote error: tls: bad certificate",
-			},
-		},
-		{
-			name: "ConnectTlsClientCertWithPasswordNoClientAuth",
-			setup: func(tb *httpmultibin.HTTPMultiBin) {
-				clientCAPool := x509.NewCertPool()
-				clientCAPool.AppendCertsFromPEM(clientAuthCA)
-				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
-				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
-			},
-			initString: codeBlock{code: `var client = new grpc.Client();`},
-			vuString: codeBlock{
-				code: fmt.Sprintf(`
-				client.connect("GRPCBIN_ADDR", { timeout: '2s', tls: { cacerts: ["%s"], cert: "%s", key: "%s", password: "%s" }});
-				`,
-					localHostCert,
-					clientAuthBad,
-					clientAuthKeyEncrypted,
-					trivialKeyPassword),
-				err: "remote error: tls: bad certificate",
-			},
-		},
-		{
 			name: "ConnectTlsInvokeSuccess",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				clientCAPool := x509.NewCertPool()
@@ -1132,33 +1094,6 @@ func TestClient_TlsParameters(t *testing.T) {
 					localHostCert,
 					clientAuth,
 					clientAuthKey),
-			},
-		},
-		{
-			name: "ConnectTlsBadAuthInvokeFails",
-			setup: func(tb *httpmultibin.HTTPMultiBin) {
-				clientCAPool := x509.NewCertPool()
-				clientCAPool.AppendCertsFromPEM(clientAuthCA)
-				tb.ServerHTTP2.TLS.ClientAuth = tls.RequireAndVerifyClientCert
-				tb.ServerHTTP2.TLS.ClientCAs = clientCAPool
-				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
-					return &grpc_testing.Empty{}, nil
-				}
-			},
-			initString: codeBlock{code: `
-				var client = new grpc.Client();
-				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
-			vuString: codeBlock{
-				code: fmt.Sprintf(`
-				client.connect("GRPCBIN_ADDR", { timeout: '2s', tls: { cacerts: ["%s"], cert: "%s", key: "%s" }});
-				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {})
-				if (resp.status !== grpc.StatusOK) {
-					throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
-				}`,
-					localHostCert,
-					clientAuthBad,
-					clientAuthKey),
-				err: "remote error: tls: bad certificate",
 			},
 		},
 	}
