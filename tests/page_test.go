@@ -19,6 +19,7 @@ import (
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
+	"github.com/grafana/xk6-browser/storage"
 )
 
 type emulateMediaOpts struct {
@@ -477,7 +478,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 		FullPage bool `js:"fullPage"`
 	}{
 		FullPage: true,
-	}))
+	}), &storage.LocalFilePersister{})
 
 	reader := bytes.NewReader(buf.Bytes())
 	img, err := png.Decode(reader)

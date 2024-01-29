@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/storage"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -374,7 +375,7 @@ func TestElementHandleScreenshot(t *testing.T) {
 	elem, err := p.Query("div")
 	require.NoError(t, err)
 
-	buf := elem.Screenshot(nil)
+	buf := elem.Screenshot(nil, &storage.LocalFilePersister{})
 
 	reader := bytes.NewReader(buf.Bytes())
 	img, err := png.Decode(reader)

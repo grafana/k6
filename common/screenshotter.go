@@ -7,14 +7,14 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/dop251/goja"
+
+	"github.com/grafana/xk6-browser/storage"
 )
 
 // ImageFormat represents an image file format.
@@ -61,11 +61,12 @@ func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 }
 
 type screenshotter struct {
-	ctx context.Context
+	ctx       context.Context
+	persister *storage.LocalFilePersister
 }
 
-func newScreenshotter(ctx context.Context) *screenshotter {
-	return &screenshotter{ctx}
+func newScreenshotter(ctx context.Context, fp *storage.LocalFilePersister) *screenshotter {
+	return &screenshotter{ctx, fp}
 }
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
@@ -217,12 +218,8 @@ func (s *screenshotter) screenshot(
 	// Save screenshot capture to file
 	// TODO: we should not write to disk here but put it on some queue for async disk writes
 	if path != "" {
-		dir := filepath.Dir(path)
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, fmt.Errorf("creating screenshot directory %q: %w", dir, err)
-		}
-		if err := os.WriteFile(path, buf, 0o644); err != nil {
-			return nil, fmt.Errorf("saving screenshot to %q: %w", path, err)
+		if err := s.persister.Persist(path, bytes.NewBuffer(buf)); err != nil {
+			return nil, fmt.Errorf("persisting screenshot: %w", err)
 		}
 	}
 

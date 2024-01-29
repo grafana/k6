@@ -279,8 +279,10 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 			}
 			return mapFrame(vu, f), nil
 		},
-		"press":                  eh.Press,
-		"screenshot":             eh.Screenshot,
+		"press": eh.Press,
+		"screenshot": func(opts goja.Value) goja.ArrayBuffer {
+			return eh.Screenshot(opts, vu.LocalFilePersister)
+		},
 		"scrollIntoViewIfNeeded": eh.ScrollIntoViewIfNeeded,
 		"selectOption":           eh.SelectOption,
 		"selectText":             eh.SelectText,
@@ -686,8 +688,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			r := mapResponse(vu, p.Reload(opts))
 			return rt.ToValue(r).ToObject(rt)
 		},
-		"route":                       p.Route,
-		"screenshot":                  p.Screenshot,
+		"route": p.Route,
+		"screenshot": func(opts goja.Value) goja.ArrayBuffer {
+			return p.Screenshot(opts, vu.LocalFilePersister)
+		},
 		"selectOption":                p.SelectOption,
 		"setContent":                  p.SetContent,
 		"setDefaultNavigationTimeout": p.SetDefaultNavigationTimeout,

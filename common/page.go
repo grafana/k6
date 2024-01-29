@@ -25,6 +25,7 @@ import (
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
+	"github.com/grafana/xk6-browser/storage"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -1120,7 +1121,7 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
-func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
+func (p *Page) Screenshot(opts goja.Value, fp *storage.LocalFilePersister) goja.ArrayBuffer {
 	spanCtx, span := TraceAPICall(p.ctx, p.targetID.String(), "page.screenshot")
 	defer span.End()
 
@@ -1130,7 +1131,7 @@ func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
 	}
 	span.SetAttributes(attribute.String("screenshot.path", parsedOpts.Path))
 
-	s := newScreenshotter(spanCtx)
+	s := newScreenshotter(spanCtx, fp)
 	buf, err := s.screenshotPage(p, parsedOpts)
 	if err != nil {
 		k6ext.Panic(p.ctx, "capturing screenshot: %w", err)
