@@ -165,16 +165,14 @@ func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
 func (h *BaseJSHandle) JSONValue() (string, error) {
 	remoteObject := h.remoteObject
 	if remoteObject.ObjectID != "" {
-		var result *runtime.RemoteObject
 		var err error
 		action := runtime.CallFunctionOn("function() { return this; }").
 			WithReturnByValue(true).
 			WithAwaitPromise(true).
 			WithObjectID(h.remoteObject.ObjectID)
-		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+		if remoteObject, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
 			return "", fmt.Errorf("retrieving json value: %w", err)
 		}
-		remoteObject = result
 	}
 
 	res, err := parseConsoleRemoteObject(h.logger, remoteObject)
