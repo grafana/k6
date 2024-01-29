@@ -137,7 +137,7 @@ jobs:
       - name: Generate coverage HTML report
         run: go tool cover -html=coverage.txt -o coverage.html
       - name: Upload coverage report
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: test-coverage-report-${{ matrix.platform }}
           path: coverage.html
