@@ -479,7 +479,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	buf, err := p.Screenshot(opts, &storage.LocalFilePersister{})
 	require.NoError(t, err)
 
-	reader := bytes.NewReader(*buf)
+	reader := bytes.NewReader(buf)
 	img, err := png.Decode(reader)
 	assert.Nil(t, err)
 

@@ -141,7 +141,7 @@ func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 //nolint:funlen,cyclop
 func (s *screenshotter) screenshot(
 	sess session, doc, viewport *Rect, format ImageFormat, omitBackground bool, quality int64, path string,
-) (*[]byte, error) {
+) ([]byte, error) {
 	var (
 		buf  []byte
 		clip *cdppage.Viewport
@@ -222,10 +222,11 @@ func (s *screenshotter) screenshot(
 		}
 	}
 
-	return &buf, nil
+	return buf, nil
 }
 
-func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleScreenshotOptions) (*[]byte, error) {
+//nolint:funlen,cyclop
+func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 	viewportSize, originalViewportSize, err := s.originalViewportSize(h.frame.page)
 	if err != nil {
@@ -296,7 +297,8 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	return buf, nil
 }
 
-func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) (*[]byte, error) {
+//nolint:funlen,cyclop
+func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 
 	// Infer file format by path

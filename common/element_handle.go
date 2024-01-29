@@ -1181,7 +1181,7 @@ func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Posi
 func (h *ElementHandle) Screenshot(
 	opts *ElementHandleScreenshotOptions,
 	fp *storage.LocalFilePersister,
-) (*[]byte, error) {
+) ([]byte, error) {
 	spanCtx, span := TraceAPICall(
 		h.ctx,
 		h.frame.page.targetID.String(),

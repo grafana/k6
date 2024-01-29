@@ -381,7 +381,7 @@ func TestElementHandleScreenshot(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	reader := bytes.NewReader(*buf)
+	reader := bytes.NewReader(buf)
 	img, err := png.Decode(reader)
 	assert.Nil(t, err)
 
