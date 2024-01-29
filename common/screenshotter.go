@@ -216,7 +216,6 @@ func (s *screenshotter) screenshot(
 	}
 
 	// Save screenshot capture to file
-	// TODO: we should not write to disk here but put it on some queue for async disk writes
 	if path != "" {
 		if err := s.persister.Persist(path, bytes.NewBuffer(buf)); err != nil {
 			return nil, fmt.Errorf("persisting screenshot: %w", err)
