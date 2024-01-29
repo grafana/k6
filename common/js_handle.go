@@ -177,7 +177,7 @@ func (h *BaseJSHandle) JSONValue() (string, error) {
 
 	res, err := parseConsoleRemoteObject(h.logger, remoteObject)
 	if err != nil {
-		return "", fmt.Errorf("extracting json value: %w", err)
+		return "", fmt.Errorf("extracting json value (remote object id: %v): %w", remoteObject.ObjectID, err)
 	}
 
 	return res, nil
