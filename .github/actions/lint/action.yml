@@ -25,7 +25,7 @@ runs:
         echo "GolangCIVersion=$(head -n 1 "${{ github.action_path }}/.golangci.yml" | tr -d '# ')" >> "${GITHUB_OUTPUT}"
       id: getenv
     - name: golangci-lint
-      uses: golangci/golangci-lint-action@349d20632dbaed38f0a492cc991152e3d351e854 // latest commit at the time that uses node20
+      uses: golangci/golangci-lint-action@349d20632dbaed38f0a492cc991152e3d351e854 # latest commit at the time that uses node20
       with:
         version: ${{ steps.getenv.outputs.GolangCIVersion }}
         only-new-issues: true
