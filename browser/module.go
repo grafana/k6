@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/storage"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -76,7 +77,8 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 					m.PidRegistry,
 					m.tracesMetadata,
 				),
-				taskQueueRegistry: newTaskQueueRegistry(vu),
+				taskQueueRegistry:  newTaskQueueRegistry(vu),
+				LocalFilePersister: &storage.LocalFilePersister{},
 			}),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),
