@@ -27,7 +27,7 @@ jobs:
         run: |
           echo "Running tests on '${GITHUB_REF}' with '$(git describe --tags --always --long --dirty)' checked out..."
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
           check-latest: true
@@ -56,7 +56,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: 1.x
           check-latest: true
@@ -94,7 +94,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install Go
-        uses: actions/setup-go@v3
+        uses: actions/setup-go@v5
         with:
           go-version: ${{ matrix.go-version }}
           check-latest: true
