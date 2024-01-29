@@ -243,7 +243,7 @@ func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPr
 
 	bb, err := json.Marshal(obj)
 	if err != nil {
-		return "", fmt.Errorf("marshaling object to string: %w", err)
+		return "", fmt.Errorf("marshaling object %q to string: %w", obj, err)
 	}
 
 	return string(bb), nil
@@ -265,7 +265,7 @@ func parseConsoleRemoteArrayPreview(logger *log.Logger, op *cdpruntime.ObjectPre
 
 	bb, err := json.Marshal(arr)
 	if err != nil {
-		return "", fmt.Errorf("marshaling array to string: %w", err)
+		return "", fmt.Errorf("marshaling array %q to string: %w", arr, err)
 	}
 
 	return string(bb), nil
