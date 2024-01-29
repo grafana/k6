@@ -12,7 +12,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
-	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/storage"
 )
@@ -121,12 +120,14 @@ func (s *screenshotter) originalViewportSize(p *Page) (*Size, *Size, error) {
 	if err != nil {
 		return nil, nil, fmt.Errorf("getting viewport dimensions: %w", err)
 	}
-	r, ok := result.(goja.Object)
-	if !ok {
-		return nil, nil, fmt.Errorf("cannot convert to goja object: %w", err)
+
+	var returnVal Size
+	if err := convert(result, &returnVal); err != nil {
+		return nil, nil, fmt.Errorf("unpacking window size: %w", err)
 	}
-	viewportSize.Width = r.Get("width").ToFloat()
-	viewportSize.Height = r.Get("height").ToFloat()
+
+	viewportSize.Width = returnVal.Width
+	viewportSize.Height = returnVal.Height
 
 	return &viewportSize, &originalViewportSize, nil
 }
@@ -277,13 +278,15 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	}
 
 	documentRect := bbox
-	rt := h.execCtx.vu.Runtime()
 	scrollOffset := h.Evaluate(`() => { return {x: window.scrollX, y: window.scrollY};}`)
-	switch s := scrollOffset.(type) {
-	case goja.Value:
-		documentRect.X += s.ToObject(rt).Get("x").ToFloat()
-		documentRect.Y += s.ToObject(rt).Get("y").ToFloat()
+
+	var returnVal Position
+	if err := convert(scrollOffset, &returnVal); err != nil {
+		return nil, fmt.Errorf("unpacking scroll offset: %w", err)
 	}
+
+	documentRect.X += returnVal.X
+	documentRect.Y += returnVal.Y
 
 	buf, err := s.screenshot(h.frame.page.session, documentRect.enclosingIntRect(), nil, format, opts.OmitBackground, opts.Quality, opts.Path)
 	if err != nil {
