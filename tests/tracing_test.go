@@ -67,6 +67,7 @@ func TestTracing(t *testing.T) {
 			fmt.Fprint(w, html)
 		},
 	))
+	defer ts.Close()
 
 	// Initialize VU and browser module
 	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
