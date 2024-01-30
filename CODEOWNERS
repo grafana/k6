@@ -1,2 +1,8 @@
 # by default the k6-core team is the owner of all files
 * @grafana/k6-core
+
+# The release notes are shared across different teams,
+# especially with the browser team.
+# It turned out to be less noisy if the author picks manually every time
+# the best reviewers based on the context of the working area.
+/release\ notes/
