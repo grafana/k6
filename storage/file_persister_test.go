@@ -61,7 +61,7 @@ func TestLocalFilePersister(t *testing.T) {
 			}
 
 			var l LocalFilePersister
-			err := l.Persist(p, strings.NewReader(tt.data))
+			err := l.Persist(context.Background(), p, strings.NewReader(tt.data))
 			assert.NoError(t, err)
 
 			i, err := os.Stat(p)

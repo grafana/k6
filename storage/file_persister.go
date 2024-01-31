@@ -26,7 +26,7 @@ type LocalFilePersister struct{}
 
 // Persist will write the contents of data to the local disk on the specified path.
 // TODO: we should not write to disk here but put it on some queue for async disk writes.
-func (l *LocalFilePersister) Persist(path string, data io.Reader) (err error) {
+func (l *LocalFilePersister) Persist(_ context.Context, path string, data io.Reader) (err error) {
 	cp := filepath.Clean(path)
 
 	dir := filepath.Dir(cp)

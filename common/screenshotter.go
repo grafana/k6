@@ -218,7 +218,7 @@ func (s *screenshotter) screenshot(
 
 	// Save screenshot capture to file
 	if path != "" {
-		if err := s.persister.Persist(path, bytes.NewBuffer(buf)); err != nil {
+		if err := s.persister.Persist(s.ctx, path, bytes.NewBuffer(buf)); err != nil {
 			return nil, fmt.Errorf("persisting screenshot: %w", err)
 		}
 	}
