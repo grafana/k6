@@ -300,7 +300,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	return buf, nil
 }
 
-//nolint:funlen,cyclop
+//nolint:funlen,cyclop,gocognit
 func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 
