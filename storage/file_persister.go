@@ -15,6 +15,12 @@ import (
 	"time"
 )
 
+// FilePersister is the type that all file persisters must implement. It's job is
+// to persist a file somewhere, hiding the details of where and how from the caller.
+type FilePersister interface {
+	Persist(ctx context.Context, path string, data io.Reader) (err error)
+}
+
 // LocalFilePersister will persist files to the local disk.
 type LocalFilePersister struct{}
 
