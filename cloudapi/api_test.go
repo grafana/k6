@@ -15,8 +15,8 @@ import (
 	"go.k6.io/k6/lib/types"
 )
 
-func fprintf(t *testing.T, w io.Writer, format string, a ...interface{}) int {
-	n, err := fmt.Fprintf(w, format, a...)
+func fprint(t *testing.T, w io.Writer, format string) int {
+	n, err := fmt.Fprint(w, format)
 	require.NoError(t, err)
 	return n
 }
@@ -30,7 +30,7 @@ func TestCreateTestRun(t *testing.T) {
 		exp := `{"name":"test","vus":0,"thresholds":null,"duration":0}`
 		assert.JSONEq(t, exp, string(b))
 
-		fprintf(t, w, `{"reference_id": "1", "config": {"aggregationPeriod": "2s"}}`)
+		fprint(t, w, `{"reference_id": "1", "config": {"aggregationPeriod": "2s"}}`)
 	}))
 	defer server.Close()
 
@@ -51,7 +51,7 @@ func TestCreateTestRun(t *testing.T) {
 func TestFinished(t *testing.T) {
 	t.Parallel()
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		fprintf(t, w, "")
+		fprint(t, w, "")
 	}))
 	defer server.Close()
 
@@ -73,7 +73,7 @@ func TestAuthorizedError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called++
 		w.WriteHeader(http.StatusForbidden)
-		fprintf(t, w, `{"error": {"code": 5, "message": "Not allowed"}}`)
+		fprint(t, w, `{"error": {"code": 5, "message": "Not allowed"}}`)
 	}))
 	defer server.Close()
 
@@ -92,7 +92,7 @@ func TestDetailsError(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		called++
 		w.WriteHeader(http.StatusForbidden)
-		fprintf(t, w, `{"error": {"code": 0, "message": "Validation failed", "details": { "name": ["Shorter than minimum length 2."]}}}`)
+		fprint(t, w, `{"error": {"code": 0, "message": "Validation failed", "details": { "name": ["Shorter than minimum length 2."]}}}`)
 	}))
 	defer server.Close()
 
@@ -145,7 +145,7 @@ func TestClientRetrySuccessOnSecond(t *testing.T) {
 		assert.Equal(t, idempotencyKey, gotK6IdempotencyKey)
 		called++
 		if called == 2 {
-			fprintf(t, w, `{"reference_id": "1"}`)
+			fprint(t, w, `{"reference_id": "1"}`)
 			return
 		}
 		w.WriteHeader(http.StatusInternalServerError)

@@ -325,7 +325,7 @@ func (o *Output) handleFlushError(err error) {
 
 	o.logger.WithError(err).Error("Failed to push metrics to the cloud")
 
-	var errResp cloudapi.ErrorResponse
+	var errResp cloudapi.ResponseError
 	if !errors.As(err, &errResp) || errResp.Response == nil {
 		return
 	}
