@@ -21,6 +21,58 @@ type FilePersister interface {
 	Persist(ctx context.Context, path string, data io.Reader) (err error)
 }
 
+// parseEnvVar will parse a value such as:
+// url=https://127.0.0.1/,basePath=/screenshots,header.1=a,header.2=b
+// and return them.
+func parseEnvVar(envVarValue string) (string, string, map[string]string, error) {
+	ss := strings.Split(envVarValue, ",")
+
+	var (
+		url      string
+		basePath string
+		headers  = make(map[string]string)
+	)
+	for _, s := range ss {
+		// The key value pair should be of the form key=value, so split
+		// on '=' to retrieve the key and value separately.
+		kv := strings.Split(s, "=")
+		if len(kv) <= 1 || len(kv) > 2 {
+			return "", "", nil, fmt.Errorf("format of value must be k=v, received %q", s)
+		}
+
+		k := kv[0]
+		v := kv[1]
+
+		// A key with "header." means that the header name is encoded in the
+		// key, separated by a ".". Split the header on "." to retrieve the
+		// header name. The header value should be present in v from the previous
+		// split.
+		var hv, hk string
+		if strings.Contains(k, "header.") {
+			hv = v
+
+			hh := strings.Split(k, ".")
+			if len(kv) <= 1 || len(kv) > 2 {
+				return "", "", nil, fmt.Errorf("format of header must be header.k=v, received %q", s)
+			}
+
+			k = hh[0]
+			hk = hh[1]
+		}
+
+		switch k {
+		case "url":
+			url = v
+		case "basePath":
+			basePath = v
+		case "header":
+			headers[hk] = hv
+		}
+	}
+
+	return url, basePath, headers, nil
+}
+
 // LocalFilePersister will persist files to the local disk.
 type LocalFilePersister struct{}
 
