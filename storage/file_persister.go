@@ -91,7 +91,7 @@ func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.
 		return fmt.Errorf("creating upload request: %w", err)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := r.httpClient.Do(req)
 	if err != nil {
 		return fmt.Errorf("performing upload request: %w", err)
 	}
@@ -132,7 +132,7 @@ func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) 
 		req.Header.Add(k, v)
 	}
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := r.httpClient.Do(req)
 	if err != nil {
 		return "", fmt.Errorf("performing request: %w", err)
 	}
