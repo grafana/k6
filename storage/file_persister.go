@@ -13,12 +13,31 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
+
+	"github.com/grafana/xk6-browser/env"
 )
 
 // FilePersister is the type that all file persisters must implement. It's job is
 // to persist a file somewhere, hiding the details of where and how from the caller.
 type FilePersister interface {
 	Persist(ctx context.Context, path string, data io.Reader) (err error)
+}
+
+// NewFilePersister will return either a LocalFilePersister or a RemoteFilePersister
+// depending on whether the K6_BROWSER_SCREENSHOTS_OUTPUT env var is setup with the
+// correct configs.
+func NewFilePersister(envLookup env.LookupFunc) (FilePersister, error) {
+	envVar, ok := envLookup(env.ScreenshotsOutput)
+	if !ok || envVar == "" {
+		return &LocalFilePersister{}, nil
+	}
+
+	u, b, h, err := parseEnvVar(envVar)
+	if err != nil {
+		return nil, fmt.Errorf("parsing %s: %w", env.ScreenshotsOutput, err)
+	}
+
+	return NewRemoteFilePersister(u, h, b), nil
 }
 
 // parseEnvVar will parse a value such as:
