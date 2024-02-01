@@ -61,10 +61,10 @@ func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 
 type screenshotter struct {
 	ctx       context.Context
-	persister *storage.LocalFilePersister
+	persister storage.FilePersister
 }
 
-func newScreenshotter(ctx context.Context, fp *storage.LocalFilePersister) *screenshotter {
+func newScreenshotter(ctx context.Context, fp storage.FilePersister) *screenshotter {
 	return &screenshotter{ctx, fp}
 }
 

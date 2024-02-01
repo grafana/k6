@@ -1180,7 +1180,7 @@ func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Posi
 // Screenshot will instruct Chrome to save a screenshot of the current element and save it to specified file.
 func (h *ElementHandle) Screenshot(
 	opts *ElementHandleScreenshotOptions,
-	fp *storage.LocalFilePersister,
+	fp storage.FilePersister,
 ) ([]byte, error) {
 	spanCtx, span := TraceAPICall(
 		h.ctx,

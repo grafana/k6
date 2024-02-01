@@ -284,7 +284,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 				return nil, fmt.Errorf("parsing frame screenshot options: %w", err)
 			}
 
-			bb, err := eh.Screenshot(popts, vu.LocalFilePersister)
+			bb, err := eh.Screenshot(popts, vu.FilePersister)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -686,7 +686,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
 
-			bb, err := p.Screenshot(popts, vu.LocalFilePersister)
+			bb, err := p.Screenshot(popts, vu.FilePersister)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}

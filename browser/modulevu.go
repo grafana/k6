@@ -22,7 +22,7 @@ type moduleVU struct {
 
 	*taskQueueRegistry
 
-	*storage.LocalFilePersister
+	storage.FilePersister
 }
 
 // browser returns the VU browser instance for the current iteration.
