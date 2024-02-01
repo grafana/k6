@@ -31,6 +31,7 @@ type (
 		remoteRegistry *remoteRegistry
 		initOnce       *sync.Once
 		tracesMetadata map[string]string
+		filePersister  storage.FilePersister
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -114,6 +115,10 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	}
 	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
 		go startDebugServer()
+	}
+	m.filePersister, err = storage.NewFilePersister(initEnv.LookupEnv)
+	if err != nil {
+		k6ext.Abort(vu.Context(), "failed to create file persister: %v", err)
 	}
 }
 
