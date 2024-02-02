@@ -88,7 +88,7 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return fmt.Errorf("parsing locator dispatch event options: %w", err)
 			}
-			return lo.DispatchEvent(typ, eventInit.Export(), popts) //nolint:wrapcheck
+			return lo.DispatchEvent(typ, exportArg(eventInit), popts) //nolint:wrapcheck
 		},
 		"waitFor": lo.WaitFor,
 	}
@@ -190,16 +190,12 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) any {
 			args := make([]any, 0, len(gargs))
 			for _, a := range gargs {
-				args = append(args, a.Export())
+				args = append(args, exportArg(a))
 			}
 			return jsh.Evaluate(pageFunc.String(), args...)
 		},
 		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
-			args := make([]any, 0, len(gargs))
-			for _, a := range gargs {
-				args = append(args, a.Export())
-			}
-			h, err := jsh.EvaluateHandle(pageFunc.String(), args...)
+			h, err := jsh.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -258,7 +254,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 		},
 		"dblclick": eh.Dblclick,
 		"dispatchEvent": func(typ string, eventInit goja.Value) error {
-			return eh.DispatchEvent(typ, eventInit.Export()) //nolint:wrapcheck
+			return eh.DispatchEvent(typ, exportArg(eventInit)) //nolint:wrapcheck
 		},
 		"fill":         eh.Fill,
 		"focus":        eh.Focus,
@@ -387,21 +383,13 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return fmt.Errorf("parsing frame dispatch event options: %w", err)
 			}
-			return f.DispatchEvent(selector, typ, eventInit.Export(), popts) //nolint:wrapcheck
+			return f.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
 		},
 		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) any {
-			args := make([]any, 0, len(gargs))
-			for _, a := range gargs {
-				args = append(args, a.Export())
-			}
-			return f.Evaluate(pageFunction.String(), args...)
+			return f.Evaluate(pageFunction.String(), exportArgs(gargs)...)
 		},
 		"evaluateHandle": func(pageFunction goja.Value, gargs ...goja.Value) (mapping, error) {
-			args := make([]any, 0, len(gargs))
-			for _, a := range gargs {
-				args = append(args, a.Export())
-			}
-			jsh, err := f.EvaluateHandle(pageFunction.String(), args...)
+			jsh, err := f.EvaluateHandle(pageFunction.String(), exportArgs(gargs)...)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -535,7 +523,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 }
 
 func parseWaitForFunctionArgs(
-	ctx context.Context, timeout time.Duration, pageFunc, opts goja.Value, args ...goja.Value,
+	ctx context.Context, timeout time.Duration, pageFunc, opts goja.Value, gargs ...goja.Value,
 ) (string, *common.FrameWaitForFunctionOptions, []any, error) {
 	popts := common.NewFrameWaitForFunctionOptions(timeout)
 	err := popts.Parse(ctx, opts)
@@ -549,12 +537,7 @@ func parseWaitForFunctionArgs(
 		js = fmt.Sprintf("() => (%s)", js)
 	}
 
-	pargs := make([]any, 0, len(args))
-	for _, arg := range args {
-		pargs = append(pargs, arg.Export())
-	}
-
-	return js, popts, pargs, nil
+	return js, popts, exportArgs(gargs), nil
 }
 
 // mapPage to the JS module.
@@ -592,24 +575,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return fmt.Errorf("parsing page dispatch event options: %w", err)
 			}
-			return p.DispatchEvent(selector, typ, eventInit.Export(), popts) //nolint:wrapcheck
+			return p.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
 		},
 		"dragAndDrop":             p.DragAndDrop,
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
 		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) any {
-			args := make([]any, 0, len(gargs))
-			for _, a := range gargs {
-				args = append(args, a.Export())
-			}
-			return p.Evaluate(pageFunction.String(), args...)
+			return p.Evaluate(pageFunction.String(), exportArgs(gargs)...)
 		},
 		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
-			args := make([]any, 0, len(gargs))
-			for _, a := range gargs {
-				args = append(args, a.Export())
-			}
-			jsh, err := p.EvaluateHandle(pageFunc.String(), args...)
+			jsh, err := p.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -1041,4 +1016,24 @@ func panicIfFatalError(ctx context.Context, err error) {
 	if errors.Is(err, k6error.ErrFatal) {
 		k6ext.Abort(ctx, err.Error())
 	}
+}
+
+// exportArg exports the value and returns it.
+// It returns nil if the value is undefined or null.
+func exportArg(gv goja.Value) any {
+	if gv == nil || gv == goja.Undefined() || gv == goja.Null() {
+		return nil
+	}
+	return gv.Export()
+}
+
+// exportArgs returns a slice of exported Goja values.
+func exportArgs(gargs []goja.Value) []any {
+	args := make([]any, 0, len(gargs))
+	for _, garg := range gargs {
+		// leaves a nil garg in the array since users might want to
+		// pass undefined or null as an argument to a function
+		args = append(args, exportArg(garg))
+	}
+	return args
 }
