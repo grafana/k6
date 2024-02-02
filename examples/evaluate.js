@@ -22,15 +22,23 @@ export default async function() {
   const page = context.newPage();
 
   try {
-    await page.goto('https://test.k6.io/', { waitUntil: 'load' });
-    
-    const result = page.evaluate(([x, y]) => {
-      return Promise.resolve(x * y);
-    }, [5, 5]);
-    console.log(result); // tests #120
-    
+    await page.goto("https://test.k6.io/", { waitUntil: "load" });
+
+    // calling evaluate without arguments
+    let result = page.evaluate(() => {
+        return Promise.resolve(5 * 42);
+    });
     check(result, {
-      'result is 25': (result) => result == 25,
+      "result should be 210": (result) => result == 210,
+    });
+
+    // calling evaluate with arguments
+    result = page.evaluate(([x, y]) => {
+        return Promise.resolve(x * y);
+      }, [5, 5]
+    );
+    check(result, {
+      "result should be 25": (result) => result == 25,
     });
   } finally {
     page.close();
