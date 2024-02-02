@@ -34,7 +34,6 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
-		"k6/experimental/grpc":       grpc.NewExperimental(),
 		"k6/experimental/timers":     timers.New(),
 		"k6/experimental/tracing":    tracing.New(),
 		"k6/experimental/browser":    browser.New(),
