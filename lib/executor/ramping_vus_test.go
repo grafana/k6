@@ -37,14 +37,14 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 	require.NotEmpty(t, errs)
 	assert.Contains(t, errs[0].Error(), "greater than 0")
 
-	const maxVUShift = 100_000_000
+	const maxTargetShift = 100_000_000
 
 	t.Run("VU up shift larger than maxVUShift should fail", func(t *testing.T) {
 		t.Parallel()
 
 		c = NewRampingVUsConfig("stage")
 		// the largest upshift will be from 0 to maxVUShift + 1 which is larger than maxVUShift
-		c.StartVUs = null.IntFrom(maxVUShift + 1)
+		c.StartVUs = null.IntFrom(maxTargetShift + 1)
 		c.Stages = []Stage{
 			// the largest downshift will be just below maxVUShift
 			{Target: null.IntFrom(100_000), Duration: types.NullDurationFrom(1 * time.Second)},
@@ -52,7 +52,7 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 
 		errs = c.Validate()
 		require.NotEmpty(t, errs)
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", 0, maxVUShift+1))
+		assert.Contains(t, errs[0].Error(), fmt.Sprintf("shifts from %d to %d is larger than", 0, maxTargetShift+1))
 	})
 
 	t.Run("VU down shift larger than maxVUShift should fail", func(t *testing.T) {
@@ -62,13 +62,13 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 		c.StartVUs = null.IntFrom(100_000)
 		c.Stages = []Stage{
 			// the largest upshift will be just below maxVUShift
-			{Target: null.IntFrom(maxVUShift + 2), Duration: types.NullDurationFrom(1 * time.Second)},
+			{Target: null.IntFrom(maxTargetShift + 2), Duration: types.NullDurationFrom(1 * time.Second)},
 			// the largest downshift will be from maxVUShift + 1 to 0 which is larger than maxVUShift
 		}
 
 		errs = c.Validate()
 		require.NotEmpty(t, errs)
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", maxVUShift+2, 0))
+		assert.Contains(t, errs[0].Error(), fmt.Sprintf("shifts from %d to %d is larger than", maxTargetShift+2, 0))
 	})
 
 	t.Run("Multiple VU shifts are larger than maxVUShift, multiple errors are returned", func(t *testing.T) {
@@ -78,13 +78,13 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 		c.StartVUs = null.IntFrom(0)
 		c.Stages = []Stage{
 			// up and down shifts are larger than maxVUShift. Multiple errors are returned
-			{Target: null.IntFrom(maxVUShift + 3), Duration: types.NullDurationFrom(1 * time.Second)},
+			{Target: null.IntFrom(maxTargetShift + 3), Duration: types.NullDurationFrom(1 * time.Second)},
 		}
 
 		errs = c.Validate()
 		require.Equal(t, 2, len(errs))
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", 0, maxVUShift+3))
-		assert.Contains(t, errs[1].Error(), fmt.Sprintf("the VU shifts from %d to %d is larger than", maxVUShift+3, 0))
+		assert.Contains(t, errs[0].Error(), fmt.Sprintf("shifts from %d to %d is larger than", 0, maxTargetShift+3))
+		assert.Contains(t, errs[1].Error(), fmt.Sprintf("shifts from %d to %d is larger than", maxTargetShift+3, 0))
 	})
 
 	t.Run("VU shifts smaller than maxVUShift will pass", func(t *testing.T) {
@@ -94,7 +94,7 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 		c.StartVUs = null.IntFrom(0)
 		c.Stages = []Stage{
 			// up and down shifts are smaller than maxVUShift
-			{Target: null.IntFrom(maxVUShift - 1), Duration: types.NullDurationFrom(1 * time.Second)},
+			{Target: null.IntFrom(maxTargetShift - 1), Duration: types.NullDurationFrom(1 * time.Second)},
 		}
 
 		errs = c.Validate()
