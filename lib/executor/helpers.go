@@ -18,7 +18,7 @@ import (
 
 const (
 	// this value is an arbitrary limit. It pervenets VU shifts from being too large.
-	maxVUShift int = 100_000_000
+	maxTargetShift int = 100_000_000
 )
 
 func sumStagesDuration(stages []Stage) (result time.Duration) {
@@ -38,26 +38,26 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 	return max
 }
 
-// Validates all the VU up and down shifts. For any shift that is larger than maxVUShift it will append an error.
-// This includes the shift from 0 to the startVUs and the shift from the last stage to 0.
-// It takes the startVUs and the stages as input.
+// Validates target up and down shifts. For any shift that is larger than maxTargetShift, it will append an error.
+// This includes the shift from 0 to the startTarget and the shift from the last stage to 0.
+// Targets can be Vus or iteration rates.
 // Each Stage needs a Target value. The stages array can be empty. The Targes could be negative.
-func validateVUShifts(startVUs int64, stages []Stage) []error {
+func validateTargetShifts(startTarget int64, stages []Stage) []error {
 	var errors []error
+	targets := []int64{0, startTarget}
 
-	TargetVUs := []int64{0, startVUs}
 	for _, s := range stages {
-		TargetVUs = append(TargetVUs, s.Target.Int64)
+		targets = append(targets, s.Target.Int64)
 	}
-	TargetVUs = append(TargetVUs, 0)
+	targets = append(targets, 0)
 
-	for i := 0; i < len(TargetVUs)-1; i++ {
-		currentVUs := TargetVUs[i]
-		nextVUs := TargetVUs[i+1]
+	for i := 0; i < len(targets)-1; i++ {
+		currentTarget := targets[i]
+		nextTarget := targets[i+1]
 
-		if absInt64(currentVUs-nextVUs) > int64(maxVUShift) {
+		if absInt64(currentTarget-nextTarget) > int64(maxTargetShift) {
 			errors = append(errors, fmt.Errorf(
-				"the VU shifts from %d to %d is larger than the maximum allowed %d", currentVUs, nextVUs, maxVUShift))
+				"the target shifts from %d to %d is larger than the maximum allowed %d", currentTarget, nextTarget, maxTargetShift))
 		}
 	}
 
