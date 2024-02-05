@@ -17,7 +17,6 @@ import (
 
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/storage"
 )
 
 const resultDone = "done"
@@ -1180,7 +1179,7 @@ func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Posi
 // Screenshot will instruct Chrome to save a screenshot of the current element and save it to specified file.
 func (h *ElementHandle) Screenshot(
 	opts *ElementHandleScreenshotOptions,
-	fp storage.FilePersister,
+	sp ScreenshotPersister,
 ) ([]byte, error) {
 	spanCtx, span := TraceAPICall(
 		h.ctx,
@@ -1191,7 +1190,7 @@ func (h *ElementHandle) Screenshot(
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, fp)
+	s := newScreenshotter(spanCtx, sp)
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
 		return nil, fmt.Errorf("taking screenshot of elementHandle: %w", err)

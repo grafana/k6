@@ -8,6 +8,7 @@ package browser
 
 import (
 	"context"
+	"io"
 	"log"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec
@@ -24,6 +25,12 @@ import (
 )
 
 type (
+	// filePersister is the type that all file persisters must implement. It's job is
+	// to persist a file somewhere, hiding the details of where and how from the caller.
+	filePersister interface {
+		Persist(ctx context.Context, path string, data io.Reader) (err error)
+	}
+
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
@@ -31,7 +38,7 @@ type (
 		remoteRegistry *remoteRegistry
 		initOnce       *sync.Once
 		tracesMetadata map[string]string
-		filePersister  storage.FilePersister
+		filePersister  filePersister
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -84,7 +91,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 					m.tracesMetadata,
 				),
 				taskQueueRegistry: newTaskQueueRegistry(vu),
-				FilePersister:     m.filePersister,
+				filePersister:     m.filePersister,
 			}),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),

@@ -6,15 +6,20 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"math"
 	"strings"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
-
-	"github.com/grafana/xk6-browser/storage"
 )
+
+// ScreenshotPersister is the type that all file persisters must implement. It's job is
+// to persist a file somewhere, hiding the details of where and how from the caller.
+type ScreenshotPersister interface {
+	Persist(ctx context.Context, path string, data io.Reader) (err error)
+}
 
 // ImageFormat represents an image file format.
 type ImageFormat string
@@ -61,11 +66,11 @@ func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 
 type screenshotter struct {
 	ctx       context.Context
-	persister storage.FilePersister
+	persister ScreenshotPersister
 }
 
-func newScreenshotter(ctx context.Context, fp storage.FilePersister) *screenshotter {
-	return &screenshotter{ctx, fp}
+func newScreenshotter(ctx context.Context, sp ScreenshotPersister) *screenshotter {
+	return &screenshotter{ctx, sp}
 }
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {

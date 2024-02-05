@@ -5,7 +5,6 @@ import (
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/storage"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -22,7 +21,7 @@ type moduleVU struct {
 
 	*taskQueueRegistry
 
-	storage.FilePersister
+	filePersister
 }
 
 // browser returns the VU browser instance for the current iteration.

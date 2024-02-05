@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/storage"
 
 	"github.com/stretchr/testify/assert"
@@ -375,9 +376,11 @@ func TestElementHandleScreenshot(t *testing.T) {
 	elem, err := p.Query("div")
 	require.NoError(t, err)
 
+	fp, err := storage.NewFilePersister(env.ConstLookup(env.ScreenshotsOutput, ""))
+	require.NoError(t, err)
+
 	buf, err := elem.Screenshot(
-		common.NewElementHandleScreenshotOptions(elem.Timeout()),
-		&storage.LocalFilePersister{},
+		common.NewElementHandleScreenshotOptions(elem.Timeout()), fp,
 	)
 	require.NoError(t, err)
 

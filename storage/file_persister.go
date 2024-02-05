@@ -17,19 +17,19 @@ import (
 	"github.com/grafana/xk6-browser/env"
 )
 
-// FilePersister is the type that all file persisters must implement. It's job is
+// filePersister is the type that all file persisters must implement. It's job is
 // to persist a file somewhere, hiding the details of where and how from the caller.
-type FilePersister interface {
+type filePersister interface {
 	Persist(ctx context.Context, path string, data io.Reader) (err error)
 }
 
-// NewFilePersister will return either a LocalFilePersister or a RemoteFilePersister
-// depending on whether the K6_BROWSER_SCREENSHOTS_OUTPUT env var is setup with the
-// correct configs.
-func NewFilePersister(envLookup env.LookupFunc) (FilePersister, error) {
+// NewFilePersister will return either a persister that persists file to the local
+// disk or uploads the files to a remote location. This decision depends on whether
+// the K6_BROWSER_SCREENSHOTS_OUTPUT env var is setup with the correct configs.
+func NewFilePersister(envLookup env.LookupFunc) (filePersister, error) {
 	envVar, ok := envLookup(env.ScreenshotsOutput)
 	if !ok || envVar == "" {
-		return &LocalFilePersister{}, nil
+		return &localFilePersister{}, nil
 	}
 
 	u, b, h, err := parseEnvVar(envVar)
@@ -37,7 +37,7 @@ func NewFilePersister(envLookup env.LookupFunc) (FilePersister, error) {
 		return nil, fmt.Errorf("parsing %s: %w", env.ScreenshotsOutput, err)
 	}
 
-	return NewRemoteFilePersister(u, h, b), nil
+	return newRemoteFilePersister(u, h, b), nil
 }
 
 // parseEnvVar will parse a value such as:
@@ -92,12 +92,12 @@ func parseEnvVar(envVarValue string) (string, string, map[string]string, error) 
 	return url, basePath, headers, nil
 }
 
-// LocalFilePersister will persist files to the local disk.
-type LocalFilePersister struct{}
+// localFilePersister will persist files to the local disk.
+type localFilePersister struct{}
 
 // Persist will write the contents of data to the local disk on the specified path.
 // TODO: we should not write to disk here but put it on some queue for async disk writes.
-func (l *LocalFilePersister) Persist(_ context.Context, path string, data io.Reader) (err error) {
+func (l *localFilePersister) Persist(_ context.Context, path string, data io.Reader) (err error) {
 	cp := filepath.Clean(path)
 
 	dir := filepath.Dir(cp)
@@ -128,11 +128,11 @@ func (l *LocalFilePersister) Persist(_ context.Context, path string, data io.Rea
 	return nil
 }
 
-// RemoteFilePersister is to be used when files created by the browser module need
+// remoteFilePersister is to be used when files created by the browser module need
 // to be uploaded to a remote location. This uses a preSignedURLGetterURL to
 // retrieve one pre-signed URL. The pre-signed url is used to upload the file
 // to the remote location.
-type RemoteFilePersister struct {
+type remoteFilePersister struct {
 	preSignedURLGetterURL string
 	headers               map[string]string
 	basePath              string
@@ -140,13 +140,13 @@ type RemoteFilePersister struct {
 	httpClient *http.Client
 }
 
-// NewRemoteFilePersister creates a new instance of RemoteFilePersister.
-func NewRemoteFilePersister(
+// newRemoteFilePersister creates a new instance of RemoteFilePersister.
+func newRemoteFilePersister(
 	preSignedURLGetterURL string,
 	headers map[string]string,
 	basePath string,
-) *RemoteFilePersister {
-	return &RemoteFilePersister{
+) *remoteFilePersister {
+	return &remoteFilePersister{
 		preSignedURLGetterURL: preSignedURLGetterURL,
 		headers:               headers,
 		basePath:              basePath,
@@ -157,7 +157,7 @@ func NewRemoteFilePersister(
 }
 
 // Persist will upload the contents of data to a remote location.
-func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) (err error) {
+func (r *remoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) (err error) {
 	pURL, err := r.getPreSignedURL(ctx, path)
 	if err != nil {
 		return fmt.Errorf("getting presigned url: %w", err)
@@ -194,7 +194,7 @@ func checkStatusCode(resp *http.Response) error {
 }
 
 // getPreSignedURL will retrieve the presigned url for the current file.
-func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) (string, error) {
+func (r *remoteFilePersister) getPreSignedURL(ctx context.Context, path string) (string, error) {
 	b, err := buildPresignedRequestBody(r.basePath, path)
 	if err != nil {
 		return "", fmt.Errorf("building request body: %w", err)
