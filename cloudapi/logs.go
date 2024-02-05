@@ -118,6 +118,8 @@ func (c *Config) logtailConn(ctx context.Context, referenceID string, since time
 
 // StreamLogsToLogger streams the logs for the configured test to the provided logger until ctx is
 // Done or an error occurs.
+//
+//nolint:funlen
 func (c *Config) StreamLogsToLogger(
 	ctx context.Context, logger logrus.FieldLogger, referenceID string, tailFrom time.Duration,
 ) error {

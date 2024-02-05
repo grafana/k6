@@ -1,3 +1,4 @@
+// Package executor defines the executors k6 can use.
 package executor
 
 import (

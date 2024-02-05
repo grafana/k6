@@ -118,7 +118,7 @@ func NewHosts(source map[string]Host) (*Hosts, error) {
 // Based on regex from https://stackoverflow.com/a/106223/5427244
 //
 //nolint:lll
-var validHostPattern *regexp.Regexp = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?(:[0-9]{1,5})?$`)
+var validHostPattern = regexp.MustCompile(`^(\*\.?)?((([a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\-]*[a-zA-Z0-9])\.)*([A-Za-z0-9]|[A-Za-z0-9][A-Za-z0-9\-]*[A-Za-z0-9]))?(:[0-9]{1,5})?$`)
 
 func isValidHostPattern(s string) error {
 	if len(validHostPattern.FindString(s)) != len(s) {

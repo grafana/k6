@@ -11,15 +11,20 @@ import (
 	"go.k6.io/k6/lib"
 )
 
+// ResultStatus represents the result status of a test.
 type ResultStatus int
 
 const (
+	// ResultStatusPassed means the test has passed
 	ResultStatusPassed ResultStatus = 0
+	// ResultStatusFailed means the test has failed
 	ResultStatusFailed ResultStatus = 1
 )
 
+// ThresholdResult is a helper type to make sending the thresholds result to the cloud.
 type ThresholdResult map[string]map[string]bool
 
+// TestRun represents a test run.
 type TestRun struct {
 	Name       string              `json:"name"`
 	ProjectID  int64               `json:"project_id,omitempty"`
@@ -36,12 +41,14 @@ type LogEntry struct {
 	Message string `json:"message"`
 }
 
+// CreateTestRunResponse represents the response of successfully created test run in the cloud.
 type CreateTestRunResponse struct {
 	ReferenceID    string     `json:"reference_id"`
 	ConfigOverride *Config    `json:"config"`
 	Logs           []LogEntry `json:"logs"`
 }
 
+// TestProgressResponse represents the progress of a cloud test.
 type TestProgressResponse struct {
 	RunStatusText string       `json:"run_status_text"`
 	RunStatus     RunStatus    `json:"run_status"`
@@ -49,6 +56,7 @@ type TestProgressResponse struct {
 	Progress      float64      `json:"progress"`
 }
 
+// LoginResponse includes the token after a successful login.
 type LoginResponse struct {
 	Token string `json:"token"`
 }
@@ -178,6 +186,7 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 	return c.Do(req, nil)
 }
 
+// GetTestProgress for the provided referenceID.
 func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, error) {
 	url := fmt.Sprintf("%s/test-progress/%s", c.baseURL, referenceID)
 	req, err := c.NewRequest(http.MethodGet, url, nil)
@@ -194,6 +203,7 @@ func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, err
 	return &ctrr, nil
 }
 
+// StopCloudTestRun tells the cloud to stop the test with the provided referenceID.
 func (c *Client) StopCloudTestRun(referenceID string) error {
 	url := fmt.Sprintf("%s/tests/%s/stop", c.baseURL, referenceID)
 
@@ -205,6 +215,7 @@ func (c *Client) StopCloudTestRun(referenceID string) error {
 	return c.Do(req, nil)
 }
 
+// ValidateOptions sends the provided options to the cloud for validation.
 func (c *Client) ValidateOptions(options lib.Options) error {
 	url := fmt.Sprintf("%s/validate-options", c.baseURL)
 
@@ -222,6 +233,7 @@ func (c *Client) ValidateOptions(options lib.Options) error {
 	return c.Do(req, nil)
 }
 
+// Login the user with the specified email and password.
 func (c *Client) Login(email string, password string) (*LoginResponse, error) {
 	url := fmt.Sprintf("%s/login", c.baseURL)
 

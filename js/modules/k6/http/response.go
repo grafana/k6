@@ -134,6 +134,8 @@ func checkErrorInJSON(input []byte, offset int, err error) error {
 
 // SubmitForm parses the body as an html looking for a from and then submitting it
 // TODO: document the actual arguments that can be provided
+//
+//nolint:funlen
 func (res *Response) SubmitForm(args ...goja.Value) (*Response, error) {
 	rt := res.client.moduleInstance.vu.Runtime()
 
@@ -251,7 +253,8 @@ func (res *Response) ClickLink(args ...goja.Value) (*Response, error) {
 	}
 	hrefAttr := link.Attr("href")
 	if hrefAttr == goja.Undefined() {
-		common.Throw(rt, fmt.Errorf("no valid href attribute value found on element '%s' in response '%s'", selector, res.URL))
+		errmsg := fmt.Errorf("no valid href attribute value found on element '%s' in response '%s'", selector, res.URL)
+		common.Throw(rt, errmsg)
 	}
 	hrefURL, err := url.Parse(hrefAttr.String())
 	if err != nil {

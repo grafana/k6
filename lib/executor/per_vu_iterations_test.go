@@ -44,7 +44,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 
 	var totalIters uint64
 	result.Range(func(key, value interface{}) bool {
-		vuIters := value.(uint64)
+		vuIters := value.(uint64) //nolint:forcetypeassert
 		assert.Equal(t, uint64(100), vuIters)
 		totalIters += vuIters
 		return true
@@ -81,7 +81,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 
 	var totalIters uint64
 	result.Range(func(key, value interface{}) bool {
-		vuIters := value.(uint64)
+		vuIters := value.(uint64) //nolint:forcetypeassert
 		if key != slowVUID {
 			assert.Equal(t, uint64(100), vuIters)
 		}

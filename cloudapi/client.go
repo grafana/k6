@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/hex"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"math/rand"
@@ -70,7 +71,7 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 		buf = bytes.NewBuffer(b)
 	}
 
-	req, err := http.NewRequest(method, url, buf)
+	req, err := http.NewRequest(method, url, buf) //nolint:noctx // the user can add this
 	if err != nil {
 		return nil, err
 	}
@@ -78,6 +79,7 @@ func (c *Client) NewRequest(method, url string, data interface{}) (*http.Request
 	return req, nil
 }
 
+// Do is simpler to http.Do but also unmarshals the response in the provided v
 func (c *Client) Do(req *http.Request, v interface{}) error {
 	if req.Body != nil && req.GetBody == nil {
 		originalBody, err := io.ReadAll(req.Body)
@@ -155,7 +157,7 @@ func (c *Client) do(req *http.Request, v interface{}, attempt int) (retry bool, 
 	}
 
 	if v != nil {
-		if err = json.NewDecoder(resp.Body).Decode(v); err == io.EOF {
+		if err = json.NewDecoder(resp.Body).Decode(v); errors.Is(err, io.EOF) {
 			err = nil // Ignore EOF from empty body
 		}
 	}
@@ -181,7 +183,7 @@ func CheckResponse(r *http.Response) error {
 	}
 
 	var payload struct {
-		Error ErrorResponse `json:"error"`
+		Error ResponseError `json:"error"`
 	}
 	if err := json.Unmarshal(data, &payload); err != nil {
 		if r.StatusCode == http.StatusUnauthorized {

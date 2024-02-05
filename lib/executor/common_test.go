@@ -93,6 +93,7 @@ type executorTest struct {
 	logHook  *testutils.SimpleLogrusHook
 }
 
+//nolint:unparam
 func setupExecutorTest(
 	t testing.TB, segmentStr, sequenceStr string, extraOptions lib.Options,
 	runner lib.Runner, config lib.ExecutorConfig,

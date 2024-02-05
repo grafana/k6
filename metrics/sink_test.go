@@ -32,17 +32,21 @@ func TestNewSinkInvalidMetricType(t *testing.T) {
 }
 
 func TestCounterSink(t *testing.T) {
+	t.Parallel()
 	samples10 := []float64{1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 100.0}
 	now := time.Now()
 
 	t.Run("add", func(t *testing.T) {
+		t.Parallel()
 		t.Run("one value", func(t *testing.T) {
+			t.Parallel()
 			sink := CounterSink{}
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0, Time: now})
 			assert.Equal(t, 1.0, sink.Value)
 			assert.Equal(t, now, sink.First)
 		})
 		t.Run("values", func(t *testing.T) {
+			t.Parallel()
 			sink := CounterSink{}
 			for _, s := range samples10 {
 				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s, Time: now})
@@ -52,6 +56,7 @@ func TestCounterSink(t *testing.T) {
 		})
 	})
 	t.Run("format", func(t *testing.T) {
+		t.Parallel()
 		sink := CounterSink{}
 		for _, s := range samples10 {
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s, Time: now})
@@ -61,10 +66,13 @@ func TestCounterSink(t *testing.T) {
 }
 
 func TestGaugeSink(t *testing.T) {
+	t.Parallel()
 	samples6 := []float64{1.0, 2.0, 3.0, 4.0, 10.0, 5.0}
 
 	t.Run("add", func(t *testing.T) {
+		t.Parallel()
 		t.Run("one value", func(t *testing.T) {
+			t.Parallel()
 			sink := GaugeSink{}
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0})
 			assert.Equal(t, 1.0, sink.Value)
@@ -73,6 +81,7 @@ func TestGaugeSink(t *testing.T) {
 			assert.Equal(t, 1.0, sink.Max)
 		})
 		t.Run("values", func(t *testing.T) {
+			t.Parallel()
 			sink := GaugeSink{}
 			for _, s := range samples6 {
 				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
@@ -84,6 +93,7 @@ func TestGaugeSink(t *testing.T) {
 		})
 	})
 	t.Run("format", func(t *testing.T) {
+		t.Parallel()
 		sink := GaugeSink{}
 		for _, s := range samples6 {
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
@@ -227,22 +237,27 @@ func TestTrendSink(t *testing.T) {
 }
 
 func TestRateSink(t *testing.T) {
+	t.Parallel()
 	samples6 := []float64{1.0, 0.0, 1.0, 0.0, 0.0, 1.0}
 
 	t.Run("add", func(t *testing.T) {
+		t.Parallel()
 		t.Run("one true", func(t *testing.T) {
+			t.Parallel()
 			sink := RateSink{}
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 1.0})
 			assert.Equal(t, int64(1), sink.Total)
 			assert.Equal(t, int64(1), sink.Trues)
 		})
 		t.Run("one false", func(t *testing.T) {
+			t.Parallel()
 			sink := RateSink{}
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: 0.0})
 			assert.Equal(t, int64(1), sink.Total)
 			assert.Equal(t, int64(0), sink.Trues)
 		})
 		t.Run("values", func(t *testing.T) {
+			t.Parallel()
 			sink := RateSink{}
 			for _, s := range samples6 {
 				sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})
@@ -252,6 +267,7 @@ func TestRateSink(t *testing.T) {
 		})
 	})
 	t.Run("format", func(t *testing.T) {
+		t.Parallel()
 		sink := RateSink{}
 		for _, s := range samples6 {
 			sink.Add(Sample{TimeSeries: TimeSeries{Metric: &Metric{}}, Value: s})

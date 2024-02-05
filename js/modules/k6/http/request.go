@@ -21,10 +21,12 @@ import (
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context
-var ErrHTTPForbiddenInInitContext = common.NewInitContextError("Making http requests in the init context is not supported")
+var ErrHTTPForbiddenInInitContext = common.NewInitContextError(
+	"Making http requests in the init context is not supported")
 
 // ErrBatchForbiddenInInitContext is used when batch was made in the init context
-var ErrBatchForbiddenInInitContext = common.NewInitContextError("Using batch in the init context is not supported")
+var ErrBatchForbiddenInInitContext = common.NewInitContextError(
+	"Using batch in the init context is not supported")
 
 func (c *Client) getMethodClosure(method string) func(url goja.Value, args ...goja.Value) (*Response, error) {
 	return func(url goja.Value, args ...goja.Value) (*Response, error) {
@@ -125,7 +127,11 @@ func (c *Client) asyncRequest(method string, url goja.Value, args ...goja.Value)
 // a reverse dependency on js/common or goja.
 func (c *Client) processResponse(resp *httpext.Response, respType httpext.ResponseType) {
 	if respType == httpext.ResponseTypeBinary && resp.Body != nil {
-		resp.Body = c.moduleInstance.vu.Runtime().NewArrayBuffer(resp.Body.([]byte))
+		b, ok := resp.Body.([]byte)
+		if !ok {
+			panic("got an unexpected type for the response body, only []byte is accepted")
+		}
+		resp.Body = c.moduleInstance.vu.Runtime().NewArrayBuffer(b)
 	}
 }
 
@@ -278,6 +284,7 @@ func (c *Client) parseRequest(
 	}
 
 	// TODO: ditch goja.Value, reflections and Object and use a simple go map and type assertions?
+	//nolint: nestif
 	if params != nil && !goja.IsUndefined(params) && !goja.IsNull(params) {
 		params := params.ToObject(rt)
 		for _, k := range params.Keys() {
@@ -333,8 +340,7 @@ func (c *Client) parseRequest(
 				if goja.IsUndefined(jarV) || goja.IsNull(jarV) {
 					continue
 				}
-				switch v := jarV.Export().(type) {
-				case *CookieJar:
+				if v, ok := jarV.Export().(*CookieJar); ok {
 					result.ActiveJar = v.Jar
 				}
 			case "compression":
@@ -569,8 +575,7 @@ func (c *Client) parseBatchRequest(key interface{}, val interface{}) (*httpext.P
 
 func requestContainsFile(data map[string]interface{}) bool {
 	for _, v := range data {
-		switch v.(type) {
-		case FileData:
+		if _, ok := v.(FileData); ok {
 			return true
 		}
 	}
