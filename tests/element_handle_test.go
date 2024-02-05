@@ -8,7 +8,6 @@ import (
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/storage"
 
 	"github.com/stretchr/testify/assert"
@@ -376,11 +375,11 @@ func TestElementHandleScreenshot(t *testing.T) {
 	elem, err := p.Query("div")
 	require.NoError(t, err)
 
-	fp, err := storage.NewFilePersister(env.ConstLookup(env.ScreenshotsOutput, ""))
-	require.NoError(t, err)
-
+	// TODO: Use a mock instead of a LocalFilePersister when there's no need to
+	//       persist files.
 	buf, err := elem.Screenshot(
-		common.NewElementHandleScreenshotOptions(elem.Timeout()), fp,
+		common.NewElementHandleScreenshotOptions(elem.Timeout()),
+		&storage.LocalFilePersister{},
 	)
 	require.NoError(t, err)
 

@@ -19,7 +19,6 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/storage"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -123,7 +122,7 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
 		go startDebugServer()
 	}
-	m.filePersister, err = storage.NewFilePersister(initEnv.LookupEnv)
+	m.filePersister, err = newFilePersister(initEnv.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create file persister: %v", err)
 	}

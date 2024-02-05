@@ -60,7 +60,7 @@ func TestLocalFilePersister(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			var l localFilePersister
+			var l LocalFilePersister
 			err := l.Persist(context.Background(), p, strings.NewReader(tt.data))
 			assert.NoError(t, err)
 
@@ -232,7 +232,7 @@ func TestRemoteFilePersister(t *testing.T) {
 					w.WriteHeader(tt.uploadResponse)
 				}))
 
-			r := newRemoteFilePersister(s.URL+presignedEndpoint, tt.wantPresignedHeaders, basePath)
+			r := NewRemoteFilePersister(s.URL+presignedEndpoint, tt.wantPresignedHeaders, basePath)
 			err := r.Persist(context.Background(), tt.path, strings.NewReader(tt.dataToUpload))
 			if tt.wantError != "" {
 				assert.EqualError(t, err, tt.wantError)

@@ -18,7 +18,6 @@ import (
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 	"github.com/grafana/xk6-browser/storage"
 )
@@ -477,9 +476,9 @@ func TestPageScreenshotFullpage(t *testing.T) {
 
 	opts := common.NewPageScreenshotOptions()
 	opts.FullPage = true
-	fp, err := storage.NewFilePersister(env.ConstLookup(env.ScreenshotsOutput, ""))
-	require.NoError(t, err)
-	buf, err := p.Screenshot(opts, fp)
+	// TODO: Use a mock instead of a LocalFilePersister when there's no need to
+	//       persist files.
+	buf, err := p.Screenshot(opts, &storage.LocalFilePersister{})
 	require.NoError(t, err)
 
 	reader := bytes.NewReader(buf)
