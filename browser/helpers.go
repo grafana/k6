@@ -19,7 +19,7 @@ func panicIfFatalError(ctx context.Context, err error) {
 // exportArg exports the value and returns it.
 // It returns nil if the value is undefined or null.
 func exportArg(gv goja.Value) any {
-	if gv == nil || gv == goja.Undefined() || gv == goja.Null() {
+	if !gojaValueExists(gv) {
 		return nil
 	}
 	return gv.Export()
