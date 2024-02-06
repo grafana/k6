@@ -1021,7 +1021,7 @@ func panicIfFatalError(ctx context.Context, err error) {
 // exportArg exports the value and returns it.
 // It returns nil if the value is undefined or null.
 func exportArg(gv goja.Value) any {
-	if gv == nil || gv == goja.Undefined() || gv == goja.Null() {
+	if !gojaValueExists(gv) {
 		return nil
 	}
 	return gv.Export()
@@ -1036,4 +1036,10 @@ func exportArgs(gargs []goja.Value) []any {
 		args = append(args, exportArg(garg))
 	}
 	return args
+}
+
+// gojaValueExists returns true if a given value is not nil and exists
+// (defined and not null) in the goja runtime.
+func gojaValueExists(v goja.Value) bool {
+	return v != nil && !goja.IsUndefined(v) && !goja.IsNull(v)
 }
