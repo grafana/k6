@@ -1,4 +1,9 @@
-// Package browser provides an entry point to the browser module.
+// Package browser is the browser module's entry point, and
+// initializer of various global types, and a translation layer
+// between Goja and the internal business logic.
+//
+// It initializes and drives the downstream components by passing
+// the necessary concrete dependencies.
 package browser
 
 import (
