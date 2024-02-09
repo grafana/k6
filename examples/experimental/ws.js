@@ -8,7 +8,7 @@ import {
 	clearTimeout,
 	setInterval,
 	clearInterval,
-} from "k6/experimental/timers";
+} from "k6/timers";
 
 let chatRoomName = "publicRoom"; // choose your chat room name
 let sessionDuration = randomIntBetween(5000, 60000); // user session between 5s and 1m
