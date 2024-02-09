@@ -38,9 +38,12 @@ func Untar(t *testing.T, fileSystem fsext.Fs, fileName string, destination strin
 			continue
 		}
 
-		// as long as this code in a test helper, we can safely
-		// omit G305: File traversal when extracting zip/tar archive
-		target := filepath.Join(destination, header.Name) //nolint:gosec
+		fileName := header.Name
+		if !filepath.IsLocal(fileName) {
+			return errors.New("tar file contains non-local file names")
+		}
+
+		target := filepath.Join(destination, filepath.Clean(fileName))
 
 		switch header.Typeflag {
 		case tar.TypeDir:
