@@ -173,9 +173,6 @@ github.com/grafana/xk6-output-prometheus-remote/pkg/stale
 # github.com/grafana/xk6-redis v0.2.0
 ## explicit; go 1.19
 github.com/grafana/xk6-redis/redis
-# github.com/grafana/xk6-timers v0.2.3
-## explicit; go 1.20
-github.com/grafana/xk6-timers/timers
 # github.com/grafana/xk6-webcrypto v0.1.1
 ## explicit; go 1.19
 github.com/grafana/xk6-webcrypto/webcrypto
