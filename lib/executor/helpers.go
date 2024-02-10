@@ -38,8 +38,7 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 	return max
 }
 
-// validateTargetShifts validates the target up shifts. It will append an error for any shift that is larger than the maximum value allowed.
-// This includes the shift from 0 to the startTarget and the shift from the last stage to 0.
+// validateTargetShifts validates the VU Target shifts. It will append an error for any VU target that is larger than the maximum value allowed.
 // Each Stage needs a Target value. The stages array can be empty. The Targes could be negative.
 func validateTargetShifts(startVus int64, stages []Stage) []error {
 	var errors []error
