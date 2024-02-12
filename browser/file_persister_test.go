@@ -4,7 +4,67 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/grafana/xk6-browser/env"
+	"github.com/grafana/xk6-browser/storage"
 )
+
+func Test_newFilePersister(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name      string
+		envLookup env.LookupFunc
+		wantType  filePersister
+		wantErr   bool
+	}{
+		{
+			name:      "local_no_env_var",
+			envLookup: env.EmptyLookup,
+			wantType:  &storage.LocalFilePersister{},
+		},
+		{
+			name: "local_empty_env_var",
+			envLookup: env.ConstLookup(
+				env.ScreenshotsOutput,
+				"",
+			),
+			wantType: &storage.LocalFilePersister{},
+		},
+		{
+			name: "remote",
+			envLookup: env.ConstLookup(
+				env.ScreenshotsOutput,
+				"url=https://127.0.0.1/,basePath=/screenshots,header.1=a",
+			),
+			wantType: &storage.RemoteFilePersister{},
+		},
+		{
+			name: "remote_parse_failed",
+			envLookup: env.ConstLookup(
+				env.ScreenshotsOutput,
+				"basePath=/screenshots,header.1=a",
+			),
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		tt := tt
+
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			gotType, err := newFilePersister(tt.envLookup)
+			if tt.wantErr {
+				assert.Error(t, err)
+				return
+			}
+
+			assert.NoError(t, err)
+			assert.IsType(t, tt.wantType, gotType)
+		})
+	}
+}
 
 func Test_parseEnvVar(t *testing.T) {
 	t.Parallel()
