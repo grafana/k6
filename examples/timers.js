@@ -1,5 +1,5 @@
 // based on https://developer.mozilla.org/en-US/docs/Web/API/setTimeout#reasons_for_delays_longer_than_specified
-import { setTimeout } from "k6/experimental/timers";
+import { setTimeout } from "k6/timers";
 let last = 0;
 let iterations = 10;
 

@@ -24,7 +24,7 @@ var (
 )
 
 const asyncFunctionNotSupportedMsg = "%s() does not support async functions as arguments, " +
-	"please see https://k6.io/docs/javascript-api/k6/group/#working-with-async-functions for more info"
+	"please see https://grafana.com/docs/k6/latest/javascript-api/k6/group/#working-with-async-functions for more info"
 
 type (
 	// RootModule is the global module instance that will create module
@@ -148,6 +148,8 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 }
 
 // Check will emit check metrics for the provided checks.
+//
+//nolint:funlen
 func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := mi.vu.State()
 	if state == nil {

@@ -20,6 +20,8 @@ import (
 // executors, running setup() and teardown(), and actually starting the
 // executors for the different scenarios at the appropriate times.
 type Scheduler struct {
+	controller Controller
+
 	initProgress    *pb.ProgressBar
 	executorConfigs []lib.ExecutorConfig // sorted by (startTime, ID)
 	executors       []lib.Executor       // sorted by (startTime, ID), excludes executors with no work
@@ -33,7 +35,7 @@ type Scheduler struct {
 // initializing it beyond the bare minimum. Specifically, it creates the needed
 // executor instances and a lot of state placeholders, but it doesn't initialize
 // the executors and it doesn't initialize or run VUs.
-func NewScheduler(trs *lib.TestRunState) (*Scheduler, error) {
+func NewScheduler(trs *lib.TestRunState, controller Controller) (*Scheduler, error) {
 	options := trs.Options
 	et, err := lib.NewExecutionTuple(options.ExecutionSegment, options.ExecutionSegmentSequence)
 	if err != nil {
@@ -81,6 +83,7 @@ func NewScheduler(trs *lib.TestRunState) (*Scheduler, error) {
 		maxDuration:     maxDuration,
 		maxPossibleVUs:  maxPossibleVUs,
 		state:           executionState,
+		controller:      controller,
 	}, nil
 }
 
@@ -380,6 +383,13 @@ func (e *Scheduler) Init(
 ) (stopVUEmission func(), initErr error) {
 	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-init")
 
+	if err := SignalAndWait(e.controller, "scheduler-init-start"); err != nil {
+		return nil, err
+	}
+	defer func() {
+		initErr = SignalErrorOrWait(e.controller, "scheduler-init-done", initErr)
+	}()
+
 	execSchedRunCtx, execSchedRunCancel := context.WithCancel(runCtx)
 	waitForVUsMetricPush := e.emitVUsAndVUsMax(execSchedRunCtx, samplesOut)
 	stopVUEmission = func() {
@@ -409,12 +419,16 @@ func (e *Scheduler) Init(
 func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- metrics.SampleContainer) (runErr error) {
 	logger := e.state.Test.Logger.WithField("phase", "execution-scheduler-run")
 
+	if err := SignalAndWait(e.controller, "scheduler-run-start"); err != nil {
+		return err
+	}
 	defer func() {
 		if interruptErr := GetCancelReasonIfTestAborted(runCtx); interruptErr != nil {
 			logger.Debugf("The test run was interrupted, returning '%s' instead of '%s'", interruptErr, runErr)
 			e.state.SetExecutionStatus(lib.ExecutionStatusInterrupted)
 			runErr = interruptErr
 		}
+		runErr = SignalErrorOrWait(e.controller, "scheduler-run-done", runErr)
 	}()
 
 	e.initProgress.Modify(pb.WithConstLeft("Run"))
@@ -428,6 +442,10 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 		case <-runCtx.Done():
 			return nil
 		}
+	}
+
+	if err := SignalAndWait(e.controller, "test-ready-to-run-setup"); err != nil {
+		return err
 	}
 
 	e.initProgress.Modify(pb.WithConstProgress(1, "Starting test..."))
@@ -449,11 +467,27 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 	if !e.state.Test.Options.NoSetup.Bool {
 		e.state.SetExecutionStatus(lib.ExecutionStatusSetup)
 		e.initProgress.Modify(pb.WithConstProgress(1, "setup()"))
-		if err := e.state.Test.Runner.Setup(withExecStateCtx, samplesOut); err != nil {
-			logger.WithField("error", err).Debug("setup() aborted by error")
+		actuallyRanSetup := false
+		data, err := e.controller.GetOrCreateData("setup", func() ([]byte, error) {
+			actuallyRanSetup = true
+			if err := e.state.Test.Runner.Setup(withExecStateCtx, samplesOut); err != nil {
+				logger.WithField("error", err).Debug("setup() aborted by error")
+				return nil, err
+			}
+			return e.state.Test.Runner.GetSetupData(), nil
+		})
+		if err != nil {
 			return err
 		}
+		if !actuallyRanSetup {
+			e.state.Test.Runner.SetSetupData(data)
+		}
 	}
+
+	if err := SignalAndWait(e.controller, "setup-done"); err != nil {
+		return err
+	}
+
 	e.initProgress.Modify(pb.WithHijack(e.getRunStats))
 
 	// Start all executors at their particular startTime in a separate goroutine...
@@ -469,12 +503,18 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 	// Wait for all executors to finish
 	var firstErr error
 	for range e.executors {
+		// TODO: add logic to abort the test early if there was an error from
+		// the controller (e.g. some other instance for this test died)
 		err := <-runResults
 		if err != nil && firstErr == nil {
 			logger.WithError(err).Debug("Executor returned with an error, cancelling test run...")
 			firstErr = err
 			executorsRunCancel()
 		}
+	}
+
+	if err := SignalAndWait(e.controller, "execution-done"); err != nil {
+		return err
 	}
 
 	// Run teardown() after all executors are done, if it's not disabled
@@ -484,10 +524,21 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 
 		// We run teardown() with the global context, so it isn't interrupted by
 		// thresholds or test.abort() or even Ctrl+C (unless used twice).
-		if err := e.state.Test.Runner.Teardown(globalCtx, samplesOut); err != nil {
-			logger.WithField("error", err).Debug("teardown() aborted by error")
+		// TODO: add a `sync.Once` equivalent?
+		_, err := e.controller.GetOrCreateData("teardown", func() ([]byte, error) {
+			if err := e.state.Test.Runner.Teardown(globalCtx, samplesOut); err != nil {
+				logger.WithField("error", err).Debug("teardown() aborted by error")
+				return nil, err
+			}
+			return nil, nil
+		})
+		if err != nil {
 			return err
 		}
+	}
+
+	if err := SignalAndWait(e.controller, "teardown-done"); err != nil {
+		return err
 	}
 
 	return firstErr

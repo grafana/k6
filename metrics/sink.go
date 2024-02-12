@@ -14,6 +14,7 @@ var (
 	_ Sink = &RateSink{}
 )
 
+// Sink is a sample sink which will accumulate data in specific way
 type Sink interface {
 	Add(s Sample)                              // Add a sample to the sink.
 	Format(t time.Duration) map[string]float64 // Data for thresholds.
@@ -42,11 +43,13 @@ func NewSink(mt MetricType) Sink {
 	return sink
 }
 
+// CounterSink is a sink that represents a Counter
 type CounterSink struct {
 	Value float64
 	First time.Time
 }
 
+// Add a single sample to the sink
 func (c *CounterSink) Add(s Sample) {
 	c.Value += s.Value
 	if c.First.IsZero() {
@@ -57,6 +60,7 @@ func (c *CounterSink) Add(s Sample) {
 // IsEmpty indicates whether the CounterSink is empty.
 func (c *CounterSink) IsEmpty() bool { return c.First.IsZero() }
 
+// Format counter and return a map
 func (c *CounterSink) Format(t time.Duration) map[string]float64 {
 	return map[string]float64{
 		"count": c.Value,
@@ -64,6 +68,7 @@ func (c *CounterSink) Format(t time.Duration) map[string]float64 {
 	}
 }
 
+// GaugeSink is a sink represents a Gauge
 type GaugeSink struct {
 	Value    float64
 	Max, Min float64
@@ -73,6 +78,7 @@ type GaugeSink struct {
 // IsEmpty indicates whether the GaugeSink is empty.
 func (g *GaugeSink) IsEmpty() bool { return !g.minSet }
 
+// Add a single sample to the sink
 func (g *GaugeSink) Add(s Sample) {
 	g.Value = s.Value
 	if s.Value > g.Max {
@@ -84,7 +90,8 @@ func (g *GaugeSink) Add(s Sample) {
 	}
 }
 
-func (g *GaugeSink) Format(t time.Duration) map[string]float64 {
+// Format gauge and return a map
+func (g *GaugeSink) Format(_ time.Duration) map[string]float64 {
 	return map[string]float64{"value": g.Value}
 }
 
@@ -93,6 +100,7 @@ func NewTrendSink() *TrendSink {
 	return &TrendSink{}
 }
 
+// TrendSink is a sink for a Trend
 type TrendSink struct {
 	values []float64
 	sorted bool
@@ -105,6 +113,7 @@ type TrendSink struct {
 // IsEmpty indicates whether the TrendSink is empty.
 func (t *TrendSink) IsEmpty() bool { return t.count == 0 }
 
+// Add a single sample into the trend
 func (t *TrendSink) Add(s Sample) {
 	if t.count == 0 {
 		t.max, t.min = s.Value, s.Value
@@ -175,7 +184,8 @@ func (t *TrendSink) Total() float64 {
 	return t.sum
 }
 
-func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
+// Format trend and return a map
+func (t *TrendSink) Format(_ time.Duration) map[string]float64 {
 	// TODO: respect the summaryTrendStats for REST API
 	return map[string]float64{
 		"min":   t.Min(),
@@ -187,6 +197,7 @@ func (t *TrendSink) Format(tt time.Duration) map[string]float64 {
 	}
 }
 
+// RateSink is a sink for a rate
 type RateSink struct {
 	Trues int64
 	Total int64
@@ -195,14 +206,16 @@ type RateSink struct {
 // IsEmpty indicates whether the RateSink is empty.
 func (r *RateSink) IsEmpty() bool { return r.Total == 0 }
 
+// Add a single sample to the rate
 func (r *RateSink) Add(s Sample) {
-	r.Total += 1
+	r.Total++
 	if s.Value != 0 {
-		r.Trues += 1
+		r.Trues++
 	}
 }
 
-func (r RateSink) Format(t time.Duration) map[string]float64 {
+// Format rate and return a map
+func (r RateSink) Format(_ time.Duration) map[string]float64 {
 	var rate float64
 	if r.Total > 0 {
 		rate = float64(r.Trues) / float64(r.Total)

@@ -14,5 +14,5 @@ func Enabled(config cloudapi.Config) bool {
 	//
 	// We currently don't have a backend API to check this
 	// information.
-	return config.TracesEnabled.ValueOrZero()
+	return config.TracesEnabled.Bool
 }

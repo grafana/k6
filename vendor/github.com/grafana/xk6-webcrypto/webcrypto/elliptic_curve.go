@@ -5,10 +5,10 @@ package webcrypto
 // key pair: that is, when the algorithm is identified as either of ECDSA or ECDH.
 type EcKeyImportParams struct {
 	// Name should be set to AlgorithmKindEcdsa or AlgorithmKindEcdh.
-	Name AlgorithmIdentifier `json:"name"`
+	Name AlgorithmIdentifier `js:"name"`
 
 	// NamedCurve holds (a String) the name of the elliptic curve to use.
-	NamedCurve EllipticCurveKind `json:"namedCurve"`
+	NamedCurve EllipticCurveKind `js:"namedCurve"`
 }
 
 // EllipticCurveKind represents the kind of elliptic curve that is being used.

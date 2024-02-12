@@ -1,3 +1,4 @@
+// Package statsd is implements an output to send metric samples to a statsd server.
 package statsd
 
 import (

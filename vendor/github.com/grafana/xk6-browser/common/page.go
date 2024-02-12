@@ -20,6 +20,8 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -656,6 +658,8 @@ func (p *Page) Click(selector string, opts goja.Value) error {
 // Close closes the page.
 func (p *Page) Close(opts goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
+	defer span.End()
 
 	// forcing the pagehide event to trigger web vitals metrics.
 	v := p.vu.Runtime().ToValue(`() => window.dispatchEvent(new Event('pagehide'))`)
@@ -860,6 +864,13 @@ func (p *Page) GoForward(_ goja.Value) *Response {
 // Goto will navigate the page to the specified URL and return a HTTP response object.
 func (p *Page) Goto(url string, opts goja.Value) (*Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
+	_, span := TraceAPICall(
+		p.ctx,
+		p.targetID.String(),
+		"page.goto",
+		trace.WithAttributes(attribute.String("page.goto.url", url)),
+	)
+	defer span.End()
 
 	return p.MainFrame().Goto(url, opts)
 }
@@ -913,13 +924,18 @@ func (p *Page) IsEnabled(selector string, opts goja.Value) bool {
 	return p.MainFrame().IsEnabled(selector, opts)
 }
 
-func (p *Page) IsHidden(selector string, opts goja.Value) bool {
+// IsHidden will look for an element in the dom with given selector and see if
+// the element is hidden. It will not wait for a match to occur. If no elements
+// match `false` will be returned.
+func (p *Page) IsHidden(selector string, opts goja.Value) (bool, error) {
 	p.logger.Debugf("Page:IsHidden", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsHidden(selector, opts)
 }
 
-func (p *Page) IsVisible(selector string, opts goja.Value) bool {
+// IsVisible will look for an element in the dom with given selector. It will
+// not wait for a match to occur. If no elements match `false` will be returned.
+func (p *Page) IsVisible(selector string, opts goja.Value) (bool, error) {
 	p.logger.Debugf("Page:IsVisible", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsVisible(selector, opts)
@@ -992,7 +1008,7 @@ func (p *Page) Press(selector string, key string, opts goja.Value) {
 func (p *Page) Query(selector string) (*ElementHandle, error) {
 	p.logger.Debugf("Page:Query", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.frameManager.MainFrame().Query(selector)
+	return p.frameManager.MainFrame().Query(selector, StrictModeOff)
 }
 
 // QueryAll returns all elements matching the specified selector.
@@ -1005,6 +1021,8 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 // Reload will reload the current page.
 func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
+	defer span.End()
 
 	parsedOpts := NewPageReloadOptions(
 		LifecycleEventLoad,
@@ -1088,11 +1106,16 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
 func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
+	spanCtx, span := TraceAPICall(p.ctx, p.targetID.String(), "page.screenshot")
+	defer span.End()
+
 	parsedOpts := NewPageScreenshotOptions()
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
 		k6ext.Panic(p.ctx, "parsing screenshot options: %w", err)
 	}
-	s := newScreenshotter(p.ctx)
+	span.SetAttributes(attribute.String("screenshot.path", parsedOpts.Path))
+
+	s := newScreenshotter(spanCtx)
 	buf, err := s.screenshotPage(p, parsedOpts)
 	if err != nil {
 		k6ext.Panic(p.ctx, "capturing screenshot: %w", err)
@@ -1267,6 +1290,8 @@ func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 func (p *Page) WaitForNavigation(opts goja.Value) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
+	defer span.End()
 
 	return p.frameManager.MainFrame().WaitForNavigation(opts)
 }

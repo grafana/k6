@@ -1,5 +1,5 @@
 {
-  "testRunId": "my-test-run-id-123",
+  "testRunId": "123",
   "aggregationPeriod": 3,
   "metrics": [
     {

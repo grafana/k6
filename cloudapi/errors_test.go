@@ -21,7 +21,7 @@ func TestErrorResponse_Error(t *testing.T) {
 	msg1 := "some message"
 	msg2 := "some other message"
 
-	errResp := ErrorResponse{
+	errResp := ResponseError{
 		Message: msg1,
 		Errors:  []string{msg2},
 		FieldErrors: map[string][]string{

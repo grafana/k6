@@ -15,7 +15,7 @@ type FileData struct {
 	ContentType string
 }
 
-var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"")
+var quoteEscaper = strings.NewReplacer("\\", "\\\\", `"`, "\\\"") //nolint:gochecknoglobals
 
 func escapeQuotes(s string) string {
 	return quoteEscaper.Replace(s)

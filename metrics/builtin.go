@@ -1,7 +1,9 @@
 package metrics
 
+//nolint:nolintlint // unfortunately it is having a false possitive
+//nolint:revive
 const (
-	VUsName               = "vus" //nolint:revive
+	VUsName               = "vus"
 	VUsMaxName            = "vus_max"
 	IterationsName        = "iterations"
 	IterationDurationName = "iteration_duration"

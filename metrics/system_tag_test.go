@@ -21,8 +21,8 @@ func TestSystemTagSetMarshalJSON(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		ts := &tc.tagset
-		got, err := json.Marshal(ts)
+		ts := tc.tagset
+		got, err := json.Marshal(&ts)
 		require.Nil(t, err)
 		require.Equal(t, tc.expected, string(got))
 	}
@@ -80,8 +80,8 @@ func TestTagSetMarshalJSON(t *testing.T) {
 	}
 
 	for _, tc := range tests {
-		ts := &tc.tagset
-		got, err := json.Marshal(ts)
+		ts := tc.tagset
+		got, err := json.Marshal(&ts)
 		require.Nil(t, err)
 		require.Equal(t, tc.expected, string(got))
 	}

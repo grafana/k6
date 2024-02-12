@@ -1,7 +1,10 @@
 package js
 
 import (
+	"sync"
+
 	"go.k6.io/k6/ext"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modules/k6"
 	"go.k6.io/k6/js/modules/k6/crypto"
 	"go.k6.io/k6/js/modules/k6/crypto/x509"
@@ -14,11 +17,11 @@ import (
 	"go.k6.io/k6/js/modules/k6/html"
 	"go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modules/k6/metrics"
+	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modules/k6/ws"
 
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-redis/redis"
-	"github.com/grafana/xk6-timers/timers"
 	"github.com/grafana/xk6-webcrypto/webcrypto"
 	expws "github.com/grafana/xk6-websockets/websockets"
 )
@@ -30,20 +33,23 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/crypto/x509":             x509.New(),
 		"k6/data":                    data.New(),
 		"k6/encoding":                encoding.New(),
+		"k6/timers":                  timers.New(),
 		"k6/execution":               execution.New(),
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
 		"k6/experimental/grpc":       grpc.NewExperimental(),
-		"k6/experimental/timers":     timers.New(),
-		"k6/experimental/tracing":    tracing.New(),
-		"k6/experimental/browser":    browser.New(),
-		"k6/experimental/fs":         fs.New(),
-		"k6/net/grpc":                grpc.New(),
-		"k6/html":                    html.New(),
-		"k6/http":                    http.New(),
-		"k6/metrics":                 metrics.New(),
-		"k6/ws":                      ws.New(),
+		"k6/experimental/timers": newWarnExperimentalModule(timers.New(),
+			"k6/experimental/timers is now part of the k6 core, please change your imports to use k6/timers instead."+
+				" The k6/experimental/timers will be removed in k6 v0.52.0"),
+		"k6/experimental/tracing": tracing.New(),
+		"k6/experimental/browser": browser.New(),
+		"k6/experimental/fs":      fs.New(),
+		"k6/net/grpc":             grpc.New(),
+		"k6/html":                 html.New(),
+		"k6/http":                 http.New(),
+		"k6/metrics":              metrics.New(),
+		"k6/ws":                   ws.New(),
 	}
 }
 
@@ -57,4 +63,23 @@ func getJSModules() map[string]interface{} {
 	}
 
 	return result
+}
+
+type warnExperimentalModule struct {
+	once *sync.Once
+	msg  string
+	base modules.Module
+}
+
+func newWarnExperimentalModule(base modules.Module, msg string) modules.Module {
+	return &warnExperimentalModule{
+		msg:  msg,
+		base: base,
+		once: &sync.Once{},
+	}
+}
+
+func (w *warnExperimentalModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	w.once.Do(func() { vu.InitEnv().Logger.Warn(w.msg) })
+	return w.base.NewModuleInstance(vu)
 }

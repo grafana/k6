@@ -10,6 +10,9 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/trace"
+
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
@@ -71,6 +74,10 @@ type FrameSession struct {
 	logger *log.Logger
 	// logger that will properly serialize RemoteObject instances
 	serializer *log.Logger
+
+	// Keep a reference to the main frame span so we can end it
+	// when FrameSession.ctx is Done
+	mainFrameSpan trace.Span
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
@@ -216,8 +223,16 @@ func (fs *FrameSession) initEvents() {
 	go func() {
 		fs.logger.Debugf("NewFrameSession:initEvents:go",
 			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
-		defer fs.logger.Debugf("NewFrameSession:initEvents:go:return",
-			"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		defer func() {
+			// If there is an active span for main frame,
+			// end it before exiting so it can be flushed
+			if fs.mainFrameSpan != nil {
+				fs.mainFrameSpan.End()
+				fs.mainFrameSpan = nil
+			}
+			fs.logger.Debugf("NewFrameSession:initEvents:go:return",
+				"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		}()
 
 		for {
 			select {
@@ -300,6 +315,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 		NumEntries     json.Number
 		NavigationType string
 		URL            string
+		SpanID         string
 	}{}
 
 	if err := json.Unmarshal([]byte(object), &wv); err != nil {
@@ -334,6 +350,14 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 			},
 		},
 	})
+
+	_, span := TraceEvent(
+		fs.ctx, fs.targetID.String(), "web_vital", wv.SpanID, trace.WithAttributes(
+			attribute.String("web_vital.name", wv.Name),
+			attribute.Float64("web_vital.value", value),
+			attribute.String("web_vital.rating", wv.Rating),
+		))
+	defer span.End()
 
 	return nil
 }
@@ -410,7 +434,10 @@ func (fs *FrameSession) initIsolatedWorld(name string) error {
 	if fs.isMainFrame() {
 		frames = fs.manager.Frames()
 	} else {
-		frames = []*Frame{fs.manager.getFrameByID(cdp.FrameID(fs.targetID))}
+		frame, ok := fs.manager.getFrameByID(cdp.FrameID(fs.targetID))
+		if ok {
+			frames = []*Frame{frame}
+		}
 	}
 	for _, frame := range frames {
 		// A frame could have been removed before we execute this, so don't wait around for a reply.
@@ -635,8 +662,8 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 		k6ext.Panic(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
 	}
 	var world executionWorld
-	frame := fs.manager.getFrameByID(i.FrameID)
-	if frame != nil {
+	frame, ok := fs.manager.getFrameByID(i.FrameID)
+	if ok {
 		if i.IsDefault {
 			world = mainWorld
 		} else if event.Context.Name == utilityWorldName && !frame.hasContext(utilityWorld) {
@@ -724,6 +751,49 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 		k6ext.Panic(fs.ctx, "handling frameNavigated event to %q: %w",
 			frame.URL+frame.URLFragment, err)
 	}
+
+	// Trace navigation only for the main frame.
+	// TODO: How will this affect sub frames such as iframes?
+	if isMainFrame := frame.ParentID == ""; !isMainFrame {
+		return
+	}
+
+	_, fs.mainFrameSpan = TraceNavigation(
+		fs.ctx, fs.targetID.String(), trace.WithAttributes(attribute.String("navigation.url", frame.URL)),
+	)
+
+	var (
+		spanID       = fs.mainFrameSpan.SpanContext().SpanID().String()
+		newFrame, ok = fs.manager.getFrameByID(frame.ID)
+	)
+
+	// Only set the k6SpanId reference if it's a new frame.
+	if !ok {
+		return
+	}
+
+	// Set k6SpanId property in the page so it can be retrieved when pushing
+	// the Web Vitals events from the page execution context and used to
+	// correlate them with the navigation span to which they belong to.
+	setSpanIDProp := func() {
+		js := fmt.Sprintf("window.k6SpanId = '%s';", spanID)
+		err := newFrame.EvaluateGlobal(fs.ctx, js)
+		if err != nil {
+			fs.logger.Errorf(
+				"FrameSession:onFrameNavigated", "error on evaluating window.k6SpanId: %v", err,
+			)
+		}
+	}
+
+	// Executing a CDP command in the event parsing goroutine might deadlock in some cases.
+	// For example a deadlock happens if the content loaded in the frame that has navigated
+	// includes a JavaScript initiated dialog which we have to explicitly accept or dismiss
+	// (see onEventJavascriptDialogOpening). In that case our EvaluateGlobal call can't be
+	// executed, as the browser is waiting for us to accept/dismiss the JS dialog, but we
+	// can't act on that because the event parsing goroutine is stuck in onFrameNavigated.
+	// Because in this case the action is to set an attribute to the global object (window)
+	// it should be safe to just execute this in a separate goroutine.
+	go setSpanIDProp()
 }
 
 func (fs *FrameSession) onFrameRequestedNavigation(event *cdppage.EventFrameRequestedNavigation) {
@@ -784,8 +854,8 @@ func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
 		"sid:%v tid:%v fid:%v event:%s eventTime:%q",
 		fs.session.ID(), fs.targetID, event.FrameID, event.Name, event.Timestamp.Time())
 
-	frame := fs.manager.getFrameByID(event.FrameID)
-	if frame == nil {
+	_, ok := fs.manager.getFrameByID(event.FrameID)
+	if !ok {
 		return
 	}
 
@@ -886,8 +956,8 @@ func (fs *FrameSession) onAttachedToTarget(event *target.EventAttachedToTarget) 
 
 // attachIFrameToTarget attaches an IFrame target to a given session.
 func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.SessionID) error {
-	fr := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
-	if fr == nil {
+	fr, ok := fs.manager.getFrameByID(cdp.FrameID(ti.TargetID))
+	if !ok {
 		// IFrame should be attached to fs.page with EventFrameAttached
 		// event before.
 		fs.logger.Debugf("FrameSession:attachIFrameToTarget:return",

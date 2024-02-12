@@ -1,3 +1,4 @@
+// Package metrics implements k6/metrics and let script work with custom metrics.
 package metrics
 
 import (
@@ -15,6 +16,7 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
+// Metric is a wrapper around custom metrics
 type Metric struct {
 	metric *metrics.Metric
 	vu     modules.VU

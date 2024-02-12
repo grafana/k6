@@ -34,6 +34,7 @@ import (
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/execution"
+	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/js/modules/k6"
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6metrics "go.k6.io/k6/js/modules/k6/metrics"
@@ -383,7 +384,7 @@ func TestDataIsolation(t *testing.T) {
 		RunTags:          runner.preInitState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
 	}
 
-	execScheduler, err := execution.NewScheduler(testRunState)
+	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 	require.NoError(t, err)
 
 	globalCtx, globalCancel := context.WithCancel(context.Background())
@@ -765,7 +766,7 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 					assert.Contains(t, vuErr.Error(), "context canceled")
 				}()
 				<-ch
-				time.Sleep(time.Millisecond * 1) // NOTE: increase this in case of problems ;)
+				time.Sleep(time.Microsecond * 1) // NOTE: increase this in case of problems ;)
 				newCancel()
 				wg.Wait()
 			}
@@ -2667,7 +2668,7 @@ func TestExecutionInfo(t *testing.T) {
 				Runner:           r,
 			}
 
-			execScheduler, err := execution.NewScheduler(testRunState)
+			execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
 			require.NoError(t, err)
 
 			ctx = lib.WithExecutionState(ctx, execScheduler.GetState())

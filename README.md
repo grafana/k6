@@ -14,8 +14,8 @@
 </p>
 <p align="center">
     <a href="https://github.com/grafana/k6/releases">Download</a> ·
-    <a href="https://k6.io/docs">Documentation</a> ·
-    <a href="https://community.k6.io/">Community Forum</a>
+    <a href="https://grafana.com/docs/k6/latest/">Documentation</a> ·
+    <a href="https://community.grafana.com/c/grafana-k6/70">Community Forum</a>
 </p>
 
 <br/>
@@ -72,18 +72,19 @@ You can run scripts like this on the CLI, or in your CI, or across a Kubernetes 
 ## Documentation
 
 The docs cover all aspects of using k6. Some highlights include:
-- [Get Started](https://k6.io/docs). Install, run a test, inspect results.
-- [HTTP requests](https://k6.io/docs/using-k6/http-requests/). Have your virtual users use HTTP methods.
-  Or, check the other [Protocols](https://k6.io/docs/using-k6/protocols/).
-- [Thresholds](https://k6.io/docs/using-k6/thresholds). Set goals for your test, and codify your SLOs.
-- [Options](https://k6.io/docs/using-k6/k6-options). Configure your load, duration, TLS certificates, and much, much more.
-- [Scenarios](https://k6.io/docs/using-k6/scenarios).
-  Choose how to model your workload: open models, closed models, constant RPS, fixed iterations, and more.
-- [Results output](https://k6.io/docs/results-output). Study, filter, and export your test results.
-- [JavaScript API](https://k6.io/docs/javascript-api). Reference and examples of all k6 modules.
-- [Extensions](https://k6.io/docs/extensions). Extend k6 for new protocols and use cases.
 
-These links barely scratch the surface! If you're looking for conceptual information, you can read about [Test types](https://k6.io/docs/test-types/introduction/), [Test strategies](https://k6.io/docs/testing-guides/), or one of the many informative [Blog posts](https://k6.io/blog).
+- [Get Started](https://grafana.com/docs/k6/latest/). Install, run a test, inspect results.
+- [HTTP requests](https://grafana.com/docs/k6/latest/using-k6/http-requests/). Have your virtual users use HTTP methods.
+  Or, check the other [Protocols](https://grafana.com/docs/k6/latest/using-k6/protocols/).
+- [Thresholds](https://grafana.com/docs/k6/latest/using-k6/thresholds/). Set goals for your test, and codify your SLOs.
+- [Options](https://grafana.com/docs/k6/latest/using-k6/k6-options/). Configure your load, duration, TLS certificates, and much, much more.
+- [Scenarios](https://grafana.com/docs/k6/latest/using-k6/scenarios/).
+  Choose how to model your workload: open models, closed models, constant RPS, fixed iterations, and more.
+- [Results output](https://grafana.com/docs/k6/latest/results-output/). Study, filter, and export your test results.
+- [JavaScript API](https://grafana.com/docs/k6/latest/javascript-api/). Reference and examples of all k6 modules.
+- [Extensions](https://grafana.com/docs/k6/latest/extensions/). Extend k6 for new protocols and use cases.
+
+These links barely scratch the surface! If you're looking for conceptual information, you can read about [Test types](https://grafana.com/docs/k6/latest/testing-guides/test-types/), [Test strategies](https://grafana.com/docs/k6/latest/testing-guides/), or one of the many informative [Blog posts](https://k6.io/blog).
 
 ## Roadmap
 

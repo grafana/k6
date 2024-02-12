@@ -246,6 +246,18 @@ func (e Element) IsSameNode(v goja.Value) bool {
 	return false
 }
 
+// Selection returns a Selection object based on the current Element.
+//
+// This function is used to create a Selection object that represents the same HTML
+// content as the Element. It is useful for performing operations or manipulations
+// on the HTML content within the scope of this Element.
+//
+// Example:
+// sel := element.Selection()
+func (e Element) Selection() Selection {
+	return *e.sel
+}
+
 func (e Element) GetElementsByClassName(name string) []goja.Value {
 	return elemList(Selection{e.sel.rt, e.sel.sel.Find("." + name), e.sel.URL})
 }

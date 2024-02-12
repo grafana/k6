@@ -16,6 +16,7 @@ import (
 	"go.k6.io/k6/output/json"
 	"go.k6.io/k6/output/statsd"
 
+	"github.com/grafana/xk6-dashboard/dashboard"
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite"
 )
 
@@ -61,6 +62,7 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 		builtinOutputExperimentalPrometheusRW.String(): func(params output.Params) (output.Output, error) {
 			return remotewrite.New(params)
 		},
+		"web-dashboard": dashboard.New,
 	}
 
 	exts := ext.Get(ext.OutputExtension)
@@ -108,9 +110,15 @@ func createOutputs(
 		RuntimeOptions: test.preInitState.RuntimeOptions,
 		ExecutionPlan:  executionPlan,
 	}
-	result := make([]output.Output, 0, len(test.derivedConfig.Out))
 
-	for _, outputFullArg := range test.derivedConfig.Out {
+	outputs := test.derivedConfig.Out
+	if test.derivedConfig.WebDashboard.Bool {
+		outputs = append(outputs, dashboard.OutputName)
+	}
+
+	result := make([]output.Output, 0, len(outputs))
+
+	for _, outputFullArg := range outputs {
 		outputType, outputArg := parseOutputArgument(outputFullArg)
 		outputConstructor, ok := outputConstructors[outputType]
 		if !ok {

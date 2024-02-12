@@ -1,0 +1,539 @@
+{
+  "title": "k6 dashboard",
+  "tabs": [
+    {
+      "sections": [
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "iterations[?!tags && rate]"
+                }
+              ],
+              "title": "Iteration Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-0",
+              "summary": "The iteration rate represents the number of times a VU has executed a test script (the `default` function) over a period of time. The panel can help you ensure that your test iteration rate matches the configuration you have specified in your test script, and that the number of VUs you have allocated matches the test capacity."
+            },
+            {
+              "series": [
+                {
+                  "query": "http_reqs[?!tags && rate]"
+                }
+              ],
+              "title": "HTTP Request Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-1",
+              "summary": "The HTTP request rate represents the number of requests over a period of time."
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_duration[?!tags && avg]"
+                }
+              ],
+              "title": "HTTP Request Duration",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-2",
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test."
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_failed[?!tags && rate ]"
+                }
+              ],
+              "title": "HTTP Request Failed",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-3",
+              "summary": "The rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details."
+            },
+            {
+              "series": [
+                {
+                  "query": "data_received[?!tags && rate]"
+                }
+              ],
+              "title": "Received Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-4",
+              "summary": "The amount of data received over a period of time."
+            },
+            {
+              "series": [
+                {
+                  "query": "data_sent[?!tags && rate]"
+                }
+              ],
+              "title": "Sent Rate",
+              "kind": "stat",
+              "id": "tab-0.section-0.panel-5",
+              "summary": "The amount of data sent to the system under test.   "
+            }
+          ],
+          "id": "tab-0.section-0"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "http_reqs[?!tags && rate]",
+                  "legend": "Request Rate"
+                },
+                {
+                  "query": "http_req_duration[?!tags && p95]",
+                  "legend": "Request Duration p(95)"
+                },
+                {
+                  "query": "http_req_failed[?!tags && rate]",
+                  "legend": "Request Failed"
+                }
+              ],
+              "title": "HTTP Performance overview",
+              "id": "tab-0.section-1.panel-0",
+              "summary": "The HTTP request rate represents the number of requests over a period of time. The HTTP request duration 95 percentile represents the total time for 95% of the requests observed. The HTTP request failed rate represents the rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details.",
+              "fullWidth": true,
+              "kind": "chart"
+            }
+          ],
+          "id": "tab-0.section-1"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "vus[?!tags && value]"
+                },
+                {
+                  "query": "http_reqs[?!tags && rate ]"
+                }
+              ],
+              "title": "VUs",
+              "id": "tab-0.section-2.panel-0",
+              "summary": "The number of VUs and the number of requests throughout the test run. This is an indication of how the two metrics correlate, and can help you visualize if you need to increase or decrease the number of VUs for your test.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "data_received[?!tags && rate]"
+                },
+                {
+                  "query": "data_sent[?!tags && rate]"
+                }
+              ],
+              "title": "Transfer Rate",
+              "id": "tab-0.section-2.panel-1",
+              "summary": "The rate at which data is sent to and received from the system under test.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "HTTP Request Duration",
+              "id": "tab-0.section-2.panel-2",
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "iteration_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Iteration Duration",
+              "id": "tab-0.section-2.panel-3",
+              "summary": "The time to complete one full iteration of the test, including time spent in setup and teardown.",
+              "kind": "chart"
+            }
+          ],
+          "id": "tab-0.section-2"
+        }
+      ],
+      "title": "Overview",
+      "summary": "This chapter provides an overview of the most important metrics of the test run. Graphs plot the value of metrics over time.",
+      "id": "tab-0"
+    },
+    {
+      "sections": [
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "http_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Duration",
+              "id": "tab-1.section-0.panel-0",
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_failed[?!tags && rate ]"
+                }
+              ],
+              "title": "Request Failed Rate",
+              "id": "tab-1.section-0.panel-1",
+              "summary": "The rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_reqs[?!tags && rate]"
+                }
+              ],
+              "title": "Request Rate",
+              "id": "tab-1.section-0.panel-2",
+              "summary": "The HTTP request rate represents the number of requests over a period of time.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_waiting[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Waiting",
+              "id": "tab-1.section-0.panel-3",
+              "summary": "The time between k6 sending a request and receiving the first byte of information from the remote host. Also known as 'time to first byte' or 'TTFB'.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_tls_handshaking[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "TLS handshaking",
+              "id": "tab-1.section-0.panel-4",
+              "summary": "The time it takes to complete the TLS handshake for the requests.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_sending[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Sending",
+              "id": "tab-1.section-0.panel-5",
+              "summary": "The time k6 spends sending data to the remote host.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_connecting[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Connecting",
+              "id": "tab-1.section-0.panel-6",
+              "summary": "The time k6 spends establishing a TCP connection to the remote host.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_receiving[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Receiving",
+              "id": "tab-1.section-0.panel-7",
+              "summary": "The time k6 spends receiving data from the remote host.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "http_req_blocked[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Blocked",
+              "id": "tab-1.section-0.panel-8",
+              "summary": "The time k6 spends waiting for a free TCP connection slot before initiating a request.",
+              "kind": "chart"
+            }
+          ],
+          "title": "HTTP",
+          "summary": "These metrics are generated only when the test makes HTTP requests.",
+          "id": "tab-1.section-0"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "browser_http_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Duration",
+              "id": "tab-1.section-1.panel-0",
+              "summary": "The HTTP request duration represents the total time for a request. This is an indication of the latency experienced when making HTTP requests against the system under test.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_http_req_failed[?!tags && rate ]"
+                }
+              ],
+              "title": "Request Failed Rate",
+              "id": "tab-1.section-1.panel-1",
+              "summary": "The rate of failed requests according to the test configuration. Failed requests can include any number of status codes depending on your test. Refer to setResponseCallback for more details.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_lcp[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Largest Contentful Paint",
+              "id": "tab-1.section-1.panel-2",
+              "summary": "Largest Contentful Paint (LCP) measures the time it takes for the largest content element on a page to become visible.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_fid[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "First Input Delay",
+              "id": "tab-1.section-1.panel-3",
+              "summary": "First Input Delay (FID) measures the responsiveness of a web page by quantifying the delay between a user's first interaction, such as clicking a button, and the browser's response.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_cls[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Cumulative Layout Shift",
+              "id": "tab-1.section-1.panel-4",
+              "summary": "Cumulative Layout Shift (CLS) measures visual stability on a webpage by quantifying the amount of unexpected layout shift of visible page content.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_ttfb[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Time to First Byte",
+              "id": "tab-1.section-1.panel-5",
+              "summary": "Time to First Byte (TTFB) measures the time between the request for a resource and when the first byte of a response begins to arrive.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_fcp[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "First Contentful Paint",
+              "id": "tab-1.section-1.panel-6",
+              "summary": "First Contentful Paint (FCP) measures the time it takes for the first content element to be painted on the screen.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "browser_web_vital_inp[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Interaction to Next Paint",
+              "id": "tab-1.section-1.panel-7",
+              "summary": "Interaction to Next Paint (INP) measures a page's overall responsiveness to user interactions by observing the latency of all click, tap, and keyboard interactions that occur throughout the lifespan of a user's visit to a page.",
+              "kind": "chart"
+            }
+          ],
+          "title": "Browser",
+          "summary": "The k6 browser module emits its own metrics based on the Core Web Vitals and Other Web Vitals.",
+          "id": "tab-1.section-1"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "ws_connecting[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Connect Duration",
+              "id": "tab-1.section-2.panel-0",
+              "summary": "The duration of the WebSocket connection request. This is an indication of the latency experienced when connecting to a WebSocket server.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_session_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Session Duration",
+              "id": "tab-1.section-2.panel-1",
+              "summary": "The time between the start of the connection and the end of the VU execution.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_ping[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Ping Duration",
+              "id": "tab-1.section-2.panel-2",
+              "summary": "The duration between a ping request and its pong reception. This is an indication of the latency experienced during the roundtrip of sending a ping message to a WebSocket server, and waiting for the pong response message to come back.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_msgs_sent[?!tags && rate]"
+                },
+                {
+                  "query": "ws_msgs_received[?!tags && rate]"
+                }
+              ],
+              "title": "Transfer Rate",
+              "id": "tab-1.section-2.panel-3",
+              "summary": "The total number of WebSocket messages sent, and the total number of WebSocket messages received.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "ws_sessions[?!tags && rate]"
+                }
+              ],
+              "title": "Sessions Rate",
+              "id": "tab-1.section-2.panel-4",
+              "summary": "The total number of WebSocket sessions started.",
+              "kind": "chart"
+            }
+          ],
+          "title": "WebSocket",
+          "summary": "k6 emits the following metrics when interacting with a WebSocket service through the experimental or legacy websockets API.",
+          "id": "tab-1.section-2"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "grpc_req_duration[?!tags && (avg || p90 || p95 || p99)]"
+                }
+              ],
+              "title": "Request Duration",
+              "id": "tab-1.section-3.panel-0",
+              "summary": "The gRPC request duration represents the total time for a gRPC request. This is an indication of the latency experienced when making gRPC requests against the system under test.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "grpc_streams_msgs_sent[?!tags && rate]"
+                },
+                {
+                  "query": "grpc_streams_msgs_received[?!tags && rate]"
+                }
+              ],
+              "title": "Transfer Rate",
+              "id": "tab-1.section-3.panel-1",
+              "summary": "The total number of messages sent to gRPC streams, and the total number of messages received from a gRPC stream.",
+              "kind": "chart"
+            },
+            {
+              "series": [
+                {
+                  "query": "grpc_streams[?!tags && rate]"
+                }
+              ],
+              "title": "Streams Rate",
+              "id": "tab-1.section-3.panel-2",
+              "summary": "The total number of gRPC streams started.",
+              "kind": "chart"
+            }
+          ],
+          "title": "gRPC",
+          "summary": "k6 emits the following metrics when it interacts with a service through the gRPC API.",
+          "id": "tab-1.section-3"
+        }
+      ],
+      "title": "Timings",
+      "summary": "This chapter provides an overview of test run HTTP timing metrics. Graphs plot the value of metrics over time.",
+      "id": "tab-1"
+    },
+    {
+      "sections": [
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "[?!tags && trend]"
+                }
+              ],
+              "title": "Trends",
+              "kind": "summary",
+              "id": "tab-2.section-0.panel-0"
+            }
+          ],
+          "title": "",
+          "id": "tab-2.section-0"
+        },
+        {
+          "panels": [
+            {
+              "series": [
+                {
+                  "query": "[?!tags && counter]"
+                }
+              ],
+              "title": "Counters",
+              "kind": "summary",
+              "id": "tab-2.section-1.panel-0"
+            },
+            {
+              "series": [
+                {
+                  "query": "[?!tags && rate]"
+                }
+              ],
+              "title": "Rates",
+              "kind": "summary",
+              "id": "tab-2.section-1.panel-1"
+            },
+            {
+              "series": [
+                {
+                  "query": "[?!tags && gauge]"
+                }
+              ],
+              "title": "Gauges",
+              "kind": "summary",
+              "id": "tab-2.section-1.panel-2"
+            }
+          ],
+          "title": "",
+          "id": "tab-2.section-1"
+        }
+      ],
+      "title": "Summary",
+      "summary": "This chapter provides a summary of the test run metrics. The tables contains the aggregated values of the metrics for the entire test run.",
+      "id": "tab-2"
+    }
+  ]
+}

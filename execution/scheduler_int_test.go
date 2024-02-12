@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
@@ -43,7 +44,7 @@ func TestSetPaused(t *testing.T) {
 	t.Run("second pause is an error", func(t *testing.T) {
 		t.Parallel()
 		testRunState := getBogusTestRunState(t)
-		sched, err := NewScheduler(testRunState)
+		sched, err := NewScheduler(testRunState, local.NewController())
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 
@@ -56,7 +57,7 @@ func TestSetPaused(t *testing.T) {
 	t.Run("unpause at the start is an error", func(t *testing.T) {
 		t.Parallel()
 		testRunState := getBogusTestRunState(t)
-		sched, err := NewScheduler(testRunState)
+		sched, err := NewScheduler(testRunState, local.NewController())
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		err = sched.SetPaused(false)
@@ -67,7 +68,7 @@ func TestSetPaused(t *testing.T) {
 	t.Run("second unpause is an error", func(t *testing.T) {
 		t.Parallel()
 		testRunState := getBogusTestRunState(t)
-		sched, err := NewScheduler(testRunState)
+		sched, err := NewScheduler(testRunState, local.NewController())
 		require.NoError(t, err)
 		sched.executors = []lib.Executor{pausableExecutor{err: nil}}
 		require.NoError(t, sched.SetPaused(true))
@@ -80,7 +81,7 @@ func TestSetPaused(t *testing.T) {
 	t.Run("an error on pausing is propagated", func(t *testing.T) {
 		t.Parallel()
 		testRunState := getBogusTestRunState(t)
-		sched, err := NewScheduler(testRunState)
+		sched, err := NewScheduler(testRunState, local.NewController())
 		require.NoError(t, err)
 		expectedErr := errors.New("testing pausable executor error")
 		sched.executors = []lib.Executor{pausableExecutor{err: expectedErr}}

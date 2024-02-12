@@ -138,7 +138,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 	}
 
 	returnVU := func(v lib.InitializedVU) {
-		require.Equal(t, atomic.LoadUint64(&vuID), v.(*minirunner.VU).ID)
+		require.Equal(t, atomic.LoadUint64(&vuID), v.(*minirunner.VU).ID) //nolint:forcetypeassert
 		close(returned)
 	}
 	var interruptedIter int64
