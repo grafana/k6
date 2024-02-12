@@ -777,3 +777,40 @@ func TestRampingArrivalRateActiveVUs(t *testing.T) {
 	assert.GreaterOrEqual(t, running, int64(5))
 	assert.LessOrEqual(t, running, int64(10))
 }
+
+func TestRampingArrivalRateActiveVUs_GetExecutionRequirements(t *testing.T) {
+	t.Parallel()
+
+	tcs := map[string]struct {
+		preAllocatedVUs    int64
+		maxVUs             int64
+		segment            string
+		sequence           string
+		expPlannedVUs      uint64
+		expMaxUnplannedVUs uint64
+	}{
+		"Segmented/Odd":     {preAllocatedVUs: 1, maxVUs: 4000, segment: "0:1/4", sequence: "0,1/4,1/2,3/4,1", expPlannedVUs: 1, expMaxUnplannedVUs: 999},
+		"Segmented/Even":    {preAllocatedVUs: 100, maxVUs: 4000, segment: "0:1/4", sequence: "0,1/4,1/2,3/4,1", expPlannedVUs: 25, expMaxUnplannedVUs: 975},
+		"NotSegmented/Odd":  {preAllocatedVUs: 1, maxVUs: 4000, segment: "0:1", sequence: "0,1", expPlannedVUs: 1, expMaxUnplannedVUs: 3999},
+		"NotSegmented/Even": {preAllocatedVUs: 100, maxVUs: 4000, segment: "0:1", sequence: "0,1", expPlannedVUs: 100, expMaxUnplannedVUs: 3900},
+	}
+
+	for name, tc := range tcs {
+		tc := tc
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			config := &RampingArrivalRateConfig{
+				PreAllocatedVUs: null.IntFrom(tc.preAllocatedVUs),
+				MaxVUs:          null.IntFrom(tc.maxVUs),
+			}
+
+			et, err := lib.NewExecutionTuple(newExecutionSegmentFromString(tc.segment), newExecutionSegmentSequenceFromString(tc.sequence))
+			require.NoError(t, err)
+
+			exp := []lib.ExecutionStep{{PlannedVUs: tc.expPlannedVUs, MaxUnplannedVUs: tc.expMaxUnplannedVUs}, {}}
+			require.Equal(t, exp, config.GetExecutionRequirements(et))
+
+		})
+	}
+}
