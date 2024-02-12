@@ -810,7 +810,6 @@ func TestRampingArrivalRateActiveVUs_GetExecutionRequirements(t *testing.T) {
 
 			exp := []lib.ExecutionStep{{PlannedVUs: tc.expPlannedVUs, MaxUnplannedVUs: tc.expMaxUnplannedVUs}, {}}
 			require.Equal(t, exp, config.GetExecutionRequirements(et))
-
 		})
 	}
 }
