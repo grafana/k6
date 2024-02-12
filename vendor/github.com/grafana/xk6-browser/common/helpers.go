@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"time"
@@ -35,8 +36,8 @@ func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, ob
 func convertArgument(
 	ctx context.Context, execCtx *ExecutionContext, arg any,
 ) (*cdpruntime.CallArgument, error) {
-	if gojaVal, ok := arg.(goja.Value); ok {
-		arg = gojaVal.Export()
+	if escapesGojaValues(arg) {
+		return nil, errors.New("goja.Value escaped")
 	}
 	switch a := arg.(type) {
 	case int64:
@@ -80,7 +81,7 @@ func convertArgument(
 		return convertBaseJSHandleTypes(ctx, execCtx, a)
 	default:
 		b, err := json.Marshal(a)
-		return &cdpruntime.CallArgument{Value: b}, err
+		return &cdpruntime.CallArgument{Value: b}, err //nolint:wrapcheck
 	}
 }
 
@@ -239,4 +240,26 @@ func asGojaValue(ctx context.Context, v any) goja.Value {
 // panics if v is not a goja value.
 func gojaValueToString(ctx context.Context, v any) string {
 	return asGojaValue(ctx, v).String()
+}
+
+// convert is a helper function to convert any value to a given type.
+// underneath, it uses json.Marshal and json.Unmarshal to do the conversion.
+func convert[T any](from any, to *T) error {
+	buf, err := json.Marshal(from)
+	if err != nil {
+		return err //nolint:wrapcheck
+	}
+	return json.Unmarshal(buf, to) //nolint:wrapcheck
+}
+
+// TODO:
+// remove this temporary helper after ensuring the goja-free
+// business logic works.
+func escapesGojaValues(args ...any) bool {
+	for _, arg := range args {
+		if _, ok := arg.(goja.Value); ok {
+			return true
+		}
+	}
+	return false
 }

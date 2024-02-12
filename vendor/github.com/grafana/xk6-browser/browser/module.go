@@ -1,4 +1,9 @@
-// Package browser provides an entry point to the browser module.
+// Package browser is the browser module's entry point, and
+// initializer of various global types, and a translation layer
+// between Goja and the internal business logic.
+//
+// It initializes and drives the downstream components by passing
+// the necessary concrete dependencies.
 package browser
 
 import (
@@ -13,6 +18,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/storage"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -76,7 +82,8 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 					m.PidRegistry,
 					m.tracesMetadata,
 				),
-				taskQueueRegistry: newTaskQueueRegistry(vu),
+				taskQueueRegistry:  newTaskQueueRegistry(vu),
+				LocalFilePersister: &storage.LocalFilePersister{},
 			}),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),

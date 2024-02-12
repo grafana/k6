@@ -625,7 +625,10 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 
 	parsedObjects := make([]string, 0, len(event.Args))
 	for _, robj := range event.Args {
-		s := parseConsoleRemoteObject(fs.logger, robj)
+		s, err := parseConsoleRemoteObject(fs.logger, robj)
+		if err != nil {
+			fs.logger.Errorf("onConsoleAPICalled", "failed to parse console message %v", err)
+		}
 		parsedObjects = append(parsedObjects, s)
 	}
 
@@ -639,6 +642,8 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 	case "error":
 		l.Error()
 	default:
+		// this is where debug & other console.* apis will default to (such as
+		// console.table).
 		l.Debug()
 	}
 }

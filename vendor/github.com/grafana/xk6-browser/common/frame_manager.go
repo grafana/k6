@@ -451,9 +451,8 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	switch rc := len(ifr); {
 	case rc <= 10:
 		for reqID := range ifr {
-			req := frame.requestByID(reqID)
-
-			if req == nil {
+			req, ok := frame.requestByID(reqID)
+			if !ok {
 				m.logger.Debugf("FrameManager:requestFailed:rc<=10 request is nil",
 					"reqID:%s frameID:%s",
 					reqID, frame.ID())

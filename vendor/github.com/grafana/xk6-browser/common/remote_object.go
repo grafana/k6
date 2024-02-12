@@ -3,17 +3,16 @@ package common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"math"
 	"regexp"
 	"strconv"
 	"strings"
 
-	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
-	"github.com/dop251/goja"
 )
 
 var bigIntRegex = regexp.MustCompile("^[0-9]*n$")
@@ -38,6 +37,7 @@ func (pe *objectPropertyParseError) Error() string {
 
 // Unwrap returns the wrapped parsing error.
 func (pe *objectPropertyParseError) Unwrap() error {
+	_ = errors.Join(nil)
 	return pe.error
 }
 
@@ -221,50 +221,56 @@ func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	return nil, UnserializableValueError{uv}
 }
 
-func valueFromRemoteObject(ctx context.Context, robj *cdpruntime.RemoteObject) (goja.Value, error) {
+func valueFromRemoteObject(_ context.Context, robj *cdpruntime.RemoteObject) (any, error) {
 	val, err := parseRemoteObject(robj)
 	if val == "undefined" {
-		return goja.Undefined(), err
+		return nil, err
 	}
-	return k6ext.Runtime(ctx).ToValue(val), err
+	return val, err
 }
 
-func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) string {
+func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) (string, error) {
 	obj := make(map[string]string)
 	if op.Overflow {
 		logger.Infof("parseConsoleRemoteObjectPreview", "object is too large and will be parsed partially")
 	}
 
 	for _, p := range op.Properties {
-		val := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		val, err := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		if err != nil {
+			return "", err
+		}
 		obj[p.Name] = val
 	}
 
 	bb, err := json.Marshal(obj)
 	if err != nil {
-		logger.Errorf("parseConsoleRemoteObjectPreview", "failed to marshal object to string: %v", err)
+		return "", fmt.Errorf("marshaling object %q to string: %w", obj, err)
 	}
 
-	return string(bb)
+	return string(bb), nil
 }
 
-func parseConsoleRemoteArrayPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) string {
+func parseConsoleRemoteArrayPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) (string, error) {
 	arr := make([]any, 0, len(op.Properties))
 	if op.Overflow {
-		logger.Warnf("parseConsoleRemoteArrayPreview", "array is too large and will be parsed partially")
+		logger.Infof("parseConsoleRemoteArrayPreview", "array is too large and will be parsed partially")
 	}
 
 	for _, p := range op.Properties {
-		val := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		val, err := parseConsoleRemoteObjectValue(logger, p.Type, p.Subtype, p.Value, p.ValuePreview)
+		if err != nil {
+			return "", err
+		}
 		arr = append(arr, val)
 	}
 
 	bb, err := json.Marshal(arr)
 	if err != nil {
-		logger.Errorf("parseConsoleRemoteArrayPreview", "failed to marshal array to string: %v", err)
+		return "", fmt.Errorf("marshaling array %q to string: %w", arr, err)
 	}
 
-	return string(bb)
+	return string(bb), nil
 }
 
 //nolint:cyclop
@@ -274,12 +280,12 @@ func parseConsoleRemoteObjectValue(
 	st cdpruntime.Subtype,
 	val string,
 	op *cdpruntime.ObjectPreview,
-) string {
+) (string, error) {
 	switch t {
 	case cdpruntime.TypeAccessor:
-		return "accessor"
+		return "accessor", nil
 	case cdpruntime.TypeFunction:
-		return "function()"
+		return "function()", nil
 	case cdpruntime.TypeString:
 		if strings.HasPrefix(val, `"`) {
 			val = strings.TrimPrefix(val, `"`)
@@ -293,13 +299,13 @@ func parseConsoleRemoteObjectValue(
 			return parseConsoleRemoteObjectPreview(logger, op)
 		}
 		if val == "Object" {
-			return val
+			return val, nil
 		}
 		if st == "null" {
-			return "null"
+			return "null", nil
 		}
 	case cdpruntime.TypeUndefined:
-		return "undefined"
+		return "undefined", nil
 	// The following cases are here to clarify that all cases have been
 	// considered, but that the result will return val without processing it.
 	case cdpruntime.TypeNumber:
@@ -308,15 +314,15 @@ func parseConsoleRemoteObjectValue(
 	case cdpruntime.TypeBigint:
 	}
 
-	return val
+	return val, nil
 }
 
 // parseConsoleRemoteObject is to be used by callers that are working with
 // console messages that are written to Chrome's console by the website under
 // test.
-func parseConsoleRemoteObject(logger *log.Logger, obj *cdpruntime.RemoteObject) string {
+func parseConsoleRemoteObject(logger *log.Logger, obj *cdpruntime.RemoteObject) (string, error) {
 	if obj.UnserializableValue != "" {
-		return obj.UnserializableValue.String()
+		return obj.UnserializableValue.String(), nil
 	}
 
 	return parseConsoleRemoteObjectValue(logger, obj.Type, obj.Subtype, string(obj.Value), obj.Preview)

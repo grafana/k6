@@ -25,6 +25,7 @@ import (
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
+	"github.com/grafana/xk6-browser/storage"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -649,20 +650,20 @@ func (p *Page) IsChecked(selector string, opts goja.Value) bool {
 }
 
 // Click clicks an element matching provided selector.
-func (p *Page) Click(selector string, opts goja.Value) error {
+func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 	p.logger.Debugf("Page:Click", "sid:%v selector:%s", p.sessionID(), selector)
 
-	return p.MainFrame().Click(selector, opts) //nolint:wrapcheck
+	return p.MainFrame().Click(selector, opts)
 }
 
 // Close closes the page.
-func (p *Page) Close(opts goja.Value) error {
+func (p *Page) Close(_ goja.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
 	defer span.End()
 
 	// forcing the pagehide event to trigger web vitals metrics.
-	v := p.vu.Runtime().ToValue(`() => window.dispatchEvent(new Event('pagehide'))`)
+	v := `() => window.dispatchEvent(new Event('pagehide'))`
 	ctx, cancel := context.WithTimeout(p.ctx, p.defaultTimeout())
 	defer cancel()
 	_, err := p.MainFrame().EvaluateWithContext(ctx, v)
@@ -716,10 +717,11 @@ func (p *Page) Dblclick(selector string, opts goja.Value) {
 	p.MainFrame().Dblclick(selector, opts)
 }
 
-func (p *Page) DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) {
+// DispatchEvent dispatches an event on the page to the element that matches the provided selector.
+func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	p.logger.Debugf("Page:DispatchEvent", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
+	return p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
 }
 
 // DragAndDrop is not implemented.
@@ -777,14 +779,14 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 }
 
 // Evaluate runs JS code within the execution context of the main frame of the page.
-func (p *Page) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
+func (p *Page) Evaluate(pageFunc string, args ...any) any {
 	p.logger.Debugf("Page:Evaluate", "sid:%v", p.sessionID())
 
 	return p.MainFrame().Evaluate(pageFunc, args...)
 }
 
 // EvaluateHandle runs JS code within the execution context of the main frame of the page.
-func (p *Page) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error) {
+func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error) {
 	p.logger.Debugf("Page:EvaluateHandle", "sid:%v", p.sessionID())
 
 	h, err := p.MainFrame().EvaluateHandle(pageFunc, args...)
@@ -827,7 +829,8 @@ func (p *Page) Frames() []*Frame {
 	return p.frameManager.Frames()
 }
 
-func (p *Page) GetAttribute(selector string, name string, opts goja.Value) goja.Value {
+// GetAttribute returns the attribute value of the element matching the provided selector.
+func (p *Page) GetAttribute(selector string, name string, opts goja.Value) any {
 	p.logger.Debugf("Page:GetAttribute", "sid:%v selector:%s name:%s",
 		p.sessionID(), selector, name)
 
@@ -862,7 +865,7 @@ func (p *Page) GoForward(_ goja.Value) *Response {
 }
 
 // Goto will navigate the page to the specified URL and return a HTTP response object.
-func (p *Page) Goto(url string, opts goja.Value) (*Response, error) {
+func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
 	_, span := TraceAPICall(
 		p.ctx,
@@ -961,6 +964,19 @@ func (p *Page) MainFrame() *Frame {
 	}
 
 	return mf
+}
+
+// Referrer returns the page's referrer.
+// It's an internal method not to be exposed as a JS API.
+func (p *Page) Referrer() string {
+	nm := p.mainFrameSession.getNetworkManager()
+	return nm.extraHTTPHeaders["referer"]
+}
+
+// NavigationTimeout returns the page's navigation timeout.
+// It's an internal method not to be exposed as a JS API.
+func (p *Page) NavigationTimeout() time.Duration {
+	return p.frameManager.timeoutSettings.navigationTimeout()
 }
 
 // On subscribes to a page event for which the given handler will be executed
@@ -1105,23 +1121,19 @@ func (p *Page) Route(url goja.Value, handler goja.Callable) {
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
-func (p *Page) Screenshot(opts goja.Value) goja.ArrayBuffer {
+func (p *Page) Screenshot(opts *PageScreenshotOptions, fp *storage.LocalFilePersister) ([]byte, error) {
 	spanCtx, span := TraceAPICall(p.ctx, p.targetID.String(), "page.screenshot")
 	defer span.End()
 
-	parsedOpts := NewPageScreenshotOptions()
-	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "parsing screenshot options: %w", err)
-	}
-	span.SetAttributes(attribute.String("screenshot.path", parsedOpts.Path))
+	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx)
-	buf, err := s.screenshotPage(p, parsedOpts)
+	s := newScreenshotter(spanCtx, fp)
+	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
-		k6ext.Panic(p.ctx, "capturing screenshot: %w", err)
+		return nil, fmt.Errorf("taking screenshot of page: %w", err)
 	}
-	rt := p.vu.Runtime()
-	return rt.NewArrayBuffer(*buf)
+
+	return buf, err
 }
 
 func (p *Page) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
@@ -1190,11 +1202,19 @@ func (p *Page) TextContent(selector string, opts goja.Value) string {
 	return p.MainFrame().TextContent(selector, opts)
 }
 
+// Timeout will return the default timeout or the one set by the user.
+// It's an internal method not to be exposed as a JS API.
+func (p *Page) Timeout() time.Duration {
+	return p.defaultTimeout()
+}
+
 func (p *Page) Title() string {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
-	v := p.vu.Runtime().ToValue(`() => document.title`)
-	return gojaValueToString(p.ctx, p.Evaluate(v))
+	// TODO: return error
+
+	v := `() => document.title`
+	return p.Evaluate(v).(string) //nolint:forcetypeassert
 }
 
 // ThrottleCPU will slow the CPU down from chrome's perspective to simulate
@@ -1246,8 +1266,10 @@ func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
 func (p *Page) URL() string {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
 
-	v := p.vu.Runtime().ToValue(`() => document.location.toString()`)
-	return gojaValueToString(p.ctx, p.Evaluate(v))
+	// TODO: return error
+
+	v := `() => document.location.toString()`
+	return p.Evaluate(v).(string) //nolint:forcetypeassert
 }
 
 // Video returns information of recorded video.
@@ -1274,10 +1296,9 @@ func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) any {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (p *Page) WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error) {
+func (p *Page) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsArgs ...any) (any, error) {
 	p.logger.Debugf("Page:WaitForFunction", "sid:%v", p.sessionID())
-
-	return p.frameManager.MainFrame().WaitForFunction(fn, opts, args...)
+	return p.frameManager.MainFrame().WaitForFunction(js, opts, jsArgs...)
 }
 
 // WaitForLoadState waits for the specified page life cycle event.
@@ -1288,7 +1309,7 @@ func (p *Page) WaitForLoadState(state string, opts goja.Value) {
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
-func (p *Page) WaitForNavigation(opts goja.Value) (*Response, error) {
+func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
 	p.logger.Debugf("Page:WaitForNavigation", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
@@ -1374,7 +1395,10 @@ func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (
 	)
 
 	for _, robj := range e.Args {
-		s := parseConsoleRemoteObject(p.logger, robj)
+		s, err := parseConsoleRemoteObject(p.logger, robj)
+		if err != nil {
+			p.logger.Errorf("consoleMsgFromConsoleEvent", "failed to parse console message %v", err)
+		}
 
 		objects = append(objects, s)
 		objectHandles = append(objectHandles, NewJSHandle(
