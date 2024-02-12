@@ -17,7 +17,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.20.x]
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -72,7 +72,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.20.x]
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
@@ -110,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        go-version: [1.19.x]
+        go-version: [1.20.x]
         platform: [ubuntu-latest]
     runs-on: ${{ matrix.platform }}
     steps:
