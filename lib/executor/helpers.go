@@ -17,7 +17,8 @@ import (
 )
 
 const (
-	// maxConcurrentVUs is an arbitrary limit for sanity checks. It prevents running an exaggeratedly large number of concurrent VUs which may lead to an out-of-memory.
+	// maxConcurrentVUs is an arbitrary limit for sanity checks.
+	// It prevents running an exaggeratedly large number of concurrent VUs which may lead to an out-of-memory.
 	maxConcurrentVUs int = 100_000_000
 )
 
@@ -38,7 +39,8 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 	return max
 }
 
-// validateTargetShifts validates the VU Target shifts. It will append an error for any VU target that is larger than the maximum value allowed.
+// validateTargetShifts validates the VU Target shifts.
+// It will append an error for any VU target that is larger than the maximum value allowed.
 // Each Stage needs a Target value. The stages array can be empty. The Targes could be negative.
 func validateTargetShifts(startVUs int64, stages []Stage) []error {
 	var errors []error
@@ -46,7 +48,7 @@ func validateTargetShifts(startVUs int64, stages []Stage) []error {
 	if startVUs > int64(maxConcurrentVUs) {
 		errors = append(errors, fmt.Errorf(
 			"the startVUs exceed max limit of %d", maxConcurrentVUs))
-	 }
+	}
 
 	for i := 0; i < len(stages); i++ {
 		if stages[i].Target.Int64 > int64(maxConcurrentVUs) {

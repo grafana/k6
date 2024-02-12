@@ -50,7 +50,7 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 
 		errs = c.Validate()
 		require.NotEmpty(t, errs)
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the startVUs exceed max limit of"))
+		assert.Contains(t, errs[0].Error(), "the startVUs exceed max limit of")
 	})
 
 	t.Run("For multiple VU values larger than maxConcurrentVUs, multiple errors are returned", func(t *testing.T) {
@@ -64,8 +64,9 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 
 		errs = c.Validate()
 		require.Equal(t, 2, len(errs))
-		assert.Contains(t, errs[0].Error(), fmt.Sprintf("the startVUs exceed max limit of"))
-		assert.Contains(t, errs[1].Error(), fmt.Sprintf("target for stage 1 exceeds max limit of "))
+		assert.Contains(t, errs[0].Error(), "the startVUs exceed max limit of")
+
+		assert.Contains(t, errs[1].Error(), "target for stage 1 exceeds max limit of")
 	})
 
 	t.Run("VU values below maxConcurrentVUs will pass validation", func(t *testing.T) {
