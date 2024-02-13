@@ -19,7 +19,6 @@ import (
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
-	"github.com/grafana/xk6-browser/storage"
 )
 
 type emulateMediaOpts struct {
@@ -476,9 +475,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 
 	opts := common.NewPageScreenshotOptions()
 	opts.FullPage = true
-	// TODO: Use a mock instead of a LocalFilePersister when there's no need to
-	//       persist files.
-	buf, err := p.Screenshot(opts, &storage.LocalFilePersister{})
+	buf, err := p.Screenshot(opts, &mockPersister{})
 	require.NoError(t, err)
 
 	reader := bytes.NewReader(buf)
