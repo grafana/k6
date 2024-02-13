@@ -151,19 +151,6 @@ func (l *Logger) ReportCaller() {
 	l.SetReportCaller(true)
 }
 
-// ConsoleLogFormatterSerializer creates a new logger that will
-// correctly serialize RemoteObject instances.
-func (l *Logger) ConsoleLogFormatterSerializer() *Logger {
-	return &Logger{
-		Logger: &logrus.Logger{
-			Out:       l.Out,
-			Level:     l.Level,
-			Formatter: l.Formatter,
-			Hooks:     l.Hooks,
-		},
-	}
-}
-
 // SetCategoryFilter enables filtering logs by the filter regex.
 func (l *Logger) SetCategoryFilter(filter string) (err error) {
 	if filter == "" {

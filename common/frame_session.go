@@ -72,8 +72,6 @@ type FrameSession struct {
 	vu            k6modules.VU
 
 	logger *log.Logger
-	// logger that will properly serialize RemoteObject instances
-	serializer *log.Logger
 
 	// Keep a reference to the main frame span so we can end it
 	// when FrameSession.ctx is Done
@@ -105,7 +103,6 @@ func NewFrameSession(
 		vu:                   k6ext.GetVU(ctx),
 		k6Metrics:            k6Metrics,
 		logger:               l,
-		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
 
 	var parentNM *NetworkManager
