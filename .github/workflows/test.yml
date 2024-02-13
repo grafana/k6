@@ -65,8 +65,10 @@ jobs:
           unzip go.zip -d $HOME/sdk
           echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
-          echo "$HOME/sdk/gotip/bin:$HOME/go/bin:$PATH" >> "$GITHUB_PATH" 
-          go env
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+          $HOME/sdk/gotip/bin/go env -w GOROOT=$HOME/sdk/gotip
+          $HOME/sdk/gotip/bin/go env -w GOPATH=$HOME/go
       - name: Run tests
         run: |
           set -x
