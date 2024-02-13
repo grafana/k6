@@ -612,7 +612,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
-	l := fs.serializer.
+	l := fs.logger.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser").
 		WithField("browser_source", "console-api")
@@ -632,19 +632,19 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 		parsedObjects = append(parsedObjects, s)
 	}
 
-	l = l.WithField("stringObjects", parsedObjects)
+	msg := strings.Join(parsedObjects, " ")
 
 	switch event.Type {
 	case "log", "info":
-		l.Info()
+		l.Info(msg)
 	case "warning":
-		l.Warn()
+		l.Warn(msg)
 	case "error":
-		l.Error()
+		l.Error(msg)
 	default:
 		// this is where debug & other console.* apis will default to (such as
 		// console.table).
-		l.Debug()
+		l.Debug(msg)
 	}
 }
 
