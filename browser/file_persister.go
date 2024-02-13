@@ -16,10 +16,10 @@ type presignedURLConfig struct {
 	basePath  string
 }
 
-// newFilePersister will return either a persister that persists file to the local
+// newScreenshotPersister will return either a persister that persists file to the local
 // disk or uploads the files to a remote location. This decision depends on whether
 // the K6_BROWSER_SCREENSHOTS_OUTPUT env var is setup with the correct configs.
-func newFilePersister(envLookup env.LookupFunc) (filePersister, error) {
+func newScreenshotPersister(envLookup env.LookupFunc) (filePersister, error) {
 	envVar, ok := envLookup(env.ScreenshotsOutput)
 	if !ok || envVar == "" {
 		return &storage.LocalFilePersister{}, nil

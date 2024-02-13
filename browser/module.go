@@ -122,7 +122,7 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
 		go startDebugServer()
 	}
-	m.filePersister, err = newFilePersister(initEnv.LookupEnv)
+	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create file persister: %v", err)
 	}
