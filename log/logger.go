@@ -6,7 +6,6 @@ import (
 	"io"
 	"regexp"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -159,7 +158,7 @@ func (l *Logger) ConsoleLogFormatterSerializer() *Logger {
 		Logger: &logrus.Logger{
 			Out:       l.Out,
 			Level:     l.Level,
-			Formatter: &consoleLogFormatter{l.Formatter},
+			Formatter: l.Formatter,
 			Hooks:     l.Hooks,
 		},
 	}
@@ -174,18 +173,4 @@ func (l *Logger) SetCategoryFilter(filter string) (err error) {
 		return fmt.Errorf("invalid category filter %q: %w", filter, err)
 	}
 	return nil
-}
-
-type consoleLogFormatter struct {
-	logrus.Formatter
-}
-
-// Format assembles a message from marshalling elements in the "objects" field
-// to JSON separated by space, and deletes the field when done.
-func (f *consoleLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	if stringObjects, ok := entry.Data["stringObjects"].([]string); ok {
-		entry.Message = strings.Join(stringObjects, " ")
-		delete(entry.Data, "stringObjects")
-	}
-	return f.Formatter.Format(entry)
 }
