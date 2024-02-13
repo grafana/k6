@@ -65,15 +65,12 @@ jobs:
           unzip go.zip -d $HOME/sdk
           echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
-          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
-          cat $GITHUB_ENV
-          cat $GITHUB_PATH
+          echo "$HOME/sdk/gotip/bin:$HOME/go/bin:$PATH" >> "$GITHUB_PATH" 
+          go env
       - name: Run tests
         run: |
           set -x
-          cat $GITHUB_ENV
-          cat $GITHUB_PATH
+          go env
           which go
           go version
           export GOMAXPROCS=2
