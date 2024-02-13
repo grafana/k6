@@ -66,7 +66,7 @@ func Test_newFilePersister(t *testing.T) {
 	}
 }
 
-func Test_parseEnvVar(t *testing.T) {
+func Test_parsePresignedURLEnvVar(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -161,7 +161,7 @@ func Test_parseEnvVar(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			got, err := parseEnvVar(tt.envVarValue)
+			got, err := parsePresignedURLEnvVar(tt.envVarValue)
 			if tt.wantErr != "" {
 				assert.ErrorContains(t, err, tt.wantErr)
 				return

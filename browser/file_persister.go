@@ -25,7 +25,7 @@ func newFilePersister(envLookup env.LookupFunc) (filePersister, error) {
 		return &storage.LocalFilePersister{}, nil
 	}
 
-	popts, err := parseEnvVar(envVar)
+	popts, err := parsePresignedURLEnvVar(envVar)
 	if err != nil {
 		return nil, fmt.Errorf("parsing %s: %w", env.ScreenshotsOutput, err)
 	}
@@ -33,12 +33,12 @@ func newFilePersister(envLookup env.LookupFunc) (filePersister, error) {
 	return storage.NewRemoteFilePersister(popts.getterURL, popts.headers, popts.basePath), nil
 }
 
-// parseEnvVar will parse a value such as:
+// parsePresignedURLEnvVar will parse a value such as:
 // url=https://127.0.0.1/,basePath=/screenshots,header.1=a,header.2=b
 // and return them.
 //
 //nolint:cyclop
-func parseEnvVar(envVarValue string) (presignedURLConfig, error) {
+func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 	ss := strings.Split(envVarValue, ",")
 
 	presignedURL := presignedURLConfig{
