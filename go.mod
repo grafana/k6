@@ -1,6 +1,6 @@
 module github.com/grafana/xk6-browser
 
-go 1.19
+go 1.20
 
 require (
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2
