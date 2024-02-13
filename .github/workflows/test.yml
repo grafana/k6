@@ -67,9 +67,13 @@ jobs:
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+          echo $GITHUB_ENV
+          echo $GITHUB_PATH
       - name: Run tests
         run: |
           set -x
+          echo $GITHUB_ENV
+          echo $GITHUB_PATH
           which go
           go version
           export GOMAXPROCS=2
