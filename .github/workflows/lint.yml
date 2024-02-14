@@ -19,7 +19,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.19.x
+          go-version: 1.21.x
           check-latest: true
       - name: Check dependencies
         run: |
@@ -42,7 +42,7 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v5
         with:
-          go-version: 1.19.x
+          go-version: 1.21.x
           check-latest: true
       - name: Retrieve golangci-lint version
         run: |
