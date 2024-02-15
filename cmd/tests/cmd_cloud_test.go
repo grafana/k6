@@ -246,21 +246,19 @@ func TestCloudWithArchive(t *testing.T) {
 
 		metadata := struct {
 			Options struct {
-				Ext struct {
-					LoadImpact struct {
-						Name      string `json:"name"`
-						Note      string `json:"note"`
-						ProjectID int    `json:"projectID"`
-					} `json:"loadimpact"`
-				} `json:"ext"`
+				Cloud struct {
+					Name      string `json:"name"`
+					Note      string `json:"note"`
+					ProjectID int    `json:"projectID"`
+				} `json:"cloud"`
 			} `json:"options"`
 		}{}
 
 		// then unpacked metadata should not contain any environment variables passed at the moment of archive creation
 		require.NoError(t, json.Unmarshal(metadataRaw, &metadata))
-		require.Equal(t, "my load test", metadata.Options.Ext.LoadImpact.Name)
-		require.Equal(t, "lorem ipsum", metadata.Options.Ext.LoadImpact.Note)
-		require.Equal(t, 124, metadata.Options.Ext.LoadImpact.ProjectID)
+		require.Equal(t, "my load test", metadata.Options.Cloud.Name)
+		require.Equal(t, "lorem ipsum", metadata.Options.Cloud.Note)
+		require.Equal(t, 124, metadata.Options.Cloud.ProjectID)
 
 		// respond with the test run ID
 		resp.WriteHeader(http.StatusOK)
