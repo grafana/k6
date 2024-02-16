@@ -399,21 +399,9 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 		return nil, err
 	}
 
-	rt := h.execCtx.vu.Runtime()
 	var border struct{ Top, Left float64 }
-	switch result := result.(type) {
-	case goja.Value:
-		if result != nil && !goja.IsUndefined(result) && !goja.IsNull(result) {
-			obj := result.ToObject(rt)
-			for _, k := range obj.Keys() {
-				switch k {
-				case "left":
-					border.Left = obj.Get(k).ToFloat()
-				case "top":
-					border.Top = obj.Get(k).ToFloat()
-				}
-			}
-		}
+	if err := convert(result, &border); err != nil {
+		return nil, fmt.Errorf("converting result (%v of type %t) to border: %w", result, result, err)
 	}
 
 	box := h.BoundingBox()
