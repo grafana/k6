@@ -55,7 +55,6 @@ Let's assume we have somehow fully partitioned a test run into multiple executio
 7. **Done status**: Even if the test hasn't finished prematurely, _something_ needs to detect that all instances are done with their part of the test run. Because of executors like [`shared-iterations`](https://k6.io/docs/using-k6/scenarios/executors/shared-iterations/) and [`per-vu-iterations`](https://k6.io/docs/using-k6/scenarios/executors/per-vu-iterations/) and because iteration durations vary, only the maximum test duration is predictable and bounded, but the test might finish a lot sooner than that max possible duration and good UX would be to not force the user to wait needlessly.
 8. **Run teardown once**: Regardless of whether the test has finished nominally or prematurely, _something_ needs to detect that it _has_ finished and must run `teardown()` on only one of the available instances, even if there were errors during the test. This is important because `setup()` might have potentially allocated costly resources. That said, any errors during `teardown()` execution must also be handled nicely.
 9. **End-of-test and handleSummary**: After `teardown()` has been executed, we _somehow_ need to produce the [end-of-test summary](https://k6.io/docs/results-output/end-of-test/) by executing the [`handleSummary()` function](https://k6.io/docs/results-output/end-of-test/custom-summary/) on a k6 instance _somewhere_. For the best UX, the differences between local and distributed k6 runs should be as minimal as possible, so the user should be able to see the end-of-test summary in their terminal or CI system, regardless of whether the k6 test was local or distributed.
-10. **Cloud metrics output**: We need to support `k6 run -o cloud script.js` case, and unfortunately, it requires a [creation phase](https://github.com/grafana/k6/blob/b5a6febd56385326ea849bde25ba09ed6324c046/output/cloud/output.go#L184-L188) for the test for registering the test on the k6 Cloud platform. It means that in case of distributed test, we may end with registering the same test multiple times. Then, moving out from the Cloud metrics output the test creation phase sounds more or less a pre-requiste for being able to deliver and use a distributed execution integrated with k6 Cloud. In concrete, it means to address [#3282](https://github.com/grafana/k6/issues/3282). If we need to narrow down the scope then we may decide, for a fist experimental phase, to not support this use-case. It would error if the distributed execution runs with the Cloud metrics output (`-o cloud`) set.
 
 So, yeah, while execution segments handle most of the heavy lifting during the test execution, there are plenty of other peripheral things that need to be handled separately in order to have fully-featured distributed k6 execution... :sweat_smile:
 
@@ -181,10 +180,6 @@ As these days, most of the observability world is using OpenTelemetry protocol f
 
 In any case, when performance matters or a high cardinality of metrics is generated then we should encourage people to use a proper storage systems for metrics, via outputs. As k6 is not a metrics database, it is expected to be good enough at store a non-intensive metrics generation but in case of high volume then it may be better if we use the right tool for the job.
 Otherwise, as explained below, the coordinator could be flooded and become unstable, potentially we may mitigate the issue in case of spikes having classic back pressure and retry mechanisms.
-
-#### Error handling
-
-TODO: define clearly how error handling is expected to work, as it is a tricky point so we have to explore it deeply in advance. 
 
 #### Test abortion
 
