@@ -512,13 +512,21 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 			return
 		}
 
-		// 8.
-		isSecretKey := result.Type == SecretCryptoKeyType
-		isPrivateKey := result.Type == PrivateCryptoKeyType
-		isUsagesEmpty := len(result.Usages) == 0
-		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-			reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
-			return
+		if !result.IsKeyPair() {
+			cryptoKey, err := result.ResolveCryptoKey()
+			if err != nil {
+				reject(NewError(OperationError, "usages cannot not be empty for a secret or private CryptoKey"))
+				return
+			}
+
+			// 8.
+			isSecretKey := cryptoKey.Type == SecretCryptoKeyType
+			isPrivateKey := cryptoKey.Type == PrivateCryptoKeyType
+			isUsagesEmpty := len(cryptoKey.Usages) == 0
+			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+				reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
+				return
+			}
 		}
 
 		resolve(result)

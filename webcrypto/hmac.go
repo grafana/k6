@@ -86,7 +86,7 @@ func newHMACKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Val
 func (hkgp *HMACKeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
-) (*CryptoKey, error) {
+) (CryptoKeyGenerationResult, error) {
 	// 1.
 	for _, usage := range keyUsages {
 		switch usage {

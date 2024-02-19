@@ -1,8 +1,22 @@
 package webcrypto
 
 import (
+	"errors"
+
 	"github.com/dop251/goja"
 )
+
+// CryptoKeyGenerationResult represents the result of a key generation operation.
+type CryptoKeyGenerationResult interface {
+	// IsKeyPair returns true if the result is a key pair, false otherwise.
+	IsKeyPair() bool
+
+	// ResolveCryptoKeyPair returns the underlying CryptoKeyPair, if the result is a key pair, error otherwise.
+	ResolveCryptoKeyPair() (*CryptoKeyPair, error)
+
+	// ResolveCryptoKey returns the underlying CryptoKey, if the result is a key, error otherwise.
+	ResolveCryptoKey() (*CryptoKey, error)
+}
 
 // CryptoKeyPair represents a key pair for an asymmetric cryptography algorithm, also known as
 // a public-key algorithm.
@@ -18,6 +32,23 @@ type CryptoKeyPair struct {
 	// this key is used to encrypt. For signing and verification algorithms it is used to verify.
 	PublicKey CryptoKey `json:"publicKey"`
 }
+
+// IsKeyPair .
+func (ckp *CryptoKeyPair) IsKeyPair() bool {
+	return true
+}
+
+// ResolveCryptoKeyPair returns the underlying CryptoKeyPair.
+func (ckp *CryptoKeyPair) ResolveCryptoKeyPair() (*CryptoKeyPair, error) {
+	return ckp, nil
+}
+
+// ResolveCryptoKey returns an error since the underlying type is not a CryptoKey.
+func (ckp *CryptoKeyPair) ResolveCryptoKey() (*CryptoKey, error) {
+	return nil, errors.New("not a CryptoKey")
+}
+
+var _ CryptoKeyGenerationResult = &CryptoKeyPair{}
 
 // CryptoKey represents a cryptographic key obtained from one of the SubtleCrypto
 // methods `SubtleCrypto.generateKey`, `SubtleCrypto.DeriveKey`, `SubtleCrypto.ImportKey`,
@@ -48,6 +79,21 @@ type CryptoKey struct {
 	// See [specification](https://www.w3.org/TR/WebCryptoAPI/#dfnReturnLink-0).
 	handle any
 }
+
+// IsKeyPair .
+func (ck *CryptoKey) IsKeyPair() bool {
+	return false
+}
+
+func (ck *CryptoKey) ResolveCryptoKeyPair() (*CryptoKeyPair, error) {
+	return nil, errors.New("not a Crypto Key Pair")
+}
+
+func (ck *CryptoKey) ResolveCryptoKey() (*CryptoKey, error) {
+	return ck, nil
+}
+
+var _ CryptoKeyGenerationResult = &CryptoKey{}
 
 // ContainsUsage returns true if the key contains the specified usage.
 func (ck *CryptoKey) ContainsUsage(usage CryptoKeyUsage) bool {
@@ -114,7 +160,7 @@ type KeyAlgorithm struct {
 // KeyGenerator is the interface implemented by the algorithms used to generate
 // cryptographic keys.
 type KeyGenerator interface {
-	GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
+	GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (CryptoKeyGenerationResult, error)
 }
 
 func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) (KeyGenerator, error) {
