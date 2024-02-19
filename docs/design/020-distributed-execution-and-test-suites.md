@@ -1,8 +1,21 @@
 # Distributed Execution
 
-https://github.com/grafana/k6/issues/140 is simultaneously the oldest still open k6 issue (opened on Mar 7th 2017, over 6 years ago! :scream:) and [the most upvoted issue ever](https://github.com/grafana/k6/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc), open or closed! It currently has 93 :+1:, which is almost 3 times the upvote count of the next issues after it... And all of that is despite the fact that [Grafana Cloud k6](https://grafana.com/products/cloud/k6/) and [k6-operator](https://github.com/grafana/k6-operator) already allow some kinds of distributed k6 execution!
+Native distributed execution https://github.com/grafana/k6/issues/140 is simultaneously the oldest and still open k6 issue (opened on Mar 7th 2017, over 6 years ago! :scream:) and [the most upvoted issue ever](https://github.com/grafana/k6/issues?q=is%3Aissue+sort%3Areactions-%2B1-desc), open or closed! It currently has 93 :+1:, which is almost 3 times the upvote count of the next issues after it... And all of that is despite the fact that [Grafana Cloud k6](https://grafana.com/products/cloud/k6/) and [k6-operator](https://github.com/grafana/k6-operator) already allow some kinds of distributed k6 execution!
 
 This document aims to explain some of the historical steps we have made in this direction, some of the context and reasons why it was complicated to implement this before, and a proposal for how we can finally implement it nicely now :tada: :crossed_fingers:
+
+### What is Native distributed execution?
+
+Run a single k6 test-run across several instances and/or machines. Ideally, having the same and consistent user experience that k6 provides running on a single instance. 
+
+### Why?
+
+>There are at least a couple of reasons why you would want to do this:
+>
+>- You run everything else in Kubernetes, or any other kind of similar infrastructure, and would like k6 to be executed in the same fashion as all your other infrastructure components.
+>- You want to run your tests within your private network for security and/or privacy reasons.
+
+https://grafana.com/blog/2022/06/23/running-distributed-load-tests-on-kubernetes
 
 ## Context
 
@@ -33,15 +46,15 @@ While the current distributed execution solution is much better than before, it'
 One big shortcoming is hidden behind the "_once the test fully starts_" caveat above. While execution segments allow the actual test execution to happen independently on multiple machines so that "the sum of the parts" is equal to the whole test run (as if it was executed on a single machine), they don't do anything for all of the initialization logic and actions that happen before the test run starts and after it ends, or for error handling, or for metric crunching and thresholds.
 
 Let's assume we have somehow fully partitioned a test run into multiple execution segments and we have initialized all of these planned "instances" (e.g. containers, k8s pods, VMs, etc.). Here is a list of (hopefully) all of the tasks that need to be handled so that distributed k6 execution has good UX and works nicely:
-1. We _somehow_ need to distribute the script [.tar archive bundle](https://k6.io/docs/misc/archive-command/) among all of the "instances" that will run the test. Ideally without the user having to manually do anything except point the instances to a central node or registry of some sort.
-2. We _somehow_ need to ensure that [`setup()`](https://k6.io/docs/using-k6/test-lifecycle/) is executed only once (i.e. on a single instance), but that any errors in it are correctly handled, and that its results are distributed to the other instances that didn't execute it.
-3. _Something_ needs to ensure that all instances have finished initializing their VUs before we _somehow_ start the actual test run on all of them simultaneously. This simultaneous start is important because, without it, a distributed test run will behave very differently to the same test run on a single big machine. Everything will be out of whack and k6 will behave unpredictably, which is something we don't want in a tool that is used to measure other services. Predictable performance is key when you are the measuring stick!
-4. While the test execution will be autonomously handled by each k6 instance for its own execution segment, _something_ needs to handle failures in a user-friendly way. For example, some of the k6 instances might suffer network problems or might die due to a bad test script or out-of-memory issues, so we somehow need to detect such problems and potentially stop the whole test.
-5. While the test is executing, we _somehow_ need to collect all of the metrics from all instances and crunch them, because we need the aggregated metrics to produce the [end-of-test summary](https://k6.io/docs/results-output/end-of-test/) and to calculate whether the [script thresholds](https://k6.io/docs/using-k6/thresholds/) were crossed. For these calculations to be correct, we can't do them separately on every k6 instance in a distributed test, we need to first aggregate the results centrally and use that for the calculations. This is particularly important because some thresholds might be [configured with `abortOnFail`](https://k6.io/docs/using-k6/thresholds/#abort), which means that we need to be continuously crunching the data, since they can require us to stop the test run mid-test!
-6. Besides thresholds with `abortOnFail` and errors, there are also a lot of other ways to prematurely stop a k6 test run, e.g. by calling [`test.abort()` from `k6/execution`](https://k6.io/docs/javascript-api/k6-execution/#test) or simply hitting Ctrl+C. _Something_ needs to handle such cases nicely. See https://github.com/grafana/k6/issues/2804 for more details, but ideally we should have the same nice UX in distributed k6 test that we have in regular local k6 tests, including the same exit codes that can be checked in a CI system.
-7. Even if the test hasn't finished prematurely, _something_ needs to detect that all instances are done with their part of the test run. Because of executors like [`shared-iterations`](https://k6.io/docs/using-k6/scenarios/executors/shared-iterations/) and [`per-vu-iterations`](https://k6.io/docs/using-k6/scenarios/executors/per-vu-iterations/) and because iteration durations vary, only the maximum test duration is predictable and bounded, but the test might finish a lot sooner than that max possible duration and good UX would be to not force the user to wait needlessly.
-8. Regardless of whether the test has finished nominally or prematurely, _something_ needs to detect that it _has_ finished and must run `teardown()` on only one of the available instances, even if there were errors during the test. This is important because `setup()` might have potentially allocated costly resources. That said, any errors during `teardown()` execution must also be handled nicely.
-9. After `teardown()` has been executed, we _somehow_ need to produce the [end-of-test summary](https://k6.io/docs/results-output/end-of-test/) by executing the [`handleSummary()` function](https://k6.io/docs/results-output/end-of-test/custom-summary/) on a k6 instance _somewhere_. For the best UX, the differences between local and distributed k6 runs should be as minimal as possible, so the user should be able to see the end-of-test summary in their terminal or CI system, regardless of whether the k6 test was local or distributed.
+1. **Pass the archive**: We _somehow_ need to distribute the script [.tar archive bundle](https://k6.io/docs/misc/archive-command/) among all of the "instances" that will run the test. Ideally without the user having to manually do anything except point the instances to a central node or registry of some sort.
+2. **Run setup once**: We _somehow_ need to ensure that [`setup()`](https://k6.io/docs/using-k6/test-lifecycle/) is executed only once (i.e. on a single instance), but that any errors in it are correctly handled, and that its results are distributed to the other instances that didn't execute it.
+3. **Ready status**: _Something_ needs to ensure that all instances have finished initializing their VUs before we _somehow_ start the actual test run on all of them simultaneously. This simultaneous start is important because, without it, a distributed test run will behave very differently to the same test run on a single big machine. Everything will be out of whack and k6 will behave unpredictably, which is something we don't want in a tool that is used to measure other services. Predictable performance is key when you are the measuring stick!
+4. **Failure detection**: While the test execution will be autonomously handled by each k6 instance for its own execution segment, _something_ needs to handle failures in a user-friendly way. For example, some of the k6 instances might suffer network problems or might die due to a bad test script or out-of-memory issues, so we somehow need to detect such problems and potentially stop the whole test.
+5. **Metric aggregation**: While the test is executing, we _somehow_ need to collect all of the metrics from all instances and crunch them, because we need the aggregated metrics to produce the [end-of-test summary](https://k6.io/docs/results-output/end-of-test/) and to calculate whether the [script thresholds](https://k6.io/docs/using-k6/thresholds/) were crossed. For these calculations to be correct, we can't do them separately on every k6 instance in a distributed test, we need to first aggregate the results centrally and use that for the calculations. This is particularly important because some thresholds might be [configured with `abortOnFail`](https://k6.io/docs/using-k6/thresholds/#abort), which means that we need to be continuously crunching the data, since they can require us to stop the test run mid-test!
+6. **Abort the test-run**: Besides thresholds with `abortOnFail` and errors, there are also a lot of other ways to prematurely stop a k6 test run, e.g. by calling [`test.abort()` from `k6/execution`](https://k6.io/docs/javascript-api/k6-execution/#test) or simply hitting Ctrl+C. _Something_ needs to handle such cases nicely. See https://github.com/grafana/k6/issues/2804 for more details, but ideally we should have the same nice UX in distributed k6 test that we have in regular local k6 tests, including the same exit codes that can be checked in a CI system.
+7. **Done status**: Even if the test hasn't finished prematurely, _something_ needs to detect that all instances are done with their part of the test run. Because of executors like [`shared-iterations`](https://k6.io/docs/using-k6/scenarios/executors/shared-iterations/) and [`per-vu-iterations`](https://k6.io/docs/using-k6/scenarios/executors/per-vu-iterations/) and because iteration durations vary, only the maximum test duration is predictable and bounded, but the test might finish a lot sooner than that max possible duration and good UX would be to not force the user to wait needlessly.
+8. **Run teardown once**: Regardless of whether the test has finished nominally or prematurely, _something_ needs to detect that it _has_ finished and must run `teardown()` on only one of the available instances, even if there were errors during the test. This is important because `setup()` might have potentially allocated costly resources. That said, any errors during `teardown()` execution must also be handled nicely.
+9. **End-of-test and handleSummary**: After `teardown()` has been executed, we _somehow_ need to produce the [end-of-test summary](https://k6.io/docs/results-output/end-of-test/) by executing the [`handleSummary()` function](https://k6.io/docs/results-output/end-of-test/custom-summary/) on a k6 instance _somewhere_. For the best UX, the differences between local and distributed k6 runs should be as minimal as possible, so the user should be able to see the end-of-test summary in their terminal or CI system, regardless of whether the k6 test was local or distributed.
 
 So, yeah, while execution segments handle most of the heavy lifting during the test execution, there are plenty of other peripheral things that need to be handled separately in order to have fully-featured distributed k6 execution... :sweat_smile:
 
@@ -67,7 +80,7 @@ So, ideally, instead of figuring out how to open the limited cloud solution we c
 
 Let's start with the goals first:
 1. Ideally, implement all 9 points from the list :arrow_up:, as well as anything else required, to get native distributed execution with great UX in k6 :sweat_smile:
-2. Have a distributed execution solution that works well for all k6 OSS users, regardless of whether they want to use it directly or via something like k6-operator. At the same time, k6-operator and k6 cloud both should also be able to make use of some of the new features and become even better than they currently are!
+2. Have a distributed execution solution that works well for all k6 open-source users, regardless of whether they want to use it directly or via something like k6-operator. At the same time, k6-operator and k6 cloud both should also be able to make use of some of the new features and become even better than they currently are!
 3. As much as practically possible, do it in a backwards compatible manner. Some changes in k6 cloud and k6-operator are expected and even wanted, but if we keep `k6 run` backwards compatible, these changes don't _need_ to happen immediately, they can be incremental and non-breaking improvements over time.
 4. As much as practically possible, have only one way to do a certain thing. We want to avoid re-implementing the same logic in multiple places whenever possible.
 
@@ -75,9 +88,13 @@ Let's start with the goals first:
 
 The good news is that all of these goals seem achievable :tada: Or at least this is my opinion after making the proof-of-concept implementation (https://github.com/grafana/k6/pull/2816).
 
-My proposal is to basically continue what [#1007](https://github.com/grafana/k6/pull/1007) started... :sweat_smile: That is, continue moving more and more of the logic out of the center and towards the edge, towards the individual k6 "worker" instances that actually execute the distributed test run. For the best UX we should probably still have some sort of a central coordinator node, but if we reverse the control flow,so that k6 "worker" instances connect to it and are the main actors instead of the central node, then the central coordinator node can be relatively "dumb".
+#### Reverse the pattern
 
-After all, a single k6 instance is already perfectly capable of executing all of the steps in a local `k6 run script.js` test run, from start to finish, completely on its own! And while every single k6 instance in a distributed test run is aware of its own execution segment, it is also already _somewhat_ aware of the existence of the other instances in the test run, from the execution segment sequence. It may not know their IPs or any other details, but it already knows that they exist and even their total number and segments!
+My proposal is to basically continue what [#1007](https://github.com/grafana/k6/pull/1007) started... :sweat_smile: That is, continue moving more and more of the logic out of the center and towards the edge, towards the individual k6 "worker" instances that actually execute the distributed test run. For the best UX we should probably still have some sort of a central coordinator node, but if we reverse the control flow, so that k6 "worker" instances connect to it and are the main actors instead of the central node, then the central coordinator node can be relatively "dumb".
+
+After all, a single k6 instance is already perfectly capable of executing all the steps in a local `k6 run script.js` test run, from start to finish, completely on its own! And while every single k6 instance in a distributed test run is aware of its own execution segment, it is also already _somewhat_ aware of the existence of the other instances in the test run, from the execution segment sequence. It may not know their IPs or any other details, but it already knows that they exist and even their total number and segments!
+
+![reverse the pattern](020-architecture.png)
 
 #### Instance Synchronization API
 
@@ -92,7 +109,7 @@ type Controller interface {
     // error are saved for the ID and returned for all other calls with it.
     //
     // This is an atomic function, so any calls to it while the callback is
-    // being executed the the same ID will wait for the first call to to finish
+    // being executed the the same ID will wait for the first call to finish
     // and receive its result.
     GetOrCreateData(id string, callback func() ([]byte, error)) ([]byte, error)
 
@@ -155,6 +172,29 @@ The only missing piece is efficiently streaming the metrics from agents to the c
 
 One remaining prerequisite is efficient metric transmission over the network and efficient metric processing by the coordinator node. That can be easily implemented for `Counter`, `Gauge`, and `Rate` metrics because all of their raw `Sample` values are easily aggregated without a data loss (at least when it concerns the end-of-test summary and the current k6 thresholds), and aggregations of their aggregations will also be correct (we are basically just summing numbers or comparing times :sweat_smile:). However, for `Trend` values, we probably should implement HDR/sparse histograms (https://github.com/grafana/k6/issues/763) before we have distributed execution. Not just because of the more efficient network transmission, but mostly because we don't want to overwhelm the `k6 coordinator` node or have it run out of memory (`Trend` metric sinks currently keep all of the raw observation values in memory...).
 
+As these days, most of the observability world is using OpenTelemetry protocol for emitting metrics, we may benefit from it as well. The coordinator node should expose an OpenTelemetry endpoint for ingesting metrics, with the following advantages:
+- It supports an efficient binary format over gRPC
+- It supports delta temporality as k6
+- It supports histogram aggregation
+- An OpenTelemetry metrics output is something we want to add independently from the distributed execution feature
+
+In any case, when performance matters or a high cardinality of metrics is generated then we should encourage people to use a proper storage systems for metrics, via outputs. As k6 is not a metrics database, it is expected to be good enough at store a non-intensive metrics generation but in case of high volume then it may be better if we use the right tool for the job.
+Otherwise, as explained below, the coordinator could be flooded and become unstable, potentially we may mitigate the issue in case of spikes having classic back pressure and retry mechanisms.
+
+#### Test abortion
+
+A test can be aborted in several ways, as described in [this summary issue](https://github.com/grafana/k6/issues/2804). For example, in the event the running script invokes the `test.abort()` function, below the expected flow:
+
+1. The agent will intercept the abortion as done by a non-distributed run, and it emits an event for aborting the distributed test
+2. Then the agent will continue the abort flow for the single instance that will lead to stop the test on the instance and exit
+3. TC reacts to the received event broadcasting it to all instances, as they should have a dedicated routine listening for any abortion event
+4. All the instances executes the abortion flow as the point `3`, returning the same error received from the event.
+
+Instead, if the abortion process is started by the Coordinator, for example, if it has received a SIGTERM signal, the following is the expected flow:
+1. Declare the test abort emitting a dedicated event for it
+2. Close the connections with instances using the gRPC GOAWAY flow
+3. Each Agent instances listening for abortion event will process it stopping the run and exiting
+
 #### High Availability
 
 As you might have noticed, the central `k6 coordinator` node is a single point of failure in the proposed architecture. Because of its simple API, it can actually be made highly-available fairly easily (or maybe even replaced with already fault-tolerant/HA components), but I'd argue it is not worth it to spend the time on that, at least in the first version.
@@ -166,6 +206,81 @@ That's why I think it'd be better for a test to completely fail than for us to h
 Because of the potential complexity of k6 scripts (especially ones with multiple scanarios), and because of the stateful nature of k6 VUs, we actually can't just replace failed instances with "hot spare" ones mid-test, even if we ignore problems with performance consistency. Something like this might only be possible with test suites (see bottom of this document), but not within an individual k6 test.
 
 In summary, if we make the `k6 coordinator` node dumb enough and the metric transmission efficient enough, it'd be much more likely for a test to fail because of a bad script that eats up all of the RAM, or because of network issues, or due to all sorts of other potential problems on the `agent` side... So, a non-highly-available `k6 coordinator` is probably good enough, at least to start with.
+
+#### Disruption resilience
+
+Based on the high availability assumption described, the architecture is intentionally not very highly resilient to disruption. Below, the process described for the components in the event of disruption.
+
+##### Coordinator
+
+For its nature of being a single point of failure, the `Coordinator` results to be the most impactful part of the architecture in case of disruption.
+
+In the event, Testcoordinator disappear the agent instances will not be able to complete the test as they will remain in a stuck status waiting for the connection to return reliable, after the gRPC connection's defined timeout expires, each agent instance will abort the ongoing test run and will shut down.
+
+In the event, a graceful shutdown (SIGTERM signal received) is initiated by Testcoordinator then it is expected to execute the flow described in test abortion section.
+
+##### Agent
+
+Eventually, Agent instances could be more resilient.
+
+If an instance at some point disappear, the system should tolerate this failure in some percentage requested by the user or by the default value. It means that a rendezvous point on the Sync API will have a timeout and if all the instances haven't reached the same point in a specified time frame then the Testcoordinator will remove those instances from the number of required instances for the sync consensus. 
+
+However, in a first experimental version, is not expected to implement and support this described scenario. The flow will let the instances stuck on the rendezvous point that at some point will make the request timing out and the Agent instance will start the abortion flow.
+
+### An end-to-end example
+
+It shows the end-to-end flow for the simplest use-case in a distributed test-run.
+The first step requires to startup the `cordinator`:
+```sh
+k6 coordinator script.js
+```
+
+that starts the gRPC server for synchronization API:
+```sh
+k6 coordinator --instance-count 2 script.js
+INFO[0000] Starting gRPC server on localhost:6566
+```
+
+At this point, the coordinator listens for a number of connected agent instances equals to the value defined. For this reason, at this point, we need to startup the agent instances:
+```
+k6 agent localhost:6566
+```
+and again in a different terminal session:
+```
+k6 agent localhost:6566
+```
+
+At this point the coordinator reached the expected status and it will notify the agent instances to start the test-run. When the agents will have been finished the coordinator will close the gathering process for metrics and it will publish the summary.
+```
+k6 coordinator --instance-count 2 script.js
+INFO[0000] Starting gRPC server on localhost:6566
+INFO[0005] Instance 1 of 2 connected!
+INFO[0017] Instance 2 of 2 connected!
+INFO[0018] All instances ready!
+INFO[0018] Test 1 (script.js) started...
+INFO[0049] Test 1 (script.js) ended!
+INFO[0049] Instances finished with the test suite
+INFO[0049] Instance 1 disconnected
+INFO[0049] Instance 2 disconnected
+INFO[0049] All done!
+
+     data_received..................: 3.1 MB 99 kB/s
+     data_sent......................: 19 kB  597 B/s
+     http_req_blocked...............: avg=18.43ms  min=4.09µs med=8.67µs   max=290ms p(90)=12.4µs   p(95)=249.54ms
+     http_req_connecting............: avg=8.33ms   min=0s     med=0s       max=130ms p(90)=0s       p(95)=114.66ms
+     http_req_duration..............: avg=129.33ms min=110ms  med=123.2ms  max=260ms p(90)=135.66ms p(95)=227.74ms
+       { expected_response:true }...: avg=129.33ms min=110ms  med=123.2ms  max=260ms p(90)=135.66ms p(95)=227.74ms
+     http_req_failed................: 0.00%  ✓ 0        ✗ 270
+     http_req_receiving.............: avg=7.17ms   min=63µs   med=140.57µs max=130ms p(90)=209.36µs p(95)=111.86ms
+     http_req_sending...............: avg=36.95µs  min=12µs   med=36.13µs  max=84µs  p(90)=50.1µs   p(95)=66.54µs
+     http_req_tls_handshaking.......: avg=8.61ms   min=0s     med=0s       max=140ms p(90)=0s       p(95)=117.16ms
+     http_req_waiting...............: avg=122.13ms min=110ms  med=122.44ms max=150ms p(90)=129.48ms p(95)=133.08ms
+     http_reqs......................: 270    8.516465/s
+     iteration_duration.............: avg=1.17s    min=1.1s   med=1.15s    max=1.5s  p(90)=1.25s    p(95)=1.35s
+     iterations.....................: 267    8.421837/s
+     vus............................: 5      min=5      max=5
+     vus_max........................: 5      min=5      max=5
+```
 
 ### Alternative Solutions
 
@@ -197,6 +312,8 @@ To show that the proposed solution is a viable one, I'll go through the 9 items 
 Because `setup()` will no longer be special and because we'll have a generic mechanism for an instance to generate some data and make it available to all other instances, there is nothing stopping us from implementing support for `SharedArray` (and other similar constructs) outside of the init context (https://github.com/grafana/k6/issues/2043 / https://github.com/grafana/k6/issues/2962) :tada: Or even things like per-scenario `setup()` (https://github.com/grafana/k6/issues/1638) or per-VU init functions (https://github.com/grafana/k6/issues/785) can now be actually useful.
 
 And maybe even more importantly, because k6 instances will now basically self-synchronize, test suites (https://github.com/grafana/k6/issues/1342) become much, much easier to implement :tada: See below for details, but we basically no longer need to have a super-smart coordinator node that knows the details for how tests are a part of the test suite, only k6 itself needs to know that and use the same `SignalAndWait()` API to synchronize even multiple tests simultaneously :tada:
+
+A potential improvement for getting a simplified user experience, when the API will be defined as stable, could be to hide the coordinator interface just behind the classic `k6 run` command. When a dedicated flag like `k6 run --distributed` is passed then the command will act as a coordinator. In this way, we are not forcing to the users the requirement to know what a _coordinator_ is. Only users with advanced cases will may require to know it and its dedicated command. 
 
 # Test suites
 
@@ -242,7 +359,7 @@ First, how can we run this at all? One way is to just use the unique test names 
 
 And we can also reuse the deconstructed `execution.Controller` API to model these dependencies between tests in the suite. In the above example, before test `B` and test `C` can start initializing their VUs, they can just call `Controller.Wait("test-A/test-finished")` (or whatever the actual convention is). Similarly, before test `D` can start, it can call `Controller.Wait("test-B/test-finished"); Controller.Wait("test-C/test-finished")`. And all of this would work in both local and distributed execution! :tada:
 
-Similarly, if we split `GetOrCreateData(id, callback)` into separate `Once(callback)`, `SetData(id)` and `GetData(id)` functions, tests down the chain would be able to even reference data from other tests in the suite before them. For example, if we save the result of `handleSummary()` under a `test-X/summary-result` identifier, then, if we want to, other tests would be able to retrieve that data with a simple JS API directly in the test script! And again, all of this would work even in distributed execution, since it relies on the same primitives it does! :tada:
+Similarly, if we split `GetOrCreateData(id, callback)` into separate `Once(id, callback)`, `SetData(id)` and `GetData(id)` functions, tests down the chain would be able to even reference data from other tests in the suite before them. For example, if we save the result of `handleSummary()` under a `test-X/summary-result` identifier, then, if we want to, other tests would be able to retrieve that data with a simple JS API directly in the test script! And again, all of this would work even in distributed execution, since it relies on the same primitives it does! :tada:
 
 ### Bundling Multiple Tests Together
 
