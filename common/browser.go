@@ -334,6 +334,15 @@ func (b *Browser) isAttachedPageValid(ev *target.EventAttachedToTarget, browserC
 			ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx == nil, targetPage.Type)
 		return false
 	}
+	// If the target is not in the same browser context as the current one, ignore it.
+	// We're not adding a log to prevent overhead.
+	if browserCtx.id != targetPage.BrowserContextID {
+		b.logger.Warnf(
+			"Browser:isAttachedPageValid", "incorrect browser context sid:%v tid:%v bctxid:%v target bctxid:%v",
+			ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx.id,
+		)
+		return false
+	}
 
 	return true
 }
