@@ -410,7 +410,6 @@ func (f *Frame) requestByID(reqID network.RequestID) (*Request, bool) {
 		if frameSession.networkManager == nil {
 			f.log.Warnf("Frame:requestByID:nil:frameSession.networkManager", "fid:%s furl:%q rid:%s",
 				f.ID(), f.URL(), reqID)
-			return nil, false
 		}
 		return frameSession.networkManager.requestFromID(reqID)
 	}
@@ -420,20 +419,17 @@ func (f *Frame) requestByID(reqID network.RequestID) (*Request, bool) {
 
 	// For unknown reasons mainFrameSession or mainFrameSession.networkManager
 	// (it's unknown exactly which one) are nil, which has caused NPDs. We're
-	// now adding nil checks here to prevent the NPDs, but we're also logging
-	// when these are nil in the hopes that we can identify which component is
-	// nil and under what conditions.
+	// now logging to see what components are nil to try and work out what is
+	// causing the NPD.
 
 	if f.page.mainFrameSession == nil {
 		f.log.Warnf("Frame:requestByID:nil:mainFrameSession", "fid:%s furl:%q rid:%s",
 			f.ID(), f.URL(), reqID)
-		return nil, false
 	}
 
 	if f.page.mainFrameSession.networkManager == nil {
 		f.log.Warnf("Frame:requestByID:nil:mainFrameSession.networkManager", "fid:%s furl:%q rid:%s",
 			f.ID(), f.URL(), reqID)
-		return nil, false
 	}
 
 	return frameSession.networkManager.requestFromID(reqID)
