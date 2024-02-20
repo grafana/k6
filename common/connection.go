@@ -203,14 +203,22 @@ func (c *Connection) close(code int) error {
 	return err
 }
 
-func (c *Connection) closeSession(sid target.SessionID, tid target.ID) {
+// closeSession closes the session with the given session ID.
+// It returns true if the session was found and closed, false otherwise.
+func (c *Connection) closeSession(sid target.SessionID, tid target.ID) bool {
 	c.logger.Debugf("Connection:closeSession", "sid:%v tid:%v wsURL:%v", sid, tid, c.wsURL)
+
 	c.sessionsMu.Lock()
-	if session, ok := c.sessions[sid]; ok {
-		session.close()
+	defer c.sessionsMu.Unlock()
+
+	session, ok := c.sessions[sid]
+	if !ok {
+		return false
 	}
+	session.close()
 	delete(c.sessions, sid)
-	c.sessionsMu.Unlock()
+
+	return true
 }
 
 func (c *Connection) closeAllSessions() {
