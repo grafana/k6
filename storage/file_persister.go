@@ -147,12 +147,14 @@ func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) 
 
 func buildPresignedRequestBody(basePath, path string) ([]byte, error) {
 	b := struct {
-		Service string `json:"service"`
-		Files   []struct {
+		Service   string `json:"service"`
+		Operation string `json:"operation"`
+		Files     []struct {
 			Name string `json:"name"`
 		} `json:"files"`
 	}{
-		Service: "aws_s3",
+		Service:   "aws_s3",
+		Operation: "upload",
 		Files: []struct {
 			Name string `json:"name"`
 		}{
