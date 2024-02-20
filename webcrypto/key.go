@@ -26,11 +26,11 @@ type CryptoKeyGenerationResult interface {
 type CryptoKeyPair struct {
 	// PrivateKey holds the private key. For encryption and decryption algorithms,
 	// this key is used to decrypt. For signing and verification algorithms it is used to sign.
-	PrivateKey CryptoKey `json:"privateKey"`
+	PrivateKey CryptoKey `js:"privateKey"`
 
 	// PublicKey holds the public key. For encryption and decryption algorithms,
 	// this key is used to encrypt. For signing and verification algorithms it is used to verify.
-	PublicKey CryptoKey `json:"publicKey"`
+	PublicKey CryptoKey `js:"publicKey"`
 }
 
 // IsKeyPair .
@@ -55,7 +55,7 @@ var _ CryptoKeyGenerationResult = &CryptoKeyPair{}
 // or `SubtleCrypto.UnwrapKey`.
 type CryptoKey struct {
 	// Type holds the type of the key.
-	Type CryptoKeyType `json:"type"`
+	Type CryptoKeyType `js:"type"`
 
 	// Extractable indicates whether or not the key may be extracted
 	// using `SubtleCrypto.ExportKey` or `SubtleCrypto.WrapKey`.
@@ -63,17 +63,17 @@ type CryptoKey struct {
 	// If the value is `true`, the key may be extracted.
 	// If the value is `false`, the key may not be extracted, and
 	// `SubtleCrypto.exportKey` and `SubtleCrypto.wrapKey` will fail.
-	Extractable bool `json:"extractable"`
+	Extractable bool `js:"extractable"`
 
 	// By the time we access the Algorithm field of CryptoKey, we
 	// generally already know what type of algorithm it is, and are
 	// really looking to access the specific attributes of that algorithm.
 	// Thus, the generic parameter type helps us manipulate the
 	// `CryptoKey` type without having to cast the `Algorithm` field.
-	Algorithm any `json:"algorithm"`
+	Algorithm any `js:"algorithm"`
 
 	// Usages holds the key usages for which this key can be used.
-	Usages []CryptoKeyUsage `json:"usages"`
+	Usages []CryptoKeyUsage `js:"usages"`
 
 	// handle is an internal slot, holding the underlying key data.
 	// See [specification](https://www.w3.org/TR/WebCryptoAPI/#dfnReturnLink-0).
@@ -172,6 +172,8 @@ func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) 
 		kg, err = newAESKeyGenParams(rt, normalized, params)
 	case HMAC:
 		kg, err = newHMACKeyGenParams(rt, normalized, params)
+	case ECDH:
+		kg, err = newECKeyGenParams(rt, normalized, params)
 	}
 
 	if err != nil {

@@ -168,7 +168,10 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		return isHashAlgorithm(algorithmName)
 	case OperationIdentifierGenerateKey:
 		// FIXME: the presence of the hash algorithm here is for HMAC support and should be handled separately
-		return isAesAlgorithm(algorithmName) || isHashAlgorithm(algorithmName) || algorithmName == HMAC
+		return isAesAlgorithm(algorithmName) ||
+			isHashAlgorithm(algorithmName) ||
+			algorithmName == HMAC ||
+			isEllipticCurve(algorithmName)
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
 		return isAesAlgorithm(algorithmName) || algorithmName == HMAC
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
@@ -192,4 +195,9 @@ func isHashAlgorithm(algorithmName string) bool {
 // if a given object has an algorithm method.
 type hasAlg interface {
 	alg() string
+}
+
+func isEllipticCurve(algorithmName string) bool {
+	// TODO: algorithmName == ECDSA
+	return algorithmName == ECDH
 }
