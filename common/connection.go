@@ -14,6 +14,7 @@ import (
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
@@ -413,6 +414,25 @@ func (c *Connection) recvLoop() {
 		default:
 			c.logger.Errorf("cdp", "ignoring malformed incoming message (missing id or method): %#v (message: %s)", msg, msg.Error.Message)
 		}
+	}
+}
+
+// stopWaitingForDebugger tells the browser to stop waiting for the
+// debugger. Otherwise, the browser will wait for the debugger to
+// attach indefinitely.
+//
+// We don't return an error because the browser might have already
+// closed the connection. In that case, handling the error would
+// be redundant. This operation is best-effort.
+func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
+	msg := &cdproto.Message{
+		ID:        c.msgIDGen.newID(),
+		SessionID: sid,
+		Method:    cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger),
+	}
+	err := c.send(c.ctx, msg, nil, nil)
+	if err != nil {
+		c.logger.Errorf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
 	}
 }
 
