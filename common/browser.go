@@ -217,6 +217,12 @@ func (b *Browser) initEvents() error {
 	return nil
 }
 
+// connectionOnAttachedToTarget is called when Connection receives an attachedToTarget
+// event. Returning false will stop the event from being processed by the connection.
+func (b *Browser) connectionOnAttachedToTarget(_ *target.EventAttachedToTarget) bool {
+	return true
+}
+
 // onAttachedToTarget is called when a new page is attached to the browser.
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
