@@ -83,6 +83,20 @@ func TestSubtleCryptoImportExportKey(t *testing.T) {
 
 		assert.NoError(t, gotErr)
 	})
+
+	t.Run("elliptic-curves", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newConfiguredRuntime(t)
+
+		gotErr := ts.EventLoop.Start(func() error {
+			err := executeTestScripts(ts.VU.Runtime(), "./tests/import_export", "ec_importKey.js")
+
+			return err
+		})
+
+		assert.NoError(t, gotErr)
+	})
 }
 
 func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
