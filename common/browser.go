@@ -224,8 +224,27 @@ func (b *Browser) initEvents() error {
 
 // connectionOnAttachedToTarget is called when Connection receives an attachedToTarget
 // event. Returning false will stop the event from being processed by the connection.
-func (b *Browser) connectionOnAttachedToTarget(_ *target.EventAttachedToTarget) bool {
-	return true
+func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget) bool {
+	// Allow connection to attach to target as the browser context is not set
+	// (hence it's the first one we have—the default), or the target is in the
+	// same browser context as the current one.
+	//
+	// This allows to attach targets to the same browser context as the current
+	// one, and to the default browser context.
+	//
+	// We don't want to hold the lock for the entire function to prevent
+	// concurrency issues with the browser context being closed while we're
+	// checking it. So, we don't use defer. This is for a future code that might
+	// extend this function, add a defer, and cause this issue to be missed.
+	b.contextMu.RLock()
+	defaultContext := b.context == nil
+	if defaultContext || b.context.id == eva.TargetInfo.BrowserContextID {
+		b.contextMu.RUnlock()
+		return true
+	}
+	b.contextMu.RUnlock()
+
+	return false
 }
 
 // onAttachedToTarget is called when a new page is attached to the browser.
