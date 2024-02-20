@@ -345,6 +345,7 @@ func (c *Connection) recvLoop() {
 				// if a session should be created for the target.
 				ok := c.onTargetAttachedToTarget(eva)
 				if !ok {
+					c.stopWaitingForDebugger(sid)
 					continue
 				}
 			}
