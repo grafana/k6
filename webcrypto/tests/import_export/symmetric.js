@@ -11,7 +11,6 @@
 
 // Test importKey and exportKey for non-PKC algorithms. Only "happy paths" are
 // currently tested - those where the operation should succeed.
-
 var subtle = crypto.subtle;
 
 // keying material for algorithms that can use any bit string.
@@ -25,25 +24,15 @@ var rawKeyData = [
 
 // combinations of algorithms, usages, parameters, and formats to test
 var testVectors = [
-    {name: "AES-CTR",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw"]},
-    {name: "AES-CBC",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw"]},
-    {name: "AES-GCM",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw"]},
-    {name: "HMAC", hash: "SHA-1",   legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
-    {name: "HMAC", hash: "SHA-256", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
-    {name: "HMAC", hash: "SHA-384", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
-    {name: "HMAC", hash: "SHA-512", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw"]},
-
-
     // FIXME: uncomment when other symmetric algorithms, and jwk formats, are supported
-    // Plus, replace the above entries with their commented-out versions.
-    // {name: "AES-CTR",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw", "jwk"]},
-    // {name: "AES-CBC",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw", "jwk"]},
-    // {name: "AES-GCM",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw", "jwk"]},
+    {name: "AES-CTR",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw", "jwk"]},
+    {name: "AES-CBC",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw", "jwk"]},
+    {name: "AES-GCM",               legalUsages: ["encrypt", "decrypt"],      extractable: [true, false], formats: ["raw", "jwk"]},
     // {name: "AES-KW",                legalUsages: ["wrapKey", "unwrapKey"],    extractable: [true, false], formats: ["raw", "jwk"]},
-    // {name: "HMAC", hash: "SHA-1",   legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
-    // {name: "HMAC", hash: "SHA-256", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
-    // {name: "HMAC", hash: "SHA-384", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
-    // {name: "HMAC", hash: "SHA-512", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
+    {name: "HMAC", hash: "SHA-1",   legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
+    {name: "HMAC", hash: "SHA-256", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
+    {name: "HMAC", hash: "SHA-384", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
+    {name: "HMAC", hash: "SHA-512", legalUsages: ["sign", "verify"],          extractable: [false],       formats: ["raw", "jwk"]},
     // {name: "HKDF",                  legalUsages: ["deriveBits", "deriveKey"], extractable: [false],       formats: ["raw"]},
     // {name: "PBKDF2",                legalUsages: ["deriveBits", "deriveKey"], extractable: [false],       formats: ["raw"]}
 ];
@@ -168,6 +157,7 @@ function byteArrayToUnpaddedBase64(byteArray){
     for (var i=0; i<byteArray.byteLength; i++){
         binaryString += String.fromCharCode(byteArray[i]);
     }
+
     var base64String = btoa(binaryString);
 
     return base64String.replace(/=/g, "");

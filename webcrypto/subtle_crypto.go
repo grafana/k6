@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"crypto/hmac"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -621,8 +622,6 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 //     `ALGORITHM` is the name of the algorithm.
 //   - for PBKDF2: pass the string "PBKDF2"
 //   - for HKDF: pass the string "HKDF"
-//
-// TODO @oleiade: implement support for JWK format
 func (sc *SubtleCrypto) ImportKey(
 	format KeyFormat,
 	keyData goja.Value,
@@ -633,14 +632,30 @@ func (sc *SubtleCrypto) ImportKey(
 	rt := sc.vu.Runtime()
 	promise, resolve, reject := promises.New(sc.vu)
 
+	var keyBytes []byte
+
 	// 2.
-	ab, err := exportArrayBuffer(rt, keyData)
-	if err != nil {
-		reject(err)
+	switch format {
+	case RawKeyFormat:
+		ab, err := exportArrayBuffer(rt, keyData)
+		if err != nil {
+			reject(err)
+			return promise
+		}
+
+		keyBytes = make([]byte, len(ab))
+		copy(keyBytes, ab)
+	case JwkKeyFormat:
+		var err error
+		keyBytes, err = json.Marshal(keyData.Export())
+		if err != nil {
+			reject(NewError(ImplementationError, "wrong keyData format for JWK format: "+err.Error()))
+			return promise
+		}
+	default:
+		reject(NewError(ImplementationError, "unsupported format "+format))
 		return promise
 	}
-	keyBytes := make([]byte, len(ab))
-	copy(keyBytes, ab)
 
 	// 3.
 	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierImportKey)
@@ -700,8 +715,6 @@ func (sc *SubtleCrypto) ImportKey(
 //
 // The `format` parameter identifies the format of the key data.
 // The `key` parameter is the key to export, as a CryptoKey object.
-//
-// TODO @oleiade: implement support for JWK format
 func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
 	promise, resolve, reject := promises.New(sc.vu)
@@ -719,7 +732,9 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 		return promise
 	}
 
-	keyAlgorithmName := key.ToObject(rt).Get("algorithm").ToObject(rt).Get("name").String()
+	inputAlgorithm := key.ToObject(rt).Get("algorithm").ToObject(rt)
+
+	keyAlgorithmName := inputAlgorithm.Get("name").String()
 	if algorithm.Name != keyAlgorithmName {
 		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
 		return promise
@@ -738,7 +753,7 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 			return
 		}
 
-		var result []byte
+		var result interface{}
 		var err error
 
 		switch keyAlgorithmName {
@@ -759,7 +774,18 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 			return
 		}
 
-		resolve(rt.NewArrayBuffer(result))
+		if format != RawKeyFormat {
+			resolve(result)
+			return
+		}
+
+		b, ok := result.([]byte)
+		if !ok {
+			reject(NewError(ImplementationError, "for "+format+" []byte expected as result"))
+			return
+		}
+
+		resolve(rt.NewArrayBuffer(b))
 	}()
 
 	return promise

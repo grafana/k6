@@ -187,3 +187,9 @@ func isAesAlgorithm(algorithmName string) bool {
 func isHashAlgorithm(algorithmName string) bool {
 	return algorithmName == SHA1 || algorithmName == SHA256 || algorithmName == SHA384 || algorithmName == SHA512
 }
+
+// hasAlg an internal interface that helps us to identify
+// if a given object has an algorithm method.
+type hasAlg interface {
+	alg() string
+}

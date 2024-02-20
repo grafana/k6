@@ -11,6 +11,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
+	k6encoding "go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modulestest"
 )
 
@@ -56,6 +57,12 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	m := new(RootModule).NewModuleInstance(runtime.VU)
 
 	err = runtime.VU.Runtime().Set("crypto", m.Exports().Named["crypto"])
+	require.NoError(t, err)
+
+	// we define the btoa function in the goja runtime
+	// so that the Web Platform tests can use it.
+	encodingModule := k6encoding.New().NewModuleInstance(runtime.VU)
+	err = runtime.VU.Runtime().Set("btoa", encodingModule.Exports().Named["b64encode"])
 	require.NoError(t, err)
 
 	_, err = runtime.VU.Runtime().RunString(initGlobals)

@@ -6,6 +6,7 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"errors"
+	"fmt"
 
 	"github.com/dop251/goja"
 )
@@ -21,6 +22,12 @@ type AESKeyGenParams struct {
 
 	// The length, in bits, of the key.
 	Length bitLength `js:"length"`
+}
+
+var _ hasAlg = (*AESKeyGenParams)(nil)
+
+func (akgp AESKeyGenParams) alg() string {
+	return akgp.Name
 }
 
 // newAESKeyGenParams creates a new AESKeyGenParams object, from the
@@ -84,7 +91,7 @@ func (akgp *AESKeyGenParams) GenerateKey(
 	// 5. 6. 7. 8. 9.
 	key := CryptoKey{}
 	key.Type = SecretCryptoKeyType
-	key.Algorithm = AESKeyAlgorithm{
+	key.Algorithm = &AESKeyAlgorithm{
 		Algorithm: akgp.Algorithm,
 		Length:    int64(akgp.Length),
 	}
@@ -114,10 +121,14 @@ type AESKeyAlgorithm struct {
 	Length int64 `js:"length"`
 }
 
+var _ hasAlg = (*AESKeyAlgorithm)(nil)
+
+func (aka AESKeyAlgorithm) alg() string {
+	return aka.Name
+}
+
 // exportAESKey exports an AES key to its raw representation.
-//
-// TODO @oleiade: support JWK format.
-func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
+func exportAESKey(key *CryptoKey, format KeyFormat) (interface{}, error) {
 	if !key.Extractable {
 		return nil, NewError(InvalidAccessError, "the key is not extractable")
 	}
@@ -135,8 +146,15 @@ func exportAESKey(key *CryptoKey, format KeyFormat) ([]byte, error) {
 		}
 
 		return handle, nil
+	case JwkKeyFormat:
+		m, err := exportSymmetricJWK(key)
+		if err != nil {
+			return nil, NewError(ImplementationError, err.Error())
+		}
+
+		return m, nil
+
 	default:
-		// FIXME: note that we do not support JWK format, yet.
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
 	}
 }
@@ -156,8 +174,6 @@ func newAESImportParams(normalized Algorithm) *AESImportParams {
 
 // ImportKey imports an AES key from its raw representation.
 // It implements the KeyImporter interface.
-//
-// TODO @oleiade: support JWK format #37
 func (aip *AESImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
@@ -172,19 +188,23 @@ func (aip *AESImportParams) ImportKey(
 		}
 	}
 
-	switch format {
-	case RawKeyFormat:
-		var (
-			has128Bits = len(keyData) == 16
-			has192Bits = len(keyData) == 24
-			has256Bits = len(keyData) == 32
-		)
-
-		if !has128Bits && !has192Bits && !has256Bits {
-			return nil, NewError(DataError, "invalid key length")
-		}
-	default:
+	// only raw and jwk formats are supported for HMAC
+	if format != RawKeyFormat && format != JwkKeyFormat {
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
+	}
+
+	// if the key is in JWK format, we need to extract the symmetric key from it
+	if format == JwkKeyFormat {
+		var err error
+		keyData, err = extractSymmetricJWK(keyData)
+		if err != nil {
+			return nil, NewError(DataError, err.Error())
+		}
+	}
+
+	// check the key length
+	if !isAESBitsLengthValid(len(keyData)) {
+		return nil, NewError(DataError, fmt.Sprintf("invalid key length %v bytes", len(keyData)))
 	}
 
 	key := &CryptoKey{
@@ -197,6 +217,12 @@ func (aip *AESImportParams) ImportKey(
 	}
 
 	return key, nil
+}
+
+// isAESBitsLengthValid returns true if the given length is a valid AES key length.
+// As per the [specification].
+func isAESBitsLengthValid(length int) bool {
+	return length == 16 || length == 24 || length == 32
 }
 
 // Ensure that AESImportParams implements the KeyImporter interface.

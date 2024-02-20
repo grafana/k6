@@ -23,3 +23,9 @@ func getHashFn(name string) (func() hash.Hash, bool) {
 		return nil, false
 	}
 }
+
+// hasHash an internal interface that helps us to identify
+// if a given object has a hash method.
+type hasHash interface {
+	hash() string
+}
