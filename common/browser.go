@@ -116,6 +116,11 @@ func (b *Browser) connect() error {
 		return fmt.Errorf("connecting to browser DevTools URL: %w", err)
 	}
 
+	// hook into the connection to listen for target attachment events.
+	// this way, browser can manage the decision of target attachments.
+	// so that we can stop connection from doing unnecessary work.
+	conn.onTargetAttachedToTarget = b.connectionOnAttachedToTarget
+
 	b.conn = conn
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
