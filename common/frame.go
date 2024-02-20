@@ -406,9 +406,36 @@ func (f *Frame) removeChildFrame(child *Frame) {
 
 func (f *Frame) requestByID(reqID network.RequestID) (*Request, bool) {
 	frameSession := f.page.getFrameSession(cdp.FrameID(f.ID()))
-	if frameSession == nil {
-		frameSession = f.page.mainFrameSession
+	if frameSession != nil {
+		if frameSession.networkManager == nil {
+			f.log.Warnf("Frame:requestByID:nil:frameSession.networkManager", "fid:%s furl:%q rid:%s",
+				f.ID(), f.URL(), reqID)
+			return nil, false
+		}
+		return frameSession.networkManager.requestFromID(reqID)
 	}
+
+	f.log.Debugf("Frame:requestByID:nil:frameSession", "fid:%s furl:%q rid:%s",
+		f.ID(), f.URL(), reqID)
+
+	// For unknown reasons mainFrameSession or mainFrameSession.networkManager
+	// (it's unknown exactly which one) are nil, which has caused NPDs. We're
+	// now adding nil checks here to prevent the NPDs, but we're also logging
+	// when these are nil in the hopes that we can identify which component is
+	// nil and under what conditions.
+
+	if f.page.mainFrameSession == nil {
+		f.log.Warnf("Frame:requestByID:nil:mainFrameSession", "fid:%s furl:%q rid:%s",
+			f.ID(), f.URL(), reqID)
+		return nil, false
+	}
+
+	if f.page.mainFrameSession.networkManager == nil {
+		f.log.Warnf("Frame:requestByID:nil:mainFrameSession.networkManager", "fid:%s furl:%q rid:%s",
+			f.ID(), f.URL(), reqID)
+		return nil, false
+	}
+
 	return frameSession.networkManager.requestFromID(reqID)
 }
 
