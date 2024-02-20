@@ -26,11 +26,11 @@ type CryptoKeyGenerationResult interface {
 type CryptoKeyPair struct {
 	// PrivateKey holds the private key. For encryption and decryption algorithms,
 	// this key is used to decrypt. For signing and verification algorithms it is used to sign.
-	PrivateKey CryptoKey `js:"privateKey"`
+	PrivateKey *CryptoKey `js:"privateKey"`
 
 	// PublicKey holds the public key. For encryption and decryption algorithms,
 	// this key is used to encrypt. For signing and verification algorithms it is used to verify.
-	PublicKey CryptoKey `js:"publicKey"`
+	PublicKey *CryptoKey `js:"publicKey"`
 }
 
 // IsKeyPair .
@@ -198,6 +198,8 @@ func newKeyImporter(rt *goja.Runtime, normalized Algorithm, params goja.Value) (
 		ki = newAESImportParams(normalized)
 	case HMAC:
 		ki, err = newHMACImportParams(rt, normalized, params)
+	case ECDH:
+		ki, err = newEcKeyImportParams(rt, normalized, params)
 	}
 
 	if err != nil {

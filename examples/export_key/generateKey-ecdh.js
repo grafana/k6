@@ -1,0 +1,22 @@
+import { crypto } from "k6/x/webcrypto";
+
+export default async function () {
+    const key = await crypto.subtle.generateKey(
+        {
+            name: "ECDH",
+            namedCurve: "P-256"
+        },
+        true,
+        [
+            "deriveKey",
+            "deriveBits"
+        ]
+    );
+
+    console.log(JSON.stringify(key))
+
+
+    const exported = await crypto.subtle.exportKey('jwk', key.publicKey);
+
+    console.log(JSON.stringify(exported.publicKey));
+}

@@ -33,17 +33,6 @@ type ECDSAParams struct {
 	Hash AlgorithmIdentifier
 }
 
-// ECKeyImportParams represents the object that should be passed as the algorithm parameter
-// into `SubtleCrypto.ImportKey` or `SubtleCrypto.UnwrapKey`, when generating any elliptic-curve-based
-// key pair: that is, when the algorithm is identified as either of ECDSA or ECDH.
-type ECKeyImportParams struct {
-	// Name should be set to AlgorithmKindEcdsa or AlgorithmKindEcdh.
-	Name AlgorithmIdentifier
-
-	// NamedCurve holds (a String) the name of the elliptic curve to use.
-	NamedCurve EllipticCurveKind
-}
-
 // HKDFParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.DeriveKey`, when using the HKDF algorithm.
 type HKDFParams struct {

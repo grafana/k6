@@ -66,7 +66,7 @@ var keyData = {
 // combinations to test
 var testVectors = [
    //  {name: "ECDSA", privateUsages: ["sign"], publicUsages: ["verify"]},
-   //  {name: "ECDH",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []}
+    {name: "ECDH",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []}
 ];
 
 // TESTS ARE HERE:
@@ -78,7 +78,9 @@ testVectors.forEach(function(vector) {
 
             // Test public keys first
             [[]].forEach(function(usages) { // Only valid usages argument is empty array
-                ['spki', 'spki_compressed', 'jwk', 'raw', 'raw_compressed'].forEach(function(format) {
+                // TODO: return back formats after implementing them
+                // 'spki', 'spki_compressed', 'jwk', 'raw_compressed'
+                ['raw'].forEach(function(format) {
                     var algorithm = {name: vector.name, namedCurve: curve};
                     var data = keyData[curve];
                     if (format === "jwk") { // Not all fields used for public keys
@@ -136,7 +138,7 @@ function testFormat(format, algorithm, data, keySize, usages, extractable) {
             if (compressed && err.name === "DataError") {
                 assert_implements_optional(false, "Compressed point format not supported: " + err.toString());
             } else {
-                assert_unreached("Threw an unexpected error: " + err.toString());
+                assert_unreached("Threw an unexpected error : " + err.toString() + ", format: " + format + " keyData: " + JSON.stringify(keyData) + " algorithm: " + JSON.stringify(algorithm) + " extractable: " + extractable + " usages: " + usages);
             }
         });
    //  }, "Good parameters: " + keySize.toString() + " bits " + parameterString(format, compressed, keyData, algorithm, extractable, usages));

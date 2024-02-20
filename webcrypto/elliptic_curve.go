@@ -3,7 +3,10 @@ package webcrypto
 import (
 	"crypto/ecdh"
 	"crypto/rand"
+	"encoding/json"
 	"errors"
+
+	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/dop251/goja"
 )
@@ -22,11 +25,53 @@ type EcKeyAlgorithm struct {
 // into `SubtleCrypto.ImportKey` or `SubtleCrypto.UnwrapKey`, when generating any elliptic-curve-based
 // key pair: that is, when the algorithm is identified as either of ECDSA or ECDH.
 type EcKeyImportParams struct {
-	// Name should be set to AlgorithmKindEcdsa or AlgorithmKindEcdh.
-	Name AlgorithmIdentifier `js:"name"`
+	Algorithm
 
 	// NamedCurve holds (a String) the name of the elliptic curve to use.
 	NamedCurve EllipticCurveKind `js:"namedCurve"`
+}
+
+func newEcKeyImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*EcKeyImportParams, error) {
+	namedCurve, err := traverseObject(rt, params, "namedCurve")
+	if err != nil {
+		return nil, NewError(SyntaxError, "could not get namedCurve from algorithm parameter")
+	}
+
+	return &EcKeyImportParams{
+		Algorithm:  normalized,
+		NamedCurve: EllipticCurveKind(namedCurve.String()),
+	}, nil
+}
+
+// Ensure that EcKeyImportParams implements the KeyImporter interface.
+var _ KeyImporter = &EcKeyImportParams{}
+
+// ImportKey imports a key according to the algorithm described in the specification.
+// https://www.w3.org/TR/WebCryptoAPI/#ecdh-operations
+func (e *EcKeyImportParams) ImportKey(
+	format KeyFormat,
+	keyData []byte,
+	keyUsages []CryptoKeyUsage,
+) (*CryptoKey, error) {
+	if len(keyUsages) == 0 {
+		return nil, NewError(SyntaxError, "key usages cannot be empty")
+	}
+
+	// only raw and jwk formats are supported for HMAC
+	if format != RawKeyFormat && format != JwkKeyFormat {
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
+	}
+
+	key := &CryptoKey{
+		Algorithm: AESKeyAlgorithm{
+			Algorithm: e.Algorithm,
+			Length:    int64(byteLength(len(keyData)).asBitLength()),
+		},
+		Type:   SecretCryptoKeyType,
+		handle: keyData,
+	}
+
+	return key, nil
 }
 
 // EllipticCurveKind represents the kind of elliptic curve that is being used.
@@ -129,7 +174,7 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 	}
 
 	// wrap the keys in CryptoKey objects
-	privateKey := CryptoKey{
+	privateKey := &CryptoKey{
 		Type:        PrivateCryptoKeyType,
 		Extractable: extractable,
 		Algorithm:   alg,
@@ -143,7 +188,7 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 		handle: rawPrivateKey,
 	}
 
-	publicKey := CryptoKey{
+	publicKey := &CryptoKey{
 		Type:        PublicCryptoKeyType,
 		Extractable: true,
 		Algorithm:   alg,
@@ -173,5 +218,29 @@ func pickEllipticCurve(k EllipticCurveKind) (ecdh.Curve, error) {
 	// return ecdh.X25519(), nil
 	default:
 		return nil, errors.New("invalid elliptic curve")
+	}
+}
+
+func exportECKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
+	if ck.handle == nil {
+		return nil, NewError(OperationError, "key data is not accessible")
+	}
+
+	switch format {
+	case JwkKeyFormat:
+		key, err := jwk.FromRaw(ck.handle)
+		if err != nil {
+			return nil, NewError(OperationError, "unable to export key to JWK format: "+err.Error())
+		}
+
+		b, err := json.Marshal(key)
+		if err != nil {
+			return nil, NewError(OperationError, "unable to marshal key to JWK format"+err.Error())
+		}
+
+		return b, nil
+	default:
+		// FIXME: note that we do not support JWK format, yet #37.
+		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
 }

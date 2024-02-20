@@ -777,6 +777,12 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 				reject(err)
 				return
 			}
+		case ECDH:
+			result, err = exportECKey(ck, format)
+			if err != nil {
+				reject(err)
+				return
+			}
 		default:
 			reject(NewError(NotSupportedError, "unsupported algorithm "+keyAlgorithmName))
 			return
