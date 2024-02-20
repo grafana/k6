@@ -348,7 +348,16 @@ func (c *Connection) recvLoop() {
 			evt := ev.(*target.EventDetachedFromTarget)
 			sid := evt.SessionID
 			tid := c.findTargetIDForLog(sid)
-			c.closeSession(sid, tid)
+			ok := c.closeSession(sid, tid)
+			if !ok {
+				c.logger.Debugf(
+					"Connection:recvLoop:EventDetachedFromTarget",
+					"sid:%v tid:%v wsURL:%q, session not found",
+					sid, tid, c.wsURL,
+				)
+
+				continue
+			}
 		}
 
 		switch {
