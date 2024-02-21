@@ -136,10 +136,21 @@ type Connection struct {
 	// onTargetAttachedToTarget is called when a new target is attached to the browser.
 	// Returning false will prevent the session from being created.
 	// If onTargetAttachedToTarget is nil, the session will be created.
+	//
+	// Register this only once, before the connection is used.
+	// It's not a constructor parameter to prevent polluting the constructor
+	// signature. Also, tests don't need to set this (or some other future code).
+	//
+	// Once the callback is registered, call start() to start the connection's
+	// main control loop where it will start reading and writing messages to the browser.
 	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool
 }
 
 // NewConnection creates a new browser.
+//
+// Call start() to start the connection's main control loop
+// where it will start reading and writing messages to the browser.
+// Otherwise, the connection will not be able to send or receive messages.
 func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Connection, error) {
 	var header http.Header
 	var tlsConfig *tls.Config
@@ -170,11 +181,6 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 		msgIDGen:         &msgID{},
 		sessions:         make(map[target.SessionID]*Session),
 	}
-
-	// starts the main control loop
-	// where the connection reads and writes messages
-	// in gorooutines.
-	c.start()
 
 	return &c, nil
 }

@@ -123,6 +123,9 @@ func (b *Browser) connect() error {
 
 	b.conn = conn
 
+	// Start the connection to listen for CDP events.
+	conn.start()
+
 	// We don't need to lock this because `connect()` is called only in NewBrowser
 	b.defaultContext, err = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
 	if err != nil {

@@ -30,6 +30,7 @@ func TestConnection(t *testing.T) {
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/echo", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger())
+		conn.start()
 		conn.Close()
 
 		require.NoError(t, err)
@@ -48,6 +49,7 @@ func TestConnectionClosureAbnormal(t *testing.T) {
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/closure-abnormal", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger())
+		conn.start()
 
 		if assert.NoError(t, err) {
 			action := target.SetDiscoverTargets(true)
@@ -69,6 +71,7 @@ func TestConnectionSendRecv(t *testing.T) {
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger())
+		conn.start()
 
 		if assert.NoError(t, err) {
 			action := target.SetDiscoverTargets(true)
@@ -136,6 +139,7 @@ func TestConnectionCreateSession(t *testing.T) {
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger())
+		conn.start()
 
 		if assert.NoError(t, err) {
 			session, err := conn.createSession(&target.Info{

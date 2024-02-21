@@ -91,6 +91,7 @@ func TestSessionCreateSession(t *testing.T) {
 		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger())
 
 		if assert.NoError(t, err) {
+			conn.start()
 			session, err := conn.createSession(&target.Info{
 				Type:             "page",
 				TargetID:         cdpTargetID,
