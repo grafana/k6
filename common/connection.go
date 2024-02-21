@@ -171,10 +171,18 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 		sessions:         make(map[target.SessionID]*Session),
 	}
 
-	go c.recvLoop()
-	go c.sendLoop()
+	// starts the main control loop
+	// where the connection reads and writes messages
+	// in gorooutines.
+	c.start()
 
 	return &c, nil
+}
+
+// start starts the connection's main control loop.
+func (c *Connection) start() {
+	go c.recvLoop()
+	go c.sendLoop()
 }
 
 func (c *Connection) close(code int) error {
