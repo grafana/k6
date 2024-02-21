@@ -378,3 +378,35 @@ func TestCloseContext(t *testing.T) {
 		assert.Error(t, tb.CloseContext())
 	})
 }
+
+func TestIsolateBrowserContexts(t *testing.T) {
+	tb := newTestBrowser(t)
+
+	b1 := tb.Browser
+	b2, err := tb.browserType.Connect(tb.context(), tb.wsURL)
+	require.NoError(t, err)
+	t.Cleanup(b2.Close)
+
+	bctx1, err := b1.NewContext(nil)
+	require.NoError(t, err)
+	bctx2, err := b2.NewContext(nil)
+	require.NoError(t, err)
+
+	// both browser connections will receive onAttachedToTarget events.
+	// each Connection value should filter out events that are not related to
+	// the browser context it wasn't created from.
+	err = tb.run(tb.context(), func() error {
+		_, err := bctx1.NewPage()
+		return err
+	}, func() error {
+		_, err := bctx2.NewPage()
+		return err
+	})
+	require.NoError(t, err)
+
+	// assert.Len produces verbose output. so, use our own len.
+	bctx1PagesLen := len(bctx1.Pages())
+	bctx2PagesLen := len(bctx2.Pages())
+	assert.Equalf(t, 1, bctx1PagesLen, "browser context #1 should be attached to a single page, but got %d", bctx1PagesLen)
+	assert.Equalf(t, 1, bctx2PagesLen, "browser context #2 should be attached to a single page, but got %d", bctx2PagesLen)
+}
