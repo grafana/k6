@@ -131,6 +131,11 @@ type Connection struct {
 	// Reuse the easyjson structs to avoid allocs per Read/Write.
 	decoder jlexer.Lexer
 	encoder jwriter.Writer
+
+	// onTargetAttachedToTarget is called when a new target is attached to the browser.
+	// Returning false will prevent the session from being created.
+	// If onTargetAttachedToTarget is nil, the session will be created.
+	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool
 }
 
 // NewConnection creates a new browser.
@@ -333,6 +338,15 @@ func (c *Connection) recvLoop() {
 			}
 			eva := ev.(*target.EventAttachedToTarget)
 			sid, tid := eva.SessionID, eva.TargetInfo.TargetID
+
+			if c.onTargetAttachedToTarget != nil {
+				// If onTargetAttachedToTarget is set, it will be called to determine
+				// if a session should be created for the target.
+				ok := c.onTargetAttachedToTarget(eva)
+				if !ok {
+					continue
+				}
+			}
 
 			c.sessionsMu.Lock()
 			session := NewSession(c.ctx, c, sid, tid, c.logger, c.msgIDGen)
