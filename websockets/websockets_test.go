@@ -950,6 +950,46 @@ func TestCookiesDefaultJar(t *testing.T) {
 	assert.Len(t, ts.errors, 0)
 }
 
+func TestManualNameTag(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.vu.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{"url", "name"})
+
+	err := ts.ev.Start(func() error {
+		_, runErr := ts.rt.RunString(sr(`
+				var ws = new WebSocket("WSBIN_URL/ws-echo", null, { tags: { name: "custom" } } )
+				ws.onopen = () => {
+					ws.send("test")
+				}
+				ws.onmessage = (event) => {
+					if (event.data != "test") {
+						throw new Error ("echo'd data doesn't match our message!");
+					}
+					ws.close()
+	 			}
+                ws.onerror = (e) => { throw JSON.stringify(e) }
+			`))
+		return runErr
+	})
+	require.NoError(t, err)
+
+	containers := metrics.GetBufferedSamples(ts.samples)
+	require.NotEmpty(t, containers)
+
+	for _, sampleContainer := range containers {
+		require.NotEmpty(t, sampleContainer.GetSamples())
+		for _, sample := range sampleContainer.GetSamples() {
+			dataToCheck := sample.Tags.Map()
+			require.NotEmpty(t, dataToCheck)
+
+			assert.Equal(t, "custom", dataToCheck["url"])
+			assert.Equal(t, "custom", dataToCheck["name"])
+		}
+	}
+}
+
 func TestSystemTags(t *testing.T) {
 	t.Parallel()
 
