@@ -429,8 +429,14 @@ func (c *Connection) recvLoop() {
 }
 
 // stopWaitingForDebugger tells the browser to stop waiting for the
-// debugger. Otherwise, the browser will wait for the debugger to
-// attach indefinitely.
+// debugger to attach to the page's session.
+//
+// Whether we're not sharing pages among browser contexts, Chromium
+// still does so (since we're auto-attaching all browser targets).
+// This means that if we don't stop waiting for the debugger, the
+// browser will wait for the debugger to attach to the new page
+// indefinitely, even if the page is not part of the browser context
+// we're using.
 //
 // We don't return an error because the browser might have already
 // closed the connection. In that case, handling the error would
