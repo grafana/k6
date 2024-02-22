@@ -236,6 +236,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		stopOutputs(err)
 	}()
 
+	conf.Outputs = outputManager.JSONConfig()
+	test.initRunner.SetOptions(conf.Options)
+
 	if !testRunState.RuntimeOptions.NoThresholds.Bool {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(
 			metricsIngester, runAbort, executionState.GetCurrentTestRunDuration,

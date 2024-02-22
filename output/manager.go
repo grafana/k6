@@ -1,6 +1,7 @@
 package output
 
 import (
+	"encoding/json"
 	"sync"
 	"time"
 
@@ -80,6 +81,18 @@ func (om *Manager) Start(samplesChan chan metrics.SampleContainer) (wait func(),
 		om.stopOutputs(testErr, len(om.outputs))
 	}
 	return wait, finish, nil
+}
+
+func (om *Manager) JSONConfig() map[string]json.RawMessage {
+	result := make(map[string]json.RawMessage)
+	for _, output := range om.outputs {
+		o, ok := output.(interface{ JSONConfig() json.RawMessage })
+		if !ok {
+			continue
+		}
+		result["cloud"] = o.JSONConfig() // TODO fix
+	}
+	return result
 }
 
 // startOutputs spins up all configured outputs. If some output fails to start,

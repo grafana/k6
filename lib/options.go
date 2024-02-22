@@ -342,6 +342,8 @@ type Options struct {
 
 	// Specify client IP ranges and/or CIDR from which VUs will make requests
 	LocalIPs types.NullIPPool `json:"-" envconfig:"K6_LOCAL_IPS"`
+
+	Outputs map[string]json.RawMessage `json:"outputs"`
 }
 
 // Apply returns the result of overwriting any fields with any that are set on the argument.
@@ -510,6 +512,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.DNS.Policy.Valid {
 		o.DNS.Policy = opts.DNS.Policy
+	}
+	if opts.Outputs != nil {
+		o.Outputs = opts.Outputs
 	}
 
 	return o

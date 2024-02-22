@@ -2,6 +2,7 @@
 package cloud
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"path/filepath"
@@ -186,6 +187,7 @@ func (out *Output) Start() error {
 		return err
 	}
 	out.testRunID = response.ReferenceID
+	out.config.PushRefID = null.StringFrom(out.testRunID)
 
 	if response.ConfigOverride != nil {
 		out.logger.WithFields(logrus.Fields{
@@ -206,6 +208,14 @@ func (out *Output) Start() error {
 		"testRunId": out.testRunID,
 	}).Debug("Started!")
 	return nil
+}
+
+func (out *Output) JSONConfig() json.RawMessage {
+	res, err := json.Marshal(out.config)
+	if err != nil {
+		panic(err) // TODO FIX
+	}
+	return res
 }
 
 // Description returns the URL with the test run results.
