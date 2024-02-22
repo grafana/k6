@@ -88,10 +88,9 @@ func TestSessionCreateSession(t *testing.T) {
 		ctx := context.Background()
 		url, _ := url.Parse(server.ServerHTTP.URL)
 		wsURL := fmt.Sprintf("ws://%s/cdp", url.Host)
-		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger())
+		conn, err := NewConnection(ctx, wsURL, log.NewNullLogger(), nil)
 
 		if assert.NoError(t, err) {
-			conn.start()
 			session, err := conn.createSession(&target.Info{
 				Type:             "page",
 				TargetID:         cdpTargetID,

@@ -140,18 +140,16 @@ type Connection struct {
 	// Register this only once, before the connection is used.
 	// It's not a constructor parameter to prevent polluting the constructor
 	// signature. Also, tests don't need to set this (or some other future code).
-	//
-	// Once the callback is registered, call start() to start the connection's
-	// main control loop where it will start reading and writing messages to the browser.
 	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool
 }
 
 // NewConnection creates a new browser.
-//
-// Call start() to start the connection's main control loop
-// where it will start reading and writing messages to the browser.
-// Otherwise, the connection will not be able to send or receive messages.
-func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Connection, error) {
+func NewConnection(
+	ctx context.Context,
+	wsURL string,
+	logger *log.Logger,
+	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool,
+) (*Connection, error) {
 	var header http.Header
 	var tlsConfig *tls.Config
 	wsd := websocket.Dialer{
@@ -167,28 +165,26 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 	}
 
 	c := Connection{
-		BaseEventEmitter: NewBaseEventEmitter(ctx),
-		ctx:              ctx,
-		wsURL:            wsURL,
-		logger:           logger,
-		conn:             conn,
-		sendCh:           make(chan *cdproto.Message, 32), // Avoid blocking in Execute
-		recvCh:           make(chan *cdproto.Message),
-		closeCh:          make(chan int),
-		errorCh:          make(chan error),
-		done:             make(chan struct{}),
-		closing:          make(chan struct{}),
-		msgIDGen:         &msgID{},
-		sessions:         make(map[target.SessionID]*Session),
+		BaseEventEmitter:         NewBaseEventEmitter(ctx),
+		ctx:                      ctx,
+		wsURL:                    wsURL,
+		logger:                   logger,
+		conn:                     conn,
+		sendCh:                   make(chan *cdproto.Message, 32), // Avoid blocking in Execute
+		recvCh:                   make(chan *cdproto.Message),
+		closeCh:                  make(chan int),
+		errorCh:                  make(chan error),
+		done:                     make(chan struct{}),
+		closing:                  make(chan struct{}),
+		msgIDGen:                 &msgID{},
+		sessions:                 make(map[target.SessionID]*Session),
+		onTargetAttachedToTarget: onTargetAttachedToTarget,
 	}
 
-	return &c, nil
-}
-
-// start starts the connection's main control loop.
-func (c *Connection) start() {
 	go c.recvLoop()
 	go c.sendLoop()
+
+	return &c, nil
 }
 
 func (c *Connection) close(code int) error {

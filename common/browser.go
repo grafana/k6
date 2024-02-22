@@ -111,20 +111,21 @@ func newBrowser(
 
 func (b *Browser) connect() error {
 	b.logger.Debugf("Browser:connect", "wsURL:%q", b.browserProc.WsURL())
-	conn, err := NewConnection(b.ctx, b.browserProc.WsURL(), b.logger)
+
+	// connectionOnAttachedToTarget hooks into the connection to listen
+	// for target attachment events. this way, browser can manage the
+	// decision of target attachments. so that we can stop connection
+	// from doing unnecessary work.
+	var err error
+	b.conn, err = NewConnection(
+		b.ctx,
+		b.browserProc.WsURL(),
+		b.logger,
+		b.connectionOnAttachedToTarget,
+	)
 	if err != nil {
 		return fmt.Errorf("connecting to browser DevTools URL: %w", err)
 	}
-
-	// hook into the connection to listen for target attachment events.
-	// this way, browser can manage the decision of target attachments.
-	// so that we can stop connection from doing unnecessary work.
-	conn.onTargetAttachedToTarget = b.connectionOnAttachedToTarget
-
-	b.conn = conn
-
-	// Start the connection to listen for CDP events.
-	conn.start()
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
 	b.defaultContext, err = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
