@@ -136,10 +136,6 @@ type Connection struct {
 	// onTargetAttachedToTarget is called when a new target is attached to the browser.
 	// Returning false will prevent the session from being created.
 	// If onTargetAttachedToTarget is nil, the session will be created.
-	//
-	// Register this only once, before the connection is used.
-	// It's not a constructor parameter to prevent polluting the constructor
-	// signature. Also, tests don't need to set this (or some other future code).
 	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool
 }
 
