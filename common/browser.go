@@ -229,10 +229,6 @@ func (b *Browser) initEvents() error {
 // connectionOnAttachedToTarget is called when Connection receives an attachedToTarget
 // event. Returning false will stop the event from being processed by the connection.
 func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget) bool {
-	// Allow connection to attach to target as the browser context is not set
-	// (hence it's the first one we have—the default), or the target is in the
-	// same browser context as the current one.
-	//
 	// This allows to attach targets to the same browser context as the current
 	// one, and to the default browser context.
 	//
@@ -338,7 +334,6 @@ func (b *Browser) isAttachedPageValid(ev *target.EventAttachedToTarget, browserC
 		return false
 	}
 	// If the target is not in the same browser context as the current one, ignore it.
-	// We're not adding a log to prevent overhead.
 	if browserCtx.id != targetPage.BrowserContextID {
 		b.logger.Warnf(
 			"Browser:isAttachedPageValid", "incorrect browser context sid:%v tid:%v bctxid:%v target bctxid:%v",
