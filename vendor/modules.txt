@@ -104,7 +104,7 @@ github.com/dgryski/go-rendezvous
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20231027120936-b396bb4c349d
+# github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
 ## explicit; go 1.16
 github.com/dop251/goja
 github.com/dop251/goja/ast
