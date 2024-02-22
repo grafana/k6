@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"errors"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -294,14 +295,21 @@ func TestMultiBrowserPanic(t *testing.T) {
 		t.Skip("skipping on windows")
 	}
 
-	p1, err := os.FindProcess(b1.pid)
-	require.NoError(t, err, "failed to find process #1")
-	p2, err := os.FindProcess(b2.pid)
-	require.NoError(t, err, "failed to find process #2")
-	err = p1.Signal(syscall.Signal(0))
-	assert.Error(t, err, "process #1 should be dead, but exists")
-	err = p2.Signal(syscall.Signal(0))
-	assert.Error(t, err, "process #2 should be dead, but exists")
+	assertProcess := func(t *testing.T, pid int, n int) {
+		t.Helper()
+
+		p, err := os.FindProcess(pid)
+		if err != nil {
+			// process is already dead.
+			// no need to check if it's dead with Signal(0).
+			return
+		}
+		if err = p.Signal(syscall.Signal(0)); !errors.Is(err, os.ErrProcessDone) {
+			assert.Errorf(t, err, "process #%d should be dead, but exists", n)
+		}
+	}
+	assertProcess(t, b1.pid, 1)
+	assertProcess(t, b2.pid, 2)
 }
 
 func TestBrowserMultiClose(t *testing.T) {
