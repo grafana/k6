@@ -236,19 +236,18 @@ func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget
 	// This allows to attach targets to the same browser context as the current
 	// one, and to the default browser context.
 	//
-	// We don't want to hold the lock for the entire function to prevent
-	// concurrency issues with the browser context being closed while we're
-	// checking it. So, we don't use defer. This is for a future code that might
-	// extend this function, add a defer, and cause this issue to be missed.
-	b.contextMu.RLock()
-	defaultContext := b.context == nil
-	if defaultContext || b.context.id == eva.TargetInfo.BrowserContextID {
-		b.contextMu.RUnlock()
-		return true
+	// We don't want to hold the lock for the entire function
+	// (connectionOnAttachedToTarget) run duration, because we want to avoid
+	// possible lock contention issues with the browser context being closed while
+	// we're waiting for it. So, we do the lock management in a function with its
+	// own defer.
+	isAllowedBrowserContext := func() bool {
+		b.contextMu.RLock()
+		defer b.contextMu.RUnlock()
+		return b.context == nil || b.context.id == eva.TargetInfo.BrowserContextID
 	}
-	b.contextMu.RUnlock()
 
-	return false
+	return isAllowedBrowserContext()
 }
 
 // onAttachedToTarget is called when a new page is attached to the browser.
