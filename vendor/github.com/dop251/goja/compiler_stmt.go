@@ -739,7 +739,7 @@ func (c *compiler) compileReturnStatement(v *ast.ReturnStatement) {
 	for b := c.block; b != nil; b = b.outer {
 		switch b.typ {
 		case blockTry:
-			c.emit(leaveTry{})
+			c.emit(saveResult, leaveTry{}, loadResult)
 		case blockLoopEnum:
 			c.emit(enumPopClose)
 		}

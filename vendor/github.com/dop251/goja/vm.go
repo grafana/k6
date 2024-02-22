@@ -932,6 +932,15 @@ func (_saveResult) exec(vm *vm) {
 	vm.pc++
 }
 
+type _loadResult struct{}
+
+var loadResult _loadResult
+
+func (_loadResult) exec(vm *vm) {
+	vm.push(vm.result)
+	vm.pc++
+}
+
 type _clearResult struct{}
 
 var clearResult _clearResult
