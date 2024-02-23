@@ -1,9 +1,5 @@
 package webcrypto
 
-import (
-	"fmt"
-)
-
 // ErrorName is a type alias for the name of a WebCryptoError.
 //
 // Note that it is a type alias, and not a binding, so that it is
@@ -53,7 +49,7 @@ type Error struct {
 
 // Error implements the `error` interface, so WebCryptoError are normal Go errors.
 func (e *Error) Error() string {
-	return fmt.Sprintf(e.Name)
+	return e.Name + ": " + e.Message
 }
 
 // NewError returns a new WebCryptoError with the given name and message.
