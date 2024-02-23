@@ -145,7 +145,7 @@ func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) 
 		return Algorithm{}, NewError(SyntaxError, "algorithm cannot be interpreted as a string or an object")
 	}
 
-	// Algorithm identifers are always upper cased.
+	// Algorithm identifiers are always upper cased.
 	// A registered algorithm provided in lower case format, should
 	// be considered valid.
 	algorithm.Name = strings.ToUpper(algorithm.Name)

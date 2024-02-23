@@ -172,7 +172,7 @@ type HMACKeyAlgorithm struct {
 func exportHMACKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 	// 1.
 	if ck.handle == nil {
-		return nil, NewError(OperationError, "key data is not accesible")
+		return nil, NewError(OperationError, "key data is not accessible")
 	}
 
 	// 2.

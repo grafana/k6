@@ -16,7 +16,7 @@ import { crypto } from "k6/x/webcrypto";
 
         const encoded = string2ArrayBuffer("Hello World");
         
-        // Signes the encoded data with the provided key using the HMAC algorithm
+        // Signs the encoded data with the provided key using the HMAC algorithm
         // the returned signature can be verified using the verify method.
         const signature = await crypto.subtle.sign("HMAC", generatedKey, encoded);
 
