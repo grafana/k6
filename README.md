@@ -37,8 +37,11 @@ The current state of the project is that it is an experimental module of the Web
 | API                           | AES-CBC | AES-GCM | AES-CTR | AES-KW | HMAC | ECDSA | ECDH | RSASSA-PKCS1-v1_5 | RSA-PSS | RSA-OAEP |
 | :---------------------------- | :------ | :------ | :------ | :----- | :--- | :---- | :--- | :---------------- | :------ | :------- |
 | `crypto.subtle.generateKey()` | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ❌   | ❌                | ❌      | ❌       |
-| `crypto.subtle.importKey()`   | ✅      | ✅      | ✅      | ❌     | ❌   | ❌    | ❌   | ❌                | ❌      | ❌       |
-| `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ❌   | ❌    | ❌   | ❌                | ❌      | ❌       |
+| `crypto.subtle.importKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ❌   | ❌                | ❌      | ❌       |
+| `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ❌   | ❌                | ❌      | ❌       |
+
+> [!WARNING]  
+> Currently, only the `raw` and `jwk` (JSON Web Key) formats are supported for import/export operations.
 
 ##### Key derivation
 
