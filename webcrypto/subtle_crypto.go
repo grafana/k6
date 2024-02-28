@@ -605,11 +605,75 @@ func (sc *SubtleCrypto) DeriveKey(
 // using `SubtleCrypto.ImportKey`.
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
-//
-//nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, length int) *goja.Promise {
-	// TODO: implementation
-	return nil
+	rt := sc.vu.Runtime()
+
+	var publicKey, privateKey CryptoKey
+	var algName string
+
+	err := func() error {
+		if err := rt.ExportTo(baseKey, &privateKey); err != nil {
+			return NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey")
+		}
+
+		if privateKey.Type != PrivateCryptoKeyType {
+			return NewError(InvalidAccessError, "provided baseKey is not a private key")
+		}
+
+		alg := algorithm.ToObject(rt)
+
+		pcValue := alg.Get("public")
+		if err := rt.ExportTo(pcValue, &publicKey); err != nil {
+			return NewError(InvalidAccessError, "algorithm's public is not a valid CryptoKey")
+		}
+
+		algName = alg.Get("name").String()
+
+		if publicKey.Type != PublicCryptoKeyType {
+			return NewError(InvalidAccessError, "algorithm's public key is not a public key")
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := func() ([]byte, error) {
+			deriver, err := newBitsDeriver(algName)
+			if err != nil {
+				return nil, err
+			}
+
+			b, err := deriver(privateKey, publicKey)
+			if err != nil {
+				return nil, NewError(OperationError, err.Error())
+			}
+
+			if len(b) < length/8 {
+				return nil, NewError(OperationError, "length is too large")
+			}
+
+			return b[:length/8], nil
+		}()
+
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(rt.NewArrayBuffer(result))
+			return nil
+		})
+	}()
+
+	return promise
 }
 
 // ImportKey imports a key: that is, it takes as input a key in an external, portable

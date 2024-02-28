@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/json"
 	"errors"
+	"log"
 
 	"github.com/lestrrat-go/jwx/v2/jwk"
 
@@ -53,25 +54,41 @@ func (e *EcKeyImportParams) ImportKey(
 	keyData []byte,
 	keyUsages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
-	if len(keyUsages) == 0 {
-		return nil, NewError(SyntaxError, "key usages cannot be empty")
+	if len(keyUsages) > 0 {
+		return nil, NewError(SyntaxError, "key usages should be empty")
 	}
 
-	// only raw and jwk formats are supported for HMAC
-	if format != RawKeyFormat && format != JwkKeyFormat {
+	// only raw format is supported
+	if format != RawKeyFormat {
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
 	}
 
-	key := &CryptoKey{
-		Algorithm: AESKeyAlgorithm{
-			Algorithm: e.Algorithm,
-			Length:    int64(byteLength(len(keyData)).asBitLength()),
-		},
-		Type:   SecretCryptoKeyType,
-		handle: keyData,
+	// pick the elliptic curve
+	c, err := pickEllipticCurve(e.NamedCurve)
+	if err != nil {
+		log.Printf("invalid elliptic curve: %v\n", err)
+		return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(e.NamedCurve))
 	}
 
-	return key, nil
+	// import the key data
+	publicKey, err := c.NewPublicKey(keyData)
+	if err != nil {
+		log.Printf("unable to import key data: %v\n", err)
+		return nil, NewError(DataError, "unable to import key data: "+err.Error())
+	}
+
+	// log.Printf("publicKey: %v\n", publicKey)
+
+	return &CryptoKey{
+		Algorithm: EcKeyAlgorithm{
+			KeyAlgorithm: KeyAlgorithm{
+				Algorithm: e.Algorithm,
+			},
+			NamedCurve: e.NamedCurve,
+		},
+		Type:   PublicCryptoKeyType, // TODO: check if this is correct
+		handle: publicKey,
+	}, nil
 }
 
 // EllipticCurveKind represents the kind of elliptic curve that is being used.
@@ -239,8 +256,27 @@ func exportECKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 		}
 
 		return b, nil
+	case RawKeyFormat:
+		k, ok := ck.handle.(*ecdh.PublicKey)
+		if !ok {
+			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
+		}
+
+		return k.Bytes(), nil
 	default:
-		// FIXME: note that we do not support JWK format, yet #37.
 		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
+}
+
+func deriveBitsECDH(privateKey CryptoKey, publicKey CryptoKey) ([]byte, error) {
+	pk, ok := privateKey.handle.(*ecdh.PrivateKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key is not a valid ECDH private key")
+	}
+	pc, ok := publicKey.handle.(*ecdh.PublicKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key is not a valid ECDH public key")
+	}
+
+	return pk.ECDH(pc)
 }

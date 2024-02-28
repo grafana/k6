@@ -85,10 +85,12 @@ func (ck *CryptoKey) IsKeyPair() bool {
 	return false
 }
 
+// ResolveCryptoKeyPair returns an error since the underlying type is not a CryptoKeyPair.
 func (ck *CryptoKey) ResolveCryptoKeyPair() (*CryptoKeyPair, error) {
 	return nil, errors.New("not a Crypto Key Pair")
 }
 
+// ResolveCryptoKey returns the underlying CryptoKey.
 func (ck *CryptoKey) ResolveCryptoKey() (*CryptoKey, error) {
 	return ck, nil
 }
