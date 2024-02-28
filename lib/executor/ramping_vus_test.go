@@ -36,6 +36,51 @@ func TestRampingVUsConfigValidation(t *testing.T) {
 	errs = c.Validate()
 	require.NotEmpty(t, errs)
 	assert.Contains(t, errs[0].Error(), "greater than 0")
+
+	const maxConcurrentVUs = 100_000_000
+
+	t.Run("If startVUs are larger than maxConcurrentVUs, the validation should return an error", func(t *testing.T) {
+		t.Parallel()
+
+		c = NewRampingVUsConfig("stage")
+		c.StartVUs = null.IntFrom(maxConcurrentVUs + 1)
+		c.Stages = []Stage{
+			{Target: null.IntFrom(0), Duration: types.NullDurationFrom(1 * time.Second)},
+		}
+
+		errs = c.Validate()
+		require.NotEmpty(t, errs)
+		assert.Contains(t, errs[0].Error(), "the startVUs exceed max limit of")
+	})
+
+	t.Run("For multiple VU values larger than maxConcurrentVUs, multiple errors are returned", func(t *testing.T) {
+		t.Parallel()
+
+		c = NewRampingVUsConfig("stage")
+		c.StartVUs = null.IntFrom(maxConcurrentVUs + 1)
+		c.Stages = []Stage{
+			{Target: null.IntFrom(maxConcurrentVUs + 2), Duration: types.NullDurationFrom(1 * time.Second)},
+		}
+
+		errs = c.Validate()
+		require.Equal(t, 2, len(errs))
+		assert.Contains(t, errs[0].Error(), "the startVUs exceed max limit of")
+
+		assert.Contains(t, errs[1].Error(), "target for stage 1 exceeds max limit of")
+	})
+
+	t.Run("VU values below maxConcurrentVUs will pass validation", func(t *testing.T) {
+		t.Parallel()
+
+		c = NewRampingVUsConfig("stage")
+		c.StartVUs = null.IntFrom(0)
+		c.Stages = []Stage{
+			{Target: null.IntFrom(maxConcurrentVUs - 1), Duration: types.NullDurationFrom(1 * time.Second)},
+		}
+
+		errs = c.Validate()
+		require.Empty(t, errs)
+	})
 }
 
 func TestRampingVUsRun(t *testing.T) {

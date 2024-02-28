@@ -86,7 +86,10 @@ func (vlvc RampingVUsConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("either startVUs or one of the stages' target values must be greater than 0"))
 	}
 
-	return append(errors, validateStages(vlvc.Stages)...)
+	errors = append(errors, validateStages(vlvc.Stages)...)
+	errors = append(errors, validateTargetShifts(vlvc.StartVUs.Int64, vlvc.Stages)...)
+
+	return errors
 }
 
 // getRawExecutionSteps calculates and returns as execution steps the number of

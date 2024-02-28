@@ -16,6 +16,12 @@ import (
 	"go.k6.io/k6/ui/pb"
 )
 
+const (
+	// maxConcurrentVUs is an arbitrary limit for sanity checks.
+	// It prevents running an exaggeratedly large number of concurrent VUs which may lead to an out-of-memory.
+	maxConcurrentVUs int = 100_000_000
+)
+
 func sumStagesDuration(stages []Stage) (result time.Duration) {
 	for _, s := range stages {
 		result += s.Duration.TimeDuration()
@@ -31,6 +37,27 @@ func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 
 		}
 	}
 	return max
+}
+
+// validateTargetShifts validates the VU Target shifts.
+// It will append an error for any VU target that is larger than the maximum value allowed.
+// Each Stage needs a Target value. The stages array can be empty. The Targes could be negative.
+func validateTargetShifts(startVUs int64, stages []Stage) []error {
+	var errors []error
+
+	if startVUs > int64(maxConcurrentVUs) {
+		errors = append(errors, fmt.Errorf(
+			"the startVUs exceed max limit of %d", maxConcurrentVUs))
+	}
+
+	for i := 0; i < len(stages); i++ {
+		if stages[i].Target.Int64 > int64(maxConcurrentVUs) {
+			errors = append(errors, fmt.Errorf(
+				"target for stage %d exceeds max limit of %d", i+1, maxConcurrentVUs))
+		}
+	}
+
+	return errors
 }
 
 // A helper function to avoid code duplication
