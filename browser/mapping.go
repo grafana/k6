@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"time"
 
 	"github.com/dop251/goja"
@@ -811,8 +812,33 @@ func mapWorker(vu moduleVU, w *common.Worker) mapping {
 func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
-		"addCookies":       bc.AddCookies,
-		"addInitScript":    bc.AddInitScript,
+		"addCookies": bc.AddCookies,
+		"addInitScript": func(script goja.Value) error {
+			source := ""
+			if gojaValueExists(script) {
+				switch script.ExportType() {
+				case reflect.TypeOf(string("")):
+					source = script.String()
+				case reflect.TypeOf(goja.Object{}):
+					opts := script.ToObject(rt)
+					for _, k := range opts.Keys() {
+						switch k {
+						case "content":
+							source = opts.Get(k).String()
+						}
+					}
+				default:
+					_, isCallable := goja.AssertFunction(script)
+					if !isCallable {
+						source = fmt.Sprintf("(%s);", script.ToString().String())
+					} else {
+						source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
+					}
+				}
+			}
+
+			return bc.AddInitScript(source) //nolint:wrapcheck
+		},
 		"browser":          bc.Browser,
 		"clearCookies":     bc.ClearCookies,
 		"clearPermissions": bc.ClearPermissions,
