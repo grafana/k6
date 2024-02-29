@@ -822,8 +822,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				case reflect.TypeOf(goja.Object{}):
 					opts := script.ToObject(rt)
 					for _, k := range opts.Keys() {
-						switch k {
-						case "content":
+						if k == "content" {
 							source = opts.Get(k).String()
 						}
 					}
