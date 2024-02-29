@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/sirupsen/logrus"
@@ -99,10 +100,15 @@ func (c *Client) CreateTestRun(testRun *TestRun) (*CreateTestRunResponse, error)
 
 // StartCloudTestRun starts a cloud test run, i.e. `k6 cloud script.js`.
 func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
-	fields := [][2]string{{"name", name}}
+	fields := [][3]string{{"name", name}}
 
 	if projectID != 0 {
-		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
+		fields = append(fields, [3]string{"project_id", strconv.FormatInt(projectID, 10)})
+	}
+
+	labels_string := os.Getenv("K6_CLOUD_LABELS")
+	if labels_string != "" {
+		fields = append(fields, [3]string{"labels_string", labels_string})
 	}
 
 	return c.uploadArchive(fields, arc)
@@ -110,16 +116,21 @@ func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archiv
 
 // UploadTestOnly uploads a test run to the cloud without actually starting it.
 func (c *Client) UploadTestOnly(name string, projectID int64, arc *lib.Archive) (*CreateTestRunResponse, error) {
-	fields := [][2]string{{"name", name}, {"upload_only", "true"}}
+	fields := [][3]string{{"name", name}, {"upload_only", "true"}}
 
 	if projectID != 0 {
-		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
+		fields = append(fields, [3]string{"project_id", strconv.FormatInt(projectID, 10)})
+	}
+
+	labels_string := os.Getenv("K6_CLOUD_LABELS")
+	if labels_string != "" {
+		fields = append(fields, [3]string{"labels_string", labels_string})
 	}
 
 	return c.uploadArchive(fields, arc)
 }
 
-func (c *Client) uploadArchive(fields [][2]string, arc *lib.Archive) (*CreateTestRunResponse, error) {
+func (c *Client) uploadArchive(fields [][3]string, arc *lib.Archive) (*CreateTestRunResponse, error) {
 	requestURL := fmt.Sprintf("%s/archive-upload", c.baseURL)
 
 	var buf bytes.Buffer
