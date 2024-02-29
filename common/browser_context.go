@@ -114,13 +114,13 @@ func NewBrowserContext(
 	wv := rt.ToValue(js.WebVitalIIFEScript)
 	wvi := rt.ToValue(js.WebVitalInitScript)
 
-	if err := b.AddInitScript(k6Obj, nil); err != nil {
+	if err := b.AddInitScript(k6Obj); err != nil {
 		return nil, fmt.Errorf("adding k6 object to new browser context: %w", err)
 	}
-	if err := b.AddInitScript(wv, nil); err != nil {
+	if err := b.AddInitScript(wv); err != nil {
 		return nil, fmt.Errorf("adding web vital script to new browser context: %w", err)
 	}
-	if err := b.AddInitScript(wvi, nil); err != nil {
+	if err := b.AddInitScript(wvi); err != nil {
 		return nil, fmt.Errorf("adding web vital init script to new browser context: %w", err)
 	}
 
@@ -128,7 +128,7 @@ func NewBrowserContext(
 }
 
 // AddInitScript adds a script that will be initialized on all new pages.
-func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) error {
+func (b *BrowserContext) AddInitScript(script goja.Value) error {
 	b.logger.Debugf("BrowserContext:AddInitScript", "bctxid:%v", b.id)
 
 	rt := b.vu.Runtime()
