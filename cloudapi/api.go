@@ -31,7 +31,8 @@ type TestRun struct {
 	VUsMax     int64               `json:"vus"`
 	Thresholds map[string][]string `json:"thresholds"`
 	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
-	Duration int64 `json:"duration"`
+	Duration int64             `json:"duration"`
+	Labels   map[string]string `json:"labels"`
 }
 
 // LogEntry can be used by the cloud to tell k6 to log something to the console,

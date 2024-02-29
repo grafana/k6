@@ -4,6 +4,7 @@ package cloud
 import (
 	"errors"
 	"fmt"
+	"os"
 	"path/filepath"
 	"strings"
 	"time"
@@ -177,12 +178,28 @@ func (out *Output) Start() error {
 		}
 	}
 
+	envVar := os.Getenv("K6_CLOUD_LABELS")
+	labels := make(map[string]string)
+
+	if envVar != "" {
+		labelPairs := strings.Split(envVar, ",")
+		for _, pair := range labelPairs {
+			kv := strings.Split(pair, "=")
+			if len(kv) != 2 {
+				out.logger.WithField("label", pair).Warn("Invalid label format")
+				continue
+			}
+			labels[kv[0]] = kv[1]
+		}
+	}
+
 	testRun := &cloudapi.TestRun{
 		Name:       out.config.Name.String,
 		ProjectID:  out.config.ProjectID.Int64,
 		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)),
 		Thresholds: thresholds,
 		Duration:   out.duration,
+		Labels:     labels,
 	}
 
 	response, err := out.client.CreateTestRun(testRun)
