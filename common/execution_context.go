@@ -206,7 +206,9 @@ func (e *ExecutionContext) eval(
 	)
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		var cdpe *cdproto.Error
-		if errors.As(err, &cdpe) && cdpe.Code == -32000 {
+		if errors.As(err, &cdpe) && cdpe.Message == "Given expression does not evaluate to a function" {
+			err = errors.New("given expression does not evaluate to a function")
+		} else if errors.As(err, &cdpe) && cdpe.Code == -32000 {
 			err = errors.New("execution context changed; most likely because of a navigation")
 		}
 		return nil, err
