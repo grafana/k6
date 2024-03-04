@@ -19,10 +19,9 @@ func (mr *ModuleResolver) dynamicLoad(name string) (interface{}, error) {
 	jsExtensions := ext.Get(ext.JSExtension)
 	for extensionName, extension := range jsExtensions {
 		if _, ok := mr.goModules[extensionName]; !ok {
-			fmt.Println("Matched", extensionName, extension, name)
-			mr.goModules[extensionName] = extension
-			mr.goModules[name] = extension // short-circuit next time
-			return extension, nil
+			mr.goModules[extensionName] = extension.Module
+			mr.goModules[name] = extension.Module // short-circuit next time
+			return extension.Module, nil
 		}
 	}
 
