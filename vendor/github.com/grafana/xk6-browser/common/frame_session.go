@@ -72,8 +72,6 @@ type FrameSession struct {
 	vu            k6modules.VU
 
 	logger *log.Logger
-	// logger that will properly serialize RemoteObject instances
-	serializer *log.Logger
 
 	// Keep a reference to the main frame span so we can end it
 	// when FrameSession.ctx is Done
@@ -105,7 +103,6 @@ func NewFrameSession(
 		vu:                   k6ext.GetVU(ctx),
 		k6Metrics:            k6Metrics,
 		logger:               l,
-		serializer:           l.ConsoleLogFormatterSerializer(),
 	}
 
 	var parentNM *NetworkManager
@@ -612,7 +609,7 @@ func (fs *FrameSession) navigateFrame(frame *Frame, url, referrer string) (strin
 }
 
 func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
-	l := fs.serializer.
+	l := fs.logger.
 		WithTime(event.Timestamp.Time()).
 		WithField("source", "browser").
 		WithField("browser_source", "console-api")
@@ -625,21 +622,26 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 
 	parsedObjects := make([]string, 0, len(event.Args))
 	for _, robj := range event.Args {
-		s := parseConsoleRemoteObject(fs.logger, robj)
+		s, err := parseConsoleRemoteObject(fs.logger, robj)
+		if err != nil {
+			fs.logger.Errorf("onConsoleAPICalled", "failed to parse console message %v", err)
+		}
 		parsedObjects = append(parsedObjects, s)
 	}
 
-	l = l.WithField("stringObjects", parsedObjects)
+	msg := strings.Join(parsedObjects, " ")
 
 	switch event.Type {
 	case "log", "info":
-		l.Info()
+		l.Info(msg)
 	case "warning":
-		l.Warn()
+		l.Warn(msg)
 	case "error":
-		l.Error()
+		l.Error(msg)
 	default:
-		l.Debug()
+		// this is where debug & other console.* apis will default to (such as
+		// console.table).
+		l.Debug(msg)
 	}
 }
 

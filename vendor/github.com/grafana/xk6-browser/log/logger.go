@@ -6,7 +6,6 @@ import (
 	"io"
 	"regexp"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 
@@ -152,19 +151,6 @@ func (l *Logger) ReportCaller() {
 	l.SetReportCaller(true)
 }
 
-// ConsoleLogFormatterSerializer creates a new logger that will
-// correctly serialize RemoteObject instances.
-func (l *Logger) ConsoleLogFormatterSerializer() *Logger {
-	return &Logger{
-		Logger: &logrus.Logger{
-			Out:       l.Out,
-			Level:     l.Level,
-			Formatter: &consoleLogFormatter{l.Formatter},
-			Hooks:     l.Hooks,
-		},
-	}
-}
-
 // SetCategoryFilter enables filtering logs by the filter regex.
 func (l *Logger) SetCategoryFilter(filter string) (err error) {
 	if filter == "" {
@@ -174,18 +160,4 @@ func (l *Logger) SetCategoryFilter(filter string) (err error) {
 		return fmt.Errorf("invalid category filter %q: %w", filter, err)
 	}
 	return nil
-}
-
-type consoleLogFormatter struct {
-	logrus.Formatter
-}
-
-// Format assembles a message from marshalling elements in the "objects" field
-// to JSON separated by space, and deletes the field when done.
-func (f *consoleLogFormatter) Format(entry *logrus.Entry) ([]byte, error) {
-	if stringObjects, ok := entry.Data["stringObjects"].([]string); ok {
-		entry.Message = strings.Join(stringObjects, " ")
-		delete(entry.Data, "stringObjects")
-	}
-	return f.Formatter.Format(entry)
 }

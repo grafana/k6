@@ -288,7 +288,7 @@ func (f *Frame) newDocumentHandle() (*ElementHandle, error) {
 			forceCallable: false,
 			returnByValue: false,
 		},
-		f.vu.Runtime().ToValue("document"),
+		"document",
 	)
 	if err != nil {
 		return nil, fmt.Errorf("getting document element handle: %w", err)
@@ -404,11 +404,34 @@ func (f *Frame) removeChildFrame(child *Frame) {
 	delete(f.childFrames, child)
 }
 
-func (f *Frame) requestByID(reqID network.RequestID) *Request {
+func (f *Frame) requestByID(reqID network.RequestID) (*Request, bool) {
 	frameSession := f.page.getFrameSession(cdp.FrameID(f.ID()))
-	if frameSession == nil {
-		frameSession = f.page.mainFrameSession
+	if frameSession != nil {
+		if frameSession.networkManager == nil {
+			f.log.Warnf("Frame:requestByID:nil:frameSession.networkManager", "fid:%s furl:%q rid:%s",
+				f.ID(), f.URL(), reqID)
+		}
+		return frameSession.networkManager.requestFromID(reqID)
 	}
+
+	f.log.Debugf("Frame:requestByID:nil:frameSession", "fid:%s furl:%q rid:%s",
+		f.ID(), f.URL(), reqID)
+
+	// For unknown reasons mainFrameSession or mainFrameSession.networkManager
+	// (it's unknown exactly which one) are nil, which has caused NPDs. We're
+	// now logging to see what components are nil to try and work out what is
+	// causing the NPD.
+
+	if f.page.mainFrameSession == nil {
+		f.log.Warnf("Frame:requestByID:nil:mainFrameSession", "fid:%s furl:%q rid:%s",
+			f.ID(), f.URL(), reqID)
+	}
+
+	if f.page.mainFrameSession.networkManager == nil {
+		f.log.Warnf("Frame:requestByID:nil:mainFrameSession.networkManager", "fid:%s furl:%q rid:%s",
+			f.ID(), f.URL(), reqID)
+	}
+
 	return frameSession.networkManager.requestFromID(reqID)
 }
 
@@ -545,14 +568,10 @@ func (f *Frame) ChildFrames() []*Frame {
 }
 
 // Click clicks the first element found that matches selector.
-func (f *Frame) Click(selector string, opts goja.Value) error {
+func (f *Frame) Click(selector string, opts *FrameClickOptions) error {
 	f.log.Debugf("Frame:Click", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameClickOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing click options %q: %w", selector, err)
-	}
-	if err := f.click(selector, popts); err != nil {
+	if err := f.click(selector, opts); err != nil {
 		return fmt.Errorf("clicking on %q: %w", selector, err)
 	}
 
@@ -676,7 +695,6 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 func (f *Frame) Content() string {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
-	rt := f.vu.Runtime()
 	js := `() => {
 		let content = '';
 		if (document.doctype) {
@@ -688,7 +706,9 @@ func (f *Frame) Content() string {
 		return content;
 	}`
 
-	return gojaValueToString(f.ctx, f.Evaluate(rt.ToValue(js)))
+	// TODO: return error
+
+	return f.Evaluate(js).(string) //nolint:forcetypeassert
 }
 
 // Dblclick double clicks an element matching provided selector.
@@ -722,22 +742,20 @@ func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
 }
 
 // DispatchEvent dispatches an event for the first element matching the selector.
-func (f *Frame) DispatchEvent(selector, typ string, eventInit, opts goja.Value) {
+func (f *Frame) DispatchEvent(selector, typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	f.log.Debugf("Frame:DispatchEvent", "fid:%s furl:%q sel:%q typ:%q", f.ID(), f.URL(), selector, typ)
 
-	popts := NewFrameDispatchEventOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing dispatch event options: %w", err)
-	}
-	if err := f.dispatchEvent(selector, typ, eventInit, popts); err != nil {
-		k6ext.Panic(f.ctx, "dispatching event %q to %q: %w", typ, selector, err)
+	if err := f.dispatchEvent(selector, typ, eventInit, opts); err != nil {
+		return fmt.Errorf("dispatching frame event %q to %q: %w", typ, selector, err)
 	}
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 // dispatchEvent is like DispatchEvent but takes parsed options and neither throws
 // an error, or applies slow motion.
-func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *FrameDispatchEventOptions) error {
+func (f *Frame) dispatchEvent(selector, typ string, eventInit any, opts *FrameDispatchEventOptions) error {
 	dispatchEvent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
@@ -759,7 +777,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit goja.Value, opts *
 // EvaluateWithContext will evaluate provided page function within an execution context.
 // The passed in context will be used instead of the frame's context. The context must
 // be a derivative of one that contains the goja runtime.
-func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error) {
+func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc string, args ...any) (any, error) {
 	f.log.Debugf("Frame:EvaluateWithContext", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -779,7 +797,7 @@ func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc goja.Value, ar
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (f *Frame) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
+func (f *Frame) Evaluate(pageFunc string, args ...any) any {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
 	result, err := f.EvaluateWithContext(f.ctx, pageFunc, args...)
@@ -809,7 +827,7 @@ func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (f *Frame) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (handle JSHandleAPI, _ error) {
+func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.waitForExecutionContext(mainWorld)
@@ -904,7 +922,7 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 }
 
 // GetAttribute of the first element found that matches the selector.
-func (f *Frame) GetAttribute(selector, name string, opts goja.Value) goja.Value {
+func (f *Frame) GetAttribute(selector, name string, opts goja.Value) any {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
@@ -921,7 +939,7 @@ func (f *Frame) GetAttribute(selector, name string, opts goja.Value) goja.Value 
 	return v
 }
 
-func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goja.Value, error) {
+func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (any, error) {
 	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
@@ -931,30 +949,29 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (goj
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return nil, errorFromDOMError(err)
-	}
-	gv, ok := v.(goja.Value)
-	if !ok {
-		return nil, fmt.Errorf("getting %q attribute of %q: unexpected type %T", name, selector, v)
+		return "", errorFromDOMError(err)
 	}
 
-	return gv, nil
+	return v, nil
+}
+
+// Referrer returns the referrer of the frame from the network manager
+// of the frame's session.
+// It's an internal method not to be exposed as a JS API.
+func (f *Frame) Referrer() string {
+	nm := f.manager.page.mainFrameSession.getNetworkManager()
+	return nm.extraHTTPHeaders["referer"]
+}
+
+// NavigationTimeout returns the navigation timeout of the frame.
+// It's an internal method not to be exposed as a JS API.
+func (f *Frame) NavigationTimeout() time.Duration {
+	return f.manager.timeoutSettings.navigationTimeout()
 }
 
 // Goto will navigate the frame to the specified URL and return a HTTP response object.
-func (f *Frame) Goto(url string, opts goja.Value) (*Response, error) {
-	var (
-		netMgr         = f.manager.page.mainFrameSession.getNetworkManager()
-		defaultReferer = netMgr.extraHTTPHeaders["referer"]
-		parsedOpts     = NewFrameGotoOptions(
-			defaultReferer,
-			f.manager.timeoutSettings.navigationTimeout(),
-		)
-	)
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing frame navigation options to %q: %w", url, err)
-	}
-	resp, err := f.manager.NavigateFrame(f, url, parsedOpts)
+func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
+	resp, err := f.manager.NavigateFrame(f, url, opts)
 	if err != nil {
 		return nil, fmt.Errorf("navigating frame to %q: %w", url, err)
 	}
@@ -963,7 +980,7 @@ func (f *Frame) Goto(url string, opts goja.Value) (*Response, error) {
 	// Since response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	return resp, nil
@@ -1032,12 +1049,12 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 	if v == nil {
 		return "", nil
 	}
-	gv, ok := v.(goja.Value)
+	gv, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting inner html of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return gv, nil
 }
 
 // InnerText returns the inner text of the first element found
@@ -1074,12 +1091,12 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	if v == nil {
 		return "", nil
 	}
-	gv, ok := v.(goja.Value)
+	gv, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting inner text of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return gv, nil
 }
 
 // InputValue returns the input value of the first element found
@@ -1111,12 +1128,12 @@ func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (strin
 	if err != nil {
 		return "", errorFromDOMError(err)
 	}
-	gv, ok := v.(goja.Value)
+	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting input value of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return s, nil
 }
 
 // IsDetached returns whether the frame is detached or not.
@@ -1461,7 +1478,11 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 	}
 	vals := make([]string, 0, len(optHandles))
 	for _, oh := range optHandles {
-		vals = append(vals, oh.JSONValue().String())
+		val, err := oh.JSONValue()
+		if err != nil {
+			return nil, fmt.Errorf("reading value: %w", err)
+		}
+		vals = append(vals, val)
 		if err := oh.dispose(); err != nil {
 			return nil, fmt.Errorf("optionHandle.dispose: %w", err)
 		}
@@ -1497,8 +1518,7 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		forceCallable: true,
 		returnByValue: true,
 	}
-	rt := f.vu.Runtime()
-	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, rt.ToValue(js), rt.ToValue(html)); err != nil {
+	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, js, html); err != nil {
 		k6ext.Panic(f.ctx, "setting content: %w", err)
 	}
 
@@ -1574,20 +1594,29 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	if v == nil {
 		return "", nil
 	}
-	gv, ok := v.(goja.Value)
+	gv, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("getting text content of %q: unexpected type %T", selector, v)
+		return "", fmt.Errorf("unexpected type %T", v)
 	}
 
-	return gv.String(), nil
+	return gv, nil
+}
+
+// Timeout will return the default timeout or the one set by the user.
+// It's an internal method not to be exposed as a JS API.
+func (f *Frame) Timeout() time.Duration {
+	return f.defaultTimeout()
 }
 
 // Title returns the title of the frame.
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	v := f.vu.Runtime().ToValue(`() => document.title`)
-	return gojaValueToString(f.ctx, f.Evaluate(v))
+	v := `() => document.title`
+
+	// TODO: return error
+
+	return f.Evaluate(v).(string) //nolint:forcetypeassert
 }
 
 // Type text on the first element found matches the selector.
@@ -1641,36 +1670,20 @@ func (f *Frame) setURL(url string) {
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
-func (f *Frame) WaitForFunction(fn goja.Value, opts goja.Value, jsArgs ...goja.Value) (any, error) {
+func (f *Frame) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsArgs ...any) (any, error) {
 	f.log.Debugf("Frame:WaitForFunction", "fid:%s furl:%q", f.ID(), f.URL())
 
-	parsedOpts := NewFrameWaitForFunctionOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		return nil, fmt.Errorf("parsing waitForFunction options: %w", err)
-	}
-
-	js := fn.ToString().String()
-	_, isCallable := goja.AssertFunction(fn)
-	if !isCallable {
-		js = fmt.Sprintf("() => (%s)", js)
-	}
-
-	args := make([]any, 0, len(jsArgs))
-	for _, a := range jsArgs {
-		args = append(args, a.Export())
-	}
-
-	var polling any = parsedOpts.Polling
-	if parsedOpts.Polling == PollingInterval {
-		polling = parsedOpts.Interval
+	var polling any = opts.Polling
+	if opts.Polling == PollingInterval {
+		polling = opts.Interval
 	}
 
 	result, err := f.waitForFunction(f.ctx, mainWorld, js,
-		polling, parsedOpts.Timeout, args...)
+		polling, opts.Timeout, jsArgs...)
 	if err != nil {
 		return nil, err
 	}
+
 	// prevent passing a non-nil interface to the upper layers.
 	if result == nil {
 		return nil, nil
@@ -1782,19 +1795,13 @@ func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 //
 //nolint:funlen,cyclop
-func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
+func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
 	defer f.log.Debugf("Frame:WaitForNavigation:return",
 		"fid:%s furl:%s", f.ID(), f.URL())
 
-	parsedOpts := NewFrameWaitForNavigationOptions(
-		f.manager.timeoutSettings.timeout())
-	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing wait for navigation options: %w", err)
-	}
-
-	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, parsedOpts.Timeout)
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, opts.Timeout)
 
 	navEvtCh, navEvtCancel := createWaitForEventHandler(timeoutCtx, f, []string{EventFrameNavigation},
 		func(data any) bool {
@@ -1805,7 +1812,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
 		timeoutCtx, f, []string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == parsedOpts.WaitUntil
+				return le.Event == opts.WaitUntil
 			}
 			return false
 		})
@@ -1816,7 +1823,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
 		if err != nil {
 			e := &k6ext.UserFriendlyError{
 				Err:     err,
-				Timeout: parsedOpts.Timeout,
+				Timeout: opts.Timeout,
 			}
 			return fmt.Errorf("waiting for navigation: %w", e)
 		}
@@ -1856,7 +1863,7 @@ func (f *Frame) WaitForNavigation(opts goja.Value) (*Response, error) {
 	// A lifecycle event won't be received when navigating within the same
 	// document, so don't wait for it. The event might've also already been
 	// fired once we're here, so also skip waiting in that case.
-	if !sameDocNav && !f.hasLifecycleEventFired(parsedOpts.WaitUntil) {
+	if !sameDocNav && !f.hasLifecycleEventFired(opts.WaitUntil) {
 		select {
 		case <-lifecycleEvtCh:
 		case <-timeoutCtx.Done():
@@ -1916,7 +1923,7 @@ func (f *Frame) adoptBackendNodeID(world executionWorld, id cdp.BackendNodeID) (
 func (f *Frame) evaluate(
 	apiCtx context.Context,
 	world executionWorld,
-	opts evalOptions, pageFunc goja.Value, args ...goja.Value,
+	opts evalOptions, pageFunc string, args ...any,
 ) (any, error) {
 	f.log.Debugf("Frame:evaluate", "fid:%s furl:%q world:%s opts:%s", f.ID(), f.URL(), world, opts)
 
@@ -1928,11 +1935,7 @@ func (f *Frame) evaluate(
 		return nil, fmt.Errorf("execution context %q not found", world)
 	}
 
-	evalArgs := make([]any, 0, len(args))
-	for _, a := range args {
-		evalArgs = append(evalArgs, a.Export())
-	}
-	eh, err := ec.eval(apiCtx, opts, pageFunc.ToString().String(), evalArgs...)
+	eh, err := ec.eval(apiCtx, opts, pageFunc, args...)
 	if err != nil {
 		return nil, fmt.Errorf("%w", err)
 	}
@@ -1962,11 +1965,11 @@ type frameExecutionContext interface {
 
 	// Eval evaluates the provided JavaScript within this execution context and
 	// returns a value or handle.
-	Eval(apiCtx context.Context, js goja.Value, args ...goja.Value) (any, error)
+	Eval(apiCtx context.Context, js string, args ...any) (any, error)
 
 	// EvalHandle evaluates the provided JavaScript within this execution
 	// context and returns a JSHandle.
-	EvalHandle(apiCtx context.Context, js goja.Value, args ...goja.Value) (JSHandleAPI, error)
+	EvalHandle(apiCtx context.Context, js string, args ...any) (JSHandleAPI, error)
 
 	// Frame returns the frame that this execution context belongs to.
 	Frame() *Frame

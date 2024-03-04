@@ -10,7 +10,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
-	"github.com/dop251/goja"
 )
 
 // JSHandleAPI is the interface of an in-page JS object.
@@ -21,11 +20,11 @@ import (
 type JSHandleAPI interface {
 	AsElement() *ElementHandle
 	Dispose()
-	Evaluate(pageFunc goja.Value, args ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error)
+	Evaluate(pageFunc string, args ...any) any
+	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
 	GetProperty(propertyName string) JSHandleAPI
-	JSONValue() goja.Value
+	JSONValue() (string, error)
 	ObjectID() cdpruntime.RemoteObjectID
 }
 
@@ -104,9 +103,7 @@ func (h *BaseJSHandle) dispose() error {
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
-	rt := h.execCtx.vu.Runtime()
-	args = append([]goja.Value{rt.ToValue(h)}, args...)
+func (h *BaseJSHandle) Evaluate(pageFunc string, args ...any) any {
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
 		k6ext.Panic(h.ctx, "%w", err)
@@ -115,10 +112,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (JSHandleAPI, error) {
-	rt := h.execCtx.vu.Runtime()
-	args = append([]goja.Value{rt.ToValue(h)}, args...)
-
+func (h *BaseJSHandle) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error) {
 	eh, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {
 		return nil, fmt.Errorf("evaluating handle for element: %w", err)
@@ -168,28 +162,25 @@ func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
 }
 
 // JSONValue returns a JSON version of this JS handle.
-func (h *BaseJSHandle) JSONValue() goja.Value {
-	if h.remoteObject.ObjectID != "" {
-		var result *runtime.RemoteObject
+func (h *BaseJSHandle) JSONValue() (string, error) {
+	remoteObject := h.remoteObject
+	if remoteObject.ObjectID != "" {
 		var err error
 		action := runtime.CallFunctionOn("function() { return this; }").
 			WithReturnByValue(true).
 			WithAwaitPromise(true).
 			WithObjectID(h.remoteObject.ObjectID)
-		if result, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
-			k6ext.Panic(h.ctx, "getting properties for JS handle: %w", err)
+		if remoteObject, _, err = action.Do(cdp.WithExecutor(h.ctx, h.session)); err != nil {
+			return "", fmt.Errorf("retrieving json value: %w", err)
 		}
-		res, err := valueFromRemoteObject(h.ctx, result)
-		if err != nil {
-			k6ext.Panic(h.ctx, "extracting value from remote object: %w", err)
-		}
-		return res
 	}
-	res, err := valueFromRemoteObject(h.ctx, h.remoteObject)
+
+	res, err := parseConsoleRemoteObject(h.logger, remoteObject)
 	if err != nil {
-		k6ext.Panic(h.ctx, "extracting value from remote object: %w", err)
+		return "", fmt.Errorf("extracting json value (remote object id: %v): %w", remoteObject.ObjectID, err)
 	}
-	return res
+
+	return res, nil
 }
 
 // ObjectID returns the remote object ID.

@@ -363,11 +363,12 @@ func (m *NetworkManager) handleEvents(in <-chan Event) bool {
 }
 
 func (m *NetworkManager) onLoadingFailed(event *network.EventLoadingFailed) {
-	req := m.requestFromID(event.RequestID)
-	if req == nil {
+	req, ok := m.requestFromID(event.RequestID)
+	if !ok {
 		// TODO: add handling of iframe document requests starting in one session and ending up in another
 		return
 	}
+
 	req.setErrorText(event.ErrorText)
 	req.responseEndTiming = float64(event.Timestamp.Time().Unix()-req.timestamp.Unix()) * 1000
 	m.deleteRequestByID(event.RequestID)
@@ -412,10 +413,10 @@ func (m *NetworkManager) onLoadingFinished(event *network.EventLoadingFinished) 
 
 // requestForOnLoadingFinished returns the request for the given request ID.
 func (m *NetworkManager) requestForOnLoadingFinished(rid network.RequestID) *Request {
-	r := m.requestFromID(rid)
+	r, ok := m.requestFromID(rid)
 
 	// Immediately return if the request is found.
-	if r != nil {
+	if ok {
 		return r
 	}
 
@@ -423,11 +424,16 @@ func (m *NetworkManager) requestForOnLoadingFinished(rid network.RequestID) *Req
 	if m.parent == nil {
 		return nil
 	}
-	// Requests eminating from the parent have matching requestIDs.
-	pr := m.parent.requestFromID(rid)
-	if pr == nil || pr.getDocumentID() != rid.String() {
+
+	pr, ok := m.parent.requestFromID(rid)
+	if !ok {
 		return nil
 	}
+	// Requests eminating from the parent have matching requestIDs.
+	if pr.getDocumentID() != rid.String() {
+		return nil
+	}
+
 	// Switch the request to the parent request.
 	m.reqsMu.Lock()
 	m.reqIDToRequest[rid] = pr
@@ -444,8 +450,8 @@ func isInternalURL(u *url.URL) bool {
 func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interceptionID string) {
 	var redirectChain []*Request = nil
 	if event.RedirectResponse != nil {
-		req := m.requestFromID(event.RequestID)
-		if req != nil {
+		req, ok := m.requestFromID(event.RequestID)
+		if ok {
 			m.handleRequestRedirect(req, event.RedirectResponse, event.Timestamp)
 			redirectChain = req.redirectChain
 		}
@@ -621,15 +627,15 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 }
 
 func (m *NetworkManager) onRequestServedFromCache(event *network.EventRequestServedFromCache) {
-	req := m.requestFromID(event.RequestID)
-	if req != nil {
+	req, ok := m.requestFromID(event.RequestID)
+	if ok {
 		req.setLoadedFromCache(true)
 	}
 }
 
 func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived) {
-	req := m.requestFromID(event.RequestID)
-	if req == nil {
+	req, ok := m.requestFromID(event.RequestID)
+	if !ok {
 		return
 	}
 	resp := NewHTTPResponse(m.ctx, req, event.Response, event.Timestamp)
@@ -639,10 +645,13 @@ func (m *NetworkManager) onResponseReceived(event *network.EventResponseReceived
 	m.frameManager.requestReceivedResponse(resp)
 }
 
-func (m *NetworkManager) requestFromID(reqID network.RequestID) *Request {
+func (m *NetworkManager) requestFromID(reqID network.RequestID) (*Request, bool) {
 	m.reqsMu.RLock()
 	defer m.reqsMu.RUnlock()
-	return m.reqIDToRequest[reqID]
+
+	r, ok := m.reqIDToRequest[reqID]
+
+	return r, ok
 }
 
 func (m *NetworkManager) setRequestInterception(value bool) error {

@@ -289,11 +289,7 @@ func (b *BrowserContext) NewPage() (*Page, error) {
 
 // Pages returns a list of pages inside this browser context.
 func (b *BrowserContext) Pages() []*Page {
-	pages := make([]*Page, 1)
-	for _, p := range b.browser.getPages() {
-		pages = append(pages, p)
-	}
-	return pages
+	return append([]*Page{}, b.browser.getPages()...)
 }
 
 // Route is not implemented.

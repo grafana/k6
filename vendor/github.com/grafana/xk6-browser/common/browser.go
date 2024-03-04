@@ -111,12 +111,21 @@ func newBrowser(
 
 func (b *Browser) connect() error {
 	b.logger.Debugf("Browser:connect", "wsURL:%q", b.browserProc.WsURL())
-	conn, err := NewConnection(b.ctx, b.browserProc.WsURL(), b.logger)
+
+	// connectionOnAttachedToTarget hooks into the connection to listen
+	// for target attachment events. this way, browser can manage the
+	// decision of target attachments. so that we can stop connection
+	// from doing unnecessary work.
+	var err error
+	b.conn, err = NewConnection(
+		b.ctx,
+		b.browserProc.WsURL(),
+		b.logger,
+		b.connectionOnAttachedToTarget,
+	)
 	if err != nil {
 		return fmt.Errorf("connecting to browser DevTools URL: %w", err)
 	}
-
-	b.conn = conn
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
 	b.defaultContext, err = NewBrowserContext(b.ctx, b, "", NewBrowserContextOptions(), b.logger)
@@ -217,6 +226,26 @@ func (b *Browser) initEvents() error {
 	return nil
 }
 
+// connectionOnAttachedToTarget is called when Connection receives an attachedToTarget
+// event. Returning false will stop the event from being processed by the connection.
+func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget) bool {
+	// This allows to attach targets to the same browser context as the current
+	// one, and to the default browser context.
+	//
+	// We don't want to hold the lock for the entire function
+	// (connectionOnAttachedToTarget) run duration, because we want to avoid
+	// possible lock contention issues with the browser context being closed while
+	// we're waiting for it. So, we do the lock management in a function with its
+	// own defer.
+	isAllowedBrowserContext := func() bool {
+		b.contextMu.RLock()
+		defer b.contextMu.RUnlock()
+		return b.context == nil || b.context.id == eva.TargetInfo.BrowserContextID
+	}
+
+	return isAllowedBrowserContext()
+}
+
 // onAttachedToTarget is called when a new page is attached to the browser.
 func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
@@ -302,6 +331,14 @@ func (b *Browser) isAttachedPageValid(ev *target.EventAttachedToTarget, browserC
 		b.logger.Warnf(
 			"Browser:isAttachedPageValid", "sid:%v tid:%v bctxid:%v bctx nil:%t, unknown target type: %q",
 			ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx == nil, targetPage.Type)
+		return false
+	}
+	// If the target is not in the same browser context as the current one, ignore it.
+	if browserCtx.id != targetPage.BrowserContextID {
+		b.logger.Debugf(
+			"Browser:isAttachedPageValid", "incorrect browser context sid:%v tid:%v bctxid:%v target bctxid:%v",
+			ev.SessionID, targetPage.TargetID, targetPage.BrowserContextID, browserCtx.id,
+		)
 		return false
 	}
 
