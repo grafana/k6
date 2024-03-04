@@ -174,6 +174,111 @@ func TestPageEvaluate(t *testing.T) {
 	})
 }
 
+func TestPageEvaluateMapping(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name   string
+		script string
+		want   any
+	}{
+		{
+			name:   "arrow",
+			script: "() => 0",
+			want:   0,
+		},
+		{
+			name:   "full_func",
+			script: "function() {return 1}",
+			want:   1,
+		},
+		{
+			name:   "arrow_func_no_return",
+			script: "() => {2}",
+			want:   goja.Null(),
+		},
+		{
+			name:   "full_func_no_return",
+			script: "function() {3}",
+			want:   goja.Null(),
+		},
+		{
+			name:   "async_func",
+			script: "async function() {return 4}",
+			want:   4,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, rt, _, cleanUp := startIteration(t)
+			defer cleanUp()
+
+			// Test script as non string input
+			got, err := rt.RunString(fmt.Sprintf(`
+				const p = browser.newPage()
+				p.evaluate(%s)
+			`, tt.script))
+			assert.NoError(t, err)
+			assert.Equal(t, rt.ToValue(tt.want), got)
+
+			// Test script as string input
+			got, err = rt.RunString(fmt.Sprintf(`
+				p.evaluate("%s")
+			`, tt.script))
+			assert.NoError(t, err)
+			assert.Equal(t, rt.ToValue(tt.want), got)
+		})
+	}
+}
+
+func TestPageEvaluateMappingError(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name    string
+		script  string
+		wantErr string
+	}{
+		{
+			name:    "invalid",
+			script:  "5",
+			wantErr: "given expression does not evaluate to a function",
+		},
+		{
+			name:    "invalid_with_brackets",
+			script:  "(6)",
+			wantErr: "given expression does not evaluate to a function",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, rt, _, cleanUp := startIteration(t)
+			defer cleanUp()
+
+			// Test script as non string input
+			_, err := rt.RunString(fmt.Sprintf(`
+				const p = browser.newPage()
+				p.evaluate(%s)
+			`, tt.script))
+			assert.ErrorContains(t, err, tt.wantErr)
+
+			// Test script as string input
+			_, err = rt.RunString(fmt.Sprintf(`
+				p.evaluate("%s")
+			`, tt.script))
+			assert.ErrorContains(t, err, tt.wantErr)
+		})
+	}
+}
+
 func TestPageGoto(t *testing.T) {
 	t.Parallel()
 
