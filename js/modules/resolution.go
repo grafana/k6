@@ -57,7 +57,14 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 func (mr *ModuleResolver) requireModule(name string) (module, error) {
 	mod, ok := mr.goModules[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown module: %s", name)
+		if !strings.HasPrefix(name, "k6/dynamicLoad/") {
+			return nil, fmt.Errorf("unknown module: %s", name)
+		}
+		var err error
+		mod, err = mr.dynamicLoad(name)
+		if err != nil {
+			return nil, err
+		}
 	}
 	if m, ok := mod.(Module); ok {
 		return &goModule{Module: m}, nil
