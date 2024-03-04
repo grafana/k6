@@ -22,6 +22,8 @@ type moduleVU struct {
 	*taskQueueRegistry
 
 	filePersister
+
+	testRunID string
 }
 
 // browser returns the VU browser instance for the current iteration.

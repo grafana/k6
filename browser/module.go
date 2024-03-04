@@ -38,6 +38,7 @@ type (
 		initOnce       *sync.Once
 		tracesMetadata map[string]string
 		filePersister  filePersister
+		testRunID      string
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -91,6 +92,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 				),
 				taskQueueRegistry: newTaskQueueRegistry(vu),
 				filePersister:     m.filePersister,
+				testRunID:         m.testRunID,
 			}),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),
@@ -125,6 +127,9 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv)
 	if err != nil {
 		k6ext.Abort(vu.Context(), "failed to create file persister: %v", err)
+	}
+	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
+		m.testRunID = e
 	}
 }
 
