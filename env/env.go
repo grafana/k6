@@ -81,6 +81,12 @@ const (
 	ScreenshotsOutput = "K6_BROWSER_SCREENSHOTS_OUTPUT"
 )
 
+const (
+	// K6TestRunID represents the test run id. Note: this was taken from
+	// k6.
+	K6TestRunID = "K6_CLOUD_PUSH_REF_ID"
+)
+
 // LookupFunc defines a function to look up a key from the environment.
 type LookupFunc func(key string) (string, bool)
 
