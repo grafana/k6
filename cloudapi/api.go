@@ -32,8 +32,9 @@ type TestRun struct {
 	VUsMax     int64               `json:"vus"`
 	Thresholds map[string][]string `json:"thresholds"`
 	// Duration of test in seconds. -1 for unknown length, 0 for continuous running.
-	Duration int64             `json:"duration"`
-	Labels   map[string]string `json:"labels"`
+	Duration    int64             `json:"duration"`
+	Labels      map[string]string `json:"labels"`
+	TestSuiteID int64             `json:"test_suite_id"`
 }
 
 // LogEntry can be used by the cloud to tell k6 to log something to the console,
@@ -106,9 +107,14 @@ func (c *Client) StartCloudTestRun(name string, projectID int64, arc *lib.Archiv
 		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
 	}
 
-	labels_string := os.Getenv("K6_CLOUD_LABELS")
-	if labels_string != "" {
-		fields = append(fields, [2]string{"labels_string", labels_string})
+	labelsEnvVar := os.Getenv("K6_CLOUD_LABELS")
+	if labelsEnvVar != "" {
+		fields = append(fields, [2]string{"labels_string", labelsEnvVar})
+	}
+
+	testSuiteEnvVar := os.Getenv("K6_CLOUD_TEST_SUITE_ID")
+	if testSuiteEnvVar != "" {
+		fields = append(fields, [2]string{"test_suite_id", testSuiteEnvVar})
 	}
 
 	return c.uploadArchive(fields, arc)
@@ -122,9 +128,14 @@ func (c *Client) UploadTestOnly(name string, projectID int64, arc *lib.Archive) 
 		fields = append(fields, [2]string{"project_id", strconv.FormatInt(projectID, 10)})
 	}
 
-	labels_string := os.Getenv("K6_CLOUD_LABELS")
-	if labels_string != "" {
-		fields = append(fields, [2]string{"labels_string", labels_string})
+	labelsEnvVar := os.Getenv("K6_CLOUD_LABELS")
+	if labelsEnvVar != "" {
+		fields = append(fields, [2]string{"labels_string", labelsEnvVar})
+	}
+
+	testSuiteEnvVar := os.Getenv("K6_CLOUD_TEST_SUITE_ID")
+	if testSuiteEnvVar != "" {
+		fields = append(fields, [2]string{"test_suite_id", testSuiteEnvVar})
 	}
 
 	return c.uploadArchive(fields, arc)

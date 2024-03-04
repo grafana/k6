@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -178,11 +179,11 @@ func (out *Output) Start() error {
 		}
 	}
 
-	envVar := os.Getenv("K6_CLOUD_LABELS")
+	labelsEnvVar := os.Getenv("K6_CLOUD_LABELS")
 	labels := make(map[string]string)
 
-	if envVar != "" {
-		labelPairs := strings.Split(envVar, ",")
+	if labelsEnvVar != "" {
+		labelPairs := strings.Split(labelsEnvVar, ",")
 		for _, pair := range labelPairs {
 			kv := strings.Split(pair, "=")
 			if len(kv) != 2 {
@@ -200,6 +201,15 @@ func (out *Output) Start() error {
 		Thresholds: thresholds,
 		Duration:   out.duration,
 		Labels:     labels,
+	}
+
+	testSuiteEnvVar := os.Getenv("K6_CLOUD_TEST_SUITE_ID")
+	if testSuiteEnvVar != "" {
+		testSuiteID, err := strconv.ParseInt(testSuiteEnvVar, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid test suite ID: %w", err)
+		}
+		testRun.TestSuiteID = testSuiteID
 	}
 
 	response, err := out.client.CreateTestRun(testRun)
