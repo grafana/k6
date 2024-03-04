@@ -814,25 +814,27 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 	return mapping{
 		"addCookies": bc.AddCookies,
 		"addInitScript": func(script goja.Value) error {
+			if !gojaValueExists(script) {
+				return nil
+			}
+
 			source := ""
-			if gojaValueExists(script) {
-				switch script.ExportType() {
-				case reflect.TypeOf(string("")):
-					source = script.String()
-				case reflect.TypeOf(goja.Object{}):
-					opts := script.ToObject(rt)
-					for _, k := range opts.Keys() {
-						if k == "content" {
-							source = opts.Get(k).String()
-						}
+			switch script.ExportType() {
+			case reflect.TypeOf(string("")):
+				source = script.String()
+			case reflect.TypeOf(goja.Object{}):
+				opts := script.ToObject(rt)
+				for _, k := range opts.Keys() {
+					if k == "content" {
+						source = opts.Get(k).String()
 					}
-				default:
-					_, isCallable := goja.AssertFunction(script)
-					if !isCallable {
-						source = fmt.Sprintf("(%s);", script.ToString().String())
-					} else {
-						source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
-					}
+				}
+			default:
+				_, isCallable := goja.AssertFunction(script)
+				if !isCallable {
+					source = fmt.Sprintf("(%s);", script.ToString().String())
+				} else {
+					source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
 				}
 			}
 
