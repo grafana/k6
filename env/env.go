@@ -81,6 +81,7 @@ const (
 	ScreenshotsOutput = "K6_BROWSER_SCREENSHOTS_OUTPUT"
 )
 
+// Infrastructural.
 const (
 	// K6TestRunID represents the test run id. Note: this was taken from
 	// k6.
