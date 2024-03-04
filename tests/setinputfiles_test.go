@@ -31,14 +31,16 @@ func TestSetInputFiles(t *testing.T) {
 	)
 
 	pageContent := `
-	  <input type="file" id="upload">
+	  <input type="file" id="upload"/>
+	  <input type="text" id="textinput"/>
+	  <button id="button1">Click</button>
 	`
 
 	defaultTestPage := func(tb *testBrowser, page *common.Page, files goja.Value) error {
-		return page.SetInputFiles("input", files, tb.toGojaValue(nil))
+		return page.SetInputFiles("#upload", files, tb.toGojaValue(nil))
 	}
 	defaultTestElementHandle := func(tb *testBrowser, page *common.Page, files goja.Value) error {
-		handle, err := page.WaitForSelector("input", tb.toGojaValue(nil))
+		handle, err := page.WaitForSelector("#upload", tb.toGojaValue(nil))
 		assert.NoError(t, err)
 		return handle.SetInputFiles(files, tb.toGojaValue(nil))
 	}
@@ -199,6 +201,52 @@ func TestSetInputFiles(t *testing.T) {
 			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
 				t.Helper()
 				assert.ErrorContains(t, err, "reading file:")
+				assert.ErrorContains(t, err, "setting input files")
+				// check if input has 0 file
+				assert.Equal(t, float64(0), getFileCountFn())
+			},
+		},
+		{
+			name: "test_injected_script_notinput",
+			setup: func(tb *testBrowser) (goja.Value, func()) {
+				return tb.toGojaValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			},
+			tests: []testFn{
+				func(tb *testBrowser, page *common.Page, files goja.Value) error {
+					return page.SetInputFiles("#button1", files, tb.toGojaValue(nil))
+				},
+				func(tb *testBrowser, page *common.Page, files goja.Value) error {
+					handle, err := page.WaitForSelector("#button1", tb.toGojaValue(nil))
+					assert.NoError(t, err)
+					return handle.SetInputFiles(files, tb.toGojaValue(nil))
+				},
+			},
+			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
+				t.Helper()
+				assert.ErrorContains(t, err, "node is not an HTMLInputElement")
+				assert.ErrorContains(t, err, "setting input files")
+				// check if input has 0 file
+				assert.Equal(t, float64(0), getFileCountFn())
+			},
+		},
+		{
+			name: "test_injected_script_notfile",
+			setup: func(tb *testBrowser) (goja.Value, func()) {
+				return tb.toGojaValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			},
+			tests: []testFn{
+				func(tb *testBrowser, page *common.Page, files goja.Value) error {
+					return page.SetInputFiles("#textinput", files, tb.toGojaValue(nil))
+				},
+				func(tb *testBrowser, page *common.Page, files goja.Value) error {
+					handle, err := page.WaitForSelector("#textinput", tb.toGojaValue(nil))
+					assert.NoError(t, err)
+					return handle.SetInputFiles(files, tb.toGojaValue(nil))
+				},
+			},
+			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
+				t.Helper()
+				assert.ErrorContains(t, err, "node is not an input[type=file] element")
 				assert.ErrorContains(t, err, "setting input files")
 				// check if input has 0 file
 				assert.Equal(t, float64(0), getFileCountFn())

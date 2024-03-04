@@ -1612,6 +1612,7 @@ func errorFromDOMError(v any) error {
 		"error:notfillablenumberinput": "cannot type text into input[type=number]",
 		"error:notvaliddate":           "malformed value",
 		"error:notinput":               "node is not an HTMLInputElement",
+		"error:notfile":                "node is not an input[type=file] element",
 		"error:hasnovalue":             "node is not an HTMLInputElement or HTMLTextAreaElement or HTMLSelectElement",
 		"error:notselect":              "element is not a <select> element",
 		"error:notcheckbox":            "not a checkbox or radio button",

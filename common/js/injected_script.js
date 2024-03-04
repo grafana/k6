@@ -436,10 +436,10 @@ class InjectedScript {
     if (node.nodeType !== Node.ELEMENT_NODE)
       return "error:notelement";
     if (node.nodeName.toLowerCase() !== "input")
-      return 'error:notinputelement';
+      return 'error:notinput';
     const type = (node.getAttribute('type') || '').toLowerCase();
     if (type !== 'file')
-      return 'error:notinputfileelement';
+      return 'error:notfile';
 
     const dt = new DataTransfer();
     if (payloads) {
