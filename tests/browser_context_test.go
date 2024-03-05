@@ -12,6 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/env"
 )
 
 func TestBrowserContextAddCookies(t *testing.T) {
@@ -627,17 +628,53 @@ func TestBrowserContextClearCookies(t *testing.T) {
 func TestK6Object(t *testing.T) {
 	t.Parallel()
 
-	_, rt, _, cleanUp := startIteration(t)
-	defer cleanUp()
+	tests := []struct {
+		name      string
+		testRunID string
+		want      string
+	}{
+		{
+			name: "empty_testRunId",
+			want: `{"testRunId":""}`,
+		},
+		{
+			name:      "with_testRunId",
+			testRunID: "123456",
+			want:      `{"testRunId":"123456"}`,
+		},
+	}
 
-	got, err := rt.RunString(`
-		const p = browser.newPage()
-		p.goto("about:blank")
-		const o = p.evaluate(() => window.k6)
-		JSON.stringify(o)
-	`)
-	require.NoError(t, err)
-	assert.Equal(t, "{}", got.String())
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, rt, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, tt.testRunID))
+			defer cleanUp()
+
+			// First test with browser.newPage
+			got, err := rt.RunString(`
+				const p = browser.newPage()
+				p.goto("about:blank")
+				const o = p.evaluate(() => window.k6)
+				JSON.stringify(o)
+			`)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.String())
+
+			// Now test with browser.newContext
+			got, err = rt.RunString(`
+				browser.closeContext()
+				const c = browser.newContext()
+				const p2 = c.newPage()
+				p2.goto("about:blank")
+				const o2 = p2.evaluate(() => window.k6)
+				JSON.stringify(o2)
+			`)
+			require.NoError(t, err)
+			assert.Equal(t, tt.want, got.String())
+		})
+	}
 }
 
 func TestBrowserContextTimeout(t *testing.T) {
