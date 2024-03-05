@@ -822,10 +822,11 @@ func TestPageWaitForFunction(t *testing.T) {
 // (more importantly) set browser as the mapped browser instance which will
 // force all tests that work with this to go through the mapping layer.
 // This returns a cleanup function which should be deferred.
-func startIteration(t *testing.T) (*k6test.VU, *goja.Runtime, *[]string, func()) {
+// The opts are passed to k6test.NewVU as is without any modification.
+func startIteration(t *testing.T, opts ...any) (*k6test.VU, *goja.Runtime, *[]string, func()) {
 	t.Helper()
 
-	vu := k6test.NewVU(t)
+	vu := k6test.NewVU(t, opts...)
 	rt := vu.Runtime()
 
 	mod := browser.New().NewModuleInstance(vu)
