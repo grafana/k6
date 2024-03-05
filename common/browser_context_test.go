@@ -31,23 +31,19 @@ func TestNewBrowserContext(t *testing.T) {
 
 		webVitalIIFEScriptFound := false
 		webVitalInitScriptFound := false
-		k6ObjScriptFound := false
 		for _, script := range bc.evaluateOnNewDocumentSources {
 			switch script {
 			case js.WebVitalIIFEScript:
 				webVitalIIFEScriptFound = true
 			case js.WebVitalInitScript:
 				webVitalInitScriptFound = true
-			case js.K6ObjectScript:
-				k6ObjScriptFound = true
 			default:
-				assert.Fail(t, "script is neither WebVitalIIFEScript, WebVitalInitScript, nor k6ObjScript")
+				assert.Fail(t, "script is neither WebVitalIIFEScript, nor WebVitalInitScript")
 			}
 		}
 
 		assert.True(t, webVitalIIFEScriptFound, "WebVitalIIFEScript was not initialized in the context")
 		assert.True(t, webVitalInitScriptFound, "WebVitalInitScript was not initialized in the context")
-		assert.True(t, k6ObjScriptFound, "k6ObjScript was not initialized in the context")
 	})
 }
 

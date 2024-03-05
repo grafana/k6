@@ -108,9 +108,6 @@ func NewBrowserContext(
 		}
 	}
 
-	if err := b.AddInitScript(js.K6ObjectScript); err != nil {
-		return nil, fmt.Errorf("adding k6 object to new browser context: %w", err)
-	}
 	if err := b.AddInitScript(js.WebVitalIIFEScript); err != nil {
 		return nil, fmt.Errorf("adding web vital script to new browser context: %w", err)
 	}
