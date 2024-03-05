@@ -246,12 +246,12 @@ func TestPageEvaluateMappingError(t *testing.T) {
 		{
 			name:    "invalid",
 			script:  "5",
-			wantErr: "given expression does not evaluate to a function",
+			wantErr: "Given expression does not evaluate to a function",
 		},
 		{
 			name:    "invalid_with_brackets",
 			script:  "(6)",
-			wantErr: "given expression does not evaluate to a function",
+			wantErr: "Given expression does not evaluate to a function",
 		},
 	}
 

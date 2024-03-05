@@ -22,6 +22,9 @@ import (
 
 const evaluationScriptURL = "__xk6_browser_evaluation_script__"
 
+// This error code originates from chromium.
+const devToolsServerErrorCode = -32000
+
 var sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
 type executionWorld string
@@ -206,11 +209,13 @@ func (e *ExecutionContext) eval(
 	)
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		var cdpe *cdproto.Error
-		if errors.As(err, &cdpe) && cdpe.Message == "Given expression does not evaluate to a function" {
-			err = errors.New("given expression does not evaluate to a function")
-		} else if errors.As(err, &cdpe) && cdpe.Code == -32000 {
-			err = errors.New("execution context changed; most likely because of a navigation")
+		if errors.As(err, &cdpe) && cdpe.Code == devToolsServerErrorCode {
+			// By creating a new error instead of reusing it, we're removing the
+			// chromium specific error code.
+			return nil, errors.New(cdpe.Message)
 		}
+
+		e.logger.Warn("ExecutionContext:eval", "Unexpected DevTools server error: %v", err)
 		return nil, err
 	}
 	if exceptionDetails != nil {
