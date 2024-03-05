@@ -627,22 +627,17 @@ func TestBrowserContextClearCookies(t *testing.T) {
 func TestK6Object(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBrowser(t, withFileServer())
-	p := b.NewPage(nil)
+	_, rt, _, cleanUp := startIteration(t)
+	defer cleanUp()
 
-	url := b.staticURL("empty.html")
-	opts := &common.FrameGotoOptions{
-		Timeout: common.DefaultTimeout,
-	}
-	r, err := p.Goto(
-		url,
-		opts,
-	)
+	got, err := rt.RunString(`
+		const p = browser.newPage()
+		p.goto("about:blank")
+		const o = p.evaluate(() => window.k6)
+		JSON.stringify(o)
+	`)
 	require.NoError(t, err)
-	require.NotNil(t, r)
-
-	k6Obj := p.Evaluate(`() => window.k6`)
-	assert.NotNil(t, k6Obj)
+	assert.Equal(t, "{}", got.String())
 }
 
 func TestBrowserContextTimeout(t *testing.T) {

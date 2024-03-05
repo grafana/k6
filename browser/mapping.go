@@ -1007,6 +1007,11 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
+
+			if err := initBrowserContext(bctx); err != nil {
+				return nil, err
+			}
+
 			m := mapBrowserContext(vu, bctx)
 			return rt.ToValue(m).ToObject(rt), nil
 		},
@@ -1033,7 +1038,24 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
+
+			if err := initBrowserContext(b.Context()); err != nil {
+				return nil, err
+			}
+
 			return mapPage(vu, page), nil
 		},
 	}
+}
+
+func initBrowserContext(bctx *common.BrowserContext) error {
+	// Setting a k6 object which will contain k6 specific metadata
+	// on the current test run. This allows external applications
+	// (such as Grafana Faro) to identify that the session is a k6
+	// automated one and not one driven by a real person.
+	if err := bctx.AddInitScript("window.k6 = {}"); err != nil {
+		return fmt.Errorf("adding k6 object to new browser context: %w", err)
+	}
+
+	return nil
 }
