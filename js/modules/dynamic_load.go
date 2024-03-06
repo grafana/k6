@@ -40,7 +40,7 @@ func (mr *ModuleResolver) dynamicLoad(name string) (interface{}, error) {
 		return nil, err
 	}
 	defer os.Remove(f.Name())
-	fmt.Println("Loading from", f.Name()))
+	fmt.Println("Loading from", f.Name())
 
 	_, err = io.Copy(f, resp.Body)
 	if err != nil {
