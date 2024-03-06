@@ -8,7 +8,6 @@ import (
 	"io"
 	"net/http"
 	"os"
-	"path/filepath"
 	"plugin"
 	"runtime/debug"
 	"strings"
@@ -36,7 +35,7 @@ func (mr *ModuleResolver) dynamicLoad(name string) (interface{}, error) {
 	}
 	defer resp.Body.Close()
 	// TODO: Obviously this needs more checks and likely better loading idea.
-	f, err := os.Create(filepath.Join(os.TempDir(), pluginNameCleaned+".so"))
+	f, err := os.CreateTemp(os.TempDir(), "dynamicLoading*.so")
 	if err != nil {
 		return nil, err
 	}
