@@ -1301,14 +1301,12 @@ func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []*File) e
 	if err != nil {
 		return err
 	}
-	v, ok := result.(goja.Value)
+	v, ok := result.(string)
 	if !ok {
 		return fmt.Errorf("unexpected type %T", result)
 	}
-	if v.ExportType().Kind() != reflect.String {
-		return fmt.Errorf("unexpected result type %s", v.ExportType().Kind().String())
-	} else if v.String() != "done" {
-		return errorFromDOMError(v.String())
+	if v != "done" {
+		return errorFromDOMError(v)
 	}
 
 	return nil
