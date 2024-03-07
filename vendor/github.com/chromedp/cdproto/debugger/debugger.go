@@ -953,15 +953,15 @@ func (p *SetBreakpointsActiveParams) Do(ctx context.Context) (err error) {
 }
 
 // SetPauseOnExceptionsParams defines pause on exceptions state. Can be set
-// to stop on all exceptions, uncaught exceptions or no exceptions. Initial
-// pause on exceptions state is none.
+// to stop on all exceptions, uncaught exceptions, or caught exceptions, no
+// exceptions. Initial pause on exceptions state is none.
 type SetPauseOnExceptionsParams struct {
 	State ExceptionsState `json:"state"` // Pause on exceptions mode.
 }
 
 // SetPauseOnExceptions defines pause on exceptions state. Can be set to stop
-// on all exceptions, uncaught exceptions or no exceptions. Initial pause on
-// exceptions state is none.
+// on all exceptions, uncaught exceptions, or caught exceptions, no exceptions.
+// Initial pause on exceptions state is none.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Debugger#method-setPauseOnExceptions
 //

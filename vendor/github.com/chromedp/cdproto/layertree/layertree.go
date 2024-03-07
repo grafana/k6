@@ -36,6 +36,7 @@ func CompositingReasons(layerID LayerID) *CompositingReasonsParams {
 
 // CompositingReasonsReturns return values.
 type CompositingReasonsReturns struct {
+	CompositingReasons   []string `json:"compositingReasons,omitempty"`   // A list of strings specifying reasons for the given layer to become composited.
 	CompositingReasonIDs []string `json:"compositingReasonIds,omitempty"` // A list of strings specifying reason IDs for the given layer to become composited.
 }
 
@@ -43,16 +44,17 @@ type CompositingReasonsReturns struct {
 //
 // returns:
 //
+//	compositingReasons - A list of strings specifying reasons for the given layer to become composited.
 //	compositingReasonIDs - A list of strings specifying reason IDs for the given layer to become composited.
-func (p *CompositingReasonsParams) Do(ctx context.Context) (compositingReasonIDs []string, err error) {
+func (p *CompositingReasonsParams) Do(ctx context.Context) (compositingReasons []string, compositingReasonIDs []string, err error) {
 	// execute
 	var res CompositingReasonsReturns
 	err = cdp.Execute(ctx, CommandCompositingReasons, p, &res)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
-	return res.CompositingReasonIDs, nil
+	return res.CompositingReasons, res.CompositingReasonIDs, nil
 }
 
 // DisableParams disables compositing tree inspection.

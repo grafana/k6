@@ -293,6 +293,7 @@ type CreateTargetParams struct {
 	EnableBeginFrameControl bool                 `json:"enableBeginFrameControl,omitempty"` // Whether BeginFrames for this target will be controlled via DevTools (headless chrome only, not supported on MacOS yet, false by default).
 	NewWindow               bool                 `json:"newWindow,omitempty"`               // Whether to create a new Window or Tab (chrome-only, false by default).
 	Background              bool                 `json:"background,omitempty"`              // Whether to create the target in background or foreground (chrome-only, false by default).
+	ForTab                  bool                 `json:"forTab,omitempty"`                  // Whether to create the target of type "tab".
 }
 
 // CreateTarget creates a new page.
@@ -345,6 +346,12 @@ func (p CreateTargetParams) WithNewWindow(newWindow bool) *CreateTargetParams {
 // (chrome-only, false by default).
 func (p CreateTargetParams) WithBackground(background bool) *CreateTargetParams {
 	p.Background = background
+	return &p
+}
+
+// WithForTab whether to create the target of type "tab".
+func (p CreateTargetParams) WithForTab(forTab bool) *CreateTargetParams {
+	p.ForTab = forTab
 	return &p
 }
 

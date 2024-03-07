@@ -99,6 +99,55 @@ func (p *AddVirtualAuthenticatorParams) Do(ctx context.Context) (authenticatorID
 	return res.AuthenticatorID, nil
 }
 
+// SetResponseOverrideBitsParams resets parameters isBogusSignature, isBadUV,
+// isBadUP to false if they are not present.
+type SetResponseOverrideBitsParams struct {
+	AuthenticatorID  AuthenticatorID `json:"authenticatorId"`
+	IsBogusSignature bool            `json:"isBogusSignature,omitempty"` // If isBogusSignature is set, overrides the signature in the authenticator response to be zero. Defaults to false.
+	IsBadUV          bool            `json:"isBadUV,omitempty"`          // If isBadUV is set, overrides the UV bit in the flags in the authenticator response to be zero. Defaults to false.
+	IsBadUP          bool            `json:"isBadUP,omitempty"`          // If isBadUP is set, overrides the UP bit in the flags in the authenticator response to be zero. Defaults to false.
+}
+
+// SetResponseOverrideBits resets parameters isBogusSignature, isBadUV,
+// isBadUP to false if they are not present.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn#method-setResponseOverrideBits
+//
+// parameters:
+//
+//	authenticatorID
+func SetResponseOverrideBits(authenticatorID AuthenticatorID) *SetResponseOverrideBitsParams {
+	return &SetResponseOverrideBitsParams{
+		AuthenticatorID: authenticatorID,
+	}
+}
+
+// WithIsBogusSignature if isBogusSignature is set, overrides the signature
+// in the authenticator response to be zero. Defaults to false.
+func (p SetResponseOverrideBitsParams) WithIsBogusSignature(isBogusSignature bool) *SetResponseOverrideBitsParams {
+	p.IsBogusSignature = isBogusSignature
+	return &p
+}
+
+// WithIsBadUV if isBadUV is set, overrides the UV bit in the flags in the
+// authenticator response to be zero. Defaults to false.
+func (p SetResponseOverrideBitsParams) WithIsBadUV(isBadUV bool) *SetResponseOverrideBitsParams {
+	p.IsBadUV = isBadUV
+	return &p
+}
+
+// WithIsBadUP if isBadUP is set, overrides the UP bit in the flags in the
+// authenticator response to be zero. Defaults to false.
+func (p SetResponseOverrideBitsParams) WithIsBadUP(isBadUP bool) *SetResponseOverrideBitsParams {
+	p.IsBadUP = isBadUP
+	return &p
+}
+
+// Do executes WebAuthn.setResponseOverrideBits against the provided context.
+func (p *SetResponseOverrideBitsParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetResponseOverrideBits, p, nil)
+}
+
 // RemoveVirtualAuthenticatorParams removes the given authenticator.
 type RemoveVirtualAuthenticatorParams struct {
 	AuthenticatorID AuthenticatorID `json:"authenticatorId"`
@@ -346,6 +395,7 @@ const (
 	CommandEnable                         = "WebAuthn.enable"
 	CommandDisable                        = "WebAuthn.disable"
 	CommandAddVirtualAuthenticator        = "WebAuthn.addVirtualAuthenticator"
+	CommandSetResponseOverrideBits        = "WebAuthn.setResponseOverrideBits"
 	CommandRemoveVirtualAuthenticator     = "WebAuthn.removeVirtualAuthenticator"
 	CommandAddCredential                  = "WebAuthn.addCredential"
 	CommandGetCredential                  = "WebAuthn.getCredential"

@@ -4,7 +4,6 @@ package cdp
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -167,31 +166,31 @@ func (t PseudoType) String() string {
 
 // PseudoType values.
 const (
-	PseudoTypeFirstLine                   PseudoType = "first-line"
-	PseudoTypeFirstLetter                 PseudoType = "first-letter"
-	PseudoTypeBefore                      PseudoType = "before"
-	PseudoTypeAfter                       PseudoType = "after"
-	PseudoTypeMarker                      PseudoType = "marker"
-	PseudoTypeBackdrop                    PseudoType = "backdrop"
-	PseudoTypeSelection                   PseudoType = "selection"
-	PseudoTypeTargetText                  PseudoType = "target-text"
-	PseudoTypeSpellingError               PseudoType = "spelling-error"
-	PseudoTypeGrammarError                PseudoType = "grammar-error"
-	PseudoTypeHighlight                   PseudoType = "highlight"
-	PseudoTypeFirstLineInherited          PseudoType = "first-line-inherited"
-	PseudoTypeScrollbar                   PseudoType = "scrollbar"
-	PseudoTypeScrollbarThumb              PseudoType = "scrollbar-thumb"
-	PseudoTypeScrollbarButton             PseudoType = "scrollbar-button"
-	PseudoTypeScrollbarTrack              PseudoType = "scrollbar-track"
-	PseudoTypeScrollbarTrackPiece         PseudoType = "scrollbar-track-piece"
-	PseudoTypeScrollbarCorner             PseudoType = "scrollbar-corner"
-	PseudoTypeResizer                     PseudoType = "resizer"
-	PseudoTypeInputListButton             PseudoType = "input-list-button"
-	PseudoTypePageTransition              PseudoType = "page-transition"
-	PseudoTypePageTransitionContainer     PseudoType = "page-transition-container"
-	PseudoTypePageTransitionImageWrapper  PseudoType = "page-transition-image-wrapper"
-	PseudoTypePageTransitionOutgoingImage PseudoType = "page-transition-outgoing-image"
-	PseudoTypePageTransitionIncomingImage PseudoType = "page-transition-incoming-image"
+	PseudoTypeFirstLine               PseudoType = "first-line"
+	PseudoTypeFirstLetter             PseudoType = "first-letter"
+	PseudoTypeBefore                  PseudoType = "before"
+	PseudoTypeAfter                   PseudoType = "after"
+	PseudoTypeMarker                  PseudoType = "marker"
+	PseudoTypeBackdrop                PseudoType = "backdrop"
+	PseudoTypeSelection               PseudoType = "selection"
+	PseudoTypeTargetText              PseudoType = "target-text"
+	PseudoTypeSpellingError           PseudoType = "spelling-error"
+	PseudoTypeGrammarError            PseudoType = "grammar-error"
+	PseudoTypeHighlight               PseudoType = "highlight"
+	PseudoTypeFirstLineInherited      PseudoType = "first-line-inherited"
+	PseudoTypeScrollbar               PseudoType = "scrollbar"
+	PseudoTypeScrollbarThumb          PseudoType = "scrollbar-thumb"
+	PseudoTypeScrollbarButton         PseudoType = "scrollbar-button"
+	PseudoTypeScrollbarTrack          PseudoType = "scrollbar-track"
+	PseudoTypeScrollbarTrackPiece     PseudoType = "scrollbar-track-piece"
+	PseudoTypeScrollbarCorner         PseudoType = "scrollbar-corner"
+	PseudoTypeResizer                 PseudoType = "resizer"
+	PseudoTypeInputListButton         PseudoType = "input-list-button"
+	PseudoTypeViewTransition          PseudoType = "view-transition"
+	PseudoTypeViewTransitionGroup     PseudoType = "view-transition-group"
+	PseudoTypeViewTransitionImagePair PseudoType = "view-transition-image-pair"
+	PseudoTypeViewTransitionOld       PseudoType = "view-transition-old"
+	PseudoTypeViewTransitionNew       PseudoType = "view-transition-new"
 )
 
 // MarshalEasyJSON satisfies easyjson.Marshaler.
@@ -206,7 +205,8 @@ func (t PseudoType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *PseudoType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch PseudoType(in.String()) {
+	v := in.String()
+	switch PseudoType(v) {
 	case PseudoTypeFirstLine:
 		*t = PseudoTypeFirstLine
 	case PseudoTypeFirstLetter:
@@ -247,19 +247,19 @@ func (t *PseudoType) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = PseudoTypeResizer
 	case PseudoTypeInputListButton:
 		*t = PseudoTypeInputListButton
-	case PseudoTypePageTransition:
-		*t = PseudoTypePageTransition
-	case PseudoTypePageTransitionContainer:
-		*t = PseudoTypePageTransitionContainer
-	case PseudoTypePageTransitionImageWrapper:
-		*t = PseudoTypePageTransitionImageWrapper
-	case PseudoTypePageTransitionOutgoingImage:
-		*t = PseudoTypePageTransitionOutgoingImage
-	case PseudoTypePageTransitionIncomingImage:
-		*t = PseudoTypePageTransitionIncomingImage
+	case PseudoTypeViewTransition:
+		*t = PseudoTypeViewTransition
+	case PseudoTypeViewTransitionGroup:
+		*t = PseudoTypeViewTransitionGroup
+	case PseudoTypeViewTransitionImagePair:
+		*t = PseudoTypeViewTransitionImagePair
+	case PseudoTypeViewTransitionOld:
+		*t = PseudoTypeViewTransitionOld
+	case PseudoTypeViewTransitionNew:
+		*t = PseudoTypeViewTransitionNew
 
 	default:
-		in.AddError(errors.New("unknown PseudoType value"))
+		in.AddError(fmt.Errorf("unknown PseudoType value: %v", v))
 	}
 }
 
@@ -297,7 +297,8 @@ func (t ShadowRootType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *ShadowRootType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch ShadowRootType(in.String()) {
+	v := in.String()
+	switch ShadowRootType(v) {
 	case ShadowRootTypeUserAgent:
 		*t = ShadowRootTypeUserAgent
 	case ShadowRootTypeOpen:
@@ -306,7 +307,7 @@ func (t *ShadowRootType) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = ShadowRootTypeClosed
 
 	default:
-		in.AddError(errors.New("unknown ShadowRootType value"))
+		in.AddError(fmt.Errorf("unknown ShadowRootType value: %v", v))
 	}
 }
 
@@ -344,7 +345,8 @@ func (t CompatibilityMode) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *CompatibilityMode) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch CompatibilityMode(in.String()) {
+	v := in.String()
+	switch CompatibilityMode(v) {
 	case CompatibilityModeQuirksMode:
 		*t = CompatibilityModeQuirksMode
 	case CompatibilityModeLimitedQuirksMode:
@@ -353,7 +355,7 @@ func (t *CompatibilityMode) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = CompatibilityModeNoQuirksMode
 
 	default:
-		in.AddError(errors.New("unknown CompatibilityMode value"))
+		in.AddError(fmt.Errorf("unknown CompatibilityMode value: %v", v))
 	}
 }
 
@@ -665,7 +667,8 @@ func (t NodeType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *NodeType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch NodeType(in.Int64()) {
+	v := in.Int64()
+	switch NodeType(v) {
 	case NodeTypeElement:
 		*t = NodeTypeElement
 	case NodeTypeAttribute:
@@ -692,7 +695,7 @@ func (t *NodeType) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = NodeTypeNotation
 
 	default:
-		in.AddError(errors.New("unknown NodeType value"))
+		in.AddError(fmt.Errorf("unknown NodeType value: %v", v))
 	}
 }
 
@@ -787,6 +790,40 @@ func (t *MonotonicTime) UnmarshalJSON(buf []byte) error {
 	return easyjson.Unmarshal(buf, t)
 }
 
+// TimeSinceEpochMilli special timestamp type for Response's responseTime
+// field.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#type-TimeSinceEpochMilli
+type TimeSinceEpochMilli time.Time
+
+// Time returns the TimeSinceEpochMilli as time.Time value.
+func (t TimeSinceEpochMilli) Time() time.Time {
+	return time.Time(t)
+}
+
+// MarshalEasyJSON satisfies easyjson.Marshaler.
+func (t TimeSinceEpochMilli) MarshalEasyJSON(out *jwriter.Writer) {
+	v := float64(time.Time(t).UnixNano() / int64(time.Millisecond))
+
+	out.Buffer.EnsureSpace(20)
+	out.Buffer.Buf = strconv.AppendFloat(out.Buffer.Buf, v, 'f', -1, 64)
+}
+
+// MarshalJSON satisfies json.Marshaler.
+func (t TimeSinceEpochMilli) MarshalJSON() ([]byte, error) {
+	return easyjson.Marshal(t)
+}
+
+// UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
+func (t *TimeSinceEpochMilli) UnmarshalEasyJSON(in *jlexer.Lexer) {
+	*t = TimeSinceEpochMilli(time.Unix(0, int64(in.Float64()*float64(time.Millisecond))))
+}
+
+// UnmarshalJSON satisfies json.Unmarshaler.
+func (t *TimeSinceEpochMilli) UnmarshalJSON(buf []byte) error {
+	return easyjson.Unmarshal(buf, t)
+}
+
 // FrameID unique frame identifier.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Page#type-FrameId
@@ -841,7 +878,8 @@ func (t AdFrameType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *AdFrameType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch AdFrameType(in.String()) {
+	v := in.String()
+	switch AdFrameType(v) {
 	case AdFrameTypeNone:
 		*t = AdFrameTypeNone
 	case AdFrameTypeChild:
@@ -850,7 +888,7 @@ func (t *AdFrameType) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = AdFrameTypeRoot
 
 	default:
-		in.AddError(errors.New("unknown AdFrameType value"))
+		in.AddError(fmt.Errorf("unknown AdFrameType value: %v", v))
 	}
 }
 
@@ -888,7 +926,8 @@ func (t AdFrameExplanation) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *AdFrameExplanation) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch AdFrameExplanation(in.String()) {
+	v := in.String()
+	switch AdFrameExplanation(v) {
 	case AdFrameExplanationParentIsAd:
 		*t = AdFrameExplanationParentIsAd
 	case AdFrameExplanationCreatedByAdScript:
@@ -897,7 +936,7 @@ func (t *AdFrameExplanation) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = AdFrameExplanationMatchedBlockingRule
 
 	default:
-		in.AddError(errors.New("unknown AdFrameExplanation value"))
+		in.AddError(fmt.Errorf("unknown AdFrameExplanation value: %v", v))
 	}
 }
 
@@ -946,7 +985,8 @@ func (t SecureContextType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *SecureContextType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch SecureContextType(in.String()) {
+	v := in.String()
+	switch SecureContextType(v) {
 	case SecureContextTypeSecure:
 		*t = SecureContextTypeSecure
 	case SecureContextTypeSecureLocalhost:
@@ -957,7 +997,7 @@ func (t *SecureContextType) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = SecureContextTypeInsecureAncestor
 
 	default:
-		in.AddError(errors.New("unknown SecureContextType value"))
+		in.AddError(fmt.Errorf("unknown SecureContextType value: %v", v))
 	}
 }
 
@@ -996,7 +1036,8 @@ func (t CrossOriginIsolatedContextType) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *CrossOriginIsolatedContextType) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch CrossOriginIsolatedContextType(in.String()) {
+	v := in.String()
+	switch CrossOriginIsolatedContextType(v) {
 	case CrossOriginIsolatedContextTypeIsolated:
 		*t = CrossOriginIsolatedContextTypeIsolated
 	case CrossOriginIsolatedContextTypeNotIsolated:
@@ -1005,7 +1046,7 @@ func (t *CrossOriginIsolatedContextType) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = CrossOriginIsolatedContextTypeNotIsolatedFeatureDisabled
 
 	default:
-		in.AddError(errors.New("unknown CrossOriginIsolatedContextType value"))
+		in.AddError(fmt.Errorf("unknown CrossOriginIsolatedContextType value: %v", v))
 	}
 }
 
@@ -1044,7 +1085,8 @@ func (t GatedAPIFeatures) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *GatedAPIFeatures) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch GatedAPIFeatures(in.String()) {
+	v := in.String()
+	switch GatedAPIFeatures(v) {
 	case GatedAPIFeaturesSharedArrayBuffers:
 		*t = GatedAPIFeaturesSharedArrayBuffers
 	case GatedAPIFeaturesSharedArrayBuffersTransferAllowed:
@@ -1055,7 +1097,7 @@ func (t *GatedAPIFeatures) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = GatedAPIFeaturesPerformanceProfile
 
 	default:
-		in.AddError(errors.New("unknown GatedAPIFeatures value"))
+		in.AddError(fmt.Errorf("unknown GatedAPIFeatures value: %v", v))
 	}
 }
 
@@ -1104,7 +1146,8 @@ func (t OriginTrialTokenStatus) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *OriginTrialTokenStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch OriginTrialTokenStatus(in.String()) {
+	v := in.String()
+	switch OriginTrialTokenStatus(v) {
 	case OriginTrialTokenStatusSuccess:
 		*t = OriginTrialTokenStatusSuccess
 	case OriginTrialTokenStatusNotSupported:
@@ -1131,7 +1174,7 @@ func (t *OriginTrialTokenStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = OriginTrialTokenStatusUnknownTrial
 
 	default:
-		in.AddError(errors.New("unknown OriginTrialTokenStatus value"))
+		in.AddError(fmt.Errorf("unknown OriginTrialTokenStatus value: %v", v))
 	}
 }
 
@@ -1170,7 +1213,8 @@ func (t OriginTrialStatus) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *OriginTrialStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch OriginTrialStatus(in.String()) {
+	v := in.String()
+	switch OriginTrialStatus(v) {
 	case OriginTrialStatusEnabled:
 		*t = OriginTrialStatusEnabled
 	case OriginTrialStatusValidTokenNotProvided:
@@ -1181,7 +1225,7 @@ func (t *OriginTrialStatus) UnmarshalEasyJSON(in *jlexer.Lexer) {
 		*t = OriginTrialStatusTrialNotAllowed
 
 	default:
-		in.AddError(errors.New("unknown OriginTrialStatus value"))
+		in.AddError(fmt.Errorf("unknown OriginTrialStatus value: %v", v))
 	}
 }
 
@@ -1218,14 +1262,15 @@ func (t OriginTrialUsageRestriction) MarshalJSON() ([]byte, error) {
 
 // UnmarshalEasyJSON satisfies easyjson.Unmarshaler.
 func (t *OriginTrialUsageRestriction) UnmarshalEasyJSON(in *jlexer.Lexer) {
-	switch OriginTrialUsageRestriction(in.String()) {
+	v := in.String()
+	switch OriginTrialUsageRestriction(v) {
 	case OriginTrialUsageRestrictionNone:
 		*t = OriginTrialUsageRestrictionNone
 	case OriginTrialUsageRestrictionSubset:
 		*t = OriginTrialUsageRestrictionSubset
 
 	default:
-		in.AddError(errors.New("unknown OriginTrialUsageRestriction value"))
+		in.AddError(fmt.Errorf("unknown OriginTrialUsageRestriction value: %v", v))
 	}
 }
 

@@ -53,7 +53,7 @@ type GetPartialAXTreeParams struct {
 	NodeID         cdp.NodeID             `json:"nodeId,omitempty"`         // Identifier of the node to get the partial accessibility tree for.
 	BackendNodeID  cdp.BackendNodeID      `json:"backendNodeId,omitempty"`  // Identifier of the backend node to get the partial accessibility tree for.
 	ObjectID       runtime.RemoteObjectID `json:"objectId,omitempty"`       // JavaScript object id of the node wrapper to get the partial accessibility tree for.
-	FetchRelatives bool                   `json:"fetchRelatives,omitempty"` // Whether to fetch this nodes ancestors, siblings and children. Defaults to true.
+	FetchRelatives bool                   `json:"fetchRelatives,omitempty"` // Whether to fetch this node's ancestors, siblings and children. Defaults to true.
 }
 
 // GetPartialAXTree fetches the accessibility node and partial accessibility
@@ -87,7 +87,7 @@ func (p GetPartialAXTreeParams) WithObjectID(objectID runtime.RemoteObjectID) *G
 	return &p
 }
 
-// WithFetchRelatives whether to fetch this nodes ancestors, siblings and
+// WithFetchRelatives whether to fetch this node's ancestors, siblings and
 // children. Defaults to true.
 func (p GetPartialAXTreeParams) WithFetchRelatives(fetchRelatives bool) *GetPartialAXTreeParams {
 	p.FetchRelatives = fetchRelatives

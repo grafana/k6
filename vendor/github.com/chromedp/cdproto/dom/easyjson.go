@@ -4803,6 +4803,10 @@ func easyjsonC5a4559bDecodeGithubComChromedpCdprotoDom59(in *jlexer.Lexer, out *
 			(out.NodeID).UnmarshalEasyJSON(in)
 		case "containerName":
 			out.ContainerName = string(in.String())
+		case "physicalAxes":
+			(out.PhysicalAxes).UnmarshalEasyJSON(in)
+		case "logicalAxes":
+			(out.LogicalAxes).UnmarshalEasyJSON(in)
 		default:
 			in.SkipRecursive()
 		}
@@ -4826,6 +4830,16 @@ func easyjsonC5a4559bEncodeGithubComChromedpCdprotoDom59(out *jwriter.Writer, in
 		const prefix string = ",\"containerName\":"
 		out.RawString(prefix)
 		out.String(string(in.ContainerName))
+	}
+	if in.PhysicalAxes != "" {
+		const prefix string = ",\"physicalAxes\":"
+		out.RawString(prefix)
+		(in.PhysicalAxes).MarshalEasyJSON(out)
+	}
+	if in.LogicalAxes != "" {
+		const prefix string = ",\"logicalAxes\":"
+		out.RawString(prefix)
+		(in.LogicalAxes).MarshalEasyJSON(out)
 	}
 	out.RawByte('}')
 }

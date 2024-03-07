@@ -423,7 +423,7 @@ func (p *SetEmulatedMediaParams) Do(ctx context.Context) (err error) {
 
 // SetEmulatedVisionDeficiencyParams emulates the given vision deficiency.
 type SetEmulatedVisionDeficiencyParams struct {
-	Type SetEmulatedVisionDeficiencyType `json:"type"` // Vision deficiency to emulate.
+	Type SetEmulatedVisionDeficiencyType `json:"type"` // Vision deficiency to emulate. Order: best-effort emulations come first, followed by any physiologically accurate emulations for medically recognized color vision deficiencies.
 }
 
 // SetEmulatedVisionDeficiency emulates the given vision deficiency.
@@ -432,7 +432,7 @@ type SetEmulatedVisionDeficiencyParams struct {
 //
 // parameters:
 //
-//	type - Vision deficiency to emulate.
+//	type - Vision deficiency to emulate. Order: best-effort emulations come first, followed by any physiologically accurate emulations for medically recognized color vision deficiencies.
 func SetEmulatedVisionDeficiency(typeVal SetEmulatedVisionDeficiencyType) *SetEmulatedVisionDeficiencyParams {
 	return &SetEmulatedVisionDeficiencyParams{
 		Type: typeVal,

@@ -431,6 +431,21 @@ func (p *DispatchTouchEventParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandDispatchTouchEvent, p, nil)
 }
 
+// CancelDraggingParams cancels any active dragging in the page.
+type CancelDraggingParams struct{}
+
+// CancelDragging cancels any active dragging in the page.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Input#method-cancelDragging
+func CancelDragging() *CancelDraggingParams {
+	return &CancelDraggingParams{}
+}
+
+// Do executes Input.cancelDragging against the provided context.
+func (p *CancelDraggingParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandCancelDragging, nil, nil)
+}
+
 // EmulateTouchFromMouseEventParams emulates touch event from the mouse event
 // parameters.
 type EmulateTouchFromMouseEventParams struct {
@@ -764,6 +779,7 @@ const (
 	CommandImeSetComposition          = "Input.imeSetComposition"
 	CommandDispatchMouseEvent         = "Input.dispatchMouseEvent"
 	CommandDispatchTouchEvent         = "Input.dispatchTouchEvent"
+	CommandCancelDragging             = "Input.cancelDragging"
 	CommandEmulateTouchFromMouseEvent = "Input.emulateTouchFromMouseEvent"
 	CommandSetIgnoreInputEvents       = "Input.setIgnoreInputEvents"
 	CommandSetInterceptDrags          = "Input.setInterceptDrags"

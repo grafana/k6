@@ -238,39 +238,6 @@ func (p *EnableParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandEnable, p, nil)
 }
 
-// GetAllCookiesParams returns all browser cookies. Depending on the backend
-// support, will return detailed cookie information in the cookies field.
-type GetAllCookiesParams struct{}
-
-// GetAllCookies returns all browser cookies. Depending on the backend
-// support, will return detailed cookie information in the cookies field.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/Network#method-getAllCookies
-func GetAllCookies() *GetAllCookiesParams {
-	return &GetAllCookiesParams{}
-}
-
-// GetAllCookiesReturns return values.
-type GetAllCookiesReturns struct {
-	Cookies []*Cookie `json:"cookies,omitempty"` // Array of cookie objects.
-}
-
-// Do executes Network.getAllCookies against the provided context.
-//
-// returns:
-//
-//	cookies - Array of cookie objects.
-func (p *GetAllCookiesParams) Do(ctx context.Context) (cookies []*Cookie, err error) {
-	// execute
-	var res GetAllCookiesReturns
-	err = cdp.Execute(ctx, CommandGetAllCookies, nil, &res)
-	if err != nil {
-		return nil, err
-	}
-
-	return res.Cookies, nil
-}
-
 // GetCertificateParams returns the DER-encoded certificate.
 type GetCertificateParams struct {
 	Origin string `json:"origin"` // Origin to get certificate for.
@@ -1028,7 +995,6 @@ const (
 	CommandDisable                                 = "Network.disable"
 	CommandEmulateNetworkConditions                = "Network.emulateNetworkConditions"
 	CommandEnable                                  = "Network.enable"
-	CommandGetAllCookies                           = "Network.getAllCookies"
 	CommandGetCertificate                          = "Network.getCertificate"
 	CommandGetCookies                              = "Network.getCookies"
 	CommandGetResponseBody                         = "Network.getResponseBody"

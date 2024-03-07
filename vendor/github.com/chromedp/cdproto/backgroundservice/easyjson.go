@@ -518,6 +518,8 @@ func easyjsonC5a4559bDecodeGithubComChromedpCdprotoBackgroundservice6(in *jlexer
 				}
 				in.Delim(']')
 			}
+		case "storageKey":
+			out.StorageKey = string(in.String())
 		default:
 			in.SkipRecursive()
 		}
@@ -585,6 +587,11 @@ func easyjsonC5a4559bEncodeGithubComChromedpCdprotoBackgroundservice6(out *jwrit
 			}
 			out.RawByte(']')
 		}
+	}
+	{
+		const prefix string = ",\"storageKey\":"
+		out.RawString(prefix)
+		out.String(string(in.StorageKey))
 	}
 	out.RawByte('}')
 }
