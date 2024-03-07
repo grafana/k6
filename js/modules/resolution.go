@@ -57,7 +57,7 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 func (mr *ModuleResolver) requireModule(name string) (module, error) {
 	mod, ok := mr.goModules[name]
 	if !ok {
-		if !strings.HasPrefix(name, "k6/dynamicLoad/") {
+		if !strings.HasPrefix(name, pluginLoadPrefix) {
 			return nil, fmt.Errorf("unknown module: %s", name)
 		}
 		var err error
@@ -93,7 +93,7 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 		return cached.mod, cached.err
 	}
 	switch {
-	case arg == "k6", strings.HasPrefix(arg, "k6/"):
+	case arg == "k6", strings.HasPrefix(arg, "k6/"), strings.HasPrefix(arg, pluginLoadPrefix):
 		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
 		// specially, as they don't exist on the filesystem.
 		mod, err := mr.requireModule(arg)

@@ -41,7 +41,7 @@ func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
 	// might be used in which case we won't be able to be doing this hack. In that case we either will
 	// need some goja specific helper or to use stack traces as goja_nodejs does.
 	currentPWD := r.currentlyRequiredModule
-	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") {
+	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") && !strings.HasPrefix(specifier, pluginLoadPrefix) {
 		defer func() {
 			r.currentlyRequiredModule = currentPWD
 		}()
