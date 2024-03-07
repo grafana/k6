@@ -104,6 +104,22 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
+			"FillTextarea", func(tb *testBrowser, p *common.Page) {
+				const value = "fill me up"
+				p.Locator("textarea", nil).Fill(value, nil)
+				require.Equal(t, value, p.InputValue("textarea", nil))
+			},
+		},
+		{
+			"FillParagraph", func(tb *testBrowser, p *common.Page) {
+				const value = "fill me up"
+				p.Locator("#firstParagraph", nil).Fill(value, nil)
+				require.Equal(t, value, p.TextContent("#firstParagraph", nil))
+				l := p.Locator("#secondParagraph", nil)
+				assert.Panics(t, func() { l.Fill(value, nil) }, "should panic")
+			},
+		},
+		{
 			"Focus", func(tb *testBrowser, p *common.Page) {
 				focused := func() bool {
 					v := p.Evaluate(
