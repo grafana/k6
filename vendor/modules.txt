@@ -104,7 +104,7 @@ github.com/davecgh/go-spew/spew
 # github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f
 ## explicit
 github.com/dgryski/go-rendezvous
-# github.com/dlclark/regexp2 v1.9.0
+# github.com/dlclark/regexp2 v1.11.0
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
@@ -548,7 +548,7 @@ google.golang.org/protobuf/types/pluginpb
 # gopkg.in/cenkalti/backoff.v1 v1.1.0
 ## explicit
 gopkg.in/cenkalti/backoff.v1
-# gopkg.in/guregu/null.v3 v3.3.0
+# gopkg.in/guregu/null.v3 v3.5.0
 ## explicit
 gopkg.in/guregu/null.v3
 # gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
