@@ -109,7 +109,7 @@ type Controller interface {
     // error are saved for the ID and returned for all other calls with it.
     //
     // This is an atomic function, so any calls to it while the callback is
-    // being executed the the same ID will wait for the first call to finish
+    // being executed the same ID will wait for the first call to finish
     // and receive its result.
     GetOrCreateData(id string, callback func() ([]byte, error)) ([]byte, error)
 
@@ -288,7 +288,7 @@ One proposal in the original posts of https://github.com/grafana/k6/issues/140 w
 
 While there were some details in the original proposal that are no longer applicable because of the big architectural changes in k6 in the meantime, the overall proposal is probably still valid. I am pretty sure that the architecture I proposed above can be built on top of these technologies and in a way where instances don't need to hold a persistent connection to a central `k6 coordinator` node!
 
-However, I think that the benefits of such an approach would be outweighed by the drawbacks in terms of imlpementation and deployment complexity. In short, it can probably work, but IMO the UX will be worse. Even if we ignore the complications of deploying multiple software stacks (vs. just the k6 binary), it'd be difficult to implement great error handling and timely handling of things like `abortOnFail` thresholds and `test.abort()` API calls. It can certainly be done, but it'd be a ton of effort to not get a flaky experience...
+However, I think that the benefits of such an approach would be outweighed by the drawbacks in terms of implementation and deployment complexity. In short, it can probably work, but IMO the UX will be worse. Even if we ignore the complications of deploying multiple software stacks (vs. just the k6 binary), it'd be difficult to implement great error handling and timely handling of things like `abortOnFail` thresholds and `test.abort()` API calls. It can certainly be done, but it'd be a ton of effort to not get a flaky experience...
 
 And, as I explained in the "High Availability" section above, a k6 test failing is not the worst thing that can happen. An inconsistent or a flaky test is a worse user experience in my mind.
 
