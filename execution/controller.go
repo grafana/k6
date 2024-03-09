@@ -9,7 +9,7 @@ type Controller interface {
 	// error are saved for the ID and returned for all other calls with it.
 	//
 	// This is an atomic and single-flight function, so any calls to it while the callback is
-	// being executed the the same ID will wait for the first call to to finish
+	// being executed the same ID will wait for the first call to finish
 	// and receive its result.
 	//
 	// TODO: split apart into `Once()`, `SetData(), `GetData()` and implement
