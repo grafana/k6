@@ -24,6 +24,7 @@ import (
 )
 
 const resultDone = "done"
+const resultNeedsInput = "needsinput"
 
 type (
 	elementHandleActionFunc        func(context.Context, *ElementHandle) (any, error)
@@ -271,7 +272,7 @@ func (h *ElementHandle) fill(_ context.Context, value string) error {
 		return fmt.Errorf("unexpected type %T", result)
 	}
 
-	if s == "needsinput" {
+	if s == resultNeedsInput {
 		h.frame.page.Keyboard.InsertText(value)
 	} else if s != resultDone {
 		// Either we're done or an error happened (returned as "error:..." from JS)
