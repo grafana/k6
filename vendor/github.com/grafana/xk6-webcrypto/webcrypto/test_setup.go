@@ -7,36 +7,32 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.k6.io/k6/js/compiler"
+
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/eventloop"
+	k6encoding "go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/metrics"
-	"gopkg.in/guregu/null.v3"
 )
 
-// testSetup is a helper struct holding components
-// necessary to test the redis client, in the context
-// of the execution of a k6 script.
-type testSetup struct {
-	rt      *goja.Runtime
-	state   *lib.State
-	samples chan metrics.SampleContainer
-	ev      *eventloop.EventLoop
-}
+const initGlobals = `
+	globalThis.CryptoKey = require("k6/x/webcrypto").CryptoKey;
+`
 
-// newTestSetup initializes a new test setup.
+// newConfiguredRuntime initializes a new test setup.
 // It prepares a test setup with a mocked redis server and a goja runtime,
 // and event loop, ready to execute scripts as if being executed in the
 // main context of k6.
-func newTestSetup(t testing.TB) testSetup {
-	tb := httpmultibin.NewHTTPMultiBin(t)
+func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
+	var err error
+	runtime := modulestest.NewRuntime(t)
 
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
+	err = runtime.SetupModuleSystem(
+		map[string]interface{}{"k6/x/webcrypto": New()},
+		nil,
+		compiler.New(runtime.VU.InitEnv().Logger),
+	)
+	require.NoError(t, err)
 
 	// We compile the Web Platform testharness script into a goja.Program
 	harnessProgram, err := CompileFile("./tests/util", "testharness.js")
@@ -45,68 +41,42 @@ func newTestSetup(t testing.TB) testSetup {
 	// We execute the harness script in the goja runtime
 	// in order to make the Web Platform assertion functions available
 	// to the tests.
-	_, err = rt.RunProgram(harnessProgram)
+	_, err = runtime.VU.Runtime().RunProgram(harnessProgram)
 	require.NoError(t, err)
 
 	// We compile the Web Platform helpers script into a goja.Program
 	helpersProgram, err := CompileFile("./tests/util", "helpers.js")
 	require.NoError(t, err)
+
 	// We execute the helpers script in the goja runtime
 	// in order to make the Web Platform helpers available
 	// to the tests.
-	_, err = rt.RunProgram(helpersProgram)
+	_, err = runtime.VU.Runtime().RunProgram(helpersProgram)
 	require.NoError(t, err)
 
-	root, err := lib.NewGroup("", nil)
+	m := new(RootModule).NewModuleInstance(runtime.VU)
+
+	err = runtime.VU.Runtime().Set("crypto", m.Exports().Named["crypto"])
 	require.NoError(t, err)
 
-	samples := make(chan metrics.SampleContainer, 1000)
+	// we define the btoa function in the goja runtime
+	// so that the Web Platform tests can use it.
+	encodingModule := k6encoding.New().NewModuleInstance(runtime.VU)
+	err = runtime.VU.Runtime().Set("btoa", encodingModule.Exports().Named["b64encode"])
+	require.NoError(t, err)
 
-	state := &lib.State{
-		Group:  root,
-		Dialer: tb.Dialer,
-		Options: lib.Options{
-			SystemTags: metrics.NewSystemTagSet(
-				metrics.TagURL,
-				metrics.TagProto,
-				metrics.TagStatus,
-				metrics.TagSubproto,
-			),
-			UserAgent: null.StringFrom("TestUserAgent"),
-		},
-		Samples:        samples,
-		TLSConfig:      tb.TLSClientConfig,
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(metrics.NewRegistry()),
-		Tags:           lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
-	}
+	_, err = runtime.VU.Runtime().RunString(initGlobals)
+	require.NoError(t, err)
 
-	vu := &modulestest.VU{
-		CtxField:     tb.Context,
-		InitEnvField: &common.InitEnvironment{},
-		RuntimeField: rt,
-		StateField:   state,
-	}
-
-	m := new(RootModule).NewModuleInstance(vu)
-	require.NoError(t, rt.Set("crypto", m.Exports().Named["crypto"]))
-
-	ev := eventloop.New(vu)
-	vu.RegisterCallbackField = ev.RegisterCallback
-
-	return testSetup{
-		rt:      rt,
-		state:   state,
-		samples: samples,
-		ev:      ev,
-	}
+	return runtime
 }
 
 // CompileFile compiles a javascript file as a goja.Program.
 func CompileFile(base, name string) (*goja.Program, error) {
-	fname := path.Join(base, name)
+	filename := path.Join(base, name)
 
 	//nolint:forbidigo // Allow os.Open in tests
-	f, err := os.Open(filepath.Clean(fname))
+	f, err := os.Open(filepath.Clean(filename))
 	if err != nil {
 		return nil, err
 	}

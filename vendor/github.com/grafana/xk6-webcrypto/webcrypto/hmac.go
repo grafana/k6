@@ -30,6 +30,10 @@ type HMACKeyGenParams struct {
 	Length null.Int `js:"length"`
 }
 
+func (hkgp HMACKeyGenParams) hash() string {
+	return hkgp.Hash.Name
+}
+
 // newHMACKeyGenParams creates a new HMACKeyGenParams object, from the normalized
 // algorithm, and the params parameters passed by the user.
 //
@@ -132,7 +136,7 @@ func (hkgp *HMACKeyGenParams) GenerateKey(
 	key := &CryptoKey{Type: SecretCryptoKeyType, handle: randomKey}
 
 	// 6.
-	algorithm := HMACKeyAlgorithm{}
+	algorithm := &HMACKeyAlgorithm{}
 
 	// 7.
 	algorithm.Name = HMAC
@@ -169,10 +173,14 @@ type HMACKeyAlgorithm struct {
 	Length int64 `js:"length"`
 }
 
-func exportHMACKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
+func (hka HMACKeyAlgorithm) hash() string {
+	return hka.Hash.Name
+}
+
+func exportHMACKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
 	// 1.
 	if ck.handle == nil {
-		return nil, NewError(OperationError, "key data is not accesible")
+		return nil, NewError(OperationError, "key data is not accessible")
 	}
 
 	// 2.
@@ -185,6 +193,13 @@ func exportHMACKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 	switch format {
 	case RawKeyFormat:
 		return bits, nil
+	case JwkKeyFormat:
+		m, err := exportSymmetricJWK(ck)
+		if err != nil {
+			return nil, NewError(ImplementationError, err.Error())
+		}
+
+		return m, nil
 	default:
 		// FIXME: note that we do not support JWK format, yet #37.
 		return nil, NewError(NotSupportedError, "unsupported key format "+format)
@@ -217,6 +232,12 @@ type HMACImportParams struct {
 	// Unless you have a good reason to use a different length, omit
 	// use the default.
 	Length null.Int `js:"length"`
+}
+
+var _ hasHash = (*HMACImportParams)(nil)
+
+func (hip HMACImportParams) hash() string {
+	return hip.Hash.Name
 }
 
 // newHMACImportParams creates a new HMACImportParams object from the given
@@ -277,14 +298,19 @@ func (hip *HMACImportParams) ImportKey(
 	}
 
 	// 3.
-	var hash KeyAlgorithm
+	if format != RawKeyFormat && format != JwkKeyFormat {
+		return nil, NewError(NotSupportedError, "unsupported key format "+format)
+	}
+
+	hash := KeyAlgorithm{Algorithm{Name: hip.Hash.Name}}
 
 	// 4.
-	switch format {
-	case RawKeyFormat:
-		hash = KeyAlgorithm{Algorithm{Name: hip.Hash.Name}}
-	default:
-		return nil, NewError(NotSupportedError, "unsupported key format "+format)
+	if format == JwkKeyFormat {
+		var err error
+		keyData, err = extractSymmetricJWK(keyData)
+		if err != nil {
+			return nil, NewError(DataError, err.Error())
+		}
 	}
 
 	// 5. 6.

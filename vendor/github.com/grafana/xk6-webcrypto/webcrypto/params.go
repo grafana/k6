@@ -188,7 +188,7 @@ type RSAPssParams struct {
 
 	// SaltLength holds (a Number) the length of the random salt to use, in bytes.
 	// RFC 3447 says that "typical salt lengths" are either 0 or the length of the output
-	// of the digest algorithm selected whe this key was generated. For instance,
+	// of the digest algorithm selected when this key was generated. For instance,
 	// when using the SHA256 digest algorithm, the salt length could be 32.
 	SaltLength int
 }

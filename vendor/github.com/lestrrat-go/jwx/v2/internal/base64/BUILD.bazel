@@ -1,0 +1,21 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "base64",
+    srcs = ["base64.go"],
+    importpath = "github.com/lestrrat-go/jwx/v2/internal/base64",
+    visibility = ["//:__subpackages__"],
+)
+
+go_test(
+    name = "base64_test",
+    srcs = ["base64_test.go"],
+    embed = [":base64"],
+    deps = ["@com_github_stretchr_testify//assert"],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":base64",
+    visibility = ["//:__subpackages__"],
+)

@@ -1,0 +1,32 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "cert",
+    srcs = [
+        "cert.go",
+        "chain.go",
+    ],
+    importpath = "github.com/lestrrat-go/jwx/v2/cert",
+    visibility = ["//visibility:public"],
+    deps = ["//internal/base64"],
+)
+
+go_test(
+    name = "cert_test",
+    srcs = [
+        "cert_test.go",
+        "chain_test.go",
+    ],
+    deps = [
+        ":cert",
+        "//internal/jwxtest",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":cert",
+    visibility = ["//visibility:public"],
+)
