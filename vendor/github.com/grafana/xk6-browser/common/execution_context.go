@@ -18,10 +18,12 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
-	"github.com/dop251/goja"
 )
 
 const evaluationScriptURL = "__xk6_browser_evaluation_script__"
+
+// This error code originates from chromium.
+const devToolsServerErrorCode = -32000
 
 var sourceURLRegex = regexp.MustCompile(`^(?s)[\040\t]*//[@#] sourceURL=\s*(\S*?)\s*$`)
 
@@ -155,6 +157,9 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 func (e *ExecutionContext) eval(
 	apiCtx context.Context, opts evalOptions, js string, args ...any,
 ) (any, error) {
+	if escapesGojaValues(args...) {
+		return nil, errors.New("goja.Value escaped")
+	}
 	e.logger.Debugf(
 		"ExecutionContext:eval",
 		"sid:%s stid:%s fid:%s ectxid:%d furl:%q %s",
@@ -204,9 +209,13 @@ func (e *ExecutionContext) eval(
 	)
 	if remoteObject, exceptionDetails, err = action.Do(cdp.WithExecutor(apiCtx, e.session)); err != nil {
 		var cdpe *cdproto.Error
-		if errors.As(err, &cdpe) && cdpe.Code == -32000 {
-			err = errors.New("execution context changed; most likely because of a navigation")
+		if errors.As(err, &cdpe) && cdpe.Code == devToolsServerErrorCode {
+			// By creating a new error instead of reusing it, we're removing the
+			// chromium specific error code.
+			return nil, errors.New(cdpe.Message)
 		}
+
+		e.logger.Warn("ExecutionContext:eval", "Unexpected DevTools server error: %v", err)
 		return nil, err
 	}
 	if exceptionDetails != nil {
@@ -289,34 +298,37 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAP
 
 // Eval evaluates the provided JavaScript within this execution context and
 // returns a value or handle.
-func (e *ExecutionContext) Eval(
-	apiCtx context.Context, js goja.Value, args ...goja.Value,
-) (any, error) {
+func (e *ExecutionContext) Eval(apiCtx context.Context, js string, args ...any) (any, error) {
+	if escapesGojaValues(args...) {
+		return nil, errors.New("goja.Value escaped")
+	}
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
 	}
 	evalArgs := make([]any, 0, len(args))
 	for _, a := range args {
-		evalArgs = append(evalArgs, a.Export())
+		evalArgs = append(evalArgs, a)
 	}
-	return e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
+
+	return e.eval(apiCtx, opts, js, evalArgs...)
 }
 
 // EvalHandle evaluates the provided JavaScript within this execution context
 // and returns a JSHandle.
-func (e *ExecutionContext) EvalHandle(
-	apiCtx context.Context, js goja.Value, args ...goja.Value,
-) (JSHandleAPI, error) {
+func (e *ExecutionContext) EvalHandle(apiCtx context.Context, js string, args ...any) (JSHandleAPI, error) {
+	if escapesGojaValues(args...) {
+		return nil, errors.New("goja.Value escaped")
+	}
 	opts := evalOptions{
 		forceCallable: true,
 		returnByValue: false,
 	}
 	evalArgs := make([]any, 0, len(args))
 	for _, a := range args {
-		evalArgs = append(evalArgs, a.Export())
+		evalArgs = append(evalArgs, a)
 	}
-	res, err := e.eval(apiCtx, opts, js.ToString().String(), evalArgs...)
+	res, err := e.eval(apiCtx, opts, js, evalArgs...)
 	if err != nil {
 		return nil, err
 	}

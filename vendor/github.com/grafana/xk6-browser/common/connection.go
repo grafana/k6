@@ -14,6 +14,7 @@ import (
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"
+	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
@@ -131,10 +132,20 @@ type Connection struct {
 	// Reuse the easyjson structs to avoid allocs per Read/Write.
 	decoder jlexer.Lexer
 	encoder jwriter.Writer
+
+	// onTargetAttachedToTarget is called when a new target is attached to the browser.
+	// Returning false will prevent the session from being created.
+	// If onTargetAttachedToTarget is nil, the session will be created.
+	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool
 }
 
 // NewConnection creates a new browser.
-func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Connection, error) {
+func NewConnection(
+	ctx context.Context,
+	wsURL string,
+	logger *log.Logger,
+	onTargetAttachedToTarget func(*target.EventAttachedToTarget) bool,
+) (*Connection, error) {
 	var header http.Header
 	var tlsConfig *tls.Config
 	wsd := websocket.Dialer{
@@ -150,19 +161,20 @@ func NewConnection(ctx context.Context, wsURL string, logger *log.Logger) (*Conn
 	}
 
 	c := Connection{
-		BaseEventEmitter: NewBaseEventEmitter(ctx),
-		ctx:              ctx,
-		wsURL:            wsURL,
-		logger:           logger,
-		conn:             conn,
-		sendCh:           make(chan *cdproto.Message, 32), // Avoid blocking in Execute
-		recvCh:           make(chan *cdproto.Message),
-		closeCh:          make(chan int),
-		errorCh:          make(chan error),
-		done:             make(chan struct{}),
-		closing:          make(chan struct{}),
-		msgIDGen:         &msgID{},
-		sessions:         make(map[target.SessionID]*Session),
+		BaseEventEmitter:         NewBaseEventEmitter(ctx),
+		ctx:                      ctx,
+		wsURL:                    wsURL,
+		logger:                   logger,
+		conn:                     conn,
+		sendCh:                   make(chan *cdproto.Message, 32), // Avoid blocking in Execute
+		recvCh:                   make(chan *cdproto.Message),
+		closeCh:                  make(chan int),
+		errorCh:                  make(chan error),
+		done:                     make(chan struct{}),
+		closing:                  make(chan struct{}),
+		msgIDGen:                 &msgID{},
+		sessions:                 make(map[target.SessionID]*Session),
+		onTargetAttachedToTarget: onTargetAttachedToTarget,
 	}
 
 	go c.recvLoop()
@@ -203,14 +215,22 @@ func (c *Connection) close(code int) error {
 	return err
 }
 
-func (c *Connection) closeSession(sid target.SessionID, tid target.ID) {
+// closeSession closes the session with the given session ID.
+// It returns true if the session was found and closed, false otherwise.
+func (c *Connection) closeSession(sid target.SessionID, tid target.ID) bool {
 	c.logger.Debugf("Connection:closeSession", "sid:%v tid:%v wsURL:%v", sid, tid, c.wsURL)
+
 	c.sessionsMu.Lock()
-	if session, ok := c.sessions[sid]; ok {
-		session.close()
+	defer c.sessionsMu.Unlock()
+
+	session, ok := c.sessions[sid]
+	if !ok {
+		return false
 	}
+	session.close()
 	delete(c.sessions, sid)
-	c.sessionsMu.Unlock()
+
+	return true
 }
 
 func (c *Connection) closeAllSessions() {
@@ -326,6 +346,16 @@ func (c *Connection) recvLoop() {
 			eva := ev.(*target.EventAttachedToTarget)
 			sid, tid := eva.SessionID, eva.TargetInfo.TargetID
 
+			if c.onTargetAttachedToTarget != nil {
+				// If onTargetAttachedToTarget is set, it will be called to determine
+				// if a session should be created for the target.
+				ok := c.onTargetAttachedToTarget(eva)
+				if !ok {
+					c.stopWaitingForDebugger(sid)
+					continue
+				}
+			}
+
 			c.sessionsMu.Lock()
 			session := NewSession(c.ctx, c, sid, tid, c.logger, c.msgIDGen)
 			c.logger.Debugf("Connection:recvLoop:EventAttachedToTarget", "sid:%v tid:%v wsURL:%q", sid, tid, c.wsURL)
@@ -340,7 +370,16 @@ func (c *Connection) recvLoop() {
 			evt := ev.(*target.EventDetachedFromTarget)
 			sid := evt.SessionID
 			tid := c.findTargetIDForLog(sid)
-			c.closeSession(sid, tid)
+			ok := c.closeSession(sid, tid)
+			if !ok {
+				c.logger.Debugf(
+					"Connection:recvLoop:EventDetachedFromTarget",
+					"sid:%v tid:%v wsURL:%q, session not found",
+					sid, tid, c.wsURL,
+				)
+
+				continue
+			}
 		}
 
 		switch {
@@ -382,6 +421,31 @@ func (c *Connection) recvLoop() {
 		default:
 			c.logger.Errorf("cdp", "ignoring malformed incoming message (missing id or method): %#v (message: %s)", msg, msg.Error.Message)
 		}
+	}
+}
+
+// stopWaitingForDebugger tells the browser to stop waiting for the
+// debugger to attach to the page's session.
+//
+// Whether we're not sharing pages among browser contexts, Chromium
+// still does so (since we're auto-attaching all browser targets).
+// This means that if we don't stop waiting for the debugger, the
+// browser will wait for the debugger to attach to the new page
+// indefinitely, even if the page is not part of the browser context
+// we're using.
+//
+// We don't return an error because the browser might have already
+// closed the connection. In that case, handling the error would
+// be redundant. This operation is best-effort.
+func (c *Connection) stopWaitingForDebugger(sid target.SessionID) {
+	msg := &cdproto.Message{
+		ID:        c.msgIDGen.newID(),
+		SessionID: sid,
+		Method:    cdproto.MethodType(cdpruntime.CommandRunIfWaitingForDebugger),
+	}
+	err := c.send(c.ctx, msg, nil, nil)
+	if err != nil {
+		c.logger.Errorf("Connection:stopWaitingForDebugger", "sid:%v wsURL:%q, err:%v", sid, c.wsURL, err)
 	}
 }
 

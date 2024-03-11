@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"net/url"
-	"reflect"
 	"strings"
 	"time"
 
@@ -109,18 +108,10 @@ func NewBrowserContext(
 		}
 	}
 
-	rt := b.vu.Runtime()
-	k6Obj := rt.ToValue(js.K6ObjectScript)
-	wv := rt.ToValue(js.WebVitalIIFEScript)
-	wvi := rt.ToValue(js.WebVitalInitScript)
-
-	if err := b.AddInitScript(k6Obj, nil); err != nil {
-		return nil, fmt.Errorf("adding k6 object to new browser context: %w", err)
-	}
-	if err := b.AddInitScript(wv, nil); err != nil {
+	if err := b.AddInitScript(js.WebVitalIIFEScript); err != nil {
 		return nil, fmt.Errorf("adding web vital script to new browser context: %w", err)
 	}
-	if err := b.AddInitScript(wvi, nil); err != nil {
+	if err := b.AddInitScript(js.WebVitalInitScript); err != nil {
 		return nil, fmt.Errorf("adding web vital init script to new browser context: %w", err)
 	}
 
@@ -128,38 +119,13 @@ func NewBrowserContext(
 }
 
 // AddInitScript adds a script that will be initialized on all new pages.
-func (b *BrowserContext) AddInitScript(script goja.Value, arg goja.Value) error {
+func (b *BrowserContext) AddInitScript(script string) error {
 	b.logger.Debugf("BrowserContext:AddInitScript", "bctxid:%v", b.id)
 
-	rt := b.vu.Runtime()
-
-	source := ""
-	if gojaValueExists(script) {
-		switch script.ExportType() {
-		case reflect.TypeOf(string("")):
-			source = script.String()
-		case reflect.TypeOf(goja.Object{}):
-			opts := script.ToObject(rt)
-			for _, k := range opts.Keys() {
-				switch k {
-				case "content":
-					source = opts.Get(k).String()
-				}
-			}
-		default:
-			_, isCallable := goja.AssertFunction(script)
-			if !isCallable {
-				source = fmt.Sprintf("(%s);", script.ToString().String())
-			} else {
-				source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
-			}
-		}
-	}
-
-	b.evaluateOnNewDocumentSources = append(b.evaluateOnNewDocumentSources, source)
+	b.evaluateOnNewDocumentSources = append(b.evaluateOnNewDocumentSources, script)
 
 	for _, p := range b.browser.getPages() {
-		if err := p.evaluateOnNewDocument(source); err != nil {
+		if err := p.evaluateOnNewDocument(script); err != nil {
 			return fmt.Errorf("adding init script to browser context: %w", err)
 		}
 	}
@@ -289,11 +255,7 @@ func (b *BrowserContext) NewPage() (*Page, error) {
 
 // Pages returns a list of pages inside this browser context.
 func (b *BrowserContext) Pages() []*Page {
-	pages := make([]*Page, 1)
-	for _, p := range b.browser.getPages() {
-		pages = append(pages, p)
-	}
-	return pages
+	return append([]*Page{}, b.browser.getPages()...)
 }
 
 // Route is not implemented.

@@ -73,6 +73,21 @@ const (
 	TracesMetadata = "K6_BROWSER_TRACES_METADATA"
 )
 
+// Screenshots.
+const (
+	// ScreenshotsOutput can be used to configure the browser module
+	// to upload screenshots to a remote location instead of saving
+	// to the local disk.
+	ScreenshotsOutput = "K6_BROWSER_SCREENSHOTS_OUTPUT"
+)
+
+// Infrastructural.
+const (
+	// K6TestRunID represents the test run id. Note: this was taken from
+	// k6.
+	K6TestRunID = "K6_CLOUD_PUSH_REF_ID"
+)
+
 // LookupFunc defines a function to look up a key from the environment.
 type LookupFunc func(key string) (string, bool)
 
