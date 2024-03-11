@@ -1,0 +1,78 @@
+load("@io_bazel_rules_go//go:def.bzl", "go_library", "go_test")
+
+go_library(
+    name = "jwk",
+    srcs = [
+        "cache.go",
+        "ecdsa.go",
+        "ecdsa_gen.go",
+        "fetch.go",
+        "interface.go",
+        "interface_gen.go",
+        "io.go",
+        "jwk.go",
+        "key_ops.go",
+        "okp.go",
+        "okp_gen.go",
+        "options.go",
+        "options_gen.go",
+        "rsa.go",
+        "rsa_gen.go",
+        "set.go",
+        "symmetric.go",
+        "symmetric_gen.go",
+        "usage.go",
+        "whitelist.go",
+    ],
+    importpath = "github.com/lestrrat-go/jwx/v2/jwk",
+    visibility = ["//visibility:public"],
+    deps = [
+        "//cert",
+        "//internal/base64",
+        "//internal/ecutil",
+        "//internal/iter",
+        "//internal/json",
+        "//internal/pool",
+        "//jwa",
+        "//x25519",
+        "@com_github_lestrrat_go_blackmagic//:go_default_library",
+        "@com_github_lestrrat_go_httprc//:go_default_library",
+        "@com_github_lestrrat_go_iter//arrayiter:go_default_library",
+        "@com_github_lestrrat_go_iter//mapiter:go_default_library",
+        "@com_github_lestrrat_go_option//:option",
+    ],
+)
+
+go_test(
+    name = "jwk_test",
+    srcs = [
+        "headers_test.go",
+        "jwk_internal_test.go",
+        "jwk_test.go",
+        "options_gen_test.go",
+        "refresh_test.go",
+        "set_test.go",
+        "x5c_test.go",
+    ],
+    data = glob(["testdata/**"]),
+    embed = [":jwk"],
+    deps = [
+        "//cert",
+        "//internal/base64",
+        "//internal/ecutil",
+        "//internal/jose",
+        "//internal/json",
+        "//internal/jwxtest",
+        "//jwa",
+        "//jws",
+        "//x25519",
+        "@com_github_stretchr_testify//assert",
+        "@com_github_stretchr_testify//require",
+    ],
+)
+
+alias(
+    name = "go_default_library",
+    actual = ":jwk",
+    visibility = ["//visibility:public"],
+)

@@ -1,0 +1,17 @@
+Changes
+=======
+
+v1.0.4 19 Jul 2022
+  * Fix sloppy API breakage
+
+v1.0.3 19 Jul 2022
+  * Fix queue insertion in the middle of the queue (#7)
+
+v1.0.2 13 Jun 2022
+  * Properly release a lock when the fetch fails (#5)
+
+v1.0.1 29 Mar 2022
+  * Bump dependency for github.com/lestrrat-go/httpcc to v1.0.1
+
+v1.0.0 29 Mar 2022
+  * Initial release, refactored out of github.com/lestrrat-go/jwx
