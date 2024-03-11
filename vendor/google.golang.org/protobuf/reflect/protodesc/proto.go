@@ -70,7 +70,7 @@ func ToFileDescriptorProto(file protoreflect.FileDescriptor) *descriptorpb.FileD
 	for i, exts := 0, file.Extensions(); i < exts.Len(); i++ {
 		p.Extension = append(p.Extension, ToFieldDescriptorProto(exts.Get(i)))
 	}
-	if syntax := file.Syntax(); syntax != protoreflect.Proto2 {
+	if syntax := file.Syntax(); syntax != protoreflect.Proto2 && syntax.IsValid() {
 		p.Syntax = proto.String(file.Syntax().String())
 	}
 	return p

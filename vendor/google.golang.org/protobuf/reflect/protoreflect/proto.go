@@ -153,8 +153,9 @@ type Syntax syntax
 type syntax int8 // keep exact type opaque as the int type may change
 
 const (
-	Proto2 Syntax = 2
-	Proto3 Syntax = 3
+	Proto2   Syntax = 2
+	Proto3   Syntax = 3
+	Editions Syntax = 4
 )
 
 // IsValid reports whether the syntax is valid.
@@ -174,6 +175,8 @@ func (s Syntax) String() string {
 		return "proto2"
 	case Proto3:
 		return "proto3"
+	case Editions:
+		return "editions"
 	default:
 		return fmt.Sprintf("<unknown:%d>", s)
 	}
