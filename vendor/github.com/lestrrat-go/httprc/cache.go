@@ -8,8 +8,8 @@ import (
 	"time"
 )
 
-// ErrSink is an abstraction that allows users to consume errors
-// produced while the cache queue is running.
+// HTTPClient defines the interface required for the HTTP client
+// used within the fetcher.
 type HTTPClient interface {
 	Get(string) (*http.Response, error)
 }
@@ -144,19 +144,22 @@ func (c *Cache) getOrFetch(ctx context.Context, u string, forceRefresh bool) (in
 	}
 	c.mu.RUnlock()
 
-	// Only one goroutine may enter this section.
-	e.acquireSem()
-
 	// has this entry been fetched? (but ignore and do a fetch
 	// if forceRefresh is true)
 	if forceRefresh || !e.hasBeenFetched() {
-		if err := c.queue.fetchAndStore(ctx, e); err != nil {
-			e.releaseSem()
-			return nil, fmt.Errorf(`failed to fetch %q: %w`, u, err)
+		// Only one goroutine may enter this section.
+		// redundant checks allow cached gets avoid the semaphore,
+		// which allows them to return cached data immediately
+		// if the upstream server is slow or not responding
+		e.acquireSem()
+		if forceRefresh || !e.hasBeenFetched() {
+			if err := c.queue.fetchAndStore(ctx, e); err != nil {
+				e.releaseSem()
+				return nil, fmt.Errorf(`failed to fetch %q: %w`, u, err)
+			}
 		}
+		e.releaseSem()
 	}
-
-	e.releaseSem()
 
 	e.mu.RLock()
 	data := e.data
