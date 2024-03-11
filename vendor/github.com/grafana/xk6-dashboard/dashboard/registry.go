@@ -7,6 +7,8 @@
 package dashboard
 
 import (
+	"sort"
+
 	"go.k6.io/k6/metrics"
 )
 
@@ -28,14 +30,21 @@ func newRegistry() *registry {
 func (reg *registry) getOrNew(
 	name string,
 	typ metrics.MetricType,
-	valTyp ...metrics.ValueType,
+	valTyp metrics.ValueType,
+	thresholds []string,
 ) (*metrics.Metric, error) {
 	if metric := reg.Registry.Get(name); metric != nil {
 		return metric, nil
 	}
 
-	metric, err := reg.Registry.NewMetric(name, typ, valTyp...)
+	metric, err := reg.Registry.NewMetric(name, typ, valTyp)
 	if err != nil {
+		return nil, err
+	}
+
+	metric.Thresholds = metrics.NewThresholds(thresholds)
+
+	if err := metric.Thresholds.Validate(name, reg.Registry); err != nil {
 		return nil, err
 	}
 
@@ -48,9 +57,10 @@ func (reg *registry) getOrNew(
 func (reg *registry) mustGetOrNew(
 	name string,
 	typ metrics.MetricType,
-	valTyp ...metrics.ValueType,
+	valTyp metrics.ValueType,
+	thresholds []string,
 ) *metrics.Metric {
-	metric, err := reg.getOrNew(name, typ, valTyp...)
+	metric, err := reg.getOrNew(name, typ, valTyp, thresholds)
 	if err != nil {
 		panic(err)
 	}
@@ -59,15 +69,37 @@ func (reg *registry) mustGetOrNew(
 }
 
 // newbies return newly registered names since last seen.
-func (reg *registry) newbies(seen map[string]struct{}) []string {
+func (reg *registry) newbies(seen []string) ([]string, []string) {
 	var names []string
 
-	for _, name := range reg.names {
-		if _, ok := seen[name]; !ok {
+	process := func(name string) {
+		idx := sort.SearchStrings(seen, name)
+		if idx == len(seen) {
+			seen = append(seen, name)
 			names = append(names, name)
-			seen[name] = struct{}{}
+		}
+
+		if seen[idx] == name {
+			return
+		}
+
+		names = append(names, name)
+
+		old := seen
+		seen = make([]string, len(old)+1)
+
+		copy(seen[:idx], old[:idx])
+		seen[idx] = name
+		copy(seen[idx+1:], old[idx:])
+	}
+
+	for _, metric := range reg.All() {
+		process(metric.Name)
+
+		for _, sub := range metric.Submetrics {
+			process(sub.Name)
 		}
 	}
 
-	return names
+	return names, seen
 }

@@ -24,6 +24,8 @@ type reporter struct {
 	data   *reportData
 	output string
 	mu     sync.RWMutex
+
+	snapshotCount int
 }
 
 var (
@@ -48,6 +50,13 @@ func (rep *reporter) onStart() error {
 
 func (rep *reporter) onStop(_ error) error {
 	if len(rep.output) == 0 {
+		return nil
+	}
+
+	if rep.snapshotCount < 2 {
+		rep.proc.logger.Warn(
+			"The test run was short, report generation was skipped (not enough data)",
+		)
 		return nil
 	}
 
@@ -93,12 +102,24 @@ func (rep *reporter) onEvent(name string, data interface{}) {
 		return
 	}
 
+	if name == thresholdEvent {
+		rep.data.threshold = envelope
+
+		return
+	}
+
 	if err := rep.data.encoder.Encode(envelope); err != nil {
 		if eerr := rep.data.encoder.Encode(nil); eerr != nil {
 			rep.proc.logger.Error(err)
 		}
 
 		rep.proc.logger.Error(err)
+
+		return
+	}
+
+	if name == snapshotEvent {
+		rep.snapshotCount++
 	}
 }
 
@@ -185,6 +206,7 @@ type reportData struct {
 	buff       bytes.Buffer
 	encoder    *json.Encoder
 	cumulative *recorderEnvelope
+	threshold  *recorderEnvelope
 }
 
 func newReportData(config json.RawMessage) *reportData {
@@ -215,7 +237,13 @@ func (data *reportData) exportJSON(out io.Writer) error {
 	}
 
 	if data.cumulative != nil {
-		return encoder.Encode(data.cumulative)
+		if err := encoder.Encode(data.cumulative); err != nil {
+			return err
+		}
+	}
+
+	if data.threshold != nil {
+		return encoder.Encode(data.threshold)
 	}
 
 	return nil
