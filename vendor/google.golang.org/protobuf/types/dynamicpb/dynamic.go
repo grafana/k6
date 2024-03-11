@@ -499,7 +499,7 @@ func isSet(fd protoreflect.FieldDescriptor, v protoreflect.Value) bool {
 		return v.List().Len() > 0
 	case fd.ContainingOneof() != nil:
 		return true
-	case fd.Syntax() == protoreflect.Proto3 && !fd.IsExtension():
+	case !fd.HasPresence() && !fd.IsExtension():
 		switch fd.Kind() {
 		case protoreflect.BoolKind:
 			return v.Bool()

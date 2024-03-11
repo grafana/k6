@@ -11,6 +11,7 @@ import (
 	"strconv"
 	"strings"
 
+	"google.golang.org/protobuf/encoding/protowire"
 	"google.golang.org/protobuf/internal/encoding/json"
 	"google.golang.org/protobuf/internal/encoding/messageset"
 	"google.golang.org/protobuf/internal/errors"
@@ -47,6 +48,10 @@ type UnmarshalOptions struct {
 		protoregistry.MessageTypeResolver
 		protoregistry.ExtensionTypeResolver
 	}
+
+	// RecursionLimit limits how deeply messages may be nested.
+	// If zero, a default limit is applied.
+	RecursionLimit int
 }
 
 // Unmarshal reads the given []byte and populates the given [proto.Message]
@@ -66,6 +71,9 @@ func (o UnmarshalOptions) unmarshal(b []byte, m proto.Message) error {
 
 	if o.Resolver == nil {
 		o.Resolver = protoregistry.GlobalTypes
+	}
+	if o.RecursionLimit == 0 {
+		o.RecursionLimit = protowire.DefaultRecursionLimit
 	}
 
 	dec := decoder{json.NewDecoder(b), o}
@@ -114,6 +122,10 @@ func (d decoder) syntaxError(pos int, f string, x ...interface{}) error {
 
 // unmarshalMessage unmarshals a message into the given protoreflect.Message.
 func (d decoder) unmarshalMessage(m protoreflect.Message, skipTypeURL bool) error {
+	d.opts.RecursionLimit--
+	if d.opts.RecursionLimit < 0 {
+		return errors.New("exceeded max recursion depth")
+	}
 	if unmarshal := wellKnownTypeUnmarshaler(m.Descriptor().FullName()); unmarshal != nil {
 		return unmarshal(d, m)
 	}

@@ -93,8 +93,14 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 		f.L1.Syntax = protoreflect.Proto2
 	case "proto3":
 		f.L1.Syntax = protoreflect.Proto3
+	case "editions":
+		f.L1.Syntax = protoreflect.Editions
+		f.L1.Edition = fromEditionProto(fd.GetEdition())
 	default:
 		return nil, errors.New("invalid syntax: %q", fd.GetSyntax())
+	}
+	if f.L1.Syntax == protoreflect.Editions && (fd.GetEdition() < SupportedEditionsMinimum || fd.GetEdition() > SupportedEditionsMaximum) {
+		return nil, errors.New("use of edition %v not yet supported by the Go Protobuf runtime", fd.GetEdition())
 	}
 	f.L1.Path = fd.GetName()
 	if f.L1.Path == "" {
@@ -107,6 +113,9 @@ func (o FileOptions) New(fd *descriptorpb.FileDescriptorProto, r Resolver) (prot
 	if opts := fd.GetOptions(); opts != nil {
 		opts = proto.Clone(opts).(*descriptorpb.FileOptions)
 		f.L2.Options = func() protoreflect.ProtoMessage { return opts }
+	}
+	if f.L1.Syntax == protoreflect.Editions {
+		initFileDescFromFeatureSet(f, fd.GetOptions().GetFeatures())
 	}
 
 	f.L2.Imports = make(filedesc.FileImports, len(fd.GetDependency()))
