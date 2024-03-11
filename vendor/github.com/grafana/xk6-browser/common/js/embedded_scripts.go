@@ -17,10 +17,3 @@ var WebVitalIIFEScript string
 //
 //go:embed web_vital_init.js
 var WebVitalInitScript string
-
-// K6ObjectScript is used to propagate
-// information to other libraries about
-// the current user session.
-//
-//go:embed k6_object.js
-var K6ObjectScript string

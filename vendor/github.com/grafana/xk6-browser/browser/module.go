@@ -1,8 +1,14 @@
-// Package browser provides an entry point to the browser module.
+// Package browser is the browser module's entry point, and
+// initializer of various global types, and a translation layer
+// between Goja and the internal business logic.
+//
+// It initializes and drives the downstream components by passing
+// the necessary concrete dependencies.
 package browser
 
 import (
 	"context"
+	"io"
 	"log"
 	"net/http"
 	_ "net/http/pprof" //nolint:gosec
@@ -18,6 +24,12 @@ import (
 )
 
 type (
+	// filePersister is the type that all file persisters must implement. It's job is
+	// to persist a file somewhere, hiding the details of where and how from the caller.
+	filePersister interface {
+		Persist(ctx context.Context, path string, data io.Reader) (err error)
+	}
+
 	// RootModule is the global module instance that will create module
 	// instances for each VU.
 	RootModule struct {
@@ -25,6 +37,8 @@ type (
 		remoteRegistry *remoteRegistry
 		initOnce       *sync.Once
 		tracesMetadata map[string]string
+		filePersister  filePersister
+		testRunID      string
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -77,6 +91,8 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 					m.tracesMetadata,
 				),
 				taskQueueRegistry: newTaskQueueRegistry(vu),
+				filePersister:     m.filePersister,
+				testRunID:         m.testRunID,
 			}),
 			Devices:         common.GetDevices(),
 			NetworkProfiles: common.GetNetworkProfiles(),
@@ -107,6 +123,13 @@ func (m *RootModule) initialize(vu k6modules.VU) {
 	}
 	if _, ok := initEnv.LookupEnv(env.EnableProfiling); ok {
 		go startDebugServer()
+	}
+	m.filePersister, err = newScreenshotPersister(initEnv.LookupEnv)
+	if err != nil {
+		k6ext.Abort(vu.Context(), "failed to create file persister: %v", err)
+	}
+	if e, ok := initEnv.LookupEnv(env.K6TestRunID); ok && e != "" {
+		m.testRunID = e
 	}
 }
 
