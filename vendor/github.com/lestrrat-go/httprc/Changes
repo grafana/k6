@@ -1,6 +1,10 @@
 Changes
 =======
 
+v1.0.5 07 Mar 2024
+  * Avoid extra locks that forces cache.Get() to hang while cache.Refresh() is 
+    being called against a slow/flaky server.
+
 v1.0.4 19 Jul 2022
   * Fix sloppy API breakage
 
