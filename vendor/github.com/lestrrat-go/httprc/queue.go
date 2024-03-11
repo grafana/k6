@@ -4,7 +4,7 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"net/http"
 	"sync"
 	"time"
@@ -50,7 +50,7 @@ func (f TransformFunc) Transform(u string, res *http.Response) (interface{}, err
 type BodyBytes struct{}
 
 func (BodyBytes) Transform(_ string, res *http.Response) (interface{}, error) {
-	buf, err := ioutil.ReadAll(res.Body)
+	buf, err := io.ReadAll(res.Body)
 	defer res.Body.Close()
 	if err != nil {
 		return nil, fmt.Errorf(`failed to read response body: %w`, err)
@@ -318,12 +318,12 @@ func (q *queue) refreshLoop(ctx context.Context, errSink ErrSink) {
 }
 
 func (q *queue) fetchAndStore(ctx context.Context, e *entry) error {
+	now := time.Now()
+	// synchronously go fetch
+	res, err := q.fetch.fetch(ctx, e.request)
 	e.mu.Lock()
 	defer e.mu.Unlock()
-
-	// synchronously go fetch
-	e.lastFetch = time.Now()
-	res, err := q.fetch.fetch(ctx, e.request)
+	e.lastFetch = now
 	if err != nil {
 		// Even if the request failed, we need to queue the next fetch
 		q.enqueueNextFetch(nil, e)
