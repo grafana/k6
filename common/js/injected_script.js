@@ -777,26 +777,31 @@ class InjectedScript {
         resolve = res;
         reject = rej;
       });
-      const observer = new MutationObserver(async () => {
-        if (timedOut) {
+      try {
+        const observer = new MutationObserver(async () => {
+          if (timedOut) {
+            observer.disconnect();
+            reject(`timed out after ${timeout}ms`);
+          }
+          const success = predicate();
+          if (success !== continuePolling) {
+            observer.disconnect();
+            resolve(success);
+          }
+        });
+        timeoutPoll = () => {
           observer.disconnect();
           reject(`timed out after ${timeout}ms`);
-        }
-        const success = predicate();
-        if (success !== continuePolling) {
-          observer.disconnect();
-          resolve(success);
-        }
-      });
-      timeoutPoll = () => {
-        observer.disconnect();
-        reject(`timed out after ${timeout}ms`);
-      };
-      observer.observe(document, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-      });
+        };
+        observer.observe(document, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      } catch(error) {
+        reject(error);
+        return;
+      }
       return result;
     }
 
