@@ -143,6 +143,42 @@ class XPathQueryEngine {
   }
 }
 
+// DocumentFragments cannot be queried with XPath and they do not
+// implement evaluate. It first needs to be converted to a Document
+// before being able to run the evaluate against it.
+function convertToDocument(fragment) {
+  var newDoc = document.implementation.createHTMLDocument("Temporary Document");
+
+  copyNodesToDocument(fragment, newDoc.body);
+
+  return newDoc;
+}
+
+// Function to manually copy nodes to a new document, excluding ShadowRoot
+// nodes. ShadowRoot are not cloneable so we need to manually clone them.
+function copyNodesToDocument(sourceNode, targetNode) {
+  sourceNode.childNodes.forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+          // Clone the child node without its descendants
+          let clonedChild = child.cloneNode(false);
+          targetNode.appendChild(clonedChild);
+
+          // If the child has a shadow root, recursively copy its children
+          // instead of the shadow root itself.
+          if (child.shadowRoot) {
+              copyNodesToDocument(child.shadowRoot, clonedChild);
+          } else {
+              // Recursively copy normal child nodes
+              copyNodesToDocument(child, clonedChild);
+          }
+      } else {
+          // For non-element nodes (like text nodes), clone them directly.
+          let clonedChild = child.cloneNode(true);
+          targetNode.appendChild(clonedChild);
+      }
+  });
+}
+
 class InjectedScript {
   constructor() {
     this._replaceRafWithTimeout = false;
