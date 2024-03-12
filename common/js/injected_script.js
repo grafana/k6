@@ -844,13 +844,18 @@ class InjectedScript {
       return result;
 
       async function onTimeout() {
-        if (timedOut) {
-          reject(`timed out after ${timeout}ms`);
+        try{
+          if (timedOut) {
+            reject(`timed out after ${timeout}ms`);
+            return;
+          }
+          const success = predicate();
+          if (success !== continuePolling) resolve(success);
+          else setTimeout(onTimeout, pollInterval);
+        } catch(error) {
+          reject(error);
           return;
         }
-        const success = predicate();
-        if (success !== continuePolling) resolve(success);
-        else setTimeout(onTimeout, pollInterval);
       }
     }
   }
