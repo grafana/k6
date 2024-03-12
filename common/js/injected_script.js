@@ -815,13 +815,22 @@ class InjectedScript {
       return result;
 
       async function onRaf() {
-        if (timedOut) {
-          reject(`timed out after ${timeout}ms`);
+        try {
+          if (timedOut) {
+            reject(`timed out after ${timeout}ms`);
+            return;
+          }
+          const success = predicate();
+          if (success !== continuePolling) {
+            resolve(success);
+            return
+          } else {
+            requestAnimationFrame(onRaf);
+          }
+        } catch (error) {
+          reject(error);
           return;
         }
-        const success = predicate();
-        if (success !== continuePolling) resolve(success);
-        else requestAnimationFrame(onRaf);
       }
     }
 
