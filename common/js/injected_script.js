@@ -124,6 +124,11 @@ class XPathQueryEngine {
       selector = "." + selector;
     }
     const result = [];
+
+    if (root instanceof DocumentFragment) {
+      root = convertToDocument(root);
+    }
+
     const document = root instanceof Document ? root : root.ownerDocument;
     if (!document) {
       return result;
