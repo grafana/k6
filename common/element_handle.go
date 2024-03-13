@@ -2,13 +2,9 @@ package common
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"math"
-	"mime"
-	"os"
-	"path/filepath"
 	"reflect"
 	"strings"
 	"time"
@@ -1273,22 +1269,6 @@ func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) error {
 	return nil
 }
 
-func (h *ElementHandle) resolveFiles(payload []*File) error {
-	for _, file := range payload {
-		if strings.TrimSpace(file.Path) != "" {
-			buffer, err := os.ReadFile(file.Path)
-			if err != nil {
-				return fmt.Errorf("reading file: %w", err)
-			}
-			file.Buffer = base64.StdEncoding.EncodeToString(buffer)
-			file.Name = filepath.Base(file.Path)
-			file.Mimetype = mime.TypeByExtension(filepath.Ext(file.Path))
-		}
-	}
-
-	return nil
-}
-
 func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []*File) error {
 	fn := `
 		(node, injected, payload) => {
@@ -1298,10 +1278,6 @@ func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []*File) e
 	evalOpts := evalOptions{
 		forceCallable: true,
 		returnByValue: true,
-	}
-	err := h.resolveFiles(payload)
-	if err != nil {
-		return err
 	}
 	result, err := h.evalWithScript(apiCtx, evalOpts, fn, payload)
 	if err != nil {

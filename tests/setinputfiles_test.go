@@ -1,8 +1,6 @@
 package tests
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -93,76 +91,6 @@ func TestSetInputFiles(t *testing.T) {
 			},
 		},
 		{
-			name: "set_one_file_with_path",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				tempFile, err := os.CreateTemp("", "*.json")
-				assert.NoError(t, err)
-				n, err := tempFile.Write([]byte("0123456789"))
-				assert.Equal(t, 10, n)
-				assert.NoError(t, err)
-				cleanupFunc := func() {
-					err := os.Remove(tempFile.Name())
-					assert.NoError(t, err)
-				}
-				return tb.toGojaValue(tempFile.Name()), cleanupFunc
-			},
-			tests: []testFn{defaultTestPage, defaultTestElementHandle},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
-				t.Helper()
-				assert.NoError(t, err)
-				// check if input has 1 file
-				assert.Equal(t, float64(1), getFileCountFn())
-				// check added file is correct
-				filename, ok := getFilePropFn(0, propName).(string)
-				assert.True(t, ok)
-				assert.Equal(t, ".json", filepath.Ext(filename))
-				assert.Equal(t, float64(10), getFilePropFn(0, propSize))
-				assert.Equal(t, "application/json", getFilePropFn(0, propType))
-			},
-		},
-		{
-			name: "set_two_files_with_path",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				tempFile1, err := os.CreateTemp("", "*.json")
-				assert.NoError(t, err)
-				n, err := tempFile1.Write([]byte("0123456789"))
-				assert.Equal(t, 10, n)
-				assert.NoError(t, err)
-
-				tempFile2, err := os.CreateTemp("", "*.xml")
-				assert.NoError(t, err)
-				n, err = tempFile2.Write([]byte("012345678901234"))
-				assert.Equal(t, 15, n)
-				assert.NoError(t, err)
-				cleanupFunc := func() {
-					err := os.Remove(tempFile1.Name())
-					assert.NoError(t, err)
-					err = os.Remove(tempFile2.Name())
-					assert.NoError(t, err)
-				}
-
-				return tb.toGojaValue([]string{tempFile1.Name(), tempFile2.Name()}), cleanupFunc
-			},
-			tests: []testFn{defaultTestPage, defaultTestElementHandle},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
-				t.Helper()
-				assert.NoError(t, err)
-				// check if input has 2 files
-				assert.Equal(t, float64(2), getFileCountFn())
-				// check added files are correct
-				filename1, ok := getFilePropFn(0, propName).(string)
-				assert.True(t, ok)
-				assert.Equal(t, ".json", filepath.Ext(filename1))
-				assert.Equal(t, float64(10), getFilePropFn(0, propSize))
-				assert.Equal(t, "application/json", getFilePropFn(0, propType))
-				filename2, ok := getFilePropFn(1, propName).(string)
-				assert.True(t, ok)
-				assert.Equal(t, ".xml", filepath.Ext(filename2))
-				assert.Equal(t, float64(15), getFilePropFn(1, propSize))
-				assert.Equal(t, "text/xml; charset=utf-8", getFilePropFn(1, propType))
-			},
-		},
-		{
 			name: "set_nil",
 			setup: func(tb *testBrowser) (goja.Value, func()) {
 				return tb.toGojaValue(nil), nil
@@ -184,24 +112,6 @@ func TestSetInputFiles(t *testing.T) {
 			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
 				t.Helper()
 				assert.ErrorContains(t, err, "invalid parameter type : int64")
-				// check if input has 0 file
-				assert.Equal(t, float64(0), getFileCountFn())
-			},
-		},
-		{
-			name: "set_file_not_exists",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				tempFile, err := os.CreateTemp("", "*.json")
-				assert.NoError(t, err)
-				err = os.Remove(tempFile.Name())
-				assert.NoError(t, err)
-				return tb.toGojaValue(tempFile.Name()), nil
-			},
-			tests: []testFn{defaultTestPage, defaultTestElementHandle},
-			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
-				t.Helper()
-				assert.ErrorContains(t, err, "reading file:")
-				assert.ErrorContains(t, err, "setting input files")
 				// check if input has 0 file
 				assert.Equal(t, float64(0), getFileCountFn())
 			},
