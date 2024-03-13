@@ -7,7 +7,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"io"
 	"net"
 	"net/http"
@@ -172,7 +171,9 @@ func sseHandler(t testing.TB, generateErrors bool) http.Handler {
 			if req.Method == http.MethodPost {
 				body, err := io.ReadAll(req.Body)
 				require.NoError(t, err)
-				assert.Equal(t, `{"ping": true}`, string(body))
+				if `{"ping": true}` != string(body) {
+					t.Fail()
+				}
 
 				_, err = w.Write([]byte("id: pong\n")) // event id
 				require.NoError(t, err)
