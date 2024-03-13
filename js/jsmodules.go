@@ -1,6 +1,7 @@
 package js
 
 import (
+	"go.k6.io/k6/js/modules/k6/experimental/sse"
 	"sync"
 
 	"go.k6.io/k6/ext"
@@ -45,6 +46,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/tracing": tracing.New(),
 		"k6/experimental/browser": browser.New(),
 		"k6/experimental/fs":      fs.New(),
+		"k6/experimental/sse":     sse.New(),
 		"k6/net/grpc":             grpc.New(),
 		"k6/html":                 html.New(),
 		"k6/http":                 http.New(),

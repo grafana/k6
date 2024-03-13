@@ -1,6 +1,7 @@
 // Package sse implements a k6/sse javascript module extension for k6.
 // It provides basic functionality to handle Server-Sent Event over http
 // that *blocks* the event loop while the http connection is opened.
+// [File API design document]: https://github.com/grafana/k6/blob/master/docs/design/021-sse-api.md#proposed-solution
 package sse
 
 import (
