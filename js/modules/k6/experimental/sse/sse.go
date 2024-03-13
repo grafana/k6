@@ -1,4 +1,5 @@
-// Package sse implements a k6/sse for k6. It provides basic functionality to handle Server-Sent Event over http
+// Package sse implements a k6/sse javascript module extension for k6.
+// It provides basic functionality to handle Server-Sent Event over http
 // that *blocks* the event loop while the http connection is opened.
 package sse
 
@@ -71,7 +72,8 @@ var ErrSSEInInitContext = common.NewInitContextError("using sse in the init cont
 // Client is the representation of the sse returned to the js.
 type Client struct {
 	rt            *goja.Runtime
-	ctx           context.Context //nolint:containedctx
+	ctx           context.Context
+	url           string
 	resp          *http.Response
 	eventHandlers map[string][]goja.Callable
 	done          chan struct{}
@@ -111,9 +113,7 @@ func (mi *sse) Exports() modules.Exports {
 	return modules.Exports{Default: mi.obj}
 }
 
-// Open establishes a client connection based on the parameters provided.
-//
-//nolint:funlen
+// Open establishes a http client connection based on the parameters provided.
 func (mi *sse) Open(url string, args ...goja.Value) (*HTTPResponse, error) {
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
@@ -129,8 +129,7 @@ func (mi *sse) Open(url string, args ...goja.Value) (*HTTPResponse, error) {
 
 	parsedArgs.tagsAndMeta.SetSystemTagOrMetaIfEnabled(state.Options.SystemTags, metrics.TagURL, url)
 
-	//nolint:bodyclose // as it's deferred closed in closeResponseBody
-	client, httpResponse, connEndHook, err := mi.open(ctx, state, rt, url, parsedArgs)
+	client, connEndHook, err := mi.open(ctx, state, rt, url, parsedArgs)
 	defer connEndHook()
 	if err != nil {
 		// Pass the error to the user script before exiting immediately
@@ -138,10 +137,7 @@ func (mi *sse) Open(url string, args ...goja.Value) (*HTTPResponse, error) {
 		if state.Options.Throw.Bool {
 			return nil, err
 		}
-		if httpResponse != nil {
-			return wrapHTTPResponse(httpResponse)
-		}
-		return &HTTPResponse{Error: err.Error()}, nil
+		return client.wrapHTTPResponse(err.Error())
 	}
 
 	// Run the user-provided set up function
@@ -157,10 +153,8 @@ func (mi *sse) Open(url string, args ...goja.Value) (*HTTPResponse, error) {
 	readErrChan := make(chan error)
 	readCloseChan := make(chan int)
 
-	reader := bufio.NewReader(httpResponse.Body)
-
 	// Wraps a couple of channels
-	go client.readEvents(reader, readEventChan, readErrChan, readCloseChan)
+	go client.readEvents(readEventChan, readErrChan, readCloseChan)
 
 	// This is the main control loop. All JS code (including error handlers)
 	// should only be executed by this thread to avoid race conditions
@@ -192,23 +186,18 @@ func (mi *sse) Open(url string, args ...goja.Value) (*HTTPResponse, error) {
 
 		case <-client.done:
 			// This is the final exit point normally triggered by closeResponseBody
-			sseResponse, sseRespErr := wrapHTTPResponse(httpResponse)
-			if sseRespErr != nil {
-				return nil, sseRespErr
-			}
-			sseResponse.URL = url
-			return sseResponse, nil
+			return client.wrapHTTPResponse("")
 		}
 	}
 }
 
-func (mi *sse) open(
-	ctx context.Context, state *lib.State, rt *goja.Runtime, url string,
-	args *sseOpenArgs,
-) (*Client, *http.Response, func(), error) {
-	client := Client{
+func (mi *sse) open(ctx context.Context, state *lib.State,
+	rt *goja.Runtime, url string, args *sseOpenArgs,
+) (*Client, func(), error) {
+	sseClient := Client{
 		ctx:            ctx,
 		rt:             rt,
+		url:            url,
 		eventHandlers:  make(map[string][]goja.Callable),
 		done:           make(chan struct{}),
 		samplesOutput:  state.Samples,
@@ -229,7 +218,8 @@ func (mi *sse) open(
 			TLSClientConfig: tlsConfig,
 		},
 	}
-	// this is needed because of how interfaces work and that ssed.Jar is http.Cookiejar
+
+	// httpClient.Jar must never be nil
 	if args.cookieJar != nil {
 		httpClient.Jar = args.cookieJar
 	}
@@ -241,13 +231,14 @@ func (mi *sse) open(
 
 	req, err := http.NewRequestWithContext(ctx, httpMethod, url, strings.NewReader(args.body))
 	if err != nil {
-		return &client, nil, nil, err
+		return &sseClient, nil, err
 	}
 
 	req.Header.Set("Cache-Control", "no-cache")
 	req.Header.Set("Accept", "text/event-stream")
 	req.Header.Set("Connection", "keep-alive")
 
+	// Wrap the request to retrieve the server IP tag
 	trace := &httptrace.ClientTrace{
 		GotConn: func(connInfo httptrace.GotConnInfo) {
 			if state.Options.SystemTags.Has(metrics.TagIP) {
@@ -258,38 +249,39 @@ func (mi *sse) open(
 		},
 	}
 
-	//nolint:contextcheck // as it's passed in the request
+	//nolint:contextcheck // parent context already passed in the request
 	req = req.WithContext(httptrace.WithClientTrace(req.Context(), trace))
 
 	connStart := time.Now()
+	//nolint:bodyclose // Body is deferred closed in closeResponseBody
 	resp, err := httpClient.Do(req)
 	connEnd := time.Now()
 
 	if resp != nil {
-		client.resp = resp
+		sseClient.resp = resp
 		if state.Options.SystemTags.Has(metrics.TagStatus) {
 			args.tagsAndMeta.SetSystemTagOrMeta(
 				metrics.TagStatus, strconv.Itoa(resp.StatusCode))
 		}
 	}
 
-	connEndHook := client.pushSessionMetrics(connStart, connEnd)
+	connEndHook := sseClient.pushSSEMetrics(connStart, connEnd)
 
-	return &client, resp, connEndHook, err
+	return &sseClient, connEndHook, err
 }
 
 // On is used to configure what the client should do on each event.
-func (s *Client) On(event string, handler goja.Value) {
+func (c *Client) On(event string, handler goja.Value) {
 	if handler, ok := goja.AssertFunction(handler); ok {
-		s.eventHandlers[event] = append(s.eventHandlers[event], handler)
+		c.eventHandlers[event] = append(c.eventHandlers[event], handler)
 	}
 }
 
-func (s *Client) handleEvent(event string, args ...goja.Value) {
-	if handlers, ok := s.eventHandlers[event]; ok {
+func (c *Client) handleEvent(event string, args ...goja.Value) {
+	if handlers, ok := c.eventHandlers[event]; ok {
 		for _, handler := range handlers {
 			if _, err := handler(goja.Undefined(), args...); err != nil {
-				common.Throw(s.rt, err)
+				common.Throw(c.rt, err)
 			}
 		}
 	}
@@ -297,37 +289,37 @@ func (s *Client) handleEvent(event string, args ...goja.Value) {
 
 // closeResponseBody cleanly closes the response body.
 // Returns an error if sending the response body cannot be closed.
-func (s *Client) closeResponseBody() error {
+func (c *Client) closeResponseBody() error {
 	var err error
 
-	s.shutdownOnce.Do(func() {
-		err = s.resp.Body.Close()
+	c.shutdownOnce.Do(func() {
+		err = c.resp.Body.Close()
 		if err != nil {
 			// Call the user-defined error handler
-			s.handleEvent("error", s.rt.ToValue(err))
+			c.handleEvent("error", c.rt.ToValue(err))
 		}
-		close(s.done)
+		close(c.done)
 	})
 
 	return err
 }
 
-func (s *Client) pushSessionMetrics(connStart, connEnd time.Time) func() {
+func (c *Client) pushSSEMetrics(connStart, connEnd time.Time) func() {
 	connDuration := metrics.D(connEnd.Sub(connStart))
 
-	metrics.PushIfNotDone(s.ctx, s.samplesOutput, metrics.ConnectedSamples{
+	metrics.PushIfNotDone(c.ctx, c.samplesOutput, metrics.ConnectedSamples{
 		Samples: []metrics.Sample{
 			{
 				TimeSeries: metrics.TimeSeries{
-					Metric: s.builtinMetrics.HTTPReqSending,
-					Tags:   s.tagsAndMeta.Tags,
+					Metric: c.builtinMetrics.HTTPReqSending,
+					Tags:   c.tagsAndMeta.Tags,
 				},
 				Time:     connStart,
-				Metadata: s.tagsAndMeta.Metadata,
+				Metadata: c.tagsAndMeta.Metadata,
 				Value:    connDuration,
 			},
 		},
-		Tags: s.tagsAndMeta.Tags,
+		Tags: c.tagsAndMeta.Tags,
 		Time: connStart,
 	})
 
@@ -335,46 +327,46 @@ func (s *Client) pushSessionMetrics(connStart, connEnd time.Time) func() {
 		end := time.Now()
 		requestDuration := metrics.D(end.Sub(connStart))
 
-		metrics.PushIfNotDone(s.ctx, s.samplesOutput, metrics.ConnectedSamples{
+		metrics.PushIfNotDone(c.ctx, c.samplesOutput, metrics.ConnectedSamples{
 			Samples: []metrics.Sample{
 				{
 					TimeSeries: metrics.TimeSeries{
-						Metric: s.builtinMetrics.HTTPReqs,
-						Tags:   s.tagsAndMeta.Tags,
+						Metric: c.builtinMetrics.HTTPReqs,
+						Tags:   c.tagsAndMeta.Tags,
 					},
 					Time:     end,
-					Metadata: s.tagsAndMeta.Metadata,
+					Metadata: c.tagsAndMeta.Metadata,
 					Value:    1,
 				},
 				{
 					TimeSeries: metrics.TimeSeries{
-						Metric: s.builtinMetrics.HTTPReqSending,
-						Tags:   s.tagsAndMeta.Tags,
+						Metric: c.builtinMetrics.HTTPReqSending,
+						Tags:   c.tagsAndMeta.Tags,
 					},
 					Time:     end,
-					Metadata: s.tagsAndMeta.Metadata,
+					Metadata: c.tagsAndMeta.Metadata,
 					Value:    connDuration,
 				},
 				{
 					TimeSeries: metrics.TimeSeries{
-						Metric: s.builtinMetrics.HTTPReqDuration,
-						Tags:   s.tagsAndMeta.Tags,
+						Metric: c.builtinMetrics.HTTPReqDuration,
+						Tags:   c.tagsAndMeta.Tags,
 					},
 					Time:     end,
-					Metadata: s.tagsAndMeta.Metadata,
+					Metadata: c.tagsAndMeta.Metadata,
 					Value:    requestDuration,
 				},
 			},
-			Tags: s.tagsAndMeta.Tags,
+			Tags: c.tagsAndMeta.Tags,
 			Time: end,
 		})
 	}
 }
 
 // Wraps SSE in a channel
-func (s *Client) readEvents(reader *bufio.Reader, readChan chan Event, errorChan chan error, closeChan chan int) {
+func (c *Client) readEvents(readChan chan Event, errorChan chan error, closeChan chan int) {
+	reader := bufio.NewReader(c.resp.Body)
 	ev := Event{}
-
 	var buf bytes.Buffer
 
 	sendEvent := false
@@ -385,14 +377,14 @@ func (s *Client) readEvents(reader *bufio.Reader, readChan chan Event, errorChan
 				select {
 				case closeChan <- -1:
 					return
-				case <-s.done:
+				case <-c.done:
 					return
 				}
 			} else {
 				select {
 				case errorChan <- err:
 					return
-				case <-s.done:
+				case <-c.done:
 					return
 				}
 			}
@@ -435,28 +427,32 @@ func (s *Client) readEvents(reader *bufio.Reader, readChan chan Event, errorChan
 					sendEvent = false
 					buf.Reset()
 					ev = Event{}
-				case <-s.done:
+				case <-c.done:
 					return
 				}
 			}
 		default:
 			select {
 			case errorChan <- errors.New("unknown event: " + string(line)):
-			case <-s.done:
+			case <-c.done:
 				return
 			}
 		}
 	}
 }
 
-// Wrap the raw HTTPResponse we received to a sseHTTPResponse we can pass to the user
-func wrapHTTPResponse(httpResponse *http.Response) (*HTTPResponse, error) {
+// Wrap the raw HTTPResponse we received to a sse.HTTPResponse we can pass to the user
+func (c *Client) wrapHTTPResponse(errMessage string) (*HTTPResponse, error) {
+	if errMessage != "" {
+		return &HTTPResponse{Error: errMessage}, nil
+	}
 	sseResponse := HTTPResponse{
-		Status: httpResponse.StatusCode,
+		URL:    c.url,
+		Status: c.resp.StatusCode,
 	}
 
-	sseResponse.Headers = make(map[string]string, len(httpResponse.Header))
-	for k, vs := range httpResponse.Header {
+	sseResponse.Headers = make(map[string]string, len(c.resp.Header))
+	for k, vs := range c.resp.Header {
 		sseResponse.Headers[k] = strings.Join(vs, ", ")
 	}
 
