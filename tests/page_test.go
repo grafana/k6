@@ -8,6 +8,8 @@ import (
 	"image/png"
 	"io"
 	"net/http"
+	"net/http/httptest"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -1627,6 +1629,73 @@ func TestPageIsHidden(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Equal(t, tc.want, got)
+		})
+	}
+}
+
+func TestShadowDOMAndDocumentFragment(t *testing.T) {
+	t.Parallel()
+
+	// Start a server that will return static html files.
+	mux := http.NewServeMux()
+	s := httptest.NewServer(mux)
+	t.Cleanup(s.Close)
+
+	const (
+		slash = string(os.PathSeparator)
+		path  = slash + testBrowserStaticDir + slash
+	)
+	fs := http.FileServer(http.Dir(testBrowserStaticDir))
+	mux.Handle(path, http.StripPrefix(path, fs))
+
+	tests := []struct {
+		name     string
+		selector string
+		want     string
+	}{
+		{
+			// This test waits for an element that is in the DocumentFragment.
+			name:     "waitFor_DocumentFragment",
+			selector: `//p[@id="inDocFrag"]`,
+			want:     "This text is added via a document fragment!",
+		},
+		{
+			// This test waits for an element that is in the DocumentFragment
+			// that is within an open shadow root.
+			name:     "waitFor_ShadowRoot_DocumentFragment",
+			selector: `//p[@id="inShadowRootDocFrag"]`,
+			want:     "This is inside Shadow DOM, added via a DocumentFragment!",
+		},
+		{
+			// This test waits for an element that is in the original Document.
+			name:     "waitFor_done",
+			selector: `//div[@id="done"]`,
+			want:     "All additions to page completed (i'm in the original document)",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			_, rt, _, cleanUp := startIteration(t)
+			defer cleanUp()
+
+			got, err := rt.RunString(fmt.Sprintf(`
+				const p = browser.newPage()
+				p.goto("%s/%s/shadow_and_doc_frag.html")
+
+				const s = p.locator('%s')
+				s.waitFor({
+					timeout: 1000,
+					state: 'attached',
+				});
+
+				s.innerText();
+			`, s.URL, testBrowserStaticDir, tt.selector))
+			assert.NoError(t, err)
+			assert.Equal(t, tt.want, got.String())
 		})
 	}
 }

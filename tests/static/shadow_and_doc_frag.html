@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DocumentFragment and ShadowRoot Test page</title>
+</head>
+<body>
+    <h2>DocumentFragment and ShadowRoot Test page</h2>
+    <div id="docFrag"></div>
+
+    <!-- Element that will host the Shadow DOM -->
+    <div id="shadowHost"></div>
+
+    <script>
+        function addDocFrag() {
+            const container = document.getElementById('docFrag');
+            const fragment = document.createDocumentFragment();
+
+            // Add some additional text in a paragraph
+            const paragraph = document.createElement('p');
+            paragraph.id = 'inDocFrag'; // Set the id of the div
+            paragraph.textContent = 'This text is added via a document fragment!';
+            fragment.appendChild(paragraph);
+
+            // Append the fragment to the container
+            container.appendChild(fragment);
+        }
+
+        function addShadowDom() {
+            const shadowHost = document.getElementById('shadowHost');
+            // When mode is set to closed, we cannot access internals with JS.
+            // We will need to create a custom element that exposes these
+            // internals with getters and setters.
+            const shadowRoot = shadowHost.attachShadow({ mode: 'open' });
+
+            // Create a DocumentFragment to add to the Shadow DOM
+            const fragment = document.createDocumentFragment();
+
+            // Add some styled content to the fragment
+            const styleElement = document.createElement('style');
+            styleElement.textContent = `
+                p {
+                    color: blue;
+                    font-weight: bold;
+                }
+            `;
+            fragment.appendChild(styleElement);
+
+            const paragraphElement = document.createElement('p');
+            paragraphElement.id = 'inShadowRootDocFrag';
+            paragraphElement.textContent = 'This is inside Shadow DOM, added via a DocumentFragment!';
+            fragment.appendChild(paragraphElement);
+
+            // Append the DocumentFragment to the Shadow DOM.
+            shadowRoot.appendChild(fragment);
+        }
+
+        function done() {
+            // Create a new div element which will reside in the original Document.
+            const doneDiv = document.createElement('div');
+            doneDiv.id = 'done';
+            doneDiv.textContent = "All additions to page completed (i'm in the original document)";
+
+            // Append it to the original Document.
+            document.body.appendChild(doneDiv);
+        }
+
+        addDocFrag();
+        addShadowDom();
+        done();
+    </script>
+</body>
+</html>
