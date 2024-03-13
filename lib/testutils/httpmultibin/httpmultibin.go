@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"io"
 	"net"
 	"net/http"
@@ -164,28 +165,39 @@ func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
 // If generateErrors is true then it generates junk
 // without respecting the protocol.
 func sseHandler(t testing.TB, generateErrors bool) http.Handler {
-	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	return http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
 		if generateErrors {
 			_, _ = w.Write([]byte("junk\n"))
 		} else {
-			_, err := w.Write([]byte(": hello\n")) // comment
-			require.NoError(t, err)
+			if req.Method == http.MethodPost {
+				body, err := io.ReadAll(req.Body)
+				require.NoError(t, err)
+				assert.Equal(t, `{"ping": true}`, string(body))
 
-			_, err = w.Write([]byte("retry: 10000\n")) // retry
-			require.NoError(t, err)
+				_, err = w.Write([]byte("id: pong\n")) // event id
+				require.NoError(t, err)
+				_, err = w.Write([]byte(`data: {"ping": "pong"}` + "\n\n")) // event data
+				require.NoError(t, err)
+			} else {
+				_, err := w.Write([]byte(": hello\n")) // comment
+				require.NoError(t, err)
 
-			_, err = w.Write([]byte("id: ABCD\n")) // id
-			require.NoError(t, err)
+				_, err = w.Write([]byte("retry: 10000\n")) // retry
+				require.NoError(t, err)
 
-			_, err = w.Write([]byte(`data: {"ping": "pong"}` + "\n")) // data 1 event 1
-			require.NoError(t, err)
-			_, err = w.Write([]byte(`data: {"hello": "sse"}` + "\n\n")) // data 2 event 1
-			require.NoError(t, err)
+				_, err = w.Write([]byte("id: ABCD\n")) // id
+				require.NoError(t, err)
 
-			_, err = w.Write([]byte("event: EFGH\n")) // event name
-			require.NoError(t, err)
-			_, err = w.Write([]byte(`data: {"hello": "sse"}` + "\n\n")) // data event 2
-			require.NoError(t, err)
+				_, err = w.Write([]byte(`data: {"ping": "pong"}` + "\n")) // event 1 data 1
+				require.NoError(t, err)
+				_, err = w.Write([]byte(`data: {"hello": "sse"}` + "\n\n")) // event 1 data 2
+				require.NoError(t, err)
+
+				_, err = w.Write([]byte("event: EFGH\n")) // event name
+				require.NoError(t, err)
+				_, err = w.Write([]byte(`data: {"hello": "sse"}` + "\n\n")) // event 2 data
+				require.NoError(t, err)
+			}
 		}
 	})
 }

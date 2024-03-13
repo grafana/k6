@@ -110,7 +110,7 @@ func newTestState(t testing.TB) testState {
 func TestOpen(t *testing.T) {
 	t.Parallel()
 
-	t.Run("nominal", func(t *testing.T) {
+	t.Run("nominal get", func(t *testing.T) {
 		t.Parallel()
 		tb := httpmultibin.NewHTTPMultiBin(t)
 		sr := tb.Replacer.Replace
@@ -170,6 +170,40 @@ func TestOpen(t *testing.T) {
 		require.NoError(t, err)
 		samplesBuf := metrics.GetBufferedSamples(test.samples)
 		assertMetricEmittedCount(t, metrics.SSEName, samplesBuf, sr("HTTPBIN_IP_URL/sse"), 2)
+	})
+
+	t.Run("post method", func(t *testing.T) {
+		t.Parallel()
+		tb := httpmultibin.NewHTTPMultiBin(t)
+		sr := tb.Replacer.Replace
+
+		test := newTestState(t)
+		_, err := test.VU.Runtime().RunString(sr(`
+		var events = [];
+		var res = sse.open("HTTPBIN_IP_URL/sse", {method: 'POST', body: '{"ping": true}'}, function(client){
+			client.on("event", function(event) {
+				events.push(event);
+			});
+		});
+		for (let i = 0; i < events.length; i++) {
+			let event = events[i];
+			switch(i) {
+				case 0:
+					if (event.id !== "pong") {
+						throw new Error("unexpected event id: " + event.id);
+					}
+					if (event.data !== '{"ping": "pong"}\n') {
+						throw new Error("unexpected event data: " + event.data);
+					}
+					break;
+				default:
+					throw new Error("unexpected event");
+			}
+		}
+		`))
+		require.NoError(t, err)
+		samplesBuf := metrics.GetBufferedSamples(test.samples)
+		assertMetricEmittedCount(t, metrics.SSEName, samplesBuf, sr("HTTPBIN_IP_URL/sse"), 1)
 	})
 }
 
