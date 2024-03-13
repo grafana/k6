@@ -23,8 +23,10 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 )
 
-const resultDone = "done"
-const resultNeedsInput = "needsinput"
+const (
+	resultDone       = "done"
+	resultNeedsInput = "needsinput"
+)
 
 type (
 	elementHandleActionFunc        func(context.Context, *ElementHandle) (any, error)
