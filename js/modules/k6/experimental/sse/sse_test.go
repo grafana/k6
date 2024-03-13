@@ -117,9 +117,16 @@ func TestOpen(t *testing.T) {
 
 		test := newTestState(t)
 		_, err := test.VU.Runtime().RunString(sr(`
+		var open = false;
 		var error = false;
 		var events = [];
 		var res = sse.open("HTTPBIN_IP_URL/sse", function(client){
+			client.on("error", function(err) {
+				error = true
+			});
+			client.on("open", function(err) {
+				open = true
+			});
 			client.on("error", function(err) {
 				error = true
 			});
@@ -127,6 +134,9 @@ func TestOpen(t *testing.T) {
 				events.push(event);
 			});
 		});
+		if (!open) {
+			throw new Error("opened is not called");
+		}
 		if (error) {
 			throw new Error("error raised");
 		}

@@ -42,10 +42,6 @@ var response = sse.open(url, params, function (client) {
         console.log(`event id=${event.id}, name=${event.name}, data=${event.data}`);
     });
 
-    client.on('close', function close() {
-        console.log('disconnected');
-    });
-
     client.on('error', function (e) {
         console.log('An unexpected error occurred: ', e.error());
     });
