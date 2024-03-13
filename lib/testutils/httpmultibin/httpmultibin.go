@@ -160,6 +160,36 @@ func echoHandler(t testing.TB, closePrematurely bool) http.Handler {
 	})
 }
 
+// sseHandler handles sse requests and generates some events.
+// If generateErrors is true then it generates junk
+// without respecting the protocol.
+func sseHandler(t testing.TB, generateErrors bool) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		if generateErrors {
+			_, _ = w.Write([]byte("junk\n"))
+		} else {
+			_, err := w.Write([]byte(": hello\n")) // comment
+			require.NoError(t, err)
+
+			_, err = w.Write([]byte("retry: 10000\n")) // retry
+			require.NoError(t, err)
+
+			_, err = w.Write([]byte("id: ABCD\n")) // id
+			require.NoError(t, err)
+
+			_, err = w.Write([]byte(`data: {"ping": "pong"}` + "\n")) // data 1 event 1
+			require.NoError(t, err)
+			_, err = w.Write([]byte(`data: {"hello": "sse"}` + "\n\n")) // data 2 event 1
+			require.NoError(t, err)
+
+			_, err = w.Write([]byte("event: EFGH\n")) // event name
+			require.NoError(t, err)
+			_, err = w.Write([]byte(`data: {"hello": "sse"}` + "\n\n")) // data event 2
+			require.NoError(t, err)
+		}
+	})
+}
+
 func writeJSON(w io.Writer, v interface{}) error {
 	e := json.NewEncoder(w)
 	e.SetIndent("", "  ")
@@ -294,6 +324,8 @@ func NewHTTPMultiBin(t testing.TB) *HTTPMultiBin {
 	mux.Handle("/ws-echo-invalid", echoHandler(t, true))
 	mux.Handle("/ws-close", autocloseHandler(t))
 	mux.Handle("/ws-close-invalid", echoHandler(t, true))
+	mux.Handle("/sse", sseHandler(t, false))
+	mux.Handle("/sse-invalid", sseHandler(t, true))
 	mux.Handle("/zstd", getEncodedHandler(t, "zstd"))
 	mux.Handle("/zstd-br", getZstdBrHandler(t))
 	mux.Handle("/", httpbin.New().Handler())
