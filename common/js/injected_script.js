@@ -125,6 +125,13 @@ class XPathQueryEngine {
     }
     const result = [];
 
+    // DocumentFragments cannot be queried with XPath and they do not implement
+    // evaluate. It first needs to be converted to a Document before being able
+    // to run the evaluate against it.
+    //
+    // This avoids the following error:
+    // - Failed to execute 'evaluate' on 'Document': The node provided is
+    //   '#document-fragment', which is not a valid context node type.
     if (root instanceof DocumentFragment) {
       root = convertToDocument(root);
     }
@@ -148,9 +155,9 @@ class XPathQueryEngine {
   }
 }
 
-// DocumentFragments cannot be queried with XPath and they do not
-// implement evaluate. It first needs to be converted to a Document
-// before being able to run the evaluate against it.
+// convertToDocument will convert a DocumentFragment into a Document. It does
+// this by creating a new Document and copying the elements from the
+// DocumentFragment to the Document.
 function convertToDocument(fragment) {
   var newDoc = document.implementation.createHTMLDocument("Temporary Document");
 
@@ -159,8 +166,9 @@ function convertToDocument(fragment) {
   return newDoc;
 }
 
-// Function to manually copy nodes to a new document, excluding ShadowRoot
-// nodes. ShadowRoot are not cloneable so we need to manually clone them.
+// copyNodesToDocument manually copies nodes to a new document, excluding
+// ShadowRoot nodes -- ShadowRoot are not cloneable so we need to manually
+// clone them one element at a time.
 function copyNodesToDocument(sourceNode, targetNode) {
   sourceNode.childNodes.forEach((child) => {
       if (child.nodeType === Node.ELEMENT_NODE) {
