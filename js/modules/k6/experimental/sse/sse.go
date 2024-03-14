@@ -95,9 +95,10 @@ type HTTPResponse struct {
 
 // Event represents a Server-Sent Event
 type Event struct {
-	ID   string
-	Name string
-	Data string
+	ID      string
+	Comment string
+	Name    string
+	Data    string
 }
 
 type sseOpenArgs struct {
@@ -364,13 +365,13 @@ func (c *Client) pushSSEMetrics(connStart, connEnd time.Time) func() {
 	}
 }
 
-// Wraps SSE in a channel
+// Wraps SSE in a channel, follow the SSE format described in:
+// https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events/Using_server-sent_events
 func (c *Client) readEvents(readChan chan Event, errorChan chan error, closeChan chan int) {
 	reader := bufio.NewReader(c.resp.Body)
 	ev := Event{}
 	var buf bytes.Buffer
 
-	sendEvent := false
 	for {
 		line, err := reader.ReadBytes('\n')
 		if err != nil {
@@ -392,17 +393,17 @@ func (c *Client) readEvents(readChan chan Event, errorChan chan error, closeChan
 		}
 
 		switch {
-		case hasPrefix(line, ":"):
-			// Comment, do nothing
-
-		case hasPrefix(line, "retry:"):
-			// Retry, do nothing for now
-
 		// id of event
 		case hasPrefix(line, "id: "):
 			ev.ID = stripPrefix(line, 4)
 		case hasPrefix(line, "id:"):
 			ev.ID = stripPrefix(line, 3)
+
+		// Comment
+		case hasPrefix(line, ": "):
+			ev.Comment = stripPrefix(line, 2)
+		case hasPrefix(line, ":"):
+			ev.Comment = stripPrefix(line, 1)
 
 		// name of event
 		case hasPrefix(line, "event: "):
@@ -413,24 +414,26 @@ func (c *Client) readEvents(readChan chan Event, errorChan chan error, closeChan
 		// event data
 		case hasPrefix(line, "data: "):
 			buf.Write(line[6:])
-			sendEvent = true
+
 		case hasPrefix(line, "data:"):
 			buf.Write(line[5:])
-			sendEvent = true
+
+		case hasPrefix(line, "retry:"):
+			// Retry, do nothing for now
 
 		// end of event
 		case bytes.Equal(line, []byte("\n")):
-			if sendEvent {
-				// Report an unexpected closure
-				ev.Data = buf.String()
-				select {
-				case readChan <- ev:
-					sendEvent = false
-					buf.Reset()
-					ev = Event{}
-				case <-c.done:
-					return
-				}
+			// Trailing newlines are removed.
+			ev.Data = strings.TrimRightFunc(buf.String(), func(r rune) bool {
+				return r == '\r' || r == '\n'
+			})
+
+			select {
+			case readChan <- ev:
+				buf.Reset()
+				ev = Event{}
+			case <-c.done:
+				return
 			}
 		default:
 			select {

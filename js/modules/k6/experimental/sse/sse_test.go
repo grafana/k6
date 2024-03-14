@@ -147,7 +147,10 @@ func TestOpen(t *testing.T) {
 					if (event.id !== "ABCD") {
 						throw new Error("unexpected event id: " + event.id);
 					}
-					if (event.data !== '{"ping": "pong"}\n{"hello": "sse"}\n') {
+					if (event.comment !== 'hello') {
+						throw new Error("unexpected event comment: " + event.comment);
+					}
+					if (event.data !== '{"ping": "pong"}\n{"hello": "sse"}') {
 						throw new Error("unexpected event data: " + event.data);
 					}
 					break;
@@ -158,7 +161,7 @@ func TestOpen(t *testing.T) {
 					if (event.name !== "EFGH") {
 						throw new Error("unexpected event name: " + event.name);
 					}
-					if (event.data !== '{"hello": "sse"}\n') {
+					if (event.data !== '{"hello": "sse"}') {
 						throw new Error("unexpected event data: " + event.data);
 					}
 					break;
@@ -192,7 +195,7 @@ func TestOpen(t *testing.T) {
 					if (event.id !== "pong") {
 						throw new Error("unexpected event id: " + event.id);
 					}
-					if (event.data !== '{"ping": "pong"}\n') {
+					if (event.data !== '{"ping": "pong"}') {
 						throw new Error("unexpected event data: " + event.data);
 					}
 					break;

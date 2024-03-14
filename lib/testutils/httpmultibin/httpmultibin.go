@@ -180,10 +180,10 @@ func sseHandler(t testing.TB, generateErrors bool) http.Handler {
 				_, err = w.Write([]byte(`data: {"ping": "pong"}` + "\n\n")) // event data
 				require.NoError(t, err)
 			} else {
-				_, err := w.Write([]byte(": hello\n")) // comment
+				_, err := w.Write([]byte("retry: 10000\n")) // retry
 				require.NoError(t, err)
 
-				_, err = w.Write([]byte("retry: 10000\n")) // retry
+				_, err = w.Write([]byte(": hello\n")) // comment
 				require.NoError(t, err)
 
 				_, err = w.Write([]byte("id: ABCD\n")) // id
