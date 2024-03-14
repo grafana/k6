@@ -124,6 +124,18 @@ class XPathQueryEngine {
       selector = "." + selector;
     }
     const result = [];
+
+    // DocumentFragments cannot be queried with XPath and they do not implement
+    // evaluate. It first needs to be converted to a Document before being able
+    // to run the evaluate against it.
+    //
+    // This avoids the following error:
+    // - Failed to execute 'evaluate' on 'Document': The node provided is
+    //   '#document-fragment', which is not a valid context node type.
+    if (root instanceof DocumentFragment) {
+      root = convertToDocument(root);
+    }
+
     const document = root instanceof Document ? root : root.ownerDocument;
     if (!document) {
       return result;
@@ -141,6 +153,43 @@ class XPathQueryEngine {
     }
     return result;
   }
+}
+
+// convertToDocument will convert a DocumentFragment into a Document. It does
+// this by creating a new Document and copying the elements from the
+// DocumentFragment to the Document.
+function convertToDocument(fragment) {
+  var newDoc = document.implementation.createHTMLDocument("Temporary Document");
+
+  copyNodesToDocument(fragment, newDoc.body);
+
+  return newDoc;
+}
+
+// copyNodesToDocument manually copies nodes to a new document, excluding
+// ShadowRoot nodes -- ShadowRoot are not cloneable so we need to manually
+// clone them one element at a time.
+function copyNodesToDocument(sourceNode, targetNode) {
+  sourceNode.childNodes.forEach((child) => {
+      if (child.nodeType === Node.ELEMENT_NODE) {
+          // Clone the child node without its descendants
+          let clonedChild = child.cloneNode(false);
+          targetNode.appendChild(clonedChild);
+
+          // If the child has a shadow root, recursively copy its children
+          // instead of the shadow root itself.
+          if (child.shadowRoot) {
+              copyNodesToDocument(child.shadowRoot, clonedChild);
+          } else {
+              // Recursively copy normal child nodes
+              copyNodesToDocument(child, clonedChild);
+          }
+      } else {
+          // For non-element nodes (like text nodes), clone them directly.
+          let clonedChild = child.cloneNode(true);
+          targetNode.appendChild(clonedChild);
+      }
+  });
 }
 
 class InjectedScript {
@@ -777,26 +826,31 @@ class InjectedScript {
         resolve = res;
         reject = rej;
       });
-      const observer = new MutationObserver(async () => {
-        if (timedOut) {
+      try {
+        const observer = new MutationObserver(async () => {
+          if (timedOut) {
+            observer.disconnect();
+            reject(`timed out after ${timeout}ms`);
+          }
+          const success = predicate();
+          if (success !== continuePolling) {
+            observer.disconnect();
+            resolve(success);
+          }
+        });
+        timeoutPoll = () => {
           observer.disconnect();
           reject(`timed out after ${timeout}ms`);
-        }
-        const success = predicate();
-        if (success !== continuePolling) {
-          observer.disconnect();
-          resolve(success);
-        }
-      });
-      timeoutPoll = () => {
-        observer.disconnect();
-        reject(`timed out after ${timeout}ms`);
-      };
-      observer.observe(document, {
-        childList: true,
-        subtree: true,
-        attributes: true,
-      });
+        };
+        observer.observe(document, {
+          childList: true,
+          subtree: true,
+          attributes: true,
+        });
+      } catch(error) {
+        reject(error);
+        return;
+      }
       return result;
     }
 
@@ -810,13 +864,22 @@ class InjectedScript {
       return result;
 
       async function onRaf() {
-        if (timedOut) {
-          reject(`timed out after ${timeout}ms`);
+        try {
+          if (timedOut) {
+            reject(`timed out after ${timeout}ms`);
+            return;
+          }
+          const success = predicate();
+          if (success !== continuePolling) {
+            resolve(success);
+            return
+          } else {
+            requestAnimationFrame(onRaf);
+          }
+        } catch (error) {
+          reject(error);
           return;
         }
-        const success = predicate();
-        if (success !== continuePolling) resolve(success);
-        else requestAnimationFrame(onRaf);
       }
     }
 
@@ -830,13 +893,18 @@ class InjectedScript {
       return result;
 
       async function onTimeout() {
-        if (timedOut) {
-          reject(`timed out after ${timeout}ms`);
+        try{
+          if (timedOut) {
+            reject(`timed out after ${timeout}ms`);
+            return;
+          }
+          const success = predicate();
+          if (success !== continuePolling) resolve(success);
+          else setTimeout(onTimeout, pollInterval);
+        } catch(error) {
+          reject(error);
           return;
         }
-        const success = predicate();
-        if (success !== continuePolling) resolve(success);
-        else setTimeout(onTimeout, pollInterval);
       }
     }
   }

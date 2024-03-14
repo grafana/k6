@@ -78,7 +78,6 @@ type ElementHandleHoverOptions struct {
 
 // File is the descriptor of a single file.
 type File struct {
-	Path     string `json:"-"`
 	Name     string `json:"name"`
 	Mimetype string `json:"mimeType"`
 	Buffer   string `json:"buffer"`
@@ -204,7 +203,7 @@ func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *Element
 	}
 }
 
-// addFile to the struct. Input value can be a path, or a file descriptor object.
+// addFile to the struct. Input value can only be a file descriptor object.
 func (f *Files) addFile(ctx context.Context, file goja.Value) error {
 	if !gojaValueExists(file) {
 		return nil
@@ -218,10 +217,6 @@ func (f *Files) addFile(ctx context.Context, file goja.Value) error {
 			return fmt.Errorf("parsing file descriptor: %w", err)
 		}
 		f.Payload = append(f.Payload, &parsedFile)
-	case reflect.String: // file path
-		if v, ok := file.Export().(string); ok {
-			f.Payload = append(f.Payload, &File{Path: v})
-		}
 	default:
 		return fmt.Errorf("invalid parameter type : %s", fileType.Kind().String())
 	}
