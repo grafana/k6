@@ -447,24 +447,6 @@ func (m *FrameManager) requestFailed(req *Request, canceled bool) {
 	}
 	frame.deleteRequest(req.getID())
 
-	ifr := frame.cloneInflightRequests()
-	switch rc := len(ifr); {
-	case rc <= 10:
-		for reqID := range ifr {
-			req, ok := frame.requestByID(reqID)
-			if !ok {
-				m.logger.Debugf("FrameManager:requestFailed:rc<=10 request is nil",
-					"reqID:%s frameID:%s",
-					reqID, frame.ID())
-				continue
-			}
-
-			m.logger.Debugf("FrameManager:requestFailed:rc<=10",
-				"reqID:%s inflightURL:%s frameID:%s",
-				reqID, req.URL(), frame.ID())
-		}
-	}
-
 	frame.pendingDocumentMu.RLock()
 	if frame.pendingDocument == nil || frame.pendingDocument.request != req {
 		m.logger.Debugf("FrameManager:requestFailed:return", "fmid:%d pdoc:nil", m.ID())
