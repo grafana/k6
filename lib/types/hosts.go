@@ -97,7 +97,7 @@ type Hosts struct {
 // NewHosts returns new Hosts from given addresses.
 func NewHosts(source map[string]Host) (*Hosts, error) {
 	h := &Hosts{
-		source: source,
+		source: toLowerKeys(source),
 		n: &trieNode{
 			children: make(map[rune]*trieNode),
 		},
@@ -111,6 +111,14 @@ func NewHosts(source map[string]Host) (*Hosts, error) {
 	}
 
 	return h, nil
+}
+
+func toLowerKeys(source map[string]Host) map[string]Host {
+	result := make(map[string]Host, len(source))
+	for k, v := range source {
+		result[strings.ToLower(k)] = v
+	}
+	return result
 }
 
 // Regex description of domain(:port)? pattern to enforce blocks by.
