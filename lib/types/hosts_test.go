@@ -49,6 +49,7 @@ func TestHosts(t *testing.T) {
 		"specific.wildcard.io":   {IP: net.ParseIP("90.100.110.120")},
 		"*wildcard-2.io":         {IP: net.ParseIP("13.14.15.16")},
 		"specific.wildcard-2.io": {IP: net.ParseIP("130.140.150.160")},
+		"with-UPPER-case.io":     {IP: net.ParseIP("17.18.19.20")},
 
 		// IPv6
 		"simple-ipv6.io":              {IP: net.ParseIP("aa::bb")},
@@ -77,6 +78,8 @@ func TestHosts(t *testing.T) {
 				{"only-port.io", "", NotInHosts},
 				{"only-port.io:443", "5.6.7.8:8443", DifferentPortMapping},
 				{"only-port.io:9999", "", NotGivenPortMapping},
+				{"with-upper-case.io", "17.18.19.20:0", EmptyPortMapping},
+				{"with-UPPER-case.io", "17.18.19.20:0", EmptyPortMapping},
 			}
 			runTcs(t, hosts, tcs)
 		})
