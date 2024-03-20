@@ -22,9 +22,10 @@ const (
 	trendString   = "trend"
 	rateString    = "rate"
 
-	defaultString = "default"
-	timeString    = "time"
-	dataString    = "data"
+	defaultString  = "default"
+	timeString     = "time"
+	dataString     = "data"
+	negativeString = "negative"
 )
 
 // MarshalJSON serializes a MetricType as a human readable string.

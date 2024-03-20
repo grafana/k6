@@ -4,9 +4,10 @@ import "errors"
 
 // Possible values for ValueType.
 const (
-	Default = ValueType(iota) // Values are presented as-is
-	Time                      // Values are time durations (milliseconds)
-	Data                      // Values are data amounts (bytes)
+	Default  = ValueType(iota) // Values are presented as-is
+	Time                       // Values are time durations (milliseconds)
+	Data                       // Values are data amounts (bytes)
+	Negative                   // Values represent negative events (e.g. failed requests)
 )
 
 // ErrInvalidValueType indicates the serialized value type is invalid.
@@ -33,6 +34,8 @@ func (t ValueType) MarshalText() ([]byte, error) {
 		return []byte(timeString), nil
 	case Data:
 		return []byte(dataString), nil
+	case Negative:
+		return []byte(negativeString), nil
 	default:
 		return nil, ErrInvalidValueType
 	}
@@ -47,6 +50,8 @@ func (t *ValueType) UnmarshalText(data []byte) error {
 		*t = Time
 	case dataString:
 		*t = Data
+	case negativeString:
+		*t = Negative
 	default:
 		return ErrInvalidValueType
 	}
@@ -62,6 +67,8 @@ func (t ValueType) String() string {
 		return timeString
 	case Data:
 		return dataString
+	case Negative:
+		return negativeString
 	default:
 		return "[INVALID]"
 	}
