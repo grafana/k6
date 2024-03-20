@@ -1,9 +1,11 @@
 # Source maps consumer for Golang
 
-[![Build Status](https://travis-ci.org/go-sourcemap/sourcemap.svg)](https://travis-ci.org/go-sourcemap/sourcemap)
 [![PkgGoDev](https://pkg.go.dev/badge/github.com/go-sourcemap/sourcemap)](https://pkg.go.dev/github.com/go-sourcemap/sourcemap)
 
-> :heart: [**Uptrace.dev** - distributed traces, logs, and errors in one place](https://uptrace.dev)
+> This package is brought to you by :star: [**uptrace/uptrace**](https://github.com/uptrace/uptrace).
+> Uptrace is an open-source APM tool that supports distributed tracing, metrics, and logs. You can
+> use it to monitor applications and set up automatic alerts to receive notifications via email,
+> Slack, Telegram, and others.
 
 ## Installation
 
