@@ -184,6 +184,10 @@ func (c *Consumer) Source(
 func (c *Consumer) source(
 	m *sourceMap, genLine, genColumn int,
 ) (source, name string, line, column int, ok bool) {
+	if len(m.mappings) == 0 {
+		return
+	}
+
 	i := sort.Search(len(m.mappings), func(i int) bool {
 		m := &m.mappings[i]
 		if int(m.genLine) == genLine {
