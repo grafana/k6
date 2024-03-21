@@ -91,7 +91,7 @@ func (varc *RampingArrivalRateConfig) Validate() []error {
 		errors = append(errors, fmt.Errorf("the startRate value can't be negative"))
 	}
 
-	if varc.TimeUnit.TimeDuration() < 0 {
+	if varc.TimeUnit.TimeDuration() <= 0 {
 		errors = append(errors, fmt.Errorf("the timeUnit must be more than 0"))
 	}
 
