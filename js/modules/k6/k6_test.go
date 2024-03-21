@@ -414,7 +414,7 @@ func testCaseRuntime(t testing.TB) *testCase {
 	state := &lib.State{
 		Group: root,
 		Options: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		Samples:        samples,
 		Tags:           lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{"group": root.Path})),

@@ -142,7 +142,7 @@ func newTestCase(t testing.TB) *httpTestCase {
 		MaxRedirects: null.IntFrom(10),
 		UserAgent:    null.StringFrom("TestUserAgent"),
 		Throw:        null.BoolFrom(true),
-		SystemTags:   &metrics.DefaultSystemTagSet,
+		SystemTags:   metrics.DefaultSystemTagSet,
 		Batch:        null.IntFrom(20),
 		BatchPerHost: null.IntFrom(20),
 		// HTTPDebug:    null.StringFrom("full"),

@@ -203,8 +203,8 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 //
 // Note that if you add option default value here, also add it in command line argument help text.
 func applyDefault(conf Config) Config {
-	if conf.SystemTags == nil {
-		conf.SystemTags = &metrics.DefaultSystemTagSet
+	if !conf.SystemTags.Valid {
+		conf.SystemTags = metrics.DefaultSystemTagSet
 	}
 	if conf.SummaryTrendStats == nil {
 		conf.SummaryTrendStats = lib.DefaultSummaryTrendStats

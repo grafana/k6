@@ -330,23 +330,29 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 
 		// Test system tags
 		{opts{}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, &metrics.DefaultSystemTagSet, c.Options.SystemTags)
+			assert.Equal(t, metrics.DefaultSystemTagSet, c.Options.SystemTags)
 		}},
 		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
-			assert.Equal(t, metrics.SystemTagSet(0), *c.Options.SystemTags)
+			assert.Equal(t, metrics.NewNullSystemTagSet(metrics.SystemTag(0)), c.Options.SystemTags)
+		}},
+		{opts{env: []string{"K6_SYSTEM_TAGS=proto,method"}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, metrics.NewNullSystemTagSet(metrics.TagProto|metrics.TagMethod), c.Options.SystemTags)
+		}},
+		{opts{env: []string{"K6_SYSTEM_TAGS=\"\""}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, metrics.NewNullSystemTagSet(metrics.SystemTag(0)), c.Options.SystemTags)
 		}},
 		{
 			opts{
 				runner: &lib.Options{
-					SystemTags: metrics.NewSystemTagSet(metrics.TagSubproto, metrics.TagURL),
+					SystemTags: metrics.NewNullSystemTagSet(metrics.TagSubproto, metrics.TagURL),
 				},
 			},
 			exp{},
 			func(t *testing.T, c Config) {
 				assert.Equal(
 					t,
-					*metrics.NewSystemTagSet(metrics.TagSubproto, metrics.TagURL),
-					*c.Options.SystemTags,
+					metrics.NewNullSystemTagSet(metrics.TagSubproto, metrics.TagURL),
+					c.Options.SystemTags,
 				)
 			},
 		},

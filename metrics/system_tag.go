@@ -44,14 +44,14 @@ const (
 // Other tags that are not enabled by default include: iter, vu, ocsp_status, ip
 //
 //nolint:gochecknoglobals
-var DefaultSystemTagSet = SystemTagSet(
+var DefaultSystemTagSet = NewNullSystemTagSet(
 	TagProto | TagSubproto | TagStatus | TagMethod | TagURL | TagName | TagGroup |
 		TagCheck | TagError | TagErrorCode | TagTLSVersion | TagScenario | TagService | TagExpectedResponse)
 
 // NonIndexableSystemTags are high cardinality system tags (i.e. metadata).
 //
 //nolint:gochecknoglobals
-var NonIndexableSystemTags = SystemTagSet(TagIter | TagVU)
+var NonIndexableSystemTags = NewNullSystemTagSet(TagIter | TagVU)
 
 // Add adds a tag to tag set.
 func (i *SystemTagSet) Add(tag SystemTag) {
@@ -153,3 +153,91 @@ func (i *SystemTagSet) UnmarshalText(data []byte) error {
 	}
 	return nil
 }
+
+// NullSystemTagSet is a wrapper around SystemTagSet like guregu/null
+type NullSystemTagSet struct {
+	Set   *SystemTagSet
+	Valid bool
+}
+
+// ToNullSystemTagSet converts list of tags to NullSystemTagSet
+func ToNullSystemTagSet(tags []string) NullSystemTagSet {
+	return NullSystemTagSet{
+		Set:   ToSystemTagSet(tags),
+		Valid: true,
+	}
+}
+
+// NewNullSystemTagSet returns valid (Valid: true) SystemTagSet
+func NewNullSystemTagSet(tags ...SystemTag) NullSystemTagSet {
+	return NullSystemTagSet{
+		Set:   NewSystemTagSet(tags...),
+		Valid: true,
+	}
+}
+
+// Add adds a tag to tag set.
+func (n *NullSystemTagSet) Add(tag SystemTag) {
+	if n.Set == nil {
+		n.Set = new(SystemTagSet)
+		n.Valid = true
+	}
+	n.Set.Add(tag)
+}
+
+// Has checks a tag included in tag set.
+func (n NullSystemTagSet) Has(tag SystemTag) bool {
+	if !n.Valid {
+		return false
+	}
+	return n.Set.Has(tag)
+}
+
+// Map returns the EnabledTags with current value from SystemTagSet
+func (n NullSystemTagSet) Map() EnabledTags {
+	return n.Set.Map()
+}
+
+// SetString returns comma separated list of the string representation of all values in the set
+func (n NullSystemTagSet) SetString() string {
+	return n.Set.SetString()
+}
+
+// MarshalJSON converts NullSystemTagSet to valid JSON
+func (n NullSystemTagSet) MarshalJSON() ([]byte, error) {
+	if !n.Valid {
+		return []byte(nullJSON), nil
+	}
+
+	return n.Set.MarshalJSON()
+}
+
+// UnmarshalJSON converts JSON to NullSystemTagSet
+func (n *NullSystemTagSet) UnmarshalJSON(data []byte) error {
+	if bytes.Equal(data, []byte(nullJSON)) {
+		n.Set = nil
+		n.Valid = false
+		return nil
+	}
+
+	var set SystemTagSet
+	if err := json.Unmarshal(data, &set); err != nil {
+		return err
+	}
+	n.Set = &set
+	n.Valid = true
+	return nil
+}
+
+// UnmarshalText converts the tag list to SystemTagSet.
+func (n *NullSystemTagSet) UnmarshalText(data []byte) error {
+	var set SystemTagSet
+	if err := set.UnmarshalText(data); err != nil {
+		return err
+	}
+	n.Set = &set
+	n.Valid = true
+	return nil
+}
+
+const nullJSON = "null"

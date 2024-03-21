@@ -153,7 +153,7 @@ func (ts *testState) ToVUContext() {
 		TLSConfig: ts.httpBin.TLSClientConfig,
 		Samples:   ts.samples,
 		Options: lib.Options{
-			SystemTags: metrics.NewSystemTagSet(
+			SystemTags: metrics.NewNullSystemTagSet(
 				metrics.TagName,
 				metrics.TagURL,
 			),

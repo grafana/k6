@@ -329,7 +329,7 @@ func TestSchedulerSystemTags(t *testing.T) {
 	require.NoError(t, err)
 
 	require.NoError(t, runner.SetOptions(runner.GetOptions().Apply(lib.Options{
-		SystemTags: &metrics.DefaultSystemTagSet,
+		SystemTags: metrics.DefaultSystemTagSet,
 	})))
 
 	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
@@ -1184,7 +1184,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
 		Iterations:      null.IntFrom(2),
 		VUs:             null.IntFrom(1),
-		SystemTags:      &metrics.DefaultSystemTagSet,
+		SystemTags:      metrics.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
 	}), nil)

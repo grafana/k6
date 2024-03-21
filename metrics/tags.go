@@ -186,9 +186,9 @@ func (tm *TagsAndMeta) SetMetadata(key, value string) {
 }
 
 // SetSystemTagOrMetaIfEnabled checks if the supplied SystemTag is enabled in
-// this test run (i.e. is in the SystemTagSet) and passes it to
+// this test run (i.e. is in the NullSystemTagSet) and passes it to
 // SetSystemTagOrMeta() if it is.
-func (tm *TagsAndMeta) SetSystemTagOrMetaIfEnabled(enabledSystemTags *SystemTagSet, tag SystemTag, value string) {
+func (tm *TagsAndMeta) SetSystemTagOrMetaIfEnabled(enabledSystemTags NullSystemTagSet, tag SystemTag, value string) {
 	if !enabledSystemTags.Has(tag) {
 		return
 	}

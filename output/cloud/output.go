@@ -139,7 +139,7 @@ func newOutput(params output.Params) (*Output, error) {
 }
 
 // validateRequiredSystemTags checks if all required tags are present.
-func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
+func validateRequiredSystemTags(scriptTags metrics.NullSystemTagSet) error {
 	missingRequiredTags := []string{}
 	requiredTags := metrics.SystemTagSet(metrics.TagName |
 		metrics.TagMethod |

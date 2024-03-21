@@ -504,7 +504,7 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("SystemTags", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{SystemTags: metrics.NewSystemTagSet(metrics.TagProto)})
+		opts := Options{}.Apply(Options{SystemTags: metrics.NewNullSystemTagSet(metrics.TagProto)})
 		assert.NotNil(t, opts.SystemTags)
 		assert.NotEmpty(t, opts.SystemTags)
 		assert.True(t, opts.SystemTags.Has(metrics.TagProto))
@@ -516,16 +516,16 @@ func TestOptions(t *testing.T) {
 				var opts Options
 				jsonStr := `{"systemTags":["url"]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
-				assert.Equal(t, *metrics.NewSystemTagSet(metrics.TagURL), *opts.SystemTags)
+				assert.Equal(t, metrics.NewNullSystemTagSet(metrics.TagURL), opts.SystemTags)
 
 				t.Run("Roundtrip", func(t *testing.T) {
 					t.Parallel()
 					data, err := json.Marshal(opts.SystemTags)
 					assert.NoError(t, err)
 					assert.Equal(t, `["url"]`, string(data))
-					var vers2 metrics.SystemTagSet
+					var vers2 metrics.NullSystemTagSet
 					assert.NoError(t, json.Unmarshal(data, &vers2))
-					assert.Equal(t, vers2, *opts.SystemTags)
+					assert.Equal(t, vers2, opts.SystemTags)
 				})
 			})
 			t.Run("Blank", func(t *testing.T) {
@@ -533,7 +533,7 @@ func TestOptions(t *testing.T) {
 				var opts Options
 				jsonStr := `{"systemTags":[]}`
 				assert.NoError(t, json.Unmarshal([]byte(jsonStr), &opts))
-				assert.Equal(t, metrics.SystemTagSet(0), *opts.SystemTags)
+				assert.Equal(t, metrics.NewNullSystemTagSet(0), opts.SystemTags)
 			})
 		})
 	})

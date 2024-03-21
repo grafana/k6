@@ -323,7 +323,7 @@ type Options struct {
 
 	// Which system tags to include with metrics ("method", "vu" etc.)
 	// Use pointer for identifying whether user provide any tag or not.
-	SystemTags *metrics.SystemTagSet `json:"systemTags" envconfig:"K6_SYSTEM_TAGS"`
+	SystemTags metrics.NullSystemTagSet `json:"systemTags" envconfig:"K6_SYSTEM_TAGS"`
 
 	// Tags are key-value pairs to be applied to all samples for the run.
 	RunTags map[string]string `json:"tags" envconfig:"K6_TAGS"`
@@ -484,7 +484,7 @@ func (o Options) Apply(opts Options) Options {
 	if opts.SummaryTimeUnit.Valid {
 		o.SummaryTimeUnit = opts.SummaryTimeUnit
 	}
-	if opts.SystemTags != nil {
+	if opts.SystemTags.Valid {
 		o.SystemTags = opts.SystemTags
 	}
 	if len(opts.RunTags) > 0 {
