@@ -52,9 +52,10 @@ const (
 type Output struct {
 	versionedOutput
 
-	logger    logrus.FieldLogger
-	config    cloudapi.Config
-	testRunID string
+	logger         logrus.FieldLogger
+	config         cloudapi.Config
+	testRunID      string
+	startedTheTest bool
 
 	executionPlan []lib.ExecutionStep
 	duration      int64 // in seconds
@@ -186,6 +187,7 @@ func (out *Output) Start() error {
 	if err != nil {
 		return err
 	}
+	out.startedTheTest = true
 	out.testRunID = response.ReferenceID
 	out.config.PushRefID = null.StringFrom(out.testRunID)
 
@@ -266,7 +268,7 @@ func (out *Output) StopWithTestError(testErr error) error {
 }
 
 func (out *Output) testFinished(testErr error) error {
-	if out.testRunID == "" || out.config.PushRefID.Valid {
+	if out.startedTheTest {
 		return nil
 	}
 
