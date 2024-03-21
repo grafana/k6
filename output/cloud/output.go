@@ -187,7 +187,7 @@ func (out *Output) Start() error {
 		return err
 	}
 	out.testRunID = response.ReferenceID
-	out.config.PushRefID = null.NewString(out.testRunID, false)
+	out.config.PushRefID = null.StringFrom(out.testRunID)
 
 	if response.ConfigOverride != nil {
 		out.logger.WithFields(logrus.Fields{
