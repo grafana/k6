@@ -447,10 +447,31 @@ func (f *Frame) setContext(world executionWorld, execCtx frameExecutionContext) 
 		panic(err)
 	}
 
+	// There is a race condition when it comes to attaching iframes and the
+	// execution context that apply to these frames. What usually occurs is:
+	//
+	// 1. An exec context for about:blank is first set;
+	// 2. A new set event is received for exec context for the url pointing
+	//    to the actual destination for the iframe;
+	// 3. Finally the execution context for about:blank is destroyed, not
+	//    for the second execution context.
+	//
+	// This is the order of events when iframes are in use on a site, and
+	// so it is safe to nil the original execution context and overwrite it
+	// with the second one.
+	//
+	// The exec context destroyed event will not remove the new exec context
+	// since the ids do not match.
+	//
+	// If we didn't overwrite the first execCtx with the new one, then
+	// waitForExecutionContext could end up waiting indefinitely since all
+	// execCtx were destroyed.
 	if f.executionContexts[world] != nil {
-		f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, world exists",
+		f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, overriding existing world",
 			f.ID(), f.URL(), execCtx.ID(), world)
-		return
+
+		f.executionContexts[world] = nil
+		f.documentHandle = nil
 	}
 
 	f.executionContexts[world] = execCtx
