@@ -1,7 +1,7 @@
 ---
 name: k6 Release
 about: k6 release accommodates activities and a checklist with the k6 open-source release process.
-title: 'k6 release v0.4x.0'
+title: 'k6 release v0.5x.0'
 labels: ["release"]
 ---
 
@@ -14,9 +14,9 @@ labels: ["release"]
 ### At the beginning of the cycle
 
 - [ ] Obtain the Release coordinator's contact from the `@k6-browser` team and co-assign the issue to them.
-- [ ] Create a new `release-v0.4x.0` long-lived branch and add a new release notes file using the available [template](/grafana/k6/tree/master/release%20notes/template.md) to the [repository's `release notes` folder](/grafana/k6/tree/master/release%20notes).
+- [ ] Create a new `release-v0.5x.0` long-lived branch and add a new release notes file using the available [template](/grafana/k6/tree/master/release%20notes/template.md) to the [repository's `release notes` folder](/grafana/k6/tree/master/release%20notes).
 - [ ] Go through the potential [dependencies updates](Dependencies.md) and create a dedicated PR if any of them is relevant to this release.
-- [ ] Create a new `release-v0.4x.0` long-lived branch on the [grafana/k6-DefinitelyTyped](https://github.com/grafana/k6-DefinitelyTyped) fork repository.
+- [ ] Create a new `release-v0.5x.0` long-lived branch on the [grafana/k6-DefinitelyTyped](https://github.com/grafana/k6-DefinitelyTyped) fork repository.
     - [ ] Bump the version in [types/k6/package.json](https://github.com/grafana/k6-DefinitelyTyped/blob/master/types/k6/package.json#L4) to the next one.
 
 ### Release Preparation
@@ -51,7 +51,7 @@ labels: ["release"]
 
 - [ ] Merge the PR bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/9fa50b2d1f259cdccff5cc7bc18a236d31c345ac/lib/consts/consts.go#L11).
 - [ ] Merge the release notes PR.
-- [ ] Create and push a new tag of the form `vX.Y.Z` using git: `git tag v0.4x.0 -m "v0.4x.0"`.
+- [ ] Create and push a new tag of the form `vX.Y.Z` using git: `git tag v0.5x.0 -m "v0.5x.0"`.
 
 #### Announcements
 
