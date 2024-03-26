@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package semconv implements OpenTelemetry semantic conventions.
-//
-// OpenTelemetry semantic conventions are agreed standardized naming
-// patterns for OpenTelemetry things. This package represents the v1.21.0
-// version of the OpenTelemetry semantic conventions.
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.21.0"
+package semconv // import "go.opentelemetry.io/otel/semconv/v1.24.0"
+
+// SchemaURL is the schema URL that matches the version of the semantic conventions
+// that this package defines. Semconv packages starting from v1.4.0 must declare
+// non-empty schema URL in the form https://opentelemetry.io/schemas/<version>
+const SchemaURL = "https://opentelemetry.io/schemas/1.24.0"
