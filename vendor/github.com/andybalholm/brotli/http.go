@@ -20,7 +20,7 @@ func HTTPCompressor(w http.ResponseWriter, r *http.Request) io.WriteCloser {
 	switch encoding {
 	case "br":
 		w.Header().Set("Content-Encoding", "br")
-		return NewWriter(w)
+		return NewWriterV2(w, DefaultCompression)
 	case "gzip":
 		w.Header().Set("Content-Encoding", "gzip")
 		return gzip.NewWriter(w)
