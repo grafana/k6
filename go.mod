@@ -11,7 +11,7 @@ require (
 	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
 	github.com/fatih/color v1.16.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
-	github.com/golang/protobuf v1.5.3
+	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.1
 	github.com/grafana/xk6-browser v1.4.3
 	github.com/grafana/xk6-dashboard v0.7.2
