@@ -433,7 +433,7 @@ golang.org/x/crypto/curve25519/internal/field
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/crypto/x509roots/fallback v0.0.0-20231218163308-9d2ee975ef9f
+# golang.org/x/crypto/x509roots/fallback v0.0.0-20240318092723-b91329d961d4
 ## explicit; go 1.20
 golang.org/x/crypto/x509roots/fallback
 # golang.org/x/net v0.22.0
