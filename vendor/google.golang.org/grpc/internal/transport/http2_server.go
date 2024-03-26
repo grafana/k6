@@ -32,13 +32,13 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/golang/protobuf/proto"
 	"golang.org/x/net/http2"
 	"golang.org/x/net/http2/hpack"
 	"google.golang.org/grpc/internal/grpclog"
 	"google.golang.org/grpc/internal/grpcutil"
 	"google.golang.org/grpc/internal/pretty"
 	"google.golang.org/grpc/internal/syscall"
+	"google.golang.org/protobuf/proto"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -651,10 +651,6 @@ func (t *http2Server) HandleStreams(ctx context.Context, handle func(*Stream)) {
 					})
 				}
 				continue
-			}
-			if err == io.EOF || err == io.ErrUnexpectedEOF {
-				t.Close(err)
-				return
 			}
 			t.Close(err)
 			return
