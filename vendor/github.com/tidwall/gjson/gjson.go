@@ -1926,6 +1926,10 @@ func AppendJSONString(dst []byte, s string) []byte {
 		if s[i] < ' ' {
 			dst = append(dst, '\\')
 			switch s[i] {
+			case '\b':
+				dst = append(dst, 'b')
+			case '\f':
+				dst = append(dst, 'f')
 			case '\n':
 				dst = append(dst, 'n')
 			case '\r':
