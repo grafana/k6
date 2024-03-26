@@ -515,7 +515,15 @@ func (cr *Client) doSendLocked(attemptCount int, prevErr error, req *refv1alpha.
 	if attemptCount >= 3 && prevErr != nil {
 		return nil, prevErr
 	}
-	if status.Code(prevErr) == codes.Unimplemented && cr.useV1() {
+	if (status.Code(prevErr) == codes.Unimplemented ||
+		status.Code(prevErr) == codes.Unavailable) &&
+		cr.useV1() {
+		// If v1 is unimplemented, fallback to v1alpha.
+		// We also fallback on unavailable because some servers have been
+		// observed to close the connection/cancel the stream, w/out sending
+		// back status or headers, when the service name is not known. When
+		// this happens, the RPC status code is unavailable.
+		// See https://github.com/fullstorydev/grpcurl/issues/434
 		cr.useV1Alpha = true
 		cr.lastTriedV1 = cr.now()
 	}

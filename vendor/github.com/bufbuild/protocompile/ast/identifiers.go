@@ -91,10 +91,10 @@ func NewCompoundIdentNode(leadingDot *RuneNode, components []*IdentNode, dots []
 	if len(components) == 0 {
 		panic("must have at least one component")
 	}
-	if len(dots) != len(components)-1 {
+	if len(dots) != len(components)-1 && len(dots) != len(components) {
 		panic(fmt.Sprintf("%d components requires %d dots, not %d", len(components), len(components)-1, len(dots)))
 	}
-	numChildren := len(components)*2 - 1
+	numChildren := len(components) + len(dots)
 	if leadingDot != nil {
 		numChildren++
 	}
@@ -112,6 +112,11 @@ func NewCompoundIdentNode(leadingDot *RuneNode, components []*IdentNode, dots []
 		}
 		children = append(children, comp)
 		b.WriteString(comp.Val)
+	}
+	if len(dots) == len(components) {
+		dot := dots[len(dots)-1]
+		children = append(children, dot)
+		b.WriteRune(dot.Rune)
 	}
 	return &CompoundIdentNode{
 		compositeNode: compositeNode{

@@ -515,8 +515,6 @@ func convertASTValue(f *ast.FileNode, v ast.ValueNode) ast2.ValueNode {
 		return convertASTCompoundStringLiteral(f, v)
 	case *ast.UintLiteralNode:
 		return convertASTUintLiteral(f, v)
-	case *ast.PositiveUintLiteralNode:
-		return convertASTPositiveUintLiteral(f, v)
 	case *ast.NegativeIntLiteralNode:
 		return convertASTNegativeIntLiteral(f, v)
 	case *ast.FloatLiteralNode:
@@ -593,8 +591,6 @@ func convertASTInt(f *ast.FileNode, n ast.IntValueNode) ast2.IntValueNode {
 	switch n := n.(type) {
 	case *ast.UintLiteralNode:
 		return convertASTUintLiteral(f, n)
-	case *ast.PositiveUintLiteralNode:
-		return convertASTPositiveUintLiteral(f, n)
 	case *ast.NegativeIntLiteralNode:
 		return convertASTNegativeIntLiteral(f, n)
 	default:
@@ -604,10 +600,6 @@ func convertASTInt(f *ast.FileNode, n ast.IntValueNode) ast2.IntValueNode {
 
 func convertASTUintLiteral(f *ast.FileNode, n *ast.UintLiteralNode) *ast2.UintLiteralNode {
 	return ast2.NewUintLiteralNode(n.Val, convertASTTokenInfo(f, n.Token()))
-}
-
-func convertASTPositiveUintLiteral(f *ast.FileNode, n *ast.PositiveUintLiteralNode) *ast2.PositiveUintLiteralNode {
-	return ast2.NewPositiveUintLiteralNode(convertASTRune(f, n.Plus), convertASTUintLiteral(f, n.Uint))
 }
 
 func convertASTNegativeIntLiteral(f *ast.FileNode, n *ast.NegativeIntLiteralNode) *ast2.NegativeIntLiteralNode {

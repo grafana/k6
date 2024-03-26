@@ -175,6 +175,10 @@ func (n *UintLiteralNode) AsFloat() float64 {
 }
 
 // PositiveUintLiteralNode represents an integer literal with a positive (+) sign.
+//
+// Deprecated: A valid AST will not contain a node of this type. The Protobuf
+// language does not actually allow a numeric literal to have a leading "+"
+// positive sign.
 type PositiveUintLiteralNode struct {
 	compositeNode
 	Plus *RuneNode
@@ -184,6 +188,8 @@ type PositiveUintLiteralNode struct {
 
 // NewPositiveUintLiteralNode creates a new *PositiveUintLiteralNode. Both
 // arguments must be non-nil.
+//
+// Deprecated: The ast.PositiveUintLiteralNode node type should not be used.
 func NewPositiveUintLiteralNode(sign *RuneNode, i *UintLiteralNode) *PositiveUintLiteralNode {
 	if sign == nil {
 		panic("sign is nil")

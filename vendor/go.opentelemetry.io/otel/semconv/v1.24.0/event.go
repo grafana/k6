@@ -14,9 +14,64 @@
 
 // Code generated from semantic convention specification. DO NOT EDIT.
 
-package semconv // import "go.opentelemetry.io/otel/semconv/v1.21.0"
+package semconv // import "go.opentelemetry.io/otel/semconv/v1.24.0"
 
 import "go.opentelemetry.io/otel/attribute"
+
+// This event represents an occurrence of a lifecycle transition on the iOS
+// platform.
+const (
+	// IosStateKey is the attribute Key conforming to the "ios.state" semantic
+	// conventions. It represents the this attribute represents the state the
+	// application has transitioned into at the occurrence of the event.
+	//
+	// Type: Enum
+	// RequirementLevel: Required
+	// Stability: experimental
+	// Note: The iOS lifecycle states are defined in the [UIApplicationDelegate
+	// documentation](https://developer.apple.com/documentation/uikit/uiapplicationdelegate#1656902),
+	// and from which the `OS terminology` column values are derived.
+	IosStateKey = attribute.Key("ios.state")
+)
+
+var (
+	// The app has become `active`. Associated with UIKit notification `applicationDidBecomeActive`
+	IosStateActive = IosStateKey.String("active")
+	// The app is now `inactive`. Associated with UIKit notification `applicationWillResignActive`
+	IosStateInactive = IosStateKey.String("inactive")
+	// The app is now in the background. This value is associated with UIKit notification `applicationDidEnterBackground`
+	IosStateBackground = IosStateKey.String("background")
+	// The app is now in the foreground. This value is associated with UIKit notification `applicationWillEnterForeground`
+	IosStateForeground = IosStateKey.String("foreground")
+	// The app is about to terminate. Associated with UIKit notification `applicationWillTerminate`
+	IosStateTerminate = IosStateKey.String("terminate")
+)
+
+// This event represents an occurrence of a lifecycle transition on the Android
+// platform.
+const (
+	// AndroidStateKey is the attribute Key conforming to the "android.state"
+	// semantic conventions. It represents the this attribute represents the
+	// state the application has transitioned into at the occurrence of the
+	// event.
+	//
+	// Type: Enum
+	// RequirementLevel: Required
+	// Stability: experimental
+	// Note: The Android lifecycle states are defined in [Activity lifecycle
+	// callbacks](https://developer.android.com/guide/components/activities/activity-lifecycle#lc),
+	// and from which the `OS identifiers` are derived.
+	AndroidStateKey = attribute.Key("android.state")
+)
+
+var (
+	// Any time before Activity.onResume() or, if the app has no Activity, Context.startService() has been called in the app for the first time
+	AndroidStateCreated = AndroidStateKey.String("created")
+	// Any time after Activity.onPause() or, if the app has no Activity, Context.stopService() has been called when the app was in the foreground state
+	AndroidStateBackground = AndroidStateKey.String("background")
+	// Any time after Activity.onResume() or, if the app has no Activity, Context.startService() has been called when the app was in either the created or background states
+	AndroidStateForeground = AndroidStateKey.String("foreground")
+)
 
 // This semantic convention defines the attributes used to represent a feature
 // flag evaluation as an event.
@@ -27,7 +82,7 @@ const (
 	//
 	// Type: string
 	// RequirementLevel: Required
-	// Stability: stable
+	// Stability: experimental
 	// Examples: 'logo-color'
 	FeatureFlagKeyKey = attribute.Key("feature_flag.key")
 
@@ -37,7 +92,7 @@ const (
 	//
 	// Type: string
 	// RequirementLevel: Recommended
-	// Stability: stable
+	// Stability: experimental
 	// Examples: 'Flag Manager'
 	FeatureFlagProviderNameKey = attribute.Key("feature_flag.provider_name")
 
@@ -48,7 +103,7 @@ const (
 	//
 	// Type: string
 	// RequirementLevel: Recommended
-	// Stability: stable
+	// Stability: experimental
 	// Examples: 'red', 'true', 'on'
 	// Note: A semantic identifier, commonly referred to as a variant, provides
 	// a means
@@ -86,14 +141,14 @@ func FeatureFlagVariant(val string) attribute.KeyValue {
 
 // RPC received/sent message.
 const (
-	// MessageTypeKey is the attribute Key conforming to the "message.type"
-	// semantic conventions. It represents the whether this is a received or
-	// sent message.
+	// MessageCompressedSizeKey is the attribute Key conforming to the
+	// "message.compressed_size" semantic conventions. It represents the
+	// compressed size of the message in bytes.
 	//
-	// Type: Enum
+	// Type: int
 	// RequirementLevel: Optional
-	// Stability: stable
-	MessageTypeKey = attribute.Key("message.type")
+	// Stability: experimental
+	MessageCompressedSizeKey = attribute.Key("message.compressed_size")
 
 	// MessageIDKey is the attribute Key conforming to the "message.id"
 	// semantic conventions. It represents the mUST be calculated as two
@@ -102,19 +157,19 @@ const (
 	//
 	// Type: int
 	// RequirementLevel: Optional
-	// Stability: stable
+	// Stability: experimental
 	// Note: This way we guarantee that the values will be consistent between
 	// different implementations.
 	MessageIDKey = attribute.Key("message.id")
 
-	// MessageCompressedSizeKey is the attribute Key conforming to the
-	// "message.compressed_size" semantic conventions. It represents the
-	// compressed size of the message in bytes.
+	// MessageTypeKey is the attribute Key conforming to the "message.type"
+	// semantic conventions. It represents the whether this is a received or
+	// sent message.
 	//
-	// Type: int
+	// Type: Enum
 	// RequirementLevel: Optional
-	// Stability: stable
-	MessageCompressedSizeKey = attribute.Key("message.compressed_size")
+	// Stability: experimental
+	MessageTypeKey = attribute.Key("message.type")
 
 	// MessageUncompressedSizeKey is the attribute Key conforming to the
 	// "message.uncompressed_size" semantic conventions. It represents the
@@ -122,7 +177,7 @@ const (
 	//
 	// Type: int
 	// RequirementLevel: Optional
-	// Stability: stable
+	// Stability: experimental
 	MessageUncompressedSizeKey = attribute.Key("message.uncompressed_size")
 )
 
@@ -133,6 +188,13 @@ var (
 	MessageTypeReceived = MessageTypeKey.String("RECEIVED")
 )
 
+// MessageCompressedSize returns an attribute KeyValue conforming to the
+// "message.compressed_size" semantic conventions. It represents the compressed
+// size of the message in bytes.
+func MessageCompressedSize(val int) attribute.KeyValue {
+	return MessageCompressedSizeKey.Int(val)
+}
+
 // MessageID returns an attribute KeyValue conforming to the "message.id"
 // semantic conventions. It represents the mUST be calculated as two different
 // counters starting from `1` one for sent messages and one for received
@@ -141,59 +203,9 @@ func MessageID(val int) attribute.KeyValue {
 	return MessageIDKey.Int(val)
 }
 
-// MessageCompressedSize returns an attribute KeyValue conforming to the
-// "message.compressed_size" semantic conventions. It represents the compressed
-// size of the message in bytes.
-func MessageCompressedSize(val int) attribute.KeyValue {
-	return MessageCompressedSizeKey.Int(val)
-}
-
 // MessageUncompressedSize returns an attribute KeyValue conforming to the
 // "message.uncompressed_size" semantic conventions. It represents the
 // uncompressed size of the message in bytes.
 func MessageUncompressedSize(val int) attribute.KeyValue {
 	return MessageUncompressedSizeKey.Int(val)
-}
-
-// The attributes used to report a single exception associated with a span.
-const (
-	// ExceptionEscapedKey is the attribute Key conforming to the
-	// "exception.escaped" semantic conventions. It represents the sHOULD be
-	// set to true if the exception event is recorded at a point where it is
-	// known that the exception is escaping the scope of the span.
-	//
-	// Type: boolean
-	// RequirementLevel: Optional
-	// Stability: stable
-	// Note: An exception is considered to have escaped (or left) the scope of
-	// a span,
-	// if that span is ended while the exception is still logically "in
-	// flight".
-	// This may be actually "in flight" in some languages (e.g. if the
-	// exception
-	// is passed to a Context manager's `__exit__` method in Python) but will
-	// usually be caught at the point of recording the exception in most
-	// languages.
-	//
-	// It is usually not possible to determine at the point where an exception
-	// is thrown
-	// whether it will escape the scope of a span.
-	// However, it is trivial to know that an exception
-	// will escape, if one checks for an active exception just before ending
-	// the span,
-	// as done in the [example above](#recording-an-exception).
-	//
-	// It follows that an exception may still escape the scope of the span
-	// even if the `exception.escaped` attribute was not set or set to false,
-	// since the event might have been recorded at a time where it was not
-	// clear whether the exception will escape.
-	ExceptionEscapedKey = attribute.Key("exception.escaped")
-)
-
-// ExceptionEscaped returns an attribute KeyValue conforming to the
-// "exception.escaped" semantic conventions. It represents the sHOULD be set to
-// true if the exception event is recorded at a point where it is known that
-// the exception is escaping the scope of the span.
-func ExceptionEscaped(val bool) attribute.KeyValue {
-	return ExceptionEscapedKey.Bool(val)
 }

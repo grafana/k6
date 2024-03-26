@@ -48,7 +48,6 @@ var _ ValueNode = (*CompoundIdentNode)(nil)
 var _ ValueNode = (*StringLiteralNode)(nil)
 var _ ValueNode = (*CompoundStringLiteralNode)(nil)
 var _ ValueNode = (*UintLiteralNode)(nil)
-var _ ValueNode = (*PositiveUintLiteralNode)(nil)
 var _ ValueNode = (*NegativeIntLiteralNode)(nil)
 var _ ValueNode = (*FloatLiteralNode)(nil)
 var _ ValueNode = (*SpecialFloatLiteralNode)(nil)
@@ -154,7 +153,6 @@ func AsInt32(n IntValueNode, min, max int32) (int32, bool) {
 }
 
 var _ IntValueNode = (*UintLiteralNode)(nil)
-var _ IntValueNode = (*PositiveUintLiteralNode)(nil)
 var _ IntValueNode = (*NegativeIntLiteralNode)(nil)
 
 // UintLiteralNode represents a simple integer literal with no sign character.
@@ -189,49 +187,6 @@ func (n *UintLiteralNode) AsUint64() (uint64, bool) {
 
 func (n *UintLiteralNode) AsFloat() float64 {
 	return float64(n.Val)
-}
-
-// PositiveUintLiteralNode represents an integer literal with a positive (+) sign.
-type PositiveUintLiteralNode struct {
-	compositeNode
-	Plus *RuneNode
-	Uint *UintLiteralNode
-	Val  uint64
-}
-
-// NewPositiveUintLiteralNode creates a new *PositiveUintLiteralNode. Both
-// arguments must be non-nil.
-func NewPositiveUintLiteralNode(sign *RuneNode, i *UintLiteralNode) *PositiveUintLiteralNode {
-	if sign == nil {
-		panic("sign is nil")
-	}
-	if i == nil {
-		panic("i is nil")
-	}
-	children := []Node{sign, i}
-	return &PositiveUintLiteralNode{
-		compositeNode: compositeNode{
-			children: children,
-		},
-		Plus: sign,
-		Uint: i,
-		Val:  i.Val,
-	}
-}
-
-func (n *PositiveUintLiteralNode) Value() interface{} {
-	return n.Val
-}
-
-func (n *PositiveUintLiteralNode) AsInt64() (int64, bool) {
-	if n.Val > math.MaxInt64 {
-		return 0, false
-	}
-	return int64(n.Val), true
-}
-
-func (n *PositiveUintLiteralNode) AsUint64() (uint64, bool) {
-	return n.Val, true
 }
 
 // NegativeIntLiteralNode represents an integer literal with a negative (-) sign.
@@ -320,12 +275,14 @@ type SpecialFloatLiteralNode struct {
 }
 
 // NewSpecialFloatLiteralNode returns a new *SpecialFloatLiteralNode for the
-// given keyword, which must be "inf" or "nan".
+// given keyword. The given keyword should be "inf", "infinity", or "nan"
+// in any case.
 func NewSpecialFloatLiteralNode(name *KeywordNode) *SpecialFloatLiteralNode {
 	var f float64
-	if name.Val == "inf" {
+	switch strings.ToLower(name.Val) {
+	case "inf", "infinity":
 		f = math.Inf(1)
-	} else {
+	default:
 		f = math.NaN()
 	}
 	return &SpecialFloatLiteralNode{

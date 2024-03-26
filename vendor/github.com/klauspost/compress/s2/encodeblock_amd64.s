@@ -100,6 +100,15 @@ repeat_extend_back_loop_encodeBlockAsm:
 	JNZ  repeat_extend_back_loop_encodeBlockAsm
 
 repeat_extend_back_end_encodeBlockAsm:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 5(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeBlockAsm
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeBlockAsm:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeBlockAsm
@@ -1513,6 +1522,15 @@ repeat_extend_back_loop_encodeBlockAsm4MB:
 	JNZ  repeat_extend_back_loop_encodeBlockAsm4MB
 
 repeat_extend_back_end_encodeBlockAsm4MB:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 4(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeBlockAsm4MB
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeBlockAsm4MB:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeBlockAsm4MB
@@ -2828,6 +2846,15 @@ repeat_extend_back_loop_encodeBlockAsm12B:
 	JNZ  repeat_extend_back_loop_encodeBlockAsm12B
 
 repeat_extend_back_end_encodeBlockAsm12B:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeBlockAsm12B
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeBlockAsm12B:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeBlockAsm12B
@@ -3903,6 +3930,15 @@ repeat_extend_back_loop_encodeBlockAsm10B:
 	JNZ  repeat_extend_back_loop_encodeBlockAsm10B
 
 repeat_extend_back_end_encodeBlockAsm10B:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeBlockAsm10B
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeBlockAsm10B:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeBlockAsm10B
@@ -4978,6 +5014,15 @@ repeat_extend_back_loop_encodeBlockAsm8B:
 	JNZ  repeat_extend_back_loop_encodeBlockAsm8B
 
 repeat_extend_back_end_encodeBlockAsm8B:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeBlockAsm8B
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeBlockAsm8B:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeBlockAsm8B
@@ -10756,6 +10801,15 @@ repeat_extend_back_loop_encodeSnappyBlockAsm:
 	JNZ  repeat_extend_back_loop_encodeSnappyBlockAsm
 
 repeat_extend_back_end_encodeSnappyBlockAsm:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 5(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeSnappyBlockAsm
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeSnappyBlockAsm:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeSnappyBlockAsm
@@ -11678,6 +11732,15 @@ repeat_extend_back_loop_encodeSnappyBlockAsm64K:
 	JNZ  repeat_extend_back_loop_encodeSnappyBlockAsm64K
 
 repeat_extend_back_end_encodeSnappyBlockAsm64K:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeSnappyBlockAsm64K
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeSnappyBlockAsm64K:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeSnappyBlockAsm64K
@@ -12504,6 +12567,15 @@ repeat_extend_back_loop_encodeSnappyBlockAsm12B:
 	JNZ  repeat_extend_back_loop_encodeSnappyBlockAsm12B
 
 repeat_extend_back_end_encodeSnappyBlockAsm12B:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeSnappyBlockAsm12B
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeSnappyBlockAsm12B:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeSnappyBlockAsm12B
@@ -13330,6 +13402,15 @@ repeat_extend_back_loop_encodeSnappyBlockAsm10B:
 	JNZ  repeat_extend_back_loop_encodeSnappyBlockAsm10B
 
 repeat_extend_back_end_encodeSnappyBlockAsm10B:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeSnappyBlockAsm10B
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeSnappyBlockAsm10B:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeSnappyBlockAsm10B
@@ -14156,6 +14237,15 @@ repeat_extend_back_loop_encodeSnappyBlockAsm8B:
 	JNZ  repeat_extend_back_loop_encodeSnappyBlockAsm8B
 
 repeat_extend_back_end_encodeSnappyBlockAsm8B:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_encodeSnappyBlockAsm8B
+	MOVQ $0x00000000, ret+48(FP)
+	RET
+
+repeat_dst_size_check_encodeSnappyBlockAsm8B:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_encodeSnappyBlockAsm8B
@@ -17949,6 +18039,15 @@ repeat_extend_back_loop_calcBlockSize:
 	JNZ  repeat_extend_back_loop_calcBlockSize
 
 repeat_extend_back_end_calcBlockSize:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 5(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_calcBlockSize
+	MOVQ $0x00000000, ret+24(FP)
+	RET
+
+repeat_dst_size_check_calcBlockSize:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_calcBlockSize
@@ -18531,6 +18630,15 @@ repeat_extend_back_loop_calcBlockSizeSmall:
 	JNZ  repeat_extend_back_loop_calcBlockSizeSmall
 
 repeat_extend_back_end_calcBlockSizeSmall:
+	MOVL SI, BX
+	SUBL 12(SP), BX
+	LEAQ 3(AX)(BX*1), BX
+	CMPQ BX, (SP)
+	JB   repeat_dst_size_check_calcBlockSizeSmall
+	MOVQ $0x00000000, ret+24(FP)
+	RET
+
+repeat_dst_size_check_calcBlockSizeSmall:
 	MOVL 12(SP), BX
 	CMPL BX, SI
 	JEQ  emit_literal_done_repeat_emit_calcBlockSizeSmall
