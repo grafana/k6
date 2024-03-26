@@ -19,6 +19,8 @@ type FileNode struct {
 	Syntax *SyntaxNode // nil if file has no syntax declaration
 	Decls  []FileElement
 
+	// TODO: add Edition *EditionNode
+
 	// Any comments that follow the last token in the file.
 	FinalComments []Comment
 	// Any whitespace at the end of the file (after the last token or
