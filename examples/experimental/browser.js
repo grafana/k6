@@ -1,16 +1,23 @@
 import { check } from 'k6';
-import { chromium } from 'k6/experimental/browser';
+import { browser } from 'k6/experimental/browser';
 
 export const options = {
+  scenarios: {
+    ui: {
+      executor: 'shared-iterations',
+      options: {
+        browser: {
+            type: 'chromium',
+        },
+      },
+    },
+  },
   thresholds: {
     checks: ["rate==1.0"]
   }
 }
 
 export default async function() {
-  const browser = chromium.launch({
-    headless: __ENV.XK6_HEADLESS ? true : false,
-  });
   const context = browser.newContext();
   const page = context.newPage();
 
@@ -32,10 +39,9 @@ export default async function() {
       page.locator('input[type="submit"]').click(),
     ]);
     check(page, {
-      'header': page.locator('h2').textContent() == 'Welcome, admin!',
+      'header': p => p.locator('h2').textContent() == 'Welcome, admin!',
     });
   } finally {
     page.close();
-    browser.close();
   }
 }
