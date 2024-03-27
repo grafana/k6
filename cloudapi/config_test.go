@@ -43,7 +43,7 @@ func TestConfigApply(t *testing.T) {
 		TracesEnabled:         null.NewBool(true, true),
 		TracesHost:            null.NewString("TracesHost", true),
 		TracesPushInterval:    types.NewNullDuration(10*time.Second, true),
-		TracesPushConcurrency:           null.NewInt(6, true),
+		TracesPushConcurrency: null.NewInt(6, true),
 	}
 
 	assert.Equal(t, full, full.Apply(empty))
