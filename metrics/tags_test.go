@@ -170,11 +170,11 @@ func TestTagsAndMetaSetSystemTagOrMetaIfEnabled(t *testing.T) {
 	t.Parallel()
 	tm := TagsAndMeta{}
 
-	tm.SetSystemTagOrMetaIfEnabled(&DefaultSystemTagSet, TagIter, "10")
+	tm.SetSystemTagOrMetaIfEnabled(DefaultSystemTagSet, TagIter, "10")
 	_, ok := tm.Metadata["iter"]
 	assert.False(t, ok)
 
-	tm.SetSystemTagOrMetaIfEnabled(&NonIndexableSystemTags, TagIter, "10")
+	tm.SetSystemTagOrMetaIfEnabled(NonIndexableSystemTags, TagIter, "10")
 	_, ok = tm.Metadata["iter"]
 	assert.True(t, ok)
 }

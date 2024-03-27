@@ -34,7 +34,7 @@ func BenchmarkHTTPRequests(b *testing.B) {
 		MaxRedirects:   null.IntFrom(10),
 		Hosts:          types.NullHosts{Trie: tb.Dialer.Hosts},
 		NoCookiesReset: null.BoolFrom(true),
-		SystemTags:     &metrics.DefaultSystemTagSet,
+		SystemTags:     metrics.DefaultSystemTagSet,
 		RunTags:        map[string]string{"myapp": "myhttpbench"},
 	})
 	require.NoError(b, err)

@@ -496,7 +496,7 @@ func TestRun(t *testing.T) {
 				Environment:    env,
 				ConfigArgument: data.fileName,
 				ScriptOptions: lib.Options{
-					SystemTags: metrics.NewSystemTagSet(metrics.TagError | metrics.TagCheck | metrics.TagVU),
+					SystemTags: metrics.NewNullSystemTagSet(metrics.TagError | metrics.TagCheck | metrics.TagVU),
 				},
 			})
 			require.NoError(t, err)

@@ -233,7 +233,7 @@ func TestCallingInstrumentedRequestEmitsTraceIdMetadata(t *testing.T) {
 		Transport:      httpBin.HTTPTransport,
 		BufferPool:     lib.NewBufferPool(),
 		Samples:        samples,
-		Options:        lib.Options{SystemTags: &metrics.DefaultSystemTagSet},
+		Options:        lib.Options{SystemTags: metrics.DefaultSystemTagSet},
 	})
 
 	// Inject a function in the JS runtime to assert the trace_id key

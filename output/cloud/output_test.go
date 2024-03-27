@@ -64,7 +64,7 @@ func TestNewOutputNameResolution(t *testing.T) {
 				Logger: testutils.NewLogger(t),
 				ScriptOptions: lib.Options{
 					Duration:   types.NullDurationFrom(1 * time.Second),
-					SystemTags: &metrics.DefaultSystemTagSet,
+					SystemTags: metrics.DefaultSystemTagSet,
 				},
 				ScriptPath: testCase.url,
 			})
@@ -80,7 +80,7 @@ func TestCloudOutputRequireScriptName(t *testing.T) {
 		Logger: testutils.NewLogger(t),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: ""},
 	})
@@ -117,7 +117,7 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 			"K6_CLOUD_AGGREGATION_PERIOD": "30s",
 		},
 		ScriptOptions: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
@@ -140,7 +140,7 @@ func TestOutputStartVersionError(t *testing.T) {
 		Logger: testutils.NewLogger(t),
 		ScriptOptions: lib.Options{
 			Duration:   types.NullDurationFrom(1 * time.Second),
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		Environment: map[string]string{
 			"K6_CLOUD_API_VERSION": "99",
@@ -213,7 +213,7 @@ func TestOutputStartWithTestRunID(t *testing.T) {
 			"K6_CLOUD_PUSH_REF_ID": "12345",
 		},
 		ScriptOptions: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})
@@ -269,7 +269,7 @@ func TestOutputStopWithTestError(t *testing.T) {
 			"K6_CLOUD_HOST": ts.URL,
 		},
 		ScriptOptions: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
 	})

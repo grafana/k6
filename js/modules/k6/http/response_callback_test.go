@@ -544,5 +544,5 @@ func deleteSystemTag(state *lib.State, tag string) {
 	for k := range enabledTags {
 		tagsList = append(tagsList, k)
 	}
-	state.Options.SystemTags = metrics.ToSystemTagSet(tagsList)
+	state.Options.SystemTags = metrics.ToNullSystemTagSet(tagsList)
 }

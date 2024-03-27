@@ -151,7 +151,7 @@ func getOptions(flags *pflag.FlagSet) (lib.Options, error) {
 		if err != nil {
 			return opts, err
 		}
-		opts.SystemTags = metrics.ToSystemTagSet(systemTagList)
+		opts.SystemTags = metrics.ToNullSystemTagSet(systemTagList)
 	}
 
 	blacklistIPStrings, err := flags.GetStringSlice("blacklist-ip")

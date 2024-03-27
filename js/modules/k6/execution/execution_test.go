@@ -77,7 +77,7 @@ func TestVUTagsMetadatasJSONEncoding(t *testing.T) {
 			tenv := setupTagsExecEnv(t)
 			tenv.MoveToVUContext(&lib.State{
 				Options: lib.Options{
-					SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
+					SystemTags: metrics.NewNullSystemTagSet(metrics.TagVU),
 				},
 				Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
 			})
@@ -170,7 +170,7 @@ func TestVUTagsMetadataErrorOutOnInvalidValues(t *testing.T) {
 				tenv := setupTagsExecEnv(t)
 				tenv.MoveToVUContext(&lib.State{
 					Options: lib.Options{
-						SystemTags: metrics.NewSystemTagSet(metrics.TagVU),
+						SystemTags: metrics.NewNullSystemTagSet(metrics.TagVU),
 					},
 					Tags:   lib.NewVUStateTags(metrics.NewRegistry().RootTagSet().With("vu", "42")),
 					Logger: testLog,
@@ -345,9 +345,8 @@ func TestOptionsTestFull(t *testing.T) {
 				},
 				SummaryTrendStats: []string{"avg", "min", "max"},
 				SummaryTimeUnit:   null.StringFrom("ms"),
-				SystemTags: func() *metrics.SystemTagSet {
-					sysm := metrics.SystemTagSet(metrics.TagIter | metrics.TagVU)
-					return &sysm
+				SystemTags: func() metrics.NullSystemTagSet {
+					return metrics.NewNullSystemTagSet(metrics.TagIter | metrics.TagVU)
 				}(),
 				RunTags:                 map[string]string{"runtag-key": "runtag-value"},
 				MetricSamplesBufferSize: null.IntFrom(8),

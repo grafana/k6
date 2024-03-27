@@ -249,7 +249,7 @@ func TestMakeRequestTimeoutInTheMiddle(t *testing.T) {
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		Transport:      srv.Client().Transport,
 		Samples:        samples,
@@ -327,7 +327,7 @@ func TestTrailFailed(t *testing.T) {
 			registry := metrics.NewRegistry()
 			state := &lib.State{
 				Options: lib.Options{
-					SystemTags: &metrics.DefaultSystemTagSet,
+					SystemTags: metrics.DefaultSystemTagSet,
 				},
 				Transport:      srv.Client().Transport,
 				Samples:        samples,
@@ -392,7 +392,7 @@ func TestMakeRequestDialTimeout(t *testing.T) {
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		Transport: &http.Transport{
 			DialContext: (&net.Dialer{
@@ -452,7 +452,7 @@ func TestMakeRequestTimeoutInTheBegining(t *testing.T) {
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		Transport:      srv.Client().Transport,
 		Samples:        samples,
@@ -521,7 +521,7 @@ func TestMakeRequestRPSLimit(t *testing.T) {
 	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Options: lib.Options{
-			SystemTags: &metrics.DefaultSystemTagSet,
+			SystemTags: metrics.DefaultSystemTagSet,
 		},
 		RPSLimit:       rate.NewLimiter(rate.Limit(1), 1),
 		Transport:      ts.Client().Transport,

@@ -158,7 +158,7 @@ func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime
 	state := &lib.State{
 		Group: root,
 		Options: lib.Options{
-			SystemTags: metrics.NewSystemTagSet(
+			SystemTags: metrics.NewNullSystemTagSet(
 				metrics.TagName,
 				metrics.TagURL,
 			),
