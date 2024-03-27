@@ -1444,6 +1444,23 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 	}
 }
 
+func TestVUIntegrationRequireFunctionError(t *testing.T) {
+	t.Parallel()
+	r, err := getSimpleRunner(t, "/script.js", `
+			exports.default = function() { require("k6/http") }
+		`)
+	require.NoError(t, err)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
+	require.NoError(t, err)
+	vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
+	err = vu.RunOnce()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "only available in the init stage")
+}
+
 func TestVUIntegrationOpenFunctionError(t *testing.T) {
 	t.Parallel()
 	r, err := getSimpleRunner(t, "/script.js", `

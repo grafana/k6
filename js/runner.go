@@ -255,13 +255,6 @@ func (r *Runner) newVU(
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
 
-	// This is here mostly so if someone tries they get a nice message
-	// instead of "Value is not an object: undefined  ..."
-	_ = vu.Runtime.GlobalObject().Set("open",
-		func() {
-			common.Throw(vu.Runtime, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "open"))
-		})
-
 	return vu, nil
 }
 
