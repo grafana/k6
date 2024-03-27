@@ -10,6 +10,7 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
+	"go.k6.io/k6/js/modules/k6/experimental/sse"
 	"go/build"
 	"io"
 	"io/fs"
@@ -1912,6 +1913,19 @@ func TestInitContextForbidden(t *testing.T) {
 
 			 exports.default = function() { console.log("p"); }`,
 			ws.ErrWSInInitContext.Error(),
+		},
+		{
+			"sse",
+			`var sse = require("k6/experimental/sse");
+			 var url = "https://echo.websocket.org/.sse";
+			 var response = sse.open(url, function (client) {
+			   client.on('open', function open() {
+					console.log('connected');
+			   })
+		     });
+
+			 exports.default = function() { console.log("p"); }`,
+			sse.ErrSSEInInitContext.Error(),
 		},
 		{
 			"metric",
