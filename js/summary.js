@@ -230,12 +230,14 @@ function nonTrendMetricValueForSum(metric, timeUnit) {
         'min=' + humanizeValue(metric.values.min, metric, timeUnit),
         'max=' + humanizeValue(metric.values.max, metric, timeUnit),
       ]
-    case 'rate':
-      return [
-        humanizeValue(metric.values.rate, metric, timeUnit),
-        succMark + ' ' + metric.values.passes,
-        failMark + ' ' + metric.values.fails,
-      ]
+	  case 'rate':
+		  const passesMark = metric.contains === 'negative' ? failMark : succMark;
+		  const failsMark = metric.contains === 'negative' ? succMark : failMark;
+		  return [
+			  humanizeValue(metric.values.rate, metric, timeUnit),
+			  passesMark + ' ' + metric.values.passes,
+			  failsMark + ' ' + metric.values.fails,
+		  ]
     default:
       return ['[no data]']
   }
