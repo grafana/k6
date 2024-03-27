@@ -52,6 +52,7 @@ const (
 )
 
 type options struct {
+	module            bool
 	disableSourceMaps bool
 	sourceMapLoader   func(path string) ([]byte, error)
 }
@@ -64,6 +65,10 @@ type Option func(*options)
 // are not in use.
 func WithDisableSourceMaps(opts *options) {
 	opts.disableSourceMaps = true
+}
+
+func IsModule(opts *options) {
+	opts.module = true
 }
 
 // WithSourceMapLoader is an option to set a custom source map loader. The loader will be given a path or a
@@ -186,7 +191,6 @@ func ParseFile(fileSet *file.FileSet, filename string, src interface{}, mode Mod
 //
 // The parameter list, if any, should be a comma-separated list of identifiers.
 func ParseFunction(parameterList, body string, options ...Option) (*ast.FunctionLiteral, error) {
-
 	src := "(function(" + parameterList + ") {\n" + body + "\n})"
 
 	parser := _newParser("", src, 1, options...)
@@ -212,6 +216,9 @@ func (self *_parser) parse() (*ast.Program, error) {
 	self.openScope()
 	defer self.closeScope()
 	self.next()
+	if self.opts.module {
+		self.scope.allowAwait = true
+	}
 	program := self.parseProgram()
 	if false {
 		self.errors.Sort()

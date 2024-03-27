@@ -107,3 +107,5 @@ require (
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7 // indirect
 )
+
+replace github.com/dop251/goja => github.com/mstoykov/goja v0.0.0-20231212144616-08f562ee86d0

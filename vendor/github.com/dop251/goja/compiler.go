@@ -2,11 +2,11 @@ package goja
 
 import (
 	"fmt"
-	"github.com/dop251/goja/token"
 	"sort"
 
 	"github.com/dop251/goja/ast"
 	"github.com/dop251/goja/file"
+	"github.com/dop251/goja/token"
 	"github.com/dop251/goja/unistring"
 )
 
@@ -29,8 +29,9 @@ const (
 	maskVar       = 1 << 30
 	maskDeletable = 1 << 29
 	maskStrict    = maskDeletable
+	maskIndirect  = 1 << 28
 
-	maskTyp = maskConst | maskVar | maskDeletable
+	maskTyp = maskConst | maskVar | maskDeletable | maskIndirect
 )
 
 type varType byte
@@ -73,12 +74,17 @@ type Program struct {
 	funcName unistring.String
 	src      *file.File
 	srcMap   []srcMapItem
+
+	scriptOrModule interface{}
 }
 
 type compiler struct {
 	p     *Program
 	scope *scope
 	block *block
+
+	hostResolveImportedModule HostResolveImportedModuleFunc
+	module                    *SourceTextModuleRecord
 
 	classScope *classScope
 
@@ -90,10 +96,18 @@ type compiler struct {
 	codeScratchpad []instruction
 }
 
+func (c *compiler) getScriptOrModule() interface{} {
+	if c.module != nil {
+		return c.module
+	}
+	return c.p // TODO figure comething better
+}
+
 type binding struct {
 	scope        *scope
 	name         unistring.String
 	accessPoints map[*scope]*[]int
+	getIndirect  func(vm *vm) Value
 	isConst      bool
 	isStrict     bool
 	isArg        bool
@@ -133,7 +147,9 @@ func (b *binding) markAccessPoint() {
 
 func (b *binding) emitGet() {
 	b.markAccessPoint()
-	if b.isVar && !b.isArg {
+	if b.getIndirect != nil {
+		b.scope.c.emit(loadIndirect(b.getIndirect))
+	} else if b.isVar && !b.isArg {
 		b.scope.c.emit(loadStack(0))
 	} else {
 		b.scope.c.emit(loadStackLex(0))
@@ -142,7 +158,9 @@ func (b *binding) emitGet() {
 
 func (b *binding) emitGetAt(pos int) {
 	b.markAccessPointAt(pos)
-	if b.isVar && !b.isArg {
+	if b.getIndirect != nil {
+		b.scope.c.p.code[pos] = loadIndirect(b.getIndirect)
+	} else if b.isVar && !b.isArg {
 		b.scope.c.p.code[pos] = loadStack(0)
 	} else {
 		b.scope.c.p.code[pos] = loadStackLex(0)
@@ -150,8 +168,11 @@ func (b *binding) emitGetAt(pos int) {
 }
 
 func (b *binding) emitGetP() {
-	if b.isVar && !b.isArg {
-		// no-op
+	if b.getIndirect != nil {
+		b.markAccessPoint()
+		b.scope.c.emit(loadIndirect(b.getIndirect), pop)
+	} else if b.isVar && !b.isArg {
+		// noop
 	} else {
 		// make sure TDZ is checked
 		b.markAccessPoint()
@@ -236,7 +257,9 @@ func (b *binding) emitInitPAtScope(scope *scope, pos int) {
 
 func (b *binding) emitGetVar(callee bool) {
 	b.markAccessPoint()
-	if b.isVar && !b.isArg {
+	if b.getIndirect != nil {
+		b.scope.c.emit(loadIndirect(b.getIndirect))
+	} else if b.isVar && !b.isArg {
 		b.scope.c.emit(&loadMixed{name: b.name, callee: callee})
 	} else {
 		b.scope.c.emit(&loadMixedLex{name: b.name, callee: callee})
@@ -664,6 +687,18 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 						switch i := (*ap).(type) {
 						case loadStack:
 							*ap = loadStash(idx)
+						case initIndirect:
+							*ap = initIndirect{idx: idx, getter: i.getter}
+						case export:
+							*ap = export{
+								idx:      idx,
+								callback: i.callback,
+							}
+						case exportLex:
+							*ap = exportLex{
+								idx:      idx,
+								callback: i.callback,
+							}
 						case storeStack:
 							*ap = storeStash(idx)
 						case storeStackP:
@@ -684,6 +719,8 @@ func (s *scope) finaliseVarAlloc(stackOffset int) (stashSize, stackSize int) {
 							i.idx = idx
 						case *resolveMixed:
 							i.idx = idx
+						case loadIndirect:
+							// do nothing
 						default:
 							s.c.assert(false, s.c.p.sourceOffset(pc), "Unsupported instruction for binding: %T", i)
 						}
@@ -859,6 +896,9 @@ func (s *scope) makeNamesMap() map[unistring.String]uint32 {
 		if b.isVar {
 			idx |= maskVar
 		}
+		if b.getIndirect != nil {
+			idx |= maskIndirect
+		}
 		names[b.name] = idx
 	}
 	return names
@@ -887,6 +927,186 @@ found:
 	l := len(s.bindings) - 1
 	s.bindings[l] = nil
 	s.bindings = s.bindings[:l]
+}
+
+func (c *compiler) compileModule(module *SourceTextModuleRecord) {
+	oldModule := c.module
+	c.module = module
+	oldResolve := c.hostResolveImportedModule
+	c.hostResolveImportedModule = module.hostResolveImportedModule
+	defer func() {
+		c.module = oldModule
+		c.hostResolveImportedModule = oldResolve
+	}()
+	in := module.body
+	c.p.scriptOrModule = module
+	c.p.src = in.File
+
+	c.newScope()
+	scope := c.scope
+	scope.dynamic = true
+	scope.strict = true
+	c.newBlockScope()
+	scope = c.scope
+	scope.funcType = funcModule
+	// scope.variable = true
+	c.emit(&enterFunc{
+		funcType: funcModule,
+	})
+	c.block = &block{
+		outer: c.block,
+		typ:   blockScope,
+
+		// needResult: true,
+	}
+	var enter *enterBlock
+	c.emit(&enterFuncBody{
+		funcType:    funcModule,
+		extensible:  true,
+		adjustStack: true,
+	})
+	for _, in := range module.indirectExportEntries {
+		v, ambiguous := module.ResolveExport(in.exportName)
+		if v == nil || ambiguous {
+			c.compileAmbiguousImport(unistring.NewFromString(in.importName))
+		}
+	}
+
+	for _, in := range module.importEntries {
+		c.compileImportEntry(in)
+	}
+	funcs := c.extractFunctions(in.Body)
+	c.createFunctionBindings(funcs)
+	c.compileDeclList(in.DeclarationList, false)
+	vars := make([]unistring.String, len(scope.bindings))
+	for i, b := range scope.bindings {
+		vars[i] = b.name
+	}
+	if len(vars) > 0 {
+		c.emit(&bindVars{names: vars, deletable: false})
+	}
+	if c.compileLexicalDeclarations(in.Body, true) {
+		c.block = &block{
+			outer:      c.block,
+			typ:        blockScope,
+			needResult: true,
+		}
+		enter = &enterBlock{}
+		c.emit(enter)
+	}
+	for _, exp := range in.Body {
+		if imp, ok := exp.(*ast.ImportDeclaration); ok {
+			c.compileImportDeclaration(imp)
+		}
+	}
+	for _, entry := range module.localExportEntries {
+		c.compileLocalExportEntry(entry)
+	}
+	for _, entry := range module.indirectExportEntries {
+		c.compileIndirectExportEntry(entry)
+	}
+
+	c.compileFunctions(funcs)
+
+	c.emit(&loadModulePromise{moduleCore: module})
+	c.emit(await) // this to stop us execute once after we initialize globals
+	c.emit(pop)
+
+	c.compileStatements(in.Body, true)
+	c.emit(loadUndef)
+	c.emit(ret)
+	if enter != nil {
+		c.leaveScopeBlock(enter)
+		c.popScope()
+	}
+
+	scope.finaliseVarAlloc(0)
+	m := &newModule{
+		moduleCore: module,
+		newAsyncFunc: newAsyncFunc{
+			newFunc: newFunc{
+				prg:    c.p,
+				name:   unistring.String(in.File.Name()),
+				source: in.File.Source(),
+				length: 0,
+				strict: true,
+			},
+		},
+	}
+	c.p = &Program{
+		src:            in.File,
+		scriptOrModule: m,
+	}
+	c.emit(_loadUndef{}, m, call(0), &setModulePromise{moduleCore: module})
+}
+
+func (c *compiler) compileImportEntry(in importEntry) {
+	importedModule, err := c.hostResolveImportedModule(c.module, in.moduleRequest)
+	if err != nil {
+		panic(fmt.Errorf("previously resolved module returned error %w", err))
+	}
+	if in.importName != "*" {
+		resolution, ambiguous := importedModule.ResolveExport(in.importName)
+		if resolution == nil || ambiguous {
+			c.compileAmbiguousImport(unistring.NewFromString(in.importName))
+			return
+		}
+	}
+	b, _ := c.scope.bindName(unistring.NewFromString(in.localName))
+	b.inStash = true
+	b.isConst = true
+}
+
+func (c *compiler) compileLocalExportEntry(entry exportEntry) {
+	name := unistring.NewFromString(entry.localName)
+	b, ok := c.scope.boundNames[name]
+	if !ok {
+		if entry.localName != "default" {
+			// TODO fix index
+			c.throwSyntaxError(0, "exporting unknown binding: %q", name)
+		}
+		b, _ = c.scope.bindName(name)
+	}
+
+	b.inStash = true
+	b.markAccessPoint()
+
+	exportName := unistring.NewFromString(entry.localName)
+	module := c.module
+	callback := func(vm *vm, getter func() Value) {
+		vm.r.modules[module].(*SourceTextModuleInstance).exportGetters[exportName.String()] = getter
+	}
+
+	if entry.lex || !c.scope.boundNames[exportName].isVar {
+		c.emit(exportLex{callback: callback})
+	} else {
+		c.emit(export{callback: callback})
+	}
+}
+
+func (c *compiler) compileIndirectExportEntry(entry exportEntry) {
+	otherModule, err := c.hostResolveImportedModule(c.module, entry.moduleRequest)
+	if err != nil {
+		panic(fmt.Errorf("previously resolved module returned error %w", err))
+	}
+	if entry.importName == "*" {
+		return
+	}
+	b, ambiguous := otherModule.ResolveExport(entry.importName)
+	if ambiguous || b == nil {
+		c.compileAmbiguousImport(unistring.NewFromString(entry.importName))
+		return
+	}
+
+	exportName := unistring.NewFromString(entry.exportName).String()
+	importName := unistring.NewFromString(b.BindingName).String()
+	module := c.module
+	c.emit(exportIndirect{callback: func(vm *vm) {
+		m := vm.r.modules[module]
+		m.(*SourceTextModuleInstance).exportGetters[exportName] = func() Value {
+			return vm.r.modules[b.Module].GetBindingValue(importName)
+		}
+	}})
 }
 
 func (c *compiler) compile(in *ast.Program, strict, inGlobal bool, evalVm *vm) {
@@ -984,6 +1204,10 @@ func (c *compiler) compile(in *ast.Program, strict, inGlobal bool, evalVm *vm) {
 	scope.finaliseVarAlloc(0)
 }
 
+func (c *compiler) compileAmbiguousImport(name unistring.String) {
+	c.emit(ambiguousImport(name))
+}
+
 func (c *compiler) compileDeclList(v []*ast.VariableDeclaration, inFunc bool) {
 	for _, value := range v {
 		c.createVarBindings(value, inFunc)
@@ -1009,6 +1233,13 @@ func (c *compiler) extractFunctions(list []ast.Statement) (funcs []*ast.Function
 			} else {
 				continue
 			}
+		case *ast.ExportDeclaration:
+			if st.HoistableDeclaration == nil {
+				continue
+			}
+			if st.HoistableDeclaration.FunctionDeclaration != nil {
+				decl = st.HoistableDeclaration.FunctionDeclaration
+			}
 		default:
 			continue
 		}
@@ -1026,6 +1257,9 @@ func (c *compiler) createFunctionBindings(funcs []*ast.FunctionDeclaration) {
 			for _, decl := range funcs {
 				if !decl.Function.Async && !decl.Function.Generator {
 					s.bindNameLexical(decl.Function.Name.Name, false, int(decl.Function.Name.Idx1())-1)
+					if decl.IsDefault && decl.Function.Name.Name != "default" {
+						s.bindNameLexical("default", unique, int(decl.Function.Name.Idx1())-1)
+					}
 				} else {
 					hasNonStandard = true
 				}
@@ -1034,12 +1268,18 @@ func (c *compiler) createFunctionBindings(funcs []*ast.FunctionDeclaration) {
 				for _, decl := range funcs {
 					if decl.Function.Async || decl.Function.Generator {
 						s.bindNameLexical(decl.Function.Name.Name, true, int(decl.Function.Name.Idx1())-1)
+						if decl.IsDefault && decl.Function.Name.Name != "default" {
+							s.bindNameLexical("default", unique, int(decl.Function.Name.Idx1())-1)
+						}
 					}
 				}
 			}
 		} else {
 			for _, decl := range funcs {
 				s.bindNameLexical(decl.Function.Name.Name, true, int(decl.Function.Name.Idx1())-1)
+				if decl.IsDefault && decl.Function.Name.Name != "default" {
+					s.bindNameLexical("default", unique, int(decl.Function.Name.Idx1())-1)
+				}
 			}
 		}
 	} else {
@@ -1190,19 +1430,33 @@ func (c *compiler) createLexicalBindings(lex *ast.LexicalDeclaration) {
 }
 
 func (c *compiler) compileLexicalDeclarations(list []ast.Statement, scopeDeclared bool) bool {
+	declareScope := func() {
+		if !scopeDeclared {
+			c.newBlockScope()
+			scopeDeclared = true
+		}
+	}
 	for _, st := range list {
-		if lex, ok := st.(*ast.LexicalDeclaration); ok {
-			if !scopeDeclared {
-				c.newBlockScope()
-				scopeDeclared = true
-			}
+		switch lex := st.(type) {
+		case *ast.LexicalDeclaration:
+			declareScope()
 			c.createLexicalBindings(lex)
-		} else if cls, ok := st.(*ast.ClassDeclaration); ok {
-			if !scopeDeclared {
-				c.newBlockScope()
-				scopeDeclared = true
+		case *ast.ClassDeclaration:
+			declareScope()
+			c.createLexicalIdBinding(lex.Class.Name.Name, false, int(lex.Class.Name.Idx)-1)
+		case *ast.ExportDeclaration:
+			if lex.LexicalDeclaration != nil {
+				declareScope()
+				c.createLexicalBindings(lex.LexicalDeclaration)
+			} else if lex.ClassDeclaration != nil {
+				declareScope()
+				if lex.IsDefault {
+					c.createLexicalIdBinding("default", false, int(lex.Idx0())-1)
+				} else {
+					cls := lex.ClassDeclaration
+					c.createLexicalIdBinding(cls.Class.Name.Name, false, int(cls.Class.Name.Idx)-1)
+				}
 			}
-			c.createLexicalIdBinding(cls.Class.Name.Name, false, int(cls.Class.Name.Idx)-1)
 		}
 	}
 	return scopeDeclared

@@ -113,7 +113,7 @@ func TestEventLoopDoesntCrossIterations(t *testing.T) {
 	eventLoopTest(t, script, func(logLines []string) {
 		require.Equal(t, []string{
 			"setTimeout 1 was stopped because the VU iteration was interrupted",
-			"just error\n\tat file:///-:13:4(15)\n", "1",
+			"just error\n\tat default (file:///-:13:5(14))\n", "1",
 		}, logLines)
 	})
 }

@@ -40,6 +40,7 @@ func NewRuntime(t testing.TB) *Runtime {
 			Logger:   testutils.NewLogger(t),
 			Registry: metrics.NewRegistry(),
 		},
+		CWD: new(url.URL),
 	}
 
 	eventloop := eventloop.New(vu)
@@ -64,7 +65,7 @@ func (r *Runtime) MoveToVUContext(state *lib.State) {
 // SetupModuleSystem sets up the modules system for the Runtime.
 // See [modules.NewModuleResolver] for the meaning of the parameters.
 func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.FileLoader, c *compiler.Compiler) error {
-	r.mr = modules.NewModuleResolver(goModules, loader, c)
+	r.mr = modules.NewModuleResolver(goModules, loader, c, r.VU.InitEnvField.CWD)
 	return r.innerSetupModuleSystem()
 }
 
@@ -104,6 +105,6 @@ func (r *Runtime) RunOnEventLoop(code string) (value goja.Value, err error) {
 
 func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
-	impl := modules.NewLegacyRequireImpl(r.VU, ms, url.URL{})
+	impl := modules.NewLegacyRequireImpl(r.VU, ms, *r.VU.InitEnv().CWD)
 	return r.VU.RuntimeField.Set("require", impl.Require)
 }

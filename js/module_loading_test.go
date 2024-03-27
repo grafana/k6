@@ -168,7 +168,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 			initVU, err := r.NewVU(ctx, 1, 1, ch)
 			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-			require.NoError(t, vu.RunOnce())
+			require.ErrorContains(t, vu.RunOnce(), "ReferenceError: exports is not defined")
 		})
 	}
 }
@@ -294,7 +294,7 @@ func TestLoadCycle(t *testing.T) {
 	require.NoError(t, fsext.WriteFile(fileSystem, "/counter.js", []byte(`
 			let main = require("./main.js");
 			exports.count = 5;
-			export function a() {
+			exports.a = function() {
 				return main.message;
 			}
 	`), fs.ModePerm))
@@ -303,15 +303,14 @@ func TestLoadCycle(t *testing.T) {
 			let counter = require("./counter.js");
 			let count = counter.count;
 			let a = counter.a;
-			let message= "Eval complete";
-			exports.message = message;
+			exports.message = "Eval complete";
 
-			export default function() {
+			exports.default = function() {
 				if (count != 5) {
 					throw new Error("Wrong value of count "+ count);
 				}
 				let aMessage = a();
-				if (aMessage != message) {
+				if (aMessage != exports.message) {
 					throw new Error("Wrong value of a() "+ aMessage);
 				}
 			}

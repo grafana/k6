@@ -643,13 +643,6 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeBase}
 	p, _, err = comp.Compile(src, name, true)
 	origErr = err
-	if err != nil && !expectsError {
-		src, _, err = comp.Transform(src, name, nil)
-		if err == nil {
-			p, _, err = comp.Compile(src, name, true)
-		}
-	}
-
 	if err != nil {
 		return early, origErr, err
 	}
@@ -689,14 +682,13 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *g
 	defer ctx.compilerPool.Put(comp)
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeExtended}
 
+	u := &url.URL{Scheme: "file", Path: path.Join(ctx.base, name)}
+	base := u.JoinPath("..")
 	mr := modules.NewModuleResolver(nil,
 		func(specifier *url.URL, name string) ([]byte, error) {
-			return fs.ReadFile(currentFS, specifier.Path[1:])
+			return fs.ReadFile(currentFS, specifier.String()[2:])
 		},
-		comp)
-	u := &url.URL{Scheme: "file", Path: path.Join(ctx.base, name)}
-
-	base := u.JoinPath("..")
+		comp, base)
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
 	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms, *base)
 	require.NoError(ctx.t, vm.Set("require", impl.Require))

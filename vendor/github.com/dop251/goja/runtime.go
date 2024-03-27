@@ -192,6 +192,15 @@ type Runtime struct {
 	hash  *maphash.Hash
 	idSeq uint64
 
+	modules          map[ModuleRecord]ModuleInstance
+	moduleNamespaces map[ModuleRecord]*namespaceObject
+	importMetas      map[ModuleRecord]*Object
+
+	getImportMetaProperties func(ModuleRecord) []MetaProperty
+	finalizeImportMeta      func(*Object, ModuleRecord)
+	importModuleDynamically ImportModuleDynamicallyCallback
+	evaluationState         *evaluationState
+
 	jobQueue []func()
 
 	promiseRejectionTracker PromiseRejectionTracker

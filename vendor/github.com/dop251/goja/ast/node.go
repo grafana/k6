@@ -288,6 +288,9 @@ type (
 	SuperExpression struct {
 		Idx file.Idx
 	}
+	DynamicImportExpression struct {
+		Idx file.Idx
+	}
 
 	UnaryExpression struct {
 		Operator token.Token
@@ -335,6 +338,8 @@ func (*MetaProperty) _expressionNode()          {}
 func (*ObjectPattern) _expressionNode()         {}
 func (*ArrayPattern) _expressionNode()          {}
 func (*Binding) _expressionNode()               {}
+
+func (*DynamicImportExpression) _expressionNode() {}
 
 func (*PropertyShort) _expressionNode() {}
 func (*PropertyKeyed) _expressionNode() {}
@@ -482,7 +487,71 @@ type (
 	}
 
 	FunctionDeclaration struct {
-		Function *FunctionLiteral
+		Function  *FunctionLiteral
+		IsDefault bool // TODO figure out how to not have to that
+	}
+
+	ImportDeclaration struct {
+		Idx             file.Idx
+		ImportClause    *ImportClause
+		FromClause      *FromClause
+		ModuleSpecifier unistring.String
+	}
+
+	ImportClause struct {
+		ImportedDefaultBinding *Identifier
+		NameSpaceImport        *NameSpaceImport
+		NamedImports           *NamedImports
+	}
+
+	NameSpaceImport struct {
+		ImportedBinding unistring.String
+	}
+
+	NamedImports struct {
+		ImportsList []*ImportSpecifier
+	}
+
+	ImportSpecifier struct {
+		IdentifierName unistring.String
+		Alias          unistring.String
+	}
+
+	ExportDeclaration struct {
+		Idx                  file.Idx
+		Variable             *VariableStatement
+		AssignExpression     Expression
+		LexicalDeclaration   *LexicalDeclaration
+		ClassDeclaration     *ClassDeclaration
+		NamedExports         *NamedExports
+		ExportFromClause     *ExportFromClause
+		FromClause           *FromClause
+		HoistableDeclaration *HoistableDeclaration
+		IsDefault            bool
+	}
+
+	FromClause struct {
+		ModuleSpecifier unistring.String
+	}
+	ExportFromClause struct {
+		IsWildcard   bool
+		Alias        unistring.String
+		NamedExports *NamedExports
+	}
+
+	NamedExports struct {
+		ExportsList []*ExportSpecifier
+	}
+
+	ExportSpecifier struct {
+		IdentifierName unistring.String
+		Alias          unistring.String
+	}
+
+	HoistableDeclaration struct {
+		FunctionDeclaration *FunctionDeclaration
+		// GeneratorDeclaration
+		// AsyncFunc and AsyncGenerator
 	}
 
 	ClassDeclaration struct {
@@ -516,6 +585,9 @@ func (*WithStatement) _statementNode()       {}
 func (*LexicalDeclaration) _statementNode()  {}
 func (*FunctionDeclaration) _statementNode() {}
 func (*ClassDeclaration) _statementNode()    {}
+
+func (*ExportDeclaration) _statementNode() {}
+func (*ImportDeclaration) _statementNode() {}
 
 // =========== //
 // Declaration //
@@ -633,6 +705,10 @@ type Program struct {
 	Body []Statement
 
 	DeclarationList []*VariableDeclaration
+	ImportEntries   []*ImportDeclaration
+	ExportEntries   []*ExportDeclaration
+
+	HasTLA bool
 
 	File *file.File
 }
@@ -679,6 +755,8 @@ func (self *UnaryExpression) Idx0() file.Idx {
 }
 func (self *MetaProperty) Idx0() file.Idx { return self.Idx }
 
+func (self *DynamicImportExpression) Idx0() file.Idx { return self.Idx }
+
 func (self *BadStatement) Idx0() file.Idx        { return self.From }
 func (self *BlockStatement) Idx0() file.Idx      { return self.LeftBrace }
 func (self *BranchStatement) Idx0() file.Idx     { return self.Idx }
@@ -712,6 +790,9 @@ func (self *ForLoopInitializerLexicalDecl) Idx0() file.Idx { return self.Lexical
 func (self *PropertyShort) Idx0() file.Idx                 { return self.Name.Idx }
 func (self *PropertyKeyed) Idx0() file.Idx                 { return self.Key.Idx0() }
 func (self *ExpressionBody) Idx0() file.Idx                { return self.Expression.Idx0() }
+
+func (self *ExportDeclaration) Idx0() file.Idx { return self.Idx }
+func (self *ImportDeclaration) Idx0() file.Idx { return self.Idx }
 
 func (self *VariableDeclaration) Idx0() file.Idx { return self.Var }
 func (self *FieldDefinition) Idx0() file.Idx     { return self.Idx }
@@ -767,9 +848,12 @@ func (self *UnaryExpression) Idx1() file.Idx {
 	}
 	return self.Operand.Idx1()
 }
+
 func (self *MetaProperty) Idx1() file.Idx {
 	return self.Property.Idx1()
 }
+
+func (self *DynamicImportExpression) Idx1() file.Idx { return self.Idx + 6 }
 
 func (self *BadStatement) Idx1() file.Idx   { return self.To }
 func (self *BlockStatement) Idx1() file.Idx { return self.RightBrace + 1 }
@@ -840,6 +924,14 @@ func (self *PropertyShort) Idx1() file.Idx {
 func (self *PropertyKeyed) Idx1() file.Idx { return self.Value.Idx1() }
 
 func (self *ExpressionBody) Idx1() file.Idx { return self.Expression.Idx1() }
+
+func (self *ExportDeclaration) Idx1() file.Idx {
+	return self.Idx + file.Idx(len(token.EXPORT.String()))
+}
+
+func (self *ImportDeclaration) Idx1() file.Idx {
+	return self.Idx + file.Idx(len(token.IMPORT.String()))
+}
 
 func (self *VariableDeclaration) Idx1() file.Idx {
 	if len(self.List) > 0 {

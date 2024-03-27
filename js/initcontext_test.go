@@ -93,8 +93,7 @@ func TestRequire(t *testing.T) {
 			fs := fsext.NewMemMapFs()
 			require.NoError(t, fsext.WriteFile(fs, "/file.js", []byte{0x00}, 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
-			require.Error(t, err)
-			assert.Contains(t, err.Error(), "SyntaxError: file:///file.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+			assert.ErrorContains(t, err, "file:///file.js: Line 1:1 Unexpected token ILLEGAL (and 1 more errors)")
 		})
 		t.Run("Error", func(t *testing.T) {
 			t.Parallel()
@@ -102,7 +101,7 @@ func TestRequire(t *testing.T) {
 			require.NoError(t, fsext.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			assert.EqualError(t, err,
-				"Error: aaaa\n\tat file:///file.js:2:7(3)\n\tat go.k6.io/k6/js.(*requireImpl).require-fm (native)\n\tat file:///script.js:1:0(15)\n")
+				"Error: aaaa\n\tat file:///file.js:2:7(3)\n")
 		})
 
 		imports := map[string]struct {
@@ -573,7 +572,7 @@ export default function(){
 	require.Error(t, err)
 	exception := new(goja.Exception)
 	require.ErrorAs(t, err, &exception)
-	require.Equal(t, exception.String(), "exception in line 2\n\tat f2 (file:///module1.js:2:4(2))\n\tat file:///script.js:5:4(3)\n")
+	require.Equal(t, exception.String(), "exception in line 2\n\tat f2 (file:///module1.js:2:5(2))\n\tat default (file:///script.js:5:15(3))\n")
 }
 
 func TestSourceMapsExternal(t *testing.T) {
@@ -603,7 +602,7 @@ export default function () {
 	require.Error(t, err)
 	exception := new(goja.Exception)
 	require.ErrorAs(t, err, &exception)
-	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat webpack:///./test1.ts:5:4(3)\n\tat file:///script.js:4:2(4)\n", exception.String())
+	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat webpack:///./test1.ts:5:4(3)\n\tat default (file:///script.js:4:4(3))\n", exception.String())
 }
 
 func TestSourceMapsExternalExtented(t *testing.T) {
@@ -636,7 +635,7 @@ export default function () {
 	require.ErrorAs(t, err, &exception)
 	// TODO figure out why those are not the same as the one in the previous test TestSourceMapsExternal
 	// likely settings in the transpilers
-	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat r (webpack:///./test1.ts:5:4(3))\n\tat file:///script.js:4:2(4)\n", exception.String())
+	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat r (webpack:///./test1.ts:5:4(3))\n\tat default (file:///script.js:4:4(3))\n", exception.String())
 }
 
 func TestSourceMapsExternalExtentedInlined(t *testing.T) {
@@ -666,7 +665,7 @@ export default function () {
 	require.ErrorAs(t, err, &exception)
 	// TODO figure out why those are not the same as the one in the previous test TestSourceMapsExternal
 	// likely settings in the transpilers
-	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat r (webpack:///./test1.ts:5:4(3))\n\tat file:///script.js:4:2(4)\n", exception.String())
+	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat r (webpack:///./test1.ts:5:4(3))\n\tat default (file:///script.js:4:4(3))\n", exception.String())
 }
 
 func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {

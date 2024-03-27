@@ -48,8 +48,9 @@ type BundleInstance struct {
 	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
 	env map[string]string
 
-	mainModuleExports *goja.Object
-	moduleVUImpl      *moduleVUImpl
+	mainModule         goja.ModuleRecord
+	mainModuleInstance goja.ModuleInstance
+	moduleVUImpl       *moduleVUImpl
 }
 
 func (bi *BundleInstance) getCallableExport(name string) goja.Callable {
@@ -59,7 +60,7 @@ func (bi *BundleInstance) getCallableExport(name string) goja.Callable {
 }
 
 func (bi *BundleInstance) getExported(name string) goja.Value {
-	return bi.mainModuleExports.Get(name)
+	return bi.mainModuleInstance.GetBindingValue(name)
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
@@ -89,7 +90,7 @@ func newBundle(
 		preInitState:      piState,
 	}
 	c := bundle.newCompiler(piState.Logger)
-	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateFileLoad(bundle), c)
+	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateFileLoad(bundle), c, src.URL.JoinPath(".."))
 
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.
@@ -103,12 +104,12 @@ func newBundle(
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	exports, err := bundle.instantiate(vuImpl, 0)
+	bi, err := bundle.instantiate(vuImpl, 0)
 	if err != nil {
 		return nil, err
 	}
 
-	err = bundle.populateExports(updateOptions, exports)
+	err = bundle.populateExports(updateOptions, bi)
 	if err != nil {
 		return nil, err
 	}
@@ -165,9 +166,9 @@ func (b *Bundle) makeArchive() *lib.Archive {
 }
 
 // populateExports validates and extracts exported objects
-func (b *Bundle) populateExports(updateOptions bool, exports *goja.Object) error {
-	for _, k := range exports.Keys() {
-		v := exports.Get(k)
+func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
+	for _, k := range bi.mainModule.GetExportedNames() {
+		v := bi.getExported(k)
 		if _, ok := goja.AssertFunction(v); ok && k != consts.Options {
 			b.callableExports[k] = struct{}{}
 			continue
@@ -216,40 +217,34 @@ func (b *Bundle) Instantiate(ctx context.Context, vuID uint64) (*BundleInstance,
 		},
 	}
 	vuImpl.eventLoop = eventloop.New(vuImpl)
-	exports, err := b.instantiate(vuImpl, vuID)
+	bi, err := b.instantiate(vuImpl, vuID)
 	if err != nil {
 		return nil, err
 	}
-
-	bi := &BundleInstance{
-		Runtime:           vuImpl.runtime,
-		env:               b.preInitState.RuntimeOptions.Env,
-		moduleVUImpl:      vuImpl,
-		mainModuleExports: exports,
+	if err = bi.manipulateOptions(b.Options); err != nil {
+		return nil, err
 	}
 
+	return bi, nil
+}
+
+func (bi *BundleInstance) manipulateOptions(options lib.Options) error {
 	// Grab any exported functions that could be executed. These were
 	// already pre-validated in cmd.validateScenarioConfig(), just get them here.
-	jsOptions := exports.Get(consts.Options)
+	jsOptions := bi.getExported(consts.Options)
 	var jsOptionsObj *goja.Object
 	if common.IsNullish(jsOptions) {
-		jsOptionsObj = vuImpl.runtime.NewObject()
-		err := exports.Set(consts.Options, jsOptionsObj)
-		if err != nil {
-			return nil, fmt.Errorf("couldn't set exported options with merged values: %w", err)
-		}
-	} else {
-		jsOptionsObj = jsOptions.ToObject(vuImpl.runtime)
+		return nil
 	}
 
+	jsOptionsObj = jsOptions.ToObject(bi.Runtime)
 	var instErr error
-	b.Options.ForEachSpecified("json", func(key string, val interface{}) {
+	options.ForEachSpecified("json", func(key string, val interface{}) {
 		if err := jsOptionsObj.Set(key, val); err != nil {
 			instErr = err
 		}
 	})
-
-	return bi, instErr
+	return instErr
 }
 
 func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
@@ -262,7 +257,7 @@ func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 	return c
 }
 
-func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, error) {
+func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance, error) {
 	rt := vuImpl.runtime
 	err := b.setupJSRuntime(rt, int64(vuID), b.preInitState.Logger)
 	if err != nil {
@@ -294,14 +289,23 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 		}
 		close(initDone)
 	}()
-
-	var exportsV goja.Value
+	bi := &BundleInstance{
+		Runtime:      vuImpl.runtime,
+		env:          b.preInitState.RuntimeOptions.Env,
+		moduleVUImpl: vuImpl,
+	}
 	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
 			//nolint:govet // here we shadow err on purpose
 			var err error
-			exportsV, err = modSys.RunSourceData(b.sourceData)
-			return err
+
+			bi.mainModule, err = modSys.RunSourceData(b.sourceData)
+			if err != nil {
+				return err
+			}
+			// TODO move this here
+			bi.mainModuleInstance = rt.GetModuleInstance(bi.mainModule)
+			return nil
 		})
 	})
 
@@ -314,14 +318,6 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 		}
 		return nil, err
 	}
-	if common.IsNullish(exportsV) {
-		return nil, errors.New("exports must not be set to null or undefined")
-	}
-	exports := exportsV.ToObject(vuImpl.runtime)
-
-	if exports == nil {
-		return nil, errors.New("exports must be an object")
-	}
 
 	// If we've already initialized the original VU init context, forbid
 	// any subsequent VUs to open new files
@@ -331,7 +327,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 
 	rt.SetRandSource(common.NewRandSource())
 
-	return exports, nil
+	return bi, nil
 }
 
 func (b *Bundle) setupJSRuntime(rt *goja.Runtime, vuID int64, logger logrus.FieldLogger) error {
@@ -402,7 +398,7 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modu
 		}
 		// This uses the pwd from the requireImpl
 		pwd := impl.internal.CurrentlyRequiredModule()
-		return openImpl(rt, b.filesystems["file"], &pwd, filename, args...)
+		return openImpl(rt, b.filesystems["file"], pwd, filename, args...)
 	})
 
 	return func() {

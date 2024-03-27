@@ -59,11 +59,157 @@ func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
 		return nil, errors.New("require() can't be used with an empty specifier")
 	}
 
-	return r.modules.Require(currentPWD, specifier)
+	rt := r.vu.Runtime()
+	// parentModule := getCurrentModuleScript(rt, r.modules.resolver.gojaModuleResolver)
+	parentModuleStr := getCurrentModuleScript(rt)
+	parentModuleStr2 := getPreviousRequiringFile(rt)
+	if parentModuleStr != parentModuleStr2 {
+		r.vu.InitEnv().Logger.Warnf("requiring %s got two different modulestr %q and %q\n",
+			specifier, parentModuleStr, parentModuleStr2)
+		parentModuleStr = parentModuleStr2
+	}
+	parentModule, _ := r.modules.resolver.gojaModuleResolver(nil, parentModuleStr)
+	m, err := r.modules.resolver.gojaModuleResolver(parentModule, specifier)
+	if err != nil {
+		return nil, err
+	}
+	if wm, ok := m.(*goModule); ok {
+		var gmi *goModuleInstance
+		gmi, err = r.getModuleInstanceFromGoModule(rt, wm)
+		if err != nil {
+			return nil, err
+		}
+		exports := toESModuleExports(gmi.mi.Exports())
+		return rt.ToValue(exports).ToObject(rt), nil
+	}
+	err = m.Link()
+	if err != nil {
+		return nil, err
+	}
+	var promise *goja.Promise
+	if c, ok := m.(goja.CyclicModuleRecord); ok {
+		promise = rt.CyclicModuleRecordEvaluate(c, r.modules.resolver.gojaModuleResolver)
+	} else {
+		panic("shouldn't happen")
+	}
+	switch promise.State() {
+	case goja.PromiseStateRejected:
+		err = promise.Result().Export().(error) //nolint:forcetypeassert
+	case goja.PromiseStateFulfilled:
+	default:
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cjs, ok := m.(*cjsModule); ok {
+		return rt.GetModuleInstance(cjs).(*cjsModuleInstance).exports, nil //nolint:forcetypeassert
+	}
+	return rt.NamespaceObjectFor(m), nil // TODO fix this probably needs to be more exteneted
+}
+
+func (r *LegacyRequireImpl) getModuleInstanceFromGoModule(
+	rt *goja.Runtime, wm *goModule,
+) (wmi *goModuleInstance, err error) {
+	mi := rt.GetModuleInstance(wm)
+	if mi == nil {
+		err = wm.Link()
+		if err != nil {
+			return nil, err
+		}
+		promise := rt.CyclicModuleRecordEvaluate(wm, r.modules.resolver.gojaModuleResolver)
+		switch promise.State() {
+		case goja.PromiseStateRejected:
+			err = promise.Result().Export().(error) //nolint:forcetypeassert
+		case goja.PromiseStateFulfilled:
+		default:
+			panic("TLA in go modules is not supported in k6 at the moment")
+		}
+		if err != nil {
+			return nil, err
+		}
+		mi = rt.GetModuleInstance(wm)
+	}
+	gmi, ok := mi.(*goModuleInstance)
+	if !ok {
+		panic("a goModule instance is of not goModuleInstance type. This is a k6 bug please report!")
+	}
+	return gmi, nil
 }
 
 // CurrentlyRequiredModule returns the module that is currently being required.
 // It is mostly used for old and somewhat buggy behaviour of the `open` call
-func (r *LegacyRequireImpl) CurrentlyRequiredModule() url.URL {
-	return *r.currentlyRequiredModule
+func (r *LegacyRequireImpl) CurrentlyRequiredModule() *url.URL {
+	fileStr := getPreviousRequiringFile(r.vu.Runtime())
+	var u *url.URL
+	switch {
+	// this works around windows URLs like file://C:/some/path
+	// url.Parse will think of C: as hostname
+	case strings.HasPrefix(fileStr, "file://"):
+		u = new(url.URL)
+		u.Scheme = "file"
+		u.Path = strings.TrimPrefix(fileStr, "file://")
+	case strings.HasPrefix(fileStr, "https://"):
+		var err error
+		u, err = url.Parse(fileStr)
+		if err != nil {
+			panic(err)
+		}
+	default:
+		panic(fileStr)
+	}
+	return loader.Dir(u)
+}
+
+func getCurrentModuleScript(rt *goja.Runtime) string {
+	var parent string
+	var buf [2]goja.StackFrame
+	frames := rt.CaptureCallStack(2, buf[:0])
+	parent = frames[1].SrcName()
+
+	return parent
+}
+
+func getPreviousRequiringFile(rt *goja.Runtime) string {
+	// TODO:replace CurrentlyRequiredModule with this
+	// TODO:stop needing either one https://github.com/grafana/k6/issues/2674
+	var buf [1000]goja.StackFrame
+	frames := rt.CaptureCallStack(1000, buf[:0])
+
+	for i, frame := range frames[1:] { // first one should be the current require
+		// TODO have this precalculated automatically
+		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
+			// we need to get the one *before* but as we skip the first one the index matches ;)
+			return frames[i].SrcName()
+		}
+	}
+	// hopefully nobody is calling `require` with 1000 big stack :crossedfingers
+	if len(frames) == 1000 {
+		panic("stack too big")
+	}
+
+	// fallback
+	return frames[len(frames)-1].SrcName()
+}
+
+func toESModuleExports(exp Exports) interface{} {
+	if exp.Named == nil {
+		return exp.Default
+	}
+	if exp.Default == nil {
+		return exp.Named
+	}
+
+	result := make(map[string]interface{}, len(exp.Named)+2)
+
+	for k, v := range exp.Named {
+		result[k] = v
+	}
+	// Maybe check that those weren't set
+	result["default"] = exp.Default
+	// this so babel works with the `default` when it transpiles from ESM to commonjs.
+	// This should probably be removed once we have support for ESM directly. So that require doesn't get support for
+	// that while ESM has.
+	result["__esModule"] = true
+
+	return result
 }
