@@ -2,9 +2,14 @@ package loader
 
 import "github.com/sirupsen/logrus"
 
-func github(_ logrus.FieldLogger, _ string, parts []string) (string, error) {
+func github(logger logrus.FieldLogger, specifier string, parts []string) (string, error) {
 	username := parts[0]
 	repo := parts[1]
 	filepath := parts[2]
-	return "https://raw.githubusercontent.com/" + username + "/" + repo + "/master/" + filepath, nil
+	realURL := "https://raw.githubusercontent.com/" + username + "/" + repo + "/master/" + filepath
+	logger.Warnf(magicURLsDeprecationWarning, specifier, "github", realURL)
+	return realURL, nil
 }
+
+const magicURLsDeprecationWarning = "Specifier %q was resolved to use a none conventional %s loader. " +
+	"That loader is deprecated and will be removed in v0.53.0. Please use the real URL %q instead."

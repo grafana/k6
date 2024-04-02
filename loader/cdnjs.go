@@ -17,7 +17,7 @@ type cdnjsEnvelope struct {
 	}
 }
 
-func cdnjs(logger logrus.FieldLogger, path string, parts []string) (string, error) {
+func cdnjs(logger logrus.FieldLogger, specifier string, parts []string) (string, error) {
 	name := parts[0]
 	version := parts[1]
 	filename := parts[2]
@@ -56,7 +56,7 @@ func cdnjs(logger logrus.FieldLogger, path string, parts []string) (string, erro
 			if len(ver.Files) == 0 {
 				return "",
 					fmt.Errorf("cdnjs: no files for version %s of %s, this is a problem with the library or cdnjs not k6",
-						version, path)
+						version, specifier)
 			}
 			backupFilename = ver.Files[0]
 			for _, file := range ver.Files {
@@ -70,5 +70,7 @@ func cdnjs(logger logrus.FieldLogger, path string, parts []string) (string, erro
 		}
 	}
 
-	return "https://cdnjs.cloudflare.com/ajax/libs/" + name + "/" + version + "/" + filename, nil
+	realURL := "https://cdnjs.cloudflare.com/ajax/libs/" + name + "/" + version + "/" + filename
+	logger.Warnf(magicURLsDeprecationWarning, specifier, "cdnjs", realURL)
+	return realURL, nil
 }
