@@ -11,5 +11,5 @@ func github(logger logrus.FieldLogger, specifier string, parts []string) (string
 	return realURL, nil
 }
 
-const magicURLsDeprecationWarning = "Specifier %q was resolved to use a none conventional %s loader. " +
+const magicURLsDeprecationWarning = "Specifier %q resolved to use a non-conventional %s loader. " +
 	"That loader is deprecated and will be removed in v0.53.0. Please use the real URL %q instead."
