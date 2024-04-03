@@ -49,7 +49,7 @@ func (te *thresholdExpression) SinkKey() string {
 	return te.AggregationMethod
 }
 
-// parseThresholdAssertion parses a threshold condition expression,
+// parseThresholdExpression parses a threshold condition expression,
 // as defined in a JS script (for instance p(95)<1000), into a thresholdExpression
 // instance.
 //
@@ -181,7 +181,7 @@ var aggregationMethodTokens = [8]string{ //nolint:gochecknoglobals
 	tokenPercentile,
 }
 
-// parseThresholdMethod will parse a threshold condition expression's method.
+// parseThresholdAggregationMethod will parse a threshold condition expression's method.
 // It assumes the provided input argument is already trimmed and cleaned up.
 // If it encounters a percentile method, it will parse it and verify it
 // boils down to an expression of the form: `p(float64)`, but will return
