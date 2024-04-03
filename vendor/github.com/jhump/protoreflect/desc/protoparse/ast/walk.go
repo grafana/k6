@@ -59,6 +59,9 @@ type Visitor struct {
 	VisitFileNode func(*FileNode) (bool, *Visitor)
 	// VisitSyntaxNode is invoked when visiting a *SyntaxNode in the AST.
 	VisitSyntaxNode func(*SyntaxNode) (bool, *Visitor)
+
+	// TODO: add VisitEditionNode
+
 	// VisitPackageNode is invoked when visiting a *PackageNode in the AST.
 	VisitPackageNode func(*PackageNode) (bool, *Visitor)
 	// VisitImportNode is invoked when visiting an *ImportNode in the AST.
@@ -112,6 +115,8 @@ type Visitor struct {
 	// VisitUintLiteralNode is invoked when visiting a *UintLiteralNode in the AST.
 	VisitUintLiteralNode func(*UintLiteralNode) (bool, *Visitor)
 	// VisitPositiveUintLiteralNode is invoked when visiting a *PositiveUintLiteralNode in the AST.
+	//
+	// Deprecated: this node type will not actually be present in an AST.
 	VisitPositiveUintLiteralNode func(*PositiveUintLiteralNode) (bool, *Visitor)
 	// VisitNegativeIntLiteralNode is invoked when visiting a *NegativeIntLiteralNode in the AST.
 	VisitNegativeIntLiteralNode func(*NegativeIntLiteralNode) (bool, *Visitor)

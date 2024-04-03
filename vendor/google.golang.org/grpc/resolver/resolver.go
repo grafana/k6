@@ -168,6 +168,9 @@ type BuildOptions struct {
 	// field. In most cases though, it is not appropriate, and this field may
 	// be ignored.
 	Dialer func(context.Context, string) (net.Conn, error)
+	// Authority is the effective authority of the clientconn for which the
+	// resolver is built.
+	Authority string
 }
 
 // An Endpoint is one network endpoint, or server, which may have multiple
@@ -313,4 +316,14 @@ type Resolver interface {
 	ResolveNow(ResolveNowOptions)
 	// Close closes the resolver.
 	Close()
+}
+
+// AuthorityOverrider is implemented by Builders that wish to override the
+// default authority for the ClientConn.
+// By default, the authority used is target.Endpoint().
+type AuthorityOverrider interface {
+	// OverrideAuthority returns the authority to use for a ClientConn with the
+	// given target. The implementation must generate it without blocking,
+	// typically in line, and must keep it unchanged.
+	OverrideAuthority(Target) string
 }

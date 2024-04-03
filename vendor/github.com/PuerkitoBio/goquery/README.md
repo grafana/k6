@@ -22,7 +22,7 @@ Syntax-wise, it is as close as possible to jQuery, with the same function names 
 
 ## Installation
 
-Please note that because of the net/html dependency, goquery requires Go1.1+ and is tested on Go1.7+.
+Please note that starting with version `v1.9.0` of goquery, Go 1.18+ is required due to the use of generics. For previous goquery versions, a Go version of 1.1+ was required because of the `net/html` dependency. Ongoing goquery development is tested on the latest 2 versions of Go.
 
     $ go get github.com/PuerkitoBio/goquery
 
@@ -40,6 +40,8 @@ Please note that because of the net/html dependency, goquery requires Go1.1+ and
 
 **Note that goquery's API is now stable, and will not break.**
 
+*    **2024-02-29 (v1.9.1)** : Improve allocation and performance of the `Map` function and `Selection.Map` method, better document the cascadia differences (thanks [@jwilsson](https://github.com/jwilsson)).
+*    **2024-02-22 (v1.9.0)** : Add a generic `Map` function, **goquery now requires Go version 1.18+** (thanks [@Fesaa](https://github.com/Fesaa)).
 *    **2023-02-18 (v1.8.1)** : Update `go.mod` dependencies, update CI workflow.
 *    **2021-10-25 (v1.8.0)** : Add `Render` function to render a `Selection` to an `io.Writer` (thanks [@anthonygedeon](https://github.com/anthonygedeon)).
 *    **2021-07-11 (v1.7.1)** : Update go.mod dependencies and add dependabot config (thanks [@jauderho](https://github.com/jauderho)).
@@ -88,7 +90,7 @@ Utility functions that are not in jQuery but are useful in Go are implemented as
 
 The complete [package reference documentation can be found here][doc].
 
-Please note that Cascadia's selectors do not necessarily match all supported selectors of jQuery (Sizzle). See the [cascadia project][cascadia] for details. Invalid selector strings compile to a `Matcher` that fails to match any node. Behaviour of the various functions that take a selector string as argument follows from that fact, e.g. (where `~` is an invalid selector string):
+Please note that Cascadia's selectors do not necessarily match all supported selectors of jQuery (Sizzle). See the [cascadia project][cascadia] for details. Also, the selectors work more like the DOM's `querySelectorAll`, than jQuery's matchers - they have no concept of contextual matching (for some concrete examples of what that means, see [this ticket](https://github.com/andybalholm/cascadia/issues/61)). In practice, it doesn't matter very often but it's something worth mentioning. Invalid selector strings compile to a `Matcher` that fails to match any node. Behaviour of the various functions that take a selector string as argument follows from that fact, e.g. (where `~` is an invalid selector string):
 
 * `Find("~")` returns an empty selection because the selector string doesn't match anything.
 * `Add("~")` returns a new selection that holds the same nodes as the original selection, because it didn't add any node (selector string didn't match anything).
@@ -157,6 +159,7 @@ func main() {
 - [stitcherd](https://github.com/vhodges/stitcherd), A server for doing server side includes using css selectors and DOM updates.
 - [goskyr](https://github.com/jakopako/goskyr), an easily configurable command-line scraper written in Go.
 - [goGetJS](https://github.com/davemolk/goGetJS), a tool for extracting, searching, and saving JavaScript files (with optional headless browser).
+- [fitter](https://github.com/PxyUp/fitter), a tool for selecting values from JSON, XML, HTML and XPath formatted pages.
 
 ## Support
 
@@ -165,7 +168,7 @@ There are a number of ways you can support the project:
 * Use it, star it, build something with it, spread the word!
   - If you do build something open-source or otherwise publicly-visible, let me know so I can add it to the [Related Projects](#related-projects) section!
 * Raise issues to improve the project (note: doc typos and clarifications are issues too!)
-  - Please search existing issues before opening a new one - it may have already been adressed.
+  - Please search existing issues before opening a new one - it may have already been addressed.
 * Pull requests: please discuss new code in an issue first, unless the fix is really trivial.
   - Make sure new code is tested.
   - Be mindful of existing code - PRs that break existing code have a high probability of being declined, unless it fixes a serious issue.

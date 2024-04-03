@@ -14,7 +14,9 @@
 
 package parser
 
-import "github.com/bufbuild/protocompile/ast"
+import (
+	"github.com/bufbuild/protocompile/ast"
+)
 
 // the types below are accumulator types, just used in intermediate productions
 // to accumulate slices that will get stored in AST nodes
@@ -91,112 +93,52 @@ func (list *messageFieldList) toNodes() ([]*ast.MessageFieldNode, []*ast.RuneNod
 	return fields, delimiters
 }
 
-func newEmptyDeclNodes(semicolons []*ast.RuneNode) []*ast.EmptyDeclNode {
-	emptyDecls := make([]*ast.EmptyDeclNode, len(semicolons))
-	for i, semicolon := range semicolons {
-		emptyDecls[i] = ast.NewEmptyDeclNode(semicolon)
-	}
-	return emptyDecls
-}
-
-func newServiceElements(semicolons []*ast.RuneNode, elements []ast.ServiceElement) []ast.ServiceElement {
-	elems := make([]ast.ServiceElement, 0, len(semicolons)+len(elements))
-	for _, semicolon := range semicolons {
-		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
+func prependRunes[T ast.Node](convert func(*ast.RuneNode) T, runes []*ast.RuneNode, elements []T) []T {
+	elems := make([]T, 0, len(runes)+len(elements))
+	for _, rune := range runes {
+		elems = append(elems, convert(rune))
 	}
 	elems = append(elems, elements...)
 	return elems
 }
 
-func newMethodElements(semicolons []*ast.RuneNode, elements []ast.RPCElement) []ast.RPCElement {
-	elems := make([]ast.RPCElement, 0, len(semicolons)+len(elements))
-	for _, semicolon := range semicolons {
-		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
-	}
-	elems = append(elems, elements...)
-	return elems
+func toServiceElement(semi *ast.RuneNode) ast.ServiceElement {
+	return ast.NewEmptyDeclNode(semi)
 }
 
-func newFileElements(semicolons []*ast.RuneNode, elements []ast.FileElement) []ast.FileElement {
-	elems := make([]ast.FileElement, 0, len(semicolons)+len(elements))
-	for _, semicolon := range semicolons {
-		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
-	}
-	elems = append(elems, elements...)
-	return elems
+func toMethodElement(semi *ast.RuneNode) ast.RPCElement {
+	return ast.NewEmptyDeclNode(semi)
 }
 
-func newEnumElements(semicolons []*ast.RuneNode, elements []ast.EnumElement) []ast.EnumElement {
-	elems := make([]ast.EnumElement, 0, len(semicolons)+len(elements))
-	for _, semicolon := range semicolons {
-		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
-	}
-	elems = append(elems, elements...)
-	return elems
+func toFileElement(semi *ast.RuneNode) ast.FileElement {
+	return ast.NewEmptyDeclNode(semi)
 }
 
-func newMessageElements(semicolons []*ast.RuneNode, elements []ast.MessageElement) []ast.MessageElement {
-	elems := make([]ast.MessageElement, 0, len(semicolons)+len(elements))
-	for _, semicolon := range semicolons {
-		elems = append(elems, ast.NewEmptyDeclNode(semicolon))
-	}
-	elems = append(elems, elements...)
-	return elems
+func toEnumElement(semi *ast.RuneNode) ast.EnumElement {
+	return ast.NewEmptyDeclNode(semi)
 }
 
-type nodeWithEmptyDecls[T ast.Node] struct {
-	Node       T
-	EmptyDecls []*ast.EmptyDeclNode
+func toMessageElement(semi *ast.RuneNode) ast.MessageElement {
+	return ast.NewEmptyDeclNode(semi)
 }
 
-func newNodeWithEmptyDecls[T ast.Node](node T, extraSemicolons []*ast.RuneNode) nodeWithEmptyDecls[T] {
-	return nodeWithEmptyDecls[T]{
-		Node:       node,
-		EmptyDecls: newEmptyDeclNodes(extraSemicolons),
+type nodeWithRunes[T ast.Node] struct {
+	Node  T
+	Runes []*ast.RuneNode
+}
+
+func newNodeWithRunes[T ast.Node](node T, trailingRunes ...*ast.RuneNode) nodeWithRunes[T] {
+	return nodeWithRunes[T]{
+		Node:  node,
+		Runes: trailingRunes,
 	}
 }
 
-func toServiceElements[T ast.ServiceElement](nodes nodeWithEmptyDecls[T]) []ast.ServiceElement {
-	elements := make([]ast.ServiceElement, 1+len(nodes.EmptyDecls))
-	elements[0] = nodes.Node
-	for i, emptyDecl := range nodes.EmptyDecls {
-		elements[i+1] = emptyDecl
-	}
-	return elements
-}
-
-func toMethodElements[T ast.RPCElement](nodes nodeWithEmptyDecls[T]) []ast.RPCElement {
-	elements := make([]ast.RPCElement, 1+len(nodes.EmptyDecls))
-	elements[0] = nodes.Node
-	for i, emptyDecl := range nodes.EmptyDecls {
-		elements[i+1] = emptyDecl
-	}
-	return elements
-}
-
-func toFileElements[T ast.FileElement](nodes nodeWithEmptyDecls[T]) []ast.FileElement {
-	elements := make([]ast.FileElement, 1+len(nodes.EmptyDecls))
-	elements[0] = nodes.Node
-	for i, emptyDecl := range nodes.EmptyDecls {
-		elements[i+1] = emptyDecl
-	}
-	return elements
-}
-
-func toEnumElements[T ast.EnumElement](nodes nodeWithEmptyDecls[T]) []ast.EnumElement {
-	elements := make([]ast.EnumElement, 1+len(nodes.EmptyDecls))
-	elements[0] = nodes.Node
-	for i, emptyDecl := range nodes.EmptyDecls {
-		elements[i+1] = emptyDecl
-	}
-	return elements
-}
-
-func toMessageElements[T ast.MessageElement](nodes nodeWithEmptyDecls[T]) []ast.MessageElement {
-	elements := make([]ast.MessageElement, 1+len(nodes.EmptyDecls))
-	elements[0] = nodes.Node
-	for i, emptyDecl := range nodes.EmptyDecls {
-		elements[i+1] = emptyDecl
+func toElements[T ast.Node](convert func(*ast.RuneNode) T, node T, runes []*ast.RuneNode) []T {
+	elements := make([]T, 1+len(runes))
+	elements[0] = node
+	for i, rune := range runes {
+		elements[i+1] = convert(rune)
 	}
 	return elements
 }

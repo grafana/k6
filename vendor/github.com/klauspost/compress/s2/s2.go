@@ -37,6 +37,8 @@ package s2
 import (
 	"bytes"
 	"hash/crc32"
+
+	"github.com/klauspost/compress/internal/race"
 )
 
 /*
@@ -112,6 +114,8 @@ var crcTable = crc32.MakeTable(crc32.Castagnoli)
 // crc implements the checksum specified in section 3 of
 // https://github.com/google/snappy/blob/master/framing_format.txt
 func crc(b []byte) uint32 {
+	race.ReadSlice(b)
+
 	c := crc32.Update(0, crcTable, b)
 	return c>>15 | c<<17 + 0xa282ead8
 }

@@ -27,7 +27,7 @@ func FieldMaskFromRequestBody(r io.Reader, msg proto.Message) (*field_mask.Field
 	var root interface{}
 
 	if err := json.NewDecoder(r).Decode(&root); err != nil {
-		if err == io.EOF {
+		if errors.Is(err, io.EOF) {
 			return fm, nil
 		}
 		return nil, err

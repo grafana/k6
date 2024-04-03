@@ -4,7 +4,7 @@ import (
 	"math/rand"
 )
 
-// randHexStringRunes returns a random string of n hex characters.
+// randHexString returns a random string of n hex characters.
 //
 // Note that this function uses a non-cryptographic random number generator.
 func randHexString(n int) string {

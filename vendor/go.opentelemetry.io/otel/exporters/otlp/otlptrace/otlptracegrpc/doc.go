@@ -28,7 +28,7 @@ The value may additionally a port, a scheme, and a path.
 The value accepts "http" and "https" scheme.
 The value should not contain a query string or fragment.
 OTEL_EXPORTER_OTLP_TRACES_ENDPOINT takes precedence over OTEL_EXPORTER_OTLP_ENDPOINT.
-The configuration can be overridden by [WithEndpoint], [WithInsecure], [WithGRPCConn] options.
+The configuration can be overridden by [WithEndpoint], [WithEndpointURL], [WithInsecure], and [WithGRPCConn] options.
 
 OTEL_EXPORTER_OTLP_INSECURE, OTEL_EXPORTER_OTLP_TRACES_INSECURE (default: "false") -
 setting "true" disables client transport security for the exporter's gRPC connection.
