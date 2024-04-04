@@ -253,20 +253,20 @@ func processField(value string, field reflect.Value) error {
 		return setter.Set(value)
 	}
 
-	if t := textUnmarshaler(field); t != nil {
-		return t.UnmarshalText([]byte(value))
-	}
-
-	if b := binaryUnmarshaler(field); b != nil {
-		return b.UnmarshalBinary([]byte(value))
-	}
-
 	if typ.Kind() == reflect.Ptr {
 		typ = typ.Elem()
 		if field.IsNil() {
 			field.Set(reflect.New(typ))
 		}
 		field = field.Elem()
+	}
+
+	if t := textUnmarshaler(field); t != nil {
+		return t.UnmarshalText([]byte(value))
+	}
+
+	if b := binaryUnmarshaler(field); b != nil {
+		return b.UnmarshalBinary([]byte(value))
 	}
 
 	switch typ.Kind() {
@@ -311,7 +311,7 @@ func processField(value string, field reflect.Value) error {
 		sl := reflect.MakeSlice(typ, 0, 0)
 		if typ.Elem().Kind() == reflect.Uint8 {
 			sl = reflect.ValueOf([]byte(value))
-		} else if len(strings.TrimSpace(value)) != 0 {
+		} else if strings.TrimSpace(value) != "" {
 			vals := strings.Split(value, ",")
 			sl = reflect.MakeSlice(typ, len(vals), len(vals))
 			for i, val := range vals {
@@ -324,7 +324,7 @@ func processField(value string, field reflect.Value) error {
 		field.Set(sl)
 	case reflect.Map:
 		mp := reflect.MakeMap(typ)
-		if len(strings.TrimSpace(value)) != 0 {
+		if strings.TrimSpace(value) != "" {
 			pairs := strings.Split(value, ",")
 			for _, pair := range pairs {
 				kvpair := strings.Split(pair, ":")
