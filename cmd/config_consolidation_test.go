@@ -335,6 +335,12 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, metrics.SystemTagSet(0), *c.Options.SystemTags)
 		}},
+		{opts{env: []string{`K6_SYSTEM_TAGS=""`}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, metrics.SystemTagSet(0), *c.Options.SystemTags)
+		}},
+		{opts{env: []string{`K6_SYSTEM_TAGS=proto,method`}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, metrics.SystemTagSet(metrics.TagProto|metrics.TagMethod), *c.Options.SystemTags)
+		}},
 		{
 			opts{
 				runner: &lib.Options{

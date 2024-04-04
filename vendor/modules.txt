@@ -285,7 +285,7 @@ github.com/mccutchen/go-httpbin/httpbin/digest
 # github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 ## explicit; go 1.18
 github.com/mstoykov/atlas
-# github.com/mstoykov/envconfig v1.4.1-0.20220114105314-765c6d8c76f1
+# github.com/mstoykov/envconfig v1.5.0
 ## explicit
 github.com/mstoykov/envconfig
 # github.com/mstoykov/k6-taskqueue-lib v0.1.0
