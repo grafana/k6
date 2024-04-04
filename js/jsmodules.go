@@ -52,7 +52,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/metrics":              metrics.New(),
 		"k6/ws":                   ws.New(),
 		"k6/experimental/grpc": newRemovedModule(
-			"k6/experimental/grpc has been removed, please use k6/net/grpc instead." +
+			"k6/experimental/grpc has been graduated, please use k6/net/grpc instead." +
 				" See https://grafana.com/docs/k6/latest/javascript-api/k6-net-grpc/ for more information.",
 		),
 	}
