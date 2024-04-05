@@ -692,9 +692,15 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"pause":  p.Pause,
 		"pdf":    p.Pdf,
 		"press":  p.Press,
-		"reload": func(opts goja.Value) *goja.Object {
-			r := mapResponse(vu, p.Reload(opts))
-			return rt.ToValue(r).ToObject(rt)
+		"reload": func(opts goja.Value) (*goja.Object, error) {
+			resp, err := p.Reload(opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+
+			r := mapResponse(vu, resp)
+
+			return rt.ToValue(r).ToObject(rt), nil
 		},
 		"route": p.Route,
 		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {

@@ -1034,7 +1034,7 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
+func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cyclop
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
@@ -1044,7 +1044,7 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 		p.timeoutSettings.navigationTimeout(),
 	)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "parsing reload options: %w", err)
+		return nil, fmt.Errorf("parsing reload options: %w", err)
 	}
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, parsedOpts.Timeout)
@@ -1070,7 +1070,7 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "reloading page: %w", err)
+		return nil, fmt.Errorf("reloading page: %w", err)
 	}
 
 	wrapTimeoutError := func(err error) error {
@@ -1090,7 +1090,7 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 	select {
 	case <-p.ctx.Done():
 	case <-timeoutCtx.Done():
-		k6ext.Panic(p.ctx, "%w", wrapTimeoutError(timeoutCtx.Err()))
+		return nil, wrapTimeoutError(timeoutCtx.Err())
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -1106,12 +1106,12 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 	select {
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
-		k6ext.Panic(p.ctx, "%w", wrapTimeoutError(timeoutCtx.Err()))
+		return nil, wrapTimeoutError(timeoutCtx.Err())
 	}
 
 	applySlowMo(p.ctx)
 
-	return resp
+	return resp, nil
 }
 
 // Route is not implemented.
