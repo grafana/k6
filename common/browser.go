@@ -557,12 +557,12 @@ func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
-		k6ext.Panic(b.ctx, "creating browser context ID %s: %w", browserContextID, err)
+		return nil, fmt.Errorf("creating browser context ID %s: %w", browserContextID, err)
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()
 	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
-		k6ext.Panic(b.ctx, "parsing newContext options: %w", err)
+		return nil, fmt.Errorf("parsing newContext options: %w", err)
 	}
 
 	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
