@@ -657,7 +657,9 @@ func (p *Page) Close(_ goja.Value) error {
 
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return fmt.Errorf("internal error while removing binding from page: %w", err)
+		err = fmt.Errorf("internal error while removing binding from page: %w", err)
+		SpanRecordError(span, "close failed due to internal error", err)
+		return err
 	}
 
 	action := target.CloseTarget(p.targetID)
@@ -676,7 +678,9 @@ func (p *Page) Close(_ goja.Value) error {
 			return nil
 		}
 
-		return fmt.Errorf("closing a page: %w", err)
+		err = fmt.Errorf("closing a page: %w", err)
+		SpanRecordError(span, "close failed", err)
+		return err
 	}
 
 	return nil
