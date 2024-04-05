@@ -1083,7 +1083,9 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	s := newScreenshotter(spanCtx, sp)
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
-		return nil, fmt.Errorf("taking screenshot of page: %w", err)
+		err = fmt.Errorf("taking screenshot of page: %w", err)
+		SpanRecordError(span, "screenshot failed", err)
+		return nil, err
 	}
 
 	return buf, err
