@@ -342,7 +342,13 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Type", func(l *common.Locator, tb *testBrowser) { l.Type("a", timeout(tb)) },
+			"Type", func(l *common.Locator, tb *testBrowser) {
+				err := l.Type("a", timeout(tb))
+				if err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"TextContent", func(l *common.Locator, tb *testBrowser) { l.TextContent(timeout(tb)) },

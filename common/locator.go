@@ -509,7 +509,7 @@ func (l *Locator) press(key string, opts *FramePressOptions) error {
 
 // Type text on the element found that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Type(text string, opts goja.Value) {
+func (l *Locator) Type(text string, opts goja.Value) error {
 	l.log.Debugf(
 		"Locator:Type", "fid:%s furl:%q sel:%q text:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
@@ -517,18 +517,17 @@ func (l *Locator) Type(text string, opts goja.Value) {
 	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.type")
 	defer span.End()
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameTypeOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing type options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing type options: %w", err)
 	}
-	if err = l.typ(text, copts); err != nil {
-		err = fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
-		return
+	if err := l.typ(text, copts); err != nil {
+		return fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
