@@ -995,7 +995,9 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 		p.timeoutSettings.navigationTimeout(),
 	)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing reload options: %w", err)
+		err = fmt.Errorf("parsing reload options: %w", err)
+		SpanRecordError(span, "reload option parsing failed", err)
+		return nil, err
 	}
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, parsedOpts.Timeout)
@@ -1021,7 +1023,9 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return nil, fmt.Errorf("reloading page: %w", err)
+		err = fmt.Errorf("reloading page: %w", err)
+		SpanRecordError(span, "reload failed", err)
+		return nil, err
 	}
 
 	wrapTimeoutError := func(err error) error {
@@ -1041,7 +1045,9 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	select {
 	case <-p.ctx.Done():
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		err := wrapTimeoutError(timeoutCtx.Err())
+		SpanRecordError(span, "reload navigation timed out", err)
+		return nil, err
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -1057,7 +1063,9 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	select {
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
-		return nil, wrapTimeoutError(timeoutCtx.Err())
+		err := wrapTimeoutError(timeoutCtx.Err())
+		SpanRecordError(span, "reload lifecycle timed out", err)
+		return nil, err
 	}
 
 	applySlowMo(p.ctx)
