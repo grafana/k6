@@ -16,6 +16,7 @@ import (
 func ReadSource(
 	logger logrus.FieldLogger, src, pwd string, filesystems map[string]fsext.Fs, stdin io.Reader,
 ) (*SourceData, error) {
+	// 'ToSlash' is here as URL only use '/' as separators, but on Windows paths use '\'
 	pwdURL := &url.URL{Scheme: "file", Path: filepath.ToSlash(filepath.Clean(pwd)) + "/"}
 	if src == "-" {
 		data, err := io.ReadAll(stdin)
