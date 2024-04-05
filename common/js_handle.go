@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/grafana/xk6-browser/k6ext"
@@ -79,7 +80,13 @@ func (h *BaseJSHandle) AsElement() *ElementHandle {
 // Dispose releases the remote object.
 func (h *BaseJSHandle) Dispose() {
 	if err := h.dispose(); err != nil {
-		k6ext.Panic(h.ctx, "dispose: %w", err)
+		// We do not want to panic on an error when the error is a closed
+		// context. The reason the context would be closed is due to the
+		// iteration ending and therefore the associated browser and its assets
+		// will be automatically deleted.
+		if !errors.Is(err, context.Canceled) {
+			k6ext.Panic(h.ctx, "dispose: %w", err)
+		}
 	}
 }
 
