@@ -44,6 +44,7 @@ func TestReadSourceSTDINCache(t *testing.T) {
 	require.Equal(t, &SourceData{
 		URL:  &url.URL{Scheme: "file", Path: "/-"},
 		Data: data,
+		PWD:  &url.URL{Scheme: "file", Path: "/path/to/pwd/"},
 	}, sourceData)
 	fileData, err := fsext.ReadFile(fs, "/-")
 	require.NoError(t, err)
