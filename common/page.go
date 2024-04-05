@@ -1254,7 +1254,13 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	return p.frameManager.MainFrame().WaitForNavigation(opts)
+	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts)
+	if err != nil {
+		SpanRecordError(span, "waiting for navigation failed", err)
+		return nil, err
+	}
+
+	return resp, err
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
