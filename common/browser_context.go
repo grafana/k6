@@ -219,7 +219,9 @@ func (b *BrowserContext) NewPage() (*Page, error) {
 
 	p, err := b.browser.newPageInContext(b.id)
 	if err != nil {
-		return nil, fmt.Errorf("creating new page in browser context: %w", err)
+		err = fmt.Errorf("creating new page in browser context: %w", err)
+		SpanRecordError(span, "failed to create a new page", err)
+		return nil, err
 	}
 
 	var (

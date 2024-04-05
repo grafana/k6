@@ -584,10 +584,18 @@ func (b *Browser) NewPage(opts goja.Value) (*Page, error) {
 
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
-		return nil, fmt.Errorf("new page: %w", err)
+		err = fmt.Errorf("new page: %w", err)
+		SpanRecordError(span, "new browserContext creation failed", err)
+		return nil, err
 	}
 
-	return browserCtx.NewPage()
+	page, err := browserCtx.NewPage()
+	if err != nil {
+		SpanRecordError(span, "new page creation failed", err)
+		return nil, err
+	}
+
+	return page, nil
 }
 
 // On returns a Promise that is resolved when the browser process is disconnected.
