@@ -64,7 +64,9 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 	defer span.End()
 
 	if err := l.click(opts); err != nil {
-		return fmt.Errorf("clicking on %q: %w", l.selector, err)
+		err = fmt.Errorf("clicking on %q: %w", l.selector, err)
+		SpanRecordError(span, "click failed", err)
+		return err
 	}
 
 	applySlowMo(l.ctx)
