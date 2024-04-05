@@ -521,10 +521,14 @@ func (l *Locator) Type(text string, opts goja.Value) error {
 
 	copts := NewFrameTypeOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		return fmt.Errorf("parsing type options: %w", err)
+		err = fmt.Errorf("parsing type options: %w", err)
+		SpanRecordError(span, "type option parsing failed", err)
+		return err
 	}
 	if err := l.typ(text, copts); err != nil {
-		return fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
+		err = fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
+		SpanRecordError(span, "type failed", err)
+		return err
 	}
 
 	applySlowMo(l.ctx)
