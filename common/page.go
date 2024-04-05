@@ -830,7 +830,13 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	)
 	defer span.End()
 
-	return p.MainFrame().Goto(url, opts)
+	resp, err := p.MainFrame().Goto(url, opts)
+	if err != nil {
+		SpanRecordError(span, "goto failed", err)
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func (p *Page) Hover(selector string, opts goja.Value) {
