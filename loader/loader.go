@@ -23,6 +23,7 @@ import (
 type SourceData struct {
 	Data []byte
 	URL  *url.URL
+	PWD  *url.URL
 }
 
 type loaderFunc func(logger logrus.FieldLogger, path string, parts []string) (string, error)

@@ -85,9 +85,14 @@ func newBundle(
 		CompatibilityMode: compatMode,
 		callableExports:   make(map[string]struct{}),
 		filesystems:       filesystems,
-		pwd:               loader.Dir(src.URL),
+		pwd:               src.PWD,
 		preInitState:      piState,
 	}
+
+	if bundle.pwd == nil {
+		bundle.pwd = loader.Dir(src.URL)
+	}
+
 	c := bundle.newCompiler(piState.Logger)
 	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateFileLoad(bundle), c)
 
