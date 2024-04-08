@@ -10,6 +10,8 @@ import (
 	"go.k6.io/k6/loader"
 )
 
+const notPreviouslyResolvedModule = "the module %q was not previously resolved during initialization (__VU==0)"
+
 // FileLoader is a type alias for a function that returns the contents of the referenced file.
 type FileLoader func(specifier *url.URL, name string) ([]byte, error)
 
@@ -32,6 +34,7 @@ type ModuleResolver struct {
 	goModules map[string]interface{}
 	loadCJS   FileLoader
 	compiler  *compiler.Compiler
+	locked    bool
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -55,6 +58,9 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 }
 
 func (mr *ModuleResolver) requireModule(name string) (module, error) {
+	if mr.locked {
+		return nil, fmt.Errorf(notPreviouslyResolvedModule, name)
+	}
 	mod, ok := mr.goModules[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
@@ -81,6 +87,12 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	return mod, err
 }
 
+// Lock locks the resolved from making any further new resolving and now depends only on it's cache
+// This to facilitate loading all the modules a test needs in it's initilization the same as with openning files.
+func (mr *ModuleResolver) Lock() {
+	mr.locked = true
+}
+
 func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) {
 	if cached, ok := mr.cache[arg]; ok {
 		return cached.mod, cached.err
@@ -102,6 +114,9 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 			return cached.mod, cached.err
 		}
 
+		if mr.locked {
+			return nil, fmt.Errorf(notPreviouslyResolvedModule, arg)
+		}
 		// Fall back to loading
 		data, err := mr.loadCJS(specifier, arg)
 		if err != nil {

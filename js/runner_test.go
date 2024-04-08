@@ -1569,6 +1569,101 @@ func TestVUDoesNonExistingPathnUnderConditions(t *testing.T) {
 	assert.Contains(t, err.Error(), "open() can't be used with files that weren't previously opened during initialization (__VU==0)")
 }
 
+func TestVUDoesRequireUnderV0Condition(t *testing.T) {
+	t.Parallel()
+
+	baseFS := fsext.NewMemMapFs()
+	data := `
+			if (__VU == 0) {
+				let data = require("/home/somebody/test.js");
+			}
+			exports.default = function() {
+				console.log("hey")
+			}
+		`
+	require.NoError(t, fsext.WriteFile(baseFS, "/home/somebody/test.js", []byte(`exports=42`), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
+
+	fs := fsext.NewCacheOnReadFs(baseFS, fsext.NewMemMapFs(), 0)
+
+	r, err := getSimpleRunner(t, "/script.js", data, fs)
+	require.NoError(t, err)
+
+	_, err = r.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
+	require.NoError(t, err)
+}
+
+func TestVUDoesNotRequireUnderConditions(t *testing.T) {
+	t.Parallel()
+
+	baseFS := fsext.NewMemMapFs()
+	data := `
+			if (__VU > 0) {
+				let data = require("/home/somebody/test.js");
+			}
+			exports.default = function() {
+				console.log("hey")
+			}
+		`
+	require.NoError(t, fsext.WriteFile(baseFS, "/home/somebody/test.js", []byte(`exports=42`), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
+
+	fs := fsext.NewCacheOnReadFs(baseFS, fsext.NewMemMapFs(), 0)
+
+	r, err := getSimpleRunner(t, "/script.js", data, fs)
+	require.NoError(t, err)
+
+	_, err = r.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), " was not previously resolved during initialization (__VU==0)")
+}
+
+func TestVUDoesRequireUnderConditions(t *testing.T) {
+	t.Parallel()
+
+	baseFS := fsext.NewMemMapFs()
+	data := `
+			if (__VU == 0) {
+				require("/home/somebody/test.js");
+				require("/home/somebody/test2.js");
+			}
+
+			if (__VU % 2 == 1) {
+				require("/home/somebody/test.js");
+			}
+
+			if (__VU % 2 == 0) {
+				require("/home/somebody/test2.js");
+			}
+
+			exports.default = function() {
+				console.log("hey")
+			}
+		`
+	require.NoError(t, fsext.WriteFile(baseFS, "/home/somebody/test.js", []byte(`console.log("test.js", __VU)`), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/home/somebody/test2.js", []byte(`console.log("test2.js", __VU)`), fs.ModePerm))
+	require.NoError(t, fsext.WriteFile(baseFS, "/script.js", []byte(data), fs.ModePerm))
+
+	fs := fsext.NewCacheOnReadFs(baseFS, fsext.NewMemMapFs(), 0)
+
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.InfoLevel)
+	r, err := getSimpleRunner(t, "/script.js", data, fs, logger)
+	require.NoError(t, err)
+	logs := hook.Drain()
+	require.Len(t, logs, 2)
+
+	_, err = r.NewVU(context.Background(), 1, 1, make(chan metrics.SampleContainer, 100))
+	require.NoError(t, err)
+	logs = hook.Drain()
+	require.Len(t, logs, 1)
+	require.Contains(t, logs[0].Message, "test.js 1")
+	_, err = r.NewVU(context.Background(), 2, 2, make(chan metrics.SampleContainer, 100))
+	require.NoError(t, err)
+	logs = hook.Drain()
+	require.Len(t, logs, 1)
+	require.Contains(t, logs[0].Message, "test2.js 2")
+}
+
 func TestVUIntegrationCookiesReset(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)

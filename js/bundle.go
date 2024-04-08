@@ -112,6 +112,7 @@ func newBundle(
 	if err != nil {
 		return nil, err
 	}
+	bundle.ModuleResolver.Lock()
 
 	err = bundle.populateExports(updateOptions, exports)
 	if err != nil {
