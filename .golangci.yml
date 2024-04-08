@@ -1,4 +1,4 @@
-# v1.55.2
+# v1.57.2
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   deadline: 5m
@@ -44,7 +44,7 @@ linters-settings:
   exhaustive:
     default-signifies-exhaustive: true
   govet:
-    check-shadowing: true
+    shadow: true
   cyclop:
     max-complexity: 25
   maligned:
