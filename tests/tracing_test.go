@@ -108,13 +108,6 @@ func TestTracing(t *testing.T) {
 			},
 		},
 		{
-			name: "web_vital",
-			js:   "sleep(100);", // Wait for async WebVitals processing
-			spans: []string{
-				"web_vital",
-			},
-		},
-		{
 			name: "page.screenshot",
 			js:   "page.screenshot();",
 			spans: []string{
@@ -147,14 +140,17 @@ func TestTracing(t *testing.T) {
 			},
 		},
 		{
-			name: "page.close",
-			js:   "page.close()",
+			name: "web_vital",
+			js:   "page.close();", // on page.close, web vitals are collected and fired/received.
 			spans: []string{
+				"web_vital",
 				"page.close",
 			},
 		},
 	}
 
+	// Each sub test depends on the previous sub test, so they cannot be ran
+	// in parallel.
 	for _, tc := range testCases {
 		assertJSInEventLoop(t, vu, tc.js)
 
