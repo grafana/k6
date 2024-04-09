@@ -617,7 +617,7 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 		}
 
 		if privateKey.Type != PrivateCryptoKeyType {
-			return NewError(InvalidAccessError, "provided baseKey is not a private key")
+			return NewError(InvalidAccessError, fmt.Sprintf("provided baseKey is not a private key: %v", privateKey))
 		}
 
 		alg := algorithm.ToObject(rt)
@@ -708,7 +708,7 @@ func (sc *SubtleCrypto) ImportKey(
 
 	// 2.
 	switch format {
-	case RawKeyFormat:
+	case Pkcs8KeyFormat, RawKeyFormat:
 		ab, err := exportArrayBuffer(rt, keyData)
 		if err != nil {
 			reject(err)
@@ -852,7 +852,7 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 			return
 		}
 
-		if format != RawKeyFormat {
+		if !isBinaryExportedFormat(format) {
 			resolve(result)
 			return
 		}
@@ -867,6 +867,10 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 	}()
 
 	return promise
+}
+
+func isBinaryExportedFormat(format KeyFormat) bool {
+	return format == RawKeyFormat || format == Pkcs8KeyFormat
 }
 
 // WrapKey  "wraps" a key.

@@ -84,7 +84,7 @@ function run_test(algorithmNames) {
     function testError(algorithm, extractable, usages, expectedError, testTag) {
         return crypto.subtle.generateKey(algorithm, extractable, usages)
         .then(function(result) {
-            assert_unreached("Operation succeeded, but should not have, alg:" + JSON.stringify(algorithm) + ", ext:" + extractable + ", usages:" + usages);
+            assert_unreached("Operation succeeded, but should not have");
         }, function(err) {
             if (typeof expectedError === "number") {
                 assert_equals(err.code, expectedError, testTag + " not supported");

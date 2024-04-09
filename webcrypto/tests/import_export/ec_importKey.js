@@ -93,9 +93,9 @@ testVectors.forEach(function(vector) {
             });
 
             // Next, test private keys
-            // TODO: return back 'pkcs8' once it supported
+            // TODO: return back 'jwk' once it supported
             allValidUsages(vector.privateUsages, []).forEach(function(usages) {
-                ['jwk'].forEach(function(format) {
+                ['pkcs8'].forEach(function(format) {
                     var algorithm = {name: vector.name, namedCurve: curve};
                     var data = keyData[curve];
 

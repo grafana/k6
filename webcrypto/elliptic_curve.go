@@ -2,12 +2,10 @@ package webcrypto
 
 import (
 	"crypto/ecdh"
+	"crypto/ecdsa"
 	"crypto/rand"
-	"encoding/json"
+	"crypto/x509"
 	"errors"
-	"log"
-
-	"github.com/lestrrat-go/jwx/v2/jwk"
 
 	"github.com/dop251/goja"
 )
@@ -52,32 +50,49 @@ var _ KeyImporter = &EcKeyImportParams{}
 func (e *EcKeyImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
-	keyUsages []CryptoKeyUsage,
+	_ []CryptoKeyUsage,
 ) (*CryptoKey, error) {
-	if len(keyUsages) > 0 {
-		return nil, NewError(SyntaxError, "key usages should be empty")
+	var keyType CryptoKeyType
+	var handle any
+
+	if format == RawKeyFormat {
+		// raw key type is always public
+		keyType = PublicCryptoKeyType
+
+		// pick the elliptic curve
+		c, err := pickEllipticCurve(e.NamedCurve)
+		if err != nil {
+			return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(e.NamedCurve))
+		}
+
+		handle, err = c.NewPublicKey(keyData)
+		if err != nil {
+			return nil, NewError(DataError, "unable to import key data: "+err.Error())
+		}
 	}
 
-	// only raw format is supported
-	if format != RawKeyFormat {
-		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
-	}
+	if format == Pkcs8KeyFormat {
+		// pkcs8 key type is always private
+		keyType = PrivateCryptoKeyType
 
-	// pick the elliptic curve
-	c, err := pickEllipticCurve(e.NamedCurve)
-	if err != nil {
-		log.Printf("invalid elliptic curve: %v\n", err)
-		return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(e.NamedCurve))
-	}
+		var err error
+		parsedKey, err := x509.ParsePKCS8PrivateKey(keyData)
+		if err != nil {
+			return nil, NewError(DataError, "unable to import key data: "+err.Error())
+		}
 
-	// import the key data
-	publicKey, err := c.NewPublicKey(keyData)
-	if err != nil {
-		log.Printf("unable to import key data: %v\n", err)
-		return nil, NewError(DataError, "unable to import key data: "+err.Error())
-	}
+		// check if the key is an ECDSA key
+		ecdsaKey, ok := parsedKey.(*ecdsa.PrivateKey)
+		if !ok {
+			return nil, NewError(DataError, "a private key is not an ECDSA key")
+		}
 
-	// log.Printf("publicKey: %v\n", publicKey)
+		// try to restore the ECDH key
+		handle, err = ecdsaKey.ECDH()
+		if err != nil {
+			return nil, NewError(DataError, "unable to import key data: "+err.Error())
+		}
+	}
 
 	return &CryptoKey{
 		Algorithm: EcKeyAlgorithm{
@@ -86,8 +101,8 @@ func (e *EcKeyImportParams) ImportKey(
 			},
 			NamedCurve: e.NamedCurve,
 		},
-		Type:   PublicCryptoKeyType, // TODO: check if this is correct
-		handle: publicKey,
+		Type:   keyType,
+		handle: handle,
 	}, nil
 }
 
@@ -103,10 +118,6 @@ const (
 
 	// EllipticCurveKindP521 represents the P-521 curve.
 	EllipticCurveKindP521 EllipticCurveKind = "P-521"
-
-	// TODO: check why this isn't a valid curve
-	// EllipticCurveKind25519 represents the Curve25519 curve.
-	// EllipticCurveKind25519 EllipticCurveKind = "Curve25519"
 )
 
 // IsEllipticCurve returns true if the given string is a valid EllipticCurveKind,
@@ -230,9 +241,6 @@ func pickEllipticCurve(k EllipticCurveKind) (ecdh.Curve, error) {
 		return ecdh.P384(), nil
 	case EllipticCurveKindP521:
 		return ecdh.P521(), nil
-	// TODO: check why this fails
-	// case EllipticCurveKind25519:
-	// return ecdh.X25519(), nil
 	default:
 		return nil, errors.New("invalid elliptic curve")
 	}
@@ -244,25 +252,33 @@ func exportECKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 	}
 
 	switch format {
-	case JwkKeyFormat:
-		key, err := jwk.FromRaw(ck.handle)
-		if err != nil {
-			return nil, NewError(OperationError, "unable to export key to JWK format: "+err.Error())
-		}
-
-		b, err := json.Marshal(key)
-		if err != nil {
-			return nil, NewError(OperationError, "unable to marshal key to JWK format"+err.Error())
-		}
-
-		return b, nil
 	case RawKeyFormat:
+		if ck.Type != PublicCryptoKeyType {
+			return nil, NewError(InvalidAccessError, "key is not a valid elliptic curve public key")
+		}
+
 		k, ok := ck.handle.(*ecdh.PublicKey)
 		if !ok {
 			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
 		}
 
 		return k.Bytes(), nil
+	case Pkcs8KeyFormat:
+		if ck.Type != PrivateCryptoKeyType {
+			return nil, NewError(InvalidAccessError, "key is not a valid elliptic curve private key")
+		}
+
+		k, ok := ck.handle.(*ecdh.PrivateKey)
+		if !ok {
+			return nil, NewError(OperationError, "key data isn't a valid elliptic curve private key")
+		}
+
+		bytes, err := x509.MarshalPKCS8PrivateKey(k)
+		if err != nil {
+			return nil, NewError(OperationError, "unable to marshal key to PKCS8 format: "+err.Error())
+		}
+
+		return bytes, nil
 	default:
 		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
