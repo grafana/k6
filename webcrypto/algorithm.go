@@ -177,7 +177,7 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
 		return isAesAlgorithm(algorithmName)
 	case OperationIdentifierSign, OperationIdentifierVerify:
-		return algorithmName == HMAC
+		return algorithmName == HMAC || algorithmName == ECDSA
 	default:
 		return false
 	}
@@ -198,6 +198,5 @@ type hasAlg interface {
 }
 
 func isEllipticCurve(algorithmName string) bool {
-	// TODO: algorithmName == ECDSA
-	return algorithmName == ECDH
+	return algorithmName == ECDH || algorithmName == ECDSA
 }

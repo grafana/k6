@@ -3,6 +3,7 @@ package webcrypto
 import (
 	"crypto/ecdh"
 	"crypto/ecdsa"
+	"crypto/elliptic"
 	"crypto/rand"
 	"crypto/x509"
 	"errors"
@@ -60,7 +61,7 @@ func (e *EcKeyImportParams) ImportKey(
 		keyType = PublicCryptoKeyType
 
 		// pick the elliptic curve
-		c, err := pickEllipticCurve(e.NamedCurve)
+		c, err := pickECDHCurve(e.NamedCurve)
 		if err != nil {
 			return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(e.NamedCurve))
 		}
@@ -161,7 +162,7 @@ func newECKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value
 	}, nil
 }
 
-// GenerateKey generates a new ECDH key pair, according to the algorithm
+// GenerateKey generates a new ECDH/ECDSA key pair, according to the algorithm
 // described in the specification.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#dfn-EcKeyGenParams
@@ -169,30 +170,29 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) (CryptoKeyGenerationResult, error) {
-	c, err := pickEllipticCurve(ecgp.NamedCurve)
-	if err != nil {
+	var keyPairGenerator func(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (any, any, error)
+	var privateKeyUsages, publicKeyUsages []CryptoKeyUsage
+
+	switch ecgp.Algorithm.Name {
+	case ECDH:
+		keyPairGenerator = generateECDHKeyPair
+		privateKeyUsages = []CryptoKeyUsage{DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage}
+		publicKeyUsages = []CryptoKeyUsage{}
+	case ECDSA:
+		keyPairGenerator = generateECDSAKeyPair
+		privateKeyUsages = []CryptoKeyUsage{SignCryptoKeyUsage}
+		publicKeyUsages = []CryptoKeyUsage{VerifyCryptoKeyUsage}
+	default:
+		return nil, NewError(NotSupportedError, "unsupported elliptic algorithm: "+ecgp.Algorithm.Name)
+	}
+
+	if !isValidEllipticCurve(ecgp.NamedCurve) {
 		return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(ecgp.NamedCurve))
 	}
 
 	if len(keyUsages) == 0 {
 		return nil, NewError(SyntaxError, "key usages cannot be empty")
 	}
-
-	for _, usage := range keyUsages {
-		switch usage {
-		case DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage:
-			continue
-		default:
-			return nil, NewError(SyntaxError, "invalid key usage")
-		}
-	}
-
-	// generate a private & public key
-	rawPrivateKey, err := c.GenerateKey(rand.Reader)
-	if err != nil {
-		return nil, NewError(OperationError, "unable to generate a key pair")
-	}
-	rawPublicKey := rawPrivateKey.PublicKey()
 
 	alg := &EcKeyAlgorithm{
 		KeyAlgorithm: KeyAlgorithm{
@@ -208,20 +208,21 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 		Algorithm:   alg,
 		Usages: UsageIntersection(
 			keyUsages,
-			[]CryptoKeyUsage{
-				DeriveKeyCryptoKeyUsage,
-				DeriveBitsCryptoKeyUsage,
-			},
+			privateKeyUsages,
 		),
-		handle: rawPrivateKey,
 	}
 
 	publicKey := &CryptoKey{
 		Type:        PublicCryptoKeyType,
 		Extractable: true,
 		Algorithm:   alg,
-		Usages:      []CryptoKeyUsage{},
-		handle:      rawPublicKey,
+		Usages:      publicKeyUsages,
+	}
+
+	var err error
+	privateKey.handle, publicKey.handle, err = keyPairGenerator(ecgp.NamedCurve, keyUsages)
+	if err != nil {
+		return nil, err
 	}
 
 	return &CryptoKeyPair{
@@ -230,10 +231,62 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 	}, nil
 }
 
-// pickEllipticCurve returns the elliptic curve that corresponds to the given
+func generateECDHKeyPair(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (any, any, error) {
+	for _, usage := range keyUsages {
+		switch usage {
+		case DeriveKeyCryptoKeyUsage, DeriveBitsCryptoKeyUsage:
+			continue
+		default:
+			return nil, nil, NewError(SyntaxError, "invalid key usage")
+		}
+	}
+
+	c, err := pickECDHCurve(curve)
+	if err != nil {
+		return nil, nil, NewError(NotSupportedError, err.Error())
+	}
+
+	// generate a private & public key
+	rawPrivateKey, err := c.GenerateKey(rand.Reader)
+	if err != nil {
+		return nil, nil, NewError(OperationError, "unable to generate a ECDH key pair")
+	}
+
+	return rawPrivateKey, rawPrivateKey.PublicKey(), nil
+}
+
+func generateECDSAKeyPair(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (any, any, error) {
+	for _, usage := range keyUsages {
+		switch usage {
+		case SignCryptoKeyUsage, VerifyCryptoKeyUsage:
+			continue
+		default:
+			return nil, nil, NewError(SyntaxError, "invalid key usage")
+		}
+	}
+
+	c, err := pickEllipticCurve(curve)
+	if err != nil {
+		return nil, nil, NewError(NotSupportedError, err.Error())
+	}
+
+	rawPrivateKey, err := ecdsa.GenerateKey(c, rand.Reader)
+	if err != nil {
+		return nil, nil, NewError(OperationError, "unable to generate a ECDSA key pair")
+	}
+
+	return rawPrivateKey, rawPrivateKey.PublicKey, nil
+}
+
+// isValidEllipticCurve returns true if the given elliptic curve is supported,
+func isValidEllipticCurve(curve EllipticCurveKind) bool {
+	return curve == EllipticCurveKindP256 || curve == EllipticCurveKindP384 || curve == EllipticCurveKindP521
+}
+
+// pickECDHCurve returns the elliptic curve that corresponds to the given
 // EllipticCurveKind.
 // If the curve is not supported, an error is returned.
-func pickEllipticCurve(k EllipticCurveKind) (ecdh.Curve, error) {
+func pickECDHCurve(k EllipticCurveKind) (ecdh.Curve, error) {
 	switch k {
 	case EllipticCurveKindP256:
 		return ecdh.P256(), nil
@@ -242,11 +295,24 @@ func pickEllipticCurve(k EllipticCurveKind) (ecdh.Curve, error) {
 	case EllipticCurveKindP521:
 		return ecdh.P521(), nil
 	default:
+		return nil, errors.New("invalid ECDH curve")
+	}
+}
+
+func pickEllipticCurve(k EllipticCurveKind) (elliptic.Curve, error) {
+	switch k {
+	case EllipticCurveKindP256:
+		return elliptic.P256(), nil
+	case EllipticCurveKindP384:
+		return elliptic.P384(), nil
+	case EllipticCurveKindP521:
+		return elliptic.P521(), nil
+	default:
 		return nil, errors.New("invalid elliptic curve")
 	}
 }
 
-func exportECKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
+func exportECKey(alg string, ck *CryptoKey, format KeyFormat) ([]byte, error) {
 	if ck.handle == nil {
 		return nil, NewError(OperationError, "key data is not accessible")
 	}
@@ -257,23 +323,18 @@ func exportECKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 			return nil, NewError(InvalidAccessError, "key is not a valid elliptic curve public key")
 		}
 
-		k, ok := ck.handle.(*ecdh.PublicKey)
-		if !ok {
-			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
+		bytes, err := extractPublicKeyBytes(alg, ck.handle)
+		if err != nil {
+			return nil, NewError(OperationError, "unable to extract public key data: "+err.Error())
 		}
 
-		return k.Bytes(), nil
+		return bytes, nil
 	case Pkcs8KeyFormat:
 		if ck.Type != PrivateCryptoKeyType {
 			return nil, NewError(InvalidAccessError, "key is not a valid elliptic curve private key")
 		}
 
-		k, ok := ck.handle.(*ecdh.PrivateKey)
-		if !ok {
-			return nil, NewError(OperationError, "key data isn't a valid elliptic curve private key")
-		}
-
-		bytes, err := x509.MarshalPKCS8PrivateKey(k)
+		bytes, err := x509.MarshalPKCS8PrivateKey(ck.handle)
 		if err != nil {
 			return nil, NewError(OperationError, "unable to marshal key to PKCS8 format: "+err.Error())
 		}
@@ -282,6 +343,28 @@ func exportECKey(ck *CryptoKey, format KeyFormat) ([]byte, error) {
 	default:
 		return nil, NewError(NotSupportedError, "unsupported key format "+format)
 	}
+}
+
+func extractPublicKeyBytes(alg string, handle any) ([]byte, error) {
+	if alg == ECDH {
+		k, ok := handle.(*ecdh.PublicKey)
+		if !ok {
+			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
+		}
+
+		return k.Bytes(), nil
+	}
+
+	if alg == ECDSA {
+		k, ok := handle.(ecdsa.PublicKey)
+		if !ok {
+			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
+		}
+
+		return elliptic.Marshal(k.Curve, k.X, k.Y), nil
+	}
+
+	return nil, errors.New("unsupported algorithm " + alg)
 }
 
 func deriveBitsECDH(privateKey CryptoKey, publicKey CryptoKey) ([]byte, error) {

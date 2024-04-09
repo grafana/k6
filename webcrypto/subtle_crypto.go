@@ -841,8 +841,8 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 				reject(err)
 				return
 			}
-		case ECDH:
-			result, err = exportECKey(ck, format)
+		case ECDH, ECDSA:
+			result, err = exportECKey(keyAlgorithmName, ck, format)
 			if err != nil {
 				reject(err)
 				return

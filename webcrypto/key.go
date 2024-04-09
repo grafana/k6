@@ -174,8 +174,10 @@ func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) 
 		kg, err = newAESKeyGenParams(rt, normalized, params)
 	case HMAC:
 		kg, err = newHMACKeyGenParams(rt, normalized, params)
-	case ECDH:
+	case ECDH, ECDSA:
 		kg, err = newECKeyGenParams(rt, normalized, params)
+	default:
+		return nil, errors.New("key generation not implemented for algorithm " + normalized.Name)
 	}
 
 	if err != nil {

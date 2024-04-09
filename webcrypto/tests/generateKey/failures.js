@@ -43,7 +43,7 @@ function run_test(algorithmNames) {
         // {name: "RSASSA-PKCS1-v1_5", resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
         // {name: "RSA-PSS",  resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
         // {name: "RSA-OAEP", resultType: "CryptoKeyPair", usages: ["encrypt", "decrypt", "wrapKey", "unwrapKey"], mandatoryUsages: ["decrypt", "unwrapKey"]},
-        // {name: "ECDSA",    resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
+        {name: "ECDSA",    resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
         {name: "ECDH",     resultType: "CryptoKeyPair", usages: ["deriveKey", "deriveBits"], mandatoryUsages: ["deriveKey", "deriveBits"]},
         // {name: "Ed25519",  resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
         // {name: "Ed448",    resultType: "CryptoKeyPair", usages: ["sign", "verify"], mandatoryUsages: ["sign"]},
@@ -205,7 +205,7 @@ function run_test(algorithmNames) {
             .forEach(function(usages) {
                 [false, true].forEach(function(extractable) {
                     if (name.substring(0,2) === "EC") {
-                        testError(algorithm, extractable, usages, "NotSupportedError", "Bad algorithm property");
+                        testError(algorithm, extractable, usages, "NotSupportedError", "Bad algorithm 2 property" + JSON.stringify({algorithm: algorithm, extractable: extractable, usages: usages}));
                     } else {
                         testError(algorithm, extractable, usages, "OperationError", "Bad algorithm property");
                     }
