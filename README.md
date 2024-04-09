@@ -36,19 +36,19 @@ The current state of the project is that it is an experimental module of the Web
 
 | API                           | AES-CBC | AES-GCM | AES-CTR | AES-KW | HMAC | ECDSA | ECDH | RSASSA-PKCS1-v1_5 | RSA-PSS | RSA-OAEP |
 | :---------------------------- | :------ | :------ | :------ | :----- | :--- | :---- | :--- | :---------------- | :------ | :------- |
-| `crypto.subtle.generateKey()` | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ❌   | ❌                | ❌      | ❌       |
-| `crypto.subtle.importKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ❌   | ❌                | ❌      | ❌       |
-| `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ❌   | ❌                | ❌      | ❌       |
+| `crypto.subtle.generateKey()` | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ✅   | ❌                | ❌      | ❌       |
+| `crypto.subtle.importKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ✅   | ❌                | ❌      | ❌       |
+| `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ❌    | ✅   | ❌                | ❌      | ❌       |
 
 > [!WARNING]  
-> Currently, only the `raw` and `jwk` (JSON Web Key) formats are supported for import/export operations.
+> Currently, only the `raw` and `jwk` (JSON Web Key) formats are supported for import/export operations for the `AES-*` and `HMAC` algorithms. `ECDH` has support for `pkcs8` and `raw` formats.
 
 ##### Key derivation
 
 | API                          | ECDH | HKDF | PBKDF2 |
 | :--------------------------- | :--- | :--- | :----- |
 | `crypto.subtle.deriveKey()`  | ❌   | ❌   | ❌     |
-| `crypto.subtle.deriveBits()` | ❌   | ❌   | ❌     |
+| `crypto.subtle.deriveBits()` | ✅   | ❌   | ❌     |
 
 ##### Key wrapping
 
