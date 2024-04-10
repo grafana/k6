@@ -202,8 +202,10 @@ func newKeyImporter(rt *goja.Runtime, normalized Algorithm, params goja.Value) (
 		ki = newAESImportParams(normalized)
 	case HMAC:
 		ki, err = newHMACImportParams(rt, normalized, params)
-	case ECDH:
+	case ECDH, ECDSA:
 		ki, err = newEcKeyImportParams(rt, normalized, params)
+	default:
+		return nil, errors.New("key import not implemented for algorithm " + normalized.Name)
 	}
 
 	if err != nil {

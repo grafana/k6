@@ -65,7 +65,7 @@ var keyData = {
 
 // combinations to test
 var testVectors = [
-   //  {name: "ECDSA", privateUsages: ["sign"], publicUsages: ["verify"]},
+    {name: "ECDSA", privateUsages: ["sign"], publicUsages: ["verify"]},
     {name: "ECDH",  privateUsages: ["deriveKey", "deriveBits"], publicUsages: []}
 ];
 
