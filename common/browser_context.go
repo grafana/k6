@@ -172,16 +172,6 @@ func (b *BrowserContext) Close() {
 	}
 }
 
-// ExposeBinding is not implemented.
-func (b *BrowserContext) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
-	k6ext.Panic(b.ctx, "BrowserContext.exposeBinding(name, callback, opts) has not been implemented yet")
-}
-
-// ExposeFunction is not implemented.
-func (b *BrowserContext) ExposeFunction(name string, callback goja.Callable) {
-	k6ext.Panic(b.ctx, "BrowserContext.exposeFunction(name, callback) has not been implemented yet")
-}
-
 // GrantPermissions enables the specified permissions, all others will be disabled.
 func (b *BrowserContext) GrantPermissions(permissions []string, opts *GrantPermissionsOptions) error {
 	b.logger.Debugf("BrowserContext:GrantPermissions", "bctxid:%v", b.id)
@@ -221,12 +211,6 @@ func (b *BrowserContext) GrantPermissions(permissions []string, opts *GrantPermi
 	return nil
 }
 
-// NewCDPSession returns a new CDP session attached to this target.
-func (b *BrowserContext) NewCDPSession() any { // TODO: implement
-	k6ext.Panic(b.ctx, "BrowserContext.newCDPSession() has not been implemented yet")
-	return nil
-}
-
 // NewPage creates a new page inside this browser context.
 func (b *BrowserContext) NewPage() (*Page, error) {
 	b.logger.Debugf("BrowserContext:NewPage", "bctxid:%v", b.id)
@@ -256,11 +240,6 @@ func (b *BrowserContext) NewPage() (*Page, error) {
 // Pages returns a list of pages inside this browser context.
 func (b *BrowserContext) Pages() []*Page {
 	return append([]*Page{}, b.browser.getPages()...)
-}
-
-// Route is not implemented.
-func (b *BrowserContext) Route(url goja.Value, handler goja.Callable) {
-	k6ext.Panic(b.ctx, "BrowserContext.route(url, handler) has not been implemented yet")
 }
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
@@ -329,16 +308,6 @@ func (b *BrowserContext) SetOffline(offline bool) {
 	for _, p := range b.browser.getPages() {
 		p.updateOffline()
 	}
-}
-
-// StorageState is not implemented.
-func (b *BrowserContext) StorageState(opts goja.Value) {
-	k6ext.Panic(b.ctx, "BrowserContext.storageState(opts) has not been implemented yet")
-}
-
-// Unroute is not implemented.
-func (b *BrowserContext) Unroute(url goja.Value, handler goja.Callable) {
-	k6ext.Panic(b.ctx, "BrowserContext.unroute(url, handler) has not been implemented yet")
 }
 
 // Timeout will return the default timeout or the one set by the user.

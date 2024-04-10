@@ -875,16 +875,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"clearPermissions": bc.ClearPermissions,
 		"close":            bc.Close,
 		"cookies":          bc.Cookies,
-		"exposeBinding":    bc.ExposeBinding,
-		"exposeFunction":   bc.ExposeFunction,
 		"grantPermissions": func(permissions []string, opts goja.Value) error {
 			pOpts := common.NewGrantPermissionsOptions()
 			pOpts.Parse(vu.Context(), opts)
 
 			return bc.GrantPermissions(permissions, pOpts) //nolint:wrapcheck
 		},
-		"newCDPSession":               bc.NewCDPSession,
-		"route":                       bc.Route,
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
 		"setExtraHTTPHeaders": func(headers map[string]string) *goja.Promise {
@@ -898,8 +894,6 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"setGeolocation":     bc.SetGeolocation,
 		"setHTTPCredentials": bc.SetHTTPCredentials, //nolint:staticcheck
 		"setOffline":         bc.SetOffline,
-		"storageState":       bc.StorageState,
-		"unroute":            bc.Unroute,
 		"waitForEvent": func(event string, optsOrPredicate goja.Value) (*goja.Promise, error) {
 			ctx := vu.Context()
 			popts := common.NewWaitForEventOptions(

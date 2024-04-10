@@ -262,21 +262,15 @@ type browserContextAPI interface {
 	ClearPermissions()
 	Close()
 	Cookies(urls ...string) ([]*common.Cookie, error)
-	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
-	ExposeFunction(name string, callback goja.Callable)
 	GrantPermissions(permissions []string, opts goja.Value)
-	NewCDPSession() any
 	NewPage() (*common.Page, error)
 	Pages() []*common.Page
-	Route(url goja.Value, handler goja.Callable)
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
 	SetExtraHTTPHeaders(headers map[string]string) error
 	SetGeolocation(geolocation goja.Value)
 	SetHTTPCredentials(httpCredentials goja.Value)
 	SetOffline(offline bool)
-	StorageState(opts goja.Value)
-	Unroute(url goja.Value, handler goja.Callable)
 	WaitForEvent(event string, optsOrPredicate goja.Value) (any, error)
 }
 
