@@ -1,6 +1,7 @@
 package webcrypto
 
 import (
+	"crypto/hmac"
 	"crypto/rand"
 	"crypto/sha1" //nolint:gosec
 	"crypto/sha256"
@@ -350,3 +351,47 @@ func (hip *HMACImportParams) ImportKey(
 
 // Ensure that HMACImportParams implements the KeyImporter interface.
 var _ KeyImporter = &HMACImportParams{}
+
+func signHMAC(key CryptoKey, data []byte) ([]byte, error) {
+	keyAlgorithm, ok := key.Algorithm.(HMACKeyAlgorithm)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key algorithm does not describe a HMAC key")
+	}
+
+	keyHandle, ok := key.handle.([]byte)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key handle is of incorrect type")
+	}
+
+	hashFn, err := keyAlgorithm.HashFn()
+	if err != nil {
+		return nil, err
+	}
+
+	hasher := hmac.New(hashFn, keyHandle)
+	hasher.Write(data)
+
+	return hasher.Sum(nil), nil
+}
+
+func verifyHMAC(key CryptoKey, signature, data []byte) (bool, error) {
+	keyAlgorithm, ok := key.Algorithm.(HMACKeyAlgorithm)
+	if !ok {
+		return false, NewError(InvalidAccessError, "key algorithm does not describe a HMAC key")
+	}
+
+	keyHandle, ok := key.handle.([]byte)
+	if !ok {
+		return false, NewError(InvalidAccessError, "key handle is of incorrect type")
+	}
+
+	hashFn, err := keyAlgorithm.HashFn()
+	if err != nil {
+		return false, err
+	}
+
+	hasher := hmac.New(hashFn, keyHandle)
+	hasher.Write(data)
+
+	return hmac.Equal(signature, hasher.Sum(nil)), nil
+}

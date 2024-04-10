@@ -1,7 +1,6 @@
 package webcrypto
 
 import (
-	"crypto/hmac"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -263,37 +262,23 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 			return
 		}
 
+		var signerFn func(key CryptoKey, dataToSign []byte) ([]byte, error)
+
 		// 10.
 		switch normalized.Name {
 		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(hasHash)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
-				return
-			}
-
-			keyHandle, ok := ck.handle.([]byte)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key handle is of incorrect type"))
-				return
-			}
-
-			hashFn, ok := getHashFn(keyAlgorithm.hash())
-			if !ok {
-				reject(NewError(NotSupportedError, "unsupported hash algorithm "+keyAlgorithm.hash()))
-				return
-			}
-
-			hasher := hmac.New(hashFn, keyHandle)
-			hasher.Write(dataToSign)
-
-			// 10.
-			mac := hasher.Sum(nil)
-
-			resolve(rt.NewArrayBuffer(mac))
+			signerFn = signHMAC
 		default:
 			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
 		}
+
+		signature, err := signerFn(ck, dataToSign)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(rt.NewArrayBuffer(signature))
 	}()
 
 	return promise
@@ -372,33 +357,22 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 			return
 		}
 
+		var verifyFn func(key CryptoKey, signature, data []byte) (bool, error)
+
 		switch normalizedAlgorithm.Name {
 		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(hasHash)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
-				return
-			}
-
-			keyHandle, ok := ck.handle.([]byte)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key handle is of incorrect type"))
-				return
-			}
-
-			hashFn, ok := getHashFn(keyAlgorithm.hash())
-			if !ok {
-				reject(NewError(NotSupportedError, "unsupported hash algorithm "+keyAlgorithm.hash()))
-				return
-			}
-
-			hasher := hmac.New(hashFn, keyHandle)
-			hasher.Write(signedData)
-
-			resolve(hmac.Equal(signatureData, hasher.Sum(nil)))
+			verifyFn = verifyHMAC
 		default:
 			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalizedAlgorithm.Name)))
 		}
+
+		verified, err := verifyFn(ck, signatureData, signedData)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(verified)
 	}()
 
 	return promise
