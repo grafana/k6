@@ -444,7 +444,6 @@ type elementHandleAPI interface {
 // requestAPI is the interface of an HTTP request.
 type requestAPI interface {
 	AllHeaders() map[string]string
-	Failure() goja.Value
 	Frame() *common.Frame
 	HeaderValue(string) goja.Value
 	Headers() map[string]string
@@ -453,9 +452,6 @@ type requestAPI interface {
 	Method() string
 	PostData() string
 	PostDataBuffer() goja.ArrayBuffer
-	PostDataJSON() string
-	RedirectedFrom() requestAPI
-	RedirectedTo() requestAPI
 	ResourceType() string
 	Response() *common.Response
 	Size() common.HTTPMessageSize

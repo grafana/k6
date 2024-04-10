@@ -115,7 +115,6 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"allHeaders": r.AllHeaders,
-		"failure":    r.Failure,
 		"frame": func() *goja.Object {
 			mf := mapFrame(vu, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)
@@ -127,16 +126,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		"method":              r.Method,
 		"postData":            r.PostData,
 		"postDataBuffer":      r.PostDataBuffer,
-		"postDataJSON":        r.PostDataJSON,
-		"redirectedFrom": func() *goja.Object {
-			mr := mapRequest(vu, r.RedirectedFrom())
-			return rt.ToValue(mr).ToObject(rt)
-		},
-		"redirectedTo": func() *goja.Object {
-			mr := mapRequest(vu, r.RedirectedTo())
-			return rt.ToValue(mr).ToObject(rt)
-		},
-		"resourceType": r.ResourceType,
+		"resourceType":        r.ResourceType,
 		"response": func() *goja.Object {
 			mr := mapResponse(vu, r.Response())
 			return rt.ToValue(mr).ToObject(rt)

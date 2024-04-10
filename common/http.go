@@ -173,12 +173,6 @@ func (r *Request) AllHeaders() map[string]string {
 	return headers
 }
 
-// Failure returns the error text if the request failed.
-func (r *Request) Failure() goja.Value {
-	k6ext.Panic(r.ctx, "Request.failure() has not been implemented yet")
-	return nil
-}
-
 // Frame returns the frame within which the request was made.
 func (r *Request) Frame() *Frame {
 	return r.frame
@@ -234,24 +228,6 @@ func (r *Request) PostData() string {
 func (r *Request) PostDataBuffer() goja.ArrayBuffer {
 	rt := r.vu.Runtime()
 	return rt.NewArrayBuffer([]byte(r.postData))
-}
-
-// PostDataJSON returns the request post data as a JS object.
-func (r *Request) PostDataJSON() string {
-	k6ext.Panic(r.ctx, "Request.postDataJSON() has not been implemented yet")
-	return ""
-}
-
-// RedirectedFrom returns the request that redirected to this one, if any.
-func (r *Request) RedirectedFrom() *Request {
-	k6ext.Panic(r.ctx, "Request.redirectedFrom() has not been implemented yet")
-	return nil
-}
-
-// RedirectedTo returns the request that this one redirected to, if any.
-func (r *Request) RedirectedTo() *Request {
-	k6ext.Panic(r.ctx, "Request.redirectedTo() has not been implemented yet")
-	return nil
 }
 
 // ResourceType returns the request resource type.
