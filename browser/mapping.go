@@ -148,7 +148,6 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 	maps := mapping{
 		"allHeaders": r.AllHeaders,
 		"body":       r.Body,
-		"finished":   r.Finished,
 		"frame": func() *goja.Object {
 			mf := mapFrame(vu, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)

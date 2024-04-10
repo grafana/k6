@@ -463,7 +463,6 @@ type requestAPI interface {
 type responseAPI interface {
 	AllHeaders() map[string]string
 	Body() goja.ArrayBuffer
-	Finished() bool
 	Frame() *common.Frame
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string

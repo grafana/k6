@@ -451,13 +451,6 @@ func (r *Response) bodySize() int64 {
 	return int64(len(r.body))
 }
 
-// Finished waits for response to finish, return error if request failed.
-func (r *Response) Finished() bool {
-	// TODO: should return nil|Error
-	k6ext.Panic(r.ctx, "Response.finished() has not been implemented yet")
-	return false
-}
-
 // Frame returns the frame within which the response was received.
 func (r *Response) Frame() *Frame {
 	return r.request.frame
