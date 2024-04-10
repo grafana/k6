@@ -57,7 +57,7 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 
 	var ck CryptoKey
 	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(TypeError, "key argument does hold not a valid CryptoKey object"))
+		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
 		return promise
 	}
 
@@ -237,6 +237,12 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 		return promise
 	}
 
+	signer, err := newSignerVerifier(rt, normalized, algorithm)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
 	var ck CryptoKey
 	if err = rt.ExportTo(key, &ck); err != nil {
 		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
@@ -262,17 +268,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 			return
 		}
 
-		var signerFn func(key CryptoKey, dataToSign []byte) ([]byte, error)
-
-		// 10.
-		switch normalized.Name {
-		case HMAC:
-			signerFn = signHMAC
-		default:
-			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
-		}
-
-		signature, err := signerFn(ck, dataToSign)
+		signature, err := signer.Sign(ck, dataToSign)
 		if err != nil {
 			reject(err)
 			return
@@ -332,6 +328,12 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 		return promise
 	}
 
+	verifier, err := newSignerVerifier(rt, normalizedAlgorithm, algorithm)
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
 	var ck CryptoKey
 	if err = rt.ExportTo(key, &ck); err != nil {
 		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
@@ -357,16 +359,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 			return
 		}
 
-		var verifyFn func(key CryptoKey, signature, data []byte) (bool, error)
-
-		switch normalizedAlgorithm.Name {
-		case HMAC:
-			verifyFn = verifyHMAC
-		default:
-			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalizedAlgorithm.Name)))
-		}
-
-		verified, err := verifyFn(ck, signatureData, signedData)
+		verified, err := verifier.Verify(ck, signatureData, signedData)
 		if err != nil {
 			reject(err)
 			return

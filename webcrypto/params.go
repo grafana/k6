@@ -18,21 +18,6 @@ type AESKwParams struct {
 	Name AlgorithmIdentifier
 }
 
-// The ECDSAParams represents the object that should be passed as the algorithm
-// parameter into `SubtleCrypto.Sign` or `SubtleCrypto.Verify“ when using the
-// ECDSA algorithm.
-type ECDSAParams struct {
-	// Name should be set to AlgorithmKindEcdsa.
-	Name AlgorithmIdentifier
-
-	// Hash identifies the name of the digest algorithm to use.
-	// You can use any of the following:
-	//   * [Sha256]
-	//   * [Sha384]
-	//   * [Sha512]
-	Hash AlgorithmIdentifier
-}
-
 // HKDFParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.DeriveKey`, when using the HKDF algorithm.
 type HKDFParams struct {

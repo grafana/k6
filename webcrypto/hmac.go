@@ -352,8 +352,11 @@ func (hip *HMACImportParams) ImportKey(
 // Ensure that HMACImportParams implements the KeyImporter interface.
 var _ KeyImporter = &HMACImportParams{}
 
-func signHMAC(key CryptoKey, data []byte) ([]byte, error) {
-	keyAlgorithm, ok := key.Algorithm.(HMACKeyAlgorithm)
+type hmacSignerVerifier struct{}
+
+// Sign .
+func (hmacSignerVerifier) Sign(key CryptoKey, data []byte) ([]byte, error) {
+	keyAlgorithm, ok := key.Algorithm.(hasHash)
 	if !ok {
 		return nil, NewError(InvalidAccessError, "key algorithm does not describe a HMAC key")
 	}
@@ -363,9 +366,9 @@ func signHMAC(key CryptoKey, data []byte) ([]byte, error) {
 		return nil, NewError(InvalidAccessError, "key handle is of incorrect type")
 	}
 
-	hashFn, err := keyAlgorithm.HashFn()
-	if err != nil {
-		return nil, err
+	hashFn, ok := getHashFn(keyAlgorithm.hash())
+	if !ok {
+		return nil, NewError(NotSupportedError, "unsupported hash algorithm "+keyAlgorithm.hash())
 	}
 
 	hasher := hmac.New(hashFn, keyHandle)
@@ -374,8 +377,9 @@ func signHMAC(key CryptoKey, data []byte) ([]byte, error) {
 	return hasher.Sum(nil), nil
 }
 
-func verifyHMAC(key CryptoKey, signature, data []byte) (bool, error) {
-	keyAlgorithm, ok := key.Algorithm.(HMACKeyAlgorithm)
+// Verify .
+func (hmacSignerVerifier) Verify(key CryptoKey, signature, data []byte) (bool, error) {
+	keyAlgorithm, ok := key.Algorithm.(hasHash)
 	if !ok {
 		return false, NewError(InvalidAccessError, "key algorithm does not describe a HMAC key")
 	}
@@ -385,9 +389,9 @@ func verifyHMAC(key CryptoKey, signature, data []byte) (bool, error) {
 		return false, NewError(InvalidAccessError, "key handle is of incorrect type")
 	}
 
-	hashFn, err := keyAlgorithm.HashFn()
-	if err != nil {
-		return false, err
+	hashFn, ok := getHashFn(keyAlgorithm.hash())
+	if !ok {
+		return false, NewError(InvalidAccessError, "key handle is of incorrect type")
 	}
 
 	hasher := hmac.New(hashFn, keyHandle)

@@ -7,6 +7,7 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"errors"
+	"math/big"
 
 	"github.com/dop251/goja"
 )
@@ -430,4 +431,103 @@ func deriveBitsECDH(privateKey CryptoKey, publicKey CryptoKey) ([]byte, error) {
 	}
 
 	return pk.ECDH(pc)
+}
+
+// The ECDSAParams represents the object that should be passed as the algorithm
+// parameter into `SubtleCrypto.Sign` or `SubtleCrypto.Verify“ when using the
+// ECDSA algorithm.
+type ECDSAParams struct {
+	// Name should be set to AlgorithmKindEcdsa.
+	Name AlgorithmIdentifier
+
+	// Hash identifies the name of the digest algorithm to use.
+	// You can use any of the following:
+	//   * [Sha256]
+	//   * [Sha384]
+	//   * [Sha512]
+	Hash Algorithm
+}
+
+func newECDSAParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*ECDSAParams, error) {
+	hashValue, err := traverseObject(rt, params, "hash")
+	if err != nil {
+		return nil, NewError(SyntaxError, "could not get hash from algorithm parameter")
+	}
+
+	normalizedHash, err := normalizeAlgorithm(rt, hashValue, OperationIdentifierGenerateKey)
+	if err != nil {
+		return nil, err
+	}
+
+	return &ECDSAParams{
+		Name: normalized.Name,
+		Hash: normalizedHash,
+	}, nil
+}
+
+// Sign .
+func (edsa *ECDSAParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
+	if key.Type != PrivateCryptoKeyType {
+		return nil, NewError(InvalidAccessError, "key is not a valid ECDSA private key")
+	}
+
+	k, ok := key.handle.(*ecdsa.PrivateKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key is not a valid ECDSA private key")
+	}
+
+	// TODO: explicitly check if the hash algorithm is defined
+	hashFn, ok := getHashFn(edsa.Hash.Name)
+	if !ok {
+		return nil, NewError(NotSupportedError, "unsupported hash algorithm: "+edsa.Hash.Name)
+	}
+
+	r, s, err := ecdsa.Sign(rand.Reader, k, hashFn().Sum(data))
+	if err != nil {
+		return nil, NewError(OperationError, "unable to sign data: "+err.Error())
+	}
+
+	bitSize := k.Curve.Params().BitSize
+	n := (bitSize + 7) / 8
+
+	rBytes := ensureLength(r.Bytes(), n)
+	sBytes := ensureLength(s.Bytes(), n)
+
+	return append(rBytes, sBytes...), nil
+}
+
+// Helper function to ensure the byte slice has length n
+// prepending it with zeros if necessary.
+func ensureLength(b []byte, n int) []byte {
+	if len(b) == n {
+		return b
+	}
+	result := make([]byte, n)
+	copy(result[n-len(b):], b)
+	return result
+}
+
+// Verify .
+func (edsa *ECDSAParams) Verify(key CryptoKey, signature []byte, data []byte) (bool, error) {
+	if key.Type != PublicCryptoKeyType {
+		return false, NewError(InvalidAccessError, "key is not a valid ECDSA public key")
+	}
+
+	k, ok := key.handle.(ecdsa.PublicKey)
+	if !ok {
+		return false, NewError(InvalidAccessError, "key is not a valid ECDSA public key")
+	}
+
+	hashFn, ok := getHashFn(edsa.Hash.Name)
+	if !ok {
+		return false, NewError(NotSupportedError, "unsupported hash algorithm: "+edsa.Hash.Name)
+	}
+
+	bitSize := k.Curve.Params().BitSize
+	n := (bitSize + 7) / 8
+
+	r := new(big.Int).SetBytes(signature[:n])
+	s := new(big.Int).SetBytes(signature[n:])
+
+	return ecdsa.Verify(&k, hashFn().Sum(data), r, s), nil
 }
