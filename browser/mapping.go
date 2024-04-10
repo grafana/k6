@@ -562,11 +562,8 @@ func parseWaitForFunctionArgs(
 func mapPage(vu moduleVU, p *common.Page) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
-		"addInitScript": p.AddInitScript,
-		"addScriptTag":  p.AddScriptTag,
-		"addStyleTag":   p.AddStyleTag,
-		"bringToFront":  p.BringToFront,
-		"check":         p.Check,
+		"bringToFront": p.BringToFront,
+		"check":        p.Check,
 		"click": func(selector string, opts goja.Value) (*goja.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, p.Timeout())
 			if err != nil {
@@ -593,7 +590,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			}
 			return p.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
 		},
-		"dragAndDrop":             p.DragAndDrop,
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
 		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) any {
@@ -606,11 +602,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			}
 			return mapJSHandle(vu, jsh), nil
 		},
-		"exposeBinding":  p.ExposeBinding,
-		"exposeFunction": p.ExposeFunction,
-		"fill":           p.Fill,
-		"focus":          p.Focus,
-		"frame":          p.Frame,
+		"fill":  p.Fill,
+		"focus": p.Focus,
 		"frames": func() *goja.Object {
 			var (
 				mfrs []mapping
@@ -622,13 +615,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
 		"getAttribute": p.GetAttribute,
-		"goBack": func(opts goja.Value) *goja.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				resp := p.GoBack(opts)
-				return mapResponse(vu, resp), nil
-			})
-		},
-		"goForward": p.GoForward,
 		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
@@ -687,8 +673,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck
 		},
 		"opener": p.Opener,
-		"pause":  p.Pause,
-		"pdf":    p.Pdf,
 		"press":  p.Press,
 		"reload": func(opts goja.Value) (*goja.Object, error) {
 			resp, err := p.Reload(opts)
@@ -700,7 +684,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 
 			return rt.ToValue(r).ToObject(rt), nil
 		},
-		"route": p.Route,
 		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
 			ctx := vu.Context()
 
@@ -739,11 +722,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"touchscreen":     rt.ToValue(p.GetTouchscreen()).ToObject(rt),
 		"type":            p.Type,
 		"uncheck":         p.Uncheck,
-		"unroute":         p.Unroute,
 		"url":             p.URL,
-		"video":           p.Video,
 		"viewportSize":    p.ViewportSize,
-		"waitForEvent":    p.WaitForEvent,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				vu.Context(), p.Timeout(), pageFunc, opts, args...,
@@ -771,8 +751,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
-		"waitForRequest":  p.WaitForRequest,
-		"waitForResponse": p.WaitForResponse,
 		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
 			eh, err := p.WaitForSelector(selector, opts)
 			if err != nil {

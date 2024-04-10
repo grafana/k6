@@ -601,21 +601,6 @@ func (p *Page) viewportSize() Size {
 	}
 }
 
-// AddInitScript adds script to run in all new frames.
-func (p *Page) AddInitScript(script goja.Value, arg goja.Value) {
-	k6ext.Panic(p.ctx, "Page.addInitScript(script, arg) has not been implemented yet")
-}
-
-// AddScriptTag is not implemented.
-func (p *Page) AddScriptTag(opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.addScriptTag(opts) has not been implemented yet")
-}
-
-// AddStyleTag is not implemented.
-func (p *Page) AddStyleTag(opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.addStyleTag(opts) has not been implemented yet")
-}
-
 // BringToFront activates the browser tab for this page.
 func (p *Page) BringToFront() {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
@@ -723,11 +708,6 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *F
 	return p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
 }
 
-// DragAndDrop is not implemented.
-func (p *Page) DragAndDrop(source string, target string, opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.DragAndDrop(source, target, opts) has not been implemented yet")
-}
-
 func (p *Page) EmulateMedia(opts goja.Value) {
 	p.logger.Debugf("Page:EmulateMedia", "sid:%v", p.sessionID())
 
@@ -795,16 +775,6 @@ func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	return h, nil
 }
 
-// ExposeBinding is not implemented.
-func (p *Page) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.exposeBinding(name, callback) has not been implemented yet")
-}
-
-// ExposeFunction is not implemented.
-func (p *Page) ExposeFunction(name string, callback goja.Callable) {
-	k6ext.Panic(p.ctx, "Page.exposeFunction(name, callback) has not been implemented yet")
-}
-
 func (p *Page) Fill(selector string, value string, opts goja.Value) {
 	p.logger.Debugf("Page:Fill", "sid:%v selector:%s", p.sessionID(), selector)
 
@@ -815,12 +785,6 @@ func (p *Page) Focus(selector string, opts goja.Value) {
 	p.logger.Debugf("Page:Focus", "sid:%v selector:%s", p.sessionID(), selector)
 
 	p.MainFrame().Focus(selector, opts)
-}
-
-// Frame is not implemented.
-func (p *Page) Frame(_ goja.Value) *Frame {
-	k6ext.Panic(p.ctx, "Page.frame(frameSelector) has not been implemented yet")
-	return nil
 }
 
 // Frames returns a list of frames on the page.
@@ -854,12 +818,6 @@ func (p *Page) GetTouchscreen() *Touchscreen {
 // GoBack is not implemented.
 func (p *Page) GoBack(_ goja.Value) *Response {
 	k6ext.Panic(p.ctx, "Page.goBack(opts) has not been implemented yet")
-	return nil
-}
-
-// GoForward is not implemented.
-func (p *Page) GoForward(_ goja.Value) *Response {
-	k6ext.Panic(p.ctx, "Page.goForward(opts) has not been implemented yet")
 	return nil
 }
 
@@ -1002,17 +960,6 @@ func (p *Page) Opener() *Page {
 	return p.opener
 }
 
-// Pause is not implemented.
-func (p *Page) Pause() {
-	k6ext.Panic(p.ctx, "Page.pause() has not been implemented yet")
-}
-
-// Pdf is not implemented.
-func (p *Page) Pdf(opts goja.Value) []byte {
-	k6ext.Panic(p.ctx, "Page.pdf(opts) has not been implemented yet")
-	return nil
-}
-
 func (p *Page) Press(selector string, key string, opts goja.Value) {
 	p.logger.Debugf("Page:Press", "sid:%v selector:%s", p.sessionID(), selector)
 
@@ -1112,11 +1059,6 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	applySlowMo(p.ctx)
 
 	return resp, nil
-}
-
-// Route is not implemented.
-func (p *Page) Route(url goja.Value, handler goja.Callable) {
-	k6ext.Panic(p.ctx, "Page.route(url, handler) has not been implemented yet")
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
@@ -1258,11 +1200,6 @@ func (p *Page) Type(selector string, text string, opts goja.Value) {
 	p.MainFrame().Type(selector, text, opts)
 }
 
-// Unroute is not implemented.
-func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
-	k6ext.Panic(p.ctx, "Page.unroute(url, handler) has not been implemented yet")
-}
-
 // URL returns the location of the page.
 func (p *Page) URL() string {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
@@ -1271,12 +1208,6 @@ func (p *Page) URL() string {
 
 	v := `() => document.location.toString()`
 	return p.Evaluate(v).(string) //nolint:forcetypeassert
-}
-
-// Video returns information of recorded video.
-func (p *Page) Video() any { // TODO: implement
-	k6ext.Panic(p.ctx, "Page.video() has not been implemented yet")
-	return nil
 }
 
 // ViewportSize will return information on the viewport width and height.
@@ -1288,12 +1219,6 @@ func (p *Page) ViewportSize() map[string]float64 {
 		"width":  vps.Width,
 		"height": vps.Height,
 	}
-}
-
-// WaitForEvent waits for the specified event to trigger.
-func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) any {
-	k6ext.Panic(p.ctx, "Page.waitForEvent(event, optsOrPredicate) has not been implemented yet")
-	return nil
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
@@ -1316,18 +1241,6 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response
 	defer span.End()
 
 	return p.frameManager.MainFrame().WaitForNavigation(opts)
-}
-
-// WaitForRequest is not implemented.
-func (p *Page) WaitForRequest(_, _ goja.Value) *Request {
-	k6ext.Panic(p.ctx, "Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet")
-	return nil
-}
-
-// WaitForResponse is not implemented.
-func (p *Page) WaitForResponse(_, _ goja.Value) *Response {
-	k6ext.Panic(p.ctx, "Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet")
-	return nil
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.

@@ -276,9 +276,6 @@ type browserContextAPI interface {
 
 // pageAPI is the interface of a single browser tab.
 type pageAPI interface {
-	AddInitScript(script goja.Value, arg goja.Value)
-	AddScriptTag(opts goja.Value)
-	AddStyleTag(opts goja.Value)
 	BringToFront()
 	Check(selector string, opts goja.Value)
 	Click(selector string, opts goja.Value) error
@@ -287,23 +284,17 @@ type pageAPI interface {
 	Context() *common.BrowserContext
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
-	DragAndDrop(source string, target string, opts goja.Value)
 	EmulateMedia(opts goja.Value)
 	EmulateVisionDeficiency(typ string)
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) any
 	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (common.JSHandleAPI, error)
-	ExposeBinding(name string, callback goja.Callable, opts goja.Value)
-	ExposeFunction(name string, callback goja.Callable)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
-	Frame(frameSelector goja.Value) *common.Frame
 	Frames() []*common.Frame
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
-	GoBack(opts goja.Value) *common.Response
-	GoForward(opts goja.Value) *common.Response
 	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string
@@ -320,13 +311,10 @@ type pageAPI interface {
 	MainFrame() *common.Frame
 	On(event string, handler func(*common.ConsoleMessage) error) error
 	Opener() pageAPI
-	Pause()
-	Pdf(opts goja.Value) []byte
 	Press(selector string, key string, opts goja.Value)
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts goja.Value) *common.Response
-	Route(url goja.Value, handler goja.Callable)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
 	SetContent(html string, opts goja.Value)
@@ -342,16 +330,11 @@ type pageAPI interface {
 	Title() string
 	Type(selector string, text string, opts goja.Value)
 	Uncheck(selector string, opts goja.Value)
-	Unroute(url goja.Value, handler goja.Callable)
 	URL() string
-	Video() any
 	ViewportSize() map[string]float64
-	WaitForEvent(event string, optsOrPredicate goja.Value) any
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
 	WaitForNavigation(opts goja.Value) (*common.Response, error)
-	WaitForRequest(urlOrPredicate, opts goja.Value) *common.Request
-	WaitForResponse(urlOrPredicate, opts goja.Value) *common.Response
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []*common.Worker
