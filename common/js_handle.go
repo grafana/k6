@@ -23,7 +23,6 @@ type JSHandleAPI interface {
 	Evaluate(pageFunc string, args ...any) any
 	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
-	GetProperty(propertyName string) JSHandleAPI
 	JSONValue() (string, error)
 	ObjectID() cdpruntime.RemoteObjectID
 }
@@ -154,11 +153,6 @@ func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
 	}
 
 	return props, nil
-}
-
-// GetProperty retreves a single property of the JS handle.
-func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
-	return nil
 }
 
 // JSONValue returns a JSON version of this JS handle.

@@ -208,13 +208,6 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			}
 			return dst, nil
 		},
-		"getProperty": func(propertyName string) *goja.Object {
-			var (
-				h = jsh.GetProperty(propertyName)
-				m = mapJSHandle(vu, h)
-			)
-			return rt.ToValue(m).ToObject(rt)
-		},
 		"jsonValue": jsh.JSONValue,
 	}
 }
