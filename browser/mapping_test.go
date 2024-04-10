@@ -548,7 +548,5 @@ type mouseAPI interface { //nolint: unused
 
 // workerAPI is the interface of a web worker.
 type workerAPI interface {
-	Evaluate(pageFunc goja.Value, args ...goja.Value) any
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
 	URL() string
 }

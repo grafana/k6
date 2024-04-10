@@ -801,15 +801,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 // mapWorker to the JS module.
 func mapWorker(vu moduleVU, w *common.Worker) mapping {
 	return mapping{
-		"evaluate": w.Evaluate,
-		"evaluateHandle": func(pageFunc goja.Value, args ...goja.Value) (mapping, error) {
-			h, err := w.EvaluateHandle(pageFunc, args...)
-			if err != nil {
-				panicIfFatalError(vu.Context(), err)
-				return nil, err //nolint:wrapcheck
-			}
-			return mapJSHandle(vu, h), nil
-		},
 		"url": w.URL(),
 	}
 }
