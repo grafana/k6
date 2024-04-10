@@ -364,9 +364,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
-		"addScriptTag": f.AddScriptTag,
-		"addStyleTag":  f.AddStyleTag,
-		"check":        f.Check,
+		"check": f.Check,
 		"childFrames": func() *goja.Object {
 			var (
 				mcfs []mapping

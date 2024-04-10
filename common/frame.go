@@ -543,18 +543,6 @@ func (f *Frame) waitFor(selector string, opts *FrameWaitForSelectorOptions) erro
 	return err
 }
 
-// AddScriptTag is not implemented.
-func (f *Frame) AddScriptTag(opts goja.Value) {
-	k6ext.Panic(f.ctx, "Frame.AddScriptTag() has not been implemented yet")
-	applySlowMo(f.ctx)
-}
-
-// AddStyleTag is not implemented.
-func (f *Frame) AddStyleTag(opts goja.Value) {
-	k6ext.Panic(f.ctx, "Frame.AddStyleTag() has not been implemented yet")
-	applySlowMo(f.ctx)
-}
-
 // ChildFrames returns a list of child frames.
 func (f *Frame) ChildFrames() []*Frame {
 	f.childFramesMu.RLock()

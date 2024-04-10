@@ -367,8 +367,6 @@ type consoleMessageAPI interface {
 
 // frameAPI is the interface of a CDP target frame.
 type frameAPI interface {
-	AddScriptTag(opts goja.Value)
-	AddStyleTag(opts goja.Value)
 	Check(selector string, opts goja.Value)
 	ChildFrames() []*common.Frame
 	Click(selector string, opts goja.Value) error
