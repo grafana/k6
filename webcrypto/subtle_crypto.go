@@ -266,7 +266,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 		// 10.
 		switch normalized.Name {
 		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(HMACKeyAlgorithm)
+			keyAlgorithm, ok := ck.Algorithm.(hasHash)
 			if !ok {
 				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
 				return
@@ -278,9 +278,9 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 				return
 			}
 
-			hashFn, err := keyAlgorithm.HashFn()
-			if err != nil {
-				reject(err)
+			hashFn, ok := getHashFn(keyAlgorithm.hash())
+			if !ok {
+				reject(NewError(NotSupportedError, "unsupported hash algorithm "+keyAlgorithm.hash()))
 				return
 			}
 
@@ -374,7 +374,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 
 		switch normalizedAlgorithm.Name {
 		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(HMACKeyAlgorithm)
+			keyAlgorithm, ok := ck.Algorithm.(hasHash)
 			if !ok {
 				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
 				return
@@ -386,9 +386,9 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 				return
 			}
 
-			hashFn, err := keyAlgorithm.HashFn()
-			if err != nil {
-				reject(err)
+			hashFn, ok := getHashFn(keyAlgorithm.hash())
+			if !ok {
+				reject(NewError(NotSupportedError, "unsupported hash algorithm "+keyAlgorithm.hash()))
 				return
 			}
 
