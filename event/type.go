@@ -1,5 +1,7 @@
 package event
 
+import "io"
+
 // Type represents the different event types emitted by k6.
 //
 //go:generate enumer -type=Type -trimprefix Type -output type_gen.go
@@ -18,12 +20,14 @@ const (
 	IterEnd
 	// Exit is emitted when the k6 process is about to exit.
 	Exit
+    // TestSummaryGenerated is emitted when the test result summary is generated.
+	TestSummaryGenerated
 )
 
 //nolint:gochecknoglobals
 var (
 	// GlobalEvents are emitted once per test run.
-	GlobalEvents = []Type{Init, TestStart, TestEnd, Exit}
+	GlobalEvents = []Type{Init, TestStart, TestEnd, Exit, TestSummaryGenerated}
 	// VUEvents are emitted multiple times per each VU.
 	VUEvents = []Type{IterStart, IterEnd}
 )
@@ -40,4 +44,9 @@ type IterData struct {
 	VUID         uint64
 	ScenarioName string
 	Error        error
+}
+
+// SummaryData is the data sent in the TestSummaryGenerated event.
+type SummaryData struct {
+	Summary map[string]io.Reader
 }
