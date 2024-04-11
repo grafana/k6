@@ -91,7 +91,7 @@ func TestNewBundle(t *testing.T) {
 		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)
 		exception := new(scriptExceptionError)
 		require.ErrorAs(t, err, &exception)
-		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:2:7(3)\n")
+		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:1:34(3)\n")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		t.Parallel()
@@ -164,13 +164,14 @@ func TestNewBundle(t *testing.T) {
 				// ES2015 modules are not supported
 				{
 					"Modules", "base", `export default function() {};`,
-					"file:///script.js: Line 2:1 Unexpected reserved word (and 2 more errors)",
+					"file:///script.js: Line 1:28 Unexpected reserved word (and 2 more errors)",
 				},
 				// BigInt is not supported
 				{
 					"BigInt", "base",
-					`module.exports.default = function() {}; BigInt(1231412444)`,
-					"ReferenceError: BigInt is not defined\n\tat file:///script.js:2:47(7)\n",
+					`module.exports.default = function() {};
+BigInt(1231412444)`,
+					"ReferenceError: BigInt is not defined\n\tat file:///script.js:2:7(7)\n",
 				},
 			}
 
