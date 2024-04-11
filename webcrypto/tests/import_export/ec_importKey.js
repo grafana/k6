@@ -80,7 +80,7 @@ testVectors.forEach(function(vector) {
             [[]].forEach(function(usages) { // Only valid usages argument is empty array
                 // TODO: return back formats after implementing them
                 // 'spki', 'spki_compressed', 'jwk', 'raw_compressed'
-                ['raw'].forEach(function(format) {
+                ['raw', 'spki'].forEach(function(format) {
                     var algorithm = {name: vector.name, namedCurve: curve};
                     var data = keyData[curve];
                     if (format === "jwk") { // Not all fields used for public keys
@@ -116,7 +116,7 @@ function testFormat(format, algorithm, data, keySize, usages, extractable) {
     if (compressed) {
         [format] = format.split("_compressed");
     }
-   //  promise_test(function(test) {
+    promise_test(function(test) {
         return subtle.importKey(format, keyData, algorithm, extractable, usages).
         then(function(key) {
             // TODO: @olegbespalov consider workaround for making this test pass
@@ -143,7 +143,7 @@ function testFormat(format, algorithm, data, keySize, usages, extractable) {
                 assert_unreached("Threw an unexpected error : " + err.toString() + ", format: " + format + " keyData: " + JSON.stringify(keyData) + " algorithm: " + JSON.stringify(algorithm) + " extractable: " + extractable + " usages: " + usages);
             }
         });
-   //  }, "Good parameters: " + keySize.toString() + " bits " + parameterString(format, compressed, keyData, algorithm, extractable, usages));
+    }, "Good parameters: " + keySize.toString() + " bits " + parameterString(format, compressed, keyData, algorithm, extractable, usages));
 }
 
 
@@ -271,6 +271,14 @@ function parameterString(format, compressed, data, algorithm, extractable, usage
 
     return result;
 }
+
+function promise_test(fn, name) {
+    try {
+       fn();  
+    } catch (e) {
+       throw Error(`Error in test "${name}": ${e}`);
+    }
+ }
 
 // Character representation of any object we may use as a parameter.
 function objectToString(obj) {

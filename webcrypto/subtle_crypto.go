@@ -675,7 +675,7 @@ func (sc *SubtleCrypto) ImportKey(
 
 	// 2.
 	switch format {
-	case Pkcs8KeyFormat, RawKeyFormat:
+	case Pkcs8KeyFormat, RawKeyFormat, SpkiKeyFormat:
 		ab, err := exportArrayBuffer(rt, keyData)
 		if err != nil {
 			reject(err)
@@ -837,7 +837,7 @@ func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promis
 }
 
 func isBinaryExportedFormat(format KeyFormat) bool {
-	return format == RawKeyFormat || format == Pkcs8KeyFormat
+	return format == RawKeyFormat || format == Pkcs8KeyFormat || format == SpkiKeyFormat
 }
 
 // WrapKey  "wraps" a key.

@@ -72,6 +72,12 @@ func (e *EcKeyImportParams) ImportKey(
 	case e.Algorithm.Name == ECDSA && format == RawKeyFormat:
 		importFn = importECDSAPublicKey
 		keyType = PublicCryptoKeyType
+	case e.Algorithm.Name == ECDH && format == SpkiKeyFormat:
+		importFn = importECDHSPKIPublicKey
+		keyType = PublicCryptoKeyType
+	case e.Algorithm.Name == ECDSA && format == SpkiKeyFormat:
+		importFn = importECDSASPKIPublicKey
+		keyType = PublicCryptoKeyType
 	default:
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+e.Algorithm.Name)
 	}
@@ -105,6 +111,36 @@ func importECDHPublicKey(curve EllipticCurveKind, keyData []byte) (any, error) {
 	}
 
 	return handle, nil
+}
+
+func importECDHSPKIPublicKey(_ EllipticCurveKind, keyData []byte) (any, error) {
+	pk, err := x509.ParsePKIXPublicKey(keyData)
+	if err != nil {
+		return nil, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
+	}
+
+	ecdsaKey, ok := pk.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, NewError(DataError, "a public key is not an ECDSA key")
+	}
+
+	// try to restore the ECDH key
+	return ecdsaKey.ECDH()
+}
+
+func importECDSASPKIPublicKey(_ EllipticCurveKind, keyData []byte) (any, error) {
+	pk, err := x509.ParsePKIXPublicKey(keyData)
+	if err != nil {
+		return nil, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
+	}
+
+	ecdsaKey, ok := pk.(*ecdsa.PublicKey)
+	if !ok {
+		return nil, NewError(DataError, "a public key is not an ECDSA key")
+	}
+
+	// try to restore the ECDH key
+	return ecdsaKey, nil
 }
 
 // EllipticCurveKind represents the kind of elliptic curve that is being used.
@@ -379,6 +415,17 @@ func exportECKey(alg string, ck *CryptoKey, format KeyFormat) ([]byte, error) {
 		bytes, err := extractPublicKeyBytes(alg, ck.handle)
 		if err != nil {
 			return nil, NewError(OperationError, "unable to extract public key data: "+err.Error())
+		}
+
+		return bytes, nil
+	case SpkiKeyFormat:
+		if ck.Type != PublicCryptoKeyType {
+			return nil, NewError(InvalidAccessError, "key is not a valid elliptic curve public key")
+		}
+
+		bytes, err := x509.MarshalPKIXPublicKey(ck.handle)
+		if err != nil {
+			return nil, NewError(OperationError, "unable to marshal key to SPKI format: "+err.Error())
 		}
 
 		return bytes, nil
