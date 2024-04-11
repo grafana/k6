@@ -205,7 +205,7 @@ function run_test(algorithmNames) {
             .forEach(function(usages) {
                 [false, true].forEach(function(extractable) {
                     if (name.substring(0,2) === "EC") {
-                        testError(algorithm, extractable, usages, "NotSupportedError", "Bad algorithm 2 property" + JSON.stringify({algorithm: algorithm, extractable: extractable, usages: usages}));
+                        testError(algorithm, extractable, usages, "NotSupportedError", "Bad algorithm property");
                     } else {
                         testError(algorithm, extractable, usages, "OperationError", "Bad algorithm property");
                     }

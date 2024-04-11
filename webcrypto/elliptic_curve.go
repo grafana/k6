@@ -218,7 +218,7 @@ func importECDSAPublicKey(curve EllipticCurveKind, keyData []byte) (any, error) 
 		return nil, NewError(DataError, "unable to import ECDSA public key data")
 	}
 
-	return ecdsa.PublicKey{
+	return &ecdsa.PublicKey{
 		Curve: c,
 		X:     x,
 		Y:     y,
@@ -364,7 +364,7 @@ func generateECDSAKeyPair(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (
 		return nil, nil, NewError(OperationError, "unable to generate a ECDSA key pair")
 	}
 
-	return rawPrivateKey, rawPrivateKey.PublicKey, nil
+	return rawPrivateKey, &rawPrivateKey.PublicKey, nil
 }
 
 // isValidEllipticCurve returns true if the given elliptic curve is supported,
@@ -456,7 +456,7 @@ func extractPublicKeyBytes(alg string, handle any) ([]byte, error) {
 	}
 
 	if alg == ECDSA {
-		k, ok := handle.(ecdsa.PublicKey)
+		k, ok := handle.(*ecdsa.PublicKey)
 		if !ok {
 			return nil, NewError(OperationError, "key data isn't a valid elliptic curve public key")
 		}
@@ -529,7 +529,10 @@ func (edsa *ECDSAParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
 		return nil, NewError(NotSupportedError, "unsupported hash algorithm: "+edsa.Hash.Name)
 	}
 
-	r, s, err := ecdsa.Sign(rand.Reader, k, hashFn().Sum(data))
+	hasher := hashFn()
+	hasher.Write(data)
+
+	r, s, err := ecdsa.Sign(rand.Reader, k, hasher.Sum(nil))
 	if err != nil {
 		return nil, NewError(OperationError, "unable to sign data: "+err.Error())
 	}
@@ -560,7 +563,7 @@ func (edsa *ECDSAParams) Verify(key CryptoKey, signature []byte, data []byte) (b
 		return false, NewError(InvalidAccessError, "key is not a valid ECDSA public key")
 	}
 
-	k, ok := key.handle.(ecdsa.PublicKey)
+	k, ok := key.handle.(*ecdsa.PublicKey)
 	if !ok {
 		return false, NewError(InvalidAccessError, "key is not a valid ECDSA public key")
 	}
@@ -573,8 +576,15 @@ func (edsa *ECDSAParams) Verify(key CryptoKey, signature []byte, data []byte) (b
 	bitSize := k.Curve.Params().BitSize
 	n := (bitSize + 7) / 8
 
+	if len(signature) != 2*n {
+		return false, nil
+	}
+
+	hasher := hashFn()
+	hasher.Write(data)
+
 	r := new(big.Int).SetBytes(signature[:n])
 	s := new(big.Int).SetBytes(signature[n:])
 
-	return ecdsa.Verify(&k, hashFn().Sum(data), r, s), nil
+	return ecdsa.Verify(k, hasher.Sum(nil), r, s), nil
 }
