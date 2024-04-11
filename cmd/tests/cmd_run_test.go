@@ -2074,6 +2074,7 @@ func TestEventSystemOK(t *testing.T) {
 		`got event IterStart with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}'`,
 		`got event IterEnd with data '{Iteration:4 VUID:1 ScenarioName:default Error:<nil>}'`,
 		`got event TestEnd with data '<nil>'`,
+		`got event TestSummaryGenerated with data '&{Summary:map[stdout:]}'`,
 		`got event Exit with data '&{Error:<nil>}'`,
 	}
 	log := ts.LoggerHook.Lines()
@@ -2108,6 +2109,7 @@ func TestEventSystemError(t *testing.T) {
 				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
 				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at file:///-:11:16(6)}'",
 				"got event TestEnd with data '<nil>'",
+				"got event TestSummaryGenerated with data '&{Summary:map[stdout:]}'",
 				"got event Exit with data '&{Error:test aborted: oops! at file:///-:11:16(6)}'",
 				"test aborted: oops! at file:///-:11:16(6)",
 			},
@@ -2144,6 +2146,7 @@ func TestEventSystemError(t *testing.T) {
 				"got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:Error: oops!\n\tat file:///-:9:11(3)\n}'",
 				"Error: oops!\n\tat file:///-:9:11(3)\n",
 				"got event TestEnd with data '<nil>'",
+				"got event TestSummaryGenerated with data '&{Summary:map[stdout:]}'",
 				"got event Exit with data '&{Error:<nil>}'",
 			},
 			expExitCode: 0,

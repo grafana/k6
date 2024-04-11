@@ -20,14 +20,14 @@ const (
 	IterEnd
 	// Exit is emitted when the k6 process is about to exit.
 	Exit
-    // TestSummaryGenerated is emitted when the test result summary is generated.
+	// TestSummaryGenerated is emitted when the test result summary is generated.
 	TestSummaryGenerated
 )
 
 //nolint:gochecknoglobals
 var (
 	// GlobalEvents are emitted once per test run.
-	GlobalEvents = []Type{Init, TestStart, TestEnd, Exit, TestSummaryGenerated}
+	GlobalEvents = []Type{Init, TestStart, TestEnd, TestSummaryGenerated, Exit}
 	// VUEvents are emitted multiple times per each VU.
 	VUEvents = []Type{IterStart, IterEnd}
 )

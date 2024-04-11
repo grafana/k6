@@ -203,7 +203,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			if hsErr == nil {
 				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				waitForSummaryGeneratedEvent := emitEvent(&event.Event{
-					Type: event.Exit,
+					Type: event.TestSummaryGenerated,
 					Data: &event.SummaryData{Summary: summaryResult},
 				})
 				waitForSummaryGeneratedEvent()
