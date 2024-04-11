@@ -84,7 +84,7 @@ func TestCompile(t *testing.T) {
 		src := `exports.d=1+(function() { return 2; })()`
 		pgm, code, err := c.Compile(src, "script.js", false)
 		require.NoError(t, err)
-		assert.Equal(t, "(function(module, exports){\nexports.d=1+(function() { return 2; })()\n})\n", code)
+		assert.Equal(t, "(function(module, exports){exports.d=1+(function() { return 2; })()\n})\n", code)
 		rt := goja.New()
 		v, err := rt.RunProgram(pgm)
 		require.NoError(t, err)
@@ -131,8 +131,7 @@ func TestCompile(t *testing.T) {
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
 		pgm, code, err := c.Compile(`import "something";`, "script.js", false)
 		require.NoError(t, err)
-		assert.Equal(t, `(function(module, exports){
-"use strict";require("something");
+		assert.Equal(t, `(function(module, exports){"use strict";require("something");
 })
 `, code)
 		var requireCalled bool

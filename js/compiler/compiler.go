@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -207,8 +208,14 @@ func (c *Compiler) compileImpl(
 ) (*goja.Program, string, error) {
 	code := src
 	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
-	if wrap { // the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
-		code = "(function(module, exports){\n" + code + "\n})\n"
+	if wrap {
+		conditionalNewLine := ""
+		if strings.Contains(code, "//# sourceMappingURL=") {
+			// the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
+			conditionalNewLine = "\n"
+			// if there is no sourcemap - bork only the first line of code, but leave the remaining ones.
+		}
+		code = "(function(module, exports){" + conditionalNewLine + code + "\n})\n"
 	}
 	opts := parser.WithDisableSourceMaps
 	if c.Options.SourceMapLoader != nil {
