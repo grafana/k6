@@ -155,79 +155,73 @@ function run_test() {
 
 
 
-    // TODO @oleiade: This test relies on generation of a ECDSA key pair, which is not
-    // supported by the current implementation.  This test should be updated
-    // when the implementation supports ECDSA key generation.
-    // // Test signing with the wrong algorithm
-    // testVectors.forEach(function(vector) {
-    //     // Want to get the key for the wrong algorithm
-    //     var promise = subtle.generateKey({name: "ECDSA", namedCurve: "P-256", hash: "SHA-256"}, false, ["sign", "verify"])
-    //     .then(function(wrongKey) {
-    //         return importVectorKeys(vector, ["verify", "sign"])
-    //         .then(function(vectors) {
-    //             // promise_test(function(test) {
-    //                 var operation = subtle.sign({name: "HMAC", hash: vector.hash}, wrongKey.privateKey, vector.plaintext)
-    //                 .then(function(signature) {
-    //                     assert_unreached("Signing should not have succeeded for " + vector.name);
-    //                 }, function(err) {
-    //                     assert_equals(err.name, "InvalidAccessError", "Should have thrown InvalidAccessError instead of '" + err.message + "'");
-    //                 });
+    // Test signing with the wrong algorithm
+    testVectors.forEach(function(vector) {
+        // Want to get the key for the wrong algorithm
+        var promise = subtle.generateKey({name: "ECDSA", namedCurve: "P-256", hash: "SHA-256"}, false, ["sign", "verify"])
+        .then(function(wrongKey) {
+            return importVectorKeys(vector, ["verify", "sign"])
+            .then(function(vectors) {
+                // promise_test(function(test) {
+                    var operation = subtle.sign({name: "HMAC", hash: vector.hash}, wrongKey.privateKey, vector.plaintext)
+                    .then(function(signature) {
+                        assert_unreached("Signing should not have succeeded for " + vector.name);
+                    }, function(err) {
+                        assert_equals(err.name, "InvalidAccessError", "Should have thrown InvalidAccessError instead of '" + err.message + "'");
+                    });
 
-    //                 return operation;
-    //             // }, vector.name + " signing with wrong algorithm name");
+                    return operation;
+                // }, vector.name + " signing with wrong algorithm name");
 
-    //         }, function(err) {
-    //             // We need a failed test if the importVectorKey operation fails, so
-    //             // we know we never tested verification.
-    //             // promise_test(function(test) {
-    //                 assert_unreached("importVectorKeys failed for " + vector.name + ". Message: ''" + err.message + "''");
-    //             // }, "importVectorKeys step: " + vector.name + " signing with wrong algorithm name");
-    //         });
-    //     }, function(err) {
-    //         // promise_test(function(test) {
-    //             assert_unreached("Generate wrong key for test " + vector.name + " failed: '" + err.message + "'");
-    //         // }, "generate wrong key step: " + vector.name + " signing with wrong algorithm name");
-    //     });
+            }, function(err) {
+                // We need a failed test if the importVectorKey operation fails, so
+                // we know we never tested verification.
+                // promise_test(function(test) {
+                    assert_unreached("importVectorKeys failed for " + vector.name + ". Message: ''" + err.message + "''");
+                // }, "importVectorKeys step: " + vector.name + " signing with wrong algorithm name");
+            });
+        }, function(err) {
+            // promise_test(function(test) {
+                assert_unreached("Generate wrong key for test " + vector.name + " failed: '" + err.message + "'");
+            // }, "generate wrong key step: " + vector.name + " signing with wrong algorithm name");
+        });
 
-    //     all_promises.push(promise);
-    // });
+        all_promises.push(promise);
+    });
 
-    // TODO @oleiade: This test relies on generation of a ECDSA key pair, which is not
-    // supported by the current implementation.  This test should be updated
-    // when the implementation supports ECDSA key generation.
-    // // Test verification with the wrong algorithm
-    // testVectors.forEach(function(vector) {
-    //     // Want to get the key for the wrong algorithm
-    //     var promise = subtle.generateKey({name: "ECDSA", namedCurve: "P-256", hash: "SHA-256"}, false, ["sign", "verify"])
-    //     .then(function(wrongKey) {
-    //         return importVectorKeys(vector, ["verify", "sign"])
-    //         .then(function(vector) {
-    //             // promise_test(function(test) {
-    //                 var operation = subtle.verify({name: "HMAC", hash: vector.hash}, wrongKey.publicKey, vector.signature, vector.plaintext)
-    //                 .then(function(signature) {
-    //                     assert_unreached("Verifying should not have succeeded for " + vector.name);
-    //                 }, function(err) {
-    //                     assert_equals(err.name, "InvalidAccessError", "Should have thrown InvalidAccessError instead of '" + err.message + "'");
-    //                 });
+    // Test verification with the wrong algorithm
+    testVectors.forEach(function(vector) {
+        // Want to get the key for the wrong algorithm
+        var promise = subtle.generateKey({name: "ECDSA", namedCurve: "P-256", hash: "SHA-256"}, false, ["sign", "verify"])
+        .then(function(wrongKey) {
+            return importVectorKeys(vector, ["verify", "sign"])
+            .then(function(vector) {
+                // promise_test(function(test) {
+                    var operation = subtle.verify({name: "HMAC", hash: vector.hash}, wrongKey.publicKey, vector.signature, vector.plaintext)
+                    .then(function(signature) {
+                        assert_unreached("Verifying should not have succeeded for " + vector.name);
+                    }, function(err) {
+                        assert_equals(err.name, "InvalidAccessError", "Should have thrown InvalidAccessError instead of '" + err.message + "'");
+                    });
 
-    //                 return operation;
-    //             // }, vector.name + " verifying with wrong algorithm name");
+                    return operation;
+                // }, vector.name + " verifying with wrong algorithm name");
 
-    //         }, function(err) {
-    //             // We need a failed test if the importVectorKey operation fails, so
-    //             // we know we never tested verification.
-    //             // promise_test(function(test) {
-    //                 assert_unreached("importVectorKeys failed for " + vector.name + ". Message: ''" + err.message + "''");
-    //             // }, "importVectorKeys step: " + vector.name + " verifying with wrong algorithm name");
-    //         });
-    //     }, function(err) {
-    //         // promise_test(function(test) {
-    //             assert_unreached("Generate wrong key for test " + vector.name + " failed: '" + err.message + "'");
-    //         // }, "generate wrong key step: " + vector.name + " verifying with wrong algorithm name");
-    //     });
+            }, function(err) {
+                // We need a failed test if the importVectorKey operation fails, so
+                // we know we never tested verification.
+                // promise_test(function(test) {
+                    assert_unreached("importVectorKeys failed for " + vector.name + ". Message: ''" + err.message + "''");
+                // }, "importVectorKeys step: " + vector.name + " verifying with wrong algorithm name");
+            });
+        }, function(err) {
+            // promise_test(function(test) {
+                assert_unreached("Generate wrong key for test " + vector.name + " failed: '" + err.message + "'");
+            // }, "generate wrong key step: " + vector.name + " verifying with wrong algorithm name");
+        });
 
-    //     all_promises.push(promise);
-    // });
+        all_promises.push(promise);
+    });
 
 
 
