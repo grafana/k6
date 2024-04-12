@@ -87,13 +87,14 @@ function getTestVectors() {
 function getInvalidTestVectors() {
    var vectors = [];
    for (const validVector of getTestVectors()) {
-      // TODO: figure out why this tests cases failing
-      //  {
-      //      const vector = structuredClone(validVector);
-      //      vector.name = `${vector.name} - The signature was truncated by 1 byte`;
-      //      vector.signature = vector.signature.subarray(0, vector.signature.byteLength - 1);
-      //      vectors.push(vector);
-      //  }
+       {
+           const vector = structuredClone(validVector);
+           vector.name = `${vector.name} - The signature was truncated by 1 byte`;
+           // this copyUint8Array is a workaround, since we have to modify the way how we read ArrayBuffers
+           // https://github.com/grafana/xk6-webcrypto/issues/72
+           vector.signature = copyUint8Array(vector.signature.subarray(0, vector.signature.byteLength - 1));
+           vectors.push(vector);
+       }
 
        // The signature was made with a different algorithm
        for (const hashName of ["SHA-1", "SHA-256", "SHA-384", "SHA-512"]) {
