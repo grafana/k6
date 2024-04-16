@@ -7,9 +7,16 @@ import (
 	"crypto/rand"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/dop251/goja"
+)
+
+const (
+	p256Canonical = "P-256"
+	p384Canonical = "P-384"
+	p521Canonical = "P-521"
 )
 
 // EcKeyAlgorithm is the algorithm for elliptic curve keys as defined in the [specification].
@@ -54,35 +61,30 @@ func (e *EcKeyImportParams) ImportKey(
 	keyData []byte,
 	_ []CryptoKeyUsage,
 ) (*CryptoKey, error) {
-	var keyType CryptoKeyType
-	var handle any
-
-	var importFn func(curve EllipticCurveKind, keyData []byte) (any, error)
+	var importFn func(curve EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error)
 
 	switch {
 	case e.Algorithm.Name == ECDH && format == Pkcs8KeyFormat:
 		importFn = importECDHPrivateKey
-		keyType = PrivateCryptoKeyType
 	case e.Algorithm.Name == ECDH && format == RawKeyFormat:
 		importFn = importECDHPublicKey
-		keyType = PublicCryptoKeyType
 	case e.Algorithm.Name == ECDSA && format == Pkcs8KeyFormat:
 		importFn = importECDSAPrivateKey
-		keyType = PrivateCryptoKeyType
 	case e.Algorithm.Name == ECDSA && format == RawKeyFormat:
 		importFn = importECDSAPublicKey
-		keyType = PublicCryptoKeyType
 	case e.Algorithm.Name == ECDH && format == SpkiKeyFormat:
 		importFn = importECDHSPKIPublicKey
-		keyType = PublicCryptoKeyType
 	case e.Algorithm.Name == ECDSA && format == SpkiKeyFormat:
 		importFn = importECDSASPKIPublicKey
-		keyType = PublicCryptoKeyType
+	case e.Algorithm.Name == ECDSA && format == JwkKeyFormat:
+		importFn = importECDSAJWK
+	case e.Algorithm.Name == ECDH && format == JwkKeyFormat:
+		importFn = importECDHJWK
 	default:
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+e.Algorithm.Name)
 	}
 
-	handle, err := importFn(e.NamedCurve, keyData)
+	handle, keyType, err := importFn(e.NamedCurve, keyData)
 	if err != nil {
 		return nil, err
 	}
@@ -99,48 +101,53 @@ func (e *EcKeyImportParams) ImportKey(
 	}, nil
 }
 
-func importECDHPublicKey(curve EllipticCurveKind, keyData []byte) (any, error) {
-	c, err := pickECDHCurve(curve)
+func importECDHPublicKey(curve EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error) {
+	c, err := pickECDHCurve(curve.String())
 	if err != nil {
-		return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(curve))
+		return nil, UnknownCryptoKeyType, NewError(NotSupportedError, "invalid ECDH curve "+string(curve))
 	}
 
 	handle, err := c.NewPublicKey(keyData)
 	if err != nil {
-		return nil, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
 	}
 
-	return handle, nil
+	return handle, PublicCryptoKeyType, nil
 }
 
-func importECDHSPKIPublicKey(_ EllipticCurveKind, keyData []byte) (any, error) {
+func importECDHSPKIPublicKey(_ EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error) {
 	pk, err := x509.ParsePKIXPublicKey(keyData)
 	if err != nil {
-		return nil, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
 	}
 
 	ecdsaKey, ok := pk.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, NewError(DataError, "a public key is not an ECDSA key")
+		return nil, UnknownCryptoKeyType, NewError(DataError, "a public key is not an ECDSA key")
 	}
 
 	// try to restore the ECDH key
-	return ecdsaKey.ECDH()
+	key, err := ecdsaKey.ECDH()
+	if err != nil {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import key data: "+err.Error())
+	}
+
+	return key, PublicCryptoKeyType, nil
 }
 
-func importECDSASPKIPublicKey(_ EllipticCurveKind, keyData []byte) (any, error) {
+func importECDSASPKIPublicKey(_ EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error) {
 	pk, err := x509.ParsePKIXPublicKey(keyData)
 	if err != nil {
-		return nil, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
 	}
 
 	ecdsaKey, ok := pk.(*ecdsa.PublicKey)
 	if !ok {
-		return nil, NewError(DataError, "a public key is not an ECDSA key")
+		return nil, UnknownCryptoKeyType, NewError(DataError, "a public key is not an ECDSA key")
 	}
 
 	// try to restore the ECDH key
-	return ecdsaKey, nil
+	return ecdsaKey, PublicCryptoKeyType, nil
 }
 
 // EllipticCurveKind represents the kind of elliptic curve that is being used.
@@ -157,6 +164,10 @@ const (
 	EllipticCurveKindP521 EllipticCurveKind = "P-521"
 )
 
+func (k EllipticCurveKind) String() string {
+	return string(k)
+}
+
 // IsEllipticCurve returns true if the given string is a valid EllipticCurveKind,
 // false otherwise.
 func IsEllipticCurve(name string) bool {
@@ -172,57 +183,57 @@ func IsEllipticCurve(name string) bool {
 	}
 }
 
-func importECDHPrivateKey(_ EllipticCurveKind, keyData []byte) (any, error) {
+func importECDHPrivateKey(_ EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error) {
 	parsedKey, err := x509.ParsePKCS8PrivateKey(keyData)
 	if err != nil {
-		return nil, NewError(DataError, "unable to import ECDH private key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH private key data: "+err.Error())
 	}
 
 	// check if the key is an ECDSA key
 	ecdsaKey, ok := parsedKey.(*ecdsa.PrivateKey)
 	if !ok {
-		return nil, NewError(DataError, "a private key is not an ECDSA key")
+		return nil, UnknownCryptoKeyType, NewError(DataError, "a private key is not an ECDSA key")
 	}
 
 	// try to restore the ECDH key
 	handle, err := ecdsaKey.ECDH()
 	if err != nil {
-		return nil, NewError(DataError, "unable to import key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import key data: "+err.Error())
 	}
 
-	return handle, nil
+	return handle, PrivateCryptoKeyType, nil
 }
 
-func importECDSAPrivateKey(_ EllipticCurveKind, keyData []byte) (any, error) {
+func importECDSAPrivateKey(_ EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error) {
 	parsedKey, err := x509.ParsePKCS8PrivateKey(keyData)
 	if err != nil {
-		return nil, NewError(DataError, "unable to import ECDSA private key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDSA private key data: "+err.Error())
 	}
 
 	ecdsaKey, ok := parsedKey.(*ecdsa.PrivateKey)
 	if !ok {
-		return nil, NewError(DataError, "a private key is not an ECDSA key")
+		return nil, UnknownCryptoKeyType, NewError(DataError, "a private key is not an ECDSA key")
 	}
 
-	return ecdsaKey, nil
+	return ecdsaKey, PrivateCryptoKeyType, nil
 }
 
-func importECDSAPublicKey(curve EllipticCurveKind, keyData []byte) (any, error) {
-	c, err := pickEllipticCurve(curve)
+func importECDSAPublicKey(curve EllipticCurveKind, keyData []byte) (any, CryptoKeyType, error) {
+	c, err := pickEllipticCurve(curve.String())
 	if err != nil {
-		return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(curve))
+		return nil, UnknownCryptoKeyType, NewError(NotSupportedError, "invalid elliptic curve "+string(curve))
 	}
 
 	x, y := elliptic.Unmarshal(c, keyData)
 	if x == nil {
-		return nil, NewError(DataError, "unable to import ECDSA public key data")
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDSA public key data")
 	}
 
 	return &ecdsa.PublicKey{
 		Curve: c,
 		X:     x,
 		Y:     y,
-	}, nil
+	}, PublicCryptoKeyType, nil
 }
 
 // ECKeyGenParams  represents the object that should be passed as the algorithm
@@ -276,7 +287,7 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 	}
 
 	if !isValidEllipticCurve(ecgp.NamedCurve) {
-		return nil, NewError(NotSupportedError, "invalid elliptic curve "+string(ecgp.NamedCurve))
+		return nil, NewError(NotSupportedError, "elliptic curve "+string(ecgp.NamedCurve)+" is not supported")
 	}
 
 	if len(keyUsages) == 0 {
@@ -330,7 +341,7 @@ func generateECDHKeyPair(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (a
 		}
 	}
 
-	c, err := pickECDHCurve(curve)
+	c, err := pickECDHCurve(curve.String())
 	if err != nil {
 		return nil, nil, NewError(NotSupportedError, err.Error())
 	}
@@ -354,7 +365,7 @@ func generateECDSAKeyPair(curve EllipticCurveKind, keyUsages []CryptoKeyUsage) (
 		}
 	}
 
-	c, err := pickEllipticCurve(curve)
+	c, err := pickEllipticCurve(curve.String())
 	if err != nil {
 		return nil, nil, NewError(NotSupportedError, err.Error())
 	}
@@ -372,36 +383,33 @@ func isValidEllipticCurve(curve EllipticCurveKind) bool {
 	return curve == EllipticCurveKindP256 || curve == EllipticCurveKindP384 || curve == EllipticCurveKindP521
 }
 
-// pickECDHCurve returns the elliptic curve that corresponds to the given
-// EllipticCurveKind.
-// If the curve is not supported, an error is returned.
-func pickECDHCurve(k EllipticCurveKind) (ecdh.Curve, error) {
+func pickECDHCurve(k string) (ecdh.Curve, error) {
 	switch k {
-	case EllipticCurveKindP256:
+	case p256Canonical:
 		return ecdh.P256(), nil
-	case EllipticCurveKindP384:
+	case p384Canonical:
 		return ecdh.P384(), nil
-	case EllipticCurveKindP521:
+	case p521Canonical:
 		return ecdh.P521(), nil
 	default:
 		return nil, errors.New("invalid ECDH curve")
 	}
 }
 
-func pickEllipticCurve(k EllipticCurveKind) (elliptic.Curve, error) {
+func pickEllipticCurve(k string) (elliptic.Curve, error) {
 	switch k {
-	case EllipticCurveKindP256:
+	case p256Canonical:
 		return elliptic.P256(), nil
-	case EllipticCurveKindP384:
+	case p384Canonical:
 		return elliptic.P384(), nil
-	case EllipticCurveKindP521:
+	case p521Canonical:
 		return elliptic.P521(), nil
 	default:
-		return nil, errors.New("invalid elliptic curve")
+		return nil, errors.New("invalid elliptic curve " + k)
 	}
 }
 
-func exportECKey(alg string, ck *CryptoKey, format KeyFormat) ([]byte, error) {
+func exportECKey(alg string, ck *CryptoKey, format KeyFormat) (interface{}, error) {
 	if ck.handle == nil {
 		return nil, NewError(OperationError, "key data is not accessible")
 	}
@@ -440,6 +448,8 @@ func exportECKey(alg string, ck *CryptoKey, format KeyFormat) ([]byte, error) {
 		}
 
 		return bytes, nil
+	case JwkKeyFormat:
+		return exportECJWK(ck)
 	default:
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
 	}
@@ -587,4 +597,41 @@ func (edsa *ECDSAParams) Verify(key CryptoKey, signature []byte, data []byte) (b
 	s := new(big.Int).SetBytes(signature[n:])
 
 	return ecdsa.Verify(k, hasher.Sum(nil), r, s), nil
+}
+
+func convertECDHtoECDSAKey(k *ecdh.PrivateKey) (*ecdsa.PrivateKey, error) {
+	pk, err := convertPublicECDHtoECDSA(k.PublicKey())
+	if err != nil {
+		return nil, err
+	}
+
+	return &ecdsa.PrivateKey{
+		PublicKey: *pk,
+		D:         new(big.Int).SetBytes(k.Bytes()),
+	}, nil
+}
+
+func convertPublicECDHtoECDSA(k *ecdh.PublicKey) (*ecdsa.PublicKey, error) {
+	var crv elliptic.Curve
+	switch k.Curve() {
+	case ecdh.P256():
+		crv = elliptic.P256()
+	case ecdh.P384():
+		crv = elliptic.P384()
+	case ecdh.P521():
+		crv = elliptic.P521()
+	default:
+		return nil, errors.New("curve not supported for converting to ECDSA key")
+	}
+
+	x, y := elliptic.Unmarshal(crv, k.Bytes())
+	if x == nil {
+		return nil, fmt.Errorf("unable to convert ECDH public key to ECDSA public key, curve: %s", crv.Params().Name)
+	}
+
+	return &ecdsa.PublicKey{
+		Curve: crv,
+		X:     x,
+		Y:     y,
+	}, nil
 }

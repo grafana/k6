@@ -109,6 +109,9 @@ func (ck *CryptoKey) ContainsUsage(usage CryptoKeyUsage) bool {
 type CryptoKeyType = string
 
 const (
+	// UnknownCryptoKeyType that we set when we don't know the type of the key.
+	UnknownCryptoKeyType CryptoKeyType = "unknown"
+
 	// SecretCryptoKeyType carries the information that a key is a secret key
 	// to use with a symmetric algorithm.
 	SecretCryptoKeyType CryptoKeyType = "secret"

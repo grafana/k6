@@ -79,8 +79,8 @@ testVectors.forEach(function(vector) {
             // Test public keys first
             [[]].forEach(function(usages) { // Only valid usages argument is empty array
                 // TODO: return back formats after implementing them
-                // 'spki', 'spki_compressed', 'jwk', 'raw_compressed'
-                ['raw', 'spki'].forEach(function(format) {
+                // 'spki', 'spki_compressed', 'raw_compressed'
+                ['raw', 'spki', 'jwk'].forEach(function(format) {
                     var algorithm = {name: vector.name, namedCurve: curve};
                     var data = keyData[curve];
                     if (format === "jwk") { // Not all fields used for public keys
@@ -93,9 +93,8 @@ testVectors.forEach(function(vector) {
             });
 
             // Next, test private keys
-            // TODO: return back 'jwk' once it supported
             allValidUsages(vector.privateUsages, []).forEach(function(usages) {
-                ['pkcs8'].forEach(function(format) {
+                ['pkcs8', 'jwk'].forEach(function(format) {
                     var algorithm = {name: vector.name, namedCurve: curve};
                     var data = keyData[curve];
 
