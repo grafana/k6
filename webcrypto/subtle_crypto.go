@@ -38,71 +38,70 @@ type SubtleCrypto struct {
 // The `data` parameter should contain the data to be encryption.
 func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	// 2.
-	// We obtain a copy of the key data, because we might need to modify it.
-	plaintext, err := exportArrayBuffer(rt, data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var (
+		plaintext []byte
+		ck        CryptoKey
+		encrypter EncryptDecrypter
+	)
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierEncrypt)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	err := func() error {
+		var err error
 
-	var ck CryptoKey
-	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
-		return promise
-	}
-
-	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	// 8.
-	if normalized.Name != keyAlgorithmNameValue.String() {
-		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-		return promise
-	}
-
-	encrypter, err := newEncryptDecrypter(rt, normalized, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	go func() {
-		// 9.
-		if !ck.ContainsUsage(EncryptCryptoKeyUsage) {
-			reject(NewError(InvalidAccessError, "key does not contain the 'encrypt' usage"))
-			return
+		plaintext, err = exportArrayBuffer(rt, data)
+		if err != nil {
+			return err
 		}
 
-		var ciphertext []byte
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierEncrypt)
+		if err != nil {
+			return err
+		}
 
-		switch normalized.Name {
-		case AESCbc, AESCtr, AESGcm:
-			// 10.
-			ciphertext, err = encrypter.Encrypt(plaintext, ck)
+		if err = rt.ExportTo(key, &ck); err != nil {
+			return NewError(InvalidAccessError, "encrypt's key argument does hold not a valid CryptoKey object")
+		}
+
+		keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalized.Name != keyAlgorithmNameValue.String() {
+			return NewError(InvalidAccessError, "encrypt's algorithm name does not match key algorithm name")
+		}
+
+		encrypter, err = newEncryptDecrypter(rt, normalized, algorithm)
+		if err != nil {
+			return err
+		}
+
+		if !ck.ContainsUsage(EncryptCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "encrypt's key does not contain the 'encrypt' usage")
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := encrypter.Encrypt(plaintext, ck)
+
+		callback(func() error {
 			if err != nil {
 				reject(err)
-				return
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
 			}
 
-			resolve(rt.NewArrayBuffer(ciphertext))
-			return
-		default:
-			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
-			return
-		}
+			resolve(rt.NewArrayBuffer(result))
+			return nil
+		})
 	}()
 
 	return promise
