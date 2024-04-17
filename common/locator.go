@@ -568,18 +568,14 @@ func (l *Locator) Tap(opts goja.Value) error {
 	if err := copts.Parse(l.ctx, opts); err != nil {
 		return fmt.Errorf("parsing tap options: %w", err)
 	}
-	if err := l.tap(copts); err != nil {
+	copts.Strict = true
+	if err := l.frame.tap(l.selector, copts); err != nil {
 		return fmt.Errorf("tapping on %q: %w", l.selector, err)
 	}
 
 	applySlowMo(l.ctx)
 
 	return nil
-}
-
-func (l *Locator) tap(opts *FrameTapOptions) error {
-	opts.Strict = true
-	return l.frame.tap(l.selector, opts)
 }
 
 // DispatchEvent dispatches an event for the element matching the
