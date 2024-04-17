@@ -1565,6 +1565,20 @@ func (f *Frame) Tap(selector string, opts goja.Value) error {
 	return nil
 }
 
+func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
+	tap := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+		return nil, handle.tap(apiCtx, p)
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, tap, &opts.ElementHandleBasePointerOptions,
+	)
+	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err)
+	}
+
+	return nil
+}
+
 func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInputFilesOptions) error {
 	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.setInputFiles(apiCtx, files.Payload)
@@ -1575,20 +1589,6 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 		opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
 
-	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err)
-	}
-
-	return nil
-}
-
-func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
-	tap := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
-		return nil, handle.tap(apiCtx, p)
-	}
-	act := f.newPointerAction(
-		selector, DOMElementStateAttached, opts.Strict, tap, &opts.ElementHandleBasePointerOptions,
-	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
 	}

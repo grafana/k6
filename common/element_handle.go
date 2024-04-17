@@ -589,10 +589,6 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 	return nil
 }
 
-func (h *ElementHandle) tap(apiCtx context.Context, p *Position) error {
-	return h.frame.page.Touchscreen.tap(p.X, p.Y)
-}
-
 func (h *ElementHandle) textContent(apiCtx context.Context) (any, error) {
 	js := `
 		(element) => {
@@ -1310,6 +1306,10 @@ func (h *ElementHandle) Tap(opts goja.Value) {
 		k6ext.Panic(h.ctx, "tapping element: %w", err)
 	}
 	applySlowMo(h.ctx)
+}
+
+func (h *ElementHandle) tap(apiCtx context.Context, p *Position) error {
+	return h.frame.page.Touchscreen.tap(p.X, p.Y)
 }
 
 func (h *ElementHandle) TextContent() string {
