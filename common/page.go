@@ -1190,6 +1190,7 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 	applySlowMo(p.ctx)
 }
 
+// Tap will tap the element matching the provided selector.
 func (p *Page) Tap(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v selector:%s", p.sessionID(), selector)
 
