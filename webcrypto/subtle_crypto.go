@@ -36,7 +36,9 @@ type SubtleCrypto struct {
 // The `key` parameter should be a `CryptoKey` to be used for encryption.
 //
 // The `data` parameter should contain the data to be encryption.
-func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
+	algorithm, key, data goja.Value,
+) *goja.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -127,7 +129,9 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 // The `key` parameter should be a `CryptoKey` to be used for decryption.
 //
 // The `data` parameter should contain the data to be decrypted.
-func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
+	algorithm, key, data goja.Value,
+) *goja.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
