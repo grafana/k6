@@ -496,46 +496,66 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
 func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyUsages []CryptoKeyUsage) *goja.Promise {
-	promise, resolve, reject := promises.New(sc.vu)
+	rt := sc.vu.Runtime()
 
-	normalized, err := normalizeAlgorithm(sc.vu.Runtime(), algorithm, OperationIdentifierGenerateKey)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var keyGenerator KeyGenerator
 
-	keyGenerator, err := newKeyGenerator(sc.vu.Runtime(), normalized, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	go func() {
-		// 7.
-		result, err := keyGenerator.GenerateKey(extractable, keyUsages)
+	err := func() error {
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierGenerateKey)
 		if err != nil {
-			reject(err)
-			return
+			return err
 		}
 
-		if !result.IsKeyPair() {
-			cryptoKey, err := result.ResolveCryptoKey()
+		keyGenerator, err = newKeyGenerator(rt, normalized, algorithm)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := func() (CryptoKeyGenerationResult, error) {
+			result, err := keyGenerator.GenerateKey(extractable, keyUsages)
 			if err != nil {
-				reject(NewError(OperationError, "usages cannot not be empty for a secret or private CryptoKey"))
-				return
+				return nil, err
 			}
 
-			// 8.
+			if result.IsKeyPair() {
+				return result, nil
+			}
+
+			cryptoKey, err := result.ResolveCryptoKey()
+			if err != nil {
+				return nil, NewError(OperationError, "usages cannot not be empty for a secret or private CryptoKey")
+			}
+
 			isSecretKey := cryptoKey.Type == SecretCryptoKeyType
 			isPrivateKey := cryptoKey.Type == PrivateCryptoKeyType
 			isUsagesEmpty := len(cryptoKey.Usages) == 0
 			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-				reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
-				return
+				return nil, NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey")
 			}
-		}
 
-		resolve(result)
+			return result, nil
+		}()
+
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(result)
+			return nil
+		})
 	}()
 
 	return promise
