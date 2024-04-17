@@ -1190,10 +1190,10 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 	applySlowMo(p.ctx)
 }
 
-func (p *Page) Tap(selector string, opts goja.Value) {
+func (p *Page) Tap(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Tap(selector, opts)
+	return p.MainFrame().Tap(selector, opts)
 }
 
 func (p *Page) TextContent(selector string, opts goja.Value) string {

@@ -341,7 +341,7 @@ type pageAPI interface {
 	SetExtraHTTPHeaders(headers map[string]string)
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)
 	SetViewportSize(viewportSize goja.Value)
-	Tap(selector string, opts goja.Value)
+	Tap(selector string, opts goja.Value) error
 	TextContent(selector string, opts goja.Value) string
 	ThrottleCPU(common.CPUProfile) error
 	ThrottleNetwork(common.NetworkProfile) error
@@ -413,7 +413,7 @@ type frameAPI interface {
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
 	SetContent(html string, opts goja.Value)
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)
-	Tap(selector string, opts goja.Value)
+	Tap(selector string, opts goja.Value) error
 	TextContent(selector string, opts goja.Value) string
 	Title() string
 	Type(selector string, text string, opts goja.Value)
