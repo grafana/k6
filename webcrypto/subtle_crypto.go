@@ -7,6 +7,7 @@ import (
 	"hash"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/promises"
 )
@@ -634,8 +635,10 @@ func (sc *SubtleCrypto) DeriveKey(
 func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, length int) *goja.Promise {
 	rt := sc.vu.Runtime()
 
-	var publicKey, privateKey CryptoKey
-	var algName string
+	var (
+		publicKey, privateKey CryptoKey
+		deriver               bitsDeriver
+	)
 
 	err := func() error {
 		if err := rt.ExportTo(baseKey, &privateKey); err != nil {
@@ -647,16 +650,23 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 		}
 
 		alg := algorithm.ToObject(rt)
+		if common.IsNullish(alg) {
+			return NewError(InvalidAccessError, "algorithm is not an object")
+		}
 
 		pcValue := alg.Get("public")
 		if err := rt.ExportTo(pcValue, &publicKey); err != nil {
 			return NewError(InvalidAccessError, "algorithm's public is not a valid CryptoKey")
 		}
 
-		algName = alg.Get("name").String()
-
 		if publicKey.Type != PublicCryptoKeyType {
 			return NewError(InvalidAccessError, "algorithm's public key is not a public key")
+		}
+
+		var err error
+		deriver, err = newBitsDeriver(alg.Get("name").String())
+		if err != nil {
+			return err
 		}
 
 		return nil
@@ -671,11 +681,6 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 	callback := sc.vu.RegisterCallback()
 	go func() {
 		result, err := func() ([]byte, error) {
-			deriver, err := newBitsDeriver(algName)
-			if err != nil {
-				return nil, err
-			}
-
 			b, err := deriver(privateKey, publicKey)
 			if err != nil {
 				return nil, NewError(OperationError, err.Error())
