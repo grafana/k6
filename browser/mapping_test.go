@@ -533,7 +533,7 @@ type locatorAPI interface {
 	Press(key string, opts goja.Value)
 	Type(text string, opts goja.Value)
 	Hover(opts goja.Value)
-	Tap(opts goja.Value)
+	Tap(opts goja.Value) error
 	DispatchEvent(typ string, eventInit, opts goja.Value)
 	WaitFor(opts goja.Value)
 }

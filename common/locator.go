@@ -561,21 +561,20 @@ func (l *Locator) hover(opts *FrameHoverOptions) error {
 }
 
 // Tap the element found that matches the locator's selector with strict mode on.
-func (l *Locator) Tap(opts goja.Value) {
+func (l *Locator) Tap(opts goja.Value) error {
 	l.log.Debugf("Locator:Tap", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameTapOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing tap options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing tap options: %w", err)
 	}
-	if err = l.tap(copts); err != nil {
-		err = fmt.Errorf("tapping on %q: %w", l.selector, err)
-		return
+	if err := l.tap(copts); err != nil {
+		return fmt.Errorf("tapping on %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) tap(opts *FrameTapOptions) error {

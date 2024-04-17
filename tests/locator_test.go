@@ -190,13 +190,14 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Tap", func(tb *testBrowser, p *common.Page) {
+			"Tap", func(_ *testBrowser, p *common.Page) {
 				result := func() bool {
 					v := p.Evaluate(`() => window.result`)
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be tapped first")
-				p.Locator("#inputText", nil).Tap(nil)
+				err := p.Locator("#inputText", nil).Tap(nil)
+				require.NoError(t, err)
 				require.True(t, result(), "should be tapped")
 			},
 		},
@@ -332,7 +333,12 @@ func TestLocator(t *testing.T) {
 			"SelectOption", func(l *common.Locator, tb *testBrowser) { l.SelectOption(tb.toGojaValue(""), timeout(tb)) },
 		},
 		{
-			"Tap", func(l *common.Locator, tb *testBrowser) { l.Tap(timeout(tb)) },
+			"Tap", func(l *common.Locator, tb *testBrowser) {
+				if err := l.Tap(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"Type", func(l *common.Locator, tb *testBrowser) { l.Type("a", timeout(tb)) },
