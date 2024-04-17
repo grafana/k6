@@ -321,67 +321,75 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 // The `data` parameter should contain the original signed data.
 func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	// 2.
-	signatureData, err := exportArrayBuffer(sc.vu.Runtime(), signature)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var (
+		signatureData, signedData []byte
+		verifier                  SignerVerifier
+		ck                        CryptoKey
+	)
 
-	// 3.
-	signedData, err := exportArrayBuffer(sc.vu.Runtime(), data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	err := func() error {
+		var err error
 
-	// 4.
-	normalizedAlgorithm, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierVerify)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	verifier, err := newSignerVerifier(rt, normalizedAlgorithm, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	var ck CryptoKey
-	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
-		return promise
-	}
-
-	keyAlgorithmNameValue, err := traverseObject(rt, key, "algorithm", "name")
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	go func() {
-		// 9.
-		if normalizedAlgorithm.Name != keyAlgorithmNameValue.String() {
-			reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-			return
-		}
-
-		// 10.
-		for !ck.ContainsUsage(VerifyCryptoKeyUsage) {
-			reject(NewError(InvalidAccessError, "key does not contain the 'sign' usage"))
-			return
-		}
-
-		verified, err := verifier.Verify(ck, signatureData, signedData)
+		signatureData, err = exportArrayBuffer(sc.vu.Runtime(), signature)
 		if err != nil {
-			reject(err)
-			return
+			return err
 		}
 
-		resolve(verified)
+		signedData, err = exportArrayBuffer(sc.vu.Runtime(), data)
+		if err != nil {
+			return err
+		}
+
+		normalizedAlgorithm, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierVerify)
+		if err != nil {
+			return err
+		}
+
+		verifier, err = newSignerVerifier(rt, normalizedAlgorithm, algorithm)
+		if err != nil {
+			return err
+		}
+
+		if err = rt.ExportTo(key, &ck); err != nil {
+			return NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object")
+		}
+
+		keyAlgorithmNameValue, err := traverseObject(rt, key, "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalizedAlgorithm.Name != keyAlgorithmNameValue.String() {
+			return NewError(InvalidAccessError, "algorithm name does not match key algorithm name")
+		}
+
+		if !ck.ContainsUsage(VerifyCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "key does not contain the 'sign' usage")
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		verified, err := verifier.Verify(ck, signatureData, signedData)
+
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(verified)
+			return nil
+		})
 	}()
 
 	return promise
