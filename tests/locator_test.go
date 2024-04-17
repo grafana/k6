@@ -196,7 +196,8 @@ func TestLocator(t *testing.T) {
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be tapped first")
-				err := p.Locator("#inputText", nil).Tap(nil)
+				opts := common.NewFrameTapOptions(common.DefaultTimeout)
+				err := p.Locator("#inputText", nil).Tap(opts)
 				require.NoError(t, err)
 				require.True(t, result(), "should be tapped")
 			},
@@ -333,8 +334,8 @@ func TestLocator(t *testing.T) {
 			"SelectOption", func(l *common.Locator, tb *testBrowser) { l.SelectOption(tb.toGojaValue(""), timeout(tb)) },
 		},
 		{
-			"Tap", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Tap(timeout(tb)); err != nil {
+			"Tap", func(l *common.Locator, _ *testBrowser) {
+				if err := l.Tap(common.NewFrameTapOptions(100 * time.Millisecond)); err != nil {
 					// TODO: remove panic and update tests when all locator methods return error.
 					panic(err)
 				}

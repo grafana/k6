@@ -82,7 +82,13 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		"press":        lo.Press,
 		"type":         lo.Type,
 		"hover":        lo.Hover,
-		"tap":          lo.Tap,
+		"tap": func(opts goja.Value) error {
+			copts := common.NewFrameTapOptions(lo.DefaultTimeout())
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return fmt.Errorf("parsing locator tap options: %w", err)
+			}
+			return lo.Tap(copts) //nolint:wrapcheck
+		},
 		"dispatchEvent": func(typ string, eventInit, opts goja.Value) error {
 			popts := common.NewFrameDispatchEventOptions(lo.DefaultTimeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
