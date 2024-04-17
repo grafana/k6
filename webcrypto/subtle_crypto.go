@@ -725,7 +725,7 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 //     `ALGORITHM` is the name of the algorithm.
 //   - for PBKDF2: pass the string "PBKDF2"
 //   - for HKDF: pass the string "HKDF"
-func (sc *SubtleCrypto) ImportKey(
+func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
 	keyData goja.Value,
 	algorithm goja.Value,
@@ -733,72 +733,80 @@ func (sc *SubtleCrypto) ImportKey(
 	keyUsages []CryptoKeyUsage,
 ) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	var keyBytes []byte
+	var (
+		keyBytes []byte
+		ki       KeyImporter
+	)
 
-	// 2.
-	switch format {
-	case Pkcs8KeyFormat, RawKeyFormat, SpkiKeyFormat:
-		ab, err := exportArrayBuffer(rt, keyData)
+	err := func() error {
+		switch format {
+		case Pkcs8KeyFormat, RawKeyFormat, SpkiKeyFormat:
+			ab, err := exportArrayBuffer(rt, keyData)
+			if err != nil {
+				return err
+			}
+
+			keyBytes = make([]byte, len(ab))
+			copy(keyBytes, ab)
+		case JwkKeyFormat:
+			var err error
+			keyBytes, err = json.Marshal(keyData.Export())
+			if err != nil {
+				return NewError(ImplementationError, "invalid keyData format for JWK format: "+err.Error())
+			}
+		default:
+			return NewError(ImplementationError, "unsupported format "+format)
+		}
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierImportKey)
 		if err != nil {
-			reject(err)
-			return promise
+			return err
 		}
 
-		keyBytes = make([]byte, len(ab))
-		copy(keyBytes, ab)
-	case JwkKeyFormat:
-		var err error
-		keyBytes, err = json.Marshal(keyData.Export())
+		ki, err = newKeyImporter(rt, normalized, algorithm)
 		if err != nil {
-			reject(NewError(ImplementationError, "wrong keyData format for JWK format: "+err.Error()))
-			return promise
+			return err
 		}
-	default:
-		reject(NewError(ImplementationError, "unsupported format "+format))
-		return promise
-	}
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierImportKey)
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
 		reject(err)
 		return promise
 	}
 
-	ki, err := newKeyImporter(rt, normalized, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	// 5.
+	callback := sc.vu.RegisterCallback()
 	go func() {
-		// 8.
-		result, err := ki.ImportKey(format, keyBytes, keyUsages)
-		if err != nil {
-			reject(err)
-			return
-		}
+		result, err := func() (*CryptoKey, error) {
+			result, err := ki.ImportKey(format, keyBytes, keyUsages)
+			if err != nil {
+				return nil, err
+			}
 
-		// 9.
-		isSecretKey := result.Type == SecretCryptoKeyType
-		isPrivateKey := result.Type == PrivateCryptoKeyType
-		isUsagesEmpty := len(keyUsages) == 0
-		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-			reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
-			return
-		}
+			isSecretKey := result.Type == SecretCryptoKeyType
+			isPrivateKey := result.Type == PrivateCryptoKeyType
+			isUsagesEmpty := len(keyUsages) == 0
+			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+				return nil, NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey")
+			}
 
-		// 10.
-		result.Extractable = extractable
+			result.Extractable = extractable
+			result.Usages = keyUsages
 
-		// 11.
-		result.Usages = keyUsages
+			return result, nil
+		}()
 
-		// 12.
-		resolve(result)
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(result)
+			return nil
+		})
 	}()
 
 	return promise
