@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/modules"
@@ -414,49 +415,63 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 //
 // The `data` parameter should contain the data to be digested.
 func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Promise {
-	promise, resolve, reject := promises.New(sc.vu)
 	rt := sc.vu.Runtime()
 
-	// Validate that the value we received is either an ArrayBuffer, TypedArray, or DataView
-	// This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
-	if !IsInstanceOf(sc.vu.Runtime(), data, ArrayBufferConstructor, DataViewConstructor) &&
-		!IsTypedArray(sc.vu.Runtime(), data) {
-		reject(errors.New("data must be an ArrayBuffer, TypedArray, or DataView"))
-		return promise
-	}
+	var (
+		hashFn func() hash.Hash
+		bytes  []byte
+	)
 
-	// 2.
-	bytes, err := exportArrayBuffer(rt, data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	err := func() error {
+		var err error
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
-	if err != nil {
-		// "if an error occurred, return a Promise rejected with NormalizedAlgorithm"
-		reject(err)
-		return promise
-	}
-
-	// 6.
-	go func() {
-		// 6.
-		hashFn, ok := getHashFn(normalized.Name)
-		if !ok {
-			// 7.
-			reject(NewError(NotSupportedError, "unsupported algorithm: "+normalized.Name))
-			return
+		// Validate that the value we received is either an ArrayBuffer, TypedArray, or DataView
+		// This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
+		if !IsInstanceOf(sc.vu.Runtime(), data, ArrayBufferConstructor, DataViewConstructor) &&
+			!IsTypedArray(sc.vu.Runtime(), data) {
+			return errors.New("data must be an ArrayBuffer, TypedArray, or DataView")
 		}
 
-		// 8.
+		bytes, err = exportArrayBuffer(rt, data)
+		if err != nil {
+			return err
+		}
+
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
+		if err != nil {
+			return err
+		}
+
+		var ok bool
+		hashFn, ok = getHashFn(normalized.Name)
+		if !ok {
+			return NewError(NotSupportedError, "unsupported algorithm: "+normalized.Name)
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
 		hash := hashFn()
 		hash.Write(bytes)
 		digest := hash.Sum(nil)
 
-		// 9.
-		resolve(rt.NewArrayBuffer(digest))
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(rt.NewArrayBuffer(digest))
+			return nil
+		})
 	}()
 
 	return promise
