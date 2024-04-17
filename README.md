@@ -41,7 +41,7 @@ The current state of the project is that it is an experimental module of the Web
 | `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ✅    | ✅   | ❌                | ❌      | ❌       |
 
 > [!WARNING]  
-> Currently, only the `raw` and `jwk` (JSON Web Key) formats are supported for import/export operations for the `AES-*` and `HMAC` algorithms. `ECDH` and `ECDSA` have support for `pkcs8`, `spki` and `raw` formats.
+> Currently, only the `raw` and `jwk` (JSON Web Key) formats are supported for import/export operations for the `AES-*` and `HMAC` algorithms. `ECDH` and `ECDSA` have support for `pkcs8`, `spki`, `raw` and `jwk` formats.
 
 ##### Key derivation
 
