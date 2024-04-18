@@ -1549,14 +1549,10 @@ func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value
 }
 
 // Tap the first element that matches the selector.
-func (f *Frame) Tap(selector string, opts goja.Value) error {
+func (f *Frame) Tap(selector string, opts *FrameTapOptions) error {
 	f.log.Debugf("Frame:Tap", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameTapOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		return fmt.Errorf("parsing tap options: %w", err)
-	}
-	if err := f.tap(selector, popts); err != nil {
+	if err := f.tap(selector, opts); err != nil {
 		return fmt.Errorf("tapping on %q: %w", selector, err)
 	}
 

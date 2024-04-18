@@ -1191,7 +1191,7 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 }
 
 // Tap will tap the element matching the provided selector.
-func (p *Page) Tap(selector string, opts goja.Value) error {
+func (p *Page) Tap(selector string, opts *FrameTapOptions) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().Tap(selector, opts)

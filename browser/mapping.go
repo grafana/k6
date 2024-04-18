@@ -456,12 +456,18 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"selectOption":  f.SelectOption,
 		"setContent":    f.SetContent,
 		"setInputFiles": f.SetInputFiles,
-		"tap":           f.Tap,
-		"textContent":   f.TextContent,
-		"title":         f.Title,
-		"type":          f.Type,
-		"uncheck":       f.Uncheck,
-		"url":           f.URL,
+		"tap": func(selector string, opts goja.Value) error {
+			popts := common.NewFrameTapOptions(f.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return fmt.Errorf("parsing frame tap options: %w", err)
+			}
+			return f.Tap(selector, popts) //nolint:wrapcheck
+		},
+		"textContent": f.TextContent,
+		"title":       f.Title,
+		"type":        f.Type,
+		"uncheck":     f.Uncheck,
+		"url":         f.URL,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				vu.Context(), f.Timeout(), pageFunc, opts, args...,
@@ -709,19 +715,25 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"setExtraHTTPHeaders":         p.SetExtraHTTPHeaders,
 		"setInputFiles":               p.SetInputFiles,
 		"setViewportSize":             p.SetViewportSize,
-		"tap":                         p.Tap,
-		"textContent":                 p.TextContent,
-		"throttleCPU":                 p.ThrottleCPU,
-		"throttleNetwork":             p.ThrottleNetwork,
-		"title":                       p.Title,
-		"touchscreen":                 rt.ToValue(p.GetTouchscreen()).ToObject(rt),
-		"type":                        p.Type,
-		"uncheck":                     p.Uncheck,
-		"unroute":                     p.Unroute,
-		"url":                         p.URL,
-		"video":                       p.Video,
-		"viewportSize":                p.ViewportSize,
-		"waitForEvent":                p.WaitForEvent,
+		"tap": func(selector string, opts goja.Value) error {
+			popts := common.NewFrameTapOptions(p.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return fmt.Errorf("parsing page tap options: %w", err)
+			}
+			return p.Tap(selector, popts) //nolint:wrapcheck
+		},
+		"textContent":     p.TextContent,
+		"throttleCPU":     p.ThrottleCPU,
+		"throttleNetwork": p.ThrottleNetwork,
+		"title":           p.Title,
+		"touchscreen":     rt.ToValue(p.GetTouchscreen()).ToObject(rt),
+		"type":            p.Type,
+		"uncheck":         p.Uncheck,
+		"unroute":         p.Unroute,
+		"url":             p.URL,
+		"video":           p.Video,
+		"viewportSize":    p.ViewportSize,
+		"waitForEvent":    p.WaitForEvent,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				vu.Context(), p.Timeout(), pageFunc, opts, args...,
