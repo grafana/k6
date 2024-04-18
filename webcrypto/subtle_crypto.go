@@ -837,23 +837,21 @@ func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error han
 	)
 
 	err := func() error {
-		var algorithm Algorithm
-		algValue := key.ToObject(rt).Get("algorithm")
-		if err := rt.ExportTo(algValue, &algorithm); err != nil {
-			return NewError(SyntaxError, "key is not a valid CryptoKey")
+		keyObj := key.ToObject(rt)
+		if common.IsNullish(keyObj) {
+			return NewError(InvalidAccessError, "key is not an object")
 		}
 
 		var ok bool
 		ck, ok = key.Export().(*CryptoKey)
 		if !ok {
-			return NewError(ImplementationError, "unable to extract CryptoKey")
+			return NewError(ImplementationError, "unable to extract CryptoKey from key object")
 		}
 
-		inputAlgorithm := key.ToObject(rt).Get("algorithm").ToObject(rt)
-
-		keyAlgorithmName := inputAlgorithm.Get("name").String()
-		if algorithm.Name != keyAlgorithmName {
-			return NewError(InvalidAccessError, "algorithm name does not match key algorithm name")
+		var algorithm Algorithm
+		algObj := keyObj.Get("algorithm")
+		if err := rt.ExportTo(algObj, &algorithm); err != nil {
+			return NewError(SyntaxError, "key is not a valid Algorithm")
 		}
 
 		if !isRegisteredAlgorithm(algorithm.Name, OperationIdentifierExportKey) {
@@ -864,7 +862,7 @@ func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error han
 			return NewError(InvalidAccessError, "the key is not extractable")
 		}
 
-		switch keyAlgorithmName {
+		switch algorithm.Name {
 		case AESCbc, AESCtr, AESGcm:
 			keyExporter = exportAESKey
 		case HMAC:
@@ -872,7 +870,7 @@ func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error han
 		case ECDH, ECDSA:
 			keyExporter = exportECKey
 		default:
-			return NewError(NotSupportedError, "unsupported algorithm "+keyAlgorithmName)
+			return NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
 		}
 
 		return nil
