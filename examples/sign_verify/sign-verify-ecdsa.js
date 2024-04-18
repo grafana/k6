@@ -13,7 +13,7 @@ export default async function () {
 
     const data = string2ArrayBuffer("Hello World");
 
-    const alg = { name: "ECDSA", hash: {name: "SHA-256" } };
+    const alg = { name: "ECDSA", hash: { name: "SHA-256" } };
 
     // makes a signature of the encoded data with the provided key
     const signature = await crypto.subtle.sign(alg, keyPair.privateKey, data);

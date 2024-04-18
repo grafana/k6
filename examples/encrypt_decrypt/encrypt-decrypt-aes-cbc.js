@@ -12,7 +12,7 @@ export default async function () {
 
   const encoded = stringToArrayBuffer("Hello, World!");
   const iv = crypto.getRandomValues(new Uint8Array(16));
-  
+
   const ciphertext = await crypto.subtle.encrypt(
     {
       name: "AES-CBC",
@@ -28,10 +28,13 @@ export default async function () {
       iv: iv,
     },
     key,
-    ciphertext,
+    ciphertext
   );
 
-  console.log("deciphered text == original text: ", arrayBufferToHex(plaintext) === arrayBufferToHex(encoded))
+  console.log(
+    "deciphered text == original text: ",
+    arrayBufferToHex(plaintext) === arrayBufferToHex(encoded)
+  );
 }
 
 function arrayBufferToHex(buffer) {

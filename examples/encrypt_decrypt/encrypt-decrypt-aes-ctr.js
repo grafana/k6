@@ -12,7 +12,7 @@ export default async function () {
 
   const encoded = string2ArrayBuffer("Hello World");
   const counter = crypto.getRandomValues(new Uint8Array(16));
-  
+
   const ciphertext = await crypto.subtle.encrypt(
     {
       name: "AES-CTR",
@@ -30,10 +30,13 @@ export default async function () {
       length: 64,
     },
     key,
-    ciphertext,
+    ciphertext
   );
 
-  console.log("deciphered text == original text: ", arrayBufferToHex(plaintext) === arrayBufferToHex(encoded))
+  console.log(
+    "deciphered text == original text: ",
+    arrayBufferToHex(plaintext) === arrayBufferToHex(encoded)
+  );
 }
 
 function arrayBufferToHex(buffer) {

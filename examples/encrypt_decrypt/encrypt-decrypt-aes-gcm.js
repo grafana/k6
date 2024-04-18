@@ -28,10 +28,13 @@ export default async function () {
       iv: iv,
     },
     key,
-    ciphertext,
+    ciphertext
   );
 
-  console.log("deciphered text == original text: ", arrayBufferToHex(plaintext) === arrayBufferToHex(encoded))
+  console.log(
+    "deciphered text == original text: ",
+    arrayBufferToHex(plaintext) === arrayBufferToHex(encoded)
+  );
 }
 
 function arrayBufferToHex(buffer) {

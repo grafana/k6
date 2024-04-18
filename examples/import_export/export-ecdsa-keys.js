@@ -27,4 +27,3 @@ const printArrayBuffer = (buffer) => {
   let view = new Uint8Array(buffer);
   return Array.from(view);
 };
-
