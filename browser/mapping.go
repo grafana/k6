@@ -304,11 +304,17 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 		"selectOption":           eh.SelectOption,
 		"selectText":             eh.SelectText,
 		"setInputFiles":          eh.SetInputFiles,
-		"tap":                    eh.Tap,
-		"textContent":            eh.TextContent,
-		"type":                   eh.Type,
-		"uncheck":                eh.Uncheck,
-		"waitForElementState":    eh.WaitForElementState,
+		"tap": func(opts goja.Value) error {
+			popts := common.NewElementHandleTapOptions(eh.Timeout())
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return fmt.Errorf("parsing element tap options: %w", err)
+			}
+			return eh.Tap(popts) //nolint:wrapcheck
+		},
+		"textContent":         eh.TextContent,
+		"type":                eh.Type,
+		"uncheck":             eh.Uncheck,
+		"waitForElementState": eh.WaitForElementState,
 		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
 			eh, err := eh.WaitForSelector(selector, opts)
 			if err != nil {
