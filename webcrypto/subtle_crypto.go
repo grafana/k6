@@ -9,7 +9,6 @@ import (
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/promises"
 )
 
 // FIXME: SubtleCrypto is described as an "interface", should it be a nested module
@@ -826,83 +825,89 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 //
 // The `format` parameter identifies the format of the key data.
 // The `key` parameter is the key to export, as a CryptoKey object.
-func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error handling
+	format KeyFormat,
+	key goja.Value,
+) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	var algorithm Algorithm
-	algValue := key.ToObject(rt).Get("algorithm")
-	if err := rt.ExportTo(algValue, &algorithm); err != nil {
-		reject(NewError(SyntaxError, "key is not a valid CryptoKey"))
-		return promise
-	}
+	var (
+		ck          *CryptoKey
+		keyExporter func(*CryptoKey, KeyFormat) (interface{}, error)
+	)
 
-	ck, ok := key.Export().(*CryptoKey)
-	if !ok {
-		reject(NewError(ImplementationError, "unable to extract CryptoKey"))
-		return promise
-	}
+	err := func() error {
+		var algorithm Algorithm
+		algValue := key.ToObject(rt).Get("algorithm")
+		if err := rt.ExportTo(algValue, &algorithm); err != nil {
+			return NewError(SyntaxError, "key is not a valid CryptoKey")
+		}
 
-	inputAlgorithm := key.ToObject(rt).Get("algorithm").ToObject(rt)
+		var ok bool
+		ck, ok = key.Export().(*CryptoKey)
+		if !ok {
+			return NewError(ImplementationError, "unable to extract CryptoKey")
+		}
 
-	keyAlgorithmName := inputAlgorithm.Get("name").String()
-	if algorithm.Name != keyAlgorithmName {
-		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-		return promise
-	}
+		inputAlgorithm := key.ToObject(rt).Get("algorithm").ToObject(rt)
 
-	go func() {
-		// 5.
+		keyAlgorithmName := inputAlgorithm.Get("name").String()
+		if algorithm.Name != keyAlgorithmName {
+			return NewError(InvalidAccessError, "algorithm name does not match key algorithm name")
+		}
+
 		if !isRegisteredAlgorithm(algorithm.Name, OperationIdentifierExportKey) {
-			reject(NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name))
-			return
+			return NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
 		}
 
-		// 6.
 		if !ck.Extractable {
-			reject(NewError(InvalidAccessError, "the key is not extractable"))
-			return
+			return NewError(InvalidAccessError, "the key is not extractable")
 		}
-
-		var result interface{}
-		var err error
 
 		switch keyAlgorithmName {
 		case AESCbc, AESCtr, AESGcm:
-			result, err = exportAESKey(ck, format)
-			if err != nil {
-				reject(err)
-				return
-			}
+			keyExporter = exportAESKey
 		case HMAC:
-			result, err = exportHMACKey(ck, format)
-			if err != nil {
-				reject(err)
-				return
-			}
+			keyExporter = exportHMACKey
 		case ECDH, ECDSA:
-			result, err = exportECKey(ck, format)
+			keyExporter = exportECKey
+		default:
+			return NewError(NotSupportedError, "unsupported algorithm "+keyAlgorithmName)
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := keyExporter(ck, format)
+
+		callback(func() error {
 			if err != nil {
 				reject(err)
-				return
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
 			}
-		default:
-			reject(NewError(NotSupportedError, "unsupported algorithm "+keyAlgorithmName))
-			return
-		}
 
-		if !isBinaryExportedFormat(format) {
-			resolve(result)
-			return
-		}
+			if !isBinaryExportedFormat(format) {
+				resolve(result)
+				return nil
+			}
 
-		b, ok := result.([]byte)
-		if !ok {
-			reject(NewError(ImplementationError, "for "+format+" []byte expected as result"))
-			return
-		}
+			b, ok := result.([]byte)
+			if !ok {
+				reject(NewError(ImplementationError, "for "+format+" []byte expected as result"))
+				return nil
+			}
 
-		resolve(rt.NewArrayBuffer(b))
+			resolve(rt.NewArrayBuffer(b))
+			return nil
+		})
 	}()
 
 	return promise
