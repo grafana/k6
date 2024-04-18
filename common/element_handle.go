@@ -1291,11 +1291,11 @@ func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []*File) e
 }
 
 // Tap scrolls element into view and taps in the center of the element.
-func (h *ElementHandle) Tap(opts goja.Value) {
+func (h *ElementHandle) Tap(opts goja.Value) error {
 	parsedOpts := NewElementHandleTapOptions(h.defaultTimeout())
 	err := parsedOpts.Parse(h.ctx, opts)
 	if err != nil {
-		k6ext.Panic(h.ctx, "parsing tap options: %w", err)
+		return fmt.Errorf("parsing tap options: %w", err)
 	}
 
 	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
@@ -1304,9 +1304,12 @@ func (h *ElementHandle) Tap(opts goja.Value) {
 	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
 	_, err = call(h.ctx, pointerFn, parsedOpts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "tapping element: %w", err)
+		return fmt.Errorf("tapping element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 func (h *ElementHandle) tap(_ context.Context, p *Position) error {
