@@ -82,12 +82,14 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 		"press":        lo.Press,
 		"type":         lo.Type,
 		"hover":        lo.Hover,
-		"tap": func(opts goja.Value) error {
+		"tap": func(opts goja.Value) (*goja.Promise, error) {
 			copts := common.NewFrameTapOptions(lo.DefaultTimeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
-				return fmt.Errorf("parsing locator tap options: %w", err)
+				return nil, fmt.Errorf("parsing locator tap options: %w", err)
 			}
-			return lo.Tap(copts) //nolint:wrapcheck
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, lo.Tap(copts) //nolint:wrapcheck
+			}), nil
 		},
 		"dispatchEvent": func(typ string, eventInit, opts goja.Value) error {
 			popts := common.NewFrameDispatchEventOptions(lo.DefaultTimeout())
@@ -286,12 +288,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping {
 		"selectOption":           eh.SelectOption,
 		"selectText":             eh.SelectText,
 		"setInputFiles":          eh.SetInputFiles,
-		"tap": func(opts goja.Value) error {
+		"tap": func(opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewElementHandleTapOptions(eh.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return fmt.Errorf("parsing element tap options: %w", err)
+				return nil, fmt.Errorf("parsing element tap options: %w", err)
 			}
-			return eh.Tap(popts) //nolint:wrapcheck
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.Tap(popts) //nolint:wrapcheck
+			}), nil
 		},
 		"textContent":         eh.TextContent,
 		"type":                eh.Type,
@@ -442,12 +446,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping {
 		"selectOption":  f.SelectOption,
 		"setContent":    f.SetContent,
 		"setInputFiles": f.SetInputFiles,
-		"tap": func(selector string, opts goja.Value) error {
+		"tap": func(selector string, opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewFrameTapOptions(f.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return fmt.Errorf("parsing frame tap options: %w", err)
+				return nil, fmt.Errorf("parsing frame tap options: %w", err)
 			}
-			return f.Tap(selector, popts) //nolint:wrapcheck
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.Tap(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"textContent": f.TextContent,
 		"title":       f.Title,
@@ -690,12 +696,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"setExtraHTTPHeaders":         p.SetExtraHTTPHeaders,
 		"setInputFiles":               p.SetInputFiles,
 		"setViewportSize":             p.SetViewportSize,
-		"tap": func(selector string, opts goja.Value) error {
+		"tap": func(selector string, opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewFrameTapOptions(p.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return fmt.Errorf("parsing page tap options: %w", err)
+				return nil, fmt.Errorf("parsing page tap options: %w", err)
 			}
-			return p.Tap(selector, popts) //nolint:wrapcheck
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.Tap(selector, popts) //nolint:wrapcheck
+			}), nil
 		},
 		"textContent":     p.TextContent,
 		"throttleCPU":     p.ThrottleCPU,

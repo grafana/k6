@@ -322,7 +322,7 @@ type pageAPI interface {
 	SetExtraHTTPHeaders(headers map[string]string)
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)
 	SetViewportSize(viewportSize goja.Value)
-	Tap(selector string, opts goja.Value) error
+	Tap(selector string, opts goja.Value) (*goja.Promise, error)
 	TextContent(selector string, opts goja.Value) string
 	ThrottleCPU(common.CPUProfile) error
 	ThrottleNetwork(common.NetworkProfile) error
@@ -387,7 +387,7 @@ type frameAPI interface {
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
 	SetContent(html string, opts goja.Value)
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)
-	Tap(selector string, opts goja.Value) error
+	Tap(selector string, opts goja.Value) (*goja.Promise, error)
 	TextContent(selector string, opts goja.Value) string
 	Title() string
 	Type(selector string, text string, opts goja.Value)
@@ -432,7 +432,7 @@ type elementHandleAPI interface {
 	SelectOption(values goja.Value, opts goja.Value) []string
 	SelectText(opts goja.Value)
 	SetInputFiles(files goja.Value, opts goja.Value)
-	Tap(opts goja.Value) error
+	Tap(opts goja.Value) (*goja.Promise, error)
 	TextContent() string
 	Type(text string, opts goja.Value)
 	Uncheck(opts goja.Value)
@@ -502,7 +502,7 @@ type locatorAPI interface {
 	Press(key string, opts goja.Value)
 	Type(text string, opts goja.Value)
 	Hover(opts goja.Value)
-	Tap(opts goja.Value) error
+	Tap(opts goja.Value) (*goja.Promise, error)
 	DispatchEvent(typ string, eventInit, opts goja.Value)
 	WaitFor(opts goja.Value)
 }
