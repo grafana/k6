@@ -555,7 +555,7 @@ type keyboardAPI interface { //nolint: unused
 // mapping is not tested using this interface. We use the concrete type
 // without testing its exported methods.
 type touchscreenAPI interface { //nolint: unused
-	Tap(x float64, y float64)
+	Tap(x float64, y float64) error
 }
 
 // mouseAPI is the interface of a mouse input device.
