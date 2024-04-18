@@ -1292,12 +1292,12 @@ func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []*File) e
 
 // Tap scrolls element into view and taps in the center of the element.
 func (h *ElementHandle) Tap(opts *ElementHandleTapOptions) error {
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+	tap := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.tap(apiCtx, p)
 	}
-	pointerFn := h.newPointerAction(fn, &opts.ElementHandleBasePointerOptions)
-	_, err := call(h.ctx, pointerFn, opts.Timeout)
-	if err != nil {
+	tapAction := h.newPointerAction(tap, &opts.ElementHandleBasePointerOptions)
+
+	if _, err := call(h.ctx, tapAction, opts.Timeout); err != nil {
 		return fmt.Errorf("tapping element: %w", err)
 	}
 
