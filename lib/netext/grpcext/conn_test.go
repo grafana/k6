@@ -30,11 +30,13 @@ func TestInvoke(t *testing.T) {
 	}
 
 	c := Conn{raw: invokemock(helloReply)}
-	r := Request{
+	r := InvokeRequest{
+		Method:           "/hello.HelloService/SayHello",
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
+		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), "/hello.HelloService/SayHello", metadata.New(nil), r)
+	res, err := c.Invoke(context.Background(), r)
 	require.NoError(t, err)
 
 	assert.Equal(t, codes.OK, res.Status)
@@ -51,11 +53,13 @@ func TestInvokeWithCallOptions(t *testing.T) {
 	}
 
 	c := Conn{raw: invokemock(reply)}
-	r := Request{
+	r := InvokeRequest{
+		Method:           "/hello.HelloService/NoOp",
 		MethodDescriptor: methodFromProto("NoOp"),
 		Message:          []byte(`{}`),
+		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), "/hello.HelloService/NoOp", metadata.New(nil), r, grpc.UseCompressor("fakeone"))
+	res, err := c.Invoke(context.Background(), r, grpc.UseCompressor("fakeone"))
 	require.NoError(t, err)
 	assert.NotNil(t, res)
 }
@@ -68,11 +72,13 @@ func TestInvokeReturnError(t *testing.T) {
 	}
 
 	c := Conn{raw: invokemock(helloReply)}
-	r := Request{
+	r := InvokeRequest{
+		Method:           "/hello.HelloService/SayHello",
 		MethodDescriptor: methodFromProto("SayHello"),
 		Message:          []byte(`{"greeting":"text request"}`),
+		Metadata:         metadata.New(nil),
 	}
-	res, err := c.Invoke(context.Background(), "/hello.HelloService/SayHello", metadata.New(nil), r)
+	res, err := c.Invoke(context.Background(), r)
 	require.NoError(t, err)
 
 	assert.Equal(t, codes.Unknown, res.Status)
@@ -92,49 +98,34 @@ func TestConnInvokeInvalid(t *testing.T) {
 		payload    = []byte(`{"greeting":"test"}`)
 	)
 
-	req := Request{
-		MethodDescriptor: methodDesc,
-		Message:          payload,
-	}
-
 	tests := []struct {
 		name   string
 		ctx    context.Context
-		md     metadata.MD
-		url    string
-		req    Request
+		req    InvokeRequest
 		experr string
 	}{
 		{
 			name:   "EmptyMethod",
 			ctx:    ctx,
-			url:    "",
-			md:     md,
-			req:    req,
+			req:    InvokeRequest{MethodDescriptor: methodDesc, Message: payload, Metadata: md, Method: ""},
 			experr: "url is required",
 		},
 		{
 			name:   "NullMethodDescriptor",
 			ctx:    ctx,
-			url:    url,
-			md:     nil,
-			req:    Request{Message: payload},
+			req:    InvokeRequest{Message: payload, Metadata: nil, Method: url},
 			experr: "method descriptor is required",
 		},
 		{
 			name:   "NullMessage",
 			ctx:    ctx,
-			url:    url,
-			md:     nil,
-			req:    Request{MethodDescriptor: methodDesc},
+			req:    InvokeRequest{MethodDescriptor: methodDesc, Metadata: nil, Method: url},
 			experr: "message is required",
 		},
 		{
 			name:   "EmptyMessage",
 			ctx:    ctx,
-			url:    url,
-			md:     nil,
-			req:    Request{MethodDescriptor: methodDesc, Message: []byte{}},
+			req:    InvokeRequest{MethodDescriptor: methodDesc, Message: []byte{}, Metadata: nil, Method: url},
 			experr: "message is required",
 		},
 	}
@@ -145,7 +136,7 @@ func TestConnInvokeInvalid(t *testing.T) {
 			t.Parallel()
 
 			c := Conn{}
-			res, err := c.Invoke(tt.ctx, tt.url, tt.md, tt.req)
+			res, err := c.Invoke(tt.ctx, tt.req)
 			require.Error(t, err)
 			require.Nil(t, res)
 			assert.Contains(t, err.Error(), tt.experr)
