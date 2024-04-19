@@ -1,36 +1,32 @@
 import { crypto } from "k6/x/webcrypto";
 
 export default async function () {
-  try {
-    const generatedKey = await crypto.subtle.generateKey(
-      {
-        name: "HMAC",
-        hash: { name: "SHA-256" },
-      },
-      true,
-      ["sign", "verify"]
-    );
+  const generatedKey = await crypto.subtle.generateKey(
+    {
+      name: "HMAC",
+      hash: { name: "SHA-256" },
+    },
+    true,
+    ["sign", "verify"]
+  );
 
-    console.log("generated: " + JSON.stringify(generatedKey));
+  console.log("generated: " + JSON.stringify(generatedKey));
 
-    const exportedKey = await crypto.subtle.exportKey("jwk", generatedKey);
+  const exportedKey = await crypto.subtle.exportKey("jwk", generatedKey);
 
-    console.log("exported: " + JSON.stringify(exportedKey));
+  console.log("exported: " + JSON.stringify(exportedKey));
 
-    const importedKey = await crypto.subtle.importKey(
-      "jwk",
-      exportedKey,
-      { name: "HMAC", hash: { name: "SHA-256" } },
-      true,
-      ["sign", "verify"]
-    );
+  const importedKey = await crypto.subtle.importKey(
+    "jwk",
+    exportedKey,
+    { name: "HMAC", hash: { name: "SHA-256" } },
+    true,
+    ["sign", "verify"]
+  );
 
-    console.log("imported: " + JSON.stringify(importedKey));
+  console.log("imported: " + JSON.stringify(importedKey));
 
-    const exportedAgain = await crypto.subtle.exportKey("jwk", importedKey);
+  const exportedAgain = await crypto.subtle.exportKey("jwk", importedKey);
 
-    console.log("exported again: " + JSON.stringify(exportedAgain));
-  } catch (err) {
-    console.log(JSON.stringify(err));
-  }
+  console.log("exported again: " + JSON.stringify(exportedAgain));
 }

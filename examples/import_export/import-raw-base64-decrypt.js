@@ -15,15 +15,11 @@ export default async function () {
     69, 215, 55, 197, 43, 122, 160, 178, 228, 104, 4, 115, 138, 159, 119, 49,
   ]);
 
-  try {
-    const result = await decrypt(keyData, transmittedData);
+  const result = await decrypt(keyData, transmittedData);
 
-    // should output decrypted message
-    // INFO[0000] result: 'my secret message'  source=console
-    console.log("result: '" + result + "'");
-  } catch (e) {
-    console.log("Error: " + JSON.stringify(e));
-  }
+  // should output decrypted message
+  // INFO[0000] result: 'my secret message'  source=console
+  console.log("result: '" + result + "'");
 }
 
 const decrypt = async (keyData, transmittedData) => {

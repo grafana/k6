@@ -1,37 +1,33 @@
 import { crypto } from "k6/x/webcrypto";
 
 export default async function () {
-  try {
-    const keyPair = await crypto.subtle.generateKey(
-      {
-        name: "ECDSA",
-        namedCurve: "P-256",
-      },
-      true,
-      ["sign", "verify"]
-    );
+  const keyPair = await crypto.subtle.generateKey(
+    {
+      name: "ECDSA",
+      namedCurve: "P-256",
+    },
+    true,
+    ["sign", "verify"]
+  );
 
-    const data = string2ArrayBuffer("Hello World");
+  const data = string2ArrayBuffer("Hello World");
 
-    const alg = { name: "ECDSA", hash: { name: "SHA-256" } };
+  const alg = { name: "ECDSA", hash: { name: "SHA-256" } };
 
-    // makes a signature of the encoded data with the provided key
-    const signature = await crypto.subtle.sign(alg, keyPair.privateKey, data);
+  // makes a signature of the encoded data with the provided key
+  const signature = await crypto.subtle.sign(alg, keyPair.privateKey, data);
 
-    console.log("signature: ", printArrayBuffer(signature));
+  console.log("signature: ", printArrayBuffer(signature));
 
-    //Verifies the signature of the encoded data with the provided key
-    const verified = await crypto.subtle.verify(
-      alg,
-      keyPair.publicKey,
-      signature,
-      data
-    );
+  //Verifies the signature of the encoded data with the provided key
+  const verified = await crypto.subtle.verify(
+    alg,
+    keyPair.publicKey,
+    signature,
+    data
+  );
 
-    console.log("verified: ", verified);
-  } catch (err) {
-    console.log("err: " + JSON.stringify(err));
-  }
+  console.log("verified: ", verified);
 }
 
 const string2ArrayBuffer = (str) => {

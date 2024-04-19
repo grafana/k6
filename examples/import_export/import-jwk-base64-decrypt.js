@@ -18,15 +18,11 @@ export default async function () {
     k: "9Id_8iG6FkGOWmc1S203vGVnTExtpDGxdQN7v7OV9Uc",
   };
 
-  try {
-    const result = await decrypt(jwkKeyData, transmittedData);
+  const result = await decrypt(jwkKeyData, transmittedData);
 
-    // should output decrypted message
-    // INFO[0000] result: 'my secret message'  source=console
-    console.log("result: '" + result + "'");
-  } catch (e) {
-    console.log("Error: " + JSON.stringify(e));
-  }
+  // should output decrypted message
+  // INFO[0000] result: 'my secret message'  source=console
+  console.log("result: '" + result + "'");
 }
 
 const decrypt = async (keyData, transmittedData) => {
