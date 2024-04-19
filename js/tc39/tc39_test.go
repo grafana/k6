@@ -704,12 +704,10 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *g
 			return fs.ReadFile(currentFS, specifier.Path[1:])
 		},
 		comp)
-	u := &url.URL{Scheme: "file", Path: path.Join(ctx.base, name)}
+	u := &url.URL{Scheme: "file", Path: "/" + path.Join(ctx.base, name)}
 
-	base := u.JoinPath("..")
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
-	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms, *base)
-	require.NoError(ctx.t, vm.Set("require", impl.Require))
+	require.NoError(ctx.t, vm.Set("require", ms.Require))
 
 	early = false
 	_, err = ms.RunSourceData(&loader.SourceData{

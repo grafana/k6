@@ -1,6 +1,7 @@
 package modules
 
 import (
+	"errors"
 	"fmt"
 	"net/url"
 	"strings"
@@ -150,6 +151,7 @@ type ModuleSystem struct {
 	vu            VU
 	instanceCache map[module]moduleInstance
 	resolver      *ModuleResolver
+	backupCWD     *url.URL
 }
 
 // NewModuleSystem returns a new ModuleSystem for the provide VU using the provided resoluter
@@ -158,26 +160,57 @@ func NewModuleSystem(resolver *ModuleResolver, vu VU) *ModuleSystem {
 		resolver:      resolver,
 		instanceCache: make(map[module]moduleInstance),
 		vu:            vu,
+		backupCWD:     vu.InitEnv().CWD,
 	}
 }
 
 // Require is called when a module/file needs to be loaded by a script
-func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) {
-	mod, err := ms.resolver.resolve(pwd, arg)
+func (ms *ModuleSystem) Require(specifier string) (*goja.Object, error) {
+	if specifier == "" {
+		return nil, errors.New("require() can't be used with an empty specifier")
+	}
+
+	currentModuleURL, err := ms.getCurrentModuleScript()
 	if err != nil {
 		return nil, err
 	}
+
+	dir := loader.Dir(currentModuleURL)
+	if currentModuleURL.String() == "file://-" {
+		dir = ms.backupCWD
+	}
+
+	mod, err := ms.resolver.resolve(dir, specifier)
+	if err != nil {
+		return nil, err
+	}
+	return ms.instantiate(mod)
+}
+
+// Require is called when a module/file needs to be loaded by a script
+func (ms *ModuleSystem) instantiate(mod module) (*goja.Object, error) {
 	if instance, ok := ms.instanceCache[mod]; ok {
 		return instance.exports(), nil
 	}
 
 	instance := mod.instantiate(ms.vu)
 	ms.instanceCache[mod] = instance
-	if err = instance.execute(); err != nil {
+	if err := instance.execute(); err != nil {
 		return nil, err
 	}
 
 	return instance.exports(), nil
+}
+
+func (ms *ModuleSystem) getCurrentModuleScript() (*url.URL, error) {
+	var parent string
+	var buf [2]goja.StackFrame
+	frames := ms.vu.Runtime().CaptureCallStack(2, buf[:0])
+	if len(frames) == 0 {
+		return &url.URL{Scheme: "file", Path: "/-"}, nil
+	}
+	parent = frames[1].SrcName()
+	return url.Parse(parent)
 }
 
 // RunSourceData runs the provided sourceData and adds it to the cache.
@@ -189,16 +222,17 @@ func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) 
 func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (goja.Value, error) {
 	specifier := source.URL.String()
 	pwd := source.URL.JoinPath("../")
-	if _, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data); err != nil {
+	mod, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data)
+	if err != nil {
 		return nil, err // TODO wrap as this should never happen
 	}
-	return ms.Require(pwd, specifier)
+	return ms.instantiate(mod)
 }
 
 // ExportGloballyModule sets all exports of the provided module name on the globalThis.
 // effectively making them globally available
 func ExportGloballyModule(rt *goja.Runtime, modSys *ModuleSystem, moduleName string) {
-	t, _ := modSys.Require(nil, moduleName)
+	t, _ := modSys.Require(moduleName)
 
 	for _, key := range t.Keys() {
 		if err := rt.Set(key, t.Get(key)); err != nil {

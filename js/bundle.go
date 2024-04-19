@@ -280,6 +280,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 		FileSystems:      b.filesystems,
 		CWD:              b.pwd,
 	}
+	vuImpl.initEnv = initenv
 
 	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
 	b.setInitGlobals(rt, vuImpl, modSys)
@@ -369,17 +370,40 @@ func (b *Bundle) setupJSRuntime(rt *goja.Runtime, vuID int64, logger logrus.Fiel
 	return nil
 }
 
-// this exists only to make the check in the init context.
+// this exists to support `open` current behaviour and to check init context conformity
 type requireImpl struct {
-	inInitContext func() bool
-	internal      *modules.LegacyRequireImpl
+	vu     *moduleVUImpl
+	modSys *modules.ModuleSystem
 }
 
 func (r *requireImpl) require(specifier string) (*goja.Object, error) {
-	if !r.inInitContext() {
+	if r.vu.state != nil {
 		return nil, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "require")
 	}
-	return r.internal.Require(specifier)
+	return r.modSys.Require(specifier)
+}
+
+// getPreviousRequiringFile is a helper that is currently need for the implemnetation of `open`.
+// it depends on the `require` method above
+func (r *requireImpl) getPreviousRequiringFile() (*url.URL, error) {
+	var buf [1000]goja.StackFrame
+
+	frames := r.vu.Runtime().CaptureCallStack(1000, buf[:0])
+
+	for i, frame := range frames[1:] { // first one should be the current require
+		// TODO have this precalculated automatically
+		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
+			// we need to get the one *before* but as we skip the first one the index matches ;)
+			return url.Parse(frames[i].SrcName())
+		}
+	}
+	// hopefully nobody is calling `require` with 1000 big stack :crossedfingers:
+	if len(frames) == 1000 {
+		return nil, errors.New("stack too big")
+	}
+
+	// fallback
+	return url.Parse(frames[len(frames)-1].SrcName())
 }
 
 func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modules.ModuleSystem) {
@@ -390,8 +414,8 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modu
 	}
 
 	impl := requireImpl{
-		inInitContext: func() bool { return vu.state == nil },
-		internal:      modules.NewLegacyRequireImpl(vu, modSys, *b.pwd),
+		vu:     vu,
+		modSys: modSys,
 	}
 
 	mustSet("require", impl.require)
@@ -406,8 +430,12 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modu
 			return nil, errors.New("open() can't be used with an empty filename")
 		}
 		// This uses the pwd from the requireImpl
-		pwd := impl.internal.CurrentlyRequiredModule()
-		return openImpl(rt, b.filesystems["file"], &pwd, filename, args...)
+		requiringFile, err := impl.getPreviousRequiringFile()
+		if err != nil {
+			return nil, err // TODO:wrap
+		}
+		pwd := loader.Dir(requiringFile)
+		return openImpl(rt, b.filesystems["file"], pwd, filename, args...)
 	})
 }
 
