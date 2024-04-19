@@ -87,8 +87,8 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	return mod, err
 }
 
-// Lock locks the resolved from making any further new resolving and now depends only on it's cache
-// This to facilitate loading all the modules a test needs in it's initilization the same as with openning files.
+// Lock locks the module's resolution from any further new resolving operation. It means that it relays only its internal cache and on the fact that it has already seen previously the module during the initialization. 
+// It is the same approach used for opening file operations.
 func (mr *ModuleResolver) Lock() {
 	mr.locked = true
 }
