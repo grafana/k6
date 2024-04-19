@@ -50,7 +50,7 @@ func (mi *ModuleInstance) NewReadableStream(call goja.ConstructorCall) *goja.Obj
 	var err error
 
 	// 1. If underlyingSource is missing, set it to null.
-	var underlyingSource *goja.Object = nil
+	var underlyingSource *goja.Object
 
 	var (
 		strategy             *goja.Object
@@ -99,8 +99,13 @@ func (mi *ModuleInstance) NewReadableStream(call goja.ConstructorCall) *goja.Obj
 		// 5.3. Let highWaterMark be ? ExtractHighWaterMark(strategy, 1).
 		highWaterMark := extractHighWaterMark(rt, strategy, 1)
 
-		// 5.4. Perform ? SetUpReadableStreamDefaultControllerFromUnderlyingSource(this, underlyingSource, underlyingSourceDict, highWaterMark, sizeAlgorithm).
-		stream.setupReadableStreamDefaultControllerFromUnderlyingSource(underlyingSource, underlyingSourceDict, highWaterMark, sizeAlgorithm)
+		// 5.4. Perform ? SetUpReadableStreamDefaultControllerFromUnderlyingSource(...).
+		stream.setupReadableStreamDefaultControllerFromUnderlyingSource(
+			underlyingSource,
+			underlyingSourceDict,
+			highWaterMark,
+			sizeAlgorithm,
+		)
 	}
 
 	streamObj := rt.ToValue(stream).ToObject(rt)
@@ -171,7 +176,11 @@ func (mi *ModuleInstance) NewCountQueuingStrategy(call goja.ConstructorCall) *go
 //
 // It allows to create a CountQueuingStrategy with or without the 'size' property,
 // depending on how the containing ReadableStream is initialized.
-func (mi *ModuleInstance) newCountQueuingStrategy(rt *goja.Runtime, call goja.ConstructorCall, size goja.Value) *goja.Object {
+func (mi *ModuleInstance) newCountQueuingStrategy(
+	rt *goja.Runtime,
+	call goja.ConstructorCall,
+	size goja.Value,
+) *goja.Object {
 	obj := rt.NewObject()
 
 	if len(call.Arguments) != 1 {
@@ -216,7 +225,9 @@ func extractHighWaterMark(rt *goja.Runtime, strategy *goja.Object, defaultHWM fl
 	highWaterMark := strategy.Get("highWaterMark")
 
 	// 3. If highWaterMark is NaN or highWaterMark < 0, throw a RangeError exception.
-	if goja.IsNaN(strategy.Get("highWaterMark")) || !isNumber(strategy.Get("highWaterMark")) || !isNonNegativeNumber(strategy.Get("highWaterMark")) {
+	if goja.IsNaN(strategy.Get("highWaterMark")) ||
+		!isNumber(strategy.Get("highWaterMark")) ||
+		!isNonNegativeNumber(strategy.Get("highWaterMark")) {
 		throw(rt, newError(RangeError, "highWaterMark must be a non-negative number"))
 	}
 

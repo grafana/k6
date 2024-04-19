@@ -12,6 +12,8 @@ import (
 )
 
 func TestReadableStream(t *testing.T) {
+	t.Parallel()
+
 	suites := []string{
 		"bad-strategies.js",
 		"bad-underlying-sources.js",
@@ -26,6 +28,7 @@ func TestReadableStream(t *testing.T) {
 	}
 
 	for _, s := range suites {
+		s := s
 		t.Run(s, func(t *testing.T) {
 			t.Parallel()
 			ts := newConfiguredRuntime(t)

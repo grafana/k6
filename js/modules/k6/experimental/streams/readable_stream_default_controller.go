@@ -256,11 +256,13 @@ func (controller *ReadableStreamDefaultController) enqueue(chunk goja.Value) err
 	// 2. Let stream be controller.[[stream]].
 	stream := controller.stream
 
-	// 3. If ! IsReadableStreamLocked(stream) is true and ! ReadableStreamGetNumReadRequests(stream) > 0, perform ! ReadableStreamFulfillReadRequest(stream, chunk, false).
+	// 3. If ! IsReadableStreamLocked(stream) is true and ! ReadableStreamGetNumReadRequests(stream) > 0,
+	// perform ! ReadableStreamFulfillReadRequest(stream, chunk, false).
 	if stream.isLocked() && stream.getNumReadRequests() > 0 {
 		stream.fulfillReadRequest(chunk, false)
 	} else { // 4. Otherwise,
-		// 4.1. Let result be the result of performing controller.[[strategySizeAlgorithm]], passing in chunk, and interpreting the result as a completion record.
+		// 4.1. Let result be the result of performing controller.[[strategySizeAlgorithm]],
+		// passing in chunk, and interpreting the result as a completion record.
 		size, err := controller.strategySizeAlgorithm(goja.Undefined(), chunk)
 		// 4.2 If result is an abrupt completion,
 		if err != nil {
@@ -275,7 +277,6 @@ func (controller *ReadableStreamDefaultController) enqueue(chunk goja.Value) err
 
 		// 4.4. Let enqueueResult be EnqueueValueWithSize(controller, chunk, chunkSize).
 		err = controller.queue.Enqueue(chunk, chunkSize)
-
 		// 4.5. If enqueueResult is an abrupt completion,
 		if err != nil {
 			// 4.5.1. Perform ! ReadableStreamDefaultControllerError(controller, enqueueResult.[[Value]]).
@@ -402,7 +403,7 @@ func (controller *ReadableStreamDefaultController) callPullIfNeeded() {
 
 	_, err = promiseThen(controller.stream.vu.Runtime(), pullPromise,
 		// 7. Upon fulfillment of pullPromise
-		func(value goja.Value) {
+		func(goja.Value) {
 			// 7.1. Set controller.[[pulling]] to false.
 			controller.pulling = false
 

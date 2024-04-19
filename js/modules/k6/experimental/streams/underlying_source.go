@@ -85,7 +85,9 @@ func NewUnderlyingSourceFromObject(rt *goja.Runtime, obj *goja.Object) (Underlyi
 
 	// We only accept a valid underlyingSource.[[type]]
 	underlyingSourceType := obj.Get("type")
-	if underlyingSourceType != nil && !goja.IsUndefined(obj.Get("type")) && obj.Get("type").String() != ReadableStreamTypeBytes {
+	if underlyingSourceType != nil &&
+		!goja.IsUndefined(obj.Get("type")) &&
+		obj.Get("type").String() != ReadableStreamTypeBytes {
 		return underlyingSource, newError(TypeError, "invalid underlying source type")
 	}
 

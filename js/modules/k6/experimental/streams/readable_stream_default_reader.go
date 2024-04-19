@@ -127,7 +127,8 @@ func (reader *ReadableStreamDefaultReader) ReleaseLock() {
 
 // release implements the [ReadableStreamDefaultReaderRelease] algorithm.
 //
-// [ReadableStreamDefaultReaderRelease]: https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaultreaderrelease
+// [ReadableStreamDefaultReaderRelease]:
+// https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaultreaderrelease
 func (reader *ReadableStreamDefaultReader) release() {
 	// 1. Perform ! ReadableStreamReaderGenericRelease(reader).
 	reader.BaseReadableStreamReader.release()

@@ -23,9 +23,6 @@ type ReadableStream struct {
 	// with the ability to control the state and queue of this stream.
 	controller ReadableStreamController
 
-	// detached is a boolean flag set to true when the stream is transferred
-	detached bool
-
 	// disturbed is true when the stream has been read from or canceled
 	disturbed bool
 
@@ -167,20 +164,7 @@ func (stream *ReadableStream) setupReadableStreamDefaultControllerFromUnderlying
 	// which returns the result of invoking underlyingSourceDict["start"] with argument
 	// list « controller » and callback this value underlyingSource.
 	if underlyingSourceDict.startSet {
-		call, ok := goja.AssertFunction(underlyingSource.Get("start"))
-		if !ok {
-			common.Throw(stream.runtime, errors.New("underlyingSource.[[start]] must be a function"))
-		}
-
-		startAlgorithm = func(obj *goja.Object) (v goja.Value) {
-			var err error
-			v, err = call(underlyingSource, obj)
-			if err != nil {
-				panic(err)
-			}
-
-			return v
-		}
+		startAlgorithm = stream.startAlgorithm(underlyingSource)
 	}
 
 	// 6. If underlyingSourceDict["pull"] exists, then set pullAlgorithm to an algorithm which
@@ -205,37 +189,58 @@ func (stream *ReadableStream) setupReadableStreamDefaultControllerFromUnderlying
 	// reason and returns the result of invoking underlyingSourceDict["cancel"] with argument list « reason » and
 	// callback this value underlyingSource.
 	if underlyingSourceDict.cancelSet {
-		call, ok := goja.AssertFunction(underlyingSource.Get("cancel"))
-		if !ok {
-			common.Throw(stream.runtime, errors.New("underlyingSource.[[cancel]] must be a function"))
-		}
-
-		cancelAlgorithm = func(reason any) goja.Value {
-			var p *goja.Promise
-
-			if e := stream.runtime.Try(func() {
-				res, err := call(underlyingSource, stream.runtime.ToValue(reason))
-				if err != nil {
-					panic(err)
-				}
-
-				if cp, ok := res.Export().(*goja.Promise); ok {
-					p = cp
-				}
-			}); e != nil {
-				p = newRejectedPromise(stream.vu, e.Value())
-			}
-
-			if p == nil {
-				p = newResolvedPromise(stream.vu, goja.Undefined())
-			}
-
-			return stream.vu.Runtime().ToValue(p)
-		}
+		cancelAlgorithm = stream.cancelAlgorithm(underlyingSource)
 	}
 
 	// 8. Perform ? SetUpReadableStreamDefaultController(...)
 	stream.setupDefaultController(controller, startAlgorithm, pullAlgorithm, cancelAlgorithm, highWaterMark, sizeAlgorithm)
+}
+
+func (stream *ReadableStream) startAlgorithm(underlyingSource *goja.Object) UnderlyingSourceStartCallback {
+	call, ok := goja.AssertFunction(underlyingSource.Get("start"))
+	if !ok {
+		common.Throw(stream.runtime, errors.New("underlyingSource.[[start]] must be a function"))
+	}
+
+	return func(obj *goja.Object) (v goja.Value) {
+		var err error
+		v, err = call(underlyingSource, obj)
+		if err != nil {
+			panic(err)
+		}
+
+		return v
+	}
+}
+
+func (stream *ReadableStream) cancelAlgorithm(underlyingSource *goja.Object) UnderlyingSourceCancelCallback {
+	call, ok := goja.AssertFunction(underlyingSource.Get("cancel"))
+	if !ok {
+		common.Throw(stream.runtime, errors.New("underlyingSource.[[cancel]] must be a function"))
+	}
+
+	return func(reason any) goja.Value {
+		var p *goja.Promise
+
+		if e := stream.runtime.Try(func() {
+			res, err := call(underlyingSource, stream.runtime.ToValue(reason))
+			if err != nil {
+				panic(err)
+			}
+
+			if cp, ok := res.Export().(*goja.Promise); ok {
+				p = cp
+			}
+		}); e != nil {
+			p = newRejectedPromise(stream.vu, e.Value())
+		}
+
+		if p == nil {
+			p = newResolvedPromise(stream.vu, goja.Undefined())
+		}
+
+		return stream.vu.Runtime().ToValue(p)
+	}
 }
 
 // setupDefaultController implements the specification's [SetUpReadableStreamDefaultController] abstract operation.
@@ -264,14 +269,10 @@ func (stream *ReadableStream) setupDefaultController(
 
 	// 4. Set controller.[[started]], controller.[[closeRequested]], controller.[[pullAgain]], and
 	// controller.[[pulling]] to false.
-	controller.started = false
-	controller.closeRequested = false
-	controller.pullAgain = false
-	controller.pulling = false
+	controller.started, controller.closeRequested, controller.pullAgain, controller.pulling = false, false, false, false
 
 	// 5. Set controller.[[strategySizeAlgorithm]] to sizeAlgorithm and controller.[[strategyHWM]] to highWaterMark.
-	controller.strategySizeAlgorithm = sizeAlgorithm
-	controller.strategyHWM = highWaterMark
+	controller.strategySizeAlgorithm, controller.strategyHWM = sizeAlgorithm, highWaterMark
 
 	// 6. Set controller.[[pullAlgorithm]] to pullAlgorithm.
 	controller.pullAlgorithm = pullAlgorithm
@@ -301,27 +302,22 @@ func (stream *ReadableStream) setupDefaultController(
 	} else {
 		startPromise = newResolvedPromise(controller.stream.vu, startResult)
 	}
-
 	_, err = promiseThen(stream.vu.Runtime(), startPromise,
 		// 11. Upon fulfillment of startPromise,
 		func(goja.Value) {
 			// 11.1. Set controller.[[started]] to true.
 			controller.started = true
-
 			// 11.2. Assert: controller.[[pulling]] is false.
 			if controller.pulling {
 				common.Throw(stream.vu.Runtime(), newError(AssertionError, "controller `pulling` state is not false"))
 			}
-
 			// 11.3. Assert: controller.[[pullAgain]] is false.
 			if controller.pullAgain {
 				common.Throw(stream.vu.Runtime(), newError(AssertionError, "controller `pullAgain` state is not false"))
 			}
-
 			// 11.4. Perform ! ReadableStreamDefaultControllerCallPullIfNeeded(controller).
 			controller.callPullIfNeeded()
 		},
-
 		// 12. Upon rejection of startPromise with reason r,
 		func(err goja.Value) {
 			controller.error(err)
@@ -545,7 +541,6 @@ func (stream *ReadableStream) fulfillReadRequest(chunk any, done bool) {
 			readRequest.closeSteps()
 			return nil
 		})
-
 	} else {
 		// 7. Otherwise, perform readRequest’s chunk steps, given chunk.
 		callback(func() error {

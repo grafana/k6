@@ -56,7 +56,7 @@ func errToObj(rt *goja.Runtime, err any) goja.Value {
 		return rt.ToValue(err)
 	}
 
-	if e, ok := err.(*goja.Exception); ok { //nolint:errorlint // we don't really want to unwrap here
+	if e, ok := err.(*goja.Exception); ok {
 		return e.Value().ToObject(rt)
 	}
 
