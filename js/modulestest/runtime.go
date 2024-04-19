@@ -15,7 +15,6 @@ import (
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
@@ -126,11 +125,6 @@ func NewRuntimeForWPT(t testing.TB) *Runtime {
 	// is very useful for debugging, because we don't have a real debugger for JS code.
 	logger := runtime.VU.InitEnvField.Logger
 	require.NoError(t, runtime.VU.RuntimeField.Set("console", newConsole(logger)))
-
-	// We also want to make [timers.Timers] available for Web Platform Tests.
-	for k, v := range timers.New().NewModuleInstance(runtime.VU).Exports().Named {
-		require.NoError(t, runtime.VU.RuntimeField.Set(k, v))
-	}
 
 	// We compile the Web Platform Tests harness scripts into a goja.Program,
 	// and execute them in the goja runtime in order to make the Web Platform

@@ -5,6 +5,7 @@ import (
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/compiler"
+	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modulestest"
 
 	"github.com/stretchr/testify/assert"
@@ -44,6 +45,11 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	// We want a runtime with the Web Platform Tests harness available.
 	runtime := modulestest.NewRuntimeForWPT(t)
 	require.NoError(t, runtime.SetupModuleSystem(nil, nil, compiler.New(runtime.VU.InitEnv().Logger)))
+
+	// We also want to make [timers.Timers] available for Web Platform Tests.
+	for k, v := range timers.New().NewModuleInstance(runtime.VU).Exports().Named {
+		require.NoError(t, runtime.VU.RuntimeField.Set(k, v))
+	}
 
 	// We also want the streams module exports to be globally available.
 	m := new(RootModule).NewModuleInstance(runtime.VU)
