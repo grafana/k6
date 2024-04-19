@@ -278,28 +278,44 @@ func (c *Client) Invoke(
 	method string,
 	req goja.Value,
 	params goja.Value,
-) (*grpcext.Response, error) {
+) (*grpcext.InvokeResponse, error) {
+	grpcReq, err := c.buildInvokeRequest(method, req, params)
+	if err != nil {
+		return nil, err
+	}
+
+	return c.conn.Invoke(c.vu.Context(), grpcReq)
+}
+
+// buildInvokeRequest creates a new InvokeRequest from the given method name, request object and parameters
+func (c *Client) buildInvokeRequest(
+	method string,
+	req goja.Value,
+	params goja.Value,
+) (grpcext.InvokeRequest, error) {
+	grpcReq := grpcext.InvokeRequest{}
+
 	state := c.vu.State()
 	if state == nil {
-		return nil, common.NewInitContextError("invoking RPC methods in the init context is not supported")
+		return grpcReq, common.NewInitContextError("invoking RPC methods in the init context is not supported")
 	}
 	if c.conn == nil {
-		return nil, errors.New("no gRPC connection, you must call connect first")
+		return grpcReq, errors.New("no gRPC connection, you must call connect first")
 	}
 	if method == "" {
-		return nil, errors.New("method to invoke cannot be empty")
+		return grpcReq, errors.New("method to invoke cannot be empty")
 	}
 	if method[0] != '/' {
 		method = "/" + method
 	}
 	methodDesc := c.mds[method]
 	if methodDesc == nil {
-		return nil, fmt.Errorf("method %q not found in file descriptors", method)
+		return grpcReq, fmt.Errorf("method %q not found in file descriptors", method)
 	}
 
 	p, err := newCallParams(c.vu, params)
 	if err != nil {
-		return nil, fmt.Errorf("invalid GRPC's client.invoke() parameters: %w", err)
+		return grpcReq, fmt.Errorf("invalid GRPC's client.invoke() parameters: %w", err)
 	}
 
 	// k6 GRPC Invoke's default timeout is 2 minutes
@@ -308,25 +324,23 @@ func (c *Client) Invoke(
 	}
 
 	if req == nil {
-		return nil, errors.New("request cannot be nil")
+		return grpcReq, errors.New("request cannot be nil")
 	}
 	b, err := req.ToObject(c.vu.Runtime()).MarshalJSON()
 	if err != nil {
-		return nil, fmt.Errorf("unable to serialise request object: %w", err)
+		return grpcReq, fmt.Errorf("unable to serialise request object: %w", err)
 	}
-
-	ctx, cancel := context.WithTimeout(c.vu.Context(), p.Timeout)
-	defer cancel()
 
 	p.SetSystemTags(state, c.addr, method)
 
-	reqmsg := grpcext.Request{
+	return grpcext.InvokeRequest{
+		Method:           method,
 		MethodDescriptor: methodDesc,
+		Timeout:          p.Timeout,
 		Message:          b,
 		TagsAndMeta:      &p.TagsAndMeta,
-	}
-
-	return c.conn.Invoke(ctx, method, p.Metadata, reqmsg)
+		Metadata:         p.Metadata,
+	}, nil
 }
 
 // Close will close the client gRPC connection
