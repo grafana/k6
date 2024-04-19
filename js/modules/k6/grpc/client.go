@@ -287,6 +287,37 @@ func (c *Client) Invoke(
 	return c.conn.Invoke(c.vu.Context(), grpcReq)
 }
 
+// AsyncInvoke creates and calls a unary RPC by fully qualified method name asynchronously
+func (c *Client) AsyncInvoke(
+	method string,
+	req goja.Value,
+	params goja.Value,
+) *goja.Promise {
+	grpcReq, err := c.buildInvokeRequest(method, req, params)
+
+	promise, resolve, reject := c.vu.Runtime().NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := c.vu.RegisterCallback()
+	go func() {
+		res, err := c.conn.Invoke(c.vu.Context(), grpcReq)
+
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we don't want to return the error
+			}
+			resolve(res)
+			return nil
+		})
+	}()
+
+	return promise
+}
+
 // buildInvokeRequest creates a new InvokeRequest from the given method name, request object and parameters
 func (c *Client) buildInvokeRequest(
 	method string,

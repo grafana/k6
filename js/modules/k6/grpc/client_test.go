@@ -224,6 +224,22 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "AsyncInvokeInvalidParam",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.asyncInvoke("grpc.testing.TestService/EmptyCall", {}, { void: true }).then(function(resp) {
+					throw new Error("should not be here")
+				}, (err) => {
+					throw new Error(err)
+				})`,
+				err: `unknown param: "void"`,
+			},
+		},
+		{
 			name: "InvokeNilRequest",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
@@ -318,6 +334,33 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "AsyncInvoke",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+					return &grpc_testing.Empty{}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.asyncInvoke("grpc.testing.TestService/EmptyCall", {}).then(function(resp) {
+					if (resp.status !== grpc.StatusOK) {
+						throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
+					}
+				}, (err) => {
+					throw new Error("unexpected error: " + err)
+				})
+				`,
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
+					samplesBuf := metrics.GetBufferedSamples(samples)
+					assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+				},
+			},
+		},
+		{
 			name: "InvokeAnyProto",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
@@ -386,6 +429,32 @@ func TestClient(t *testing.T) {
 				if (resp.status !== grpc.StatusOK) {
 					throw new Error("server did not receive the correct request message")
 				}`},
+		},
+		{
+			name: "AsyncRequestMessage",
+			initString: codeBlock{
+				code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.UnaryCallFunc = func(_ context.Context, req *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
+					if req.Payload == nil || string(req.Payload.Body) != "负载测试" {
+						return nil, status.Error(codes.InvalidArgument, "")
+					}
+					return &grpc_testing.SimpleResponse{}, nil
+				}
+			},
+			vuString: codeBlock{code: `
+				client.connect("GRPCBIN_ADDR");
+				client.asyncInvoke("grpc.testing.TestService/UnaryCall", { payload: { body: "6LSf6L295rWL6K+V"} }).then(function(resp) {
+					if (resp.status !== grpc.StatusOK) {
+						throw new Error("server did not receive the correct request message")
+					}
+				}, (err) => {
+					throw new Error("unexpected error: " + err)
+				});
+				`},
 		},
 		{
 			name: "RequestHeaders",
@@ -458,6 +527,37 @@ func TestClient(t *testing.T) {
 				if (!resp.message || resp.message.username !== "" || resp.message.oauthScope !== "水") {
 					throw new Error("unexpected response message: " + JSON.stringify(resp.message))
 				}`,
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
+					samplesBuf := metrics.GetBufferedSamples(samples)
+					assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
+				},
+			},
+		},
+		{
+			name: "AsyncResponseMessage",
+			initString: codeBlock{
+				code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
+			},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.UnaryCallFunc = func(context.Context, *grpc_testing.SimpleRequest) (*grpc_testing.SimpleResponse, error) {
+					return &grpc_testing.SimpleResponse{
+						OauthScope: "水",
+					}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.asyncInvoke("grpc.testing.TestService/UnaryCall", {}).then(function(resp) {
+					if (!resp.message || resp.message.username !== "" || resp.message.oauthScope !== "水") {
+						throw new Error("unexpected response message: " + JSON.stringify(resp.message))
+					}
+				}, (err) => {
+					throw new Error("unexpected error: " + err)
+				});
+				`,
 				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
 					samplesBuf := metrics.GetBufferedSamples(samples)
 					assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/UnaryCall"))
@@ -973,7 +1073,7 @@ func TestClient(t *testing.T) {
 			assertResponse(t, tt.initString, err, val, ts)
 
 			ts.ToVUContext()
-			val, err = ts.Run(tt.vuString.code)
+			val, err = ts.RunOnEventLoop(tt.vuString.code)
 			assertResponse(t, tt.vuString, err, val, ts)
 		})
 	}
