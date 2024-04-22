@@ -108,7 +108,7 @@ func TestFileHookFromConfigLine(t *testing.T) {
 			}
 
 			require.NoError(t, err)
-			assert.NotNil(t, res.(*fileHook).w) //nolint:forcetypeassert
+			assert.NotNil(t, res.(*fileHook).w)
 		})
 	}
 }

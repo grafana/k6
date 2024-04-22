@@ -1091,8 +1091,8 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
 					defer cancel()
 					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool() //nolint:forcetypeassert
-					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)        //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool()
+					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)
 
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
@@ -1428,8 +1428,8 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 					defer cancel()
 					initVU, err := r.NewVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
 					require.NoError(t, err)
-					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool() //nolint:forcetypeassert
-					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)        //nolint:forcetypeassert
+					initVU.(*VU).TLSConfig.RootCAs = x509.NewCertPool()
+					initVU.(*VU).TLSConfig.RootCAs.AddCert(cert)
 					vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
 					err = vu.RunOnce()
 					if data.errMsg != "" {

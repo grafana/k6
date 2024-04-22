@@ -63,7 +63,7 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 			time.Sleep(200 * time.Millisecond)
 		}
 		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-		result.Store(state.VUID, currIter.(uint64)+1) //nolint:forcetypeassert
+		result.Store(state.VUID, currIter.(uint64)+1)
 		return nil
 	})
 
@@ -74,7 +74,7 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 
 	var totalIters uint64
 	result.Range(func(_, value interface{}) bool {
-		totalIters += value.(uint64) //nolint:forcetypeassert
+		totalIters += value.(uint64)
 		return true
 	})
 
