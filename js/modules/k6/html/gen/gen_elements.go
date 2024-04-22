@@ -1,3 +1,4 @@
+// Package main - this package generates some of the code for k6/html
 package main
 
 import (
