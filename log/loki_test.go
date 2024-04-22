@@ -156,7 +156,7 @@ func TestLokiFlushingOnStop(t *testing.T) {
 	t.Parallel()
 	receivedData := make(chan string, 1)
 	srv := httptest.NewServer(
-		http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			b, err := io.ReadAll(req.Body)
 			if err != nil {
 				t.Fatal(err)
@@ -196,7 +196,7 @@ func TestLokiHeaders(t *testing.T) {
 	t.Parallel()
 	receivedHeaders := make(chan http.Header, 1)
 	srv := httptest.NewServer(
-		http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {
+		http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			receivedHeaders <- req.Header
 			close(receivedHeaders) // see comment in TestLokiFlushingOnStop
 		}),

@@ -17,7 +17,7 @@ func getCmdResume(gs *state.GlobalState) *cobra.Command {
 		Long: `Resume a paused test.
 
   Use the global --address flag to specify the URL to the API server.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			c, err := client.New(gs.Flags.Address)
 			if err != nil {
 				return err

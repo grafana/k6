@@ -130,7 +130,6 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*ht
 		result, err = c.requestFunc(method, url, args...)
 		return err
 	}, args...)
-
 	if err != nil {
 		return nil, err
 	}
@@ -146,7 +145,6 @@ func (c *Client) AsyncRequest(method string, url goja.Value, args ...goja.Value)
 		result, err = c.asyncRequestFunc(method, url, args...)
 		return err
 	}, args...)
-
 	if err != nil {
 		return nil, err
 	}

@@ -31,7 +31,7 @@ func TestSharedIterationsRun(t *testing.T) {
 	t.Parallel()
 	var doneIters uint64
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		atomic.AddUint64(&doneIters, 1)
 		return nil
 	})
@@ -52,7 +52,7 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 		slowVUID uint64
 	)
 
-	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, state *lib.State) error {
 		time.Sleep(10 * time.Millisecond) // small wait to stabilize the test
 		// Pick one VU randomly and always slow it down.
 		sid := atomic.LoadUint64(&slowVUID)
@@ -73,7 +73,7 @@ func TestSharedIterationsRunVariableVU(t *testing.T) {
 	require.NoError(t, test.executor.Run(test.ctx, nil))
 
 	var totalIters uint64
-	result.Range(func(key, value interface{}) bool {
+	result.Range(func(_, value interface{}) bool {
 		totalIters += value.(uint64) //nolint:forcetypeassert
 		return true
 	})
@@ -137,7 +137,7 @@ func TestSharedIterationsGlobalIters(t *testing.T) {
 
 			gotIters := []uint64{}
 			var mx sync.Mutex
-			runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+			runner := simpleRunner(func(_ context.Context, state *lib.State) error {
 				mx.Lock()
 				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()

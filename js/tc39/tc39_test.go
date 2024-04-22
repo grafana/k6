@@ -690,7 +690,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *g
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeExtended}
 
 	mr := modules.NewModuleResolver(nil,
-		func(specifier *url.URL, name string) ([]byte, error) {
+		func(specifier *url.URL, _ string) ([]byte, error) {
 			return fs.ReadFile(currentFS, specifier.Path[1:])
 		},
 		comp)

@@ -30,7 +30,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 	t.Parallel()
 	var result sync.Map
 
-	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, state *lib.State) error {
 		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
 		result.Store(state.VUID, currIter.(uint64)+1) //nolint:forcetypeassert
 		return nil
@@ -43,7 +43,7 @@ func TestPerVUIterationsRun(t *testing.T) {
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 
 	var totalIters uint64
-	result.Range(func(key, value interface{}) bool {
+	result.Range(func(_, value interface{}) bool {
 		vuIters := value.(uint64) //nolint:forcetypeassert
 		assert.Equal(t, uint64(100), vuIters)
 		totalIters += vuIters
@@ -61,7 +61,7 @@ func TestPerVUIterationsRunVariableVU(t *testing.T) {
 		slowVUID = uint64(1)
 	)
 
-	runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, state *lib.State) error {
 		if state.VUID == slowVUID {
 			time.Sleep(200 * time.Millisecond)
 		}

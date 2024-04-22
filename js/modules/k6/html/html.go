@@ -337,7 +337,7 @@ func (s Selection) Val() goja.Value {
 	case SelectTagName:
 		selected := s.sel.First().Find("option[selected]")
 		if _, exists := s.sel.Attr("multiple"); exists {
-			return s.rt.ToValue(selected.Map(func(idx int, opt *goquery.Selection) string { return valueOrHTML(opt) }))
+			return s.rt.ToValue(selected.Map(func(_ int, opt *goquery.Selection) string { return valueOrHTML(opt) }))
 		}
 
 		return s.rt.ToValue(valueOrHTML(selected))
@@ -361,7 +361,7 @@ func (s Selection) Each(v goja.Value) Selection {
 		common.Throw(s.rt, errors.New("the argument to each() must be a function"))
 	}
 
-	fn := func(idx int, sel *goquery.Selection) {
+	fn := func(idx int, _ *goquery.Selection) {
 		if _, err := gojaFn(v, s.rt.ToValue(idx), selToElement(Selection{s.rt, s.sel.Eq(idx), s.URL})); err != nil {
 			common.Throw(s.rt, fmt.Errorf("the function passed to each() failed: %w", err))
 		}

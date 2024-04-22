@@ -503,7 +503,7 @@ func getCloudTestEndChecker(
 
 	srv := getTestServer(tb, map[string]http.Handler{
 		"POST ^/v1/tests$": testStart,
-		fmt.Sprintf("POST ^/v1/tests/%d$", testRunID): http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		fmt.Sprintf("POST ^/v1/tests/%d$", testRunID): http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
 			require.NotNil(tb, req.Body)
 			buf := &bytes.Buffer{}
 			_, err := io.Copy(buf, req.Body)
@@ -829,7 +829,7 @@ func injectMockSignalNotifier(ts *GlobalTestState) (sendSignal chan os.Signal) {
 			close(sendSignal)
 		}()
 	}
-	ts.GlobalState.SignalStop = func(c chan<- os.Signal) { /* noop */ }
+	ts.GlobalState.SignalStop = func(_ chan<- os.Signal) { /* noop */ }
 	return sendSignal
 }
 
@@ -1703,7 +1703,7 @@ func TestRunWithCloudOutputOverrides(t *testing.T) {
 		[]string{"-v", "--log-output=stdout", "--out=cloud", "--out", "json=results.json"}, 0,
 	)
 
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
 		_, err := fmt.Fprint(resp, `{"reference_id": "132", "config": {"webAppURL": "https://bogus.url"}}`)
 		assert.NoError(t, err)
@@ -1841,7 +1841,6 @@ func TestPrometheusRemoteWriteOutput(t *testing.T) {
 func BenchmarkReadResponseBody(b *testing.B) {
 	httpSrv := httpmultibin.NewHTTPMultiBin(b)
 
-	//nolint:goconst
 	script := httpSrv.Replacer.Replace(`
 		import http from "k6/http";
 		import { check, sleep } from "k6";

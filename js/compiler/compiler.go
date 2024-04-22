@@ -122,7 +122,7 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 		// TODO: drop this code and everything it's connected to when babel is dropped
 		v := os.Getenv(maxSrcLenForBabelSourceMapVarName) //nolint:forbidigo
 		if len(v) > 0 {
-			i, err := strconv.Atoi(v) //nolint:govet // we shadow err on purpose
+			i, err := strconv.Atoi(v)
 			if err != nil {
 				c.logger.Warnf("Tried to parse %q from %s as integer but couldn't %s\n",
 					v, maxSrcLenForBabelSourceMapVarName, err)

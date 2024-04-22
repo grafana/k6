@@ -299,7 +299,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	ch := make(chan bool, 1)
 
-	h := func(w http.ResponseWriter, r *http.Request) {
+	h := func(_ http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ch <- true
 		}()
@@ -387,7 +387,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 
 	ch := make(chan bool, 1)
 
-	h := func(w http.ResponseWriter, r *http.Request) {
+	h := func(_ http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ch <- true
 		}()

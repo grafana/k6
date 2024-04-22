@@ -35,7 +35,7 @@ func TestVUHandleRace(t *testing.T) {
 	logEntry := logrus.NewEntry(testLog)
 
 	runner := &minirunner.MiniRunner{}
-	runner.Fn = func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+	runner.Fn = func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 		return nil
 	}
 
@@ -124,7 +124,7 @@ func TestVUHandleStartStopRace(t *testing.T) {
 	logEntry := logrus.NewEntry(testLog)
 
 	runner := &minirunner.MiniRunner{}
-	runner.Fn = func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+	runner.Fn = func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 		return nil
 	}
 
@@ -367,7 +367,7 @@ func BenchmarkVUHandleIterations(b *testing.B) {
 	}
 
 	runner := &minirunner.MiniRunner{}
-	runner.Fn = func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+	runner.Fn = func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 		return nil
 	}
 	getVU := func() (lib.InitializedVU, error) {

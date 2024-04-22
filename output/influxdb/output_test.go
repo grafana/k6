@@ -112,7 +112,7 @@ func TestOutput(t *testing.T) {
 		}
 
 		rw.WriteHeader(http.StatusNoContent)
-	}, func(tb testing.TB, c *Output) {
+	}, func(_ testing.TB, c *Output) {
 		samples := make(metrics.Samples, 10)
 		for i := 0; i < len(samples); i++ {
 			samples[i] = metrics.Sample{
@@ -142,7 +142,7 @@ func TestOutputFlushMetricsConcurrency(t *testing.T) {
 	)
 
 	wg := sync.WaitGroup{}
-	ts := httptest.NewServer(http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	ts := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		// block all the received requests
 		// so concurrency will be needed
 		// to not block the flush
