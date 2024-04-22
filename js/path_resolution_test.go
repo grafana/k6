@@ -135,7 +135,7 @@ func TestRequirePathResolution(t *testing.T) {
 				`,
 			},
 			expectedLogs: []string{
-				`The "wrong" path ("file:///A/C/B/") and the actually used by k6 path ("file:///A/B/B/") to resolve "./../data.js" are different`,
+				`The "wrong" path ("file:///A/C/B/") and the path actually used by k6 ("file:///A/B/B/") to resolve "./../data.js" are different`,
 			},
 		},
 		"ESM and require": {
@@ -160,7 +160,7 @@ func TestRequirePathResolution(t *testing.T) {
 				`,
 			},
 			expectedLogs: []string{
-				`The "wrong" path ("file:///A/C/B/") and the actually used by k6 path ("file:///A/B/B/") to resolve "./../data.js" are different`,
+				`The "wrong" path ("file:///A/C/B/") and the path actually used by k6 ("file:///A/B/B/") to resolve "./../data.js" are different`,
 			},
 		},
 		"full ESM": {
@@ -186,7 +186,7 @@ func TestRequirePathResolution(t *testing.T) {
 				`,
 			},
 			expectedLogs: []string{
-				`The "wrong" path ("file:///A/C/B/") and the actually used by k6 path ("file:///A/B/B/") to resolve "./../data.js" are different`,
+				`The "wrong" path ("file:///A/C/B/") and the path actually used by k6 ("file:///A/B/B/") to resolve "./../data.js" are different`,
 			},
 		},
 	}
