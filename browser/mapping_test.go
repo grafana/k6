@@ -193,6 +193,12 @@ func TestMappings(t *testing.T) {
 				return mapConsoleMessage(moduleVU{VU: vu}, &common.ConsoleMessage{})
 			},
 		},
+		"mapTouchscreen": {
+			apiInterface: (*touchscreenAPI)(nil),
+			mapp: func() mapping {
+				return mapTouchscreen(moduleVU{VU: vu}, &common.Touchscreen{})
+			},
+		},
 	} {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
@@ -520,10 +526,7 @@ type keyboardAPI interface { //nolint: unused
 }
 
 // touchscreenAPI is the interface of a touchscreen.
-// TODO: map this to page.GetTouchscreen(). Currently, the common.TouchscreenAPI type
-// mapping is not tested using this interface. We use the concrete type
-// without testing its exported methods.
-type touchscreenAPI interface { //nolint: unused
+type touchscreenAPI interface {
 	Tap(x float64, y float64) error
 }
 

@@ -709,7 +709,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 		"throttleCPU":     p.ThrottleCPU,
 		"throttleNetwork": p.ThrottleNetwork,
 		"title":           p.Title,
-		"touchscreen":     rt.ToValue(p.GetTouchscreen()).ToObject(rt),
+		"touchscreen":     mapTouchscreen(vu, p.GetTouchscreen()),
 		"type":            p.Type,
 		"uncheck":         p.Uncheck,
 		"url":             p.URL,
@@ -786,6 +786,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 	}
 
 	return maps
+}
+
+// mapTouchscreen to the JS module.
+func mapTouchscreen(_ moduleVU, ts *common.Touchscreen) mapping {
+	return mapping{
+		"tap": ts.Tap,
+	}
 }
 
 // mapWorker to the JS module.
