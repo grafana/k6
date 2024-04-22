@@ -527,7 +527,7 @@ type keyboardAPI interface { //nolint: unused
 
 // touchscreenAPI is the interface of a touchscreen.
 type touchscreenAPI interface {
-	Tap(x float64, y float64) error
+	Tap(x float64, y float64) *goja.Promise
 }
 
 // mouseAPI is the interface of a mouse input device.

@@ -789,9 +789,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping {
 }
 
 // mapTouchscreen to the JS module.
-func mapTouchscreen(_ moduleVU, ts *common.Touchscreen) mapping {
+func mapTouchscreen(vu moduleVU, ts *common.Touchscreen) mapping {
 	return mapping{
-		"tap": ts.Tap,
+		"tap": func(x float64, y float64) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
+				return nil, ts.Tap(x, y) //nolint:wrapcheck
+			})
+		},
 	}
 }
 
