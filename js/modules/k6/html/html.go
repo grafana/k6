@@ -299,6 +299,7 @@ func (s Selection) Attr(name string, def ...goja.Value) goja.Value {
 	return s.rt.ToValue(val)
 }
 
+//nolint:revive,stylecheck // var-naming wants this to be HTML but this will break the API
 func (s Selection) Html() goja.Value {
 	val, err := s.sel.Html()
 	if err != nil {
@@ -480,6 +481,9 @@ func (s Selection) Index(def ...goja.Value) int {
 	}
 }
 
+// Data return the value at the named data store for the first element in the set of matched elements.
+// Mimics jquery.data
+//
 // When 0 arguments: Read all data from attributes beginning with "data-".
 // When 1 argument: Append argument to "data-" then find for a matching attribute
 func (s Selection) Data(def ...string) goja.Value {
