@@ -242,7 +242,6 @@ func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
 	}
 
 	err = o.Set("metrics", metrics)
-
 	if err != nil {
 		return o, err
 	}

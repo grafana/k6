@@ -22,7 +22,7 @@ import (
 func TestInvoke(t *testing.T) {
 	t.Parallel()
 
-	helloReply := func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error {
+	helloReply := func(_, out *dynamicpb.Message, _ ...grpc.CallOption) error {
 		err := protojson.Unmarshal([]byte(`{"reply":"text reply"}`), out)
 		require.NoError(t, err)
 
@@ -45,7 +45,7 @@ func TestInvoke(t *testing.T) {
 func TestInvokeWithCallOptions(t *testing.T) {
 	t.Parallel()
 
-	reply := func(in, out *dynamicpb.Message, opts ...grpc.CallOption) error {
+	reply := func(_, _ *dynamicpb.Message, opts ...grpc.CallOption) error {
 		assert.Len(t, opts, 3) // two by default plus one injected
 		return nil
 	}
@@ -63,7 +63,7 @@ func TestInvokeWithCallOptions(t *testing.T) {
 func TestInvokeReturnError(t *testing.T) {
 	t.Parallel()
 
-	helloReply := func(in, out *dynamicpb.Message, _ ...grpc.CallOption) error {
+	helloReply := func(_, _ *dynamicpb.Message, _ ...grpc.CallOption) error {
 		return fmt.Errorf("test error")
 	}
 

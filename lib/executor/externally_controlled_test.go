@@ -29,7 +29,7 @@ func TestExternallyControlledRun(t *testing.T) {
 	t.Parallel()
 
 	doneIters := new(uint64)
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		time.Sleep(200 * time.Millisecond)
 		atomic.AddUint64(doneIters, 1)
 		return nil

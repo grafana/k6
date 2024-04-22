@@ -38,7 +38,7 @@ func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 This will set the default token used when just "k6 run -o cloud" is passed.`,
 		Example: exampleText,
 		Args:    cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			currentDiskConf, err := readDiskConfig(gs)
 			if err != nil {
 				return err

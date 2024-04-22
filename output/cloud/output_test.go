@@ -198,7 +198,7 @@ func TestOutputStartVersionedOutputV1Error(t *testing.T) {
 func TestOutputStartWithTestRunID(t *testing.T) {
 	t.Parallel()
 
-	handler := func(w http.ResponseWriter, r *http.Request) {
+	handler := func(_ http.ResponseWriter, _ *http.Request) {
 		// no calls are expected to the cloud service when
 		// the reference ID is passed
 		t.Error("got unexpected call")

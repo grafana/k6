@@ -718,11 +718,11 @@ func TestSchedulerSetupTeardownRun(t *testing.T) {
 		setupC := make(chan struct{})
 		teardownC := make(chan struct{})
 		runner := &minirunner.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error) {
+			SetupFn: func(_ context.Context, _ chan<- metrics.SampleContainer) ([]byte, error) {
 				close(setupC)
 				return nil, nil
 			},
-			TeardownFn: func(ctx context.Context, out chan<- metrics.SampleContainer) error {
+			TeardownFn: func(_ context.Context, _ chan<- metrics.SampleContainer) error {
 				close(teardownC)
 				return nil
 			},
@@ -739,7 +739,7 @@ func TestSchedulerSetupTeardownRun(t *testing.T) {
 	t.Run("Setup Error", func(t *testing.T) {
 		t.Parallel()
 		runner := &minirunner.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error) {
+			SetupFn: func(_ context.Context, _ chan<- metrics.SampleContainer) ([]byte, error) {
 				return nil, errors.New("setup error")
 			},
 		}
@@ -750,10 +750,10 @@ func TestSchedulerSetupTeardownRun(t *testing.T) {
 	t.Run("Don't Run Setup", func(t *testing.T) {
 		t.Parallel()
 		runner := &minirunner.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error) {
-				return nil, errors.New("setup error")
+			SetupFn: func(_ context.Context, _ chan<- metrics.SampleContainer) ([]byte, error) {
+				return nil, errors.New("setup _")
 			},
-			TeardownFn: func(ctx context.Context, out chan<- metrics.SampleContainer) error {
+			TeardownFn: func(_ context.Context, _ chan<- metrics.SampleContainer) error {
 				return errors.New("teardown error")
 			},
 		}
@@ -769,10 +769,10 @@ func TestSchedulerSetupTeardownRun(t *testing.T) {
 	t.Run("Teardown Error", func(t *testing.T) {
 		t.Parallel()
 		runner := &minirunner.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error) {
+			SetupFn: func(_ context.Context, _ chan<- metrics.SampleContainer) ([]byte, error) {
 				return nil, nil
 			},
-			TeardownFn: func(ctx context.Context, out chan<- metrics.SampleContainer) error {
+			TeardownFn: func(_ context.Context, _ chan<- metrics.SampleContainer) error {
 				return errors.New("teardown error")
 			},
 		}
@@ -787,10 +787,10 @@ func TestSchedulerSetupTeardownRun(t *testing.T) {
 	t.Run("Don't Run Teardown", func(t *testing.T) {
 		t.Parallel()
 		runner := &minirunner.MiniRunner{
-			SetupFn: func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error) {
+			SetupFn: func(_ context.Context, _ chan<- metrics.SampleContainer) ([]byte, error) {
 				return nil, nil
 			},
-			TeardownFn: func(ctx context.Context, out chan<- metrics.SampleContainer) error {
+			TeardownFn: func(_ context.Context, _ chan<- metrics.SampleContainer) error {
 				return errors.New("teardown error")
 			},
 		}
@@ -835,7 +835,7 @@ func TestSchedulerStages(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
 			runner := &minirunner.MiniRunner{
-				Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+				Fn: func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 					time.Sleep(100 * time.Millisecond)
 					return nil
 				},
@@ -854,7 +854,7 @@ func TestSchedulerStages(t *testing.T) {
 func TestSchedulerEndTime(t *testing.T) {
 	t.Parallel()
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+		Fn: func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 			time.Sleep(100 * time.Millisecond)
 			return nil
 		},
@@ -879,7 +879,7 @@ func TestSchedulerEndTime(t *testing.T) {
 func TestSchedulerRuntimeErrors(t *testing.T) {
 	t.Parallel()
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+		Fn: func(_ context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 			time.Sleep(10 * time.Millisecond)
 			return errors.New("hi")
 		},
@@ -917,7 +917,7 @@ func TestSchedulerEndErrors(t *testing.T) {
 	exec.GracefulStop = types.NullDurationFrom(0 * time.Second)
 
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 			<-ctx.Done()
 			return errors.New("hi")
 		},
@@ -1005,7 +1005,7 @@ func TestSchedulerEndIterations(t *testing.T) {
 func TestSchedulerIsRunning(t *testing.T) {
 	t.Parallel()
 	runner := &minirunner.MiniRunner{
-		Fn: func(ctx context.Context, _ *lib.State, out chan<- metrics.SampleContainer) error {
+		Fn: func(ctx context.Context, _ *lib.State, _ chan<- metrics.SampleContainer) error {
 			<-ctx.Done()
 			return nil
 		},
@@ -1110,7 +1110,7 @@ func TestDNSResolverCache(t *testing.T) {
 
 			mr := mockresolver.New(map[string][]net.IP{"myhost": {net.ParseIP(sr("HTTPBIN_IP"))}})
 			var newResolutions uint32
-			resolveHook := func(host string, result []net.IP) {
+			resolveHook := func(_ string, result []net.IP) {
 				require.Len(t, result, 1)
 				if result[0].String() == "127.0.0.1" {
 					mr.Set("myhost", "127.0.0.254")

@@ -323,7 +323,7 @@ func TestClient(t *testing.T) {
 				var client = new grpc.Client();
 				client.load([], "../../../../lib/testutils/httpmultibin/grpc_any_testing/any_test.proto");`},
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
-				tb.GRPCAnyStub.SumFunc = func(ctx context.Context, req *grpcanytesting.SumRequest) (*grpcanytesting.SumReply, error) {
+				tb.GRPCAnyStub.SumFunc = func(_ context.Context, req *grpcanytesting.SumRequest) (*grpcanytesting.SumReply, error) {
 					var sumRequestData grpcanytesting.SumRequestData
 					if err := req.Data.UnmarshalTo(&sumRequestData); err != nil {
 						return nil, err
@@ -622,7 +622,7 @@ func TestClient(t *testing.T) {
 			name: "ReflectInvokeNoExist",
 			setup: func(tb *httpmultibin.HTTPMultiBin) {
 				reflection.Register(tb.ServerGRPC)
-				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+				tb.GRPCStub.EmptyCallFunc = func(_ context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 					return &grpc_testing.Empty{}, nil
 				}
 			},
@@ -643,7 +643,7 @@ func TestClient(t *testing.T) {
 				// this register both reflection APIs v1 and v1alpha
 				reflection.Register(tb.ServerGRPC)
 
-				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+				tb.GRPCStub.EmptyCallFunc = func(_ context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 					return &grpc_testing.Empty{}, nil
 				}
 			},
@@ -665,7 +665,7 @@ func TestClient(t *testing.T) {
 				svr := reflection.NewServer(reflection.ServerOptions{Services: s})
 				v1alphagrpc.RegisterServerReflectionServer(s, svr)
 
-				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+				tb.GRPCStub.EmptyCallFunc = func(_ context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 					return &grpc_testing.Empty{}, nil
 				}
 			},
@@ -685,7 +685,7 @@ func TestClient(t *testing.T) {
 				// this register only reflection APIs v1
 				reflection.RegisterV1(tb.ServerGRPC)
 
-				tb.GRPCStub.EmptyCallFunc = func(ctx context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+				tb.GRPCStub.EmptyCallFunc = func(_ context.Context, _ *grpc_testing.Empty) (*grpc_testing.Empty, error) {
 					return &grpc_testing.Empty{}, nil
 				}
 			},

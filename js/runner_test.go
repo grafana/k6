@@ -977,7 +977,7 @@ func generateTLSCertificateWithCA(t *testing.T, host string, notBefore time.Time
 
 func getTestServerWithCertificate(t *testing.T, certPem, key []byte) *httptest.Server {
 	server := &http.Server{
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}),
 		ReadHeaderTimeout: time.Second,
@@ -1866,7 +1866,7 @@ func TestVUIntegrationClientCerts(t *testing.T) {
 	})
 	require.NoError(t, err)
 	srv := &http.Server{ //nolint:gosec
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			_, _ = fmt.Fprintf(w, "ok")
 		}),
 		ErrorLog: stdlog.New(io.Discard, "", 0),
@@ -2240,7 +2240,7 @@ func TestSystemTags(t *testing.T) {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	// Handle paths with custom logic
-	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/wrong-redirect", func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Add("Location", "%")
 		w.WriteHeader(http.StatusTemporaryRedirect)
 	})
@@ -2468,7 +2468,7 @@ func TestComplicatedFileImportsForGRPC(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	tb.GRPCStub.UnaryCallFunc = func(ctx context.Context, sreq *grpc_testing.SimpleRequest) (
+	tb.GRPCStub.UnaryCallFunc = func(_ context.Context, _ *grpc_testing.SimpleRequest) (
 		*grpc_testing.SimpleResponse, error,
 	) {
 		return &grpc_testing.SimpleResponse{

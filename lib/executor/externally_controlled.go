@@ -544,6 +544,7 @@ func (mex *ExternallyControlled) Run(parentCtx context.Context, _ chan<- metrics
 	if err != nil {
 		return err
 	}
+	//nolint:contextcheck
 	defer func() { // Make sure we release the VUs at the end
 		err = runState.handleConfigChange(currentControlConfig, ExternallyControlledConfigParams{})
 	}()
