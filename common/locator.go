@@ -65,7 +65,7 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 
 	if err := l.click(opts); err != nil {
 		err := fmt.Errorf("clicking on %q: %w", l.selector, err)
-		SpanRecordError(span, "click failed", err)
+		spanRecordError(span, "click failed", err)
 		return err
 	}
 
@@ -522,12 +522,12 @@ func (l *Locator) Type(text string, opts goja.Value) error {
 	copts := NewFrameTypeOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
 		err := fmt.Errorf("parsing type options: %w", err)
-		SpanRecordError(span, "type option parsing failed", err)
+		spanRecordError(span, "type option parsing failed", err)
 		return err
 	}
 	if err := l.typ(text, copts); err != nil {
 		err := fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
-		SpanRecordError(span, "type failed", err)
+		spanRecordError(span, "type failed", err)
 		return err
 	}
 

@@ -58,10 +58,10 @@ func TraceEvent(
 	return ctx, browsertrace.NoopSpan{}
 }
 
-// SpanRecordError will set the status of the span to error and record the
+// spanRecordError will set the status of the span to error and record the
 // error on the span. Check the documentation for trace.SetStatus and
 // trace.RecordError for more details.
-func SpanRecordError(span trace.Span, description string, err error) {
+func spanRecordError(span trace.Span, description string, err error) {
 	span.SetStatus(codes.Error, description)
 	span.RecordError(err)
 }
