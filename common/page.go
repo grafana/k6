@@ -657,7 +657,7 @@ func (p *Page) Close(_ goja.Value) error {
 
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		err = fmt.Errorf("internal error while removing binding from page: %w", err)
+		err := fmt.Errorf("internal error while removing binding from page: %w", err)
 		SpanRecordError(span, "close failed due to internal error", err)
 		return err
 	}
@@ -678,7 +678,7 @@ func (p *Page) Close(_ goja.Value) error {
 			return nil
 		}
 
-		err = fmt.Errorf("closing a page: %w", err)
+		err := fmt.Errorf("closing a page: %w", err)
 		SpanRecordError(span, "close failed", err)
 		return err
 	}
@@ -995,7 +995,7 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 		p.timeoutSettings.navigationTimeout(),
 	)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing reload options: %w", err)
+		err := fmt.Errorf("parsing reload options: %w", err)
 		SpanRecordError(span, "reload option parsing failed", err)
 		return nil, err
 	}
@@ -1023,7 +1023,7 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		err = fmt.Errorf("reloading page: %w", err)
+		err := fmt.Errorf("reloading page: %w", err)
 		SpanRecordError(span, "reload failed", err)
 		return nil, err
 	}
@@ -1083,7 +1083,7 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	s := newScreenshotter(spanCtx, sp)
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
-		err = fmt.Errorf("taking screenshot of page: %w", err)
+		err := fmt.Errorf("taking screenshot of page: %w", err)
 		SpanRecordError(span, "screenshot failed", err)
 		return nil, err
 	}
