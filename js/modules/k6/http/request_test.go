@@ -573,7 +573,7 @@ func TestRequest(t *testing.T) {
 			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr) //nolint:forcetypeassert
+			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr)
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 
@@ -599,7 +599,7 @@ func TestRequest(t *testing.T) {
 			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr) //nolint:forcetypeassert
+			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr)
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 	})
@@ -2084,7 +2084,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 				return hosts
 			}(),
 		}
-		client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
+		client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext
 		_, err = rt.RunString(`throw JSON.stringify(http.get("https://expired.localhost/"));`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "x509: certificate has expired or is not yet valid")
@@ -2136,7 +2136,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			state.Dialer = &netext.Dialer{Hosts: hosts}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
-			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
+			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext
 			realURL := "https://" + versionTest.URL + "/"
 			_, err = rt.RunString(fmt.Sprintf(`
             var res = http.get("%s");
@@ -2181,7 +2181,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			state.Dialer = &netext.Dialer{Hosts: hosts}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
-			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
+			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext
 			realURL := "https://" + cipherSuiteTest.URL + "/"
 			_, err = rt.RunString(fmt.Sprintf(`
 					var res = http.get("%s");

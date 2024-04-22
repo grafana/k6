@@ -297,7 +297,7 @@ func TestHTTP2ConnectionError(t *testing.T) {
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
 	tb.Mux.HandleFunc("/tsr", func(_ http.ResponseWriter, req *http.Request) {
-		conn := req.Context().Value(connKey).(*tls.Conn) //nolint:forcetypeassert
+		conn := req.Context().Value(connKey).(*tls.Conn)
 		f := http2.NewFramer(conn, conn)
 		require.NoError(t, f.WriteData(3213, false, []byte("something")))
 	})
@@ -317,7 +317,7 @@ func TestHTTP2GoAwayError(t *testing.T) {
 
 	tb := getHTTP2ServerWithCustomConnContext(t)
 	tb.Mux.HandleFunc("/tsr", func(_ http.ResponseWriter, req *http.Request) {
-		conn := req.Context().Value(connKey).(*tls.Conn) //nolint:forcetypeassert
+		conn := req.Context().Value(connKey).(*tls.Conn)
 		f := http2.NewFramer(conn, conn)
 		require.NoError(t, f.WriteGoAway(4, http2.ErrCodeInadequateSecurity, []byte("whatever")))
 		require.NoError(t, conn.CloseWrite())

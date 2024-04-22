@@ -58,7 +58,7 @@ func TestExternallyControlledRun(t *testing.T) {
 			MaxVUs:   null.IntFrom(maxVUs),
 			Duration: types.NullDurationFrom(2 * time.Second),
 		}
-		err := test.executor.(*ExternallyControlled).UpdateConfig(test.ctx, newConfig) //nolint:forcetypeassert
+		err := test.executor.(*ExternallyControlled).UpdateConfig(test.ctx, newConfig)
 		if errMsg != "" {
 			assert.EqualError(t, err, errMsg)
 		} else {
