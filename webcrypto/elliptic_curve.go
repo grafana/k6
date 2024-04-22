@@ -294,7 +294,7 @@ func (ecgp *ECKeyGenParams) GenerateKey(
 		return nil, NewError(SyntaxError, "key usages cannot be empty")
 	}
 
-	alg := &EcKeyAlgorithm{
+	alg := EcKeyAlgorithm{
 		KeyAlgorithm: KeyAlgorithm{
 			Algorithm: ecgp.Algorithm,
 		},
