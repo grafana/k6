@@ -90,10 +90,10 @@ func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string
 	if err != nil {
 		logger.Warningf("Couldn't get the \"correct\" path to resolve specifier %q against: %q"+
 			"Please report to issue %s. "+
-			"This will not currently break your script but might mean the future it won't work",
+			"This will not currently break your script but it might mean that in the future it won't work",
 			specifier, err, issueLink)
 	} else if r.currentlyRequiredModule.String() != correct.String() {
-		logger.Warningf("The \"wrong\" path (%q) and the actually used by k6 path (%q) to resolve %q are different. "+
+		logger.Warningf("The \"wrong\" path (%q) and the path actually used by k6 (%q) to resolve %q are different. "+
 			"Please report to issue %s. "+
 			"This will not currently break your script but *WILL* in the future, please report this!!!",
 			correct, r.currentlyRequiredModule, specifier, issueLink)
@@ -103,7 +103,7 @@ func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string
 	if err != nil {
 		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
 			"Please report to issue %s. "+
-			"This will not currently break your script but might mean the future it won't work",
+			"This will not currently break your script but it might mean that in the future it won't work",
 			specifier, err, issueLink)
 		return
 	}
@@ -111,15 +111,15 @@ func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string
 	if err != nil {
 		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
 			"Please report to issue %s. "+
-			"This will not currently break your script but might mean the future it won't work",
+			"This will not currently break your script but it might mean that in the future it won't work",
 			specifier, err, issueLink)
 		return
 	}
 	if r.currentlyRequiredModule.String() != k6behaviour.String() {
 		// this should always be equal, but check anyway to be certain we won't break something
-		logger.Warningf("The \"wrong\" path (%q) and the actually used by k6 path (%q) to resolve %q are different. "+
+		logger.Warningf("The \"wrong\" path (%q) and the path actually used by k6 (%q) to resolve %q are different. "+
 			"Please report to issue %s. "+
-			"This will not currently break your script but might mean the future it won't work",
+			"This will not currently break your script but it might mean that in the future it won't work",
 			k6behaviour, r.currentlyRequiredModule, specifier, issueLink)
 	}
 }
