@@ -658,7 +658,7 @@ func (p *Page) Close(_ goja.Value) error {
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		err := fmt.Errorf("internal error while removing binding from page: %w", err)
-		spanRecordError(span, "close failed due to internal error", err)
+		spanRecordError(span, err)
 		return err
 	}
 
@@ -679,7 +679,7 @@ func (p *Page) Close(_ goja.Value) error {
 		}
 
 		err := fmt.Errorf("closing a page: %w", err)
-		spanRecordError(span, "close failed", err)
+		spanRecordError(span, err)
 		return err
 	}
 
@@ -832,7 +832,7 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 
 	resp, err := p.MainFrame().Goto(url, opts)
 	if err != nil {
-		spanRecordError(span, "goto failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -996,7 +996,7 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
 		err := fmt.Errorf("parsing reload options: %w", err)
-		spanRecordError(span, "reload option parsing failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -1024,7 +1024,7 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		err := fmt.Errorf("reloading page: %w", err)
-		spanRecordError(span, "reload failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -1046,7 +1046,7 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	case <-p.ctx.Done():
 	case <-timeoutCtx.Done():
 		err := wrapTimeoutError(timeoutCtx.Err())
-		spanRecordError(span, "reload navigation timed out", err)
+		spanRecordError(span, err)
 		return nil, err
 	case data := <-ch:
 		event = data.(*NavigationEvent)
@@ -1064,7 +1064,7 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
 		err := wrapTimeoutError(timeoutCtx.Err())
-		spanRecordError(span, "reload lifecycle timed out", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -1084,7 +1084,7 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
 		err := fmt.Errorf("taking screenshot of page: %w", err)
-		spanRecordError(span, "screenshot failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -1256,7 +1256,7 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response
 
 	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts)
 	if err != nil {
-		spanRecordError(span, "waiting for navigation failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 

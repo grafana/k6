@@ -61,7 +61,7 @@ func TraceEvent(
 // spanRecordError will set the status of the span to error and record the
 // error on the span. Check the documentation for trace.SetStatus and
 // trace.RecordError for more details.
-func spanRecordError(span trace.Span, description string, err error) {
-	span.SetStatus(codes.Error, description)
+func spanRecordError(span trace.Span, err error) {
+	span.SetStatus(codes.Error, err.Error())
 	span.RecordError(err)
 }

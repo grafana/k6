@@ -1184,7 +1184,7 @@ func (h *ElementHandle) Screenshot(
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
 		err := fmt.Errorf("taking screenshot of elementHandle: %w", err)
-		spanRecordError(span, "failed to take screenshot", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 

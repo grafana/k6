@@ -551,7 +551,7 @@ func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 
 	if b.context != nil {
 		err := errors.New("existing browser context must be closed before creating a new one")
-		spanRecordError(span, "browserContext already exists", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -560,21 +560,21 @@ func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
 		err := fmt.Errorf("creating browser context ID %s: %w", browserContextID, err)
-		spanRecordError(span, "browserContext creation in Chrome failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()
 	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
 		err := fmt.Errorf("parsing newContext options: %w", err)
-		spanRecordError(span, "new browserContext options parsing failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
 	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
 	if err != nil {
 		err := fmt.Errorf("new context: %w", err)
-		spanRecordError(span, "new browserContext creation failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
@@ -593,13 +593,13 @@ func (b *Browser) NewPage(opts goja.Value) (*Page, error) {
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
 		err := fmt.Errorf("new page: %w", err)
-		spanRecordError(span, "new browserContext creation failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
 	page, err := browserCtx.NewPage()
 	if err != nil {
-		spanRecordError(span, "new page creation failed", err)
+		spanRecordError(span, err)
 		return nil, err
 	}
 
