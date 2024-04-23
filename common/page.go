@@ -815,12 +815,6 @@ func (p *Page) GetTouchscreen() *Touchscreen {
 	return p.Touchscreen
 }
 
-// GoBack is not implemented.
-func (p *Page) GoBack(_ goja.Value) *Response {
-	k6ext.Panic(p.ctx, "Page.goBack(opts) has not been implemented yet")
-	return nil
-}
-
 // Goto will navigate the page to the specified URL and return a HTTP response object.
 func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)

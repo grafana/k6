@@ -18,6 +18,7 @@ import (
 	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
+	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
@@ -278,14 +279,9 @@ func TestMultiBrowserPanic(t *testing.T) {
 		b1 = newTestBrowser(t)
 		b2 = newTestBrowser(t)
 
-		bctx, err := b1.NewContext(nil)
-		require.NoError(t, err)
-		p1, err := bctx.NewPage()
-		require.NoError(t, err, "failed to create page #1")
-
 		func() {
 			defer func() { _ = recover() }()
-			p1.GoBack(nil)
+			k6ext.Panic(b1.ctx, "forcing a panic")
 		}()
 	})
 
