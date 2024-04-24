@@ -47,7 +47,7 @@ For alternative ways of cloning the k6 repository, please refer to [GitHub's clo
 
 #### Running the linter
 
-We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) tool to lint the code in CI. The actual version you can find in our [`.golangci.yml`](https://github.com/grafana/k6/blob/master/.golangci.yml#L1). To run it locally, first [install it](https://golangci-lint.run/usage/install/#local-installation), then run:
+We make use of the [golangci-lint](https://github.com/golangci/golangci-lint) tool to lint the code in CI. The actual version you can find in our [`.golangci.yml`](https://github.com/grafana/k6/blob/master/.golangci.yml#L1). To run it locally, first [install it](https://golangci-lint.run/welcome/install/#local-installation), then run:
 
 ```bash
 make lint

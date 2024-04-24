@@ -138,7 +138,7 @@ func TestClient_Dial_ReturnsNoErrorWithFailingDialer(t *testing.T) {
 			Block:                  true,
 			FailOnNonTempDialError: true,
 			Timeout:                1 * time.Second,
-			Dialer: func(ctx context.Context, s string) (net.Conn, error) {
+			Dialer: func(_ context.Context, _ string) (net.Conn, error) {
 				return nil, &fatalError{}
 			},
 		},

@@ -102,7 +102,7 @@ func TestRequire(t *testing.T) {
 			require.NoError(t, fsext.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			assert.EqualError(t, err,
-				"Error: aaaa\n\tat file:///file.js:2:7(3)\n\tat go.k6.io/k6/js.(*requireImpl).require-fm (native)\n\tat file:///script.js:1:0(15)\n")
+				"Error: aaaa\n\tat file:///file.js:1:34(3)\n\tat go.k6.io/k6/js.(*requireImpl).require-fm (native)\n\tat file:///script.js:1:0(15)\n")
 		})
 
 		imports := map[string]struct {
@@ -299,7 +299,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 
 	ch := make(chan bool, 1)
 
-	h := func(w http.ResponseWriter, r *http.Request) {
+	h := func(_ http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ch <- true
 		}()
@@ -387,7 +387,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 
 	ch := make(chan bool, 1)
 
-	h := func(w http.ResponseWriter, r *http.Request) {
+	h := func(_ http.ResponseWriter, r *http.Request) {
 		defer func() {
 			ch <- true
 		}()
@@ -574,6 +574,40 @@ export default function(){
 	exception := new(goja.Exception)
 	require.ErrorAs(t, err, &exception)
 	require.Equal(t, exception.String(), "exception in line 2\n\tat f2 (file:///module1.js:2:4(2))\n\tat file:///script.js:5:4(3)\n")
+}
+
+func TestSourceMapsCJS(t *testing.T) {
+	t.Parallel()
+	fs := fsext.NewMemMapFs()
+	require.NoError(t, fsext.WriteFile(fs, "/module1.js", []byte(`
+exports.f2 = function(){
+    throw "exception in line 2"
+    console.log("in f2")
+}
+exports.f1 = function(){
+    throw "exception in line 6"
+    console.log("in f1")
+}
+`[1:]), 0o644))
+	data := `
+import * as module1 from "./module1.js"
+
+export default function(){
+//    throw "exception in line 4"
+    module1.f2()
+    console.log("in default")
+}
+`[1:]
+	b, err := getSimpleBundle(t, "/script.js", data, fs)
+	require.NoError(t, err)
+
+	bi, err := b.Instantiate(context.Background(), 0)
+	require.NoError(t, err)
+	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	require.Error(t, err)
+	exception := new(goja.Exception)
+	require.ErrorAs(t, err, &exception)
+	require.Equal(t, exception.String(), "exception in line 2\n\tat file:///module1.js:2:5(2)\n\tat file:///script.js:5:4(3)\n")
 }
 
 func TestSourceMapsExternal(t *testing.T) {

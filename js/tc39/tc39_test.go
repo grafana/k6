@@ -690,7 +690,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *g
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeExtended}
 
 	mr := modules.NewModuleResolver(nil,
-		func(specifier *url.URL, name string) ([]byte, error) {
+		func(specifier *url.URL, _ string) ([]byte, error) {
 			return fs.ReadFile(currentFS, specifier.Path[1:])
 		},
 		comp)
@@ -748,8 +748,8 @@ outer:
 	}
 }
 
+//nolint:paralleltest // this is on purpose so the test can wait for the subtest to finish
 func TestTC39(t *testing.T) {
-	t.Parallel()
 	if testing.Short() {
 		t.Skip()
 	}
@@ -766,7 +766,6 @@ func TestTC39(t *testing.T) {
 	// ctx.enableBench = true
 
 	t.Run("test262", func(t *testing.T) {
-		t.Parallel()
 		ctx.t = t
 		ctx.runTC39Tests("test/language")
 		ctx.runTC39Tests("test/built-ins")

@@ -33,7 +33,7 @@ func TestConstantVUsRun(t *testing.T) {
 		default:
 		}
 		currIter, _ := result.LoadOrStore(state.VUID, uint64(0))
-		result.Store(state.VUID, currIter.(uint64)+1) //nolint:forcetypeassert
+		result.Store(state.VUID, currIter.(uint64)+1)
 		time.Sleep(210 * time.Millisecond)
 		return nil
 	})
@@ -44,8 +44,8 @@ func TestConstantVUsRun(t *testing.T) {
 	require.NoError(t, test.executor.Run(test.ctx, nil))
 
 	var totalIters uint64
-	result.Range(func(key, value interface{}) bool {
-		vuIters := value.(uint64) //nolint:forcetypeassert
+	result.Range(func(_, value interface{}) bool {
+		vuIters := value.(uint64)
 		assert.Equal(t, uint64(5), vuIters)
 		totalIters += vuIters
 		return true

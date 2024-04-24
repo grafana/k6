@@ -24,7 +24,7 @@ func getCmdLoginInfluxDB(gs *state.GlobalState) *cobra.Command {
 
 This will set the default server used when just "-o influxdb" is passed.`,
 		Args: cobra.MaximumNArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			config, err := readDiskConfig(gs)
 			if err != nil {
 				return err
@@ -40,7 +40,7 @@ This will set the default server used when just "-o influxdb" is passed.`,
 				conf = conf.Apply(jsonConfParsed)
 			}
 			if len(args) > 0 {
-				urlConf, err := influxdb.ParseURL(args[0]) //nolint:govet
+				urlConf, err := influxdb.ParseURL(args[0])
 				if err != nil {
 					return err
 				}

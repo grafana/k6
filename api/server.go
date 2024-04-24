@@ -33,7 +33,7 @@ func newHandler(cs *v1.ControlSurface, profilingEnabled bool) http.Handler {
 func injectProfilerHandler(mux *http.ServeMux, profilingEnabled bool) {
 	var handler http.Handler
 
-	handler = http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	handler = http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		_, _ = rw.Write([]byte("To enable profiling, please run k6 with the --profiling-enabled flag"))
 	})
@@ -91,7 +91,7 @@ func withLoggingHandler(l logrus.FieldLogger, next http.Handler) http.HandlerFun
 }
 
 func handlePing(logger logrus.FieldLogger) http.Handler {
-	return http.HandlerFunc(func(rw http.ResponseWriter, r *http.Request) {
+	return http.HandlerFunc(func(rw http.ResponseWriter, _ *http.Request) {
 		rw.Header().Add("Content-Type", "text/plain; charset=utf-8")
 		if _, err := fmt.Fprint(rw, "ok"); err != nil {
 			logger.WithError(err).Error("Error while printing ok")

@@ -179,7 +179,7 @@ func TestClientInstrumentedCall(t *testing.T) {
 	})
 	testCase.client.propagator = NewW3CPropagator(NewAlwaysOnSampler())
 
-	callFn := func(args ...goja.Value) error {
+	callFn := func(_ ...goja.Value) error {
 		gotMetadataTraceID, gotTraceIDKey := testCase.client.vu.State().Tags.GetCurrentValues().Metadata["trace_id"]
 		assert.True(t, gotTraceIDKey)
 		assert.NotEmpty(t, gotMetadataTraceID)

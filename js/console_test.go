@@ -72,7 +72,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 			RuntimeOptions: rtOpts,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
-			LookupEnv:      func(key string) (val string, ok bool) { return "", false },
+			LookupEnv:      func(_ string) (val string, ok bool) { return "", false },
 		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},

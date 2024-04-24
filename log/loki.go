@@ -162,7 +162,7 @@ func (h *lokiHook) Listen(ctx context.Context) {
 	defer ticker.Stop()
 	defer close(pushCh)
 
-	go func() {
+	go func() { //nolint:contextcheck
 		defer close(pushDone)
 		oldLogs := make([]tmpMsg, 0, h.limit*2)
 		for ch := range pushCh {

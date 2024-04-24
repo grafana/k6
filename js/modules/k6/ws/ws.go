@@ -167,7 +167,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 	// handlers and for cleanup. See closeConnection.
 	// closeConnection is not set directly as a handler here to
 	// avoid race conditions when calling the Goja runtime.
-	socket.conn.SetCloseHandler(func(code int, text string) error { return nil })
+	socket.conn.SetCloseHandler(func(_ int, _ string) error { return nil })
 
 	// Pass ping/pong events through the main control loop
 	pingChan := make(chan string)

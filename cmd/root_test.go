@@ -25,7 +25,7 @@ func TestPanicHandling(t *testing.T) {
 	rootCmd := newRootCommand(ts.GlobalState)
 	rootCmd.cmd.AddCommand(&cobra.Command{
 		Use: "panic",
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, _ []string) error {
 			panic("oh no, oh no, oh no,no,no,no,no")
 		},
 	})

@@ -101,7 +101,6 @@ func (o *Output) Start() error {
 	}
 
 	o.client, err = statsd.NewBuffered(o.config.Addr.String, int(o.config.BufferSize.Int64))
-
 	if err != nil {
 		o.logger.Errorf("Couldn't make buffered client, %s", err)
 		return err

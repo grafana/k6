@@ -19,7 +19,7 @@ import (
 )
 
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
-	return http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+	return http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
 		_, err := fmt.Fprintf(resp, `{"reference_id": "%d"}`, testRunID)
 		assert.NoError(tb, err)
@@ -43,7 +43,7 @@ func getMockCloud(
 
 	srv := getTestServer(t, map[string]http.Handler{
 		"POST ^/v1/archive-upload$": archiveUpload,
-		testProgressURL: http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+		testProgressURL: http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 			testProgress := defaultProgress
 			if progressCallback != nil {
 				testProgress = progressCallback()
@@ -169,7 +169,7 @@ func TestCloudUploadOnly(t *testing.T) {
 func TestCloudWithConfigOverride(t *testing.T) {
 	t.Parallel()
 
-	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+	configOverride := http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		resp.WriteHeader(http.StatusOK)
 		_, err := fmt.Fprint(resp, `{
 			"reference_id": "123",

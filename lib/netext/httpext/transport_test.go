@@ -57,7 +57,7 @@ func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 		}
 	})
 
-	t.responseCallback = func(n int) bool { return true }
+	t.responseCallback = func(_ int) bool { return true }
 
 	b.Run("responseCallback", func(b *testing.B) {
 		for i := 0; i < b.N; i++ {
