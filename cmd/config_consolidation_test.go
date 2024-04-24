@@ -485,6 +485,16 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			},
 			nil,
 		},
+		{
+			opts{
+				env: []string{"K6_PROFILING_ENABLED=true"},
+				cli: []string{"--profiling-enabled"},
+			},
+			exp{
+				consolidationError: false,
+			},
+			nil,
+		},
 		// TODO: test for differences between flagsets
 		// TODO: more tests in general, especially ones not related to execution parameters...
 	}
