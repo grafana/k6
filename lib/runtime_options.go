@@ -17,6 +17,8 @@ const (
 	CompatibilityModeExtended CompatibilityMode = iota + 1
 	// CompatibilityModeBase is standard goja ES5.1+
 	CompatibilityModeBase
+	// CompatibilityModeEnhanced achives ES6+ and TypeScript compatibility with k6pack
+	CompatibilityModeEnhanced
 )
 
 // RuntimeOptions are settings passed onto the goja JS runtime

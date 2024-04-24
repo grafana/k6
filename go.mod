@@ -13,6 +13,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.1
+	github.com/grafana/k6pack v0.1.5
 	github.com/grafana/xk6-browser v1.4.3
 	github.com/grafana/xk6-dashboard v0.7.2
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
@@ -70,6 +71,7 @@ require (
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2 v1.9.0 // indirect
+	github.com/evanw/esbuild v0.20.2 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

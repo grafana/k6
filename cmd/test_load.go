@@ -10,6 +10,7 @@ import (
 	"sync"
 	"syscall"
 
+	"github.com/grafana/k6pack"
 	"github.com/sirupsen/logrus"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
@@ -22,6 +23,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"gopkg.in/guregu/null.v3"
 )
 
 const (
@@ -64,6 +66,21 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 	runtimeOptions, err := getRuntimeOptions(cmd.Flags(), gs.Env)
 	if err != nil {
 		return nil, err
+	}
+
+	if runtimeOptions.CompatibilityMode.String == lib.CompatibilityModeEnhanced.String() {
+		script, err := k6pack.Pack(string(src.Data), &k6pack.Options{
+			Filename:   src.URL.Path,
+			SourceMap:  true,
+			SourceRoot: pwd,
+		})
+		if err != nil {
+			return nil, err
+		}
+
+		src.Data = script
+
+		runtimeOptions.CompatibilityMode = null.StringFrom(lib.CompatibilityModeBase.String())
 	}
 
 	registry := metrics.NewRegistry()

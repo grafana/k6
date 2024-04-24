@@ -59,6 +59,8 @@ github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymF
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
+github.com/evanw/esbuild v0.20.2 h1:E4Y0iJsothpUCq7y0D+ERfqpJmPWrZpNybJA3x3I4p8=
+github.com/evanw/esbuild v0.20.2/go.mod h1:D2vIQZqV/vIf/VRHtViaUtViZmG7o+kKmlBfVQuRi48=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
 github.com/fsnotify/fsnotify v1.5.4 h1:jRbGcIw6P2Meqdwuo0H1p6JVLbL5DHKAKlYndzMwVZI=
@@ -96,6 +98,8 @@ github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
 github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/QY=
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
+github.com/grafana/k6pack v0.1.5 h1:XrOM7GQX30ISzashmegcowxKVhpFULm9fQIZe0+vJXA=
+github.com/grafana/k6pack v0.1.5/go.mod h1:cltO5vmQOObJDtKbRkNVGymk3J+MRhriJyQg1JJzeEc=
 github.com/grafana/xk6-browser v1.4.3 h1:QwOi2dpcgUyY6tXz0khBaLPh38dn44fWkfE9cUCEeDg=
 github.com/grafana/xk6-browser v1.4.3/go.mod h1:pj4OWy+VL3vM5qmsuAxwGleySq/6fhRsocfmHGQV7YQ=
 github.com/grafana/xk6-dashboard v0.7.2 h1:CLaWeRfPZ388IS6rBn0nI+lqtX50QoQ73z0Hz5BIrS4=
