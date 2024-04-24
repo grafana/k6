@@ -1,10 +1,11 @@
+//go:build wpt
+
 package streams
 
 import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modulestest"
 
@@ -16,16 +17,16 @@ func TestReadableStream(t *testing.T) {
 	t.Parallel()
 
 	suites := []string{
-		"bad-strategies.js",
-		"bad-underlying-sources.js",
-		"cancel.js",
-		"constructor.js",
-		"count-queuing-strategy-integration.js",
-		"default-reader.js",
-		"floating-point-total-queue-size.js",
-		"general.js",
-		"reentrant-strategies.js",
-		"templated.js",
+		"bad-strategies.any.js",
+		"bad-underlying-sources.any.js",
+		"cancel.any.js",
+		"constructor.any.js",
+		"count-queuing-strategy-integration.any.js",
+		"default-reader.any.js",
+		"floating-point-total-queue-size.any.js",
+		"general.any.js",
+		"reentrant-strategies.any.js",
+		"templated.any.js",
 	}
 
 	for _, s := range suites {
@@ -34,7 +35,7 @@ func TestReadableStream(t *testing.T) {
 			t.Parallel()
 			ts := newConfiguredRuntime(t)
 			gotErr := ts.EventLoop.Start(func() error {
-				return executeTestScripts(ts.VU.Runtime(), "./tests/readable-streams", s)
+				return executeTestScripts(ts.VU.Runtime(), "tests/wpt/streams/readable-streams", s)
 			})
 			assert.NoError(t, gotErr)
 		})
@@ -42,22 +43,45 @@ func TestReadableStream(t *testing.T) {
 }
 
 func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
-	// We want a runtime with the Web Platform Tests harness available.
-	runtime := modulestest.NewRuntimeForWPT(t)
-	require.NoError(t, runtime.SetupModuleSystem(nil, nil, compiler.New(runtime.VU.InitEnv().Logger)))
+	rt := modulestest.NewRuntime(t)
+
+	// We want to make the [self] available for Web Platform Tests, as it is used in test harness.
+	_, err := rt.VU.Runtime().RunString("var self = this;")
+	require.NoError(t, err)
 
 	// We also want to make [timers.Timers] available for Web Platform Tests.
-	for k, v := range timers.New().NewModuleInstance(runtime.VU).Exports().Named {
-		require.NoError(t, runtime.VU.RuntimeField.Set(k, v))
+	for k, v := range timers.New().NewModuleInstance(rt.VU).Exports().Named {
+		require.NoError(t, rt.VU.RuntimeField.Set(k, v))
 	}
 
 	// We also want the streams module exports to be globally available.
-	m := new(RootModule).NewModuleInstance(runtime.VU)
+	m := new(RootModule).NewModuleInstance(rt.VU)
 	for k, v := range m.Exports().Named {
-		require.NoError(t, runtime.VU.RuntimeField.Set(k, v))
+		require.NoError(t, rt.VU.RuntimeField.Set(k, v))
 	}
 
-	return runtime
+	// Then, we register the Web Platform Tests harness.
+	compileAndRun(t, rt, "tests/wpt", "resources/testharness.js")
+
+	// And the Streams-specific test utilities.
+	files := []string{
+		"resources/rs-test-templates.js",
+		"resources/rs-utils.js",
+		"resources/test-utils.js",
+	}
+	for _, file := range files {
+		compileAndRun(t, rt, "tests/wpt/streams", file)
+	}
+
+	return rt
+}
+
+func compileAndRun(t testing.TB, runtime *modulestest.Runtime, base, file string) {
+	program, err := modulestest.CompileFile(base, file)
+	require.NoError(t, err)
+
+	_, err = runtime.VU.Runtime().RunProgram(program)
+	require.NoError(t, err)
 }
 
 func executeTestScripts(rt *goja.Runtime, base string, scripts ...string) error {

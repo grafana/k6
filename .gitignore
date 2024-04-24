@@ -3,6 +3,7 @@
 /dist
 /pkg-build
 /js/tc39/TestTC39
+/js/modules/k6/experimental/streams/tests/wpt
 
 .vscode
 *.sublime-workspace
