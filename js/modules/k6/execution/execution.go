@@ -176,8 +176,12 @@ func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
 			}
 		},
 		"options": func() interface{} {
+			vuState := mi.vu.State()
+			if vuState == nil {
+				common.Throw(rt, fmt.Errorf("getting test options in the init context is not supported"))
+			}
 			if optionsObject == nil {
-				opts, err := optionsAsObject(rt, mi.vu.State().Options)
+				opts, err := optionsAsObject(rt, vuState.Options)
 				if err != nil {
 					common.Throw(rt, err)
 				}
