@@ -454,7 +454,7 @@ BigInt(1231412444)`,
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.WarnLevel, entries[0].Level)
 			assert.Contains(t, entries[0].Message, "There were unknown fields")
-			assert.Contains(t, entries[0].Data["error"].(error).Error(), "unknown field \"something\"") //nolint:forcetypeassert
+			assert.Contains(t, entries[0].Data["error"].(error).Error(), "unknown field \"something\"")
 		})
 	})
 }

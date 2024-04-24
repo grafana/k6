@@ -86,7 +86,7 @@ func TestAsyncRequestResponseCallbackRace(t *testing.T) {
 		})
 	})
 	require.NoError(t, err)
-	err = ts.runtime.VU.Runtime().Set("log", func(s string) {
+	err = ts.runtime.VU.Runtime().Set("log", func(_ string) {
 		// t.Log(s) // uncomment for debugging
 	})
 	require.NoError(t, err)

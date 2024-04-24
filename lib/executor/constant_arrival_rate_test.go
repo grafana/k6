@@ -49,7 +49,7 @@ func getTestConstantArrivalRateConfig() *ConstantArrivalRateConfig {
 func TestConstantArrivalRateRunNotEnoughAllocatedVUsWarn(t *testing.T) {
 	t.Parallel()
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		time.Sleep(time.Second)
 		return nil
 	})
@@ -73,7 +73,7 @@ func TestConstantArrivalRateRunCorrectRate(t *testing.T) {
 	t.Parallel()
 
 	var count int64
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		atomic.AddInt64(&count, 1)
 		return nil
 	})
@@ -171,7 +171,7 @@ func TestConstantArrivalRateRunCorrectTiming(t *testing.T) {
 			var count int64
 			startTime := time.Now()
 			expectedTimeInt64 := int64(test.start)
-			runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 				current := atomic.AddInt64(&count, 1)
 
 				expectedTime := test.start
@@ -242,7 +242,7 @@ func TestArrivalRateCancel(t *testing.T) {
 			errCh := make(chan error, 1)
 			weAreDoneCh := make(chan struct{})
 
-			runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+			runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 				select {
 				case <-ch:
 					<-ch
@@ -339,7 +339,7 @@ func TestConstantArrivalRateGlobalIters(t *testing.T) {
 
 			gotIters := []uint64{}
 			var mx sync.Mutex
-			runner := simpleRunner(func(ctx context.Context, state *lib.State) error {
+			runner := simpleRunner(func(_ context.Context, state *lib.State) error {
 				mx.Lock()
 				gotIters = append(gotIters, state.GetScenarioGlobalVUIter())
 				mx.Unlock()

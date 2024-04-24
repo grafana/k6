@@ -50,7 +50,7 @@ func TestStream_RequestHeaders(t *testing.T) {
 
 	var registeredMetadata metadata.MD
 	stub := &featureExplorerStub{}
-	stub.listFeatures = func(rect *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
 		// collect metadata from the stream context
 		md, ok := metadata.FromIncomingContext(stream.Context())
 		if ok {
@@ -122,7 +122,7 @@ func TestStream_ErrorHandling(t *testing.T) {
 		},
 	}
 
-	stub.listFeatures = func(rect *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
 		for _, feature := range savedFeatures {
 			if err := stream.Send(feature); err != nil {
 				return err
@@ -208,7 +208,7 @@ func TestStream_ReceiveAllServerResponsesAfterEnd(t *testing.T) {
 		},
 	}
 
-	stub.listFeatures = func(rect *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
 		for _, feature := range savedFeatures {
 			// adding a delay to make server response "slower"
 			time.Sleep(200 * time.Millisecond)

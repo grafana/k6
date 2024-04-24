@@ -44,7 +44,7 @@ func baseTest(t *testing.T,
 			case <-end:
 				return
 			default:
-				n, _, err := listener.ReadFromUDP(buf[:]) //nolint:govet // it is on purpose
+				n, _, err := listener.ReadFromUDP(buf[:])
 				require.NoError(t, err)
 				ch <- string(buf[:n])
 			}

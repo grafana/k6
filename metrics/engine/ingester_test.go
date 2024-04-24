@@ -43,7 +43,7 @@ func TestIngesterOutputFlushMetrics(t *testing.T) {
 	require.NotNil(t, metric.Sink)
 	assert.Equal(t, testMetric, metric)
 
-	sink := metric.Sink.(*metrics.TrendSink) //nolint:forcetypeassert
+	sink := metric.Sink.(*metrics.TrendSink)
 	assert.Equal(t, 42.0, sink.Total())
 }
 

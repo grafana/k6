@@ -283,10 +283,10 @@ func TestResponseCallbackInAction(t *testing.T) {
 				assertRequestMetricsEmittedSingle(t, bufSamples[i], expectedSample.tags, expectedSample.metrics, nil)
 			}
 		}
-		t.Run(name, func(t *testing.T) {
+		t.Run(name, func(_ *testing.T) {
 			runCode(testCase.code)
 		})
-		t.Run("async_"+name, func(t *testing.T) {
+		t.Run("async_"+name, func(_ *testing.T) {
 			runCode(strings.ReplaceAll(testCase.code, "http.request", "http.asyncRequest"))
 		})
 	}

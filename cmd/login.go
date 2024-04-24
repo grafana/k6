@@ -16,7 +16,7 @@ func getCmdLogin(gs *state.GlobalState) *cobra.Command {
 Logging into a service changes the default when just "-o [type]" is passed with
 no parameters, you can always override the stored credentials by passing some
 on the commandline.`,
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(cmd *cobra.Command, _ []string) error {
 			return cmd.Usage()
 		},
 	}

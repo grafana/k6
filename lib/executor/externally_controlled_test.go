@@ -29,7 +29,7 @@ func TestExternallyControlledRun(t *testing.T) {
 	t.Parallel()
 
 	doneIters := new(uint64)
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		time.Sleep(200 * time.Millisecond)
 		atomic.AddUint64(doneIters, 1)
 		return nil
@@ -58,7 +58,7 @@ func TestExternallyControlledRun(t *testing.T) {
 			MaxVUs:   null.IntFrom(maxVUs),
 			Duration: types.NullDurationFrom(2 * time.Second),
 		}
-		err := test.executor.(*ExternallyControlled).UpdateConfig(test.ctx, newConfig) //nolint:forcetypeassert
+		err := test.executor.(*ExternallyControlled).UpdateConfig(test.ctx, newConfig)
 		if errMsg != "" {
 			assert.EqualError(t, err, errMsg)
 		} else {

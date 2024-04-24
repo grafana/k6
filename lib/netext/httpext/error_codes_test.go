@@ -180,7 +180,7 @@ func TestHTTP2StreamError(t *testing.T) {
 	t.Parallel()
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
+	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, _ *http.Request) {
 		rw.Header().Set("Content-Length", "100000")
 		rw.WriteHeader(http.StatusOK)
 
@@ -264,7 +264,7 @@ func TestDefaultTLSError(t *testing.T) {
 	l, err := net.Listen("tcp", "127.0.0.1:0")
 	require.NoError(t, err)
 	go func() {
-		conn, err := l.Accept() //nolint:govet // the shadowing is intentional
+		conn, err := l.Accept()
 		require.NoError(t, err)
 		_, err = conn.Write([]byte("not tls header")) // we just want to get an error
 		require.NoError(t, err)
@@ -296,8 +296,8 @@ func TestHTTP2ConnectionError(t *testing.T) {
 	tb := getHTTP2ServerWithCustomConnContext(t)
 
 	// Pre-configure the HTTP client transport with the dialer and TLS config (incl. HTTP2 support)
-	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
-		conn := req.Context().Value(connKey).(*tls.Conn) //nolint:forcetypeassert
+	tb.Mux.HandleFunc("/tsr", func(_ http.ResponseWriter, req *http.Request) {
+		conn := req.Context().Value(connKey).(*tls.Conn)
 		f := http2.NewFramer(conn, conn)
 		require.NoError(t, f.WriteData(3213, false, []byte("something")))
 	})
@@ -316,8 +316,8 @@ func TestHTTP2GoAwayError(t *testing.T) {
 	t.Parallel()
 
 	tb := getHTTP2ServerWithCustomConnContext(t)
-	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
-		conn := req.Context().Value(connKey).(*tls.Conn) //nolint:forcetypeassert
+	tb.Mux.HandleFunc("/tsr", func(_ http.ResponseWriter, req *http.Request) {
+		conn := req.Context().Value(connKey).(*tls.Conn)
 		f := http2.NewFramer(conn, conn)
 		require.NoError(t, f.WriteGoAway(4, http2.ErrCodeInadequateSecurity, []byte("whatever")))
 		require.NoError(t, conn.CloseWrite())
