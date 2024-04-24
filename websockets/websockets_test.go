@@ -208,11 +208,11 @@ func TestBasic(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 	_, err := ts.runtime.RunOnEventLoop(sr(`
-    var ws = new WebSocket("WSBIN_URL/ws-echo")
-    ws.addEventListener("open", () => {
-      ws.send("something")
-      ws.close()
-    })
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			ws.send("something")
+			ws.close()
+		})
 	`))
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -225,11 +225,11 @@ func TestBasicWithOn(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 	_, err := ts.runtime.RunOnEventLoop(sr(`
-    var ws = new WebSocket("WSBIN_URL/ws-echo")
-    ws.onopen = () => {
-      ws.send("something")
-      ws.close()
-    }
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.onopen = () => {
+			ws.send("something")
+			ws.close()
+		}
 	`))
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -240,23 +240,23 @@ func TestReadyState(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)
 	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
-    var ws = new WebSocket("WSBIN_URL/ws-echo")
-    ws.addEventListener("open", () => {
-      if (ws.readyState != 1){
-        throw new Error("Expected ready state 1 got "+ ws.readyState)
-      }
-      ws.addEventListener("close", () => {
-        if (ws.readyState != 3){
-          throw new Error("Expected ready state 3 got "+ ws.readyState)
-        }
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			if (ws.readyState != 1){
+				throw new Error("Expected ready state 1 got "+ ws.readyState)
+			}
+			ws.addEventListener("close", () => {
+				if (ws.readyState != 3){
+					throw new Error("Expected ready state 3 got "+ ws.readyState)
+				}
 
-      })
-      ws.send("something")
-      ws.close()
-    })
-    if (ws.readyState != 0){
-      throw new Error("Expected ready state 0 got "+ ws.readyState)
-    }
+			})
+			ws.send("something")
+			ws.close()
+		})
+		if (ws.readyState != 0){
+			throw new Error("Expected ready state 0 got "+ ws.readyState)
+		}
 	`))
 	require.NoError(t, err)
 }
@@ -265,22 +265,22 @@ func TestBinaryState(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)
 	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
-    var ws = new WebSocket("WSBIN_URL/ws-echo")
-    ws.addEventListener("open", () => ws.close())
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => ws.close())
 
-    if (ws.binaryType != "ArrayBuffer") {
-      throw new Error("Wrong binaryType value, expected ArrayBuffer got "+ ws.binaryType)
-    }
+		if (ws.binaryType != "ArrayBuffer") {
+			throw new Error("Wrong binaryType value, expected ArrayBuffer got "+ ws.binaryType)
+		}
 
-    var thrown = false;
-    try {
-      ws.binaryType = "something"
-    } catch(e) {
-      thrown = true
-    }
-    if (!thrown) {
-      throw new Error("Expects ws.binaryType to not be writable")
-    }
+		var thrown = false;
+		try {
+			ws.binaryType = "something"
+		} catch(e) {
+			thrown = true
+		}
+		if (!thrown) {
+			throw new Error("Expects ws.binaryType to not be writable")
+		}
 	`))
 	require.NoError(t, err)
 }
@@ -292,81 +292,81 @@ func TestExceptionDontPanic(t *testing.T) {
 	}{
 		"open": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/ws/echo")
-    ws.addEventListener("open", () => {
-      oops
-    })`,
-			expectedError: "oops is not defined at <eval>:4:7",
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.addEventListener("open", () => {
+			oops
+		})`,
+			expectedError: "oops is not defined at <eval>:4:4",
 		},
 		"onopen": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/ws/echo")
-    ws.onopen = () => {
-      oops
-    }`,
-			expectedError: "oops is not defined at <eval>:4:7",
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onopen = () => {
+			oops
+		}`,
+			expectedError: "oops is not defined at <eval>:4:4",
 		},
 		"error": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/badurl")
-    ws.addEventListener("error", () =>{
-      inerroridf
-    })
-    `,
-			expectedError: "inerroridf is not defined at <eval>:4:7",
+		var ws = new WebSocket("WSBIN_URL/badurl")
+		ws.addEventListener("error", () =>{
+			inerroridf
+		})
+		`,
+			expectedError: "inerroridf is not defined at <eval>:4:4",
 		},
 		"onerror": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/badurl")
-    ws.onerror = () => {
-      inerroridf
-    }
-    `,
-			expectedError: "inerroridf is not defined at <eval>:4:7",
+		var ws = new WebSocket("WSBIN_URL/badurl")
+		ws.onerror = () => {
+			inerroridf
+		}
+		`,
+			expectedError: "inerroridf is not defined at <eval>:4:4",
 		},
 		"close": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/ws/echo")
-    ws.addEventListener("open", () => {
-        ws.close()
-    })
-    ws.addEventListener("close", ()=>{
-      incloseidf
-    })`,
-			expectedError: "incloseidf is not defined at <eval>:7:7",
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.addEventListener("open", () => {
+				ws.close()
+		})
+		ws.addEventListener("close", ()=>{
+			incloseidf
+		})`,
+			expectedError: "incloseidf is not defined at <eval>:7:4",
 		},
 		"onclose": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/ws/echo")
-    ws.onopen = () => {
-        ws.close()
-    }
-    ws.onclose = () =>{
-      incloseidf
-    }`,
-			expectedError: "incloseidf is not defined at <eval>:7:7",
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onopen = () => {
+				ws.close()
+		}
+		ws.onclose = () =>{
+			incloseidf
+		}`,
+			expectedError: "incloseidf is not defined at <eval>:7:4",
 		},
 		"message": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/ws/echo")
-    ws.addEventListener("open", () => {
-        ws.send("something")
-    })
-    ws.addEventListener("message", ()=>{
-      inmessageidf
-    })`,
-			expectedError: "inmessageidf is not defined at <eval>:7:7",
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.addEventListener("open", () => {
+				ws.send("something")
+		})
+		ws.addEventListener("message", ()=>{
+			inmessageidf
+		})`,
+			expectedError: "inmessageidf is not defined at <eval>:7:4",
 		},
 		"onmessage": {
 			script: `
-    var ws = new WebSocket("WSBIN_URL/ws/echo")
-    ws.onopen = () => {
-        ws.send("something")
-    }
-    ws.onmessage = () =>{
-      inmessageidf
-    }`,
-			expectedError: "inmessageidf is not defined at <eval>:7:7",
+		var ws = new WebSocket("WSBIN_URL/ws/echo")
+		ws.onopen = () => {
+				ws.send("something")
+		}
+		ws.onmessage = () =>{
+			inmessageidf
+		}`,
+			expectedError: "inmessageidf is not defined at <eval>:7:4",
 		},
 	}
 	for name, testcase := range cases {
@@ -457,33 +457,33 @@ func TestTwoTalking(t *testing.T) {
 	})
 
 	_, err := ts.runtime.RunOnEventLoop(sr(`
-    var count = 0;
-    var ws1 = new WebSocket("WSBIN_URL/ws/couple/1");
-    ws1.addEventListener("open", () => {
-      ws1.send("I am 1");
-    })
-    ws1.addEventListener("message", (e)=>{
-      if (e.data != "I am 2") {
-        throw "oops";
-      }
-      count++;
-      if (count == 2) {
-        ws1.close();
-      }
-    })
-    var ws2 = new WebSocket("WSBIN_URL/ws/couple/2");
-    ws2.addEventListener("open", () => {
-      ws2.send("I am 2");
-    })
-    ws2.addEventListener("message", (e)=>{
-      if (e.data != "I am 1") {
-        throw "oops";
-      }
-      count++;
-      if (count == 2) {
-        ws2.close();
-      }
-    })
+		var count = 0;
+		var ws1 = new WebSocket("WSBIN_URL/ws/couple/1");
+		ws1.addEventListener("open", () => {
+			ws1.send("I am 1");
+		})
+		ws1.addEventListener("message", (e)=>{
+			if (e.data != "I am 2") {
+				throw "oops";
+			}
+			count++;
+			if (count == 2) {
+				ws1.close();
+			}
+		})
+		var ws2 = new WebSocket("WSBIN_URL/ws/couple/2");
+		ws2.addEventListener("open", () => {
+			ws2.send("I am 2");
+		})
+		ws2.addEventListener("message", (e)=>{
+			if (e.data != "I am 1") {
+				throw "oops";
+			}
+			count++;
+			if (count == 2) {
+				ws2.close();
+			}
+		})
 	`))
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -545,35 +545,35 @@ func TestTwoTalkingUsingOn(t *testing.T) {
 	})
 
 	_, err := ts.runtime.RunOnEventLoop(sr(`
-    var count = 0;
-    var ws1 = new WebSocket("WSBIN_URL/ws/couple/1");
-    ws1.onopen = () => {
-      ws1.send("I am 1");
-    }
+		var count = 0;
+		var ws1 = new WebSocket("WSBIN_URL/ws/couple/1");
+		ws1.onopen = () => {
+			ws1.send("I am 1");
+		}
 
-    ws1.onmessage = (e) => {
-      if (e.data != "I am 2") {
-        throw "oops";
-      }
-      count++;
-      if (count == 2) {
-        ws1.close();
-      }
-    }
+		ws1.onmessage = (e) => {
+			if (e.data != "I am 2") {
+				throw "oops";
+			}
+			count++;
+			if (count == 2) {
+				ws1.close();
+			}
+		}
 
-    var ws2 = new WebSocket("WSBIN_URL/ws/couple/2");
-    ws2.onopen = () => {
-      ws2.send("I am 2");
-    }
-    ws2.onmessage = (e) => {
-      if (e.data != "I am 1") {
-        throw "oops";
-      }
-      count++;
-      if (count == 2) {
-        ws2.close();
-      }
-    }
+		var ws2 = new WebSocket("WSBIN_URL/ws/couple/2");
+		ws2.onopen = () => {
+			ws2.send("I am 2");
+		}
+		ws2.onmessage = (e) => {
+			if (e.data != "I am 1") {
+				throw "oops";
+			}
+			count++;
+			if (count == 2) {
+				ws2.close();
+			}
+		}
 	`))
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -884,8 +884,8 @@ func TestManualNameTag(t *testing.T) {
 						throw new Error ("echo'd data doesn't match our message!");
 					}
 					ws.close()
-	 			}
-                ws.onerror = (e) => { throw JSON.stringify(e) }
+				}
+				ws.onerror = (e) => { throw JSON.stringify(e) }
 			`))
 	require.NoError(t, err)
 
@@ -929,8 +929,8 @@ func TestSystemTags(t *testing.T) {
 						throw new Error ("echo'd data doesn't match our message!");
 					}
 					ws.close()
-	 			}
-                ws.onerror = (e) => { throw JSON.stringify(e) }
+				}
+				ws.onerror = (e) => { throw JSON.stringify(e) }
 			`))
 			require.NoError(t, err)
 
@@ -962,12 +962,12 @@ func TestCustomTags(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 	_, err := ts.runtime.RunOnEventLoop(sr(`
-    var ws = new WebSocket("WSBIN_URL/ws-echo", null, {tags: {lorem: "ipsum", version: 13}})
-    ws.onopen = () => {
-      ws.send("something")
-      ws.close()
-    }
-    ws.onerror = (e) => { throw JSON.stringify(e) }
+	var ws = new WebSocket("WSBIN_URL/ws-echo", null, {tags: {lorem: "ipsum", version: 13}})
+	ws.onopen = () => {
+		ws.send("something")
+		ws.close()
+	}
+	ws.onerror = (e) => { throw JSON.stringify(e) }
 	`))
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -1148,7 +1148,7 @@ func TestSessionPing(t *testing.T) {
 				call("from onpong")
 				ws.close()
 			}
-             ws.onerror = (e) => { throw JSON.stringify(e) }
+			ws.onerror = (e) => { throw JSON.stringify(e) }
 		`))
 
 	require.NoError(t, err)
@@ -1171,8 +1171,8 @@ func TestSessionPingAdd(t *testing.T) {
 				ws.ping()
 			})
 
-             ws.onerror = (e) => { throw JSON.stringify(e) }
-			 ws.addEventListener("pong", () => {
+			ws.onerror = (e) => { throw JSON.stringify(e) }
+			ws.addEventListener("pong", () => {
 				call("from onpong")
 				ws.close()
 			})
