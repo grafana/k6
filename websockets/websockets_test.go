@@ -10,14 +10,11 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/eventloop"
 	httpModule "go.k6.io/k6/js/modules/k6/http"
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
@@ -83,17 +80,13 @@ func assertMetricEmittedCount(t *testing.T, metricName string, sampleContainers 
 }
 
 type testState struct {
-	rt      *goja.Runtime
 	tb      *httpmultibin.HTTPMultiBin
-	vu      *modulestest.VU
-	state   *lib.State
+	runtime *modulestest.Runtime
 	samples chan metrics.SampleContainer
-	ev      *eventloop.EventLoop
+	t       testing.TB
 
 	callRecorder *callRecorder
 	errors       chan error
-
-	t testing.TB
 }
 
 // callRecorder a helper type that records all calls
@@ -130,16 +123,12 @@ func (r *callRecorder) Recorded() []string {
 }
 
 func newTestState(t testing.TB) testState {
+	runtime := modulestest.NewRuntime(t)
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
 	root, err := lib.NewGroup("", nil)
 	require.NoError(t, err)
-
-	rt := goja.New()
-	rt.SetFieldNameMapper(common.FieldNameMapper{})
-
 	samples := make(chan metrics.SampleContainer, 1000)
-	registry := metrics.NewRegistry()
 	state := &lib.State{
 		Group:  root,
 		Dialer: tb.Dialer,
@@ -154,33 +143,23 @@ func newTestState(t testing.TB) testState {
 		},
 		Samples:        samples,
 		TLSConfig:      tb.TLSClientConfig,
-		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
-		Tags:           lib.NewVUStateTags(registry.RootTagSet()),
+		BuiltinMetrics: runtime.BuiltinMetrics,
+		Tags:           lib.NewVUStateTags(runtime.VU.InitEnvField.Registry.RootTagSet()),
 	}
 
 	recorder := &callRecorder{
 		calls: make([]string, 0),
 	}
 
-	vu := &modulestest.VU{
-		CtxField:     tb.Context,
-		RuntimeField: rt,
-		StateField:   state,
-	}
-	m := new(RootModule).NewModuleInstance(vu)
-	require.NoError(t, rt.Set("WebSocket", m.Exports().Named["WebSocket"]))
-	require.NoError(t, rt.Set("call", recorder.Call))
+	m := new(RootModule).NewModuleInstance(runtime.VU)
+	require.NoError(t, runtime.VU.RuntimeField.Set("WebSocket", m.Exports().Named["WebSocket"]))
+	require.NoError(t, runtime.VU.RuntimeField.Set("call", recorder.Call))
 
-	ev := eventloop.New(vu)
-	vu.RegisterCallbackField = ev.RegisterCallback
-
+	runtime.MoveToVUContext(state)
 	return testState{
-		rt:           rt,
+		runtime:      runtime,
 		tb:           tb,
-		vu:           vu,
-		state:        state,
 		samples:      samples,
-		ev:           ev,
 		callRecorder: recorder,
 		errors:       make(chan error, 50),
 		t:            t,
@@ -228,16 +207,13 @@ func TestBasic(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
-	err := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
     var ws = new WebSocket("WSBIN_URL/ws-echo")
     ws.addEventListener("open", () => {
       ws.send("something")
       ws.close()
     })
 	`))
-		return err
-	})
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
@@ -248,16 +224,13 @@ func TestBasicWithOn(t *testing.T) {
 
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
-	err := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
     var ws = new WebSocket("WSBIN_URL/ws-echo")
     ws.onopen = () => {
       ws.send("something")
       ws.close()
     }
 	`))
-		return err
-	})
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
@@ -266,8 +239,7 @@ func TestBasicWithOn(t *testing.T) {
 func TestReadyState(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)
-	err := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(ts.tb.Replacer.Replace(`
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
     var ws = new WebSocket("WSBIN_URL/ws-echo")
     ws.addEventListener("open", () => {
       if (ws.readyState != 1){
@@ -286,16 +258,13 @@ func TestReadyState(t *testing.T) {
       throw new Error("Expected ready state 0 got "+ ws.readyState)
     }
 	`))
-		return err
-	})
 	require.NoError(t, err)
 }
 
 func TestBinaryState(t *testing.T) {
 	t.Parallel()
 	ts := newTestState(t)
-	err := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(ts.tb.Replacer.Replace(`
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
     var ws = new WebSocket("WSBIN_URL/ws-echo")
     ws.addEventListener("open", () => ws.close())
 
@@ -313,8 +282,6 @@ func TestBinaryState(t *testing.T) {
       throw new Error("Expects ws.binaryType to not be writable")
     }
 	`))
-		return err
-	})
 	require.NoError(t, err)
 }
 
@@ -429,10 +396,7 @@ func TestExceptionDontPanic(t *testing.T) {
 			})
 
 			sr := ts.tb.Replacer.Replace
-			err := ts.ev.Start(func() error {
-				_, err := ts.rt.RunString(sr(testcase.script))
-				return err
-			})
+			_, err := ts.runtime.RunOnEventLoop(sr(testcase.script))
 			require.Error(t, err)
 			require.ErrorContains(t, err, testcase.expectedError)
 		})
@@ -492,8 +456,7 @@ func TestTwoTalking(t *testing.T) {
 		}
 	})
 
-	err := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
     var count = 0;
     var ws1 = new WebSocket("WSBIN_URL/ws/couple/1");
     ws1.addEventListener("open", () => {
@@ -522,8 +485,6 @@ func TestTwoTalking(t *testing.T) {
       }
     })
 	`))
-		return err
-	})
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/1"), http.StatusSwitchingProtocols, "")
@@ -583,8 +544,7 @@ func TestTwoTalkingUsingOn(t *testing.T) {
 		}
 	})
 
-	err := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
     var count = 0;
     var ws1 = new WebSocket("WSBIN_URL/ws/couple/1");
     ws1.onopen = () => {
@@ -615,8 +575,6 @@ func TestTwoTalkingUsingOn(t *testing.T) {
       }
     }
 	`))
-		return err
-	})
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/1"), http.StatusSwitchingProtocols, "")
@@ -629,26 +587,18 @@ func TestDialError(t *testing.T) {
 	sr := ts.tb.Replacer.Replace
 
 	// without listeners
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("ws://127.0.0.2");
 	`))
-		return runErr
-	})
 	require.NoError(t, err)
 
-	// with the error listener
-	ts.ev.WaitOnRegistered()
-	err = ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err = ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("ws://127.0.0.2");
 		ws.addEventListener("error", (e) =>{
 			ws.close();
 			throw new Error("The provided url is an invalid endpoint")
 		})
 	`))
-		return runErr
-	})
 	assert.Error(t, err)
 }
 
@@ -657,17 +607,13 @@ func TestOnError(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 
-	ts.ev.WaitOnRegistered()
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("ws://127.0.0.2");
 		ws.onerror = (e) => {
 			ws.close();
 			throw new Error("lorem ipsum")
 		}
 	`))
-		return runErr
-	})
 	assert.Error(t, err)
 	assert.Equal(t, "Error: lorem ipsum at <eval>:5:10(7)", err.Error())
 }
@@ -677,9 +623,7 @@ func TestOnClose(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 
-	ts.ev.WaitOnRegistered()
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("WSBIN_URL/ws/echo")
 		ws.onopen = () => {
 			ws.close()
@@ -688,8 +632,6 @@ func TestOnClose(t *testing.T) {
 			call("from close")
 		}
 	`))
-		return runErr
-	})
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"from close"}, ts.callRecorder.Recorded())
 }
@@ -699,9 +641,7 @@ func TestMixingOnAndAddHandlers(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 
-	ts.ev.WaitOnRegistered()
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("WSBIN_URL/ws/echo")
 		ws.onopen = () => {
 			ws.close()
@@ -713,8 +653,6 @@ func TestMixingOnAndAddHandlers(t *testing.T) {
 			call("from onclose")
 		}
 	`))
-		return runErr
-	})
 	assert.NoError(t, err)
 	assert.Equal(t, 2, ts.callRecorder.Len())
 	assert.Contains(t, ts.callRecorder.Recorded(), "from addEventListener")
@@ -727,9 +665,7 @@ func TestOncloseRedefineListener(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 
-	ts.ev.WaitOnRegistered()
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("WSBIN_URL/ws/echo")
 		ws.onopen = () => {
 			ws.close()
@@ -741,8 +677,6 @@ func TestOncloseRedefineListener(t *testing.T) {
 			call("from onclose 2")
 		}
 	`))
-		return runErr
-	})
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"from onclose 2"}, ts.callRecorder.Recorded())
 }
@@ -753,9 +687,7 @@ func TestOncloseRedefineWithNull(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 
-	ts.ev.WaitOnRegistered()
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("WSBIN_URL/ws/echo")
 		ws.onopen = () => {
 			ws.close()
@@ -765,8 +697,6 @@ func TestOncloseRedefineWithNull(t *testing.T) {
 		}
 		ws.onclose = null
 	`))
-		return runErr
-	})
 	assert.NoError(t, err)
 	assert.Equal(t, 0, ts.callRecorder.Len())
 }
@@ -777,14 +707,10 @@ func TestOncloseDefineWithInvalidValue(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 
-	ts.ev.WaitOnRegistered()
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("WSBIN_URL/ws/echo")
 		ws.onclose = 1
 	`))
-		return runErr
-	})
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "a value for 'onclose' should be callable")
 }
@@ -815,15 +741,12 @@ func TestCustomHeaders(t *testing.T) {
 		}
 	}))
 
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var ws = new WebSocket("WSBIN_URL/ws-echo-someheader", null, {headers: {"x-lorem": "ipsum"}})
 		ws.onopen = () => {
 			ws.close()
 		}
 	`))
-		return runErr
-	})
 	assert.NoError(t, err)
 
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -865,12 +788,11 @@ func TestCookies(t *testing.T) {
 		}
 	}))
 
-	err := ts.rt.Set("http", httpModule.New().NewModuleInstance(ts.vu).Exports().Default)
+	err := ts.runtime.VU.RuntimeField.Set("http", httpModule.New().NewModuleInstance(ts.runtime.VU).Exports().Default)
 	require.NoError(t, err)
 
-	ts.state.CookieJar, _ = cookiejar.New(nil)
-	err = ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	ts.runtime.VU.StateField.CookieJar, _ = cookiejar.New(nil)
+	_, err = ts.runtime.RunOnEventLoop(sr(`
 		var jar = new http.CookieJar();
 		jar.set("HTTPBIN_URL/ws-echo-someheader", "someheader", "customjar")
 
@@ -879,8 +801,6 @@ func TestCookies(t *testing.T) {
 			ws.close()
 		}
 	`))
-		return runErr
-	})
 	assert.NoError(t, err)
 
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -922,12 +842,11 @@ func TestCookiesDefaultJar(t *testing.T) {
 		}
 	}))
 
-	err := ts.rt.Set("http", httpModule.New().NewModuleInstance(ts.vu).Exports().Default)
+	err := ts.runtime.VU.RuntimeField.Set("http", httpModule.New().NewModuleInstance(ts.runtime.VU).Exports().Default)
 	require.NoError(t, err)
 
-	ts.state.CookieJar, _ = cookiejar.New(nil)
-	err = ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	ts.runtime.VU.StateField.CookieJar, _ = cookiejar.New(nil)
+	_, err = ts.runtime.RunOnEventLoop(sr(`
 		http.cookieJar().set("HTTPBIN_URL/ws-echo-someheader", "someheader", "defaultjar")		
 
 		var ws = new WebSocket("WSBIN_URL/ws-echo-someheader", null)
@@ -935,8 +854,6 @@ func TestCookiesDefaultJar(t *testing.T) {
 			ws.close()
 		}
 	`))
-		return runErr
-	})
 	assert.NoError(t, err)
 
 	samples := metrics.GetBufferedSamples(ts.samples)
@@ -955,10 +872,9 @@ func TestManualNameTag(t *testing.T) {
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
 
-	ts.vu.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{"url", "name"})
+	ts.runtime.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{"url", "name"})
 
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 				var ws = new WebSocket("WSBIN_URL/ws-echo", null, { tags: { name: "custom" } } )
 				ws.onopen = () => {
 					ws.send("test")
@@ -971,8 +887,6 @@ func TestManualNameTag(t *testing.T) {
 	 			}
                 ws.onerror = (e) => { throw JSON.stringify(e) }
 			`))
-		return runErr
-	})
 	require.NoError(t, err)
 
 	containers := metrics.GetBufferedSamples(ts.samples)
@@ -1003,10 +917,9 @@ func TestSystemTags(t *testing.T) {
 
 			ts := newTestState(t)
 			sr := ts.tb.Replacer.Replace
-			ts.vu.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTagStr})
+			ts.runtime.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTagStr})
 
-			err = ts.ev.Start(func() error {
-				_, runErr := ts.rt.RunString(sr(`
+			_, err = ts.runtime.RunOnEventLoop(sr(`
 				var ws = new WebSocket("WSBIN_URL/ws-echo")
 				ws.onopen = () => {
 					ws.send("test")
@@ -1019,8 +932,6 @@ func TestSystemTags(t *testing.T) {
 	 			}
                 ws.onerror = (e) => { throw JSON.stringify(e) }
 			`))
-				return runErr
-			})
 			require.NoError(t, err)
 
 			containers := metrics.GetBufferedSamples(ts.samples)
@@ -1050,8 +961,7 @@ func TestCustomTags(t *testing.T) {
 
 	ts := newTestState(t)
 	sr := ts.tb.Replacer.Replace
-	err := ts.ev.Start(func() error {
-		_, err := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
     var ws = new WebSocket("WSBIN_URL/ws-echo", null, {tags: {lorem: "ipsum", version: 13}})
     ws.onopen = () => {
       ws.send("something")
@@ -1059,8 +969,6 @@ func TestCustomTags(t *testing.T) {
     }
     ws.onerror = (e) => { throw JSON.stringify(e) }
 	`))
-		return err
-	})
 	require.NoError(t, err)
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
@@ -1092,8 +1000,7 @@ func TestCompressionSession(t *testing.T) {
 		WriteBufferSize:   1024,
 	}, &testMessage{websocket.TextMessage, []byte(text)})
 
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var params = {
 			"compression": "deflate"
 		}
@@ -1108,8 +1015,6 @@ func TestCompressionSession(t *testing.T) {
 		}
 
 		`))
-		return runErr
-	})
 
 	require.NoError(t, err)
 
@@ -1130,8 +1035,7 @@ func TestServerWithoutCompression(t *testing.T) {
 
 	ts.addHandler("/ws-compression", &websocket.Upgrader{}, &testMessage{websocket.TextMessage, []byte(text)})
 
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		var params = {
 			"compression": "deflate"
 		}
@@ -1144,8 +1048,6 @@ func TestServerWithoutCompression(t *testing.T) {
 			ws.close()
 		}
 		`))
-		return runErr
-	})
 
 	require.NoError(t, err)
 
@@ -1212,15 +1114,12 @@ func TestCompressionParams(t *testing.T) {
 				WriteBufferSize:   1024,
 			}, nil)
 
-			err := ts.ev.Start(func() error {
-				_, runErr := ts.rt.RunString(sr(`
+			_, err := ts.runtime.RunOnEventLoop(sr(`
 					var ws = new WebSocket("WSBIN_URL/ws-compression-param", null, {"compression":` + testCase.compression + `})
 					ws.onopen = () => {
 						ws.close()
 					}
 					`))
-				return runErr
-			})
 
 			if testCase.expectedError == "" {
 				require.NoError(t, err)
@@ -1239,8 +1138,7 @@ func TestSessionPing(t *testing.T) {
 
 	ts := newTestState(t)
 
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 			var ws = new WebSocket("WSBIN_URL/ws-echo")
 			ws.onopen = () => {
 				ws.ping()
@@ -1252,8 +1150,6 @@ func TestSessionPing(t *testing.T) {
 			}
              ws.onerror = (e) => { throw JSON.stringify(e) }
 		`))
-		return runErr
-	})
 
 	require.NoError(t, err)
 
@@ -1269,8 +1165,7 @@ func TestSessionPingAdd(t *testing.T) {
 
 	ts := newTestState(t)
 
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 			var ws = new WebSocket("WSBIN_URL/ws-echo")			
 			ws.addEventListener("open", () => {
 				ws.ping()
@@ -1282,8 +1177,6 @@ func TestSessionPingAdd(t *testing.T) {
 				ws.close()
 			})
 		`))
-		return runErr
-	})
 
 	require.NoError(t, err)
 
@@ -1301,9 +1194,9 @@ func TestLockingUpWithAThrow(t *testing.T) {
 
 	ts := newTestState(t)
 	go destroySamples(ctx, ts.samples)
-	ts.vu.CtxField = ctx
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	ts.runtime.VU.CtxField = ctx
+	err := ts.runtime.EventLoop.Start(func() error {
+		_, runErr := ts.runtime.VU.Runtime().RunString(sr(`
 		let a = 0;
 		const connections = 200;
 		async function s() {
@@ -1329,7 +1222,7 @@ func TestLockingUpWithAThrow(t *testing.T) {
 
 	cancel()
 	assert.ErrorContains(t, err, "s at <eval>")
-	ts.ev.WaitOnRegistered()
+	ts.runtime.EventLoop.WaitOnRegistered()
 }
 
 func TestLockingUpWithAJustGeneralCancel(t *testing.T) {
@@ -1344,10 +1237,9 @@ func TestLockingUpWithAJustGeneralCancel(t *testing.T) {
 		close(ts.samples)
 	}()
 	go destroySamples(ctx, ts.samples)
-	ts.vu.CtxField = ctx
-	require.NoError(t, ts.vu.RuntimeField.Set("cancel", cancel))
-	err := ts.ev.Start(func() error {
-		_, runErr := ts.rt.RunString(sr(`
+	ts.runtime.VU.CtxField = ctx
+	require.NoError(t, ts.runtime.VU.RuntimeField.Set("cancel", cancel))
+	_, err := ts.runtime.RunOnEventLoop(sr(`
 		let a = 0;
 		const connections = 1000;
 		async function s() {
@@ -1368,12 +1260,10 @@ func TestLockingUpWithAJustGeneralCancel(t *testing.T) {
 		}
 		[...Array(connections)].forEach(_ => s())
 		`))
-		return runErr
-	})
 
 	cancel()
 	assert.NoError(t, err)
-	ts.ev.WaitOnRegistered()
+	ts.runtime.EventLoop.WaitOnRegistered()
 }
 
 func destroySamples(ctx context.Context, c <-chan metrics.SampleContainer) {
