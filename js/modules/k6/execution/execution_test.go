@@ -444,6 +444,23 @@ func TestScenarioNoAvailableInInitContext(t *testing.T) {
 	}
 }
 
+func TestOptionsNoAvailableInInitContext(t *testing.T) {
+	t.Parallel()
+
+	rt := goja.New()
+	m, ok := New().NewModuleInstance(
+		&modulestest.VU{
+			RuntimeField: rt,
+			CtxField:     context.Background(),
+		},
+	).(*ModuleInstance)
+	require.True(t, ok)
+	require.NoError(t, rt.Set("exec", m.Exports().Default))
+
+	_, err := rt.RunString("exec.test.options")
+	require.ErrorContains(t, err, "getting test options in the init context is not supported")
+}
+
 func TestVUDefaultDetails(t *testing.T) {
 	t.Parallel()
 
