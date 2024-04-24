@@ -87,15 +87,17 @@ function define_tests() {
                });
            }, namedCurve + " short result");
 
-           // Non-multiple of 8
-           promise_test(function(test) {
-               return subtle.deriveBits({name: "ECDH", public: publicKeys[namedCurve]}, privateKeys[namedCurve], 8 * sizes[namedCurve] - 11)
-               .then(function(derivation) {
-                   assert_true(equalBuffers(derivation, derivations[namedCurve], 8 * sizes[namedCurve] - 11), "Derived correct bits " + namedCurve + " size: " + 8 * sizes[namedCurve] + " derivation: " + JSON.stringify(derivation) + " expected: " + JSON.stringify(derivations[namedCurve]) );
-               }, function(err) {
-                   assert_unreached("deriveBits failed with error " + err.name + ": " + err.message);
-               });
-           }, namedCurve + " non-multiple of 8 bits");
+        // TODO: once we have support of lengths that are not a multiple of 8 bits, uncomment this test
+        // https://github.com/grafana/xk6-webcrypto/issues/80
+        //   // Non-multiple of 8
+        //    promise_test(function(test) {
+        //        return subtle.deriveBits({name: "ECDH", public: publicKeys[namedCurve]}, privateKeys[namedCurve], 8 * sizes[namedCurve] - 11)
+        //        .then(function(derivation) {
+        //            assert_true(equalBuffers(derivation, derivations[namedCurve], 8 * sizes[namedCurve] - 11), "Derived correct bits " + namedCurve + " size: " + 8 * sizes[namedCurve] + " derivation: " + JSON.stringify(derivation) + " expected: " + JSON.stringify(derivations[namedCurve]) );
+        //        }, function(err) {
+        //            assert_unreached("deriveBits failed with error " + err.name + ": " + err.message);
+        //        });
+        //    }, namedCurve + " non-multiple of 8 bits");
 
            // Errors to test:
 

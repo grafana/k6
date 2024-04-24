@@ -50,6 +50,8 @@ The current state of the project is that it is an experimental module of the Web
 | `crypto.subtle.deriveKey()`  | ❌   | ❌   | ❌     |
 | `crypto.subtle.deriveBits()` | ✅   | ❌   | ❌     |
 
+Note: `deriveBits` currently doesn't support length parameter non-multiple of 8.
+
 ##### Key wrapping
 
 | API                         | AES-CBC | AES-GCM | AES-CTR | AES-KW | RSA-OAEP |

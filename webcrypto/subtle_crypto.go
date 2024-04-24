@@ -703,6 +703,12 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 			return NewError(InvalidAccessError, err.Error())
 		}
 
+		// currently we don't support lengths that are not multiples of 8
+		// https://github.com/grafana/xk6-webcrypto/issues/80
+		if length%8 != 0 {
+			return NewError(NotSupportedError, "currently only multiples of 8 are supported for length")
+		}
+
 		deriver, err = newBitsDeriver(normalizeAlgorithmName)
 		if err != nil {
 			return err
