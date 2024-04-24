@@ -2,7 +2,6 @@ package modulestest
 
 import (
 	"io"
-	"io/fs"
 	"os"
 	"path"
 	"path/filepath"
@@ -27,16 +26,6 @@ func CompileFile(base, name string) (*goja.Program, error) {
 	}()
 
 	b, err := io.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-
-	return compile(name, b)
-}
-
-// CompileFileFromFS compiles a JS file like CompileFile, but using a [fs.FS] as base.
-func CompileFileFromFS(base fs.FS, name string) (*goja.Program, error) {
-	b, err := fs.ReadFile(base, name)
 	if err != nil {
 		return nil, err
 	}

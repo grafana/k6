@@ -3,14 +3,10 @@ package modulestest
 
 import (
 	"context"
-	"embed"
-	"fmt"
-	"io/fs"
 	"net/url"
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
@@ -110,41 +106,4 @@ func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
 	impl := modules.NewLegacyRequireImpl(r.VU, ms, url.URL{})
 	return r.VU.RuntimeField.Set("require", impl.Require)
-}
-
-//go:embed wptutils/*
-var wptutils embed.FS
-
-// NewRuntimeForWPT will create a new test runtime like NewRuntime, but ready to be used
-// for Web Platform Tests (https://github.com/web-platform-tests/wpt).
-func NewRuntimeForWPT(t testing.TB) *Runtime {
-	var err error
-	runtime := NewRuntime(t)
-
-	// We want to make the [console.log()] available for Web Platform Tests, as it
-	// is very useful for debugging, because we don't have a real debugger for JS code.
-	logger := runtime.VU.InitEnvField.Logger
-	require.NoError(t, runtime.VU.RuntimeField.Set("console", newConsole(logger)))
-
-	// We compile the Web Platform Tests harness scripts into a goja.Program,
-	// and execute them in the goja runtime in order to make the Web Platform
-	// assertion functions available to the tests.
-	files, err := fs.ReadDir(wptutils, "wptutils")
-	require.NoError(t, err)
-
-	for _, file := range files {
-		// Skip directories for safety,
-		// as we expect all files to be present in the root.
-		if file.IsDir() {
-			continue
-		}
-
-		program, err := CompileFileFromFS(wptutils, fmt.Sprintf("wptutils/%s", file.Name()))
-		require.NoError(t, err)
-
-		_, err = runtime.VU.Runtime().RunProgram(program)
-		require.NoError(t, err)
-	}
-
-	return runtime
 }
