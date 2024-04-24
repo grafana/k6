@@ -95,6 +95,15 @@ func (ck *CryptoKey) ResolveCryptoKey() (*CryptoKey, error) {
 	return ck, nil
 }
 
+// Validate checks if the key is valid.
+func (ck *CryptoKey) Validate() error {
+	if ck.Type != PrivateCryptoKeyType && ck.Type != PublicCryptoKeyType && ck.Type != SecretCryptoKeyType {
+		return errors.New("invalid key type")
+	}
+
+	return nil
+}
+
 var _ CryptoKeyGenerationResult = &CryptoKey{}
 
 // ContainsUsage returns true if the key contains the specified usage.

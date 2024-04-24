@@ -640,3 +640,17 @@ func convertPublicECDHtoECDSA(k *ecdh.PublicKey) (*ecdsa.PublicKey, error) {
 		Y:     y,
 	}, nil
 }
+
+func ensureKeysUseSameCurve(k1, k2 CryptoKey) error {
+	ecAlg1, ok1 := k1.Algorithm.(EcKeyAlgorithm)
+	ecAlg2, ok2 := k2.Algorithm.(EcKeyAlgorithm)
+	if !ok1 || !ok2 {
+		return errors.New("keys are not valid elliptic curve keys")
+	}
+
+	if ecAlg1.NamedCurve != ecAlg2.NamedCurve {
+		return errors.New("keys have different curves " + string(ecAlg1.NamedCurve) + " and " + string(ecAlg2.NamedCurve))
+	}
+
+	return nil
+}

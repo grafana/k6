@@ -196,6 +196,24 @@ func TestSubtleCryptoSignVerify(t *testing.T) {
 	})
 }
 
+func TestSubtleCryptoDeriveBitsKeys(t *testing.T) {
+	t.Parallel()
+
+	t.Run("ecdh", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newConfiguredRuntime(t)
+
+		gotErr := ts.EventLoop.Start(func() error {
+			err := executeTestScripts(ts.VU.Runtime(), "./tests/derive_bits_keys", "ecdh_bits.js")
+
+			return err
+		})
+
+		assert.NoError(t, gotErr)
+	})
+}
+
 func executeTestScripts(rt *goja.Runtime, base string, scripts ...string) error {
 	for _, script := range scripts {
 		program, err := CompileFile(base, script)

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"hash"
+	"strings"
 
 	"github.com/dop251/goja"
 	"go.k6.io/k6/js/common"
@@ -631,7 +632,11 @@ func (sc *SubtleCrypto) DeriveKey(
 // using `SubtleCrypto.ImportKey`.
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
-func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, length int) *goja.Promise {
+func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of error handling
+	algorithm goja.Value,
+	baseKey goja.Value,
+	length int,
+) *goja.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -643,9 +648,16 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 		if err := rt.ExportTo(baseKey, &privateKey); err != nil {
 			return NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey")
 		}
+		if err := privateKey.Validate(); err != nil {
+			return NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey: "+err.Error())
+		}
 
 		if privateKey.Type != PrivateCryptoKeyType {
 			return NewError(InvalidAccessError, fmt.Sprintf("provided baseKey is not a private key: %v", privateKey))
+		}
+
+		if !privateKey.ContainsUsage(DeriveBitsCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "provided baseKey does not contain the 'deriveBits' usage")
 		}
 
 		alg := algorithm.ToObject(rt)
@@ -654,16 +666,44 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 		}
 
 		pcValue := alg.Get("public")
+		if common.IsNullish(pcValue) {
+			return NewError(TypeError, "algorithm does not contain a public key")
+		}
 		if err := rt.ExportTo(pcValue, &publicKey); err != nil {
-			return NewError(InvalidAccessError, "algorithm's public is not a valid CryptoKey")
+			return NewError(TypeError, "algorithm's public is not a valid CryptoKey: "+err.Error())
+		}
+		if err := publicKey.Validate(); err != nil {
+			return NewError(TypeError, "algorithm's public key is not a valid CryptoKey: "+err.Error())
 		}
 
 		if publicKey.Type != PublicCryptoKeyType {
 			return NewError(InvalidAccessError, "algorithm's public key is not a public key")
 		}
 
-		var err error
-		deriver, err = newBitsDeriver(alg.Get("name").String())
+		algName := alg.Get("name")
+		if common.IsNullish(algName) {
+			return NewError(TypeError, "algorithm does not contain a name property")
+		}
+		normalizeAlgorithmName := strings.ToUpper(algName.String())
+
+		keyAlgorithmNameValue, err := traverseObject(rt, pcValue, "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalizeAlgorithmName != keyAlgorithmNameValue.String() {
+			return NewError(
+				InvalidAccessError,
+				"algorithm name does not match public key's algorithm name: "+
+					normalizeAlgorithmName+" != "+keyAlgorithmNameValue.String(),
+			)
+		}
+
+		if err := ensureKeysUseSameCurve(privateKey, publicKey); err != nil {
+			return NewError(InvalidAccessError, err.Error())
+		}
+
+		deriver, err = newBitsDeriver(normalizeAlgorithmName)
 		if err != nil {
 			return err
 		}
@@ -683,6 +723,10 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 			b, err := deriver(privateKey, publicKey)
 			if err != nil {
 				return nil, NewError(OperationError, err.Error())
+			}
+
+			if length == 0 {
+				return b, nil
 			}
 
 			if len(b) < length/8 {
