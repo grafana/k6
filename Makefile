@@ -22,7 +22,7 @@ check-linter-version:
 ## lint: Runs the linters.
 lint: check-linter-version
 	echo "Running linters..."
-	golangci-lint run --out-format=tab --new-from-rev master ./...
+	golangci-lint run --out-format=tab ./...
 
 ## tests: Executes any unit tests.
 tests:
