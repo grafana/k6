@@ -1,7 +1,6 @@
 package modulestest
 
 import (
-	"io"
 	"os"
 	"path"
 	"path/filepath"
@@ -10,34 +9,16 @@ import (
 )
 
 // CompileFile compiles a JS file as a [*goja.Program].
+//
+// The base path is used to resolve the file path. The name is the file name.
+//
+// This function facilitates evaluating javascript test files in a [goja.Runtime] using
+// the [goja.Runtime.RunProgram] method.
 func CompileFile(base, name string) (*goja.Program, error) {
-	filename := path.Join(base, name)
-
-	//nolint:forbidigo // Allow os.Open in tests
-	f, err := os.Open(filepath.Clean(filename))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	b, err := io.ReadAll(f)
+	b, err := os.ReadFile(filepath.Clean(path.Join(base, name))) //nolint:forbidigo
 	if err != nil {
 		return nil, err
 	}
 
-	return compile(name, b)
-}
-
-func compile(name string, b []byte) (*goja.Program, error) {
-	program, err := goja.Compile(name, string(b), false)
-	if err != nil {
-		return nil, err
-	}
-
-	return program, nil
+	return goja.Compile(name, string(b), false)
 }
