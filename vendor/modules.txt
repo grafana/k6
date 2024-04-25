@@ -187,7 +187,7 @@ github.com/grafana/xk6-redis/redis
 # github.com/grafana/xk6-webcrypto v0.2.1
 ## explicit; go 1.19
 github.com/grafana/xk6-webcrypto/webcrypto
-# github.com/grafana/xk6-websockets v0.3.0
+# github.com/grafana/xk6-websockets v0.4.0
 ## explicit; go 1.18
 github.com/grafana/xk6-websockets/websockets
 github.com/grafana/xk6-websockets/websockets/events
