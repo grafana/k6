@@ -1,14 +1,15 @@
 package webcrypto
 
 import (
-	"crypto/hmac"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"hash"
+	"strings"
 
 	"github.com/dop251/goja"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/promises"
 )
 
 // FIXME: SubtleCrypto is described as an "interface", should it be a nested module
@@ -37,73 +38,74 @@ type SubtleCrypto struct {
 // The `key` parameter should be a `CryptoKey` to be used for encryption.
 //
 // The `data` parameter should contain the data to be encryption.
-func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
+	algorithm, key, data goja.Value,
+) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	// 2.
-	// We obtain a copy of the key data, because we might need to modify it.
-	plaintext, err := exportArrayBuffer(rt, data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var (
+		plaintext []byte
+		ck        CryptoKey
+		encrypter EncryptDecrypter
+	)
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierEncrypt)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	err := func() error {
+		var err error
 
-	var ck CryptoKey
-	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(TypeError, "key argument does hold not a valid CryptoKey object"))
-		return promise
-	}
-
-	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	// 8.
-	if normalized.Name != keyAlgorithmNameValue.String() {
-		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-		return promise
-	}
-
-	encrypter, err := newEncryptDecrypter(rt, normalized, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	go func() {
-		// 9.
-		if !ck.ContainsUsage(EncryptCryptoKeyUsage) {
-			reject(NewError(InvalidAccessError, "key does not contain the 'encrypt' usage"))
-			return
+		plaintext, err = exportArrayBuffer(rt, data)
+		if err != nil {
+			return err
 		}
 
-		var ciphertext []byte
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierEncrypt)
+		if err != nil {
+			return err
+		}
 
-		switch normalized.Name {
-		case AESCbc, AESCtr, AESGcm:
-			// 10.
-			ciphertext, err = encrypter.Encrypt(plaintext, ck)
+		if err = rt.ExportTo(key, &ck); err != nil {
+			return NewError(InvalidAccessError, "encrypt's key argument does hold not a valid CryptoKey object")
+		}
+
+		keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalized.Name != keyAlgorithmNameValue.String() {
+			return NewError(InvalidAccessError, "encrypt's algorithm name does not match key algorithm name")
+		}
+
+		encrypter, err = newEncryptDecrypter(rt, normalized, algorithm)
+		if err != nil {
+			return err
+		}
+
+		if !ck.ContainsUsage(EncryptCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "encrypt's key does not contain the 'encrypt' usage")
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := encrypter.Encrypt(plaintext, ck)
+
+		callback(func() error {
 			if err != nil {
 				reject(err)
-				return
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
 			}
 
-			resolve(rt.NewArrayBuffer(ciphertext))
-			return
-		default:
-			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
-			return
-		}
+			resolve(rt.NewArrayBuffer(result))
+			return nil
+		})
 	}()
 
 	return promise
@@ -129,71 +131,73 @@ func (sc *SubtleCrypto) Encrypt(algorithm, key, data goja.Value) *goja.Promise {
 // The `key` parameter should be a `CryptoKey` to be used for decryption.
 //
 // The `data` parameter should contain the data to be decrypted.
-func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
+	algorithm, key, data goja.Value,
+) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	// 2.
-	// We obtain a copy of the key data, because we might need to modify it.
-	ciphertext, err := exportArrayBuffer(rt, data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var (
+		ciphertext []byte
+		ck         CryptoKey
+		decrypter  EncryptDecrypter
+	)
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDecrypt)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	var ck CryptoKey
-	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
-		return promise
-	}
-
-	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	// 8.
-	if normalized.Name != keyAlgorithmNameValue.String() {
-		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-		return promise
-	}
-
-	decrypter, err := newEncryptDecrypter(rt, normalized, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	go func() {
-		// 9.
-		if !ck.ContainsUsage(DecryptCryptoKeyUsage) {
-			reject(NewError(InvalidAccessError, "key does not contain the 'decrypt' usage"))
-			return
+	err := func() error {
+		var err error
+		ciphertext, err = exportArrayBuffer(rt, data)
+		if err != nil {
+			return err
 		}
 
-		var plaintext []byte
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDecrypt)
+		if err != nil {
+			return err
+		}
 
-		switch normalized.Name {
-		case AESCbc, AESCtr, AESGcm:
-			// 10.
-			plaintext, err = decrypter.Decrypt(ciphertext, ck)
+		if err = rt.ExportTo(key, &ck); err != nil {
+			return NewError(InvalidAccessError, "decrypt's key argument does hold not a valid CryptoKey object")
+		}
+
+		keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalized.Name != keyAlgorithmNameValue.String() {
+			return NewError(InvalidAccessError, "decrypt's algorithm name does not match key algorithm name")
+		}
+
+		decrypter, err = newEncryptDecrypter(rt, normalized, algorithm)
+		if err != nil {
+			return err
+		}
+
+		if !ck.ContainsUsage(DecryptCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "decrypt's key does not contain the 'decrypt' usage")
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := decrypter.Decrypt(ciphertext, ck)
+
+		callback(func() error {
 			if err != nil {
 				reject(err)
-				return
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
 			}
 
-			resolve(rt.NewArrayBuffer(plaintext))
-		default:
-			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
-		}
+			resolve(rt.NewArrayBuffer(result))
+			return nil
+		})
 	}()
 
 	return promise
@@ -221,79 +225,74 @@ func (sc *SubtleCrypto) Decrypt(algorithm, key, data goja.Value) *goja.Promise {
 // The `data` parameter should contain the data to be signed.
 func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	// 2.
-	// We obtain a copy of the key data, because we might need to modify it.
-	dataToSign, err := exportArrayBuffer(rt, data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var (
+		dataToSign []byte
+		ck         CryptoKey
+		signer     SignerVerifier
+	)
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierSign)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	err := func() error {
+		var err error
+		// 2.
+		// We obtain a copy of the key data, because we might need to modify it.
+		dataToSign, err = exportArrayBuffer(rt, data)
+		if err != nil {
+			return err
+		}
 
-	var ck CryptoKey
-	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
-		return promise
-	}
+		// 3.
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierSign)
+		if err != nil {
+			return err
+		}
 
-	keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
-	if err != nil {
-		reject(err)
-		return promise
-	}
+		signer, err = newSignerVerifier(rt, normalized, algorithm)
+		if err != nil {
+			return err
+		}
 
-	go func() {
+		if err = rt.ExportTo(key, &ck); err != nil {
+			return NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object")
+		}
+
+		keyAlgorithmNameValue, err := traverseObject(rt, key.ToObject(rt), "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
 		// 8.
 		if normalized.Name != keyAlgorithmNameValue.String() {
-			reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-			return
+			return NewError(InvalidAccessError, "algorithm name does not match key algorithm name")
 		}
 
 		// 9.
-		for !ck.ContainsUsage(SignCryptoKeyUsage) {
-			reject(NewError(InvalidAccessError, "key does not contain the 'sign' usage"))
-			return
+		if !ck.ContainsUsage(SignCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "key does not contain the 'sign' usage")
 		}
 
-		// 10.
-		switch normalized.Name {
-		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(HMACKeyAlgorithm)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
-				return
-			}
+		return nil
+	}()
 
-			keyHandle, ok := ck.handle.([]byte)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key handle is of incorrect type"))
-				return
-			}
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
 
-			hashFn, err := keyAlgorithm.HashFn()
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		signature, err := signer.Sign(ck, dataToSign)
+
+		callback(func() error {
 			if err != nil {
 				reject(err)
-				return
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
 			}
 
-			hasher := hmac.New(hashFn, keyHandle)
-			hasher.Write(dataToSign)
-
-			// 10.
-			mac := hasher.Sum(nil)
-
-			resolve(rt.NewArrayBuffer(mac))
-		default:
-			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalized.Name)))
-		}
+			resolve(rt.NewArrayBuffer(signature))
+			return nil
+		})
 	}()
 
 	return promise
@@ -324,81 +323,75 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 // The `data` parameter should contain the original signed data.
 func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	// 2.
-	signatureData, err := exportArrayBuffer(sc.vu.Runtime(), signature)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var (
+		signatureData, signedData []byte
+		verifier                  SignerVerifier
+		ck                        CryptoKey
+	)
 
-	// 3.
-	signedData, err := exportArrayBuffer(sc.vu.Runtime(), data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	err := func() error {
+		var err error
 
-	// 4.
-	normalizedAlgorithm, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierVerify)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+		signatureData, err = exportArrayBuffer(sc.vu.Runtime(), signature)
+		if err != nil {
+			return err
+		}
 
-	var ck CryptoKey
-	if err = rt.ExportTo(key, &ck); err != nil {
-		reject(NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object"))
-		return promise
-	}
+		signedData, err = exportArrayBuffer(sc.vu.Runtime(), data)
+		if err != nil {
+			return err
+		}
 
-	keyAlgorithmNameValue, err := traverseObject(rt, key, "algorithm", "name")
-	if err != nil {
-		reject(err)
-		return promise
-	}
+		normalizedAlgorithm, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierVerify)
+		if err != nil {
+			return err
+		}
 
-	go func() {
-		// 9.
+		verifier, err = newSignerVerifier(rt, normalizedAlgorithm, algorithm)
+		if err != nil {
+			return err
+		}
+
+		if err = rt.ExportTo(key, &ck); err != nil {
+			return NewError(InvalidAccessError, "key argument does hold not a valid CryptoKey object")
+		}
+
+		keyAlgorithmNameValue, err := traverseObject(rt, key, "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
 		if normalizedAlgorithm.Name != keyAlgorithmNameValue.String() {
-			reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-			return
+			return NewError(InvalidAccessError, "algorithm name does not match key algorithm name")
 		}
 
-		// 10.
-		for !ck.ContainsUsage(VerifyCryptoKeyUsage) {
-			reject(NewError(InvalidAccessError, "key does not contain the 'sign' usage"))
-			return
+		if !ck.ContainsUsage(VerifyCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "key does not contain the 'sign' usage")
 		}
 
-		switch normalizedAlgorithm.Name {
-		case HMAC:
-			keyAlgorithm, ok := ck.Algorithm.(HMACKeyAlgorithm)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key algorithm does not describe a HMAC key"))
-				return
-			}
+		return nil
+	}()
 
-			keyHandle, ok := ck.handle.([]byte)
-			if !ok {
-				reject(NewError(InvalidAccessError, "key handle is of incorrect type"))
-				return
-			}
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
 
-			hashFn, err := keyAlgorithm.HashFn()
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		verified, err := verifier.Verify(ck, signatureData, signedData)
+
+		callback(func() error {
 			if err != nil {
 				reject(err)
-				return
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
 			}
 
-			hasher := hmac.New(hashFn, keyHandle)
-			hasher.Write(signedData)
-
-			resolve(hmac.Equal(signatureData, hasher.Sum(nil)))
-		default:
-			reject(NewError(NotSupportedError, fmt.Sprintf("unsupported algorithm %q", normalizedAlgorithm.Name)))
-		}
+			resolve(verified)
+			return nil
+		})
 	}()
 
 	return promise
@@ -423,49 +416,63 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 //
 // The `data` parameter should contain the data to be digested.
 func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Promise {
-	promise, resolve, reject := promises.New(sc.vu)
 	rt := sc.vu.Runtime()
 
-	// Validate that the value we received is either an ArrayBuffer, TypedArray, or DataView
-	// This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
-	if !IsInstanceOf(sc.vu.Runtime(), data, ArrayBufferConstructor, DataViewConstructor) &&
-		!IsTypedArray(sc.vu.Runtime(), data) {
-		reject(errors.New("data must be an ArrayBuffer, TypedArray, or DataView"))
-		return promise
-	}
+	var (
+		hashFn func() hash.Hash
+		bytes  []byte
+	)
 
-	// 2.
-	bytes, err := exportArrayBuffer(rt, data)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	err := func() error {
+		var err error
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
-	if err != nil {
-		// "if an error occurred, return a Promise rejected with NormalizedAlgorithm"
-		reject(err)
-		return promise
-	}
-
-	// 6.
-	go func() {
-		// 6.
-		hashFn, ok := getHashFn(normalized.Name)
-		if !ok {
-			// 7.
-			reject(NewError(NotSupportedError, "unsupported algorithm: "+normalized.Name))
-			return
+		// Validate that the value we received is either an ArrayBuffer, TypedArray, or DataView
+		// This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
+		if !IsInstanceOf(sc.vu.Runtime(), data, ArrayBufferConstructor, DataViewConstructor) &&
+			!IsTypedArray(sc.vu.Runtime(), data) {
+			return errors.New("data must be an ArrayBuffer, TypedArray, or DataView")
 		}
 
-		// 8.
+		bytes, err = exportArrayBuffer(rt, data)
+		if err != nil {
+			return err
+		}
+
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierDigest)
+		if err != nil {
+			return err
+		}
+
+		var ok bool
+		hashFn, ok = getHashFn(normalized.Name)
+		if !ok {
+			return NewError(NotSupportedError, "unsupported algorithm: "+normalized.Name)
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
 		hash := hashFn()
 		hash.Write(bytes)
 		digest := hash.Sum(nil)
 
-		// 9.
-		resolve(rt.NewArrayBuffer(digest))
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(rt.NewArrayBuffer(digest))
+			return nil
+		})
 	}()
 
 	return promise
@@ -490,38 +497,66 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
 func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyUsages []CryptoKeyUsage) *goja.Promise {
-	promise, resolve, reject := promises.New(sc.vu)
+	rt := sc.vu.Runtime()
 
-	normalized, err := normalizeAlgorithm(sc.vu.Runtime(), algorithm, OperationIdentifierGenerateKey)
-	if err != nil {
-		reject(err)
-		return promise
-	}
+	var keyGenerator KeyGenerator
 
-	keyGenerator, err := newKeyGenerator(sc.vu.Runtime(), normalized, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	go func() {
-		// 7.
-		result, err := keyGenerator.GenerateKey(extractable, keyUsages)
+	err := func() error {
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierGenerateKey)
 		if err != nil {
-			reject(err)
-			return
+			return err
 		}
 
-		// 8.
-		isSecretKey := result.Type == SecretCryptoKeyType
-		isPrivateKey := result.Type == PrivateCryptoKeyType
-		isUsagesEmpty := len(result.Usages) == 0
-		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-			reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
-			return
+		keyGenerator, err = newKeyGenerator(rt, normalized, algorithm)
+		if err != nil {
+			return err
 		}
 
-		resolve(result)
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := func() (CryptoKeyGenerationResult, error) {
+			result, err := keyGenerator.GenerateKey(extractable, keyUsages)
+			if err != nil {
+				return nil, err
+			}
+
+			if result.IsKeyPair() {
+				return result, nil
+			}
+
+			cryptoKey, err := result.ResolveCryptoKey()
+			if err != nil {
+				return nil, NewError(OperationError, "usages cannot not be empty for a secret or private CryptoKey")
+			}
+
+			isSecretKey := cryptoKey.Type == SecretCryptoKeyType
+			isPrivateKey := cryptoKey.Type == PrivateCryptoKeyType
+			isUsagesEmpty := len(cryptoKey.Usages) == 0
+			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+				return nil, NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey")
+			}
+
+			return result, nil
+		}()
+
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(result)
+			return nil
+		})
 	}()
 
 	return promise
@@ -597,11 +632,128 @@ func (sc *SubtleCrypto) DeriveKey(
 // using `SubtleCrypto.ImportKey`.
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
-//
-//nolint:revive // remove the nolint directive when the method is implemented
-func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, length int) *goja.Promise {
-	// TODO: implementation
-	return nil
+func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of error handling
+	algorithm goja.Value,
+	baseKey goja.Value,
+	length int,
+) *goja.Promise {
+	rt := sc.vu.Runtime()
+
+	var (
+		publicKey, privateKey CryptoKey
+		deriver               bitsDeriver
+	)
+
+	err := func() error {
+		if err := rt.ExportTo(baseKey, &privateKey); err != nil {
+			return NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey")
+		}
+		if err := privateKey.Validate(); err != nil {
+			return NewError(InvalidAccessError, "provided baseKey is not a valid CryptoKey: "+err.Error())
+		}
+
+		if privateKey.Type != PrivateCryptoKeyType {
+			return NewError(InvalidAccessError, fmt.Sprintf("provided baseKey is not a private key: %v", privateKey))
+		}
+
+		if !privateKey.ContainsUsage(DeriveBitsCryptoKeyUsage) {
+			return NewError(InvalidAccessError, "provided baseKey does not contain the 'deriveBits' usage")
+		}
+
+		alg := algorithm.ToObject(rt)
+		if common.IsNullish(alg) {
+			return NewError(InvalidAccessError, "algorithm is not an object")
+		}
+
+		pcValue := alg.Get("public")
+		if common.IsNullish(pcValue) {
+			return NewError(TypeError, "algorithm does not contain a public key")
+		}
+		if err := rt.ExportTo(pcValue, &publicKey); err != nil {
+			return NewError(TypeError, "algorithm's public is not a valid CryptoKey: "+err.Error())
+		}
+		if err := publicKey.Validate(); err != nil {
+			return NewError(TypeError, "algorithm's public key is not a valid CryptoKey: "+err.Error())
+		}
+
+		if publicKey.Type != PublicCryptoKeyType {
+			return NewError(InvalidAccessError, "algorithm's public key is not a public key")
+		}
+
+		algName := alg.Get("name")
+		if common.IsNullish(algName) {
+			return NewError(TypeError, "algorithm does not contain a name property")
+		}
+		normalizeAlgorithmName := strings.ToUpper(algName.String())
+
+		keyAlgorithmNameValue, err := traverseObject(rt, pcValue, "algorithm", "name")
+		if err != nil {
+			return err
+		}
+
+		if normalizeAlgorithmName != keyAlgorithmNameValue.String() {
+			return NewError(
+				InvalidAccessError,
+				"algorithm name does not match public key's algorithm name: "+
+					normalizeAlgorithmName+" != "+keyAlgorithmNameValue.String(),
+			)
+		}
+
+		if err := ensureKeysUseSameCurve(privateKey, publicKey); err != nil {
+			return NewError(InvalidAccessError, err.Error())
+		}
+
+		// currently we don't support lengths that are not multiples of 8
+		// https://github.com/grafana/xk6-webcrypto/issues/80
+		if length%8 != 0 {
+			return NewError(NotSupportedError, "currently only multiples of 8 are supported for length")
+		}
+
+		deriver, err = newBitsDeriver(normalizeAlgorithmName)
+		if err != nil {
+			return err
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := func() ([]byte, error) {
+			b, err := deriver(privateKey, publicKey)
+			if err != nil {
+				return nil, NewError(OperationError, err.Error())
+			}
+
+			if length == 0 {
+				return b, nil
+			}
+
+			if len(b) < length/8 {
+				return nil, NewError(OperationError, "length is too large")
+			}
+
+			return b[:length/8], nil
+		}()
+
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(rt.NewArrayBuffer(result))
+			return nil
+		})
+	}()
+
+	return promise
 }
 
 // ImportKey imports a key: that is, it takes as input a key in an external, portable
@@ -622,7 +774,7 @@ func (sc *SubtleCrypto) DeriveBits(algorithm goja.Value, baseKey goja.Value, len
 //     `ALGORITHM` is the name of the algorithm.
 //   - for PBKDF2: pass the string "PBKDF2"
 //   - for HKDF: pass the string "HKDF"
-func (sc *SubtleCrypto) ImportKey(
+func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
 	keyData goja.Value,
 	algorithm goja.Value,
@@ -630,72 +782,80 @@ func (sc *SubtleCrypto) ImportKey(
 	keyUsages []CryptoKeyUsage,
 ) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	var keyBytes []byte
+	var (
+		keyBytes []byte
+		ki       KeyImporter
+	)
 
-	// 2.
-	switch format {
-	case RawKeyFormat:
-		ab, err := exportArrayBuffer(rt, keyData)
+	err := func() error {
+		switch format {
+		case Pkcs8KeyFormat, RawKeyFormat, SpkiKeyFormat:
+			ab, err := exportArrayBuffer(rt, keyData)
+			if err != nil {
+				return err
+			}
+
+			keyBytes = make([]byte, len(ab))
+			copy(keyBytes, ab)
+		case JwkKeyFormat:
+			var err error
+			keyBytes, err = json.Marshal(keyData.Export())
+			if err != nil {
+				return NewError(ImplementationError, "invalid keyData format for JWK format: "+err.Error())
+			}
+		default:
+			return NewError(ImplementationError, "unsupported format "+format)
+		}
+		normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierImportKey)
 		if err != nil {
-			reject(err)
-			return promise
+			return err
 		}
 
-		keyBytes = make([]byte, len(ab))
-		copy(keyBytes, ab)
-	case JwkKeyFormat:
-		var err error
-		keyBytes, err = json.Marshal(keyData.Export())
+		ki, err = newKeyImporter(rt, normalized, algorithm)
 		if err != nil {
-			reject(NewError(ImplementationError, "wrong keyData format for JWK format: "+err.Error()))
-			return promise
+			return err
 		}
-	default:
-		reject(NewError(ImplementationError, "unsupported format "+format))
-		return promise
-	}
 
-	// 3.
-	normalized, err := normalizeAlgorithm(rt, algorithm, OperationIdentifierImportKey)
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
 	if err != nil {
 		reject(err)
 		return promise
 	}
 
-	ki, err := newKeyImporter(rt, normalized, algorithm)
-	if err != nil {
-		reject(err)
-		return promise
-	}
-
-	// 5.
+	callback := sc.vu.RegisterCallback()
 	go func() {
-		// 8.
-		result, err := ki.ImportKey(format, keyBytes, keyUsages)
-		if err != nil {
-			reject(err)
-			return
-		}
+		result, err := func() (*CryptoKey, error) {
+			result, err := ki.ImportKey(format, keyBytes, keyUsages)
+			if err != nil {
+				return nil, err
+			}
 
-		// 9.
-		isSecretKey := result.Type == SecretCryptoKeyType
-		isPrivateKey := result.Type == PrivateCryptoKeyType
-		isUsagesEmpty := len(keyUsages) == 0
-		if (isSecretKey || isPrivateKey) && isUsagesEmpty {
-			reject(NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey"))
-			return
-		}
+			isSecretKey := result.Type == SecretCryptoKeyType
+			isPrivateKey := result.Type == PrivateCryptoKeyType
+			isUsagesEmpty := len(keyUsages) == 0
+			if (isSecretKey || isPrivateKey) && isUsagesEmpty {
+				return nil, NewError(SyntaxError, "usages cannot not be empty for a secret or private CryptoKey")
+			}
 
-		// 10.
-		result.Extractable = extractable
+			result.Extractable = extractable
+			result.Usages = keyUsages
 
-		// 11.
-		result.Usages = keyUsages
+			return result, nil
+		}()
 
-		// 12.
-		resolve(result)
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			resolve(result)
+			return nil
+		})
 	}()
 
 	return promise
@@ -715,80 +875,94 @@ func (sc *SubtleCrypto) ImportKey(
 //
 // The `format` parameter identifies the format of the key data.
 // The `key` parameter is the key to export, as a CryptoKey object.
-func (sc *SubtleCrypto) ExportKey(format KeyFormat, key goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error handling
+	format KeyFormat,
+	key goja.Value,
+) *goja.Promise {
 	rt := sc.vu.Runtime()
-	promise, resolve, reject := promises.New(sc.vu)
 
-	var algorithm Algorithm
-	algValue := key.ToObject(rt).Get("algorithm")
-	if err := rt.ExportTo(algValue, &algorithm); err != nil {
-		reject(NewError(SyntaxError, "key is not a valid CryptoKey"))
-		return promise
-	}
+	var (
+		ck          *CryptoKey
+		keyExporter func(*CryptoKey, KeyFormat) (interface{}, error)
+	)
 
-	ck, ok := key.Export().(*CryptoKey)
-	if !ok {
-		reject(NewError(ImplementationError, "unable to extract CryptoKey"))
-		return promise
-	}
-
-	inputAlgorithm := key.ToObject(rt).Get("algorithm").ToObject(rt)
-
-	keyAlgorithmName := inputAlgorithm.Get("name").String()
-	if algorithm.Name != keyAlgorithmName {
-		reject(NewError(InvalidAccessError, "algorithm name does not match key algorithm name"))
-		return promise
-	}
-
-	go func() {
-		// 5.
-		if !isRegisteredAlgorithm(algorithm.Name, OperationIdentifierExportKey) {
-			reject(NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name))
-			return
+	err := func() error {
+		keyObj := key.ToObject(rt)
+		if common.IsNullish(keyObj) {
+			return NewError(InvalidAccessError, "key is not an object")
 		}
 
-		// 6.
-		if !ck.Extractable {
-			reject(NewError(InvalidAccessError, "the key is not extractable"))
-			return
-		}
-
-		var result interface{}
-		var err error
-
-		switch keyAlgorithmName {
-		case AESCbc, AESCtr, AESGcm:
-			result, err = exportAESKey(ck, format)
-			if err != nil {
-				reject(err)
-				return
-			}
-		case HMAC:
-			result, err = exportHMACKey(ck, format)
-			if err != nil {
-				reject(err)
-				return
-			}
-		default:
-			reject(NewError(NotSupportedError, "unsupported algorithm "+keyAlgorithmName))
-			return
-		}
-
-		if format != RawKeyFormat {
-			resolve(result)
-			return
-		}
-
-		b, ok := result.([]byte)
+		var ok bool
+		ck, ok = key.Export().(*CryptoKey)
 		if !ok {
-			reject(NewError(ImplementationError, "for "+format+" []byte expected as result"))
-			return
+			return NewError(ImplementationError, "unable to extract CryptoKey from key object")
 		}
 
-		resolve(rt.NewArrayBuffer(b))
+		var algorithm Algorithm
+		algObj := keyObj.Get("algorithm")
+		if err := rt.ExportTo(algObj, &algorithm); err != nil {
+			return NewError(SyntaxError, "key is not a valid Algorithm")
+		}
+
+		if !isRegisteredAlgorithm(algorithm.Name, OperationIdentifierExportKey) {
+			return NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
+		}
+
+		if !ck.Extractable {
+			return NewError(InvalidAccessError, "the key is not extractable")
+		}
+
+		switch algorithm.Name {
+		case AESCbc, AESCtr, AESGcm:
+			keyExporter = exportAESKey
+		case HMAC:
+			keyExporter = exportHMACKey
+		case ECDH, ECDSA:
+			keyExporter = exportECKey
+		default:
+			return NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
+		}
+
+		return nil
+	}()
+
+	promise, resolve, reject := rt.NewPromise()
+	if err != nil {
+		reject(err)
+		return promise
+	}
+
+	callback := sc.vu.RegisterCallback()
+	go func() {
+		result, err := keyExporter(ck, format)
+
+		callback(func() error {
+			if err != nil {
+				reject(err)
+				return nil //nolint:nilerr // we return nil to indicate that the error was handled
+			}
+
+			if !isBinaryExportedFormat(format) {
+				resolve(result)
+				return nil
+			}
+
+			b, ok := result.([]byte)
+			if !ok {
+				reject(NewError(ImplementationError, "for "+format+" []byte expected as result"))
+				return nil
+			}
+
+			resolve(rt.NewArrayBuffer(b))
+			return nil
+		})
 	}()
 
 	return promise
+}
+
+func isBinaryExportedFormat(format KeyFormat) bool {
+	return format == RawKeyFormat || format == Pkcs8KeyFormat || format == SpkiKeyFormat
 }
 
 // WrapKey  "wraps" a key.
