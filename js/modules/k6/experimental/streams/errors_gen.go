@@ -4,14 +4,11 @@ package streams
 
 import (
 	"fmt"
-	"strings"
 )
 
-const _errorKindName = "TypeErrorRangeErrorRuntimeErrorAssertionError"
+const _errorKindName = "TypeErrorRangeErrorRuntimeErrorAssertionErrorNotSupportedError"
 
-var _errorKindIndex = [...]uint8{0, 9, 19, 31, 45}
-
-const _errorKindLowerName = "typeerrorrangeerrorruntimeerrorassertionerror"
+var _errorKindIndex = [...]uint8{0, 9, 19, 31, 45, 62}
 
 func (i errorKind) String() string {
 	i -= 1
@@ -21,34 +18,14 @@ func (i errorKind) String() string {
 	return _errorKindName[_errorKindIndex[i]:_errorKindIndex[i+1]]
 }
 
-// An "invalid array index" compiler error signifies that the constant values have changed.
-// Re-run the stringer command to generate them again.
-func _errorKindNoOp() {
-	var x [1]struct{}
-	_ = x[TypeError-(1)]
-	_ = x[RangeError-(2)]
-	_ = x[RuntimeError-(3)]
-	_ = x[AssertionError-(4)]
-}
-
-var _errorKindValues = []errorKind{TypeError, RangeError, RuntimeError, AssertionError}
+var _errorKindValues = []errorKind{1, 2, 3, 4, 5}
 
 var _errorKindNameToValueMap = map[string]errorKind{
-	_errorKindName[0:9]:        TypeError,
-	_errorKindLowerName[0:9]:   TypeError,
-	_errorKindName[9:19]:       RangeError,
-	_errorKindLowerName[9:19]:  RangeError,
-	_errorKindName[19:31]:      RuntimeError,
-	_errorKindLowerName[19:31]: RuntimeError,
-	_errorKindName[31:45]:      AssertionError,
-	_errorKindLowerName[31:45]: AssertionError,
-}
-
-var _errorKindNames = []string{
-	_errorKindName[0:9],
-	_errorKindName[9:19],
-	_errorKindName[19:31],
-	_errorKindName[31:45],
+	_errorKindName[0:9]:   1,
+	_errorKindName[9:19]:  2,
+	_errorKindName[19:31]: 3,
+	_errorKindName[31:45]: 4,
+	_errorKindName[45:62]: 5,
 }
 
 // errorKindString retrieves an enum value from the enum constants string name.
@@ -57,23 +34,12 @@ func errorKindString(s string) (errorKind, error) {
 	if val, ok := _errorKindNameToValueMap[s]; ok {
 		return val, nil
 	}
-
-	if val, ok := _errorKindNameToValueMap[strings.ToLower(s)]; ok {
-		return val, nil
-	}
 	return 0, fmt.Errorf("%s does not belong to errorKind values", s)
 }
 
 // errorKindValues returns all values of the enum
 func errorKindValues() []errorKind {
 	return _errorKindValues
-}
-
-// errorKindStrings returns a slice of all String values of the enum
-func errorKindStrings() []string {
-	strs := make([]string, len(_errorKindNames))
-	copy(strs, _errorKindNames)
-	return strs
 }
 
 // IsAerrorKind returns "true" if the value is listed in the enum definition. "false" otherwise

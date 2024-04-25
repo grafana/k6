@@ -61,6 +61,7 @@ var _ ReadableStreamController = &ReadableStreamDefaultController{}
 func NewReadableStreamDefaultControllerObject(controller *ReadableStreamDefaultController) (*goja.Object, error) {
 	rt := controller.stream.runtime
 	obj := rt.NewObject()
+	objName := "ReadableStreamDefaultController"
 
 	err := obj.DefineAccessorProperty("desiredSize", rt.ToValue(func() goja.Value {
 		desiredSize := controller.getDesiredSize()
@@ -74,21 +75,21 @@ func NewReadableStreamDefaultControllerObject(controller *ReadableStreamDefaultC
 	}
 
 	// Exposing the properties of the [ReadableStreamController] interface
-	if err := setReadOnlyPropertyOf(obj, "constructor", rt.ToValue(func() goja.Value {
+	if err := setReadOnlyPropertyOf(obj, objName, "constructor", rt.ToValue(func() goja.Value {
 		return rt.ToValue(&ReadableStreamDefaultController{})
 	})); err != nil {
 		return nil, err
 	}
 
-	if err := setReadOnlyPropertyOf(obj, "close", rt.ToValue(controller.Close)); err != nil {
+	if err := setReadOnlyPropertyOf(obj, objName, "close", rt.ToValue(controller.Close)); err != nil {
 		return nil, err
 	}
 
-	if err := setReadOnlyPropertyOf(obj, "enqueue", rt.ToValue(controller.Enqueue)); err != nil {
+	if err := setReadOnlyPropertyOf(obj, objName, "enqueue", rt.ToValue(controller.Enqueue)); err != nil {
 		return nil, err
 	}
 
-	if err := setReadOnlyPropertyOf(obj, "error", rt.ToValue(controller.Error)); err != nil {
+	if err := setReadOnlyPropertyOf(obj, objName, "error", rt.ToValue(controller.Error)); err != nil {
 		return nil, err
 	}
 
@@ -212,14 +213,14 @@ func (controller *ReadableStreamDefaultController) pullSteps(readRequest ReadReq
 	}
 }
 
-// releaseSteps performs the controller’s steps that run when a reader is
-// released, used to clean up reader-specific resources stored in the controller.
+// releaseSteps implements the [ReleaseSteps] contract following the default controller's
+// [specification].
 //
-// It implements the ReadableStreamDefaultControllerReleaseSteps [specification]
-// algorithm.
-//
-// [specification]: https://streams.spec.whatwg.org/#readable-stream-default-controller-release-steps
+// [ReleaseSteps]: https://streams.spec.whatwg.org/#abstract-opdef-readablestreamcontroller-releasesteps
+// [specification]: https://streams.spec.whatwg.org/#abstract-opdef-readablestreamdefaultcontroller-releasesteps
 func (controller *ReadableStreamDefaultController) releaseSteps() {
+	// 1.
+	return //nolint:gosimple
 }
 
 // close implements the [ReadableStreamDefaultControllerClose] algorithm

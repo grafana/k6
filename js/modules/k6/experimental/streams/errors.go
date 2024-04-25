@@ -74,6 +74,9 @@ const (
 
 	// AssertionError is thrown when an assertion fails
 	AssertionError
+
+	// NotSupportedError is thrown when a feature is not supported, or not yet implemented
+	NotSupportedError
 )
 
 type streamError struct {

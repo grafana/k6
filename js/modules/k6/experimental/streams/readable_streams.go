@@ -80,7 +80,7 @@ func (stream *ReadableStream) GetReader(options *goja.Object) goja.Value {
 	}
 
 	// 3. Return ? AcquireReadableStreamBYOBReader(this).
-	common.Throw(stream.runtime, newError(RuntimeError, "'byob' mode is not supported yet"))
+	common.Throw(stream.runtime, newError(NotSupportedError, "'byob' mode is not supported yet"))
 	return goja.Undefined()
 }
 
@@ -88,7 +88,7 @@ func (stream *ReadableStream) GetReader(options *goja.Object) goja.Value {
 //
 // [tee]: https://streams.spec.whatwg.org/#rs-tee
 func (stream *ReadableStream) Tee() goja.Value {
-	common.Throw(stream.runtime, newError(RuntimeError, "'tee()' is not supported yet"))
+	common.Throw(stream.runtime, newError(NotSupportedError, "'tee()' is not supported yet"))
 	return goja.Undefined()
 }
 
@@ -536,7 +536,7 @@ func (stream *ReadableStream) error(e any) {
 
 	// 9. OTHERWISE, reader is a ReadableStreamBYOBReader
 	// 9.1. Assert: reader implements ReadableStreamBYOBReader.
-	common.Throw(stream.vu.Runtime(), newError(RuntimeError, "ReadableStreamBYOBReader is not supported yet"))
+	common.Throw(stream.vu.Runtime(), newError(NotSupportedError, "ReadableStreamBYOBReader is not supported yet"))
 }
 
 // fulfillReadRequest implements the [ReadableStreamFulfillReadRequest()] algorithm.
