@@ -6,6 +6,7 @@ require (
 	github.com/dop251/goja v0.0.0-20230919151941-fc55792775de
 	github.com/gorilla/websocket v1.5.0
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
+	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.8.4
 	go.k6.io/k6 v0.47.1-0.20231012091148-de19a6a1bc53
 	go.uber.org/goleak v1.2.1
@@ -37,7 +38,6 @@ require (
 	github.com/onsi/gomega v1.20.2 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
 	github.com/serenize/snaker v0.0.0-20201027110005-a7ad2135616e // indirect
-	github.com/sirupsen/logrus v1.9.3 // indirect
 	github.com/spf13/afero v1.1.2 // indirect
 	github.com/tidwall/gjson v1.17.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
