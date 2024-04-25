@@ -1,8 +1,22 @@
 package webcrypto
 
 import (
+	"errors"
+
 	"github.com/dop251/goja"
 )
+
+// CryptoKeyGenerationResult represents the result of a key generation operation.
+type CryptoKeyGenerationResult interface {
+	// IsKeyPair returns true if the result is a key pair, false otherwise.
+	IsKeyPair() bool
+
+	// ResolveCryptoKeyPair returns the underlying CryptoKeyPair, if the result is a key pair, error otherwise.
+	ResolveCryptoKeyPair() (*CryptoKeyPair, error)
+
+	// ResolveCryptoKey returns the underlying CryptoKey, if the result is a key, error otherwise.
+	ResolveCryptoKey() (*CryptoKey, error)
+}
 
 // CryptoKeyPair represents a key pair for an asymmetric cryptography algorithm, also known as
 // a public-key algorithm.
@@ -12,19 +26,36 @@ import (
 type CryptoKeyPair struct {
 	// PrivateKey holds the private key. For encryption and decryption algorithms,
 	// this key is used to decrypt. For signing and verification algorithms it is used to sign.
-	PrivateKey CryptoKey `json:"privateKey"`
+	PrivateKey *CryptoKey `js:"privateKey"`
 
 	// PublicKey holds the public key. For encryption and decryption algorithms,
 	// this key is used to encrypt. For signing and verification algorithms it is used to verify.
-	PublicKey CryptoKey `json:"publicKey"`
+	PublicKey *CryptoKey `js:"publicKey"`
 }
+
+// IsKeyPair .
+func (ckp *CryptoKeyPair) IsKeyPair() bool {
+	return true
+}
+
+// ResolveCryptoKeyPair returns the underlying CryptoKeyPair.
+func (ckp *CryptoKeyPair) ResolveCryptoKeyPair() (*CryptoKeyPair, error) {
+	return ckp, nil
+}
+
+// ResolveCryptoKey returns an error since the underlying type is not a CryptoKey.
+func (ckp *CryptoKeyPair) ResolveCryptoKey() (*CryptoKey, error) {
+	return nil, errors.New("not a CryptoKey")
+}
+
+var _ CryptoKeyGenerationResult = &CryptoKeyPair{}
 
 // CryptoKey represents a cryptographic key obtained from one of the SubtleCrypto
 // methods `SubtleCrypto.generateKey`, `SubtleCrypto.DeriveKey`, `SubtleCrypto.ImportKey`,
 // or `SubtleCrypto.UnwrapKey`.
 type CryptoKey struct {
 	// Type holds the type of the key.
-	Type CryptoKeyType `json:"type"`
+	Type CryptoKeyType `js:"type"`
 
 	// Extractable indicates whether or not the key may be extracted
 	// using `SubtleCrypto.ExportKey` or `SubtleCrypto.WrapKey`.
@@ -32,22 +63,48 @@ type CryptoKey struct {
 	// If the value is `true`, the key may be extracted.
 	// If the value is `false`, the key may not be extracted, and
 	// `SubtleCrypto.exportKey` and `SubtleCrypto.wrapKey` will fail.
-	Extractable bool `json:"extractable"`
+	Extractable bool `js:"extractable"`
 
 	// By the time we access the Algorithm field of CryptoKey, we
 	// generally already know what type of algorithm it is, and are
 	// really looking to access the specific attributes of that algorithm.
 	// Thus, the generic parameter type helps us manipulate the
 	// `CryptoKey` type without having to cast the `Algorithm` field.
-	Algorithm any `json:"algorithm"`
+	Algorithm any `js:"algorithm"`
 
 	// Usages holds the key usages for which this key can be used.
-	Usages []CryptoKeyUsage `json:"usages"`
+	Usages []CryptoKeyUsage `js:"usages"`
 
 	// handle is an internal slot, holding the underlying key data.
 	// See [specification](https://www.w3.org/TR/WebCryptoAPI/#dfnReturnLink-0).
 	handle any
 }
+
+// IsKeyPair .
+func (ck *CryptoKey) IsKeyPair() bool {
+	return false
+}
+
+// ResolveCryptoKeyPair returns an error since the underlying type is not a CryptoKeyPair.
+func (ck *CryptoKey) ResolveCryptoKeyPair() (*CryptoKeyPair, error) {
+	return nil, errors.New("not a Crypto Key Pair")
+}
+
+// ResolveCryptoKey returns the underlying CryptoKey.
+func (ck *CryptoKey) ResolveCryptoKey() (*CryptoKey, error) {
+	return ck, nil
+}
+
+// Validate checks if the key is valid.
+func (ck *CryptoKey) Validate() error {
+	if ck.Type != PrivateCryptoKeyType && ck.Type != PublicCryptoKeyType && ck.Type != SecretCryptoKeyType {
+		return errors.New("invalid key type")
+	}
+
+	return nil
+}
+
+var _ CryptoKeyGenerationResult = &CryptoKey{}
 
 // ContainsUsage returns true if the key contains the specified usage.
 func (ck *CryptoKey) ContainsUsage(usage CryptoKeyUsage) bool {
@@ -61,6 +118,9 @@ func (ck *CryptoKey) ContainsUsage(usage CryptoKeyUsage) bool {
 type CryptoKeyType = string
 
 const (
+	// UnknownCryptoKeyType that we set when we don't know the type of the key.
+	UnknownCryptoKeyType CryptoKeyType = "unknown"
+
 	// SecretCryptoKeyType carries the information that a key is a secret key
 	// to use with a symmetric algorithm.
 	SecretCryptoKeyType CryptoKeyType = "secret"
@@ -114,7 +174,7 @@ type KeyAlgorithm struct {
 // KeyGenerator is the interface implemented by the algorithms used to generate
 // cryptographic keys.
 type KeyGenerator interface {
-	GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
+	GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (CryptoKeyGenerationResult, error)
 }
 
 func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) (KeyGenerator, error) {
@@ -126,6 +186,10 @@ func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) 
 		kg, err = newAESKeyGenParams(rt, normalized, params)
 	case HMAC:
 		kg, err = newHMACKeyGenParams(rt, normalized, params)
+	case ECDH, ECDSA:
+		kg, err = newECKeyGenParams(rt, normalized, params)
+	default:
+		return nil, errors.New("key generation not implemented for algorithm " + normalized.Name)
 	}
 
 	if err != nil {
@@ -150,6 +214,10 @@ func newKeyImporter(rt *goja.Runtime, normalized Algorithm, params goja.Value) (
 		ki = newAESImportParams(normalized)
 	case HMAC:
 		ki, err = newHMACImportParams(rt, normalized, params)
+	case ECDH, ECDSA:
+		ki, err = newEcKeyImportParams(rt, normalized, params)
+	default:
+		return nil, errors.New("key import not implemented for algorithm " + normalized.Name)
 	}
 
 	if err != nil {

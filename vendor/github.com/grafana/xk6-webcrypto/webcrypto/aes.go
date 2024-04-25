@@ -59,7 +59,7 @@ func newAESKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Valu
 func (akgp *AESKeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
-) (*CryptoKey, error) {
+) (CryptoKeyGenerationResult, error) {
 	for _, usage := range keyUsages {
 		switch usage {
 		case WrapKeyCryptoKeyUsage, UnwrapKeyCryptoKeyUsage:
