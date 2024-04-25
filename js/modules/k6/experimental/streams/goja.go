@@ -87,15 +87,15 @@ func isNonNegativeNumber(value goja.Value) bool {
 }
 
 // setReadOnlyPropertyOf sets a read-only property on the given [goja.Object].
-func setReadOnlyPropertyOf(obj *goja.Object, name string, value goja.Value) error {
-	err := obj.DefineDataProperty(name,
-		value,
+func setReadOnlyPropertyOf(obj *goja.Object, objName, propName string, propValue goja.Value) error {
+	err := obj.DefineDataProperty(propName,
+		propValue,
 		goja.FLAG_FALSE,
 		goja.FLAG_FALSE,
 		goja.FLAG_TRUE,
 	)
 	if err != nil {
-		return fmt.Errorf("unable to define %s read-only property on TextEncoder object; reason: %w", name, err)
+		return fmt.Errorf("unable to define %s read-only property on %s object; reason: %w", propName, objName, err)
 	}
 
 	return nil

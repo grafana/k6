@@ -18,6 +18,7 @@ type ReadableStreamDefaultReader struct {
 func NewReadableStreamDefaultReaderObject(reader *ReadableStreamDefaultReader) (*goja.Object, error) {
 	rt := reader.stream.runtime
 	obj := rt.NewObject()
+	objName := "ReadableStreamDefaultReader"
 
 	err := obj.DefineAccessorProperty("closed", rt.ToValue(func() *goja.Promise {
 		p, _, _ := reader.GetClosed()
@@ -27,16 +28,16 @@ func NewReadableStreamDefaultReaderObject(reader *ReadableStreamDefaultReader) (
 		return nil, err
 	}
 
-	if err := setReadOnlyPropertyOf(obj, "cancel", rt.ToValue(reader.Cancel)); err != nil {
+	if err := setReadOnlyPropertyOf(obj, objName, "cancel", rt.ToValue(reader.Cancel)); err != nil {
 		return nil, err
 	}
 
 	// Exposing the properties of the [ReadableStreamDefaultReader] interface
-	if err := setReadOnlyPropertyOf(obj, "read", rt.ToValue(reader.Read)); err != nil {
+	if err := setReadOnlyPropertyOf(obj, objName, "read", rt.ToValue(reader.Read)); err != nil {
 		return nil, err
 	}
 
-	if err := setReadOnlyPropertyOf(obj, "releaseLock", rt.ToValue(reader.ReleaseLock)); err != nil {
+	if err := setReadOnlyPropertyOf(obj, objName, "releaseLock", rt.ToValue(reader.ReleaseLock)); err != nil {
 		return nil, err
 	}
 

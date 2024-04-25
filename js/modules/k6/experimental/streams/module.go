@@ -86,7 +86,7 @@ func (mi *ModuleInstance) NewReadableStream(call goja.ConstructorCall) *goja.Obj
 
 	// 4. If underlyingSourceDict["type"] is "bytes":
 	if underlyingSourceDict.Type == "bytes" {
-		common.Throw(stream.runtime, newError(RuntimeError, "'bytes' stream is not supported yet"))
+		common.Throw(stream.runtime, newError(NotSupportedError, "'bytes' stream is not supported yet"))
 	} else { // 5. Otherwise,
 		// 5.1. Assert: underlyingSourceDict["type"] does not exist.
 		if underlyingSourceDict.Type != "" {
@@ -150,7 +150,8 @@ func (mi *ModuleInstance) initializeStrategy(call goja.ConstructorCall) *goja.Ob
 	size := runtime.ToValue(defaultSizeFunc)
 	if len(call.Arguments) > 0 && !common.IsNullish(call.Arguments[0]) {
 		srcArg := call.Arguments[0].ToObject(runtime)
-		if !common.IsNullish(srcArg.Get("type")) && srcArg.Get("type").String() == ReadableStreamTypeBytes {
+		srcTypeArg := srcArg.Get("type")
+		if !common.IsNullish(srcTypeArg) && srcTypeArg.String() == ReadableStreamTypeBytes {
 			size = nil
 		}
 	}
@@ -182,27 +183,28 @@ func (mi *ModuleInstance) newCountQueuingStrategy(
 	size goja.Value,
 ) *goja.Object {
 	obj := rt.NewObject()
+	objName := "CountQueuingStrategy"
 
 	if len(call.Arguments) != 1 {
-		common.Throw(rt, newError(TypeError, "CountQueuingStrategy takes a single argument"))
+		common.Throw(rt, newError(TypeError, objName+" takes a single argument"))
 	}
 
 	if !isObject(call.Argument(0)) {
-		common.Throw(rt, newError(TypeError, "CountQueuingStrategy argument must be an object"))
+		common.Throw(rt, newError(TypeError, objName+" argument must be an object"))
 	}
 
 	argObj := call.Argument(0).ToObject(rt)
 	if common.IsNullish(argObj.Get("highWaterMark")) {
-		common.Throw(rt, newError(TypeError, "CountQueuingStrategy argument must have 'highWaterMark' property"))
+		common.Throw(rt, newError(TypeError, objName+" argument must have 'highWaterMark' property"))
 	}
 
 	highWaterMark := argObj.Get("highWaterMark")
-	if err := setReadOnlyPropertyOf(obj, "highWaterMark", highWaterMark); err != nil {
+	if err := setReadOnlyPropertyOf(obj, "highWaterMark", objName, highWaterMark); err != nil {
 		common.Throw(rt, newError(TypeError, err.Error()))
 	}
 
 	if !common.IsNullish(size) {
-		if err := setReadOnlyPropertyOf(obj, "size", size); err != nil {
+		if err := setReadOnlyPropertyOf(obj, objName, "size", size); err != nil {
 			common.Throw(rt, newError(TypeError, err.Error()))
 		}
 	}
