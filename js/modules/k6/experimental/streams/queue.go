@@ -19,14 +19,16 @@ type ValueWithSize struct {
 type QueueWithSizes struct {
 	Queue          []ValueWithSize
 	QueueTotalSize float64
+	runtime        *goja.Runtime
 }
 
 // NewQueueWithSizes creates a new queue of values with sizes, as described in the [specification].
 //
 // [specification]: https://streams.spec.whatwg.org/#queue-with-sizes
-func NewQueueWithSizes() *QueueWithSizes {
+func NewQueueWithSizes(runtime *goja.Runtime) *QueueWithSizes {
 	return &QueueWithSizes{
-		Queue: make([]ValueWithSize, 0),
+		Queue:   make([]ValueWithSize, 0),
+		runtime: runtime,
 	}
 }
 
@@ -35,7 +37,7 @@ func NewQueueWithSizes() *QueueWithSizes {
 // [EnqueueValueWithSize]: https://streams.spec.whatwg.org/#enqueue-value-with-size
 func (q *QueueWithSizes) Enqueue(value goja.Value, size float64) error {
 	if math.IsNaN(size) || size < 0 || math.IsInf(size, 1) { // Check for +Inf
-		return newError(RangeError, "size must be a finite, non-NaN number")
+		return newRangeError(q.runtime, "size must be a finite, non-NaN number")
 	}
 
 	valueWithSize := ValueWithSize{

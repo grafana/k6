@@ -101,9 +101,11 @@ func NewReadableStreamDefaultControllerObject(controller *ReadableStreamDefaultC
 //
 // [specification]: https://streams.spec.whatwg.org/#rs-default-controller-close
 func (controller *ReadableStreamDefaultController) Close() {
+	rt := controller.stream.vu.Runtime()
+
 	// 1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(this) is false, throw a TypeError exception.
 	if !controller.canCloseOrEnqueue() {
-		throw(controller.stream.vu.Runtime(), newError(TypeError, "cannot close or enqueue"))
+		throw(rt, newTypeError(rt, "cannot close or enqueue"))
 	}
 
 	// 2. Perform ! ReadableStreamDefaultControllerClose(this).
@@ -116,14 +118,16 @@ func (controller *ReadableStreamDefaultController) Close() {
 //
 // [specification]: https://streams.spec.whatwg.org/#rs-default-controller-enqueue
 func (controller *ReadableStreamDefaultController) Enqueue(chunk goja.Value) {
+	rt := controller.stream.vu.Runtime()
+
 	// 1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(this) is false, throw a TypeError exception.
 	if !controller.canCloseOrEnqueue() {
-		throw(controller.stream.vu.Runtime(), newError(TypeError, "cannot close or enqueue"))
+		throw(rt, newTypeError(rt, "cannot close or enqueue"))
 	}
 
 	// 2. Perform ? ReadableStreamDefaultControllerEnqueue(this, chunk).
 	if err := controller.enqueue(chunk); err != nil {
-		throw(controller.stream.vu.Runtime(), err)
+		throw(rt, err)
 	}
 }
 
@@ -363,7 +367,7 @@ func (controller *ReadableStreamDefaultController) resetQueue() {
 
 	// 2. Set container.[[queue]] to a new empty list.
 	// 3. Set container.[[queueTotalSize]] to 0.
-	controller.queue = NewQueueWithSizes()
+	controller.queue = NewQueueWithSizes(controller.stream.runtime)
 }
 
 // callPullIfNeeded implements the [specification]'s ReadableStreamDefaultControllerCallPullIfNeeded algorithm

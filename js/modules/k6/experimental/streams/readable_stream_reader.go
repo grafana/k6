@@ -98,7 +98,7 @@ func (reader *BaseReadableStreamReader) cancel(reason goja.Value) *goja.Promise 
 
 	// 2. Assert: stream is not undefined.
 	if stream == nil {
-		return newRejectedPromise(reader.vu, newError(TypeError, "stream is undefined"))
+		return newRejectedPromise(reader.vu, newTypeError(reader.runtime, "stream is undefined"))
 	}
 
 	// 3. Return ! ReadableStreamCancel(stream, reason).
@@ -133,9 +133,9 @@ func (reader *BaseReadableStreamReader) release() {
 
 	// 4. If stream.[[state]] is "readable", reject reader.[[closedPromise]] with a TypeError exception.
 	if stream.state == ReadableStreamStateReadable {
-		reader.closedPromiseRejectFunc(newError(TypeError, "stream is readable"))
+		reader.closedPromiseRejectFunc(newTypeError(reader.runtime, "stream is readable").Err())
 	} else { // 5. Otherwise, set reader.[[closedPromise]] to a promise rejected with a TypeError exception.
-		reader.closedPromise = newRejectedPromise(stream.vu, newError(TypeError, "stream is not readable"))
+		reader.closedPromise = newRejectedPromise(stream.vu, newTypeError(reader.runtime, "stream is not readable").Err())
 	}
 
 	// 6. Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
@@ -205,7 +205,11 @@ func ReadableStreamReaderGenericInitialize(reader ReadableStreamGenericReader, s
 		}
 
 		// 5.2 Set reader.[[closedPromise]] to a promise rejected with stream.[[storedError]].
-		reject(errToObj(stream.runtime, stream.storedError))
+		if jsErr, ok := stream.storedError.(*jsError); ok {
+			reject(jsErr.Err())
+		} else {
+			reject(errToObj(stream.runtime, stream.storedError))
+		}
 
 		// 5.3 Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
 		// See https://github.com/dop251/goja/issues/565

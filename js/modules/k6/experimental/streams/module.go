@@ -66,7 +66,7 @@ func (mi *ModuleInstance) NewReadableStream(call goja.ConstructorCall) *goja.Obj
 	if len(call.Arguments) > 0 && !goja.IsUndefined(call.Arguments[0]) {
 		// We first assert that it is an object (requirement)
 		if !isObject(call.Arguments[0]) {
-			throw(rt, newError(TypeError, "underlyingSource must be an object"))
+			throw(rt, newTypeError(rt, "underlyingSource must be an object"))
 		}
 
 		// Then we try to convert it to an UnderlyingSource
@@ -184,26 +184,26 @@ func (mi *ModuleInstance) newCountQueuingStrategy(
 	obj := rt.NewObject()
 
 	if len(call.Arguments) != 1 {
-		common.Throw(rt, newError(TypeError, "CountQueuingStrategy takes a single argument"))
+		throw(rt, newTypeError(rt, "CountQueuingStrategy takes a single argument"))
 	}
 
 	if !isObject(call.Argument(0)) {
-		common.Throw(rt, newError(TypeError, "CountQueuingStrategy argument must be an object"))
+		throw(rt, newTypeError(rt, "CountQueuingStrategy argument must be an object"))
 	}
 
 	argObj := call.Argument(0).ToObject(rt)
 	if common.IsNullish(argObj.Get("highWaterMark")) {
-		common.Throw(rt, newError(TypeError, "CountQueuingStrategy argument must have 'highWaterMark' property"))
+		throw(rt, newTypeError(rt, "CountQueuingStrategy argument must have 'highWaterMark' property"))
 	}
 
 	highWaterMark := argObj.Get("highWaterMark")
 	if err := setReadOnlyPropertyOf(obj, "highWaterMark", highWaterMark); err != nil {
-		common.Throw(rt, newError(TypeError, err.Error()))
+		throw(rt, newTypeError(rt, err.Error()))
 	}
 
 	if !common.IsNullish(size) {
 		if err := setReadOnlyPropertyOf(obj, "size", size); err != nil {
-			common.Throw(rt, newError(TypeError, err.Error()))
+			throw(rt, newTypeError(rt, err.Error()))
 		}
 	}
 
@@ -228,7 +228,7 @@ func extractHighWaterMark(rt *goja.Runtime, strategy *goja.Object, defaultHWM fl
 	if goja.IsNaN(strategy.Get("highWaterMark")) ||
 		!isNumber(strategy.Get("highWaterMark")) ||
 		!isNonNegativeNumber(strategy.Get("highWaterMark")) {
-		throw(rt, newError(RangeError, "highWaterMark must be a non-negative number"))
+		throw(rt, newRangeError(rt, "highWaterMark must be a non-negative number"))
 	}
 
 	// 4. Return highWaterMark.
@@ -251,7 +251,7 @@ func extractSizeAlgorithm(rt *goja.Runtime, strategy *goja.Object) SizeAlgorithm
 
 	sizeFunc, isFunc := goja.AssertFunction(sizeProp)
 	if !isFunc {
-		common.Throw(rt, newError(TypeError, "size must be a function"))
+		throw(rt, newTypeError(rt, "size must be a function"))
 	}
 
 	return sizeFunc
@@ -264,12 +264,12 @@ func (mi *ModuleInstance) NewReadableStreamDefaultReader(call goja.ConstructorCa
 	rt := mi.vu.Runtime()
 
 	if len(call.Arguments) != 1 {
-		throw(rt, newError(TypeError, "ReadableStreamDefaultReader takes a single argument"))
+		throw(rt, newTypeError(rt, "ReadableStreamDefaultReader takes a single argument"))
 	}
 
 	stream, ok := call.Argument(0).Export().(*ReadableStream)
 	if !ok {
-		throw(rt, newError(TypeError, "ReadableStreamDefaultReader argument must be a ReadableStream"))
+		throw(rt, newTypeError(rt, "ReadableStreamDefaultReader argument must be a ReadableStream"))
 	}
 
 	// 1. Perform ? SetUpReadableStreamDefaultReader(this, stream).

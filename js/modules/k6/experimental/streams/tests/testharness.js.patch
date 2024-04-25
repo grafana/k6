@@ -1,100 +1,34 @@
 diff --git a/resources/testharness.js b/resources/testharness.js
-index c5c375e17..aeda287d5 100644
+index c5c375e17..a4610d927 100644
 --- a/resources/testharness.js
 +++ b/resources/testharness.js
-@@ -2100,32 +2100,52 @@
-                    "${func} threw null, not an object",
-                    {func:func});
- 
--            // Basic sanity-check on the passed-in constructor
--            assert(typeof constructor == "function",
--                   assertion_type, description,
--                   "${constructor} is not a constructor",
--                   {constructor:constructor});
--            var obj = constructor;
--            while (obj) {
--                if (typeof obj === "function" &&
--                    obj.name === "Error") {
--                    break;
--                }
--                obj = Object.getPrototypeOf(obj);
--            }
--            assert(obj != null,
--                   assertion_type, description,
--                   "${constructor} is not an Error subtype",
--                   {constructor:constructor});
-+            // Note @oleiade: As k6 does not throw error objects that match the Javascript
-+            // standard errors and their associated expectations and properties, we cannot
-+            // rely on the WPT assertions to be true.
-+            //
-+            // Instead, we check that the error object has the shape we give it when we throw it.
-+            // Namely, that it has a name property that matches the name of the expected constructor.
-+            assert('name' in e,
-+              assertion_type, description,
-+              "${func} threw ${e} without a name property",
-+              {func: func, e: e});
- 
--            // And checking that our exception is reasonable
--            assert(e.constructor === constructor &&
--                   e.name === constructor.name,
--                   assertion_type, description,
--                   "${func} threw ${actual} (${actual_name}) expected instance of ${expected} (${expected_name})",
--                   {func:func, actual:e, actual_name:e.name,
--                    expected:constructor,
--                    expected_name:constructor.name});
-+            assert(e.name === constructor.name,
-+              assertion_type, description,
-+              "${func} threw ${e} with name ${e.name}, not ${constructor.name}",
-+              {func: func, e: e, constructor: constructor});
-+
-+            // Note @oleiade: We deactivated the following assertions in favor of our own
-+            // as mentioned above.
-+
-+            // Basic sanity-check on the passed-in constructor
-+            // Basic sanity-check on the passed-in constructor
-+            // assert(typeof constructor == "function",
-+            // 	assertion_type, description,
-+            // 	"${constructor} is not a constructor",
-+            // 	{constructor:constructor});
-+            // var obj = constructor;
-+            // while (obj) {
-+            // 	if (typeof obj === "function" &&
-+            // 		obj.name === "Error") {
-+            // 		break;
-+            // 	}
-+            // 	obj = Object.getPrototypeOf(obj);
-+            // }
-+            // assert(obj != null,
-+            // 	assertion_type, description,
-+            // 	"${constructor} is not an Error subtype",
-+            // 	{constructor:constructor});
-+            //
-+            // // And checking that our exception is reasonable
-+            // assert(e.constructor === constructor &&
-+            // 	e.name === constructor.name,
-+            // 	assertion_type, description,
-+            // 	"${func} threw ${actual} (${actual_name}) expected instance of ${expected} (${expected_name})",
-+            // 	{func:func, actual:e, actual_name:e.name,
-+            // 		expected:constructor,
-+            // 		expected_name:constructor.name});
+@@ -2589,10 +2589,6 @@
+      */
+     Test.prototype.step = function(func, this_obj)
+     {
+-        if (this.phase > this.phases.STARTED) {
+-            return;
+-        }
+-
+         if (settings.debug && this.phase !== this.phases.STARTED) {
+             console.log("TEST START", this.name);
          }
-     }
- 
-@@ -2621,16 +2641,7 @@
+@@ -2621,9 +2617,6 @@
          try {
              return func.apply(this_obj, Array.prototype.slice.call(arguments, 2));
          } catch (e) {
 -            if (this.phase >= this.phases.HAS_RESULT) {
 -                return;
 -            }
--            var status = e instanceof OptionalFeatureUnsupportedError ? this.PRECONDITION_FAILED : this.FAIL;
--            var message = String((typeof e === "object" && e !== null) ? e.message : e);
--            var stack = e.stack ? e.stack : null;
--
--            this.set_status(status, message, stack);
--            this.phase = this.phases.HAS_RESULT;
--            this.done();
-+            throw e;
+             var status = e instanceof OptionalFeatureUnsupportedError ? this.PRECONDITION_FAILED : this.FAIL;
+             var message = String((typeof e === "object" && e !== null) ? e.message : e);
+             var stack = e.stack ? e.stack : null;
+@@ -2631,6 +2624,8 @@
+             this.set_status(status, message, stack);
+             this.phase = this.phases.HAS_RESULT;
+             this.done();
++
++            throw `${this.name} failed - ${e}`;
          } finally {
              this.current_test = null;
          }

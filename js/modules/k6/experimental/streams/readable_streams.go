@@ -49,7 +49,7 @@ func (stream *ReadableStream) Cancel(reason goja.Value) *goja.Promise {
 		promise, _, reject := promises.New(stream.vu)
 
 		go func() {
-			reject(newError(TypeError, "cannot cancel a locked stream"))
+			reject(newTypeError(stream.runtime, "cannot cancel a locked stream").Err())
 		}()
 
 		return promise
@@ -76,7 +76,7 @@ func (stream *ReadableStream) GetReader(options *goja.Object) goja.Value {
 
 	// 2. Assert: options["mode"] is "byob".
 	if options.Get("mode").String() != "byob" {
-		throw(stream.runtime, newError(TypeError, "options.mode is not 'byob'"))
+		throw(stream.runtime, newTypeError(stream.runtime, "options.mode is not 'byob'"))
 	}
 
 	// 3. Return ? AcquireReadableStreamBYOBReader(this).
@@ -164,42 +164,34 @@ func (stream *ReadableStream) setupReadableStreamDefaultControllerFromUnderlying
 	// which returns the result of invoking underlyingSourceDict["start"] with argument
 	// list « controller » and callback this value underlyingSource.
 	if underlyingSourceDict.startSet {
-		startAlgorithm = stream.startAlgorithm(underlyingSource)
+		startAlgorithm = stream.startAlgorithm(underlyingSource, underlyingSourceDict)
 	}
 
 	// 6. If underlyingSourceDict["pull"] exists, then set pullAlgorithm to an algorithm which
 	// returns the result of invoking underlyingSourceDict["pull"] with argument list
 	// « controller » and callback this value underlyingSource.
 	if underlyingSourceDict.pullSet {
-		pullAlgorithm = func(obj *goja.Object) (p *goja.Promise) {
-			if e := stream.runtime.Try(func() {
-				p = underlyingSourceDict.Pull(obj)
-			}); e != nil {
-				p = newRejectedPromise(stream.vu, e.Value())
-			}
-
-			if p == nil {
-				p = newResolvedPromise(stream.vu, goja.Undefined())
-			}
-			return p
-		}
+		pullAlgorithm = stream.pullAlgorithm(underlyingSource, underlyingSourceDict)
 	}
 
 	// 7. If underlyingSourceDict["cancel"] exists, then set cancelAlgorithm to an algorithm which takes an argument
 	// reason and returns the result of invoking underlyingSourceDict["cancel"] with argument list « reason » and
 	// callback this value underlyingSource.
 	if underlyingSourceDict.cancelSet {
-		cancelAlgorithm = stream.cancelAlgorithm(underlyingSource)
+		cancelAlgorithm = stream.cancelAlgorithm(underlyingSource, underlyingSourceDict)
 	}
 
 	// 8. Perform ? SetUpReadableStreamDefaultController(...)
 	stream.setupDefaultController(controller, startAlgorithm, pullAlgorithm, cancelAlgorithm, highWaterMark, sizeAlgorithm)
 }
 
-func (stream *ReadableStream) startAlgorithm(underlyingSource *goja.Object) UnderlyingSourceStartCallback {
-	call, ok := goja.AssertFunction(underlyingSource.Get("start"))
+func (stream *ReadableStream) startAlgorithm(
+	underlyingSource *goja.Object,
+	underlyingSourceDict UnderlyingSource,
+) UnderlyingSourceStartCallback {
+	call, ok := goja.AssertFunction(underlyingSourceDict.Start)
 	if !ok {
-		common.Throw(stream.runtime, errors.New("underlyingSource.[[start]] must be a function"))
+		throw(stream.runtime, newTypeError(stream.runtime, "underlyingSource.[[start]] must be a function"))
 	}
 
 	return func(obj *goja.Object) (v goja.Value) {
@@ -213,10 +205,40 @@ func (stream *ReadableStream) startAlgorithm(underlyingSource *goja.Object) Unde
 	}
 }
 
-func (stream *ReadableStream) cancelAlgorithm(underlyingSource *goja.Object) UnderlyingSourceCancelCallback {
-	call, ok := goja.AssertFunction(underlyingSource.Get("cancel"))
+func (stream *ReadableStream) pullAlgorithm(
+	underlyingSource *goja.Object,
+	underlyingSourceDict UnderlyingSource,
+) UnderlyingSourcePullCallback {
+	call, ok := goja.AssertFunction(underlyingSourceDict.Pull)
 	if !ok {
-		common.Throw(stream.runtime, errors.New("underlyingSource.[[cancel]] must be a function"))
+		throw(stream.runtime, newTypeError(stream.runtime, "underlyingSource.[[pull]] must be a function"))
+	}
+
+	return func(obj *goja.Object) *goja.Promise {
+		v, err := call(underlyingSource, obj)
+		if err != nil {
+			var ex *goja.Exception
+			if errors.As(err, &ex) {
+				return newRejectedPromise(stream.vu, ex.Value())
+			}
+			return newRejectedPromise(stream.vu, err)
+		}
+
+		if p, ok := v.Export().(*goja.Promise); ok {
+			return p
+		}
+
+		return newResolvedPromise(stream.vu, v)
+	}
+}
+
+func (stream *ReadableStream) cancelAlgorithm(
+	underlyingSource *goja.Object,
+	underlyingSourceDict UnderlyingSource,
+) UnderlyingSourceCancelCallback {
+	call, ok := goja.AssertFunction(underlyingSourceDict.Cancel)
+	if !ok {
+		throw(stream.runtime, newTypeError(stream.runtime, "underlyingSource.[[cancel]] must be a function"))
 	}
 
 	return func(reason any) goja.Value {
@@ -377,7 +399,11 @@ func (stream *ReadableStream) cancel(reason goja.Value) *goja.Promise {
 
 	// 3. If stream.[[state]] is "errored", return a promise rejected with stream.[[storedError]].
 	if stream.state == ReadableStreamStateErrored {
-		return newRejectedPromise(stream.vu, stream.storedError)
+		if jsErr, ok := stream.storedError.(*jsError); ok {
+			return newRejectedPromise(stream.vu, jsErr.Err())
+		} else {
+			return newRejectedPromise(stream.vu, stream.storedError)
+		}
 	}
 
 	// 4. Perform ! ReadableStreamClose(stream).
@@ -443,6 +469,7 @@ func (stream *ReadableStream) close() {
 
 		// 6.3. For each readRequest of readRequests,
 		for _, readRequest := range readRequests {
+			readRequest := readRequest
 			// 6.3.1. Perform readRequest’s close steps.
 			stream.vu.RegisterCallback()(func() error {
 				readRequest.closeSteps()
@@ -482,7 +509,11 @@ func (stream *ReadableStream) error(e any) {
 
 	// 6. Reject reader.[[closedPromise]] with e.
 	promise, _, rejectFunc := genericReader.GetClosed()
-	rejectFunc(e)
+	if jsErr, ok := e.(*jsError); ok {
+		rejectFunc(jsErr.Err())
+	} else {
+		rejectFunc(e)
+	}
 
 	// 7. Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
 	// See https://github.com/dop251/goja/issues/565

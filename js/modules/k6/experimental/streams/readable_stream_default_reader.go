@@ -52,7 +52,7 @@ func (reader *ReadableStreamDefaultReader) Read() *goja.Promise {
 
 	// 1. If this.[[stream]] is undefined, return a promise rejected with a TypeError exception.
 	if stream == nil {
-		return newRejectedPromise(reader.vu, newError(TypeError, "stream is undefined"))
+		return newRejectedPromise(reader.vu, newTypeError(reader.runtime, "stream is undefined").Err())
 	}
 
 	// 2. Let promise be a new promise.
@@ -94,7 +94,7 @@ func (reader *ReadableStreamDefaultReader) Read() *goja.Promise {
 func (reader *ReadableStreamDefaultReader) Cancel(reason goja.Value) *goja.Promise {
 	// 1. If this.[[stream]] is undefined, return a promise rejected with a TypeError exception.
 	if reader.stream == nil {
-		return newRejectedPromise(reader.vu, newError(TypeError, "stream is undefined"))
+		return newRejectedPromise(reader.vu, newTypeError(reader.runtime, "stream is undefined").Err())
 	}
 
 	// 2. Return ! ReadableStreamReaderGenericCancel(this, reason).
@@ -134,19 +134,21 @@ func (reader *ReadableStreamDefaultReader) release() {
 	reader.BaseReadableStreamReader.release()
 
 	// 2. Let e be a new TypeError exception.
-	e := newError(TypeError, "reader released")
+	e := newTypeError(reader.runtime, "reader released")
 
 	// 3. Perform ! ReadableStreamDefaultReaderErrorReadRequests(reader, e).
-	reader.errorReadRequests(e)
+	reader.errorReadRequests(e.Err())
 }
 
 // setup implements the [SetUpReadableStreamDefaultReader] algorithm.
 //
 // [SetUpReadableStreamDefaultReader]: https://streams.spec.whatwg.org/#set-up-readable-stream-default-reader
 func (reader *ReadableStreamDefaultReader) setup(stream *ReadableStream) {
+	rt := stream.vu.Runtime()
+
 	// 1. If ! IsReadableStreamLocked(stream) is true, throw a TypeError exception.
 	if stream.isLocked() {
-		throw(stream.vu.Runtime(), newError(TypeError, "stream is locked"))
+		throw(rt, newTypeError(rt, "stream is locked"))
 	}
 
 	// 2. Perform ! ReadableStreamReaderGenericInitialize(reader, stream).
@@ -197,7 +199,12 @@ func (reader *ReadableStreamDefaultReader) read(readRequest ReadRequest) {
 		readRequest.closeSteps()
 	case ReadableStreamStateErrored:
 		// 5. Otherwise, if stream.[[state]] is "errored", perform readRequest’s error steps given stream.[[storedError]].
-		readRequest.errorSteps(stream.storedError)
+		if jsErr, ok := stream.storedError.(*jsError); ok {
+			readRequest.errorSteps(jsErr.Err())
+		} else {
+			readRequest.errorSteps(stream.storedError)
+		}
+
 	default:
 		// 6. Otherwise,
 		// 6.1. Assert: stream.[[state]] is "readable".
