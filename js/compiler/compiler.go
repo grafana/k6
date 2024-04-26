@@ -216,7 +216,7 @@ func (c *Compiler) compileImpl(
 			conditionalNewLine = "\n"
 			newCode, err := state.updateInlineSourceMap(code, index)
 			if err != nil {
-				c.logger.Warnf("while compiling %q we couldn't update it's inline sourcemap which might lead "+
+				c.logger.Warnf("while compiling %q, couldn't update its inline sourcemap which might lead "+
 					"to some line numbers being off: %s", filename, err)
 			} else {
 				code = newCode
