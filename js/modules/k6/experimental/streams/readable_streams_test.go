@@ -5,7 +5,7 @@ package streams
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modulestest"
 
@@ -35,7 +35,7 @@ func TestReadableStream(t *testing.T) {
 			t.Parallel()
 			ts := newConfiguredRuntime(t)
 			gotErr := ts.EventLoop.Start(func() error {
-				return executeTestScripts(ts.VU.Runtime(), "tests/wpt/streams/readable-streams", s)
+				return executeTestScripts(ts.VU, "tests/wpt/streams/readable-streams", s)
 			})
 			assert.NoError(t, gotErr)
 		})
@@ -84,14 +84,37 @@ func compileAndRun(t testing.TB, runtime *modulestest.Runtime, base, file string
 	require.NoError(t, err)
 }
 
-func executeTestScripts(rt *goja.Runtime, base string, scripts ...string) error {
+func executeTestScripts(vu modules.VU, base string, scripts ...string) error {
 	for _, script := range scripts {
 		program, err := modulestest.CompileFile(base, script)
 		if err != nil {
 			return err
 		}
 
-		if _, err = rt.RunProgram(program); err != nil {
+		if _, err = vu.Runtime().RunProgram(program); err != nil {
+			return err
+		}
+
+		// After having executed the tests suite file,
+		// we use a callback to make sure we wait until all
+		// the promise-based tests have finished.
+		// Also, as a mechanism to capture deadlocks caused
+		// by those promises not resolved during normal execution.
+		callback := vu.RegisterCallback()
+		if err := vu.Runtime().Set("wait", func() {
+			callback(func() error { return nil })
+		}); err != nil {
+			return err
+		}
+
+		waitForPromiseTests := `
+if (this.tests && this.tests.promise_tests && typeof this.tests.promise_tests.then === 'function') {
+	this.tests.promise_tests.then(() => wait());
+} else {
+	wait();
+}
+`
+		if _, err = vu.Runtime().RunString(waitForPromiseTests); err != nil {
 			return err
 		}
 	}
