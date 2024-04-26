@@ -925,3 +925,40 @@ func TestBundleMakeArchive(t *testing.T) {
 		})
 	}
 }
+
+func TestGlobalTimers(t *testing.T) {
+	t.Parallel()
+	data := `
+			import timers from "k6/timers";
+			if (setTimeout != timers.setTimeout) {
+				throw "setTimeout doesn't match";
+			}
+			if (clearTimeout != timers.clearTimeout) {
+				throw "clearTimeout doesn't match";
+			}
+			if (setInterval != timers.setInterval) {
+				throw "setInterval doesn't match";
+			}
+			if (clearInterval != timers.clearInterval) {
+				throw "clearInterval doesn't match";
+			}
+			export default function() {}
+	`
+
+	b1, err := getSimpleBundle(t, "/script.js", data)
+	require.NoError(t, err)
+	logger := testutils.NewLogger(t)
+
+	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
+	require.NoError(t, err)
+
+	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
+	for name, b := range bundles {
+		b := b
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := b.Instantiate(context.Background(), 1)
+			require.NoError(t, err)
+		})
+	}
+}

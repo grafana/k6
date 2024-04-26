@@ -223,6 +223,7 @@ func (e Element) TextContent() string {
 	return e.sel.sel.Text()
 }
 
+//nolint:revive,stylecheck // var-naming wants this to be ID but this will break the API
 func (e Element) Id() string {
 	return e.attrAsString("id")
 }

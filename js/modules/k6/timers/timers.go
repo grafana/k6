@@ -62,10 +62,12 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (e *Timers) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]interface{}{
-			"setTimeout":    e.setTimeout,
-			"clearTimeout":  e.clearTimeout,
-			"setInterval":   e.setInterval,
-			"clearInterval": e.clearInterval,
+			// TODO the usage of `ToValue` here is so that goja doesn't do it automatically later
+			// which will effectively create new instance each time it is accessed.
+			"setTimeout":    e.vu.Runtime().ToValue(e.setTimeout),
+			"clearTimeout":  e.vu.Runtime().ToValue(e.clearTimeout),
+			"setInterval":   e.vu.Runtime().ToValue(e.setInterval),
+			"clearInterval": e.vu.Runtime().ToValue(e.clearInterval),
 		},
 	}
 }

@@ -194,3 +194,15 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (goja.Value, er
 	}
 	return ms.Require(pwd, specifier)
 }
+
+// ExportGloballyModule sets all exports of the provided module name on the globalThis.
+// effectively making them globally available
+func ExportGloballyModule(rt *goja.Runtime, modSys *ModuleSystem, moduleName string) {
+	t, _ := modSys.Require(nil, moduleName)
+
+	for _, key := range t.Keys() {
+		if err := rt.Set(key, t.Get(key)); err != nil {
+			panic(fmt.Errorf("failed to set '%s' global object: %w", key, err))
+		}
+	}
+}

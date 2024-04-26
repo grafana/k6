@@ -283,6 +283,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 
 	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
 	b.setInitGlobals(rt, vuImpl, modSys)
+	modules.ExportGloballyModule(rt, modSys, "k6/timers")
 	vuImpl.initEnv = initenv
 	defer func() {
 		vuImpl.initEnv = nil

@@ -11,6 +11,7 @@ import (
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
@@ -64,6 +65,14 @@ func (r *Runtime) MoveToVUContext(state *lib.State) {
 // SetupModuleSystem sets up the modules system for the Runtime.
 // See [modules.NewModuleResolver] for the meaning of the parameters.
 func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.FileLoader, c *compiler.Compiler) error {
+	if goModules == nil {
+		goModules = make(map[string]any)
+	}
+
+	if _, ok := goModules["k6/timers"]; !ok {
+		goModules["k6/timers"] = timers.New()
+	}
+
 	r.mr = modules.NewModuleResolver(goModules, loader, c)
 	return r.innerSetupModuleSystem()
 }
@@ -105,5 +114,6 @@ func (r *Runtime) RunOnEventLoop(code string) (value goja.Value, err error) {
 func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
 	impl := modules.NewLegacyRequireImpl(r.VU, ms, url.URL{})
+	modules.ExportGloballyModule(r.VU.RuntimeField, ms, "k6/timers")
 	return r.VU.RuntimeField.Set("require", impl.Require)
 }

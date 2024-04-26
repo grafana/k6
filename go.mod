@@ -17,8 +17,8 @@ require (
 	github.com/grafana/xk6-dashboard v0.7.2
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0
-	github.com/grafana/xk6-webcrypto v0.2.1
-	github.com/grafana/xk6-websockets v0.3.0
+	github.com/grafana/xk6-webcrypto v0.3.0
+	github.com/grafana/xk6-websockets v0.4.0
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	github.com/influxdata/influxdb1-client v0.0.0-20190402204710-8ff2fc3824fc
 	github.com/jhump/protoreflect v1.15.6
@@ -67,24 +67,16 @@ require (
 	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2 // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
-	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.2.0 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect
 	github.com/dlclark/regexp2 v1.9.0 // indirect
 	github.com/fsnotify/fsnotify v1.5.4 // indirect
 	github.com/go-logr/logr v1.4.1 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
-	github.com/goccy/go-json v0.10.2 // indirect
 	github.com/google/pprof v0.0.0-20230728192033-2ba5b33183c6 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0 // indirect
 	github.com/inconshreveable/mousetrap v1.0.0 // indirect
 	github.com/josharian/intern v1.0.0 // indirect
-	github.com/lestrrat-go/blackmagic v1.0.2 // indirect
-	github.com/lestrrat-go/httpcc v1.0.1 // indirect
-	github.com/lestrrat-go/httprc v1.0.5 // indirect
-	github.com/lestrrat-go/iter v1.0.2 // indirect
-	github.com/lestrrat-go/jwx/v2 v2.0.21 // indirect
-	github.com/lestrrat-go/option v1.0.1 // indirect
 	github.com/matttproud/golang_protobuf_extensions v1.0.4 // indirect
 	github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8 // indirect
 	github.com/pmezard/go-difflib v1.0.0 // indirect
@@ -94,7 +86,6 @@ require (
 	github.com/prometheus/procfs v0.10.1 // indirect
 	github.com/r3labs/sse/v2 v2.10.0 // indirect
 	github.com/redis/go-redis/v9 v9.0.5 // indirect
-	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/tidwall/match v1.1.1 // indirect
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect

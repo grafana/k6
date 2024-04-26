@@ -127,12 +127,15 @@ func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
 	return newInfoObj(rt, si)
 }
 
+//nolint:lll,gochecknoglobals
+var instanceInfoInitContextErr = common.NewInitContextError("getting instance information in the init context is not supported")
+
 // newInstanceInfo returns a goja.Object with property accessors to retrieve
 // information about the local instance stats.
 func (mi *ModuleInstance) newInstanceInfo() (*goja.Object, error) {
 	es := lib.GetExecutionState(mi.vu.Context())
 	if es == nil {
-		return nil, errors.New("getting instance information in the init context is not supported")
+		return nil, instanceInfoInitContextErr
 	}
 	rt := mi.vu.Runtime()
 
@@ -157,6 +160,9 @@ func (mi *ModuleInstance) newInstanceInfo() (*goja.Object, error) {
 	return newInfoObj(rt, ti)
 }
 
+//nolint:gochecknoglobals
+var testInfoInitContextErr = common.NewInitContextError("getting test options in the init context is not supported")
+
 // newTestInfo returns a goja.Object with property accessors to retrieve
 // information and control execution of the overall test run.
 func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
@@ -176,8 +182,12 @@ func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
 			}
 		},
 		"options": func() interface{} {
+			vuState := mi.vu.State()
+			if vuState == nil {
+				common.Throw(rt, testInfoInitContextErr)
+			}
 			if optionsObject == nil {
-				opts, err := optionsAsObject(rt, mi.vu.State().Options)
+				opts, err := optionsAsObject(rt, vuState.Options)
 				if err != nil {
 					common.Throw(rt, err)
 				}
@@ -190,12 +200,15 @@ func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
 	return newInfoObj(rt, ti)
 }
 
+//nolint:gochecknoglobals
+var vuInfoInitContextErr = common.NewInitContextError("getting VU information in the init context is not supported")
+
 // newVUInfo returns a goja.Object with property accessors to retrieve
 // information about the currently executing VU.
 func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
 	vuState := mi.vu.State()
 	if vuState == nil {
-		return nil, errors.New("getting VU information in the init context is not supported")
+		return nil, vuInfoInitContextErr
 	}
 	rt := mi.vu.Runtime()
 
