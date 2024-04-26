@@ -469,12 +469,7 @@ func (stream *ReadableStream) close() {
 
 		// 6.3. For each readRequest of readRequests,
 		for _, readRequest := range readRequests {
-			readRequest := readRequest
-			// 6.3.1. Perform readRequest’s close steps.
-			stream.vu.RegisterCallback()(func() error {
-				readRequest.closeSteps()
-				return nil
-			})
+			readRequest.closeSteps()
 		}
 	}
 }
@@ -565,19 +560,12 @@ func (stream *ReadableStream) fulfillReadRequest(chunk any, done bool) {
 	// 5. Remove readRequest from reader.[[readRequests]].
 	reader.readRequests = reader.readRequests[1:]
 
-	callback := reader.vu.RegisterCallback()
 	if done {
 		// 6. If done is true, perform readRequest’s close steps.
-		callback(func() error {
-			readRequest.closeSteps()
-			return nil
-		})
+		readRequest.closeSteps()
 	} else {
 		// 7. Otherwise, perform readRequest’s chunk steps, given chunk.
-		callback(func() error {
-			readRequest.chunkSteps(chunk)
-			return nil
-		})
+		readRequest.chunkSteps(chunk)
 	}
 }
 

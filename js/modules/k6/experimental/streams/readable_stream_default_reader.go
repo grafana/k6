@@ -172,10 +172,7 @@ func (reader *ReadableStreamDefaultReader) errorReadRequests(e any) {
 	// 3. For each readRequest of readRequests,
 	for _, request := range readRequests {
 		// 3.1. Perform readRequest’s error steps, given e.
-		reader.vu.RegisterCallback()(func() error {
-			request.errorSteps(e)
-			return nil
-		})
+		request.errorSteps(e)
 	}
 }
 
