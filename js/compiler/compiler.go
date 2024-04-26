@@ -216,8 +216,8 @@ func (c *Compiler) compileImpl(
 			conditionalNewLine = "\n"
 			newCode, err := state.updateInlineSourceMap(code, index)
 			if err != nil {
-				c.logger.Warn("while compiling %q we couldn't update it's inline sourcemap which might lead "+
-					"to some line numbers being off", filename)
+				c.logger.Warnf("while compiling %q we couldn't update it's inline sourcemap which might lead "+
+					"to some line numbers being off: %s", filename, err)
 			} else {
 				code = newCode
 			}
@@ -293,7 +293,7 @@ func (c *compilationState) updateInlineSourceMap(code string, index int) (string
 	const base64EncodePrefix = "application/json;base64,"
 	if startOfBase64EncodedSourceMap := strings.Index(mapurl, base64EncodePrefix); startOfBase64EncodedSourceMap != -1 {
 		startOfBase64EncodedSourceMap += len(base64EncodePrefix)
-		b, err := base64.RawStdEncoding.DecodeString(mapurl[startOfBase64EncodedSourceMap:])
+		b, err := base64.StdEncoding.DecodeString(mapurl[startOfBase64EncodedSourceMap:])
 		if err != nil {
 			return code, err
 		}
@@ -301,7 +301,7 @@ func (c *compilationState) updateInlineSourceMap(code string, index int) (string
 		if err != nil {
 			return code, err
 		}
-		encoded := base64.RawStdEncoding.EncodeToString(b)
+		encoded := base64.StdEncoding.EncodeToString(b)
 		code = code[:index] + "//# sourcemappingurl=data:application/json;base64," + encoded + code[nextnewline:]
 	}
 	return code, nil
