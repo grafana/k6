@@ -401,9 +401,8 @@ func (stream *ReadableStream) cancel(reason goja.Value) *goja.Promise {
 	if stream.state == ReadableStreamStateErrored {
 		if jsErr, ok := stream.storedError.(*jsError); ok {
 			return newRejectedPromise(stream.vu, jsErr.Err())
-		} else {
-			return newRejectedPromise(stream.vu, stream.storedError)
 		}
+		return newRejectedPromise(stream.vu, stream.storedError)
 	}
 
 	// 4. Perform ! ReadableStreamClose(stream).
