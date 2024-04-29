@@ -703,6 +703,76 @@ export default function () {
 	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat r (webpack:///./test1.ts:5:4(3))\n\tat file:///script.js:4:2(4)\n", exception.String())
 }
 
+func TestSourceMapsInlinedCJS(t *testing.T) {
+	t.Parallel()
+	fs := fsext.NewMemMapFs()
+	// this example is from https://github.com/grafana/k6/issues/3689 generated with k6pack
+	data := `
+var __defProp = Object.defineProperty;
+var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+var __getOwnPropNames = Object.getOwnPropertyNames;
+var __hasOwnProp = Object.prototype.hasOwnProperty;
+var __defNormalProp = (obj, key, value) => key in obj ? __defProp(obj, key, { enumerable: true, configurable: true, writable: true, value }) : obj[key] = value;
+var __export = (target, all) => {
+  for (var name in all)
+    __defProp(target, name, { get: all[name], enumerable: true });
+};
+var __copyProps = (to, from, except, desc) => {
+  if (from && typeof from === "object" || typeof from === "function") {
+    for (let key of __getOwnPropNames(from))
+      if (!__hasOwnProp.call(to, key) && key !== except)
+        __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+  }
+  return to;
+};
+var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+var __publicField = (obj, key, value) => {
+  __defNormalProp(obj, typeof key !== "symbol" ? key + "" : key, value);
+  return value;
+};
+
+// script.ts
+var script_exports = {};
+__export(script_exports, {
+  default: () => script_default
+});
+module.exports = __toCommonJS(script_exports);
+
+// user.ts
+var UserAccount = class {
+  constructor(name) {
+    __publicField(this, "name");
+    __publicField(this, "id");
+    this.name = name;
+    this.id = Math.floor(Math.random() * Number.MAX_SAFE_INTEGER);
+    throw "ooops";
+  }
+};
+function newUser(name) {
+  return new UserAccount(name);
+}
+
+// script.ts
+var script_default = () => {
+  const user = newUser("John");
+  console.log(user);
+};
+//# sourceMappingURL=data:application/json;base64,ewogICJ2ZXJzaW9uIjogMywKICAic291cmNlcyI6IFsic2NyaXB0LnRzIiwgInVzZXIudHMiXSwKICAic291cmNlc0NvbnRlbnQiOiBbImltcG9ydCB7IFVzZXIsIG5ld1VzZXIgfSBmcm9tIFwiLi91c2VyXCI7XG5cbmV4cG9ydCBkZWZhdWx0ICgpID0+IHtcbiAgY29uc3QgdXNlcjogVXNlciA9IG5ld1VzZXIoXCJKb2huXCIpO1xuICBjb25zb2xlLmxvZyh1c2VyKTtcbn07XG4iLCAiaW50ZXJmYWNlIFVzZXIge1xuICBuYW1lOiBzdHJpbmc7XG4gIGlkOiBudW1iZXI7XG59XG5cbmNsYXNzIFVzZXJBY2NvdW50IGltcGxlbWVudHMgVXNlciB7XG4gIG5hbWU6IHN0cmluZztcbiAgaWQ6IG51bWJlcjtcblxuICBjb25zdHJ1Y3RvcihuYW1lOiBzdHJpbmcpIHtcbiAgICB0aGlzLm5hbWUgPSBuYW1lO1xuICAgIHRoaXMuaWQgPSBNYXRoLmZsb29yKE1hdGgucmFuZG9tKCkgKiBOdW1iZXIuTUFYX1NBRkVfSU5URUdFUik7XG4gICAgdGhyb3cgXCJvb29wc1wiO1xuICB9XG59XG5cbmZ1bmN0aW9uIG5ld1VzZXIobmFtZTogc3RyaW5nKTogVXNlciB7XG4gIHJldHVybiBuZXcgVXNlckFjY291bnQobmFtZSk7XG59XG5cbmV4cG9ydCB7IFVzZXIsIG5ld1VzZXIgfTtcbiJdLAogICJtYXBwaW5ncyI6ICI7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7Ozs7OztBQUFBO0FBQUE7QUFBQTtBQUFBO0FBQUE7OztBQ0tBLElBQU0sY0FBTixNQUFrQztBQUFBLEVBSWhDLFlBQVksTUFBYztBQUgxQjtBQUNBO0FBR0UsU0FBSyxPQUFPO0FBQ1osU0FBSyxLQUFLLEtBQUssTUFBTSxLQUFLLE9BQU8sSUFBSSxPQUFPLGdCQUFnQjtBQUM1RCxVQUFNO0FBQUEsRUFDUjtBQUNGO0FBRUEsU0FBUyxRQUFRLE1BQW9CO0FBQ25DLFNBQU8sSUFBSSxZQUFZLElBQUk7QUFDN0I7OztBRGhCQSxJQUFPLGlCQUFRLE1BQU07QUFDbkIsUUFBTSxPQUFhLFFBQVEsTUFBTTtBQUNqQyxVQUFRLElBQUksSUFBSTtBQUNsQjsiLAogICJuYW1lcyI6IFtdCn0K
+`[1:]
+	b, err := getSimpleBundle(t, "/script.js", data, fs)
+	require.NoError(t, err)
+
+	bi, err := b.Instantiate(context.Background(), 0)
+	require.NoError(t, err)
+	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	require.Error(t, err)
+	exception := new(goja.Exception)
+	require.ErrorAs(t, err, &exception)
+	// TODO figure out why those are not the same as the one in the previous test TestSourceMapsExternal
+	// likely settings in the transpilers
+	require.Equal(t, "ooops\n\tat file:///user.ts:13:4(28)\n\tat newUser (file:///user.ts:18:9(3))\n\tat script_default (file:///script.ts:4:29(4))\n", exception.String())
+}
+
 func TestImportModificationsAreConsistentBetweenFiles(t *testing.T) {
 	t.Parallel()
 	fs := fsext.NewMemMapFs()
