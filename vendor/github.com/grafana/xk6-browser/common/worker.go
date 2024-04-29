@@ -4,14 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/grafana/xk6-browser/k6error"
-
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/log"
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
-	"github.com/dop251/goja"
 )
 
 type Worker struct {
@@ -56,18 +53,6 @@ func (w *Worker) initEvents() error {
 		}
 	}
 	return nil
-}
-
-// Evaluate evaluates a page function in the context of the web worker.
-func (w *Worker) Evaluate(pageFunc goja.Value, args ...goja.Value) any {
-	// TODO: implement
-	return nil
-}
-
-// EvaluateHandle evaluates a page function in the context of the web worker and returns a JS handle.
-func (w *Worker) EvaluateHandle(_ goja.Value, _ ...goja.Value) (JSHandleAPI, error) {
-	// TODO: implement
-	return nil, fmt.Errorf("Worker.EvaluateHandle has not been implemented yet: %w", k6error.ErrFatal)
 }
 
 // URL returns the URL of the web worker.

@@ -447,10 +447,31 @@ func (f *Frame) setContext(world executionWorld, execCtx frameExecutionContext) 
 		panic(err)
 	}
 
+	// There is a race condition when it comes to attaching iframes and the
+	// execution context that apply to these frames. What usually occurs is:
+	//
+	// 1. An exec context for about:blank is first set;
+	// 2. A new set event is received for exec context for the url pointing
+	//    to the actual destination for the iframe;
+	// 3. Finally the execution context for about:blank is destroyed, not
+	//    for the second execution context.
+	//
+	// This is the order of events when iframes are in use on a site, and
+	// so it is safe to nil the original execution context and overwrite it
+	// with the second one.
+	//
+	// The exec context destroyed event will not remove the new exec context
+	// since the ids do not match.
+	//
+	// If we didn't overwrite the first execCtx with the new one, then
+	// waitForExecutionContext could end up waiting indefinitely since all
+	// execCtx were destroyed.
 	if f.executionContexts[world] != nil {
-		f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, world exists",
+		f.log.Debugf("Frame:setContext", "fid:%s furl:%q ectxid:%d world:%s, overriding existing world",
 			f.ID(), f.URL(), execCtx.ID(), world)
-		return
+
+		f.executionContexts[world] = nil
+		f.documentHandle = nil
 	}
 
 	f.executionContexts[world] = execCtx
@@ -541,18 +562,6 @@ func (f *Frame) waitFor(selector string, opts *FrameWaitForSelectorOptions) erro
 
 	_, err = document.waitForSelector(f.ctx, selector, opts)
 	return err
-}
-
-// AddScriptTag is not implemented.
-func (f *Frame) AddScriptTag(opts goja.Value) {
-	k6ext.Panic(f.ctx, "Frame.AddScriptTag() has not been implemented yet")
-	applySlowMo(f.ctx)
-}
-
-// AddStyleTag is not implemented.
-func (f *Frame) AddStyleTag(opts goja.Value) {
-	k6ext.Panic(f.ctx, "Frame.AddStyleTag() has not been implemented yet")
-	applySlowMo(f.ctx)
 }
 
 // ChildFrames returns a list of child frames.
@@ -1549,18 +1558,30 @@ func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value
 }
 
 // Tap the first element that matches the selector.
-func (f *Frame) Tap(selector string, opts goja.Value) {
+func (f *Frame) Tap(selector string, opts *FrameTapOptions) error {
 	f.log.Debugf("Frame:Tap", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	popts := NewFrameTapOptions(f.defaultTimeout())
-	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing tap options: %w", err)
-	}
-	if err := f.tap(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "tapping on %q: %w", selector, err)
+	if err := f.tap(selector, opts); err != nil {
+		return fmt.Errorf("tapping on %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
+}
+
+func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
+	tap := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+		return nil, handle.tap(apiCtx, p)
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, tap, &opts.ElementHandleBasePointerOptions,
+	)
+	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err)
+	}
+
+	return nil
 }
 
 func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInputFilesOptions) error {
@@ -1573,20 +1594,6 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 		opts.Force, opts.NoWaitAfter, opts.Timeout,
 	)
 
-	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
-		return errorFromDOMError(err)
-	}
-
-	return nil
-}
-
-func (f *Frame) tap(selector string, opts *FrameTapOptions) error {
-	tap := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
-		return nil, handle.tap(apiCtx, p)
-	}
-	act := f.newPointerAction(
-		selector, DOMElementStateAttached, opts.Strict, tap, &opts.ElementHandleBasePointerOptions,
-	)
 	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
 		return errorFromDOMError(err)
 	}

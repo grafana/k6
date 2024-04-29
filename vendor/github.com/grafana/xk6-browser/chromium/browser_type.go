@@ -18,11 +18,8 @@ import (
 	"github.com/grafana/xk6-browser/log"
 	"github.com/grafana/xk6-browser/storage"
 
-	k6common "go.k6.io/k6/js/common"
 	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
-
-	"github.com/dop251/goja"
 )
 
 // BrowserType provides methods to launch a Chrome browser instance or connect to an existing one.
@@ -212,13 +209,6 @@ func (b *BrowserType) launch(
 func (b *BrowserType) tmpdir() string {
 	dir, _ := b.envLookupper("TMPDIR")
 	return dir
-}
-
-// LaunchPersistentContext launches the browser with persistent storage.
-func (b *BrowserType) LaunchPersistentContext(_ string, _ goja.Value) *common.Browser {
-	rt := b.vu.Runtime()
-	k6common.Throw(rt, errors.New("BrowserType.LaunchPersistentContext(userDataDir, opts) has not been implemented yet"))
-	return nil
 }
 
 // Name returns the name of this browser type.
