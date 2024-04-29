@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -85,6 +86,14 @@ func (h *BaseJSHandle) Dispose() {
 		// iteration ending and therefore the associated browser and its assets
 		// will be automatically deleted.
 		if errors.Is(err, context.Canceled) {
+			h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
+			return
+		}
+		// The following error indicates that the object we're trying to release
+		// cannot be found, which would mean that the object has already been
+		// removed/deleted. This can occur when a navigation occurs, usually when
+		// a page contains an iframe.
+		if strings.Contains(err.Error(), "Cannot find context with specified id") {
 			h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
 			return
 		}
