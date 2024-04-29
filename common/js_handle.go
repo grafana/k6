@@ -84,9 +84,12 @@ func (h *BaseJSHandle) Dispose() {
 		// context. The reason the context would be closed is due to the
 		// iteration ending and therefore the associated browser and its assets
 		// will be automatically deleted.
-		if !errors.Is(err, context.Canceled) {
-			k6ext.Panic(h.ctx, "dispose: %w", err)
+		if errors.Is(err, context.Canceled) {
+			h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
+			return
 		}
+
+		k6ext.Panic(h.ctx, "dispose: %w", err)
 	}
 }
 
