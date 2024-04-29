@@ -335,6 +335,12 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 		{opts{cli: []string{"--system-tags", `""`}}, exp{}, func(t *testing.T, c Config) {
 			assert.Equal(t, metrics.SystemTagSet(0), *c.Options.SystemTags)
 		}},
+		{opts{env: []string{`K6_SYSTEM_TAGS=""`}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, metrics.SystemTagSet(0), *c.Options.SystemTags)
+		}},
+		{opts{env: []string{`K6_SYSTEM_TAGS=proto,method`}}, exp{}, func(t *testing.T, c Config) {
+			assert.Equal(t, metrics.SystemTagSet(metrics.TagProto|metrics.TagMethod), *c.Options.SystemTags)
+		}},
 		{
 			opts{
 				runner: &lib.Options{
@@ -476,6 +482,16 @@ func getConfigConsolidationTestCases() []configConsolidationTestCase {
 			opts{env: []string{"K6_NO_SETUP=false", "K6_NO_TEARDOWN=bool"}},
 			exp{
 				consolidationError: true,
+			},
+			nil,
+		},
+		{
+			opts{
+				env: []string{"K6_PROFILING_ENABLED=true"},
+				cli: []string{"--profiling-enabled"},
+			},
+			exp{
+				consolidationError: false,
 			},
 			nil,
 		},

@@ -101,7 +101,7 @@ func NewConfig() Config {
 
 // Apply saves config non-zero config values from the passed config in the receiver.
 //
-//nolint:funlen,gocognit,cyclop
+//nolint:cyclop
 func (c Config) Apply(cfg Config) Config {
 	if cfg.Token.Valid {
 		c.Token = cfg.Token

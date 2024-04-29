@@ -44,7 +44,7 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 		builtinOutputCloud.String():    cloud.New,
 		builtinOutputCSV.String():      csv.New,
 		builtinOutputInfluxdb.String(): influxdb.New,
-		builtinOutputKafka.String(): func(params output.Params) (output.Output, error) {
+		builtinOutputKafka.String(): func(_ output.Params) (output.Output, error) {
 			return nil, errors.New("the kafka output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
 				"please use the new xk6 kafka output extension instead - https://github.com/k6io/xk6-output-kafka")
 		},
@@ -55,7 +55,7 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 				"more info at https://github.com/grafana/k6/issues/2982.")
 			return statsd.New(params)
 		},
-		builtinOutputDatadog.String(): func(params output.Params) (output.Output, error) {
+		builtinOutputDatadog.String(): func(_ output.Params) (output.Output, error) {
 			return nil, errors.New("the datadog output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
 				"please use the statsd output with env. variable K6_STATSD_ENABLE_TAGS=true instead")
 		},

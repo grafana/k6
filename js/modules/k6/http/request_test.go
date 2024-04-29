@@ -187,7 +187,7 @@ func TestRequest(t *testing.T) {
 	sr := tb.Replacer.Replace
 
 	// Handle paths with custom logic
-	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/digest-auth/failure", http.HandlerFunc(func(_ http.ResponseWriter, _ *http.Request) {
 		time.Sleep(2 * time.Second)
 	}))
 
@@ -446,7 +446,7 @@ func TestRequest(t *testing.T) {
 		})
 		t.Run("custom compression", func(t *testing.T) {
 			// We should not try to decode it
-			tb.Mux.HandleFunc("/customcompression", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			tb.Mux.HandleFunc("/customcompression", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 				w.Header().Set("Content-Encoding", "custom")
 				_, err := w.Write([]byte(`{"custom": true}`))
 				assert.NoError(t, err)
@@ -573,7 +573,7 @@ func TestRequest(t *testing.T) {
 			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr) //nolint:forcetypeassert
+			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr)
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 
@@ -599,7 +599,7 @@ func TestRequest(t *testing.T) {
 			logEntry := ts.hook.LastEntry()
 			require.NotNil(t, logEntry)
 			assert.Equal(t, logrus.WarnLevel, logEntry.Level)
-			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr) //nolint:forcetypeassert
+			assert.ErrorContains(t, logEntry.Data["error"].(error), expErr)
 			assert.Equal(t, "Request Failed", logEntry.Message)
 		})
 	})
@@ -696,7 +696,7 @@ func TestRequest(t *testing.T) {
 			t.Run("redirect", func(t *testing.T) {
 				t.Run("set cookie after redirect", func(t *testing.T) {
 					// TODO figure out a way to remove this ?
-					tb.Mux.HandleFunc("/set-cookie-without-redirect", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					tb.Mux.HandleFunc("/set-cookie-without-redirect", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 						cookie := http.Cookie{
 							Name:   "key-foo",
 							Value:  "value-bar",
@@ -1406,7 +1406,7 @@ func TestRequestCompression(t *testing.T) {
 		expectedEncoding string
 		actualEncoding   string
 	)
-	tb.Mux.HandleFunc("/compressed-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/compressed-text", http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		require.Equal(t, expectedEncoding, r.Header.Get("Content-Encoding"))
 
 		expectedLength, err := strconv.Atoi(r.Header.Get("Content-Length"))
@@ -1556,12 +1556,12 @@ func TestResponseTypes(t *testing.T) {
 
 	text := `•?((¯°·._.• ţ€$ţɨɲǥ µɲɨȼ๏ď€ ɨɲ Ќ6 •._.·°¯))؟•`
 	textLen := len(text)
-	tb.Mux.HandleFunc("/get-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/get-text", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		n, err := w.Write([]byte(text))
 		assert.NoError(t, err)
 		assert.Equal(t, textLen, n)
 	}))
-	tb.Mux.HandleFunc("/compare-text", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/compare-text", http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		assert.Equal(t, text, string(body))
@@ -1572,12 +1572,12 @@ func TestResponseTypes(t *testing.T) {
 	for i := 0; i < binaryLen; i++ {
 		binary[i] = byte(i)
 	}
-	tb.Mux.HandleFunc("/get-bin", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/get-bin", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		n, err := w.Write(binary)
 		assert.NoError(t, err)
 		assert.Equal(t, binaryLen, n)
 	}))
-	tb.Mux.HandleFunc("/compare-bin", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/compare-bin", http.HandlerFunc(func(_ http.ResponseWriter, r *http.Request) {
 		body, err := io.ReadAll(r.Body)
 		require.NoError(t, err)
 		assert.True(t, bytes.Equal(binary, body))
@@ -1814,7 +1814,7 @@ func TestResponseWaitingAndReceivingTimings(t *testing.T) {
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
 
-	tb.Mux.HandleFunc("/slow-response", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/slow-response", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		flusher, ok := w.(http.Flusher)
 		require.True(t, ok)
 
@@ -1974,7 +1974,7 @@ func BenchmarkHandlingOfResponseBodies(b *testing.B) {
 	}()
 
 	mbData := bytes.Repeat([]byte("0123456789"), 100000)
-	tb.Mux.HandleFunc("/1mbdata", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
+	tb.Mux.HandleFunc("/1mbdata", http.HandlerFunc(func(resp http.ResponseWriter, _ *http.Request) {
 		_, err := resp.Write(mbData)
 		if err != nil {
 			b.Error(err)
@@ -2084,7 +2084,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 				return hosts
 			}(),
 		}
-		client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
+		client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext
 		_, err = rt.RunString(`throw JSON.stringify(http.get("https://expired.localhost/"));`)
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "x509: certificate has expired or is not yet valid")
@@ -2136,7 +2136,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			state.Dialer = &netext.Dialer{Hosts: hosts}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
-			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
+			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext
 			realURL := "https://" + versionTest.URL + "/"
 			_, err = rt.RunString(fmt.Sprintf(`
             var res = http.get("%s");
@@ -2181,7 +2181,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			state.Dialer = &netext.Dialer{Hosts: hosts}
 			state.Transport = client.Transport
 			state.TLSConfig = s.TLS
-			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext //nolint:forcetypeassert
+			client.Transport.(*http.Transport).DialContext = state.Dialer.DialContext
 			realURL := "https://" + cipherSuiteTest.URL + "/"
 			_, err = rt.RunString(fmt.Sprintf(`
 					var res = http.get("%s");
@@ -2322,9 +2322,9 @@ func GenerateTLSCertificate(t *testing.T, host string, notBefore time.Time, vali
 	return certPem, keyPem
 }
 
-func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIds ...uint16) (*httptest.Server, *http.Client) {
+func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIDs ...uint16) (*httptest.Server, *http.Client) {
 	server := &http.Server{
-		Handler: http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Handler: http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 			w.WriteHeader(http.StatusOK)
 		}),
 		ReadHeaderTimeout: time.Second,
@@ -2345,10 +2345,10 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIds .
 	require.NoError(t, err)
 	s.TLS.Certificates = append(s.TLS.Certificates, cert)
 	suites := tls.CipherSuites()
-	if len(suitesIds) > 0 {
-		newSuites := make([]*tls.CipherSuite, 0, len(suitesIds))
+	if len(suitesIDs) > 0 {
+		newSuites := make([]*tls.CipherSuite, 0, len(suitesIDs))
 		for _, suite := range suites {
-			for _, id := range suitesIds {
+			for _, id := range suitesIDs {
 				if id == suite.ID {
 					newSuites = append(newSuites, suite)
 				}
@@ -2372,7 +2372,7 @@ func GetTestServerWithCertificate(t *testing.T, certPem, key []byte, suitesIds .
 			RootCAs:      certpool,
 			MinVersion:   tls.VersionTLS10,
 			MaxVersion:   tls.VersionTLS12, // this so that the ciphersuite work
-			CipherSuites: suitesIds,
+			CipherSuites: suitesIDs,
 		},
 		ForceAttemptHTTP2:     s.EnableHTTP2,
 		TLSHandshakeTimeout:   time.Second,
@@ -2394,7 +2394,7 @@ func TestGzipped204Response(t *testing.T) {
 	state.Options.Throw = null.BoolFrom(true)
 	sr := tb.Replacer.Replace
 	// We should not try to decode it
-	tb.Mux.HandleFunc("/gzipempty", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	tb.Mux.HandleFunc("/gzipempty", http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.Header().Set("Content-Encoding", "gzip")
 		w.WriteHeader(http.StatusNoContent)
 	}))

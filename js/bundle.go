@@ -85,9 +85,14 @@ func newBundle(
 		CompatibilityMode: compatMode,
 		callableExports:   make(map[string]struct{}),
 		filesystems:       filesystems,
-		pwd:               loader.Dir(src.URL),
+		pwd:               src.PWD,
 		preInitState:      piState,
 	}
+
+	if bundle.pwd == nil {
+		bundle.pwd = loader.Dir(src.URL)
+	}
+
 	c := bundle.newCompiler(piState.Logger)
 	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateFileLoad(bundle), c)
 
@@ -107,6 +112,7 @@ func newBundle(
 	if err != nil {
 		return nil, err
 	}
+	bundle.ModuleResolver.Lock()
 
 	err = bundle.populateExports(updateOptions, exports)
 	if err != nil {
@@ -276,10 +282,10 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 	}
 
 	modSys := modules.NewModuleSystem(b.ModuleResolver, vuImpl)
-	unbindInit := b.setInitGlobals(rt, vuImpl, modSys)
+	b.setInitGlobals(rt, vuImpl, modSys)
+	modules.ExportGloballyModule(rt, modSys, "k6/timers")
 	vuImpl.initEnv = initenv
 	defer func() {
-		unbindInit()
 		vuImpl.initEnv = nil
 	}()
 
@@ -298,7 +304,6 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*goja.Object, e
 	var exportsV goja.Value
 	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
 		return vuImpl.eventLoop.Start(func() error {
-			//nolint:govet // here we shadow err on purpose
 			var err error
 			exportsV, err = modSys.RunSourceData(b.sourceData)
 			return err
@@ -377,7 +382,7 @@ func (r *requireImpl) require(specifier string) (*goja.Object, error) {
 	return r.internal.Require(specifier)
 }
 
-func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modules.ModuleSystem) (unset func()) {
+func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modules.ModuleSystem) {
 	mustSet := func(k string, v interface{}) {
 		if err := rt.Set(k, v); err != nil {
 			panic(fmt.Errorf("failed to set '%s' global object: %w", k, err))
@@ -404,11 +409,6 @@ func (b *Bundle) setInitGlobals(rt *goja.Runtime, vu *moduleVUImpl, modSys *modu
 		pwd := impl.internal.CurrentlyRequiredModule()
 		return openImpl(rt, b.filesystems["file"], &pwd, filename, args...)
 	})
-
-	return func() {
-		mustSet("require", goja.Undefined())
-		mustSet("open", goja.Undefined())
-	}
 }
 
 func generateFileLoad(b *Bundle) modules.FileLoader {

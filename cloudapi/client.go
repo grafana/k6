@@ -2,12 +2,12 @@ package cloudapi
 
 import (
 	"bytes"
+	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
-	"math/rand"
 	"net/http"
 	"time"
 
@@ -230,15 +230,9 @@ func shouldAddIdempotencyKey(req *http.Request) bool {
 
 // randomStrHex returns a hex string which can be used
 // for session token id or idempotency key.
-//
-//nolint:gosec
 func randomStrHex() string {
 	// 16 hex characters
 	b := make([]byte, 8)
 	_, _ = rand.Read(b)
 	return hex.EncodeToString(b)
-}
-
-func init() {
-	rand.Seed(time.Now().UTC().UnixNano())
 }

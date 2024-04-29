@@ -7,7 +7,7 @@ runs:
     - name: Install Go
       uses: actions/setup-go@v5
       with:
-        go-version: 1.21.x
+        go-version: 1.22.x
         check-latest: true
     - name: Get golangci-lint version and download rules
       shell: bash
@@ -28,5 +28,4 @@ runs:
       uses: golangci/golangci-lint-action@349d20632dbaed38f0a492cc991152e3d351e854 # latest commit at the time that uses node20
       with:
         version: ${{ steps.getenv.outputs.GolangCIVersion }}
-        only-new-issues: true
         args: "--config=${{ github.action_path }}/.golangci.yml"

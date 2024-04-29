@@ -177,5 +177,8 @@ func getFlags(defaultFlags GlobalFlags, env map[string]string) GlobalFlags {
 	if _, ok := env["NO_COLOR"]; ok {
 		result.NoColor = true
 	}
+	if _, ok := env["K6_PROFILING_ENABLED"]; ok {
+		result.ProfilingEnabled = true
+	}
 	return result
 }

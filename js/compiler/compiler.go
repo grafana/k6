@@ -4,11 +4,13 @@ package compiler
 
 import (
 	_ "embed" // we need this for embedding Babel
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
 	"os"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -121,7 +123,7 @@ func (c *Compiler) Transform(src, filename string, inputSrcMap []byte) (code str
 		// TODO: drop this code and everything it's connected to when babel is dropped
 		v := os.Getenv(maxSrcLenForBabelSourceMapVarName) //nolint:forbidigo
 		if len(v) > 0 {
-			i, err := strconv.Atoi(v) //nolint:govet // we shadow err on purpose
+			i, err := strconv.Atoi(v)
 			if err != nil {
 				c.logger.Warnf("Tried to parse %q from %s as integer but couldn't %s\n",
 					v, maxSrcLenForBabelSourceMapVarName, err)
@@ -207,8 +209,22 @@ func (c *Compiler) compileImpl(
 ) (*goja.Program, string, error) {
 	code := src
 	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
-	if wrap { // the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
-		code = "(function(module, exports){\n" + code + "\n})\n"
+	if wrap {
+		conditionalNewLine := ""
+		if index := strings.LastIndex(code, "//# sourceMappingURL="); index != -1 {
+			// the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
+			conditionalNewLine = "\n"
+			newCode, err := state.updateInlineSourceMap(code, index)
+			if err != nil {
+				c.logger.Warnf("while compiling %q, couldn't update its inline sourcemap which might lead "+
+					"to some line numbers being off: %s", filename, err)
+			} else {
+				code = newCode
+			}
+
+			// if there is no sourcemap - bork only the first line of code, but leave the remaining ones.
+		}
+		code = "(function(module, exports){" + conditionalNewLine + code + "\n})\n"
 	}
 	opts := parser.WithDisableSourceMaps
 	if c.Options.SourceMapLoader != nil {
@@ -266,6 +282,29 @@ func newBabel() (*babel, error) {
 	}
 
 	return result, err
+}
+
+func (c *compilationState) updateInlineSourceMap(code string, index int) (string, error) {
+	nextnewline := strings.Index(code[index:], "\n")
+	if nextnewline == -1 {
+		nextnewline = len(code[index:])
+	}
+	mapurl := code[index : index+nextnewline]
+	const base64EncodePrefix = "application/json;base64,"
+	if startOfBase64EncodedSourceMap := strings.Index(mapurl, base64EncodePrefix); startOfBase64EncodedSourceMap != -1 {
+		startOfBase64EncodedSourceMap += len(base64EncodePrefix)
+		b, err := base64.StdEncoding.DecodeString(mapurl[startOfBase64EncodedSourceMap:])
+		if err != nil {
+			return code, err
+		}
+		b, err = c.increaseMappingsByOne(b)
+		if err != nil {
+			return code, err
+		}
+		encoded := base64.StdEncoding.EncodeToString(b)
+		code = code[:index] + "//# sourcemappingurl=data:application/json;base64," + encoded + code[nextnewline:]
+	}
+	return code, nil
 }
 
 // increaseMappingsByOne increases the lines in the sourcemap by line so that it fixes the case where we need to wrap a

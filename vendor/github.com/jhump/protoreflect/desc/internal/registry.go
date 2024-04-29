@@ -6,11 +6,30 @@ import (
 	"google.golang.org/protobuf/types/dynamicpb"
 )
 
-func RegisterExtensionsForFile(reg *protoregistry.Types, fd protoreflect.FileDescriptor) {
+// RegisterExtensionsFromImportedFile registers extensions in the given file as well
+// as those in its public imports. So if another file imports the given fd, this adds
+// all extensions made visible to that importing file.
+//
+// All extensions in the given file are made visible to the importing file, and so are
+// extensions in any public imports in the given file.
+func RegisterExtensionsFromImportedFile(reg *protoregistry.Types, fd protoreflect.FileDescriptor) {
+	registerTypesForFile(reg, fd, true, true)
+}
+
+// RegisterExtensionsVisibleToFile registers all extensions visible to the given file.
+// This includes all extensions defined in fd and as well as extensions defined in the
+// files that it imports (and any public imports thereof, etc).
+//
+// This is effectively the same as registering the extensions in fd and then calling
+// RegisterExtensionsFromImportedFile for each file imported by fd.
+func RegisterExtensionsVisibleToFile(reg *protoregistry.Types, fd protoreflect.FileDescriptor) {
 	registerTypesForFile(reg, fd, true, false)
 }
 
-func RegisterTypesForFile(reg *protoregistry.Types, fd protoreflect.FileDescriptor) {
+// RegisterTypesVisibleToFile registers all types visible to the given file.
+// This is the same as RegisterExtensionsVisibleToFile but it also registers
+// message and enum types, not just extensions.
+func RegisterTypesVisibleToFile(reg *protoregistry.Types, fd protoreflect.FileDescriptor) {
 	registerTypesForFile(reg, fd, false, false)
 }
 

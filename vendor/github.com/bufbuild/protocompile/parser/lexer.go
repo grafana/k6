@@ -764,7 +764,7 @@ func (l *protoLex) errWithCurrentPos(err error, offset int) reporter.ErrorWithPo
 
 func (l *protoLex) requireSemicolon(semicolons []*ast.RuneNode) (*ast.RuneNode, []*ast.RuneNode) {
 	if len(semicolons) == 0 {
-		l.Error("expected ';'")
+		l.Error("syntax error: expecting ';'")
 		return nil, nil
 	}
 	return semicolons[0], semicolons[1:]

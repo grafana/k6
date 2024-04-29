@@ -68,7 +68,7 @@ func getNullString(flags *pflag.FlagSet, key string) null.String {
 }
 
 func exactArgsWithMsg(n int, msg string) cobra.PositionalArgs {
-	return func(cmd *cobra.Command, args []string) error {
+	return func(_ *cobra.Command, args []string) error {
 		if len(args) != n {
 			return fmt.Errorf("accepts %d arg(s), received %d: %s", n, len(args), msg)
 		}

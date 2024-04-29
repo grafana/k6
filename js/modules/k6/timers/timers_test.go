@@ -1,4 +1,4 @@
-package timers
+package timers_test
 
 import (
 	"context"
@@ -6,20 +6,27 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modulestest"
 )
 
+func newRuntime(t testing.TB) *modulestest.Runtime {
+	t.Helper()
+	runtime := modulestest.NewRuntime(t)
+	err := runtime.SetupModuleSystem(map[string]any{"k6/x/timers": timers.New()}, nil, nil)
+	require.NoError(t, err)
+	return runtime
+}
+
 func TestSetTimeout(t *testing.T) {
 	t.Parallel()
-	runtime := modulestest.NewRuntime(t)
-	err := runtime.SetupModuleSystem(map[string]any{"k6/x/timers": New()}, nil, nil)
-	require.NoError(t, err)
 
+	runtime := newRuntime(t)
 	rt := runtime.VU.Runtime()
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	_, err = runtime.RunOnEventLoop(`
+	_, err := runtime.RunOnEventLoop(`
 		let timers = require("k6/x/timers");
 		timers.setTimeout(()=> {
 			print("in setTimeout")
@@ -32,16 +39,14 @@ func TestSetTimeout(t *testing.T) {
 
 func TestSetInterval(t *testing.T) {
 	t.Parallel()
-	runtime := modulestest.NewRuntime(t)
-	err := runtime.SetupModuleSystem(map[string]any{"k6/x/timers": New()}, nil, nil)
-	require.NoError(t, err)
+	runtime := newRuntime(t)
 
 	rt := runtime.VU.Runtime()
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 	require.NoError(t, rt.Set("sleep10", func() { time.Sleep(10 * time.Millisecond) }))
 
-	_, err = runtime.RunOnEventLoop(`
+	_, err := runtime.RunOnEventLoop(`
 		let timers = require("k6/x/timers");
 		var i = 0;
 		let s = timers.setInterval(()=> {
@@ -64,15 +69,13 @@ func TestSetInterval(t *testing.T) {
 
 func TestSetTimeoutOrder(t *testing.T) {
 	t.Parallel()
-	runtime := modulestest.NewRuntime(t)
-	err := runtime.SetupModuleSystem(map[string]any{"k6/x/timers": New()}, nil, nil)
-	require.NoError(t, err)
+	runtime := newRuntime(t)
 
 	rt := runtime.VU.Runtime()
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	_, err = rt.RunString(`globalThis.setTimeout = require("k6/x/timers").setTimeout;`)
+	_, err := rt.RunString(`globalThis.setTimeout = require("k6/x/timers").setTimeout;`)
 	require.NoError(t, err)
 
 	for i := 0; i < 100; i++ {
@@ -94,15 +97,13 @@ func TestSetTimeoutOrder(t *testing.T) {
 
 func TestSetIntervalOrder(t *testing.T) {
 	t.Parallel()
-	runtime := modulestest.NewRuntime(t)
-	err := runtime.SetupModuleSystem(map[string]any{"k6/x/timers": New()}, nil, nil)
-	require.NoError(t, err)
+	runtime := newRuntime(t)
 
 	rt := runtime.VU.Runtime()
 	var log []string
 	require.NoError(t, rt.Set("print", func(s string) { log = append(log, s) }))
 
-	_, err = rt.RunString(`globalThis.setInterval = require("k6/x/timers").setInterval;`)
+	_, err := rt.RunString(`globalThis.setInterval = require("k6/x/timers").setInterval;`)
 	require.NoError(t, err)
 
 	_, err = rt.RunString(`globalThis.clearInterval = require("k6/x/timers").clearInterval;`)
@@ -142,9 +143,7 @@ func TestSetIntervalOrder(t *testing.T) {
 
 func TestSetTimeoutContextCancel(t *testing.T) {
 	t.Parallel()
-	runtime := modulestest.NewRuntime(t)
-	err := runtime.SetupModuleSystem(map[string]any{"k6/x/timers": New()}, nil, nil)
-	require.NoError(t, err)
+	runtime := newRuntime(t)
 
 	rt := runtime.VU.Runtime()
 	var log []string
@@ -157,7 +156,7 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 		}
 	}))
 
-	_, err = rt.RunString(`globalThis.setTimeout = require("k6/x/timers").setTimeout;`)
+	_, err := rt.RunString(`globalThis.setTimeout = require("k6/x/timers").setTimeout;`)
 	require.NoError(t, err)
 
 	for i := 0; i < 2000; i++ {

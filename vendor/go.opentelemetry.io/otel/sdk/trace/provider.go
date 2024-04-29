@@ -55,7 +55,7 @@ type tracerProviderConfig struct {
 	resource *resource.Resource
 }
 
-// MarshalLog is the marshaling function used by the logging system to represent this exporter.
+// MarshalLog is the marshaling function used by the logging system to represent this Provider.
 func (cfg tracerProviderConfig) MarshalLog() interface{} {
 	return struct {
 		SpanProcessors  []SpanProcessor

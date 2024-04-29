@@ -139,8 +139,6 @@ type (
 	VideoElement           struct{ MediaElement }
 )
 
-//revive:enable:exported
-
 func (h HrefElement) hrefURL() *url.URL {
 	href, exists := h.attrAsURL("href")
 	if !exists {

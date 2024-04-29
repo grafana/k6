@@ -80,9 +80,8 @@ func toNumeric(val string) (float64, bool) {
 		return 0, false
 	} else if repr := strconv.FormatFloat(fltVal, 'f', -1, 64); repr == val {
 		return fltVal, true
-	} else {
-		return 0, false
 	}
+	return 0, false
 }
 
 func convertDataAttrVal(val string) interface{} {

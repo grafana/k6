@@ -108,7 +108,7 @@ func TestRampingVUsRun(t *testing.T) {
 
 	var iterCount int64
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		// Sleeping for a weird duration somewhat offset from the
 		// executor ticks to hopefully keep race conditions out of
 		// our control from failing the test.
@@ -388,7 +388,7 @@ func TestRampingVUsRampDownNoWobble(t *testing.T) {
 		},
 	}
 
-	runner := simpleRunner(func(ctx context.Context, _ *lib.State) error {
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
 		time.Sleep(500 * time.Millisecond)
 		return nil
 	})

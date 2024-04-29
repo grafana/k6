@@ -22,14 +22,14 @@ import (
 	"os"
 	"regexp"
 
-	semconv "go.opentelemetry.io/otel/semconv/v1.21.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 )
 
 type containerIDProvider func() (string, error)
 
 var (
 	containerID         containerIDProvider = getContainerIDFromCGroup
-	cgroupContainerIDRe                     = regexp.MustCompile(`^.*/(?:.*-)?([0-9a-f]+)(?:\.|\s*$)`)
+	cgroupContainerIDRe                     = regexp.MustCompile(`^.*/(?:.*[-:])?([0-9a-f]+)(?:\.|\s*$)`)
 )
 
 type cgroupContainerIDDetector struct{}

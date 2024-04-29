@@ -24,7 +24,7 @@ env:
   APP_NAME: "k6"
   DOCKER_IMAGE_ID: "grafana/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
-  DEFAULT_GO_VERSION: "1.21.x"
+  DEFAULT_GO_VERSION: "1.22.x"
 
 jobs:
   configure:
@@ -286,25 +286,6 @@ jobs:
           path: |
             packaging/k6-*.msi
           retention-days: 7
-
-  # Disabled until #1997 and #1998 are addressed.
-  # publish-macos:
-  #   runs-on: macos-latest
-  #   needs: [configure, build]
-  #   if: ${{ startsWith(github.ref, 'refs/tags/v') && github.event_name != 'workflow_dispatch' }}
-  #   env:
-  #     VERSION: ${{ needs.configure.outputs.k6_version }}
-  #     HOMEBREW_GITHUB_API_TOKEN: ${{ secrets.HOMEBREW_GITHUB_API_TOKEN }}
-  #   steps:
-  #     - name: Download source code archive
-  #       run: curl -fsSL "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" -o "${VERSION}.tar.gz"
-  #     - name: Set up Homebrew
-  #       uses: Homebrew/actions/setup-homebrew@2eb78889a50ba021d744837934f1af2d8c4458ec
-  #     - name: Create version bump PR
-  #       run: |
-  #         brew bump-formula-pr k6 \
-  #           --url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/archive/${VERSION}.tar.gz" \
-  #           --sha256="$(shasum -a 256 ${VERSION}.tar.gz | cut -d' ' -f1)"
 
   publish-github:
     runs-on: ubuntu-latest

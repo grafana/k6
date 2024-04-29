@@ -239,11 +239,11 @@ func TestOptions(t *testing.T) {
 					"CgYIKoZIzj0EAwIDSAAwRQIgSGxnJ+/cLUNTzt7fhr/mjJn7ShsTW33dAdfLM7H2\n" +
 					"z/gCIQDyVf8DePtxlkMBScTxZmIlMQdNc6+6VGZQ4QscruVLmg==\n" +
 					"-----END CERTIFICATE-----",
-				Key: "-----BEGIN EC PRIVATE KEY-----\n" + //nolint:goconst
+				Key: "-----BEGIN EC PRIVATE KEY-----\n" +
 					"MHcCAQEEIAfJeoc+XgcqmYV0b4owmofx0LXwPRqOPXMO+PUKxZSgoAoGCCqGSM49\n" +
 					"AwEHoUQDQgAEtp/EQ6YEeTNup33/RVlf/f2o7bJCrYbPl9pF2/LfyS4swJX70dit\n" +
 					"8zHoZgJnNNQirqHxBc6uWBhOLG5RV+Ek1Q==\n" +
-					"-----END EC PRIVATE KEY-----", //nolint:goconst
+					"-----END EC PRIVATE KEY-----",
 			}, nil},
 			{TLSAuthFields{
 				Domains: []string{"sub.example.com"},

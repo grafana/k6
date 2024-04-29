@@ -20,6 +20,12 @@ const (
 // Find gets the descendants of each element in the current set of matched
 // elements, filtered by a selector. It returns a new Selection object
 // containing these matched elements.
+//
+// Note that as for all methods accepting a selector string, the selector is
+// compiled and applied by the cascadia package and inherits its behavior and
+// constraints regarding supported selectors. See the note on cascadia in
+// the goquery documentation here:
+// https://github.com/PuerkitoBio/goquery?tab=readme-ov-file#api
 func (s *Selection) Find(selector string) *Selection {
 	return pushStack(s, findWithMatcher(s.Nodes, compileMatcher(selector)))
 }

@@ -23,6 +23,7 @@ import (
 type SourceData struct {
 	Data []byte
 	URL  *url.URL
+	PWD  *url.URL
 }
 
 type loaderFunc func(logger logrus.FieldLogger, path string, parts []string) (string, error)
@@ -170,6 +171,10 @@ func Load(
 	data, err := fsext.ReadFile(filesystems[scheme], pathOnFs)
 
 	if err == nil {
+		if moduleSpecifier.Opaque != "" {
+			loaderName, _, _ := pickLoader(moduleSpecifier.Opaque)
+			logger.Warnf(magicURLsDeprecationWarning, originalModuleSpecifier, loaderName)
+		}
 		return &SourceData{URL: moduleSpecifier, Data: data}, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
@@ -203,13 +208,20 @@ func Load(
 	return result, nil
 }
 
+const (
+	magicURLsDeprecationWarning = "Specifier %q resolved to use a non-conventional %[2]q loader. " +
+		"The used %[2]q loader is deprecated and will be removed in k6 v0.53.0."
+	magicURLsDeprecationWarningExtended = magicURLsDeprecationWarning + " Please use the real URL %q instead."
+)
+
 func resolveUsingLoaders(logger logrus.FieldLogger, name string) (*url.URL, error) {
-	_, loader, loaderArgs := pickLoader(name)
+	loaderName, loader, loaderArgs := pickLoader(name)
 	if loader != nil {
 		urlString, err := loader(logger, name, loaderArgs)
 		if err != nil {
 			return nil, err
 		}
+		logger.Warnf(magicURLsDeprecationWarningExtended, name, loaderName, urlString)
 		return url.Parse(urlString)
 	}
 

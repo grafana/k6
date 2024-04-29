@@ -18,9 +18,9 @@ import (
 // TODO?: Discard? Or make this actually user-configurable somehow? hello #883...
 var DefaultGracefulStopValue = 30 * time.Second //nolint:gochecknoglobals
 
-var executorNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`)
+var scenarioNameWhitelist = regexp.MustCompile(`^[0-9a-zA-Z_-]+$`)
 
-const executorNameErr = "the executor name should contain only numbers, latin letters, underscores, and dashes"
+const scenarioNameErr = "the scenario name should contain only numbers, latin letters, underscores, and dashes"
 
 // BaseConfig contains the common config fields for all executors
 type BaseConfig struct {
@@ -50,10 +50,10 @@ func (bc BaseConfig) Validate() (errors []error) {
 	// Some just-in-case checks, since those things are likely checked in other places or
 	// even assigned by us:
 	if bc.Name == "" {
-		errors = append(errors, fmt.Errorf("executor name can't be empty"))
+		errors = append(errors, fmt.Errorf("scenario name can't be empty"))
 	}
-	if !executorNameWhitelist.MatchString(bc.Name) {
-		errors = append(errors, fmt.Errorf(executorNameErr))
+	if !scenarioNameWhitelist.MatchString(bc.Name) {
+		errors = append(errors, fmt.Errorf(scenarioNameErr))
 	}
 	if bc.Exec.Valid && bc.Exec.String == "" {
 		errors = append(errors, fmt.Errorf("exec value cannot be empty"))
@@ -71,7 +71,7 @@ func (bc BaseConfig) Validate() (errors []error) {
 	return errors
 }
 
-// GetName returns the name of the executor.
+// GetName returns the name of the scenario.
 func (bc BaseConfig) GetName() string {
 	return bc.Name
 }
@@ -117,7 +117,7 @@ func (bc BaseConfig) GetScenarioOptions() *lib.ScenarioOptions {
 	return bc.Options
 }
 
-// GetTags returns any custom tags configured for the executor.
+// GetTags returns any custom tags configured for the scenario.
 func (bc BaseConfig) GetTags() map[string]string {
 	return bc.Tags
 }

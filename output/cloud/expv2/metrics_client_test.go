@@ -17,7 +17,7 @@ func TestMetricsClientPush(t *testing.T) {
 	t.Parallel()
 
 	reqs := 0
-	h := func(rw http.ResponseWriter, r *http.Request) {
+	h := func(_ http.ResponseWriter, r *http.Request) {
 		reqs++
 
 		assert.Equal(t, "/v2/metrics/test-ref-id", r.URL.Path)

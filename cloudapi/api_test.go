@@ -50,7 +50,7 @@ func TestCreateTestRun(t *testing.T) {
 
 func TestFinished(t *testing.T) {
 	t.Parallel()
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		fprint(t, w, "")
 	}))
 	defer server.Close()
@@ -70,7 +70,7 @@ func TestFinished(t *testing.T) {
 func TestAuthorizedError(t *testing.T) {
 	t.Parallel()
 	called := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called++
 		w.WriteHeader(http.StatusForbidden)
 		fprint(t, w, `{"error": {"code": 5, "message": "Not allowed"}}`)
@@ -89,7 +89,7 @@ func TestAuthorizedError(t *testing.T) {
 func TestDetailsError(t *testing.T) {
 	t.Parallel()
 	called := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		called++
 		w.WriteHeader(http.StatusForbidden)
 		fprint(t, w, `{"error": {"code": 0, "message": "Validation failed", "details": { "name": ["Shorter than minimum length 2."]}}}`)

@@ -139,7 +139,7 @@ func newTestState(t *testing.T) testState {
 	return ts
 }
 
-// ToInitContext moves the test state to the VU context.
+// ToVUContext moves the test state to the VU context.
 func (ts *testState) ToVUContext() {
 	registry := metrics.NewRegistry()
 	root, err := lib.NewGroup("", nil)

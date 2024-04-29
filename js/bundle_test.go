@@ -91,7 +91,7 @@ func TestNewBundle(t *testing.T) {
 		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)
 		exception := new(scriptExceptionError)
 		require.ErrorAs(t, err, &exception)
-		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:2:7(3)\n")
+		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:1:34(3)\n")
 	})
 	t.Run("InvalidExports", func(t *testing.T) {
 		t.Parallel()
@@ -164,13 +164,14 @@ func TestNewBundle(t *testing.T) {
 				// ES2015 modules are not supported
 				{
 					"Modules", "base", `export default function() {};`,
-					"file:///script.js: Line 2:1 Unexpected reserved word (and 2 more errors)",
+					"file:///script.js: Line 1:28 Unexpected reserved word (and 2 more errors)",
 				},
 				// BigInt is not supported
 				{
 					"BigInt", "base",
-					`module.exports.default = function() {}; BigInt(1231412444)`,
-					"ReferenceError: BigInt is not defined\n\tat file:///script.js:2:47(7)\n",
+					`module.exports.default = function() {};
+BigInt(1231412444)`,
+					"ReferenceError: BigInt is not defined\n\tat file:///script.js:2:7(7)\n",
 				},
 			}
 
@@ -453,7 +454,7 @@ func TestNewBundle(t *testing.T) {
 			require.Len(t, entries, 1)
 			assert.Equal(t, logrus.WarnLevel, entries[0].Level)
 			assert.Contains(t, entries[0].Message, "There were unknown fields")
-			assert.Contains(t, entries[0].Data["error"].(error).Error(), "unknown field \"something\"") //nolint:forcetypeassert
+			assert.Contains(t, entries[0].Data["error"].(error).Error(), "unknown field \"something\"")
 		})
 	})
 }
@@ -921,6 +922,43 @@ func TestBundleMakeArchive(t *testing.T) {
 			assert.Equal(t, `hi`, string(fileData))
 			assert.Equal(t, consts.Version, arc.K6Version)
 			assert.Equal(t, tc.cm.String(), arc.CompatibilityMode)
+		})
+	}
+}
+
+func TestGlobalTimers(t *testing.T) {
+	t.Parallel()
+	data := `
+			import timers from "k6/timers";
+			if (setTimeout != timers.setTimeout) {
+				throw "setTimeout doesn't match";
+			}
+			if (clearTimeout != timers.clearTimeout) {
+				throw "clearTimeout doesn't match";
+			}
+			if (setInterval != timers.setInterval) {
+				throw "setInterval doesn't match";
+			}
+			if (clearInterval != timers.clearInterval) {
+				throw "clearInterval doesn't match";
+			}
+			export default function() {}
+	`
+
+	b1, err := getSimpleBundle(t, "/script.js", data)
+	require.NoError(t, err)
+	logger := testutils.NewLogger(t)
+
+	b2, err := NewBundleFromArchive(getTestPreInitState(t, logger, nil), b1.makeArchive())
+	require.NoError(t, err)
+
+	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
+	for name, b := range bundles {
+		b := b
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+			_, err := b.Instantiate(context.Background(), 1)
+			require.NoError(t, err)
 		})
 	}
 }

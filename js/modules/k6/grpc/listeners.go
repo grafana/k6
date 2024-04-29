@@ -42,7 +42,7 @@ func (l *eventListener) add(fn func(goja.Value) (goja.Value, error)) {
 	l.list = append(l.list, fn)
 }
 
-// getTypes return event listener of a certain type
+// getType return event listener of a certain type
 func (l *eventListeners) getType(t string) *eventListener {
 	switch t {
 	case eventData:

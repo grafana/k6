@@ -1,7 +1,7 @@
-# v1.55.2
+# v1.57.2
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
-  deadline: 5m
+  timeout: 5m
 
 issues:
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
@@ -24,6 +24,11 @@ issues:
        - gocognit
        - funlen
        - lll
+       - forcetypeassert
+   - path: js\/modules\/k6\/html\/.*\.go
+     text: "exported: exported "
+     linters:
+       - revive
    - path: js\/modules\/k6\/http\/.*_test\.go
      linters:
        # k6/http module's tests are quite complex because they often have several nested levels.
@@ -38,17 +43,10 @@ issues:
      text: 'use of `os\.(SyscallError|Signal|Interrupt)` forbidden'
 
 linters-settings:
-  nolintlint:
-    # Disable to ensure that nolint directives don't have a leading space. Default is true.
-    allow-leading-space: false
   exhaustive:
     default-signifies-exhaustive: true
-  govet:
-    check-shadowing: true
   cyclop:
     max-complexity: 25
-  maligned:
-    suggest-new: true
   dupl:
     threshold: 150
   goconst:
