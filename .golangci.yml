@@ -1,7 +1,7 @@
 # v1.57.2
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
-  deadline: 5m
+  timeout: 5m
 
 issues:
   # Maximum issues count per one linter. Set to 0 to disable. Default is 50.
