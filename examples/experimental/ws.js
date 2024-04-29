@@ -13,7 +13,7 @@ import {
 let chatRoomName = "publicRoom"; // choose your chat room name
 let sessionDuration = randomIntBetween(5000, 60000); // user session between 5s and 1m
 
-export default function () {
+export default function() {
 	for (let i = 0; i < 4; i++) {
 		startWSWorker(i);
 	}
@@ -22,6 +22,7 @@ export default function () {
 function startWSWorker(id) {
 	let url = `wss://test-api.k6.io/ws/crocochat/${chatRoomName}/`;
 	let ws = new WebSocket(url);
+	ws.binaryType = "arraybuffer";
 	ws.addEventListener("open", () => {
 		ws.send(
 			JSON.stringify({
@@ -54,7 +55,7 @@ function startWSWorker(id) {
 			);
 		}, randomIntBetween(2000, 8000)); // say something every 2-8seconds
 
-		let timeout1id = setTimeout(function () {
+		let timeout1id = setTimeout(function() {
 			clearInterval(intervalId);
 			console.log(
 				`VU ${__VU}:${id}: ${sessionDuration}ms passed, leaving the chat`
@@ -62,7 +63,7 @@ function startWSWorker(id) {
 			ws.send(JSON.stringify({ event: "LEAVE" }));
 		}, sessionDuration);
 
-		let timeout2id = setTimeout(function () {
+		let timeout2id = setTimeout(function() {
 			console.log(
 				`Closing the socket forcefully 3s after graceful LEAVE`
 			);
