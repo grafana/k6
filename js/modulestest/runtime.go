@@ -88,7 +88,7 @@ func (r *Runtime) SetupModuleSystemFromAnother(another *Runtime) error {
 // It is meant as a helper to test code that is expected to be run on the event loop, such
 // as code that returns a promise.
 //
-// A typical usage is to facilitate writing tests for asynchrounous code:
+// A typical usage is to facilitate writing tests for asynchrounous code:
 //
 //	func TestSomething(t *testing.T) {
 //	    runtime := modulestest.NewRuntime(t)

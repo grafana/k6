@@ -1,0 +1,46 @@
+diff --git a/resources/testharness.js b/resources/testharness.js
+index c5c375e17..57d201b57 100644
+--- a/resources/testharness.js
++++ b/resources/testharness.js
+@@ -487,7 +487,11 @@
+         this.all_loaded = false;
+         this.on_loaded_callback = null;
+         Promise.resolve().then(function() {
+-            this.all_loaded = true
++            // This is the test environment used when we run tests from Go
++            // code and with the Goja/k6 runtime. However, we don't want
++            // all tests to be marked as loaded "by default", as it would
++            // make some of the tests to not be executed at all.
++            // this.all_loaded = true
+             if (this.on_loaded_callback) {
+                 this.on_loaded_callback();
+             }
+@@ -2631,6 +2635,16 @@
+             this.set_status(status, message, stack);
+             this.phase = this.phases.HAS_RESULT;
+             this.done();
++
++            // We don't want to rely on the DOM and other browser-based
++            // mechanisms for reporting test failures. Instead, we just
++            // throw the error and make it fail fast, to be aware of it.
++            //
++            // In the future, we might want to add a way to report these
++            // that doesn't rely on a browser, but let all test end before
++            // actually reporting failures.
++            // But, as a first iteration, this approach should suffice.
++            throw `${this.name} failed - ${e}`;
+         } finally {
+             this.current_test = null;
+         }
+@@ -4784,6 +4798,11 @@
+      */
+
+     var tests = new Tests();
++    // We expose the [tests] global variable through
++    // the [global_scope], so we can access it from
++    // Go code, in order to make sure that all test
++    // have finished from Go code.
++    global_scope.tests = tests;
+
+     if (global_scope.addEventListener) {
+         var error_handler = function(error, message, stack) {

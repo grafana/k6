@@ -14,6 +14,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modules/k6/execution"
 	"go.k6.io/k6/js/modules/k6/experimental/fs"
+	"go.k6.io/k6/js/modules/k6/experimental/streams"
 	"go.k6.io/k6/js/modules/k6/experimental/tracing"
 	"go.k6.io/k6/js/modules/k6/grpc"
 	"go.k6.io/k6/js/modules/k6/html"
@@ -38,6 +39,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/timers":                  timers.New(),
 		"k6/execution":               execution.New(),
 		"k6/experimental/redis":      redis.New(),
+		"k6/experimental/streams":    streams.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
 		"k6/experimental/timers": newWarnExperimentalModule(timers.New(),
