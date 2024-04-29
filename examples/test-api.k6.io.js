@@ -15,6 +15,7 @@ export default function() {
 function startWSWorker(id) {
   let url = `wss://test-api.k6.io/ws/crocochat/${chatRoomName}/`;
   let ws = new WebSocket(url);
+  ws.binaryType = "arraybuffer";
   ws.addEventListener("open", () => {
     ws.send(JSON.stringify({ 'event': 'SET_NAME', 'new_name': `Croc ${__VU}:${id}` }));
 

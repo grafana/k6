@@ -3,16 +3,16 @@ import { setTimeout, clearTimeout, setInterval, clearInterval } from "k6/x/timer
 
 const CLOSED_STATE = 3
 
-export default function () {
+export default function() {
     // local echo server should be launched with `make ws-echo-server-run`
     var url = "ws://localhost:10000";
     var params = { "tags": { "my_tag": "hello" } };
 
     let ws = new WebSocket(url, null, params)
-    
+    ws.binaryType = "arraybuffer";
     ws.onopen = () => {
         console.log('connected')
-        ws.send(Date.now().toString())        
+        ws.send(Date.now().toString())
     }
 
     let intervalId = setInterval(() => {
@@ -20,11 +20,11 @@ export default function () {
         console.log("Pinging every 1 sec (setInterval test)")
     }, 1000);
 
-    let timeout1id = setTimeout(function () {
+    let timeout1id = setTimeout(function() {
         console.log('2 seconds passed, closing the socket')
         clearInterval(intervalId)
         ws.close()
-        
+
     }, 2000);
 
     ws.onclose = () => {
@@ -33,7 +33,7 @@ export default function () {
         console.log('disconnected')
     }
 
-    
+
     ws.onping = () => {
         console.log("PING!")
     }
@@ -55,7 +55,7 @@ export default function () {
             return
         }
 
-        console.log(`Roundtrip time: ${Date.now() - parsed} ms`);        
+        console.log(`Roundtrip time: ${Date.now() - parsed} ms`);
 
         let timeoutId = setTimeout(function() {
             if (ws.readyState == CLOSED_STATE) {
@@ -67,11 +67,11 @@ export default function () {
 
             ws.send(Date.now().toString())
         }, 500);
-    }   
+    }
 
     ws.onerror = (e) => {
         if (e.error != "websocket: close sent") {
             console.log('An unexpected error occurred: ', e.error);
         }
-    };  
+    };
 };
