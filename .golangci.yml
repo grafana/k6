@@ -43,17 +43,10 @@ issues:
      text: 'use of `os\.(SyscallError|Signal|Interrupt)` forbidden'
 
 linters-settings:
-  nolintlint:
-    # Disable to ensure that nolint directives don't have a leading space. Default is true.
-    allow-leading-space: false
   exhaustive:
     default-signifies-exhaustive: true
-  govet:
-    shadow: true
   cyclop:
     max-complexity: 25
-  maligned:
-    suggest-new: true
   dupl:
     threshold: 150
   goconst:
