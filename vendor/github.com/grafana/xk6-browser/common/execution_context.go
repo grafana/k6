@@ -215,7 +215,7 @@ func (e *ExecutionContext) eval(
 			return nil, errors.New(cdpe.Message)
 		}
 
-		e.logger.Warn("ExecutionContext:eval", "Unexpected DevTools server error: %v", err)
+		e.logger.Warnf("ExecutionContext:eval", "Unexpected DevTools server error: %v", err)
 		return nil, err
 	}
 	if exceptionDetails != nil {

@@ -550,24 +550,32 @@ func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 	defer span.End()
 
 	if b.context != nil {
-		return nil, errors.New("existing browser context must be closed before creating a new one")
+		err := errors.New("existing browser context must be closed before creating a new one")
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
 	browserContextID, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
-		k6ext.Panic(b.ctx, "creating browser context ID %s: %w", browserContextID, err)
+		err := fmt.Errorf("creating browser context ID %s: %w", browserContextID, err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	browserCtxOpts := NewBrowserContextOptions()
 	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
-		k6ext.Panic(b.ctx, "parsing newContext options: %w", err)
+		err := fmt.Errorf("parsing newContext options: %w", err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
 	if err != nil {
-		return nil, fmt.Errorf("new context: %w", err)
+		err := fmt.Errorf("new context: %w", err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	b.contextMu.Lock()
@@ -584,10 +592,18 @@ func (b *Browser) NewPage(opts goja.Value) (*Page, error) {
 
 	browserCtx, err := b.NewContext(opts)
 	if err != nil {
-		return nil, fmt.Errorf("new page: %w", err)
+		err := fmt.Errorf("new page: %w", err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
-	return browserCtx.NewPage()
+	page, err := browserCtx.NewPage()
+	if err != nil {
+		spanRecordError(span, err)
+		return nil, err
+	}
+
+	return page, nil
 }
 
 // On returns a Promise that is resolved when the browser process is disconnected.

@@ -601,21 +601,6 @@ func (p *Page) viewportSize() Size {
 	}
 }
 
-// AddInitScript adds script to run in all new frames.
-func (p *Page) AddInitScript(script goja.Value, arg goja.Value) {
-	k6ext.Panic(p.ctx, "Page.addInitScript(script, arg) has not been implemented yet")
-}
-
-// AddScriptTag is not implemented.
-func (p *Page) AddScriptTag(opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.addScriptTag(opts) has not been implemented yet")
-}
-
-// AddStyleTag is not implemented.
-func (p *Page) AddStyleTag(opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.addStyleTag(opts) has not been implemented yet")
-}
-
 // BringToFront activates the browser tab for this page.
 func (p *Page) BringToFront() {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
@@ -672,7 +657,9 @@ func (p *Page) Close(_ goja.Value) error {
 
 	add := runtime.RemoveBinding(webVitalBinding)
 	if err := add.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		return fmt.Errorf("internal error while removing binding from page: %w", err)
+		err := fmt.Errorf("internal error while removing binding from page: %w", err)
+		spanRecordError(span, err)
+		return err
 	}
 
 	action := target.CloseTarget(p.targetID)
@@ -691,7 +678,9 @@ func (p *Page) Close(_ goja.Value) error {
 			return nil
 		}
 
-		return fmt.Errorf("closing a page: %w", err)
+		err := fmt.Errorf("closing a page: %w", err)
+		spanRecordError(span, err)
+		return err
 	}
 
 	return nil
@@ -721,11 +710,6 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *F
 	p.logger.Debugf("Page:DispatchEvent", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
-}
-
-// DragAndDrop is not implemented.
-func (p *Page) DragAndDrop(source string, target string, opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.DragAndDrop(source, target, opts) has not been implemented yet")
 }
 
 func (p *Page) EmulateMedia(opts goja.Value) {
@@ -795,16 +779,6 @@ func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	return h, nil
 }
 
-// ExposeBinding is not implemented.
-func (p *Page) ExposeBinding(name string, callback goja.Callable, opts goja.Value) {
-	k6ext.Panic(p.ctx, "Page.exposeBinding(name, callback) has not been implemented yet")
-}
-
-// ExposeFunction is not implemented.
-func (p *Page) ExposeFunction(name string, callback goja.Callable) {
-	k6ext.Panic(p.ctx, "Page.exposeFunction(name, callback) has not been implemented yet")
-}
-
 func (p *Page) Fill(selector string, value string, opts goja.Value) {
 	p.logger.Debugf("Page:Fill", "sid:%v selector:%s", p.sessionID(), selector)
 
@@ -815,12 +789,6 @@ func (p *Page) Focus(selector string, opts goja.Value) {
 	p.logger.Debugf("Page:Focus", "sid:%v selector:%s", p.sessionID(), selector)
 
 	p.MainFrame().Focus(selector, opts)
-}
-
-// Frame is not implemented.
-func (p *Page) Frame(_ goja.Value) *Frame {
-	k6ext.Panic(p.ctx, "Page.frame(frameSelector) has not been implemented yet")
-	return nil
 }
 
 // Frames returns a list of frames on the page.
@@ -851,18 +819,6 @@ func (p *Page) GetTouchscreen() *Touchscreen {
 	return p.Touchscreen
 }
 
-// GoBack is not implemented.
-func (p *Page) GoBack(_ goja.Value) *Response {
-	k6ext.Panic(p.ctx, "Page.goBack(opts) has not been implemented yet")
-	return nil
-}
-
-// GoForward is not implemented.
-func (p *Page) GoForward(_ goja.Value) *Response {
-	k6ext.Panic(p.ctx, "Page.goForward(opts) has not been implemented yet")
-	return nil
-}
-
 // Goto will navigate the page to the specified URL and return a HTTP response object.
 func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	p.logger.Debugf("Page:Goto", "sid:%v url:%q", p.sessionID(), url)
@@ -874,7 +830,13 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	)
 	defer span.End()
 
-	return p.MainFrame().Goto(url, opts)
+	resp, err := p.MainFrame().Goto(url, opts)
+	if err != nil {
+		spanRecordError(span, err)
+		return nil, err
+	}
+
+	return resp, nil
 }
 
 func (p *Page) Hover(selector string, opts goja.Value) {
@@ -1002,17 +964,6 @@ func (p *Page) Opener() *Page {
 	return p.opener
 }
 
-// Pause is not implemented.
-func (p *Page) Pause() {
-	k6ext.Panic(p.ctx, "Page.pause() has not been implemented yet")
-}
-
-// Pdf is not implemented.
-func (p *Page) Pdf(opts goja.Value) []byte {
-	k6ext.Panic(p.ctx, "Page.pdf(opts) has not been implemented yet")
-	return nil
-}
-
 func (p *Page) Press(selector string, key string, opts goja.Value) {
 	p.logger.Debugf("Page:Press", "sid:%v selector:%s", p.sessionID(), selector)
 
@@ -1034,7 +985,7 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
+func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cyclop
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
@@ -1044,7 +995,9 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 		p.timeoutSettings.navigationTimeout(),
 	)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "parsing reload options: %w", err)
+		err := fmt.Errorf("parsing reload options: %w", err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, parsedOpts.Timeout)
@@ -1070,7 +1023,9 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 
 	action := cdppage.Reload()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "reloading page: %w", err)
+		err := fmt.Errorf("reloading page: %w", err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	wrapTimeoutError := func(err error) error {
@@ -1090,7 +1045,9 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 	select {
 	case <-p.ctx.Done():
 	case <-timeoutCtx.Done():
-		k6ext.Panic(p.ctx, "%w", wrapTimeoutError(timeoutCtx.Err()))
+		err := wrapTimeoutError(timeoutCtx.Err())
+		spanRecordError(span, err)
+		return nil, err
 	case data := <-ch:
 		event = data.(*NavigationEvent)
 	}
@@ -1106,17 +1063,14 @@ func (p *Page) Reload(opts goja.Value) *Response { //nolint:funlen,cyclop
 	select {
 	case <-lifecycleEvtCh:
 	case <-timeoutCtx.Done():
-		k6ext.Panic(p.ctx, "%w", wrapTimeoutError(timeoutCtx.Err()))
+		err := wrapTimeoutError(timeoutCtx.Err())
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	applySlowMo(p.ctx)
 
-	return resp
-}
-
-// Route is not implemented.
-func (p *Page) Route(url goja.Value, handler goja.Callable) {
-	k6ext.Panic(p.ctx, "Page.route(url, handler) has not been implemented yet")
+	return resp, nil
 }
 
 // Screenshot will instruct Chrome to save a screenshot of the current page and save it to specified file.
@@ -1129,7 +1083,9 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	s := newScreenshotter(spanCtx, sp)
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
-		return nil, fmt.Errorf("taking screenshot of page: %w", err)
+		err := fmt.Errorf("taking screenshot of page: %w", err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	return buf, err
@@ -1190,10 +1146,11 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) {
 	applySlowMo(p.ctx)
 }
 
-func (p *Page) Tap(selector string, opts goja.Value) {
+// Tap will tap the element matching the provided selector.
+func (p *Page) Tap(selector string, opts *FrameTapOptions) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Tap(selector, opts)
+	return p.MainFrame().Tap(selector, opts)
 }
 
 func (p *Page) TextContent(selector string, opts goja.Value) string {
@@ -1257,11 +1214,6 @@ func (p *Page) Type(selector string, text string, opts goja.Value) {
 	p.MainFrame().Type(selector, text, opts)
 }
 
-// Unroute is not implemented.
-func (p *Page) Unroute(url goja.Value, handler goja.Callable) {
-	k6ext.Panic(p.ctx, "Page.unroute(url, handler) has not been implemented yet")
-}
-
 // URL returns the location of the page.
 func (p *Page) URL() string {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
@@ -1270,12 +1222,6 @@ func (p *Page) URL() string {
 
 	v := `() => document.location.toString()`
 	return p.Evaluate(v).(string) //nolint:forcetypeassert
-}
-
-// Video returns information of recorded video.
-func (p *Page) Video() any { // TODO: implement
-	k6ext.Panic(p.ctx, "Page.video() has not been implemented yet")
-	return nil
 }
 
 // ViewportSize will return information on the viewport width and height.
@@ -1287,12 +1233,6 @@ func (p *Page) ViewportSize() map[string]float64 {
 		"width":  vps.Width,
 		"height": vps.Height,
 	}
-}
-
-// WaitForEvent waits for the specified event to trigger.
-func (p *Page) WaitForEvent(event string, optsOrPredicate goja.Value) any {
-	k6ext.Panic(p.ctx, "Page.waitForEvent(event, optsOrPredicate) has not been implemented yet")
-	return nil
 }
 
 // WaitForFunction waits for the given predicate to return a truthy value.
@@ -1314,19 +1254,13 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForNavigation")
 	defer span.End()
 
-	return p.frameManager.MainFrame().WaitForNavigation(opts)
-}
+	resp, err := p.frameManager.MainFrame().WaitForNavigation(opts)
+	if err != nil {
+		spanRecordError(span, err)
+		return nil, err
+	}
 
-// WaitForRequest is not implemented.
-func (p *Page) WaitForRequest(_, _ goja.Value) *Request {
-	k6ext.Panic(p.ctx, "Page.waitForRequest(urlOrPredicate, opts) has not been implemented yet")
-	return nil
-}
-
-// WaitForResponse is not implemented.
-func (p *Page) WaitForResponse(_, _ goja.Value) *Response {
-	k6ext.Panic(p.ctx, "Page.waitForResponse(urlOrPredicate, opts) has not been implemented yet")
-	return nil
+	return resp, err
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.

@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"errors"
 	"fmt"
 
 	"github.com/grafana/xk6-browser/k6ext"
@@ -23,7 +24,6 @@ type JSHandleAPI interface {
 	Evaluate(pageFunc string, args ...any) any
 	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
-	GetProperty(propertyName string) JSHandleAPI
 	JSONValue() (string, error)
 	ObjectID() cdpruntime.RemoteObjectID
 }
@@ -80,7 +80,13 @@ func (h *BaseJSHandle) AsElement() *ElementHandle {
 // Dispose releases the remote object.
 func (h *BaseJSHandle) Dispose() {
 	if err := h.dispose(); err != nil {
-		k6ext.Panic(h.ctx, "dispose: %w", err)
+		// We do not want to panic on an error when the error is a closed
+		// context. The reason the context would be closed is due to the
+		// iteration ending and therefore the associated browser and its assets
+		// will be automatically deleted.
+		if !errors.Is(err, context.Canceled) {
+			k6ext.Panic(h.ctx, "dispose: %w", err)
+		}
 	}
 }
 
@@ -154,11 +160,6 @@ func (h *BaseJSHandle) getProperties() (map[string]jsHandle, error) {
 	}
 
 	return props, nil
-}
-
-// GetProperty retreves a single property of the JS handle.
-func (h *BaseJSHandle) GetProperty(_ string) JSHandleAPI {
-	return nil
 }
 
 // JSONValue returns a JSON version of this JS handle.

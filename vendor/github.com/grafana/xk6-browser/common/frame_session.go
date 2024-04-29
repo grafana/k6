@@ -663,18 +663,25 @@ func (fs *FrameSession) onExecutionContextCreated(event *cdpruntime.EventExecuti
 	if err := json.Unmarshal(auxData, &i); err != nil {
 		k6ext.Panic(fs.ctx, "unmarshaling executionContextCreated event JSON: %w", err)
 	}
-	var world executionWorld
+
 	frame, ok := fs.manager.getFrameByID(i.FrameID)
-	if ok {
-		if i.IsDefault {
-			world = mainWorld
-		} else if event.Context.Name == utilityWorldName && !frame.hasContext(utilityWorld) {
-			// In case of multiple sessions to the same target, there's a race between
-			// connections so we might end up creating multiple isolated worlds.
-			// We can use either.
-			world = utilityWorld
-		}
+	if !ok {
+		fs.logger.Debugf("FrameSession:onExecutionContextCreated:return",
+			"sid:%v tid:%v ectxid:%d missing frame",
+			fs.session.ID(), fs.targetID, event.Context.ID)
+		return
 	}
+
+	var world executionWorld
+	if i.IsDefault {
+		world = mainWorld
+	} else if event.Context.Name == utilityWorldName && !frame.hasContext(utilityWorld) {
+		// In case of multiple sessions to the same target, there's a race between
+		// connections so we might end up creating multiple isolated worlds.
+		// We can use either.
+		world = utilityWorld
+	}
+
 	if i.Type == "isolated" {
 		fs.isolatedWorlds[event.Context.Name] = true
 	}

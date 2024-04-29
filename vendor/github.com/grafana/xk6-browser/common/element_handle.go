@@ -589,10 +589,6 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 	return nil
 }
 
-func (h *ElementHandle) tap(apiCtx context.Context, p *Position) error {
-	return h.frame.page.Touchscreen.tap(p.X, p.Y)
-}
-
 func (h *ElementHandle) textContent(apiCtx context.Context) (any, error) {
 	js := `
 		(element) => {
@@ -1187,7 +1183,9 @@ func (h *ElementHandle) Screenshot(
 	s := newScreenshotter(spanCtx, sp)
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
-		return nil, fmt.Errorf("taking screenshot of elementHandle: %w", err)
+		err := fmt.Errorf("taking screenshot of elementHandle: %w", err)
+		spanRecordError(span, err)
+		return nil, err
 	}
 
 	return buf, err
@@ -1294,22 +1292,24 @@ func (h *ElementHandle) setInputFiles(apiCtx context.Context, payload []*File) e
 	return nil
 }
 
-func (h *ElementHandle) Tap(opts goja.Value) {
-	parsedOpts := NewElementHandleTapOptions(h.defaultTimeout())
-	err := parsedOpts.Parse(h.ctx, opts)
-	if err != nil {
-		k6ext.Panic(h.ctx, "parsing tap options: %w", err)
-	}
-
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+// Tap scrolls element into view and taps in the center of the element.
+func (h *ElementHandle) Tap(opts *ElementHandleTapOptions) error {
+	tap := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.tap(apiCtx, p)
 	}
-	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
-	_, err = call(h.ctx, pointerFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "tapping element: %w", err)
+	tapAction := h.newPointerAction(tap, &opts.ElementHandleBasePointerOptions)
+
+	if _, err := call(h.ctx, tapAction, opts.Timeout); err != nil {
+		return fmt.Errorf("tapping element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
+}
+
+func (h *ElementHandle) tap(_ context.Context, p *Position) error {
+	return h.frame.page.Touchscreen.tap(p.X, p.Y)
 }
 
 func (h *ElementHandle) TextContent() string {

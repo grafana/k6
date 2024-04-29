@@ -64,7 +64,9 @@ func (l *Locator) Click(opts *FrameClickOptions) error {
 	defer span.End()
 
 	if err := l.click(opts); err != nil {
-		return fmt.Errorf("clicking on %q: %w", l.selector, err)
+		err := fmt.Errorf("clicking on %q: %w", l.selector, err)
+		spanRecordError(span, err)
+		return err
 	}
 
 	applySlowMo(l.ctx)
@@ -509,7 +511,7 @@ func (l *Locator) press(key string, opts *FramePressOptions) error {
 
 // Type text on the element found that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Type(text string, opts goja.Value) {
+func (l *Locator) Type(text string, opts goja.Value) error {
 	l.log.Debugf(
 		"Locator:Type", "fid:%s furl:%q sel:%q text:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
@@ -517,18 +519,21 @@ func (l *Locator) Type(text string, opts goja.Value) {
 	_, span := TraceAPICall(l.ctx, l.frame.page.targetID.String(), "locator.type")
 	defer span.End()
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameTypeOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing type options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		err := fmt.Errorf("parsing type options: %w", err)
+		spanRecordError(span, err)
+		return err
 	}
-	if err = l.typ(text, copts); err != nil {
-		err = fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
-		return
+	if err := l.typ(text, copts); err != nil {
+		err := fmt.Errorf("typing %q in %q: %w", text, l.selector, err)
+		spanRecordError(span, err)
+		return err
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
@@ -561,26 +566,17 @@ func (l *Locator) hover(opts *FrameHoverOptions) error {
 }
 
 // Tap the element found that matches the locator's selector with strict mode on.
-func (l *Locator) Tap(opts goja.Value) {
+func (l *Locator) Tap(opts *FrameTapOptions) error {
 	l.log.Debugf("Locator:Tap", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
-	copts := NewFrameTapOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing tap options: %w", err)
-		return
-	}
-	if err = l.tap(copts); err != nil {
-		err = fmt.Errorf("tapping on %q: %w", l.selector, err)
-		return
-	}
-}
-
-func (l *Locator) tap(opts *FrameTapOptions) error {
 	opts.Strict = true
-	return l.frame.tap(l.selector, opts)
+	if err := l.frame.tap(l.selector, opts); err != nil {
+		return fmt.Errorf("tapping on %q: %w", l.selector, err)
+	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 // DispatchEvent dispatches an event for the element matching the

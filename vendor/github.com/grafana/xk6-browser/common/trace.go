@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
 	browsertrace "github.com/grafana/xk6-browser/trace"
@@ -55,4 +56,12 @@ func TraceEvent(
 		return tracer.TraceEvent(ctx, targetID, eventName, spanID, options...)
 	}
 	return ctx, browsertrace.NoopSpan{}
+}
+
+// spanRecordError will set the status of the span to error and record the
+// error on the span. Check the documentation for trace.SetStatus and
+// trace.RecordError for more details.
+func spanRecordError(span trace.Span, err error) {
+	span.SetStatus(codes.Error, err.Error())
+	span.RecordError(err)
 }
