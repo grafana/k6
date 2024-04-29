@@ -29,13 +29,13 @@ func TestReadableStream(t *testing.T) {
 		"templated.any.js",
 	}
 
-	for _, s := range suites {
-		s := s
-		t.Run(s, func(t *testing.T) {
+	for _, suite := range suites {
+		suite := suite
+		t.Run(suite, func(t *testing.T) {
 			t.Parallel()
 			ts := newConfiguredRuntime(t)
 			gotErr := ts.EventLoop.Start(func() error {
-				return executeTestScripts(ts.VU, "tests/wpt/streams/readable-streams", s)
+				return executeTestScript(ts.VU, "tests/wpt/streams/readable-streams", suite)
 			})
 			assert.NoError(t, gotErr)
 		})
@@ -84,39 +84,37 @@ func compileAndRun(t testing.TB, runtime *modulestest.Runtime, base, file string
 	require.NoError(t, err)
 }
 
-func executeTestScripts(vu modules.VU, base string, scripts ...string) error {
-	for _, script := range scripts {
-		program, err := modulestest.CompileFile(base, script)
-		if err != nil {
-			return err
-		}
+func executeTestScript(vu modules.VU, base string, script string) error {
+	program, err := modulestest.CompileFile(base, script)
+	if err != nil {
+		return err
+	}
 
-		if _, err = vu.Runtime().RunProgram(program); err != nil {
-			return err
-		}
+	if _, err = vu.Runtime().RunProgram(program); err != nil {
+		return err
+	}
 
-		// After having executed the tests suite file,
-		// we use a callback to make sure we wait until all
-		// the promise-based tests have finished.
-		// Also, as a mechanism to capture deadlocks caused
-		// by those promises not resolved during normal execution.
-		callback := vu.RegisterCallback()
-		if err := vu.Runtime().Set("wait", func() {
-			callback(func() error { return nil })
-		}); err != nil {
-			return err
-		}
+	// After having executed the tests suite file,
+	// we use a callback to make sure we wait until all
+	// the promise-based tests have finished.
+	// Also, as a mechanism to capture deadlocks caused
+	// by those promises not resolved during normal execution.
+	callback := vu.RegisterCallback()
+	if err := vu.Runtime().Set("wait", func() {
+		callback(func() error { return nil })
+	}); err != nil {
+		return err
+	}
 
-		waitForPromiseTests := `
+	waitForPromiseTests := `
 if (this.tests && this.tests.promise_tests && typeof this.tests.promise_tests.then === 'function') {
 	this.tests.promise_tests.then(() => wait());
 } else {
 	wait();
 }
 `
-		if _, err = vu.Runtime().RunString(waitForPromiseTests); err != nil {
-			return err
-		}
+	if _, err = vu.Runtime().RunString(waitForPromiseTests); err != nil {
+		return err
 	}
 
 	return nil

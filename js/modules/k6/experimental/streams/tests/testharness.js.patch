@@ -20,7 +20,7 @@ index c5c375e17..57d201b57 100644
              this.phase = this.phases.HAS_RESULT;
              this.done();
 +
-+						// We don't want to rely on the DOM and other browser-based
++            // We don't want to rely on the DOM and other browser-based
 +            // mechanisms for reporting test failures. Instead, we just
 +            // throw the error and make it fail fast, to be aware of it.
 +            //
@@ -34,13 +34,13 @@ index c5c375e17..57d201b57 100644
          }
 @@ -4784,6 +4798,11 @@
       */
- 
+
      var tests = new Tests();
-+		// We expose the [tests] global variable through
-+		// the [global_scope], so we can access it from
-+		// Go code, in order to make sure that all test
-+		// have finished from Go code.
++    // We expose the [tests] global variable through
++    // the [global_scope], so we can access it from
++    // Go code, in order to make sure that all test
++    // have finished from Go code.
 +    global_scope.tests = tests;
- 
+
      if (global_scope.addEventListener) {
          var error_handler = function(error, message, stack) {
