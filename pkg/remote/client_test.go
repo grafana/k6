@@ -92,7 +92,7 @@ func TestClientStore(t *testing.T) {
 
 func TestClientStoreHTTPError(t *testing.T) {
 	t.Parallel()
-	h := func(w http.ResponseWriter, r *http.Request) {
+	h := func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "bad", http.StatusUnauthorized)
 	}
 	ts := httptest.NewServer(http.HandlerFunc(h))
@@ -111,7 +111,7 @@ func TestClientStoreHTTPError(t *testing.T) {
 
 func TestClientStoreHTTPBasic(t *testing.T) {
 	t.Parallel()
-	h := func(w http.ResponseWriter, r *http.Request) {
+	h := func(_ http.ResponseWriter, r *http.Request) {
 		u, pwd, ok := r.BasicAuth()
 		require.True(t, ok)
 		assert.Equal(t, "usertest", u)
@@ -138,7 +138,7 @@ func TestClientStoreHTTPBasic(t *testing.T) {
 
 func TestClientStoreHeaders(t *testing.T) {
 	t.Parallel()
-	h := func(w http.ResponseWriter, r *http.Request) {
+	h := func(_ http.ResponseWriter, r *http.Request) {
 		assert.Equal(t, r.Header.Get("X-Prometheus-Remote-Write-Version"), "0.1.0")
 		assert.Equal(t, r.Header.Get("X-MY-CUSTOM-HEADER"), "fake")
 	}
