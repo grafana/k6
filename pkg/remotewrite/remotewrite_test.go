@@ -183,7 +183,7 @@ func TestOutputConvertToPbSeries_WithPreviousState(t *testing.T) {
 			})
 			require.Len(t, o.tsdb, 1)
 			require.Equal(t, tc.expSeries, len(pbseries))
-			assert.Equal(t, tc.expCount, swm.Measure.(*metrics.CounterSink).Value) //nolint:forcetypeassert
+			assert.Equal(t, tc.expCount, swm.Measure.(*metrics.CounterSink).Value)
 			assert.Equal(t, tc.expLatest, swm.Latest)
 		})
 	}
