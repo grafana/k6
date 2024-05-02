@@ -62,7 +62,7 @@ func TestTextSummary(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			result, err := runner.HandleSummary(context.Background(), summary)
+			result, _, err := runner.HandleSummary(context.Background(), summary)
 			require.NoError(t, err)
 
 			require.Len(t, result, 1)
@@ -116,7 +116,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, err := runner.HandleSummary(context.Background(), summary)
+	result, _, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)
@@ -307,7 +307,7 @@ func TestOldJSONExport(t *testing.T) {
 	require.NoError(t, err)
 
 	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	result, _, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -577,7 +577,7 @@ func TestRawHandleSummaryData(t *testing.T) {
 	require.NoError(t, err)
 
 	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	result, _, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -612,7 +612,7 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	runner.SetSetupData([]byte("5"))
 
 	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	result, _, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -635,7 +635,7 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	runner.SetSetupData([]byte("5"))
 
 	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	result, _, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -660,7 +660,7 @@ func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 			require.NoError(t, err)
 
 			summary := createTestSummary(t)
-			_, err = runner.HandleSummary(context.Background(), summary)
+			_, _, err = runner.HandleSummary(context.Background(), summary)
 			require.Error(t, err)
 		})
 	}
@@ -685,7 +685,7 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	summary := createTestSummary(t)
-	result, err := runner.HandleSummary(context.Background(), summary)
+	result, _, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)

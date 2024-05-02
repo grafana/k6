@@ -1,6 +1,5 @@
 package event
 
-
 // Type represents the different event types emitted by k6.
 //
 //go:generate enumer -type=Type -trimprefix Type -output type_gen.go
@@ -48,4 +47,9 @@ type IterData struct {
 // SummaryData is the data sent in the TestSummaryGenerated event.
 type SummaryData struct {
 	Summary map[string]interface{}
+}
+
+// Overiding for tests
+func (s *SummaryData) String() string {
+	return "&{Summary:map[...]...}"
 }
