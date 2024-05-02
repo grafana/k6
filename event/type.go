@@ -1,6 +1,5 @@
 package event
 
-import "io"
 
 // Type represents the different event types emitted by k6.
 //
@@ -48,5 +47,5 @@ type IterData struct {
 
 // SummaryData is the data sent in the TestSummaryGenerated event.
 type SummaryData struct {
-	Summary map[string]io.Reader
+	Summary map[string]interface{}
 }

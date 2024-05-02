@@ -190,7 +190,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	if !testRunState.RuntimeOptions.NoSummary.Bool {
 		defer func() {
 			logger.Debug("Generating the end-of-test summary...")
-			summaryResult, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
+			summaryResult, summaryJs, hsErr := test.initRunner.HandleSummary(globalCtx, &lib.Summary{
 				Metrics:         metricsEngine.ObservedMetrics,
 				RootGroup:       testRunState.Runner.GetDefaultGroup(),
 				TestRunDuration: executionState.GetCurrentTestRunDuration(),
@@ -204,7 +204,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
 				waitForSummaryGeneratedEvent := emitEvent(&event.Event{
 					Type: event.TestSummaryGenerated,
-					Data: &event.SummaryData{Summary: summaryResult},
+					Data: &event.SummaryData{Summary: summaryJs},
 				})
 				waitForSummaryGeneratedEvent()
 			}
