@@ -49,7 +49,7 @@ type SummaryData struct {
 	Summary map[string]interface{}
 }
 
-// Overiding for tests
+// String Overiding for tests
 func (s *SummaryData) String() string {
 	return "&{Summary:map[...]...}"
 }
