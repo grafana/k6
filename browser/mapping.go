@@ -67,17 +67,6 @@ func parseWaitForFunctionArgs(
 	return js, popts, exportArgs(gargs), nil
 }
 
-// mapTouchscreen to the JS module.
-func mapTouchscreen(vu moduleVU, ts *common.Touchscreen) mapping {
-	return mapping{
-		"tap": func(x float64, y float64) *goja.Promise {
-			return k6ext.Promise(vu.Context(), func() (result any, reason error) {
-				return nil, ts.Tap(x, y) //nolint:wrapcheck
-			})
-		},
-	}
-}
-
 // mapWorker to the JS module.
 func mapWorker(vu moduleVU, w *common.Worker) mapping {
 	return mapping{
