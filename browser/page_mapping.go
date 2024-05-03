@@ -1,7 +1,9 @@
 package browser
 
 import (
+	"context"
 	"fmt"
+	"time"
 
 	"github.com/dop251/goja"
 
@@ -252,4 +254,22 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	}
 
 	return maps
+}
+
+func parseWaitForFunctionArgs(
+	ctx context.Context, timeout time.Duration, pageFunc, opts goja.Value, gargs ...goja.Value,
+) (string, *common.FrameWaitForFunctionOptions, []any, error) {
+	popts := common.NewFrameWaitForFunctionOptions(timeout)
+	err := popts.Parse(ctx, opts)
+	if err != nil {
+		return "", nil, nil, fmt.Errorf("parsing waitForFunction options: %w", err)
+	}
+
+	js := pageFunc.ToString().String()
+	_, isCallable := goja.AssertFunction(pageFunc)
+	if !isCallable {
+		js = fmt.Sprintf("() => (%s)", js)
+	}
+
+	return js, popts, exportArgs(gargs), nil
 }

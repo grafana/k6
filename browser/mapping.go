@@ -46,24 +46,6 @@ func parseFrameClickOptions(
 	return copts, nil
 }
 
-func parseWaitForFunctionArgs(
-	ctx context.Context, timeout time.Duration, pageFunc, opts goja.Value, gargs ...goja.Value,
-) (string, *common.FrameWaitForFunctionOptions, []any, error) {
-	popts := common.NewFrameWaitForFunctionOptions(timeout)
-	err := popts.Parse(ctx, opts)
-	if err != nil {
-		return "", nil, nil, fmt.Errorf("parsing waitForFunction options: %w", err)
-	}
-
-	js := pageFunc.ToString().String()
-	_, isCallable := goja.AssertFunction(pageFunc)
-	if !isCallable {
-		js = fmt.Sprintf("() => (%s)", js)
-	}
-
-	return js, popts, exportArgs(gargs), nil
-}
-
 func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
 	// Setting a k6 object which will contain k6 specific metadata
 	// on the current test run. This allows external applications
