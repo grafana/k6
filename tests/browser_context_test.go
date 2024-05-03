@@ -5,6 +5,8 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
+	"net/http/httptest"
+	"os"
 	"testing"
 	"time"
 
@@ -675,6 +677,39 @@ func TestK6Object(t *testing.T) {
 			assert.Equal(t, tt.want, got.String())
 		})
 	}
+}
+
+// This test ensures that when opening a new tab, this it is possible to navigate
+// to the url. If the mapping layer is not setup correctly we can end up with a
+// NPD.
+func TestNewTab(t *testing.T) {
+	t.Parallel()
+
+	// Start a server that will return static html files.
+	mux := http.NewServeMux()
+	s := httptest.NewServer(mux)
+	t.Cleanup(s.Close)
+
+	const (
+		slash = string(os.PathSeparator)
+		path  = slash + testBrowserStaticDir + slash
+	)
+	fs := http.FileServer(http.Dir(testBrowserStaticDir))
+	mux.Handle(path, http.StripPrefix(path, fs))
+
+	// Start the iteration
+	_, rt, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, "12345"))
+	defer cleanUp()
+
+	// Run the test script
+	_, err := rt.RunString(fmt.Sprintf(`
+		const p = browser.newPage()
+		p.goto("%s/%s/ping.html")
+		
+		const p2 = browser.context().newPage()
+		p2.goto("%s/%s/ping.html")
+	`, s.URL, testBrowserStaticDir, s.URL, testBrowserStaticDir))
+	require.NoError(t, err)
 }
 
 func TestBrowserContextTimeout(t *testing.T) {

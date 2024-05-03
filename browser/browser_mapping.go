@@ -12,12 +12,12 @@ import (
 func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 	rt := vu.Runtime()
 	return mapping{
-		"context": func() (*common.BrowserContext, error) {
+		"context": func() (mapping, error) {
 			b, err := vu.browser()
 			if err != nil {
 				return nil, err
 			}
-			return b.Context(), nil
+			return mapBrowserContext(vu, b.Context()), nil
 		},
 		"closeContext": func() error {
 			b, err := vu.browser()
