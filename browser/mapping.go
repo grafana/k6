@@ -45,17 +45,3 @@ func parseFrameClickOptions(
 	}
 	return copts, nil
 }
-
-func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
-	// Setting a k6 object which will contain k6 specific metadata
-	// on the current test run. This allows external applications
-	// (such as Grafana Faro) to identify that the session is a k6
-	// automated one and not one driven by a real person.
-	if err := bctx.AddInitScript(
-		fmt.Sprintf(`window.k6 = { testRunId: %q }`, testRunID),
-	); err != nil {
-		return fmt.Errorf("adding k6 object to new browser context: %w", err)
-	}
-
-	return nil
-}
