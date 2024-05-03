@@ -67,13 +67,6 @@ func parseWaitForFunctionArgs(
 	return js, popts, exportArgs(gargs), nil
 }
 
-// mapWorker to the JS module.
-func mapWorker(vu moduleVU, w *common.Worker) mapping {
-	return mapping{
-		"url": w.URL(),
-	}
-}
-
 // mapBrowserContext to the JS module.
 func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen
 	rt := vu.Runtime()
