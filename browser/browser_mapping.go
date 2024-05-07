@@ -69,21 +69,23 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return b.Version(), nil
 		},
-		"newPage": func(opts goja.Value) (mapping, error) {
-			b, err := vu.browser()
-			if err != nil {
-				return nil, err
-			}
-			page, err := b.NewPage(opts)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
+		"newPage": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				b, err := vu.browser()
+				if err != nil {
+					return nil, err
+				}
+				page, err := b.NewPage(opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
 
-			if err := initBrowserContext(b.Context(), vu.testRunID); err != nil {
-				return nil, err
-			}
+				if err := initBrowserContext(b.Context(), vu.testRunID); err != nil {
+					return nil, err
+				}
 
-			return mapPage(vu, page), nil
+				return mapPage(vu, page), nil
+			})
 		},
 	}
 }

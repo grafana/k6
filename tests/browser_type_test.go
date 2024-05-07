@@ -51,9 +51,11 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 
 	rt := vu.Runtime()
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
-	_, err := rt.RunString(`
-		const p = browser.newPage();
-		p.close();
+	_, err := vu.TestRT.RunOnEventLoop(`
+		(async function() {
+			const p = await browser.newPage();
+			p.close();
+		})();
 	`)
 	require.NoError(t, err)
 

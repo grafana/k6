@@ -216,23 +216,32 @@ func TestPageEvaluateMapping(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, rt, _, cleanUp := startIteration(t)
+			vu, _, _, cleanUp := startIteration(t)
 			defer cleanUp()
 
 			// Test script as non string input
-			got, err := rt.RunString(fmt.Sprintf(`
-				const p = browser.newPage()
-				p.evaluate(%s)
+			got, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(`
+				let p;
+				(async function() {
+					p = await browser.newPage()
+					return p.evaluate(%s)
+				})();
 			`, tt.script))
 			assert.NoError(t, err)
-			assert.Equal(t, rt.ToValue(tt.want), got)
+			p, ok := got.Export().(*goja.Promise)
+			require.Truef(t, ok, "got: %T, want *goja.Promise", got.Export())
+			assert.Equal(t, vu.ToGojaValue(tt.want), p.Result())
 
 			// Test script as string input
-			got, err = rt.RunString(fmt.Sprintf(`
-				p.evaluate("%s")
+			got, err = vu.TestRT.RunOnEventLoop(fmt.Sprintf(`
+				(async function() {
+					return p.evaluate("%s")
+				})();
 			`, tt.script))
 			assert.NoError(t, err)
-			assert.Equal(t, rt.ToValue(tt.want), got)
+			p, ok = got.Export().(*goja.Promise)
+			require.Truef(t, ok, "got: %T, want *goja.Promise", got.Export())
+			assert.Equal(t, vu.ToGojaValue(tt.want), p.Result())
 		})
 	}
 }
@@ -262,18 +271,21 @@ func TestPageEvaluateMappingError(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, rt, _, cleanUp := startIteration(t)
+			vu, _, _, cleanUp := startIteration(t)
 			defer cleanUp()
 
 			// Test script as non string input
-			_, err := rt.RunString(fmt.Sprintf(`
-				const p = browser.newPage()
-				p.evaluate(%s)
+			_, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(`
+				let p;
+				(async function() {
+					p = await browser.newPage()
+					p.evaluate(%s)
+				})();
 			`, tt.script))
 			assert.ErrorContains(t, err, tt.wantErr)
 
 			// Test script as string input
-			_, err = rt.RunString(fmt.Sprintf(`
+			_, err = vu.TestRT.RunOnEventLoop(fmt.Sprintf(`
 				p.evaluate("%s")
 			`, tt.script))
 			assert.ErrorContains(t, err, tt.wantErr)
@@ -648,21 +660,19 @@ func TestPageWaitForFunction(t *testing.T) {
 	// waitForFunction.
 	script := `
 		var page;
-		const test = async function() {
-			page = browser.newPage();
+		(async function() {
+			page = await browser.newPage();
 			let resp = await page.waitForFunction(%s, %s, %s);
 			log('ok: '+resp);
-		}
-		test();
-		`
+		})();`
 
 	t.Run("ok_func_raf_default", func(t *testing.T) {
 		t.Parallel()
 
-		vu, rt, log, cleanUp := startIteration(t)
+		vu, _, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		_, err := rt.RunString(`fn = () => {
+		_, err := vu.TestRT.RunOnEventLoop(`fn = () => {
 			if (typeof window._cnt == 'undefined') window._cnt = 0;
 			if (window._cnt >= 50) return true;
 			window._cnt++;
@@ -681,7 +691,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, rt, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		_, err := rt.RunString(`fn = arg => {
+		_, err := vu.TestRT.RunOnEventLoop(`fn = arg => {
 			window._arg = arg;
 			return true;
 		}`)
@@ -692,7 +702,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 
-		argEval, err := rt.RunString(`page.evaluate(() => window._arg);`)
+		argEval, err := vu.TestRT.RunOnEventLoop(`page.evaluate(() => window._arg);`)
 		require.NoError(t, err)
 
 		var gotArg string
@@ -706,7 +716,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, rt, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		_, err := rt.RunString(`fn = (...args) => {
+		_, err := vu.TestRT.RunOnEventLoop(`fn = (...args) => {
 			window._args = args;
 			return true;
 		}`)
@@ -720,7 +730,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 
-		argEval, err := rt.RunString(`page.evaluate(() => window._args);`)
+		argEval, err := vu.TestRT.RunOnEventLoop(`page.evaluate(() => window._args);`)
 		require.NoError(t, err)
 
 		var gotArgs []int
@@ -734,7 +744,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, _, _, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		_, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(script, "false", "{ polling: 'raf', timeout: 500, }", "null"))
+		_, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(script, "false", "{ polling: 'raf', timeout: 500 }", "null"))
 		require.ErrorContains(t, err, "timed out after 500ms")
 	})
 
@@ -754,18 +764,22 @@ func TestPageWaitForFunction(t *testing.T) {
 	t.Run("ok_expr_poll_interval", func(t *testing.T) {
 		t.Parallel()
 
-		vu, rt, log, cleanUp := startIteration(t)
+		vu, _, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		_, err := rt.RunString(`
-		const page = browser.newPage();
-		page.evaluate(() => {
-			setTimeout(() => {
-				const el = document.createElement('h1');
-				el.innerHTML = 'Hello';
-				document.body.appendChild(el);
-			}, 1000);
-		});`)
+		_, err := vu.TestRT.RunOnEventLoop(`
+		let page;
+
+		(async function() {
+			page = await browser.newPage();
+			page.evaluate(() => {
+				setTimeout(() => {
+					const el = document.createElement('h1');
+					el.innerHTML = 'Hello';
+					document.body.appendChild(el);
+				}, 1000);
+			});
+		})();`)
 		require.NoError(t, err)
 
 		script := `
@@ -788,30 +802,33 @@ func TestPageWaitForFunction(t *testing.T) {
 	t.Run("ok_func_poll_mutation", func(t *testing.T) {
 		t.Parallel()
 
-		vu, rt, log, cleanUp := startIteration(t)
+		vu, _, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		_, err := rt.RunString(`
-		fn = () => document.querySelector('h1') !== null
+		_, err := vu.TestRT.RunOnEventLoop(`
+		let page;
 
-		const page = browser.newPage();
-		page.evaluate(() => {
-			console.log('calling setTimeout...');
-			setTimeout(() => {
-				console.log('creating element...');
-				const el = document.createElement('h1');
-				el.innerHTML = 'Hello';
-				document.body.appendChild(el);
-			}, 1000);
-		})`)
+		(async function() {
+			fn = () => document.querySelector('h1') !== null
+
+			page = await browser.newPage();
+			page.evaluate(() => {
+				console.log('calling setTimeout...');
+				setTimeout(() => {
+					console.log('creating element...');
+					const el = document.createElement('h1');
+					el.innerHTML = 'Hello';
+					document.body.appendChild(el);
+				}, 1000);
+			})
+		})();`)
 		require.NoError(t, err)
 
 		script := `
-		const test = async function() {
+		(async function() {
 			let resp = await page.waitForFunction(%s, %s, %s);
 			log('ok: '+resp);
-		}
-		test();`
+		})()`
 
 		s := fmt.Sprintf(script, "fn", "{ polling: 'mutation', timeout: 2000, }", "null")
 		_, err = vu.TestRT.RunOnEventLoop(s)
@@ -1679,23 +1696,26 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, rt, _, cleanUp := startIteration(t)
+			vu, _, _, cleanUp := startIteration(t)
 			defer cleanUp()
 
-			got, err := rt.RunString(fmt.Sprintf(`
-				const p = browser.newPage()
-				p.goto("%s/%s/shadow_and_doc_frag.html")
+			got, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(`
+				(async function() {
+					const p = await browser.newPage()
+					p.goto("%s/%s/shadow_and_doc_frag.html")
 
-				const s = p.locator('%s')
-				s.waitFor({
-					timeout: 1000,
-					state: 'attached',
-				});
+					const s = p.locator('%s')
+					s.waitFor({
+						timeout: 1000,
+						state: 'attached',
+					});
 
-				s.innerText();
-			`, s.URL, testBrowserStaticDir, tt.selector))
+					return s.innerText();
+ 				})()`, s.URL, testBrowserStaticDir, tt.selector))
 			assert.NoError(t, err)
-			assert.Equal(t, tt.want, got.String())
+			p, ok := got.Export().(*goja.Promise)
+			require.Truef(t, ok, "got: %T, want *goja.Promise", got.Export())
+			assert.Equal(t, tt.want, p.Result().String())
 		})
 	}
 }

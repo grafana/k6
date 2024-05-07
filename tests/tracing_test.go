@@ -92,7 +92,7 @@ func TestTracing(t *testing.T) {
 	}{
 		{
 			name: "browser.newPage",
-			js:   "page = browser.newPage()",
+			js:   "page = await browser.newPage()",
 			spans: []string{
 				"browser.newPage",
 				"browser.newContext",

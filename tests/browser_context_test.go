@@ -657,28 +657,31 @@ func TestK6Object(t *testing.T) {
 
 			// First test with browser.newPage
 			got, err := vu.TestRT.RunOnEventLoop(`
-				const p = browser.newPage();
-				p.goto("about:blank");
-				const o = p.evaluate(() => window.k6);
-				JSON.stringify(o);
-			`)
-			require.NoError(t, err)
-			assert.Equal(t, tt.want, got.String())
-
-			// Now test with browser.newContext
-			got, err = vu.TestRT.RunOnEventLoop(`
-				const test = async function() {
-					await browser.closeContext();
-					const c = await browser.newContext();
-					const p2 = c.newPage();
-					p2.goto("about:blank");
-					const o2 = p2.evaluate(() => window.k6);
-					return JSON.stringify(o2);
-				}
-				test();
+				(async function() {
+					const p = await browser.newPage();
+					p.goto("about:blank");
+					const o = p.evaluate(() => window.k6);
+					return JSON.stringify(o);
+				})();
 			`)
 			require.NoError(t, err)
 			p, ok := got.Export().(*goja.Promise)
+			require.Truef(t, ok, "got: %T, want *goja.Promise", got.Export())
+			assert.Equal(t, tt.want, p.Result().String())
+
+			// Now test with browser.newContext
+			got, err = vu.TestRT.RunOnEventLoop(`
+				(async function() {
+					await browser.closeContext();
+					const c = await browser.newContext();
+					const p2 = await c.newPage();
+					p2.goto("about:blank");
+					const o2 = p2.evaluate(() => window.k6);
+					return JSON.stringify(o2);
+				})();
+			`)
+			require.NoError(t, err)
+			p, ok = got.Export().(*goja.Promise)
 			require.Truef(t, ok, "got: %T, want *goja.Promise", got.Export())
 			assert.Equal(t, tt.want, p.Result().String())
 		})
@@ -704,17 +707,18 @@ func TestNewTab(t *testing.T) {
 	mux.Handle(path, http.StripPrefix(path, fs))
 
 	// Start the iteration
-	_, rt, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, "12345"))
+	vu, _, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, "12345"))
 	defer cleanUp()
 
 	// Run the test script
-	_, err := rt.RunString(fmt.Sprintf(`
-		const p = browser.newPage()
-		p.goto("%s/%s/ping.html")
-		
-		const p2 = browser.context().newPage()
-		p2.goto("%s/%s/ping.html")
-	`, s.URL, testBrowserStaticDir, s.URL, testBrowserStaticDir))
+	_, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(`
+		(async function() {
+			const p = await browser.newPage()
+			p.goto("%s/%s/ping.html")
+
+			const p2 = browser.context().newPage()
+			p2.goto("%s/%s/ping.html")
+		})()`, s.URL, testBrowserStaticDir, s.URL, testBrowserStaticDir))
 	require.NoError(t, err)
 }
 
