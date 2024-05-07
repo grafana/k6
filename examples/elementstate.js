@@ -17,8 +17,8 @@ export const options = {
   }
 }
 
-export default function() {
-  const context = browser.newContext();
+export default async function() {
+  const context = await browser.newContext();
   const page = context.newPage();
 
   // Inject page content

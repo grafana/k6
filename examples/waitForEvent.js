@@ -14,7 +14,7 @@ export const options = {
 }
 
 export default async function() {
-  const context = browser.newContext()
+  const context = await browser.newContext()
 
   // We want to wait for two page creations before carrying on.
   var counter = 0

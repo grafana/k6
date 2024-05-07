@@ -19,7 +19,7 @@ export const options = {
 export default async function() {
   // grant camera and microphone permissions to the
   // new browser context.
-  const context = browser.newContext({
+  const context = await browser.newContext({
     permissions: ["camera", "microphone"],
   });
 

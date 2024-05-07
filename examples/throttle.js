@@ -39,7 +39,7 @@ export const options = {
 }
 
 export async function normal() {
-  const context = browser.newContext();
+  const context = await browser.newContext();
   const page = context.newPage();
 
   try {
@@ -50,7 +50,7 @@ export async function normal() {
 }
 
 export async function networkThrottled() {
-  const context = browser.newContext();
+  const context = await browser.newContext();
   const page = context.newPage();
 
   try {
@@ -63,7 +63,7 @@ export async function networkThrottled() {
 }
 
 export async function cpuThrottled() {
-  const context = browser.newContext();
+  const context = await browser.newContext();
   const page = context.newPage();
 
   try {

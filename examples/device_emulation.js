@@ -23,7 +23,7 @@ export default async function() {
   // Object.assign instead to merge browser context and device options.
   // See https://github.com/grafana/k6/issues/2296
   const options = Object.assign({ locale: 'es-ES' }, device);
-  const context = browser.newContext(options);
+  const context = await browser.newContext(options);
   const page = context.newPage();
 
   try {

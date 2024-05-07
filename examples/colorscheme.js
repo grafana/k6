@@ -20,7 +20,7 @@ export const options = {
 export default async function() {
   const preferredColorScheme = 'dark';
 
-  const context = browser.newContext({
+  const context = await browser.newContext({
     // valid values are "light", "dark" or "no-preference"
     colorScheme: preferredColorScheme,
   });
