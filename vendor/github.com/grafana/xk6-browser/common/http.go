@@ -17,7 +17,7 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
-	k6modules "go.k6.io/k6/js/modules"
+	k6modules "github.com/liuxd6825/k6server/js/modules"
 )
 
 // HTTPHeader is a single HTTP header.

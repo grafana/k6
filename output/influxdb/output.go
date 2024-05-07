@@ -15,8 +15,8 @@ import (
 	client "github.com/influxdata/influxdb1-client/v2"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
 )
 
 // FieldKind defines Enum for tag-to-field type conversion

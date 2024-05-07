@@ -15,8 +15,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/liuxd6825/k6server/lib/fsext"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib/fsext"
 )
 
 // SourceData wraps a source file; data and filename.
@@ -166,6 +166,10 @@ func Load(
 	pathOnFs, err := url.PathUnescape(filepath.FromSlash(pathOnFs))
 	if err != nil {
 		return nil, err
+	}
+
+	if !strings.HasSuffix(pathOnFs, ".js") {
+		pathOnFs = pathOnFs + ".js"
 	}
 
 	data, err := fsext.ReadFile(filesystems[scheme], pathOnFs)

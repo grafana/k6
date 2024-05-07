@@ -7,7 +7,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/lib"
+	"github.com/liuxd6825/k6server/lib"
 )
 
 type stateType int32

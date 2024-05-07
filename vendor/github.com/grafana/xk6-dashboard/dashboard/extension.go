@@ -13,9 +13,9 @@ import (
 	"time"
 
 	"github.com/pkg/browser"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
 )
 
 // extension holds the runtime state of the dashboard extension.

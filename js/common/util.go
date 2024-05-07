@@ -8,8 +8,8 @@ import (
 	"runtime/debug"
 
 	"github.com/dop251/goja"
+	"github.com/liuxd6825/k6server/errext"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/errext"
 )
 
 // Throw a JS error; avoids re-wrapping GoErrors.

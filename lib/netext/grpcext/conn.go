@@ -10,9 +10,9 @@ import (
 	"strings"
 	"time"
 
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
 
 	protov1 "github.com/golang/protobuf/proto" //nolint:staticcheck,nolintlint // this is the old v1 version
 	"google.golang.org/grpc"

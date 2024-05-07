@@ -5,7 +5,7 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	"github.com/liuxd6825/k6server/js/common"
 )
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView

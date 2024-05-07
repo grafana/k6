@@ -16,7 +16,7 @@ import (
 
 	"github.com/r3labs/sse/v2"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/errext"
+	"github.com/liuxd6825/k6server/errext"
 )
 
 type eventEmitter struct {

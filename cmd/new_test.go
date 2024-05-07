@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"testing"
 
+	"github.com/liuxd6825/k6server/cmd/tests"
+	"github.com/liuxd6825/k6server/lib/fsext"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cmd/tests"
-	"go.k6.io/k6/lib/fsext"
 )
 
 func TestNewScriptCmd(t *testing.T) {

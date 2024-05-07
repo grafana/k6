@@ -10,8 +10,8 @@ import (
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remote"
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/stale"
 
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/sirupsen/logrus"

@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/loader"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/lib/testutils/httpmultibin"
+	"github.com/liuxd6825/k6server/loader"
 )
 
 func TestDir(t *testing.T) {

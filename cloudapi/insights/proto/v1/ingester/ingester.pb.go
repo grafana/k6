@@ -7,8 +7,8 @@
 package ingester
 
 import (
-	k6 "go.k6.io/k6/cloudapi/insights/proto/v1/k6"
-	trace "go.k6.io/k6/cloudapi/insights/proto/v1/trace"
+	k6 "github.com/liuxd6825/k6server/cloudapi/insights/proto/v1/k6"
+	trace "github.com/liuxd6825/k6server/cloudapi/insights/proto/v1/trace"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

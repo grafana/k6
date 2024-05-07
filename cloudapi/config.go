@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"time"
 
+	"github.com/liuxd6825/k6server/lib/types"
 	"github.com/mstoykov/envconfig"
-	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 

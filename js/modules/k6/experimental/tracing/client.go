@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	httpmodule "go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
+	httpmodule "github.com/liuxd6825/k6server/js/modules/k6/http"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // Client represents a HTTP Client instrumenting the requests

@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
+	"github.com/liuxd6825/k6server/cmd/state"
 )
 
 // cmdArchive handles the `k6 archive` sub-command
@@ -77,7 +77,7 @@ func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(gs, `
   # Archive a test run.
   {{.}} archive -u 10 -d 10s -O myarchive.tar script.js
-  
+
   # Run the resulting archive.
   {{.}} run myarchive.tar`[1:])
 

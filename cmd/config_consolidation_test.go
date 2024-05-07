@@ -9,13 +9,13 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/cmd/tests"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/cmd/tests"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/executor"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 func verifyOneIterPerOneVU(t *testing.T, c Config) {

@@ -7,7 +7,7 @@
 package dashboard
 
 import (
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // registry is what can create metrics and make them iterable.

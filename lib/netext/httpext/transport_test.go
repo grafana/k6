@@ -6,9 +6,9 @@ import (
 	"net/url"
 	"testing"
 
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
 )
 
 func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
@@ -16,7 +16,7 @@ func BenchmarkMeasureAndEmitMetrics(b *testing.B) {
 	defer cancel()
 	samples := make(chan metrics.SampleContainer, 10)
 	defer close(samples)
-	go func() { // discard all metrics
+	go func() {             // discard all metrics
 		for range samples { //nolint:revive
 		}
 	}()

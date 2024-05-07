@@ -6,9 +6,9 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/metrics"
 )
 
 func assertResponse(t *testing.T, cb codeBlock, err error, val goja.Value, ts testState) {

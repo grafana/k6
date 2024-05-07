@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"sync"
 
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/netext"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // transport is an implementation of http.RoundTripper that will measure and emit

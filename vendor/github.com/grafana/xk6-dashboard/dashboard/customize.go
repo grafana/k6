@@ -15,9 +15,9 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
+	"github.com/liuxd6825/k6server/js/compiler"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/fsext"
 )
 
 const (

@@ -3,7 +3,7 @@ package v1
 import (
 	"time"
 
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // MetricsJSONAPI is JSON API envelop for metrics

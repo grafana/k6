@@ -22,8 +22,8 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 	browsertrace "github.com/grafana/xk6-browser/trace"
 
-	k6event "go.k6.io/k6/event"
-	k6modules "go.k6.io/k6/js/modules"
+	k6event "github.com/liuxd6825/k6server/event"
+	k6modules "github.com/liuxd6825/k6server/js/modules"
 )
 
 // errBrowserNotFoundInRegistry indicates that the browser instance

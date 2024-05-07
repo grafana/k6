@@ -4,14 +4,14 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liuxd6825/k6server/execution"
+	"github.com/liuxd6825/k6server/execution/local"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/lib/executor"
+	"github.com/liuxd6825/k6server/lib/testutils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/execution"
-	"go.k6.io/k6/execution/local"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/testutils"
 	"gopkg.in/guregu/null.v3"
 )
 

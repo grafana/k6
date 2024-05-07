@@ -9,9 +9,9 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/redis/go-redis/v9"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/lib"
 )
 
 // Client represents the Client constructor (i.e. `new redis.Client()`) and

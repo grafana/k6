@@ -16,11 +16,11 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/log"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/log"
 )
 
 const waitLoggerCloseTimeout = time.Second * 5
@@ -63,7 +63,7 @@ func newRootCommand(gs *state.GlobalState) *rootCommand {
 	subCommands := []func(*state.GlobalState) *cobra.Command{
 		getCmdArchive, getCmdCloud, getCmdNewScript, getCmdInspect,
 		getCmdLogin, getCmdPause, getCmdResume, getCmdScale, getCmdRun,
-		getCmdStats, getCmdStatus, getCmdVersion,
+		getCmdStats, getCmdStatus, getCmdVersion, getCmdServer,
 	}
 
 	for _, sc := range subCommands {

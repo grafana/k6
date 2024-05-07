@@ -14,11 +14,11 @@ import (
 
 	"github.com/grafana/xk6-browser/k6ext"
 
-	k6modules "go.k6.io/k6/js/modules"
-	k6lib "go.k6.io/k6/lib"
-	k6netext "go.k6.io/k6/lib/netext"
-	k6types "go.k6.io/k6/lib/types"
-	k6metrics "go.k6.io/k6/metrics"
+	k6modules "github.com/liuxd6825/k6server/js/modules"
+	k6lib "github.com/liuxd6825/k6server/lib"
+	k6netext "github.com/liuxd6825/k6server/lib/netext"
+	k6types "github.com/liuxd6825/k6server/lib/types"
+	k6metrics "github.com/liuxd6825/k6server/metrics"
 
 	"github.com/chromedp/cdproto"
 	"github.com/chromedp/cdproto/cdp"

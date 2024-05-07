@@ -22,14 +22,14 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/liuxd6825/k6server/js/compiler"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/js/modulestest"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/loader"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/loader"
 	"gopkg.in/yaml.v3"
 )
 

@@ -6,7 +6,7 @@ import (
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
 
-	k6modules "go.k6.io/k6/js/modules"
+	k6modules "github.com/liuxd6825/k6server/js/modules"
 )
 
 // moduleVU carries module specific VU information.

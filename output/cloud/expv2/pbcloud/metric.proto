@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package metrics;
 
-option go_package = "go.k6.io/k6/output/cloud/expv2/pbcloud";
+option go_package = "github.com/liuxd6825/k6server/output/cloud/expv2/pbcloud";
 
 import "google/protobuf/timestamp.proto";
 

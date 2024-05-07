@@ -9,7 +9,7 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/fsext"
 )
 
 // ReadSource Reads a source file from any supported destination.

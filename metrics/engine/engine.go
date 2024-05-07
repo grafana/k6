@@ -10,11 +10,11 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 )
 

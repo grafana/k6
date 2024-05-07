@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"net/url"
 
-	v1 "go.k6.io/k6/api/v1"
+	v1 "github.com/liuxd6825/k6server/api/v1"
 )
 
 // Metrics returns the current metrics summary.

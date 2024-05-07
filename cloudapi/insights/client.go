@@ -17,7 +17,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 
-	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
+	"github.com/liuxd6825/k6server/cloudapi/insights/proto/v1/ingester"
 )
 
 const (

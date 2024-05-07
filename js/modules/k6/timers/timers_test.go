@@ -5,9 +5,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liuxd6825/k6server/js/modules/k6/timers"
+	"github.com/liuxd6825/k6server/js/modulestest"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/modules/k6/timers"
-	"go.k6.io/k6/js/modulestest"
 )
 
 func newRuntime(t testing.TB) *modulestest.Runtime {

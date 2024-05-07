@@ -12,9 +12,9 @@ import (
 	"github.com/mattn/go-isatty"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/event"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/ui/console"
+	"github.com/liuxd6825/k6server/event"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/ui/console"
 )
 
 const defaultConfigFileName = "config.json"

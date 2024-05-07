@@ -74,10 +74,14 @@ type FailoverOptions struct {
 	PoolTimeout     time.Duration
 	MinIdleConns    int
 	MaxIdleConns    int
+	MaxActiveConns  int
 	ConnMaxIdleTime time.Duration
 	ConnMaxLifetime time.Duration
 
 	TLSConfig *tls.Config
+
+	DisableIndentity bool
+	IdentitySuffix   string
 }
 
 func (opt *FailoverOptions) clientOptions() *Options {
@@ -107,10 +111,14 @@ func (opt *FailoverOptions) clientOptions() *Options {
 		PoolTimeout:     opt.PoolTimeout,
 		MinIdleConns:    opt.MinIdleConns,
 		MaxIdleConns:    opt.MaxIdleConns,
+		MaxActiveConns:  opt.MaxActiveConns,
 		ConnMaxIdleTime: opt.ConnMaxIdleTime,
 		ConnMaxLifetime: opt.ConnMaxLifetime,
 
 		TLSConfig: opt.TLSConfig,
+
+		DisableIndentity: opt.DisableIndentity,
+		IdentitySuffix:   opt.IdentitySuffix,
 	}
 }
 
@@ -130,19 +138,24 @@ func (opt *FailoverOptions) sentinelOptions(addr string) *Options {
 		MinRetryBackoff: opt.MinRetryBackoff,
 		MaxRetryBackoff: opt.MaxRetryBackoff,
 
-		DialTimeout:  opt.DialTimeout,
-		ReadTimeout:  opt.ReadTimeout,
-		WriteTimeout: opt.WriteTimeout,
+		DialTimeout:           opt.DialTimeout,
+		ReadTimeout:           opt.ReadTimeout,
+		WriteTimeout:          opt.WriteTimeout,
+		ContextTimeoutEnabled: opt.ContextTimeoutEnabled,
 
 		PoolFIFO:        opt.PoolFIFO,
 		PoolSize:        opt.PoolSize,
 		PoolTimeout:     opt.PoolTimeout,
 		MinIdleConns:    opt.MinIdleConns,
 		MaxIdleConns:    opt.MaxIdleConns,
+		MaxActiveConns:  opt.MaxActiveConns,
 		ConnMaxIdleTime: opt.ConnMaxIdleTime,
 		ConnMaxLifetime: opt.ConnMaxLifetime,
 
 		TLSConfig: opt.TLSConfig,
+
+		DisableIndentity: opt.DisableIndentity,
+		IdentitySuffix:   opt.IdentitySuffix,
 	}
 }
 
@@ -165,19 +178,24 @@ func (opt *FailoverOptions) clusterOptions() *ClusterOptions {
 		MinRetryBackoff: opt.MinRetryBackoff,
 		MaxRetryBackoff: opt.MaxRetryBackoff,
 
-		DialTimeout:  opt.DialTimeout,
-		ReadTimeout:  opt.ReadTimeout,
-		WriteTimeout: opt.WriteTimeout,
+		DialTimeout:           opt.DialTimeout,
+		ReadTimeout:           opt.ReadTimeout,
+		WriteTimeout:          opt.WriteTimeout,
+		ContextTimeoutEnabled: opt.ContextTimeoutEnabled,
 
 		PoolFIFO:        opt.PoolFIFO,
 		PoolSize:        opt.PoolSize,
 		PoolTimeout:     opt.PoolTimeout,
 		MinIdleConns:    opt.MinIdleConns,
 		MaxIdleConns:    opt.MaxIdleConns,
+		MaxActiveConns:  opt.MaxActiveConns,
 		ConnMaxIdleTime: opt.ConnMaxIdleTime,
 		ConnMaxLifetime: opt.ConnMaxLifetime,
 
 		TLSConfig: opt.TLSConfig,
+
+		DisableIndentity: opt.DisableIndentity,
+		IdentitySuffix:   opt.IdentitySuffix,
 	}
 }
 

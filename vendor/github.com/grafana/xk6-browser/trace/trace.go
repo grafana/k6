@@ -9,7 +9,7 @@ import (
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
-	k6lib "go.k6.io/k6/lib"
+	k6lib "github.com/liuxd6825/k6server/lib"
 )
 
 const tracerName = "k6.browser"

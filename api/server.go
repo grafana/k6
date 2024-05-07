@@ -12,11 +12,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	v1 "go.k6.io/k6/api/v1"
-	"go.k6.io/k6/execution"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/metrics/engine"
+	v1 "github.com/liuxd6825/k6server/api/v1"
+	"github.com/liuxd6825/k6server/execution"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/metrics/engine"
 )
 
 func newHandler(cs *v1.ControlSurface, profilingEnabled bool) http.Handler {

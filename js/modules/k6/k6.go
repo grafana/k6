@@ -10,9 +10,9 @@ import (
 
 	"github.com/dop251/goja"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 var (

@@ -8,9 +8,9 @@ import (
 	"sync/atomic"
 	"time"
 
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // Dialer wraps net.Dialer and provides k6 specific functionality -

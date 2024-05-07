@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/liuxd6825/k6server/lib/strvals"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib/strvals"
 )
 
 // lokiHook is a Logrus hook for flushing to Loki.

@@ -13,7 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 	"google.golang.org/grpc/test/bufconn"
 
-	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
+	"github.com/liuxd6825/k6server/cloudapi/insights/proto/v1/ingester"
 )
 
 func newMockListener(t *testing.T, ingesterServer ingester.IngesterServiceServer) *bufconn.Listener {

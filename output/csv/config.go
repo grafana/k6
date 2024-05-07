@@ -8,8 +8,8 @@ import (
 
 	"gopkg.in/guregu/null.v3"
 
+	"github.com/liuxd6825/k6server/lib/types"
 	"github.com/mstoykov/envconfig"
-	"go.k6.io/k6/lib/types"
 )
 
 // Config is the config for the csv output

@@ -9,11 +9,11 @@ import (
 
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/execution"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/ui/pb"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/execution"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/ui/pb"
 )
 
 const (

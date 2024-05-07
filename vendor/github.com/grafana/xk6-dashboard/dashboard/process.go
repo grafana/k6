@@ -6,9 +6,9 @@ package dashboard
 
 import (
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/output"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/output"
 )
 
 type process struct {

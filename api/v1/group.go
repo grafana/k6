@@ -3,7 +3,7 @@ package v1
 import (
 	"fmt"
 
-	"go.k6.io/k6/lib"
+	"github.com/liuxd6825/k6server/lib"
 )
 
 // Check represents a k6's check in a k6 REST API

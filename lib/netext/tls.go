@@ -6,7 +6,7 @@ import (
 
 	"golang.org/x/crypto/ocsp"
 
-	"go.k6.io/k6/lib"
+	"github.com/liuxd6825/k6server/lib"
 )
 
 //nolint:golint,revive,stylecheck // we want to keep these constants as they are

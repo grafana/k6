@@ -3,9 +3,9 @@ package outputtest
 import (
 	"strconv"
 
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
 	"github.com/spf13/afero"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
 )
 
 func init() {

@@ -3,7 +3,7 @@ package loader
 import (
 	"runtime"
 
-	"go.k6.io/k6/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/fsext"
 )
 
 // CreateFilesystems creates the correct filesystem map for the current OS

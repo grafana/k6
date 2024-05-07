@@ -21,9 +21,9 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/net/http2"
 
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/lib/types"
+	"github.com/liuxd6825/k6server/lib/netext"
+	"github.com/liuxd6825/k6server/lib/testutils/httpmultibin"
+	"github.com/liuxd6825/k6server/lib/types"
 )
 
 func TestDefaultError(t *testing.T) {

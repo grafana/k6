@@ -2,10 +2,11 @@ package lib
 
 import (
 	"context"
+	"github.com/dop251/goja"
 	"io"
 	"time"
 
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // ActiveVU represents an actively running virtual user.
@@ -37,6 +38,10 @@ type VUActivationParams struct {
 	Exec, Scenario           string
 	GetNextIterationCounters func() (uint64, uint64)
 }
+type VU interface {
+	GetRuntime() *goja.Runtime
+}
+type NewOption = func(vu VU) error
 
 // A Runner is a factory for VUs. It should precompute as much as possible upon
 // creation (parse ASTs, load files into memory, etc.), so that spawning VUs
@@ -59,7 +64,7 @@ type Runner interface {
 	// Spawns a new VU. It's fine to make this function rather heavy, if it means a performance
 	// improvement at runtime. Remember, this is called once per VU and normally only at the start
 	// of a test - RunOnce() may be called hundreds of thousands of times, and must be fast.
-	NewVU(ctx context.Context, idLocal, idGlobal uint64, out chan<- metrics.SampleContainer) (InitializedVU, error)
+	NewVU(ctx context.Context, idLocal, idGlobal uint64, out chan<- metrics.SampleContainer, opts ...NewOption) (InitializedVU, error)
 
 	// Runs pre-test setup, if applicable.
 	Setup(ctx context.Context, out chan<- metrics.SampleContainer) error

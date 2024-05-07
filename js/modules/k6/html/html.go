@@ -9,8 +9,8 @@ import (
 	"github.com/dop251/goja"
 	gohtml "golang.org/x/net/html"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
 )
 
 // RootModule is the global module object type. It is instantiated once per test

@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"time"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/consts"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/lib/consts"
 )
 
 // timeoutError is used when some operation times out.

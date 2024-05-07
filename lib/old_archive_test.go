@@ -11,7 +11,7 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/fsext"
 )
 
 func dumpMemMapFsToBuf(fileSystem fsext.Fs) (*bytes.Buffer, error) {

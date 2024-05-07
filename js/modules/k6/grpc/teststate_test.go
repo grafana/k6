@@ -9,17 +9,17 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/liuxd6825/k6server/js/modulestest"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/lib/testutils/httpmultibin"
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
 
-	xk6grpc "go.k6.io/k6/js/modules/k6/grpc"
+	xk6grpc "github.com/liuxd6825/k6server/js/modules/k6/grpc"
 )
 
 const isWindows = runtime.GOOS == "windows"

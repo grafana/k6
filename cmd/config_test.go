@@ -8,11 +8,11 @@ import (
 	"github.com/stretchr/testify/assert"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/executor"
-	"go.k6.io/k6/lib/types"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/executor"
+	"github.com/liuxd6825/k6server/lib/types"
 )
 
 type testCmdData struct {

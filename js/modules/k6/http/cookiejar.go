@@ -10,7 +10,7 @@ import (
 	"time"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	"github.com/liuxd6825/k6server/js/common"
 )
 
 // ErrJarForbiddenInInitContext is used when a cookie jar was made in the init context

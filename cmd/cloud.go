@@ -15,13 +15,13 @@ import (
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/ui/pb"
+	"github.com/liuxd6825/k6server/cloudapi"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/ui/pb"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command

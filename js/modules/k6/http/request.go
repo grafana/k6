@@ -15,9 +15,9 @@ import (
 	"github.com/dop251/goja"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/lib/netext/httpext"
-	"go.k6.io/k6/lib/types"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/lib/netext/httpext"
+	"github.com/liuxd6825/k6server/lib/types"
 )
 
 // ErrHTTPForbiddenInInitContext is used when a http requests was made in the init context

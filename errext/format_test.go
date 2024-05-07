@@ -6,7 +6,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
-	"go.k6.io/k6/errext"
+	"github.com/liuxd6825/k6server/errext"
 )
 
 func TestFormat(t *testing.T) {

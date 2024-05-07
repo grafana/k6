@@ -10,16 +10,16 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liuxd6825/k6server/cloudapi"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
+	cloudv2 "github.com/liuxd6825/k6server/output/cloud/expv2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
-	cloudv2 "go.k6.io/k6/output/cloud/expv2"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -37,12 +37,12 @@ func TestNewOutputNameResolution(t *testing.T) {
 	}{
 		{
 			url: &url.URL{
-				Opaque: "go.k6.io/k6/samples/http_get.js",
+				Opaque: "github.com/liuxd6825/k6server/samples/http_get.js",
 			},
 			expected: "http_get.js",
 		},
 		{
-			url:      mustParse("http://go.k6.io/k6/samples/http_get.js"),
+			url:      mustParse("http://github.com/liuxd6825/k6server/samples/http_get.js"),
 			expected: "http_get.js",
 		},
 		{

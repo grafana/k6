@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/ext"
+	"github.com/liuxd6825/k6server/lib/consts"
 	"github.com/spf13/cobra"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/ext"
-	"go.k6.io/k6/lib/consts"
 )
 
 func versionString() string {

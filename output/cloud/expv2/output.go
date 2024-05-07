@@ -11,14 +11,14 @@ import (
 	"sync"
 	"time"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cloudapi/insights"
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
-	insightsOutput "go.k6.io/k6/output/cloud/insights"
+	"github.com/liuxd6825/k6server/cloudapi"
+	"github.com/liuxd6825/k6server/cloudapi/insights"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
+	insightsOutput "github.com/liuxd6825/k6server/output/cloud/insights"
 
 	"github.com/sirupsen/logrus"
 )

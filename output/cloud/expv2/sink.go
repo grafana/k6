@@ -3,7 +3,7 @@ package expv2
 import (
 	"fmt"
 
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // TODO:A potential optimization

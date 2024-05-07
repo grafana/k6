@@ -1,7 +1,7 @@
 package k6ext
 
 import (
-	k6metrics "go.k6.io/k6/metrics"
+	k6metrics "github.com/liuxd6825/k6server/metrics"
 )
 
 const (

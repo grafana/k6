@@ -20,9 +20,9 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/lib/netext"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 const traceDelay = 100 * time.Millisecond

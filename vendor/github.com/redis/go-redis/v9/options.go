@@ -98,8 +98,10 @@ type Options struct {
 	// Note that FIFO has slightly higher overhead compared to LIFO,
 	// but it helps closing idle connections faster reducing the pool size.
 	PoolFIFO bool
-	// Maximum number of socket connections.
+	// Base number of socket connections.
 	// Default is 10 connections per every available CPU as reported by runtime.GOMAXPROCS.
+	// If there is not enough connections in the pool, new connections will be allocated in excess of PoolSize,
+	// you can limit it through MaxActiveConns
 	PoolSize int
 	// Amount of time client waits for connection if all connections
 	// are busy before returning an error.
@@ -112,6 +114,9 @@ type Options struct {
 	// Maximum number of idle connections.
 	// Default is 0. the idle connections are not closed by default.
 	MaxIdleConns int
+	// Maximum number of connections allocated by the pool at a given time.
+	// When zero, there is no limit on the number of connections in the pool.
+	MaxActiveConns int
 	// ConnMaxIdleTime is the maximum amount of time a connection may be idle.
 	// Should be less than server's timeout.
 	//
@@ -136,6 +141,12 @@ type Options struct {
 
 	// Enables read only queries on slave/follower nodes.
 	readOnly bool
+
+	// Disable set-lib on connect. Default is false.
+	DisableIndentity bool
+
+	// Add suffix to client name. Default is empty.
+	IdentitySuffix string
 }
 
 func (opt *Options) init() {
@@ -453,6 +464,7 @@ func setupConnParams(u *url.URL, o *Options) (*Options, error) {
 	o.PoolTimeout = q.duration("pool_timeout")
 	o.MinIdleConns = q.int("min_idle_conns")
 	o.MaxIdleConns = q.int("max_idle_conns")
+	o.MaxActiveConns = q.int("max_active_conns")
 	if q.has("conn_max_idle_time") {
 		o.ConnMaxIdleTime = q.duration("conn_max_idle_time")
 	} else {
@@ -499,6 +511,7 @@ func newConnPool(
 		PoolTimeout:     opt.PoolTimeout,
 		MinIdleConns:    opt.MinIdleConns,
 		MaxIdleConns:    opt.MaxIdleConns,
+		MaxActiveConns:  opt.MaxActiveConns,
 		ConnMaxIdleTime: opt.ConnMaxIdleTime,
 		ConnMaxLifetime: opt.ConnMaxLifetime,
 	})

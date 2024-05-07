@@ -8,8 +8,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/cloudapi/insights"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/cloudapi/insights"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 type mockWorkingInsightsClient struct {

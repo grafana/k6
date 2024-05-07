@@ -2,7 +2,7 @@ package streams
 
 import (
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	"github.com/liuxd6825/k6server/js/common"
 )
 
 // ReadableStreamDefaultReader represents a default reader designed to be vended by a [ReadableStream].

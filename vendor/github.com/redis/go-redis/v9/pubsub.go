@@ -487,11 +487,11 @@ func (c *PubSub) getContext() context.Context {
 
 // Channel returns a Go channel for concurrently receiving messages.
 // The channel is closed together with the PubSub. If the Go channel
-// is blocked full for 30 seconds the message is dropped.
+// is blocked full for 1 minute the message is dropped.
 // Receive* APIs can not be used after channel is created.
 //
 // go-redis periodically sends ping messages to test connection health
-// and re-subscribes if ping can not not received for 30 seconds.
+// and re-subscribes if ping can not not received for 1 minute.
 func (c *PubSub) Channel(opts ...ChannelOption) <-chan *Message {
 	c.chOnce.Do(func() {
 		c.msgCh = newChannel(c, opts...)

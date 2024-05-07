@@ -7,10 +7,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liuxd6825/k6server/cloudapi"
+	"github.com/liuxd6825/k6server/output/cloud/expv2/pbcloud"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 )
 
 func TestMetricsClientPush(t *testing.T) {

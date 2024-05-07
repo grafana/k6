@@ -3,8 +3,8 @@ package expv2
 import (
 	"testing"
 
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/stretchr/testify/assert"
-	"go.k6.io/k6/metrics"
 )
 
 func TestNewSink(t *testing.T) {

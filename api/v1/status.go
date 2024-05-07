@@ -3,7 +3,7 @@ package v1
 import (
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/lib"
+	"github.com/liuxd6825/k6server/lib"
 )
 
 // Status represents the current status of the test run.

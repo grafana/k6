@@ -7,14 +7,14 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/eventloop"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/modules/k6/timers"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/compiler"
+	"github.com/liuxd6825/k6server/js/eventloop"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/js/modules/k6/timers"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // Runtime is a helper struct that contains what is needed to run a (simple) module test

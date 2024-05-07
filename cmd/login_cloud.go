@@ -11,10 +11,10 @@ import (
 	"golang.org/x/term"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/ui"
+	"github.com/liuxd6825/k6server/cloudapi"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/ui"
 )
 
 //nolint:funlen,gocognit

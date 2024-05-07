@@ -3,10 +3,10 @@ package lib
 import (
 	"io"
 
+	"github.com/liuxd6825/k6server/event"
+	"github.com/liuxd6825/k6server/lib/trace"
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/event"
-	"go.k6.io/k6/lib/trace"
-	"go.k6.io/k6/metrics"
 )
 
 // TestPreInitState contains all of the state that can be gathered and built

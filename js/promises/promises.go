@@ -3,7 +3,7 @@ package promises
 
 import (
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/modules"
+	"github.com/liuxd6825/k6server/js/modules"
 )
 
 // New can be used to create promises that will be dispatched to k6's event loop.

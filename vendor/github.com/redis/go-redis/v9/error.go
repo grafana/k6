@@ -2,6 +2,7 @@ package redis
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net"
 	"strings"
@@ -15,11 +16,11 @@ var ErrClosed = pool.ErrClosed
 
 // HasErrorPrefix checks if the err is a Redis error and the message contains a prefix.
 func HasErrorPrefix(err error, prefix string) bool {
-	err, ok := err.(Error)
-	if !ok {
+	var rErr Error
+	if !errors.As(err, &rErr) {
 		return false
 	}
-	msg := err.Error()
+	msg := rErr.Error()
 	msg = strings.TrimPrefix(msg, "ERR ") // KVRocks adds such prefix
 	return strings.HasPrefix(msg, prefix)
 }

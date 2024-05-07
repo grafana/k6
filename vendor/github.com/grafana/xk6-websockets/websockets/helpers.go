@@ -2,7 +2,7 @@ package websockets
 
 import (
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	"github.com/liuxd6825/k6server/js/common"
 )
 
 // must is a small helper that will panic if err is not nil.

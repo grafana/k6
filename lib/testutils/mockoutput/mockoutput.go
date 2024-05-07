@@ -2,7 +2,7 @@
 package mockoutput
 
 import (
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // New exists so that the usage from tests avoids repetition, i.e. is

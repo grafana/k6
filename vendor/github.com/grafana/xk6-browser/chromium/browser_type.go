@@ -18,8 +18,8 @@ import (
 	"github.com/grafana/xk6-browser/log"
 	"github.com/grafana/xk6-browser/storage"
 
-	k6modules "go.k6.io/k6/js/modules"
-	k6lib "go.k6.io/k6/lib"
+	k6modules "github.com/liuxd6825/k6server/js/modules"
+	k6lib "github.com/liuxd6825/k6server/lib"
 )
 
 // BrowserType provides methods to launch a Chrome browser instance or connect to an existing one.

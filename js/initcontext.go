@@ -8,8 +8,8 @@ import (
 	"github.com/dop251/goja"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/loader"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/loader"
 )
 
 const cantBeUsedOutsideInitContextMsg = `the "%s" function is only available in the init stage ` +

@@ -16,12 +16,12 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/netext"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 func TestRequire(t *testing.T) {
@@ -102,7 +102,7 @@ func TestRequire(t *testing.T) {
 			require.NoError(t, fsext.WriteFile(fs, "/file.js", []byte(`throw new Error("aaaa")`), 0o755))
 			_, err := getSimpleBundle(t, "/script.js", `import "/file.js"; export default function() {}`, fs)
 			assert.EqualError(t, err,
-				"Error: aaaa\n\tat file:///file.js:1:34(3)\n\tat go.k6.io/k6/js.(*requireImpl).require-fm (native)\n\tat file:///script.js:1:0(15)\n")
+				"Error: aaaa\n\tat file:///file.js:1:34(3)\n\tat github.com/liuxd6825/k6server/js.(*requireImpl).require-fm (native)\n\tat file:///script.js:1:0(15)\n")
 		})
 
 		imports := map[string]struct {

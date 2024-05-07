@@ -5,10 +5,10 @@ import (
 	"path"
 	"testing"
 
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/output"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/output"
 )
 
 func BenchmarkFlushMetrics(b *testing.B) {

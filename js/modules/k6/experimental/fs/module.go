@@ -10,10 +10,10 @@ import (
 	"reflect"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/promises"
-	"go.k6.io/k6/lib/fsext"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/js/promises"
+	"github.com/liuxd6825/k6server/lib/fsext"
 )
 
 type (

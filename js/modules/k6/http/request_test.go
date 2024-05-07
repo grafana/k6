@@ -26,7 +26,7 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/lib/types"
+	"github.com/liuxd6825/k6server/lib/types"
 
 	"github.com/andybalholm/brotli"
 	"github.com/klauspost/compress/zstd"
@@ -36,12 +36,12 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/js/modulestest"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/netext"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/lib/testutils/httpmultibin"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // TODO replace this with the Single version

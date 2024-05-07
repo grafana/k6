@@ -6,9 +6,9 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
 	"google.golang.org/grpc/codes"
 )
 

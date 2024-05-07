@@ -11,14 +11,14 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/event"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/ui/console"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/event"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/ui/console"
 )
 
 // GlobalTestState is a wrapper around GlobalState for use in tests.

@@ -7,7 +7,7 @@ import (
 	easyjson "github.com/mailru/easyjson"
 	jlexer "github.com/mailru/easyjson/jlexer"
 	jwriter "github.com/mailru/easyjson/jwriter"
-	metrics "go.k6.io/k6/metrics"
+	metrics "github.com/liuxd6825/k6server/metrics"
 	time "time"
 )
 

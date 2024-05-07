@@ -18,9 +18,9 @@ import (
 	"github.com/grafana/xk6-websockets/websockets/events"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // RootModule is the root module for the websockets API

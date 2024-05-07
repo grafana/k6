@@ -11,7 +11,7 @@ import (
 	"github.com/grafana/xk6-browser/env"
 	"github.com/grafana/xk6-browser/log"
 
-	"go.k6.io/k6/lib/types"
+	"github.com/liuxd6825/k6server/lib/types"
 )
 
 // Script variables.

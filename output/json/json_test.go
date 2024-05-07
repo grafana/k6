@@ -11,10 +11,10 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
 )
 
 func getValidator(t testing.TB, expected []string) func(io.Reader) {

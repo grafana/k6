@@ -8,8 +8,8 @@ import (
 	"testing"
 	"time"
 
-	"go.k6.io/k6/lib/testutils/grpcservice"
-	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_wrappers_testing"
+	"github.com/liuxd6825/k6server/lib/testutils/grpcservice"
+	"github.com/liuxd6825/k6server/lib/testutils/httpmultibin/grpc_wrappers_testing"
 
 	"github.com/dop251/goja"
 	"github.com/golang/protobuf/ptypes/wrappers"

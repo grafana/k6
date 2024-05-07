@@ -21,18 +21,18 @@ import (
 	"golang.org/x/net/http2"
 	"golang.org/x/time/rate"
 
-	"go.k6.io/k6/errext"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/event"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/eventloop"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/netext"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/loader"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/errext"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/event"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/eventloop"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/netext"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/loader"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 // Ensure Runner implements the lib.Runner interface
@@ -119,8 +119,9 @@ func (r *Runner) MakeArchive() *lib.Archive {
 // NewVU returns a new initialized VU.
 func (r *Runner) NewVU(
 	ctx context.Context, idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer,
+	opts ...lib.NewOption,
 ) (lib.InitializedVU, error) {
-	vu, err := r.newVU(ctx, idLocal, idGlobal, samplesOut)
+	vu, err := r.newVU(ctx, idLocal, idGlobal, samplesOut, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -130,6 +131,7 @@ func (r *Runner) NewVU(
 //nolint:funlen
 func (r *Runner) newVU(
 	ctx context.Context, idLocal, idGlobal uint64, samplesOut chan<- metrics.SampleContainer,
+	opts ...lib.NewOption,
 ) (*VU, error) {
 	// Instantiate a new bundle, make a VU out of it.
 	bi, err := r.Bundle.Instantiate(ctx, idLocal)
@@ -254,6 +256,11 @@ func (r *Runner) newVU(
 	}
 	vu.moduleVUImpl.state = vu.state
 	_ = vu.Runtime.Set("console", vu.Console)
+	for _, o := range opts {
+		if err := o(vu); err != nil {
+			return nil, err
+		}
+	}
 
 	return vu, nil
 }
@@ -656,6 +663,10 @@ type ActiveVU struct {
 // GetID returns the unique VU ID.
 func (u *VU) GetID() uint64 {
 	return u.ID
+}
+
+func (u *VU) GetRuntime() *goja.Runtime {
+	return u.Runtime
 }
 
 // Activate the VU so it will be able to run code.

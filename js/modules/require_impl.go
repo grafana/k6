@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/loader"
+	"github.com/liuxd6825/k6server/loader"
 )
 
 // LegacyRequireImpl is a legacy implementation of `require()` that is not compatible with
@@ -45,7 +45,7 @@ func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
 	// might be used in which case we won't be able to be doing this hack. In that case we either will
 	// need some goja specific helper or to use stack traces as goja_nodejs does.
 	currentPWD := r.currentlyRequiredModule
-	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") {
+	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") && strings.Contains(specifier, "/k6/") {
 		defer func() {
 			r.currentlyRequiredModule = currentPWD
 		}()
@@ -76,6 +76,8 @@ func (r *LegacyRequireImpl) CurrentlyRequiredModule() url.URL {
 }
 
 func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string) {
+	// lxd：去掉提示信息
+	return
 	normalizePathToURL := func(path string) (*url.URL, error) {
 		u, err := url.Parse(path)
 		if err != nil {
@@ -139,7 +141,7 @@ func getPreviousRequiringFile(rt *goja.Runtime) (string, error) {
 
 	for i, frame := range frames[1:] { // first one should be the current require
 		// TODO have this precalculated automatically
-		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
+		if frame.FuncName() == "github.com/liuxd6825/k6server/js.(*requireImpl).require-fm" {
 			// we need to get the one *before* but as we skip the first one the index matches ;)
 			return frames[i].SrcName(), nil
 		}

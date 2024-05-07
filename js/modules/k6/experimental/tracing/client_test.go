@@ -6,12 +6,12 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
+	"github.com/liuxd6825/k6server/js/modulestest"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/testutils/httpmultibin"
+	"github.com/liuxd6825/k6server/metrics"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils/httpmultibin"
-	"go.k6.io/k6/metrics"
 )
 
 // traceParentHeaderName is the normalized trace header name.

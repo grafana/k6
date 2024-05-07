@@ -4,9 +4,9 @@ import (
 	"github.com/spf13/cobra"
 	"gopkg.in/guregu/null.v3"
 
-	v1 "go.k6.io/k6/api/v1"
-	"go.k6.io/k6/api/v1/client"
-	"go.k6.io/k6/cmd/state"
+	v1 "github.com/liuxd6825/k6server/api/v1"
+	"github.com/liuxd6825/k6server/api/v1/client"
+	"github.com/liuxd6825/k6server/cmd/state"
 )
 
 func getCmdResume(gs *state.GlobalState) *cobra.Command {

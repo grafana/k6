@@ -15,15 +15,15 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/execution"
-	"go.k6.io/k6/execution/local"
-	"go.k6.io/k6/js"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/loader"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/metrics/engine"
-	"go.k6.io/k6/output"
+	"github.com/liuxd6825/k6server/execution"
+	"github.com/liuxd6825/k6server/execution/local"
+	"github.com/liuxd6825/k6server/js"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/loader"
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/metrics/engine"
+	"github.com/liuxd6825/k6server/output"
 )
 
 func TestSetupData(t *testing.T) {

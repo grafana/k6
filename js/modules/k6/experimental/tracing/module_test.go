@@ -3,12 +3,12 @@ package tracing
 import (
 	"testing"
 
+	"github.com/liuxd6825/k6server/js/compiler"
+	"github.com/liuxd6825/k6server/js/modules/k6/http"
+	"github.com/liuxd6825/k6server/js/modulestest"
+	"github.com/liuxd6825/k6server/lib"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/modules/k6/http"
-	"go.k6.io/k6/js/modulestest"
-	"go.k6.io/k6/lib"
 )
 
 func TestInstrumentHTTP_SucceedsInInitContext(t *testing.T) {

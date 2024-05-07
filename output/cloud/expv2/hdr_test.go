@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/liuxd6825/k6server/output/cloud/expv2/pbcloud"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/output/cloud/expv2/pbcloud"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

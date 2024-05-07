@@ -6,8 +6,8 @@ import (
 	"strings"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/loader"
+	"github.com/liuxd6825/k6server/js/compiler"
+	"github.com/liuxd6825/k6server/loader"
 )
 
 const notPreviouslyResolvedModule = "the module %q was not previously resolved during initialization (__VU==0)"
@@ -106,6 +106,11 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 		mod, err := mr.requireModule(arg)
 		mr.cache[arg] = moduleCacheElement{mod: mod, err: err}
 		return mod, err
+	case strings.Contains(arg, "/k6/"):
+		argNew := getArg(arg)
+		mod, err := mr.requireModule(argNew)
+		mr.cache[arg] = moduleCacheElement{mod: mod, err: err}
+		return mod, err
 	default:
 		specifier, err := mr.resolveSpecifier(basePWD, arg)
 		if err != nil {
@@ -130,6 +135,13 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 
 		return mod, err
 	}
+}
+
+func getArg(arg string) string {
+	arg = strings.ReplaceAll(arg, "../", "")
+	arg = strings.ReplaceAll(arg, "./", "")
+
+	return arg
 }
 
 // Imported returns the list of imported and resolved modules.

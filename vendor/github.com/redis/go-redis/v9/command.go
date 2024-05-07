@@ -1,11 +1,14 @@
 package redis
 
 import (
+	"bufio"
 	"context"
 	"fmt"
 	"net"
+	"regexp"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/redis/go-redis/v9/internal"
@@ -15,10 +18,22 @@ import (
 )
 
 type Cmder interface {
+	// command name.
+	// e.g. "set k v ex 10" -> "set", "cluster info" -> "cluster".
 	Name() string
+
+	// full command name.
+	// e.g. "set k v ex 10" -> "set", "cluster info" -> "cluster info".
 	FullName() string
+
+	// all args of the command.
+	// e.g. "set k v ex 10" -> "[set k v ex 10]".
 	Args() []interface{}
+
+	// format request and response string.
+	// e.g. "set k v ex 10" -> "set k v ex 10: OK", "get k" -> "get k: v".
 	String() string
+
 	stringArg(int) string
 	firstKeyPos() int8
 	SetFirstKeyPos(int8)
@@ -60,7 +75,7 @@ func writeCmd(wr *proto.Writer, cmd Cmder) error {
 	return wr.WriteArgs(cmd.Args())
 }
 
-func cmdFirstKeyPos(cmd Cmder, info *CommandInfo) int {
+func cmdFirstKeyPos(cmd Cmder) int {
 	if pos := cmd.firstKeyPos(); pos != 0 {
 		return int(pos)
 	}
@@ -79,10 +94,6 @@ func cmdFirstKeyPos(cmd Cmder, info *CommandInfo) int {
 		if cmd.stringArg(1) == "usage" {
 			return 2
 		}
-	}
-
-	if info != nil {
-		return int(info.FirstKeyPos)
 	}
 	return 1
 }
@@ -340,6 +351,8 @@ func (cmd *Cmd) Bool() (bool, error) {
 
 func toBool(val interface{}) (bool, error) {
 	switch val := val.(type) {
+	case bool:
+		return val, nil
 	case int64:
 		return val != 0, nil
 	case string:
@@ -841,7 +854,7 @@ func (cmd *StringCmd) Val() string {
 }
 
 func (cmd *StringCmd) Result() (string, error) {
-	return cmd.Val(), cmd.err
+	return cmd.val, cmd.err
 }
 
 func (cmd *StringCmd) Bytes() ([]byte, error) {
@@ -945,7 +958,7 @@ func (cmd *FloatCmd) Val() float64 {
 }
 
 func (cmd *FloatCmd) Result() (float64, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *FloatCmd) String() string {
@@ -1040,7 +1053,7 @@ func (cmd *StringSliceCmd) Val() []string {
 }
 
 func (cmd *StringSliceCmd) Result() ([]string, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *StringSliceCmd) String() string {
@@ -1346,6 +1359,65 @@ func (cmd *MapStringIntCmd) readReply(rd *proto.Reader) error {
 		}
 		cmd.val[key] = nn
 	}
+	return nil
+}
+
+// ------------------------------------------------------------------------------
+type MapStringSliceInterfaceCmd struct {
+	baseCmd
+	val map[string][]interface{}
+}
+
+func NewMapStringSliceInterfaceCmd(ctx context.Context, args ...interface{}) *MapStringSliceInterfaceCmd {
+	return &MapStringSliceInterfaceCmd{
+		baseCmd: baseCmd{
+			ctx:  ctx,
+			args: args,
+		},
+	}
+}
+
+func (cmd *MapStringSliceInterfaceCmd) String() string {
+	return cmdString(cmd, cmd.val)
+}
+
+func (cmd *MapStringSliceInterfaceCmd) SetVal(val map[string][]interface{}) {
+	cmd.val = val
+}
+
+func (cmd *MapStringSliceInterfaceCmd) Result() (map[string][]interface{}, error) {
+	return cmd.val, cmd.err
+}
+
+func (cmd *MapStringSliceInterfaceCmd) Val() map[string][]interface{} {
+	return cmd.val
+}
+
+func (cmd *MapStringSliceInterfaceCmd) readReply(rd *proto.Reader) (err error) {
+	n, err := rd.ReadMapLen()
+	if err != nil {
+		return err
+	}
+	cmd.val = make(map[string][]interface{}, n)
+	for i := 0; i < n; i++ {
+		k, err := rd.ReadString()
+		if err != nil {
+			return err
+		}
+		nn, err := rd.ReadArrayLen()
+		if err != nil {
+			return err
+		}
+		cmd.val[k] = make([]interface{}, nn)
+		for j := 0; j < nn; j++ {
+			value, err := rd.ReadReply()
+			if err != nil {
+				return err
+			}
+			cmd.val[k][j] = value
+		}
+	}
+
 	return nil
 }
 
@@ -2643,7 +2715,7 @@ func (cmd *ZWithKeyCmd) Val() *ZWithKey {
 }
 
 func (cmd *ZWithKeyCmd) Result() (*ZWithKey, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *ZWithKeyCmd) String() string {
@@ -2781,7 +2853,7 @@ func (cmd *ClusterSlotsCmd) Val() []ClusterSlot {
 }
 
 func (cmd *ClusterSlotsCmd) Result() ([]ClusterSlot, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *ClusterSlotsCmd) String() string {
@@ -3241,7 +3313,7 @@ func (cmd *GeoPosCmd) Val() []*GeoPos {
 }
 
 func (cmd *GeoPosCmd) Result() ([]*GeoPos, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *GeoPosCmd) String() string {
@@ -3322,7 +3394,7 @@ func (cmd *CommandsInfoCmd) Val() map[string]*CommandInfo {
 }
 
 func (cmd *CommandsInfoCmd) Result() (map[string]*CommandInfo, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *CommandsInfoCmd) String() string {
@@ -3512,7 +3584,7 @@ func (cmd *SlowLogCmd) Val() []SlowLog {
 }
 
 func (cmd *SlowLogCmd) Result() ([]SlowLog, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *SlowLogCmd) String() string {
@@ -3611,7 +3683,7 @@ func (cmd *MapStringInterfaceCmd) Val() map[string]interface{} {
 }
 
 func (cmd *MapStringInterfaceCmd) Result() (map[string]interface{}, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *MapStringInterfaceCmd) String() string {
@@ -3675,7 +3747,7 @@ func (cmd *MapStringStringSliceCmd) Val() []map[string]string {
 }
 
 func (cmd *MapStringStringSliceCmd) Result() ([]map[string]string, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *MapStringStringSliceCmd) String() string {
@@ -3704,6 +3776,71 @@ func (cmd *MapStringStringSliceCmd) readReply(rd *proto.Reader) error {
 			v, err := rd.ReadString()
 			if err != nil {
 				return err
+			}
+			cmd.val[i][k] = v
+		}
+	}
+	return nil
+}
+
+//-----------------------------------------------------------------------
+
+type MapStringInterfaceSliceCmd struct {
+	baseCmd
+
+	val []map[string]interface{}
+}
+
+var _ Cmder = (*MapStringInterfaceSliceCmd)(nil)
+
+func NewMapStringInterfaceSliceCmd(ctx context.Context, args ...interface{}) *MapStringInterfaceSliceCmd {
+	return &MapStringInterfaceSliceCmd{
+		baseCmd: baseCmd{
+			ctx:  ctx,
+			args: args,
+		},
+	}
+}
+
+func (cmd *MapStringInterfaceSliceCmd) SetVal(val []map[string]interface{}) {
+	cmd.val = val
+}
+
+func (cmd *MapStringInterfaceSliceCmd) Val() []map[string]interface{} {
+	return cmd.val
+}
+
+func (cmd *MapStringInterfaceSliceCmd) Result() ([]map[string]interface{}, error) {
+	return cmd.val, cmd.err
+}
+
+func (cmd *MapStringInterfaceSliceCmd) String() string {
+	return cmdString(cmd, cmd.val)
+}
+
+func (cmd *MapStringInterfaceSliceCmd) readReply(rd *proto.Reader) error {
+	n, err := rd.ReadArrayLen()
+	if err != nil {
+		return err
+	}
+
+	cmd.val = make([]map[string]interface{}, n)
+	for i := 0; i < n; i++ {
+		nn, err := rd.ReadMapLen()
+		if err != nil {
+			return err
+		}
+		cmd.val[i] = make(map[string]interface{}, nn)
+		for f := 0; f < nn; f++ {
+			k, err := rd.ReadString()
+			if err != nil {
+				return err
+			}
+			v, err := rd.ReadReply()
+			if err != nil {
+				if err != Nil {
+					return err
+				}
 			}
 			cmd.val[i][k] = v
 		}
@@ -4198,7 +4335,6 @@ func (cmd *FunctionStatsCmd) readDuration(rd *proto.Reader) (time.Duration, erro
 }
 
 func (cmd *FunctionStatsCmd) readCommand(rd *proto.Reader) ([]string, error) {
-
 	n, err := rd.ReadArrayLen()
 	if err != nil {
 		return nil, err
@@ -4215,6 +4351,7 @@ func (cmd *FunctionStatsCmd) readCommand(rd *proto.Reader) ([]string, error) {
 
 	return command, nil
 }
+
 func (cmd *FunctionStatsCmd) readRunningScripts(rd *proto.Reader) ([]RunningScript, bool, error) {
 	n, err := rd.ReadArrayLen()
 	if err != nil {
@@ -4524,7 +4661,7 @@ func (cmd *ClusterLinksCmd) Val() []ClusterLink {
 }
 
 func (cmd *ClusterLinksCmd) Result() ([]ClusterLink, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *ClusterLinksCmd) String() string {
@@ -4626,7 +4763,7 @@ func (cmd *ClusterShardsCmd) Val() []ClusterShard {
 }
 
 func (cmd *ClusterShardsCmd) Result() ([]ClusterShard, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *ClusterShardsCmd) String() string {
@@ -5099,7 +5236,7 @@ func (cmd *ACLLogCmd) Val() []*ACLLogEntry {
 }
 
 func (cmd *ACLLogCmd) Result() ([]*ACLLogEntry, error) {
-	return cmd.Val(), cmd.Err()
+	return cmd.val, cmd.err
 }
 
 func (cmd *ACLLogCmd) String() string {
@@ -5165,4 +5302,182 @@ func (cmd *ACLLogCmd) readReply(rd *proto.Reader) error {
 	}
 
 	return nil
+}
+
+// LibraryInfo holds the library info.
+type LibraryInfo struct {
+	LibName *string
+	LibVer  *string
+}
+
+// WithLibraryName returns a valid LibraryInfo with library name only.
+func WithLibraryName(libName string) LibraryInfo {
+	return LibraryInfo{LibName: &libName}
+}
+
+// WithLibraryVersion returns a valid LibraryInfo with library version only.
+func WithLibraryVersion(libVer string) LibraryInfo {
+	return LibraryInfo{LibVer: &libVer}
+}
+
+// -------------------------------------------
+
+type InfoCmd struct {
+	baseCmd
+	val map[string]map[string]string
+}
+
+var _ Cmder = (*InfoCmd)(nil)
+
+func NewInfoCmd(ctx context.Context, args ...interface{}) *InfoCmd {
+	return &InfoCmd{
+		baseCmd: baseCmd{
+			ctx:  ctx,
+			args: args,
+		},
+	}
+}
+
+func (cmd *InfoCmd) SetVal(val map[string]map[string]string) {
+	cmd.val = val
+}
+
+func (cmd *InfoCmd) Val() map[string]map[string]string {
+	return cmd.val
+}
+
+func (cmd *InfoCmd) Result() (map[string]map[string]string, error) {
+	return cmd.val, cmd.err
+}
+
+func (cmd *InfoCmd) String() string {
+	return cmdString(cmd, cmd.val)
+}
+
+func (cmd *InfoCmd) readReply(rd *proto.Reader) error {
+	val, err := rd.ReadString()
+	if err != nil {
+		return err
+	}
+
+	section := ""
+	scanner := bufio.NewScanner(strings.NewReader(val))
+	moduleRe := regexp.MustCompile(`module:name=(.+?),(.+)$`)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		if strings.HasPrefix(line, "#") {
+			if cmd.val == nil {
+				cmd.val = make(map[string]map[string]string)
+			}
+			section = strings.TrimPrefix(line, "# ")
+			cmd.val[section] = make(map[string]string)
+		} else if line != "" {
+			if section == "Modules" {
+				kv := moduleRe.FindStringSubmatch(line)
+				if len(kv) == 3 {
+					cmd.val[section][kv[1]] = kv[2]
+				}
+			} else {
+				kv := strings.SplitN(line, ":", 2)
+				if len(kv) == 2 {
+					cmd.val[section][kv[0]] = kv[1]
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (cmd *InfoCmd) Item(section, key string) string {
+	if cmd.val == nil {
+		return ""
+	} else if cmd.val[section] == nil {
+		return ""
+	} else {
+		return cmd.val[section][key]
+	}
+}
+
+type MonitorStatus int
+
+const (
+	monitorStatusIdle MonitorStatus = iota
+	monitorStatusStart
+	monitorStatusStop
+)
+
+type MonitorCmd struct {
+	baseCmd
+	ch     chan string
+	status MonitorStatus
+	mu     sync.Mutex
+}
+
+func newMonitorCmd(ctx context.Context, ch chan string) *MonitorCmd {
+	return &MonitorCmd{
+		baseCmd: baseCmd{
+			ctx:  ctx,
+			args: []interface{}{"monitor"},
+		},
+		ch:     ch,
+		status: monitorStatusIdle,
+		mu:     sync.Mutex{},
+	}
+}
+
+func (cmd *MonitorCmd) String() string {
+	return cmdString(cmd, nil)
+}
+
+func (cmd *MonitorCmd) readReply(rd *proto.Reader) error {
+	ctx, cancel := context.WithCancel(cmd.ctx)
+	go func(ctx context.Context) {
+		for {
+			select {
+			case <-ctx.Done():
+				return
+			default:
+				err := cmd.readMonitor(rd, cancel)
+				if err != nil {
+					cmd.err = err
+					return
+				}
+			}
+		}
+	}(ctx)
+	return nil
+}
+
+func (cmd *MonitorCmd) readMonitor(rd *proto.Reader, cancel context.CancelFunc) error {
+	for {
+		cmd.mu.Lock()
+		st := cmd.status
+		cmd.mu.Unlock()
+		if pk, _ := rd.Peek(1); len(pk) != 0 && st == monitorStatusStart {
+			line, err := rd.ReadString()
+			if err != nil {
+				return err
+			}
+			cmd.ch <- line
+		}
+		if st == monitorStatusStop {
+			cancel()
+			break
+		}
+	}
+	return nil
+}
+
+func (cmd *MonitorCmd) Start() {
+	cmd.mu.Lock()
+	defer cmd.mu.Unlock()
+	cmd.status = monitorStatusStart
+}
+
+func (cmd *MonitorCmd) Stop() {
+	cmd.mu.Lock()
+	defer cmd.mu.Unlock()
+	cmd.status = monitorStatusStop
 }

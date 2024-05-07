@@ -7,7 +7,7 @@
 package trace
 
 import (
-	common "go.k6.io/k6/cloudapi/insights/proto/v1/common"
+	common "github.com/liuxd6825/k6server/cloudapi/insights/proto/v1/common"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"

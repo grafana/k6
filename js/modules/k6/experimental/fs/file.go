@@ -5,7 +5,7 @@ import (
 	"path/filepath"
 	"sync/atomic"
 
-	"go.k6.io/k6/lib"
+	"github.com/liuxd6825/k6server/lib"
 )
 
 // file is an abstraction for interacting with files.

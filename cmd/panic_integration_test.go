@@ -6,14 +6,14 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/liuxd6825/k6server/cmd/tests"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cmd/tests"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
 )
 
 // alarmist is a mock module that do a panic

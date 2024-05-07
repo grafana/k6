@@ -11,9 +11,9 @@ import (
 	"github.com/spf13/pflag"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/types"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/errext/exitcodes"
+	"github.com/liuxd6825/k6server/lib/types"
 
 	// Blank-importing golang.org/x/crypto/x509roots/fallback bundles a set of
 	// root fallback certificates from Mozilla into the resulting binary. This

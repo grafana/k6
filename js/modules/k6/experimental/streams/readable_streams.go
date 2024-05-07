@@ -4,9 +4,9 @@ import (
 	"errors"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/js/promises"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/js/promises"
 )
 
 // ReadableStream is a concrete instance of the general [readable stream] concept.

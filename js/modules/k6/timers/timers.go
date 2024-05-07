@@ -8,7 +8,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/modules"
+	"github.com/liuxd6825/k6server/js/modules"
 )
 
 // RootModule is the global module instance that will create module

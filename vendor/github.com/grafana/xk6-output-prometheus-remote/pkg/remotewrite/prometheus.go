@@ -5,7 +5,7 @@ import (
 
 	prompb "buf.build/gen/go/prometheus/prometheus/protocolbuffers/go"
 	"github.com/mstoykov/atlas"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/metrics"
 )
 
 const namelbl = "__name__"

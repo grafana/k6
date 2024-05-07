@@ -15,6 +15,10 @@ var (
 	// ErrClosed performs any operation on the closed client will return this error.
 	ErrClosed = errors.New("redis: client is closed")
 
+	// ErrPoolExhausted is returned from a pool connection method
+	// when the maximum number of database connections in the pool has been reached.
+	ErrPoolExhausted = errors.New("redis: connection pool exhausted")
+
 	// ErrPoolTimeout timed out waiting to get a connection from the connection pool.
 	ErrPoolTimeout = errors.New("redis: connection pool timeout")
 )
@@ -61,6 +65,7 @@ type Options struct {
 	PoolTimeout     time.Duration
 	MinIdleConns    int
 	MaxIdleConns    int
+	MaxActiveConns  int
 	ConnMaxIdleTime time.Duration
 	ConnMaxLifetime time.Duration
 }
@@ -159,6 +164,17 @@ func (p *ConnPool) NewConn(ctx context.Context) (*Conn, error) {
 }
 
 func (p *ConnPool) newConn(ctx context.Context, pooled bool) (*Conn, error) {
+	if p.closed() {
+		return nil, ErrClosed
+	}
+
+	p.connsMu.Lock()
+	if p.cfg.MaxActiveConns > 0 && p.poolSize >= p.cfg.MaxActiveConns {
+		p.connsMu.Unlock()
+		return nil, ErrPoolExhausted
+	}
+	p.connsMu.Unlock()
+
 	cn, err := p.dialConn(ctx, pooled)
 	if err != nil {
 		return nil, err
@@ -167,10 +183,9 @@ func (p *ConnPool) newConn(ctx context.Context, pooled bool) (*Conn, error) {
 	p.connsMu.Lock()
 	defer p.connsMu.Unlock()
 
-	// It is not allowed to add new connections to the closed connection pool.
-	if p.closed() {
+	if p.cfg.MaxActiveConns > 0 && p.poolSize >= p.cfg.MaxActiveConns {
 		_ = cn.Close()
-		return nil, ErrClosed
+		return nil, ErrPoolExhausted
 	}
 
 	p.conns = append(p.conns, cn)
@@ -256,6 +271,7 @@ func (p *ConnPool) Get(ctx context.Context) (*Conn, error) {
 		p.connsMu.Unlock()
 
 		if err != nil {
+			p.freeTurn()
 			return nil, err
 		}
 

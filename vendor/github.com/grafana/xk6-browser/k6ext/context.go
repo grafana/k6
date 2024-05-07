@@ -3,8 +3,8 @@ package k6ext
 import (
 	"context"
 
-	k6modules "go.k6.io/k6/js/modules"
-	k6lib "go.k6.io/k6/lib"
+	k6modules "github.com/liuxd6825/k6server/js/modules"
+	k6lib "github.com/liuxd6825/k6server/lib"
 
 	"github.com/dop251/goja"
 )

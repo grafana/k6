@@ -7,8 +7,8 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/liuxd6825/k6server/lib"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/lib"
 )
 
 // ResultStatus represents the result status of a test.

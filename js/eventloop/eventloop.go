@@ -6,7 +6,7 @@ import (
 	"sync"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/modules"
+	"github.com/liuxd6825/k6server/js/modules"
 )
 
 // EventLoop implements an event with

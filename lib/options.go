@@ -9,8 +9,8 @@ import (
 	"net"
 	"reflect"
 
-	"go.k6.io/k6/lib/types"
-	"go.k6.io/k6/metrics"
+	"github.com/liuxd6825/k6server/lib/types"
+	"github.com/liuxd6825/k6server/metrics"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -225,6 +225,8 @@ func ParseCIDR(s string) (*IPNet, error) {
 
 // Options represent configure options for k6.
 type Options struct {
+	// lxd:扩展的javascript模块
+	JSModules map[string]any `json:"jsModules"`
 	// Should the test start in a paused state?
 	Paused null.Bool `json:"paused" envconfig:"K6_PAUSED"`
 

@@ -1,109 +1,192 @@
 package redis
 
-import (
-	"context"
-	"sync"
-	"sync/atomic"
-)
+import "context"
 
-func (c *ClusterClient) DBSize(ctx context.Context) *IntCmd {
-	cmd := NewIntCmd(ctx, "dbsize")
-	_ = c.withProcessHook(ctx, cmd, func(ctx context.Context, _ Cmder) error {
-		var size int64
-		err := c.ForEachMaster(ctx, func(ctx context.Context, master *Client) error {
-			n, err := master.DBSize(ctx).Result()
-			if err != nil {
-				return err
-			}
-			atomic.AddInt64(&size, n)
-			return nil
-		})
-		if err != nil {
-			cmd.SetErr(err)
-		} else {
-			cmd.val = size
-		}
-		return nil
-	})
+type ClusterCmdable interface {
+	ClusterMyShardID(ctx context.Context) *StringCmd
+	ClusterSlots(ctx context.Context) *ClusterSlotsCmd
+	ClusterShards(ctx context.Context) *ClusterShardsCmd
+	ClusterLinks(ctx context.Context) *ClusterLinksCmd
+	ClusterNodes(ctx context.Context) *StringCmd
+	ClusterMeet(ctx context.Context, host, port string) *StatusCmd
+	ClusterForget(ctx context.Context, nodeID string) *StatusCmd
+	ClusterReplicate(ctx context.Context, nodeID string) *StatusCmd
+	ClusterResetSoft(ctx context.Context) *StatusCmd
+	ClusterResetHard(ctx context.Context) *StatusCmd
+	ClusterInfo(ctx context.Context) *StringCmd
+	ClusterKeySlot(ctx context.Context, key string) *IntCmd
+	ClusterGetKeysInSlot(ctx context.Context, slot int, count int) *StringSliceCmd
+	ClusterCountFailureReports(ctx context.Context, nodeID string) *IntCmd
+	ClusterCountKeysInSlot(ctx context.Context, slot int) *IntCmd
+	ClusterDelSlots(ctx context.Context, slots ...int) *StatusCmd
+	ClusterDelSlotsRange(ctx context.Context, min, max int) *StatusCmd
+	ClusterSaveConfig(ctx context.Context) *StatusCmd
+	ClusterSlaves(ctx context.Context, nodeID string) *StringSliceCmd
+	ClusterFailover(ctx context.Context) *StatusCmd
+	ClusterAddSlots(ctx context.Context, slots ...int) *StatusCmd
+	ClusterAddSlotsRange(ctx context.Context, min, max int) *StatusCmd
+	ReadOnly(ctx context.Context) *StatusCmd
+	ReadWrite(ctx context.Context) *StatusCmd
+}
+
+func (c cmdable) ClusterMyShardID(ctx context.Context) *StringCmd {
+	cmd := NewStringCmd(ctx, "cluster", "myshardid")
+	_ = c(ctx, cmd)
 	return cmd
 }
 
-func (c *ClusterClient) ScriptLoad(ctx context.Context, script string) *StringCmd {
-	cmd := NewStringCmd(ctx, "script", "load", script)
-	_ = c.withProcessHook(ctx, cmd, func(ctx context.Context, _ Cmder) error {
-		var mu sync.Mutex
-		err := c.ForEachShard(ctx, func(ctx context.Context, shard *Client) error {
-			val, err := shard.ScriptLoad(ctx, script).Result()
-			if err != nil {
-				return err
-			}
-
-			mu.Lock()
-			if cmd.Val() == "" {
-				cmd.val = val
-			}
-			mu.Unlock()
-
-			return nil
-		})
-		if err != nil {
-			cmd.SetErr(err)
-		}
-		return nil
-	})
+func (c cmdable) ClusterSlots(ctx context.Context) *ClusterSlotsCmd {
+	cmd := NewClusterSlotsCmd(ctx, "cluster", "slots")
+	_ = c(ctx, cmd)
 	return cmd
 }
 
-func (c *ClusterClient) ScriptFlush(ctx context.Context) *StatusCmd {
-	cmd := NewStatusCmd(ctx, "script", "flush")
-	_ = c.withProcessHook(ctx, cmd, func(ctx context.Context, _ Cmder) error {
-		err := c.ForEachShard(ctx, func(ctx context.Context, shard *Client) error {
-			return shard.ScriptFlush(ctx).Err()
-		})
-		if err != nil {
-			cmd.SetErr(err)
-		}
-		return nil
-	})
+func (c cmdable) ClusterShards(ctx context.Context) *ClusterShardsCmd {
+	cmd := NewClusterShardsCmd(ctx, "cluster", "shards")
+	_ = c(ctx, cmd)
 	return cmd
 }
 
-func (c *ClusterClient) ScriptExists(ctx context.Context, hashes ...string) *BoolSliceCmd {
-	args := make([]interface{}, 2+len(hashes))
-	args[0] = "script"
-	args[1] = "exists"
-	for i, hash := range hashes {
-		args[2+i] = hash
+func (c cmdable) ClusterLinks(ctx context.Context) *ClusterLinksCmd {
+	cmd := NewClusterLinksCmd(ctx, "cluster", "links")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterNodes(ctx context.Context) *StringCmd {
+	cmd := NewStringCmd(ctx, "cluster", "nodes")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterMeet(ctx context.Context, host, port string) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "cluster", "meet", host, port)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterForget(ctx context.Context, nodeID string) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "cluster", "forget", nodeID)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterReplicate(ctx context.Context, nodeID string) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "cluster", "replicate", nodeID)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterResetSoft(ctx context.Context) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "cluster", "reset", "soft")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterResetHard(ctx context.Context) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "cluster", "reset", "hard")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterInfo(ctx context.Context) *StringCmd {
+	cmd := NewStringCmd(ctx, "cluster", "info")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterKeySlot(ctx context.Context, key string) *IntCmd {
+	cmd := NewIntCmd(ctx, "cluster", "keyslot", key)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterGetKeysInSlot(ctx context.Context, slot int, count int) *StringSliceCmd {
+	cmd := NewStringSliceCmd(ctx, "cluster", "getkeysinslot", slot, count)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterCountFailureReports(ctx context.Context, nodeID string) *IntCmd {
+	cmd := NewIntCmd(ctx, "cluster", "count-failure-reports", nodeID)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterCountKeysInSlot(ctx context.Context, slot int) *IntCmd {
+	cmd := NewIntCmd(ctx, "cluster", "countkeysinslot", slot)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterDelSlots(ctx context.Context, slots ...int) *StatusCmd {
+	args := make([]interface{}, 2+len(slots))
+	args[0] = "cluster"
+	args[1] = "delslots"
+	for i, slot := range slots {
+		args[2+i] = slot
 	}
-	cmd := NewBoolSliceCmd(ctx, args...)
+	cmd := NewStatusCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
 
-	result := make([]bool, len(hashes))
-	for i := range result {
-		result[i] = true
+func (c cmdable) ClusterDelSlotsRange(ctx context.Context, min, max int) *StatusCmd {
+	size := max - min + 1
+	slots := make([]int, size)
+	for i := 0; i < size; i++ {
+		slots[i] = min + i
 	}
+	return c.ClusterDelSlots(ctx, slots...)
+}
 
-	_ = c.withProcessHook(ctx, cmd, func(ctx context.Context, _ Cmder) error {
-		var mu sync.Mutex
-		err := c.ForEachShard(ctx, func(ctx context.Context, shard *Client) error {
-			val, err := shard.ScriptExists(ctx, hashes...).Result()
-			if err != nil {
-				return err
-			}
+func (c cmdable) ClusterSaveConfig(ctx context.Context) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "cluster", "saveconfig")
+	_ = c(ctx, cmd)
+	return cmd
+}
 
-			mu.Lock()
-			for i, v := range val {
-				result[i] = result[i] && v
-			}
-			mu.Unlock()
+func (c cmdable) ClusterSlaves(ctx context.Context, nodeID string) *StringSliceCmd {
+	cmd := NewStringSliceCmd(ctx, "cluster", "slaves", nodeID)
+	_ = c(ctx, cmd)
+	return cmd
+}
 
-			return nil
-		})
-		if err != nil {
-			cmd.SetErr(err)
-		} else {
-			cmd.val = result
-		}
-		return nil
-	})
+func (c cmdable) ClusterFailover(ctx context.Context) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "cluster", "failover")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterAddSlots(ctx context.Context, slots ...int) *StatusCmd {
+	args := make([]interface{}, 2+len(slots))
+	args[0] = "cluster"
+	args[1] = "addslots"
+	for i, num := range slots {
+		args[2+i] = num
+	}
+	cmd := NewStatusCmd(ctx, args...)
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ClusterAddSlotsRange(ctx context.Context, min, max int) *StatusCmd {
+	size := max - min + 1
+	slots := make([]int, size)
+	for i := 0; i < size; i++ {
+		slots[i] = min + i
+	}
+	return c.ClusterAddSlots(ctx, slots...)
+}
+
+func (c cmdable) ReadOnly(ctx context.Context) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "readonly")
+	_ = c(ctx, cmd)
+	return cmd
+}
+
+func (c cmdable) ReadWrite(ctx context.Context) *StatusCmd {
+	cmd := NewStatusCmd(ctx, "readwrite")
+	_ = c(ctx, cmd)
 	return cmd
 }

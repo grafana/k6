@@ -7,12 +7,12 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/js/compiler"
+	"github.com/liuxd6825/k6server/js/compiler"
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/require"
-	k6encoding "go.k6.io/k6/js/modules/k6/encoding"
-	"go.k6.io/k6/js/modulestest"
+	k6encoding "github.com/liuxd6825/k6server/js/modules/k6/encoding"
+	"github.com/liuxd6825/k6server/js/modulestest"
 )
 
 const initGlobals = `

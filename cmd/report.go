@@ -8,8 +8,8 @@ import (
 	"runtime"
 	"strings"
 
-	"go.k6.io/k6/execution"
-	"go.k6.io/k6/lib/consts"
+	"github.com/liuxd6825/k6server/execution"
+	"github.com/liuxd6825/k6server/lib/consts"
 )
 
 type report struct {

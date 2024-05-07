@@ -1,7 +1,7 @@
 package insights
 
 import (
-	"go.k6.io/k6/cloudapi"
+	"github.com/liuxd6825/k6server/cloudapi"
 )
 
 // Enabled returns true if the k6 x Tempo feature is enabled.

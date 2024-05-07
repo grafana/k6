@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/dop251/goja"
-	"go.k6.io/k6/js/common"
+	"github.com/liuxd6825/k6server/js/common"
 )
 
 // options are the options that can be passed to the

@@ -5,8 +5,8 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/cmd"
-	"go.k6.io/k6/lib/fsext"
+	"github.com/liuxd6825/k6server/cmd"
+	"github.com/liuxd6825/k6server/lib/fsext"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

@@ -10,8 +10,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
 )
 
 type errorReader string

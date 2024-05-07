@@ -1,6 +1,6 @@
 package grpc
 
-import "go.k6.io/k6/metrics"
+import "github.com/liuxd6825/k6server/metrics"
 
 // instanceMetrics contains the metrics for the grpc extension.
 type instanceMetrics struct {

@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/lib/testutils"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/lib/testutils"
 )
 
 // This whole file is about tests around https://github.com/grafana/k6/issues/2674

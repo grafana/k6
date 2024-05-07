@@ -14,15 +14,15 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
-	"go.k6.io/k6/event"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/compiler"
-	"go.k6.io/k6/js/eventloop"
-	"go.k6.io/k6/js/modules"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/lib/fsext"
-	"go.k6.io/k6/loader"
+	"github.com/liuxd6825/k6server/event"
+	"github.com/liuxd6825/k6server/js/common"
+	"github.com/liuxd6825/k6server/js/compiler"
+	"github.com/liuxd6825/k6server/js/eventloop"
+	"github.com/liuxd6825/k6server/js/modules"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/lib/fsext"
+	"github.com/liuxd6825/k6server/loader"
 )
 
 // A Bundle is a self-contained bundle of scripts and resources.
@@ -69,6 +69,13 @@ func NewBundle(
 	return newBundle(piState, src, filesystems, lib.Options{}, true)
 }
 
+func NewBundleFormJsModules(
+	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
+	jsModules map[string]any,
+) (*Bundle, error) {
+	return newBundle(piState, src, filesystems, lib.Options{JSModules: jsModules}, true)
+}
+
 func newBundle(
 	piState *lib.TestPreInitState, src *loader.SourceData, filesystems map[string]fsext.Fs,
 	options lib.Options, updateOptions bool, // TODO: try to figure out a way to not need both
@@ -92,9 +99,15 @@ func newBundle(
 	if bundle.pwd == nil {
 		bundle.pwd = loader.Dir(src.URL)
 	}
-
+	// lxd:增加扩展的jsModules
+	jsModules := getJSModules()
+	if options.JSModules != nil {
+		for k, v := range options.JSModules {
+			jsModules[k] = v
+		}
+	}
 	c := bundle.newCompiler(piState.Logger)
-	bundle.ModuleResolver = modules.NewModuleResolver(getJSModules(), generateFileLoad(bundle), c)
+	bundle.ModuleResolver = modules.NewModuleResolver(jsModules, generateFileLoad(bundle), c)
 
 	// Instantiate the bundle into a new VM using a bound init context. This uses a context with a
 	// runtime, but no state, to allow module-provided types to function within the init context.

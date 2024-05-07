@@ -6,8 +6,8 @@ import (
 
 	"github.com/stretchr/testify/require"
 
-	"go.k6.io/k6/cloudapi/insights/proto/v1/ingester"
-	"go.k6.io/k6/cloudapi/insights/proto/v1/k6"
+	"github.com/liuxd6825/k6server/cloudapi/insights/proto/v1/ingester"
+	"github.com/liuxd6825/k6server/cloudapi/insights/proto/v1/k6"
 )
 
 func Test_newBatchCreateRequestMetadatasRequest_CorrectlyMapsDomainTypeToProtoDefinition(t *testing.T) {

@@ -13,7 +13,7 @@ import (
 
 	"golang.org/x/net/http2"
 
-	"go.k6.io/k6/lib/netext"
+	"github.com/liuxd6825/k6server/lib/netext"
 )
 
 // TODO: maybe rename the type errorCode, so we can have errCode variables? and

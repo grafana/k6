@@ -19,7 +19,7 @@ import (
 	"github.com/go-sourcemap/sourcemap"
 	"github.com/sirupsen/logrus"
 
-	"go.k6.io/k6/lib"
+	"github.com/liuxd6825/k6server/lib"
 )
 
 //go:embed lib/babel.min.js

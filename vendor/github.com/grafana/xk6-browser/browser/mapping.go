@@ -12,7 +12,7 @@ import (
 	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 
-	k6common "go.k6.io/k6/js/common"
+	k6common "github.com/liuxd6825/k6server/js/common"
 )
 
 // mapping is a type for mapping our module API to Goja.

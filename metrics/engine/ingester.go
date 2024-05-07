@@ -3,9 +3,9 @@ package engine
 import (
 	"time"
 
+	"github.com/liuxd6825/k6server/metrics"
+	"github.com/liuxd6825/k6server/output"
 	"github.com/sirupsen/logrus"
-	"go.k6.io/k6/metrics"
-	"go.k6.io/k6/output"
 )
 
 const (

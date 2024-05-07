@@ -3,7 +3,7 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 
-	"go.k6.io/k6/cmd/state"
+	"github.com/liuxd6825/k6server/cmd/state"
 )
 
 // getCmdLogin returns the `k6 login` sub-command, together with its children.

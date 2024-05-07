@@ -17,12 +17,12 @@ import (
 
 	"gopkg.in/yaml.v3"
 
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/metrics/engine"
-	"go.k6.io/k6/output"
-	"go.k6.io/k6/ui/pb"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/lib"
+	"github.com/liuxd6825/k6server/lib/consts"
+	"github.com/liuxd6825/k6server/metrics/engine"
+	"github.com/liuxd6825/k6server/output"
+	"github.com/liuxd6825/k6server/ui/pb"
 )
 
 const (

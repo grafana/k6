@@ -6,10 +6,10 @@ import (
 	"text/template"
 
 	"github.com/fatih/color"
+	"github.com/liuxd6825/k6server/cmd/state"
+	"github.com/liuxd6825/k6server/lib/fsext"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/fsext"
 )
 
 const defaultNewScriptName = "script.js"
