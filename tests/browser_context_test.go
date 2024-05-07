@@ -10,6 +10,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -651,30 +652,35 @@ func TestK6Object(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			_, rt, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, tt.testRunID))
+			vu, _, _, cleanUp := startIteration(t, env.ConstLookup(env.K6TestRunID, tt.testRunID))
 			defer cleanUp()
 
 			// First test with browser.newPage
-			got, err := rt.RunString(`
-				const p = browser.newPage()
-				p.goto("about:blank")
-				const o = p.evaluate(() => window.k6)
-				JSON.stringify(o)
+			got, err := vu.TestRT.RunOnEventLoop(`
+				const p = browser.newPage();
+				p.goto("about:blank");
+				const o = p.evaluate(() => window.k6);
+				JSON.stringify(o);
 			`)
 			require.NoError(t, err)
 			assert.Equal(t, tt.want, got.String())
 
 			// Now test with browser.newContext
-			got, err = rt.RunString(`
-				browser.closeContext()
-				const c = browser.newContext()
-				const p2 = c.newPage()
-				p2.goto("about:blank")
-				const o2 = p2.evaluate(() => window.k6)
-				JSON.stringify(o2)
+			got, err = vu.TestRT.RunOnEventLoop(`
+				const test = async function() {
+					browser.closeContext();
+					const c = await browser.newContext();
+					const p2 = c.newPage();
+					p2.goto("about:blank");
+					const o2 = p2.evaluate(() => window.k6);
+					return JSON.stringify(o2);
+				}
+				test();
 			`)
 			require.NoError(t, err)
-			assert.Equal(t, tt.want, got.String())
+			p, ok := got.Export().(*goja.Promise)
+			require.Truef(t, ok, "got: %T, want *goja.Promise", got.Export())
+			assert.Equal(t, tt.want, p.Result().String())
 		})
 	}
 }
