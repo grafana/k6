@@ -18,7 +18,7 @@ export const options = {
 };
 
 export default async function () {
-  const page = browser.newPage();
+  const page = await browser.newPage();
   const context = page.context();
 
   try {

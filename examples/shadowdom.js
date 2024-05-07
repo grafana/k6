@@ -18,7 +18,7 @@ export const options = {
 }
 
 export default async function() {
-  const page = browser.newPage();
+  const page = await browser.newPage();
   page.setContent("<html><head><style></style></head><body>hello!</body></html>")
   await page.evaluate(() => {
     const shadowRoot = document.createElement('div');

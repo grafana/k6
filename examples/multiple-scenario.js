@@ -33,7 +33,7 @@ export const options = {
 }
 
 export async function messages() {
-  const page = browser.newPage();
+  const page = await browser.newPage();
 
   try {
     await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
@@ -43,7 +43,7 @@ export async function messages() {
 }
 
 export async function news() {
-  const page = browser.newPage();
+  const page = await browser.newPage();
 
   try {
     await page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' });
