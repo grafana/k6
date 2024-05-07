@@ -19,12 +19,14 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return mapBrowserContext(vu, b.Context()), nil
 		},
-		"closeContext": func() error {
-			b, err := vu.browser()
-			if err != nil {
-				return err
-			}
-			return b.CloseContext() //nolint:wrapcheck
+		"closeContext": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				b, err := vu.browser()
+				if err != nil {
+					return nil, err
+				}
+				return nil, b.CloseContext() //nolint:wrapcheck
+			})
 		},
 		"isConnected": func() (bool, error) {
 			b, err := vu.browser()

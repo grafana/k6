@@ -668,7 +668,7 @@ func TestK6Object(t *testing.T) {
 			// Now test with browser.newContext
 			got, err = vu.TestRT.RunOnEventLoop(`
 				const test = async function() {
-					browser.closeContext();
+					await browser.closeContext();
 					const c = await browser.newContext();
 					const p2 = c.newPage();
 					p2.goto("about:blank");
