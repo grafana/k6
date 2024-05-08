@@ -24,7 +24,7 @@ func TestKeyboardPress(t *testing.T) {
 
 		assert.NotPanics(t, func() {
 			for k := range layout.Keys {
-				kb.Press(string(k), nil)
+				require.NoError(t, kb.Press(string(k), nil))
 			}
 		})
 	})
@@ -44,7 +44,7 @@ func TestKeyboardPress(t *testing.T) {
 		kb.Type("Hello World!", nil)
 		require.Equal(t, "Hello World!", el.InputValue(nil))
 
-		kb.Press("Backspace", nil)
+		require.NoError(t, kb.Press("Backspace", nil))
 		assert.Equal(t, "Hello World", el.InputValue(nil))
 	})
 
@@ -60,17 +60,17 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("input", nil)
 
-		kb.Press("Shift++", nil)
-		kb.Press("Shift+=", nil)
-		kb.Press("Shift+@", nil)
-		kb.Press("Shift+6", nil)
-		kb.Press("Shift+KeyA", nil)
-		kb.Press("Shift+b", nil)
-		kb.Press("Shift+C", nil)
+		require.NoError(t, kb.Press("Shift++", nil))
+		require.NoError(t, kb.Press("Shift+=", nil))
+		require.NoError(t, kb.Press("Shift+@", nil))
+		require.NoError(t, kb.Press("Shift+6", nil))
+		require.NoError(t, kb.Press("Shift+KeyA", nil))
+		require.NoError(t, kb.Press("Shift+b", nil))
+		require.NoError(t, kb.Press("Shift+C", nil))
 
-		kb.Press("Control+KeyI", nil)
-		kb.Press("Control+J", nil)
-		kb.Press("Control+k", nil)
+		require.NoError(t, kb.Press("Control+KeyI", nil))
+		require.NoError(t, kb.Press("Control+J", nil))
+		require.NoError(t, kb.Press("Control+k", nil))
 
 		require.Equal(t, "+=@6AbC", el.InputValue(nil))
 	})
@@ -87,9 +87,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("input", nil)
 
-		kb.Press("Shift+KeyA", nil)
-		kb.Press("Shift+b", nil)
-		kb.Press("Shift+C", nil)
+		require.NoError(t, kb.Press("Shift+KeyA", nil))
+		require.NoError(t, kb.Press("Shift+b", nil))
+		require.NoError(t, kb.Press("Shift+C", nil))
 
 		require.Equal(t, "AbC", el.InputValue(nil))
 
@@ -97,8 +97,8 @@ func TestKeyboardPress(t *testing.T) {
 		if runtime.GOOS == "darwin" {
 			metaKey = "Meta"
 		}
-		kb.Press(metaKey+"+A", nil)
-		kb.Press("Delete", nil)
+		require.NoError(t, kb.Press(metaKey+"+A", nil))
+		require.NoError(t, kb.Press("Delete", nil))
 		assert.Equal(t, "", el.InputValue(nil))
 	})
 
@@ -130,9 +130,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
-		kb.Press("C", nil)
-		kb.Press("d", nil)
-		kb.Press("KeyE", nil)
+		require.NoError(t, kb.Press("C", nil))
+		require.NoError(t, kb.Press("d", nil))
+		require.NoError(t, kb.Press("KeyE", nil))
 
 		require.NoError(t, kb.Down("Shift"))
 		require.NoError(t, kb.Down("f"))
@@ -178,8 +178,8 @@ func TestKeyboardPress(t *testing.T) {
 		p.Focus("textarea", nil)
 
 		kb.Type("Hello", nil)
-		kb.Press("Enter", nil)
-		kb.Press("Enter", nil)
+		require.NoError(t, kb.Press("Enter", nil))
+		require.NoError(t, kb.Press("Enter", nil))
 		kb.Type("World!", nil)
 		assert.Equal(t, "Hello\n\nWorld!", el.InputValue(nil))
 	})
@@ -200,16 +200,16 @@ func TestKeyboardPress(t *testing.T) {
 		kb.Type("Hello World!", nil)
 		require.Equal(t, "Hello World!", el.InputValue(nil))
 
-		kb.Press("ArrowLeft", nil)
+		require.NoError(t, kb.Press("ArrowLeft", nil))
 		// Should hold the key until Up() is called.
 		require.NoError(t, kb.Down("Shift"))
 		for i := 0; i < len(" World"); i++ {
-			kb.Press("ArrowLeft", nil)
+			require.NoError(t, kb.Press("ArrowLeft", nil))
 		}
 		// Should release the key but the selection should remain active.
 		kb.Up("Shift")
 		// Should delete the selection.
-		kb.Press("Backspace", nil)
+		require.NoError(t, kb.Press("Backspace", nil))
 
 		assert.Equal(t, "Hello!", el.InputValue(nil))
 	})

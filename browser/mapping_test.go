@@ -524,7 +524,7 @@ type keyboardAPI interface {
 	Down(key string) error
 	Up(key string) error
 	InsertText(char string)
-	Press(key string, opts goja.Value)
+	Press(key string, opts goja.Value) error
 	Type(text string, opts goja.Value)
 }
 

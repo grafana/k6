@@ -63,15 +63,17 @@ func (k *Keyboard) Up(key string) error {
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
 // A press message consists of successive key down and up messages.
-func (k *Keyboard) Press(key string, opts goja.Value) {
+func (k *Keyboard) Press(key string, opts goja.Value) error {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6ext.Panic(k.ctx, "parsing keyboard options: %w", err)
+		return fmt.Errorf("parsing keyboard options: %w", err)
 	}
 
 	if err := k.comboPress(key, kbdOpts); err != nil {
-		k6ext.Panic(k.ctx, "pressing key: %w", err)
+		return fmt.Errorf("pressing key: %w", err)
 	}
+
+	return nil
 }
 
 // InsertText inserts a text without dispatching key events.

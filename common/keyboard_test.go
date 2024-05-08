@@ -7,6 +7,7 @@ import (
 	"github.com/grafana/xk6-browser/keyboardlayout"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestSplit(t *testing.T) {
@@ -82,7 +83,7 @@ func TestKeyboardPress(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		k := NewKeyboard(vu.Context(), nil)
-		assert.Panics(t, func() { k.Press("", nil) })
+		require.Error(t, k.Press("", nil))
 	})
 }
 
