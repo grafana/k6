@@ -199,6 +199,12 @@ func TestMappings(t *testing.T) {
 				return mapTouchscreen(moduleVU{VU: vu}, &common.Touchscreen{})
 			},
 		},
+		"mapKeyboard": {
+			apiInterface: (*keyboardAPI)(nil),
+			mapp: func() mapping {
+				return mapKeyboard(moduleVU{VU: vu}, &common.Keyboard{})
+			},
+		},
 	} {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
@@ -514,15 +520,12 @@ type locatorAPI interface {
 }
 
 // keyboardAPI is the interface of a keyboard input device.
-// TODO: map this to page.GetKeyboard(). Currently, the common.Keyboard type
-// mapping is not tested using this interface. We use the concrete type
-// without testing its exported methods.
-type keyboardAPI interface { //nolint: unused
+type keyboardAPI interface {
 	Down(key string)
+	Up(key string)
 	InsertText(char string)
 	Press(key string, opts goja.Value)
 	Type(text string, opts goja.Value)
-	Up(key string)
 }
 
 // touchscreenAPI is the interface of a touchscreen.

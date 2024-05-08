@@ -98,7 +98,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"isEnabled":  p.IsEnabled,
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
-		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
+		"keyboard":   mapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts goja.Value) *goja.Object {
 			ml := mapLocator(vu, p.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
