@@ -525,7 +525,7 @@ type keyboardAPI interface {
 	Up(key string) error
 	InsertText(char string) error
 	Press(key string, opts goja.Value) error
-	Type(text string, opts goja.Value)
+	Type(text string, opts goja.Value) error
 }
 
 // touchscreenAPI is the interface of a touchscreen.

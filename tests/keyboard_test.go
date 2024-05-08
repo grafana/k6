@@ -41,7 +41,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("input", nil)
 
-		kb.Type("Hello World!", nil)
+		require.NoError(t, kb.Type("Hello World!", nil))
 		require.Equal(t, "Hello World!", el.InputValue(nil))
 
 		require.NoError(t, kb.Press("Backspace", nil))
@@ -114,7 +114,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
-		kb.Type("L+m+KeyN", nil)
+		require.NoError(t, kb.Type("L+m+KeyN", nil))
 		assert.Equal(t, "L+m+KeyN", el.InputValue(nil))
 	})
 
@@ -159,7 +159,7 @@ func TestKeyboardPress(t *testing.T) {
 		p.Focus("textarea", nil)
 
 		require.NoError(t, kb.Down("Shift"))
-		kb.Type("oPqR", nil)
+		require.NoError(t, kb.Type("oPqR", nil))
 		require.NoError(t, kb.Up("Shift"))
 
 		assert.Equal(t, "oPqR", el.InputValue(nil))
@@ -177,10 +177,10 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
-		kb.Type("Hello", nil)
+		require.NoError(t, kb.Type("Hello", nil))
 		require.NoError(t, kb.Press("Enter", nil))
 		require.NoError(t, kb.Press("Enter", nil))
-		kb.Type("World!", nil)
+		require.NoError(t, kb.Type("World!", nil))
 		assert.Equal(t, "Hello\n\nWorld!", el.InputValue(nil))
 	})
 
@@ -197,7 +197,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("input", nil)
 
-		kb.Type("Hello World!", nil)
+		require.NoError(t, kb.Type("Hello World!", nil))
 		require.Equal(t, "Hello World!", el.InputValue(nil))
 
 		require.NoError(t, kb.Press("ArrowLeft", nil))

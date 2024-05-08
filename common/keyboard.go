@@ -6,7 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/keyboardlayout"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -89,14 +88,15 @@ func (k *Keyboard) InsertText(text string) error {
 //
 // It sends an insertText message if a character is not among
 // valid characters in the keyboard's layout.
-func (k *Keyboard) Type(text string, opts goja.Value) {
+func (k *Keyboard) Type(text string, opts goja.Value) error {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6ext.Panic(k.ctx, "parsing keyboard options: %w", err)
+		return fmt.Errorf("parsing keyboard options: %w", err)
 	}
 	if err := k.typ(text, kbdOpts); err != nil {
-		k6ext.Panic(k.ctx, "typing text: %w", err)
+		return fmt.Errorf("typing text: %w", err)
 	}
+	return nil
 }
 
 func (k *Keyboard) down(key string) error {
