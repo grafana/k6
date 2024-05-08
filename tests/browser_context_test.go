@@ -659,7 +659,7 @@ func TestK6Object(t *testing.T) {
 			got, err := vu.TestRT.RunOnEventLoop(`
 				(async function() {
 					const p = await browser.newPage();
-					p.goto("about:blank");
+					await p.goto("about:blank");
 					const o = p.evaluate(() => window.k6);
 					return JSON.stringify(o);
 				})();
@@ -675,7 +675,7 @@ func TestK6Object(t *testing.T) {
 					await browser.closeContext();
 					const c = await browser.newContext();
 					const p2 = await c.newPage();
-					p2.goto("about:blank");
+					await p2.goto("about:blank");
 					const o2 = p2.evaluate(() => window.k6);
 					return JSON.stringify(o2);
 				})();
@@ -714,10 +714,10 @@ func TestNewTab(t *testing.T) {
 	_, err := vu.TestRT.RunOnEventLoop(fmt.Sprintf(`
 		(async function() {
 			const p = await browser.newPage()
-			p.goto("%s/%s/ping.html")
+			await p.goto("%s/%s/ping.html")
 
 			const p2 = browser.context().newPage()
-			p2.goto("%s/%s/ping.html")
+			await p2.goto("%s/%s/ping.html")
 		})()`, s.URL, testBrowserStaticDir, s.URL, testBrowserStaticDir))
 	require.NoError(t, err)
 }
