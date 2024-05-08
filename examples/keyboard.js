@@ -17,16 +17,17 @@ export default async function () {
   const page = await browser.newPage();
 
   await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
-    
+
   const userInput = page.locator('input[name="login"]');
   await userInput.click();
-  page.keyboard.type('admin');
-    
+  await page.keyboard.type("admin");
+
   const pwdInput = page.locator('input[name="password"]');
   await pwdInput.click();
-  page.keyboard.type('123');
+  await page.keyboard.type("123");
 
-  page.keyboard.press('Enter'); // submit
-    
-  await page.close();
+  await page.keyboard.press('Enter'); // submit
+  await page.waitForNavigation();
+
+  page.close();
 }
