@@ -136,12 +136,12 @@ func TestKeyboardPress(t *testing.T) {
 
 		kb.Down("Shift")
 		kb.Down("f")
-		kb.Up("f")
+		require.NoError(t, kb.Up("f"))
 		kb.Down("G")
-		kb.Up("G")
+		require.NoError(t, kb.Up("G"))
 		kb.Down("KeyH")
-		kb.Up("KeyH")
-		kb.Up("Shift")
+		require.NoError(t, kb.Up("KeyH"))
+		require.NoError(t, kb.Up("Shift"))
 
 		assert.Equal(t, "CdefGH", el.InputValue(nil))
 	})
@@ -160,7 +160,7 @@ func TestKeyboardPress(t *testing.T) {
 
 		kb.Down("Shift")
 		kb.Type("oPqR", nil)
-		kb.Up("Shift")
+		require.NoError(t, kb.Up("Shift"))
 
 		assert.Equal(t, "oPqR", el.InputValue(nil))
 	})

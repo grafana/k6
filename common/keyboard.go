@@ -52,10 +52,11 @@ func (k *Keyboard) Down(key string) {
 }
 
 // Up sends a key up message to a session target.
-func (k *Keyboard) Up(key string) {
+func (k *Keyboard) Up(key string) error {
 	if err := k.up(key); err != nil {
-		k6ext.Panic(k.ctx, "sending key up: %w", err)
+		return fmt.Errorf("sending key up: %w", err)
 	}
+	return nil
 }
 
 // Press sends a key press message to a session target.
