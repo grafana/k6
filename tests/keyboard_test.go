@@ -134,12 +134,12 @@ func TestKeyboardPress(t *testing.T) {
 		kb.Press("d", nil)
 		kb.Press("KeyE", nil)
 
-		kb.Down("Shift")
-		kb.Down("f")
+		require.NoError(t, kb.Down("Shift"))
+		require.NoError(t, kb.Down("f"))
 		require.NoError(t, kb.Up("f"))
-		kb.Down("G")
+		require.NoError(t, kb.Down("G"))
 		require.NoError(t, kb.Up("G"))
-		kb.Down("KeyH")
+		require.NoError(t, kb.Down("KeyH"))
 		require.NoError(t, kb.Up("KeyH"))
 		require.NoError(t, kb.Up("Shift"))
 
@@ -158,7 +158,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		p.Focus("textarea", nil)
 
-		kb.Down("Shift")
+		require.NoError(t, kb.Down("Shift"))
 		kb.Type("oPqR", nil)
 		require.NoError(t, kb.Up("Shift"))
 
@@ -202,7 +202,7 @@ func TestKeyboardPress(t *testing.T) {
 
 		kb.Press("ArrowLeft", nil)
 		// Should hold the key until Up() is called.
-		kb.Down("Shift")
+		require.NoError(t, kb.Down("Shift"))
 		for i := 0; i < len(" World"); i++ {
 			kb.Press("ArrowLeft", nil)
 		}

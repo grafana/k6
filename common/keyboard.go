@@ -45,10 +45,11 @@ func NewKeyboard(ctx context.Context, s session) *Keyboard {
 }
 
 // Down sends a key down message to a session target.
-func (k *Keyboard) Down(key string) {
+func (k *Keyboard) Down(key string) error {
 	if err := k.down(key); err != nil {
-		k6ext.Panic(k.ctx, "sending key down: %w", err)
+		return fmt.Errorf("sending key down: %w", err)
 	}
+	return nil
 }
 
 // Up sends a key up message to a session target.

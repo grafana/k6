@@ -521,7 +521,7 @@ type locatorAPI interface {
 
 // keyboardAPI is the interface of a keyboard input device.
 type keyboardAPI interface {
-	Down(key string)
+	Down(key string) error
 	Up(key string) error
 	InsertText(char string)
 	Press(key string, opts goja.Value)
