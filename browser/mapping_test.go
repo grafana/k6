@@ -523,7 +523,7 @@ type locatorAPI interface {
 type keyboardAPI interface {
 	Down(key string) error
 	Up(key string) error
-	InsertText(char string)
+	InsertText(char string) error
 	Press(key string, opts goja.Value) error
 	Type(text string, opts goja.Value)
 }

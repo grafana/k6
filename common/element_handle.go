@@ -271,7 +271,9 @@ func (h *ElementHandle) fill(_ context.Context, value string) error {
 	}
 
 	if s == resultNeedsInput {
-		h.frame.page.Keyboard.InsertText(value)
+		if err := h.frame.page.Keyboard.InsertText(value); err != nil {
+			return fmt.Errorf("fill: %w", err)
+		}
 	} else if s != resultDone {
 		// Either we're done or an error happened (returned as "error:..." from JS)
 		return errorFromDOMError(s)

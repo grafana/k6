@@ -77,10 +77,11 @@ func (k *Keyboard) Press(key string, opts goja.Value) error {
 }
 
 // InsertText inserts a text without dispatching key events.
-func (k *Keyboard) InsertText(text string) {
+func (k *Keyboard) InsertText(text string) error {
 	if err := k.insertText(text); err != nil {
-		k6ext.Panic(k.ctx, "inserting text: %w", err)
+		return fmt.Errorf("inserting text: %w", err)
 	}
+	return nil
 }
 
 // Type sends a press message to a session target for each character in text.
