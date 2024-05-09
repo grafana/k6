@@ -2,6 +2,7 @@ package k6test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 
 	"github.com/dop251/goja"
@@ -123,6 +124,49 @@ func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, op
 		Data: data,
 	})
 	require.NoError(tb, waitDone(context.Background()), "error waiting on %s done", eventName)
+}
+
+// RunOnEventLoop runs the given JavaScript code on the VU's event loop and
+// returns the result as a goja.Value.
+func (v *VU) RunOnEventLoop(tb testing.TB, js string, args ...any) (goja.Value, error) {
+	tb.Helper()
+
+	return v.TestRT.RunOnEventLoop(fmt.Sprintf(js, args...))
+}
+
+// RunAsync runs the given JavaScript code on the VU's event loop and returns
+// the result as a goja.Value.
+func (v *VU) RunAsync(tb testing.TB, js string, args ...any) (goja.Value, error) {
+	tb.Helper()
+
+	return v.RunOnEventLoop(tb, fmt.Sprintf("(async function() { "+js+" })();", args...))
+}
+
+// RunPromise runs the given JavaScript code on the VU's event loop and returns
+// the result as a *goja.Promise.
+func (v *VU) RunPromise(tb testing.TB, js string, args ...any) *goja.Promise {
+	tb.Helper()
+
+	gv, err := v.RunAsync(tb, js, args...)
+	require.NoError(tb, err, "running promise on event loop")
+	return ToPromise(tb, gv)
+}
+
+// SetVar sets a variable in the VU's Goja runtime's global scope.
+func (v *VU) SetVar(tb testing.TB, name string, value any) {
+	tb.Helper()
+
+	err := v.TestRT.VU.Runtime().GlobalObject().Set(name, value)
+	require.NoError(tb, err, "setting variable %q to %v", name, value)
+}
+
+// ToPromise asserts and returns a goja.Value as a *goja.Promise.
+func ToPromise(tb testing.TB, gv goja.Value) *goja.Promise {
+	tb.Helper()
+
+	p, ok := gv.Export().(*goja.Promise)
+	require.True(tb, ok, "got: %T, want *goja.Promise", gv.Export())
+	return p
 }
 
 // WithSamples is used to indicate we want to use a bidirectional channel
