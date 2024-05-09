@@ -543,7 +543,7 @@ type touchscreenAPI interface {
 type mouseAPI interface {
 	Click(x float64, y float64, opts goja.Value) error
 	DblClick(x float64, y float64, opts goja.Value) error
-	Down(opts goja.Value)
+	Down(opts goja.Value) error
 	Up(opts goja.Value)
 	Move(x float64, y float64, opts goja.Value)
 }

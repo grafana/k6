@@ -130,14 +130,15 @@ func (m *Mouse) DblClick(x float64, y float64, opts goja.Value) error {
 }
 
 // Down will trigger a MouseDown event in the browser.
-func (m *Mouse) Down(opts goja.Value) {
+func (m *Mouse) Down(opts goja.Value) error {
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse down options: %w", err)
+		return fmt.Errorf("parsing mouse down options: %w", err)
 	}
 	if err := m.down(mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "pressing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
+		return fmt.Errorf("pressing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
 	}
+	return nil
 }
 
 // Move will trigger a MouseMoved event in the browser.
