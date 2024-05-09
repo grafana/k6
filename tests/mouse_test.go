@@ -40,20 +40,31 @@ func TestMouseActions(t *testing.T) {
 		p := tb.NewPage(nil)
 		m := p.GetMouse()
 
-		// Set up a page with a button that changes text on double click
+		// Set up a page with a button that changes text on double click and also counts clicks
 		buttonHTML := `
-			<button ondblclick="this.innerHTML='Double Clicked!'">Click me</button>
+			<script>window.clickCount = 0;</script>
+			<button
+				onclick="document.getElementById('clicks').innerHTML = ++window.clickCount;"
+				ondblclick="this.innerHTML='Double Clicked!';">Click me</button>
+			<div id="clicks"></div>
 		`
 		p.SetContent(buttonHTML, nil)
 		button, err := p.Query("button")
 		require.NoError(t, err)
 
-		// Simulate a double click at the button coordinates
+		// Get the button's bounding box for accurate clicking
 		box := button.BoundingBox()
+
+		// Simulate a double click at the button coordinates
 		m.DblClick(box.X, box.Y, nil)
 
 		// Verify the button's text changed
 		assert.Equal(t, "Double Clicked!", button.TextContent())
+
+		// Also verify that the element was clicked twice
+		clickCountDiv, err := p.Query("div#clicks")
+		require.NoError(t, err)
+		assert.Equal(t, "2", clickCountDiv.TextContent())
 	})
 
 	t.Run("move", func(t *testing.T) {
