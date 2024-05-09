@@ -153,14 +153,15 @@ func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
 }
 
 // Up will trigger a MouseUp event in the browser.
-func (m *Mouse) Up(opts goja.Value) {
+func (m *Mouse) Up(opts goja.Value) error {
 	mouseOpts := NewMouseDownUpOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse up options: %w", err)
+		return fmt.Errorf("parsing mouse up options: %w", err)
 	}
 	if err := m.up(mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "releasing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
+		return fmt.Errorf("releasing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
 	}
+	return nil
 }
 
 // Wheel will trigger a MouseWheel event in the browser

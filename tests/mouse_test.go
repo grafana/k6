@@ -113,7 +113,7 @@ func TestMouseActions(t *testing.T) {
 		m.Move(box.X, box.Y, nil)
 		require.NoError(t, m.Down(nil))
 		assert.Equal(t, "Mouse Down", button.TextContent())
-		m.Up(nil)
+		require.NoError(t, m.Up(nil))
 		assert.Equal(t, "Mouse Up", button.TextContent())
 	})
 }
