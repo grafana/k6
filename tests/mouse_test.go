@@ -56,7 +56,7 @@ func TestMouseActions(t *testing.T) {
 		box := button.BoundingBox()
 
 		// Simulate a double click at the button coordinates
-		m.DblClick(box.X, box.Y, nil)
+		require.NoError(t, m.DblClick(box.X, box.Y, nil))
 
 		// Verify the button's text changed
 		assert.Equal(t, "Double Clicked!", button.TextContent())
