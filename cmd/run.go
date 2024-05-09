@@ -202,11 +202,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			})
 			if hsErr == nil {
 				hsErr = handleSummaryResult(c.gs.FS, c.gs.Stdout, c.gs.Stderr, summaryResult)
-				waitForSummaryGeneratedEvent := emitEvent(&event.Event{
-					Type: event.TestSummaryGenerated,
-					Data: &event.SummaryData{Summary: summaryResult},
-				})
-				waitForSummaryGeneratedEvent()
 			}
 			if hsErr != nil {
 				logger.WithError(hsErr).Error("failed to handle the end-of-test summary")
