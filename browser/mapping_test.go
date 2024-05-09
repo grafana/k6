@@ -545,7 +545,7 @@ type mouseAPI interface {
 	DblClick(x float64, y float64, opts goja.Value) error
 	Down(opts goja.Value) error
 	Up(opts goja.Value) error
-	Move(x float64, y float64, opts goja.Value)
+	Move(x float64, y float64, opts goja.Value) error
 }
 
 // workerAPI is the interface of a web worker.

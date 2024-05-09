@@ -87,7 +87,7 @@ func TestMouseActions(t *testing.T) {
 
 		// Simulate mouse move within the div
 		box := area.BoundingBox()
-		m.Move(box.X+50, box.Y+50, nil) // Move to the center of the div
+		require.NoError(t, m.Move(box.X+50, box.Y+50, nil)) // Move to the center of the div
 		assert.Equal(t, "Mouse Moved", area.TextContent())
 	})
 
@@ -110,7 +110,7 @@ func TestMouseActions(t *testing.T) {
 		require.NoError(t, err)
 
 		box := button.BoundingBox()
-		m.Move(box.X, box.Y, nil)
+		require.NoError(t, m.Move(box.X, box.Y, nil))
 		require.NoError(t, m.Down(nil))
 		assert.Equal(t, "Mouse Down", button.TextContent())
 		require.NoError(t, m.Up(nil))

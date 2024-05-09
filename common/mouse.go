@@ -8,8 +8,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
 	"github.com/dop251/goja"
-
-	"github.com/grafana/xk6-browser/k6ext"
 )
 
 // Mouse represents a mouse input device.
@@ -142,14 +140,15 @@ func (m *Mouse) Down(opts goja.Value) error {
 }
 
 // Move will trigger a MouseMoved event in the browser.
-func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
+func (m *Mouse) Move(x float64, y float64, opts goja.Value) error {
 	mouseOpts := NewMouseMoveOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse move options: %w", err)
+		return fmt.Errorf("parsing mouse move options: %w", err)
 	}
 	if err := m.move(x, y, mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "moving the mouse pointer to x:%f y:%f: %w", x, y, err)
+		return fmt.Errorf("moving the mouse pointer to x:%f y:%f: %w", x, y, err)
 	}
+	return nil
 }
 
 // Up will trigger a MouseUp event in the browser.
