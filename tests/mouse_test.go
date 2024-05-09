@@ -27,7 +27,7 @@ func TestMouseActions(t *testing.T) {
 
 		// Simulate a click at the button coordinates
 		box := button.BoundingBox()
-		m.Click(box.X, box.Y, nil)
+		require.NoError(t, m.Click(box.X, box.Y, nil))
 
 		// Verify the button's text changed
 		assert.Equal(t, "Clicked!", button.TextContent())

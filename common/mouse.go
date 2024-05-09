@@ -106,14 +106,15 @@ func (m *Mouse) up(opts *MouseDownUpOptions) error {
 }
 
 // Click will trigger a series of MouseMove, MouseDown and MouseUp events in the browser.
-func (m *Mouse) Click(x float64, y float64, opts goja.Value) {
+func (m *Mouse) Click(x float64, y float64, opts goja.Value) error {
 	mouseOpts := NewMouseClickOptions()
 	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse click options: %w", err)
+		return fmt.Errorf("parsing mouse click options: %w", err)
 	}
 	if err := m.click(x, y, mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "clicking on x:%f y:%f: %w", x, y, err)
+		return fmt.Errorf("clicking on x:%f y:%f: %w", x, y, err)
 	}
+	return nil
 }
 
 // DblClick will trigger Click twice in quick succession.
