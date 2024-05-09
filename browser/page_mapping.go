@@ -107,7 +107,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			mf := mapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
+		"mouse": mapMouse(vu, p.GetMouse()),
 		"on": func(event string, handler goja.Callable) error {
 			tq := vu.taskQueueRegistry.get(p.TargetID())
 

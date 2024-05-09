@@ -205,6 +205,12 @@ func TestMappings(t *testing.T) {
 				return mapKeyboard(moduleVU{VU: vu}, &common.Keyboard{})
 			},
 		},
+		"mapMouse": {
+			apiInterface: (*mouseAPI)(nil),
+			mapp: func() mapping {
+				return mapMouse(moduleVU{VU: vu}, &common.Mouse{})
+			},
+		},
 	} {
 		tt := tt
 		t.Run(name, func(t *testing.T) {
@@ -534,15 +540,12 @@ type touchscreenAPI interface {
 }
 
 // mouseAPI is the interface of a mouse input device.
-// TODO: map this to page.GetMouse(). Currently, the common.Mouse type
-// mapping is not tested using this interface. We use the concrete type
-// without testing its exported methods.
-type mouseAPI interface { //nolint: unused
+type mouseAPI interface {
 	Click(x float64, y float64, opts goja.Value)
 	DblClick(x float64, y float64, opts goja.Value)
-	Down(x float64, y float64, opts goja.Value)
+	Down(opts goja.Value)
+	Up(opts goja.Value)
 	Move(x float64, y float64, opts goja.Value)
-	Up(x float64, y float64, opts goja.Value)
 	// Wheel(opts goja.Value)
 }
 
