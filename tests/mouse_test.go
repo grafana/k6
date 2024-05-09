@@ -5,30 +5,104 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-
-	"github.com/grafana/xk6-browser/common"
 )
 
-func TestMouseDblClick(t *testing.T) {
+func TestMouseActions(t *testing.T) {
 	t.Parallel()
 
-	b := newTestBrowser(t, withFileServer())
-	p := b.NewPage(nil)
-	opts := &common.FrameGotoOptions{
-		Timeout: common.DefaultTimeout,
-	}
-	_, err := p.Goto(
-		b.staticURL("dbl_click.html"),
-		opts,
-	)
-	require.NoError(t, err)
+	t.Run("click", func(t *testing.T) {
+		t.Parallel()
 
-	p.Mouse.DblClick(35, 17, nil)
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		m := p.GetMouse()
 
-	v := p.Evaluate(`() => window.dblclick`)
-	bv := asBool(t, v)
-	assert.True(t, bv, "failed to double click the link")
+		// Set up a page with a button that changes text when clicked
+		buttonHTML := `
+			<button onclick="this.innerHTML='Clicked!'">Click me</button>
+		`
+		p.SetContent(buttonHTML, nil)
+		button, err := p.Query("button")
+		require.NoError(t, err)
 
-	got := p.InnerText("#counter", nil)
-	assert.Equal(t, "2", got)
+		// Simulate a click at the button coordinates
+		box := button.BoundingBox()
+		m.Click(box.X, box.Y, nil)
+
+		// Verify the button's text changed
+		assert.Equal(t, "Clicked!", button.TextContent())
+	})
+
+	t.Run("double_click", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		m := p.GetMouse()
+
+		// Set up a page with a button that changes text on double click
+		buttonHTML := `
+			<button ondblclick="this.innerHTML='Double Clicked!'">Click me</button>
+		`
+		p.SetContent(buttonHTML, nil)
+		button, err := p.Query("button")
+		require.NoError(t, err)
+
+		// Simulate a double click at the button coordinates
+		box := button.BoundingBox()
+		m.DblClick(box.X, box.Y, nil)
+
+		// Verify the button's text changed
+		assert.Equal(t, "Double Clicked!", button.TextContent())
+	})
+
+	t.Run("move", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		m := p.GetMouse()
+
+		// Set up a page with an area that detects mouse move
+		areaHTML := `
+			<div
+				onmousemove="this.innerHTML='Mouse Moved';"
+				style="width:100px;height:100px;"
+			></div>
+		`
+		p.SetContent(areaHTML, nil)
+		area, err := p.Query("div")
+		require.NoError(t, err)
+
+		// Simulate mouse move within the div
+		box := area.BoundingBox()
+		m.Move(box.X+50, box.Y+50, nil) // Move to the center of the div
+		assert.Equal(t, "Mouse Moved", area.TextContent())
+	})
+
+	t.Run("move_down_up", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		m := p.GetMouse()
+
+		// Set up a page with a button that tracks mouse down and up
+		buttonHTML := `
+			<button
+				onmousedown="this.innerHTML='Mouse Down';"
+				onmouseup="this.innerHTML='Mouse Up';"
+			>Mouse</button>
+		`
+		p.SetContent(buttonHTML, nil)
+		button, err := p.Query("button")
+		require.NoError(t, err)
+
+		box := button.BoundingBox()
+		m.Move(box.X, box.Y, nil)
+		m.Down(nil)
+		assert.Equal(t, "Mouse Down", button.TextContent())
+		m.Up(nil)
+		assert.Equal(t, "Mouse Up", button.TextContent())
+	})
 }
