@@ -49,13 +49,10 @@ func TestBrowserTypeLaunchToConnect(t *testing.T) {
 	vu.ActivateVU()
 	vu.StartIteration(t)
 
-	rt := vu.Runtime()
-	require.NoError(t, rt.Set("browser", jsMod.Browser))
-	_, err := vu.TestRT.RunOnEventLoop(`
-		(async function() {
-			const p = await browser.newPage();
-			p.close();
-		})();
+	vu.SetVar(t, "browser", jsMod.Browser)
+	_, err := vu.RunAsync(t, `
+		const p = await browser.newPage();
+		p.close();
 	`)
 	require.NoError(t, err)
 
