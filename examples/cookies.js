@@ -23,7 +23,7 @@ export default async function () {
 
   try {
     // get cookies from the browser context
-    check(context.cookies().length, {
+    check((await context.cookies()).length, {
         'initial number of cookies should be zero': n => n === 0,
     });
 
@@ -62,7 +62,7 @@ export default async function () {
         expires: dayBefore
       }
     ]);
-    let cookies = context.cookies();
+    let cookies = await context.cookies();
     check(cookies.length, {
       'number of cookies should be 2': n => n === 2,
     });
@@ -102,7 +102,7 @@ export default async function () {
         url: 'https://baz.com'
       }
     ]);
-    cookies = context.cookies('http://foo.com', 'https://baz.com');
+    cookies = await context.cookies("http://foo.com", "https://baz.com");
     check(cookies.length, {
       'number of filtered cookies should be 2': n => n === 2,
     });
@@ -117,7 +117,7 @@ export default async function () {
 
     // clear cookies
     context.clearCookies();
-    cookies = context.cookies();
+    cookies = await context.cookies();
     check(cookies.length, {
       'number of cookies should be zero': n => n === 0,
     });

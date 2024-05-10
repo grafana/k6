@@ -43,7 +43,7 @@ export default async function() {
     });
 
     // Check whether we receive cookies from the logged site.
-    check(context.cookies(), {
+    check(await context.cookies(), {
       'session cookie is set': cookies => {
         const sessionID = cookies.find(c => c.name == 'sid')
         return typeof sessionID !== 'undefined'
