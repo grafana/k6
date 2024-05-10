@@ -704,7 +704,7 @@ func TestNewTab(t *testing.T) {
 		const p = await browser.newPage()
 		await p.goto("%s/%s/ping.html")
 
-		const p2 = browser.context().newPage()
+		const p2 = await browser.context().newPage()
 		await p2.goto("%s/%s/ping.html")
 	`, s.URL, testBrowserStaticDir, s.URL, testBrowserStaticDir)
 	require.NoError(t, err)

@@ -124,12 +124,14 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 
 			return rt.ToValue(mpages).ToObject(rt)
 		},
-		"newPage": func() (mapping, error) {
-			page, err := bc.NewPage()
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapPage(vu, page), nil
+		"newPage": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				page, err := bc.NewPage()
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapPage(vu, page), nil
+			})
 		},
 	}
 }
