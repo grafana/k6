@@ -277,7 +277,7 @@ type browserContextAPI interface {
 	AddInitScript(script goja.Value, arg goja.Value) error
 	Browser() *common.Browser
 	ClearCookies() error
-	ClearPermissions()
+	ClearPermissions() error
 	Close() error
 	Cookies(urls ...string) ([]*common.Cookie, error)
 	GrantPermissions(permissions []string, opts goja.Value)
