@@ -32,7 +32,7 @@ export default async function () {
     const day = 60*60*24;
     const dayAfter = unixTimeSinceEpoch+day;
     const dayBefore = unixTimeSinceEpoch-day;
-    context.addCookies([
+    await context.addCookies([
       // this cookie expires at the end of the session
       {
         name: 'testcookie',
@@ -82,25 +82,25 @@ export default async function () {
     });
 
     // let's add more cookies to filter by urls.
-    context.addCookies([
+    await context.addCookies([
       {
-        name: 'foo',
-        value: '42',
-        sameSite: 'Strict',
-        url: 'http://foo.com'
+        name: "foo",
+        value: "42",
+        sameSite: "Strict",
+        url: "http://foo.com",
       },
       {
-        name: 'bar',
-        value: '43',
-        sameSite: 'Lax',
-        url: 'https://bar.com'
+        name: "bar",
+        value: "43",
+        sameSite: "Lax",
+        url: "https://bar.com",
       },
       {
-        name: 'baz',
-        value: '44',
-        sameSite: 'Lax',
-        url: 'https://baz.com'
-      }
+        name: "baz",
+        value: "44",
+        sameSite: "Lax",
+        url: "https://baz.com",
+      },
     ]);
     cookies = await context.cookies("http://foo.com", "https://baz.com");
     check(cookies.length, {
