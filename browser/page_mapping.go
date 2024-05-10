@@ -35,8 +35,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			return p.Close(opts) //nolint:wrapcheck
 		},
-		"content":  p.Content,
-		"context":  p.Context,
+		"content": p.Content,
+		"context": func() mapping {
+			return mapBrowserContext(vu, p.Context())
+		},
 		"dblclick": p.Dblclick,
 		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) error {
 			popts := common.NewFrameDispatchEventOptions(p.Timeout())
