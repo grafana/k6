@@ -280,7 +280,7 @@ type browserContextAPI interface {
 	ClearPermissions() error
 	Close() error
 	Cookies(urls ...string) ([]*common.Cookie, error)
-	GrantPermissions(permissions []string, opts goja.Value)
+	GrantPermissions(permissions []string, opts goja.Value) error
 	NewPage() (*common.Page, error)
 	Pages() []*common.Page
 	SetDefaultNavigationTimeout(timeout int64)
