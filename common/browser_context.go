@@ -260,20 +260,22 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 // SetGeolocation overrides the geo location of the user.
-func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
+func (b *BrowserContext) SetGeolocation(geolocation goja.Value) error {
 	b.logger.Debugf("BrowserContext:SetGeolocation", "bctxid:%v", b.id)
 
 	g := NewGeolocation()
 	if err := g.Parse(b.ctx, geolocation); err != nil {
-		k6ext.Panic(b.ctx, "parsing geo location: %v", err)
+		return fmt.Errorf("parsing geo location: %w", err)
 	}
 
 	b.opts.Geolocation = g
 	for _, p := range b.browser.getPages() {
 		if err := p.updateGeolocation(); err != nil {
-			k6ext.Panic(b.ctx, "updating geo location in target ID %s: %w", p.targetID, err)
+			return fmt.Errorf("updating geo location in target ID %s: %w", p.targetID, err)
 		}
 	}
+
+	return nil
 }
 
 // SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
