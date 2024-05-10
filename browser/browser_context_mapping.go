@@ -16,32 +16,34 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies": bc.AddCookies,
-		"addInitScript": func(script goja.Value) error {
-			if !gojaValueExists(script) {
-				return nil
-			}
+		"addInitScript": func(script goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				if !gojaValueExists(script) {
+					return nil, nil
+				}
 
-			source := ""
-			switch script.ExportType() {
-			case reflect.TypeOf(string("")):
-				source = script.String()
-			case reflect.TypeOf(goja.Object{}):
-				opts := script.ToObject(rt)
-				for _, k := range opts.Keys() {
-					if k == "content" {
-						source = opts.Get(k).String()
+				source := ""
+				switch script.ExportType() {
+				case reflect.TypeOf(string("")):
+					source = script.String()
+				case reflect.TypeOf(goja.Object{}):
+					opts := script.ToObject(rt)
+					for _, k := range opts.Keys() {
+						if k == "content" {
+							source = opts.Get(k).String()
+						}
+					}
+				default:
+					_, isCallable := goja.AssertFunction(script)
+					if !isCallable {
+						source = fmt.Sprintf("(%s);", script.ToString().String())
+					} else {
+						source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
 					}
 				}
-			default:
-				_, isCallable := goja.AssertFunction(script)
-				if !isCallable {
-					source = fmt.Sprintf("(%s);", script.ToString().String())
-				} else {
-					source = fmt.Sprintf("(%s)(...args);", script.ToString().String())
-				}
-			}
 
-			return bc.AddInitScript(source) //nolint:wrapcheck
+				return nil, bc.AddInitScript(source) //nolint:wrapcheck
+			})
 		},
 		"browser": func() mapping {
 			// the browser is grabbed from VU.
