@@ -554,8 +554,7 @@ func (b *Browser) CloseContext() error {
 	if b.context == nil {
 		return errors.New("cannot close context as none is active in browser")
 	}
-	b.context.Close()
-	return nil
+	return b.context.Close()
 }
 
 // Context returns the current browser context or nil.

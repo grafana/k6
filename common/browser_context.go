@@ -161,15 +161,16 @@ func (b *BrowserContext) ClearPermissions() error {
 }
 
 // Close shuts down the browser context.
-func (b *BrowserContext) Close() {
+func (b *BrowserContext) Close() error {
 	b.logger.Debugf("BrowserContext:Close", "bctxid:%v", b.id)
 
 	if b.id == "" {
-		k6ext.Panic(b.ctx, "default browser context can't be closed")
+		return fmt.Errorf("default browser context can't be closed")
 	}
 	if err := b.browser.disposeContext(b.id); err != nil {
-		k6ext.Panic(b.ctx, "disposing browser context: %w", err)
+		return fmt.Errorf("disposing browser context: %w", err)
 	}
+	return nil
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.

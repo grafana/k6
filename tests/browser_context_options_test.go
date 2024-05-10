@@ -60,7 +60,11 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 		},
 	}))
 	require.NoError(t, err)
-	t.Cleanup(bctx.Close)
+	t.Cleanup(func() {
+		if err := bctx.Close(); err != nil {
+			t.Log("closing browser context:", err)
+		}
+	})
 	p, err := bctx.NewPage()
 	require.NoError(t, err)
 
@@ -81,7 +85,11 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 		},
 	}))
 	require.NoError(t, err)
-	t.Cleanup(bctx.Close)
+	t.Cleanup(func() {
+		if err := bctx.Close(); err != nil {
+			t.Log("closing browser context:", err)
+		}
+	})
 	p, err := bctx.NewPage()
 	require.NoError(t, err)
 

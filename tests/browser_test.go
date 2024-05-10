@@ -41,7 +41,7 @@ func TestBrowserNewPage(t *testing.T) {
 	_, err = b.Browser.NewPage(nil)
 	assert.EqualError(t, err, "new page: existing browser context must be closed before creating a new one")
 
-	b.Context().Close()
+	require.NoError(t, b.Context().Close())
 	c = b.Context()
 	assert.Nil(t, c)
 
@@ -62,7 +62,7 @@ func TestBrowserNewContext(t *testing.T) {
 	_, err = b.NewContext(nil)
 	assert.EqualError(t, err, "existing browser context must be closed before creating a new one")
 
-	bc1.Close()
+	require.NoError(t, bc1.Close())
 	c = b.Context()
 	assert.Nil(t, c)
 
@@ -340,7 +340,7 @@ func TestMultiConnectToSingleBrowser(t *testing.T) {
 
 	err = p1.Close(nil)
 	require.NoError(t, err, "failed to close page #1")
-	bctx1.Close()
+	require.NoError(t, bctx1.Close())
 
 	p2, err := bctx2.NewPage()
 	require.NoError(t, err, "failed to create page #2")

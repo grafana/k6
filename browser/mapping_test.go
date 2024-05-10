@@ -278,7 +278,7 @@ type browserContextAPI interface {
 	Browser() *common.Browser
 	ClearCookies() error
 	ClearPermissions()
-	Close()
+	Close() error
 	Cookies(urls ...string) ([]*common.Cookie, error)
 	GrantPermissions(permissions []string, opts goja.Value)
 	NewPage() (*common.Page, error)
