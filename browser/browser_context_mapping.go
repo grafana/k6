@@ -60,7 +60,11 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
 		"setGeolocation":              bc.SetGeolocation,
-		"setHTTPCredentials":          bc.SetHTTPCredentials, //nolint:staticcheck
+		"setHTTPCredentials": func(httpCredentials goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, bc.SetHTTPCredentials(httpCredentials) //nolint:staticcheck,wrapcheck
+			})
+		},
 		"setOffline": func(offline bool) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.SetOffline(offline) //nolint:wrapcheck
