@@ -116,7 +116,7 @@ export default async function () {
     });
 
     // clear cookies
-    context.clearCookies();
+    await context.clearCookies();
     cookies = await context.cookies();
     check(cookies.length, {
       'number of cookies should be zero': n => n === 0,
