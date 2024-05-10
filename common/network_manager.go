@@ -732,9 +732,9 @@ func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
 }
 
 // SetOfflineMode toggles offline mode on/off.
-func (m *NetworkManager) SetOfflineMode(offline bool) {
+func (m *NetworkManager) SetOfflineMode(offline bool) error {
 	if m.offline == offline {
-		return
+		return nil
 	}
 	m.offline = offline
 
@@ -745,8 +745,10 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 		m.networkProfile.Upload,
 	)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "setting offline mode: %w", err)
+		return fmt.Errorf("emulating network conditions: %w", err)
 	}
+
+	return nil
 }
 
 // ThrottleNetwork changes the network attributes in chrome to simulate slower

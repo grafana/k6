@@ -572,15 +572,19 @@ func (p *Page) updateGeolocation() error {
 	return nil
 }
 
-func (p *Page) updateOffline() {
+func (p *Page) updateOffline() error {
 	p.logger.Debugf("Page:updateOffline", "sid:%v", p.sessionID())
 
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
-		fs.updateOffline(false)
+		if err := fs.updateOffline(false); err != nil {
+			return fmt.Errorf("updating page frame sessions to offline: %w", err)
+		}
 	}
+
+	return nil
 }
 
 func (p *Page) updateHTTPCredentials() error {

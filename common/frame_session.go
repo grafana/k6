@@ -524,7 +524,9 @@ func (fs *FrameSession) initOptions() error {
 		return err
 	}
 
-	fs.updateOffline(true)
+	if err := fs.updateOffline(true); err != nil {
+		return err
+	}
 	if err := fs.updateHTTPCredentials(true); err != nil {
 		return err
 	}
@@ -1104,13 +1106,17 @@ func (fs *FrameSession) updateHTTPCredentials(initial bool) error {
 	return nil
 }
 
-func (fs *FrameSession) updateOffline(initial bool) {
+func (fs *FrameSession) updateOffline(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateOffline", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	offline := fs.page.browserCtx.opts.Offline
 	if !initial || offline {
-		fs.networkManager.SetOfflineMode(offline)
+		if err := fs.networkManager.SetOfflineMode(offline); err != nil {
+			return fmt.Errorf("updating offline mode for frame %v: %w", fs.targetID, err)
+		}
 	}
+
+	return nil
 }
 
 func (fs *FrameSession) throttleNetwork(networkProfile NetworkProfile) error {

@@ -305,13 +305,20 @@ func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) error {
 }
 
 // SetOffline toggles the browser's connectivity on/off.
-func (b *BrowserContext) SetOffline(offline bool) {
+func (b *BrowserContext) SetOffline(offline bool) error {
 	b.logger.Debugf("BrowserContext:SetOffline", "bctxid:%v offline:%t", b.id, offline)
 
 	b.opts.Offline = offline
 	for _, p := range b.browser.getPages() {
-		p.updateOffline()
+		if err := p.updateOffline(); err != nil {
+			return fmt.Errorf(
+				"setting offline status to %t for the browser context ID %s: %w",
+				offline, b.id, err,
+			)
+		}
 	}
+
+	return nil
 }
 
 // Timeout will return the default timeout or the one set by the user.
