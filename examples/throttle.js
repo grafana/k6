@@ -40,7 +40,7 @@ export const options = {
 
 export async function normal() {
   const context = await browser.newContext();
-  const page = context.newPage();
+  const page = await context.newPage();
 
   try {
     await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
@@ -51,7 +51,7 @@ export async function normal() {
 
 export async function networkThrottled() {
   const context = await browser.newContext();
-  const page = context.newPage();
+  const page = await context.newPage();
 
   try {
     page.throttleNetwork(networkProfiles['Slow 3G']);
@@ -64,7 +64,7 @@ export async function networkThrottled() {
 
 export async function cpuThrottled() {
   const context = await browser.newContext();
-  const page = context.newPage();
+  const page = await context.newPage();
 
   try {
     page.throttleCPU({ rate: 4 });

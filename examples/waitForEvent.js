@@ -26,8 +26,8 @@ export default async function() {
   } })
   
   // Now we create two pages.
-  const page = context.newPage()
-  const page2 = context.newPage()
+  const page = await context.newPage();
+  const page2 = await context.newPage();
 
   // We await for the page creation events to be processed and the predicate
   // to pass.

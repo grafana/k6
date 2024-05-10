@@ -23,7 +23,7 @@ export default async function() {
     permissions: ["camera", "microphone"],
   });
 
-  const page = context.newPage();
+  const page = await context.newPage();
 
   try {
     await page.goto('https://test.k6.io/');

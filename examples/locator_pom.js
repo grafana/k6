@@ -58,7 +58,7 @@ export class Bet {
 
 export default async function() {
   const context = await browser.newContext();
-  const page = context.newPage();
+  const page = await context.newPage();
 
   const bet = new Bet(page);
   try {

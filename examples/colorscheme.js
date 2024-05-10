@@ -24,7 +24,7 @@ export default async function() {
     // valid values are "light", "dark" or "no-preference"
     colorScheme: preferredColorScheme,
   });
-  const page = context.newPage();
+  const page = await context.newPage();
 
   try {
     await page.goto(

@@ -24,7 +24,7 @@ export default async function() {
   // See https://github.com/grafana/k6/issues/2296
   const options = Object.assign({ locale: 'es-ES' }, device);
   const context = await browser.newContext(options);
-  const page = context.newPage();
+  const page = await context.newPage();
 
   try {
     await page.goto('https://k6.io/', { waitUntil: 'networkidle' });

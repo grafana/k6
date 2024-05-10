@@ -20,7 +20,7 @@ export const options = {
 
 export default async function() {
   const context = await browser.newContext();
-  const page = context.newPage();
+  const page = await context.newPage();
 
   try {
     const res = await page.goto('http://test.k6.io/', { waitUntil: 'load' });
