@@ -49,7 +49,11 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		},
 		"clearCookies":     bc.ClearCookies,
 		"clearPermissions": bc.ClearPermissions,
-		"close":            bc.Close,
+		"close": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, bc.Close() //nolint:wrapcheck
+			})
+		},
 		"cookies": func(urls ...string) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return bc.Cookies(urls...) //nolint:wrapcheck
