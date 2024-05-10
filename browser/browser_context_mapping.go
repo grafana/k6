@@ -51,11 +51,13 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		"clearPermissions": bc.ClearPermissions,
 		"close":            bc.Close,
 		"cookies":          bc.Cookies,
-		"grantPermissions": func(permissions []string, opts goja.Value) error {
-			pOpts := common.NewGrantPermissionsOptions()
-			pOpts.Parse(vu.Context(), opts)
+		"grantPermissions": func(permissions []string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				popts := common.NewGrantPermissionsOptions()
+				popts.Parse(vu.Context(), opts)
 
-			return bc.GrantPermissions(permissions, pOpts) //nolint:wrapcheck
+				return nil, bc.GrantPermissions(permissions, popts) //nolint:wrapcheck
+			})
 		},
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
