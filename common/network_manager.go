@@ -705,14 +705,16 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 }
 
 // Authenticate sets HTTP authentication credentials to use.
-func (m *NetworkManager) Authenticate(credentials *Credentials) {
+func (m *NetworkManager) Authenticate(credentials *Credentials) error {
 	m.credentials = credentials
 	if credentials != nil {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
-		k6ext.Panic(m.ctx, "setting authentication credentials: %w", err)
+		return fmt.Errorf("setting authentication credentials: %w", err)
 	}
+
+	return nil
 }
 
 // ExtraHTTPHeaders returns the currently set extra HTTP request headers.

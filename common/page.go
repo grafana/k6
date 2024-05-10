@@ -583,15 +583,19 @@ func (p *Page) updateOffline() {
 	}
 }
 
-func (p *Page) updateHttpCredentials() {
+func (p *Page) updateHTTPCredentials() error {
 	p.logger.Debugf("Page:updateHttpCredentials", "sid:%v", p.sessionID())
 
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
-		fs.updateHTTPCredentials(false)
+		if err := fs.updateHTTPCredentials(false); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func (p *Page) viewportSize() Size {

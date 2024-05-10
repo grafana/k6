@@ -284,20 +284,24 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) error {
 // See for details:
 // - https://github.com/microsoft/playwright/issues/2196#issuecomment-627134837
 // - https://github.com/microsoft/playwright/pull/2763
-func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
+func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) error {
 	b.logger.Warnf("setHTTPCredentials", "setHTTPCredentials is deprecated."+
 		" Create a new BrowserContext with httpCredentials instead.")
 	b.logger.Debugf("BrowserContext:SetHTTPCredentials", "bctxid:%v", b.id)
 
 	c := NewCredentials()
 	if err := c.Parse(b.ctx, httpCredentials); err != nil {
-		k6ext.Panic(b.ctx, "setting HTTP credentials: %w", err)
+		return fmt.Errorf("parsing HTTP credentials: %w", err)
 	}
 
 	b.opts.HttpCredentials = c
 	for _, p := range b.browser.getPages() {
-		p.updateHttpCredentials()
+		if err := p.updateHTTPCredentials(); err != nil {
+			return fmt.Errorf("setting HTTP credentials in target ID %s: %w", p.targetID, err)
+		}
 	}
+
+	return nil
 }
 
 // SetOffline toggles the browser's connectivity on/off.
