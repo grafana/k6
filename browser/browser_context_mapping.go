@@ -43,7 +43,10 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 
 			return bc.AddInitScript(source) //nolint:wrapcheck
 		},
-		"browser":          bc.Browser,
+		"browser": func() mapping {
+			// the browser is grabbed from VU.
+			return mapBrowser(vu)
+		},
 		"clearCookies":     bc.ClearCookies,
 		"clearPermissions": bc.ClearPermissions,
 		"close":            bc.Close,
