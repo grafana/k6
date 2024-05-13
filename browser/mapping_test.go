@@ -502,7 +502,7 @@ type locatorAPI interface {
 	Click(opts goja.Value) error
 	Dblclick(opts goja.Value) error
 	Check(opts goja.Value) error
-	Uncheck(opts goja.Value)
+	Uncheck(opts goja.Value) error
 	IsChecked(opts goja.Value) bool
 	IsEditable(opts goja.Value) bool
 	IsEnabled(opts goja.Value) bool

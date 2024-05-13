@@ -42,14 +42,14 @@ func TestLocator(t *testing.T) {
 					require.False(t, check(), "should be unchecked first")
 					require.NoError(t, l.Check(nil))
 					require.True(t, check(), "cannot not check the input box")
-					l.Uncheck(nil)
+					require.NoError(t, l.Uncheck(nil))
 					require.False(t, check(), "cannot not uncheck the input box")
 				})
 				t.Run("is_checked", func(t *testing.T) {
 					l := p.Locator("#inputCheckbox", nil)
 					require.NoError(t, l.Check(nil))
 					require.True(t, l.IsChecked(nil))
-					l.Uncheck(nil)
+					require.NoError(t, l.Uncheck(nil))
 					require.False(t, l.IsChecked(nil))
 				})
 			},
@@ -366,7 +366,12 @@ func TestLocator(t *testing.T) {
 			"TextContent", func(l *common.Locator, tb *testBrowser) { l.TextContent(timeout(tb)) },
 		},
 		{
-			"Uncheck", func(l *common.Locator, tb *testBrowser) { l.Uncheck(timeout(tb)) },
+			"Uncheck", func(l *common.Locator, tb *testBrowser) {
+				if err := l.Uncheck(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"WaitFor", func(l *common.Locator, tb *testBrowser) { l.WaitFor(timeout(tb)) },
