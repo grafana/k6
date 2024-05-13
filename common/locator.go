@@ -155,19 +155,19 @@ func (l *Locator) uncheck(opts *FrameUncheckOptions) error {
 
 // IsChecked returns true if the element matches the locator's
 // selector and is checked. Otherwise, returns false.
-func (l *Locator) IsChecked(opts goja.Value) bool {
+func (l *Locator) IsChecked(opts goja.Value) (bool, error) {
 	l.log.Debugf("Locator:IsChecked", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameIsCheckedOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing is checked options: %w", err)
+		return false, fmt.Errorf("parsing is checked options: %w", err)
 	}
 	checked, err := l.isChecked(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "checking is %q checked: %w", l.selector, err)
+		return false, fmt.Errorf("checking is %q checked: %w", l.selector, err)
 	}
 
-	return checked
+	return checked, nil
 }
 
 // isChecked is like IsChecked but takes parsed options and does not

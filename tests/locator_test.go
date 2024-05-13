@@ -48,9 +48,14 @@ func TestLocator(t *testing.T) {
 				t.Run("is_checked", func(t *testing.T) {
 					l := p.Locator("#inputCheckbox", nil)
 					require.NoError(t, l.Check(nil))
-					require.True(t, l.IsChecked(nil))
+					checked, err := l.IsChecked(nil)
+					require.NoError(t, err)
+					require.True(t, checked)
+
 					require.NoError(t, l.Uncheck(nil))
-					require.False(t, l.IsChecked(nil))
+					checked, err = l.IsChecked(nil)
+					require.NoError(t, err)
+					require.False(t, checked)
 				})
 			},
 		},
@@ -480,7 +485,12 @@ func TestLocatorElementState(t *testing.T) {
 		do   func(*common.Locator, *testBrowser)
 	}{
 		{
-			"IsChecked", func(l *common.Locator, tb *testBrowser) { l.IsChecked(timeout(tb)) },
+			"IsChecked", func(l *common.Locator, tb *testBrowser) {
+				if _, err := l.IsChecked(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"IsEditable", func(l *common.Locator, tb *testBrowser) { l.IsEditable(timeout(tb)) },
