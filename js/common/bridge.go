@@ -3,8 +3,6 @@ package common
 import (
 	"reflect"
 	"strings"
-
-	"github.com/serenize/snaker"
 )
 
 // if a fieldName is the key of this map exactly than the value for the given key should be used as
@@ -36,8 +34,11 @@ func FieldName(_ reflect.Type, f reflect.StructField) string {
 		return exception
 	}
 
+	// lxd: use camelCase for fields that start with a lowercase letter
+	return strings.ToLower(f.Name[0:1]) + f.Name[1:]
+
 	// Default to lowercasing the first character of the field name.
-	return snaker.CamelToSnake(f.Name)
+	//return snaker.CamelToSnake(f.Name)
 }
 
 // if a methodName is the key of this map exactly than the value for the given key should be used as
