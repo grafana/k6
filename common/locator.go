@@ -301,21 +301,20 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 }
 
 // Focus on the element using locator's selector with strict mode on.
-func (l *Locator) Focus(opts goja.Value) {
+func (l *Locator) Focus(opts goja.Value) error {
 	l.log.Debugf("Locator:Focus", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing focus options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing focus options: %w", err)
 	}
-	if err = l.focus(copts); err != nil {
-		err = fmt.Errorf("focusing on %q: %w", l.selector, err)
-		return
+	if err := l.focus(copts); err != nil {
+		return fmt.Errorf("focusing on %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) focus(opts *FrameBaseOptions) error {

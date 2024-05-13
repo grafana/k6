@@ -130,16 +130,16 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Focus", func(tb *testBrowser, p *common.Page) {
+			"Focus", func(_ *testBrowser, p *common.Page) {
 				focused := func() bool {
 					v := p.Evaluate(
 						`() => document.activeElement == document.getElementById('inputText')`,
 					)
 					return asBool(t, v)
 				}
-				l := p.Locator("#inputText", nil)
+				lo := p.Locator("#inputText", nil)
 				require.False(t, focused(), "should not be focused first")
-				l.Focus(nil)
+				require.NoError(t, lo.Focus(nil))
 				require.True(t, focused(), "should be focused")
 			},
 		},
@@ -327,7 +327,12 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Focus", func(l *common.Locator, tb *testBrowser) { l.Focus(timeout(tb)) },
+			"Focus", func(l *common.Locator, tb *testBrowser) {
+				if err := l.Focus(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"Fill", func(l *common.Locator, tb *testBrowser) {
