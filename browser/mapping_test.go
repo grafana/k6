@@ -500,7 +500,7 @@ type responseAPI interface {
 type locatorAPI interface {
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts goja.Value) error
-	Dblclick(opts goja.Value)
+	Dblclick(opts goja.Value) error
 	Check(opts goja.Value)
 	Uncheck(opts goja.Value)
 	IsChecked(opts goja.Value) bool

@@ -77,10 +77,12 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"DblClick", func(tb *testBrowser, p *common.Page) {
-				p.Locator("#linkdbl", nil).Dblclick(nil)
+			"Dblclick", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#linkdbl", nil)
+				require.NoError(t, lo.Dblclick(nil))
+
 				v := p.Evaluate(`() => window.dblclick`)
-				require.True(t, asBool(t, v), "cannot not double click the link")
+				require.True(t, asBool(t, v), "cannot double click the link")
 			},
 		},
 		{
@@ -295,7 +297,12 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Dblclick", func(l *common.Locator, tb *testBrowser) { l.Dblclick(timeout(tb)) },
+			"Dblclick", func(l *common.Locator, tb *testBrowser) {
+				if err := l.Dblclick(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"DispatchEvent", func(l *common.Locator, tb *testBrowser) {
