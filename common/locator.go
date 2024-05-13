@@ -203,19 +203,19 @@ func (l *Locator) isEditable(opts *FrameIsEditableOptions) (bool, error) {
 
 // IsEnabled returns true if the element matches the locator's
 // selector and is Enabled. Otherwise, returns false.
-func (l *Locator) IsEnabled(opts goja.Value) bool {
+func (l *Locator) IsEnabled(opts goja.Value) (bool, error) {
 	l.log.Debugf("Locator:IsEnabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameIsEnabledOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing is enabled options: %w", err)
+		return false, fmt.Errorf("parsing is enabled options: %w", err)
 	}
 	enabled, err := l.isEnabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "checking is %q enabled: %w", l.selector, err)
+		return false, fmt.Errorf("checking is %q enabled: %w", l.selector, err)
 	}
 
-	return enabled
+	return enabled, nil
 }
 
 // isEnabled is like IsEnabled but takes parsed options and does not

@@ -432,7 +432,7 @@ func TestLocatorElementState(t *testing.T) {
 		{
 			"enabled",
 			`() => document.getElementById('inputText').disabled = true`,
-			func(l *common.Locator) bool { return l.IsEnabled(nil) },
+			func(l *common.Locator) bool { resp, _ := l.IsEnabled(nil); return resp },
 		},
 		{
 			"hidden",
@@ -501,7 +501,12 @@ func TestLocatorElementState(t *testing.T) {
 			},
 		},
 		{
-			"IsEnabled", func(l *common.Locator, tb *testBrowser) { l.IsEnabled(timeout(tb)) },
+			"IsEnabled", func(l *common.Locator, tb *testBrowser) {
+				if _, err := l.IsEnabled(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"IsDisabled", func(l *common.Locator, tb *testBrowser) { l.IsDisabled(timeout(tb)) },
