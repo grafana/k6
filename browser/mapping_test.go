@@ -507,7 +507,7 @@ type locatorAPI interface {
 	IsEditable(opts goja.Value) (bool, error)
 	IsEnabled(opts goja.Value) (bool, error)
 	IsDisabled(opts goja.Value) (bool, error)
-	IsVisible(opts goja.Value) bool
+	IsVisible(opts goja.Value) (bool, error)
 	IsHidden(opts goja.Value) bool
 	Fill(value string, opts goja.Value)
 	Focus(opts goja.Value)
