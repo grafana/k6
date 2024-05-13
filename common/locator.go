@@ -323,27 +323,22 @@ func (l *Locator) focus(opts *FrameBaseOptions) error {
 }
 
 // GetAttribute of the element using locator's selector with strict mode on.
-func (l *Locator) GetAttribute(name string, opts goja.Value) any {
+func (l *Locator) GetAttribute(name string, opts goja.Value) (any, error) {
 	l.log.Debugf(
 		"Locator:GetAttribute", "fid:%s furl:%q sel:%q name:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, name, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing get attribute options: %w", err)
-		return nil
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return nil, fmt.Errorf("parsing get attribute options: %w", err)
 	}
-	var v any
-	if v, err = l.getAttribute(name, copts); err != nil {
-		err = fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
-		return nil
+	v, err := l.getAttribute(name, copts)
+	if err != nil {
+		return nil, fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
 	}
 
-	return v
+	return v, nil
 }
 
 func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (any, error) {
