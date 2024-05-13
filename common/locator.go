@@ -106,21 +106,20 @@ func (l *Locator) dblclick(opts *FrameDblclickOptions) error {
 }
 
 // Check on an element using locator's selector with strict mode on.
-func (l *Locator) Check(opts goja.Value) {
+func (l *Locator) Check(opts goja.Value) error {
 	l.log.Debugf("Locator:Check", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing check options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing check options: %w", err)
 	}
-	if err = l.check(copts); err != nil {
-		err = fmt.Errorf("checking %q: %w", l.selector, err)
-		return
+	if err := l.check(copts); err != nil {
+		return fmt.Errorf("checking %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 // check is like Check but takes parsed options and neither throws an

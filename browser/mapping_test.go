@@ -501,7 +501,7 @@ type locatorAPI interface {
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts goja.Value) error
 	Dblclick(opts goja.Value) error
-	Check(opts goja.Value)
+	Check(opts goja.Value) error
 	Uncheck(opts goja.Value)
 	IsChecked(opts goja.Value) bool
 	IsEditable(opts goja.Value) bool
