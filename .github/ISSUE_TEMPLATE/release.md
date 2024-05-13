@@ -53,6 +53,7 @@ labels: ["release"]
 
 - [ ] Merge the PR bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/9fa50b2d1f259cdccff5cc7bc18a236d31c345ac/lib/consts/consts.go#L11).
 - [ ] Merge the release notes PR.
+- [ ] Pull locally the previously merged changes.
 - [ ] Create and push a new tag of the form `vX.Y.Z` using git: `git tag v0.5x.0 -m "v0.5x.0"`.
 
 #### Announcements
