@@ -442,7 +442,7 @@ func TestLocatorElementState(t *testing.T) {
 		{
 			"readOnly",
 			`() => document.getElementById('inputText').readOnly = true`,
-			func(l *common.Locator) bool { return l.IsEditable(nil) },
+			func(l *common.Locator) bool { resp, _ := l.IsEditable(nil); return resp },
 		},
 		{
 			"visible",
@@ -493,7 +493,12 @@ func TestLocatorElementState(t *testing.T) {
 			},
 		},
 		{
-			"IsEditable", func(l *common.Locator, tb *testBrowser) { l.IsEditable(timeout(tb)) },
+			"IsEditable", func(l *common.Locator, tb *testBrowser) {
+				if _, err := l.IsEditable(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"IsEnabled", func(l *common.Locator, tb *testBrowser) { l.IsEnabled(timeout(tb)) },

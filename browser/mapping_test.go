@@ -504,7 +504,7 @@ type locatorAPI interface {
 	Check(opts goja.Value) error
 	Uncheck(opts goja.Value) error
 	IsChecked(opts goja.Value) (bool, error)
-	IsEditable(opts goja.Value) bool
+	IsEditable(opts goja.Value) (bool, error)
 	IsEnabled(opts goja.Value) bool
 	IsDisabled(opts goja.Value) bool
 	IsVisible(opts goja.Value) bool
