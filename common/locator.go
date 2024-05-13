@@ -276,24 +276,23 @@ func (l *Locator) IsHidden() (bool, error) {
 }
 
 // Fill out the element using locator's selector with strict mode on.
-func (l *Locator) Fill(value string, opts goja.Value) {
+func (l *Locator) Fill(value string, opts goja.Value) error {
 	l.log.Debugf(
 		"Locator:Fill", "fid:%s furl:%q sel:%q val:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, value, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameFillOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing fill options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing fill options: %w", err)
 	}
-	if err = l.fill(value, copts); err != nil {
-		err = fmt.Errorf("filling %q with %q: %w", l.selector, value, err)
-		return
+	if err := l.fill(value, copts); err != nil {
+		return fmt.Errorf("filling %q with %q: %w", l.selector, value, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) fill(value string, opts *FrameFillOptions) error {

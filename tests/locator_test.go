@@ -60,11 +60,11 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Clear", func(tb *testBrowser, p *common.Page) {
+			"Clear", func(_ *testBrowser, p *common.Page) {
 				const value = "fill me up"
 				l := p.Locator("#inputText", nil)
 
-				l.Fill(value, nil)
+				require.NoError(t, l.Fill(value, nil))
 				require.Equal(t, value, p.InputValue("#inputText", nil))
 
 				err := l.Clear(common.NewFrameFillOptions(l.Timeout()))
@@ -104,26 +104,29 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"Fill", func(tb *testBrowser, p *common.Page) {
+			"Fill", func(_ *testBrowser, p *common.Page) {
 				const value = "fill me up"
-				p.Locator("#inputText", nil).Fill(value, nil)
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Fill(value, nil))
 				require.Equal(t, value, p.InputValue("#inputText", nil))
 			},
 		},
 		{
-			"FillTextarea", func(tb *testBrowser, p *common.Page) {
+			"FillTextarea", func(_ *testBrowser, p *common.Page) {
 				const value = "fill me up"
-				p.Locator("textarea", nil).Fill(value, nil)
+				lo := p.Locator("textarea", nil)
+				require.NoError(t, lo.Fill(value, nil))
 				require.Equal(t, value, p.InputValue("textarea", nil))
 			},
 		},
 		{
-			"FillParagraph", func(tb *testBrowser, p *common.Page) {
+			"FillParagraph", func(_ *testBrowser, p *common.Page) {
 				const value = "fill me up"
-				p.Locator("#firstParagraph", nil).Fill(value, nil)
+				lo := p.Locator("#firstParagraph", nil)
+				require.NoError(t, lo.Fill(value, nil))
 				require.Equal(t, value, p.TextContent("#firstParagraph", nil))
-				l := p.Locator("#secondParagraph", nil)
-				assert.Panics(t, func() { l.Fill(value, nil) }, "should panic")
+				lo = p.Locator("#secondParagraph", nil)
+				require.Error(t, lo.Fill(value, nil))
 			},
 		},
 		{
@@ -327,7 +330,12 @@ func TestLocator(t *testing.T) {
 			"Focus", func(l *common.Locator, tb *testBrowser) { l.Focus(timeout(tb)) },
 		},
 		{
-			"Fill", func(l *common.Locator, tb *testBrowser) { l.Fill("fill me up", timeout(tb)) },
+			"Fill", func(l *common.Locator, tb *testBrowser) {
+				if err := l.Fill("fill me up", timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"GetAttribute", func(l *common.Locator, tb *testBrowser) { l.GetAttribute("value", timeout(tb)) },

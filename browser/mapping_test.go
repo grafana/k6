@@ -509,7 +509,7 @@ type locatorAPI interface {
 	IsDisabled(opts goja.Value) (bool, error)
 	IsVisible(opts goja.Value) (bool, error)
 	IsHidden(opts goja.Value) (bool, error)
-	Fill(value string, opts goja.Value)
+	Fill(value string, opts goja.Value) error
 	Focus(opts goja.Value)
 	GetAttribute(name string, opts goja.Value) goja.Value
 	InnerHTML(opts goja.Value) string
