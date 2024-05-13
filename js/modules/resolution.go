@@ -138,9 +138,10 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 }
 
 func getArg(arg string) string {
-	arg = strings.ReplaceAll(arg, "../", "")
-	arg = strings.ReplaceAll(arg, "./", "")
-
+	i := strings.Index(arg, "/k6/")
+	if i > -1 {
+		return arg[i+1:]
+	}
 	return arg
 }
 
