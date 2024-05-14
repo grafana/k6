@@ -24,12 +24,12 @@ export default async function() {
   try {
     await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
 
-    page.locator('a[href="/contacts.php"]')
-        .dispatchEvent("click");
+    const contacts = page.locator('a[href="/contacts.php"]');
+    await contacts.dispatchEvent("click");
 
-    check(page, {
-      header: (p) => p.locator("h3").textContent() == "Contact us",
-    });
+    const h3 = page.locator("h3");
+    const ok = await h3.textContent() == "Contact us";
+    check(ok, { "header": ok });
   } finally {
     page.close();
   }
