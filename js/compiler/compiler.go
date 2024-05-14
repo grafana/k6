@@ -259,6 +259,8 @@ func (c *Compiler) compileImpl(
 		if err != nil {
 			return nil, code, err
 		}
+		// This hack is required for the source map to work
+		code += "\n//# sourceMappingURL=" + sourceMapURLFromBabel
 		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
 	}
 	return nil, code, err
