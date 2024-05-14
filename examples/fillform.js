@@ -28,9 +28,11 @@ export default async function() {
       page.waitForNavigation(),
       page.locator('a[href="/my_messages.php"]').click(),
     ]);
+
     // Enter login credentials and login
-    page.locator('input[name="login"]').type('admin');
-    page.locator('input[name="password"]').type('123');
+    await page.locator('input[name="login"]').type('admin');
+    await page.locator('input[name="password"]').type("123");
+
     // We expect the form submission to trigger a navigation, so to prevent a
     // race condition, setup a waiter concurrently while waiting for the click
     // to resolve.
@@ -38,9 +40,10 @@ export default async function() {
       page.waitForNavigation(),
       page.locator('input[type="submit"]').click(),
     ]);
-    check(page, {
-      'header': p => p.locator('h2').textContent() == 'Welcome, admin!',
-    });
+
+    const h2 = page.locator('h2');
+    const headerOK = await h2.textContent() == 'Welcome, admin!';
+    check(headerOK, { 'header': headerOK });
 
     // Check whether we receive cookies from the logged site.
     check(await context.cookies(), {
