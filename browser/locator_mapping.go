@@ -41,7 +41,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Check(opts) //nolint:wrapcheck
 			})
 		},
-		"uncheck":      lo.Uncheck,
+		"uncheck": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, lo.Uncheck(opts) //nolint:wrapcheck
+			})
+		},
 		"isChecked":    lo.IsChecked,
 		"isEditable":   lo.IsEditable,
 		"isEnabled":    lo.IsEnabled,
