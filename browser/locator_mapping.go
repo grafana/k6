@@ -66,7 +66,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return lo.IsDisabled(opts) //nolint:wrapcheck
 			})
 		},
-		"isVisible":    lo.IsVisible,
+		"isVisible": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.IsVisible() //nolint:wrapcheck
+			})
+		},
 		"isHidden":     lo.IsHidden,
 		"fill":         lo.Fill,
 		"focus":        lo.Focus,
