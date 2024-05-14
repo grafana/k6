@@ -12,15 +12,14 @@ import (
 // mapLocator API to the JS module.
 func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 	return mapping{
-		"clear": func(opts goja.Value) error {
-			ctx := vu.Context()
-
+		"clear": func(opts goja.Value) (*goja.Promise, error) {
 			copts := common.NewFrameFillOptions(lo.Timeout())
-			if err := copts.Parse(ctx, opts); err != nil {
-				return fmt.Errorf("parsing clear options: %w", err)
+			if err := copts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing clear options: %w", err)
 			}
-
-			return lo.Clear(copts) //nolint:wrapcheck
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, lo.Clear(copts) //nolint:wrapcheck
+			}), nil
 		},
 		"click": func(opts goja.Value) (*goja.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, lo.Timeout())
