@@ -91,15 +91,16 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"DispatchEvent", func(tb *testBrowser, p *common.Page) {
+			"DispatchEvent", func(_ *testBrowser, p *common.Page) {
 				result := func() bool {
 					v := p.Evaluate(`() => window.result`)
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be clicked first")
+
+				lo := p.Locator("#link", nil)
 				opts := common.NewFrameDispatchEventOptions(0) // no timeout
-				err := p.Locator("#link", nil).DispatchEvent("click", "mouseevent", opts)
-				require.NoError(t, err)
+				require.NoError(t, lo.DispatchEvent("click", "mouseevent", opts))
 				require.True(t, result(), "cannot not dispatch event")
 			},
 		},
@@ -336,8 +337,8 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 		},
 		{
 			"DispatchEvent", func(l *common.Locator, tb *testBrowser) {
-				err := l.DispatchEvent("click", "mouseevent", common.NewFrameDispatchEventOptions(100*time.Millisecond))
-				if err != nil {
+				opts := common.NewFrameDispatchEventOptions(100 * time.Millisecond)
+				if err := l.DispatchEvent("click", "mouseevent", opts); err != nil {
 					// TODO: remove panic and update tests when all locator methods return error.
 					panic(err)
 				}

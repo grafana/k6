@@ -562,12 +562,11 @@ func (l *Locator) DispatchEvent(typ string, eventInit any, opts *FrameDispatchEv
 		l.frame.ID(), l.frame.URL(), l.selector, typ, eventInit, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
-	if err = l.dispatchEvent(typ, eventInit, opts); err != nil {
+	if err := l.dispatchEvent(typ, eventInit, opts); err != nil {
 		return fmt.Errorf("dispatching locator event %q to %q: %w", typ, l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
 
 	return nil
 }
