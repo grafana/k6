@@ -10,7 +10,7 @@ import (
 )
 
 // mapLocator API to the JS module.
-func mapLocator(vu moduleVU, lo *common.Locator) mapping {
+func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 	return mapping{
 		"clear": func(opts goja.Value) (*goja.Promise, error) {
 			copts := common.NewFrameFillOptions(lo.Timeout())
@@ -31,7 +31,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping {
 				return nil, lo.Click(popts) //nolint:wrapcheck
 			}), nil
 		},
-		"dblclick":     lo.Dblclick,
+		"dblclick": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, lo.Dblclick(opts) //nolint:wrapcheck
+			})
+		},
 		"check":        lo.Check,
 		"uncheck":      lo.Uncheck,
 		"isChecked":    lo.IsChecked,
