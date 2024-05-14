@@ -96,7 +96,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return lo.InnerHTML(opts) //nolint:wrapcheck
 			})
 		},
-		"innerText":    lo.InnerText,
+		"innerText": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.InnerText(opts) //nolint:wrapcheck
+			})
+		},
 		"textContent":  lo.TextContent,
 		"inputValue":   lo.InputValue,
 		"selectOption": lo.SelectOption,
