@@ -28,9 +28,10 @@ export default async function() {
     document.body.appendChild(shadowRoot);
   });
   const shadowEl = page.locator("#find");
+  const ok = await shadowEl.innerText() === "Shadow DOM";
   check(shadowEl, {
     "shadow element exists": (e) => e !== null,
-    "shadow element text is correct": (e) => e.innerText() === "Shadow DOM",
+    "shadow element text is correct": () => ok,
   });
   page.close();
 }
