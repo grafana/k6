@@ -15,7 +15,7 @@ func esbuildTransform(src, filename string) (code string, srcMap []byte, err err
 		Target:         api.ES2017,
 		Format:         api.FormatCommonJS,
 		Sourcemap:      api.SourceMapExternal,
-		SourcesContent: api.SourcesContentExclude,
+		SourcesContent: api.SourcesContentInclude,
 		LegalComments:  api.LegalCommentsNone,
 		Platform:       api.PlatformNeutral,
 		LogLevel:       api.LogLevelSilent,
