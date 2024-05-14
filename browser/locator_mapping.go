@@ -86,7 +86,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Focus(opts) //nolint:wrapcheck
 			})
 		},
-		"getAttribute": lo.GetAttribute,
+		"getAttribute": func(name string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.GetAttribute(name, opts) //nolint:wrapcheck
+			})
+		},
 		"innerHTML":    lo.InnerHTML,
 		"innerText":    lo.InnerText,
 		"textContent":  lo.TextContent,
