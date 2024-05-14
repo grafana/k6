@@ -244,7 +244,8 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 		{
 			"WaitFor state:visible", func(tb *testBrowser, p *common.Page) {
 				opts := tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
-				require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(opts) })
+				lo := p.Locator("#link", nil)
+				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 		{
@@ -253,7 +254,8 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "attached",
 				})
-				require.NotPanics(t, func() { p.Locator("#link", nil).WaitFor(opts) })
+				lo := p.Locator("#link", nil)
+				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 		{
@@ -262,7 +264,8 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "hidden",
 				})
-				require.NotPanics(t, func() { p.Locator("#inputHiddenText", nil).WaitFor(opts) })
+				lo := p.Locator("#inputHiddenText", nil)
+				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 		{
@@ -271,7 +274,8 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "detached",
 				})
-				require.NotPanics(t, func() { p.Locator("#nonExistingElement", nil).WaitFor(opts) })
+				lo := p.Locator("#nonExistingElement", nil)
+				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 	}
@@ -449,7 +453,12 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"WaitFor", func(l *common.Locator, tb *testBrowser) { l.WaitFor(timeout(tb)) },
+			"WaitFor", func(l *common.Locator, tb *testBrowser) {
+				if err := l.WaitFor(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 	}
 	for _, tt := range sanityTests {

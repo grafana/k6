@@ -522,7 +522,7 @@ type locatorAPI interface {
 	Hover(opts goja.Value) error
 	Tap(opts goja.Value) (*goja.Promise, error)
 	DispatchEvent(typ string, eventInit, opts goja.Value)
-	WaitFor(opts goja.Value)
+	WaitFor(opts goja.Value) error
 }
 
 // keyboardAPI is the interface of a keyboard input device.
