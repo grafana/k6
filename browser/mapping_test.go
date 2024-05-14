@@ -515,7 +515,7 @@ type locatorAPI interface {
 	InnerHTML(opts goja.Value) (string, error)
 	InnerText(opts goja.Value) (string, error)
 	TextContent(opts goja.Value) (string, error)
-	InputValue(opts goja.Value) string
+	InputValue(opts goja.Value) (string, error)
 	SelectOption(values goja.Value, opts goja.Value) []string
 	Press(key string, opts goja.Value)
 	Type(text string, opts goja.Value)

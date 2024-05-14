@@ -180,13 +180,19 @@ func TestLocator(t *testing.T) {
 		{
 			"InputValue", func(tb *testBrowser, p *common.Page) {
 				t.Run("input", func(t *testing.T) {
-					require.Equal(t, "something", p.Locator("#inputText", nil).InputValue(nil))
+					v, err := p.Locator("#inputText", nil).InputValue(nil)
+					require.NoError(t, err)
+					require.Equal(t, "something", v)
 				})
 				t.Run("textarea", func(t *testing.T) {
-					require.Equal(t, "text area", p.Locator("textarea", nil).InputValue(nil))
+					v, err := p.Locator("textarea", nil).InputValue(nil)
+					require.NoError(t, err)
+					require.Equal(t, "text area", v)
 				})
 				t.Run("select", func(t *testing.T) {
-					require.Equal(t, "option text", p.Locator("#selectElement", nil).InputValue(nil))
+					v, err := p.Locator("#selectElement", nil).InputValue(nil)
+					require.NoError(t, err)
+					require.Equal(t, "option text", v)
 				})
 			},
 		},
@@ -377,7 +383,12 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"InputValue", func(l *common.Locator, tb *testBrowser) { l.InputValue(timeout(tb)) },
+			"InputValue", func(l *common.Locator, tb *testBrowser) {
+				if _, err := l.InputValue(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"Press", func(l *common.Locator, tb *testBrowser) { l.Press("a", timeout(tb)) },
@@ -607,7 +618,9 @@ func TestLocatorPress(t *testing.T) {
 	l.Press("KeyB", nil)
 	l.Press("Shift+KeyC", nil)
 
-	require.Equal(t, "AbC", l.InputValue(nil))
+	v, err := l.InputValue(nil)
+	require.NoError(t, err)
+	require.Equal(t, "AbC", v)
 }
 
 func TestLocatorShadowDOM(t *testing.T) {

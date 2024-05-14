@@ -414,19 +414,19 @@ func (l *Locator) textContent(opts *FrameTextContentOptions) (string, error) {
 
 // InputValue returns the element's input value that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InputValue(opts goja.Value) string {
+func (l *Locator) InputValue(opts goja.Value) (string, error) {
 	l.log.Debugf("Locator:InputValue", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameInputValueOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing input value options: %w", err)
+		return "", fmt.Errorf("parsing input value options: %w", err)
 	}
 	v, err := l.inputValue(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "getting input value of %q: %w", l.selector, err)
+		return "", fmt.Errorf("getting input value of %q: %w", l.selector, err)
 	}
 
-	return v
+	return v, nil
 }
 
 func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
