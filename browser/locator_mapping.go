@@ -126,7 +126,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Type(text, opts) //nolint:wrapcheck
 			})
 		},
-		"hover": lo.Hover,
+		"hover": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, lo.Hover(opts) //nolint:wrapcheck
+			})
+		},
 		"tap": func(opts goja.Value) (*goja.Promise, error) {
 			copts := common.NewFrameTapOptions(lo.DefaultTimeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
