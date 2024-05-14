@@ -218,8 +218,10 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"TextContent", func(tb *testBrowser, p *common.Page) {
-				require.Equal(t, `hello`, p.Locator("#divHello", nil).TextContent(nil))
+			"TextContent", func(_ *testBrowser, p *common.Page) {
+				text, err := p.Locator("#divHello", nil).TextContent(nil)
+				require.NoError(t, err)
+				require.Equal(t, `hello`, text)
 			},
 		},
 		{
@@ -401,7 +403,12 @@ func TestLocator(t *testing.T) {
 			},
 		},
 		{
-			"TextContent", func(l *common.Locator, tb *testBrowser) { l.TextContent(timeout(tb)) },
+			"TextContent", func(l *common.Locator, tb *testBrowser) {
+				if _, err := l.TextContent(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"Uncheck", func(l *common.Locator, tb *testBrowser) {

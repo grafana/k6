@@ -514,7 +514,7 @@ type locatorAPI interface {
 	GetAttribute(name string, opts goja.Value) (any, error)
 	InnerHTML(opts goja.Value) (string, error)
 	InnerText(opts goja.Value) (string, error)
-	TextContent(opts goja.Value) string
+	TextContent(opts goja.Value) (string, error)
 	InputValue(opts goja.Value) string
 	SelectOption(values goja.Value, opts goja.Value) []string
 	Press(key string, opts goja.Value)
