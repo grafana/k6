@@ -149,6 +149,10 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.DispatchEvent(typ, exportArg(eventInit), popts) //nolint:wrapcheck
 			}), nil
 		},
-		"waitFor": lo.WaitFor,
+		"waitFor": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, lo.WaitFor(opts) //nolint:wrapcheck
+			})
+		},
 	}
 }
