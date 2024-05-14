@@ -370,24 +370,19 @@ func (l *Locator) innerHTML(opts *FrameInnerHTMLOptions) (string, error) {
 
 // InnerText returns the element's inner text that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InnerText(opts goja.Value) string {
+func (l *Locator) InnerText(opts goja.Value) (string, error) {
 	l.log.Debugf("Locator:InnerText", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameInnerTextOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing inner text options: %w", err)
-		return ""
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return "", fmt.Errorf("parsing inner text options: %w", err)
 	}
-	var s string
-	if s, err = l.innerText(copts); err != nil {
-		err = fmt.Errorf("getting inner text of %q: %w", l.selector, err)
-		return ""
+	s, err := l.innerText(copts)
+	if err != nil {
+		return "", fmt.Errorf("getting inner text of %q: %w", l.selector, err)
 	}
 
-	return s
+	return s, nil
 }
 
 func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
