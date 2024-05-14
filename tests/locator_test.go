@@ -24,7 +24,7 @@ type jsFrameWaitForSelectorOpts struct {
 	State string
 }
 
-func TestLocator(t *testing.T) { //nolint:gocognit
+func TestLocator(t *testing.T) {
 	t.Parallel()
 
 	tests := []struct {
@@ -73,7 +73,7 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"Click", func(tb *testBrowser, p *common.Page) {
+			"Click", func(_ *testBrowser, p *common.Page) {
 				l := p.Locator("#link", nil)
 				err := l.Click(common.NewFrameClickOptions(l.Timeout()))
 				require.NoError(t, err)
@@ -154,7 +154,7 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"Hover", func(tb *testBrowser, p *common.Page) {
+			"Hover", func(_ *testBrowser, p *common.Page) {
 				result := func() bool {
 					v := p.Evaluate(`() => window.result`)
 					return asBool(t, v)
@@ -180,7 +180,7 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"InputValue", func(tb *testBrowser, p *common.Page) {
+			"InputValue", func(_ *testBrowser, p *common.Page) {
 				t.Run("input", func(t *testing.T) {
 					v, err := p.Locator("#inputText", nil).InputValue(nil)
 					require.NoError(t, err)
@@ -303,161 +303,111 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 	}
 	sanityTests := []struct {
 		name string
-		do   func(*common.Locator, *testBrowser)
+		do   func(*common.Locator, *testBrowser) error
 	}{
 		{
-			"Check", func(l *common.Locator, tb *testBrowser) {
-				// TODO: remove panic and update tests when all locator methods return error.
-				if err := l.Check(timeout(tb)); err != nil {
-					panic(err)
-				}
+			"Check", func(l *common.Locator, tb *testBrowser) error {
+				return l.Check(timeout(tb))
 			},
 		},
 		{
-			"Clear", func(l *common.Locator, tb *testBrowser) {
-				err := l.Clear(common.NewFrameFillOptions(100 * time.Millisecond))
-				if err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Clear", func(l *common.Locator, _ *testBrowser) error {
+				opts := common.NewFrameFillOptions(100 * time.Millisecond)
+				return l.Clear(opts)
 			},
 		},
 		{
-			"Click", func(l *common.Locator, tb *testBrowser) {
-				err := l.Click(common.NewFrameClickOptions(100 * time.Millisecond))
-				if err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Click", func(l *common.Locator, _ *testBrowser) error {
+				opts := common.NewFrameClickOptions(100 * time.Millisecond)
+				return l.Click(opts)
 			},
 		},
 		{
-			"Dblclick", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Dblclick(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Dblclick", func(l *common.Locator, tb *testBrowser) error {
+				return l.Dblclick(timeout(tb))
 			},
 		},
 		{
-			"DispatchEvent", func(l *common.Locator, tb *testBrowser) {
+			"DispatchEvent", func(l *common.Locator, _ *testBrowser) error {
 				opts := common.NewFrameDispatchEventOptions(100 * time.Millisecond)
-				if err := l.DispatchEvent("click", "mouseevent", opts); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+				return l.DispatchEvent("click", "mouseevent", opts)
 			},
 		},
 		{
-			"Focus", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Focus(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Focus", func(l *common.Locator, tb *testBrowser) error {
+				return l.Focus(timeout(tb))
 			},
 		},
 		{
-			"Fill", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Fill("fill me up", timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Fill", func(l *common.Locator, tb *testBrowser) error {
+				return l.Fill("fill me up", timeout(tb))
 			},
 		},
 		{
-			"GetAttribute", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.GetAttribute("value", timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"GetAttribute", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.GetAttribute("value", timeout(tb))
+				return err
 			},
 		},
 		{
-			"Hover", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Hover(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Hover", func(l *common.Locator, tb *testBrowser) error {
+				return l.Hover(timeout(tb))
 			},
 		},
 		{
-			"InnerHTML", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.InnerHTML(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"InnerHTML", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.InnerHTML(timeout(tb))
+				return err
 			},
 		},
 		{
-			"InnerText", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.InnerText(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"InnerText", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.InnerText(timeout(tb))
+				return err
 			},
 		},
 		{
-			"InputValue", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.InputValue(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"InputValue", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.InputValue(timeout(tb))
+				return err
 			},
 		},
 		{
-			"Press", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Press("a", timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Press", func(l *common.Locator, tb *testBrowser) error {
+				return l.Press("a", timeout(tb))
 			},
 		},
 		{
-			"SelectOption", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.SelectOption(tb.toGojaValue(""), timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"SelectOption", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.SelectOption(tb.toGojaValue(""), timeout(tb))
+				return err
 			},
 		},
 		{
-			"Tap", func(l *common.Locator, _ *testBrowser) {
-				if err := l.Tap(common.NewFrameTapOptions(100 * time.Millisecond)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Tap", func(l *common.Locator, _ *testBrowser) error {
+				opts := common.NewFrameTapOptions(100 * time.Millisecond)
+				return l.Tap(opts)
 			},
 		},
 		{
-			"Type", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Type("a", timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Type", func(l *common.Locator, tb *testBrowser) error {
+				return l.Type("a", timeout(tb))
 			},
 		},
 		{
-			"TextContent", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.TextContent(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"TextContent", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.TextContent(timeout(tb))
+				return err
 			},
 		},
 		{
-			"Uncheck", func(l *common.Locator, tb *testBrowser) {
-				if err := l.Uncheck(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"Uncheck", func(l *common.Locator, tb *testBrowser) error {
+				return l.Uncheck(timeout(tb))
 			},
 		},
 		{
-			"WaitFor", func(l *common.Locator, tb *testBrowser) {
-				if err := l.WaitFor(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"WaitFor", func(l *common.Locator, tb *testBrowser) error {
+				return l.WaitFor(timeout(tb))
 			},
 		},
 	}
@@ -469,7 +419,7 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			tb := newTestBrowser(t)
 			p := tb.NewPage(nil)
 			p.SetContent("<html></html>", nil)
-			assert.Panics(t, func() { tt.do(p.Locator("NOTEXIST", nil), tb) })
+			require.Error(t, tt.do(p.Locator("NOTEXIST", nil), tb))
 		})
 	}
 
@@ -489,9 +439,7 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			)
 			require.NoError(t, err)
 
-			assert.Panics(t, func() {
-				tt.do(p.Locator("a", nil), tb)
-			})
+			require.Error(t, tt.do(p.Locator("a", nil), tb))
 		})
 	}
 }
@@ -561,38 +509,30 @@ func TestLocatorElementState(t *testing.T) {
 	}
 	sanityTests := []struct {
 		name string
-		do   func(*common.Locator, *testBrowser)
+		do   func(*common.Locator, *testBrowser) error
 	}{
 		{
-			"IsChecked", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.IsChecked(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"IsChecked", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.IsChecked(timeout(tb))
+				return err
 			},
 		},
 		{
-			"IsEditable", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.IsEditable(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"IsEditable", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.IsEditable(timeout(tb))
+				return err
 			},
 		},
 		{
-			"IsEnabled", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.IsEnabled(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"IsEnabled", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.IsEnabled(timeout(tb))
+				return err
 			},
 		},
 		{
-			"IsDisabled", func(l *common.Locator, tb *testBrowser) {
-				if _, err := l.IsDisabled(timeout(tb)); err != nil {
-					// TODO: remove panic and update tests when all locator methods return error.
-					panic(err)
-				}
+			"IsDisabled", func(l *common.Locator, tb *testBrowser) error {
+				_, err := l.IsDisabled(timeout(tb))
+				return err
 			},
 		},
 	}
@@ -604,7 +544,7 @@ func TestLocatorElementState(t *testing.T) {
 			tb := newTestBrowser(t)
 			p := tb.NewPage(nil)
 			p.SetContent("<html></html>", nil)
-			assert.Panics(t, func() { tt.do(p.Locator("NOTEXIST", nil), tb) })
+			require.Error(t, tt.do(p.Locator("NOTEXIST", nil), tb))
 		})
 	}
 
@@ -623,10 +563,8 @@ func TestLocatorElementState(t *testing.T) {
 				tb.staticURL("locators.html"),
 				opts,
 			)
-			assert.Panics(t, func() {
-				tt.do(p.Locator("a", nil), tb)
-			})
 			require.NoError(t, err)
+			require.Error(t, tt.do(p.Locator("a", nil), tb))
 		})
 	}
 }
