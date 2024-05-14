@@ -573,16 +573,18 @@ func (ctx *tc39TestCtx) init() {
 	ctx.prgCache = make(map[string]*goja.Program)
 	ctx.errors = make(map[string]string)
 
-	b, err := os.ReadFile(breakingTestErrorsFilename(ctx.compatibilityMode))
-	if err != nil {
-		panic(err)
-	}
-	b = bytes.TrimSpace(b)
-	if len(b) > 0 {
-		ctx.expectedErrors = make(map[string]string, 1000)
-		err = json.Unmarshal(b, &ctx.expectedErrors)
+	if !*update {
+		b, err := os.ReadFile(breakingTestErrorsFilename(ctx.compatibilityMode))
 		if err != nil {
 			panic(err)
+		}
+		b = bytes.TrimSpace(b)
+		if len(b) > 0 {
+			ctx.expectedErrors = make(map[string]string, 1000)
+			err = json.Unmarshal(b, &ctx.expectedErrors)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }
