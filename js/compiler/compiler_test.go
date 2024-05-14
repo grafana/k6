@@ -187,6 +187,17 @@ func TestCompile(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, requireCalled)
 	})
+	t.Run("enhanced sourcemap", func(t *testing.T) {
+		t.Parallel()
+		c := New(testutils.NewLogger(t))
+		c.Options.CompatibilityMode = lib.CompatibilityModeEnhanced
+		c.Options.SourceMapLoader = func(_ string) ([]byte, error) { return nil, nil }
+		_, code, err := c.Compile(`import "something"`, "script.js", true)
+		require.NoError(t, err)
+		assert.Equal(t, `var import_something = require("something");
+
+//# sourceMappingURL=k6://internal-should-not-leak/file.map`, code)
+	})
 }
 
 func TestCorruptSourceMap(t *testing.T) {
