@@ -1647,7 +1647,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 				p.goto("%s/%s/shadow_and_doc_frag.html")
 
 				const s = p.locator('%s')
-				s.waitFor({
+				await s.waitFor({
 					timeout: 1000,
 					state: 'attached',
 				});
