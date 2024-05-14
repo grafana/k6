@@ -24,7 +24,7 @@ type jsFrameWaitForSelectorOpts struct {
 	State string
 }
 
-func TestLocator(t *testing.T) {
+func TestLocator(t *testing.T) { //nolint:gocognit
 	t.Parallel()
 
 	tests := []struct {
@@ -205,7 +205,8 @@ func TestLocator(t *testing.T) {
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
-				rv := l.SelectOption(tb.toGojaValue(`option text 2`), nil)
+				rv, err := l.SelectOption(tb.toGojaValue(`option text 2`), nil)
+				require.NoError(t, err)
 				require.Len(t, rv, 1)
 				require.Equal(t, "option text 2", rv[0])
 			},
@@ -394,7 +395,12 @@ func TestLocator(t *testing.T) {
 			"Press", func(l *common.Locator, tb *testBrowser) { l.Press("a", timeout(tb)) },
 		},
 		{
-			"SelectOption", func(l *common.Locator, tb *testBrowser) { l.SelectOption(tb.toGojaValue(""), timeout(tb)) },
+			"SelectOption", func(l *common.Locator, tb *testBrowser) {
+				if _, err := l.SelectOption(tb.toGojaValue(""), timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"Tap", func(l *common.Locator, _ *testBrowser) {
