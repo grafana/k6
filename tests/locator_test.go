@@ -233,8 +233,9 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"Type", func(tb *testBrowser, p *common.Page) {
-				p.Locator("#inputText", nil).Type("real ", nil)
+			"Type", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Type("real ", nil))
 				require.Equal(t, "real something", p.InputValue("#inputText", nil))
 			},
 		},
@@ -418,8 +419,7 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 		},
 		{
 			"Type", func(l *common.Locator, tb *testBrowser) {
-				err := l.Type("a", timeout(tb))
-				if err != nil {
+				if err := l.Type("a", timeout(tb)); err != nil {
 					// TODO: remove panic and update tests when all locator methods return error.
 					panic(err)
 				}
