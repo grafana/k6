@@ -111,10 +111,14 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return lo.InputValue(opts) //nolint:wrapcheck
 			})
 		},
-		"selectOption": lo.SelectOption,
-		"press":        lo.Press,
-		"type":         lo.Type,
-		"hover":        lo.Hover,
+		"selectOption": func(values goja.Value, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.SelectOption(values, opts) //nolint:wrapcheck
+			})
+		},
+		"press": lo.Press,
+		"type":  lo.Type,
+		"hover": lo.Hover,
 		"tap": func(opts goja.Value) (*goja.Promise, error) {
 			copts := common.NewFrameTapOptions(lo.DefaultTimeout())
 			if err := copts.Parse(vu.Context(), opts); err != nil {
