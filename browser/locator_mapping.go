@@ -51,7 +51,11 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return lo.IsChecked(opts) //nolint:wrapcheck
 			})
 		},
-		"isEditable":   lo.IsEditable,
+		"isEditable": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return lo.IsEditable(opts) //nolint:wrapcheck
+			})
+		},
 		"isEnabled":    lo.IsEnabled,
 		"isDisabled":   lo.IsDisabled,
 		"isVisible":    lo.IsVisible,
