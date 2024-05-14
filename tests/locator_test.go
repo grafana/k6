@@ -159,7 +159,8 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be hovered first")
-				p.Locator("#inputText", nil).Hover(nil)
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Hover(nil))
 				require.True(t, result(), "should be hovered")
 			},
 		},
@@ -367,7 +368,12 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"Hover", func(l *common.Locator, tb *testBrowser) { l.Hover(timeout(tb)) },
+			"Hover", func(l *common.Locator, tb *testBrowser) {
+				if err := l.Hover(timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"InnerHTML", func(l *common.Locator, tb *testBrowser) {

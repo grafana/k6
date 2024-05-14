@@ -519,21 +519,20 @@ func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
 
 // Hover moves the pointer over the element that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Hover(opts goja.Value) {
+func (l *Locator) Hover(opts goja.Value) error {
 	l.log.Debugf("Locator:Hover", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameHoverOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing hover options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing hover options: %w", err)
 	}
-	if err = l.hover(copts); err != nil {
-		err = fmt.Errorf("hovering on %q: %w", l.selector, err)
-		return
+	if err := l.hover(copts); err != nil {
+		return fmt.Errorf("hovering on %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) hover(opts *FrameHoverOptions) error {
