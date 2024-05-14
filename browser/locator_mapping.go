@@ -140,12 +140,14 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Tap(copts) //nolint:wrapcheck
 			}), nil
 		},
-		"dispatchEvent": func(typ string, eventInit, opts goja.Value) error {
+		"dispatchEvent": func(typ string, eventInit, opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewFrameDispatchEventOptions(lo.DefaultTimeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return fmt.Errorf("parsing locator dispatch event options: %w", err)
+				return nil, fmt.Errorf("parsing locator dispatch event options: %w", err)
 			}
-			return lo.DispatchEvent(typ, exportArg(eventInit), popts) //nolint:wrapcheck
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, lo.DispatchEvent(typ, exportArg(eventInit), popts) //nolint:wrapcheck
+			}), nil
 		},
 		"waitFor": lo.WaitFor,
 	}
