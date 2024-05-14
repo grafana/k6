@@ -461,24 +461,23 @@ func (l *Locator) selectOption(values goja.Value, opts *FrameSelectOptionOptions
 
 // Press the given key on the element found that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Press(key string, opts goja.Value) {
+func (l *Locator) Press(key string, opts goja.Value) error {
 	l.log.Debugf(
 		"Locator:Press", "fid:%s furl:%q sel:%q key:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, key, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFramePressOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing press options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing press options: %w", err)
 	}
-	if err = l.press(key, copts); err != nil {
-		err = fmt.Errorf("pressing %q on %q: %w", key, l.selector, err)
-		return
+	if err := l.press(key, copts); err != nil {
+		return fmt.Errorf("pressing %q on %q: %w", key, l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) press(key string, opts *FramePressOptions) error {

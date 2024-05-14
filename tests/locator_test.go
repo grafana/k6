@@ -197,8 +197,9 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"Press", func(tb *testBrowser, p *common.Page) {
-				p.Locator("#inputText", nil).Press("x", nil)
+			"Press", func(_ *testBrowser, p *common.Page) {
+				lo := p.Locator("#inputText", nil)
+				require.NoError(t, lo.Press("x", nil))
 				require.Equal(t, "xsomething", p.InputValue("#inputText", nil))
 			},
 		},
@@ -392,7 +393,12 @@ func TestLocator(t *testing.T) { //nolint:gocognit
 			},
 		},
 		{
-			"Press", func(l *common.Locator, tb *testBrowser) { l.Press("a", timeout(tb)) },
+			"Press", func(l *common.Locator, tb *testBrowser) {
+				if err := l.Press("a", timeout(tb)); err != nil {
+					// TODO: remove panic and update tests when all locator methods return error.
+					panic(err)
+				}
+			},
 		},
 		{
 			"SelectOption", func(l *common.Locator, tb *testBrowser) {
@@ -620,9 +626,9 @@ func TestLocatorPress(t *testing.T) {
 
 	l := p.Locator("#text1", nil)
 
-	l.Press("Shift+KeyA", nil)
-	l.Press("KeyB", nil)
-	l.Press("Shift+KeyC", nil)
+	require.NoError(t, l.Press("Shift+KeyA", nil))
+	require.NoError(t, l.Press("KeyB", nil))
+	require.NoError(t, l.Press("Shift+KeyC", nil))
 
 	v, err := l.InputValue(nil)
 	require.NoError(t, err)

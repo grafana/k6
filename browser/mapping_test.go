@@ -517,7 +517,7 @@ type locatorAPI interface {
 	TextContent(opts goja.Value) (string, error)
 	InputValue(opts goja.Value) (string, error)
 	SelectOption(values goja.Value, opts goja.Value) ([]string, error)
-	Press(key string, opts goja.Value)
+	Press(key string, opts goja.Value) error
 	Type(text string, opts goja.Value)
 	Hover(opts goja.Value)
 	Tap(opts goja.Value) (*goja.Promise, error)
