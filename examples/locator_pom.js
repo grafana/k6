@@ -64,13 +64,13 @@ export default async function() {
   try {
     await bet.goto()
     await bet.tails();
-    console.log("Current bet:", bet.current());
+    console.log("Current bet:", await bet.current());
     await bet.heads();
-    console.log("Current bet:", bet.current());
+    console.log("Current bet:", await bet.current());
     await bet.tails();
-    console.log("Current bet:", bet.current());
+    console.log("Current bet:", await bet.current());
     await bet.heads();
-    console.log("Current bet:", bet.current());
+    console.log("Current bet:", await bet.current());
   } finally {
     page.close();
   }
