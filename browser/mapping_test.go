@@ -429,7 +429,7 @@ type elementHandleAPI interface {
 	Dblclick(opts goja.Value) error
 	DispatchEvent(typ string, props goja.Value) error
 	Fill(value string, opts goja.Value) error
-	Focus()
+	Focus() error
 	GetAttribute(name string) goja.Value
 	Hover(opts goja.Value)
 	InnerHTML() string

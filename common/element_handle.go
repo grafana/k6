@@ -812,17 +812,21 @@ func (h *ElementHandle) Fill(value string, opts goja.Value) error {
 }
 
 // Focus scrolls element into view and focuses the element.
-func (h *ElementHandle) Focus() {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) Focus() error {
+	focus := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.focus(apiCtx, false)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	_, err := call(h.ctx, actFn, opts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "focusing on element: %w", err)
+	focusAction := h.newAction(
+		[]string{}, focus, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	if _, err := call(h.ctx, focusAction, opts.Timeout); err != nil {
+		return fmt.Errorf("focusing on element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // GetAttribute retrieves the value of specified element attribute.
