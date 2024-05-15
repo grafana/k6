@@ -1707,7 +1707,7 @@ func TestPageTargetBlank(t *testing.T) {
 	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
 		_, err := w.Write([]byte(
 			`<!DOCTYPE html><html><head></head><body>
-				<h1>click please</h1><a href="/link" target="_blank">click me</a>
+				<a href="/link" target="_blank">click me</a>
 			</body></html>`,
 		))
 		require.NoError(t, err)
@@ -1737,21 +1737,19 @@ func TestPageTargetBlank(t *testing.T) {
 	err = p.Click("a[href='/link']", common.NewFrameClickOptions(p.Timeout()))
 	require.NoError(t, err)
 
-	// Page count should now be 2.
-	for i := 0; i < 5; i++ {
-		pp = p.Context().Pages()
-		if len(pp) == 2 {
-			break
-		}
-		time.Sleep(time.Millisecond * 500)
-	}
+	// Wait for the page to be created and for it to navigate to the link.
+	obj, err := p.Context().WaitForEvent("page", nil, common.DefaultTimeout)
+	require.NoError(t, err)
+	p2, ok := obj.(*common.Page)
+	require.True(t, ok, "return from WaitForEvent is not a Page")
+
+	p2.WaitForLoadState(common.LifecycleEventLoad.String(), nil)
+
+	// Now there should be 2 pages.
+	pp = p.Context().Pages()
 	assert.Equal(t, 2, len(pp))
 
-	// Make sure the new page is in focus and assert this.
-	// At the moment pages() will not always return the pages in the expected order
-	// (the order they were opened in -- https://github.com/grafana/xk6-browser/issues/444)
-	// so we must check both pages for the expected header.
-	p0 := pp[0].MainFrame().InnerHTML("h1", nil)
-	p1 := pp[1].MainFrame().InnerHTML("h1", nil)
-	assert.True(t, p0 == "you clicked!" || p1 == "you clicked!", "Neither page had the expected h1 text")
+	// Make sure the new page contains the correct page.
+	got := p2.InnerHTML("h1", nil)
+	assert.Equal(t, "you clicked!", got)
 }
