@@ -1414,20 +1414,25 @@ func (h *ElementHandle) Timeout() time.Duration {
 }
 
 // Type scrolls element into view, focuses element and types text.
-func (h *ElementHandle) Type(text string, opts goja.Value) {
-	parsedOpts := NewElementHandleTypeOptions(h.defaultTimeout())
-	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing type options: %v", err)
+func (h *ElementHandle) Type(text string, opts goja.Value) error {
+	popts := NewElementHandleTypeOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing type options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	typ := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.typ(apiCtx, text, NewKeyboardOptions())
 	}
-	actFn := h.newAction([]string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
-	_, err := call(h.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "typing text %q: %w", text, err)
+	typeAction := h.newAction(
+		[]string{}, typ, false, popts.NoWaitAfter, popts.Timeout,
+	)
+	if _, err := call(h.ctx, typeAction, popts.Timeout); err != nil {
+		return fmt.Errorf("typing text %q: %w", text, err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {

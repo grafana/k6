@@ -452,7 +452,7 @@ type elementHandleAPI interface {
 	SetInputFiles(files goja.Value, opts goja.Value) error
 	Tap(opts goja.Value) error
 	TextContent() (string, error)
-	Type(text string, opts goja.Value)
+	Type(text string, opts goja.Value) error
 	Uncheck(opts goja.Value) error
 	WaitForElementState(state string, opts goja.Value)
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
