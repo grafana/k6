@@ -105,6 +105,10 @@ func NewFrameSession(
 		logger:               l,
 	}
 
+	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return nil, fmt.Errorf("run if waiting for debugger to attach: %w", err)
+	}
+
 	var parentNM *NetworkManager
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
@@ -531,8 +535,6 @@ func (fs *FrameSession) initOptions() error {
 	      promises.push(this._evaluateOnNewDocument(source, 'main'));
 	  for (const source of this._crPage._page._evaluateOnNewDocumentSources)
 	      promises.push(this._evaluateOnNewDocument(source, 'main'));*/
-
-	optActions = append(optActions, cdpruntime.RunIfWaitingForDebugger())
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
