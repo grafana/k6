@@ -616,8 +616,10 @@ func (h *ElementHandle) typ(apiCtx context.Context, text string, opts *KeyboardO
 	return nil
 }
 
-func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, force, noWaitAfter bool, timeout time.Duration) error {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(
+	_ context.Context, force, noWaitAfter bool, timeout time.Duration,
+) error {
+	fn := func(apiCtx context.Context, _ *ElementHandle) (any, error) {
 		fn := `
 			(element) => {
 				element.scrollIntoViewIfNeeded(true);
@@ -628,6 +630,7 @@ func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, fo
 			forceCallable: true,
 			returnByValue: true,
 		}
+
 		return h.eval(apiCtx, opts, fn)
 	}
 	actFn := h.newAction([]string{"visible", "stable"}, fn, force, noWaitAfter, timeout)
@@ -1246,16 +1249,21 @@ func (h *ElementHandle) Screenshot(
 	return buf, err
 }
 
-func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing scrollIntoViewIfNeeded options: %w", err)
+// ScrollIntoViewIfNeeded scrolls element into view if needed.
+func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) error {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing scrollIntoViewIfNeeded options: %w", err)
 	}
-	err := h.waitAndScrollIntoViewIfNeeded(h.ctx, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
+
+	err := h.waitAndScrollIntoViewIfNeeded(h.ctx, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "scrolling element into view: %w", err)
+		return fmt.Errorf("scrolling element into view: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []string {
