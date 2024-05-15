@@ -772,13 +772,14 @@ func (h *ElementHandle) Dblclick(opts goja.Value) error {
 
 // DispatchEvent dispatches a DOM event to the element.
 func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+	dispatchEvent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	_, err := call(h.ctx, actFn, opts.Timeout)
-	if err != nil {
+	dispatchEventAction := h.newAction(
+		[]string{}, dispatchEvent, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	if _, err := call(h.ctx, dispatchEventAction, opts.Timeout); err != nil {
 		return fmt.Errorf("dispatching element event %q: %w", typ, err)
 	}
 
