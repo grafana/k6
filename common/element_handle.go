@@ -1435,16 +1435,18 @@ func (h *ElementHandle) Type(text string, opts goja.Value) error {
 	return nil
 }
 
-func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
-	parsedOpts := NewElementHandleWaitForElementStateOptions(h.defaultTimeout())
-	err := parsedOpts.Parse(h.ctx, opts)
-	if err != nil {
-		k6ext.Panic(h.ctx, "parsing waitForElementState options: %w", err)
+// WaitForElementState waits for the element to reach the given state.
+func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) error {
+	popts := NewElementHandleWaitForElementStateOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing waitForElementState options: %w", err)
 	}
-	_, err = h.waitForElementState(h.ctx, []string{state}, parsedOpts.Timeout)
+	_, err := h.waitForElementState(h.ctx, []string{state}, popts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "waiting for element state %q: %w", state, err)
+		return fmt.Errorf("waiting for element state %q: %w", state, err)
 	}
+
+	return nil
 }
 
 // WaitForSelector waits for the selector to appear in the DOM.
