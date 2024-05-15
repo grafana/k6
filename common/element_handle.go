@@ -228,7 +228,7 @@ func compensateHalfIntegerRoundingError(p Position) Position {
 	return p
 }
 
-func (h *ElementHandle) dblClick(p *Position, opts *MouseClickOptions) error {
+func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
 	return h.frame.page.Mouse.click(p.X, p.Y, opts)
 }
 
@@ -750,20 +750,24 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 	return frame, nil
 }
 
-func (h *ElementHandle) Dblclick(opts goja.Value) {
-	actionOpts := NewElementHandleDblclickOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element double click options: %w", err)
+// Dblclick scrolls element into view and double clicks on the element.
+func (h *ElementHandle) Dblclick(opts goja.Value) error {
+	popts := NewElementHandleDblclickOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing element double click options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
-		return nil, handle.dblClick(p, actionOpts.ToMouseClickOptions())
+
+	dblclick := func(_ context.Context, handle *ElementHandle, p *Position) (any, error) {
+		return nil, handle.dblclick(p, popts.ToMouseClickOptions())
 	}
-	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "double clicking on element: %w", err)
+	dblclickAction := h.newPointerAction(dblclick, &popts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, dblclickAction, popts.Timeout); err != nil {
+		return fmt.Errorf("double clicking on element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // DispatchEvent dispatches a DOM event to the element.

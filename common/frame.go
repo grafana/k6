@@ -738,7 +738,7 @@ func (f *Frame) Dblclick(selector string, opts goja.Value) {
 // an error, or applies slow motion.
 func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
 	dblclick := func(apiCtx context.Context, eh *ElementHandle, p *Position) (any, error) {
-		return nil, eh.dblClick(p, opts.ToMouseClickOptions())
+		return nil, eh.dblclick(p, opts.ToMouseClickOptions())
 	}
 	act := f.newPointerAction(
 		selector, DOMElementStateAttached, opts.Strict, dblclick, &opts.ElementHandleBasePointerOptions,
