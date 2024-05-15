@@ -1383,21 +1383,28 @@ func (h *ElementHandle) tap(_ context.Context, p *Position) error {
 	return h.frame.page.Touchscreen.tap(p.X, p.Y)
 }
 
-func (h *ElementHandle) TextContent() string {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+// TextContent returns the text content of the element.
+func (h *ElementHandle) TextContent() (string, error) {
+	textContent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.textContent(apiCtx)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	textContentAction := h.newAction(
+		[]string{}, textContent, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	v, err := call(h.ctx, textContentAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting text content of element: %w", err)
+		return "", fmt.Errorf("getting text content of element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
 
-	// TODO: handle error
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+	}
 
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // Timeout will return the default timeout or the one set by the user.
