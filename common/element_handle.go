@@ -997,12 +997,14 @@ func (h *ElementHandle) IsHidden() (bool, error) {
 }
 
 // IsVisible checks if the element is visible.
-func (h *ElementHandle) IsVisible() bool {
-	result, err := h.isVisible(h.ctx)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is visible: %w", err)
+func (h *ElementHandle) IsVisible() (bool, error) {
+	ok, err := h.isVisible(h.ctx)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is visible: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // OwnerFrame returns the frame containing this element.
