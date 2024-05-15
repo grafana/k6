@@ -1082,9 +1082,9 @@ func (h *ElementHandle) Press(key string, opts goja.Value) error {
 func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
-		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
+		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
 	}
-	fn := `
+	querySelector := `
 		(node, injected, selector, strict) => {
 			return injected.querySelector(selector, strict, node || document);
 		}
@@ -1093,7 +1093,7 @@ func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, err
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector, strict)
+	result, err := h.evalWithScript(h.ctx, opts, querySelector, parsedSelector, strict)
 	if err != nil {
 		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
