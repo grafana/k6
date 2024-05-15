@@ -1113,8 +1113,6 @@ func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, err
 // QueryAll queries element subtree for matching elements.
 // If no element matches the selector, the return value resolves to "null".
 func (h *ElementHandle) QueryAll(selector string) ([]*ElementHandle, error) {
-	defer applySlowMo(h.ctx)
-
 	handles, err := h.queryAll(selector, h.evalWithScript)
 	if err != nil {
 		return nil, fmt.Errorf("querying all selector %q: %w", selector, err)
