@@ -445,7 +445,7 @@ type elementHandleAPI interface {
 	Press(key string, opts goja.Value) error
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
-	Screenshot(opts goja.Value) goja.ArrayBuffer
+	Screenshot(opts goja.Value) (goja.ArrayBuffer, error)
 	ScrollIntoViewIfNeeded(opts goja.Value)
 	SelectOption(values goja.Value, opts goja.Value) []string
 	SelectText(opts goja.Value)
