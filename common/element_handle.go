@@ -942,12 +942,14 @@ func (h *ElementHandle) InputValue(opts goja.Value) (string, error) {
 }
 
 // IsChecked checks if a checkbox or radio is checked.
-func (h *ElementHandle) IsChecked() bool {
-	result, err := h.isChecked(h.ctx, 0)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is checked: %w", err)
+func (h *ElementHandle) IsChecked() (bool, error) {
+	ok, err := h.isChecked(h.ctx, 0)
+	// We don't care about timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is checked: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsDisabled checks if the element is disabled.

@@ -295,13 +295,17 @@ func TestElementHandleIsChecked(t *testing.T) {
 	element, err := p.Query("input")
 	require.NoError(t, err)
 
-	assert.True(t, element.IsChecked(), "expected checkbox to be checked")
+	checked, err := element.IsChecked()
+	require.NoError(t, err)
+	assert.True(t, checked, "expected checkbox to be checked")
 	element.Dispose()
 
 	p.SetContent(`<input type="checkbox">`, nil)
 	element, err = p.Query("input")
 	require.NoError(t, err)
-	assert.False(t, element.IsChecked(), "expected checkbox to be unchecked")
+	checked, err = element.IsChecked()
+	require.NoError(t, err)
+	assert.False(t, checked, "expected checkbox to be unchecked")
 	element.Dispose()
 }
 
