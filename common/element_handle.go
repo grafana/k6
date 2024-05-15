@@ -953,12 +953,14 @@ func (h *ElementHandle) IsChecked() (bool, error) {
 }
 
 // IsDisabled checks if the element is disabled.
-func (h *ElementHandle) IsDisabled() bool {
-	result, err := h.isDisabled(h.ctx, 0)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is disabled: %w", err)
+func (h *ElementHandle) IsDisabled() (bool, error) {
+	ok, err := h.isDisabled(h.ctx, 0)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is disabled: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsEditable checks if the element is editable.

@@ -436,7 +436,7 @@ type elementHandleAPI interface {
 	InnerText() (string, error)
 	InputValue(opts goja.Value) (string, error)
 	IsChecked() (bool, error)
-	IsDisabled() bool
+	IsDisabled() (bool, error)
 	IsEditable() bool
 	IsEnabled() bool
 	IsHidden() bool
