@@ -1266,27 +1266,31 @@ func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) error {
 	return nil
 }
 
-func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []string {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing selectOption options: %w", err)
+// SelectOption selects the options matching the given values.
+func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) ([]string, error) {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return nil, fmt.Errorf("parsing selectOption options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	selectOption := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.selectOption(apiCtx, values)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	selectedOptions, err := call(h.ctx, actFn, actionOpts.Timeout)
+	selectOptionAction := h.newAction(
+		[]string{}, selectOption, aopts.Force, aopts.NoWaitAfter, aopts.Timeout,
+	)
+	selectedOptions, err := call(h.ctx, selectOptionAction, aopts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "selecting options: %w", err)
+		return nil, fmt.Errorf("selecting options: %w", err)
 	}
 	var returnVal []string
 	if err := convert(selectedOptions, &returnVal); err != nil {
-		k6ext.Panic(h.ctx, "unpacking selected options: %w", err)
+		return nil, fmt.Errorf("unpacking selected options: %w", err)
 	}
 
 	applySlowMo(h.ctx)
 
-	return returnVal
+	return returnVal, nil
 }
 
 func (h *ElementHandle) SelectText(opts goja.Value) {
