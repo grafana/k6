@@ -431,7 +431,7 @@ type elementHandleAPI interface {
 	Fill(value string, opts goja.Value) error
 	Focus() error
 	GetAttribute(name string) (any, error)
-	Hover(opts goja.Value)
+	Hover(opts goja.Value) error
 	InnerHTML() string
 	InnerText() string
 	InputValue(opts goja.Value) string

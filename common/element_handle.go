@@ -850,20 +850,23 @@ func (h *ElementHandle) GetAttribute(name string) (any, error) {
 }
 
 // Hover scrolls element into view and hovers over its center point.
-func (h *ElementHandle) Hover(opts goja.Value) {
-	actionOpts := NewElementHandleHoverOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element hover options: %w", err)
+func (h *ElementHandle) Hover(opts goja.Value) error {
+	aopts := NewElementHandleHoverOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing element hover options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+
+	hover := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.hover(apiCtx, p)
 	}
-	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "hovering on element: %w", err)
+	hoverAction := h.newPointerAction(hover, &aopts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, hoverAction, aopts.Timeout); err != nil {
+		return fmt.Errorf("hovering on element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // InnerHTML returns the inner HTML of the element.
