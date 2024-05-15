@@ -5,10 +5,10 @@ import (
 	"runtime"
 	"testing"
 
-	"github.com/grafana/xk6-browser/keyboardlayout"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/keyboardlayout"
 )
 
 func TestKeyboardPress(t *testing.T) {
@@ -22,11 +22,9 @@ func TestKeyboardPress(t *testing.T) {
 		kb := p.GetKeyboard()
 		layout := keyboardlayout.GetKeyboardLayout("us")
 
-		assert.NotPanics(t, func() {
-			for k := range layout.Keys {
-				require.NoError(t, kb.Press(string(k), nil))
-			}
-		})
+		for k := range layout.Keys {
+			assert.NoError(t, kb.Press(string(k), nil))
+		}
 	})
 
 	t.Run("backspace", func(t *testing.T) {
@@ -227,7 +225,7 @@ func TestKeyboardPress(t *testing.T) {
 			require.NoError(t, kb.Press("ArrowLeft", nil))
 		}
 		// Should release the key but the selection should remain active.
-		kb.Up("Shift")
+		require.NoError(t, kb.Up("Shift"))
 		// Should delete the selection.
 		require.NoError(t, kb.Press("Backspace", nil))
 
