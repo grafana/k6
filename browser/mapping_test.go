@@ -439,7 +439,7 @@ type elementHandleAPI interface {
 	IsDisabled() (bool, error)
 	IsEditable() (bool, error)
 	IsEnabled() (bool, error)
-	IsHidden() bool
+	IsHidden() (bool, error)
 	IsVisible() bool
 	OwnerFrame() (*common.Frame, error)
 	Press(key string, opts goja.Value)

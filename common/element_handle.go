@@ -986,12 +986,14 @@ func (h *ElementHandle) IsEnabled() (bool, error) {
 }
 
 // IsHidden checks if the element is hidden.
-func (h *ElementHandle) IsHidden() bool {
-	result, err := h.isHidden(h.ctx)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is hidden: %w", err)
+func (h *ElementHandle) IsHidden() (bool, error) {
+	ok, err := h.isHidden(h.ctx)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is hidden: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsVisible checks if the element is visible.
