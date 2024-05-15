@@ -1293,20 +1293,25 @@ func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) ([]stri
 	return returnVal, nil
 }
 
-func (h *ElementHandle) SelectText(opts goja.Value) {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing selectText options: %w", err)
+// SelectText selects the text of the element.
+func (h *ElementHandle) SelectText(opts goja.Value) error {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing selectText options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+	selectText := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.selectText(apiCtx)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := call(h.ctx, actFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "selecting text: %w", err)
+	selectTextAction := h.newAction(
+		[]string{}, selectText, aopts.Force, aopts.NoWaitAfter, aopts.Timeout,
+	)
+	if _, err := call(h.ctx, selectTextAction, aopts.Timeout); err != nil {
+		return fmt.Errorf("selecting text: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // SetInputFiles sets the given files into the input file element.
