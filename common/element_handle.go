@@ -1650,11 +1650,11 @@ func errorFromDOMError(v any) error {
 		serr = e
 	case error:
 		if e == nil {
-			panic("DOM error is nil")
+			return errors.New("DOM error is nil")
 		}
 		err, serr = e, e.Error()
 	default:
-		panic(fmt.Errorf("unexpected DOM error type %T", v))
+		return fmt.Errorf("unexpected DOM error type %T", v)
 	}
 	var uerr *k6ext.UserFriendlyError
 	if errors.As(err, &uerr) {
