@@ -1113,22 +1113,23 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHand
 }
 
 // SetChecked checks or unchecks an element.
-func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
-	parsedOpts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
-	err := parsedOpts.Parse(h.ctx, opts)
-	if err != nil {
-		k6ext.Panic(h.ctx, "parsing setChecked options: %w", err)
+func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) error {
+	popts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing setChecked options: %w", err)
 	}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+	setChecked := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.setChecked(apiCtx, checked, p)
 	}
-	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
-	_, err = call(h.ctx, pointerFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "checking element: %w", err)
+	setCheckedAction := h.newPointerAction(setChecked, &popts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, setCheckedAction, popts.Timeout); err != nil {
+		return fmt.Errorf("checking element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // Uncheck scrolls element into view, and if it's an input element of type
@@ -1139,8 +1140,8 @@ func (h *ElementHandle) Uncheck(opts goja.Value) {
 
 // Check scrolls element into view, and if it's an input element of type
 // checkbox that is unchecked, clicks on it to mark it as checked.
-func (h *ElementHandle) Check(opts goja.Value) {
-	h.SetChecked(true, opts)
+func (h *ElementHandle) Check(opts goja.Value) error {
+	return h.SetChecked(true, opts)
 }
 
 func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Position) error {

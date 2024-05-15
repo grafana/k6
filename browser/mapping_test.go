@@ -423,7 +423,7 @@ type elementHandleAPI interface {
 	common.JSHandleAPI
 
 	BoundingBox() (*common.Rect, error)
-	Check(opts goja.Value)
+	Check(opts goja.Value) error
 	Click(opts goja.Value) error
 	ContentFrame() (*common.Frame, error)
 	Dblclick(opts goja.Value)
