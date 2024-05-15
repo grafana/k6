@@ -453,7 +453,7 @@ type elementHandleAPI interface {
 	Tap(opts goja.Value) error
 	TextContent() string
 	Type(text string, opts goja.Value)
-	Uncheck(opts goja.Value)
+	Uncheck(opts goja.Value) error
 	WaitForElementState(state string, opts goja.Value)
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 }

@@ -1134,8 +1134,8 @@ func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) error {
 
 // Uncheck scrolls element into view, and if it's an input element of type
 // checkbox that is already checked, clicks on it to mark it as unchecked.
-func (h *ElementHandle) Uncheck(opts goja.Value) {
-	h.SetChecked(false, opts)
+func (h *ElementHandle) Uncheck(opts goja.Value) error {
+	return h.SetChecked(false, opts)
 }
 
 // Check scrolls element into view, and if it's an input element of type
