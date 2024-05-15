@@ -830,21 +830,23 @@ func (h *ElementHandle) Focus() error {
 }
 
 // GetAttribute retrieves the value of specified element attribute.
-func (h *ElementHandle) GetAttribute(name string) any {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) GetAttribute(name string) (any, error) {
+	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	getAttributeAction := h.newAction(
+		[]string{}, getAttribute, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+
+	v, err := call(h.ctx, getAttributeAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting attribute of %q: %q", name, err)
+		return nil, fmt.Errorf("getting attribute %q of element: %w", name, err)
 	}
+
 	applySlowMo(h.ctx)
 
-	// TODO: return any with error
-
-	return v
+	return v, nil
 }
 
 // Hover scrolls element into view and hovers over its center point.

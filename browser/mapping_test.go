@@ -430,7 +430,7 @@ type elementHandleAPI interface {
 	DispatchEvent(typ string, props goja.Value) error
 	Fill(value string, opts goja.Value) error
 	Focus() error
-	GetAttribute(name string) goja.Value
+	GetAttribute(name string) (any, error)
 	Hover(opts goja.Value)
 	InnerHTML() string
 	InnerText() string
