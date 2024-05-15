@@ -870,21 +870,27 @@ func (h *ElementHandle) Hover(opts goja.Value) error {
 }
 
 // InnerHTML returns the inner HTML of the element.
-func (h *ElementHandle) InnerHTML() string {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) InnerHTML() (string, error) {
+	innerHTML := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.innerHTML(apiCtx)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	innerHTMLAction := h.newAction(
+		[]string{}, innerHTML, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	v, err := call(h.ctx, innerHTMLAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting element's inner HTML: %w", err)
+		return "", fmt.Errorf("getting element's inner HTML: %w", err)
 	}
+
 	applySlowMo(h.ctx)
 
-	// TODO: handle error
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+	}
 
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // InnerText returns the inner text of the element.
