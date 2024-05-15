@@ -455,9 +455,9 @@ func TestElementHandlePress(t *testing.T) {
 	el, err := p.Query("input")
 	require.NoError(t, err)
 
-	el.Press("Shift+KeyA", nil)
-	el.Press("KeyB", nil)
-	el.Press("Shift+KeyC", nil)
+	require.NoError(t, el.Press("Shift+KeyA", nil))
+	require.NoError(t, el.Press("KeyB", nil))
+	require.NoError(t, el.Press("Shift+KeyC", nil))
 
 	v, err := el.InputValue(nil)
 	require.NoError(t, err)

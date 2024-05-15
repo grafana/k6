@@ -1052,20 +1052,26 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 	return frame, nil
 }
 
-func (h *ElementHandle) Press(key string, opts goja.Value) {
-	parsedOpts := NewElementHandlePressOptions(h.defaultTimeout())
-	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing press %q options: %v", key, err)
+// Press scrolls element into view and presses the given keys.
+func (h *ElementHandle) Press(key string, opts goja.Value) error {
+	popts := NewElementHandlePressOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing press %q options: %w", key, err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	press := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.press(apiCtx, key, NewKeyboardOptions())
 	}
-	actFn := h.newAction([]string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
-	_, err := call(h.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "pressing %q: %v", key, err)
+	pressAction := h.newAction(
+		[]string{}, press, false, popts.NoWaitAfter, popts.Timeout,
+	)
+	if _, err := call(h.ctx, pressAction, popts.Timeout); err != nil {
+		return fmt.Errorf("pressing %q on element: %w", key, err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,

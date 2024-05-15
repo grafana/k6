@@ -442,7 +442,7 @@ type elementHandleAPI interface {
 	IsHidden() (bool, error)
 	IsVisible() (bool, error)
 	OwnerFrame() (*common.Frame, error)
-	Press(key string, opts goja.Value)
+	Press(key string, opts goja.Value) error
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Screenshot(opts goja.Value) goja.ArrayBuffer
