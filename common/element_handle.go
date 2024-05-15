@@ -1316,8 +1316,8 @@ func (h *ElementHandle) SelectText(opts goja.Value) error {
 
 // SetInputFiles sets the given files into the input file element.
 func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) error {
-	actionOpts := NewElementHandleSetInputFilesOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
+	aopts := NewElementHandleSetInputFilesOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
 		return fmt.Errorf("parsing setInputFiles options: %w", err)
 	}
 
@@ -1327,12 +1327,11 @@ func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) error {
 		return fmt.Errorf("parsing setInputFiles parameter: %w", err)
 	}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.setInputFiles(apiCtx, actionParam.Payload)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := call(h.ctx, actFn, actionOpts.Timeout)
-	if err != nil {
+	setInputFilesAction := h.newAction([]string{}, setInputFiles, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
+	if _, err := call(h.ctx, setInputFilesAction, aopts.Timeout); err != nil {
 		return fmt.Errorf("setting input files: %w", err)
 	}
 

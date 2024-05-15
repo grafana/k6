@@ -449,7 +449,7 @@ type elementHandleAPI interface {
 	ScrollIntoViewIfNeeded(opts goja.Value) error
 	SelectOption(values goja.Value, opts goja.Value) ([]string, error)
 	SelectText(opts goja.Value) error
-	SetInputFiles(files goja.Value, opts goja.Value)
+	SetInputFiles(files goja.Value, opts goja.Value) error
 	Tap(opts goja.Value) error
 	TextContent() string
 	Type(text string, opts goja.Value)
