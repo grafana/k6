@@ -1699,3 +1699,59 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 		})
 	}
 }
+
+func TestPageTargetBlank(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write([]byte(
+			`<!DOCTYPE html><html><head></head><body>
+				<h1>click please</h1><a href="/link" target="_blank">click me</a>
+			</body></html>`,
+		))
+		require.NoError(t, err)
+	})
+	tb.withHandler("/link", func(w http.ResponseWriter, _ *http.Request) {
+		_, err := w.Write(
+			[]byte(`<!DOCTYPE html><html><head></head><body><h1>you clicked!</h1></body></html>`),
+		)
+		require.NoError(t, err)
+	})
+
+	p := tb.NewPage(nil)
+
+	// Navigate to the page with a link that opens a new page.
+	opts := &common.FrameGotoOptions{
+		Timeout: common.DefaultTimeout,
+	}
+	resp, err := p.Goto(tb.url("/home"), opts)
+	require.NoError(t, err)
+	require.NotNil(t, resp)
+
+	// Current page count should be 1.
+	pp := p.Context().Pages()
+	assert.Equal(t, 1, len(pp))
+
+	// This link should open the link on a new page.
+	err = p.Click("a[href='/link']", common.NewFrameClickOptions(p.Timeout()))
+	require.NoError(t, err)
+
+	// Page count should now be 2.
+	for i := 0; i < 5; i++ {
+		pp = p.Context().Pages()
+		if len(pp) == 2 {
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
+	}
+	assert.Equal(t, 2, len(pp))
+
+	// Make sure the new page is in focus and assert this.
+	// At the moment pages() will not always return the pages in the expected order
+	// (the order they were opened in -- https://github.com/grafana/xk6-browser/issues/444)
+	// so we must check both pages for the expected header.
+	p0 := pp[0].MainFrame().InnerHTML("h1", nil)
+	p1 := pp[1].MainFrame().InnerHTML("h1", nil)
+	assert.True(t, p0 == "you clicked!" || p1 == "you clicked!", "Neither page had the expected h1 text")
+}
