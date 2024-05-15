@@ -433,7 +433,7 @@ type elementHandleAPI interface {
 	GetAttribute(name string) (any, error)
 	Hover(opts goja.Value) error
 	InnerHTML() (string, error)
-	InnerText() string
+	InnerText() (string, error)
 	InputValue(opts goja.Value) string
 	IsChecked() bool
 	IsDisabled() bool

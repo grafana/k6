@@ -894,21 +894,27 @@ func (h *ElementHandle) InnerHTML() (string, error) {
 }
 
 // InnerText returns the inner text of the element.
-func (h *ElementHandle) InnerText() string {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) InnerText() (string, error) {
+	innerText := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.innerText(apiCtx)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	innerTextAction := h.newAction(
+		[]string{}, innerText, opts.Force, opts.NoWaitAfter, opts.Timeout.Abs(),
+	)
+	v, err := call(h.ctx, innerTextAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting element's inner text: %w", err)
+		return "", fmt.Errorf("getting element's inner text: %w", err)
 	}
+
 	applySlowMo(h.ctx)
 
-	// TODO: handle error
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+	}
 
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 func (h *ElementHandle) InputValue(opts goja.Value) string {
