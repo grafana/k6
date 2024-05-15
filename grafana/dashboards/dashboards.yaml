@@ -1,0 +1,14 @@
+# For configuration options, see
+#   https://grafana.com/docs/grafana/latest/administration/provisioning/#dashboards
+
+apiVersion: 1
+
+providers:
+  # We're defining a directory from which to load file-based dashboards
+  - name: 'prometheus'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 10
+    editable: true
+    options:
+      path: /etc/grafana/provisioning/dashboards
