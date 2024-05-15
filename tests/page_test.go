@@ -495,7 +495,7 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 		`¯\_(ツ)_/¯`,
 	}
 	for _, want := range wants {
-		el.Fill("", nil)
+		require.NoError(t, el.Fill("", nil))
 		el.Type(want, nil)
 
 		got := el.InputValue(nil)

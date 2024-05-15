@@ -428,7 +428,7 @@ type elementHandleAPI interface {
 	ContentFrame() (*common.Frame, error)
 	Dblclick(opts goja.Value) error
 	DispatchEvent(typ string, props goja.Value)
-	Fill(value string, opts goja.Value)
+	Fill(value string, opts goja.Value) error
 	Focus()
 	GetAttribute(name string) goja.Value
 	Hover(opts goja.Value)

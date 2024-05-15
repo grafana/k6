@@ -787,21 +787,27 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
 	return nil
 }
 
-func (h *ElementHandle) Fill(value string, opts goja.Value) {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element fill options: %w", err)
+// Fill types the given value into the element.
+func (h *ElementHandle) Fill(value string, opts goja.Value) error {
+	popts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing element fill options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	fill := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.fill(apiCtx, value)
 	}
-	actFn := h.newAction([]string{"visible", "enabled", "editable"},
-		fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := call(h.ctx, actFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "handling element fill action: %w", err)
+	fillAction := h.newAction(
+		[]string{"visible", "enabled", "editable"},
+		fill, popts.Force, popts.NoWaitAfter, popts.Timeout,
+	)
+	if _, err := call(h.ctx, fillAction, popts.Timeout); err != nil {
+		return fmt.Errorf("filling element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // Focus scrolls element into view and focuses the element.
