@@ -42,10 +42,14 @@ func TestKeyboardPress(t *testing.T) {
 		p.Focus("input", nil)
 
 		require.NoError(t, kb.Type("Hello World!", nil))
-		require.Equal(t, "Hello World!", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		require.Equal(t, "Hello World!", v)
 
 		require.NoError(t, kb.Press("Backspace", nil))
-		assert.Equal(t, "Hello World", el.InputValue(nil))
+		v, err = el.InputValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "Hello World", v)
 	})
 
 	t.Run("combo", func(t *testing.T) {
@@ -72,7 +76,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Press("Control+J", nil))
 		require.NoError(t, kb.Press("Control+k", nil))
 
-		require.Equal(t, "+=@6AbC", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		require.Equal(t, "+=@6AbC", v)
 	})
 
 	t.Run("meta", func(t *testing.T) {
@@ -91,7 +97,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Press("Shift+b", nil))
 		require.NoError(t, kb.Press("Shift+C", nil))
 
-		require.Equal(t, "AbC", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		require.Equal(t, "AbC", v)
 
 		metaKey := "Control"
 		if runtime.GOOS == "darwin" {
@@ -99,7 +107,9 @@ func TestKeyboardPress(t *testing.T) {
 		}
 		require.NoError(t, kb.Press(metaKey+"+A", nil))
 		require.NoError(t, kb.Press("Delete", nil))
-		assert.Equal(t, "", el.InputValue(nil))
+		v, err = el.InputValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "", v)
 	})
 
 	t.Run("type does not split on +", func(t *testing.T) {
@@ -115,7 +125,9 @@ func TestKeyboardPress(t *testing.T) {
 		p.Focus("textarea", nil)
 
 		require.NoError(t, kb.Type("L+m+KeyN", nil))
-		assert.Equal(t, "L+m+KeyN", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "L+m+KeyN", v)
 	})
 
 	t.Run("capitalization", func(t *testing.T) {
@@ -143,7 +155,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Up("KeyH"))
 		require.NoError(t, kb.Up("Shift"))
 
-		assert.Equal(t, "CdefGH", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "CdefGH", v)
 	})
 
 	t.Run("type not affected by shift", func(t *testing.T) {
@@ -162,7 +176,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Type("oPqR", nil))
 		require.NoError(t, kb.Up("Shift"))
 
-		assert.Equal(t, "oPqR", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "oPqR", v)
 	})
 
 	t.Run("newline", func(t *testing.T) {
@@ -181,7 +197,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, kb.Press("Enter", nil))
 		require.NoError(t, kb.Press("Enter", nil))
 		require.NoError(t, kb.Type("World!", nil))
-		assert.Equal(t, "Hello\n\nWorld!", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "Hello\n\nWorld!", v)
 	})
 
 	// Replicates the test from https://playwright.dev/docs/api/class-keyboard
@@ -198,7 +216,9 @@ func TestKeyboardPress(t *testing.T) {
 		p.Focus("input", nil)
 
 		require.NoError(t, kb.Type("Hello World!", nil))
-		require.Equal(t, "Hello World!", el.InputValue(nil))
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		require.Equal(t, "Hello World!", v)
 
 		require.NoError(t, kb.Press("ArrowLeft", nil))
 		// Should hold the key until Up() is called.
@@ -211,6 +231,8 @@ func TestKeyboardPress(t *testing.T) {
 		// Should delete the selection.
 		require.NoError(t, kb.Press("Backspace", nil))
 
-		assert.Equal(t, "Hello!", el.InputValue(nil))
+		require.NoError(t, err)
+		require.NoError(t, err)
+		assert.Equal(t, "Hello World!", v)
 	})
 }

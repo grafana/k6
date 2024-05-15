@@ -264,21 +264,24 @@ func TestElementHandleInputValue(t *testing.T) {
 	element, err := p.Query("input")
 	require.NoError(t, err)
 
-	value := element.InputValue(nil)
+	value, err := element.InputValue(nil)
+	require.NoError(t, err)
 	element.Dispose()
 	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
 
 	element, err = p.Query("select")
 	require.NoError(t, err)
 
-	value = element.InputValue(nil)
+	value, err = element.InputValue(nil)
+	require.NoError(t, err)
 	element.Dispose()
 	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
 
 	element, err = p.Query("textarea")
 	require.NoError(t, err)
 
-	value = element.InputValue(nil)
+	value, err = element.InputValue(nil)
+	require.NoError(t, err)
 	element.Dispose()
 	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
 }
@@ -452,7 +455,9 @@ func TestElementHandlePress(t *testing.T) {
 	el.Press("KeyB", nil)
 	el.Press("Shift+KeyC", nil)
 
-	require.Equal(t, "AbC", el.InputValue(nil))
+	v, err := el.InputValue(nil)
+	require.NoError(t, err)
+	require.Equal(t, "AbC", v)
 }
 
 func TestElementHandleQuery(t *testing.T) {

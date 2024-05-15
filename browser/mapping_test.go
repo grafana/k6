@@ -434,7 +434,7 @@ type elementHandleAPI interface {
 	Hover(opts goja.Value) error
 	InnerHTML() (string, error)
 	InnerText() (string, error)
-	InputValue(opts goja.Value) string
+	InputValue(opts goja.Value) (string, error)
 	IsChecked() bool
 	IsDisabled() bool
 	IsEditable() bool

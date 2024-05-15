@@ -498,7 +498,8 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 		require.NoError(t, el.Fill("", nil))
 		el.Type(want, nil)
 
-		got := el.InputValue(nil)
+		got, err := el.InputValue(nil)
+		require.NoError(t, err)
 		assert.Equal(t, want, got)
 	}
 }

@@ -917,24 +917,28 @@ func (h *ElementHandle) InnerText() (string, error) {
 	return s, nil
 }
 
-func (h *ElementHandle) InputValue(opts goja.Value) string {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element input value options: %w", err)
+// InputValue returns the value of the input element.
+func (h *ElementHandle) InputValue(opts goja.Value) (string, error) {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return "", fmt.Errorf("parsing element input value options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	inputValue := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.inputValue(apiCtx)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	v, err := call(h.ctx, actFn, actionOpts.Timeout)
+	inputValueAction := h.newAction([]string{}, inputValue, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
+	v, err := call(h.ctx, inputValueAction, aopts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting element's input value: %w", err)
+		return "", fmt.Errorf("getting element's input value: %w", err)
 	}
-	applySlowMo(h.ctx)
 
-	// TODO: return error
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+	}
 
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // IsChecked checks if a checkbox or radio is checked.
