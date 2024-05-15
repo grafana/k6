@@ -438,7 +438,7 @@ type elementHandleAPI interface {
 	IsChecked() (bool, error)
 	IsDisabled() (bool, error)
 	IsEditable() (bool, error)
-	IsEnabled() bool
+	IsEnabled() (bool, error)
 	IsHidden() bool
 	IsVisible() bool
 	OwnerFrame() (*common.Frame, error)
