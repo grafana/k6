@@ -449,32 +449,47 @@ func TestLocatorElementState(t *testing.T) {
 
 	tests := []struct {
 		state, eval string
-		query       func(*common.Locator) bool
+		query       func(*common.Locator) (bool, error)
 	}{
 		{
 			"disabled",
 			`() => document.getElementById('inputText').disabled = true`,
-			func(l *common.Locator) bool { resp, _ := l.IsDisabled(nil); return !resp },
+			func(l *common.Locator) (bool, error) {
+				resp, err := l.IsDisabled(nil)
+				return !resp, err
+			},
 		},
 		{
 			"enabled",
 			`() => document.getElementById('inputText').disabled = true`,
-			func(l *common.Locator) bool { resp, _ := l.IsEnabled(nil); return resp },
+			func(l *common.Locator) (bool, error) {
+				resp, err := l.IsEnabled(nil)
+				return resp, err
+			},
 		},
 		{
 			"hidden",
 			`() => document.getElementById('inputText').style.visibility = 'hidden'`,
-			func(l *common.Locator) bool { resp, _ := l.IsHidden(); return !resp },
+			func(l *common.Locator) (bool, error) {
+				resp, err := l.IsHidden()
+				return !resp, err
+			},
 		},
 		{
 			"readOnly",
 			`() => document.getElementById('inputText').readOnly = true`,
-			func(l *common.Locator) bool { resp, _ := l.IsEditable(nil); return resp },
+			func(l *common.Locator) (bool, error) {
+				resp, err := l.IsEditable(nil)
+				return resp, err
+			},
 		},
 		{
 			"visible",
 			`() => document.getElementById('inputText').style.visibility = 'hidden'`,
-			func(l *common.Locator) bool { resp, _ := l.IsVisible(); return resp },
+			func(l *common.Locator) (bool, error) {
+				resp, err := l.IsVisible()
+				return resp, err
+			},
 		},
 	}
 
@@ -496,11 +511,14 @@ func TestLocatorElementState(t *testing.T) {
 			require.NoError(t, err)
 
 			l := p.Locator("#inputText", nil)
-			require.True(t, tt.query(l))
+			result, err := tt.query(l)
+			require.NoError(t, err)
+			require.True(t, result)
 
 			p.Evaluate(tt.eval)
-			require.False(t, tt.query(l))
+			result, err = tt.query(l)
 			require.NoError(t, err)
+			require.False(t, result)
 		})
 	}
 
