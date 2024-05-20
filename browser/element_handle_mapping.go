@@ -156,7 +156,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.ScrollIntoViewIfNeeded(opts) //nolint:wrapcheck
 			})
 		},
-		"selectOption":  eh.SelectOption,
+		"selectOption": func(values goja.Value, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.SelectOption(values, opts) //nolint:wrapcheck
+			})
+		},
 		"selectText":    eh.SelectText,
 		"setInputFiles": eh.SetInputFiles,
 		"tap": func(opts goja.Value) (*goja.Promise, error) {
