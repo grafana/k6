@@ -55,7 +55,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.DispatchEvent(typ, exportArg(eventInit)) //nolint:wrapcheck
 			})
 		},
-		"fill":         eh.Fill,
+		"fill": func(value string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.Fill(value, opts) //nolint:wrapcheck
+			})
+		},
 		"focus":        eh.Focus,
 		"getAttribute": eh.GetAttribute,
 		"hover":        eh.Hover,
