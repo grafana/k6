@@ -15,8 +15,12 @@ import (
 func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:cyclop
 	rt := vu.Runtime()
 	maps := mapping{
-		"boundingBox": eh.BoundingBox,
-		"check":       eh.Check,
+		"boundingBox": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.BoundingBox(), nil
+			})
+		},
+		"check": eh.Check,
 		"click": func(opts goja.Value) (*goja.Promise, error) {
 			ctx := vu.Context()
 
