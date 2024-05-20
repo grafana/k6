@@ -129,7 +129,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return mapFrame(vu, f), nil
 			})
 		},
-		"press": eh.Press,
+		"press": func(key string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.Press(key, opts) //nolint:wrapcheck
+			})
+		},
 		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
 			ctx := vu.Context()
 
