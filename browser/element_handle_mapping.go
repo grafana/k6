@@ -180,7 +180,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.Tap(popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent":         eh.TextContent,
+		"textContent": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.TextContent() //nolint:wrapcheck
+			})
+		},
 		"type":                eh.Type,
 		"uncheck":             eh.Uncheck,
 		"waitForElementState": eh.WaitForElementState,
