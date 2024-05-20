@@ -60,7 +60,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.Fill(value, opts) //nolint:wrapcheck
 			})
 		},
-		"focus":        eh.Focus,
+		"focus": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.Focus() //nolint:wrapcheck
+			})
+		},
 		"getAttribute": eh.GetAttribute,
 		"hover":        eh.Hover,
 		"innerHTML":    eh.InnerHTML,
