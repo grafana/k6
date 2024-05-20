@@ -195,7 +195,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.Uncheck(opts) //nolint:wrapcheck
 			})
 		},
-		"waitForElementState": eh.WaitForElementState,
+		"waitForElementState": func(state string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.WaitForElementState(state, opts) //nolint:wrapcheck
+			})
+		},
 		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
 			eh, err := eh.WaitForSelector(selector, opts)
 			if err != nil {
