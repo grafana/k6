@@ -23,11 +23,13 @@ export default async function() {
 
   try {
     await page.goto('https://test.k6.io/');
+
+    const titleWithCSS = await page.$('header h1.title').textContent();
+    const titleWithXPath = await page.$(`//header//h1[@class="title"]`).textContent();
+
     check(page, {
-      'Title with CSS selector':
-        p => p.$('header h1.title').textContent() == 'test.k6.io',
-      'Title with XPath selector':
-        p => p.$(`//header//h1[@class="title"]`).textContent() == 'test.k6.io',
+      'Title with CSS selector': titleWithCSS == 'test.k6.io',
+      'Title with XPath selector': titleWithXPath == 'test.k6.io',
     });
   } finally {
     page.close();
