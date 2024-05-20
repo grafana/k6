@@ -134,22 +134,22 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.Press(key, opts) //nolint:wrapcheck
 			})
 		},
-		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
-			ctx := vu.Context()
-
+		"screenshot": func(opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewElementHandleScreenshotOptions(eh.Timeout())
-			if err := popts.Parse(ctx, opts); err != nil {
-				return nil, fmt.Errorf("parsing frame screenshot options: %w", err)
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing element handle screenshot options: %w", err)
 			}
 
-			bb, err := eh.Screenshot(popts, vu.filePersister)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				bb, err := eh.Screenshot(popts, vu.filePersister)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
 
-			ab := rt.NewArrayBuffer(bb)
+				ab := rt.NewArrayBuffer(bb)
 
-			return &ab, nil
+				return &ab, nil
+			}), nil
 		},
 		"scrollIntoViewIfNeeded": eh.ScrollIntoViewIfNeeded,
 		"selectOption":           eh.SelectOption,
