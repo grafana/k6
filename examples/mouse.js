@@ -20,8 +20,12 @@ export default async function () {
 
   // Obtain ElementHandle for news link and navigate to it
   // by clicking in the 'a' element's bounding box
-  const newsLinkBox = page.$('a[href="/news.php"]').boundingBox();
-  await page.mouse.click(newsLinkBox.x + newsLinkBox.width / 2, newsLinkBox.y);
+  const newsLinkBox = await page.$('a[href="/news.php"]').boundingBox();
+
+  await Promise.all([
+    page.waitForNavigation(),
+    page.mouse.click(newsLinkBox.x + newsLinkBox.width / 2, newsLinkBox.y)
+  ]);
 
   await page.close();
 }
