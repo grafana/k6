@@ -120,12 +120,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return eh.IsVisible() //nolint:wrapcheck
 			})
 		},
-		"ownerFrame": func() (mapping, error) {
-			f, err := eh.OwnerFrame()
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapFrame(vu, f), nil
+		"ownerFrame": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				f, err := eh.OwnerFrame()
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapFrame(vu, f), nil
+			})
 		},
 		"press": eh.Press,
 		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
