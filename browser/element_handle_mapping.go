@@ -45,7 +45,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return mapFrame(vu, f), nil
 			})
 		},
-		"dblclick": eh.Dblclick,
+		"dblclick": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.Dblclick(opts) //nolint:wrapcheck
+			})
+		},
 		"dispatchEvent": func(typ string, eventInit goja.Value) error {
 			return eh.DispatchEvent(typ, exportArg(eventInit)) //nolint:wrapcheck
 		},
