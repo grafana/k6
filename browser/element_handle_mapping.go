@@ -36,12 +36,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
-		"contentFrame": func() (mapping, error) {
-			f, err := eh.ContentFrame()
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapFrame(vu, f), nil
+		"contentFrame": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				f, err := eh.ContentFrame()
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapFrame(vu, f), nil
+			})
 		},
 		"dblclick": eh.Dblclick,
 		"dispatchEvent": func(typ string, eventInit goja.Value) error {
