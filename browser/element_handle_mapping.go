@@ -10,9 +10,7 @@ import (
 )
 
 // mapElementHandle to the JS module.
-//
-//nolint:funlen
-func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:cyclop
+func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,cyclop,funlen
 	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": func() *goja.Promise {
