@@ -65,17 +65,21 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.Focus() //nolint:wrapcheck
 			})
 		},
-		"getAttribute": eh.GetAttribute,
-		"hover":        eh.Hover,
-		"innerHTML":    eh.InnerHTML,
-		"innerText":    eh.InnerText,
-		"inputValue":   eh.InputValue,
-		"isChecked":    eh.IsChecked,
-		"isDisabled":   eh.IsDisabled,
-		"isEditable":   eh.IsEditable,
-		"isEnabled":    eh.IsEnabled,
-		"isHidden":     eh.IsHidden,
-		"isVisible":    eh.IsVisible,
+		"getAttribute": func(name string) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.GetAttribute(name) //nolint:wrapcheck
+			})
+		},
+		"hover":      eh.Hover,
+		"innerHTML":  eh.InnerHTML,
+		"innerText":  eh.InnerText,
+		"inputValue": eh.InputValue,
+		"isChecked":  eh.IsChecked,
+		"isDisabled": eh.IsDisabled,
+		"isEditable": eh.IsEditable,
+		"isEnabled":  eh.IsEnabled,
+		"isHidden":   eh.IsHidden,
+		"isVisible":  eh.IsVisible,
 		"ownerFrame": func() (mapping, error) {
 			f, err := eh.OwnerFrame()
 			if err != nil {
