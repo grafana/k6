@@ -33,14 +33,21 @@ export default async function() {
   `);
 
   // Check state
+  const isVisible = await page.$('.visible').isVisible();
+  const isHidden = await page.$('.hidden').isHidden();
+  const isEditable = await page.$('.editable').isEditable();
+  const isEnabled = await page.$('.enabled').isEnabled();
+  const isDisabled = await page.$('.disabled').isDisabled();
+  const isChecked = await page.$('.checked').isChecked();
+  const isUnchecked = await page.$('.unchecked').isChecked() === false;
   check(page, {
-    'visible': p => p.$('.visible').isVisible(),
-    'hidden': p => p.$('.hidden').isHidden(),
-    'editable': p => p.$('.editable').isEditable(),
-    'enabled': p => p.$('.enabled').isEnabled(),
-    'disabled': p => p.$('.disabled').isDisabled(),
-    'checked': p => p.$('.checked').isChecked(),
-    'unchecked': p => p.$('.unchecked').isChecked() === false,
+    'visible': isVisible,
+    'hidden': isHidden,
+    'editable': isEditable,
+    'enabled': isEnabled,
+    'disabled': isDisabled,
+    'checked': isChecked,
+    'unchecked': isUnchecked,
   });
 
   page.close();
