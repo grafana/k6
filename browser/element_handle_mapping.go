@@ -110,7 +110,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return eh.IsEnabled() //nolint:wrapcheck
 			})
 		},
-		"isHidden":  eh.IsHidden,
+		"isHidden": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.IsHidden() //nolint:wrapcheck
+			})
+		},
 		"isVisible": eh.IsVisible,
 		"ownerFrame": func() (mapping, error) {
 			f, err := eh.OwnerFrame()
