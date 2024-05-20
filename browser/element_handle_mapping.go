@@ -90,7 +90,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return eh.InputValue(opts) //nolint:wrapcheck
 			})
 		},
-		"isChecked":  eh.IsChecked,
+		"isChecked": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.IsChecked() //nolint:wrapcheck
+			})
+		},
 		"isDisabled": eh.IsDisabled,
 		"isEditable": eh.IsEditable,
 		"isEnabled":  eh.IsEnabled,
