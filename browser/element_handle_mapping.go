@@ -166,7 +166,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.SelectText(opts) //nolint:wrapcheck
 			})
 		},
-		"setInputFiles": eh.SetInputFiles,
+		"setInputFiles": func(files goja.Value, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.SetInputFiles(files, opts) //nolint:wrapcheck
+			})
+		},
 		"tap": func(opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewElementHandleTapOptions(eh.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
