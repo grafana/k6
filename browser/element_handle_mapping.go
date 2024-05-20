@@ -75,7 +75,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.Hover(opts) //nolint:wrapcheck
 			})
 		},
-		"innerHTML":  eh.InnerHTML,
+		"innerHTML": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.InnerHTML() //nolint:wrapcheck
+			})
+		},
 		"innerText":  eh.InnerText,
 		"inputValue": eh.InputValue,
 		"isChecked":  eh.IsChecked,
