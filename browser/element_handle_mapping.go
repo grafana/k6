@@ -200,12 +200,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.WaitForElementState(state, opts) //nolint:wrapcheck
 			})
 		},
-		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
-			eh, err := eh.WaitForSelector(selector, opts)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapElementHandle(vu, eh), nil
+		"waitForSelector": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				eh, err := eh.WaitForSelector(selector, opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapElementHandle(vu, eh), nil
+			})
 		},
 	}
 	maps["$"] = func(selector string) (mapping, error) {
