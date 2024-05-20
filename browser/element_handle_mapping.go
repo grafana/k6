@@ -100,10 +100,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return eh.IsDisabled() //nolint:wrapcheck
 			})
 		},
-		"isEditable": eh.IsEditable,
-		"isEnabled":  eh.IsEnabled,
-		"isHidden":   eh.IsHidden,
-		"isVisible":  eh.IsVisible,
+		"isEditable": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return eh.IsEditable() //nolint:wrapcheck
+			})
+		},
+		"isEnabled": eh.IsEnabled,
+		"isHidden":  eh.IsHidden,
+		"isVisible": eh.IsVisible,
 		"ownerFrame": func() (mapping, error) {
 			f, err := eh.OwnerFrame()
 			if err != nil {
