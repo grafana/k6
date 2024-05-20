@@ -26,10 +26,8 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			})
 		},
 		"click": func(opts goja.Value) (*goja.Promise, error) {
-			ctx := vu.Context()
-
 			popts := common.NewElementHandleClickOptions(eh.Timeout())
-			if err := popts.Parse(ctx, opts); err != nil {
+			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element click options: %w", err)
 			}
 
