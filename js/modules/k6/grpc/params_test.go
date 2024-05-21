@@ -148,15 +148,12 @@ func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime
 
 	testRuntime := modulestest.NewRuntime(t)
 	registry := metrics.NewRegistry()
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.InfoLevel)
 	logger.Out = io.Discard
 
 	state := &lib.State{
-		Group: root,
 		Options: lib.Options{
 			SystemTags: metrics.NewSystemTagSet(
 				metrics.TagName,
@@ -171,7 +168,7 @@ func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime
 
 	testRuntime.MoveToVUContext(state)
 
-	_, err = testRuntime.VU.Runtime().RunString(`let params = ` + paramsJSON + `;`)
+	_, err := testRuntime.VU.Runtime().RunString(`let params = ` + paramsJSON + `;`)
 	require.NoError(t, err)
 
 	params := testRuntime.VU.Runtime().Get("params")

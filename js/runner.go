@@ -48,7 +48,6 @@ var nameToCertWarning sync.Once
 type Runner struct {
 	Bundle       *Bundle
 	preInitState *lib.TestPreInitState
-	defaultGroup *lib.Group
 
 	BaseDialer net.Dialer
 	Resolver   netext.Resolver
@@ -84,16 +83,10 @@ func NewFromArchive(piState *lib.TestPreInitState, arc *lib.Archive) (*Runner, e
 
 // NewFromBundle returns a new Runner from the provided Bundle
 func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
-	defaultGroup, err := lib.NewGroup("", nil)
-	if err != nil {
-		return nil, err
-	}
-
 	defDNS := types.DefaultDNSConfig()
 	r := &Runner{
 		Bundle:       b,
 		preInitState: piState,
-		defaultGroup: defaultGroup,
 		BaseDialer: net.Dialer{
 			Timeout:   30 * time.Second,
 			KeepAlive: 30 * time.Second,
@@ -105,7 +98,7 @@ func NewFromBundle(piState *lib.TestPreInitState, b *Bundle) (*Runner, error) {
 		BufferPool:     lib.NewBufferPool(),
 	}
 
-	err = r.SetOptions(r.Bundle.Options)
+	err := r.SetOptions(r.Bundle.Options)
 
 	return r, err
 }
@@ -248,7 +241,6 @@ func (r *Runner) newVU(
 		VUIDGlobal:     vu.IDGlobal,
 		Samples:        vu.Samples,
 		Tags:           lib.NewVUStateTags(vu.Runner.RunTags),
-		Group:          r.defaultGroup,
 		BuiltinMetrics: r.preInitState.BuiltinMetrics,
 		TracerProvider: r.preInitState.TracerProvider,
 	}
@@ -342,11 +334,6 @@ func (r *Runner) Teardown(ctx context.Context, out chan<- metrics.SampleContaine
 	}
 	_, err := r.runPart(teardownCtx, out, consts.TeardownFn, data)
 	return err
-}
-
-// GetDefaultGroup returns the default (root) Group.
-func (r *Runner) GetDefaultGroup() *lib.Group {
-	return r.defaultGroup
 }
 
 // GetOptions returns the currently calculated [lib.Options] for the given Runner.
@@ -559,17 +546,16 @@ func (r *Runner) runPart(
 	}()
 	vu.moduleVUImpl.ctx = ctx
 
-	group, err := r.GetDefaultGroup().Group(name)
+	groupPath, err := lib.NewGroupPath(lib.RootGroupPath, name)
 	if err != nil {
 		return goja.Undefined(), err
 	}
 
 	if r.Bundle.Options.SystemTags.Has(metrics.TagGroup) {
 		vu.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, group.Path)
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, groupPath)
 		})
 	}
-	vu.state.Group = group
 	v, _, _, err := vu.runFn(ctx, false, fn, nil, vu.Runtime.ToValue(arg))
 
 	if deadlineError := r.checkDeadline(ctx, name, v, err); deadlineError != nil {
@@ -692,7 +678,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		if opts.SystemTags.Has(metrics.TagIter) {
 			tagsAndMeta.SetSystemTagOrMeta(metrics.TagIter, strconv.FormatInt(u.iteration, 10))
 		}
-		tagsAndMeta.SetSystemTagOrMetaIfEnabled(opts.SystemTags, metrics.TagGroup, u.state.Group.Path)
+		tagsAndMeta.SetSystemTagOrMetaIfEnabled(opts.SystemTags, metrics.TagGroup, lib.RootGroupPath)
 		tagsAndMeta.SetSystemTagOrMetaIfEnabled(opts.SystemTags, metrics.TagScenario, params.Scenario)
 	})
 

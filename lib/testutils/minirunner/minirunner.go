@@ -28,7 +28,6 @@ type MiniRunner struct {
 
 	SetupData []byte
 
-	Group        *lib.Group
 	Options      lib.Options
 	PreInitState *lib.TestPreInitState
 
@@ -84,14 +83,6 @@ func (r MiniRunner) Teardown(ctx context.Context, out chan<- metrics.SampleConta
 		return fn(ctx, out)
 	}
 	return nil
-}
-
-// GetDefaultGroup returns the default group.
-func (r MiniRunner) GetDefaultGroup() *lib.Group {
-	if r.Group == nil {
-		r.Group = &lib.Group{}
-	}
-	return r.Group
 }
 
 // IsExecutable satisfies lib.Runner, but is mocked for MiniRunner since
