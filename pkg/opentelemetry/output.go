@@ -4,7 +4,6 @@ package opentelemetry
 import (
 	"context"
 	"fmt"
-	"sync"
 	"time"
 
 	"github.com/sirupsen/logrus"
@@ -25,12 +24,8 @@ type Output struct {
 	periodicFlusher *output.PeriodicFlusher
 	logger          logrus.FieldLogger
 
-	meterProvider *metric.MeterProvider
-	meter         otelMetric.Meter
-
-	counters       sync.Map
-	upDownCounters sync.Map
-	histograms     sync.Map
+	meterProvider   *metric.MeterProvider
+	metricsRegistry *registry
 }
 
 var _ output.WithStopWithTestError = new(Output)
@@ -108,7 +103,7 @@ func (o *Output) Start() error {
 	o.logger.Debug("Started!")
 	o.periodicFlusher = pf
 	o.meterProvider = meterProvider
-	o.meter = meterProvider.Meter("k6")
+	o.metricsRegistry = newRegistry(meterProvider.Meter("k6"), o.logger)
 
 	return nil
 }
@@ -152,29 +147,28 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 
 	switch entry.Metric.Type {
 	case metrics.Counter:
-		counter, err := o.getOrCreateCounter(name)
+		counter, err := o.metricsRegistry.getOrCreateCounter(name)
 		if err != nil {
 			return err
 		}
 
 		counter.Add(ctx, entry.Value, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
 	case metrics.Gauge:
-		gauge, err := o.getOrCreateUpDownCounter(name)
+		gauge, err := o.metricsRegistry.getOrCreateUpDownCounter(name)
 		if err != nil {
 			return err
 		}
 
 		gauge.Add(ctx, entry.Value, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
 	case metrics.Trend:
-		trend, err := o.getOrCreateHistogram(name)
+		trend, err := o.metricsRegistry.getOrCreateHistogram(name)
 		if err != nil {
 			return err
 		}
 
 		trend.Record(ctx, entry.Value, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
 	default:
-		// TODO: add support for other metric types
-		o.logger.Debugf("Drop unsupported metric type: %s", entry.Metric.Name)
+		o.logger.Warnf("metric %q has unsupported metric type", entry.Metric.Name)
 	}
 
 	return nil
@@ -182,64 +176,4 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 
 func normalizeMetricName(cfg Config, name string) string {
 	return cfg.MetricPrefix + name
-}
-
-func (o *Output) getOrCreateCounter(name string) (otelMetric.Float64Counter, error) {
-	if counter, ok := o.counters.Load(name); ok {
-		if v, ok := counter.(otelMetric.Float64Counter); ok {
-			return v, nil
-		}
-
-		return nil, fmt.Errorf("metric %q is not a counter", name)
-	}
-
-	c, err := o.meter.Float64Counter(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create counter for %q: %w", name, err)
-	}
-
-	o.logger.Debugf("registered counter metric %q", name)
-
-	o.counters.Store(name, c)
-	return c, nil
-}
-
-func (o *Output) getOrCreateHistogram(name string) (otelMetric.Float64Histogram, error) {
-	if histogram, ok := o.histograms.Load(name); ok {
-		if v, ok := histogram.(otelMetric.Float64Histogram); ok {
-			return v, nil
-		}
-
-		return nil, fmt.Errorf("metric %q is not a histogram", name)
-	}
-
-	h, err := o.meter.Float64Histogram(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create histogram for %q: %w", name, err)
-	}
-
-	o.logger.Debugf("registered histogram metric %q", name)
-
-	o.histograms.Store(name, h)
-	return h, nil
-}
-
-func (o *Output) getOrCreateUpDownCounter(name string) (otelMetric.Float64UpDownCounter, error) {
-	if counter, ok := o.upDownCounters.Load(name); ok {
-		if v, ok := counter.(otelMetric.Float64UpDownCounter); ok {
-			return v, nil
-		}
-
-		return nil, fmt.Errorf("metric %q is not an up/down counter", name)
-	}
-
-	c, err := o.meter.Float64UpDownCounter(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create up/down counter for %q: %w", name, err)
-	}
-
-	o.logger.Debugf("registered up/down counter (gauge) metric %q ", name)
-
-	o.upDownCounters.Store(name, c)
-	return c, nil
 }
