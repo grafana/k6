@@ -622,10 +622,10 @@ func (p *Page) BringToFront() error {
 }
 
 // Check checks an element matching the provided selector.
-func (p *Page) Check(selector string, opts goja.Value) {
+func (p *Page) Check(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:Check", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Check(selector, opts)
+	return p.MainFrame().Check(selector, opts)
 }
 
 // Uncheck unchecks an element matching the provided selector.
