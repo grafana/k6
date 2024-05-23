@@ -878,9 +878,9 @@ func TestPagePress(t *testing.T) {
 
 	p.SetContent(`<input id="text1">`, nil)
 
-	p.Press("#text1", "Shift+KeyA", nil)
-	p.Press("#text1", "KeyB", nil)
-	p.Press("#text1", "Shift+KeyC", nil)
+	require.NoError(t, p.Press("#text1", "Shift+KeyA", nil))
+	require.NoError(t, p.Press("#text1", "KeyB", nil))
+	require.NoError(t, p.Press("#text1", "Shift+KeyC", nil))
 
 	inputValue, err := p.InputValue("#text1", nil)
 	require.NoError(t, err)

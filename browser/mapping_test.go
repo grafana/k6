@@ -328,7 +328,7 @@ type pageAPI interface {
 	MainFrame() *common.Frame
 	On(event string, handler func(*common.ConsoleMessage) error) error
 	Opener() pageAPI
-	Press(selector string, key string, opts goja.Value)
+	Press(selector string, key string, opts goja.Value) error
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts goja.Value) *common.Response
@@ -401,7 +401,7 @@ type frameAPI interface {
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Page() *common.Page
 	ParentFrame() *common.Frame
-	Press(selector string, key string, opts goja.Value)
+	Press(selector string, key string, opts goja.Value) error
 	SelectOption(selector string, values goja.Value, opts goja.Value) []string
 	SetContent(html string, opts goja.Value)
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)

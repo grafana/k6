@@ -991,10 +991,11 @@ func (p *Page) Opener() *Page {
 	return p.opener
 }
 
-func (p *Page) Press(selector string, key string, opts goja.Value) {
+// Press presses the given key for the first element found that matches the selector.
+func (p *Page) Press(selector string, key string, opts goja.Value) error {
 	p.logger.Debugf("Page:Press", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Press(selector, key, opts)
+	return p.MainFrame().Press(selector, key, opts)
 }
 
 // Query returns the first element matching the specified selector.

@@ -1427,18 +1427,20 @@ func (f *Frame) ParentFrame() *Frame {
 }
 
 // Press presses the given key for the first element found that matches the selector.
-func (f *Frame) Press(selector, key string, opts goja.Value) {
+func (f *Frame) Press(selector, key string, opts goja.Value) error {
 	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q key:%q", f.ID(), f.URL(), selector, key)
 
 	popts := NewFramePressOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing press options: %w", err)
+		return fmt.Errorf("parsing press options: %w", err)
 	}
 	if err := f.press(selector, key, popts); err != nil {
-		k6ext.Panic(f.ctx, "pressing %q on %q: %w", key, selector, err)
+		return fmt.Errorf("pressing %q on %q: %w", key, selector, err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) press(selector, key string, opts *FramePressOptions) error {

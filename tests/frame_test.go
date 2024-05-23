@@ -24,9 +24,9 @@ func TestFramePress(t *testing.T) {
 
 	f := p.Frames()[0]
 
-	f.Press("#text1", "Shift+KeyA", nil)
-	f.Press("#text1", "KeyB", nil)
-	f.Press("#text1", "Shift+KeyC", nil)
+	require.NoError(t, f.Press("#text1", "Shift+KeyA", nil))
+	require.NoError(t, f.Press("#text1", "KeyB", nil))
+	require.NoError(t, f.Press("#text1", "Shift+KeyC", nil))
 
 	inputValue, err := f.InputValue("#text1", nil)
 	require.NoError(t, err)
