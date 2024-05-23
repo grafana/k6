@@ -629,10 +629,10 @@ func (p *Page) Check(selector string, opts goja.Value) error {
 }
 
 // Uncheck unchecks an element matching the provided selector.
-func (p *Page) Uncheck(selector string, opts goja.Value) {
+func (p *Page) Uncheck(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:Uncheck", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Uncheck(selector, opts)
+	return p.MainFrame().Uncheck(selector, opts)
 }
 
 // IsChecked returns true if the first element that matches the selector

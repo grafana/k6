@@ -635,17 +635,20 @@ func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
 }
 
 // Uncheck the first found element that matches the selector.
-func (f *Frame) Uncheck(selector string, opts goja.Value) {
+func (f *Frame) Uncheck(selector string, opts goja.Value) error {
 	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameUncheckOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing frame uncheck options %q: %w", selector, err)
+		return fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
 	}
 	if err := f.uncheck(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "unchecking %q: %w", selector, err)
+		return fmt.Errorf("unchecking %q: %w", selector, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {

@@ -346,7 +346,7 @@ type pageAPI interface {
 	ThrottleNetwork(common.NetworkProfile) error
 	Title() (string, error)
 	Type(selector string, text string, opts goja.Value)
-	Uncheck(selector string, opts goja.Value)
+	Uncheck(selector string, opts goja.Value) error
 	URL() (string, error)
 	ViewportSize() map[string]float64
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
@@ -409,7 +409,7 @@ type frameAPI interface {
 	TextContent(selector string, opts goja.Value) string
 	Title() string
 	Type(selector string, text string, opts goja.Value)
-	Uncheck(selector string, opts goja.Value)
+	Uncheck(selector string, opts goja.Value) error
 	URL() string
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)
