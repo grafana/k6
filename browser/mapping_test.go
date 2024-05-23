@@ -313,7 +313,7 @@ type pageAPI interface {
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
 	Goto(url string, opts goja.Value) (*common.Response, error)
-	Hover(selector string, opts goja.Value)
+	Hover(selector string, opts goja.Value) error
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
 	InputValue(selector string, opts goja.Value) string
@@ -382,7 +382,7 @@ type frameAPI interface {
 	FrameElement() (*common.ElementHandle, error)
 	GetAttribute(selector string, name string, opts goja.Value) (any, error)
 	Goto(url string, opts goja.Value) (*common.Response, error)
-	Hover(selector string, opts goja.Value)
+	Hover(selector string, opts goja.Value) error
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
 	InputValue(selector string, opts goja.Value) string

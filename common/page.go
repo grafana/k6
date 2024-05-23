@@ -856,10 +856,11 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	return resp, nil
 }
 
-func (p *Page) Hover(selector string, opts goja.Value) {
+// Hover hovers over an element matching the provided selector.
+func (p *Page) Hover(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:Hover", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Hover(selector, opts)
+	return p.MainFrame().Hover(selector, opts)
 }
 
 func (p *Page) InnerHTML(selector string, opts goja.Value) string {
