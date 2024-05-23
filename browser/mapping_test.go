@@ -308,7 +308,7 @@ type pageAPI interface {
 	Fill(selector string, value string, opts goja.Value) error
 	Focus(selector string, opts goja.Value) error
 	Frames() []*common.Frame
-	GetAttribute(selector string, name string, opts goja.Value) goja.Value
+	GetAttribute(selector string, name string, opts goja.Value) (any, error)
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
@@ -380,7 +380,7 @@ type frameAPI interface {
 	Fill(selector string, value string, opts goja.Value) error
 	Focus(selector string, opts goja.Value) error
 	FrameElement() (*common.ElementHandle, error)
-	GetAttribute(selector string, name string, opts goja.Value) goja.Value
+	GetAttribute(selector string, name string, opts goja.Value) (any, error)
 	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value)
 	InnerHTML(selector string, opts goja.Value) string

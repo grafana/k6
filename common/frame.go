@@ -948,21 +948,19 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 }
 
 // GetAttribute of the first element found that matches the selector.
-func (f *Frame) GetAttribute(selector, name string, opts goja.Value) any {
+func (f *Frame) GetAttribute(selector, name string, opts goja.Value) (any, error) {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		return nil, fmt.Errorf("parsing get attribute options: %w", err)
 	}
 	v, err := f.getAttribute(selector, name, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting attribute %q of %q: %w", name, selector, err)
+		return nil, fmt.Errorf("getting attribute %q of %q: %w", name, selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return v, nil
 }
 
 func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (any, error) {
