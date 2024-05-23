@@ -303,7 +303,7 @@ type pageAPI interface {
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	EmulateMedia(opts goja.Value)
 	EmulateVisionDeficiency(typ string)
-	Evaluate(pageFunc goja.Value, arg ...goja.Value) any
+	Evaluate(pageFunc goja.Value, arg ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (common.JSHandleAPI, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)
@@ -375,7 +375,7 @@ type frameAPI interface {
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	// EvaluateWithContext for internal use only
 	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)
-	Evaluate(pageFunc goja.Value, args ...goja.Value) any
+	Evaluate(pageFunc goja.Value, args ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
 	Fill(selector string, value string, opts goja.Value)
 	Focus(selector string, opts goja.Value)

@@ -49,8 +49,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
-		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) any {
-			return p.Evaluate(pageFunction.String(), exportArgs(gargs)...)
+		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) (any, error) {
+			return p.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
 		},
 		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
 			jsh, err := p.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)

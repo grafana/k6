@@ -64,7 +64,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				p.Evaluate(`() => void 0`)
+				_, err := p.Evaluate(`() => void 0`)
+				require.NoError(t, err)
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {
@@ -202,7 +203,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				f.Evaluate(`() => void 0`)
+				_, err := f.Evaluate(`() => void 0`)
+				require.NoError(t, err)
 			})
 		})
 		t.Run("evaluateHandle", func(t *testing.T) {

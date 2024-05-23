@@ -35,7 +35,8 @@ func TestLocator(t *testing.T) {
 			"Check", func(_ *testBrowser, p *common.Page) {
 				t.Run("check", func(t *testing.T) {
 					check := func() bool {
-						v := p.Evaluate(`() => window.check`)
+						v, err := p.Evaluate(`() => window.check`)
+						require.NoError(t, err)
 						return asBool(t, v)
 					}
 					l := p.Locator("#inputCheckbox", nil)
@@ -77,7 +78,8 @@ func TestLocator(t *testing.T) {
 				l := p.Locator("#link", nil)
 				err := l.Click(common.NewFrameClickOptions(l.Timeout()))
 				require.NoError(t, err)
-				v := p.Evaluate(`() => window.result`)
+				v, err := p.Evaluate(`() => window.result`)
+				require.NoError(t, err)
 				require.True(t, asBool(t, v), "cannot not click the link")
 			},
 		},
@@ -86,14 +88,16 @@ func TestLocator(t *testing.T) {
 				lo := p.Locator("#linkdbl", nil)
 				require.NoError(t, lo.Dblclick(nil))
 
-				v := p.Evaluate(`() => window.dblclick`)
+				v, err := p.Evaluate(`() => window.dblclick`)
+				require.NoError(t, err)
 				require.True(t, asBool(t, v), "cannot double click the link")
 			},
 		},
 		{
 			"DispatchEvent", func(_ *testBrowser, p *common.Page) {
 				result := func() bool {
-					v := p.Evaluate(`() => window.result`)
+					v, err := p.Evaluate(`() => window.result`)
+					require.NoError(t, err)
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be clicked first")
@@ -133,9 +137,10 @@ func TestLocator(t *testing.T) {
 		{
 			"Focus", func(_ *testBrowser, p *common.Page) {
 				focused := func() bool {
-					v := p.Evaluate(
+					v, err := p.Evaluate(
 						`() => document.activeElement == document.getElementById('inputText')`,
 					)
+					require.NoError(t, err)
 					return asBool(t, v)
 				}
 				lo := p.Locator("#inputText", nil)
@@ -156,7 +161,8 @@ func TestLocator(t *testing.T) {
 		{
 			"Hover", func(_ *testBrowser, p *common.Page) {
 				result := func() bool {
-					v := p.Evaluate(`() => window.result`)
+					v, err := p.Evaluate(`() => window.result`)
+					require.NoError(t, err)
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be hovered first")
@@ -217,7 +223,8 @@ func TestLocator(t *testing.T) {
 		{
 			"Tap", func(_ *testBrowser, p *common.Page) {
 				result := func() bool {
-					v := p.Evaluate(`() => window.result`)
+					v, err := p.Evaluate(`() => window.result`)
+					require.NoError(t, err)
 					return asBool(t, v)
 				}
 				require.False(t, result(), "should not be tapped first")
@@ -515,7 +522,8 @@ func TestLocatorElementState(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, result)
 
-			p.Evaluate(tt.eval)
+			_, err = p.Evaluate(tt.eval)
+			require.NoError(t, err)
 			result, err = tt.query(l)
 			require.NoError(t, err)
 			require.False(t, result)

@@ -770,7 +770,7 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 }
 
 // Evaluate runs JS code within the execution context of the main frame of the page.
-func (p *Page) Evaluate(pageFunc string, args ...any) any {
+func (p *Page) Evaluate(pageFunc string, args ...any) (any, error) {
 	p.logger.Debugf("Page:Evaluate", "sid:%v", p.sessionID())
 
 	return p.MainFrame().Evaluate(pageFunc, args...)
@@ -1179,7 +1179,9 @@ func (p *Page) Title() string {
 	// TODO: return error
 
 	v := `() => document.title`
-	return p.Evaluate(v).(string) //nolint:forcetypeassert
+	s, _ := p.Evaluate(v)
+
+	return s.(string) //nolint:forcetypeassert
 }
 
 // ThrottleCPU will slow the CPU down from chrome's perspective to simulate
@@ -1228,8 +1230,10 @@ func (p *Page) URL() string {
 
 	// TODO: return error
 
-	v := `() => document.location.toString()`
-	return p.Evaluate(v).(string) //nolint:forcetypeassert
+	script := `() => document.location.toString()`
+	v, _ := p.Evaluate(script)
+
+	return v.(string) //nolint:forcetypeassert
 }
 
 // ViewportSize will return information on the viewport width and height.

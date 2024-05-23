@@ -85,7 +85,8 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
         const rect = e.getBoundingClientRect();
         return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
     }`
-	box := p.Evaluate(pageFn, element)
+	box, err := p.Evaluate(pageFn, element)
+	require.NoError(t, err)
 	rect := convert(t, box, &common.Rect{})
 	require.EqualValues(t, bbox, rect)
 }
@@ -108,7 +109,8 @@ func TestElementHandleClick(t *testing.T) {
 	err = button.Click(opts)
 	require.NoError(t, err)
 
-	res := p.Evaluate(`() => window['result']`)
+	res, err := p.Evaluate(`() => window['result']`)
+	require.NoError(t, err)
 	assert.Equal(t, res, "Clicked")
 }
 
@@ -121,7 +123,8 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	p.SetContent(htmlInputButton, nil)
 
 	// Remove all nodes
-	p.Evaluate(`() => delete window['Node']`)
+	_, err := p.Evaluate(`() => delete window['Node']`)
+	require.NoError(t, err)
 
 	button, err := p.Query("button")
 	require.NoError(t, err)
@@ -133,7 +136,8 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	err = button.Click(opts)
 	require.NoError(t, err)
 
-	res := p.Evaluate(`() => window['result']`)
+	res, err := p.Evaluate(`() => window['result']`)
+	require.NoError(t, err)
 	assert.Equal(t, res, "Clicked")
 }
 
@@ -148,7 +152,8 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	require.NoError(t, err)
 
 	// Detach node to panic when clicked
-	p.Evaluate(`button => button.remove()`, button)
+	_, err = p.Evaluate(`button => button.remove()`, button)
+	require.NoError(t, err)
 
 	opts := common.NewElementHandleClickOptions(button.Timeout())
 	// FIX: this is just a workaround because navigation is never triggered
@@ -185,12 +190,11 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	p, err := bc.NewPage()
 	require.NoError(t, err)
 
-	clickResult := func() any {
+	clickResult := func() (any, error) {
 		const cmd = `
 			() => window.clickResult
 		`
-		cr := p.Evaluate(cmd)
-		return cr
+		return p.Evaluate(cmd)
 	}
 	opts := &common.FrameGotoOptions{
 		Timeout: common.DefaultTimeout,
@@ -201,11 +205,15 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	)
 	require.NotNil(t, resp)
 	require.NoError(t, err)
-	require.Equal(t, wantBefore, clickResult())
+	result, err := clickResult()
+	require.NoError(t, err)
+	require.Equal(t, wantBefore, result)
 
 	err = p.Click("#concealed", common.NewFrameClickOptions(p.Timeout()))
 	require.NoError(t, err)
-	require.Equal(t, wantAfter, clickResult())
+	result, err = clickResult()
+	require.NoError(t, err)
+	require.Equal(t, wantAfter, result)
 }
 
 func TestElementHandleNonClickable(t *testing.T) {
@@ -369,7 +377,8 @@ func TestElementHandleScreenshot(t *testing.T) {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
-	p.Evaluate(`
+
+	_, err := p.Evaluate(`
 		() => {
 			document.body.style.margin = '0';
 			document.body.style.padding = '0';
@@ -385,7 +394,8 @@ func TestElementHandleScreenshot(t *testing.T) {
 
 			document.body.appendChild(div);
 		}
-    	`)
+	`)
+	require.NoError(t, err)
 
 	elem, err := p.Query("div")
 	require.NoError(t, err)
@@ -423,17 +433,18 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 	root, err := p.Query(".root")
 	require.NoError(t, err)
 
-	p.Evaluate(`
+	_, err = p.Evaluate(`
         () => {
-		setTimeout(() => {
-			const div = document.createElement('div');
-			div.className = 'element-to-appear';
-			div.appendChild(document.createTextNode("Hello World"));
-			root = document.querySelector('.root');
-			root.appendChild(div);
+			setTimeout(() => {
+				const div = document.createElement('div');
+				div.className = 'element-to-appear';
+				div.appendChild(document.createTextNode("Hello World"));
+				root = document.querySelector('.root');
+				root.appendChild(div);
 			}, 100);
 		}
 	`)
+	require.NoError(t, err)
 	element, err := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))

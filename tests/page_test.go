@@ -75,7 +75,8 @@ func TestNestedFrames(t *testing.T) {
 	err = button1Handle.Click(common.NewElementHandleClickOptions(button1Handle.Timeout()))
 	assert.Nil(t, err)
 
-	v := frame2.Evaluate(`() => window.buttonClicked`)
+	v, err := frame2.Evaluate(`() => window.buttonClicked`)
+	require.NoError(t, err)
 	bv := asBool(t, v)
 	assert.True(t, bv, "button hasn't been clicked")
 }
@@ -92,13 +93,16 @@ func TestPageEmulateMedia(t *testing.T) {
 		ReducedMotion: "reduce",
 	}))
 
-	result := p.Evaluate(`() => matchMedia('print').matches`)
+	result, err := p.Evaluate(`() => matchMedia('print').matches`)
+	require.NoError(t, err)
 	assert.IsTypef(t, true, result, "expected media 'print'")
 
-	result = p.Evaluate(`() => matchMedia('(prefers-color-scheme: dark)').matches`)
+	result, err = p.Evaluate(`() => matchMedia('(prefers-color-scheme: dark)').matches`)
+	require.NoError(t, err)
 	assert.IsTypef(t, true, result, "expected color scheme 'dark'")
 
-	result = p.Evaluate(`() => matchMedia('(prefers-reduced-motion: reduce)').matches`)
+	result, err = p.Evaluate(`() => matchMedia('(prefers-reduced-motion: reduce)').matches`)
+	require.NoError(t, err)
 	assert.IsTypef(t, true, result, "expected reduced motion setting to be 'reduce'")
 }
 
@@ -123,10 +127,11 @@ func TestPageEvaluate(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 
-		got := p.Evaluate(
+		got, err := p.Evaluate(
 			`(v) => { window.v = v; return window.v }`,
 			"test",
 		)
+		require.NoError(t, err)
 		s := asString(t, got)
 		assert.Equal(t, "test", s)
 	})
@@ -165,10 +170,9 @@ func TestPageEvaluate(t *testing.T) {
 				t.Parallel()
 
 				tb := newTestBrowser(t)
-				assertExceptionContains(t, tb.runtime(), func() {
-					p := tb.NewPage(nil)
-					p.Evaluate(tc.js)
-				}, tc.errMsg)
+				p := tb.NewPage(nil)
+				_, err := p.Evaluate(tc.js)
+				require.ErrorContains(t, err, tc.errMsg)
 			})
 		}
 	})
@@ -329,7 +333,8 @@ func TestPageGotoWaitUntilLoad(t *testing.T) {
 	}
 	_, err := p.Goto(b.staticURL("wait_until.html"), opts)
 	require.NoError(t, err)
-	results := p.Evaluate(`() => window.results`)
+	results, err := p.Evaluate(`() => window.results`)
+	require.NoError(t, err)
 	assert.EqualValues(t,
 		[]any{"DOMContentLoaded", "load"}, results,
 		`expected "load" event to have fired`,
@@ -348,7 +353,8 @@ func TestPageGotoWaitUntilDOMContentLoaded(t *testing.T) {
 	}
 	_, err := p.Goto(b.staticURL("wait_until.html"), opts)
 	require.NoError(t, err)
-	v := p.Evaluate(`() => window.results`)
+	v, err := p.Evaluate(`() => window.results`)
+	require.NoError(t, err)
 	results, ok := v.([]any)
 	if !ok {
 		t.Fatalf("expected results to be a slice, got %T", v)
@@ -564,7 +570,8 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	}{
 		Width: 1280, Height: 800,
 	}))
-	p.Evaluate(`
+
+	_, err := p.Evaluate(`
 	() => {
 		document.body.style.margin = '0';
 		document.body.style.padding = '0';
@@ -577,8 +584,8 @@ func TestPageScreenshotFullpage(t *testing.T) {
 		div.style.background = 'linear-gradient(red, blue)';
 
 		document.body.appendChild(div);
-	}
-    `)
+	}`)
+	require.NoError(t, err)
 
 	opts := common.NewPageScreenshotOptions()
 	opts.FullPage = true
@@ -1142,7 +1149,8 @@ func TestPageOn(t *testing.T) {
 			err = p.On("console", eventHandlerTwo)
 			require.NoError(t, err)
 
-			p.Evaluate(tc.consoleFn)
+			_, err = p.Evaluate(tc.consoleFn)
+			require.NoError(t, err)
 
 			select {
 			case <-done1:

@@ -715,9 +715,11 @@ func (f *Frame) Content() string {
 		return content;
 	}`
 
+	v, _ := f.Evaluate(js)
+
 	// TODO: return error
 
-	return f.Evaluate(js).(string) //nolint:forcetypeassert
+	return v.(string) //nolint:forcetypeassert
 }
 
 // Dblclick double clicks an element matching provided selector.
@@ -806,15 +808,10 @@ func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc string, args .
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (f *Frame) Evaluate(pageFunc string, args ...any) any {
+func (f *Frame) Evaluate(pageFunc string, args ...any) (any, error) {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
-	result, err := f.EvaluateWithContext(f.ctx, pageFunc, args...)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%v", err)
-	}
-
-	return result
+	return f.EvaluateWithContext(f.ctx, pageFunc, args...)
 }
 
 // EvaluateGlobal will evaluate the given JS code in the global object.
@@ -1653,11 +1650,12 @@ func (f *Frame) Timeout() time.Duration {
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	v := `() => document.title`
+	script := `() => document.title`
 
 	// TODO: return error
 
-	return f.Evaluate(v).(string) //nolint:forcetypeassert
+	v, _ := f.Evaluate(script)
+	return v.(string) //nolint:forcetypeassert
 }
 
 // Type text on the first element found matches the selector.

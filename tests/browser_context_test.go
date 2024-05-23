@@ -565,7 +565,8 @@ func TestBrowserContextCookies(t *testing.T) {
 			)
 
 			// setting document.cookie into the page
-			cookie := p.Evaluate(tt.documentCookiesSnippet)
+			cookie, err := p.Evaluate(tt.documentCookiesSnippet)
+			require.NoError(t, err)
 			require.Equalf(t,
 				tt.wantDocumentCookies,
 				cookie,
@@ -934,7 +935,8 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 				{ name: %q }
 			).then(result => result.state)
 		`, perm)
-		v := p.Evaluate(js)
+		v, err := p.Evaluate(js)
+		require.NoError(t, err)
 		s := asString(t, v)
 		return s == "granted"
 	}

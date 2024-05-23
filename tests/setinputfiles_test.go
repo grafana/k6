@@ -5,6 +5,7 @@ import (
 
 	"github.com/dop251/goja"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/common"
 )
@@ -176,14 +177,19 @@ func TestSetInputFiles(t *testing.T) {
 				page.SetContent(pageContent, nil)
 
 				getFileCountFn := func() interface{} {
-					return page.Evaluate(`() => document.getElementById("upload").files.length`)
+					v, err := page.Evaluate(`() => document.getElementById("upload").files.length`)
+					require.NoError(t, err)
+
+					return v
 				}
 
 				getFilePropertyFn := func(idx int, propName string) interface{} {
-					return page.Evaluate(
+					v, err := page.Evaluate(
 						`(idx, propName) => document.getElementById("upload").files[idx][propName]`,
 						idx,
 						propName)
+					require.NoError(t, err)
+					return v
 				}
 
 				files, cleanup := tc.setup(tb)
