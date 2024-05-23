@@ -891,7 +891,9 @@ func (p *Page) IsClosed() bool {
 	return p.closed
 }
 
-func (p *Page) IsDisabled(selector string, opts goja.Value) bool {
+// IsDisabled returns true if the first element that matches the selector
+// is disabled. Otherwise, returns false.
+func (p *Page) IsDisabled(selector string, opts goja.Value) (bool, error) {
 	p.logger.Debugf("Page:IsDisabled", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsDisabled(selector, opts)

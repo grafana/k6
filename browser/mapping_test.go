@@ -319,7 +319,7 @@ type pageAPI interface {
 	InputValue(selector string, opts goja.Value) (string, error)
 	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsClosed() bool
-	IsDisabled(selector string, opts goja.Value) bool
+	IsDisabled(selector string, opts goja.Value) (bool, error)
 	IsEditable(selector string, opts goja.Value) bool
 	IsEnabled(selector string, opts goja.Value) bool
 	IsHidden(selector string, opts goja.Value) bool
@@ -388,7 +388,7 @@ type frameAPI interface {
 	InputValue(selector string, opts goja.Value) (string, error)
 	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsDetached() bool
-	IsDisabled(selector string, opts goja.Value) bool
+	IsDisabled(selector string, opts goja.Value) (bool, error)
 	IsEditable(selector string, opts goja.Value) bool
 	IsEnabled(selector string, opts goja.Value) bool
 	IsHidden(selector string, opts goja.Value) bool
