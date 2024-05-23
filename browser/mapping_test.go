@@ -301,7 +301,7 @@ type pageAPI interface {
 	Context() *common.BrowserContext
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
-	EmulateMedia(opts goja.Value)
+	EmulateMedia(opts goja.Value) error
 	EmulateVisionDeficiency(typ string)
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (common.JSHandleAPI, error)

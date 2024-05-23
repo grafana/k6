@@ -87,11 +87,12 @@ func TestPageEmulateMedia(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.EmulateMedia(tb.toGojaValue(emulateMediaOpts{
+	err := p.EmulateMedia(tb.toGojaValue(emulateMediaOpts{
 		Media:         "print",
 		ColorScheme:   "dark",
 		ReducedMotion: "reduce",
 	}))
+	require.NoError(t, err)
 
 	result, err := p.Evaluate(`() => matchMedia('print').matches`)
 	require.NoError(t, err)

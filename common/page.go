@@ -722,12 +722,13 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *F
 	return p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
 }
 
-func (p *Page) EmulateMedia(opts goja.Value) {
+// EmulateMedia emulates the given media type.
+func (p *Page) EmulateMedia(opts goja.Value) error {
 	p.logger.Debugf("Page:EmulateMedia", "sid:%v", p.sessionID())
 
 	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "parsing emulateMedia options: %w", err)
+		return fmt.Errorf("parsing emulateMedia options: %w", err)
 	}
 
 	p.mediaType = parsedOpts.Media
@@ -738,12 +739,14 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
 			p.frameSessionsMu.RUnlock()
-			k6ext.Panic(p.ctx, "emulating media: %w", err)
+			return fmt.Errorf("emulating media: %w", err)
 		}
 	}
 	p.frameSessionsMu.RUnlock()
 
 	applySlowMo(p.ctx)
+
+	return nil
 }
 
 // EmulateVisionDeficiency activates/deactivates emulation of a vision deficiency.

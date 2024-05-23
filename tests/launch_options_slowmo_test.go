@@ -53,11 +53,12 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				p.EmulateMedia(tb.toGojaValue(struct {
+				err := p.EmulateMedia(tb.toGojaValue(struct {
 					Media string `js:"media"`
 				}{
 					Media: "print",
 				}))
+				require.NoError(t, err)
 			})
 		})
 		t.Run("evaluate", func(t *testing.T) {
