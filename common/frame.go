@@ -734,23 +734,26 @@ func (f *Frame) Content() (string, error) {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (f *Frame) Dblclick(selector string, opts goja.Value) {
+func (f *Frame) Dblclick(selector string, opts goja.Value) error {
 	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameDblClickOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing double click options: %w", err)
+		return fmt.Errorf("parsing double click options: %w", err)
 	}
 	if err := f.dblclick(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "double clicking on %q: %w", selector, err)
+		return fmt.Errorf("double clicking on %q: %w", selector, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 // dblclick is like Dblclick but takes parsed options and neither throws
 // an error, or applies slow motion.
 func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
-	dblclick := func(apiCtx context.Context, eh *ElementHandle, p *Position) (any, error) {
+	dblclick := func(_ context.Context, eh *ElementHandle, p *Position) (any, error) {
 		return nil, eh.dblclick(p, opts.ToMouseClickOptions())
 	}
 	act := f.newPointerAction(

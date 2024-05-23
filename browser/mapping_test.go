@@ -299,7 +299,7 @@ type pageAPI interface {
 	Close(opts goja.Value) error
 	Content() (string, error)
 	Context() *common.BrowserContext
-	Dblclick(selector string, opts goja.Value)
+	Dblclick(selector string, opts goja.Value) error
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	EmulateMedia(opts goja.Value) error
 	EmulateVisionDeficiency(typ string) error
@@ -371,7 +371,7 @@ type frameAPI interface {
 	ChildFrames() []*common.Frame
 	Click(selector string, opts goja.Value) error
 	Content() (string, error)
-	Dblclick(selector string, opts goja.Value)
+	Dblclick(selector string, opts goja.Value) error
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	// EvaluateWithContext for internal use only
 	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)

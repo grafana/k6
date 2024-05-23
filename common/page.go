@@ -709,10 +709,10 @@ func (p *Page) Context() *BrowserContext {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (p *Page) Dblclick(selector string, opts goja.Value) {
+func (p *Page) Dblclick(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:Dblclick", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Dblclick(selector, opts)
+	return p.MainFrame().Dblclick(selector, opts)
 }
 
 // DispatchEvent dispatches an event on the page to the element that matches the provided selector.
