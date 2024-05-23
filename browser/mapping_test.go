@@ -372,7 +372,7 @@ type frameAPI interface {
 	Click(selector string, opts goja.Value) error
 	Content() (string, error)
 	Dblclick(selector string, opts goja.Value) error
-	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
+	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) error
 	// EvaluateWithContext for internal use only
 	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)
 	Evaluate(pageFunc goja.Value, args ...goja.Value) (any, error)
