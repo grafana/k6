@@ -302,7 +302,7 @@ type pageAPI interface {
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	EmulateMedia(opts goja.Value) error
-	EmulateVisionDeficiency(typ string)
+	EmulateVisionDeficiency(typ string) error
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (common.JSHandleAPI, error)
 	Fill(selector string, value string, opts goja.Value)

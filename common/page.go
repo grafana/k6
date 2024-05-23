@@ -750,7 +750,7 @@ func (p *Page) EmulateMedia(opts goja.Value) error {
 }
 
 // EmulateVisionDeficiency activates/deactivates emulation of a vision deficiency.
-func (p *Page) EmulateVisionDeficiency(typ string) {
+func (p *Page) EmulateVisionDeficiency(typ string) error {
 	p.logger.Debugf("Page:EmulateVisionDeficiency", "sid:%v typ:%s", p.sessionID(), typ)
 
 	validTypes := map[string]emulation.SetEmulatedVisionDeficiencyType{
@@ -763,15 +763,17 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 	}
 	t, ok := validTypes[typ]
 	if !ok {
-		k6ext.Panic(p.ctx, "unsupported vision deficiency: '%s'", typ)
+		return fmt.Errorf("unsupported vision deficiency: %s", typ)
 	}
 
 	action := emulation.SetEmulatedVisionDeficiency(t)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "setting emulated vision deficiency %q: %w", typ, err)
+		return fmt.Errorf("setting emulated vision deficiency %q: %w", typ, err)
 	}
 
 	applySlowMo(p.ctx)
+
+	return nil
 }
 
 // Evaluate runs JS code within the execution context of the main frame of the page.
