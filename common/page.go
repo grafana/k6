@@ -610,13 +610,15 @@ func (p *Page) viewportSize() Size {
 }
 
 // BringToFront activates the browser tab for this page.
-func (p *Page) BringToFront() {
+func (p *Page) BringToFront() error {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
 
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "bringing page to front: %w", err)
+		return fmt.Errorf("bringing page to front: %w", err)
 	}
+
+	return nil
 }
 
 // Check checks an element matching the provided selector.

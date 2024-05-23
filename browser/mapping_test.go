@@ -293,7 +293,7 @@ type browserContextAPI interface {
 
 // pageAPI is the interface of a single browser tab.
 type pageAPI interface {
-	BringToFront()
+	BringToFront() error
 	Check(selector string, opts goja.Value)
 	Click(selector string, opts goja.Value) error
 	Close(opts goja.Value) error
