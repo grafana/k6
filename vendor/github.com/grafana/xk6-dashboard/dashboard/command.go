@@ -52,7 +52,7 @@ func newReplayCommand(assets *assets, proc *process) *cobra.Command {
 		Long: `The replay command load the recorded dashboard events (NDJSON format) and replay it for the dashboard UI.
 The compressed file will be automatically decompressed if the file extension is .gz`,
 		Args: cobra.ExactArgs(1),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			err := replay(args[0], opts, assets, proc)
 			if err != nil {
 				return err
@@ -107,7 +107,7 @@ func newAggregateCommand(proc *process) *cobra.Command {
 		Long: `The aggregate command converts the file saved by json output to dashboard format events file.
 The files will be automatically compressed/decompressed if the file extension is .gz`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			return aggregate(args[0], args[1], opts, proc)
 		},
 	}
@@ -153,7 +153,7 @@ $ k6 ` + OutputName + ` replay test_result.ndjson
 $ k6 run --out web-dashboard=record=test_result.ndjson script.js
 $ k6 ` + OutputName + ` report test_result.ndjson test_result_report.html`,
 		Args: cobra.ExactArgs(2),
-		RunE: func(cmd *cobra.Command, args []string) error {
+		RunE: func(_ *cobra.Command, args []string) error {
 			opts.Port = -1
 			opts.Export = args[1]
 
