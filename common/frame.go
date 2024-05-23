@@ -1460,21 +1460,21 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 
 // SelectOption selects the given options and returns the array of
 // option values of the first element found that matches the selector.
-func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
+func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value) ([]string, error) {
 	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameSelectOptionOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing select option options: %w", err)
+		return nil, fmt.Errorf("parsing select option options: %w", err)
 	}
 	v, err := f.selectOption(selector, values, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "selecting option on %q: %w", selector, err)
+		return nil, fmt.Errorf("selecting option on %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
 
-	return v
+	return v, nil
 }
 
 func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSelectOptionOptions) ([]string, error) {

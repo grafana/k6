@@ -1119,7 +1119,9 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	return buf, err
 }
 
-func (p *Page) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
+// SelectOption selects the given options and returns the array of
+// option values of the first element found that matches the selector.
+func (p *Page) SelectOption(selector string, values goja.Value, opts goja.Value) ([]string, error) {
 	p.logger.Debugf("Page:SelectOption", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().SelectOption(selector, values, opts)

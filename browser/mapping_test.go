@@ -333,7 +333,7 @@ type pageAPI interface {
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts goja.Value) *common.Response
 	Screenshot(opts goja.Value) goja.ArrayBuffer
-	SelectOption(selector string, values goja.Value, opts goja.Value) []string
+	SelectOption(selector string, values goja.Value, opts goja.Value) ([]string, error)
 	SetContent(html string, opts goja.Value)
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
@@ -402,7 +402,7 @@ type frameAPI interface {
 	Page() *common.Page
 	ParentFrame() *common.Frame
 	Press(selector string, key string, opts goja.Value) error
-	SelectOption(selector string, values goja.Value, opts goja.Value) []string
+	SelectOption(selector string, values goja.Value, opts goja.Value) ([]string, error)
 	SetContent(html string, opts goja.Value)
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)
 	Tap(selector string, opts goja.Value) error
