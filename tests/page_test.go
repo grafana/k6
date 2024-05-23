@@ -1726,7 +1726,8 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 					state: 'attached',
 				});
 
-				return s.innerText();
+				const text = await s.innerText();
+				return text;
  			`, s.URL, testBrowserStaticDir, tt.selector)
 			assert.Equal(t, tt.want, got.Result().String())
 		})
