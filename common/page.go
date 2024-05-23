@@ -697,7 +697,7 @@ func (p *Page) Close(_ goja.Value) error {
 }
 
 // Content returns the HTML content of the page.
-func (p *Page) Content() string {
+func (p *Page) Content() (string, error) {
 	p.logger.Debugf("Page:Content", "sid:%v", p.sessionID())
 
 	return p.MainFrame().Content()

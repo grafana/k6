@@ -707,7 +707,7 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 }
 
 // Content returns the HTML content of the frame.
-func (f *Frame) Content() string {
+func (f *Frame) Content() (string, error) {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
 	js := `() => {
@@ -721,11 +721,16 @@ func (f *Frame) Content() string {
 		return content;
 	}`
 
-	v, _ := f.Evaluate(js)
+	v, err := f.Evaluate(js)
+	if err != nil {
+		return "", fmt.Errorf("getting frame content: %w", err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("getting frame content: expected string, got %T", v)
+	}
 
-	// TODO: return error
-
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // Dblclick double clicks an element matching provided selector.

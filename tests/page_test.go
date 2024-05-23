@@ -116,7 +116,9 @@ func TestPageContent(t *testing.T) {
 	content := `<!DOCTYPE html><html><head></head><body><h1>Hello</h1></body></html>`
 	p.SetContent(content, nil)
 
-	assert.Equal(t, content, p.Content())
+	content, err := p.Content()
+	require.NoError(t, err)
+	assert.Equal(t, content, content)
 }
 
 func TestPageEvaluate(t *testing.T) {

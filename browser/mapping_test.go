@@ -297,7 +297,7 @@ type pageAPI interface {
 	Check(selector string, opts goja.Value) error
 	Click(selector string, opts goja.Value) error
 	Close(opts goja.Value) error
-	Content() string
+	Content() (string, error)
 	Context() *common.BrowserContext
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
@@ -370,7 +370,7 @@ type frameAPI interface {
 	Check(selector string, opts goja.Value) error
 	ChildFrames() []*common.Frame
 	Click(selector string, opts goja.Value) error
-	Content() string
+	Content() (string, error)
 	Dblclick(selector string, opts goja.Value)
 	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
 	// EvaluateWithContext for internal use only
