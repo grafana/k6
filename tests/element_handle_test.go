@@ -9,10 +9,10 @@ import (
 	"io"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common"
-
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/grafana/xk6-browser/common"
 )
 
 //go:embed static/mouse_helper.js
@@ -373,12 +373,13 @@ func TestElementHandleScreenshot(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetViewportSize(tb.toGojaValue(struct {
+	err := p.SetViewportSize(tb.toGojaValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
+	require.NoError(t, err)
 
-	_, err := p.Evaluate(`
+	_, err = p.Evaluate(`
 		() => {
 			document.body.style.margin = '0';
 			document.body.style.padding = '0';

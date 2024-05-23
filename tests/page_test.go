@@ -565,14 +565,15 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetViewportSize(tb.toGojaValue(struct {
+	err := p.SetViewportSize(tb.toGojaValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{
 		Width: 1280, Height: 800,
 	}))
+	require.NoError(t, err)
 
-	_, err := p.Evaluate(`
+	_, err = p.Evaluate(`
 	() => {
 		document.body.style.margin = '0';
 		document.body.style.padding = '0';

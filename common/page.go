@@ -1148,17 +1148,20 @@ func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value)
 }
 
 // SetViewportSize will update the viewport width and height.
-func (p *Page) SetViewportSize(viewportSize goja.Value) {
+func (p *Page) SetViewportSize(viewportSize goja.Value) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
-	s := &Size{}
+	var s Size
 	if err := s.Parse(p.ctx, viewportSize); err != nil {
-		k6ext.Panic(p.ctx, "parsing viewport size: %w", err)
+		return fmt.Errorf("parsing viewport size: %w", err)
 	}
-	if err := p.setViewportSize(s); err != nil {
-		k6ext.Panic(p.ctx, "setting viewport size: %w", err)
+	if err := p.setViewportSize(&s); err != nil {
+		return fmt.Errorf("setting viewport size: %w", err)
 	}
+
 	applySlowMo(p.ctx)
+
+	return nil
 }
 
 // Tap will tap the element matching the provided selector.
