@@ -869,7 +869,9 @@ func TestPageURL(t *testing.T) {
 	b := newTestBrowser(t, withHTTPServer())
 
 	p := b.NewPage(nil)
-	assert.Equal(t, common.BlankPage, p.URL())
+	uri, err := p.URL()
+	require.NoError(t, err)
+	assert.Equal(t, common.BlankPage, uri)
 
 	opts := &common.FrameGotoOptions{
 		Timeout: common.DefaultTimeout,
@@ -880,7 +882,9 @@ func TestPageURL(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.NotNil(t, resp)
-	assert.Regexp(t, "http://.*/get", p.URL())
+	uri, err = p.URL()
+	require.NoError(t, err)
+	assert.Regexp(t, "http://.*/get", uri)
 }
 
 func TestPageClose(t *testing.T) {
@@ -932,7 +936,9 @@ func TestPageOn(t *testing.T) {
 				val, err := cm.Args[0].JSONValue()
 				assert.NoError(t, err)
 				assert.Equal(t, "this is a log message", val)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -945,7 +951,9 @@ func TestPageOn(t *testing.T) {
 				val, err := cm.Args[0].JSONValue()
 				assert.NoError(t, err)
 				assert.Equal(t, "this is a debug message", val)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -958,7 +966,9 @@ func TestPageOn(t *testing.T) {
 				val, err := cm.Args[0].JSONValue()
 				assert.NoError(t, err)
 				assert.Equal(t, "this is an info message", val)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -971,7 +981,9 @@ func TestPageOn(t *testing.T) {
 				val, err := cm.Args[0].JSONValue()
 				assert.NoError(t, err)
 				assert.Equal(t, "this is an error message", val)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -984,7 +996,9 @@ func TestPageOn(t *testing.T) {
 				val, err := cm.Args[0].JSONValue()
 				assert.NoError(t, err)
 				assert.Equal(t, "this is a warning message", val)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -994,7 +1008,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "dir", cm.Type)
 				assert.Equal(t, "Location", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1004,7 +1020,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "dirxml", cm.Type)
 				assert.Equal(t, "Location", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1017,7 +1035,9 @@ func TestPageOn(t *testing.T) {
 				val, err := cm.Args[0].JSONValue()
 				assert.NoError(t, err)
 				assert.Equal(t, `[["Grafana","k6"],["Grafana","Mimir"]]`, val)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1030,7 +1050,9 @@ func TestPageOn(t *testing.T) {
 				val, err := cm.Args[0].JSONValue()
 				assert.NoError(t, err)
 				assert.Equal(t, "trace example", val)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1039,7 +1061,9 @@ func TestPageOn(t *testing.T) {
 			assertFn: func(t *testing.T, cm *common.ConsoleMessage) {
 				t.Helper()
 				assert.Equal(t, "clear", cm.Type)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1049,7 +1073,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "startGroup", cm.Type)
 				assert.Equal(t, "console.group", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1059,7 +1085,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "startGroupCollapsed", cm.Type)
 				assert.Equal(t, "console.groupCollapsed", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1069,7 +1097,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "endGroup", cm.Type)
 				assert.Equal(t, "console.groupEnd", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1079,7 +1109,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "assert", cm.Type)
 				assert.Equal(t, "console.assert", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1089,7 +1121,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "count", cm.Type)
 				assert.Equal(t, "default: 1", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1099,7 +1133,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "count", cm.Type)
 				assert.Equal(t, "k6: 1", cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 		{
@@ -1109,7 +1145,9 @@ func TestPageOn(t *testing.T) {
 				t.Helper()
 				assert.Equal(t, "timeEnd", cm.Type)
 				assert.Regexp(t, `^k6: [0-9]+\.[0-9]+`, cm.Text, `expected prefix "k6: <a float>" but got %q`, cm.Text)
-				assert.True(t, cm.Page.URL() == blankPage, "url is not %s", blankPage)
+				uri, err := cm.Page.URL()
+				require.NoError(t, err)
+				assert.True(t, uri == blankPage, "url is not %s", blankPage)
 			},
 		},
 	}

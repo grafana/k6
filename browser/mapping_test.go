@@ -347,7 +347,7 @@ type pageAPI interface {
 	Title() (string, error)
 	Type(selector string, text string, opts goja.Value)
 	Uncheck(selector string, opts goja.Value)
-	URL() string
+	URL() (string, error)
 	ViewportSize() map[string]float64
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
 	WaitForLoadState(state string, opts goja.Value)

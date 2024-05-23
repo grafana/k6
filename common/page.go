@@ -1231,15 +1231,20 @@ func (p *Page) Type(selector string, text string, opts goja.Value) {
 }
 
 // URL returns the location of the page.
-func (p *Page) URL() string {
+func (p *Page) URL() (string, error) {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
 
-	// TODO: return error
+	js := `() => document.location.toString()`
+	v, err := p.Evaluate(js)
+	if err != nil {
+		return "", fmt.Errorf("getting page URL: %w", err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("getting page URL: expected string, got %T", v)
+	}
 
-	script := `() => document.location.toString()`
-	v, _ := p.Evaluate(script)
-
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // ViewportSize will return information on the viewport width and height.
