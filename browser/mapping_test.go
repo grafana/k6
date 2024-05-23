@@ -306,7 +306,7 @@ type pageAPI interface {
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (common.JSHandleAPI, error)
 	Fill(selector string, value string, opts goja.Value) error
-	Focus(selector string, opts goja.Value)
+	Focus(selector string, opts goja.Value) error
 	Frames() []*common.Frame
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	GetKeyboard() *common.Keyboard
@@ -378,7 +378,7 @@ type frameAPI interface {
 	Evaluate(pageFunc goja.Value, args ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
 	Fill(selector string, value string, opts goja.Value) error
-	Focus(selector string, opts goja.Value)
+	Focus(selector string, opts goja.Value) error
 	FrameElement() (*common.ElementHandle, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
 	Goto(url string, opts goja.Value) (*common.Response, error)

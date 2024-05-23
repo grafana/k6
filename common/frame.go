@@ -905,17 +905,20 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 }
 
 // Focus focuses on the first element that matches the selector.
-func (f *Frame) Focus(selector string, opts goja.Value) {
+func (f *Frame) Focus(selector string, opts goja.Value) error {
 	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing focus options: %w", err)
+		return fmt.Errorf("parsing focus options: %w", err)
 	}
 	if err := f.focus(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "focusing %q: %w", selector, err)
+		return fmt.Errorf("focusing %q: %w", selector, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {

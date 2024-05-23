@@ -801,10 +801,11 @@ func (p *Page) Fill(selector string, value string, opts goja.Value) error {
 	return p.MainFrame().Fill(selector, value, opts)
 }
 
-func (p *Page) Focus(selector string, opts goja.Value) {
+// Focus focuses an element matching the provided selector.
+func (p *Page) Focus(selector string, opts goja.Value) error {
 	p.logger.Debugf("Page:Focus", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Focus(selector, opts)
+	return p.MainFrame().Focus(selector, opts)
 }
 
 // Frames returns a list of frames on the page.
