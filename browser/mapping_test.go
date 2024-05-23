@@ -344,7 +344,7 @@ type pageAPI interface {
 	TextContent(selector string, opts goja.Value) string
 	ThrottleCPU(common.CPUProfile) error
 	ThrottleNetwork(common.NetworkProfile) error
-	Title() string
+	Title() (string, error)
 	Type(selector string, text string, opts goja.Value)
 	Uncheck(selector string, opts goja.Value)
 	URL() string

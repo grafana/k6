@@ -1173,15 +1173,21 @@ func (p *Page) Timeout() time.Duration {
 	return p.defaultTimeout()
 }
 
-func (p *Page) Title() string {
+// Title returns the page title.
+func (p *Page) Title() (string, error) {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
-	// TODO: return error
+	js := `() => document.title`
+	v, err := p.Evaluate(js)
+	if err != nil {
+		return "", fmt.Errorf("getting page title: %w", err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("getting page title: expected string, got %T", v)
+	}
 
-	v := `() => document.title`
-	s, _ := p.Evaluate(v)
-
-	return s.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // ThrottleCPU will slow the CPU down from chrome's perspective to simulate

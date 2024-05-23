@@ -612,7 +612,9 @@ func TestPageTitle(t *testing.T) {
 
 	p := newTestBrowser(t).NewPage(nil)
 	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
-	assert.Equal(t, "Some title", p.Title())
+	title, err := p.Title()
+	require.NoError(t, err)
+	assert.Equal(t, "Some title", title)
 }
 
 func TestPageSetExtraHTTPHeaders(t *testing.T) {

@@ -110,5 +110,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 	err = tb.run(ctx, waitForNav, click)
 	require.NoError(t, err)
 
-	assert.Equal(t, "Second page", p.Title())
+	title, err := p.Title()
+	require.NoError(t, err)
+	assert.Equal(t, "Second page", title)
 }
