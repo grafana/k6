@@ -30,6 +30,7 @@ const (
 	configEvent     = "config"
 	metricEvent     = "metric"
 	paramEvent      = "param"
+	thresholdEvent  = "threshold"
 )
 
 type webServer struct {
