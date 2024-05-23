@@ -5,13 +5,36 @@ A work in progress k6 extension to output real-time test metrics in [OpenTelemet
 > [!WARNING]  
 > It's work in progress implementation and not ready for production use.
 
-Configuration options (currently environment variables only):
+## Configuration options
 
-* `K6_OTEL_RECEIVER_TYPE` - OpenTelemetry receiver type, currently only `grpc` is supported. Default is `grpc`.
-* `K6_OTEL_RECEIVER_ENDPOINT` - OpenTelemetry receiver endpoint. Default is `localhost:4317`.
+Currently, environment variables only. It's worth to mention that the extension is using the [OpenTelemetry Go SDK](https://opentelemetry.io/docs/languages/go/getting-started/) that's why it's possible to use the configuration environment variables from the SDK. However, if the `K6_OTEL_*` environment variables are set, they will take precedence over the SDK configuration.
+
+### k6-specific configuration
+
 * `K6_OTEL_METRIC_PREFIX` - Metric prefix. Default is empty.
-* `K6_OTEL_FLUSH_INTERVAL` - How frequently to flush metrics to the receiver from k6. Default is `1s`.
-* `K6_OTEL_PUSH_INTERVAL` - How frequently to push metrics to the receiver from k6. Default is `1s`.
+* `K6_OTEL_FLUSH_INTERVAL` - How frequently to flush metrics from k6 metrics engine. Default is `1s`.
+
+### OpenTelemetry-specific configuration
+
+* `K6_OTEL_EXPORT_INTERVAL` - configures the intervening time between metrics exports. Default is `1s`.
+* `K6_OTEL_EXPORTER_TYPE` - metric exporter type. Default is `grpc`.
+
+#### GRPC exporter
+
+* `K6_OTEL_GRPC_EXPORTER_INSECURE` - disables client transport security for the gRPC exporter.
+* `K6_OTEL_GRPC_EXPORTER_ENDPOINT` - configures the gRPC exporter endpoint. Default is `localhost:4317`.
+
+> [!TIP]
+> Also, you can use [OpenTelemetry SDK configuration environment variables](https://pkg.go.dev/go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc@v1.26.0).
+
+#### HTTP exporter
+
+* `K6_OTEL_HTTP_EXPORTER_INSECURE` - disables client transport security for the HTTP exporter.
+* `K6_OTEL_HTTP_EXPORTER_ENDPOINT` - configures the HTTP exporter endpoint. Default is `localhost:4318`.
+* `K6_OTEL_HTTP_EXPORTER_URL_PATH` - configures the HTTP exporter path. Default is `/v1/metrics`.
+
+> [!TIP]
+> Also, you can use [OpenTelemetry SDK configuration environment variables](https://pkg.go.dev/go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp@v1.26.0).
 
 ## Build
 

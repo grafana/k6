@@ -9,9 +9,11 @@ require (
 	go.k6.io/k6 v0.51.0
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.26.0
+	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.26.0
 	go.opentelemetry.io/otel/metric v1.26.0
 	go.opentelemetry.io/otel/sdk v1.26.0
 	go.opentelemetry.io/otel/sdk/metric v1.26.0
+	gopkg.in/guregu/null.v3 v3.5.0
 )
 
 require (
@@ -40,6 +42,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240401170217-c3f982113cda // indirect
 	google.golang.org/grpc v1.63.2 // indirect
 	google.golang.org/protobuf v1.33.0 // indirect
-	gopkg.in/guregu/null.v3 v3.5.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
 )

@@ -8,13 +8,11 @@ import (
 	"time"
 
 	"github.com/sirupsen/logrus"
-	"go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc"
 	otelMetric "go.opentelemetry.io/otel/metric"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/resource"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 
-	k6Const "go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 )
@@ -57,8 +55,8 @@ func (o *Output) Description() string {
 
 // StopWithTestError flushes all remaining metrics and finalizes the test run
 func (o *Output) StopWithTestError(_ error) error {
-	o.logger.Info("Stopping...")
-	defer o.logger.Info("Stopped!")
+	o.logger.Debug("Stopping...")
+	defer o.logger.Debug("Stopped!")
 
 	if err := o.meterProvider.Shutdown(context.Background()); err != nil {
 		o.logger.WithError(err).Error("can't shutdown OpenTelemetry metric provider")
@@ -78,22 +76,15 @@ func (o *Output) Stop() error {
 func (o *Output) Start() error {
 	o.logger.Debug("Starting output...")
 
-	ctx := context.Background()
-
-	// TODO: support different exporters (e.g. OTLP/HTTP), authentication, etc.
-	exp, err := otlpmetricgrpc.New(
-		ctx,
-		otlpmetricgrpc.WithInsecure(),
-		otlpmetricgrpc.WithEndpoint(o.config.GRPCReceiverEndpoint),
-	)
+	exp, err := getExporter(o.config)
 	if err != nil {
 		return fmt.Errorf("failed to create OpenTelemetry exporter: %w", err)
 	}
 
 	res, err := resource.Merge(resource.Default(),
 		resource.NewWithAttributes(semconv.SchemaURL,
-			semconv.ServiceName("k6"),
-			semconv.ServiceVersion(k6Const.Version),
+			semconv.ServiceName(o.config.ServiceName),
+			semconv.ServiceVersion(o.config.ServiceVersion),
 		))
 	if err != nil {
 		return fmt.Errorf("failed to create OpenTelemetry resource: %w", err)
@@ -104,7 +95,7 @@ func (o *Output) Start() error {
 		metric.WithReader(
 			metric.NewPeriodicReader(
 				exp,
-				metric.WithInterval(o.config.PushInterval),
+				metric.WithInterval(o.config.ExportInterval),
 			),
 		),
 	)
