@@ -413,17 +413,18 @@ func TestPageInnerText(t *testing.T) {
 
 		p := newTestBrowser(t).NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, "Test\nOne", p.InnerText("div", nil))
+		innerText, err := p.InnerText("div", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "Test\nOne", innerText)
 	})
 
 	t.Run("err_empty_selector", func(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t)
-		assertExceptionContains(t, tb.runtime(), func() {
-			p := tb.NewPage(nil)
-			p.InnerText("", nil)
-		}, "The provided selector is empty")
+		p := tb.NewPage(nil)
+		_, err := p.InnerText("", nil)
+		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -432,7 +433,8 @@ func TestPageInnerText(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		require.Panics(t, func() { p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})) })
+		_, err := p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
+		require.Error(t, err)
 	})
 }
 
@@ -1440,7 +1442,8 @@ func TestPageThrottleNetwork(t *testing.T) {
 			_, err = page.WaitForSelector(selector, nil)
 			require.NoError(t, err)
 
-			resp := page.InnerText(selector, nil)
+			resp, err := page.InnerText(selector, nil)
+			require.NoError(t, err)
 			ms, err := strconv.ParseInt(resp, 10, 64)
 			require.NoError(t, err)
 			assert.GreaterOrEqual(t, ms, tc.wantMinRoundTripDuration)

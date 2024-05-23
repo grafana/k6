@@ -870,7 +870,8 @@ func (p *Page) InnerHTML(selector string, opts goja.Value) (string, error) {
 	return p.MainFrame().InnerHTML(selector, opts)
 }
 
-func (p *Page) InnerText(selector string, opts goja.Value) string {
+// InnerText returns the inner text of the element matching the provided selector.
+func (p *Page) InnerText(selector string, opts goja.Value) (string, error) {
 	p.logger.Debugf("Page:InnerText", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InnerText(selector, opts)

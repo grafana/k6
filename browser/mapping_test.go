@@ -315,7 +315,7 @@ type pageAPI interface {
 	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value) error
 	InnerHTML(selector string, opts goja.Value) (string, error)
-	InnerText(selector string, opts goja.Value) string
+	InnerText(selector string, opts goja.Value) (string, error)
 	InputValue(selector string, opts goja.Value) string
 	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsClosed() bool
@@ -384,7 +384,7 @@ type frameAPI interface {
 	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value) error
 	InnerHTML(selector string, opts goja.Value) (string, error)
-	InnerText(selector string, opts goja.Value) string
+	InnerText(selector string, opts goja.Value) (string, error)
 	InputValue(selector string, opts goja.Value) string
 	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsDetached() bool

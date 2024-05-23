@@ -1083,21 +1083,19 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 
 // InnerText returns the inner text of the first element found
 // that matches the selector.
-func (f *Frame) InnerText(selector string, opts goja.Value) string {
+func (f *Frame) InnerText(selector string, opts goja.Value) (string, error) {
 	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameInnerTextOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing inner text options: %w", err)
+		return "", fmt.Errorf("parsing inner text options: %w", err)
 	}
 	v, err := f.innerText(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting inner text of %q: %w", selector, err)
+		return "", fmt.Errorf("getting inner text of %q: %w", selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return v, nil
 }
 
 func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string, error) {
