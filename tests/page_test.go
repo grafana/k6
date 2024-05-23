@@ -538,13 +538,15 @@ func TestPageFill(t *testing.T) {
 	}
 	for _, tt := range happy {
 		t.Run("happy/"+tt.name, func(t *testing.T) {
-			p.Fill(tt.selector, tt.value, nil)
+			err := p.Fill(tt.selector, tt.value, nil)
+			require.NoError(t, err)
 			require.Equal(t, tt.value, p.InputValue(tt.selector, nil))
 		})
 	}
 	for _, tt := range sad {
 		t.Run("sad/"+tt.name, func(t *testing.T) {
-			require.Panics(t, func() { p.Fill(tt.selector, tt.value, nil) })
+			err := p.Fill(tt.selector, tt.value, nil)
+			require.Error(t, err)
 		})
 	}
 }

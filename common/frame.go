@@ -872,17 +872,20 @@ func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI
 }
 
 // Fill fills out the first element found that matches the selector.
-func (f *Frame) Fill(selector, value string, opts goja.Value) {
+func (f *Frame) Fill(selector, value string, opts goja.Value) error {
 	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%q", f.ID(), f.URL(), selector, value)
 
 	popts := NewFrameFillOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing fill options: %w", err)
+		return fmt.Errorf("parsing fill options: %w", err)
 	}
 	if err := f.fill(selector, value, popts); err != nil {
-		k6ext.Panic(f.ctx, "filling %q with %q: %w", selector, value, err)
+		return fmt.Errorf("filling %q with %q: %w", selector, value, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {

@@ -305,7 +305,7 @@ type pageAPI interface {
 	EmulateVisionDeficiency(typ string) error
 	Evaluate(pageFunc goja.Value, arg ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (common.JSHandleAPI, error)
-	Fill(selector string, value string, opts goja.Value)
+	Fill(selector string, value string, opts goja.Value) error
 	Focus(selector string, opts goja.Value)
 	Frames() []*common.Frame
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value
@@ -377,7 +377,7 @@ type frameAPI interface {
 	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)
 	Evaluate(pageFunc goja.Value, args ...goja.Value) (any, error)
 	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
-	Fill(selector string, value string, opts goja.Value)
+	Fill(selector string, value string, opts goja.Value) error
 	Focus(selector string, opts goja.Value)
 	FrameElement() (*common.ElementHandle, error)
 	GetAttribute(selector string, name string, opts goja.Value) goja.Value

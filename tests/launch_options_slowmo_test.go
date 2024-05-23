@@ -82,7 +82,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				p.Fill(".fill", "foo", nil)
+				err := p.Fill(".fill", "foo", nil)
+				require.NoError(t, err)
 			})
 		})
 		t.Run("focus", func(t *testing.T) {
@@ -222,7 +223,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				f.Fill(".fill", "foo", nil)
+				err := f.Fill(".fill", "foo", nil)
+				require.NoError(t, err)
 			})
 		})
 		t.Run("focus", func(t *testing.T) {

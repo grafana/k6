@@ -794,10 +794,11 @@ func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	return h, nil
 }
 
-func (p *Page) Fill(selector string, value string, opts goja.Value) {
+// Fill fills an input element with the provided value.
+func (p *Page) Fill(selector string, value string, opts goja.Value) error {
 	p.logger.Debugf("Page:Fill", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Fill(selector, value, opts)
+	return p.MainFrame().Fill(selector, value, opts)
 }
 
 func (p *Page) Focus(selector string, opts goja.Value) {
