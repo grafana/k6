@@ -1096,6 +1096,11 @@ func TestCompressionSession(t *testing.T) {
 				throw new Error("wrong message received from server: ", event.data)
 			}
 
+			const expectedExtension = "permessage-deflate; server_no_context_takeover; client_no_context_takeover"
+			if (!(ws.extensions.includes(expectedExtension))) {
+				throw "expected value '" + expectedExtension + "' missing in " + JSON.stringify(ws.extensions);
+			}
+
 			ws.close()
 		}
 

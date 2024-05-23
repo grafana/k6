@@ -85,6 +85,7 @@ type webSocket struct {
 	bufferedAmount int
 	binaryType     string
 	protocol       string
+	extensions     []string
 }
 
 type ping struct {
@@ -193,7 +194,8 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 	must(rt, w.obj.DefineAccessorProperty(
 		"bufferedAmount", rt.ToValue(func() goja.Value { return rt.ToValue(w.bufferedAmount) }), nil,
 		goja.FLAG_FALSE, goja.FLAG_TRUE))
-	// extensions
+	must(rt, w.obj.DefineAccessorProperty("extensions",
+		rt.ToValue(func() goja.Value { return rt.ToValue(w.extensions) }), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
 		"protocol", rt.ToValue(func() goja.Value { return rt.ToValue(w.protocol) }), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
@@ -304,6 +306,7 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		if conn != nil {
 			w.protocol = conn.Subprotocol()
 		}
+		w.extensions = httpResponse.Header.Values("Sec-WebSocket-Extensions")
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, w.protocol)
 	}
 	w.conn = conn
