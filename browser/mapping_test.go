@@ -322,7 +322,7 @@ type pageAPI interface {
 	IsDisabled(selector string, opts goja.Value) (bool, error)
 	IsEditable(selector string, opts goja.Value) (bool, error)
 	IsEnabled(selector string, opts goja.Value) (bool, error)
-	IsHidden(selector string, opts goja.Value) bool
+	IsHidden(selector string, opts goja.Value) (bool, error)
 	IsVisible(selector string, opts goja.Value) bool
 	Locator(selector string, opts goja.Value) *common.Locator
 	MainFrame() *common.Frame
@@ -391,7 +391,7 @@ type frameAPI interface {
 	IsDisabled(selector string, opts goja.Value) (bool, error)
 	IsEditable(selector string, opts goja.Value) (bool, error)
 	IsEnabled(selector string, opts goja.Value) (bool, error)
-	IsHidden(selector string, opts goja.Value) bool
+	IsHidden(selector string, opts goja.Value) (bool, error)
 	IsVisible(selector string, opts goja.Value) bool
 	ID() string
 	LoaderID() string
