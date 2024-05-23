@@ -1043,21 +1043,19 @@ func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
 
 // InnerHTML returns the innerHTML attribute of the first element found
 // that matches the selector.
-func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
+func (f *Frame) InnerHTML(selector string, opts goja.Value) (string, error) {
 	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameInnerHTMLOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing inner HTML options: %w", err)
+		return "", fmt.Errorf("parsing inner HTML options: %w", err)
 	}
 	v, err := f.innerHTML(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting inner HTML of %q: %w", selector, err)
+		return "", fmt.Errorf("getting inner HTML of %q: %w", selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return v, nil
 }
 
 func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string, error) {

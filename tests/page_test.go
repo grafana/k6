@@ -377,7 +377,9 @@ func TestPageInnerHTML(t *testing.T) {
 
 		p := newTestBrowser(t).NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		assert.Equal(t, `<b>Test</b><ol><li><i>One</i></li></ol>`, p.InnerHTML("div", nil))
+		innerHTML, err := p.InnerHTML("div", nil)
+		require.NoError(t, err)
+		assert.Equal(t, `<b>Test</b><ol><li><i>One</i></li></ol>`, innerHTML)
 	})
 
 	t.Run("err_empty_selector", func(t *testing.T) {
@@ -387,10 +389,9 @@ func TestPageInnerHTML(t *testing.T) {
 		}()
 
 		tb := newTestBrowser(t)
-		assertExceptionContains(t, tb.runtime(), func() {
-			p := tb.NewPage(nil)
-			p.InnerHTML("", nil)
-		}, "The provided selector is empty")
+		p := tb.NewPage(nil)
+		_, err := p.InnerHTML("", nil)
+		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -399,7 +400,8 @@ func TestPageInnerHTML(t *testing.T) {
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		p.SetContent(sampleHTML, nil)
-		require.Panics(t, func() { p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})) })
+		_, err := p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
+		require.Error(t, err)
 	})
 }
 

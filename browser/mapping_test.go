@@ -314,7 +314,7 @@ type pageAPI interface {
 	GetTouchscreen() *common.Touchscreen
 	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value) error
-	InnerHTML(selector string, opts goja.Value) string
+	InnerHTML(selector string, opts goja.Value) (string, error)
 	InnerText(selector string, opts goja.Value) string
 	InputValue(selector string, opts goja.Value) string
 	IsChecked(selector string, opts goja.Value) (bool, error)
@@ -383,7 +383,7 @@ type frameAPI interface {
 	GetAttribute(selector string, name string, opts goja.Value) (any, error)
 	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value) error
-	InnerHTML(selector string, opts goja.Value) string
+	InnerHTML(selector string, opts goja.Value) (string, error)
 	InnerText(selector string, opts goja.Value) string
 	InputValue(selector string, opts goja.Value) string
 	IsChecked(selector string, opts goja.Value) (bool, error)

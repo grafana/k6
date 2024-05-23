@@ -863,7 +863,8 @@ func (p *Page) Hover(selector string, opts goja.Value) error {
 	return p.MainFrame().Hover(selector, opts)
 }
 
-func (p *Page) InnerHTML(selector string, opts goja.Value) string {
+// InnerHTML returns the inner HTML of the element matching the provided selector.
+func (p *Page) InnerHTML(selector string, opts goja.Value) (string, error) {
 	p.logger.Debugf("Page:InnerHTML", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InnerHTML(selector, opts)
