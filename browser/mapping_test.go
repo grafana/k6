@@ -317,7 +317,7 @@ type pageAPI interface {
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
 	InputValue(selector string, opts goja.Value) string
-	IsChecked(selector string, opts goja.Value) bool
+	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsClosed() bool
 	IsDisabled(selector string, opts goja.Value) bool
 	IsEditable(selector string, opts goja.Value) bool
@@ -386,7 +386,7 @@ type frameAPI interface {
 	InnerHTML(selector string, opts goja.Value) string
 	InnerText(selector string, opts goja.Value) string
 	InputValue(selector string, opts goja.Value) string
-	IsChecked(selector string, opts goja.Value) bool
+	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsDetached() bool
 	IsDisabled(selector string, opts goja.Value) bool
 	IsEditable(selector string, opts goja.Value) bool

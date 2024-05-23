@@ -637,7 +637,7 @@ func (p *Page) Uncheck(selector string, opts goja.Value) error {
 
 // IsChecked returns true if the first element that matches the selector
 // is checked. Otherwise, returns false.
-func (p *Page) IsChecked(selector string, opts goja.Value) bool {
+func (p *Page) IsChecked(selector string, opts goja.Value) (bool, error) {
 	p.logger.Debugf("Page:IsChecked", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsChecked(selector, opts)
