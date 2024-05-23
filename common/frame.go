@@ -1216,19 +1216,19 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 
 // IsEnabled returns true if the first element that matches the selector
 // is enabled. Otherwise, returns false.
-func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
+func (f *Frame) IsEnabled(selector string, opts goja.Value) (bool, error) {
 	f.log.Debugf("Frame:IsEnabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsEnabledOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is enabled options: %w", err)
+		return false, fmt.Errorf("parsing is enabled options: %w", err)
 	}
 	enabled, err := f.isEnabled(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q enabled: %w", selector, err)
+		return false, fmt.Errorf("checking is %q enabled: %w", selector, err)
 	}
 
-	return enabled
+	return enabled, nil
 }
 
 func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, error) {

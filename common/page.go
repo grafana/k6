@@ -907,7 +907,9 @@ func (p *Page) IsEditable(selector string, opts goja.Value) (bool, error) {
 	return p.MainFrame().IsEditable(selector, opts)
 }
 
-func (p *Page) IsEnabled(selector string, opts goja.Value) bool {
+// IsEnabled returns true if the first element that matches the selector
+// is enabled. Otherwise, returns false.
+func (p *Page) IsEnabled(selector string, opts goja.Value) (bool, error) {
 	p.logger.Debugf("Page:IsEnabled", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsEnabled(selector, opts)

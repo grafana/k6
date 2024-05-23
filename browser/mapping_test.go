@@ -321,7 +321,7 @@ type pageAPI interface {
 	IsClosed() bool
 	IsDisabled(selector string, opts goja.Value) (bool, error)
 	IsEditable(selector string, opts goja.Value) (bool, error)
-	IsEnabled(selector string, opts goja.Value) bool
+	IsEnabled(selector string, opts goja.Value) (bool, error)
 	IsHidden(selector string, opts goja.Value) bool
 	IsVisible(selector string, opts goja.Value) bool
 	Locator(selector string, opts goja.Value) *common.Locator
@@ -390,7 +390,7 @@ type frameAPI interface {
 	IsDetached() bool
 	IsDisabled(selector string, opts goja.Value) (bool, error)
 	IsEditable(selector string, opts goja.Value) (bool, error)
-	IsEnabled(selector string, opts goja.Value) bool
+	IsEnabled(selector string, opts goja.Value) (bool, error)
 	IsHidden(selector string, opts goja.Value) bool
 	IsVisible(selector string, opts goja.Value) bool
 	ID() string
