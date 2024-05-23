@@ -66,11 +66,15 @@ func TestLocator(t *testing.T) {
 				l := p.Locator("#inputText", nil)
 
 				require.NoError(t, l.Fill(value, nil))
-				require.Equal(t, value, p.InputValue("#inputText", nil))
+				inputValue, err := p.InputValue("#inputText", nil)
+				require.NoError(t, err)
+				require.Equal(t, value, inputValue)
 
-				err := l.Clear(common.NewFrameFillOptions(l.Timeout()))
+				err = l.Clear(common.NewFrameFillOptions(l.Timeout()))
 				assert.NoError(t, err)
-				assert.Equal(t, "", p.InputValue("#inputText", nil))
+				inputValue, err = p.InputValue("#inputText", nil)
+				require.NoError(t, err)
+				assert.Equal(t, "", inputValue)
 			},
 		},
 		{
@@ -113,7 +117,9 @@ func TestLocator(t *testing.T) {
 				const value = "fill me up"
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Fill(value, nil))
-				require.Equal(t, value, p.InputValue("#inputText", nil))
+				inputValue, err := p.InputValue("#inputText", nil)
+				require.NoError(t, err)
+				require.Equal(t, value, inputValue)
 			},
 		},
 		{
@@ -121,7 +127,9 @@ func TestLocator(t *testing.T) {
 				const value = "fill me up"
 				lo := p.Locator("textarea", nil)
 				require.NoError(t, lo.Fill(value, nil))
-				require.Equal(t, value, p.InputValue("textarea", nil))
+				inputValue, err := p.InputValue("textarea", nil)
+				require.NoError(t, err)
+				require.Equal(t, value, inputValue)
 			},
 		},
 		{
@@ -208,7 +216,9 @@ func TestLocator(t *testing.T) {
 			"Press", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Press("x", nil))
-				require.Equal(t, "xsomething", p.InputValue("#inputText", nil))
+				inputValue, err := p.InputValue("#inputText", nil)
+				require.NoError(t, err)
+				require.Equal(t, "xsomething", inputValue)
 			},
 		},
 		{
@@ -245,7 +255,9 @@ func TestLocator(t *testing.T) {
 			"Type", func(_ *testBrowser, p *common.Page) {
 				lo := p.Locator("#inputText", nil)
 				require.NoError(t, lo.Type("real ", nil))
-				require.Equal(t, "real something", p.InputValue("#inputText", nil))
+				inputValue, err := p.InputValue("#inputText", nil)
+				require.NoError(t, err)
+				require.Equal(t, "real something", inputValue)
 			},
 		},
 		{

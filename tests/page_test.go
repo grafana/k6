@@ -480,13 +480,19 @@ func TestPageInputValue(t *testing.T) {
 		<textarea>hello3</textarea>
      	`, nil)
 
-	got, want := p.InputValue("input", nil), "hello1"
+	inputValue, err := p.InputValue("input", nil)
+	require.NoError(t, err)
+	got, want := inputValue, "hello1"
 	assert.Equal(t, got, want)
 
-	got, want = p.InputValue("select", nil), "hello2"
+	inputValue, err = p.InputValue("select", nil)
+	require.NoError(t, err)
+	got, want = inputValue, "hello2"
 	assert.Equal(t, got, want)
 
-	got, want = p.InputValue("textarea", nil), "hello3"
+	inputValue, err = p.InputValue("textarea", nil)
+	require.NoError(t, err)
+	got, want = inputValue, "hello3"
 	assert.Equal(t, got, want)
 }
 
@@ -544,7 +550,9 @@ func TestPageFill(t *testing.T) {
 		t.Run("happy/"+tt.name, func(t *testing.T) {
 			err := p.Fill(tt.selector, tt.value, nil)
 			require.NoError(t, err)
-			require.Equal(t, tt.value, p.InputValue(tt.selector, nil))
+			inputValue, err := p.InputValue(tt.selector, nil)
+			require.NoError(t, err)
+			require.Equal(t, tt.value, inputValue)
 		})
 	}
 	for _, tt := range sad {
@@ -874,7 +882,9 @@ func TestPagePress(t *testing.T) {
 	p.Press("#text1", "KeyB", nil)
 	p.Press("#text1", "Shift+KeyC", nil)
 
-	require.Equal(t, "AbC", p.InputValue("#text1", nil))
+	inputValue, err := p.InputValue("#text1", nil)
+	require.NoError(t, err)
+	require.Equal(t, "AbC", inputValue)
 }
 
 func TestPageURL(t *testing.T) {

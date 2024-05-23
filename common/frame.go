@@ -1121,21 +1121,20 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	return gv, nil
 }
 
-// InputValue returns the input value of the first element found
-// that matches the selector.
-func (f *Frame) InputValue(selector string, opts goja.Value) string {
+// InputValue returns the input value of the first element found that matches the selector.
+func (f *Frame) InputValue(selector string, opts goja.Value) (string, error) {
 	f.log.Debugf("Frame:InputValue", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameInputValueOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing input value options: %w", err)
+		return "", fmt.Errorf("parsing input value options: %w", err)
 	}
 	v, err := f.inputValue(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting input value of %q: %w", selector, err)
+		return "", fmt.Errorf("getting input value of %q: %w", selector, err)
 	}
 
-	return v
+	return v, nil
 }
 
 func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (string, error) {

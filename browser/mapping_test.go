@@ -316,7 +316,7 @@ type pageAPI interface {
 	Hover(selector string, opts goja.Value) error
 	InnerHTML(selector string, opts goja.Value) (string, error)
 	InnerText(selector string, opts goja.Value) (string, error)
-	InputValue(selector string, opts goja.Value) string
+	InputValue(selector string, opts goja.Value) (string, error)
 	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsClosed() bool
 	IsDisabled(selector string, opts goja.Value) bool
@@ -385,7 +385,7 @@ type frameAPI interface {
 	Hover(selector string, opts goja.Value) error
 	InnerHTML(selector string, opts goja.Value) (string, error)
 	InnerText(selector string, opts goja.Value) (string, error)
-	InputValue(selector string, opts goja.Value) string
+	InputValue(selector string, opts goja.Value) (string, error)
 	IsChecked(selector string, opts goja.Value) (bool, error)
 	IsDetached() bool
 	IsDisabled(selector string, opts goja.Value) bool

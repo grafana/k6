@@ -877,7 +877,8 @@ func (p *Page) InnerText(selector string, opts goja.Value) (string, error) {
 	return p.MainFrame().InnerText(selector, opts)
 }
 
-func (p *Page) InputValue(selector string, opts goja.Value) string {
+// InputValue returns the value of the input element matching the provided selector.
+func (p *Page) InputValue(selector string, opts goja.Value) (string, error) {
 	p.logger.Debugf("Page:InputValue", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InputValue(selector, opts)

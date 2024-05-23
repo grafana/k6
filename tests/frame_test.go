@@ -28,7 +28,9 @@ func TestFramePress(t *testing.T) {
 	f.Press("#text1", "KeyB", nil)
 	f.Press("#text1", "Shift+KeyC", nil)
 
-	require.Equal(t, "AbC", f.InputValue("#text1", nil))
+	inputValue, err := f.InputValue("#text1", nil)
+	require.NoError(t, err)
+	require.Equal(t, "AbC", inputValue)
 }
 
 func TestFrameDismissDialogBox(t *testing.T) {
