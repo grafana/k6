@@ -406,7 +406,8 @@ func (fs *FrameSession) initFrameTree() error {
 		return fmt.Errorf("got a nil page frame tree")
 	}
 
-	fs.handleFrameTree(frameTree)
+	// Any new frame may have a child frame, not just mainframes.
+	fs.handleFrameTree(frameTree, fs.isMainFrame())
 
 	if fs.isMainFrame() {
 		fs.initRendererEvents()
@@ -578,19 +579,19 @@ func (fs *FrameSession) isMainFrame() bool {
 	return fs.targetID == fs.page.targetID
 }
 
-func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
+func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
 	fs.logger.Debugf("FrameSession:handleFrameTree",
-		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		"fid:%v sid:%v tid:%v", frameTree.Frame.ID, fs.session.ID(), fs.targetID)
 
 	if frameTree.Frame.ParentID != "" {
 		fs.onFrameAttached(frameTree.Frame.ID, frameTree.Frame.ParentID)
 	}
-	fs.onFrameNavigated(frameTree.Frame, true)
+	fs.onFrameNavigated(frameTree.Frame, initialFrame)
 	if frameTree.ChildFrames == nil {
 		return
 	}
 	for _, child := range frameTree.ChildFrames {
-		fs.handleFrameTree(child)
+		fs.handleFrameTree(child, initialFrame)
 	}
 }
 
