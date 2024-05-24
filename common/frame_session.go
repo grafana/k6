@@ -406,8 +406,9 @@ func (fs *FrameSession) initFrameTree() error {
 		return fmt.Errorf("got a nil page frame tree")
 	}
 
+	fs.handleFrameTree(frameTree)
+
 	if fs.isMainFrame() {
-		fs.handleFrameTree(frameTree)
 		fs.initRendererEvents()
 	}
 	return nil
