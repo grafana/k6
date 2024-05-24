@@ -20,7 +20,11 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 			mf := mapFrame(vu, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"headerValue":         r.HeaderValue,
+		"headerValue": func(name string) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.HeaderValue(name), nil
+			})
+		},
 		"headers":             r.Headers,
 		"headersArray":        r.HeadersArray,
 		"isNavigationRequest": r.IsNavigationRequest,
