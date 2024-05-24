@@ -44,8 +44,14 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 			}
 			return p
 		},
-		"postDataBuffer": r.PostDataBuffer,
-		"resourceType":   r.ResourceType,
+		"postDataBuffer": func() any {
+			p := r.PostDataBuffer()
+			if len(p) == 0 {
+				return nil
+			}
+			return rt.NewArrayBuffer(p)
+		},
+		"resourceType": r.ResourceType,
 		"response": func(name string) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp := r.Response()

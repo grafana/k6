@@ -225,9 +225,8 @@ func (r *Request) PostData() string {
 }
 
 // PostDataBuffer returns the request post data as an ArrayBuffer.
-func (r *Request) PostDataBuffer() goja.ArrayBuffer {
-	rt := r.vu.Runtime()
-	return rt.NewArrayBuffer([]byte(r.postData))
+func (r *Request) PostDataBuffer() []byte {
+	return []byte(r.postData)
 }
 
 // ResourceType returns the request resource type.
