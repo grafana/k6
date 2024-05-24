@@ -173,6 +173,24 @@ func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDe
 		return
 	}
 
+	// This helps prevent an iframe and its child frames from being removed
+	// when the type of detach is a swap. After this detach event usually
+	// the iframe navigates, which requires the frames to be present for the
+	// navigate to work.
+	fs := m.page.getFrameSession(frameID)
+	if fs != nil {
+		m.logger.Debugf("FrameManager:frameDetached:sessionFound",
+			"fmid:%d fid:%v fsID1:%v fsID2:%v found session for frame",
+			m.ID(), frameID, fs.session.ID(), m.session.ID())
+
+		if fs.session.ID() != m.session.ID() {
+			m.logger.Debugf("FrameManager:frameDetached:notSameSession:return",
+				"fmid:%d fid:%v event session and frame session do not match",
+				m.ID(), frameID)
+			return
+		}
+	}
+
 	if reason == cdppage.FrameDetachedReasonSwap {
 		// When a local frame is swapped out for a remote
 		// frame, we want to keep the current frame which is
