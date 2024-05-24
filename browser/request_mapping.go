@@ -37,9 +37,15 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		},
 		"isNavigationRequest": r.IsNavigationRequest,
 		"method":              r.Method,
-		"postData":            r.PostData,
-		"postDataBuffer":      r.PostDataBuffer,
-		"resourceType":        r.ResourceType,
+		"postData": func() any {
+			p := r.PostData()
+			if p == "" {
+				return nil
+			}
+			return p
+		},
+		"postDataBuffer": r.PostDataBuffer,
+		"resourceType":   r.ResourceType,
 		"response": func(name string) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp := r.Response()
