@@ -30,7 +30,11 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return r.Headers(), nil
 			})
 		},
-		"headersArray":        r.HeadersArray,
+		"headersArray": func(name string) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.HeadersArray(), nil
+			})
+		},
 		"isNavigationRequest": r.IsNavigationRequest,
 		"method":              r.Method,
 		"postData":            r.PostData,
