@@ -1676,18 +1676,20 @@ func (f *Frame) Title() string {
 }
 
 // Type text on the first element found matches the selector.
-func (f *Frame) Type(selector, text string, opts goja.Value) {
+func (f *Frame) Type(selector, text string, opts goja.Value) error {
 	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%q", f.ID(), f.URL(), selector, text)
 
 	popts := NewFrameTypeOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing type options: %w", err)
+		return fmt.Errorf("parsing type options: %w", err)
 	}
 	if err := f.typ(selector, text, popts); err != nil {
-		k6ext.Panic(f.ctx, "typing %q in %q: %w", text, selector, err)
+		return fmt.Errorf("typing %q in %q: %w", text, selector, err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) typ(selector, text string, opts *FrameTypeOptions) error {

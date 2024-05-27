@@ -345,7 +345,7 @@ type pageAPI interface {
 	ThrottleCPU(common.CPUProfile) error
 	ThrottleNetwork(common.NetworkProfile) error
 	Title() (string, error)
-	Type(selector string, text string, opts goja.Value)
+	Type(selector string, text string, opts goja.Value) error
 	Uncheck(selector string, opts goja.Value) error
 	URL() (string, error)
 	ViewportSize() map[string]float64
@@ -408,7 +408,7 @@ type frameAPI interface {
 	Tap(selector string, opts goja.Value) error
 	TextContent(selector string, opts goja.Value) (string, error)
 	Title() string
-	Type(selector string, text string, opts goja.Value)
+	Type(selector string, text string, opts goja.Value) error
 	Uncheck(selector string, opts goja.Value) error
 	URL() string
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)

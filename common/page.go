@@ -1263,10 +1263,11 @@ func (p *Page) ThrottleNetwork(networkProfile NetworkProfile) error {
 	return nil
 }
 
-func (p *Page) Type(selector string, text string, opts goja.Value) {
+// Type text on the first element found matches the selector.
+func (p *Page) Type(selector string, text string, opts goja.Value) error {
 	p.logger.Debugf("Page:Type", "sid:%v selector:%s text:%s", p.sessionID(), selector, text)
 
-	p.MainFrame().Type(selector, text, opts)
+	return p.MainFrame().Type(selector, text, opts)
 }
 
 // URL returns the location of the page.
