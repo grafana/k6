@@ -338,7 +338,7 @@ type pageAPI interface {
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
 	SetExtraHTTPHeaders(headers map[string]string) error
-	SetInputFiles(selector string, files goja.Value, opts goja.Value)
+	SetInputFiles(selector string, files goja.Value, opts goja.Value) error
 	SetViewportSize(viewportSize goja.Value) error
 	Tap(selector string, opts goja.Value) error
 	TextContent(selector string, opts goja.Value) string
