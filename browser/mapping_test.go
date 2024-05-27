@@ -341,7 +341,7 @@ type pageAPI interface {
 	SetInputFiles(selector string, files goja.Value, opts goja.Value) error
 	SetViewportSize(viewportSize goja.Value) error
 	Tap(selector string, opts goja.Value) error
-	TextContent(selector string, opts goja.Value) string
+	TextContent(selector string, opts goja.Value) (string, error)
 	ThrottleCPU(common.CPUProfile) error
 	ThrottleNetwork(common.NetworkProfile) error
 	Title() (string, error)
@@ -406,7 +406,7 @@ type frameAPI interface {
 	SetContent(html string, opts goja.Value) error
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)
 	Tap(selector string, opts goja.Value) error
-	TextContent(selector string, opts goja.Value) string
+	TextContent(selector string, opts goja.Value) (string, error)
 	Title() string
 	Type(selector string, text string, opts goja.Value)
 	Uncheck(selector string, opts goja.Value) error

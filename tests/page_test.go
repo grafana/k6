@@ -452,17 +452,18 @@ func TestPageTextContent(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		assert.Equal(t, "TestOne", p.TextContent("div", nil))
+		textContent, err := p.TextContent("div", nil)
+		require.NoError(t, err)
+		assert.Equal(t, "TestOne", textContent)
 	})
 
 	t.Run("err_empty_selector", func(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t)
-		assertExceptionContains(t, tb.runtime(), func() {
-			p := tb.NewPage(nil)
-			p.TextContent("", nil)
-		}, "The provided selector is empty")
+		p := tb.NewPage(nil)
+		_, err := p.TextContent("", nil)
+		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
 	t.Run("err_wrong_selector", func(t *testing.T) {
@@ -472,7 +473,10 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		require.Panics(t, func() { p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})) })
+		_, err = p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
+			Timeout: "100",
+		}))
+		require.Error(t, err)
 	})
 }
 

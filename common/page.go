@@ -1198,7 +1198,9 @@ func (p *Page) Tap(selector string, opts *FrameTapOptions) error {
 	return p.MainFrame().Tap(selector, opts)
 }
 
-func (p *Page) TextContent(selector string, opts goja.Value) string {
+// TextContent returns the textContent attribute of the first element found
+// that matches the selector.
+func (p *Page) TextContent(selector string, opts goja.Value) (string, error) {
 	p.logger.Debugf("Page:TextContent", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().TextContent(selector, opts)

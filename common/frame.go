@@ -1619,21 +1619,19 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 
 // TextContent returns the textContent attribute of the first element found
 // that matches the selector.
-func (f *Frame) TextContent(selector string, opts goja.Value) string {
+func (f *Frame) TextContent(selector string, opts goja.Value) (string, error) {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameTextContentOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing text content options: %w", err)
+		return "", fmt.Errorf("parsing text content options: %w", err)
 	}
 	v, err := f.textContent(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting text content of %q: %w", selector, err)
+		return "", fmt.Errorf("getting text content of %q: %w", selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return v, nil
 }
 
 func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (string, error) {

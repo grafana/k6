@@ -137,7 +137,9 @@ func TestLocator(t *testing.T) {
 				const value = "fill me up"
 				lo := p.Locator("#firstParagraph", nil)
 				require.NoError(t, lo.Fill(value, nil))
-				require.Equal(t, value, p.TextContent("#firstParagraph", nil))
+				textContent, err := p.TextContent("#firstParagraph", nil)
+				require.NoError(t, err)
+				require.Equal(t, value, textContent)
 				lo = p.Locator("#secondParagraph", nil)
 				require.Error(t, lo.Fill(value, nil))
 			},

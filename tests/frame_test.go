@@ -64,7 +64,8 @@ func TestFrameDismissDialogBox(t *testing.T) {
 				require.NoError(t, err)
 			}
 
-			result := p.TextContent("#textField", nil)
+			result, err := p.TextContent("#textField", nil)
+			require.NoError(t, err)
 			assert.EqualValues(t, tt+" dismissed", result)
 		})
 	}
@@ -97,7 +98,8 @@ func TestFrameNoPanicWithEmbeddedIFrame(t *testing.T) {
 	_, err := p.Goto(tb.staticURL("embedded_iframe.html"), opts)
 	require.NoError(t, err)
 
-	result := p.TextContent("#doneDiv", nil)
+	result, err := p.TextContent("#doneDiv", nil)
+	require.NoError(t, err)
 	assert.EqualValues(t, "Done!", result)
 }
 
@@ -149,7 +151,8 @@ func TestFrameNoPanicNavigateAndClickOnPageWithIFrames(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result := p.TextContent("#doneDiv", nil)
+	result, err := p.TextContent("#doneDiv", nil)
+	require.NoError(t, err)
 	assert.EqualValues(t, "Sign In Page", result)
 }
 
