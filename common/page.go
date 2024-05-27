@@ -1018,39 +1018,41 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
 
-	parsedOpts := NewPageReloadOptions(
+	reloadOpts := NewPageReloadOptions(
 		LifecycleEventLoad,
 		p.timeoutSettings.navigationTimeout(),
 	)
-	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
+	if err := reloadOpts.Parse(p.ctx, opts); err != nil {
 		err := fmt.Errorf("parsing reload options: %w", err)
 		spanRecordError(span, err)
 		return nil, err
 	}
 
-	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, parsedOpts.Timeout)
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, reloadOpts.Timeout)
 	defer timeoutCancelFn()
 
-	ch, evCancelFn := createWaitForEventHandler(
-		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameNavigation},
-		func(data any) bool {
+	waitForFrameNavigation, cancelWaitingForFrameNavigation := createWaitForEventHandler(
+		timeoutCtx, p.frameManager.MainFrame(),
+		[]string{EventFrameNavigation},
+		func(_ any) bool {
 			return true // Both successful and failed navigations are considered
 		},
 	)
-	defer evCancelFn() // Remove event handler
+	defer cancelWaitingForFrameNavigation() // Remove event handler
 
-	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
-		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameAddLifecycle},
+	waitForLifecycleEvent, cancelWaitingForLifecycleEvent := createWaitForEventPredicateHandler(
+		timeoutCtx, p.frameManager.MainFrame(),
+		[]string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == parsedOpts.WaitUntil
+				return le.Event == reloadOpts.WaitUntil
 			}
 			return false
 		})
-	defer lifecycleEvtCancel()
+	defer cancelWaitingForLifecycleEvent()
 
-	action := cdppage.Reload()
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	reloadAction := cdppage.Reload()
+	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		err := fmt.Errorf("reloading page: %w", err)
 		spanRecordError(span, err)
 		return nil, err
@@ -1060,36 +1062,43 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
 				Err:     err,
-				Timeout: parsedOpts.Timeout,
+				Timeout: reloadOpts.Timeout,
 			}
 			return fmt.Errorf("reloading page: %w", err)
 		}
 		p.logger.Debugf("Page:Reload", "timeoutCtx done: %v", err)
 
-		return err // TODO maybe wrap this as well?
+		return fmt.Errorf("reloading page: %w", err)
 	}
 
-	var event *NavigationEvent
+	var (
+		navigationEvent *NavigationEvent
+		err             error
+	)
 	select {
 	case <-p.ctx.Done():
 	case <-timeoutCtx.Done():
-		err := wrapTimeoutError(timeoutCtx.Err())
+		err = wrapTimeoutError(timeoutCtx.Err())
+	case event := <-waitForFrameNavigation:
+		var ok bool
+		if navigationEvent, ok = event.(*NavigationEvent); !ok {
+			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
+		}
+	}
+	if err != nil {
 		spanRecordError(span, err)
 		return nil, err
-	case data := <-ch:
-		event = data.(*NavigationEvent)
 	}
 
 	var resp *Response
-	req := event.newDocument.request
-	if req != nil {
+	if req := navigationEvent.newDocument.request; req != nil {
 		req.responseMu.RLock()
 		resp = req.response
 		req.responseMu.RUnlock()
 	}
 
 	select {
-	case <-lifecycleEvtCh:
+	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
 		err := wrapTimeoutError(timeoutCtx.Err())
 		spanRecordError(span, err)
