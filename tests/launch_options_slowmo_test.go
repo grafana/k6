@@ -135,7 +135,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				p.SetContent("hello world", nil)
+				err := p.SetContent("hello world", nil)
+				require.NoError(t, err)
 			})
 		})
 		/*t.Run("setInputFiles", func(t *testing.T) {
@@ -272,7 +273,8 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				f.SetContent("hello world", nil)
+				err := f.SetContent("hello world", nil)
+				require.NoError(t, err)
 			})
 		})
 		/*t.Run("setInputFiles", func(t *testing.T) {
@@ -336,7 +338,7 @@ func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *co
 	t.Helper()
 
 	p := tb.NewPage(nil)
-	p.SetContent(`
+	err := p.SetContent(`
 		<button>a</button>
 		<input type="checkbox" class="check">
 		<input type="checkbox" checked=true class="uncheck">
@@ -345,7 +347,9 @@ func testPageSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser, *co
 		<option>foo</option>
 		</select>
 		<input type="file" class="file">
-    	`, nil)
+    	`, nil,
+	)
+	require.NoError(t, err)
 	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, p) })
 }
 
@@ -375,7 +379,7 @@ func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser,
 	f, err := h.AsElement().ContentFrame()
 	require.NoError(tb.t, err)
 
-	f.SetContent(`
+	err = f.SetContent(`
 		<button>a</button>
 		<input type="checkbox" class="check">
 		<input type="checkbox" checked=true class="uncheck">
@@ -385,5 +389,6 @@ func testFrameSlowMoImpl(t *testing.T, tb *testBrowser, fn func(bt *testBrowser,
 		</select>
 		<input type="file" class="file">
     	`, nil)
+	require.NoError(tb.t, err)
 	testSlowMoImpl(t, tb, func(tb *testBrowser) { fn(tb, f) })
 }

@@ -171,10 +171,13 @@ func TestSetInputFiles(t *testing.T) {
 			test := test
 			t.Run(tc.name, func(t *testing.T) {
 				t.Parallel()
+
 				tb := newTestBrowser(t)
 				defer tb.Browser.Close()
 				page := tb.NewPage(nil)
-				page.SetContent(pageContent, nil)
+
+				err := page.SetContent(pageContent, nil)
+				require.NoError(t, err)
 
 				getFileCountFn := func() interface{} {
 					v, err := page.Evaluate(`() => document.getElementById("upload").files.length`)
@@ -196,7 +199,7 @@ func TestSetInputFiles(t *testing.T) {
 				if cleanup != nil {
 					defer cleanup()
 				}
-				err := test(tb, page, files)
+				err = test(tb, page, files)
 				tc.check(t, getFileCountFn, getFilePropertyFn, err)
 			})
 		}

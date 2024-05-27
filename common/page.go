@@ -1127,10 +1127,11 @@ func (p *Page) SelectOption(selector string, values goja.Value, opts goja.Value)
 	return p.MainFrame().SelectOption(selector, values, opts)
 }
 
-func (p *Page) SetContent(html string, opts goja.Value) {
+// SetContent replaces the entire HTML document content.
+func (p *Page) SetContent(html string, opts goja.Value) error {
 	p.logger.Debugf("Page:SetContent", "sid:%v", p.sessionID())
 
-	p.MainFrame().SetContent(html, opts)
+	return p.MainFrame().SetContent(html, opts)
 }
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.

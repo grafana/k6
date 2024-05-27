@@ -437,7 +437,8 @@ func TestLocator(t *testing.T) {
 
 			tb := newTestBrowser(t)
 			p := tb.NewPage(nil)
-			p.SetContent("<html></html>", nil)
+			err := p.SetContent("<html></html>", nil)
+			require.NoError(t, err)
 			require.Error(t, tt.do(p.Locator("NOTEXIST", nil), tb))
 		})
 	}
@@ -581,7 +582,8 @@ func TestLocatorElementState(t *testing.T) {
 
 			tb := newTestBrowser(t)
 			p := tb.NewPage(nil)
-			p.SetContent("<html></html>", nil)
+			err := p.SetContent("<html></html>", nil)
+			require.NoError(t, err)
 			require.Error(t, tt.do(p.Locator("NOTEXIST", nil), tb))
 		})
 	}
@@ -614,7 +616,8 @@ func TestLocatorPress(t *testing.T) {
 
 	p := tb.NewPage(nil)
 
-	p.SetContent(`<input id="text1">`, nil)
+	err := p.SetContent(`<input id="text1">`, nil)
+	require.NoError(t, err)
 
 	l := p.Locator("#text1", nil)
 

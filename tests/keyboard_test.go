@@ -34,7 +34,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<input>`, nil)
+		err := p.SetContent(`<input>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("input")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))
@@ -57,7 +58,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<input>`, nil)
+		err := p.SetContent(`<input>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("input")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))
@@ -86,7 +88,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<input>`, nil)
+		err := p.SetContent(`<input>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("input")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))
@@ -117,7 +120,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<textarea>`, nil)
+		err := p.SetContent(`<textarea>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("textarea")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("textarea", nil))
@@ -135,7 +139,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<textarea>`, nil)
+		err := p.SetContent(`<textarea>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("textarea")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("textarea", nil))
@@ -165,7 +170,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<textarea>`, nil)
+		err := p.SetContent(`<textarea>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("textarea")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("textarea", nil))
@@ -186,7 +192,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<textarea>`, nil)
+		err := p.SetContent(`<textarea>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("textarea")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("textarea", nil))
@@ -208,7 +215,8 @@ func TestKeyboardPress(t *testing.T) {
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()
 
-		p.SetContent(`<input>`, nil)
+		err := p.SetContent(`<input>`, nil)
+		require.NoError(t, err)
 		el, err := p.Query("input")
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))

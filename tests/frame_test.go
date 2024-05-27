@@ -20,7 +20,8 @@ func TestFramePress(t *testing.T) {
 
 	p := tb.NewPage(nil)
 
-	p.SetContent(`<input id="text1">`, nil)
+	err := p.SetContent(`<input id="text1">`, nil)
+	require.NoError(t, err)
 
 	f := p.Frames()[0]
 
@@ -156,6 +157,10 @@ func TestFrameTitle(t *testing.T) {
 	t.Parallel()
 
 	p := newTestBrowser(t).NewPage(nil)
-	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
+	err := p.SetContent(
+		`<html><head><title>Some title</title></head></html>`,
+		nil,
+	)
+	require.NoError(t, err)
 	assert.Equal(t, "Some title", p.MainFrame().Title())
 }

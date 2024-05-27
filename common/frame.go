@@ -1518,14 +1518,14 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 }
 
 // SetContent replaces the entire HTML document content.
-func (f *Frame) SetContent(html string, opts goja.Value) {
+func (f *Frame) SetContent(html string, opts goja.Value) error {
 	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
 
 	parsedOpts := NewFrameSetContentOptions(
 		f.manager.timeoutSettings.navigationTimeout(),
 	)
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing set content options: %w", err)
+		return fmt.Errorf("parsing set content options: %w", err)
 	}
 
 	js := `(html) => {
@@ -1542,10 +1542,12 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		returnByValue: true,
 	}
 	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, js, html); err != nil {
-		k6ext.Panic(f.ctx, "setting content: %w", err)
+		return fmt.Errorf("setting content: %w", err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 // SetInputFiles sets input files for the selected element.

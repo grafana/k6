@@ -114,9 +114,10 @@ func TestPageContent(t *testing.T) {
 	p := tb.NewPage(nil)
 
 	content := `<!DOCTYPE html><html><head></head><body><h1>Hello</h1></body></html>`
-	p.SetContent(content, nil)
+	err := p.SetContent(content, nil)
+	require.NoError(t, err)
 
-	content, err := p.Content()
+	content, err = p.Content()
 	require.NoError(t, err)
 	assert.Equal(t, content, content)
 }
@@ -376,7 +377,8 @@ func TestPageInnerHTML(t *testing.T) {
 		t.Parallel()
 
 		p := newTestBrowser(t).NewPage(nil)
-		p.SetContent(sampleHTML, nil)
+		err := p.SetContent(sampleHTML, nil)
+		require.NoError(t, err)
 		innerHTML, err := p.InnerHTML("div", nil)
 		require.NoError(t, err)
 		assert.Equal(t, `<b>Test</b><ol><li><i>One</i></li></ol>`, innerHTML)
@@ -399,8 +401,9 @@ func TestPageInnerHTML(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		p.SetContent(sampleHTML, nil)
-		_, err := p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
+		err := p.SetContent(sampleHTML, nil)
+		require.NoError(t, err)
+		_, err = p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
 		require.Error(t, err)
 	})
 }
@@ -412,7 +415,8 @@ func TestPageInnerText(t *testing.T) {
 		t.Parallel()
 
 		p := newTestBrowser(t).NewPage(nil)
-		p.SetContent(sampleHTML, nil)
+		err := p.SetContent(sampleHTML, nil)
+		require.NoError(t, err)
 		innerText, err := p.InnerText("div", nil)
 		require.NoError(t, err)
 		assert.Equal(t, "Test\nOne", innerText)
@@ -432,8 +436,9 @@ func TestPageInnerText(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		p.SetContent(sampleHTML, nil)
-		_, err := p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
+		err := p.SetContent(sampleHTML, nil)
+		require.NoError(t, err)
+		_, err = p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
 		require.Error(t, err)
 	})
 }
@@ -445,7 +450,8 @@ func TestPageTextContent(t *testing.T) {
 		t.Parallel()
 
 		p := newTestBrowser(t).NewPage(nil)
-		p.SetContent(sampleHTML, nil)
+		err := p.SetContent(sampleHTML, nil)
+		require.NoError(t, err)
 		assert.Equal(t, "TestOne", p.TextContent("div", nil))
 	})
 
@@ -464,7 +470,8 @@ func TestPageTextContent(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		p.SetContent(sampleHTML, nil)
+		err := p.SetContent(sampleHTML, nil)
+		require.NoError(t, err)
 		require.Panics(t, func() { p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})) })
 	})
 }
@@ -474,11 +481,12 @@ func TestPageInputValue(t *testing.T) {
 
 	p := newTestBrowser(t).NewPage(nil)
 
-	p.SetContent(`
+	err := p.SetContent(`
 		<input value="hello1">
 		<select><option value="hello2" selected></option></select>
 		<textarea>hello3</textarea>
      	`, nil)
+	require.NoError(t, err)
 
 	inputValue, err := p.InputValue("input", nil)
 	require.NoError(t, err)
@@ -502,7 +510,8 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 
 	p := newTestBrowser(t).NewPage(nil)
 
-	p.SetContent(`<input id="special">`, nil)
+	err := p.SetContent(`<input id="special">`, nil)
+	require.NoError(t, err)
 	el, err := p.Query("#special")
 	require.NoError(t, err)
 
@@ -529,12 +538,13 @@ func TestPageFill(t *testing.T) {
 	// faster when run sequentially.
 
 	p := newTestBrowser(t).NewPage(nil)
-	p.SetContent(`
+	err := p.SetContent(`
 		<input id="text" type="text" value="something" />
 		<input id="date" type="date" value="2012-03-12"/>
 		<input id="number" type="number" value="42"/>
 		<input id="unfillable" type="radio" />
 	`, nil)
+	require.NoError(t, err)
 
 	happy := []struct{ name, selector, value string }{
 		{name: "text", selector: "#text", value: "fill me up"},
@@ -568,12 +578,14 @@ func TestPageIsChecked(t *testing.T) {
 
 	p := newTestBrowser(t).NewPage(nil)
 
-	p.SetContent(`<input type="checkbox" checked>`, nil)
+	err := p.SetContent(`<input type="checkbox" checked>`, nil)
+	require.NoError(t, err)
 	checked, err := p.IsChecked("input", nil)
 	require.NoError(t, err)
 	assert.True(t, checked, "expected checkbox to be checked")
 
-	p.SetContent(`<input type="checkbox">`, nil)
+	err = p.SetContent(`<input type="checkbox">`, nil)
+	require.NoError(t, err)
 	checked, err = p.IsChecked("input", nil)
 	require.NoError(t, err)
 	assert.False(t, checked, "expected checkbox to be unchecked")
@@ -633,7 +645,8 @@ func TestPageTitle(t *testing.T) {
 	t.Parallel()
 
 	p := newTestBrowser(t).NewPage(nil)
-	p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
+	err := p.SetContent(`<html><head><title>Some title</title></head></html>`, nil)
+	require.NoError(t, err)
 	title, err := p.Title()
 	require.NoError(t, err)
 	assert.Equal(t, "Some title", title)
@@ -876,7 +889,8 @@ func TestPagePress(t *testing.T) {
 
 	p := tb.NewPage(nil)
 
-	p.SetContent(`<input id="text1">`, nil)
+	err := p.SetContent(`<input id="text1">`, nil)
+	require.NoError(t, err)
 
 	require.NoError(t, p.Press("#text1", "Shift+KeyA", nil))
 	require.NoError(t, p.Press("#text1", "KeyB", nil))

@@ -59,7 +59,8 @@ func TestElementHandleBoundingBoxInvisibleElement(t *testing.T) {
 
 	p := newTestBrowser(t).NewPage(nil)
 
-	p.SetContent(`<div style="display:none">hello</div>`, nil)
+	err := p.SetContent(`<div style="display:none">hello</div>`, nil)
+	require.NoError(t, err)
 	element, err := p.Query("div")
 	require.NoError(t, err)
 	require.Nil(t, element.BoundingBox())
@@ -71,11 +72,12 @@ func TestElementHandleBoundingBoxSVG(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetContent(`
+	err := p.SetContent(`
 		<svg xmlns="http://www.w3.org/2000/svg" width="500" height="500">
 			<rect id="theRect" x="30" y="50" width="200" height="300"></rect>
 		</svg>
 	`, nil)
+	require.NoError(t, err)
 
 	element, err := p.Query("#therect")
 	require.NoError(t, err)
@@ -97,7 +99,8 @@ func TestElementHandleClick(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetContent(htmlInputButton, nil)
+	err := p.SetContent(htmlInputButton, nil)
+	require.NoError(t, err)
 
 	button, err := p.Query("button")
 	require.NoError(t, err)
@@ -120,10 +123,11 @@ func TestElementHandleClickWithNodeRemoved(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetContent(htmlInputButton, nil)
+	err := p.SetContent(htmlInputButton, nil)
+	require.NoError(t, err)
 
 	// Remove all nodes
-	_, err := p.Evaluate(`() => delete window['Node']`)
+	_, err = p.Evaluate(`() => delete window['Node']`)
 	require.NoError(t, err)
 
 	button, err := p.Query("button")
@@ -147,7 +151,8 @@ func TestElementHandleClickWithDetachedNode(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	p.SetContent(htmlInputButton, nil)
+	err := p.SetContent(htmlInputButton, nil)
+	require.NoError(t, err)
 	button, err := p.Query("button")
 	require.NoError(t, err)
 
@@ -246,9 +251,10 @@ func TestElementHandleGetAttribute(t *testing.T) {
 	const want = "https://somewhere"
 
 	p := newTestBrowser(t).NewPage(nil)
-	p.SetContent(`
+	err := p.SetContent(`
 		<a id="dark-mode-toggle-X" href="https://somewhere">Dark</a>
 	`, nil)
+	require.NoError(t, err)
 
 	el, err := p.Query("#dark-mode-toggle-X")
 	require.NoError(t, err)
@@ -263,11 +269,12 @@ func TestElementHandleInputValue(t *testing.T) {
 
 	p := newTestBrowser(t).NewPage(nil)
 
-	p.SetContent(`
+	err := p.SetContent(`
 		<input value="hello1">
 		<select><option value="hello2" selected></option></select>
 		<textarea>hello3</textarea>
-    	`, nil)
+    `, nil)
+	require.NoError(t, err)
 
 	element, err := p.Query("input")
 	require.NoError(t, err)
@@ -299,7 +306,8 @@ func TestElementHandleIsChecked(t *testing.T) {
 
 	p := newTestBrowser(t).NewPage(nil)
 
-	p.SetContent(`<input type="checkbox" checked>`, nil)
+	err := p.SetContent(`<input type="checkbox" checked>`, nil)
+	require.NoError(t, err)
 	element, err := p.Query("input")
 	require.NoError(t, err)
 
@@ -308,7 +316,8 @@ func TestElementHandleIsChecked(t *testing.T) {
 	assert.True(t, checked, "expected checkbox to be checked")
 	element.Dispose()
 
-	p.SetContent(`<input type="checkbox">`, nil)
+	err = p.SetContent(`<input type="checkbox">`, nil)
+	require.NoError(t, err)
 	element, err = p.Query("input")
 	require.NoError(t, err)
 	checked, err = element.IsChecked()
@@ -326,12 +335,13 @@ func TestElementHandleQueryAll(t *testing.T) {
 	)
 
 	p := newTestBrowser(t).NewPage(nil)
-	p.SetContent(`
+	err := p.SetContent(`
 		<ul id="aul">
 			<li class="ali">1</li>
 			<li class="ali">2</li>
 		</ul>
   	`, nil)
+	require.NoError(t, err)
 
 	t.Run("element_handle", func(t *testing.T) {
 		t.Parallel()
@@ -429,7 +439,8 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
-	p.SetContent(`<div class="root"></div>`, nil)
+	err := p.SetContent(`<div class="root"></div>`, nil)
+	require.NoError(t, err)
 
 	root, err := p.Query(".root")
 	require.NoError(t, err)
@@ -462,7 +473,8 @@ func TestElementHandlePress(t *testing.T) {
 
 	p := tb.NewPage(nil)
 
-	p.SetContent(`<input>`, nil)
+	err := p.SetContent(`<input>`, nil)
+	require.NoError(t, err)
 
 	el, err := p.Query("input")
 	require.NoError(t, err)
@@ -480,7 +492,8 @@ func TestElementHandleQuery(t *testing.T) {
 	t.Parallel()
 
 	p := newTestBrowser(t).NewPage(nil)
-	p.SetContent(`<div id="foo">hello</div>`, nil)
+	err := p.SetContent(`<div id="foo">hello</div>`, nil)
+	require.NoError(t, err)
 
 	element, err := p.Query("bar")
 

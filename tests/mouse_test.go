@@ -21,7 +21,8 @@ func TestMouseActions(t *testing.T) {
 		buttonHTML := `
 			<button onclick="this.innerHTML='Clicked!'">Click me</button>
 		`
-		p.SetContent(buttonHTML, nil)
+		err := p.SetContent(buttonHTML, nil)
+		require.NoError(t, err)
 		button, err := p.Query("button")
 		require.NoError(t, err)
 
@@ -50,7 +51,8 @@ func TestMouseActions(t *testing.T) {
 				ondblclick="this.innerHTML='Double Clicked!';">Click me</button>
 			<div id="clicks"></div>
 		`
-		p.SetContent(buttonHTML, nil)
+		err := p.SetContent(buttonHTML, nil)
+		require.NoError(t, err)
 		button, err := p.Query("button")
 		require.NoError(t, err)
 
@@ -87,7 +89,8 @@ func TestMouseActions(t *testing.T) {
 				style="width:100px;height:100px;"
 			></div>
 		`
-		p.SetContent(areaHTML, nil)
+		err := p.SetContent(areaHTML, nil)
+		require.NoError(t, err)
 		area, err := p.Query("div")
 		require.NoError(t, err)
 
@@ -113,7 +116,8 @@ func TestMouseActions(t *testing.T) {
 				onmouseup="this.innerHTML='Mouse Up';"
 			>Mouse</button>
 		`
-		p.SetContent(buttonHTML, nil)
+		err := p.SetContent(buttonHTML, nil)
+		require.NoError(t, err)
 		button, err := p.Query("button")
 		require.NoError(t, err)
 
