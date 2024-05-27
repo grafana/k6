@@ -724,11 +724,15 @@ func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
-func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
-	action := network.SetExtraHTTPHeaders(headers)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "setting extra HTTP headers: %w", err)
+func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) error {
+	err := network.
+		SetExtraHTTPHeaders(headers).
+		Do(cdp.WithExecutor(m.ctx, m.session))
+	if err != nil {
+		return fmt.Errorf("setting extra HTTP headers: %w", err)
 	}
+
+	return nil
 }
 
 // SetOfflineMode toggles offline mode on/off.

@@ -513,7 +513,9 @@ func (fs *FrameSession) initOptions() error {
 	if err := fs.updateGeolocation(true); err != nil {
 		return err
 	}
-	fs.updateExtraHTTPHeaders(true)
+	if err := fs.updateExtraHTTPHeaders(true); err != nil {
+		return err
+	}
 
 	var reqIntercept bool
 	if state.Options.BlockedHostnames.Trie != nil ||
@@ -1062,7 +1064,7 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 	return nil
 }
 
-func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
+func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateExtraHTTPHeaders", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// Merge extra headers from browser context and page, where page specific headers ake precedence.
@@ -1074,8 +1076,12 @@ func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
 		mergedHeaders[k] = v
 	}
 	if !initial || len(mergedHeaders) > 0 {
-		fs.networkManager.SetExtraHTTPHeaders(mergedHeaders)
+		if err := fs.networkManager.SetExtraHTTPHeaders(mergedHeaders); err != nil {
+			return fmt.Errorf("updating extra HTTP headers: %w", err)
+		}
 	}
+
+	return nil
 }
 
 func (fs *FrameSession) updateGeolocation(initial bool) error {

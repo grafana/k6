@@ -538,15 +538,19 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 	return p.setEmulatedSize(NewEmulatedSize(viewport, screen))
 }
 
-func (p *Page) updateExtraHTTPHeaders() {
+func (p *Page) updateExtraHTTPHeaders() error {
 	p.logger.Debugf("Page:updateExtraHTTPHeaders", "sid:%v", p.sessionID())
 
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
-		fs.updateExtraHTTPHeaders(false)
+		if err := fs.updateExtraHTTPHeaders(false); err != nil {
+			return fmt.Errorf("updating extra HTTP headers: %w", err)
+		}
 	}
+
+	return nil
 }
 
 func (p *Page) updateGeolocation() error {
@@ -1158,11 +1162,11 @@ func (p *Page) SetDefaultTimeout(timeout int64) {
 }
 
 // SetExtraHTTPHeaders sets default HTTP headers for page and whole frame hierarchy.
-func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
+func (p *Page) SetExtraHTTPHeaders(headers map[string]string) error {
 	p.logger.Debugf("Page:SetExtraHTTPHeaders", "sid:%v", p.sessionID())
 
 	p.extraHTTPHeaders = headers
-	p.updateExtraHTTPHeaders()
+	return p.updateExtraHTTPHeaders()
 }
 
 // SetInputFiles sets input files for the selected element.
