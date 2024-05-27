@@ -66,7 +66,7 @@ func TestGetGroups(t *testing.T) {
 	t.Parallel()
 
 	cs := getControlSurface(t, getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{}))
-    require.NoError(t, cs.RunState.GroupSummary.Start())
+	require.NoError(t, cs.RunState.GroupSummary.Start())
 	cs.RunState.GroupSummary.AddMetricSamples([]metrics.SampleContainer{
 		metrics.Sample{
 			TimeSeries: metrics.TimeSeries{
