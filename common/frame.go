@@ -1809,45 +1809,48 @@ func (f *Frame) waitForFunction(
 
 // WaitForLoadState waits for the given load state to be reached.
 // This will unblock if that lifecycle event has already been received.
-func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
+func (f *Frame) WaitForLoadState(state string, opts goja.Value) error {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 
-	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		k6ext.Panic(f.ctx, "parsing waitForLoadState %q options: %v", state, err)
+	waitForLoadStateOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
+	if err := waitForLoadStateOpts.Parse(f.ctx, opts); err != nil {
+		return fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
 	}
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, parsedOpts.Timeout)
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, waitForLoadStateOpts.Timeout)
 	defer timeoutCancel()
 
 	waitUntil := LifecycleEventLoad
 	if state != "" {
-		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
-			k6ext.Panic(f.ctx, "waiting for load state: %v", err)
+		if err := waitUntil.UnmarshalText([]byte(state)); err != nil {
+			return fmt.Errorf("unmarshaling wait for load state %q: %w", state, err)
 		}
 	}
 
-	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
-		timeoutCtx, f, []string{EventFrameAddLifecycle},
+	lifecycleEvent, lifecycleEventCancel := createWaitForEventPredicateHandler(
+		timeoutCtx,
+		f,
+		[]string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
 				return le.Event == waitUntil
 			}
 			return false
 		})
-	defer lifecycleEvtCancel()
+	defer lifecycleEventCancel()
 
 	if f.hasLifecycleEventFired(waitUntil) {
-		return
+		return nil
 	}
 
 	select {
-	case <-lifecycleEvtCh:
+	case <-lifecycleEvent:
 	case <-timeoutCtx.Done():
-		k6ext.Panic(f.ctx, "waiting for load state %q: %v", state, err)
+		return fmt.Errorf("waiting for load state %q: %w", state, timeoutCtx.Err())
 	}
+
+	return nil
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.

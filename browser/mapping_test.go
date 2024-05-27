@@ -350,7 +350,7 @@ type pageAPI interface {
 	URL() (string, error)
 	ViewportSize() map[string]float64
 	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
-	WaitForLoadState(state string, opts goja.Value)
+	WaitForLoadState(state string, opts goja.Value) error
 	WaitForNavigation(opts goja.Value) (*common.Response, error)
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
@@ -412,7 +412,7 @@ type frameAPI interface {
 	Uncheck(selector string, opts goja.Value) error
 	URL() string
 	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
-	WaitForLoadState(state string, opts goja.Value)
+	WaitForLoadState(state string, opts goja.Value) error
 	WaitForNavigation(opts goja.Value) (*common.Response, error)
 	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)

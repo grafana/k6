@@ -865,10 +865,9 @@ func TestPageWaitForLoadState(t *testing.T) {
 		t.Parallel()
 
 		tb := newTestBrowser(t)
-		assertExceptionContains(t, tb.runtime(), func() {
-			p := tb.NewPage(nil)
-			p.WaitForLoadState("none", nil)
-		}, `invalid lifecycle event: "none"; must be one of: load, domcontentloaded, networkidle`)
+		p := tb.NewPage(nil)
+		err := p.WaitForLoadState("none", nil)
+		require.ErrorContains(t, err, `invalid lifecycle event: "none"; must be one of: load, domcontentloaded, networkidle`)
 	})
 }
 

@@ -1305,10 +1305,10 @@ func (p *Page) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsA
 }
 
 // WaitForLoadState waits for the specified page life cycle event.
-func (p *Page) WaitForLoadState(state string, opts goja.Value) {
+func (p *Page) WaitForLoadState(state string, opts goja.Value) error {
 	p.logger.Debugf("Page:WaitForLoadState", "sid:%v state:%q", p.sessionID(), state)
 
-	p.frameManager.MainFrame().WaitForLoadState(state, opts)
+	return p.frameManager.MainFrame().WaitForLoadState(state, opts)
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
