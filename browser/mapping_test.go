@@ -332,7 +332,7 @@ type pageAPI interface {
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Reload(opts goja.Value) *common.Response
-	Screenshot(opts goja.Value) goja.ArrayBuffer
+	Screenshot(opts goja.Value) ([]byte, error)
 	SelectOption(selector string, values goja.Value, opts goja.Value) ([]string, error)
 	SetContent(html string, opts goja.Value) error
 	SetDefaultNavigationTimeout(timeout int64)

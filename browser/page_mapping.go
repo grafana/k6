@@ -142,10 +142,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(r).ToObject(rt), nil
 		},
 		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
-			ctx := vu.Context()
-
 			popts := common.NewPageScreenshotOptions()
-			if err := popts.Parse(ctx, opts); err != nil {
+			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
 
