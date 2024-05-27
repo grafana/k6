@@ -1188,8 +1188,6 @@ func (p *Page) SetViewportSize(viewportSize goja.Value) error {
 		return fmt.Errorf("setting viewport size: %w", err)
 	}
 
-	applySlowMo(p.ctx)
-
 	return nil
 }
 

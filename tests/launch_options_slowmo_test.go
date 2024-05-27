@@ -152,13 +152,6 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 				require.NoError(t, err)
 			})
 		})
-		t.Run("setViewportSize", func(t *testing.T) {
-			t.Parallel()
-			tb := newTestBrowser(t, withFileServer())
-			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				require.NoError(t, p.SetViewportSize(nil))
-			})
-		})
 		t.Run("type", func(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
