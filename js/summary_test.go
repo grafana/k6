@@ -593,6 +593,33 @@ func TestRawHandleSummaryData(t *testing.T) {
 	assert.JSONEq(t, expectedHandleSummaryRawData, string(newRawData))
 }
 
+func TestJSDataSuppliedToHandleSummary(t *testing.T) {
+	t.Parallel()
+	runner, err := getSimpleRunner(
+		t, "/script.js",
+		`
+		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.default = function() { /* we don't run this, metrics are mocked */ };
+		exports.handleSummary = function(data) {
+			return {'rawdata.json': JSON.stringify(data)};
+		};
+		`,
+	)
+
+	require.NoError(t, err)
+
+	summary := createTestSummary(t)
+	result, jsData, err := runner.HandleSummary(context.Background(), summary)
+	delete(jsData, "setup_data")
+	require.NoError(t, err)
+	jsonString, jerr := json.Marshal(jsData)
+	require.NoError(t, jerr)
+	require.NotNil(t, result["rawdata.json"])
+	newRawData, err := io.ReadAll(result["rawdata.json"])
+	require.NoError(t, err)
+	assert.JSONEq(t, string(newRawData), string(jsonString))
+}
+
 func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	t.Parallel()
 	runner, err := getSimpleRunner(
