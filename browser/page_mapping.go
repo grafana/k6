@@ -287,7 +287,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent":     p.TextContent,
+		"textContent": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.TextContent(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"throttleCPU":     p.ThrottleCPU,
 		"throttleNetwork": p.ThrottleNetwork,
 		"title":           p.Title,
