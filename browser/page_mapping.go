@@ -364,7 +364,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapElementHandle(vu, eh), nil
 			})
 		},
-		"waitForTimeout": p.WaitForTimeout,
+		"waitForTimeout": func(timeout int64) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				p.WaitForTimeout(timeout)
+				return nil, nil
+			})
+		},
 		"workers": func() *goja.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {
