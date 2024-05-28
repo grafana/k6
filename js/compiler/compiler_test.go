@@ -7,7 +7,6 @@ import (
 	"testing"
 
 	"github.com/dop251/goja"
-	"github.com/dop251/goja/parser"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -158,45 +157,6 @@ func TestCompile(t *testing.T) {
 		assert.IsType(t, &goja.Exception{}, err)
 		assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
 > 1 | 1+(=>2)()`)
-	})
-
-	t.Run("experimental_enhanced Invalid", func(t *testing.T) {
-		t.Parallel()
-		c := New(testutils.NewLogger(t))
-		src := `1+(function() { return 2; )()`
-		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		_, _, err := c.Compile(src, "script.js", false)
-		assert.IsType(t, &parser.Error{}, err)
-		assert.Contains(t, err.Error(), `script.js: Line 1:26 Unexpected ")"`)
-	})
-	t.Run("experimental_enhanced", func(t *testing.T) {
-		t.Parallel()
-		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		pgm, code, err := c.Compile(`import "something"`, "script.js", true)
-		require.NoError(t, err)
-		assert.Equal(t, `var import_something = require("something");
-`, code)
-		rt := goja.New()
-		var requireCalled bool
-		require.NoError(t, rt.Set("require", func(s string) {
-			assert.Equal(t, "something", s)
-			requireCalled = true
-		}))
-		_, err = rt.RunProgram(pgm)
-		require.NoError(t, err)
-		require.True(t, requireCalled)
-	})
-	t.Run("experimental_enhanced sourcemap", func(t *testing.T) {
-		t.Parallel()
-		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		c.Options.SourceMapLoader = func(_ string) ([]byte, error) { return nil, nil }
-		_, code, err := c.Compile(`import "something"`, "script.js", true)
-		require.NoError(t, err)
-		assert.Equal(t, `var import_something = require("something");
-
-//# sourceMappingURL=k6://internal-should-not-leak/file.map`, code)
 	})
 }
 
