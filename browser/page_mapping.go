@@ -222,15 +222,17 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Press(selector, key, opts) //nolint:wrapcheck
 			})
 		},
-		"reload": func(opts goja.Value) (*goja.Object, error) {
-			resp, err := p.Reload(opts)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
+		"reload": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				resp, err := p.Reload(opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
 
-			r := mapResponse(vu, resp)
+				r := mapResponse(vu, resp)
 
-			return rt.ToValue(r).ToObject(rt), nil
+				return rt.ToValue(r).ToObject(rt), nil
+			})
 		},
 		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
 			popts := common.NewPageScreenshotOptions()
