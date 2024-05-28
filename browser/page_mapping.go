@@ -81,12 +81,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
 			})
 		},
-		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
-			jsh, err := p.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapJSHandle(vu, jsh), nil
+		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				jsh, err := p.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapJSHandle(vu, jsh), nil
+			})
 		},
 		"fill":  p.Fill,
 		"focus": p.Focus,
