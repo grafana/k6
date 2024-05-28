@@ -160,19 +160,19 @@ func TestCompile(t *testing.T) {
 > 1 | 1+(=>2)()`)
 	})
 
-	t.Run("enhanced Invalid", func(t *testing.T) {
+	t.Run("experimental_enhanced Invalid", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		src := `1+(function() { return 2; )()`
-		c.Options.CompatibilityMode = lib.CompatibilityModeEnhanced
+		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
 		_, _, err := c.Compile(src, "script.js", false)
 		assert.IsType(t, &parser.Error{}, err)
 		assert.Contains(t, err.Error(), `script.js: Line 1:26 Unexpected ")"`)
 	})
-	t.Run("enhanced", func(t *testing.T) {
+	t.Run("experimental_enhanced", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeEnhanced
+		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
 		pgm, code, err := c.Compile(`import "something"`, "script.js", true)
 		require.NoError(t, err)
 		assert.Equal(t, `var import_something = require("something");
@@ -187,10 +187,10 @@ func TestCompile(t *testing.T) {
 		require.NoError(t, err)
 		require.True(t, requireCalled)
 	})
-	t.Run("enhanced sourcemap", func(t *testing.T) {
+	t.Run("experimental_enhanced sourcemap", func(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
-		c.Options.CompatibilityMode = lib.CompatibilityModeEnhanced
+		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
 		c.Options.SourceMapLoader = func(_ string) ([]byte, error) { return nil, nil }
 		_, code, err := c.Compile(`import "something"`, "script.js", true)
 		require.NoError(t, err)

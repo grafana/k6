@@ -254,7 +254,7 @@ func (c *Compiler) compileImpl(
 		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
 	}
 
-	if compatibilityMode == lib.CompatibilityModeEnhanced {
+	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
 		code, state.srcMap, err = esbuildTransform(src, filename)
 		if err != nil {
 			return nil, code, err

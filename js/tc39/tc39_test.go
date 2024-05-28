@@ -765,7 +765,7 @@ func TestTC39(t *testing.T) {
 	}
 
 	runTestTC39(t, lib.CompatibilityModeExtended)
-	runTestTC39(t, lib.CompatibilityModeEnhanced)
+	runTestTC39(t, lib.CompatibilityModeExperimentalEnhanced)
 }
 
 func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {
