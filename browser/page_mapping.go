@@ -17,8 +17,12 @@ import (
 func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	rt := vu.Runtime()
 	maps := mapping{
-		"bringToFront": p.BringToFront,
-		"check":        p.Check,
+		"bringToFront": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.BringToFront() //nolint:wrapcheck
+			})
+		},
+		"check": p.Check,
 		"click": func(selector string, opts goja.Value) (*goja.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, p.Timeout())
 			if err != nil {
