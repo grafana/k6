@@ -76,8 +76,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.EmulateVisionDeficiency(typ) //nolint:wrapcheck
 			})
 		},
-		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) (any, error) {
-			return p.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
+		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
+			})
 		},
 		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
 			jsh, err := p.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)

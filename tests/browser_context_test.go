@@ -659,7 +659,7 @@ func TestK6Object(t *testing.T) {
 			got := vu.RunPromise(t, `
 				const p = await browser.newPage();
 				await p.goto("about:blank");
-				const o = p.evaluate(() => window.k6);
+				const o = await p.evaluate(() => window.k6);
 				return JSON.stringify(o);
 			`)
 			assert.Equal(t, tt.want, got.Result().String())
@@ -670,7 +670,7 @@ func TestK6Object(t *testing.T) {
 				const c = await browser.newContext();
 				const p2 = await c.newPage();
 				await p2.goto("about:blank");
-				const o2 = p2.evaluate(() => window.k6);
+				const o2 = await p2.evaluate(() => window.k6);
 				return JSON.stringify(o2);
 			`)
 			assert.Equal(t, tt.want, got.Result().String())

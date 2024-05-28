@@ -229,13 +229,13 @@ func TestPageEvaluateMapping(t *testing.T) {
 			vu.SetVar(t, "p", &goja.Object{})
 			got := vu.RunPromise(t, `
 				p = await browser.newPage()
-				return p.evaluate(%s)
+				return await p.evaluate(%s)
 			`, tt.script)
 			assert.Equal(t, vu.ToGojaValue(tt.want), got.Result())
 
 			// Test script as string input
 			got = vu.RunPromise(t,
-				`return p.evaluate("%s")`,
+				`return await p.evaluate("%s")`,
 				tt.script,
 			)
 			assert.Equal(t, vu.ToGojaValue(tt.want), got.Result())
@@ -722,7 +722,7 @@ func TestPageWaitForFunction(t *testing.T) {
 	t.Run("ok_func_raf_default_arg", func(t *testing.T) {
 		t.Parallel()
 
-		vu, rt, log, cleanUp := startIteration(t)
+		vu, _, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
 		_, err := vu.RunOnEventLoop(t, `fn = arg => {
@@ -735,12 +735,9 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 
-		argEval, err := vu.RunOnEventLoop(t, `page.evaluate(() => window._arg);`)
-		require.NoError(t, err)
-
-		var gotArg string
-		_ = rt.ExportTo(argEval, &gotArg)
-		assert.Equal(t, "raf_arg", gotArg)
+		p := vu.RunPromise(t, `return await page.evaluate(() => window._arg);`)
+		require.Equal(t, p.State(), goja.PromiseStateFulfilled)
+		assert.Equal(t, "raf_arg", p.Result().String())
 	})
 
 	t.Run("ok_func_raf_default_args", func(t *testing.T) {
@@ -763,11 +760,10 @@ func TestPageWaitForFunction(t *testing.T) {
 		require.NoError(t, err)
 		assert.Contains(t, *log, "ok: null")
 
-		argEval, err := vu.RunOnEventLoop(t, `page.evaluate(() => window._args);`)
-		require.NoError(t, err)
-
+		p := vu.RunPromise(t, `return await page.evaluate(() => window._args);`)
+		require.Equal(t, p.State(), goja.PromiseStateFulfilled)
 		var gotArgs []int
-		_ = rt.ExportTo(argEval, &gotArgs)
+		_ = rt.ExportTo(p.Result(), &gotArgs)
 		assert.Equal(t, args, gotArgs)
 	})
 
@@ -803,7 +799,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu.SetVar(t, "page", &goja.Object{})
 		_, err := vu.RunAsync(t, `
 			page = await browser.newPage();
-			page.evaluate(() => {
+			await page.evaluate(() => {
 				setTimeout(() => {
 					const el = document.createElement('h1');
 					el.innerHTML = 'Hello';
@@ -836,7 +832,7 @@ func TestPageWaitForFunction(t *testing.T) {
 			fn = () => document.querySelector('h1') !== null
 
 			page = await browser.newPage();
-			page.evaluate(() => {
+			await page.evaluate(() => {
 				console.log('calling setTimeout...');
 				setTimeout(() => {
 					console.log('creating element...');
