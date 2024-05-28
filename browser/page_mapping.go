@@ -44,7 +44,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Close(opts) //nolint:wrapcheck
 			})
 		},
-		"content": p.Content,
+		"content": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.Content() //nolint:wrapcheck
+			})
+		},
 		"context": func() mapping {
 			return mapBrowserContext(vu, p.Context())
 		},
