@@ -302,7 +302,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.ThrottleNetwork(networkProfile) //nolint:wrapcheck
 			})
 		},
-		"title":        p.Title,
+		"title": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.Title() //nolint:wrapcheck
+			})
+		},
 		"touchscreen":  mapTouchscreen(vu, p.GetTouchscreen()),
 		"type":         p.Type,
 		"uncheck":      p.Uncheck,
