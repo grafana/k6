@@ -12,7 +12,7 @@ func esbuildTransform(src, filename string) (code string, srcMap []byte, err err
 	opts := api.TransformOptions{
 		Sourcefile:     filename,
 		Loader:         api.LoaderJS,
-		Target:         api.ES2017,
+		Target:         api.ESNext,
 		Format:         api.FormatCommonJS,
 		Sourcemap:      api.SourceMapExternal,
 		SourcesContent: api.SourcesContentInclude,
