@@ -25,12 +25,12 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return r.HeaderValue(name), nil
 			})
 		},
-		"headers": func(name string) *goja.Promise {
+		"headers": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return r.Headers(), nil
 			})
 		},
-		"headersArray": func(name string) *goja.Promise {
+		"headersArray": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return r.HeadersArray(), nil
 			})
@@ -52,7 +52,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 			return rt.NewArrayBuffer(p)
 		},
 		"resourceType": r.ResourceType,
-		"response": func(name string) *goja.Promise {
+		"response": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp := r.Response()
 				if resp == nil {
@@ -61,7 +61,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return mapResponse(vu, resp), nil
 			})
 		},
-		"size": func(name string) *goja.Promise {
+		"size": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return r.Size(), nil
 			})
