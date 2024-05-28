@@ -110,7 +110,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
-		"getAttribute": p.GetAttribute,
+		"getAttribute": func(selector string, name string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.GetAttribute(selector, name, opts) //nolint:wrapcheck
+			})
+		},
 		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
