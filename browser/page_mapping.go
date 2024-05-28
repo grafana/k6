@@ -297,13 +297,17 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.ThrottleCPU(cpuProfile) //nolint:wrapcheck
 			})
 		},
-		"throttleNetwork": p.ThrottleNetwork,
-		"title":           p.Title,
-		"touchscreen":     mapTouchscreen(vu, p.GetTouchscreen()),
-		"type":            p.Type,
-		"uncheck":         p.Uncheck,
-		"url":             p.URL,
-		"viewportSize":    p.ViewportSize,
+		"throttleNetwork": func(networkProfile common.NetworkProfile) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.ThrottleNetwork(networkProfile) //nolint:wrapcheck
+			})
+		},
+		"title":        p.Title,
+		"touchscreen":  mapTouchscreen(vu, p.GetTouchscreen()),
+		"type":         p.Type,
+		"uncheck":      p.Uncheck,
+		"url":          p.URL,
+		"viewportSize": p.ViewportSize,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				vu.Context(), p.Timeout(), pageFunc, opts, args...,
