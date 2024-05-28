@@ -251,7 +251,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return &ab, nil
 			}), nil
 		},
-		"selectOption":                p.SelectOption,
+		"selectOption": func(selector string, values goja.Value, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.SelectOption(selector, values, opts) //nolint:wrapcheck
+			})
+		},
 		"setContent":                  p.SetContent,
 		"setDefaultNavigationTimeout": p.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           p.SetDefaultTimeout,
