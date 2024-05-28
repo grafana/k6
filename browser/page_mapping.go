@@ -217,7 +217,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.Opener(), nil
 			})
 		},
-		"press": p.Press,
+		"press": func(selector string, key string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.Press(selector, key, opts) //nolint:wrapcheck
+			})
+		},
 		"reload": func(opts goja.Value) (*goja.Object, error) {
 			resp, err := p.Reload(opts)
 			if err != nil {
