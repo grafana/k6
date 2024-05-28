@@ -35,7 +35,7 @@ type extension struct {
 
 	cumulative *meter
 
-	seenMetrics map[string]struct{}
+	seenMetrics []string
 
 	period time.Duration
 
@@ -126,7 +126,7 @@ func (ext *extension) Start() error {
 	}
 
 	ext.cumulative = newMeter(0, time.Now(), ext.options.Tags)
-	ext.seenMetrics = make(map[string]struct{})
+	ext.seenMetrics = make([]string, 0)
 
 	if err := ext.fireStart(); err != nil {
 		return err
@@ -189,11 +189,12 @@ func (ext *extension) flush() {
 	samples := ext.buffer.GetBufferedSamples()
 	now := time.Now()
 
-	if !ext.noFlush.Load() { // skip the last fraction period for sanpshot (called when flusher stops)
-		ext.updateAndSend(samples, newMeter(ext.period, now, ext.options.Tags), snapshotEvent, now)
-	}
-
 	ext.updateAndSend(samples, ext.cumulative, cumulativeEvent, now)
+	ext.evaluateAndSend(ext.cumulative, now)
+
+	if !ext.noFlush.Load() { // skip the last fraction period for sanpshot (called when flusher stops)
+		ext.updateAndSend(samples, ext.cumulative.toSnapshot(ext.period, now), snapshotEvent, now)
+	}
 }
 
 func (ext *extension) updateAndSend(
@@ -209,12 +210,20 @@ func (ext *extension) updateAndSend(
 		return
 	}
 
-	newbies := met.newbies(ext.seenMetrics)
+	newbies, updated := met.newbies(ext.seenMetrics)
 	if len(newbies) != 0 {
+		ext.seenMetrics = updated
 		ext.fireEvent(metricEvent, newbies)
 	}
 
 	ext.fireEvent(event, data)
+}
+
+func (ext *extension) evaluateAndSend(met *meter, now time.Time) {
+	failures := met.evaluate(now)
+	if len(failures) > 0 {
+		ext.fireEvent(thresholdEvent, failures)
+	}
 }
 
 type paramData struct {
@@ -223,6 +232,8 @@ type paramData struct {
 	EndOffset  time.Duration       `json:"endOffset,omitempty"`
 	Period     time.Duration       `json:"period,omitempty"`
 	Tags       []string            `json:"tags,omitempty"`
+	ScriptPath string              `json:"scriptPath,omitempty"`
+	Aggregates map[string][]string `json:"aggregates,omitempty"`
 }
 
 func newParamData(params *output.Params) *paramData {
@@ -230,6 +241,17 @@ func newParamData(params *output.Params) *paramData {
 
 	for name := range params.ScriptOptions.Scenarios {
 		param.Scenarios = append(param.Scenarios, name)
+	}
+
+	if params.ScriptPath != nil {
+		param.ScriptPath = params.ScriptPath.String()
+	}
+
+	param.Aggregates = map[string][]string{
+		metrics.Counter.String(): counterAggregateNames,
+		metrics.Gauge.String():   gaugeAggregateNames,
+		metrics.Rate.String():    rateAggregateNames,
+		metrics.Trend.String():   trendAggregateNames,
 	}
 
 	return param
@@ -249,13 +271,7 @@ func (param *paramData) withThresholds(thresholds map[string]metrics.Thresholds)
 	param.Thresholds = make(map[string][]string, len(thresholds))
 
 	for name, value := range thresholds {
-		tre := make([]string, 0, len(value.Thresholds))
-
-		for _, threshold := range value.Thresholds {
-			tre = append(tre, threshold.Source)
-		}
-
-		param.Thresholds[name] = tre
+		param.Thresholds[name] = thresholdsSources(value)
 	}
 
 	return param
