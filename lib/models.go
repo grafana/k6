@@ -19,6 +19,9 @@ import (
 const GroupSeparator = "::"
 
 // RootGroupPath is the id of the root group
+//
+// Note(@mstoykov): the constant shouldn't be used in all tests in order to not couple the tests too much with it.
+// Changing this will be a breaking change and in this way it will be more obvious.
 const RootGroupPath = ""
 
 // ErrNameContainsGroupSeparator is emitted if you attempt to instantiate a Group or Check that contains the separator.
