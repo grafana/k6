@@ -38,10 +38,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
-		"close": func(opts goja.Value) error {
-			vu.taskQueueRegistry.close(p.TargetID())
-
-			return p.Close(opts) //nolint:wrapcheck
+		"close": func(opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				vu.taskQueueRegistry.close(p.TargetID())
+				return nil, p.Close(opts) //nolint:wrapcheck
+			})
 		},
 		"content": p.Content,
 		"context": func() mapping {
