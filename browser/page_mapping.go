@@ -90,7 +90,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapJSHandle(vu, jsh), nil
 			})
 		},
-		"fill":  p.Fill,
+		"fill": func(selector string, value string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.Fill(selector, value, opts) //nolint:wrapcheck
+			})
+		},
 		"focus": p.Focus,
 		"frames": func() *goja.Object {
 			var (
