@@ -142,7 +142,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.InnerHTML(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"innerText":  p.InnerText,
+		"innerText": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.InnerText(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"inputValue": p.InputValue,
 		"isChecked":  p.IsChecked,
 		"isClosed":   p.IsClosed,
