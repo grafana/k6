@@ -396,17 +396,19 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return ehm, nil
 		})
 	}
-	maps["$$"] = func(selector string) ([]mapping, error) {
-		ehs, err := p.QueryAll(selector)
-		if err != nil {
-			return nil, err //nolint:wrapcheck
-		}
-		var mehs []mapping
-		for _, eh := range ehs {
-			ehm := mapElementHandle(vu, eh)
-			mehs = append(mehs, ehm)
-		}
-		return mehs, nil
+	maps["$$"] = func(selector string) *goja.Promise {
+		return k6ext.Promise(vu.Context(), func() (any, error) {
+			ehs, err := p.QueryAll(selector)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			var mehs []mapping
+			for _, eh := range ehs {
+				ehm := mapElementHandle(vu, eh)
+				mehs = append(mehs, ehm)
+			}
+			return mehs, nil
+		})
 	}
 
 	return maps
