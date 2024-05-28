@@ -313,7 +313,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Type(selector, text, opts) //nolint:wrapcheck
 			})
 		},
-		"uncheck":      p.Uncheck,
+		"uncheck": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.Uncheck(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"url":          p.URL,
 		"viewportSize": p.ViewportSize,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
