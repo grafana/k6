@@ -52,7 +52,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"context": func() mapping {
 			return mapBrowserContext(vu, p.Context())
 		},
-		"dblclick": p.Dblclick,
+		"dblclick": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.Dblclick(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) error {
 			popts := common.NewFrameDispatchEventOptions(p.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
