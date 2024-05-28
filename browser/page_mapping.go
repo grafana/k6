@@ -178,8 +178,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.IsHidden(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"isVisible": p.IsVisible,
-		"keyboard":  mapKeyboard(vu, p.GetKeyboard()),
+		"isVisible": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.IsVisible(selector, opts) //nolint:wrapcheck
+			})
+		},
+		"keyboard": mapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts goja.Value) *goja.Object {
 			ml := mapLocator(vu, p.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
