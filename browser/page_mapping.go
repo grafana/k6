@@ -336,7 +336,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
 			}), nil
 		},
-		"waitForLoadState": p.WaitForLoadState,
+		"waitForLoadState": func(state string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.WaitForLoadState(state, opts) //nolint:wrapcheck
+			})
+		},
 		"waitForNavigation": func(opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewFrameWaitForNavigationOptions(p.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
