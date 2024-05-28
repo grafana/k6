@@ -275,13 +275,13 @@ func TestPageEvaluateMappingError(t *testing.T) {
 			vu.SetVar(t, "p", &goja.Object{})
 			_, err := vu.RunAsync(t, `
 				p = await browser.newPage()
-				p.evaluate(%s)
+				await p.evaluate(%s)
 			`, tt.script)
 			assert.ErrorContains(t, err, tt.wantErr)
 
 			// Test script as string input
 			_, err = vu.RunAsync(t, `
-				p.evaluate("%s")
+				await p.evaluate("%s")
 			`, tt.script)
 			assert.ErrorContains(t, err, tt.wantErr)
 		})
@@ -1731,7 +1731,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 
 			got := vu.RunPromise(t, `
 				const p = await browser.newPage()
-				p.goto("%s/%s/shadow_and_doc_frag.html")
+				await p.goto("%s/%s/shadow_and_doc_frag.html")
 
 				const s = p.locator('%s')
 				await s.waitFor({

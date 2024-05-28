@@ -234,7 +234,7 @@ func TestBrowserCrashErr(t *testing.T) {
 	vu.SetVar(t, "browser", jsMod.Browser)
 	_, err := vu.RunAsync(t, `
 		const p = await browser.newPage();
-		p.close();
+		await p.close();
 	`)
 	assert.ErrorContains(t, err, "launching browser: Invalid devtools server port")
 }
