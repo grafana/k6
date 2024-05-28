@@ -355,12 +355,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
-		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
-			eh, err := p.WaitForSelector(selector, opts)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapElementHandle(vu, eh), nil
+		"waitForSelector": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				eh, err := p.WaitForSelector(selector, opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapElementHandle(vu, eh), nil
+			})
 		},
 		"waitForTimeout": p.WaitForTimeout,
 		"workers": func() *goja.Object {
