@@ -22,7 +22,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.BringToFront() //nolint:wrapcheck
 			})
 		},
-		"check": p.Check,
+		"check": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.Check(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"click": func(selector string, opts goja.Value) (*goja.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, p.Timeout())
 			if err != nil {
