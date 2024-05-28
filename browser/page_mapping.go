@@ -234,20 +234,22 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return rt.ToValue(r).ToObject(rt), nil
 			})
 		},
-		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
+		"screenshot": func(opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewPageScreenshotOptions()
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page screenshot options: %w", err)
 			}
 
-			bb, err := p.Screenshot(popts, vu.filePersister)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				bb, err := p.Screenshot(popts, vu.filePersister)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
 
-			ab := rt.NewArrayBuffer(bb)
+				ab := rt.NewArrayBuffer(bb)
 
-			return &ab, nil
+				return &ab, nil
+			}), nil
 		},
 		"selectOption":                p.SelectOption,
 		"setContent":                  p.SetContent,
