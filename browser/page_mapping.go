@@ -379,20 +379,22 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(mws).ToObject(rt)
 		},
 	}
-	maps["$"] = func(selector string) (mapping, error) {
-		eh, err := p.Query(selector)
-		if err != nil {
-			return nil, err //nolint:wrapcheck
-		}
-		// ElementHandle can be null when the selector does not match any elements.
-		// We do not want to map nil elementHandles since the expectation is a
-		// null result in the test script for this case.
-		if eh == nil {
-			return nil, nil //nolint:nilnil
-		}
-		ehm := mapElementHandle(vu, eh)
+	maps["$"] = func(selector string) *goja.Promise {
+		return k6ext.Promise(vu.Context(), func() (any, error) {
+			eh, err := p.Query(selector)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			// ElementHandle can be null when the selector does not match any elements.
+			// We do not want to map nil elementHandles since the expectation is a
+			// null result in the test script for this case.
+			if eh == nil {
+				return nil, nil
+			}
+			ehm := mapElementHandle(vu, eh)
 
-		return ehm, nil
+			return ehm, nil
+		})
 	}
 	maps["$$"] = func(selector string) ([]mapping, error) {
 		ehs, err := p.QueryAll(selector)
