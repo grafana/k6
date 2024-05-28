@@ -57,12 +57,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Dblclick(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) error {
+		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewFrameDispatchEventOptions(p.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
-				return fmt.Errorf("parsing page dispatch event options: %w", err)
+				return nil, fmt.Errorf("parsing page dispatch event options: %w", err)
 			}
-			return p.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
+			}), nil
 		},
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
