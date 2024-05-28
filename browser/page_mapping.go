@@ -71,7 +71,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.EmulateMedia(opts) //nolint:wrapcheck
 			})
 		},
-		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
+		"emulateVisionDeficiency": func(typ string) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.EmulateVisionDeficiency(typ) //nolint:wrapcheck
+			})
+		},
 		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) (any, error) {
 			return p.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
 		},
