@@ -72,6 +72,6 @@ export default async function() {
     await bet.heads();
     console.log("Current bet:", await bet.current());
   } finally {
-    page.close();
+    await page.close();
   }
 }

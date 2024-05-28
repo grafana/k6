@@ -25,12 +25,12 @@ export default async function() {
     await page.goto('https://googlechromelabs.github.io/dark-mode-toggle/demo/', {
       waitUntil: 'load',
     });
-    let el = page.$('#dark-mode-toggle-3');
+    let el = await page.$('#dark-mode-toggle-3');
     const mode = await el.getAttribute('mode');
     check(mode, {
       "GetAttribute('mode')": mode === 'light',
     });
   } finally {
-    page.close();
+    await page.close();
   }
 }

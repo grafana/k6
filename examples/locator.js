@@ -69,6 +69,6 @@ export default async function() {
     ]);
     console.log(await currentBet.innerText());
   } finally {
-    page.close();
+    await page.close();
   }
 }

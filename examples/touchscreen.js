@@ -30,5 +30,5 @@ export default async function () {
     page.touchscreen.tap(newsLinkBox.x + newsLinkBox.width / 2, newsLinkBox.y),
   ]);
 
-  page.close();
+  await page.close();
 }

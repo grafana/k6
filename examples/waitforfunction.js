@@ -22,7 +22,7 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    page.evaluate(() => {
+    await page.evaluate(() => {
       setTimeout(() => {
         const el = document.createElement('h1');
         el.innerHTML = 'Hello';
@@ -36,6 +36,6 @@ export default async function() {
     });
     check(ok, { 'waitForFunction successfully resolved': ok.innerHTML() == 'Hello' });
   } finally {
-    page.close();
+    await page.close();
   }
 }

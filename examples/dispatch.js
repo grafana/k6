@@ -31,6 +31,6 @@ export default async function() {
     const ok = await h3.textContent() == "Contact us";
     check(ok, { "header": ok });
   } finally {
-    page.close();
+    await page.close();
   }
 }

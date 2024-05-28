@@ -38,7 +38,7 @@ export async function messages() {
   try {
     await page.goto('https://test.k6.io/my_messages.php', { waitUntil: 'networkidle' });
   } finally {
-    page.close();
+    await page.close();
   }
 }
 
@@ -48,6 +48,6 @@ export async function news() {
   try {
     await page.goto('https://test.k6.io/news.php', { waitUntil: 'networkidle' });
   } finally {
-    page.close();
+    await page.close();
   }
 }

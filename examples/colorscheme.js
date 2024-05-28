@@ -31,7 +31,7 @@ export default async function() {
       'https://googlechromelabs.github.io/dark-mode-toggle/demo/',
       { waitUntil: 'load' },
     )
-    const colorScheme = page.evaluate(() => {
+    const colorScheme = await page.evaluate(() => {
       return {
         isDarkColorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches
       };
@@ -40,6 +40,6 @@ export default async function() {
       'isDarkColorScheme': cs => cs.isDarkColorScheme
     });
   } finally {
-    page.close();
+    await page.close();
   }
 }

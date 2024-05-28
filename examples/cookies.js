@@ -122,6 +122,6 @@ export default async function () {
       'number of cookies should be zero': n => n === 0,
     });
   } finally {
-    page.close();
+    await page.close();
   }
 }

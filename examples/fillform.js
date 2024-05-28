@@ -53,6 +53,6 @@ export default async function() {
       }
     })
   } finally {
-    page.close();
+    await page.close();
   }
 }

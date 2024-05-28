@@ -29,5 +29,5 @@ export default async function () {
   await page.keyboard.press('Enter'); // submit
   await page.waitForNavigation();
 
-  page.close();
+  await page.close();
 }

@@ -32,6 +32,6 @@ export default async function() {
       'Title with XPath selector': titleWithXPath == 'test.k6.io',
     });
   } finally {
-    page.close();
+    await page.close();
   }
 }

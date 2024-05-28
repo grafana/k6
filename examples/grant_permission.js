@@ -27,9 +27,9 @@ export default async function() {
 
   try {
     await page.goto('https://test.k6.io/');
-    page.screenshot({ path: `example-chromium.png` });
+    await page.screenshot({ path: `example-chromium.png` });
     await context.clearPermissions();
   } finally {
-    page.close();
+    await page.close();
   }
 }

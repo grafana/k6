@@ -45,7 +45,7 @@ export async function normal() {
   try {
     await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
   } finally {
-    page.close();
+    await page.close();
   }
 }
 
@@ -54,11 +54,11 @@ export async function networkThrottled() {
   const page = await context.newPage();
 
   try {
-    page.throttleNetwork(networkProfiles['Slow 3G']);
+    await page.throttleNetwork(networkProfiles["Slow 3G"]);
 
     await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
   } finally {
-    page.close();
+    await page.close();
   }
 }
 
@@ -67,10 +67,10 @@ export async function cpuThrottled() {
   const page = await context.newPage();
 
   try {
-    page.throttleCPU({ rate: 4 });
+    await page.throttleCPU({ rate: 4 });
 
     await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
   } finally {
-    page.close();
+    await page.close();
   }
 }

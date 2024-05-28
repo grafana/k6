@@ -28,6 +28,6 @@ export default async function() {
       'null response': r => r === null,
     });
   } finally {
-    page.close();
+    await page.close();
   }
 }

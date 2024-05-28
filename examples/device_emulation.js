@@ -28,7 +28,7 @@ export default async function() {
 
   try {
     await page.goto('https://k6.io/', { waitUntil: 'networkidle' });
-    const dimensions = page.evaluate(() => {
+    const dimensions = await page.evaluate(() => {
       return {
         width: document.documentElement.clientWidth,
         height: document.documentElement.clientHeight,
@@ -46,6 +46,6 @@ export default async function() {
       sleep(10);
     }
   } finally {
-    page.close();
+    await page.close();
   }
 }
