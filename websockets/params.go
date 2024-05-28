@@ -20,6 +20,7 @@ type wsParams struct {
 	cookieJar         *cookiejar.Jar
 	tagsAndMeta       *metrics.TagsAndMeta
 	enableCompression bool
+	subprocotols      []string
 }
 
 // buildParams builds WebSocket params and configure some of them

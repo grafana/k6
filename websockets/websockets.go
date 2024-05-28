@@ -84,11 +84,20 @@ type webSocket struct {
 	readyState     ReadyState
 	bufferedAmount int
 	binaryType     string
+	protocol       string
 }
 
 type ping struct {
 	counter    int
 	timestamps map[string]time.Time
+}
+
+func isString(o *goja.Object, rt *goja.Runtime) bool {
+	return o.Prototype().Get("constructor") == rt.GlobalObject().Get("String")
+}
+
+func isArray(o *goja.Object, rt *goja.Runtime) bool {
+	return o.Prototype().Get("constructor") == rt.GlobalObject().Get("Array")
 }
 
 func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
@@ -102,6 +111,19 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 	params, err := buildParams(r.vu.State(), rt, c.Argument(2))
 	if err != nil {
 		common.Throw(rt, err)
+	}
+
+	subprocotolsArg := c.Argument(1)
+	if !common.IsNullish(subprocotolsArg) {
+		subprocotolsObj := subprocotolsArg.ToObject(rt)
+		switch {
+		case isString(subprocotolsObj, rt):
+			params.subprocotols = append(params.subprocotols, subprocotolsObj.String())
+		case isArray(subprocotolsObj, rt):
+			for _, key := range subprocotolsObj.Keys() {
+				params.subprocotols = append(params.subprocotols, subprocotolsObj.Get(key).String())
+			}
+		}
 	}
 
 	w := &webSocket{
@@ -171,7 +193,8 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 	must(rt, w.obj.DefineDataProperty(
 		"bufferedAmount", rt.ToValue(w.bufferedAmount), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	// extensions
-	// protocol
+	must(rt, w.obj.DefineAccessorProperty(
+		"protocol", rt.ToValue(func() goja.Value { return rt.ToValue(w.protocol) }), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
 		"binaryType", rt.ToValue(func() goja.Value {
 			return rt.ToValue(w.binaryType)
@@ -249,6 +272,7 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		Proxy:             http.ProxyFromEnvironment,
 		TLSClientConfig:   tlsConfig,
 		EnableCompression: params.enableCompression,
+		Subprotocols:      params.subprocotols,
 	}
 
 	// this is needed because of how interfaces work and that wsd.Jar is http.Cookiejar
@@ -276,8 +300,10 @@ func (w *webSocket) establishConnection(params *wsParams) {
 		}()
 
 		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagStatus, strconv.Itoa(httpResponse.StatusCode))
-		subProtocol := httpResponse.Header.Get("Sec-WebSocket-Protocol")
-		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, subProtocol)
+		if conn != nil {
+			w.protocol = conn.Subprotocol()
+		}
+		w.tagsAndMeta.SetSystemTagOrMetaIfEnabled(systemTags, metrics.TagSubproto, w.protocol)
 	}
 	w.conn = conn
 

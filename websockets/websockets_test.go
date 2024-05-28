@@ -28,7 +28,7 @@ import (
 func assertSessionMetricsEmitted(
 	t *testing.T,
 	sampleContainers []metrics.SampleContainer,
-	subprotocol, //nolint:unparam // TODO: check why it always same in tests
+	subprotocol,
 	url string,
 	status int, //nolint:unparam // TODO: check why it always same in tests
 	group string, //nolint:unparam // TODO: check why it always same in tests
@@ -593,6 +593,68 @@ func TestTwoTalkingUsingOn(t *testing.T) {
 	samples := metrics.GetBufferedSamples(ts.samples)
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/1"), http.StatusSwitchingProtocols, "")
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws/couple/2"), http.StatusSwitchingProtocols, "")
+}
+
+func TestSubProtocols(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+
+	ts.tb.Mux.HandleFunc("/ws/protocols", func(w http.ResponseWriter, req *http.Request) {
+		conn, err := (&websocket.Upgrader{Subprotocols: []string{"unsupported", "supported"}}).Upgrade(w, req, w.Header())
+		if conn.Subprotocol() != "supported" {
+			_ = conn.WriteMessage(websocket.TextMessage, []byte(`bad subprotocol on server `+conn.Subprotocol()))
+			return
+		}
+		ch := make(chan message)
+		if err != nil {
+			return
+		}
+		defer func() {
+			_ = conn.Close()
+		}()
+
+		go func() {
+			defer close(ch)
+			for {
+				msgT, msg, err := conn.ReadMessage()
+				if err != nil {
+					return
+				}
+				ch <- message{
+					data:  msg,
+					mtype: msgT,
+				}
+			}
+		}()
+		for msg := range ch {
+			err := conn.WriteMessage(msg.mtype, msg.data)
+			if err != nil {
+				return
+			}
+		}
+	})
+
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		const ws = new WebSocket("WSBIN_URL/ws/protocols", ["one", "supported"]);
+		ws.onopen = () => {
+			if (ws.protocol != "supported") {
+				throw "bad protocol " + ws.protocol;
+			}
+			ws.send("hello");
+		}
+
+		ws.onmessage = (e) => {
+			if (e.data != "hello") {
+				throw "oops";
+			}
+			ws.close();
+		}
+		ws.onerror = (e) => { throw e.error; ws.close();}
+	`))
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "supported", sr("WSBIN_URL/ws/protocols"), http.StatusSwitchingProtocols, "")
 }
 
 func TestDialError(t *testing.T) {
