@@ -173,7 +173,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.IsEnabled(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"isHidden":  p.IsHidden,
+		"isHidden": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return p.IsHidden(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"isVisible": p.IsVisible,
 		"keyboard":  mapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts goja.Value) *goja.Object {
