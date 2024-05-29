@@ -272,8 +272,17 @@ func TestBinaryState(t *testing.T) {
 		var ws = new WebSocket("WSBIN_URL/ws-echo-invalid")
 		ws.addEventListener("open", () => {
 			ws.send(new Uint8Array([164,41]).buffer)
+			if (ws.bufferedAmount != 2) {
+				throw "Expected 2 bufferedAmount got "+ ws.bufferedAmount
+			}
 			ws.send("k6")
+			if (ws.bufferedAmount != 4) {
+				throw "Expected 4 bufferedAmount got "+ ws.bufferedAmount
+			}
 			ws.onmessage = (e) => {
+				if (ws.bufferedAmount != 0 && ws.bufferedAmount != 2) { // it is possible one or both were flushed
+					throw "Expected 0 or 2 bufferedAmount, but got "+ ws.bufferedAmount
+				}
 				ws.close()
 				call(JSON.stringify(e))
 			}

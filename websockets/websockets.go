@@ -190,8 +190,9 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 		"readyState", rt.ToValue(func() ReadyState {
 			return w.readyState
 		}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
-	must(rt, w.obj.DefineDataProperty(
-		"bufferedAmount", rt.ToValue(w.bufferedAmount), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+	must(rt, w.obj.DefineAccessorProperty(
+		"bufferedAmount", rt.ToValue(func() goja.Value { return rt.ToValue(w.bufferedAmount) }), nil,
+		goja.FLAG_FALSE, goja.FLAG_TRUE))
 	// extensions
 	must(rt, w.obj.DefineAccessorProperty(
 		"protocol", rt.ToValue(func() goja.Value { return rt.ToValue(w.protocol) }), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
