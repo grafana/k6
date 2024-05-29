@@ -666,7 +666,8 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	headers := map[string]string{
 		"Some-Header": "Some-Value",
 	}
-	p.SetExtraHTTPHeaders(headers)
+	err := p.SetExtraHTTPHeaders(headers)
+	require.NoError(t, err)
 
 	opts := &common.FrameGotoOptions{
 		Timeout: common.DefaultTimeout,
@@ -1790,13 +1791,15 @@ func TestPageTargetBlank(t *testing.T) {
 	p2, ok := obj.(*common.Page)
 	require.True(t, ok, "return from WaitForEvent is not a Page")
 
-	p2.WaitForLoadState(common.LifecycleEventLoad.String(), nil)
+	err = p2.WaitForLoadState(common.LifecycleEventLoad.String(), nil)
+	require.NoError(t, err)
 
 	// Now there should be 2 pages.
 	pp = p.Context().Pages()
 	assert.Equal(t, 2, len(pp))
 
 	// Make sure the new page contains the correct page.
-	got := p2.InnerHTML("h1", nil)
+	got, err := p2.InnerHTML("h1", nil)
+	require.NoError(t, err)
 	assert.Equal(t, "you clicked!", got)
 }

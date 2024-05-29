@@ -416,7 +416,8 @@ func TestLifecycleReload(t *testing.T) {
 					WaitUntil: tt.waitUntil,
 					Timeout:   30 * time.Second,
 				})
-				p.Reload(opts)
+				_, err = p.Reload(opts)
+				require.NoError(t, err)
 
 				result, err = p.TextContent("#pingRequestText", nil)
 				if err != nil {
