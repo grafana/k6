@@ -16,6 +16,7 @@ import (
 	k6common "go.k6.io/k6/js/common"
 	k6eventloop "go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
+	"go.k6.io/k6/lib"
 	k6lib "go.k6.io/k6/lib"
 	k6executor "go.k6.io/k6/lib/executor"
 	k6testutils "go.k6.io/k6/lib/testutils"
@@ -158,17 +159,12 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 
 	logger := k6testutils.NewLogger(tb)
 
-	root, err := k6lib.NewGroup("", nil)
-	require.NoError(tb, err)
-
 	testRT := k6modulestest.NewRuntime(tb)
 	testRT.VU.InitEnvField.LookupEnv = lookupFunc
 	testRT.VU.EventsField = k6common.Events{
 		Global: k6event.NewEventSystem(100, logger),
 		Local:  k6event.NewEventSystem(100, logger),
 	}
-
-	tags := testRT.VU.InitEnvField.Registry.RootTagSet()
 
 	state := &k6lib.State{
 		Options: k6lib.Options{
@@ -191,11 +187,12 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 				},
 			},
 		},
-		Logger:         logger,
-		Group:          root,
-		BufferPool:     k6lib.NewBufferPool(),
-		Samples:        samples,
-		Tags:           k6lib.NewVUStateTags(tags.With("group", root.Path)),
+		Logger:     logger,
+		BufferPool: k6lib.NewBufferPool(),
+		Samples:    samples,
+		Tags: k6lib.NewVUStateTags(
+			testRT.VU.InitEnvField.Registry.RootTagSet().With("group", lib.RootGroupPath),
+		),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
 		TracerProvider: tracerProvider,
 	}
