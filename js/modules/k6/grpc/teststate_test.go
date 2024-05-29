@@ -142,13 +142,8 @@ func newTestState(t *testing.T) testState {
 // ToVUContext moves the test state to the VU context.
 func (ts *testState) ToVUContext() {
 	registry := metrics.NewRegistry()
-	root, err := lib.NewGroup("", nil)
-	if err != nil {
-		panic(err)
-	}
 
 	state := &lib.State{
-		Group:     root,
 		Dialer:    ts.httpBin.Dialer,
 		TLSConfig: ts.httpBin.TLSClientConfig,
 		Samples:   ts.samples,

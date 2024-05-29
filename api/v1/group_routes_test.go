@@ -37,6 +37,7 @@ func getTestRunState(tb testing.TB, options lib.Options, runner lib.Runner) *lib
 		TestPreInitState: piState,
 		Options:          options,
 		Runner:           runner,
+		GroupSummary:     lib.NewGroupSummary(piState.Logger),
 		RunTags:          piState.Registry.RootTagSet().WithTagsFromMap(options.RunTags),
 	}
 }
@@ -64,14 +65,36 @@ func getControlSurface(tb testing.TB, testState *lib.TestRunState) *ControlSurfa
 func TestGetGroups(t *testing.T) {
 	t.Parallel()
 
+	cs := getControlSurface(t, getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{}))
+	require.NoError(t, cs.RunState.GroupSummary.Start())
+	cs.RunState.GroupSummary.AddMetricSamples([]metrics.SampleContainer{
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: cs.RunState.BuiltinMetrics.GroupDuration,
+				Tags:   cs.RunState.Registry.RootTagSet().With("group", "::group 1"),
+			},
+		},
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: cs.RunState.BuiltinMetrics.GroupDuration,
+				Tags:   cs.RunState.Registry.RootTagSet().With("group", ""),
+			},
+		},
+		metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: cs.RunState.BuiltinMetrics.GroupDuration,
+				Tags:   cs.RunState.Registry.RootTagSet().With("group", "::group 1::group 2"),
+			},
+		},
+	})
+	require.NoError(t, cs.RunState.GroupSummary.Stop())
+
 	g0, err := lib.NewGroup("", nil)
 	assert.NoError(t, err)
 	g1, err := g0.Group("group 1")
 	assert.NoError(t, err)
 	g2, err := g1.Group("group 2")
 	assert.NoError(t, err)
-
-	cs := getControlSurface(t, getTestRunState(t, lib.Options{}, &minirunner.MiniRunner{Group: g0}))
 
 	t.Run("list", func(t *testing.T) {
 		t.Parallel()

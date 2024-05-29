@@ -6,7 +6,7 @@ import (
 )
 
 func handleGetGroups(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request) {
-	root := NewGroup(cs.RunState.Runner.GetDefaultGroup(), nil)
+	root := NewGroup(cs.RunState.GroupSummary.Group(), nil)
 	groups := FlattenGroup(root)
 
 	data, err := json.Marshal(newGroupsJSONAPI(groups))
@@ -18,7 +18,7 @@ func handleGetGroups(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request
 }
 
 func handleGetGroup(cs *ControlSurface, rw http.ResponseWriter, _ *http.Request, id string) {
-	root := NewGroup(cs.RunState.Runner.GetDefaultGroup(), nil)
+	root := NewGroup(cs.RunState.GroupSummary.Group(), nil)
 	groups := FlattenGroup(root)
 
 	var group *Group
