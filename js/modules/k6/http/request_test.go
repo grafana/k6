@@ -128,8 +128,6 @@ type httpTestCase struct {
 func newTestCase(t testing.TB) *httpTestCase {
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 
 	logger := logrus.New()
@@ -152,13 +150,12 @@ func newTestCase(t testing.TB) *httpTestCase {
 	state := &lib.State{
 		Options:    options,
 		Logger:     logger,
-		Group:      root,
 		TLSConfig:  tb.TLSClientConfig,
 		Transport:  tb.HTTPTransport,
 		BufferPool: lib.NewBufferPool(),
 		Samples:    samples,
 		Tags: lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{
-			"group": root.Path,
+			"group": lib.RootGroupPath,
 		})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}

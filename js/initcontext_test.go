@@ -342,9 +342,6 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
 
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
-
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	logger.Out = io.Discard
@@ -354,7 +351,6 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	bi.moduleVUImpl.state = &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
-		Group:   root,
 		Transport: &http.Transport{
 			DialContext: (netext.NewDialer(
 				net.Dialer{
@@ -488,9 +484,6 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
 
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
-
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	logger.Out = io.Discard
@@ -500,7 +493,6 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 	bi.moduleVUImpl.state = &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
-		Group:   root,
 		Transport: &http.Transport{
 			DialContext: (netext.NewDialer(
 				net.Dialer{

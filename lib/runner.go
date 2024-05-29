@@ -49,8 +49,6 @@ type VUActivationParams struct {
 //
 // interfacebloat: We may evaluate in the future to move out some methods;
 // but considering how central it is, it would require a huge effort.
-//
-//nolint:interfacebloat
 type Runner interface {
 	// Creates an Archive of the runner. There should be a corresponding NewFromArchive() function
 	// that will restore the runner from the archive.
@@ -72,9 +70,6 @@ type Runner interface {
 
 	// Runs post-test teardown, if applicable.
 	Teardown(ctx context.Context, out chan<- metrics.SampleContainer) error
-
-	// Returns the default (root) Group.
-	GetDefaultGroup() *Group
 
 	// Get and set options. The initial value will be whatever the script specifies (for JS,
 	// `export let options = {}`); cmd/run.go will mix this in with CLI-, config- and env-provided

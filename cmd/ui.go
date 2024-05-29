@@ -114,7 +114,8 @@ func printExecutionDescription(
 	default:
 		for _, out := range outputs {
 			desc := out.Description()
-			if desc == engine.IngesterDescription {
+			switch desc {
+			case engine.IngesterDescription, lib.GroupSummaryDescription:
 				continue
 			}
 			if strings.HasPrefix(desc, dashboard.OutputName) {

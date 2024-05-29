@@ -239,19 +239,33 @@ func (c *Compiler) compileImpl(
 		c.logger.WithError(state.srcMapError).Warnf("Couldn't load source map for %s", filename)
 		ast, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps)
 	}
-	if err != nil {
-		if compatibilityMode == lib.CompatibilityModeExtended {
-			code, state.srcMap, err = c.Transform(src, filename, state.srcMap)
-			if err != nil {
-				return nil, code, err
-			}
-			// the compatibility mode "decreases" here as we shouldn't transform twice
-			return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
-		}
-		return nil, code, err
+
+	if err == nil {
+		pgm, err := goja.CompileAST(ast, c.Options.Strict)
+		return pgm, code, err
 	}
-	pgm, err := goja.CompileAST(ast, c.Options.Strict)
-	return pgm, code, err
+
+	if compatibilityMode == lib.CompatibilityModeExtended {
+		code, state.srcMap, err = c.Transform(src, filename, state.srcMap)
+		if err != nil {
+			return nil, code, err
+		}
+		// the compatibility mode "decreases" here as we shouldn't transform twice
+		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+	}
+
+	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+		code, state.srcMap, err = esbuildTransform(src, filename)
+		if err != nil {
+			return nil, code, err
+		}
+		if c.Options.SourceMapLoader != nil {
+			// This hack is required for the source map to work
+			code += "\n//# sourceMappingURL=" + sourceMapURLFromBabel
+		}
+		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+	}
+	return nil, code, err
 }
 
 type babel struct {
