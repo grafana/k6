@@ -159,7 +159,7 @@ func TestNewBundle(t *testing.T) {
 			}{
 				{
 					"InvalidCompat", "es1", `export default function() {};`,
-					`invalid compatibility mode "es1". Use: "extended", "base"`,
+					`invalid compatibility mode "es1". Use: "extended", "base", "experimental_enhanced"`,
 				},
 				// ES2015 modules are not supported
 				{

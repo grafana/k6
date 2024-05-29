@@ -7,12 +7,14 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"flag"
 	"fmt"
 	"io"
 	"io/fs"
 	"net/url"
 	"os"
 	"path"
+	"path/filepath"
 	"runtime"
 	"sort"
 	"strings"
@@ -230,6 +232,8 @@ var (
 		"test/language/identifiers/start-unicode-14.",
 		"test/language/identifiers/part-unicode-14.",
 	}
+
+	update = flag.Bool("update", false, "update breaking_test_errors-*.json files") //nolint:gochecknoglobals
 )
 
 //nolint:unused,structcheck
@@ -259,6 +263,8 @@ type tc39TestCtx struct {
 
 	errorsLock sync.Mutex
 	errors     map[string]string
+
+	compatibilityMode lib.CompatibilityMode
 }
 
 type TC39MetaNegative struct {
@@ -559,20 +565,26 @@ func (ctx *tc39TestCtx) runTC39File(name string, t testing.TB) {
 	}
 }
 
+func breakingTestErrorsFilename(compatibilityMode lib.CompatibilityMode) string {
+	return fmt.Sprintf("./breaking_test_errors-%s.json", compatibilityMode)
+}
+
 func (ctx *tc39TestCtx) init() {
 	ctx.prgCache = make(map[string]*goja.Program)
 	ctx.errors = make(map[string]string)
 
-	b, err := os.ReadFile("./breaking_test_errors.json")
-	if err != nil {
-		panic(err)
-	}
-	b = bytes.TrimSpace(b)
-	if len(b) > 0 {
-		ctx.expectedErrors = make(map[string]string, 1000)
-		err = json.Unmarshal(b, &ctx.expectedErrors)
+	if !*update {
+		b, err := os.ReadFile(breakingTestErrorsFilename(ctx.compatibilityMode))
 		if err != nil {
 			panic(err)
+		}
+		b = bytes.TrimSpace(b)
+		if len(b) > 0 {
+			ctx.expectedErrors = make(map[string]string, 1000)
+			err = json.Unmarshal(b, &ctx.expectedErrors)
+			if err != nil {
+				panic(err)
+			}
 		}
 	}
 }
@@ -598,7 +610,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*goja.Program, error) {
 		str := string(b)
 		comp := ctx.compilerPool.Get()
 		defer ctx.compilerPool.Put(comp)
-		comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeExtended}
+		comp.Options = compiler.Options{Strict: false, CompatibilityMode: ctx.compatibilityMode}
 		prg, _, err = comp.Compile(str, name, true)
 		if err != nil {
 			return nil, err
@@ -644,10 +656,8 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	p, _, err = comp.Compile(src, name, true)
 	origErr = err
 	if err != nil && !expectsError {
-		src, _, err = comp.Transform(src, name, nil)
-		if err == nil {
-			p, _, err = comp.Compile(src, name, true)
-		}
+		comp.Options.CompatibilityMode = ctx.compatibilityMode
+		p, _, err = comp.Compile(src, name, true)
 	}
 
 	if err != nil {
@@ -687,7 +697,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *g
 
 	comp := ctx.compilerPool.Get()
 	defer ctx.compilerPool.Put(comp)
-	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeExtended}
+	comp.Options = compiler.Options{Strict: false, CompatibilityMode: ctx.compatibilityMode}
 
 	mr := modules.NewModuleResolver(nil,
 		func(specifier *url.URL, _ string) ([]byte, error) {
@@ -754,13 +764,21 @@ func TestTC39(t *testing.T) {
 		t.Skip()
 	}
 
+	runTestTC39(t, lib.CompatibilityModeExtended)
+	runTestTC39(t, lib.CompatibilityModeExperimentalEnhanced)
+}
+
+func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {
+	t.Helper()
+
 	if _, err := os.Stat(tc39BASE); err != nil {
 		t.Skipf("If you want to run tc39 tests, you need to run the 'checkout.sh` script in the directory to get  https://github.com/tc39/test262 at the correct last tested commit (%v)", err)
 	}
 
 	ctx := &tc39TestCtx{
-		base:         tc39BASE,
-		compilerPool: compiler.NewPool(testutils.NewLogger(t), runtime.GOMAXPROCS(0)),
+		base:              tc39BASE,
+		compilerPool:      compiler.NewPool(testutils.NewLogger(t), runtime.GOMAXPROCS(0)),
+		compatibilityMode: compatibilityMode,
 	}
 	ctx.init()
 	// ctx.enableBench = true
@@ -787,13 +805,23 @@ func TestTC39(t *testing.T) {
 			fmt.Printf("%s\t%d\n", item.name, item.duration/time.Millisecond)
 		}
 	}
-	if len(ctx.errors) > 0 {
-		enc := json.NewEncoder(os.Stdout)
+	if len(ctx.errors) > 0 && *update {
+		filename := breakingTestErrorsFilename(ctx.compatibilityMode)
+		file, err := os.Create(filepath.Clean(filename))
+		if err != nil {
+			t.Logf("Error while creating %s: %s", filename, err)
+		}
+
+		enc := json.NewEncoder(file)
 		enc.SetIndent("", "  ")
 		enc.SetEscapeHTML(false)
-		err := enc.Encode(ctx.errors)
+		err = enc.Encode(ctx.errors)
 		if err != nil {
 			t.Logf("Error while json encoding errors: %s", err)
+		}
+		err = file.Close()
+		if err != nil {
+			t.Logf("Error while closing %s: %s", filename, err)
 		}
 	}
 }
