@@ -97,6 +97,13 @@ func NewBrowser(
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
+
+	// cache the browser version information.
+	var err error
+	if b.version, err = b.fetchVersion(); err != nil {
+		return nil, err
+	}
+
 	return b, nil
 }
 
