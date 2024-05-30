@@ -73,6 +73,15 @@ type Browser struct {
 	logger *log.Logger
 }
 
+// browserVersion is a struct to hold the browser version information.
+type browserVersion struct {
+	protocolVersion string
+	product         string
+	revision        string
+	userAgent       string
+	jsVersion       string
+}
+
 // NewBrowser creates a new browser, connects to it, then returns it.
 func NewBrowser(
 	ctx context.Context,
