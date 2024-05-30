@@ -195,8 +195,10 @@ func TestBrowserVersion(t *testing.T) {
 	t.Parallel()
 
 	const re = `^\d+\.\d+\.\d+\.\d+$`
-	r, _ := regexp.Compile(re)
-	ver := newTestBrowser(t).Version()
+	r, err := regexp.Compile(re) //nolint:gocritic
+	require.NoError(t, err)
+	ver, err := newTestBrowser(t).Version()
+	require.NoError(t, err)
 	assert.Regexp(t, r, ver, "expected browser version to match regex %q, but found %q", re, ver)
 }
 

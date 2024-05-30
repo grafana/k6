@@ -638,17 +638,17 @@ func (b *Browser) UserAgent() (string, error) {
 }
 
 // Version returns the controlled browser's version.
-func (b *Browser) Version() string {
+func (b *Browser) Version() (string, error) {
 	action := cdpbrowser.GetVersion()
-	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
+	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn)) //nolint:dogsled
 	if err != nil {
-		k6ext.Panic(b.ctx, "getting browser version: %w", err)
+		return "", fmt.Errorf("getting browser version: %w", err)
 	}
 	i := strings.Index(product, "/")
 	if i == -1 {
-		return product
+		return product, nil
 	}
-	return product[i+1:]
+	return product[i+1:], nil
 }
 
 // WsURL returns the Websocket URL that the browser is listening on for CDP clients.
