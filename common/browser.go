@@ -68,6 +68,9 @@ type Browser struct {
 	// Used to display a warning when the browser is reclosed.
 	closed bool
 
+	// version caches the browser version information.
+	version browserVersion
+
 	vu k6modules.VU
 
 	logger *log.Logger
