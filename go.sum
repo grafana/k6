@@ -57,6 +57,8 @@ github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymF
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
 github.com/envoyproxy/protoc-gen-validate v0.1.0/go.mod h1:iSmxcyjqTsJpI2R4NaDN7+kN2VEUnK/pcBlmesArF7c=
+github.com/evanw/esbuild v0.21.2 h1:CLplcGi794CfHLVmUbvVfTMKkykm+nyIHU8SU60KUTA=
+github.com/evanw/esbuild v0.21.2/go.mod h1:D2vIQZqV/vIf/VRHtViaUtViZmG7o+kKmlBfVQuRi48=
 github.com/fatih/color v1.16.0 h1:zmkK9Ngbjj+K0yRhTVONQh1p/HknKYSlNT+vZCzyokM=
 github.com/fatih/color v1.16.0/go.mod h1:fL2Sau1YI5c0pdGEVCbKQbLXB6edEj1ZgiY4NijnWvE=
 github.com/fsnotify/fsnotify v1.5.4 h1:jRbGcIw6P2Meqdwuo0H1p6JVLbL5DHKAKlYndzMwVZI=
@@ -94,8 +96,8 @@ github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
 github.com/grafana/xk6-browser v1.5.1 h1:wexnBtx1raDniYcXkRQ9zfXvuJGjvixZag4kmiYG3tg=
 github.com/grafana/xk6-browser v1.5.1/go.mod h1:hD9H1zpe1Fvs6RCENKnaPqpObh6alz+hX00Xf5qvDE4=
-github.com/grafana/xk6-dashboard v0.7.2 h1:CLaWeRfPZ388IS6rBn0nI+lqtX50QoQ73z0Hz5BIrS4=
-github.com/grafana/xk6-dashboard v0.7.2/go.mod h1:7HLAY4udlWGXGDQL5gWIi+In3eZRljXi8AnHt1Z+lFM=
+github.com/grafana/xk6-dashboard v0.7.3 h1:47dxL87eMhpCIHSJTOnohTq3WIfCwvNriRTDvYNlsHY=
+github.com/grafana/xk6-dashboard v0.7.3/go.mod h1:7HLAY4udlWGXGDQL5gWIi+In3eZRljXi8AnHt1Z+lFM=
 github.com/grafana/xk6-output-prometheus-remote v0.3.1 h1:X23rQzlJD8dXWB31DkxR4uPnuRFo8L0Y0H22fSG9xl0=
 github.com/grafana/xk6-output-prometheus-remote v0.3.1/go.mod h1:0JLAm4ONsNUlNoxJXAwOCfA6GtDwTPs557OplAvE+3o=
 github.com/grafana/xk6-redis v0.2.0 h1:iXmAKVlAxafZ/h8ptuXTFhGu63IFsyDI8QjUgWm66BU=

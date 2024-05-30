@@ -109,6 +109,7 @@ func TestRuntimeOptions(t *testing.T) {
 		defaultCompatMode   = null.NewString("extended", false)
 		baseCompatMode      = null.NewString("base", true)
 		extendedCompatMode  = null.NewString("extended", true)
+		enhancedCompatMode  = null.NewString("experimental_enhanced", true)
 		defaultTracesOutput = null.NewString("none", false)
 	)
 
@@ -139,6 +140,16 @@ func TestRuntimeOptions(t *testing.T) {
 			expRTOpts: lib.RuntimeOptions{
 				IncludeSystemEnvVars: null.NewBool(false, false),
 				CompatibilityMode:    extendedCompatMode,
+				Env:                  map[string]string{},
+				TracesOutput:         defaultTracesOutput,
+			},
+		},
+		"disabled sys env by default with experimental_enhanced compat mode": {
+			useSysEnv: false,
+			systemEnv: map[string]string{"test1": "val1", "K6_COMPATIBILITY_MODE": "experimental_enhanced"},
+			expRTOpts: lib.RuntimeOptions{
+				IncludeSystemEnvVars: null.NewBool(false, false),
+				CompatibilityMode:    enhancedCompatMode,
 				Env:                  map[string]string{},
 				TracesOutput:         defaultTracesOutput,
 			},

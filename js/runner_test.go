@@ -89,24 +89,6 @@ func TestRunnerNew(t *testing.T) {
 	})
 }
 
-func TestRunnerGetDefaultGroup(t *testing.T) {
-	t.Parallel()
-	r1, err := getSimpleRunner(t, "/script.js", `exports.default = function() {};`)
-	require.NoError(t, err)
-	assert.NotNil(t, r1.GetDefaultGroup())
-
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, r1.MakeArchive())
-	require.NoError(t, err)
-	assert.NotNil(t, r2.GetDefaultGroup())
-}
-
 func TestRunnerOptions(t *testing.T) {
 	t.Parallel()
 	r1, err := getSimpleRunner(t, "/script.js", `exports.default = function() {};`)
@@ -398,8 +380,6 @@ func TestDataIsolation(t *testing.T) {
 	require.NoError(t, err)
 	defer stopOutputs(nil)
 
-	require.Empty(t, runner.defaultGroup.Groups)
-
 	stopEmission, err := execScheduler.Init(runCtx, samples)
 	require.NoError(t, err)
 
@@ -416,8 +396,6 @@ func TestDataIsolation(t *testing.T) {
 		require.NoError(t, err)
 		waitForMetricsFlushed()
 	}
-	require.Contains(t, runner.defaultGroup.Groups, "setup")
-	require.Contains(t, runner.defaultGroup.Groups, "teardown")
 	var count int
 	for _, s := range mockOutput.Samples {
 		if s.Metric.Name == "mycounter" {
@@ -672,7 +650,6 @@ func TestVURunContext(t *testing.T) {
 				assert.Equal(t, null.IntFrom(10), state.Options.VUs)
 				assert.Equal(t, null.BoolFrom(true), state.Options.Throw)
 				assert.NotNil(t, state.Logger)
-				assert.Equal(t, r.GetDefaultGroup(), state.Group)
 				assert.Equal(t, vu.Transport, state.Transport)
 			}))
 
@@ -770,74 +747,6 @@ func TestVURunInterruptDoesntPanic(t *testing.T) {
 				newCancel()
 				wg.Wait()
 			}
-		})
-	}
-}
-
-func TestVUIntegrationGroups(t *testing.T) {
-	t.Parallel()
-	r1, err := getSimpleRunner(t, "/script.js", `
-		var group = require("k6").group;
-		exports.default = function() {
-			fnOuter();
-			group("my group", function() {
-				fnInner();
-				group("nested group", function() {
-					fnNested();
-				})
-			});
-		}
-		`)
-	require.NoError(t, err)
-
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, r1.MakeArchive())
-	require.NoError(t, err)
-
-	testdata := map[string]*Runner{"Source": r1, "Archive": r2}
-	for name, r := range testdata {
-		r := r
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			ctx, cancel := context.WithCancel(context.Background())
-			defer cancel()
-
-			vu, err := r.newVU(ctx, 1, 1, make(chan metrics.SampleContainer, 100))
-			require.NoError(t, err)
-
-			fnOuterCalled := false
-			fnInnerCalled := false
-			fnNestedCalled := false
-			require.NoError(t, vu.Runtime.Set("fnOuter", func() {
-				fnOuterCalled = true
-				assert.Equal(t, r.GetDefaultGroup(), vu.state.Group)
-			}))
-			require.NoError(t, vu.Runtime.Set("fnInner", func() {
-				fnInnerCalled = true
-				g := vu.state.Group
-				assert.Equal(t, "my group", g.Name)
-				assert.Equal(t, r.GetDefaultGroup(), g.Parent)
-			}))
-			require.NoError(t, vu.Runtime.Set("fnNested", func() {
-				fnNestedCalled = true
-				g := vu.state.Group
-				assert.Equal(t, "nested group", g.Name)
-				assert.Equal(t, "my group", g.Parent.Name)
-				assert.Equal(t, r.GetDefaultGroup(), g.Parent.Parent)
-			}))
-
-			activeVU := vu.Activate(&lib.VUActivationParams{RunContext: ctx})
-			err = activeVU.RunOnce()
-			require.NoError(t, err)
-			assert.True(t, fnOuterCalled, "fnOuter() not called")
-			assert.True(t, fnInnerCalled, "fnInner() not called")
-			assert.True(t, fnNestedCalled, "fnNested() not called")
 		})
 	}
 }

@@ -5,13 +5,14 @@ import (
 	"errors"
 	"fmt"
 	"math/rand"
-	"sync/atomic"
+	"strings"
 	"time"
 
 	"github.com/dop251/goja"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
+	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
 
@@ -105,25 +106,23 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 	if common.IsAsyncFunction(mi.vu.Runtime(), val) {
 		return goja.Undefined(), fmt.Errorf(asyncFunctionNotSupportedMsg, "group")
 	}
-	g, err := state.Group.Group(name)
+	oldGroupName, _ := state.Tags.GetCurrentValues().Tags.Get(metrics.TagGroup.String())
+	// TODO: what are we doing if group is not tagged
+	newGroupName, err := lib.NewGroupPath(oldGroupName, name)
 	if err != nil {
 		return goja.Undefined(), err
 	}
 
-	old := state.Group
-	state.Group = g
-
 	shouldUpdateTag := state.Options.SystemTags.Has(metrics.TagGroup)
 	if shouldUpdateTag {
 		state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, g.Path)
+			tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, newGroupName)
 		})
 	}
 	defer func() {
-		state.Group = old
 		if shouldUpdateTag {
 			state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-				tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, old.Path)
+				tagsAndMeta.SetSystemTagOrMeta(metrics.TagGroup, oldGroupName)
 			})
 		}
 	}()
@@ -148,8 +147,6 @@ func (mi *K6) Group(name string, val goja.Value) (goja.Value, error) {
 }
 
 // Check will emit check metrics for the provided checks.
-//
-//nolint:funlen
 func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error) {
 	state := mi.vu.State()
 	if state == nil {
@@ -174,17 +171,14 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 	var exc error
 	obj := checks.ToObject(rt)
 	for _, name := range obj.Keys() {
-		val := obj.Get(name)
-
-		// Resolve the check record.
-		check, err := state.Group.Check(name)
-		if err != nil {
-			return false, err
+		if strings.Contains(name, lib.GroupSeparator) {
+			return false, lib.ErrNameContainsGroupSeparator
 		}
+		val := obj.Get(name)
 
 		tags := commonTagsAndMeta.Tags
 		if state.Options.SystemTags.Has(metrics.TagCheck) {
-			tags = tags.With("check", check.Name)
+			tags = tags.With("check", name)
 		}
 
 		if common.IsAsyncFunction(rt, val) {
@@ -207,28 +201,19 @@ func (mi *K6) Check(arg0, checks goja.Value, extras ...goja.Value) (bool, error)
 			succ = false
 		}
 
-		// Emit! (But only if we have a valid context.)
-		select {
-		case <-ctx.Done():
-		default:
-			sample := metrics.Sample{
-				TimeSeries: metrics.TimeSeries{
-					Metric: state.BuiltinMetrics.Checks,
-					Tags:   tags,
-				},
-				Time:     t,
-				Metadata: commonTagsAndMeta.Metadata,
-				Value:    0,
-			}
-			if booleanVal {
-				atomic.AddInt64(&check.Passes, 1)
-				sample.Value = 1
-			} else {
-				atomic.AddInt64(&check.Fails, 1)
-			}
-
-			metrics.PushIfNotDone(ctx, state.Samples, sample)
+		sample := metrics.Sample{
+			TimeSeries: metrics.TimeSeries{
+				Metric: state.BuiltinMetrics.Checks,
+				Tags:   tags,
+			},
+			Time:     t,
+			Metadata: commonTagsAndMeta.Metadata,
 		}
+		if booleanVal {
+			sample.Value = 1
+		}
+
+		metrics.PushIfNotDone(ctx, state.Samples, sample)
 
 		if exc != nil {
 			return false, exc
