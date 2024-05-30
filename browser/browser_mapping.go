@@ -56,7 +56,7 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			if err != nil {
 				return "", err
 			}
-			return b.UserAgent(), nil
+			return b.UserAgent() //nolint:wrapcheck
 		},
 		"version": func() (string, error) {
 			b, err := vu.browser()

@@ -628,13 +628,13 @@ func (b *Browser) On(event string) (bool, error) {
 }
 
 // UserAgent returns the controlled browser's user agent string.
-func (b *Browser) UserAgent() string {
+func (b *Browser) UserAgent() (string, error) {
 	action := cdpbrowser.GetVersion()
-	_, _, _, ua, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
+	_, _, _, ua, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn)) //nolint:dogsled
 	if err != nil {
-		k6ext.Panic(b.ctx, "getting browser user agent: %w", err)
+		return "", fmt.Errorf("getting browser user agent: %w", err)
 	}
-	return ua
+	return ua, nil
 }
 
 // Version returns the controlled browser's version.

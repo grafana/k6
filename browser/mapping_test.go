@@ -255,7 +255,7 @@ type browserAPI interface {
 	NewContext(opts goja.Value) (*common.BrowserContext, error)
 	NewPage(opts goja.Value) (*common.Page, error)
 	On(string) (bool, error)
-	UserAgent() string
+	UserAgent() (string, error)
 	Version() string
 }
 
