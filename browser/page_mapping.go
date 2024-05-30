@@ -318,12 +318,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Uncheck(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"url": p.URL,
-		"viewportSize": func() *goja.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return p.ViewportSize(), nil
-			})
-		},
+		"url":          p.URL,
+		"viewportSize": p.ViewportSize,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				vu.Context(), p.Timeout(), pageFunc, opts, args...,
