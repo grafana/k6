@@ -660,6 +660,22 @@ func (b *Browser) Version() (string, error) {
 	return product[i+1:], nil
 }
 
+// fetchVersion returns the browser version information.
+func (b *Browser) fetchVersion() (browserVersion, error) {
+	var (
+		bv  browserVersion
+		err error
+	)
+	bv.protocolVersion, bv.product, bv.revision, bv.userAgent, bv.jsVersion, err = cdpbrowser.
+		GetVersion().
+		Do(cdp.WithExecutor(b.ctx, b.conn))
+	if err != nil {
+		return browserVersion{}, fmt.Errorf("getting browser version information: %w", err)
+	}
+
+	return bv, nil
+}
+
 // WsURL returns the Websocket URL that the browser is listening on for CDP clients.
 func (b *Browser) WsURL() string {
 	return b.browserProc.WsURL()
