@@ -53,14 +53,13 @@ func (mi *ModuleInstance) NewReadableStream(call goja.ConstructorCall) *goja.Obj
 }
 
 func newReadableStream(vu modules.VU, call goja.ConstructorCall) *goja.Object {
-	rt := vu.Runtime()
-
-	var err error
-
-	// 1. If underlyingSource is missing, set it to null.
-	var underlyingSource *goja.Object
-
 	var (
+		// 1. If underlyingSource is missing, set it to null.
+		underlyingSource *goja.Object
+
+		rt = vu.Runtime()
+
+		err                  error
 		strategy             *goja.Object
 		underlyingSourceDict UnderlyingSource
 	)
@@ -292,6 +291,9 @@ func (mi *ModuleInstance) NewReadableStreamDefaultReader(call goja.ConstructorCa
 	return object
 }
 
+// NewReadableStreamForReader is the equivalent of [NewReadableStreamDefaultReader] but to initialize
+// a new [ReadableStream] from a given [io.Reader] in Go code.
+// It is useful for those situations when a [io.Reader] needs to be surfaced up to the JS runtime.
 func NewReadableStreamForReader(vu modules.VU, reader io.Reader) *goja.Object {
 	rt := vu.Runtime()
 	return newReadableStream(vu, goja.ConstructorCall{

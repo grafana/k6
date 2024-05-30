@@ -11,6 +11,8 @@ import (
 )
 
 func TestNewReadableStreamForReader(t *testing.T) {
+	t.Parallel()
+
 	// The value to be streamed.
 	exp := "Hello, World!"
 
