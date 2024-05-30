@@ -211,8 +211,7 @@ func TestBrowserUserAgent(t *testing.T) {
 
 	// testBrowserVersion() tests the version already
 	// just look for "Headless" in UserAgent
-	ua, err := b.UserAgent()
-	require.NoError(t, err)
+	ua := b.UserAgent()
 	if prefix := "Mozilla/5.0"; !strings.HasPrefix(ua, prefix) {
 		t.Errorf("UserAgent should start with %q, but got: %q", prefix, ua)
 	}
