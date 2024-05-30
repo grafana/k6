@@ -63,7 +63,7 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			if err != nil {
 				return "", err
 			}
-			return b.Version() //nolint:wrapcheck
+			return b.Version(), nil
 		},
 		"newPage": func(opts goja.Value) (mapping, error) {
 			b, err := vu.browser()

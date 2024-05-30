@@ -256,7 +256,7 @@ type browserAPI interface {
 	NewPage(opts goja.Value) (*common.Page, error)
 	On(string) (bool, error)
 	UserAgent() (string, error)
-	Version() (string, error)
+	Version() string
 }
 
 // browserContextAPI is the public interface of a CDP browser context.

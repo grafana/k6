@@ -657,17 +657,13 @@ func (b *Browser) UserAgent() (string, error) {
 }
 
 // Version returns the controlled browser's version.
-func (b *Browser) Version() (string, error) {
-	action := cdpbrowser.GetVersion()
-	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn)) //nolint:dogsled
-	if err != nil {
-		return "", fmt.Errorf("getting browser version: %w", err)
-	}
+func (b *Browser) Version() string {
+	product := b.version.product
 	i := strings.Index(product, "/")
 	if i == -1 {
-		return product, nil
+		return product
 	}
-	return product[i+1:], nil
+	return product[i+1:]
 }
 
 // fetchVersion returns the browser version information.
