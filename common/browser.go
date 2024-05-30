@@ -172,7 +172,7 @@ func (b *Browser) getPages() []*Page {
 	return pages
 }
 
-func (b *Browser) initEvents() error {
+func (b *Browser) initEvents() error { //nolint:cyclop
 	var cancelCtx context.Context
 	cancelCtx, b.evCancelFn = context.WithCancel(b.ctx)
 	chHandler := make(chan Event)
@@ -198,7 +198,9 @@ func (b *Browser) initEvents() error {
 			case event := <-chHandler:
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-					b.onAttachedToTarget(ev)
+					if err := b.onAttachedToTarget(ev); err != nil {
+						k6ext.Panic(b.ctx, "browser is attaching to target: %w", err)
+					}
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
 					b.onDetachedFromTarget(ev)
@@ -247,7 +249,7 @@ func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget
 }
 
 // onAttachedToTarget is called when a new page is attached to the browser.
-func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
+func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
 		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID)
 
@@ -257,14 +259,14 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	)
 
 	if !b.isAttachedPageValid(ev, browserCtx) {
-		return // Ignore this page.
+		return nil // Ignore this page.
 	}
 	session := b.conn.getSession(ev.SessionID)
 	if session == nil {
 		b.logger.Debugf("Browser:onAttachedToTarget",
 			"session closed before attachToTarget is handled. sid:%v tid:%v",
 			ev.SessionID, targetPage.TargetID)
-		return // ignore
+		return nil // ignore
 	}
 
 	var (
@@ -281,17 +283,21 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 	p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
-		return // Ignore this page.
+		return nil // Ignore this page.
 	}
 	if err != nil {
-		k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
+		return fmt.Errorf("creating a new %s: %w", targetPage.Type, err)
 	}
+
 	b.attachNewPage(p, ev) // Register the page as an active page.
+
 	// Emit the page event only for pages, not for background pages.
 	// Background pages are created by extensions.
 	if isPage {
 		browserCtx.emit(EventBrowserContextPage, p)
 	}
+
+	return nil
 }
 
 // attachNewPage registers the page as an active page and attaches the sessionID with the targetID.
