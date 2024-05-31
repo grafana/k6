@@ -12,7 +12,6 @@ func mapResponse(vu moduleVU, r *common.Response) mapping { //nolint:funlen
 	if r == nil {
 		return nil
 	}
-	rt := vu.Runtime()
 	maps := mapping{
 		"allHeaders": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -29,9 +28,8 @@ func mapResponse(vu moduleVU, r *common.Response) mapping { //nolint:funlen
 				return &buf, nil
 			})
 		},
-		"frame": func() *goja.Object {
-			mf := mapFrame(vu, r.Frame())
-			return rt.ToValue(mf).ToObject(rt)
+		"frame": func() mapping {
+			return mapFrame(vu, r.Frame())
 		},
 		"headerValue": func(name string) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -59,9 +57,8 @@ func mapResponse(vu moduleVU, r *common.Response) mapping { //nolint:funlen
 			})
 		},
 		"ok": r.Ok,
-		"request": func() *goja.Object {
-			mr := mapRequest(vu, r.Request())
-			return rt.ToValue(mr).ToObject(rt)
+		"request": func() mapping {
+			return mapRequest(vu, r.Request())
 		},
 		"securityDetails": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
