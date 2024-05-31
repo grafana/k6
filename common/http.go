@@ -418,18 +418,19 @@ func (r *Response) AllHeaders() map[string]string {
 	return headers
 }
 
-// Body returns the response body as a binary buffer.
-func (r *Response) Body() goja.ArrayBuffer {
+// Body returns the response body as a bytes buffer.
+func (r *Response) Body() ([]byte, error) {
 	if r.status >= 300 && r.status <= 399 {
-		k6ext.Panic(r.ctx, "Response body is unavailable for redirect responses")
+		return nil, fmt.Errorf("response body is unavailable for redirect responses")
 	}
 	if err := r.fetchBody(); err != nil {
-		k6ext.Panic(r.ctx, "getting response body: %w", err)
+		return nil, fmt.Errorf("getting response body: %w", err)
 	}
+
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()
-	rt := r.vu.Runtime()
-	return rt.NewArrayBuffer(r.body)
+
+	return r.body, nil
 }
 
 // bodySize returns the size in bytes of the response body.

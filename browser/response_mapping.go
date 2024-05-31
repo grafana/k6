@@ -4,6 +4,7 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 // mapResponse to the JS module.
@@ -14,7 +15,16 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
 		"allHeaders": r.AllHeaders,
-		"body":       r.Body,
+		"body": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				body, err := r.Body()
+				if err != nil {
+					return nil, err //nolint: wrapcheck
+				}
+				buf := vu.Runtime().NewArrayBuffer(body)
+				return &buf, nil
+			})
+		},
 		"frame": func() *goja.Object {
 			mf := mapFrame(vu, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)

@@ -105,11 +105,17 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 			return err
 		}
 		require.NotNil(t, resp)
+
+		responseBody, err := resp.Body()
+		require.NoError(t, err)
+
 		var body struct{ Headers map[string][]string }
-		require.NoError(t, json.Unmarshal(resp.Body().Bytes(), &body))
+		require.NoError(t, json.Unmarshal(responseBody, &body))
+
 		h := body.Headers["Some-Header"]
 		require.NotEmpty(t, h)
 		assert.Equal(t, "Some-Value", h[0])
+
 		return nil
 	})
 	require.NoError(t, err)

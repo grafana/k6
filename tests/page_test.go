@@ -679,8 +679,11 @@ func TestPageSetExtraHTTPHeaders(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, resp)
 
+	responseBody, err := resp.Body()
+	require.NoError(t, err)
+
 	var body struct{ Headers map[string][]string }
-	err = json.Unmarshal(resp.Body().Bytes(), &body)
+	err = json.Unmarshal(responseBody, &body)
 	require.NoError(t, err)
 
 	h := body.Headers["Some-Header"]

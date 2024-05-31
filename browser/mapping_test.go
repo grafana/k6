@@ -479,7 +479,7 @@ type requestAPI interface {
 // responseAPI is the interface of an HTTP response.
 type responseAPI interface {
 	AllHeaders() map[string]string
-	Body() goja.ArrayBuffer
+	Body() ([]byte, error)
 	Frame() *common.Frame
 	HeaderValue(string) goja.Value
 	HeaderValues(string) []string
