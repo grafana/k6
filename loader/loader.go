@@ -151,8 +151,12 @@ func Load(
 		pathOnFs = filepath.Join(fsext.FilePathSeparator, moduleSpecifier.Opaque)
 	case moduleSpecifier.Scheme == "":
 		pathOnFs = path.Clean(moduleSpecifier.String())
+		// lxd TODO:
+		pathOnFs = originalModuleSpecifier
 	default:
 		pathOnFs = path.Clean(moduleSpecifier.String()[len(moduleSpecifier.Scheme)+len(":/"):])
+		// lxd TODO: 不处理path的相对路径问题
+		pathOnFs = originalModuleSpecifier
 	}
 	scheme := moduleSpecifier.Scheme
 	if scheme == "" {

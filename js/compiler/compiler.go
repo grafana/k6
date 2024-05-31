@@ -208,6 +208,11 @@ func (c *Compiler) compileImpl(
 	src, filename string, wrap bool, compatibilityMode lib.CompatibilityMode, srcMap []byte,
 ) (*goja.Program, string, error) {
 	code := src
+
+	if i := strings.Index(code, "__decorate(["); i != -1 {
+		code = c.decorate(code, i)
+	}
+
 	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
 	if wrap {
 		conditionalNewLine := ""
@@ -226,6 +231,7 @@ func (c *Compiler) compileImpl(
 		}
 		code = "(function(module, exports){" + conditionalNewLine + code + "\n})\n"
 	}
+
 	opts := parser.WithDisableSourceMaps
 	if c.Options.SourceMapLoader != nil {
 		opts = parser.WithSourceMapLoader(state.sourceMapLoader)
@@ -252,6 +258,44 @@ func (c *Compiler) compileImpl(
 	}
 	pgm, err := goja.CompileAST(ast, c.Options.Strict)
 	return pgm, code, err
+}
+
+// decorate
+//
+//	@Description: 更改源码，调整修饰器代码位置
+//	@receiver c
+//	@param code
+//	@param start
+//	@return string
+func (c *Compiler) decorate(code string, start int) string {
+	// lxd
+	//start := strings.Index(code, "__decorate([")
+	if start > -1 {
+		className := ""
+		endChar := ", void 0);"
+		end := strings.LastIndex(code, endChar)
+		decorate := code[start : end+len(endChar)]
+		ip := strings.Index(decorate, ".prototype,")
+		if ip > -1 {
+			s := decorate[:ip]
+			i := strings.LastIndex(s, ",")
+			if i > -1 {
+				className = strings.ReplaceAll(s[i+1:], " ", "")
+			}
+		}
+		if className != "" {
+			decorate = strings.ReplaceAll(decorate, className+".prototype", "this")
+			st := -1
+			for i := start; i >= 0; i-- {
+				if code[i] == '}' {
+					st = i
+					break
+				}
+			}
+			code = code[:st] + "\n // lxd \n" + decorate + "\n}" + code[end+len(endChar):]
+		}
+	}
+	return code
 }
 
 type babel struct {
