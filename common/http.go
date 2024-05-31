@@ -457,14 +457,11 @@ func (r *Response) Frame() *Frame {
 }
 
 // HeaderValue returns the value of the given header.
-func (r *Response) HeaderValue(name string) goja.Value {
+// Returns true if the header is present, false otherwise.
+func (r *Response) HeaderValue(name string) (string, bool) {
 	headers := r.AllHeaders()
-	val, ok := headers[name]
-	if !ok {
-		return goja.Null()
-	}
-	rt := r.vu.Runtime()
-	return rt.ToValue(val)
+	v, ok := headers[name]
+	return v, ok
 }
 
 // HeaderValues returns the values of the given header.

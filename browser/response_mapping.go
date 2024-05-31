@@ -14,7 +14,11 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 	}
 	rt := vu.Runtime()
 	maps := mapping{
-		"allHeaders": r.AllHeaders,
+		"allHeaders": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.AllHeaders(), nil
+			})
+		},
 		"body": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				body, err := r.Body()
@@ -29,12 +33,28 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			mf := mapFrame(vu, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"headerValue":  r.HeaderValue,
-		"headerValues": r.HeaderValues,
-		"headers":      r.Headers,
-		"headersArray": r.HeadersArray,
-		"json":         r.JSON,
-		"ok":           r.Ok,
+		"headerValue": func(name string) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				v, ok := r.HeaderValue(name)
+				if !ok {
+					return nil, nil
+				}
+				return v, nil
+			})
+		},
+		"headerValues": func(name string) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.HeaderValues(name), nil
+			})
+		},
+		"headers": r.Headers,
+		"headersArray": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.HeadersArray(), nil
+			})
+		},
+		"json": r.JSON,
+		"ok":   r.Ok,
 		"request": func() *goja.Object {
 			mr := mapRequest(vu, r.Request())
 			return rt.ToValue(mr).ToObject(rt)

@@ -481,7 +481,7 @@ type responseAPI interface {
 	AllHeaders() map[string]string
 	Body() ([]byte, error)
 	Frame() *common.Frame
-	HeaderValue(string) goja.Value
+	HeaderValue(string) (string, bool)
 	HeaderValues(string) []string
 	Headers() map[string]string
 	HeadersArray() []common.HTTPHeader
