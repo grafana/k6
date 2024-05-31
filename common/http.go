@@ -545,9 +545,8 @@ func (r *Response) SecurityDetails() *SecurityDetails {
 }
 
 // ServerAddr returns the remote address of the server.
-func (r *Response) ServerAddr() goja.Value {
-	rt := r.vu.Runtime()
-	return rt.ToValue(r.remoteAddress)
+func (r *Response) ServerAddr() *RemoteAddress {
+	return r.remoteAddress
 }
 
 // Size returns the size in bytes of the response.

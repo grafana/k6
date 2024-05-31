@@ -489,7 +489,7 @@ type responseAPI interface {
 	Ok() bool
 	Request() *common.Request
 	SecurityDetails() *common.SecurityDetails
-	ServerAddr() goja.Value
+	ServerAddr() *common.RemoteAddress
 	Size() common.HTTPMessageSize
 	Status() int64
 	StatusText() string
