@@ -57,11 +57,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return mapResponse(vu, resp), nil
 			})
 		},
-		"size": func() *goja.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return r.Size(), nil
-			})
-		},
+		"size":   r.Size,
 		"timing": r.Timing,
 		"url":    r.URL,
 	}
