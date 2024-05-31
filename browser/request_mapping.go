@@ -25,11 +25,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 				return r.HeaderValue(name), nil
 			})
 		},
-		"headers": func() *goja.Promise {
-			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return r.Headers(), nil
-			})
-		},
+		"headers": r.Headers,
 		"headersArray": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return r.HeadersArray(), nil
