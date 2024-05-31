@@ -540,9 +540,8 @@ func (r *Response) Request() *Request {
 }
 
 // SecurityDetails returns the security details of the response.
-func (r *Response) SecurityDetails() goja.Value {
-	rt := r.vu.Runtime()
-	return rt.ToValue(r.securityDetails)
+func (r *Response) SecurityDetails() *SecurityDetails {
+	return r.securityDetails
 }
 
 // ServerAddr returns the remote address of the server.

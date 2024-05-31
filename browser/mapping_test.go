@@ -488,7 +488,7 @@ type responseAPI interface {
 	JSON() (any, error)
 	Ok() bool
 	Request() *common.Request
-	SecurityDetails() goja.Value
+	SecurityDetails() *common.SecurityDetails
 	ServerAddr() goja.Value
 	Size() common.HTTPMessageSize
 	Status() int64

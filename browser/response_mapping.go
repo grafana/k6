@@ -63,12 +63,16 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 			mr := mapRequest(vu, r.Request())
 			return rt.ToValue(mr).ToObject(rt)
 		},
-		"securityDetails": r.SecurityDetails,
-		"serverAddr":      r.ServerAddr,
-		"size":            r.Size,
-		"status":          r.Status,
-		"statusText":      r.StatusText,
-		"url":             r.URL,
+		"securityDetails": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.SecurityDetails(), nil
+			})
+		},
+		"serverAddr": r.ServerAddr,
+		"size":       r.Size,
+		"status":     r.Status,
+		"statusText": r.StatusText,
+		"url":        r.URL,
 	}
 
 	return maps
