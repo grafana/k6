@@ -8,7 +8,7 @@ import (
 )
 
 // mapResponse to the JS module.
-func mapResponse(vu moduleVU, r *common.Response) mapping {
+func mapResponse(vu moduleVU, r *common.Response) mapping { //nolint:funlen
 	if r == nil {
 		return nil
 	}
@@ -81,6 +81,11 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 		"status":     r.Status,
 		"statusText": r.StatusText,
 		"url":        r.URL,
+		"text": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.Text() //nolint:wrapcheck
+			})
+		},
 	}
 
 	return maps

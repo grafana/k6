@@ -568,13 +568,15 @@ func (r *Response) StatusText() string {
 }
 
 // Text returns the response body as a string.
-func (r *Response) Text() string {
+func (r *Response) Text() (string, error) {
 	if err := r.fetchBody(); err != nil {
-		k6ext.Panic(r.ctx, "getting response body as text: %w", err)
+		return "", fmt.Errorf("getting response body as text: %w", err)
 	}
+
 	r.bodyMu.RLock()
 	defer r.bodyMu.RUnlock()
-	return string(r.body)
+
+	return string(r.body), nil
 }
 
 // URL returns the request URL.

@@ -494,6 +494,7 @@ type responseAPI interface {
 	Status() int64
 	StatusText() string
 	URL() string
+	Text() (string, error)
 }
 
 // locatorAPI represents a way to find element(s) on a page at any moment.
