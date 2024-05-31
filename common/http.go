@@ -506,23 +506,24 @@ func (r *Response) HeadersArray() []HTTPHeader {
 }
 
 // JSON returns the response body as JSON data.
-func (r *Response) JSON() goja.Value {
-	if r.cachedJSON == nil {
-		if err := r.fetchBody(); err != nil {
-			k6ext.Panic(r.ctx, "getting response body: %w", err)
-		}
-
-		var v any
-		r.bodyMu.RLock()
-		defer r.bodyMu.RUnlock()
-		if err := json.Unmarshal(r.body, &v); err != nil {
-			k6ext.Panic(r.ctx, "unmarshalling response body to JSON: %w", err)
-		}
-		r.cachedJSON = v
+func (r *Response) JSON() (any, error) {
+	if r.cachedJSON != nil {
+		return r.cachedJSON, nil
 	}
-	rt := r.vu.Runtime()
+	if err := r.fetchBody(); err != nil {
+		return nil, fmt.Errorf("getting response body: %w", err)
+	}
 
-	return rt.ToValue(r.cachedJSON)
+	r.bodyMu.RLock()
+	defer r.bodyMu.RUnlock()
+
+	var v any
+	if err := json.Unmarshal(r.body, &v); err != nil {
+		return nil, fmt.Errorf("unmarshalling response body to JSON: %w", err)
+	}
+	r.cachedJSON = v
+
+	return v, nil
 }
 
 // Ok returns true if status code of response if considered ok, otherwise returns false.

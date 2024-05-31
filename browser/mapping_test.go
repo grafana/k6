@@ -485,7 +485,7 @@ type responseAPI interface {
 	HeaderValues(string) []string
 	Headers() map[string]string
 	HeadersArray() []common.HTTPHeader
-	JSON() goja.Value
+	JSON() (any, error)
 	Ok() bool
 	Request() *common.Request
 	SecurityDetails() goja.Value

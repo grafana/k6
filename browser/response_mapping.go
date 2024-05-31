@@ -53,8 +53,12 @@ func mapResponse(vu moduleVU, r *common.Response) mapping {
 				return r.HeadersArray(), nil
 			})
 		},
-		"json": r.JSON,
-		"ok":   r.Ok,
+		"json": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return r.JSON() //nolint: wrapcheck
+			})
+		},
+		"ok": r.Ok,
 		"request": func() *goja.Object {
 			mr := mapRequest(vu, r.Request())
 			return rt.ToValue(mr).ToObject(rt)
