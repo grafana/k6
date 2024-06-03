@@ -153,34 +153,18 @@ func (c *rootCommand) stopLoggers() {
 
 func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 	flags := pflag.NewFlagSet("", pflag.ContinueOnError)
-	// TODO: refactor this config, the default value management with pflag is
-	// simply terrible... :/
-	//
-	// We need to use `gs.Flags.<value>` both as the destination and as
-	// the value here, since the config values could have already been set by
-	// their respective environment variables. However, we then also have to
-	// explicitly set the DefValue to the respective default value from
-	// `gs.DefaultFlags.<value>`, so that the `k6 --help` message is
-	// not messed up...
 
-	flags.StringVar(&gs.Flags.LogOutput, "log-output", gs.Flags.LogOutput,
-		"change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]")
-	flags.Lookup("log-output").DefValue = gs.DefaultFlags.LogOutput
+	logOutputUsage := "change the output for k6 logs, possible values are stderr,stdout,none,loki[=host:port],file[=./path.fileformat]"
+	flags.StringVar(&gs.Flags.LogOutput, "log-output", gs.DefaultFlags.LogOutput, logOutputUsage)
 
-	flags.StringVar(&gs.Flags.LogFormat, "log-format", gs.Flags.LogFormat, "log output format")
-	flags.Lookup("log-format").DefValue = gs.DefaultFlags.LogFormat
+	flags.StringVar(&gs.Flags.LogFormat, "log-format", gs.DefaultFlags.LogFormat, "log output format")
 
-	flags.StringVarP(&gs.Flags.ConfigFilePath, "config", "c", gs.Flags.ConfigFilePath, "JSON config file")
-	// And we also need to explicitly set the default value for the usage message here, so things
-	// like `K6_CONFIG="blah" k6 run -h` don't produce a weird usage message
-	flags.Lookup("config").DefValue = gs.DefaultFlags.ConfigFilePath
+	configFilePathUsage := "JSON config file"
+	flags.StringVarP(&gs.Flags.ConfigFilePath, "config", "c", gs.DefaultFlags.ConfigFilePath, configFilePathUsage)
 	must(cobra.MarkFlagFilename(flags, "config"))
 
-	flags.BoolVar(&gs.Flags.NoColor, "no-color", gs.Flags.NoColor, "disable colored output")
-	flags.Lookup("no-color").DefValue = strconv.FormatBool(gs.DefaultFlags.NoColor)
+	flags.BoolVar(&gs.Flags.NoColor, "no-color", gs.DefaultFlags.NoColor, "disable colored output")
 
-	// TODO: support configuring these through environment variables as well?
-	// either with croconf or through the hack above...
 	flags.BoolVarP(&gs.Flags.Verbose, "verbose", "v", gs.DefaultFlags.Verbose, "enable verbose logging")
 	flags.BoolVarP(&gs.Flags.Quiet, "quiet", "q", gs.DefaultFlags.Quiet, "disable progress updates")
 	flags.StringVarP(&gs.Flags.Address, "address", "a", gs.DefaultFlags.Address, "address for the REST API server")
@@ -190,6 +174,29 @@ func rootCmdPersistentFlagSet(gs *state.GlobalState) *pflag.FlagSet {
 		gs.DefaultFlags.ProfilingEnabled,
 		"enable profiling (pprof) endpoints, k6's REST API should be enabled as well",
 	)
+
+	flags.VisitAll(func(flag *pflag.Flag) {
+		if flag.DefValue == "" {
+			switch flag.Name {
+			case "log-output":
+				flag.DefValue = gs.DefaultFlags.LogOutput
+			case "log-format":
+				flag.DefValue = gs.DefaultFlags.LogFormat
+			case "config":
+				flag.DefValue = gs.DefaultFlags.ConfigFilePath
+			case "no-color":
+				flag.DefValue = strconv.FormatBool(gs.DefaultFlags.NoColor)
+			case "verbose":
+				flag.DefValue = strconv.FormatBool(gs.DefaultFlags.Verbose)
+			case "quiet":
+				flag.DefValue = strconv.FormatBool(gs.DefaultFlags.Quiet)
+			case "address":
+				flag.DefValue = gs.DefaultFlags.Address
+			case "profiling-enabled":
+				flag.DefValue = strconv.FormatBool(gs.DefaultFlags.ProfilingEnabled)
+			}
+		}
+	})
 
 	return flags
 }
