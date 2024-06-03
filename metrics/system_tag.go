@@ -92,15 +92,16 @@ func (i SystemTagSet) SetString() string {
 }
 
 // ToSystemTagSet converts list of tags to SystemTagSet
-// TODO: emit error instead of discarding invalid values.
-func ToSystemTagSet(tags []string) *SystemTagSet {
+func ToSystemTagSet(tags []string) (*SystemTagSet, error) {
 	ts := new(SystemTagSet)
 	for _, tag := range tags {
-		if v, err := SystemTagString(tag); err == nil {
+		if v, err := SystemTagString(tag); err != nil {
+			return nil, err
+		} else {
 			ts.Add(v)
 		}
 	}
-	return ts
+	return ts, nil
 }
 
 // NewSystemTagSet returns a SystemTagSet from input.
@@ -132,7 +133,7 @@ func (i *SystemTagSet) UnmarshalJSON(data []byte) error {
 		return err
 	}
 	if len(tags) != 0 {
-		*i = *ToSystemTagSet(tags)
+		*i = *ToSystemTagSet(tags)[0]
 	}
 
 	return nil

@@ -733,7 +733,7 @@ func TestSystemTags(t *testing.T) {
 			expectedTag, err := metrics.SystemTagString(expectedTagStr)
 			require.NoError(t, err)
 			tb := httpmultibin.NewHTTPMultiBin(t)
-			test.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTagStr})
+			test.VU.StateField.Options.SystemTags = metrics.ToSystemTagSet([]string{expectedTagStr})[0]
 			_, err = test.VU.Runtime().RunString(tb.Replacer.Replace(`
 			var res = ws.connect("WSBIN_URL/ws-echo", function(socket){
 				socket.on("open", function() {
