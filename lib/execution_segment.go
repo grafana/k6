@@ -805,37 +805,33 @@ func (s *SegmentedIndex) Prev() (int64, int64) {
 
 // GoTo sets the scaled index to its biggest value for which the corresponding
 // unscaled index is smaller or equal to value.
-func (s *SegmentedIndex) GoTo(value int64) (int64, int64) { // TODO optimize
+func (s *SegmentedIndex) GoTo(value int64) (int64, int64) {
 	var gi int64
-	// Because of the cyclical nature of the striping algorithm (with a cycle
-	// length of LCD, the least common denominator), when scaling large values
-	// (i.e. many multiples of the LCD), we can quickly calculate how many times
-	// the cycle repeats.
+	cumulativeOffsets := make([]int64, len(s.offsets))
+	sum := int64(0)
+	for i, offset := range s.offsets {
+		sum += offset
+		cumulativeOffsets[i] = sum
+	}
+
 	wholeCycles := (value / s.lcd)
-	// So we can set some approximate initial values quickly, since we also know
-	// precisely how many scaled values there are per cycle length.
 	s.scaled = wholeCycles * int64(len(s.offsets))
-	s.unscaled = wholeCycles*s.lcd + s.start + 1 // our indexes are from 1 the start is from 0
-	// Approach the final value using the slow algorithm with the step by step loop
-	// TODO: this can be optimized by another array with size offsets that instead of the offsets
-	// from the previous is the offset from either 0 or start
-	i := s.start
-	for ; i < value%s.lcd; gi, i = gi+1, i+s.offsets[gi] {
+	s.unscaled = wholeCycles*s.lcd + s.start + 1
+
+	for i := s.start; i < value%s.lcd; i++ {
+		gi := i % int64(len(s.offsets))
 		s.scaled++
 		s.unscaled += s.offsets[gi]
 	}
 
-	if gi > 0 { // there were more values after the wholecycles
-		// the last offset actually shouldn't have been added
-		s.unscaled -= s.offsets[gi-1]
-	} else if s.scaled > 0 { // we didn't actually have more values after the wholecycles but we still had some
-		// in this case the unscaled value needs to move back by the last offset as it would've been
-		// the one to get it from the value it needs to be to it's current one
-		s.unscaled -= s.offsets[len(s.offsets)-1]
+	if gi > 0 {
+		s.unscaled -= cumulativeOffsets[gi-1]
+	} else if s.scaled > 0 {
+		s.unscaled -= cumulativeOffsets[len(s.offsets)-1]
 	}
 
 	if s.scaled == 0 {
-		s.unscaled = 0 // we would've added the start and 1
+		s.unscaled = 0
 	}
 
 	return s.scaled, s.unscaled
