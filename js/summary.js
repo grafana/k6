@@ -11,10 +11,18 @@ var forEach = function (obj, callback) {
 var palette = {
   bold: 1,
   faint: 2,
+  underline: 4,
+  blink: 5,
+  reverse: 7,
+  concealed: 8,
   red: 31,
   green: 32,
+  yellow: 33,
+  blue: 34,
+  magenta: 35,
   cyan: 36,
-  //TODO: add others?
+  white: 37,
+  black: 30
 }
 
 var groupPrefix = '█'
