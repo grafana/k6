@@ -8,11 +8,9 @@ import (
 
 // mapJSHandle to the JS module.
 func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
-	rt := vu.Runtime()
 	return mapping{
-		"asElement": func() *goja.Object {
-			m := mapElementHandle(vu, jsh.AsElement())
-			return rt.ToValue(m).ToObject(rt)
+		"asElement": func() mapping {
+			return mapElementHandle(vu, jsh.AsElement())
 		},
 		"dispose": jsh.Dispose,
 		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) (any, error) {
