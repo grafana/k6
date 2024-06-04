@@ -13,14 +13,13 @@ import (
 //
 //nolint:funlen
 func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
-	rt := vu.Runtime()
 	maps := mapping{
 		"check": func(selector string, opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, f.Check(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"childFrames": func() *goja.Object {
+		"childFrames": func() []mapping {
 			var (
 				mcfs []mapping
 				cfs  = f.ChildFrames()
@@ -28,7 +27,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 			for _, fr := range cfs {
 				mcfs = append(mcfs, mapFrame(vu, fr))
 			}
-			return rt.ToValue(mcfs).ToObject(rt)
+			return mcfs
 		},
 		"click": func(selector string, opts goja.Value) (*goja.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, f.Timeout())
@@ -164,18 +163,15 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.IsVisible(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"locator": func(selector string, opts goja.Value) *goja.Object {
-			ml := mapLocator(vu, f.Locator(selector, opts))
-			return rt.ToValue(ml).ToObject(rt)
+		"locator": func(selector string, opts goja.Value) mapping {
+			return mapLocator(vu, f.Locator(selector, opts))
 		},
 		"name": f.Name,
-		"page": func() *goja.Object {
-			mp := mapPage(vu, f.Page())
-			return rt.ToValue(mp).ToObject(rt)
+		"page": func() mapping {
+			return mapPage(vu, f.Page())
 		},
-		"parentFrame": func() *goja.Object {
-			mf := mapFrame(vu, f.ParentFrame())
-			return rt.ToValue(mf).ToObject(rt)
+		"parentFrame": func() mapping {
+			return mapFrame(vu, f.ParentFrame())
 		},
 		"press": func(selector, key string, opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
