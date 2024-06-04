@@ -15,7 +15,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 			return rt.ToValue(m).ToObject(rt)
 		},
 		"dispose": jsh.Dispose,
-		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) any {
+		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) (any, error) {
 			args := make([]any, 0, len(gargs))
 			for _, a := range gargs {
 				args = append(args, exportArg(a))

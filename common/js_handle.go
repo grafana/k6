@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -22,7 +21,7 @@ import (
 type JSHandleAPI interface {
 	AsElement() *ElementHandle
 	Dispose() error
-	Evaluate(pageFunc string, args ...any) any
+	Evaluate(pageFunc string, args ...any) (any, error)
 	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
 	JSONValue() (string, error)
@@ -124,12 +123,13 @@ func (h *BaseJSHandle) dispose() error {
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) Evaluate(pageFunc string, args ...any) any {
+func (h *BaseJSHandle) Evaluate(pageFunc string, args ...any) (any, error) {
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
-		k6ext.Panic(h.ctx, "%w", err)
+		return nil, fmt.Errorf("evaluating element: %w", err)
 	}
-	return res
+
+	return res, nil
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
