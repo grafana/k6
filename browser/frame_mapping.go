@@ -133,7 +133,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.InputValue(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"isChecked":  f.IsChecked,
+		"isChecked": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return f.IsChecked(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"isDetached": f.IsDetached,
 		"isDisabled": f.IsDisabled,
 		"isEditable": f.IsEditable,
