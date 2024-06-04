@@ -267,7 +267,12 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return mapElementHandle(vu, eh), nil
 			})
 		},
-		"waitForTimeout": f.WaitForTimeout,
+		"waitForTimeout": func(timeout int64) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				f.WaitForTimeout(timeout)
+				return nil, nil
+			})
+		},
 	}
 	maps["$"] = func(selector string) (mapping, error) {
 		eh, err := f.Query(selector, common.StrictModeOff)
