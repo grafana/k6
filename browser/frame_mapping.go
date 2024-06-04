@@ -91,7 +91,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 			}
 			return mapElementHandle(vu, fe), nil
 		},
-		"getAttribute": f.GetAttribute,
+		"getAttribute": func(selector, name string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return f.GetAttribute(selector, name, opts) //nolint:wrapcheck
+			})
+		},
 		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				f.Referrer(),
