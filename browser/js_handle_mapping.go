@@ -50,6 +50,10 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				return dst, nil
 			})
 		},
-		"jsonValue": jsh.JSONValue,
+		"jsonValue": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return jsh.JSONValue() //nolint:wrapcheck
+			})
+		},
 	}
 }
