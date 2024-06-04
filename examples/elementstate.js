@@ -33,26 +33,13 @@ export default async function() {
   `);
 
   // Check state
-  let el = await page.$('.visible');
-  const isVisible = await el.isVisible();
-
-  el = await page.$('.hidden');
-  const isHidden = await el.isHidden();
-
-  el = await page.$('.editable');
-  const isEditable = await el.isEditable();
-
-  el = await page.$('.enabled');
-  const isEnabled = await el.isEnabled();
-
-  el = await page.$('.disabled');
-  const isDisabled = await el.isDisabled();
-
-  el = await page.$('.checked');
-  const isChecked = await el.isChecked();
-
-  el = await page.$('.unchecked');
-  const isUnchecked = await el.isChecked() === false;
+  let isVisible = await page.$('.visible').then(e => e.isVisible());
+  let isHidden = await page.$('.hidden').then(e => e.isHidden());
+  let isEditable = await page.$('.editable').then(e => e.isEditable());
+  let isEnabled = await page.$('.enabled').then(e => e.isEnabled());
+  let isDisabled = await page.$('.disabled').then(e => e.isDisabled());
+  let isChecked = await page.$('.checked').then(e => e.isChecked());
+  let isUnchecked = !await page.$('.unchecked').then(e => e.isChecked());
 
   check(page, {
     'visible': isVisible,
