@@ -24,8 +24,8 @@ export default async function() {
   try {
     await page.goto('https://test.k6.io/');
 
-    const titleWithCSS = await page.$('header h1.title').textContent();
-    const titleWithXPath = await page.$(`//header//h1[@class="title"]`).textContent();
+    const titleWithCSS = await page.$('header h1.title').then(e => e.textContent());
+    const titleWithXPath = await page.$(`//header//h1[@class="title"]`).then(e => e.textContent());
 
     check(page, {
       'Title with CSS selector': titleWithCSS == 'test.k6.io',
