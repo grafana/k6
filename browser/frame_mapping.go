@@ -284,24 +284,26 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 			// We do not want to map nil elementHandles since the expectation is a
 			// null result in the test script for this case.
 			if eh == nil {
-				return nil, nil //nolint:nilnil
+				return nil, nil
 			}
 			ehm := mapElementHandle(vu, eh)
 
 			return ehm, nil
 		})
 	}
-	maps["$$"] = func(selector string) ([]mapping, error) {
-		ehs, err := f.QueryAll(selector)
-		if err != nil {
-			return nil, err //nolint:wrapcheck
-		}
-		var mehs []mapping
-		for _, eh := range ehs {
-			ehm := mapElementHandle(vu, eh)
-			mehs = append(mehs, ehm)
-		}
-		return mehs, nil
+	maps["$$"] = func(selector string) *goja.Promise {
+		return k6ext.Promise(vu.Context(), func() (any, error) {
+			ehs, err := f.QueryAll(selector)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			var mehs []mapping
+			for _, eh := range ehs {
+				ehm := mapElementHandle(vu, eh)
+				mehs = append(mehs, ehm)
+			}
+			return mehs, nil
+		})
 	}
 
 	return maps
