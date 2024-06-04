@@ -15,7 +15,11 @@ import (
 func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 	rt := vu.Runtime()
 	maps := mapping{
-		"check": f.Check,
+		"check": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.Check(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"childFrames": func() *goja.Object {
 			var (
 				mcfs []mapping
