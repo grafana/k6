@@ -36,17 +36,19 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				return mapJSHandle(vu, h), nil
 			})
 		},
-		"getProperties": func() (mapping, error) {
-			props, err := jsh.GetProperties()
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
+		"getProperties": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				props, err := jsh.GetProperties()
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
 
-			dst := make(map[string]any)
-			for k, v := range props {
-				dst[k] = mapJSHandle(vu, v)
-			}
-			return dst, nil
+				dst := make(map[string]any)
+				for k, v := range props {
+					dst[k] = mapJSHandle(vu, v)
+				}
+				return dst, nil
+			})
 		},
 		"jsonValue": jsh.JSONValue,
 	}
