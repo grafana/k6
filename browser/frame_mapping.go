@@ -46,7 +46,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.Content() //nolint:wrapcheck
 			})
 		},
-		"dblclick": f.Dblclick,
+		"dblclick": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.Dblclick(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) error {
 			popts := common.NewFrameDispatchEventOptions(f.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
