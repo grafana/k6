@@ -258,12 +258,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return mapResponse(vu, resp), nil
 			}), nil
 		},
-		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
-			eh, err := f.WaitForSelector(selector, opts)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapElementHandle(vu, eh), nil
+		"waitForSelector": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				eh, err := f.WaitForSelector(selector, opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapElementHandle(vu, eh), nil
+			})
 		},
 		"waitForTimeout": f.WaitForTimeout,
 	}
