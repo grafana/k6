@@ -177,7 +177,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 			mf := mapFrame(vu, f.ParentFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"press":         f.Press,
+		"press": func(selector, key string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.Press(selector, key, opts) //nolint:wrapcheck
+			})
+		},
 		"selectOption":  f.SelectOption,
 		"setContent":    f.SetContent,
 		"setInputFiles": f.SetInputFiles,
