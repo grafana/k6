@@ -211,7 +211,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.TextContent(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"title":   f.Title,
+		"title": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return f.Title(), nil
+			})
+		},
 		"type":    f.Type,
 		"uncheck": f.Uncheck,
 		"url":     f.URL,
