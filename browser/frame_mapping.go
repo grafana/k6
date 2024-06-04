@@ -65,12 +65,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
 			})
 		},
-		"evaluateHandle": func(pageFunction goja.Value, gargs ...goja.Value) (mapping, error) {
-			jsh, err := f.EvaluateHandle(pageFunction.String(), exportArgs(gargs)...)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapJSHandle(vu, jsh), nil
+		"evaluateHandle": func(pageFunction goja.Value, gargs ...goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				jsh, err := f.EvaluateHandle(pageFunction.String(), exportArgs(gargs)...)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapJSHandle(vu, jsh), nil
+			})
 		},
 		"fill":  f.Fill,
 		"focus": f.Focus,
