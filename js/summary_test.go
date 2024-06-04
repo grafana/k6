@@ -23,9 +23,9 @@ const (
 		"       ✓ check1\n" +
 		"       ✗ check3\n        ↳  66% — ✓ 10 / ✗ 5\n" +
 		"       ✗ check2\n        ↳  33% — ✓ 5 / ✗ 10\n\n" +
-		"   ✓ checks......: 75.00% ✓ 45  ✗ 15 \n"
+		"   ✓ checks......: 75.00% 45 out of 60\n"
 	countOut = "   ✗ http_reqs...: 3      3/s\n"
-	gaugeOut = "     vus.........: 1      min=1 max=1\n"
+	gaugeOut = "     vus.........: 1      min=1        max=1\n"
 	trendOut = "   ✗ my_trend....: avg=15ms min=10ms med=15ms max=20ms p(90)=19ms " +
 		"p(95)=19.5ms p(99.9)=19.99ms\n"
 )
