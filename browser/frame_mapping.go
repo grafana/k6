@@ -216,7 +216,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.Title(), nil
 			})
 		},
-		"type":    f.Type,
+		"type": func(selector, text string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.Type(selector, text, opts) //nolint:wrapcheck
+			})
+		},
 		"uncheck": f.Uncheck,
 		"url":     f.URL,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
