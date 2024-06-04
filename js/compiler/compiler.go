@@ -270,7 +270,7 @@ func (c *Compiler) compileImpl(
 func (c *Compiler) decorate(code string, start int) string {
 	deco := newClassDecorate(code, 0)
 	for deco.endIndex > -1 {
-		deco = newClassDecorate(deco.Code(), deco.endIndex+1)
+		deco = newClassDecorate(deco.code, deco.endIndex+1)
 	}
 	return deco.Code()
 }
@@ -304,21 +304,23 @@ func newClassDecorate(jsCode string, startIndex int) *classDecorate {
 	// 1. find the class name
 	i := strings.Index(code, " = /** @class */ (function () {")
 	if i == -1 {
-		return this
+		i = strings.Index(code, " = /** @class */function () {")
+		if i == -1 {
+			return this
+		}
+
 	}
 	n := strings.LastIndex(code[0:i], "var ")
 	if n == -1 {
 		return this
 	}
-	className := code[n+4 : i]
+	className := code[n+len("var ") : i]
 	this.className = className
 	hasClass := false
 	start := strings.Index(code, fmt.Sprintf("%s = __decorate([", className))
 	classEnd := 0
 	if start > -1 {
-		endStr := fmt.Sprintf(`    ], %s);
-    return %s;
-}());`, className, className)
+		endStr := fmt.Sprintf(`], %s);`, className)
 		end := strings.Index(code, endStr)
 
 		if end > -1 {
@@ -326,8 +328,7 @@ func newClassDecorate(jsCode string, startIndex int) *classDecorate {
 			newCode := code[start:end]
 			newCode = strings.ReplaceAll(newCode, fmt.Sprintf("%s = ", className), "")
 			newCode = strings.ReplaceAll(newCode, fmt.Sprintf("], %s);", className), "], this);")
-			code = code[0:start] + newCode + code[end:]
-			this.code = headCode + code
+			code = code[0:start] + newCode + "\n    }\n" + code[end:]
 			this.endIndex = end
 			hasClass = true
 			classEnd = end
@@ -341,7 +342,8 @@ func newClassDecorate(jsCode string, startIndex int) *classDecorate {
 		endChar := ", void 0);"
 		end := strings.LastIndex(code, endChar)
 		if end > -1 {
-			decorate := code[start : end+len(endChar)]
+			end = end + len(endChar)
+			decorate := code[start:end]
 			if className != "" {
 				decorate = strings.ReplaceAll(decorate, className+".prototype", "this")
 				st := -1
@@ -355,9 +357,7 @@ func newClassDecorate(jsCode string, startIndex int) *classDecorate {
 				if !hasClass {
 					decorate += "}"
 				}
-				end = end + len(endChar)
 				code = code[:st] + decorate + code[end:]
-				this.code = headCode + code
 				methodEnd = end
 			}
 		}
@@ -366,6 +366,7 @@ func newClassDecorate(jsCode string, startIndex int) *classDecorate {
 	if classEnd < methodEnd {
 		this.endIndex = methodEnd
 	}
+	this.code = headCode + code
 	return this
 }
 
