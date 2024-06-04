@@ -1412,7 +1412,7 @@ func (f *Frame) Query(selector string, strict bool) (*ElementHandle, error) {
 
 	document, err := f.document()
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting document: %w", err)
+		return nil, fmt.Errorf("getting document: %w", err)
 	}
 	return document.Query(selector, strict)
 }
