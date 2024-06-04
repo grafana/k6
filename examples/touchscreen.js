@@ -20,7 +20,7 @@ export default async function () {
 
   // Obtain ElementHandle for news link and navigate to it
   // by tapping in the 'a' element's bounding box
-  const newsLinkBox = await page.$('a[href="/news.php"]').boundingBox();
+  const newsLinkBox = await page.$('a[href="/news.php"]').then((e) => e.boundingBox());
 
   // Wait until the navigation is done before closing the page.
   // Otherwise, there will be a race condition between the page closing
