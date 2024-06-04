@@ -18,12 +18,14 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				return nil, jsh.Dispose() //nolint:wrapcheck
 			})
 		},
-		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) (any, error) {
-			args := make([]any, 0, len(gargs))
-			for _, a := range gargs {
-				args = append(args, exportArg(a))
-			}
-			return jsh.Evaluate(pageFunc.String(), args...)
+		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				args := make([]any, 0, len(gargs))
+				for _, a := range gargs {
+					args = append(args, exportArg(a))
+				}
+				return jsh.Evaluate(pageFunc.String(), args...) //nolint:wrapcheck
+			})
 		},
 		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
 			h, err := jsh.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
