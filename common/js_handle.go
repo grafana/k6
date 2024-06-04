@@ -21,7 +21,7 @@ import (
 // JSHandleAPI interface.
 type JSHandleAPI interface {
 	AsElement() *ElementHandle
-	Dispose()
+	Dispose() error
 	Evaluate(pageFunc string, args ...any) any
 	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
@@ -79,30 +79,33 @@ func (h *BaseJSHandle) AsElement() *ElementHandle {
 }
 
 // Dispose releases the remote object.
-func (h *BaseJSHandle) Dispose() {
-	if err := h.dispose(); err != nil {
-		// We do not want to panic on an error when the error is a closed
-		// context. The reason the context would be closed is due to the
-		// iteration ending and therefore the associated browser and its assets
-		// will be automatically deleted.
-		if errors.Is(err, context.Canceled) {
-			h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
-			return
-		}
-		// The following error indicates that the object we're trying to release
-		// cannot be found, which would mean that the object has already been
-		// removed/deleted. This can occur when a navigation occurs, usually when
-		// a page contains an iframe.
-		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
-			return
-		}
-
-		k6ext.Panic(h.ctx, "dispose: %w", err)
+func (h *BaseJSHandle) Dispose() error {
+	err := h.dispose()
+	if err == nil { // no error
+		return nil
 	}
+
+	// We do not want to return an error when the error is a closed
+	// context. The reason the context would be closed is due to the
+	// iteration ending and therefore the associated browser and its assets
+	// will be automatically deleted.
+	if errors.Is(err, context.Canceled) {
+		h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
+		return nil
+	}
+	// The following error indicates that the object we're trying to release
+	// cannot be found, which would mean that the object has already been
+	// removed/deleted. This can occur when a navigation occurs, usually when
+	// a page contains an iframe.
+	if strings.Contains(err.Error(), "Cannot find context with specified id") {
+		h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
+		return nil
+	}
+
+	return fmt.Errorf("disposing element with ID %s: %w", h.remoteObject.ObjectID, err)
 }
 
-// dispose is like Dispose, but does not panic.
+// dispose sends a command to the browser to release the remote object.
 func (h *BaseJSHandle) dispose() error {
 	if h.disposed {
 		return nil

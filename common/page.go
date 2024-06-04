@@ -441,7 +441,7 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 	return parent.adoptBackendNodeID(mainWorld, backendNodeId)
 }
 
-func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.FrameID {
+func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.FrameID, error) {
 	p.logger.Debugf("Page:getOwnerFrame", "sid:%v", p.sessionID())
 
 	// document.documentElement has frameId of the owner frame
@@ -461,34 +461,37 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 	result, err := h.execCtx.eval(apiCtx, opts, pageFn, h)
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v err:%v", p.sessionID(), err)
-		return ""
+		return "", nil
 	}
 	switch result.(type) {
 	case nil:
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v result:nil", p.sessionID())
-		return ""
+		return "", nil
 	}
 
 	documentElement := result.(*ElementHandle)
 	if documentElement == nil {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v docel:nil", p.sessionID())
-		return ""
+		return "", nil
 	}
 	if documentElement.remoteObject.ObjectID == "" {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v robjid:%q", p.sessionID(), "")
-		return ""
+		return "", nil
 	}
 
 	action := dom.DescribeNode().WithObjectID(documentElement.remoteObject.ObjectID)
 	node, err := action.Do(cdp.WithExecutor(p.ctx, p.session))
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:DescribeNode:return", "sid:%v err:%v", p.sessionID(), err)
-		return ""
+		return "", nil
 	}
 
 	frameID := node.FrameID
-	documentElement.Dispose()
-	return frameID
+	if err := documentElement.Dispose(); err != nil {
+		return "", fmt.Errorf("disposing document element while getting owner frame: %w", err)
+	}
+
+	return frameID, nil
 }
 
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {

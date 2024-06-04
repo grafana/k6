@@ -281,7 +281,7 @@ func TestElementHandleInputValue(t *testing.T) {
 
 	value, err := element.InputValue(nil)
 	require.NoError(t, err)
-	element.Dispose()
+	require.NoError(t, element.Dispose())
 	assert.Equal(t, value, "hello1", `expected input value "hello1", got %q`, value)
 
 	element, err = p.Query("select")
@@ -289,7 +289,7 @@ func TestElementHandleInputValue(t *testing.T) {
 
 	value, err = element.InputValue(nil)
 	require.NoError(t, err)
-	element.Dispose()
+	require.NoError(t, element.Dispose())
 	assert.Equal(t, value, "hello2", `expected input value "hello2", got %q`, value)
 
 	element, err = p.Query("textarea")
@@ -297,7 +297,7 @@ func TestElementHandleInputValue(t *testing.T) {
 
 	value, err = element.InputValue(nil)
 	require.NoError(t, err)
-	element.Dispose()
+	require.NoError(t, element.Dispose())
 	assert.Equal(t, value, "hello3", `expected input value "hello3", got %q`, value)
 }
 
@@ -314,7 +314,7 @@ func TestElementHandleIsChecked(t *testing.T) {
 	checked, err := element.IsChecked()
 	require.NoError(t, err)
 	assert.True(t, checked, "expected checkbox to be checked")
-	element.Dispose()
+	require.NoError(t, element.Dispose())
 
 	err = p.SetContent(`<input type="checkbox">`, nil)
 	require.NoError(t, err)
@@ -323,7 +323,7 @@ func TestElementHandleIsChecked(t *testing.T) {
 	checked, err = element.IsChecked()
 	require.NoError(t, err)
 	assert.False(t, checked, "expected checkbox to be unchecked")
-	element.Dispose()
+	require.NoError(t, element.Dispose())
 }
 
 func TestElementHandleQueryAll(t *testing.T) {
@@ -463,7 +463,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 	require.NoError(t, err)
 	require.NotNil(t, element, "expected element to have been found after wait")
 
-	element.Dispose()
+	require.NoError(t, element.Dispose())
 }
 
 func TestElementHandlePress(t *testing.T) {

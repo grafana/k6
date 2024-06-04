@@ -228,7 +228,7 @@ func (f *Frame) clearLifecycle() {
 	f.inflightRequestsMu.Unlock()
 }
 
-func (f *Frame) detach() {
+func (f *Frame) detach() error {
 	f.log.Debugf("Frame:detach", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.setDetached(true)
@@ -236,12 +236,18 @@ func (f *Frame) detach() {
 		f.parentFrame.removeChildFrame(f)
 	}
 	f.parentFrame = nil
+
 	// detach() is called by the same frame Goroutine that manages execution
 	// context switches. so this should be safe.
 	// we don't need to protect the following with executionContextMu.
-	if f.documentHandle != nil {
-		f.documentHandle.Dispose()
+	if f.documentHandle == nil {
+		return nil
 	}
+	if err := f.documentHandle.Dispose(); err != nil {
+		return fmt.Errorf("disposing document handle while detaching frame: %w", err)
+	}
+
+	return nil
 }
 
 func (f *Frame) defaultTimeout() time.Duration {
@@ -516,7 +522,7 @@ func (f *Frame) waitForSelectorRetry(
 	return nil, err
 }
 
-func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (_ *ElementHandle, rerr error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
@@ -543,9 +549,14 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	// an element should belong to the current execution context.
 	// otherwise, we should adopt it to this execution context.
 	if ec != handle.execCtx {
-		defer handle.Dispose()
+		defer func() {
+			if err := handle.Dispose(); err != nil {
+				err = fmt.Errorf("disposing element handle: %w", err)
+				rerr = errors.Join(err, rerr)
+			}
+		}()
 		if handle, err = ec.adoptElementHandle(handle); err != nil {
-			return nil, fmt.Errorf("adopting element handle while waiting for selector %q: %w", selector, err)
+			return nil, fmt.Errorf("waiting for selector %q: adopting element handle: %w", selector, err)
 		}
 	}
 

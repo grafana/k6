@@ -64,7 +64,10 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 }
 
 func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
-	frame := h.ownerFrame(apiCtx)
+	frame, err := h.ownerFrame(apiCtx)
+	if err != nil {
+		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
+	}
 	if frame != nil && frame.parentFrame != nil {
 		el, err := h.frame.FrameElement()
 		if err != nil {
@@ -424,22 +427,26 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 	}, nil
 }
 
-func (h *ElementHandle) ownerFrame(apiCtx context.Context) *Frame {
-	frameId := h.frame.page.getOwnerFrame(apiCtx, h)
-	if frameId == "" {
-		return nil
+func (h *ElementHandle) ownerFrame(apiCtx context.Context) (*Frame, error) {
+	frameID, err := h.frame.page.getOwnerFrame(apiCtx, h)
+	if err != nil {
+		return nil, err
 	}
-	frame, ok := h.frame.page.frameManager.getFrameByID(frameId)
+	if frameID == "" {
+		return nil, nil //nolint:nilnil
+	}
+	frame, ok := h.frame.page.frameManager.getFrameByID(frameID)
 	if ok {
-		return frame
+		return frame, nil
 	}
 	for _, page := range h.frame.page.browserCtx.browser.pages {
-		frame, ok = page.frameManager.getFrameByID(frameId)
+		frame, ok = page.frameManager.getFrameByID(frameID)
 		if ok {
-			return frame
+			return frame, nil
 		}
 	}
-	return nil
+
+	return nil, nil //nolint:nilnil
 }
 
 func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect *dom.Rect) error {
@@ -1011,7 +1018,7 @@ func (h *ElementHandle) IsVisible() (bool, error) {
 }
 
 // OwnerFrame returns the frame containing this element.
-func (h *ElementHandle) OwnerFrame() (*Frame, error) {
+func (h *ElementHandle) OwnerFrame() (_ *Frame, rerr error) {
 	fn := `
 		(node, injected) => {
 			return injected.getDocumentElement(node);
@@ -1033,7 +1040,13 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 	if !ok {
 		return nil, fmt.Errorf("unexpected result type while getting document element: %T", res)
 	}
-	defer documentHandle.Dispose()
+	defer func() {
+		if err := documentHandle.Dispose(); err != nil {
+			err = fmt.Errorf("disposing document element: %w", err)
+			rerr = errors.Join(err, rerr)
+		}
+	}()
+
 	if documentHandle.remoteObject.ObjectID == "" {
 		return nil, err
 	}
@@ -1079,7 +1092,7 @@ func (h *ElementHandle) Press(key string, opts goja.Value) error {
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
-func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, error) {
+func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, rerr error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
@@ -1106,7 +1119,12 @@ func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, err
 	}
 	element := handle.AsElement()
 	if element == nil {
-		handle.Dispose()
+		defer func() {
+			if err := handle.Dispose(); err != nil {
+				err = fmt.Errorf("disposing element handle: %w", err)
+				rerr = errors.Join(err, rerr)
+			}
+		}()
 		return nil, fmt.Errorf("querying selector %q", selector)
 	}
 
@@ -1124,7 +1142,7 @@ func (h *ElementHandle) QueryAll(selector string) ([]*ElementHandle, error) {
 	return handles, nil
 }
 
-func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHandle, error) {
+func (h *ElementHandle) queryAll(selector string, eval evalFunc) (_ []*ElementHandle, rerr error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
@@ -1147,7 +1165,12 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHand
 	if !ok {
 		return nil, fmt.Errorf("getting element handle for selector %q: %w", selector, ErrJSHandleInvalid)
 	}
-	defer handles.Dispose()
+	defer func() {
+		if err := handles.Dispose(); err != nil {
+			err = fmt.Errorf("disposing element handles: %w", err)
+			rerr = errors.Join(err, rerr)
+		}
+	}()
 
 	props, err := handles.GetProperties()
 	if err != nil {
@@ -1159,8 +1182,8 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHand
 	for _, prop := range props {
 		if el := prop.AsElement(); el != nil {
 			els = append(els, el)
-		} else {
-			prop.Dispose()
+		} else if err := prop.Dispose(); err != nil {
+			return nil, fmt.Errorf("disposing property while querying all selectors %q: %w", selector, err)
 		}
 	}
 

@@ -755,7 +755,9 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.Fram
 		"sid:%v tid:%v fid:%v reason:%s",
 		fs.session.ID(), fs.targetID, frameID, reason)
 
-	fs.manager.frameDetached(frameID, reason)
+	if err := fs.manager.frameDetached(frameID, reason); err != nil {
+		k6ext.Panic(fs.ctx, "handling frameDetached event: %w", err)
+	}
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {

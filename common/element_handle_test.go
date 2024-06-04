@@ -197,8 +197,9 @@ func (s *jsHandleStub) AsElement() *ElementHandle {
 	return s.asElementFn()
 }
 
-func (s *jsHandleStub) Dispose() {
+func (s *jsHandleStub) Dispose() error {
 	s.disposeCalls++
+	return nil
 }
 
 func (s *jsHandleStub) GetProperties() (map[string]JSHandleAPI, error) {
