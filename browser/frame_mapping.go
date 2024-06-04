@@ -74,7 +74,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return mapJSHandle(vu, jsh), nil
 			})
 		},
-		"fill":  f.Fill,
+		"fill": func(selector, value string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.Fill(selector, value, opts) //nolint:wrapcheck
+			})
+		},
 		"focus": f.Focus,
 		"frameElement": func() (mapping, error) {
 			fe, err := f.FrameElement()
