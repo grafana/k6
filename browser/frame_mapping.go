@@ -128,7 +128,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.InnerText(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"inputValue": f.InputValue,
+		"inputValue": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return f.InputValue(selector, opts) //nolint:wrapcheck
+			})
+		},
 		"isChecked":  f.IsChecked,
 		"isDetached": f.IsDetached,
 		"isDisabled": f.IsDisabled,
