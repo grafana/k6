@@ -182,7 +182,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return nil, f.Press(selector, key, opts) //nolint:wrapcheck
 			})
 		},
-		"selectOption":  f.SelectOption,
+		"selectOption": func(selector string, values goja.Value, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return f.SelectOption(selector, values, opts) //nolint:wrapcheck
+			})
+		},
 		"setContent":    f.SetContent,
 		"setInputFiles": f.SetInputFiles,
 		"tap": func(selector string, opts goja.Value) (*goja.Promise, error) {
