@@ -144,10 +144,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.IsDisabled(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"isEditable": f.IsEditable,
-		"isEnabled":  f.IsEnabled,
-		"isHidden":   f.IsHidden,
-		"isVisible":  f.IsVisible,
+		"isEditable": func(selector string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return f.IsEditable(selector, opts) //nolint:wrapcheck
+			})
+		},
+		"isEnabled": f.IsEnabled,
+		"isHidden":  f.IsHidden,
+		"isVisible": f.IsVisible,
 		"locator": func(selector string, opts goja.Value) *goja.Object {
 			ml := mapLocator(vu, f.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
