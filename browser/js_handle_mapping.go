@@ -27,12 +27,14 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				return jsh.Evaluate(pageFunc.String(), args...) //nolint:wrapcheck
 			})
 		},
-		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
-			h, err := jsh.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapJSHandle(vu, h), nil
+		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				h, err := jsh.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapJSHandle(vu, h), nil
+			})
 		},
 		"getProperties": func() (mapping, error) {
 			props, err := jsh.GetProperties()
