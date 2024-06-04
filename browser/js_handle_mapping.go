@@ -4,6 +4,7 @@ import (
 	"github.com/dop251/goja"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6ext"
 )
 
 // mapJSHandle to the JS module.
@@ -12,7 +13,11 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 		"asElement": func() mapping {
 			return mapElementHandle(vu, jsh.AsElement())
 		},
-		"dispose": jsh.Dispose,
+		"dispose": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, jsh.Dispose() //nolint:wrapcheck
+			})
+		},
 		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) (any, error) {
 			args := make([]any, 0, len(gargs))
 			for _, a := range gargs {
