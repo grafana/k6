@@ -23,12 +23,14 @@ export default async function() {
   try {
     await page.goto('https://test.k6.io/');
 
-    page.on('console', msg => {
+    page.on('console', async(msg) => {
+        const jsonValue1 = await msg.args()[0].jsonValue();
+        const jsonValue2 = await msg.args()[1].jsonValue();
         check(msg, {
             'assertConsoleMessageType': msg => msg.type() == 'log',
             'assertConsoleMessageText': msg => msg.text() == 'this is a console.log message 42',
-            'assertConsoleMessageArgs0': msg => msg.args()[0].jsonValue() == 'this is a console.log message',
-            'assertConsoleMessageArgs1': msg => msg.args()[1].jsonValue() == 42,
+            'assertConsoleMessageArgs0': msg => jsonValue1 == 'this is a console.log message',
+            'assertConsoleMessageArgs1': msg => jsonValue2 == 42,
         });
     });
 
