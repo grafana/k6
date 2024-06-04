@@ -861,18 +861,19 @@ func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
 func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.waitForExecutionContext(mainWorld)
+	evalHandle := func() (JSHandleAPI, error) {
+		f.executionContextMu.RLock()
+		defer f.executionContextMu.RUnlock()
 
-	var err error
-	f.executionContextMu.RLock()
-	{
 		ec := f.executionContexts[mainWorld]
 		if ec == nil {
-			k6ext.Panic(f.ctx, "evaluating handle for frame: execution context %q not found", mainWorld)
+			return nil, fmt.Errorf("evaluating handle for frame: execution context %q not found", mainWorld)
 		}
-		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
+		return ec.EvalHandle(f.ctx, pageFunc, args...) //nolint:wrapcheck
 	}
-	f.executionContextMu.RUnlock()
+
+	f.waitForExecutionContext(mainWorld)
+	handle, err := evalHandle()
 	if err != nil {
 		return nil, fmt.Errorf("evaluating handle for frame: %w", err)
 	}
