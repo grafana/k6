@@ -239,7 +239,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.WaitForFunction(js, popts, pargs...) //nolint:wrapcheck
 			}), nil
 		},
-		"waitForLoadState": f.WaitForLoadState,
+		"waitForLoadState": func(state string, opts goja.Value) *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.WaitForLoadState(state, opts) //nolint:wrapcheck
+			})
+		},
 		"waitForNavigation": func(opts goja.Value) (*goja.Promise, error) {
 			popts := common.NewFrameWaitForNavigationOptions(f.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
