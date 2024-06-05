@@ -167,3 +167,42 @@ func TestFrameTitle(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "Some title", p.MainFrame().Title())
 }
+
+func TestFrameGetAttribute(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<a id="el" href="null">Something</a>`, nil)
+	require.NoError(t, err)
+
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "href", nil)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "null", got)
+}
+
+func TestFrameGetAttributeMissing(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<a id="el">Something</a>`, nil)
+	require.NoError(t, err)
+
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "missing", nil)
+	require.NoError(t, err)
+	require.False(t, ok)
+	assert.Equal(t, "", got)
+}
+
+func TestFrameGetAttributeEmpty(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<a id="el" empty>Something</a>`, nil)
+	require.NoError(t, err)
+
+	got, ok, err := p.Frames()[0].GetAttribute("#el", "empty", nil)
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "", got)
+}
