@@ -304,7 +304,7 @@ func (s *Stream) isHeaderSent() bool {
 }
 
 // updateHeaderSent updates headerSent and returns true
-// if it was alreay set. It is valid only on server-side.
+// if it was already set. It is valid only on server-side.
 func (s *Stream) updateHeaderSent() bool {
 	return atomic.SwapUint32(&s.headerSent, 1) == 1
 }

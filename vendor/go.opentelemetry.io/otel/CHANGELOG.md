@@ -8,6 +8,117 @@ This project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.htm
 
 ## [Unreleased]
 
+## [1.27.0/0.49.0/0.3.0] 2024-05-21
+
+### Added
+
+- Add example for `go.opentelemetry.io/otel/exporters/stdout/stdoutlog`. (#5242)
+- Add `RecordFactory` in `go.opentelemetry.io/otel/sdk/log/logtest` to facilitate testing exporter and processor implementations. (#5258)
+- Add `RecordFactory` in `go.opentelemetry.io/otel/log/logtest` to facilitate testing bridge implementations. (#5263)
+- The count of dropped records from the `BatchProcessor` in `go.opentelemetry.io/otel/sdk/log` is logged. (#5276)
+- Add metrics in the `otel-collector` example. (#5283)
+- Add the synchronous gauge instrument to `go.opentelemetry.io/otel/metric`. (#5304)
+  - An `int64` or `float64` synchronous gauge instrument can now be created from a `Meter`.
+  - All implementations of the API (`go.opentelemetry.io/otel/metric/noop`, `go.opentelemetry.io/otel/sdk/metric`) are updated to support this instrument.
+- Add logs to `go.opentelemetry.io/otel/example/dice`. (#5349)
+
+### Changed
+
+- The `Shutdown` method of `Exporter` in `go.opentelemetry.io/otel/exporters/stdout/stdouttrace` ignores the context cancellation and always returns `nil`. (#5189)
+- The `ForceFlush` and `Shutdown` methods of the exporter returned by `New` in `go.opentelemetry.io/otel/exporters/stdout/stdoutmetric` ignore the context cancellation and always return `nil`. (#5189)
+- Apply the value length limits to `Record` attributes in `go.opentelemetry.io/otel/sdk/log`. (#5230)
+- De-duplicate map attributes added to a `Record` in `go.opentelemetry.io/otel/sdk/log`. (#5230)
+- `go.opentelemetry.io/otel/exporters/stdout/stdoutlog` won't print timestamps when `WithoutTimestamps` option is set. (#5241)
+- The `go.opentelemetry.io/otel/exporters/stdout/stdoutlog` exporter won't print `AttributeValueLengthLimit` and `AttributeCountLimit` fields now, instead it prints the `DroppedAttributes` field. (#5272)
+- Improved performance in the `Stringer` implementation of `go.opentelemetry.io/otel/baggage.Member` by reducing the number of allocations. (#5286)
+- Set the start time for last-value aggregates in `go.opentelemetry.io/otel/sdk/metric`. (#5305)
+- The `Span` in `go.opentelemetry.io/otel/sdk/trace` will record links without span context if either non-empty `TraceState` or attributes are provided. (#5315)
+- Upgrade all dependencies of `go.opentelemetry.io/otel/semconv/v1.24.0` to `go.opentelemetry.io/otel/semconv/v1.25.0`. (#5374)
+
+### Fixed
+
+- Comparison of unordered maps for `go.opentelemetry.io/otel/log.KeyValue` and `go.opentelemetry.io/otel/log.Value`. (#5306)
+- Fix the empty output of `go.opentelemetry.io/otel/log.Value` in `go.opentelemetry.io/otel/exporters/stdout/stdoutlog`. (#5311)
+- Split the behavior of `Recorder` in `go.opentelemetry.io/otel/log/logtest` so it behaves as a `LoggerProvider` only. (#5365)
+- Fix wrong package name of the error message when parsing endpoint URL in `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp`. (#5371)
+- Identify the `Logger` returned from the global `LoggerProvider` in `go.opentelemetry.io/otel/log/global` with its schema URL. (#5375)
+
+## [1.26.0/0.48.0/0.2.0-alpha] 2024-04-24
+
+### Added
+
+- Add `Recorder` in `go.opentelemetry.io/otel/log/logtest` to facilitate testing the log bridge implementations. (#5134)
+- Add span flags to OTLP spans and links exported by `go.opentelemetry.io/otel/exporters/otlp/otlptrace`. (#5194)
+- Make the initial alpha release of `go.opentelemetry.io/otel/sdk/log`.
+  This new module contains the Go implementation of the OpenTelemetry Logs SDK.
+  This module is unstable and breaking changes may be introduced.
+  See our [versioning policy](VERSIONING.md) for more information about these stability guarantees. (#5240)
+- Make the initial alpha release of `go.opentelemetry.io/otel/exporters/otlp/otlplog/otlploghttp`.
+  This new module contains an OTLP exporter that transmits log telemetry using HTTP.
+  This module is unstable and breaking changes may be introduced.
+  See our [versioning policy](VERSIONING.md) for more information about these stability guarantees. (#5240)
+- Make the initial alpha release of `go.opentelemetry.io/otel/exporters/stdout/stdoutlog`.
+  This new module contains an exporter prints log records to STDOUT.
+  This module is unstable and breaking changes may be introduced.
+  See our [versioning policy](VERSIONING.md) for more information about these stability guarantees. (#5240)
+- The `go.opentelemetry.io/otel/semconv/v1.25.0` package.
+  The package contains semantic conventions from the `v1.25.0` version of the OpenTelemetry Semantic Conventions. (#5254)
+
+### Changed
+
+- Update `go.opentelemetry.io/proto/otlp` from v1.1.0 to v1.2.0. (#5177)
+- Improve performance of baggage member character validation in `go.opentelemetry.io/otel/baggage`. (#5214)
+- The `otel-collector` example now uses docker compose to bring up services instead of kubernetes. (#5244)
+
+### Fixed
+
+- Slice attribute values in `go.opentelemetry.io/otel/attribute` are now emitted as their JSON representation. (#5159)
+
+## [1.25.0/0.47.0/0.0.8/0.1.0-alpha] 2024-04-05
+
+### Added
+
+- Add `WithProxy` option in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp`. (#4906)
+- Add `WithProxy` option in `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlptracehttp`. (#4906)
+- Add `AddLink` method to the `Span` interface in `go.opentelemetry.io/otel/trace`. (#5032)
+- The `Enabled` method is added to the `Logger` interface in `go.opentelemetry.io/otel/log`.
+  This method is used to notify users if a log record will be emitted or not. (#5071)
+- Add `SeverityUndefined` `const` to `go.opentelemetry.io/otel/log`.
+  This value represents an unset severity level. (#5072)
+- Add `Empty` function in `go.opentelemetry.io/otel/log` to return a `KeyValue` for an empty value. (#5076)
+- Add `go.opentelemetry.io/otel/log/global` to manage the global `LoggerProvider`.
+  This package is provided with the anticipation that all functionality will be migrate to `go.opentelemetry.io/otel` when `go.opentelemetry.io/otel/log` stabilizes.
+  At which point, users will be required to migrage their code, and this package will be deprecated then removed. (#5085)
+- Add support for `Summary` metrics in the `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp` and `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc` exporters. (#5100)
+- Add `otel.scope.name` and `otel.scope.version` tags to spans exported by `go.opentelemetry.io/otel/exporters/zipkin`. (#5108)
+- Add support for `AddLink` to `go.opentelemetry.io/otel/bridge/opencensus`. (#5116)
+- Add `String` method to `Value` and `KeyValue` in `go.opentelemetry.io/otel/log`. (#5117)
+- Add Exemplar support to `go.opentelemetry.io/otel/exporters/prometheus`. (#5111)
+- Add metric semantic conventions to `go.opentelemetry.io/otel/semconv/v1.24.0`. Future `semconv` packages will include metric semantic conventions as well. (#4528)
+
+### Changed
+
+- `SpanFromContext` and `SpanContextFromContext` in `go.opentelemetry.io/otel/trace` no longer make a heap allocation when the passed context has no span. (#5049)
+- `go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc` and `go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc` now create a gRPC client in idle mode and with "dns" as the default resolver using [`grpc.NewClient`](https://pkg.go.dev/google.golang.org/grpc#NewClient). (#5151)
+  Because of that `WithDialOption` ignores [`grpc.WithBlock`](https://pkg.go.dev/google.golang.org/grpc#WithBlock), [`grpc.WithTimeout`](https://pkg.go.dev/google.golang.org/grpc#WithTimeout), and [`grpc.WithReturnConnectionError`](https://pkg.go.dev/google.golang.org/grpc#WithReturnConnectionError).
+  Notice that [`grpc.DialContext`](https://pkg.go.dev/google.golang.org/grpc#DialContext) which was used before is now deprecated.
+
+### Fixed
+
+- Clarify the documentation about equivalence guarantees for the `Set` and `Distinct` types in `go.opentelemetry.io/otel/attribute`. (#5027)
+- Prevent default `ErrorHandler` self-delegation. (#5137)
+- Update all dependencies to address [GO-2024-2687]. (#5139)
+
+### Removed
+
+- Drop support for [Go 1.20]. (#4967)
+
+### Deprecated
+
+- Deprecate `go.opentelemetry.io/otel/attribute.Sortable` type. (#4734)
+- Deprecate `go.opentelemetry.io/otel/attribute.NewSetWithSortable` function. (#4734)
+- Deprecate `go.opentelemetry.io/otel/attribute.NewSetWithSortableFiltered` function. (#4734)
+
 ## [1.24.0/0.46.0/0.0.1-alpha] 2024-02-23
 
 This release is the last to support [Go 1.20].
@@ -22,6 +133,7 @@ The next release will require at least [Go 1.21].
   This module includes OpenTelemetry Go's implementation of the Logs Bridge API.
   This module is in an alpha state, it is subject to breaking changes.
   See our [versioning policy](./VERSIONING.md) for more info. (#4961)
+- ARM64 platform to the compatibility testing suite. (#4994)
 
 ### Fixed
 
@@ -2849,7 +2961,10 @@ It contains api and sdk for trace and meter.
 - CircleCI build CI manifest files.
 - CODEOWNERS file to track owners of this project.
 
-[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.24.0...HEAD
+[Unreleased]: https://github.com/open-telemetry/opentelemetry-go/compare/v1.27.0...HEAD
+[1.27.0/0.49.0/0.3.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.27.0
+[1.26.0/0.48.0/0.2.0-alpha]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.26.0
+[1.25.0/0.47.0/0.0.8/0.1.0-alpha]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.25.0
 [1.24.0/0.46.0/0.0.1-alpha]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.24.0
 [1.23.1]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.23.1
 [1.23.0]: https://github.com/open-telemetry/opentelemetry-go/releases/tag/v1.23.0
@@ -2937,3 +3052,5 @@ It contains api and sdk for trace and meter.
 [metric API]:https://pkg.go.dev/go.opentelemetry.io/otel/metric
 [metric SDK]:https://pkg.go.dev/go.opentelemetry.io/otel/sdk/metric
 [trace API]:https://pkg.go.dev/go.opentelemetry.io/otel/trace
+
+[GO-2024-2687]: https://pkg.go.dev/vuln/GO-2024-2687

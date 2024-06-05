@@ -330,8 +330,7 @@ func NewServerTransport(conn net.Conn, config *ServerConfig) (_ ServerTransport,
 	t.handleSettings(sf)
 
 	go func() {
-		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst, t.conn, t.logger)
-		t.loopy.ssGoAwayHandler = t.outgoingGoAwayHandler
+		t.loopy = newLoopyWriter(serverSide, t.framer, t.controlBuf, t.bdpEst, t.conn, t.logger, t.outgoingGoAwayHandler)
 		err := t.loopy.run()
 		close(t.loopyWriterDone)
 		if !isIOError(err) {
@@ -860,7 +859,7 @@ func (t *http2Server) handleSettings(f *http2.SettingsFrame) {
 		}
 		return nil
 	})
-	t.controlBuf.executeAndPut(func(any) bool {
+	t.controlBuf.executeAndPut(func() bool {
 		for _, f := range updateFuncs {
 			f()
 		}
@@ -1014,12 +1013,13 @@ func (t *http2Server) writeHeaderLocked(s *Stream) error {
 		headerFields = append(headerFields, hpack.HeaderField{Name: "grpc-encoding", Value: s.sendCompress})
 	}
 	headerFields = appendHeaderFieldsFromMD(headerFields, s.header)
-	success, err := t.controlBuf.executeAndPut(t.checkForHeaderListSize, &headerFrame{
+	hf := &headerFrame{
 		streamID:  s.id,
 		hf:        headerFields,
 		endStream: false,
 		onWrite:   t.setResetPingStrikes,
-	})
+	}
+	success, err := t.controlBuf.executeAndPut(func() bool { return t.checkForHeaderListSize(hf) }, hf)
 	if !success {
 		if err != nil {
 			return err
@@ -1208,7 +1208,7 @@ func (t *http2Server) keepalive() {
 				continue
 			}
 			if outstandingPing && kpTimeoutLeft <= 0 {
-				t.Close(fmt.Errorf("keepalive ping not acked within timeout %s", t.kp.Time))
+				t.Close(fmt.Errorf("keepalive ping not acked within timeout %s", t.kp.Timeout))
 				return
 			}
 			if !outstandingPing {

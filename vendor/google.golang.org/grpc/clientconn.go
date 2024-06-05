@@ -37,7 +37,6 @@ import (
 	"google.golang.org/grpc/internal/channelz"
 	"google.golang.org/grpc/internal/grpcsync"
 	"google.golang.org/grpc/internal/idle"
-	"google.golang.org/grpc/internal/pretty"
 	iresolver "google.golang.org/grpc/internal/resolver"
 	"google.golang.org/grpc/internal/transport"
 	"google.golang.org/grpc/keepalive"
@@ -121,8 +120,9 @@ func (dcs *defaultConfigSelector) SelectConfig(rpcInfo iresolver.RPCInfo) (*ires
 // https://github.com/grpc/grpc/blob/master/doc/naming.md.  e.g. to use dns
 // resolver, a "dns:///" prefix should be applied to the target.
 //
-// The DialOptions returned by WithBlock, WithTimeout, and
-// WithReturnConnectionError are ignored by this function.
+// The DialOptions returned by WithBlock, WithTimeout,
+// WithReturnConnectionError, and FailOnNonTempDialError are ignored by this
+// function.
 func NewClient(target string, opts ...DialOption) (conn *ClientConn, err error) {
 	cc := &ClientConn{
 		target: target,
@@ -196,6 +196,8 @@ func NewClient(target string, opts ...DialOption) (conn *ClientConn, err error) 
 }
 
 // Dial calls DialContext(context.Background(), target, opts...).
+//
+// Deprecated: use NewClient instead.  Will be supported throughout 1.x.
 func Dial(target string, opts ...DialOption) (*ClientConn, error) {
 	return DialContext(context.Background(), target, opts...)
 }
@@ -209,6 +211,8 @@ func Dial(target string, opts ...DialOption) (*ClientConn, error) {
 // "passthrough" for backward compatibility.  This distinction should not matter
 // to most users, but could matter to legacy users that specify a custom dialer
 // and expect it to receive the target string directly.
+//
+// Deprecated: use NewClient instead.  Will be supported throughout 1.x.
 func DialContext(ctx context.Context, target string, opts ...DialOption) (conn *ClientConn, err error) {
 	// At the end of this method, we kick the channel out of idle, rather than
 	// waiting for the first rpc.
@@ -838,6 +842,9 @@ func (cc *ClientConn) newAddrConnLocked(addrs []resolver.Address, opts balancer.
 		stateChan:    make(chan struct{}),
 	}
 	ac.ctx, ac.cancel = context.WithCancel(cc.ctx)
+	// Start with our address set to the first address; this may be updated if
+	// we connect to different addresses.
+	ac.channelz.ChannelMetrics.Target.Store(&addrs[0].Addr)
 
 	channelz.AddTraceEvent(logger, ac.channelz, 0, &channelz.TraceEvent{
 		Desc:     "Subchannel created",
@@ -929,10 +936,14 @@ func equalAddresses(a, b []resolver.Address) bool {
 // updateAddrs updates ac.addrs with the new addresses list and handles active
 // connections or connection attempts.
 func (ac *addrConn) updateAddrs(addrs []resolver.Address) {
-	ac.mu.Lock()
-	channelz.Infof(logger, ac.channelz, "addrConn: updateAddrs curAddr: %v, addrs: %v", pretty.ToJSON(ac.curAddr), pretty.ToJSON(addrs))
-
 	addrs = copyAddressesWithoutBalancerAttributes(addrs)
+	limit := len(addrs)
+	if limit > 5 {
+		limit = 5
+	}
+	channelz.Infof(logger, ac.channelz, "addrConn: updateAddrs addrs (%d of %d): %v", limit, len(addrs), addrs[:limit])
+
+	ac.mu.Lock()
 	if equalAddresses(ac.addrs, addrs) {
 		ac.mu.Unlock()
 		return
@@ -1167,6 +1178,10 @@ type addrConn struct {
 	// is received, transport is closed, ac has been torn down).
 	transport transport.ClientTransport // The current transport.
 
+	// This mutex is used on the RPC path, so its usage should be minimized as
+	// much as possible.
+	// TODO: Find a lock-free way to retrieve the transport and state from the
+	// addrConn.
 	mu      sync.Mutex
 	curAddr resolver.Address   // The current address.
 	addrs   []resolver.Address // All addresses that the resolver resolved to.
@@ -1292,6 +1307,7 @@ func (ac *addrConn) resetTransport() {
 func (ac *addrConn) tryAllAddrs(ctx context.Context, addrs []resolver.Address, connectDeadline time.Time) error {
 	var firstConnErr error
 	for _, addr := range addrs {
+		ac.channelz.ChannelMetrics.Target.Store(&addr.Addr)
 		if ctx.Err() != nil {
 			return errConnClosing
 		}
@@ -1739,7 +1755,7 @@ func encodeAuthority(authority string) string {
 			return false
 		case '!', '$', '&', '\'', '(', ')', '*', '+', ',', ';', '=': // Subdelim characters
 			return false
-		case ':', '[', ']', '@': // Authority related delimeters
+		case ':', '[', ']', '@': // Authority related delimiters
 			return false
 		}
 		// Everything else must be escaped.

@@ -33,8 +33,8 @@ import (
 
 // This is a compile-time assertion to ensure that this generated file
 // is compatible with the grpc package it is being compiled against.
-// Requires gRPC-Go v1.32.0 or later.
-const _ = grpc.SupportPackageIsVersion7
+// Requires gRPC-Go v1.62.0 or later.
+const _ = grpc.SupportPackageIsVersion8
 
 const (
 	ServerReflection_ServerReflectionInfo_FullMethodName = "/grpc.reflection.v1alpha.ServerReflection/ServerReflectionInfo"
@@ -58,11 +58,12 @@ func NewServerReflectionClient(cc grpc.ClientConnInterface) ServerReflectionClie
 }
 
 func (c *serverReflectionClient) ServerReflectionInfo(ctx context.Context, opts ...grpc.CallOption) (ServerReflection_ServerReflectionInfoClient, error) {
-	stream, err := c.cc.NewStream(ctx, &ServerReflection_ServiceDesc.Streams[0], ServerReflection_ServerReflectionInfo_FullMethodName, opts...)
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ServerReflection_ServiceDesc.Streams[0], ServerReflection_ServerReflectionInfo_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &serverReflectionServerReflectionInfoClient{stream}
+	x := &serverReflectionServerReflectionInfoClient{ClientStream: stream}
 	return x, nil
 }
 
@@ -117,7 +118,7 @@ func RegisterServerReflectionServer(s grpc.ServiceRegistrar, srv ServerReflectio
 }
 
 func _ServerReflection_ServerReflectionInfo_Handler(srv interface{}, stream grpc.ServerStream) error {
-	return srv.(ServerReflectionServer).ServerReflectionInfo(&serverReflectionServerReflectionInfoServer{stream})
+	return srv.(ServerReflectionServer).ServerReflectionInfo(&serverReflectionServerReflectionInfoServer{ServerStream: stream})
 }
 
 type ServerReflection_ServerReflectionInfoServer interface {

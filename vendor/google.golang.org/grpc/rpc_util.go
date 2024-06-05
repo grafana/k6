@@ -964,7 +964,7 @@ func setCallInfoCodec(c *callInfo) error {
 
 // The SupportPackageIsVersion variables are referenced from generated protocol
 // buffer files to ensure compatibility with the gRPC version used.  The latest
-// support package version is 7.
+// support package version is 9.
 //
 // Older versions are kept for compatibility.
 //
@@ -976,6 +976,7 @@ const (
 	SupportPackageIsVersion6 = true
 	SupportPackageIsVersion7 = true
 	SupportPackageIsVersion8 = true
+	SupportPackageIsVersion9 = true
 )
 
 const grpcUA = "grpc-go/" + Version

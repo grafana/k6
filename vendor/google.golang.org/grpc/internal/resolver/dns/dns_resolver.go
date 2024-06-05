@@ -41,18 +41,24 @@ import (
 	"google.golang.org/grpc/serviceconfig"
 )
 
-// EnableSRVLookups controls whether the DNS resolver attempts to fetch gRPCLB
-// addresses from SRV records.  Must not be changed after init time.
-var EnableSRVLookups = false
+var (
+	// EnableSRVLookups controls whether the DNS resolver attempts to fetch gRPCLB
+	// addresses from SRV records.  Must not be changed after init time.
+	EnableSRVLookups = false
 
-// ResolvingTimeout specifies the maximum duration for a DNS resolution request.
-// If the timeout expires before a response is received, the request will be canceled.
-//
-// It is recommended to set this value at application startup. Avoid modifying this variable
-// after initialization as it's not thread-safe for concurrent modification.
-var ResolvingTimeout = 30 * time.Second
+	// MinResolutionInterval is the minimum interval at which re-resolutions are
+	// allowed. This helps to prevent excessive re-resolution.
+	MinResolutionInterval = 30 * time.Second
 
-var logger = grpclog.Component("dns")
+	// ResolvingTimeout specifies the maximum duration for a DNS resolution request.
+	// If the timeout expires before a response is received, the request will be canceled.
+	//
+	// It is recommended to set this value at application startup. Avoid modifying this variable
+	// after initialization as it's not thread-safe for concurrent modification.
+	ResolvingTimeout = 30 * time.Second
+
+	logger = grpclog.Component("dns")
+)
 
 func init() {
 	resolver.Register(NewBuilder())
@@ -208,7 +214,7 @@ func (d *dnsResolver) watcher() {
 			// Success resolving, wait for the next ResolveNow. However, also wait 30
 			// seconds at the very least to prevent constantly re-resolving.
 			backoffIndex = 1
-			waitTime = internal.MinResolutionRate
+			waitTime = MinResolutionInterval
 			select {
 			case <-d.ctx.Done():
 				return
