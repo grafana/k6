@@ -438,12 +438,12 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) error {
 			m.ID(), child.ID(), frame.ID(), child.Name(), child.URL())
 
 		if err := m.removeFramesRecursively(child); err != nil {
-			return fmt.Errorf("removing child frames recursively: %w", err)
+			return fmt.Errorf("removing frames recursively: %w", err)
 		}
 	}
 
 	if err := frame.detach(); err != nil {
-		return fmt.Errorf("removing frames recursively: %w", err)
+		return fmt.Errorf("removing frames recursively: detaching frame: %w", err)
 	}
 
 	m.framesMu.Lock()
