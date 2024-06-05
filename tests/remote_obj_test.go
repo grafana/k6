@@ -144,7 +144,7 @@ func TestEvalRemoteObjectParse(t *testing.T) {
 			name: "empty", eval: "", want: "",
 		},
 		{
-			name: "null", eval: "null", want: "null",
+			name: "null", eval: "null", want: nil,
 		},
 		{
 			name: "undefined", eval: "undefined", want: nil,

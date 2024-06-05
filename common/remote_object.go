@@ -12,6 +12,7 @@ import (
 
 	"github.com/grafana/xk6-browser/log"
 
+	"github.com/chromedp/cdproto/runtime"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 )
 
@@ -105,8 +106,8 @@ func parseRemoteObjectValue(
 		if val == "Object" {
 			return val, nil
 		}
-		if st == "null" {
-			return "null", nil
+		if st == runtime.SubtypeNull {
+			return nil, nil //nolint:nilnil
 		}
 	case cdpruntime.TypeUndefined:
 		return "undefined", nil

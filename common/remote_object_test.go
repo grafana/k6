@@ -104,6 +104,20 @@ func TestValueFromRemoteObject(t *testing.T) {
 		require.Nil(t, arg)
 	})
 
+	t.Run("null", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		remoteObject := &runtime.RemoteObject{
+			Type:    cdpruntime.TypeObject,
+			Subtype: cdpruntime.SubtypeNull,
+		}
+
+		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
+		require.NoError(t, err)
+		require.Nil(t, arg)
+	})
+
 	t.Run("primitive types", func(t *testing.T) {
 		t.Parallel()
 
@@ -236,7 +250,7 @@ func TestParseRemoteObject(t *testing.T) {
 			name:     "null",
 			subtype:  "null",
 			value:    nil,
-			expected: "null",
+			expected: nil,
 		},
 	}
 
