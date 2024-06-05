@@ -248,21 +248,49 @@ func TestElementHandleNonClickable(t *testing.T) {
 func TestElementHandleGetAttribute(t *testing.T) {
 	t.Parallel()
 
-	const want = "https://somewhere"
-
 	p := newTestBrowser(t).NewPage(nil)
-	err := p.SetContent(`
-		<a id="dark-mode-toggle-X" href="https://somewhere">Dark</a>
-	`, nil)
+	err := p.SetContent(`<a id="el" href="null">Something</a>`, nil)
 	require.NoError(t, err)
 
-	el, err := p.Query("#dark-mode-toggle-X")
+	el, err := p.Query("#el")
 	require.NoError(t, err)
 
 	got, ok, err := el.GetAttribute("href")
 	require.NoError(t, err)
 	require.True(t, ok)
-	assert.Equal(t, want, got)
+	assert.Equal(t, "null", got)
+}
+
+func TestElementHandleGetAttributeMissing(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<a id="el">Something</a>`, nil)
+	require.NoError(t, err)
+
+	el, err := p.Query("#el")
+	require.NoError(t, err)
+
+	got, ok, err := el.GetAttribute("missing")
+	require.NoError(t, err)
+	require.False(t, ok)
+	assert.Equal(t, "", got)
+}
+
+func TestElementHandleGetAttributeEmpty(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<a id="el" empty>Something</a>`, nil)
+	require.NoError(t, err)
+
+	el, err := p.Query("#el")
+	require.NoError(t, err)
+
+	got, ok, err := el.GetAttribute("empty")
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "", got)
 }
 
 func TestElementHandleInputValue(t *testing.T) {
