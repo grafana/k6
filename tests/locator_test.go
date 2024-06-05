@@ -162,9 +162,10 @@ func TestLocator(t *testing.T) {
 		{
 			"GetAttribute", func(_ *testBrowser, p *common.Page) {
 				l := p.Locator("#inputText", nil)
-				v, err := l.GetAttribute("value", nil)
+				v, ok, err := l.GetAttribute("value", nil)
 				require.NoError(t, err)
 				require.NotNil(t, v)
+				require.True(t, ok)
 				require.Equal(t, "something", v)
 			},
 		},
@@ -366,7 +367,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"GetAttribute", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.GetAttribute("value", timeout(tb))
+				_, _, err := l.GetAttribute("value", timeout(tb))
 				return err
 			},
 		},

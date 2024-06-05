@@ -65,7 +65,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 		},
 		"getAttribute": func(name string) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return eh.GetAttribute(name) //nolint:wrapcheck
+				s, ok, err := eh.GetAttribute(name)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				if !ok {
+					return nil, nil
+				}
+				return s, nil
 			})
 		},
 		"hover": func(opts goja.Value) *goja.Promise {

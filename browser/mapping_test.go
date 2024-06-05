@@ -308,7 +308,7 @@ type pageAPI interface {
 	Fill(selector string, value string, opts goja.Value) error
 	Focus(selector string, opts goja.Value) error
 	Frames() []*common.Frame
-	GetAttribute(selector string, name string, opts goja.Value) (any, error)
+	GetAttribute(selector string, name string, opts goja.Value) (string, bool, error)
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
@@ -380,7 +380,7 @@ type frameAPI interface {
 	Fill(selector string, value string, opts goja.Value) error
 	Focus(selector string, opts goja.Value) error
 	FrameElement() (*common.ElementHandle, error)
-	GetAttribute(selector string, name string, opts goja.Value) (any, error)
+	GetAttribute(selector string, name string, opts goja.Value) (string, bool, error)
 	Goto(url string, opts goja.Value) (*common.Response, error)
 	Hover(selector string, opts goja.Value) error
 	InnerHTML(selector string, opts goja.Value) (string, error)
@@ -430,7 +430,7 @@ type elementHandleAPI interface {
 	DispatchEvent(typ string, props goja.Value) error
 	Fill(value string, opts goja.Value) error
 	Focus() error
-	GetAttribute(name string) (any, error)
+	GetAttribute(name string) (string, bool, error)
 	Hover(opts goja.Value) error
 	InnerHTML() (string, error)
 	InnerText() (string, error)
@@ -512,7 +512,7 @@ type locatorAPI interface {
 	IsHidden(opts goja.Value) (bool, error)
 	Fill(value string, opts goja.Value) error
 	Focus(opts goja.Value) error
-	GetAttribute(name string, opts goja.Value) (any, error)
+	GetAttribute(name string, opts goja.Value) (string, bool, error)
 	InnerHTML(opts goja.Value) (string, error)
 	InnerText(opts goja.Value) (string, error)
 	TextContent(opts goja.Value) (string, error)

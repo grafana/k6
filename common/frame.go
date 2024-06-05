@@ -960,22 +960,23 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 }
 
 // GetAttribute of the first element found that matches the selector.
-func (f *Frame) GetAttribute(selector, name string, opts goja.Value) (any, error) {
+// The second return value is true if the attribute exists, and false otherwise.
+func (f *Frame) GetAttribute(selector, name string, opts goja.Value) (string, bool, error) {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		return nil, fmt.Errorf("parsing get attribute options: %w", err)
+		return "", false, fmt.Errorf("parsing get attribute options: %w", err)
 	}
-	v, err := f.getAttribute(selector, name, popts)
+	s, ok, err := f.getAttribute(selector, name, popts)
 	if err != nil {
-		return nil, fmt.Errorf("getting attribute %q of %q: %w", name, selector, err)
+		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, selector, err)
 	}
 
-	return v, nil
+	return s, ok, nil
 }
 
-func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (any, error) {
+func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (string, bool, error) {
 	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
@@ -985,10 +986,17 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (any
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err)
+		return "", false, errorFromDOMError(err)
+	}
+	if v == nil {
+		return "", false, nil
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", false, fmt.Errorf("unexpected type %T (expecting string)", v)
 	}
 
-	return v, nil
+	return s, true, nil
 }
 
 // Referrer returns the referrer of the frame from the network manager

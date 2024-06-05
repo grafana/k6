@@ -840,7 +840,8 @@ func (h *ElementHandle) Focus() error {
 }
 
 // GetAttribute retrieves the value of specified element attribute.
-func (h *ElementHandle) GetAttribute(name string) (any, error) {
+// The second return value is true if the attribute exists, and false otherwise.
+func (h *ElementHandle) GetAttribute(name string) (string, bool, error) {
 	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
@@ -851,12 +852,20 @@ func (h *ElementHandle) GetAttribute(name string) (any, error) {
 
 	v, err := call(h.ctx, getAttributeAction, opts.Timeout)
 	if err != nil {
-		return nil, fmt.Errorf("getting attribute %q of element: %w", name, err)
+		return "", false, fmt.Errorf("getting attribute %q of element: %w", name, err)
+	}
+	if v == nil {
+		return "", false, nil
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", false, fmt.Errorf(
+			"getting attribute %q of element: unexpected type %T (expecting string)",
+			name, v,
+		)
 	}
 
-	applySlowMo(h.ctx)
-
-	return v, nil
+	return s, true, nil
 }
 
 // Hover scrolls element into view and hovers over its center point.

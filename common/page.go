@@ -821,7 +821,8 @@ func (p *Page) Frames() []*Frame {
 }
 
 // GetAttribute returns the attribute value of the element matching the provided selector.
-func (p *Page) GetAttribute(selector string, name string, opts goja.Value) (any, error) {
+// The second return value is true if the attribute exists, and false otherwise.
+func (p *Page) GetAttribute(selector string, name string, opts goja.Value) (string, bool, error) {
 	p.logger.Debugf("Page:GetAttribute", "sid:%v selector:%s name:%s",
 		p.sessionID(), selector, name)
 

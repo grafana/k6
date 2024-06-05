@@ -259,8 +259,9 @@ func TestElementHandleGetAttribute(t *testing.T) {
 	el, err := p.Query("#dark-mode-toggle-X")
 	require.NoError(t, err)
 
-	got, err := el.GetAttribute("href")
+	got, ok, err := el.GetAttribute("href")
 	require.NoError(t, err)
+	require.True(t, ok)
 	assert.Equal(t, want, got)
 }
 
