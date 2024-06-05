@@ -46,10 +46,10 @@ require (
 	go.opentelemetry.io/otel/sdk v1.24.0
 	go.opentelemetry.io/otel/trace v1.24.0
 	go.uber.org/goleak v1.3.0
-	golang.org/x/crypto v0.21.0
-	golang.org/x/crypto/x509roots/fallback v0.0.0-20240318092723-b91329d961d4
-	golang.org/x/net v0.23.0
-	golang.org/x/term v0.18.0
+	golang.org/x/crypto v0.24.0
+	golang.org/x/crypto/x509roots/fallback v0.0.0-20240604170348-d4e7c9cb6cb8
+	golang.org/x/net v0.26.0
+	golang.org/x/term v0.21.0
 	golang.org/x/time v0.5.0
 	google.golang.org/grpc v1.63.2
 	google.golang.org/protobuf v1.33.0
@@ -91,9 +91,9 @@ require (
 	github.com/tidwall/pretty v1.2.1 // indirect
 	go.opentelemetry.io/otel/metric v1.24.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.1.0 // indirect
-	golang.org/x/sync v0.6.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/sync v0.7.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240227224415-6ceb2ff114de // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240227224415-6ceb2ff114de // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
