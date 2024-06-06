@@ -290,7 +290,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*sobek.Object, 
 	}()
 
 	// TODO: make something cleaner for interrupting scripts, and more unified
-	// (e.g. as a part of the event loop or RunWithPanicCatching()?
+	// (e.g. as a part of the event loop?
 	initDone := make(chan struct{})
 	go func() {
 		select {
@@ -302,12 +302,10 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*sobek.Object, 
 	}()
 
 	var exportsV sobek.Value
-	err = common.RunWithPanicCatching(b.preInitState.Logger, rt, func() error {
-		return vuImpl.eventLoop.Start(func() error {
-			var err error
-			exportsV, err = modSys.RunSourceData(b.sourceData)
-			return err
-		})
+	err = vuImpl.eventLoop.Start(func() error {
+		var err error
+		exportsV, err = modSys.RunSourceData(b.sourceData)
+		return err
 	})
 
 	<-initDone

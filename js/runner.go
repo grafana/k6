@@ -840,11 +840,9 @@ func (u *VU) runFn(
 	if u.moduleVUImpl.eventLoop == nil {
 		u.moduleVUImpl.eventLoop = eventloop.New(u.moduleVUImpl)
 	}
-	err = common.RunWithPanicCatching(u.state.Logger, u.Runtime, func() error {
-		return u.moduleVUImpl.eventLoop.Start(func() (err error) {
-			v, err = fn(sobek.Undefined(), args...) // Actually run the JS script
-			return err
-		})
+	err = u.moduleVUImpl.eventLoop.Start(func() (err error) {
+		v, err = fn(sobek.Undefined(), args...) // Actually run the JS script
+		return err
 	})
 
 	select {
