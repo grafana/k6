@@ -128,11 +128,8 @@ func newTestState(t testing.TB) testState {
 	runtime := modulestest.NewRuntime(t)
 	tb := httpmultibin.NewHTTPMultiBin(t)
 
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
 	samples := make(chan metrics.SampleContainer, 1000)
 	state := &lib.State{
-		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
 			SystemTags: metrics.NewSystemTagSet(
