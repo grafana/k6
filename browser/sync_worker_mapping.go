@@ -5,6 +5,8 @@ import (
 )
 
 // syncMapWorker is like mapWorker but returns synchronous functions.
-func syncMapWorker(_ moduleVU, _ *common.Worker) mapping {
-	return nil
+func syncMapWorker(_ moduleVU, w *common.Worker) mapping {
+	return mapping{
+		"url": w.URL(),
+	}
 }
