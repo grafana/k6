@@ -4,7 +4,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // Algorithm represents
@@ -16,7 +16,7 @@ type Algorithm struct {
 // As defined by the [specification]
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
-// to ensure it is handled as a string by goja.
+// to ensure it is handled as a string by sobek.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-dictionary
 type AlgorithmIdentifier = string
@@ -56,7 +56,7 @@ const (
 // HashAlgorithmIdentifier represents the name of a hash algorithm.
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
-// to ensure it is handled as a string under the hood by goja.
+// to ensure it is handled as a string under the hood by sobek.
 type HashAlgorithmIdentifier = AlgorithmIdentifier
 
 const (
@@ -76,7 +76,7 @@ const (
 // OperationIdentifier represents the name of an operation.
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
-// to ensure it is handled as a string by goja.
+// to ensure it is handled as a string by sobek.
 type OperationIdentifier = string
 
 const (
@@ -121,7 +121,7 @@ const (
 // algorithm described in the WebCrypto [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#algorithm-normalization-normalize-an-algorithm
-func normalizeAlgorithm(rt *goja.Runtime, v goja.Value, op AlgorithmIdentifier) (Algorithm, error) {
+func normalizeAlgorithm(rt *sobek.Runtime, v sobek.Value, op AlgorithmIdentifier) (Algorithm, error) {
 	var algorithm Algorithm
 
 	// "if alg is an instance of a DOMString: return the result of the running the

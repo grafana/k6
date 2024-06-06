@@ -9,7 +9,7 @@ import (
 
 	"go.k6.io/k6/js/compiler"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	k6encoding "go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modulestest"
@@ -34,7 +34,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	)
 	require.NoError(t, err)
 
-	// We compile the Web Platform testharness script into a goja.Program
+	// We compile the Web Platform testharness script into a sobek.Program
 	harnessProgram, err := CompileFile("./tests/util", "testharness.js")
 	require.NoError(t, err)
 
@@ -44,7 +44,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	_, err = runtime.VU.Runtime().RunProgram(harnessProgram)
 	require.NoError(t, err)
 
-	// We compile the Web Platform helpers script into a goja.Program
+	// We compile the Web Platform helpers script into a sobek.Program
 	helpersProgram, err := CompileFile("./tests/util", "helpers.js")
 	require.NoError(t, err)
 
@@ -71,8 +71,8 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	return runtime
 }
 
-// CompileFile compiles a javascript file as a goja.Program.
-func CompileFile(base, name string) (*goja.Program, error) {
+// CompileFile compiles a javascript file as a sobek.Program.
+func CompileFile(base, name string) (*sobek.Program, error) {
 	filename := path.Join(base, name)
 
 	//nolint:forbidigo // Allow os.Open in tests
@@ -93,7 +93,7 @@ func CompileFile(base, name string) (*goja.Program, error) {
 	}
 
 	str := string(b)
-	program, err := goja.Compile(name, str, false)
+	program, err := sobek.Compile(name, str, false)
 	if err != nil {
 		return nil, err
 	}

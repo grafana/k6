@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"math/big"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 const (
@@ -39,7 +39,7 @@ type EcKeyImportParams struct {
 	NamedCurve EllipticCurveKind `js:"namedCurve"`
 }
 
-func newEcKeyImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*EcKeyImportParams, error) {
+func newEcKeyImportParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*EcKeyImportParams, error) {
 	namedCurve, err := traverseObject(rt, params, "namedCurve")
 	if err != nil {
 		return nil, NewError(SyntaxError, "could not get namedCurve from algorithm parameter")
@@ -250,7 +250,7 @@ type ECKeyGenParams struct {
 
 var _ KeyGenerator = &ECKeyGenParams{}
 
-func newECKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*ECKeyGenParams, error) {
+func newECKeyGenParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*ECKeyGenParams, error) {
 	namedCurve, err := traverseObject(rt, params, "namedCurve")
 	if err != nil {
 		return nil, NewError(SyntaxError, "could not get namedCurve from algorithm parameter")
@@ -510,7 +510,7 @@ type ECDSAParams struct {
 	Hash Algorithm
 }
 
-func newECDSAParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*ECDSAParams, error) {
+func newECDSAParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*ECDSAParams, error) {
 	hashValue, err := traverseObject(rt, params, "hash")
 	if err != nil {
 		return nil, NewError(SyntaxError, "could not get hash from algorithm parameter")

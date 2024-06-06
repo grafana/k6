@@ -4,29 +4,29 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 )
 
 // exportArrayBuffer interprets the given value as an ArrayBuffer, TypedArray or DataView
 // and returns a copy of the underlying byte slice.
-func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
+func exportArrayBuffer(rt *sobek.Runtime, v sobek.Value) ([]byte, error) {
 	if common.IsNullish(v) {
 		return nil, NewError(TypeError, "data is null or undefined")
 	}
 
 	asObject := v.ToObject(rt)
 
-	var ab goja.ArrayBuffer
+	var ab sobek.ArrayBuffer
 	var ok bool
 
 	if IsTypedArray(rt, v) {
-		ab, ok = asObject.Get("buffer").Export().(goja.ArrayBuffer)
+		ab, ok = asObject.Get("buffer").Export().(sobek.ArrayBuffer)
 		if !ok {
 			return nil, NewError(TypeError, "TypedArray.buffer is not an ArrayBuffer")
 		}
 	} else {
-		ab, ok = asObject.Export().(goja.ArrayBuffer)
+		ab, ok = asObject.Export().(sobek.ArrayBuffer)
 		if !ok {
 			return nil, NewError(OperationError, "data is neither an ArrayBuffer, nor a TypedArray nor DataView")
 		}
@@ -45,7 +45,7 @@ func exportArrayBuffer(rt *goja.Runtime, v goja.Value) ([]byte, error) {
 
 // traverseObject traverses the given object using the given fields and returns the value
 // at the end of the traversal. It assumes that all the traversed fields are Objects.
-func traverseObject(rt *goja.Runtime, src goja.Value, fields ...string) (goja.Value, error) {
+func traverseObject(rt *sobek.Runtime, src sobek.Value, fields ...string) (sobek.Value, error) {
 	if common.IsNullish(src) {
 		return nil, NewError(TypeError, "Object is null or undefined")
 	}
@@ -78,7 +78,7 @@ func traverseObject(rt *goja.Runtime, src goja.Value, fields ...string) (goja.Va
 
 // IsInstanceOf returns true if the given value is an instance of the given constructor
 // This uses the technique described in https://github.com/dop251/goja/issues/379#issuecomment-1164441879
-func IsInstanceOf(rt *goja.Runtime, v goja.Value, instanceOf ...JSType) bool {
+func IsInstanceOf(rt *sobek.Runtime, v sobek.Value, instanceOf ...JSType) bool {
 	var valid bool
 
 	for _, t := range instanceOf {
@@ -92,7 +92,7 @@ func IsInstanceOf(rt *goja.Runtime, v goja.Value, instanceOf ...JSType) bool {
 }
 
 // IsTypedArray returns true if the given value is an instance of a Typed Array
-func IsTypedArray(rt *goja.Runtime, v goja.Value) bool {
+func IsTypedArray(rt *sobek.Runtime, v sobek.Value) bool {
 	asObject := v.ToObject(rt)
 
 	typedArrayTypes := []JSType{

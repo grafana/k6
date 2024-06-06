@@ -8,7 +8,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // AESKeyGenParams represents the object that should be passed as
@@ -35,7 +35,7 @@ func (akgp AESKeyGenParams) alg() string {
 //
 // It handles the logic involved in handling the `length` attribute,
 // which is not part of the normalized algorithm.
-func newAESKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*AESKeyGenParams, error) {
+func newAESKeyGenParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*AESKeyGenParams, error) {
 	// We extract the length attribute from the params object, as it's not
 	// part of the normalized algorithm, and as accessing the runtime from the
 	// callback below could lead to a race condition.

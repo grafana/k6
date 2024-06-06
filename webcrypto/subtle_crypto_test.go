@@ -3,7 +3,7 @@ package webcrypto
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -214,7 +214,7 @@ func TestSubtleCryptoDeriveBitsKeys(t *testing.T) {
 	})
 }
 
-func executeTestScripts(rt *goja.Runtime, base string, scripts ...string) error {
+func executeTestScripts(rt *sobek.Runtime, base string, scripts ...string) error {
 	for _, script := range scripts {
 		program, err := CompileFile(base, script)
 		if err != nil {

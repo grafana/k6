@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -16,7 +16,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("empty object and empty fields", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		obj := rt.NewObject()
 
 		gotVal, gotErr := traverseObject(rt, obj)
@@ -28,7 +28,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("empty object and non-empty fields", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		obj := rt.NewObject()
 
 		_, gotErr := traverseObject(rt, obj, "foo")
@@ -42,7 +42,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("non-empty object and empty fields", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		obj := rt.NewObject()
 		childObj := rt.NewObject()
 		err := obj.Set("foo", childObj)
@@ -56,7 +56,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("non-empty object and non-empty fields", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		obj := rt.NewObject()
 		childValue := rt.NewObject()
 		err := obj.Set("foo", childValue)
@@ -71,7 +71,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("non-empty object and non-empty fields with non-object leaf", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		obj := rt.NewObject()
 		childValue := rt.ToValue("bar")
 		err := obj.Set("foo", childValue)
@@ -86,7 +86,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("non-empty object and non-empty fields with non-existent leaf", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		obj := rt.NewObject()
 		childValue := rt.ToValue("bar")
 		err := obj.Set("foo", childValue)
@@ -103,7 +103,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("non-empty object and non-empty fields with non-object intermediate", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		obj := rt.NewObject()
 		childValue := rt.ToValue("bar")
 		err := obj.Set("foo", childValue)
@@ -120,7 +120,7 @@ func TestTraverseObject(t *testing.T) {
 	t.Run("nil object", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 
 		_, gotErr := traverseObject(rt, nil)
 

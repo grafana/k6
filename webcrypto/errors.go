@@ -3,7 +3,7 @@ package webcrypto
 // ErrorName is a type alias for the name of a WebCryptoError.
 //
 // Note that it is a type alias, and not a binding, so that it is
-// not interpreted as an object by goja.
+// not interpreted as an object by sobek.
 type ErrorName = string
 
 const (
