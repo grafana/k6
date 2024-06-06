@@ -37,6 +37,17 @@ func TestSetTimeout(t *testing.T) {
 	require.Equal(t, []string{"outside setTimeout", "in setTimeout"}, log)
 }
 
+func TestSetUndefinedFunction(t *testing.T) {
+	t.Parallel()
+
+	runtime := newRuntime(t)
+	_, err := runtime.RunOnEventLoop(`
+		let timers = require("k6/x/timers");
+		timers.setTimeout(undefined)
+	`)
+	require.Error(t, err, "setTimeout's callback isn't a callable function")
+}
+
 func TestSetInterval(t *testing.T) {
 	t.Parallel()
 	runtime := newRuntime(t)
