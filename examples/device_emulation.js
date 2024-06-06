@@ -1,5 +1,5 @@
 import { check, sleep } from 'k6';
-import { browser, devices } from 'k6/x/browser';
+import { browser, devices } from 'k6/x/browser/async';
 
 export const options = {
   scenarios: {

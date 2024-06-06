@@ -1,4 +1,4 @@
-import { browser, networkProfiles } from 'k6/x/browser';
+import { browser, networkProfiles } from 'k6/x/browser/async';
 
 export const options = {
   scenarios: {
