@@ -1,3 +1,4 @@
+// Package browser provides an entry point to the browser extension.
 package browser
 
 import (
@@ -7,5 +8,5 @@ import (
 )
 
 func init() {
-	k6modules.Register("k6/x/browser/async", browser.New())
+	k6modules.Register("k6/x/browser", browser.NewSync())
 }
