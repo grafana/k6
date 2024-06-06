@@ -3,7 +3,7 @@ package js
 import (
 	"context"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/event"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/eventloop"
@@ -18,7 +18,7 @@ type moduleVUImpl struct {
 	ctx       context.Context
 	initEnv   *common.InitEnvironment
 	state     *lib.State
-	runtime   *goja.Runtime
+	runtime   *sobek.Runtime
 	eventLoop *eventloop.EventLoop
 	events    events
 }
@@ -39,7 +39,7 @@ func (m *moduleVUImpl) State() *lib.State {
 	return m.state
 }
 
-func (m *moduleVUImpl) Runtime() *goja.Runtime {
+func (m *moduleVUImpl) Runtime() *sobek.Runtime {
 	return m.runtime
 }
 

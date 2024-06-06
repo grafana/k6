@@ -22,8 +22,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/compiler"
@@ -45,7 +45,7 @@ var (
 
 	// ignorableTestError = newSymbol(stringEmpty)
 
-	sabStub = goja.MustCompile("sabStub.js", `
+	sabStub = sobek.MustCompile("sabStub.js", `
 		Object.defineProperty(this, "SharedArrayBuffer", {
 			get: function() {
 				throw IgnorableTestError;
@@ -253,7 +253,7 @@ type tc39TestCtx struct {
 	compilerPool   *compiler.Pool
 	base           string
 	t              *testing.T
-	prgCache       map[string]*goja.Program
+	prgCache       map[string]*sobek.Program
 	prgCacheLock   sync.Mutex
 	enableBench    bool
 	benchmark      tc39BenchmarkData
@@ -326,16 +326,16 @@ func parseTC39File(name string) (*tc39Meta, string, error) {
 	return &meta, string(b), nil
 }
 
-func (*tc39TestCtx) detachArrayBuffer(call goja.FunctionCall) goja.Value {
-	if obj, ok := call.Argument(0).(*goja.Object); ok {
-		var buf goja.ArrayBuffer
-		if goja.New().ExportTo(obj, &buf) == nil {
-			// if buf, ok := obj.Export().(goja.ArrayBuffer); ok {
+func (*tc39TestCtx) detachArrayBuffer(call sobek.FunctionCall) sobek.Value {
+	if obj, ok := call.Argument(0).(*sobek.Object); ok {
+		var buf sobek.ArrayBuffer
+		if sobek.New().ExportTo(obj, &buf) == nil {
+			// if buf, ok := obj.Export().(sobek.ArrayBuffer); ok {
 			buf.Detach()
-			return goja.Undefined()
+			return sobek.Undefined()
 		}
 	}
-	panic(goja.New().NewTypeError("detachArrayBuffer() is called with incompatible argument"))
+	panic(sobek.New().NewTypeError("detachArrayBuffer() is called with incompatible argument"))
 }
 
 func (ctx *tc39TestCtx) fail(t testing.TB, name string, strict bool, errStr string) {
@@ -371,15 +371,15 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 			failf("panic while running %s: %v", name, x)
 		}
 	}()
-	vm := goja.New()
+	vm := sobek.New()
 	_262 := vm.NewObject()
 	ignorableTestError := vm.NewGoError(fmt.Errorf(""))
 	_ = vm.Set("IgnorableTestError", ignorableTestError)
 	_ = _262.Set("detachArrayBuffer", ctx.detachArrayBuffer)
-	_ = _262.Set("createRealm", func(goja.FunctionCall) goja.Value {
+	_ = _262.Set("createRealm", func(sobek.FunctionCall) sobek.Value {
 		panic(ignorableTestError)
 	})
-	_ = _262.Set("evalScript", func(call goja.FunctionCall) goja.Value {
+	_ = _262.Set("evalScript", func(call sobek.FunctionCall) sobek.Value {
 		script := call.Argument(0).String()
 		result, err := vm.RunString(script)
 		if err != nil {
@@ -432,7 +432,7 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	}
 
 	if meta.Negative.Type == "" {
-		if err, ok := err.(*goja.Exception); ok { //nolint:errorlint
+		if err, ok := err.(*sobek.Exception); ok { //nolint:errorlint
 			if err.Value() == ignorableTestError {
 				t.Skip("Test threw IgnorableTestError")
 			}
@@ -484,10 +484,10 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 
 func getErrType(name string, err error, failf func(str string, args ...interface{})) string {
 	switch err := err.(type) { //nolint:errorlint
-	case *goja.Exception:
-		if o, ok := err.Value().(*goja.Object); ok {
+	case *sobek.Exception:
+		if o, ok := err.Value().(*sobek.Object); ok {
 			if c := o.Get("constructor"); c != nil {
-				if c, ok := c.(*goja.Object); ok {
+				if c, ok := c.(*sobek.Object); ok {
 					return c.Get("name").String()
 				}
 				failf("%s: error constructor is not an object (%v)", name, o)
@@ -498,9 +498,9 @@ func getErrType(name string, err error, failf func(str string, args ...interface
 		}
 		failf("%s: error is not an object (%v)", name, err.Value())
 		return ""
-	case *goja.CompilerSyntaxError, *parser.Error, parser.ErrorList:
+	case *sobek.CompilerSyntaxError, *parser.Error, parser.ErrorList:
 		return "SyntaxError"
-	case *goja.CompilerReferenceError:
+	case *sobek.CompilerReferenceError:
 		return "ReferenceError"
 	default:
 		failf("%s: error is not a JS error: %v", name, err)
@@ -570,7 +570,7 @@ func breakingTestErrorsFilename(compatibilityMode lib.CompatibilityMode) string 
 }
 
 func (ctx *tc39TestCtx) init() {
-	ctx.prgCache = make(map[string]*goja.Program)
+	ctx.prgCache = make(map[string]*sobek.Program)
 	ctx.errors = make(map[string]string)
 
 	if !*update {
@@ -589,7 +589,7 @@ func (ctx *tc39TestCtx) init() {
 	}
 }
 
-func (ctx *tc39TestCtx) compile(base, name string) (*goja.Program, error) {
+func (ctx *tc39TestCtx) compile(base, name string) (*sobek.Program, error) {
 	ctx.prgCacheLock.Lock()
 	defer ctx.prgCacheLock.Unlock()
 
@@ -621,7 +621,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*goja.Program, error) {
 	return prg, nil
 }
 
-func (ctx *tc39TestCtx) runFile(base, name string, vm *goja.Runtime) error {
+func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 	prg, err := ctx.compile(base, name)
 	if err != nil {
 		return err
@@ -630,7 +630,7 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *goja.Runtime) error {
 	return err
 }
 
-func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *goja.Runtime, expectsError bool) (early bool, origErr, err error) {
+func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *sobek.Runtime, expectsError bool) (early bool, origErr, err error) {
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
@@ -649,7 +649,7 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 		}
 	}
 
-	var p *goja.Program
+	var p *sobek.Program
 	comp := ctx.compilerPool.Get()
 	defer ctx.compilerPool.Put(comp)
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeBase}
@@ -670,7 +670,7 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *g
 	return early, origErr, err
 }
 
-func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *goja.Runtime) (early bool, origErr, err error) {
+func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *sobek.Runtime) (early bool, origErr, err error) {
 	currentFS := os.DirFS(".")
 	if err != nil {
 		panic(err)

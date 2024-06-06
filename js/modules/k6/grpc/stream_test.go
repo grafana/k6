@@ -11,8 +11,8 @@ import (
 	"go.k6.io/k6/lib/testutils/grpcservice"
 	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_wrappers_testing"
 
-	"github.com/dop251/goja"
 	"github.com/golang/protobuf/ptypes/wrappers"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -320,7 +320,7 @@ func TestStream_Wrappers(t *testing.T) {
 		}
 	}
 
-	replace := func(code string) (goja.Value, error) {
+	replace := func(code string) (sobek.Value, error) {
 		return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
 	}
 

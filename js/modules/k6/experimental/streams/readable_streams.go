@@ -3,7 +3,7 @@ package streams
 import (
 	"errors"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/promises"
@@ -36,14 +36,14 @@ type ReadableStream struct {
 	// storedError holds the error that caused the stream to be errored
 	storedError any
 
-	Source *goja.Object
+	Source *sobek.Object
 
-	runtime *goja.Runtime
+	runtime *sobek.Runtime
 	vu      modules.VU
 }
 
 // Cancel cancels the stream and returns a Promise to the user
-func (stream *ReadableStream) Cancel(reason goja.Value) *goja.Promise {
+func (stream *ReadableStream) Cancel(reason sobek.Value) *sobek.Promise {
 	// 1. IsReadableStreamLocked(this) is true, return a promise rejected with a TypeError exception.
 	if stream.isLocked() {
 		promise, _, reject := promises.New(stream.vu)
@@ -62,9 +62,10 @@ func (stream *ReadableStream) Cancel(reason goja.Value) *goja.Promise {
 // GetReader implements the [getReader] operation.
 //
 // [getReader]: https://streams.spec.whatwg.org/#rs-get-reader
-func (stream *ReadableStream) GetReader(options *goja.Object) goja.Value {
+func (stream *ReadableStream) GetReader(options *sobek.Object) sobek.Value {
 	// 1. If options["mode"] does not exist, return ? AcquireReadableStreamDefaultReader(this).
-	if options == nil || common.IsNullish(options) || options.Get("mode") == nil || goja.IsUndefined(options.Get("mode")) {
+	if options == nil || common.IsNullish(options) ||
+		options.Get("mode") == nil || sobek.IsUndefined(options.Get("mode")) {
 		defaultReader := stream.acquireDefaultReader()
 		defaultReaderObj, err := NewReadableStreamDefaultReaderObject(defaultReader)
 		if err != nil {
@@ -81,15 +82,15 @@ func (stream *ReadableStream) GetReader(options *goja.Object) goja.Value {
 
 	// 3. Return ? AcquireReadableStreamBYOBReader(this).
 	common.Throw(stream.runtime, newError(NotSupportedError, "'byob' mode is not supported yet"))
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // Tee implements the [tee] operation.
 //
 // [tee]: https://streams.spec.whatwg.org/#rs-tee
-func (stream *ReadableStream) Tee() goja.Value {
+func (stream *ReadableStream) Tee() sobek.Value {
 	common.Throw(stream.runtime, newError(NotSupportedError, "'tee()' is not supported yet"))
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 // ReadableStreamState represents the current state of a ReadableStream
@@ -137,7 +138,7 @@ func (stream *ReadableStream) initialize() {
 //
 // [specification]: https://streams.spec.whatwg.org/#set-up-readable-stream-default-controller-from-underlying-source
 func (stream *ReadableStream) setupReadableStreamDefaultControllerFromUnderlyingSource(
-	underlyingSource *goja.Object,
+	underlyingSource *sobek.Object,
 	underlyingSourceDict UnderlyingSource,
 	highWaterMark float64,
 	sizeAlgorithm SizeAlgorithm,
@@ -146,18 +147,18 @@ func (stream *ReadableStream) setupReadableStreamDefaultControllerFromUnderlying
 	controller := &ReadableStreamDefaultController{}
 
 	// 2. Let startAlgorithm be an algorithm that returns undefined.
-	var startAlgorithm UnderlyingSourceStartCallback = func(*goja.Object) goja.Value {
-		return goja.Undefined()
+	var startAlgorithm UnderlyingSourceStartCallback = func(*sobek.Object) sobek.Value {
+		return sobek.Undefined()
 	}
 
 	// 3. Let pullAlgorithm be an algorithm that returns a promise resolved with undefined.
-	var pullAlgorithm UnderlyingSourcePullCallback = func(*goja.Object) *goja.Promise {
-		return newResolvedPromise(stream.vu, goja.Undefined())
+	var pullAlgorithm UnderlyingSourcePullCallback = func(*sobek.Object) *sobek.Promise {
+		return newResolvedPromise(stream.vu, sobek.Undefined())
 	}
 
 	// 4. Let cancelAlgorithm be an algorithm that returns a promise resolved with undefined.
-	var cancelAlgorithm UnderlyingSourceCancelCallback = func(any) goja.Value {
-		return stream.vu.Runtime().ToValue(newResolvedPromise(stream.vu, goja.Undefined()))
+	var cancelAlgorithm UnderlyingSourceCancelCallback = func(any) sobek.Value {
+		return stream.vu.Runtime().ToValue(newResolvedPromise(stream.vu, sobek.Undefined()))
 	}
 
 	// 5. If underlyingSourceDict["start"] exists, then set startAlgorithm to an algorithm
@@ -186,15 +187,15 @@ func (stream *ReadableStream) setupReadableStreamDefaultControllerFromUnderlying
 }
 
 func (stream *ReadableStream) startAlgorithm(
-	underlyingSource *goja.Object,
+	underlyingSource *sobek.Object,
 	underlyingSourceDict UnderlyingSource,
 ) UnderlyingSourceStartCallback {
-	call, ok := goja.AssertFunction(underlyingSourceDict.Start)
+	call, ok := sobek.AssertFunction(underlyingSourceDict.Start)
 	if !ok {
 		throw(stream.runtime, newTypeError(stream.runtime, "underlyingSource.[[start]] must be a function"))
 	}
 
-	return func(obj *goja.Object) (v goja.Value) {
+	return func(obj *sobek.Object) (v sobek.Value) {
 		var err error
 		v, err = call(underlyingSource, obj)
 		if err != nil {
@@ -206,25 +207,25 @@ func (stream *ReadableStream) startAlgorithm(
 }
 
 func (stream *ReadableStream) pullAlgorithm(
-	underlyingSource *goja.Object,
+	underlyingSource *sobek.Object,
 	underlyingSourceDict UnderlyingSource,
 ) UnderlyingSourcePullCallback {
-	call, ok := goja.AssertFunction(underlyingSourceDict.Pull)
+	call, ok := sobek.AssertFunction(underlyingSourceDict.Pull)
 	if !ok {
 		throw(stream.runtime, newTypeError(stream.runtime, "underlyingSource.[[pull]] must be a function"))
 	}
 
-	return func(obj *goja.Object) *goja.Promise {
+	return func(obj *sobek.Object) *sobek.Promise {
 		v, err := call(underlyingSource, obj)
 		if err != nil {
-			var ex *goja.Exception
+			var ex *sobek.Exception
 			if errors.As(err, &ex) {
 				return newRejectedPromise(stream.vu, ex.Value())
 			}
 			return newRejectedPromise(stream.vu, err)
 		}
 
-		if p, ok := v.Export().(*goja.Promise); ok {
+		if p, ok := v.Export().(*sobek.Promise); ok {
 			return p
 		}
 
@@ -233,16 +234,16 @@ func (stream *ReadableStream) pullAlgorithm(
 }
 
 func (stream *ReadableStream) cancelAlgorithm(
-	underlyingSource *goja.Object,
+	underlyingSource *sobek.Object,
 	underlyingSourceDict UnderlyingSource,
 ) UnderlyingSourceCancelCallback {
-	call, ok := goja.AssertFunction(underlyingSourceDict.Cancel)
+	call, ok := sobek.AssertFunction(underlyingSourceDict.Cancel)
 	if !ok {
 		throw(stream.runtime, newTypeError(stream.runtime, "underlyingSource.[[cancel]] must be a function"))
 	}
 
-	return func(reason any) goja.Value {
-		var p *goja.Promise
+	return func(reason any) sobek.Value {
+		var p *sobek.Promise
 
 		if e := stream.runtime.Try(func() {
 			res, err := call(underlyingSource, stream.runtime.ToValue(reason))
@@ -250,7 +251,7 @@ func (stream *ReadableStream) cancelAlgorithm(
 				panic(err)
 			}
 
-			if cp, ok := res.Export().(*goja.Promise); ok {
+			if cp, ok := res.Export().(*sobek.Promise); ok {
 				p = cp
 			}
 		}); e != nil {
@@ -258,7 +259,7 @@ func (stream *ReadableStream) cancelAlgorithm(
 		}
 
 		if p == nil {
-			p = newResolvedPromise(stream.vu, goja.Undefined())
+			p = newResolvedPromise(stream.vu, sobek.Undefined())
 		}
 
 		return stream.vu.Runtime().ToValue(p)
@@ -313,11 +314,11 @@ func (stream *ReadableStream) setupDefaultController(
 	startResult := startAlgorithm(controllerObj)
 
 	// 10. Let startPromise be a promise with startResult.
-	var startPromise *goja.Promise
+	var startPromise *sobek.Promise
 	if common.IsNullish(startResult) {
 		startPromise = newResolvedPromise(controller.stream.vu, startResult)
-	} else if p, ok := startResult.Export().(*goja.Promise); ok {
-		if p.State() == goja.PromiseStateRejected {
+	} else if p, ok := startResult.Export().(*sobek.Promise); ok {
+		if p.State() == sobek.PromiseStateRejected {
 			controller.error(p.Result())
 		}
 		startPromise = p
@@ -326,7 +327,7 @@ func (stream *ReadableStream) setupDefaultController(
 	}
 	_, err = promiseThen(stream.vu.Runtime(), startPromise,
 		// 11. Upon fulfillment of startPromise,
-		func(goja.Value) {
+		func(sobek.Value) {
 			// 11.1. Set controller.[[started]] to true.
 			controller.started = true
 			// 11.2. Assert: controller.[[pulling]] is false.
@@ -341,7 +342,7 @@ func (stream *ReadableStream) setupDefaultController(
 			controller.callPullIfNeeded()
 		},
 		// 12. Upon rejection of startPromise with reason r,
-		func(err goja.Value) {
+		func(err sobek.Value) {
 			controller.error(err)
 		},
 	)
@@ -388,13 +389,13 @@ func (stream *ReadableStream) addReadRequest(readRequest ReadRequest) {
 // cancel implements the specification's [ReadableStreamCancel()] abstract operation.
 //
 // [ReadableStreamCancel()]: https://streams.spec.whatwg.org/#readable-stream-cancel
-func (stream *ReadableStream) cancel(reason goja.Value) *goja.Promise {
+func (stream *ReadableStream) cancel(reason sobek.Value) *sobek.Promise {
 	// 1. Set stream.[[disturbed]] to true.
 	stream.disturbed = true
 
 	// 2. If stream.[[state]] is "closed", return a promise resolved with undefined.
 	if stream.state == ReadableStreamStateClosed {
-		return newResolvedPromise(stream.vu, goja.Undefined())
+		return newResolvedPromise(stream.vu, sobek.Undefined())
 	}
 
 	// 3. If stream.[[state]] is "errored", return a promise rejected with stream.[[storedError]].
@@ -418,8 +419,8 @@ func (stream *ReadableStream) cancel(reason goja.Value) *goja.Promise {
 	// 8. Return the result of reacting to sourceCancelPromise with a fulfillment step that returns undefined.
 	promise, err := promiseThen(stream.vu.Runtime(), sourceCancelPromise,
 		// Mimicking Deno's implementation: https://github.com/denoland/deno/blob/main/ext/web/06_streams.js#L405
-		func(goja.Value) {},
-		func(err goja.Value) { throw(stream.vu.Runtime(), err) },
+		func(sobek.Value) {},
+		func(err sobek.Value) { throw(stream.vu.Runtime(), err) },
 	)
 	if err != nil {
 		common.Throw(stream.vu.Runtime(), err)
@@ -455,7 +456,7 @@ func (stream *ReadableStream) close() {
 	}
 
 	_, resolveFunc, _ := genericReader.GetClosed()
-	resolveFunc(goja.Undefined())
+	resolveFunc(sobek.Undefined())
 
 	// 6. If reader implements ReadableStreamDefaultReader,
 	defaultReader, ok := reader.(*ReadableStreamDefaultReader)
@@ -513,7 +514,7 @@ func (stream *ReadableStream) error(e any) {
 	// See https://github.com/dop251/goja/issues/565
 	var (
 		err       error
-		doNothing = func(goja.Value) {}
+		doNothing = func(sobek.Value) {}
 	)
 	_, err = promiseThen(stream.vu.Runtime(), promise, doNothing, doNothing)
 	if err != nil {

@@ -5,28 +5,28 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestThrow(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
-	fn1, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, errors.New("aaaa")) }))
+	rt := sobek.New()
+	fn1, ok := sobek.AssertFunction(rt.ToValue(func() { Throw(rt, errors.New("aaaa")) }))
 	require.True(t, ok, "fn1 is invalid")
-	_, err := fn1(goja.Undefined())
+	_, err := fn1(sobek.Undefined())
 	assert.EqualError(t, err, "GoError: aaaa")
 
-	fn2, ok := goja.AssertFunction(rt.ToValue(func() { Throw(rt, err) }))
+	fn2, ok := sobek.AssertFunction(rt.ToValue(func() { Throw(rt, err) }))
 	require.True(t, ok, "fn2 is invalid")
-	_, err = fn2(goja.Undefined())
+	_, err = fn2(sobek.Undefined())
 	assert.EqualError(t, err, "GoError: aaaa")
 }
 
 func TestToBytes(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
+	rt := sobek.New()
 	b := []byte("hello")
 	testCases := []struct {
 		in     interface{}
@@ -55,7 +55,7 @@ func TestToBytes(t *testing.T) {
 
 func TestToString(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
+	rt := sobek.New()
 	s := "hello"
 	testCases := []struct {
 		in             interface{}

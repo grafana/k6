@@ -7,14 +7,14 @@ import (
 	"io"
 	"runtime/debug"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/errext"
 )
 
 // Throw a JS error; avoids re-wrapping GoErrors.
-func Throw(rt *goja.Runtime, err error) {
-	if e, ok := err.(*goja.Exception); ok { //nolint:errorlint // we don't really want to unwrap here
+func Throw(rt *sobek.Runtime, err error) {
+	if e, ok := err.(*sobek.Exception); ok { //nolint:errorlint // we don't really want to unwrap here
 		panic(e)
 	}
 	panic(rt.NewGoError(err)) // this catches the stack unlike rt.ToValue
@@ -29,7 +29,7 @@ func GetReader(data interface{}) (io.Reader, error) {
 		return bytes.NewBuffer(r), nil
 	case io.Reader:
 		return r, nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return bytes.NewBuffer(r.Bytes()), nil
 	default:
 		return nil, fmt.Errorf("invalid type %T, it needs to be a string or ArrayBuffer", data)
@@ -43,7 +43,7 @@ func ToBytes(data interface{}) ([]byte, error) {
 		return dt, nil
 	case string:
 		return []byte(dt), nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return dt.Bytes(), nil
 	default:
 		return nil, fmt.Errorf("invalid type %T, expected string, []byte or ArrayBuffer", data)
@@ -57,7 +57,7 @@ func ToString(data interface{}) (string, error) {
 		return string(dt), nil
 	case string:
 		return dt, nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return string(dt.Bytes()), nil
 	default:
 		return "", fmt.Errorf("invalid type %T, expected string, []byte or ArrayBuffer", data)
@@ -65,7 +65,7 @@ func ToString(data interface{}) (string, error) {
 }
 
 // RunWithPanicCatching catches panic and converts into an InterruptError error that should abort a script
-func RunWithPanicCatching(logger logrus.FieldLogger, _ *goja.Runtime, fn func() error) (err error) {
+func RunWithPanicCatching(logger logrus.FieldLogger, _ *sobek.Runtime, fn func() error) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			err = &errext.InterruptError{Reason: fmt.Sprintf("a panic occurred during JS execution: %s", r)}
@@ -81,12 +81,12 @@ func RunWithPanicCatching(logger logrus.FieldLogger, _ *goja.Runtime, fn func() 
 }
 
 // IsNullish checks if the given value is nullish, i.e. nil, undefined or null.
-func IsNullish(v goja.Value) bool {
-	return v == nil || goja.IsUndefined(v) || goja.IsNull(v)
+func IsNullish(v sobek.Value) bool {
+	return v == nil || sobek.IsUndefined(v) || sobek.IsNull(v)
 }
 
 // IsAsyncFunction checks if the provided value is an AsyncFunction
-func IsAsyncFunction(rt *goja.Runtime, val goja.Value) bool {
+func IsAsyncFunction(rt *sobek.Runtime, val sobek.Value) bool {
 	if IsNullish(val) {
 		return false
 	}

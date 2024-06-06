@@ -105,8 +105,8 @@ github.com/dgryski/go-rendezvous
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
-## explicit; go 1.16
+# github.com/dop251/goja v0.0.0-20240516125602-ccbae20bcec2
+## explicit; go 1.20
 github.com/dop251/goja
 github.com/dop251/goja/ast
 github.com/dop251/goja/file
@@ -173,6 +173,9 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
+# github.com/grafana/sobek v0.0.0-20240606091932-2da0e9e5f3e7
+## explicit; go 1.20
+github.com/grafana/sobek
 # github.com/grafana/xk6-browser v1.5.1
 ## explicit; go 1.20
 github.com/grafana/xk6-browser/browser

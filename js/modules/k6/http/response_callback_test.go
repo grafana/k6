@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib"
@@ -71,7 +71,7 @@ func TestExpectedStatuses(t *testing.T) {
 			}
 
 			require.Error(t, err)
-			var exc *goja.Exception
+			var exc *sobek.Exception
 			errors.As(err, &exc)
 			require.ErrorContains(t, exc, testCase.err)
 		})

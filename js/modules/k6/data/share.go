@@ -1,7 +1,7 @@
 package data
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 )
 
@@ -14,16 +14,16 @@ type sharedArray struct {
 type wrappedSharedArray struct {
 	sharedArray
 
-	rt       *goja.Runtime
-	freeze   goja.Callable
-	isFrozen goja.Callable
-	parse    goja.Callable
+	rt       *sobek.Runtime
+	freeze   sobek.Callable
+	isFrozen sobek.Callable
+	parse    sobek.Callable
 }
 
-func (s sharedArray) wrap(rt *goja.Runtime) goja.Value {
-	freeze, _ := goja.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("freeze"))
-	isFrozen, _ := goja.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("isFrozen"))
-	parse, _ := goja.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("parse"))
+func (s sharedArray) wrap(rt *sobek.Runtime) sobek.Value {
+	freeze, _ := sobek.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("freeze"))
+	isFrozen, _ := sobek.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("isFrozen"))
+	parse, _ := sobek.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("parse"))
 	return rt.NewDynamicArray(wrappedSharedArray{
 		sharedArray: s,
 		rt:          rt,
@@ -33,7 +33,7 @@ func (s sharedArray) wrap(rt *goja.Runtime) goja.Value {
 	})
 }
 
-func (s wrappedSharedArray) Set(_ int, _ goja.Value) bool {
+func (s wrappedSharedArray) Set(_ int, _ sobek.Value) bool {
 	panic(s.rt.NewTypeError("SharedArray is immutable")) // this is specifically a type error
 }
 
@@ -41,11 +41,11 @@ func (s wrappedSharedArray) SetLen(_ int) bool {
 	panic(s.rt.NewTypeError("SharedArray is immutable")) // this is specifically a type error
 }
 
-func (s wrappedSharedArray) Get(index int) goja.Value {
+func (s wrappedSharedArray) Get(index int) sobek.Value {
 	if index < 0 || index >= len(s.arr) {
-		return goja.Undefined()
+		return sobek.Undefined()
 	}
-	val, err := s.parse(goja.Undefined(), s.rt.ToValue(s.arr[index]))
+	val, err := s.parse(sobek.Undefined(), s.rt.ToValue(s.arr[index]))
 	if err != nil {
 		common.Throw(s.rt, err)
 	}
@@ -61,12 +61,12 @@ func (s wrappedSharedArray) Len() int {
 	return len(s.arr)
 }
 
-func (s wrappedSharedArray) deepFreeze(rt *goja.Runtime, val goja.Value) error {
-	if val != nil && goja.IsNull(val) {
+func (s wrappedSharedArray) deepFreeze(rt *sobek.Runtime, val sobek.Value) error {
+	if val != nil && sobek.IsNull(val) {
 		return nil
 	}
 
-	_, err := s.freeze(goja.Undefined(), val)
+	_, err := s.freeze(sobek.Undefined(), val)
 	if err != nil {
 		return err
 	}
@@ -79,7 +79,7 @@ func (s wrappedSharedArray) deepFreeze(rt *goja.Runtime, val goja.Value) error {
 		prop := o.Get(key)
 		if prop != nil {
 			// isFrozen returns true for all non objects so it we don't need to check that
-			frozen, err := s.isFrozen(goja.Undefined(), prop)
+			frozen, err := s.isFrozen(sobek.Undefined(), prop)
 			if err != nil {
 				return err
 			}

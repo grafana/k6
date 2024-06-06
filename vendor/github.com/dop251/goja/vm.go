@@ -897,10 +897,12 @@ func (vm *vm) toCallee(v Value) *Object {
 	panic(vm.r.NewTypeError("Value is not an object: %s", v.toString()))
 }
 
-type loadVal uint32
+type loadVal struct {
+	v Value
+}
 
 func (l loadVal) exec(vm *vm) {
-	vm.push(vm.prg.values[l])
+	vm.push(l.v)
 	vm.pc++
 }
 

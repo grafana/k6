@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 )
 
 // cjsModule represents a commonJS module
 type cjsModule struct {
-	prg *goja.Program
+	prg *sobek.Program
 	url *url.URL
 }
 
@@ -19,7 +19,7 @@ var _ module = &cjsModule{}
 
 type cjsModuleInstance struct {
 	mod       *cjsModule
-	moduleObj *goja.Object
+	moduleObj *sobek.Object
 	vu        VU
 }
 
@@ -42,7 +42,7 @@ func (c *cjsModuleInstance) execute() error {
 	if err != nil {
 		return err
 	}
-	if call, ok := goja.AssertFunction(f); ok {
+	if call, ok := sobek.AssertFunction(f); ok {
 		if _, err = call(exports, c.moduleObj, exports); err != nil {
 			return err
 		}
@@ -51,7 +51,7 @@ func (c *cjsModuleInstance) execute() error {
 	return nil
 }
 
-func (c *cjsModuleInstance) exports() *goja.Object {
+func (c *cjsModuleInstance) exports() *sobek.Object {
 	exportsV := c.moduleObj.Get("exports")
 	if common.IsNullish(exportsV) {
 		return nil

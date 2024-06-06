@@ -1,17 +1,17 @@
 package streams
 
-import "github.com/dop251/goja"
+import "github.com/grafana/sobek"
 
-func newTypeError(rt *goja.Runtime, message string) *jsError {
+func newTypeError(rt *sobek.Runtime, message string) *jsError {
 	return newJsError(rt, rt.Get("TypeError"), TypeError, message)
 }
 
-func newRangeError(rt *goja.Runtime, message string) *jsError {
+func newRangeError(rt *sobek.Runtime, message string) *jsError {
 	return newJsError(rt, rt.Get("RangeError"), RangeError, message)
 }
 
-func newJsError(rt *goja.Runtime, base goja.Value, kind errorKind, message string) *jsError {
-	constructor, ok := goja.AssertConstructor(base)
+func newJsError(rt *sobek.Runtime, base sobek.Value, kind errorKind, message string) *jsError {
+	constructor, ok := sobek.AssertConstructor(base)
 	if !ok {
 		throw(rt, newError(kind, message))
 	}
@@ -28,9 +28,9 @@ func newJsError(rt *goja.Runtime, base goja.Value, kind errorKind, message strin
 //
 // We need to use it because whenever we need to return a [TypeError]
 // or a [RangeError], we want to use original JS errors, which can be
-// retrieved from Goja, for instance with: goja.Runtime.Get("TypeError").
+// retrieved from Goja, for instance with: sobek.Runtime.Get("TypeError").
 //
-// However, that is implemented as a [*goja.Object], but sometimes we
+// However, that is implemented as a [*sobek.Object], but sometimes we
 // need to return that error as a Go [error], or even keep the instance
 // in memory to be returned/thrown later.
 //
@@ -38,7 +38,7 @@ func newJsError(rt *goja.Runtime, base goja.Value, kind errorKind, message strin
 // Otherwise, we would need to replace everything typed as [error] with
 // [any] to be compatible, and that would be a mess.
 type jsError struct {
-	err *goja.Object
+	err *sobek.Object
 	msg string
 }
 
@@ -46,7 +46,7 @@ func (e *jsError) Error() string {
 	return e.msg
 }
 
-func (e *jsError) Err() *goja.Object {
+func (e *jsError) Err() *sobek.Object {
 	return e.err
 }
 
@@ -97,7 +97,7 @@ func (e *streamError) Error() string {
 	return e.Name + ":" + e.Message
 }
 
-func throw(rt *goja.Runtime, err any) {
+func throw(rt *sobek.Runtime, err any) {
 	if e, ok := err.(*jsError); ok {
 		panic(e.Err())
 	}
@@ -105,13 +105,13 @@ func throw(rt *goja.Runtime, err any) {
 	panic(errToObj(rt, err))
 }
 
-func errToObj(rt *goja.Runtime, err any) goja.Value {
+func errToObj(rt *sobek.Runtime, err any) sobek.Value {
 	// Undefined remains undefined.
-	if goja.IsUndefined(rt.ToValue(err)) {
+	if sobek.IsUndefined(rt.ToValue(err)) {
 		return rt.ToValue(err)
 	}
 
-	if e, ok := err.(*goja.Exception); ok {
+	if e, ok := err.(*sobek.Exception); ok {
 		return e.Value().ToObject(rt)
 	}
 
