@@ -39,6 +39,7 @@ type (
 		tracesMetadata map[string]string
 		filePersister  filePersister
 		testRunID      string
+		isSync         bool // remove later
 	}
 
 	// JSModule exposes the properties available to the JS script.
@@ -64,6 +65,17 @@ func New() *RootModule {
 	return &RootModule{
 		PidRegistry: &pidRegistry{},
 		initOnce:    &sync.Once{},
+	}
+}
+
+// NewSync returns a pointer to a new RootModule instance that maps the
+// browser's business logic to the synchronous version of the module's
+// JS API.
+func NewSync() *RootModule {
+	return &RootModule{
+		PidRegistry: &pidRegistry{},
+		initOnce:    &sync.Once{},
+		isSync:      true,
 	}
 }
 
