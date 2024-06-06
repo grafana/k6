@@ -90,9 +90,17 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	m.initOnce.Do(func() {
 		m.initialize(vu)
 	})
+
+	// decide whether to map the browser module to the async JS API or
+	// the sync one.
+	mapper := mapBrowserToGoja
+	if m.isSync {
+		mapper = syncMapBrowserToGoja
+	}
+
 	return &ModuleInstance{
 		mod: &JSModule{
-			Browser: mapBrowserToGoja(moduleVU{
+			Browser: mapper(moduleVU{
 				VU:          vu,
 				pidRegistry: m.PidRegistry,
 				browserRegistry: newBrowserRegistry(
