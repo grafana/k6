@@ -5,7 +5,7 @@ import (
 	"os"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 )
 
@@ -35,7 +35,7 @@ func newFileConsole(filepath string, formatter logrus.Formatter, level logrus.Le
 	return &console{l}, nil
 }
 
-func (c console) log(level logrus.Level, args ...goja.Value) {
+func (c console) log(level logrus.Level, args ...sobek.Value) {
 	var strs strings.Builder
 	for i := 0; i < len(args); i++ {
 		if i > 0 {
@@ -57,27 +57,27 @@ func (c console) log(level logrus.Level, args ...goja.Value) {
 	}
 }
 
-func (c console) Log(args ...goja.Value) {
+func (c console) Log(args ...sobek.Value) {
 	c.Info(args...)
 }
 
-func (c console) Debug(args ...goja.Value) {
+func (c console) Debug(args ...sobek.Value) {
 	c.log(logrus.DebugLevel, args...)
 }
 
-func (c console) Info(args ...goja.Value) {
+func (c console) Info(args ...sobek.Value) {
 	c.log(logrus.InfoLevel, args...)
 }
 
-func (c console) Warn(args ...goja.Value) {
+func (c console) Warn(args ...sobek.Value) {
 	c.log(logrus.WarnLevel, args...)
 }
 
-func (c console) Error(args ...goja.Value) {
+func (c console) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
-func (c console) valueString(v goja.Value) string {
+func (c console) valueString(v sobek.Value) string {
 	mv, ok := v.(json.Marshaler)
 	if !ok {
 		return v.String()

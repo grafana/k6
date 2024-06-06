@@ -3,17 +3,17 @@ package common
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // FreezeObject replicates the JavaScript Object.freeze function.
-func FreezeObject(rt *goja.Runtime, obj goja.Value) error {
+func FreezeObject(rt *sobek.Runtime, obj sobek.Value) error {
 	global := rt.GlobalObject().Get("Object").ToObject(rt)
-	freeze, ok := goja.AssertFunction(global.Get("freeze"))
+	freeze, ok := sobek.AssertFunction(global.Get("freeze"))
 	if !ok {
 		panic("failed to get the Object.freeze function from the runtime")
 	}
-	isFrozen, ok := goja.AssertFunction(global.Get("isFrozen"))
+	isFrozen, ok := sobek.AssertFunction(global.Get("isFrozen"))
 	if !ok {
 		panic("failed to get the Object.isFrozen function from the runtime")
 	}
@@ -27,18 +27,18 @@ func FreezeObject(rt *goja.Runtime, obj goja.Value) error {
 }
 
 type freezing struct {
-	rt       *goja.Runtime
-	global   goja.Value
-	freeze   goja.Callable
-	isFrozen goja.Callable
+	rt       *sobek.Runtime
+	global   sobek.Value
+	freeze   sobek.Callable
+	isFrozen sobek.Callable
 }
 
-func (f *freezing) deepFreeze(val goja.Value) error {
-	if val != nil && goja.IsNull(val) {
+func (f *freezing) deepFreeze(val sobek.Value) error {
+	if val != nil && sobek.IsNull(val) {
 		return nil
 	}
 
-	_, err := f.freeze(goja.Undefined(), val)
+	_, err := f.freeze(sobek.Undefined(), val)
 	if err != nil {
 		return fmt.Errorf("object freeze failed: %w", err)
 	}
@@ -53,7 +53,7 @@ func (f *freezing) deepFreeze(val goja.Value) error {
 		if prop == nil {
 			continue
 		}
-		frozen, err := f.isFrozen(goja.Undefined(), prop)
+		frozen, err := f.isFrozen(sobek.Undefined(), prop)
 		if err != nil {
 			return err
 		}

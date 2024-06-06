@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -25,13 +25,13 @@ type Metric struct {
 // ErrMetricsAddInInitContext is error returned when adding to metric is done in the init context
 var ErrMetricsAddInInitContext = common.NewInitContextError("Adding to metrics in the init context is not supported")
 
-func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t metrics.MetricType) (*goja.Object, error) {
+func (mi *ModuleInstance) newMetric(call sobek.ConstructorCall, t metrics.MetricType) (*sobek.Object, error) {
 	initEnv := mi.vu.InitEnv()
 	if initEnv == nil {
 		return nil, errors.New("metrics must be declared in the init context")
 	}
 	rt := mi.vu.Runtime()
-	c, _ := goja.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*goja.Object, error) {
+	c, _ := sobek.AssertFunction(rt.ToValue(func(name string, isTime ...bool) (*sobek.Object, error) {
 		valueType := metrics.Default
 		if len(isTime) > 0 && isTime[0] {
 			valueType = metrics.Time
@@ -42,7 +42,7 @@ func (mi *ModuleInstance) newMetric(call goja.ConstructorCall, t metrics.MetricT
 		}
 		metric := &Metric{metric: m, vu: mi.vu}
 		o := rt.NewObject()
-		err = o.DefineDataProperty("name", rt.ToValue(name), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		err = o.DefineDataProperty("name", rt.ToValue(name), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 		if err != nil {
 			return nil, err
 		}
@@ -74,7 +74,7 @@ func limitValue(v string) string {
 	}, string(omitMsg))
 }
 
-func (m Metric) add(v goja.Value, addTags goja.Value) (bool, error) {
+func (m Metric) add(v sobek.Value, addTags sobek.Value) (bool, error) {
 	state := m.vu.State()
 	if state == nil {
 		return false, ErrMetricsAddInInitContext
@@ -97,7 +97,7 @@ func (m Metric) add(v goja.Value, addTags goja.Value) (bool, error) {
 		return raiseErr(fmt.Errorf("no value was provided for metric '%s', a number or a boolean value is expected",
 			m.metric.Name))
 	}
-	if goja.IsNull(v) {
+	if sobek.IsNull(v) {
 		return raiseNan()
 	}
 
@@ -165,7 +165,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 }
 
 // XCounter is a counter constructor
-func (mi *ModuleInstance) XCounter(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+func (mi *ModuleInstance) XCounter(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	v, err := mi.newMetric(call, metrics.Counter)
 	if err != nil {
 		common.Throw(rt, err)
@@ -174,7 +174,7 @@ func (mi *ModuleInstance) XCounter(call goja.ConstructorCall, rt *goja.Runtime) 
 }
 
 // XGauge is a gauge constructor
-func (mi *ModuleInstance) XGauge(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+func (mi *ModuleInstance) XGauge(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	v, err := mi.newMetric(call, metrics.Gauge)
 	if err != nil {
 		common.Throw(rt, err)
@@ -183,7 +183,7 @@ func (mi *ModuleInstance) XGauge(call goja.ConstructorCall, rt *goja.Runtime) *g
 }
 
 // XTrend is a trend constructor
-func (mi *ModuleInstance) XTrend(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+func (mi *ModuleInstance) XTrend(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	v, err := mi.newMetric(call, metrics.Trend)
 	if err != nil {
 		common.Throw(rt, err)
@@ -192,7 +192,7 @@ func (mi *ModuleInstance) XTrend(call goja.ConstructorCall, rt *goja.Runtime) *g
 }
 
 // XRate is a rate constructor
-func (mi *ModuleInstance) XRate(call goja.ConstructorCall, rt *goja.Runtime) *goja.Object {
+func (mi *ModuleInstance) XRate(call sobek.ConstructorCall, rt *sobek.Runtime) *sobek.Object {
 	v, err := mi.newMetric(call, metrics.Rate)
 	if err != nil {
 		common.Throw(rt, err)

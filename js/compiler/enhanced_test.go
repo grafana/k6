@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib"
@@ -73,7 +73,7 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, `var import_something = require("something");
 `, code)
-		rt := goja.New()
+		rt := sobek.New()
 		var requireCalled bool
 		require.NoError(t, rt.Set("require", func(s string) {
 			assert.Equal(t, "something", s)

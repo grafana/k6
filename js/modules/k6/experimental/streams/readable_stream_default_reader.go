@@ -1,7 +1,7 @@
 package streams
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 )
 
@@ -14,16 +14,16 @@ type ReadableStreamDefaultReader struct {
 	readRequests []ReadRequest
 }
 
-// NewReadableStreamDefaultReaderObject creates a new goja.Object from a [ReadableStreamDefaultReader] instance.
-func NewReadableStreamDefaultReaderObject(reader *ReadableStreamDefaultReader) (*goja.Object, error) {
+// NewReadableStreamDefaultReaderObject creates a new sobek.Object from a [ReadableStreamDefaultReader] instance.
+func NewReadableStreamDefaultReaderObject(reader *ReadableStreamDefaultReader) (*sobek.Object, error) {
 	rt := reader.stream.runtime
 	obj := rt.NewObject()
 	objName := "ReadableStreamDefaultReader"
 
-	err := obj.DefineAccessorProperty("closed", rt.ToValue(func() *goja.Promise {
+	err := obj.DefineAccessorProperty("closed", rt.ToValue(func() *sobek.Promise {
 		p, _, _ := reader.GetClosed()
 		return p
-	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	if err != nil {
 		return nil, err
 	}
@@ -47,8 +47,8 @@ func NewReadableStreamDefaultReaderObject(reader *ReadableStreamDefaultReader) (
 // Ensure the ReadableStreamReader interface is implemented correctly
 var _ ReadableStreamReader = &ReadableStreamDefaultReader{}
 
-// Read returns a [goja.Promise] providing access to the next chunk in the stream's internal queue.
-func (reader *ReadableStreamDefaultReader) Read() *goja.Promise {
+// Read returns a [sobek.Promise] providing access to the next chunk in the stream's internal queue.
+func (reader *ReadableStreamDefaultReader) Read() *sobek.Promise {
 	stream := reader.GetStream()
 
 	// 1. If this.[[stream]] is undefined, return a promise rejected with a TypeError exception.
@@ -67,7 +67,7 @@ func (reader *ReadableStreamDefaultReader) Read() *goja.Promise {
 		},
 		closeSteps: func() {
 			// Resolve promise with «[ "value" → undefined, "done" → true ]».
-			resolve(map[string]any{"value": goja.Undefined(), "done": true})
+			resolve(map[string]any{"value": sobek.Undefined(), "done": true})
 		},
 		errorSteps: func(e any) {
 			// Reject promise with e.
@@ -82,7 +82,7 @@ func (reader *ReadableStreamDefaultReader) Read() *goja.Promise {
 	return promise
 }
 
-// Cancel returns a [goja.Promise] that resolves when the stream is canceled.
+// Cancel returns a [sobek.Promise] that resolves when the stream is canceled.
 //
 // Calling this method signals a loss of interest in the stream by a consumer. The
 // supplied reason argument will be given to the underlying source, which may or
@@ -92,7 +92,7 @@ func (reader *ReadableStreamDefaultReader) Read() *goja.Promise {
 // the cancellation. This value may or may not be used.
 //
 // [SetUpReadableStreamDefaultReader]: https://streams.spec.whatwg.org/#set-up-readable-stream-default-reader
-func (reader *ReadableStreamDefaultReader) Cancel(reason goja.Value) *goja.Promise {
+func (reader *ReadableStreamDefaultReader) Cancel(reason sobek.Value) *sobek.Promise {
 	// 1. If this.[[stream]] is undefined, return a promise rejected with a TypeError exception.
 	if reader.stream == nil {
 		return newRejectedPromise(reader.vu, newTypeError(reader.runtime, "stream is undefined").Err())
@@ -107,7 +107,7 @@ func (reader *ReadableStreamDefaultReader) Cancel(reason goja.Value) *goja.Promi
 // It contains the value read from the stream and a boolean indicating whether or not the stream is done.
 // An undefined value indicates that the stream has been closed.
 type ReadResult struct {
-	Value goja.Value
+	Value sobek.Value
 	Done  bool
 }
 

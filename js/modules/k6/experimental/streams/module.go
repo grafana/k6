@@ -5,7 +5,7 @@ import (
 	"errors"
 	"io"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -48,19 +48,19 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 }
 
 // NewReadableStream is the constructor for the ReadableStream object.
-func (mi *ModuleInstance) NewReadableStream(call goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) NewReadableStream(call sobek.ConstructorCall) *sobek.Object {
 	return newReadableStream(mi.vu, call)
 }
 
-func newReadableStream(vu modules.VU, call goja.ConstructorCall) *goja.Object {
+func newReadableStream(vu modules.VU, call sobek.ConstructorCall) *sobek.Object {
 	var (
 		// 1. If underlyingSource is missing, set it to null.
-		underlyingSource *goja.Object
+		underlyingSource *sobek.Object
 
 		rt = vu.Runtime()
 
 		err                  error
-		strategy             *goja.Object
+		strategy             *sobek.Object
 		underlyingSourceDict UnderlyingSource
 	)
 
@@ -70,7 +70,7 @@ func newReadableStream(vu modules.VU, call goja.ConstructorCall) *goja.Object {
 	strategy = initializeStrategy(rt, call)
 
 	// 2. Let underlyingSourceDict be underlyingSource, converted to an IDL value of type UnderlyingSource.
-	if len(call.Arguments) > 0 && !goja.IsUndefined(call.Arguments[0]) {
+	if len(call.Arguments) > 0 && !sobek.IsUndefined(call.Arguments[0]) {
 		// We first assert that it is an object (requirement)
 		if !isObject(call.Arguments[0]) {
 			throw(rt, newTypeError(rt, "underlyingSource must be an object"))
@@ -119,9 +119,9 @@ func newReadableStream(vu modules.VU, call goja.ConstructorCall) *goja.Object {
 
 	proto := call.This.Prototype()
 	if proto.Get("locked") == nil {
-		err = proto.DefineAccessorProperty("locked", rt.ToValue(func() goja.Value {
+		err = proto.DefineAccessorProperty("locked", rt.ToValue(func() sobek.Value {
 			return rt.ToValue(stream.Locked)
-		}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 		if err != nil {
 			common.Throw(rt, newError(RuntimeError, err.Error()))
 		}
@@ -134,9 +134,9 @@ func newReadableStream(vu modules.VU, call goja.ConstructorCall) *goja.Object {
 
 	return streamObj
 }
-func defaultSizeFunc(_ goja.Value) (float64, error) { return 1.0, nil }
+func defaultSizeFunc(_ sobek.Value) (float64, error) { return 1.0, nil }
 
-func initializeStrategy(rt *goja.Runtime, call goja.ConstructorCall) *goja.Object {
+func initializeStrategy(rt *sobek.Runtime, call sobek.ConstructorCall) *sobek.Object {
 	// Either if the strategy is not provided or if it doesn't have a 'highWaterMark',
 	// we need to set its default value (highWaterMark=1).
 	// https://streams.spec.whatwg.org/#rs-prototype
@@ -164,14 +164,14 @@ func initializeStrategy(rt *goja.Runtime, call goja.ConstructorCall) *goja.Objec
 		size = strArg.Get("size")
 	}
 
-	strCall := goja.ConstructorCall{Arguments: []goja.Value{strArg}}
+	strCall := sobek.ConstructorCall{Arguments: []sobek.Value{strArg}}
 	return newCountQueuingStrategy(rt, strCall, size)
 }
 
 // NewCountQueuingStrategy is the constructor for the [CountQueuingStrategy] object.
 //
 // [CountQueuingStrategy]: https://streams.spec.whatwg.org/#cqs-class
-func (mi *ModuleInstance) NewCountQueuingStrategy(call goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) NewCountQueuingStrategy(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 	// By default, the CountQueuingStrategy has a pre-defined 'size' property.
 	// It cannot be overwritten by the user.
@@ -183,10 +183,10 @@ func (mi *ModuleInstance) NewCountQueuingStrategy(call goja.ConstructorCall) *go
 // It allows to create a CountQueuingStrategy with or without the 'size' property,
 // depending on how the containing ReadableStream is initialized.
 func newCountQueuingStrategy(
-	rt *goja.Runtime,
-	call goja.ConstructorCall,
-	size goja.Value,
-) *goja.Object {
+	rt *sobek.Runtime,
+	call sobek.ConstructorCall,
+	size sobek.Value,
+) *sobek.Object {
 	obj := rt.NewObject()
 	objName := "CountQueuingStrategy"
 
@@ -222,7 +222,7 @@ func newCountQueuingStrategy(
 // It implements the [ExtractHighWaterMark] algorithm.
 //
 // [ExtractHighWaterMark]: https://streams.spec.whatwg.org/#validate-and-normalize-high-water-mark
-func extractHighWaterMark(rt *goja.Runtime, strategy *goja.Object, defaultHWM float64) float64 {
+func extractHighWaterMark(rt *sobek.Runtime, strategy *sobek.Object, defaultHWM float64) float64 {
 	// 1. If strategy["highWaterMark"] does not exist, return defaultHWM.
 	if common.IsNullish(strategy.Get("highWaterMark")) {
 		return defaultHWM
@@ -232,7 +232,7 @@ func extractHighWaterMark(rt *goja.Runtime, strategy *goja.Object, defaultHWM fl
 	highWaterMark := strategy.Get("highWaterMark")
 
 	// 3. If highWaterMark is NaN or highWaterMark < 0, throw a RangeError exception.
-	if goja.IsNaN(strategy.Get("highWaterMark")) ||
+	if sobek.IsNaN(strategy.Get("highWaterMark")) ||
 		!isNumber(strategy.Get("highWaterMark")) ||
 		!isNonNegativeNumber(strategy.Get("highWaterMark")) {
 		throw(rt, newRangeError(rt, "highWaterMark must be a non-negative number"))
@@ -247,16 +247,16 @@ func extractHighWaterMark(rt *goja.Runtime, strategy *goja.Object, defaultHWM fl
 // It implements the [ExtractSizeAlgorithm] algorithm.
 //
 // [ExtractSizeAlgorithm]: https://streams.spec.whatwg.org/#make-size-algorithm-from-size-function
-func extractSizeAlgorithm(rt *goja.Runtime, strategy *goja.Object) SizeAlgorithm {
-	var sizeFunc goja.Callable
+func extractSizeAlgorithm(rt *sobek.Runtime, strategy *sobek.Object) SizeAlgorithm {
+	var sizeFunc sobek.Callable
 	sizeProp := strategy.Get("size")
 
 	if common.IsNullish(sizeProp) {
-		sizeFunc, _ = goja.AssertFunction(rt.ToValue(func(_ goja.Value) (float64, error) { return 1.0, nil }))
+		sizeFunc, _ = sobek.AssertFunction(rt.ToValue(func(_ sobek.Value) (float64, error) { return 1.0, nil }))
 		return sizeFunc
 	}
 
-	sizeFunc, isFunc := goja.AssertFunction(sizeProp)
+	sizeFunc, isFunc := sobek.AssertFunction(sizeProp)
 	if !isFunc {
 		throw(rt, newTypeError(rt, "size must be a function"))
 	}
@@ -267,7 +267,7 @@ func extractSizeAlgorithm(rt *goja.Runtime, strategy *goja.Object) SizeAlgorithm
 // NewReadableStreamDefaultReader is the constructor for the [ReadableStreamDefaultReader] object.
 //
 // [ReadableStreamDefaultReader]: https://streams.spec.whatwg.org/#readablestreamdefaultreader
-func (mi *ModuleInstance) NewReadableStreamDefaultReader(call goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) NewReadableStreamDefaultReader(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 
 	if len(call.Arguments) != 1 {
@@ -291,25 +291,25 @@ func (mi *ModuleInstance) NewReadableStreamDefaultReader(call goja.ConstructorCa
 	return object
 }
 
-// NewReadableStreamForReader is the equivalent of [NewReadableStreamDefaultReader] but to initialize
+// NewReadableStreamFromReader is the equivalent of [NewReadableStreamDefaultReader] but to initialize
 // a new [ReadableStream] from a given [io.Reader] in Go code.
 // It is useful for those situations when a [io.Reader] needs to be surfaced up to the JS runtime.
-func NewReadableStreamFromReader(vu modules.VU, reader io.Reader) *goja.Object {
+func NewReadableStreamFromReader(vu modules.VU, reader io.Reader) *sobek.Object {
 	rt := vu.Runtime()
-	return newReadableStream(vu, goja.ConstructorCall{
-		Arguments: []goja.Value{rt.ToValue(underlyingSourceForReader(vu, reader))},
+	return newReadableStream(vu, sobek.ConstructorCall{
+		Arguments: []sobek.Value{rt.ToValue(underlyingSourceForReader(vu, reader))},
 		This:      rt.NewObject(),
 	})
 }
 
-func underlyingSourceForReader(vu modules.VU, reader io.Reader) *goja.Object {
+func underlyingSourceForReader(vu modules.VU, reader io.Reader) *sobek.Object {
 	rt := vu.Runtime()
 
 	underlyingSource := vu.Runtime().NewObject()
-	if err := underlyingSource.Set("pull", rt.ToValue(func(controller *goja.Object) *goja.Promise {
+	if err := underlyingSource.Set("pull", rt.ToValue(func(controller *sobek.Object) *sobek.Promise {
 		// Prepare methods
-		cClose, _ := goja.AssertFunction(controller.Get("close"))
-		cEnqueue, _ := goja.AssertFunction(controller.Get("enqueue"))
+		cClose, _ := sobek.AssertFunction(controller.Get("close"))
+		cEnqueue, _ := sobek.AssertFunction(controller.Get("enqueue"))
 
 		buf := make([]byte, 1024)
 		n, err := reader.Read(buf)
@@ -329,7 +329,7 @@ func underlyingSourceForReader(vu modules.VU, reader io.Reader) *goja.Object {
 			}
 		}
 
-		return newResolvedPromise(vu, goja.Undefined())
+		return newResolvedPromise(vu, sobek.Undefined())
 	})); err != nil {
 		throw(rt, err)
 	}

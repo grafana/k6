@@ -6,7 +6,7 @@ import (
 	"net/url"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/eventloop"
@@ -33,7 +33,7 @@ func NewRuntime(t testing.TB) *Runtime {
 	t.Cleanup(cancel)
 	vu := &VU{
 		CtxField:     ctx,
-		RuntimeField: goja.New(),
+		RuntimeField: sobek.New(),
 	}
 	vu.RuntimeField.SetFieldNameMapper(common.FieldNameMapper{})
 	vu.InitEnvField = &common.InitEnvironment{
@@ -100,7 +100,7 @@ func (r *Runtime) SetupModuleSystemFromAnother(another *Runtime) error {
 //	    `)
 //	    require.NoError(t, err)
 //	}
-func (r *Runtime) RunOnEventLoop(code string) (value goja.Value, err error) {
+func (r *Runtime) RunOnEventLoop(code string) (value sobek.Value, err error) {
 	defer r.EventLoop.WaitOnRegistered()
 
 	err = r.EventLoop.Start(func() error {

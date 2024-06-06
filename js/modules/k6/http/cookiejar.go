@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 )
 
@@ -41,7 +41,7 @@ func (j CookieJar) CookiesForURL(url string) map[string][]string {
 }
 
 // Set sets a cookie for a particular url with the given name value and additional opts
-func (j CookieJar) Set(url, name, value string, opts goja.Value) (bool, error) {
+func (j CookieJar) Set(url, name, value string, opts sobek.Value) (bool, error) {
 	rt := j.moduleInstance.vu.Runtime()
 
 	u, err := neturl.Parse(url)
@@ -51,7 +51,7 @@ func (j CookieJar) Set(url, name, value string, opts goja.Value) (bool, error) {
 
 	c := http.Cookie{Name: name, Value: value}
 	paramsV := opts
-	if paramsV != nil && !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
+	if paramsV != nil && !sobek.IsUndefined(paramsV) && !sobek.IsNull(paramsV) {
 		params := paramsV.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch strings.ToLower(k) {

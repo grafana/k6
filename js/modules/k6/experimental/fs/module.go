@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/promises"
@@ -64,7 +64,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 }
 
 // Open opens a file and returns a promise that will resolve to a [File] instance
-func (mi *ModuleInstance) Open(path goja.Value) *goja.Promise {
+func (mi *ModuleInstance) Open(path sobek.Value) *sobek.Promise {
 	promise, resolve, reject := promises.New(mi.vu)
 
 	if mi.vu.State() != nil {
@@ -171,7 +171,7 @@ type File struct {
 
 // Stat returns a promise that will resolve to a [FileInfo] instance describing
 // the file.
-func (f *File) Stat() *goja.Promise {
+func (f *File) Stat() *sobek.Promise {
 	promise, resolve, _ := promises.New(f.vu)
 
 	go func() {
@@ -188,7 +188,7 @@ func (f *File) Stat() *goja.Promise {
 //
 // It is possible for a read to successfully return with 0 bytes.
 // This does not indicate EOF.
-func (f *File) Read(into goja.Value) *goja.Promise {
+func (f *File) Read(into sobek.Value) *sobek.Promise {
 	promise, resolve, reject := f.vu.Runtime().NewPromise()
 
 	if common.IsNullish(into) {
@@ -203,7 +203,7 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 	}
 
 	// Obtain the underlying ArrayBuffer from the Uint8Array
-	ab, ok := intoObj.Get("buffer").Export().(goja.ArrayBuffer)
+	ab, ok := intoObj.Get("buffer").Export().(sobek.ArrayBuffer)
 	if !ok {
 		reject(newFsError(TypeError, "read() failed; reason: into argument must be a Uint8Array"))
 		return promise
@@ -240,7 +240,7 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 			}
 
 			if fsErr.kind == EOFError && n == 0 {
-				resolve(goja.Null())
+				resolve(sobek.Null())
 			} else {
 				resolve(n)
 			}
@@ -257,7 +257,7 @@ func (f *File) Read(into goja.Value) *goja.Promise {
 // The returned promise resolves to the new `offset` (position) within the file, which
 // is expressed in bytes from the selected start, current, or end position depending
 // the provided `whence`.
-func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
+func (f *File) Seek(offset sobek.Value, whence sobek.Value) *sobek.Promise {
 	promise, resolve, reject := f.vu.Runtime().NewPromise()
 
 	intOffset, err := exportInt(offset)
@@ -298,7 +298,7 @@ func (f *File) Seek(offset goja.Value, whence goja.Value) *goja.Promise {
 	return promise
 }
 
-func isUint8Array(rt *goja.Runtime, o *goja.Object) bool {
+func isUint8Array(rt *sobek.Runtime, o *sobek.Object) bool {
 	uint8ArrayConstructor := rt.Get("Uint8Array")
 	if isUint8Array := o.Get("constructor").SameAs(uint8ArrayConstructor); !isUint8Array {
 		return false
@@ -307,7 +307,7 @@ func isUint8Array(rt *goja.Runtime, o *goja.Object) bool {
 	return true
 }
 
-func exportInt(v goja.Value) (int64, error) {
+func exportInt(v sobek.Value) (int64, error) {
 	if common.IsNullish(v) {
 		return 0, errors.New("cannot be null or undefined")
 	}
