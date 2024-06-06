@@ -1416,7 +1416,8 @@ func (h *ElementHandle) tap(_ context.Context, p *Position) error {
 }
 
 // TextContent returns the text content of the element.
-func (h *ElementHandle) TextContent() (string, error) {
+// The second return value is true if the text content exists, and false otherwise.
+func (h *ElementHandle) TextContent() (string, bool, error) {
 	textContent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.textContent(apiCtx)
 	}
@@ -1426,17 +1427,20 @@ func (h *ElementHandle) TextContent() (string, error) {
 	)
 	v, err := call(h.ctx, textContentAction, opts.Timeout)
 	if err != nil {
-		return "", fmt.Errorf("getting text content of element: %w", err)
+		return "", false, fmt.Errorf("getting text content of element: %w", err)
 	}
-
-	applySlowMo(h.ctx)
-
+	if v == nil {
+		return "", false, nil
+	}
 	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+		return "", false, fmt.Errorf(
+			"getting text content of element: unexpected type %T (expecting string)",
+			v,
+		)
 	}
 
-	return s, nil
+	return s, true, nil
 }
 
 // Timeout will return the default timeout or the one set by the user.

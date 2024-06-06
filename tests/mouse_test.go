@@ -31,8 +31,9 @@ func TestMouseActions(t *testing.T) {
 		require.NoError(t, m.Click(box.X, box.Y, nil))
 
 		// Verify the button's text changed
-		text, err := button.TextContent()
+		text, ok, err := button.TextContent()
 		require.NoError(t, err)
+		require.True(t, ok)
 		assert.Equal(t, "Clicked!", text)
 	})
 
@@ -63,15 +64,17 @@ func TestMouseActions(t *testing.T) {
 		require.NoError(t, m.DblClick(box.X, box.Y, nil))
 
 		// Verify the button's text changed
-		text, err := button.TextContent()
+		text, ok, err := button.TextContent()
 		require.NoError(t, err)
+		require.True(t, ok)
 		assert.Equal(t, "Double Clicked!", text)
 
 		// Also verify that the element was clicked twice
 		clickCountDiv, err := p.Query("div#clicks")
 		require.NoError(t, err)
-		text, err = clickCountDiv.TextContent()
+		text, ok, err = clickCountDiv.TextContent()
 		require.NoError(t, err)
+		require.True(t, ok)
 		assert.Equal(t, "2", text)
 	})
 
@@ -97,8 +100,9 @@ func TestMouseActions(t *testing.T) {
 		// Simulate mouse move within the div
 		box := area.BoundingBox()
 		require.NoError(t, m.Move(box.X+50, box.Y+50, nil)) // Move to the center of the div
-		text, err := area.TextContent()
+		text, ok, err := area.TextContent()
 		require.NoError(t, err)
+		require.True(t, ok)
 		assert.Equal(t, "Mouse Moved", text)
 	})
 
@@ -124,12 +128,14 @@ func TestMouseActions(t *testing.T) {
 		box := button.BoundingBox()
 		require.NoError(t, m.Move(box.X, box.Y, nil))
 		require.NoError(t, m.Down(nil))
-		text, err := button.TextContent()
+		text, ok, err := button.TextContent()
 		require.NoError(t, err)
+		require.True(t, ok)
 		assert.Equal(t, "Mouse Down", text)
 		require.NoError(t, m.Up(nil))
-		text, err = button.TextContent()
+		text, ok, err = button.TextContent()
 		require.NoError(t, err)
+		require.True(t, ok)
 		assert.Equal(t, "Mouse Up", text)
 	})
 }

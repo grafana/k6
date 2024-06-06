@@ -187,7 +187,14 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 		},
 		"textContent": func() *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return eh.TextContent() //nolint:wrapcheck
+				s, ok, err := eh.TextContent()
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				if !ok {
+					return nil, nil
+				}
+				return s, nil
 			})
 		},
 		"type": func(text string, opts goja.Value) *goja.Promise {
