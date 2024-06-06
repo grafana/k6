@@ -529,3 +529,49 @@ func TestElementHandleQuery(t *testing.T) {
 	require.NoError(t, err)
 	require.Nil(t, element)
 }
+
+func TestElementHandleTextContent(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<div id="el">Something</div>`, nil)
+	require.NoError(t, err)
+
+	el, err := p.Query("#el")
+	require.NoError(t, err)
+
+	got, ok, err := el.TextContent()
+	require.NoError(t, err)
+	require.True(t, ok)
+	assert.Equal(t, "Something", got)
+}
+
+func TestElementHandleTextContentMissing(t *testing.T) {
+	t.Parallel()
+
+	tb := newTestBrowser(t)
+	p := tb.NewPage(nil)
+
+	// document never has text content.
+	js, err := p.EvaluateHandle(`() => document`)
+	require.NoError(t, err)
+	_, ok, err := js.AsElement().TextContent()
+	require.NoError(t, err)
+	require.False(t, ok)
+}
+
+func TestElementHandleTextContentEmpty(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<div id="el"/>`, nil)
+	require.NoError(t, err)
+
+	el, err := p.Query("#el")
+	require.NoError(t, err)
+
+	got, ok, err := el.TextContent()
+	require.NoError(t, err)
+	require.True(t, ok)
+	require.Empty(t, got)
+}
