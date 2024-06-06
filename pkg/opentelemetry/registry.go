@@ -13,10 +13,10 @@ type registry struct {
 	meter  otelMetric.Meter
 	logger logrus.FieldLogger
 
-	counters       sync.Map
-	upDownCounters sync.Map
-	histograms     sync.Map
-	rateCounters   sync.Map
+	counters     sync.Map
+	gauges       sync.Map
+	histograms   sync.Map
+	rateCounters sync.Map
 }
 
 // newRegistry creates a new registry.
@@ -67,26 +67,6 @@ func (r *registry) getOrCreateHistogram(name string) (otelMetric.Float64Histogra
 	return h, nil
 }
 
-func (r *registry) getOrCreateUpDownCounter(name string) (otelMetric.Float64UpDownCounter, error) {
-	if counter, ok := r.upDownCounters.Load(name); ok {
-		if v, ok := counter.(otelMetric.Float64UpDownCounter); ok {
-			return v, nil
-		}
-
-		return nil, fmt.Errorf("metric %q is not an up/down counter", name)
-	}
-
-	c, err := r.meter.Float64UpDownCounter(name)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create up/down counter for %q: %w", name, err)
-	}
-
-	r.logger.Debugf("registered up/down counter (gauge) metric %q ", name)
-
-	r.upDownCounters.Store(name, c)
-	return c, nil
-}
-
 func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Counter, otelMetric.Int64Counter, error) {
 	// k6's rate metric tracks how frequently a non-zero value occurs.
 	// so to correctly calculate the rate in a metrics backend
@@ -133,4 +113,25 @@ func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Coun
 	}
 
 	return nonZeroCounter, totalCounter, nil
+}
+
+func (r *registry) getOrCreateGauge(name string) (*Float64Gauge, error) {
+	if gauge, ok := r.gauges.Load(name); ok {
+		if v, ok := gauge.(*Float64Gauge); ok {
+			return v, nil
+		}
+
+		return nil, fmt.Errorf("metric %q is not a gauge", name)
+	}
+
+	g := NewFloat64Gauge()
+	_, err := r.meter.Float64ObservableGauge(name, otelMetric.WithFloat64Callback(g.Callback))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gauge for %q: %w", name, err)
+	}
+
+	r.logger.Debugf("registered gauge metric %q ", name)
+
+	r.gauges.Store(name, g)
+	return g, nil
 }

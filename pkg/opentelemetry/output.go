@@ -145,6 +145,9 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 	ctx := context.Background()
 	name := normalizeMetricName(o.config, entry.Metric.Name)
 
+	attributeSet := newAttributeSet(entry.Tags)
+	attributeSetOpt := otelMetric.WithAttributeSet(attributeSet)
+
 	switch entry.Metric.Type {
 	case metrics.Counter:
 		counter, err := o.metricsRegistry.getOrCreateCounter(name)
@@ -152,21 +155,21 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 			return err
 		}
 
-		counter.Add(ctx, entry.Value, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
+		counter.Add(ctx, entry.Value, attributeSetOpt)
 	case metrics.Gauge:
-		gauge, err := o.metricsRegistry.getOrCreateUpDownCounter(name)
+		gauge, err := o.metricsRegistry.getOrCreateGauge(name)
 		if err != nil {
 			return err
 		}
 
-		gauge.Add(ctx, entry.Value, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
+		gauge.Set(entry.Value, attributeSet)
 	case metrics.Trend:
 		trend, err := o.metricsRegistry.getOrCreateHistogram(name)
 		if err != nil {
 			return err
 		}
 
-		trend.Record(ctx, entry.Value, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
+		trend.Record(ctx, entry.Value, attributeSetOpt)
 	case metrics.Rate:
 		nonZero, total, err := o.metricsRegistry.getOrCreateCountersForRate(name)
 		if err != nil {
@@ -174,9 +177,9 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 		}
 
 		if entry.Value != 0 {
-			nonZero.Add(ctx, 1, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
+			nonZero.Add(ctx, 1, attributeSetOpt)
 		}
-		total.Add(ctx, 1, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
+		total.Add(ctx, 1, attributeSetOpt)
 	default:
 		o.logger.Warnf("metric %q has unsupported metric type", entry.Metric.Name)
 	}

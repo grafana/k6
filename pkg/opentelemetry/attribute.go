@@ -6,12 +6,12 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 )
 
-// MapTagSet converts a k6 tag set into
+// newAttributeSet converts a k6 tag set into
 // the equivalent set of opentelemetry attributes
-func MapTagSet(t *metrics.TagSet) []attribute.KeyValue {
+func newAttributeSet(t *metrics.TagSet) attribute.Set {
 	n := (*atlas.Node)(t)
 	if n.Len() < 1 {
-		return nil
+		return *attribute.EmptySet()
 	}
 	labels := make([]attribute.KeyValue, 0, n.Len())
 	for !n.IsRoot() {
@@ -22,5 +22,6 @@ func MapTagSet(t *metrics.TagSet) []attribute.KeyValue {
 		}
 		labels = append(labels, attribute.String(key, value))
 	}
-	return labels
+
+	return attribute.NewSet(labels...)
 }
