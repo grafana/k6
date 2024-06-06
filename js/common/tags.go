@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/metrics"
 )
 
@@ -12,8 +12,8 @@ import (
 // user specified custom tags and metadata.
 // It expects to receive the `keyValues` object in the `{key1: value1, key2:
 // value2, ...}` format.
-func ApplyCustomUserTags(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, keyValues goja.Value) error {
-	if keyValues == nil || goja.IsNull(keyValues) || goja.IsUndefined(keyValues) {
+func ApplyCustomUserTags(rt *sobek.Runtime, tagsAndMeta *metrics.TagsAndMeta, keyValues sobek.Value) error {
+	if keyValues == nil || sobek.IsNull(keyValues) || sobek.IsUndefined(keyValues) {
 		return nil
 	}
 
@@ -30,7 +30,7 @@ func ApplyCustomUserTags(rt *goja.Runtime, tagsAndMeta *metrics.TagsAndMeta, key
 
 // ApplyCustomUserTag modifies the given metrics.TagsAndMeta object with the
 // given custom tag and theirs value.
-func ApplyCustomUserTag(tagsAndMeta *metrics.TagsAndMeta, key string, val goja.Value) error {
+func ApplyCustomUserTag(tagsAndMeta *metrics.TagsAndMeta, key string, val sobek.Value) error {
 	kind := reflect.Invalid
 	if typ := val.ExportType(); typ != nil {
 		kind = typ.Kind()
@@ -57,7 +57,7 @@ func ApplyCustomUserTag(tagsAndMeta *metrics.TagsAndMeta, key string, val goja.V
 
 // ApplyCustomUserMetadata modifies the given metrics.TagsAndMeta object with the
 // given custom metadata and their value.
-func ApplyCustomUserMetadata(tagsAndMeta *metrics.TagsAndMeta, key string, val goja.Value) error {
+func ApplyCustomUserMetadata(tagsAndMeta *metrics.TagsAndMeta, key string, val sobek.Value) error {
 	kind := reflect.Invalid
 	if typ := val.ExportType(); typ != nil {
 		kind = typ.Kind()

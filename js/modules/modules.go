@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
@@ -56,8 +56,8 @@ type VU interface {
 	// State returns lib.State if any is present
 	State() *lib.State
 
-	// Runtime returns the goja.Runtime for the current VU
-	Runtime() *goja.Runtime
+	// Runtime returns the sobek.Runtime for the current VU
+	Runtime() *sobek.Runtime
 
 	// RegisterCallback lets a JS module declare that it wants to run a function
 	// on the event loop *at a later point in time*. See the documentation for

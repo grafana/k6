@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/dop251/goja/parser"
 	"github.com/go-sourcemap/sourcemap"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/lib"
@@ -72,11 +72,11 @@ var (
 	maxSrcLenForBabelSourceMap     = 250 * 1024 //nolint:gochecknoglobals
 	maxSrcLenForBabelSourceMapOnce sync.Once    //nolint:gochecknoglobals
 
-	onceBabelCode      sync.Once     //nolint:gochecknoglobals
-	globalBabelCode    *goja.Program //nolint:gochecknoglobals
-	errGlobalBabelCode error         //nolint:gochecknoglobals
-	onceBabel          sync.Once     //nolint:gochecknoglobals
-	globalBabel        *babel        //nolint:gochecknoglobals
+	onceBabelCode      sync.Once      //nolint:gochecknoglobals
+	globalBabelCode    *sobek.Program //nolint:gochecknoglobals
+	errGlobalBabelCode error          //nolint:gochecknoglobals
+	onceBabel          sync.Once      //nolint:gochecknoglobals
+	globalBabel        *babel         //nolint:gochecknoglobals
 )
 
 const (
@@ -84,7 +84,7 @@ const (
 	sourceMapURLFromBabel             = "k6://internal-should-not-leak/file.map"
 )
 
-// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
+// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a sobek.Program
 type Compiler struct {
 	logger  logrus.FieldLogger
 	babel   *babel
@@ -173,7 +173,7 @@ type compilationState struct {
 
 // Compile the program in the given CompatibilityMode, wrapping it between pre and post code
 // TODO isESM will be used once goja support ESM modules natively
-func (c *Compiler) Compile(src, filename string, isESM bool) (*goja.Program, string, error) {
+func (c *Compiler) Compile(src, filename string, isESM bool) (*sobek.Program, string, error) {
 	return c.compileImpl(src, filename, !isESM, c.Options.CompatibilityMode, nil)
 }
 
@@ -206,7 +206,7 @@ func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 
 func (c *Compiler) compileImpl(
 	src, filename string, wrap bool, compatibilityMode lib.CompatibilityMode, srcMap []byte,
-) (*goja.Program, string, error) {
+) (*sobek.Program, string, error) {
 	code := src
 	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
 	if wrap {
@@ -241,7 +241,7 @@ func (c *Compiler) compileImpl(
 	}
 
 	if err == nil {
-		pgm, err := goja.CompileAST(ast, c.Options.Strict)
+		pgm, err := sobek.CompileAST(ast, c.Options.Strict)
 		return pgm, code, err
 	}
 
@@ -269,20 +269,20 @@ func (c *Compiler) compileImpl(
 }
 
 type babel struct {
-	vm        *goja.Runtime
-	this      goja.Value
-	transform goja.Callable
+	vm        *sobek.Runtime
+	this      sobek.Value
+	transform sobek.Callable
 	m         sync.Mutex
 }
 
 func newBabel() (*babel, error) {
 	onceBabelCode.Do(func() {
-		globalBabelCode, errGlobalBabelCode = goja.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
+		globalBabelCode, errGlobalBabelCode = sobek.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
 	})
 	if errGlobalBabelCode != nil {
 		return nil, errGlobalBabelCode
 	}
-	vm := goja.New()
+	vm := sobek.New()
 	_, err := vm.RunProgram(globalBabelCode)
 	if err != nil {
 		return nil, err
@@ -404,8 +404,8 @@ func (b *babel) transformImpl(
 	if err != nil {
 		return code, nil, err
 	}
-	c, _ := goja.AssertFunction(stringify)
-	mapAsJSON, err := c(goja.Undefined(), vO.Get("map"))
+	c, _ := sobek.AssertFunction(stringify)
+	mapAsJSON, err := c(sobek.Undefined(), vO.Get("map"))
 	if err != nil {
 		return code, nil, err
 	}

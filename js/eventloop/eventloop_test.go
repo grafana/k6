@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/eventloop"
@@ -16,7 +16,7 @@ import (
 
 func TestBasicEventLoop(t *testing.T) {
 	t.Parallel()
-	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
 	var ran int
 	f := func() error { //nolint:unparam
 		ran++
@@ -36,7 +36,7 @@ func TestBasicEventLoop(t *testing.T) {
 
 func TestEventLoopRegistered(t *testing.T) {
 	t.Parallel()
-	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
 	var ran int
 	f := func() error {
 		ran++
@@ -61,7 +61,7 @@ func TestEventLoopRegistered(t *testing.T) {
 func TestEventLoopWaitOnRegistered(t *testing.T) {
 	t.Parallel()
 	var ran int
-	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
 	f := func() error {
 		ran++
 		r := loop.RegisterCallback()
@@ -88,7 +88,7 @@ func TestEventLoopWaitOnRegistered(t *testing.T) {
 func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
 	t.Parallel()
 	sleepTime := time.Millisecond * 500
-	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
 	var called int64
 	f := func() error {
 		for i := 0; i < 100; i++ {
@@ -126,7 +126,7 @@ func TestEventLoopAllCallbacksGetCalled(t *testing.T) {
 
 func TestEventLoopPanicOnDoubleCallback(t *testing.T) {
 	t.Parallel()
-	loop := eventloop.New(&modulestest.VU{RuntimeField: goja.New()})
+	loop := eventloop.New(&modulestest.VU{RuntimeField: sobek.New()})
 	var ran int
 	f := func() error {
 		ran++
@@ -152,7 +152,7 @@ func TestEventLoopPanicOnDoubleCallback(t *testing.T) {
 
 func TestEventLoopRejectUndefined(t *testing.T) {
 	t.Parallel()
-	vu := &modulestest.VU{RuntimeField: goja.New()}
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
 	loop := eventloop.New(vu)
 	err := loop.Start(func() error {
 		_, err := vu.Runtime().RunString("Promise.reject()")
@@ -164,7 +164,7 @@ func TestEventLoopRejectUndefined(t *testing.T) {
 
 func TestEventLoopRejectString(t *testing.T) {
 	t.Parallel()
-	vu := &modulestest.VU{RuntimeField: goja.New()}
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
 	loop := eventloop.New(vu)
 	err := loop.Start(func() error {
 		_, err := vu.Runtime().RunString("Promise.reject('some string')")
@@ -176,7 +176,7 @@ func TestEventLoopRejectString(t *testing.T) {
 
 func TestEventLoopRejectSyntaxError(t *testing.T) {
 	t.Parallel()
-	vu := &modulestest.VU{RuntimeField: goja.New()}
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
 	loop := eventloop.New(vu)
 	err := loop.Start(func() error {
 		_, err := vu.Runtime().RunString("Promise.resolve().then(()=> {some.syntax.error})")
@@ -188,7 +188,7 @@ func TestEventLoopRejectSyntaxError(t *testing.T) {
 
 func TestEventLoopRejectGoError(t *testing.T) {
 	t.Parallel()
-	vu := &modulestest.VU{RuntimeField: goja.New()}
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
 	loop := eventloop.New(vu)
 	rt := vu.Runtime()
 	require.NoError(t, rt.Set("f", rt.ToValue(func() error {
@@ -204,7 +204,7 @@ func TestEventLoopRejectGoError(t *testing.T) {
 
 func TestEventLoopRejectThrow(t *testing.T) {
 	t.Parallel()
-	vu := &modulestest.VU{RuntimeField: goja.New()}
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
 	loop := eventloop.New(vu)
 	rt := vu.Runtime()
 	require.NoError(t, rt.Set("f", rt.ToValue(func() error {
@@ -221,7 +221,7 @@ func TestEventLoopRejectThrow(t *testing.T) {
 
 func TestEventLoopAsyncAwait(t *testing.T) {
 	t.Parallel()
-	vu := &modulestest.VU{RuntimeField: goja.New()}
+	vu := &modulestest.VU{RuntimeField: sobek.New()}
 	loop := eventloop.New(vu)
 	err := loop.Start(func() error {
 		_, err := vu.Runtime().RunString(`

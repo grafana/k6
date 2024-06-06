@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/loader"
 )
 
@@ -31,7 +31,7 @@ func NewLegacyRequireImpl(vu VU, ms *ModuleSystem, pwd url.URL) *LegacyRequireIm
 const issueLink = "https://github.com/grafana/k6/issues/3534"
 
 // Require is the actual call that implements require
-func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
+func (r *LegacyRequireImpl) Require(specifier string) (*sobek.Object, error) {
 	// TODO remove this in the future when we address https://github.com/grafana/k6/issues/2674
 	// This is currently needed as each time require is called we need to record it's new pwd
 	// to be used if a require *or* open is used within the file as they are relative to the
@@ -124,17 +124,17 @@ func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string
 	}
 }
 
-func getCurrentModuleScript(rt *goja.Runtime) string {
+func getCurrentModuleScript(rt *sobek.Runtime) string {
 	var parent string
-	var buf [2]goja.StackFrame
+	var buf [2]sobek.StackFrame
 	frames := rt.CaptureCallStack(2, buf[:0])
 	parent = frames[1].SrcName()
 
 	return parent
 }
 
-func getPreviousRequiringFile(rt *goja.Runtime) (string, error) {
-	var buf [1000]goja.StackFrame
+func getPreviousRequiringFile(rt *sobek.Runtime) (string, error) {
+	var buf [1000]sobek.StackFrame
 	frames := rt.CaptureCallStack(1000, buf[:0])
 
 	for i, frame := range frames[1:] { // first one should be the current require

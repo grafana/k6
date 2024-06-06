@@ -3,7 +3,7 @@ package html
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -137,7 +137,7 @@ func TestSerialize(t *testing.T) {
 
 		v, err := rt.RunString(`doc.find("form").serializeObject()`)
 		if assert.NoError(t, err) {
-			obj, ok := v.Export().(map[string]goja.Value)
+			obj, ok := v.Export().(map[string]sobek.Value)
 
 			assert.True(t, ok)
 			assert.Equal(t, 11, len(obj))

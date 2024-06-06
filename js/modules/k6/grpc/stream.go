@@ -14,7 +14,7 @@ import (
 	"go.k6.io/k6/lib/netext/grpcext"
 	"go.k6.io/k6/metrics"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc/codes"
@@ -50,7 +50,7 @@ type stream struct {
 	instanceMetrics *instanceMetrics
 	builtinMetrics  *metrics.BuiltinMetrics
 
-	obj *goja.Object // the object that is given to js to interact with the stream
+	obj *sobek.Object // the object that is given to js to interact with the stream
 
 	writingState int8
 	done         chan struct{}
@@ -62,16 +62,16 @@ type stream struct {
 	timeoutCancel context.CancelFunc
 }
 
-// defineStream defines the goja.Object that is given to js to interact with the Stream
-func defineStream(rt *goja.Runtime, s *stream) {
+// defineStream defines the sobek.Object that is given to js to interact with the Stream
+func defineStream(rt *sobek.Runtime, s *stream) {
 	must(rt, s.obj.DefineDataProperty(
-		"on", rt.ToValue(s.on), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"on", rt.ToValue(s.on), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 
 	must(rt, s.obj.DefineDataProperty(
-		"write", rt.ToValue(s.write), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"write", rt.ToValue(s.write), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 
 	must(rt, s.obj.DefineDataProperty(
-		"end", rt.ToValue(s.end), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"end", rt.ToValue(s.end), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 }
 
 func (s *stream) beginStream(p *callParams) error {
@@ -294,14 +294,14 @@ func (s *stream) processSendError(err error) {
 }
 
 // on registers a listener for a certain event type
-func (s *stream) on(event string, listener func(goja.Value) (goja.Value, error)) {
+func (s *stream) on(event string, listener func(sobek.Value) (sobek.Value, error)) {
 	if err := s.eventListeners.add(event, listener); err != nil {
 		s.vu.State().Logger.Warnf("can't register %s event handler: %s", event, err)
 	}
 }
 
 // write writes a message to the stream
-func (s *stream) write(input goja.Value) {
+func (s *stream) write(input sobek.Value) {
 	if s.writingState != opened {
 		return
 	}
@@ -433,7 +433,7 @@ func (s *stream) callEventListeners(eventType string) error {
 }
 
 // must is a small helper that will panic if err is not nil.
-func must(rt *goja.Runtime, err error) {
+func must(rt *sobek.Runtime, err error) {
 	if err != nil {
 		common.Throw(rt, err)
 	}

@@ -8,7 +8,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	logtest "github.com/sirupsen/logrus/hooks/test"
 	"github.com/stretchr/testify/assert"
@@ -25,7 +25,7 @@ import (
 
 func TestConsoleContext(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	logger, hook := logtest.NewNullLogger()
@@ -104,7 +104,7 @@ func extractLogger(vu lib.ActiveVU) *logrus.Logger {
 func TestConsoleLogWithGojaNativeObject(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	obj := rt.NewObject()
@@ -163,7 +163,7 @@ func TestConsoleLogObjectsWithGoTypes(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 
-			rt := goja.New()
+			rt := sobek.New()
 			rt.SetFieldNameMapper(common.FieldNameMapper{})
 			obj := rt.ToValue(tt.in)
 

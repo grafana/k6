@@ -3,7 +3,7 @@ package html
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -291,13 +291,13 @@ func TestElements(t *testing.T) {
 			rt := getTestRuntimeWithDoc(t, testHTMLElems)
 
 			if v, err := rt.RunString(`doc.find("#form_btn").get(0).labels()`); assert.NoError(t, err) {
-				assert.Equal(t, 1, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "form_btn_label", v.Export().([]goja.Value)[0].Export().(LabelElement).Id())
+				assert.Equal(t, 1, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "form_btn_label", v.Export().([]sobek.Value)[0].Export().(LabelElement).Id())
 			}
 			if v, err := rt.RunString(`doc.find("#form_btn_2").get(0).labels()`); assert.NoError(t, err) {
-				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "wrapper_label", v.Export().([]goja.Value)[0].Export().(LabelElement).Id())
-				assert.Equal(t, "form_btn_2_label", v.Export().([]goja.Value)[1].Export().(LabelElement).Id())
+				assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "wrapper_label", v.Export().([]sobek.Value)[0].Export().(LabelElement).Id())
+				assert.Equal(t, "form_btn_2_label", v.Export().([]sobek.Value)[1].Export().(LabelElement).Id())
 			}
 		})
 		t.Run("name", func(t *testing.T) {
@@ -342,9 +342,9 @@ func TestElements(t *testing.T) {
 		rt := getTestRuntimeWithDoc(t, testHTMLElems)
 
 		if v, err := rt.RunString(`doc.find("datalist").get(0).options()`); assert.NoError(t, err) {
-			assert.Equal(t, 2, len(v.Export().([]goja.Value)))
-			assert.Equal(t, "dl_opt_1", v.Export().([]goja.Value)[0].Export().(OptionElement).Id())
-			assert.Equal(t, "dl_opt_2", v.Export().([]goja.Value)[1].Export().(OptionElement).Id())
+			assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
+			assert.Equal(t, "dl_opt_1", v.Export().([]sobek.Value)[0].Export().(OptionElement).Id())
+			assert.Equal(t, "dl_opt_2", v.Export().([]sobek.Value)[1].Export().(OptionElement).Id())
 		}
 	})
 	t.Run("FieldSetElement", func(t *testing.T) {
@@ -353,7 +353,7 @@ func TestElements(t *testing.T) {
 
 		t.Run("elements", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("fieldset").get(0).elements()`); assert.NoError(t, err) {
-				assert.Equal(t, 5, len(v.Export().([]goja.Value)))
+				assert.Equal(t, 5, len(v.Export().([]sobek.Value)))
 			}
 		})
 		t.Run("type", func(t *testing.T) {
@@ -373,7 +373,7 @@ func TestElements(t *testing.T) {
 
 		t.Run("elements", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#fieldset_form").get(0).elements()`); assert.NoError(t, err) {
-				assert.Equal(t, 6, len(v.Export().([]goja.Value)))
+				assert.Equal(t, 6, len(v.Export().([]sobek.Value)))
 			}
 		})
 		t.Run("length", func(t *testing.T) {
@@ -396,7 +396,7 @@ func TestElements(t *testing.T) {
 
 		t.Run("form", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#test_dl_input").get(0).list().options()`); assert.NoError(t, err) {
-				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+				assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
 			}
 		})
 	})
@@ -441,12 +441,12 @@ func TestElements(t *testing.T) {
 
 		t.Run("areas", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#find_this_map").get(0).areas()`); assert.NoError(t, err) {
-				assert.Equal(t, 3, len(v.Export().([]goja.Value)))
+				assert.Equal(t, 3, len(v.Export().([]sobek.Value)))
 			}
 		})
 		t.Run("images", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#find_this_map").get(0).images()`); assert.NoError(t, err) {
-				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+				assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
 			}
 		})
 	})
@@ -523,7 +523,7 @@ func TestElements(t *testing.T) {
 		})
 		t.Run("labels", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#output1").get(0).labels()`); assert.NoError(t, err) {
-				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
+				assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
 			}
 		})
 	})
@@ -582,14 +582,14 @@ func TestElements(t *testing.T) {
 		})
 		t.Run("options", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#sel1").get(0).options()`); assert.NoError(t, err) {
-				assert.Equal(t, 3, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "opt_1", v.Export().([]goja.Value)[0].Export().(OptionElement).Id())
+				assert.Equal(t, 3, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "opt_1", v.Export().([]sobek.Value)[0].Export().(OptionElement).Id())
 			}
 		})
 		t.Run("selectedOptions", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#sel1").get(0).selectedOptions()`); assert.NoError(t, err) {
-				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "opt_2", v.Export().([]goja.Value)[0].Export().(OptionElement).Id())
+				assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "opt_2", v.Export().([]sobek.Value)[0].Export().(OptionElement).Id())
 			}
 		})
 		t.Run("selectedIndex", func(t *testing.T) {
@@ -627,29 +627,29 @@ func TestElements(t *testing.T) {
 		})
 		t.Run("thead", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("table").get(0).tHead().rows()`); assert.NoError(t, err) {
-				assert.Equal(t, 1, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "thead_row", v.Export().([]goja.Value)[0].Export().(TableRowElement).Id())
+				assert.Equal(t, 1, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "thead_row", v.Export().([]sobek.Value)[0].Export().(TableRowElement).Id())
 			}
 		})
 		t.Run("tbody", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("table").get(0).tBodies()[0].rows()`); assert.NoError(t, err) {
-				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "tbody_row", v.Export().([]goja.Value)[1].Export().(TableRowElement).Id())
+				assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "tbody_row", v.Export().([]sobek.Value)[1].Export().(TableRowElement).Id())
 			}
 		})
 		t.Run("tfoot", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("table").get(0).tFoot().rows()`); assert.NoError(t, err) {
-				assert.Equal(t, 3, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "tfoot_row", v.Export().([]goja.Value)[2].Export().(TableRowElement).Id())
+				assert.Equal(t, 3, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "tfoot_row", v.Export().([]sobek.Value)[2].Export().(TableRowElement).Id())
 			}
 		})
 		t.Run("rows", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("table").get(0).rows()`); assert.NoError(t, err) {
-				assert.Equal(t, 7, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "thead_row", v.Export().([]goja.Value)[0].Export().(TableRowElement).Id())
-				assert.Equal(t, "tfoot_row", v.Export().([]goja.Value)[3].Export().(TableRowElement).Id())
-				assert.Equal(t, "tbody_row", v.Export().([]goja.Value)[5].Export().(TableRowElement).Id())
-				assert.Equal(t, "last_row", v.Export().([]goja.Value)[6].Export().(TableRowElement).Id())
+				assert.Equal(t, 7, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "thead_row", v.Export().([]sobek.Value)[0].Export().(TableRowElement).Id())
+				assert.Equal(t, "tfoot_row", v.Export().([]sobek.Value)[3].Export().(TableRowElement).Id())
+				assert.Equal(t, "tbody_row", v.Export().([]sobek.Value)[5].Export().(TableRowElement).Id())
+				assert.Equal(t, "last_row", v.Export().([]sobek.Value)[6].Export().(TableRowElement).Id())
 			}
 		})
 		t.Run("TableCellElement", func(t *testing.T) {
@@ -683,8 +683,8 @@ func TestElements(t *testing.T) {
 		t.Run("TableRowElement", func(t *testing.T) {
 			t.Run("cells", func(t *testing.T) {
 				if v, err := rt.RunString(`doc.find("#thead_row").get(0).cells()`); assert.NoError(t, err) {
-					assert.Equal(t, 3, len(v.Export().([]goja.Value)))
-					assert.Equal(t, "th_cell", v.Export().([]goja.Value)[1].Export().(TableHeaderCellElement).Id())
+					assert.Equal(t, 3, len(v.Export().([]sobek.Value)))
+					assert.Equal(t, "th_cell", v.Export().([]sobek.Value)[1].Export().(TableHeaderCellElement).Id())
 				}
 			})
 			t.Run("colSpan", func(t *testing.T) {
@@ -719,9 +719,9 @@ func TestElements(t *testing.T) {
 
 		t.Run("text tracks", func(t *testing.T) {
 			if v, err := rt.RunString(`doc.find("#video1").get(0).textTracks()`); assert.NoError(t, err) {
-				assert.Equal(t, 2, len(v.Export().([]goja.Value)))
-				assert.Equal(t, "trk1", v.Export().([]goja.Value)[0].Export().(TrackElement).Id())
-				assert.Equal(t, "trk2", v.Export().([]goja.Value)[1].Export().(TrackElement).Id())
+				assert.Equal(t, 2, len(v.Export().([]sobek.Value)))
+				assert.Equal(t, "trk1", v.Export().([]sobek.Value)[0].Export().(TrackElement).Id())
+				assert.Equal(t, "trk2", v.Export().([]sobek.Value)[1].Export().(TrackElement).Id())
 			}
 		})
 	})

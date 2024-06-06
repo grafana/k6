@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	gohtml "golang.org/x/net/html"
 )
 
@@ -113,15 +113,15 @@ func (e Element) ownerFormSel() (*goquery.Selection, bool) {
 	return findForm, true
 }
 
-func (e Element) ownerFormVal() goja.Value {
+func (e Element) ownerFormVal() sobek.Value {
 	formSel, exists := e.ownerFormSel()
 	if !exists {
-		return goja.Undefined()
+		return sobek.Undefined()
 	}
 	return selToElement(Selection{e.sel.rt, formSel.Eq(0), e.sel.URL})
 }
 
-func (e Element) elemLabels() []goja.Value {
+func (e Element) elemLabels() []sobek.Value {
 	wrapperLbl := e.sel.sel.Closest("label")
 
 	id := e.attrAsString("id")
@@ -173,16 +173,16 @@ func (a Attribute) LocalName() string {
 	return a.Name
 }
 
-func (e Element) GetAttribute(name string) goja.Value {
+func (e Element) GetAttribute(name string) sobek.Value {
 	return e.sel.Attr(name)
 }
 
-func (e Element) GetAttributeNode(name string) goja.Value {
+func (e Element) GetAttributeNode(name string) sobek.Value {
 	if attr := getHTMLAttr(e.node, name); attr != nil {
 		return e.sel.rt.ToValue(Attribute{&e, attr.Key, attr.Namespace, attr.Val})
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 func (e Element) HasAttribute(name string) bool {
@@ -203,9 +203,9 @@ func (e Element) Attributes() map[string]Attribute {
 	return attrs
 }
 
-func (e Element) ToString() goja.Value {
+func (e Element) ToString() sobek.Value {
 	if e.sel.sel.Length() == 0 {
-		return goja.Undefined()
+		return sobek.Undefined()
 	}
 
 	if e.node.Type == gohtml.ElementNode {
@@ -228,7 +228,7 @@ func (e Element) Id() string {
 	return e.attrAsString("id")
 }
 
-func (e Element) IsEqualNode(v goja.Value) bool {
+func (e Element) IsEqualNode(v sobek.Value) bool {
 	if other, ok := v.Export().(Element); ok {
 		htmlA, errA := e.sel.sel.Html()
 		htmlB, errB := other.sel.sel.Html()
@@ -239,7 +239,7 @@ func (e Element) IsEqualNode(v goja.Value) bool {
 	return false
 }
 
-func (e Element) IsSameNode(v goja.Value) bool {
+func (e Element) IsSameNode(v sobek.Value) bool {
 	if other, ok := v.Export().(Element); ok {
 		return e.node == other.node
 	}
@@ -259,19 +259,19 @@ func (e Element) Selection() Selection {
 	return *e.sel
 }
 
-func (e Element) GetElementsByClassName(name string) []goja.Value {
+func (e Element) GetElementsByClassName(name string) []sobek.Value {
 	return elemList(Selection{e.sel.rt, e.sel.sel.Find("." + name), e.sel.URL})
 }
 
-func (e Element) GetElementsByTagName(name string) []goja.Value {
+func (e Element) GetElementsByTagName(name string) []sobek.Value {
 	return elemList(Selection{e.sel.rt, e.sel.sel.Find(name), e.sel.URL})
 }
 
-func (e Element) QuerySelector(selector string) goja.Value {
+func (e Element) QuerySelector(selector string) sobek.Value {
 	return selToElement(Selection{e.sel.rt, e.sel.sel.Find(selector), e.sel.URL})
 }
 
-func (e Element) QuerySelectorAll(selector string) []goja.Value {
+func (e Element) QuerySelectorAll(selector string) []sobek.Value {
 	return elemList(Selection{e.sel.rt, e.sel.sel.Find(selector), e.sel.URL})
 }
 
@@ -279,75 +279,75 @@ func (e Element) NodeName() string {
 	return goquery.NodeName(e.sel.sel)
 }
 
-func (e Element) FirstChild() goja.Value {
+func (e Element) FirstChild() sobek.Value {
 	return nodeToElement(e, e.node.FirstChild)
 }
 
-func (e Element) LastChild() goja.Value {
+func (e Element) LastChild() sobek.Value {
 	return nodeToElement(e, e.node.LastChild)
 }
 
-func (e Element) FirstElementChild() goja.Value {
+func (e Element) FirstElementChild() sobek.Value {
 	if child := e.sel.sel.Children().First(); child.Length() > 0 {
 		return selToElement(Selection{e.sel.rt, child.First(), e.sel.URL})
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
-func (e Element) LastElementChild() goja.Value {
+func (e Element) LastElementChild() sobek.Value {
 	if child := e.sel.sel.Children(); child.Length() > 0 {
 		return selToElement(Selection{e.sel.rt, child.Last(), e.sel.URL})
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
-func (e Element) PreviousSibling() goja.Value {
+func (e Element) PreviousSibling() sobek.Value {
 	return nodeToElement(e, e.node.PrevSibling)
 }
 
-func (e Element) NextSibling() goja.Value {
+func (e Element) NextSibling() sobek.Value {
 	return nodeToElement(e, e.node.NextSibling)
 }
 
-func (e Element) PreviousElementSibling() goja.Value {
+func (e Element) PreviousElementSibling() sobek.Value {
 	if prev := e.sel.sel.Prev(); prev.Length() > 0 {
 		return selToElement(Selection{e.sel.rt, prev, e.sel.URL})
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
-func (e Element) NextElementSibling() goja.Value {
+func (e Element) NextElementSibling() sobek.Value {
 	if next := e.sel.sel.Next(); next.Length() > 0 {
 		return selToElement(Selection{e.sel.rt, next, e.sel.URL})
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
-func (e Element) ParentNode() goja.Value {
+func (e Element) ParentNode() sobek.Value {
 	if e.node.Parent != nil {
 		return nodeToElement(e, e.node.Parent)
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
-func (e Element) ParentElement() goja.Value {
+func (e Element) ParentElement() sobek.Value {
 	if prt := e.sel.sel.Parent(); prt.Length() > 0 {
 		return selToElement(Selection{e.sel.rt, prt, e.sel.URL})
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
-func (e Element) ChildNodes() []goja.Value {
+func (e Element) ChildNodes() []sobek.Value {
 	return elemList(e.sel.Contents())
 }
 
-func (e Element) Children() []goja.Value {
+func (e Element) Children() []sobek.Value {
 	return elemList(e.sel.Children())
 }
 
@@ -363,24 +363,24 @@ func (e Element) ClassList() []string {
 	return nil
 }
 
-func (e Element) ClassName() goja.Value {
+func (e Element) ClassName() sobek.Value {
 	return e.sel.Attr("class")
 }
 
-func (e Element) Lang() goja.Value {
+func (e Element) Lang() sobek.Value {
 	if attr := getHTMLAttr(e.node, "lang"); attr != nil && attr.Namespace == "" {
 		return e.sel.rt.ToValue(attr.Val)
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
-func (e Element) OwnerDocument() goja.Value {
+func (e Element) OwnerDocument() sobek.Value {
 	if node := getOwnerDocNode(e.node); node != nil {
 		return nodeToElement(e, node)
 	}
 
-	return goja.Undefined()
+	return sobek.Undefined()
 }
 
 func (e Element) NamespaceURI() string {
@@ -401,11 +401,11 @@ func getOwnerDocNode(node *gohtml.Node) *gohtml.Node {
 	return nil
 }
 
-func (e Element) InnerHTML() goja.Value {
+func (e Element) InnerHTML() sobek.Value {
 	return e.sel.Html()
 }
 
-func (e Element) NodeType() goja.Value {
+func (e Element) NodeType() sobek.Value {
 	switch e.node.Type {
 	case gohtml.TextNode:
 		return e.sel.rt.ToValue(TextNode)
@@ -423,11 +423,11 @@ func (e Element) NodeType() goja.Value {
 		return e.sel.rt.ToValue(DoctypeNode)
 
 	default:
-		return goja.Undefined()
+		return sobek.Undefined()
 	}
 }
 
-func (e Element) NodeValue() goja.Value {
+func (e Element) NodeValue() sobek.Value {
 	switch e.node.Type {
 	case gohtml.TextNode:
 		return e.sel.rt.ToValue(e.sel.Text())
@@ -436,11 +436,11 @@ func (e Element) NodeValue() goja.Value {
 		return e.sel.rt.ToValue(e.sel.Text())
 
 	default:
-		return goja.Undefined()
+		return sobek.Undefined()
 	}
 }
 
-func (e Element) Contains(v goja.Value) bool {
+func (e Element) Contains(v sobek.Value) bool {
 	if other, ok := v.Export().(Element); ok {
 		// When testing if a node contains itself, jquery's + goquery's version of Contains()
 		// return true while the DOM API returns false.

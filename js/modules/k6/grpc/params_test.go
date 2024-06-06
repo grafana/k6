@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -143,7 +143,7 @@ func TestCallParamsTimeOutParse(t *testing.T) {
 // that could be used to test the params
 // it also moves to the VU context and creates the params
 // goja value that could be used in the tests
-func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime, goja.Value) {
+func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime, sobek.Value) {
 	t.Helper()
 
 	testRuntime := modulestest.NewRuntime(t)

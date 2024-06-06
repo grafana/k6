@@ -8,12 +8,13 @@ require (
 	github.com/PuerkitoBio/goquery v1.9.1
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.0
-	github.com/dop251/goja v0.0.0-20240220182346-e401ed450204
+	github.com/dop251/goja v0.0.0-20240516125602-ccbae20bcec2
 	github.com/evanw/esbuild v0.21.2
 	github.com/fatih/color v1.16.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.1
+	github.com/grafana/sobek v0.0.0-20240606091932-2da0e9e5f3e7
 	github.com/grafana/xk6-browser v1.5.1
 	github.com/grafana/xk6-dashboard v0.7.3
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1

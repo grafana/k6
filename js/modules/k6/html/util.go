@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/serenize/snaker"
 	gohtml "golang.org/x/net/html"
 )
@@ -55,15 +55,15 @@ func getHTMLAttr(node *gohtml.Node, name string) *gohtml.Attribute {
 	return nil
 }
 
-func elemList(s Selection) (items []goja.Value) {
-	items = make([]goja.Value, s.Size())
+func elemList(s Selection) (items []sobek.Value) {
+	items = make([]sobek.Value, s.Size())
 	for i := 0; i < s.Size(); i++ {
 		items[i] = selToElement(s.Eq(i))
 	}
 	return items
 }
 
-func nodeToElement(e Element, node *gohtml.Node) goja.Value {
+func nodeToElement(e Element, node *gohtml.Node) sobek.Value {
 	// Goquery does not expose a way to build a goquery.Selection with an arbitrary html.Node.
 	// Workaround by adding a node to an empty Selection
 	emptySel := e.sel.emptySelection()
@@ -86,7 +86,7 @@ func toNumeric(val string) (float64, bool) {
 
 func convertDataAttrVal(val string) interface{} {
 	if len(val) == 0 {
-		return goja.Undefined()
+		return sobek.Undefined()
 	}
 
 	if val[0] == '{' || val[0] == '[' {
@@ -107,10 +107,10 @@ func convertDataAttrVal(val string) interface{} {
 		return false
 
 	case "null":
-		return goja.Undefined()
+		return sobek.Undefined()
 
 	case "undefined":
-		return goja.Undefined()
+		return sobek.Undefined()
 
 	default:
 		if fltVal, isOk := toNumeric(val); isOk {
