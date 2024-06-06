@@ -6,7 +6,7 @@ require (
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
-	go.k6.io/k6 v0.51.0
+	go.k6.io/k6 v0.51.1-0.20240606120708-bd114fdbd683
 	go.opentelemetry.io/otel v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetricgrpc v1.26.0
 	go.opentelemetry.io/otel/exporters/otlp/otlpmetric/otlpmetrichttp v1.26.0
