@@ -90,7 +90,16 @@ func syncMapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nol
 				return nil, eh.Tap(popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent":         eh.TextContent,
+		"textContent": func() (any, error) {
+			v, ok, err := eh.TextContent()
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil //nolint:nilnil
+			}
+			return v, nil
+		},
 		"type":                eh.Type,
 		"uncheck":             eh.Uncheck,
 		"waitForElementState": eh.WaitForElementState,

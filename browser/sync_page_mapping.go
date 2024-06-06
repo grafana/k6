@@ -168,7 +168,16 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent":     p.TextContent,
+		"textContent": func(selector string, opts goja.Value) (any, error) {
+			v, ok, err := p.TextContent(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil //nolint:nilnil
+			}
+			return v, nil
+		},
 		"throttleCPU":     p.ThrottleCPU,
 		"throttleNetwork": p.ThrottleNetwork,
 		"title":           p.Title,

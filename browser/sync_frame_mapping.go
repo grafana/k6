@@ -118,11 +118,20 @@ func syncMapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cycl
 				return nil, f.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent": f.TextContent,
-		"title":       f.Title,
-		"type":        f.Type,
-		"uncheck":     f.Uncheck,
-		"url":         f.URL,
+		"textContent": func(selector string, opts goja.Value) (any, error) {
+			v, ok, err := f.TextContent(selector, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil //nolint:nilnil
+			}
+			return v, nil
+		},
+		"title":   f.Title,
+		"type":    f.Type,
+		"uncheck": f.Uncheck,
+		"url":     f.URL,
 		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				vu.Context(), f.Timeout(), pageFunc, opts, args...,

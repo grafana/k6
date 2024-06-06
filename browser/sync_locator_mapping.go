@@ -10,7 +10,7 @@ import (
 )
 
 // syncMapLocator is like mapLocator but returns synchronous functions.
-func syncMapLocator(vu moduleVU, lo *common.Locator) mapping {
+func syncMapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 	return mapping{
 		"clear": func(opts goja.Value) error {
 			ctx := vu.Context()
@@ -46,7 +46,16 @@ func syncMapLocator(vu moduleVU, lo *common.Locator) mapping {
 		"getAttribute": lo.GetAttribute,
 		"innerHTML":    lo.InnerHTML,
 		"innerText":    lo.InnerText,
-		"textContent":  lo.TextContent,
+		"textContent": func(opts goja.Value) (any, error) {
+			v, ok, err := lo.TextContent(opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil
+			}
+			return v, nil
+		},
 		"inputValue":   lo.InputValue,
 		"selectOption": lo.SelectOption,
 		"press":        lo.Press,
