@@ -65,7 +65,16 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
-		"getAttribute": p.GetAttribute,
+		"getAttribute": func(selector string, name string, opts goja.Value) (any, error) {
+			v, ok, err := p.GetAttribute(selector, name, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil //nolint:nilnil
+			}
+			return v, nil
+		},
 		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),

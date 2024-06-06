@@ -10,7 +10,7 @@ import (
 )
 
 // syncMapElementHandle is like mapElementHandle but returns synchronous functions.
-func syncMapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:cyclop,funlen
+func syncMapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,cyclop,funlen
 	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,
@@ -39,19 +39,28 @@ func syncMapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nol
 		"dispatchEvent": func(typ string, eventInit goja.Value) error {
 			return eh.DispatchEvent(typ, exportArg(eventInit)) //nolint:wrapcheck
 		},
-		"fill":         eh.Fill,
-		"focus":        eh.Focus,
-		"getAttribute": eh.GetAttribute,
-		"hover":        eh.Hover,
-		"innerHTML":    eh.InnerHTML,
-		"innerText":    eh.InnerText,
-		"inputValue":   eh.InputValue,
-		"isChecked":    eh.IsChecked,
-		"isDisabled":   eh.IsDisabled,
-		"isEditable":   eh.IsEditable,
-		"isEnabled":    eh.IsEnabled,
-		"isHidden":     eh.IsHidden,
-		"isVisible":    eh.IsVisible,
+		"fill":  eh.Fill,
+		"focus": eh.Focus,
+		"getAttribute": func(name string) (any, error) {
+			v, ok, err := eh.GetAttribute(name)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil //nolint:nilnil
+			}
+			return v, nil
+		},
+		"hover":      eh.Hover,
+		"innerHTML":  eh.InnerHTML,
+		"innerText":  eh.InnerText,
+		"inputValue": eh.InputValue,
+		"isChecked":  eh.IsChecked,
+		"isDisabled": eh.IsDisabled,
+		"isEditable": eh.IsEditable,
+		"isEnabled":  eh.IsEnabled,
+		"isHidden":   eh.IsHidden,
+		"isVisible":  eh.IsVisible,
 		"ownerFrame": func() (mapping, error) {
 			f, err := eh.OwnerFrame()
 			if err != nil {

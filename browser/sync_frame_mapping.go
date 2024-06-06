@@ -63,7 +63,16 @@ func syncMapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cycl
 			}
 			return syncMapElementHandle(vu, fe), nil
 		},
-		"getAttribute": f.GetAttribute,
+		"getAttribute": func(selector, name string, opts goja.Value) (any, error) {
+			v, ok, err := f.GetAttribute(selector, name, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil //nolint:nilnil
+			}
+			return v, nil
+		},
 		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				f.Referrer(),

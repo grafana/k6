@@ -32,20 +32,29 @@ func syncMapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 				return nil, lo.Click(popts) //nolint:wrapcheck
 			}), nil
 		},
-		"dblclick":     lo.Dblclick,
-		"check":        lo.Check,
-		"uncheck":      lo.Uncheck,
-		"isChecked":    lo.IsChecked,
-		"isEditable":   lo.IsEditable,
-		"isEnabled":    lo.IsEnabled,
-		"isDisabled":   lo.IsDisabled,
-		"isVisible":    lo.IsVisible,
-		"isHidden":     lo.IsHidden,
-		"fill":         lo.Fill,
-		"focus":        lo.Focus,
-		"getAttribute": lo.GetAttribute,
-		"innerHTML":    lo.InnerHTML,
-		"innerText":    lo.InnerText,
+		"dblclick":   lo.Dblclick,
+		"check":      lo.Check,
+		"uncheck":    lo.Uncheck,
+		"isChecked":  lo.IsChecked,
+		"isEditable": lo.IsEditable,
+		"isEnabled":  lo.IsEnabled,
+		"isDisabled": lo.IsDisabled,
+		"isVisible":  lo.IsVisible,
+		"isHidden":   lo.IsHidden,
+		"fill":       lo.Fill,
+		"focus":      lo.Focus,
+		"getAttribute": func(name string, opts goja.Value) (any, error) {
+			v, ok, err := lo.GetAttribute(name, opts)
+			if err != nil {
+				return nil, err //nolint:wrapcheck
+			}
+			if !ok {
+				return nil, nil
+			}
+			return v, nil
+		},
+		"innerHTML": lo.InnerHTML,
+		"innerText": lo.InnerText,
 		"textContent": func(opts goja.Value) (any, error) {
 			v, ok, err := lo.TextContent(opts)
 			if err != nil {
