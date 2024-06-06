@@ -83,12 +83,14 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return nil, f.Focus(selector, opts) //nolint:wrapcheck
 			})
 		},
-		"frameElement": func() (mapping, error) {
-			fe, err := f.FrameElement()
-			if err != nil {
-				return nil, err //nolint:wrapcheck
-			}
-			return mapElementHandle(vu, fe), nil
+		"frameElement": func() *goja.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				fe, err := f.FrameElement()
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				return mapElementHandle(vu, fe), nil
+			})
 		},
 		"getAttribute": func(selector, name string, opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
