@@ -496,7 +496,9 @@ func (sc *SubtleCrypto) Digest(algorithm sobek.Value, data sobek.Value) *sobek.P
 // using `SubtleCrypto.ExportKey` or `SubtleCrypto.WrapKey`.
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
-func (sc *SubtleCrypto) GenerateKey(algorithm sobek.Value, extractable bool, keyUsages []CryptoKeyUsage) *sobek.Promise {
+func (sc *SubtleCrypto) GenerateKey(
+	algorithm sobek.Value, extractable bool, keyUsages []CryptoKeyUsage,
+) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var keyGenerator KeyGenerator
