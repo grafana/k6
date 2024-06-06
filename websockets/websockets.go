@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	"github.com/grafana/sobek"
 	"github.com/grafana/xk6-websockets/websockets/events"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 
@@ -70,7 +70,7 @@ type webSocket struct {
 	tagsAndMeta    *metrics.TagsAndMeta
 	tq             *taskqueue.TaskQueue
 	builtinMetrics *metrics.BuiltinMetrics
-	obj            *goja.Object // the object that is given to js to interact with the WebSocket
+	obj            *sobek.Object // the object that is given to js to interact with the WebSocket
 	started        time.Time
 
 	done         chan struct{}
@@ -93,15 +93,15 @@ type ping struct {
 	timestamps map[string]time.Time
 }
 
-func isString(o *goja.Object, rt *goja.Runtime) bool {
+func isString(o *sobek.Object, rt *sobek.Runtime) bool {
 	return o.Prototype().Get("constructor") == rt.GlobalObject().Get("String")
 }
 
-func isArray(o *goja.Object, rt *goja.Runtime) bool {
+func isArray(o *sobek.Object, rt *sobek.Runtime) bool {
 	return o.Prototype().Get("constructor") == rt.GlobalObject().Get("Array")
 }
 
-func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
+func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 	rt := r.vu.Runtime()
 
 	url, err := parseURL(c.Argument(0))
@@ -149,8 +149,8 @@ func (r *WebSocketsAPI) websocket(c goja.ConstructorCall) *goja.Object {
 }
 
 // parseURL parses the url from the first constructor calls argument or returns an error
-func parseURL(urlValue goja.Value) (*url.URL, error) {
-	if urlValue == nil || goja.IsUndefined(urlValue) {
+func parseURL(urlValue sobek.Value) (*url.URL, error) {
+	if urlValue == nil || sobek.IsUndefined(urlValue) {
 		return nil, errors.New("WebSocket requires a url")
 	}
 
@@ -176,30 +176,30 @@ const (
 )
 
 // defineWebsocket defines all properties and methods for the WebSocket
-func defineWebsocket(rt *goja.Runtime, w *webSocket) {
+func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 	must(rt, w.obj.DefineDataProperty(
-		"addEventListener", rt.ToValue(w.addEventListener), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"addEventListener", rt.ToValue(w.addEventListener), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineDataProperty(
-		"send", rt.ToValue(w.send), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"send", rt.ToValue(w.send), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineDataProperty(
-		"ping", rt.ToValue(w.ping), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"ping", rt.ToValue(w.ping), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineDataProperty(
-		"close", rt.ToValue(w.close), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"close", rt.ToValue(w.close), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineDataProperty(
-		"url", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"url", rt.ToValue(w.url.String()), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty( // this needs to be with an accessor as we change the value
 		"readyState", rt.ToValue(func() ReadyState {
 			return w.readyState
-		}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
-		"bufferedAmount", rt.ToValue(func() goja.Value { return rt.ToValue(w.bufferedAmount) }), nil,
-		goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"bufferedAmount", rt.ToValue(func() sobek.Value { return rt.ToValue(w.bufferedAmount) }), nil,
+		sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty("extensions",
-		rt.ToValue(func() goja.Value { return rt.ToValue(w.extensions) }), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		rt.ToValue(func() sobek.Value { return rt.ToValue(w.extensions) }), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
-		"protocol", rt.ToValue(func() goja.Value { return rt.ToValue(w.protocol) }), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		"protocol", rt.ToValue(func() sobek.Value { return rt.ToValue(w.protocol) }), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
-		"binaryType", rt.ToValue(func() goja.Value {
+		"binaryType", rt.ToValue(func() sobek.Value {
 			return rt.ToValue(w.binaryType)
 		}), rt.ToValue(func(s string) error {
 			switch s {
@@ -211,7 +211,7 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 			default:
 				return fmt.Errorf("unknown binaryType %s, the supported one is arraybuffer", s)
 			}
-		}), goja.FLAG_FALSE, goja.FLAG_TRUE))
+		}), sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 
 	setOn := func(property string, el *eventListener) {
 		if el == nil {
@@ -220,27 +220,27 @@ func defineWebsocket(rt *goja.Runtime, w *webSocket) {
 		}
 
 		must(rt, w.obj.DefineAccessorProperty(
-			property, rt.ToValue(func() goja.Value {
+			property, rt.ToValue(func() sobek.Value {
 				return rt.ToValue(el.getOn)
-			}), rt.ToValue(func(call goja.FunctionCall) goja.Value {
+			}), rt.ToValue(func(call sobek.FunctionCall) sobek.Value {
 				arg := call.Argument(0)
 
 				// it's possible to unset handlers by setting them to null
-				if arg == nil || goja.IsUndefined(arg) || goja.IsNull(arg) {
+				if arg == nil || sobek.IsUndefined(arg) || sobek.IsNull(arg) {
 					el.setOn(nil)
 
 					return nil
 				}
 
-				fn, isFunc := goja.AssertFunction(arg)
+				fn, isFunc := sobek.AssertFunction(arg)
 				if !isFunc {
 					common.Throw(rt, fmt.Errorf("a value for '%s' should be callable", property))
 				}
 
-				el.setOn(func(v goja.Value) (goja.Value, error) { return fn(goja.Undefined(), v) })
+				el.setOn(func(v sobek.Value) (sobek.Value, error) { return fn(sobek.Undefined(), v) })
 
 				return nil
-			}), goja.FLAG_FALSE, goja.FLAG_TRUE))
+			}), sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	}
 
 	setOn("onmessage", w.eventListeners.getType(events.MESSAGE))
@@ -454,16 +454,16 @@ func (w *webSocket) queueMessage(msg *message) {
 			}
 			// TODO this technically could be BLOB , but we don't support that
 			ab := rt.NewArrayBuffer(msg.data)
-			must(rt, ev.DefineDataProperty("data", rt.ToValue(ab), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+			must(rt, ev.DefineDataProperty("data", rt.ToValue(ab), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 		} else {
 			must(
 				rt,
-				ev.DefineDataProperty("data", rt.ToValue(string(msg.data)), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
+				ev.DefineDataProperty("data", rt.ToValue(string(msg.data)), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE),
 			)
 		}
 		must(
 			rt,
-			ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE),
+			ev.DefineDataProperty("origin", rt.ToValue(w.url.String()), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE),
 		)
 
 		for _, messageListener := range w.eventListeners.all(events.MESSAGE) {
@@ -588,7 +588,7 @@ func (w *webSocket) writePump(wg *sync.WaitGroup) {
 	}
 }
 
-func (w *webSocket) send(msg goja.Value) {
+func (w *webSocket) send(msg sobek.Value) {
 	w.assertStateOpen()
 
 	switch o := msg.Export().(type) {
@@ -599,7 +599,7 @@ func (w *webSocket) send(msg goja.Value) {
 			data:  []byte(o),
 			t:     time.Now(),
 		}
-	case *goja.ArrayBuffer:
+	case *sobek.ArrayBuffer:
 		b := o.Bytes()
 		w.bufferedAmount += len(b)
 		w.writeQueueCh <- message{
@@ -607,7 +607,7 @@ func (w *webSocket) send(msg goja.Value) {
 			data:  b,
 			t:     time.Now(),
 		}
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		b := o.Bytes()
 		w.bufferedAmount += len(b)
 		w.writeQueueCh <- message{
@@ -722,16 +722,16 @@ func (w *webSocket) connectionClosedWithError(err error) error {
 // newEvent return an event implementing "implements" https://dom.spec.whatwg.org/#event
 // needs to be called on the event loop
 // TODO: move to events
-func (w *webSocket) newEvent(eventType string, t time.Time) *goja.Object {
+func (w *webSocket) newEvent(eventType string, t time.Time) *sobek.Object {
 	rt := w.vu.Runtime()
 	o := rt.NewObject()
 
 	must(rt, o.DefineAccessorProperty("type", rt.ToValue(func() string {
 		return eventType
-	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
+	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, o.DefineAccessorProperty("target", rt.ToValue(func() interface{} {
 		return w.obj
-	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
+	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	// skip srcElement
 	// skip currentTarget ??!!
 	// skip eventPhase ??!!
@@ -743,7 +743,7 @@ func (w *webSocket) newEvent(eventType string, t time.Time) *goja.Object {
 	must(rt, o.DefineAccessorProperty("timestamp", rt.ToValue(func() float64 {
 		return float64(t.UnixNano()) / 1_000_000 // milliseconds as double as per the spec
 		// https://w3c.github.io/hr-time/#dom-domhighrestimestamp
-	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE))
+	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 
 	return o
 }
@@ -765,7 +765,7 @@ func (w *webSocket) callErrorListeners(e error) error { // TODO use the error ev
 	ev := w.newEvent(events.ERROR, time.Now())
 	must(rt, ev.DefineDataProperty("error",
 		rt.ToValue(e.Error()),
-		goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE))
+		sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	for _, errorListener := range w.eventListeners.all(events.ERROR) {
 		if _, err := errorListener(ev); err != nil { // TODO fix timestamp
 			return err
@@ -784,7 +784,7 @@ func (w *webSocket) callEventListeners(eventType string) error {
 	return nil
 }
 
-func (w *webSocket) addEventListener(event string, listener func(goja.Value) (goja.Value, error)) {
+func (w *webSocket) addEventListener(event string, listener func(sobek.Value) (sobek.Value, error)) {
 	// TODO support options https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters
 	if err := w.eventListeners.add(event, listener); err != nil {
 		w.vu.State().Logger.Warnf("can't add event listener: %s", err)

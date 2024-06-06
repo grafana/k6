@@ -6,7 +6,7 @@ import (
 	"net/http/cookiejar"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/js/common"
 	httpModule "go.k6.io/k6/js/modules/k6/http"
@@ -24,7 +24,7 @@ type wsParams struct {
 }
 
 // buildParams builds WebSocket params and configure some of them
-func buildParams(state *lib.State, rt *goja.Runtime, raw goja.Value) (*wsParams, error) {
+func buildParams(state *lib.State, rt *sobek.Runtime, raw sobek.Value) (*wsParams, error) {
 	tagsAndMeta := state.Tags.GetCurrentValues()
 
 	parsed := &wsParams{
@@ -35,7 +35,7 @@ func buildParams(state *lib.State, rt *goja.Runtime, raw goja.Value) (*wsParams,
 
 	parsed.headers.Set("User-Agent", state.Options.UserAgent.String)
 
-	if raw == nil || goja.IsUndefined(raw) {
+	if raw == nil || sobek.IsUndefined(raw) {
 		return parsed, nil
 	}
 
@@ -44,7 +44,7 @@ func buildParams(state *lib.State, rt *goja.Runtime, raw goja.Value) (*wsParams,
 		switch k {
 		case "headers":
 			headersV := params.Get(k)
-			if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
+			if sobek.IsUndefined(headersV) || sobek.IsNull(headersV) {
 				continue
 			}
 			headersObj := headersV.ToObject(rt)
@@ -60,7 +60,7 @@ func buildParams(state *lib.State, rt *goja.Runtime, raw goja.Value) (*wsParams,
 			}
 		case "jar":
 			jarV := params.Get(k)
-			if goja.IsUndefined(jarV) || goja.IsNull(jarV) {
+			if sobek.IsUndefined(jarV) || sobek.IsNull(jarV) {
 				continue
 			}
 			if v, ok := jarV.Export().(*httpModule.CookieJar); ok {
