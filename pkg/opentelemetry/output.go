@@ -167,6 +167,16 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 		}
 
 		trend.Record(ctx, entry.Value, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
+	case metrics.Rate:
+		nonZero, total, err := o.metricsRegistry.getOrCreateCountersForRate(name)
+		if err != nil {
+			return err
+		}
+
+		if entry.Value != 0 {
+			nonZero.Add(ctx, 1, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
+		}
+		total.Add(ctx, 1, otelMetric.WithAttributes(MapTagSet(entry.Tags)...))
 	default:
 		o.logger.Warnf("metric %q has unsupported metric type", entry.Metric.Name)
 	}

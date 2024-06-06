@@ -16,6 +16,7 @@ type registry struct {
 	counters       sync.Map
 	upDownCounters sync.Map
 	histograms     sync.Map
+	rateCounters   sync.Map
 }
 
 // newRegistry creates a new registry.
@@ -84,4 +85,52 @@ func (r *registry) getOrCreateUpDownCounter(name string) (otelMetric.Float64UpDo
 
 	r.upDownCounters.Store(name, c)
 	return c, nil
+}
+
+func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Counter, otelMetric.Int64Counter, error) {
+	// k6's rate metric tracks how frequently a non-zero value occurs.
+	// so to correctly calculate the rate in a metrics backend
+	// we need to split the rate metric into two counters:
+	// 2. number of non-zero occurrences
+	// 1. the total number of occurrences
+
+	nonZeroName := name + ".occurred"
+	totalName := name + ".total"
+
+	var err error
+	var nonZeroCounter, totalCounter otelMetric.Int64Counter
+
+	storedNonZeroCounter, ok := r.rateCounters.Load(nonZeroName)
+	if !ok {
+		nonZeroCounter, err = r.meter.Int64Counter(nonZeroName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create counter for %q: %w", nonZeroName, err)
+		}
+
+		r.rateCounters.Store(nonZeroName, nonZeroCounter)
+		r.logger.Debugf("registered counter metric %q", nonZeroName)
+	} else {
+		nonZeroCounter, ok = storedNonZeroCounter.(otelMetric.Int64Counter)
+		if !ok {
+			return nil, nil, fmt.Errorf("metric %q stored not as counter", nonZeroName)
+		}
+	}
+
+	storedTotalCounter, ok := r.rateCounters.Load(totalName)
+	if !ok {
+		totalCounter, err = r.meter.Int64Counter(totalName)
+		if err != nil {
+			return nil, nil, fmt.Errorf("failed to create counter for %q: %w", totalName, err)
+		}
+
+		r.rateCounters.Store(totalName, totalCounter)
+		r.logger.Debugf("registered counter metric %q", totalName)
+	} else {
+		totalCounter, ok = storedTotalCounter.(otelMetric.Int64Counter)
+		if !ok {
+			return nil, nil, fmt.Errorf("metric %q stored not as counter", totalName)
+		}
+	}
+
+	return nonZeroCounter, totalCounter, nil
 }
