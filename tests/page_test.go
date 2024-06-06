@@ -452,8 +452,9 @@ func TestPageTextContent(t *testing.T) {
 		p := newTestBrowser(t).NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		textContent, err := p.TextContent("div", nil)
+		textContent, ok, err := p.TextContent("div", nil)
 		require.NoError(t, err)
+		require.True(t, ok)
 		assert.Equal(t, "TestOne", textContent)
 	})
 
@@ -462,7 +463,7 @@ func TestPageTextContent(t *testing.T) {
 
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
-		_, err := p.TextContent("", nil)
+		_, _, err := p.TextContent("", nil)
 		require.ErrorContains(t, err, "The provided selector is empty")
 	})
 
@@ -473,7 +474,20 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
+		_, _, err = p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
+			Timeout: "100",
+		}))
+		require.Error(t, err)
+	})
+
+	t.Run("err_wrong_selector", func(t *testing.T) {
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		err := p.SetContent(sampleHTML, nil)
+		require.NoError(t, err)
+		_, _, err = p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
 			Timeout: "100",
 		}))
 		require.Error(t, err)

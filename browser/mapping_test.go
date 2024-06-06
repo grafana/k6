@@ -341,7 +341,7 @@ type pageAPI interface {
 	SetInputFiles(selector string, files goja.Value, opts goja.Value) error
 	SetViewportSize(viewportSize goja.Value) error
 	Tap(selector string, opts goja.Value) error
-	TextContent(selector string, opts goja.Value) (string, error)
+	TextContent(selector string, opts goja.Value) (string, bool, error)
 	ThrottleCPU(common.CPUProfile) error
 	ThrottleNetwork(common.NetworkProfile) error
 	Title() (string, error)
@@ -406,7 +406,7 @@ type frameAPI interface {
 	SetContent(html string, opts goja.Value) error
 	SetInputFiles(selector string, files goja.Value, opts goja.Value)
 	Tap(selector string, opts goja.Value) error
-	TextContent(selector string, opts goja.Value) (string, error)
+	TextContent(selector string, opts goja.Value) (string, bool, error)
 	Title() string
 	Type(selector string, text string, opts goja.Value) error
 	Uncheck(selector string, opts goja.Value) error
@@ -515,7 +515,7 @@ type locatorAPI interface {
 	GetAttribute(name string, opts goja.Value) (string, bool, error)
 	InnerHTML(opts goja.Value) (string, error)
 	InnerText(opts goja.Value) (string, error)
-	TextContent(opts goja.Value) (string, error)
+	TextContent(opts goja.Value) (string, bool, error)
 	InputValue(opts goja.Value) (string, error)
 	SelectOption(values goja.Value, opts goja.Value) ([]string, error)
 	Press(key string, opts goja.Value) error

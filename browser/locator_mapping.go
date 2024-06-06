@@ -110,7 +110,14 @@ func mapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
 		},
 		"textContent": func(opts goja.Value) *goja.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return lo.TextContent(opts) //nolint:wrapcheck
+				s, ok, err := lo.TextContent(opts)
+				if err != nil {
+					return nil, err //nolint:wrapcheck
+				}
+				if !ok {
+					return nil, nil
+				}
+				return s, nil
 			})
 		},
 		"inputValue": func(opts goja.Value) *goja.Promise {

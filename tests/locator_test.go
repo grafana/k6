@@ -137,8 +137,9 @@ func TestLocator(t *testing.T) {
 				const value = "fill me up"
 				lo := p.Locator("#firstParagraph", nil)
 				require.NoError(t, lo.Fill(value, nil))
-				textContent, err := p.TextContent("#firstParagraph", nil)
+				textContent, ok, err := p.TextContent("#firstParagraph", nil)
 				require.NoError(t, err)
+				require.True(t, ok)
 				require.Equal(t, value, textContent)
 				lo = p.Locator("#secondParagraph", nil)
 				require.Error(t, lo.Fill(value, nil))
@@ -249,8 +250,9 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"TextContent", func(_ *testBrowser, p *common.Page) {
-				text, err := p.Locator("#divHello", nil).TextContent(nil)
+				text, ok, err := p.Locator("#divHello", nil).TextContent(nil)
 				require.NoError(t, err)
+				require.True(t, ok)
 				require.Equal(t, `hello`, text)
 			},
 		},
@@ -418,7 +420,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"TextContent", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.TextContent(timeout(tb))
+				_, _, err := l.TextContent(timeout(tb))
 				return err
 			},
 		},

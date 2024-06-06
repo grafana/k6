@@ -1638,23 +1638,24 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 }
 
 // TextContent returns the textContent attribute of the first element found
-// that matches the selector.
-func (f *Frame) TextContent(selector string, opts goja.Value) (string, error) {
+// that matches the selector. The second return value is true if the returned
+// text content is not null or empty, and false otherwise.
+func (f *Frame) TextContent(selector string, opts goja.Value) (string, bool, error) {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameTextContentOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		return "", fmt.Errorf("parsing text content options: %w", err)
+		return "", false, fmt.Errorf("parsing text content options: %w", err)
 	}
-	v, err := f.textContent(selector, popts)
+	v, ok, err := f.textContent(selector, popts)
 	if err != nil {
-		return "", fmt.Errorf("getting text content of %q: %w", selector, err)
+		return "", false, fmt.Errorf("getting text content of %q: %w", selector, err)
 	}
 
-	return v, nil
+	return v, ok, nil
 }
 
-func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (string, error) {
+func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (string, bool, error) {
 	TextContent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.textContent(apiCtx)
 	}
@@ -1664,17 +1665,17 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err)
+		return "", false, errorFromDOMError(err)
 	}
 	if v == nil {
-		return "", nil
+		return "", false, nil
 	}
-	gv, ok := v.(string)
+	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("unexpected type %T", v)
+		return "", false, fmt.Errorf("unexpected type %T (expecting string)", v)
 	}
 
-	return gv, nil
+	return s, true, nil
 }
 
 // Timeout will return the default timeout or the one set by the user.

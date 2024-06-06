@@ -125,7 +125,7 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 			pingJSSlow:   false,
 			waitUntil:    common.LifecycleEventNetworkIdle,
 			assertFunc: func(tb *testBrowser, p *common.Page) error {
-				result, err := p.TextContent("#pingRequestText", nil)
+				result, _, err := p.TextContent("#pingRequestText", nil)
 				if err != nil {
 					return err
 				}
@@ -163,13 +163,13 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 			}
 
 			assertHome(t, tb, p, tt.waitUntil, func() error {
-				result, err := p.TextContent("#pingRequestText", nil)
+				result, _, err := p.TextContent("#pingRequestText", nil)
 				if err != nil {
 					return err
 				}
 				tt.pingRequestTextAssert(result, 10)
 
-				result, err = p.TextContent("#pingJSText", nil)
+				result, _, err = p.TextContent("#pingJSText", nil)
 				if err != nil {
 					return err
 				}
@@ -192,11 +192,11 @@ func TestLifecycleWaitForNavigation(t *testing.T) {
 
 				return tb.run(ctx, waitForNav, click)
 			}, func() {
-				result, err := p.TextContent("#pingRequestText", nil)
+				result, _, err := p.TextContent("#pingRequestText", nil)
 				require.NoError(t, err)
 				tt.pingRequestTextAssert(result, 20)
 
-				result, err = p.TextContent("#pingJSText", nil)
+				result, _, err = p.TextContent("#pingJSText", nil)
 				require.NoError(t, err)
 				tt.pingJSTextAssert(result)
 			}, "")
@@ -281,11 +281,11 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 				err := p.WaitForLoadState(common.LifecycleEventNetworkIdle.String(), nil)
 				require.NoError(t, err)
 
-				result, err := p.TextContent("#pingRequestText", nil)
+				result, _, err := p.TextContent("#pingRequestText", nil)
 				require.NoError(t, err)
 				assert.EqualValues(t, "Waiting... pong 10 - for loop complete", result)
 
-				result, err = p.TextContent("#pingJSText", nil)
+				result, _, err = p.TextContent("#pingJSText", nil)
 				require.NoError(t, err)
 				assert.EqualValues(t, "ping.js loaded from server", result)
 			},
@@ -313,11 +313,11 @@ func TestLifecycleWaitForLoadState(t *testing.T) {
 			}
 
 			assertHome(t, tb, p, tt.waitUntil, func() error {
-				result, err := p.TextContent("#pingRequestText", nil)
+				result, _, err := p.TextContent("#pingRequestText", nil)
 				require.NoError(t, err)
 				tt.pingRequestTextAssert(result)
 
-				result, err = p.TextContent("#pingJSText", nil)
+				result, _, err = p.TextContent("#pingJSText", nil)
 				require.NoError(t, err)
 				tt.pingJSTextAssert(result)
 
@@ -400,13 +400,13 @@ func TestLifecycleReload(t *testing.T) {
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			assertHome(t, tb, p, tt.waitUntil, func() error {
-				result, err := p.TextContent("#pingRequestText", nil)
+				result, _, err := p.TextContent("#pingRequestText", nil)
 				if err != nil {
 					return err
 				}
 				tt.pingRequestTextAssert(result, 10)
 
-				result, err = p.TextContent("#pingJSText", nil)
+				result, _, err = p.TextContent("#pingJSText", nil)
 				if err != nil {
 					return err
 				}
@@ -419,13 +419,13 @@ func TestLifecycleReload(t *testing.T) {
 				_, err = p.Reload(opts)
 				require.NoError(t, err)
 
-				result, err = p.TextContent("#pingRequestText", nil)
+				result, _, err = p.TextContent("#pingRequestText", nil)
 				if err != nil {
 					return err
 				}
 				tt.pingRequestTextAssert(result, 20)
 
-				result, err = p.TextContent("#pingJSText", nil)
+				result, _, err = p.TextContent("#pingJSText", nil)
 				if err != nil {
 					return err
 				}
@@ -510,13 +510,13 @@ func TestLifecycleGotoWithSubFrame(t *testing.T) {
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, true)
 
 			assertHome(t, tb, p, tt.waitUntil, func() error {
-				result, err := p.TextContent("#subFramePingRequestText", nil)
+				result, _, err := p.TextContent("#subFramePingRequestText", nil)
 				if err != nil {
 					return err
 				}
 				tt.pingRequestTextAssert(result)
 
-				result, err = p.TextContent("#subFramePingJSText", nil)
+				result, _, err = p.TextContent("#subFramePingJSText", nil)
 				if err != nil {
 					return err
 				}
@@ -587,13 +587,13 @@ func TestLifecycleGoto(t *testing.T) {
 			withPingJSHandler(t, tb, tt.pingJSSlow, nil, false)
 
 			assertHome(t, tb, p, tt.waitUntil, func() error {
-				result, err := p.TextContent("#pingRequestText", nil)
+				result, _, err := p.TextContent("#pingRequestText", nil)
 				if err != nil {
 					return err
 				}
 				tt.pingRequestTextAssert(result)
 
-				result, err = p.TextContent("#pingJSText", nil)
+				result, _, err = p.TextContent("#pingJSText", nil)
 				if err != nil {
 					return err
 				}
@@ -628,7 +628,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withPingJSHandler(t, tb, false, nil, false)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() error {
-			result, err := p.TextContent("#pingJSText", nil)
+			result, _, err := p.TextContent("#pingJSText", nil)
 			if err != nil {
 				return err
 			}
@@ -650,13 +650,13 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withPingJSHandler(t, tb, false, ch, false)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() error {
-			result, err := p.TextContent("#pingRequestText", nil)
+			result, _, err := p.TextContent("#pingRequestText", nil)
 			if err != nil {
 				return err
 			}
 			assert.EqualValues(t, "Waiting... pong 4 - for loop complete", result)
 
-			result, err = p.TextContent("#pingJSText", nil)
+			result, _, err = p.TextContent("#pingJSText", nil)
 			if err != nil {
 				return err
 			}
@@ -676,7 +676,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		withPingHandler(t, tb, 50*time.Millisecond, nil)
 
 		assertHome(t, tb, p, common.LifecycleEventNetworkIdle, func() error {
-			result, err := p.TextContent("#pingRequestText", nil)
+			result, _, err := p.TextContent("#pingRequestText", nil)
 			if err != nil {
 				return err
 			}
