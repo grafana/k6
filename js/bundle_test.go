@@ -73,6 +73,34 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 	)
 }
 
+func getSimpleBundleStdin(tb testing.TB, pwd *url.URL, data string, opts ...interface{}) (*Bundle, error) {
+	fs := fsext.NewMemMapFs()
+	var rtOpts *lib.RuntimeOptions
+	var logger logrus.FieldLogger
+	for _, o := range opts {
+		switch opt := o.(type) {
+		case fsext.Fs:
+			fs = opt
+		case lib.RuntimeOptions:
+			rtOpts = &opt
+		case logrus.FieldLogger:
+			logger = opt
+		default:
+			tb.Fatalf("unknown test option %q", opt)
+		}
+	}
+
+	return NewBundle(
+		getTestPreInitState(tb, logger, rtOpts),
+		&loader.SourceData{
+			URL:  &url.URL{Path: "/-", Scheme: "file"},
+			Data: []byte(data),
+			PWD:  pwd,
+		},
+		map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()},
+	)
+}
+
 func TestNewBundle(t *testing.T) {
 	t.Parallel()
 	t.Run("Blank", func(t *testing.T) {

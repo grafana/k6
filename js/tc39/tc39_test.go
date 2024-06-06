@@ -710,6 +710,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
 	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms, *base)
 	require.NoError(ctx.t, vm.Set("require", impl.Require))
+	moduleRuntime.VU.InitEnvField.CWD = base
 
 	early = false
 	_, err = ms.RunSourceData(&loader.SourceData{

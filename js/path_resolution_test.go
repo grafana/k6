@@ -2,6 +2,7 @@ package js
 
 import (
 	"context"
+	"net/url"
 	"testing"
 
 	"github.com/sirupsen/logrus"
@@ -201,6 +202,39 @@ func TestRequirePathResolution(t *testing.T) {
 			require.NoError(t, err)
 			logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
 			b, err := getSimpleBundle(t, "/main.js", `export { default } from "/A/A/A/A/script.js"`, fs, logger)
+			require.NoError(t, err)
+
+			_, err = b.Instantiate(context.Background(), 0)
+			require.NoError(t, err)
+			logs := hook.Drain()
+
+			if len(testCase.expectedLogs) == 0 {
+				require.Empty(t, logs)
+				return
+			}
+			require.Equal(t, len(logs), len(testCase.expectedLogs))
+
+			for i, log := range logs {
+				require.Contains(t, log.Message, testCase.expectedLogs[i], "log line %d", i)
+			}
+		})
+	}
+
+	pwd, err := url.Parse("file:///A/A/A/A/")
+	require.NoError(t, err)
+
+	for name, testCase := range testCases {
+		name, testCase := name, testCase
+
+		t.Run("STDIN-"+name, func(t *testing.T) {
+			t.Parallel()
+			fs := fsext.NewMemMapFs()
+			err := writeToFs(fs, testCase.fsMap)
+			fs = fsext.NewCacheOnReadFs(fs, fsext.NewMemMapFs(), 0)
+			require.NoError(t, err)
+			logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+
+			b, err := getSimpleBundleStdin(t, pwd, testCase.fsMap["/A/A/A/A/script.js"].(string), fs, logger)
 			require.NoError(t, err)
 
 			_, err = b.Instantiate(context.Background(), 0)
