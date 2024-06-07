@@ -38,6 +38,13 @@ const (
 	ScrollPositionNearest ScrollPosition = "nearest"
 )
 
+const (
+	optionButton     = "button"
+	optionDelay      = "delay"
+	optionClickCount = "clickCount"
+	optionModifiers  = "modifiers"
+)
+
 // ScrollIntoViewOptions change the behavior of ScrollIntoView.
 // See: https://developer.mozilla.org/en-US/docs/Web/API/Element/scrollIntoView
 type ScrollIntoViewOptions struct {
@@ -272,29 +279,33 @@ func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleCl
 
 // Parse parses the ElementHandleClickOptions from the given opts.
 func (o *ElementHandleClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "button":
-				o.Button = opts.Get(k).String()
-			case "clickCount":
-				o.ClickCount = opts.Get(k).ToInteger()
-			case "delay":
-				o.Delay = opts.Get(k).ToInteger()
-			case "modifiers":
-				var m []string
-				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
-					return err
-				}
-				o.Modifiers = m
+
+	if !sobekValueExists(opts) {
+		return nil
+	}
+
+	rt := k6ext.Runtime(ctx)
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case optionButton:
+			o.Button = obj.Get(k).String()
+		case optionClickCount:
+			o.ClickCount = obj.Get(k).ToInteger()
+		case optionDelay:
+			o.Delay = obj.Get(k).ToInteger()
+		case optionModifiers:
+			var m []string
+			if err := rt.ExportTo(obj.Get(k), &m); err != nil {
+				return fmt.Errorf("parsing element handle click option modifiers: %w", err)
 			}
+			o.Modifiers = m
 		}
 	}
+
 	return nil
 }
 
