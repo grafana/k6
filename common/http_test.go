@@ -71,9 +71,14 @@ func TestRequest(t *testing.T) {
 		}, req.HeadersArray())
 	})
 
-	t.Run("HeaderValue()", func(t *testing.T) {
+	t.Run("HeaderValue()_key", func(t *testing.T) {
 		t.Parallel()
 		assert.Equal(t, "value", req.HeaderValue("key").Export())
+	})
+
+	t.Run("HeaderValue()_KEY", func(t *testing.T) {
+		t.Parallel()
+		assert.Equal(t, "value", req.HeaderValue("KEY").Export())
 	})
 
 	t.Run("Size()", func(t *testing.T) {
