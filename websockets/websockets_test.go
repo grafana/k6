@@ -218,6 +218,20 @@ func TestBasic(t *testing.T) {
 	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
 }
 
+func TestAddUndefinedHandler(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			ws.close()
+		})
+		ws.addEventListener("open", undefined)
+	`))
+	require.ErrorContains(t, err, "handler for event type \"open\" isn't a callable function")
+}
+
 func TestBasicWithOn(t *testing.T) {
 	t.Parallel()
 

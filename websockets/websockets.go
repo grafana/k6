@@ -784,10 +784,15 @@ func (w *webSocket) callEventListeners(eventType string) error {
 	return nil
 }
 
-func (w *webSocket) addEventListener(event string, listener func(sobek.Value) (sobek.Value, error)) {
+func (w *webSocket) addEventListener(event string, handler func(sobek.Value) (sobek.Value, error)) {
 	// TODO support options https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener#parameters
-	if err := w.eventListeners.add(event, listener); err != nil {
-		w.vu.State().Logger.Warnf("can't add event listener: %s", err)
+
+	if handler == nil {
+		common.Throw(w.vu.Runtime(), fmt.Errorf("handler for event type %q isn't a callable function", event))
+	}
+
+	if err := w.eventListeners.add(event, handler); err != nil {
+		w.vu.State().Logger.Warnf("can't add event handler: %s", err)
 	}
 }
 
