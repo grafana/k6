@@ -13,7 +13,7 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/lib"
@@ -82,9 +82,9 @@ func exists(fs fsext.Fs, filename string) bool {
 }
 
 type configLoader struct {
-	runtime       *goja.Runtime
+	runtime       *sobek.Runtime
 	compiler      *compiler.Compiler
-	defaultConfig *goja.Object
+	defaultConfig *sobek.Object
 	proc          *process
 }
 
@@ -96,9 +96,9 @@ func newConfigLoader(defaultConfig json.RawMessage, proc *process) (*configLoade
 
 	con := newConfigConsole(proc.logger)
 
-	runtime := goja.New()
+	runtime := sobek.New()
 
-	runtime.SetFieldNameMapper(goja.UncapFieldNameMapper())
+	runtime.SetFieldNameMapper(sobek.UncapFieldNameMapper())
 
 	if err := runtime.Set("console", con); err != nil {
 		return nil, err
@@ -140,11 +140,11 @@ func (loader *configLoader) load(filename string) (json.RawMessage, error) {
 	return obj.MarshalJSON()
 }
 
-func isObject(val goja.Value) bool {
+func isObject(val sobek.Value) bool {
 	return val != nil && val.ExportType() != nil && val.ExportType().Kind() == reflect.Map
 }
 
-func (loader *configLoader) eval(src []byte, filename string) (*goja.Object, error) {
+func (loader *configLoader) eval(src []byte, filename string) (*sobek.Object, error) {
 	prog, _, err := loader.compiler.Compile(string(src), filename, false)
 	if err != nil {
 		return nil, err
@@ -162,7 +162,7 @@ func (loader *configLoader) eval(src []byte, filename string) (*goja.Object, err
 		return nil, err
 	}
 
-	call, isCallable := goja.AssertFunction(val)
+	call, isCallable := sobek.AssertFunction(val)
 	if !isCallable {
 		return nil, fmt.Errorf("%w, file: %s", errNotFunction, filename)
 	}
@@ -177,7 +177,7 @@ func (loader *configLoader) eval(src []byte, filename string) (*goja.Object, err
 		return nil, fmt.Errorf("%w, file: %s", errNoExport, filename)
 	}
 
-	if call, isCallable = goja.AssertFunction(def); isCallable {
+	if call, isCallable = sobek.AssertFunction(def); isCallable {
 		def, err = call(exports, loader.defaultConfig)
 		if err != nil {
 			return nil, err
@@ -193,10 +193,10 @@ func (loader *configLoader) eval(src []byte, filename string) (*goja.Object, err
 
 // toObject use JavaScript JSON.parse to create native goja object
 // there could be a better solution.... (but Object.UnmarshallJSON is missing).
-func toObject(runtime *goja.Runtime, bin json.RawMessage) (*goja.Object, error) {
+func toObject(runtime *sobek.Runtime, bin json.RawMessage) (*sobek.Object, error) {
 	val := runtime.Get("JSON").ToObject(runtime).Get("parse")
 
-	call, _ := goja.AssertFunction(val)
+	call, _ := sobek.AssertFunction(val)
 
 	val, err := call(runtime.GlobalObject(), runtime.ToValue(string(bin)))
 	if err != nil {
@@ -229,7 +229,7 @@ func newConfigConsole(logger logrus.FieldLogger) *configConsole {
 	return &configConsole{logger.WithField("source", "console").WithField("extension", "dashboard")}
 }
 
-func (c configConsole) log(level logrus.Level, args ...goja.Value) {
+func (c configConsole) log(level logrus.Level, args ...sobek.Value) {
 	var strs strings.Builder
 
 	for i := 0; i < len(args); i++ {
@@ -260,27 +260,27 @@ func (c configConsole) log(level logrus.Level, args ...goja.Value) {
 	}
 }
 
-func (c configConsole) Log(args ...goja.Value) {
+func (c configConsole) Log(args ...sobek.Value) {
 	c.Info(args...)
 }
 
-func (c configConsole) Debug(args ...goja.Value) {
+func (c configConsole) Debug(args ...sobek.Value) {
 	c.log(logrus.DebugLevel, args...)
 }
 
-func (c configConsole) Info(args ...goja.Value) {
+func (c configConsole) Info(args ...sobek.Value) {
 	c.log(logrus.InfoLevel, args...)
 }
 
-func (c configConsole) Warn(args ...goja.Value) {
+func (c configConsole) Warn(args ...sobek.Value) {
 	c.log(logrus.WarnLevel, args...)
 }
 
-func (c configConsole) Error(args ...goja.Value) {
+func (c configConsole) Error(args ...sobek.Value) {
 	c.log(logrus.ErrorLevel, args...)
 }
 
-func (c configConsole) valueString(value goja.Value) string {
+func (c configConsole) valueString(value sobek.Value) string {
 	mv, ok := value.(json.Marshaler)
 	if !ok {
 		return value.String()
