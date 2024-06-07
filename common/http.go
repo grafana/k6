@@ -460,7 +460,7 @@ func (r *Response) Frame() *Frame {
 // Returns true if the header is present, false otherwise.
 func (r *Response) HeaderValue(name string) (string, bool) {
 	headers := r.AllHeaders()
-	v, ok := headers[name]
+	v, ok := headers[strings.ToLower(name)]
 	return v, ok
 }
 
