@@ -435,36 +435,39 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 }
 
 // Parse parses the ElementHandleScreenshotOptions from the given opts.
-func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
-		formatSpecified := false
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "omitBackground":
-				o.OmitBackground = opts.Get(k).ToBoolean()
-			case "path":
-				o.Path = opts.Get(k).String()
-			case "quality":
-				o.Quality = opts.Get(k).ToInteger()
-			case "type":
-				if f, ok := imageFormatToID[opts.Get(k).String()]; ok {
-					o.Format = f
-					formatSpecified = true
-				}
-			case "timeout":
-				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-			}
-		}
+func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error { //nolint:cyclop
+	if !sobekValueExists(opts) {
+		return nil
+	}
 
-		// Infer file format by path if format not explicitly specified (default is PNG)
-		if o.Path != "" && !formatSpecified {
-			if strings.HasSuffix(o.Path, ".jpg") || strings.HasSuffix(o.Path, ".jpeg") {
-				o.Format = ImageFormatJPEG
+	rt := k6ext.Runtime(ctx)
+	formatSpecified := false
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "omitBackground":
+			o.OmitBackground = obj.Get(k).ToBoolean()
+		case "path":
+			o.Path = obj.Get(k).String()
+		case "quality":
+			o.Quality = obj.Get(k).ToInteger()
+		case "type":
+			if f, ok := imageFormatToID[obj.Get(k).String()]; ok {
+				o.Format = f
+				formatSpecified = true
 			}
+		case "timeout":
+			o.Timeout = time.Duration(obj.Get(k).ToInteger()) * time.Millisecond
 		}
 	}
+
+	// Infer file format by path if format not explicitly specified (default is PNG)
+	if o.Path != "" && !formatSpecified {
+		if strings.HasSuffix(o.Path, ".jpg") || strings.HasSuffix(o.Path, ".jpeg") {
+			o.Format = ImageFormatJPEG
+		}
+	}
+
 	return nil
 }
 
