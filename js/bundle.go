@@ -15,6 +15,8 @@ import (
 	"github.com/sirupsen/logrus"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/event"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/compiler"
@@ -208,7 +210,10 @@ func (b *Bundle) populateExports(updateOptions bool, exports *goja.Object) error
 			dec.DisallowUnknownFields()
 			if err := dec.Decode(&b.Options); err != nil {
 				if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
-					return uerr
+					return errext.WithAbortReasonIfNone(
+						errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig),
+						errext.AbortedByScriptError,
+					)
 				}
 				b.preInitState.Logger.WithError(err).Warn("There were unknown fields in the options exported in the script")
 			}
