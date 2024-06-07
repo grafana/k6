@@ -182,7 +182,7 @@ func (r *Request) Frame() *Frame {
 func (r *Request) HeaderValue(name string) goja.Value {
 	rt := r.vu.Runtime()
 	headers := r.AllHeaders()
-	val, ok := headers[name]
+	val, ok := headers[strings.ToLower(name)]
 	if !ok {
 		return goja.Null()
 	}
