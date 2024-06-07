@@ -14,9 +14,9 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.1
-	github.com/grafana/sobek v0.0.0-20240606091932-2da0e9e5f3e7
+	github.com/grafana/sobek v0.0.0-20240607083612-4f0cd64f4e78
 	github.com/grafana/xk6-browser v1.5.1
-	github.com/grafana/xk6-dashboard v0.7.3
+	github.com/grafana/xk6-dashboard v0.7.4
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0
 	github.com/grafana/xk6-webcrypto v0.3.0
