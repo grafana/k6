@@ -100,45 +100,47 @@ func NewPageScreenshotOptions() *PageScreenshotOptions {
 }
 
 // Parse parses the page screenshot options.
-func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
+func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error { //nolint:cyclop
+	if !sobekValueExists(opts) {
+		return nil
+	}
+
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
-		formatSpecified := false
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "clip":
-				var c map[string]float64
-				if rt.ExportTo(opts.Get(k), &c) != nil {
-					o.Clip = &page.Viewport{
-						X:      c["x"],
-						Y:      c["y"],
-						Width:  c["width"],
-						Height: c["height"],
-						Scale:  1,
-					}
+	formatSpecified := false
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		switch k {
+		case "clip":
+			var c map[string]float64
+			if rt.ExportTo(obj.Get(k), &c) != nil {
+				o.Clip = &page.Viewport{
+					X:      c["x"],
+					Y:      c["y"],
+					Width:  c["width"],
+					Height: c["height"],
+					Scale:  1,
 				}
-			case "fullPage":
-				o.FullPage = opts.Get(k).ToBoolean()
-			case "omitBackground":
-				o.OmitBackground = opts.Get(k).ToBoolean()
-			case "path":
-				o.Path = opts.Get(k).String()
-			case "quality":
-				o.Quality = opts.Get(k).ToInteger()
-			case "type":
-				if f, ok := imageFormatToID[opts.Get(k).String()]; ok {
-					o.Format = f
-					formatSpecified = true
-				}
+			}
+		case "fullPage":
+			o.FullPage = obj.Get(k).ToBoolean()
+		case "omitBackground":
+			o.OmitBackground = obj.Get(k).ToBoolean()
+		case "path":
+			o.Path = obj.Get(k).String()
+		case "quality":
+			o.Quality = obj.Get(k).ToInteger()
+		case "type":
+			if f, ok := imageFormatToID[obj.Get(k).String()]; ok {
+				o.Format = f
+				formatSpecified = true
 			}
 		}
+	}
 
-		// Infer file format by path if format not explicitly specified (default is PNG)
-		if o.Path != "" && !formatSpecified {
-			if strings.HasSuffix(o.Path, ".jpg") || strings.HasSuffix(o.Path, ".jpeg") {
-				o.Format = ImageFormatJPEG
-			}
+	// Infer file format by path if format not explicitly specified (default is PNG)
+	if o.Path != "" && !formatSpecified {
+		if strings.HasSuffix(o.Path, ".jpg") || strings.HasSuffix(o.Path, ".jpeg") {
+			o.Format = ImageFormatJPEG
 		}
 	}
 
