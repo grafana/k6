@@ -291,7 +291,7 @@ func (b *testBrowser) runtime() *sobek.Runtime { return b.vu.Runtime() }
 func (b *testBrowser) toSobekValue(i any) sobek.Value { return b.runtime().ToValue(i) }
 
 // runJavaScript in the sobek runtime.
-func (b *testBrowser) runJavaScript(s string, args ...any) (sobek.Value, error) {
+func (b *testBrowser) runJavaScript(s string, args ...any) (sobek.Value, error) { //nolint:unparam
 	b.t.Helper()
 	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
 	if err != nil {
