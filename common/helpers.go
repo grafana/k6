@@ -226,22 +226,6 @@ func sobekValueExists(v sobek.Value) bool {
 	return v != nil && !sobek.IsUndefined(v) && !sobek.IsNull(v)
 }
 
-// asSobekValue return v as a sobek value.
-// panics if v is not a sobek value.
-func asSobekValue(ctx context.Context, v any) sobek.Value {
-	gv, ok := v.(sobek.Value)
-	if !ok {
-		k6ext.Panic(ctx, "unexpected type %T", v)
-	}
-	return gv
-}
-
-// sobekValueToString returns v as string.
-// panics if v is not a sobek value.
-func sobekValueToString(ctx context.Context, v any) string {
-	return asSobekValue(ctx, v).String()
-}
-
 // convert is a helper function to convert any value to a given type.
 // underneath, it uses json.Marshal and json.Unmarshal to do the conversion.
 func convert[T any](from any, to *T) error {

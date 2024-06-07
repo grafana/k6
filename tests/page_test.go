@@ -1262,15 +1262,6 @@ func TestPageOn(t *testing.T) {
 	}
 }
 
-func assertExceptionContains(t *testing.T, rt *sobek.Runtime, fn func(), expErrMsg string) {
-	t.Helper()
-
-	cal, _ := sobek.AssertFunction(rt.ToValue(fn))
-
-	_, err := cal(sobek.Undefined())
-	require.ErrorContains(t, err, expErrMsg)
-}
-
 func TestPageTimeout(t *testing.T) {
 	t.Parallel()
 
