@@ -12,7 +12,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/dom"
 	cdppage "github.com/chromedp/cdproto/page"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
 
 	"github.com/grafana/xk6-browser/common/js"
@@ -64,7 +64,10 @@ func (h *ElementHandle) boundingBox() (*Rect, error) {
 }
 
 func (h *ElementHandle) checkHitTargetAt(apiCtx context.Context, point Position) (bool, error) {
-	frame := h.ownerFrame(apiCtx)
+	frame, err := h.ownerFrame(apiCtx)
+	if err != nil {
+		return false, fmt.Errorf("checking hit target at %v: %w", point, err)
+	}
 	if frame != nil && frame.parentFrame != nil {
 		el, err := h.frame.FrameElement()
 		if err != nil {
@@ -228,7 +231,7 @@ func compensateHalfIntegerRoundingError(p Position) Position {
 	return p
 }
 
-func (h *ElementHandle) dblClick(p *Position, opts *MouseClickOptions) error {
+func (h *ElementHandle) dblclick(p *Position, opts *MouseClickOptions) error {
 	return h.frame.page.Mouse.click(p.X, p.Y, opts)
 }
 
@@ -271,7 +274,9 @@ func (h *ElementHandle) fill(_ context.Context, value string) error {
 	}
 
 	if s == resultNeedsInput {
-		h.frame.page.Keyboard.InsertText(value)
+		if err := h.frame.page.Keyboard.InsertText(value); err != nil {
+			return fmt.Errorf("fill: %w", err)
+		}
 	} else if s != resultDone {
 		// Either we're done or an error happened (returned as "error:..." from JS)
 		return errorFromDOMError(s)
@@ -422,22 +427,26 @@ func (h *ElementHandle) offsetPosition(apiCtx context.Context, offset *Position)
 	}, nil
 }
 
-func (h *ElementHandle) ownerFrame(apiCtx context.Context) *Frame {
-	frameId := h.frame.page.getOwnerFrame(apiCtx, h)
-	if frameId == "" {
-		return nil
+func (h *ElementHandle) ownerFrame(apiCtx context.Context) (*Frame, error) {
+	frameID, err := h.frame.page.getOwnerFrame(apiCtx, h)
+	if err != nil {
+		return nil, err
 	}
-	frame, ok := h.frame.page.frameManager.getFrameByID(frameId)
+	if frameID == "" {
+		return nil, nil //nolint:nilnil
+	}
+	frame, ok := h.frame.page.frameManager.getFrameByID(frameID)
 	if ok {
-		return frame
+		return frame, nil
 	}
 	for _, page := range h.frame.page.browserCtx.browser.pages {
-		frame, ok = page.frameManager.getFrameByID(frameId)
+		frame, ok = page.frameManager.getFrameByID(frameID)
 		if ok {
-			return frame
+			return frame, nil
 		}
 	}
-	return nil
+
+	return nil, nil //nolint:nilnil
 }
 
 func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect *dom.Rect) error {
@@ -468,9 +477,9 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts *Keyboard
 }
 
 //nolint:funlen,gocognit,cyclop
-func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) (any, error) {
-	convertSelectOptionValues := func(values goja.Value) ([]any, error) {
-		if goja.IsNull(values) || goja.IsUndefined(values) {
+func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value) (any, error) {
+	convertSelectOptionValues := func(values sobek.Value) ([]any, error) {
+		if sobek.IsNull(values) || sobek.IsUndefined(values) {
 			return nil, nil
 		}
 
@@ -489,7 +498,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 					return nil, fmt.Errorf("options[%d]: expected object, got null", i)
 				case reflect.TypeOf(&ElementHandle{}).Kind():
 					opts = append(opts, t.(*ElementHandle))
-				case reflect.TypeOf(goja.Object{}).Kind():
+				case reflect.TypeOf(sobek.Object{}).Kind():
 					obj := values.ToObject(rt)
 					opt := SelectOption{}
 					for _, k := range obj.Keys() {
@@ -514,7 +523,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values goja.Value) 
 			}
 		case reflect.TypeOf(&ElementHandle{}).Kind():
 			opts = append(opts, t.(*ElementHandle))
-		case reflect.TypeOf(goja.Object{}).Kind():
+		case reflect.TypeOf(sobek.Object{}).Kind():
 			obj := values.ToObject(rt)
 			opt := SelectOption{}
 			for _, k := range obj.Keys() {
@@ -614,8 +623,10 @@ func (h *ElementHandle) typ(apiCtx context.Context, text string, opts *KeyboardO
 	return nil
 }
 
-func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, force, noWaitAfter bool, timeout time.Duration) error {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(
+	_ context.Context, force, noWaitAfter bool, timeout time.Duration,
+) error {
+	fn := func(apiCtx context.Context, _ *ElementHandle) (any, error) {
 		fn := `
 			(element) => {
 				element.scrollIntoViewIfNeeded(true);
@@ -626,6 +637,7 @@ func (h *ElementHandle) waitAndScrollIntoViewIfNeeded(apiCtx context.Context, fo
 			forceCallable: true,
 			returnByValue: true,
 		}
+
 		return h.eval(apiCtx, opts, fn)
 	}
 	actFn := h.newAction([]string{"visible", "stable"}, fn, force, noWaitAfter, timeout)
@@ -748,31 +760,36 @@ func (h *ElementHandle) ContentFrame() (*Frame, error) {
 	return frame, nil
 }
 
-func (h *ElementHandle) Dblclick(opts goja.Value) {
-	actionOpts := NewElementHandleDblclickOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element double click options: %w", err)
+// Dblclick scrolls element into view and double clicks on the element.
+func (h *ElementHandle) Dblclick(opts sobek.Value) error {
+	popts := NewElementHandleDblclickOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing element double click options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
-		return nil, handle.dblClick(p, actionOpts.ToMouseClickOptions())
+
+	dblclick := func(_ context.Context, handle *ElementHandle, p *Position) (any, error) {
+		return nil, handle.dblclick(p, popts.ToMouseClickOptions())
 	}
-	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "double clicking on element: %w", err)
+	dblclickAction := h.newPointerAction(dblclick, &popts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, dblclickAction, popts.Timeout); err != nil {
+		return fmt.Errorf("double clicking on element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // DispatchEvent dispatches a DOM event to the element.
 func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+	dispatchEvent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.dispatchEvent(apiCtx, typ, eventInit)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	_, err := call(h.ctx, actFn, opts.Timeout)
-	if err != nil {
+	dispatchEventAction := h.newAction(
+		[]string{}, dispatchEvent, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	if _, err := call(h.ctx, dispatchEventAction, opts.Timeout); err != nil {
 		return fmt.Errorf("dispatching element event %q: %w", typ, err)
 	}
 
@@ -781,184 +798,236 @@ func (h *ElementHandle) DispatchEvent(typ string, eventInit any) error {
 	return nil
 }
 
-func (h *ElementHandle) Fill(value string, opts goja.Value) {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element fill options: %w", err)
+// Fill types the given value into the element.
+func (h *ElementHandle) Fill(value string, opts sobek.Value) error {
+	popts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing element fill options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	fill := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.fill(apiCtx, value)
 	}
-	actFn := h.newAction([]string{"visible", "enabled", "editable"},
-		fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := call(h.ctx, actFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "handling element fill action: %w", err)
+	fillAction := h.newAction(
+		[]string{"visible", "enabled", "editable"},
+		fill, popts.Force, popts.NoWaitAfter, popts.Timeout,
+	)
+	if _, err := call(h.ctx, fillAction, popts.Timeout); err != nil {
+		return fmt.Errorf("filling element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // Focus scrolls element into view and focuses the element.
-func (h *ElementHandle) Focus() {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) Focus() error {
+	focus := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.focus(apiCtx, false)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	_, err := call(h.ctx, actFn, opts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "focusing on element: %w", err)
+	focusAction := h.newAction(
+		[]string{}, focus, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	if _, err := call(h.ctx, focusAction, opts.Timeout); err != nil {
+		return fmt.Errorf("focusing on element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // GetAttribute retrieves the value of specified element attribute.
-func (h *ElementHandle) GetAttribute(name string) any {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+// The second return value is true if the attribute exists, and false otherwise.
+func (h *ElementHandle) GetAttribute(name string) (string, bool, error) {
+	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	getAttributeAction := h.newAction(
+		[]string{}, getAttribute, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+
+	v, err := call(h.ctx, getAttributeAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting attribute of %q: %q", name, err)
+		return "", false, fmt.Errorf("getting attribute %q of element: %w", name, err)
 	}
-	applySlowMo(h.ctx)
+	if v == nil {
+		return "", false, nil
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", false, fmt.Errorf(
+			"getting attribute %q of element: unexpected type %T (expecting string)",
+			name, v,
+		)
+	}
 
-	// TODO: return any with error
-
-	return v
+	return s, true, nil
 }
 
 // Hover scrolls element into view and hovers over its center point.
-func (h *ElementHandle) Hover(opts goja.Value) {
-	actionOpts := NewElementHandleHoverOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element hover options: %w", err)
+func (h *ElementHandle) Hover(opts sobek.Value) error {
+	aopts := NewElementHandleHoverOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing element hover options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+
+	hover := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.hover(apiCtx, p)
 	}
-	pointerFn := h.newPointerAction(fn, &actionOpts.ElementHandleBasePointerOptions)
-	_, err := call(h.ctx, pointerFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "hovering on element: %w", err)
+	hoverAction := h.newPointerAction(hover, &aopts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, hoverAction, aopts.Timeout); err != nil {
+		return fmt.Errorf("hovering on element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // InnerHTML returns the inner HTML of the element.
-func (h *ElementHandle) InnerHTML() string {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) InnerHTML() (string, error) {
+	innerHTML := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.innerHTML(apiCtx)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	innerHTMLAction := h.newAction(
+		[]string{}, innerHTML, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	v, err := call(h.ctx, innerHTMLAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting element's inner HTML: %w", err)
+		return "", fmt.Errorf("getting element's inner HTML: %w", err)
 	}
+
 	applySlowMo(h.ctx)
 
-	// TODO: handle error
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+	}
 
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // InnerText returns the inner text of the element.
-func (h *ElementHandle) InnerText() string {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+func (h *ElementHandle) InnerText() (string, error) {
+	innerText := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.innerText(apiCtx)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	innerTextAction := h.newAction(
+		[]string{}, innerText, opts.Force, opts.NoWaitAfter, opts.Timeout.Abs(),
+	)
+	v, err := call(h.ctx, innerTextAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting element's inner text: %w", err)
+		return "", fmt.Errorf("getting element's inner text: %w", err)
 	}
+
 	applySlowMo(h.ctx)
 
-	// TODO: handle error
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+	}
 
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
-func (h *ElementHandle) InputValue(opts goja.Value) string {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing element input value options: %w", err)
+// InputValue returns the value of the input element.
+func (h *ElementHandle) InputValue(opts sobek.Value) (string, error) {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return "", fmt.Errorf("parsing element input value options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	inputValue := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.inputValue(apiCtx)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	v, err := call(h.ctx, actFn, actionOpts.Timeout)
+	inputValueAction := h.newAction([]string{}, inputValue, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
+	v, err := call(h.ctx, inputValueAction, aopts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting element's input value: %w", err)
+		return "", fmt.Errorf("getting element's input value: %w", err)
 	}
-	applySlowMo(h.ctx)
 
-	// TODO: return error
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("unexpected type %T (expecting string)", v)
+	}
 
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // IsChecked checks if a checkbox or radio is checked.
-func (h *ElementHandle) IsChecked() bool {
-	result, err := h.isChecked(h.ctx, 0)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is checked: %w", err)
+func (h *ElementHandle) IsChecked() (bool, error) {
+	ok, err := h.isChecked(h.ctx, 0)
+	// We don't care about timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is checked: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsDisabled checks if the element is disabled.
-func (h *ElementHandle) IsDisabled() bool {
-	result, err := h.isDisabled(h.ctx, 0)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is disabled: %w", err)
+func (h *ElementHandle) IsDisabled() (bool, error) {
+	ok, err := h.isDisabled(h.ctx, 0)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is disabled: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsEditable checks if the element is editable.
-func (h *ElementHandle) IsEditable() bool {
-	result, err := h.isEditable(h.ctx, 0)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is editable: %w", err)
+func (h *ElementHandle) IsEditable() (bool, error) {
+	ok, err := h.isEditable(h.ctx, 0)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is editable: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsEnabled checks if the element is enabled.
-func (h *ElementHandle) IsEnabled() bool {
-	result, err := h.isEnabled(h.ctx, 0)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is enabled: %w", err)
+func (h *ElementHandle) IsEnabled() (bool, error) {
+	ok, err := h.isEnabled(h.ctx, 0)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is enabled: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsHidden checks if the element is hidden.
-func (h *ElementHandle) IsHidden() bool {
-	result, err := h.isHidden(h.ctx)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is hidden: %w", err)
+func (h *ElementHandle) IsHidden() (bool, error) {
+	ok, err := h.isHidden(h.ctx)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is hidden: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // IsVisible checks if the element is visible.
-func (h *ElementHandle) IsVisible() bool {
-	result, err := h.isVisible(h.ctx)
-	if err != nil && !errors.Is(err, ErrTimedOut) { // We don't care anout timeout errors here!
-		k6ext.Panic(h.ctx, "checking element is visible: %w", err)
+func (h *ElementHandle) IsVisible() (bool, error) {
+	ok, err := h.isVisible(h.ctx)
+	// We don't care anout timeout errors here!
+	if err != nil && !errors.Is(err, ErrTimedOut) {
+		return false, fmt.Errorf("checking element is visible: %w", err)
 	}
-	return result
+
+	return ok, nil
 }
 
 // OwnerFrame returns the frame containing this element.
-func (h *ElementHandle) OwnerFrame() (*Frame, error) {
+func (h *ElementHandle) OwnerFrame() (_ *Frame, rerr error) {
 	fn := `
 		(node, injected) => {
 			return injected.getDocumentElement(node);
@@ -980,7 +1049,13 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 	if !ok {
 		return nil, fmt.Errorf("unexpected result type while getting document element: %T", res)
 	}
-	defer documentHandle.Dispose()
+	defer func() {
+		if err := documentHandle.Dispose(); err != nil {
+			err = fmt.Errorf("disposing document element: %w", err)
+			rerr = errors.Join(err, rerr)
+		}
+	}()
+
 	if documentHandle.remoteObject.ObjectID == "" {
 		return nil, err
 	}
@@ -1002,30 +1077,36 @@ func (h *ElementHandle) OwnerFrame() (*Frame, error) {
 	return frame, nil
 }
 
-func (h *ElementHandle) Press(key string, opts goja.Value) {
-	parsedOpts := NewElementHandlePressOptions(h.defaultTimeout())
-	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing press %q options: %v", key, err)
+// Press scrolls element into view and presses the given keys.
+func (h *ElementHandle) Press(key string, opts sobek.Value) error {
+	popts := NewElementHandlePressOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing press %q options: %w", key, err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	press := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.press(apiCtx, key, NewKeyboardOptions())
 	}
-	actFn := h.newAction([]string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
-	_, err := call(h.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "pressing %q: %v", key, err)
+	pressAction := h.newAction(
+		[]string{}, press, false, popts.NoWaitAfter, popts.Timeout,
+	)
+	if _, err := call(h.ctx, pressAction, popts.Timeout); err != nil {
+		return fmt.Errorf("pressing %q on element: %w", key, err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // Query runs "element.querySelector" within the page. If no element matches the selector,
 // the return value resolves to "null".
-func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, error) {
+func (h *ElementHandle) Query(selector string, strict bool) (_ *ElementHandle, rerr error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
-		k6ext.Panic(h.ctx, "parsing selector %q: %w", selector, err)
+		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
 	}
-	fn := `
+	querySelector := `
 		(node, injected, selector, strict) => {
 			return injected.querySelector(selector, strict, node || document);
 		}
@@ -1034,7 +1115,7 @@ func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, err
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(h.ctx, opts, fn, parsedSelector, strict)
+	result, err := h.evalWithScript(h.ctx, opts, querySelector, parsedSelector, strict)
 	if err != nil {
 		return nil, fmt.Errorf("querying selector %q: %w", selector, err)
 	}
@@ -1047,7 +1128,12 @@ func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, err
 	}
 	element := handle.AsElement()
 	if element == nil {
-		handle.Dispose()
+		defer func() {
+			if err := handle.Dispose(); err != nil {
+				err = fmt.Errorf("disposing element handle: %w", err)
+				rerr = errors.Join(err, rerr)
+			}
+		}()
 		return nil, fmt.Errorf("querying selector %q", selector)
 	}
 
@@ -1057,8 +1143,6 @@ func (h *ElementHandle) Query(selector string, strict bool) (*ElementHandle, err
 // QueryAll queries element subtree for matching elements.
 // If no element matches the selector, the return value resolves to "null".
 func (h *ElementHandle) QueryAll(selector string) ([]*ElementHandle, error) {
-	defer applySlowMo(h.ctx)
-
 	handles, err := h.queryAll(selector, h.evalWithScript)
 	if err != nil {
 		return nil, fmt.Errorf("querying all selector %q: %w", selector, err)
@@ -1067,7 +1151,7 @@ func (h *ElementHandle) QueryAll(selector string) ([]*ElementHandle, error) {
 	return handles, nil
 }
 
-func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHandle, error) {
+func (h *ElementHandle) queryAll(selector string, eval evalFunc) (_ []*ElementHandle, rerr error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, fmt.Errorf("parsing selector %q: %w", selector, err)
@@ -1090,7 +1174,12 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHand
 	if !ok {
 		return nil, fmt.Errorf("getting element handle for selector %q: %w", selector, ErrJSHandleInvalid)
 	}
-	defer handles.Dispose()
+	defer func() {
+		if err := handles.Dispose(); err != nil {
+			err = fmt.Errorf("disposing element handles: %w", err)
+			rerr = errors.Join(err, rerr)
+		}
+	}()
 
 	props, err := handles.GetProperties()
 	if err != nil {
@@ -1102,8 +1191,8 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHand
 	for _, prop := range props {
 		if el := prop.AsElement(); el != nil {
 			els = append(els, el)
-		} else {
-			prop.Dispose()
+		} else if err := prop.Dispose(); err != nil {
+			return nil, fmt.Errorf("disposing property while querying all selectors %q: %w", selector, err)
 		}
 	}
 
@@ -1111,34 +1200,35 @@ func (h *ElementHandle) queryAll(selector string, eval evalFunc) ([]*ElementHand
 }
 
 // SetChecked checks or unchecks an element.
-func (h *ElementHandle) SetChecked(checked bool, opts goja.Value) {
-	parsedOpts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
-	err := parsedOpts.Parse(h.ctx, opts)
-	if err != nil {
-		k6ext.Panic(h.ctx, "parsing setChecked options: %w", err)
+func (h *ElementHandle) SetChecked(checked bool, opts sobek.Value) error {
+	popts := NewElementHandleSetCheckedOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing setChecked options: %w", err)
 	}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+	setChecked := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
 		return nil, handle.setChecked(apiCtx, checked, p)
 	}
-	pointerFn := h.newPointerAction(fn, &parsedOpts.ElementHandleBasePointerOptions)
-	_, err = call(h.ctx, pointerFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "checking element: %w", err)
+	setCheckedAction := h.newPointerAction(setChecked, &popts.ElementHandleBasePointerOptions)
+	if _, err := call(h.ctx, setCheckedAction, popts.Timeout); err != nil {
+		return fmt.Errorf("checking element: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // Uncheck scrolls element into view, and if it's an input element of type
 // checkbox that is already checked, clicks on it to mark it as unchecked.
-func (h *ElementHandle) Uncheck(opts goja.Value) {
-	h.SetChecked(false, opts)
+func (h *ElementHandle) Uncheck(opts sobek.Value) error {
+	return h.SetChecked(false, opts)
 }
 
 // Check scrolls element into view, and if it's an input element of type
 // checkbox that is unchecked, clicks on it to mark it as checked.
-func (h *ElementHandle) Check(opts goja.Value) {
-	h.SetChecked(true, opts)
+func (h *ElementHandle) Check(opts sobek.Value) error {
+	return h.SetChecked(true, opts)
 }
 
 func (h *ElementHandle) setChecked(apiCtx context.Context, checked bool, p *Position) error {
@@ -1191,61 +1281,75 @@ func (h *ElementHandle) Screenshot(
 	return buf, err
 }
 
-func (h *ElementHandle) ScrollIntoViewIfNeeded(opts goja.Value) {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing scrollIntoViewIfNeeded options: %w", err)
+// ScrollIntoViewIfNeeded scrolls element into view if needed.
+func (h *ElementHandle) ScrollIntoViewIfNeeded(opts sobek.Value) error {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing scrollIntoViewIfNeeded options: %w", err)
 	}
-	err := h.waitAndScrollIntoViewIfNeeded(h.ctx, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
+
+	err := h.waitAndScrollIntoViewIfNeeded(h.ctx, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "scrolling element into view: %w", err)
+		return fmt.Errorf("scrolling element into view: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
-func (h *ElementHandle) SelectOption(values goja.Value, opts goja.Value) []string {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing selectOption options: %w", err)
+// SelectOption selects the options matching the given values.
+func (h *ElementHandle) SelectOption(values sobek.Value, opts sobek.Value) ([]string, error) {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return nil, fmt.Errorf("parsing selectOption options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	selectOption := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.selectOption(apiCtx, values)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	selectedOptions, err := call(h.ctx, actFn, actionOpts.Timeout)
+	selectOptionAction := h.newAction(
+		[]string{}, selectOption, aopts.Force, aopts.NoWaitAfter, aopts.Timeout,
+	)
+	selectedOptions, err := call(h.ctx, selectOptionAction, aopts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "selecting options: %w", err)
+		return nil, fmt.Errorf("selecting options: %w", err)
 	}
 	var returnVal []string
 	if err := convert(selectedOptions, &returnVal); err != nil {
-		k6ext.Panic(h.ctx, "unpacking selected options: %w", err)
+		return nil, fmt.Errorf("unpacking selected options: %w", err)
 	}
 
 	applySlowMo(h.ctx)
 
-	return returnVal
+	return returnVal, nil
 }
 
-func (h *ElementHandle) SelectText(opts goja.Value) {
-	actionOpts := NewElementHandleBaseOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing selectText options: %w", err)
+// SelectText selects the text of the element.
+func (h *ElementHandle) SelectText(opts sobek.Value) error {
+	aopts := NewElementHandleBaseOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing selectText options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+	selectText := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.selectText(apiCtx)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := call(h.ctx, actFn, actionOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "selecting text: %w", err)
+	selectTextAction := h.newAction(
+		[]string{}, selectText, aopts.Force, aopts.NoWaitAfter, aopts.Timeout,
+	)
+	if _, err := call(h.ctx, selectTextAction, aopts.Timeout); err != nil {
+		return fmt.Errorf("selecting text: %w", err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
 // SetInputFiles sets the given files into the input file element.
-func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) error {
-	actionOpts := NewElementHandleSetInputFilesOptions(h.defaultTimeout())
-	if err := actionOpts.Parse(h.ctx, opts); err != nil {
+func (h *ElementHandle) SetInputFiles(files sobek.Value, opts sobek.Value) error {
+	aopts := NewElementHandleSetInputFilesOptions(h.defaultTimeout())
+	if err := aopts.Parse(h.ctx, opts); err != nil {
 		return fmt.Errorf("parsing setInputFiles options: %w", err)
 	}
 
@@ -1255,12 +1359,11 @@ func (h *ElementHandle) SetInputFiles(files goja.Value, opts goja.Value) error {
 		return fmt.Errorf("parsing setInputFiles parameter: %w", err)
 	}
 
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+	setInputFiles := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.setInputFiles(apiCtx, actionParam.Payload)
 	}
-	actFn := h.newAction([]string{}, fn, actionOpts.Force, actionOpts.NoWaitAfter, actionOpts.Timeout)
-	_, err := call(h.ctx, actFn, actionOpts.Timeout)
-	if err != nil {
+	setInputFilesAction := h.newAction([]string{}, setInputFiles, aopts.Force, aopts.NoWaitAfter, aopts.Timeout)
+	if _, err := call(h.ctx, setInputFilesAction, aopts.Timeout); err != nil {
 		return fmt.Errorf("setting input files: %w", err)
 	}
 
@@ -1312,21 +1415,32 @@ func (h *ElementHandle) tap(_ context.Context, p *Position) error {
 	return h.frame.page.Touchscreen.tap(p.X, p.Y)
 }
 
-func (h *ElementHandle) TextContent() string {
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+// TextContent returns the text content of the element.
+// The second return value is true if the text content exists, and false otherwise.
+func (h *ElementHandle) TextContent() (string, bool, error) {
+	textContent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.textContent(apiCtx)
 	}
 	opts := NewElementHandleBaseOptions(h.defaultTimeout())
-	actFn := h.newAction([]string{}, fn, opts.Force, opts.NoWaitAfter, opts.Timeout)
-	v, err := call(h.ctx, actFn, opts.Timeout)
+	textContentAction := h.newAction(
+		[]string{}, textContent, opts.Force, opts.NoWaitAfter, opts.Timeout,
+	)
+	v, err := call(h.ctx, textContentAction, opts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "getting text content of element: %w", err)
+		return "", false, fmt.Errorf("getting text content of element: %w", err)
 	}
-	applySlowMo(h.ctx)
+	if v == nil {
+		return "", false, nil
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", false, fmt.Errorf(
+			"getting text content of element: unexpected type %T (expecting string)",
+			v,
+		)
+	}
 
-	// TODO: handle error
-
-	return v.(string) //nolint:forcetypeassert
+	return s, true, nil
 }
 
 // Timeout will return the default timeout or the one set by the user.
@@ -1336,36 +1450,43 @@ func (h *ElementHandle) Timeout() time.Duration {
 }
 
 // Type scrolls element into view, focuses element and types text.
-func (h *ElementHandle) Type(text string, opts goja.Value) {
-	parsedOpts := NewElementHandleTypeOptions(h.defaultTimeout())
-	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
-		k6ext.Panic(h.ctx, "parsing type options: %v", err)
+func (h *ElementHandle) Type(text string, opts sobek.Value) error {
+	popts := NewElementHandleTypeOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing type options: %w", err)
 	}
-	fn := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
+
+	typ := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return nil, handle.typ(apiCtx, text, NewKeyboardOptions())
 	}
-	actFn := h.newAction([]string{}, fn, false, parsedOpts.NoWaitAfter, parsedOpts.Timeout)
-	_, err := call(h.ctx, actFn, parsedOpts.Timeout)
-	if err != nil {
-		k6ext.Panic(h.ctx, "typing text %q: %w", text, err)
+	typeAction := h.newAction(
+		[]string{}, typ, false, popts.NoWaitAfter, popts.Timeout,
+	)
+	if _, err := call(h.ctx, typeAction, popts.Timeout); err != nil {
+		return fmt.Errorf("typing text %q: %w", text, err)
 	}
+
 	applySlowMo(h.ctx)
+
+	return nil
 }
 
-func (h *ElementHandle) WaitForElementState(state string, opts goja.Value) {
-	parsedOpts := NewElementHandleWaitForElementStateOptions(h.defaultTimeout())
-	err := parsedOpts.Parse(h.ctx, opts)
-	if err != nil {
-		k6ext.Panic(h.ctx, "parsing waitForElementState options: %w", err)
+// WaitForElementState waits for the element to reach the given state.
+func (h *ElementHandle) WaitForElementState(state string, opts sobek.Value) error {
+	popts := NewElementHandleWaitForElementStateOptions(h.defaultTimeout())
+	if err := popts.Parse(h.ctx, opts); err != nil {
+		return fmt.Errorf("parsing waitForElementState options: %w", err)
 	}
-	_, err = h.waitForElementState(h.ctx, []string{state}, parsedOpts.Timeout)
+	_, err := h.waitForElementState(h.ctx, []string{state}, popts.Timeout)
 	if err != nil {
-		k6ext.Panic(h.ctx, "waiting for element state %q: %w", state, err)
+		return fmt.Errorf("waiting for element state %q: %w", state, err)
 	}
+
+	return nil
 }
 
 // WaitForSelector waits for the selector to appear in the DOM.
-func (h *ElementHandle) WaitForSelector(selector string, opts goja.Value) (*ElementHandle, error) {
+func (h *ElementHandle) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(h.defaultTimeout())
 	if err := parsedOpts.Parse(h.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing waitForSelector %q options: %w", selector, err)
@@ -1565,11 +1686,11 @@ func errorFromDOMError(v any) error {
 		serr = e
 	case error:
 		if e == nil {
-			panic("DOM error is nil")
+			return errors.New("DOM error is nil")
 		}
 		err, serr = e, e.Error()
 	default:
-		panic(fmt.Errorf("unexpected DOM error type %T", v))
+		return fmt.Errorf("unexpected DOM error type %T", v)
 	}
 	var uerr *k6ext.UserFriendlyError
 	if errors.As(err, &uerr) {
