@@ -88,3 +88,35 @@ func TestRequest(t *testing.T) {
 			req.Size())
 	})
 }
+
+func TestResponse(t *testing.T) {
+	t.Parallel()
+
+	ts := cdp.MonotonicTime(time.Now())
+	headers := map[string]any{"key": "value"}
+	vu := k6test.NewVU(t)
+	vu.ActivateVU()
+	req := &Request{
+		offset: 0,
+	}
+	res := NewHTTPResponse(vu.Context(), req, &network.Response{
+		URL:     "https://test/post",
+		Headers: network.Headers(headers),
+	}, &ts)
+
+	t.Run("HeaderValue()_key", func(t *testing.T) {
+		t.Parallel()
+
+		got, ok := res.HeaderValue("key")
+		assert.True(t, ok)
+		assert.Equal(t, "value", got)
+	})
+
+	t.Run("HeaderValue()_KEY", func(t *testing.T) {
+		t.Parallel()
+
+		got, ok := res.HeaderValue("KEY")
+		assert.True(t, ok)
+		assert.Equal(t, "value", got)
+	})
+}
