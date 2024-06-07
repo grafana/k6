@@ -1,6 +1,6 @@
 // Package browser is the browser module's entry point, and
 // initializer of various global types, and a translation layer
-// between Goja and the internal business logic.
+// between sobek and the internal business logic.
 //
 // It initializes and drives the downstream components by passing
 // the necessary concrete dependencies.
@@ -14,7 +14,7 @@ import (
 	_ "net/http/pprof" //nolint:gosec
 	"sync"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
@@ -39,11 +39,12 @@ type (
 		tracesMetadata map[string]string
 		filePersister  filePersister
 		testRunID      string
+		isSync         bool // remove later
 	}
 
 	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
-		Browser         *goja.Object
+		Browser         *sobek.Object
 		Devices         map[string]common.Device
 		NetworkProfiles map[string]common.NetworkProfile `js:"networkProfiles"`
 	}
@@ -67,6 +68,17 @@ func New() *RootModule {
 	}
 }
 
+// NewSync returns a pointer to a new RootModule instance that maps the
+// browser's business logic to the synchronous version of the module's
+// JS API.
+func NewSync() *RootModule {
+	return &RootModule{
+		PidRegistry: &pidRegistry{},
+		initOnce:    &sync.Once{},
+		isSync:      true,
+	}
+}
+
 // NewModuleInstance implements the k6modules.Module interface to return
 // a new instance for each VU.
 func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
@@ -78,9 +90,17 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 	m.initOnce.Do(func() {
 		m.initialize(vu)
 	})
+
+	// decide whether to map the browser module to the async JS API or
+	// the sync one.
+	mapper := mapBrowserToSobek
+	if m.isSync {
+		mapper = syncMapBrowserToSobek
+	}
+
 	return &ModuleInstance{
 		mod: &JSModule{
-			Browser: mapBrowserToGoja(moduleVU{
+			Browser: mapper(moduleVU{
 				VU:          vu,
 				pidRegistry: m.PidRegistry,
 				browserRegistry: newBrowserRegistry(

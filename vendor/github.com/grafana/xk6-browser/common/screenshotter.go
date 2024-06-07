@@ -282,18 +282,29 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 		}
 	}
 
-	documentRect := bbox
-	scrollOffset := h.Evaluate(`() => { return {x: window.scrollX, y: window.scrollY};}`)
+	scrollOffset, err := h.Evaluate(`() => { return {x: window.scrollX, y: window.scrollY};}`)
+	if err != nil {
+		return nil, fmt.Errorf("evaluating scroll offset: %w", err)
+	}
 
 	var returnVal Position
 	if err := convert(scrollOffset, &returnVal); err != nil {
 		return nil, fmt.Errorf("unpacking scroll offset: %w", err)
 	}
 
+	documentRect := bbox
 	documentRect.X += returnVal.X
 	documentRect.Y += returnVal.Y
 
-	buf, err := s.screenshot(h.frame.page.session, documentRect.enclosingIntRect(), nil, format, opts.OmitBackground, opts.Quality, opts.Path)
+	buf, err := s.screenshot(
+		h.frame.page.session,
+		documentRect.enclosingIntRect(),
+		nil, // viewportRect
+		format,
+		opts.OmitBackground,
+		opts.Quality,
+		opts.Path,
+	)
 	if err != nil {
 		return nil, err
 	}
@@ -302,6 +313,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 			return nil, fmt.Errorf("restoring viewport: %w", err)
 		}
 	}
+
 	return buf, nil
 }
 

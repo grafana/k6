@@ -15,7 +15,7 @@ require (
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.1
 	github.com/grafana/sobek v0.0.0-20240607083612-4f0cd64f4e78
-	github.com/grafana/xk6-browser v1.5.1
+	github.com/grafana/xk6-browser v1.5.2-0.20240607140836-ffcc1f5169ad
 	github.com/grafana/xk6-dashboard v0.7.4
 	github.com/grafana/xk6-output-prometheus-remote v0.3.1
 	github.com/grafana/xk6-redis v0.2.0

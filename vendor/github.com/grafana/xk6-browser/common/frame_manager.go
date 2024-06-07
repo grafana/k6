@@ -162,7 +162,7 @@ func (m *FrameManager) frameAttached(frameID cdp.FrameID, parentFrameID cdp.Fram
 	}
 }
 
-func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDetachedReason) {
+func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDetachedReason) error {
 	m.logger.Debugf("FrameManager:frameDetached", "fmid:%d fid:%v", m.ID(), frameID)
 
 	frame, ok := m.getFrameByID(frameID)
@@ -170,7 +170,25 @@ func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDe
 		m.logger.Debugf("FrameManager:frameDetached:return",
 			"fmid:%d fid:%v cannot find frame",
 			m.ID(), frameID)
-		return
+		return nil
+	}
+
+	// This helps prevent an iframe and its child frames from being removed
+	// when the type of detach is a swap. After this detach event usually
+	// the iframe navigates, which requires the frames to be present for the
+	// navigate to work.
+	fs := m.page.getFrameSession(frameID)
+	if fs != nil {
+		m.logger.Debugf("FrameManager:frameDetached:sessionFound",
+			"fmid:%d fid:%v fsID1:%v fsID2:%v found session for frame",
+			m.ID(), frameID, fs.session.ID(), m.session.ID())
+
+		if fs.session.ID() != m.session.ID() {
+			m.logger.Debugf("FrameManager:frameDetached:notSameSession:return",
+				"fmid:%d fid:%v event session and frame session do not match",
+				m.ID(), frameID)
+			return nil
+		}
 	}
 
 	if reason == cdppage.FrameDetachedReasonSwap {
@@ -178,11 +196,10 @@ func (m *FrameManager) frameDetached(frameID cdp.FrameID, reason cdppage.FrameDe
 		// frame, we want to keep the current frame which is
 		// still referenced by the (incoming) remote frame, but
 		// remove all its child frames.
-		m.removeChildFramesRecursively(frame)
-		return
+		return m.removeChildFramesRecursively(frame)
 	}
 
-	m.removeFramesRecursively(frame)
+	return m.removeFramesRecursively(frame)
 }
 
 func (m *FrameManager) frameLifecycleEvent(frameID cdp.FrameID, event LifecycleEvent) {
@@ -239,7 +256,10 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 	if frame != nil {
 		m.framesMu.Unlock()
 		for _, child := range frame.ChildFrames() {
-			m.removeFramesRecursively(child)
+			if err := m.removeFramesRecursively(child); err != nil {
+				m.framesMu.Lock()
+				return fmt.Errorf("removing child frames recursively: %w", err)
+			}
 		}
 		m.framesMu.Lock()
 	}
@@ -401,22 +421,30 @@ func (m *FrameManager) getFrameByID(id cdp.FrameID) (*Frame, bool) {
 	return frame, ok
 }
 
-func (m *FrameManager) removeChildFramesRecursively(frame *Frame) {
+func (m *FrameManager) removeChildFramesRecursively(frame *Frame) error {
 	for _, child := range frame.ChildFrames() {
-		m.removeFramesRecursively(child)
+		if err := m.removeFramesRecursively(child); err != nil {
+			return fmt.Errorf("removing child frames recursively: %w", err)
+		}
 	}
+
+	return nil
 }
 
-func (m *FrameManager) removeFramesRecursively(frame *Frame) {
+func (m *FrameManager) removeFramesRecursively(frame *Frame) error {
 	for _, child := range frame.ChildFrames() {
 		m.logger.Debugf("FrameManager:removeFramesRecursively",
 			"fmid:%d cfid:%v pfid:%v cfname:%s cfurl:%s",
 			m.ID(), child.ID(), frame.ID(), child.Name(), child.URL())
 
-		m.removeFramesRecursively(child)
+		if err := m.removeFramesRecursively(child); err != nil {
+			return fmt.Errorf("removing frames recursively: %w", err)
+		}
 	}
 
-	frame.detach()
+	if err := frame.detach(); err != nil {
+		return fmt.Errorf("removing frames recursively: detaching frame: %w", err)
+	}
 
 	m.framesMu.Lock()
 	m.logger.Debugf("FrameManager:removeFramesRecursively:delParentFrame",
@@ -433,6 +461,8 @@ func (m *FrameManager) removeFramesRecursively(frame *Frame) {
 
 		m.page.emit(EventPageFrameDetached, frame)
 	}
+
+	return nil
 }
 
 func (m *FrameManager) requestFailed(req *Request, canceled bool) {

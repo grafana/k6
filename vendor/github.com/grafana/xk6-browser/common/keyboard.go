@@ -6,12 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/keyboardlayout"
-
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
+
+	"github.com/grafana/xk6-browser/keyboardlayout"
 )
 
 const (
@@ -45,38 +44,43 @@ func NewKeyboard(ctx context.Context, s session) *Keyboard {
 }
 
 // Down sends a key down message to a session target.
-func (k *Keyboard) Down(key string) {
+func (k *Keyboard) Down(key string) error {
 	if err := k.down(key); err != nil {
-		k6ext.Panic(k.ctx, "sending key down: %w", err)
+		return fmt.Errorf("sending key down: %w", err)
 	}
+	return nil
 }
 
 // Up sends a key up message to a session target.
-func (k *Keyboard) Up(key string) {
+func (k *Keyboard) Up(key string) error {
 	if err := k.up(key); err != nil {
-		k6ext.Panic(k.ctx, "sending key up: %w", err)
+		return fmt.Errorf("sending key up: %w", err)
 	}
+	return nil
 }
 
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
 // A press message consists of successive key down and up messages.
-func (k *Keyboard) Press(key string, opts goja.Value) {
+func (k *Keyboard) Press(key string, opts sobek.Value) error {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6ext.Panic(k.ctx, "parsing keyboard options: %w", err)
+		return fmt.Errorf("parsing keyboard options: %w", err)
 	}
 
 	if err := k.comboPress(key, kbdOpts); err != nil {
-		k6ext.Panic(k.ctx, "pressing key: %w", err)
+		return fmt.Errorf("pressing key: %w", err)
 	}
+
+	return nil
 }
 
 // InsertText inserts a text without dispatching key events.
-func (k *Keyboard) InsertText(text string) {
+func (k *Keyboard) InsertText(text string) error {
 	if err := k.insertText(text); err != nil {
-		k6ext.Panic(k.ctx, "inserting text: %w", err)
+		return fmt.Errorf("inserting text: %w", err)
 	}
+	return nil
 }
 
 // Type sends a press message to a session target for each character in text.
@@ -84,14 +88,15 @@ func (k *Keyboard) InsertText(text string) {
 //
 // It sends an insertText message if a character is not among
 // valid characters in the keyboard's layout.
-func (k *Keyboard) Type(text string, opts goja.Value) {
+func (k *Keyboard) Type(text string, opts sobek.Value) error {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		k6ext.Panic(k.ctx, "parsing keyboard options: %w", err)
+		return fmt.Errorf("parsing keyboard options: %w", err)
 	}
 	if err := k.typ(text, kbdOpts); err != nil {
-		k6ext.Panic(k.ctx, "typing text: %w", err)
+		return fmt.Errorf("typing text: %w", err)
 	}
+	return nil
 }
 
 func (k *Keyboard) down(key string) error {

@@ -8,18 +8,18 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/errext"
 	k6common "go.k6.io/k6/js/common"
 )
 
 // Abort will shutdown the whole test run. This should
-// only be used from the goja mapping layer. It is only
+// only be used from the sobek mapping layer. It is only
 // to be used when an error will occur in all iterations,
 // so it's permanent.
 func Abort(ctx context.Context, format string, a ...any) {
-	failFunc := func(rt *goja.Runtime, a ...any) {
+	failFunc := func(rt *sobek.Runtime, a ...any) {
 		reason := fmt.Errorf(format, a...).Error()
 		rt.Interrupt(&errext.InterruptError{Reason: reason})
 	}
@@ -31,13 +31,13 @@ func Abort(ctx context.Context, format string, a ...any) {
 // browser process from the context and kill it if it still exists.
 // TODO: test.
 func Panic(ctx context.Context, format string, a ...any) {
-	failFunc := func(rt *goja.Runtime, a ...any) {
+	failFunc := func(rt *sobek.Runtime, a ...any) {
 		k6common.Throw(rt, fmt.Errorf(format, a...))
 	}
 	sharedPanic(ctx, failFunc, a...)
 }
 
-func sharedPanic(ctx context.Context, failFunc func(rt *goja.Runtime, a ...any), a ...any) {
+func sharedPanic(ctx context.Context, failFunc func(rt *sobek.Runtime, a ...any), a ...any) {
 	rt := Runtime(ctx)
 	if rt == nil {
 		// this should never happen unless a programmer error

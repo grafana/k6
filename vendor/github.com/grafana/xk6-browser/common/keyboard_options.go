@@ -3,7 +3,7 @@ package common
 import (
 	"context"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 )
@@ -18,9 +18,10 @@ func NewKeyboardOptions() *KeyboardOptions {
 	}
 }
 
-func (o *KeyboardOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the keyboard options.
+func (o *KeyboardOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
