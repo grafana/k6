@@ -126,3 +126,5 @@ type (
 	Symbol             = goja.Symbol
 	Value              = goja.Value
 )
+
+func UncapFieldNameMapper() FieldNameMapper { return goja.UncapFieldNameMapper() }
