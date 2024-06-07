@@ -611,30 +611,31 @@ func NewFrameWaitForFunctionOptions(defaultTimeout time.Duration) *FrameWaitForF
 
 // Parse JavaScript waitForFunction options.
 func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
+	if !sobekValueExists(opts) {
+		return nil
+	}
 
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			v := opts.Get(k)
-			switch k {
-			case "timeout":
-				o.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
-			case "polling":
-				switch v.ExportType().Kind() { //nolint: exhaustive
-				case reflect.Int64:
-					o.Polling = PollingInterval
-					o.Interval = v.ToInteger()
-				case reflect.String:
-					if p, ok := pollingTypeToID[v.ToString().String()]; ok {
-						o.Polling = p
-						break
-					}
-					fallthrough
-				default:
-					return fmt.Errorf("wrong polling option value: %q; "+
-						`possible values: "raf", "mutation" or number`, v)
+	rt := k6ext.Runtime(ctx)
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		v := obj.Get(k)
+		switch k {
+		case "timeout":
+			o.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
+		case "polling":
+			switch v.ExportType().Kind() { //nolint: exhaustive
+			case reflect.Int64:
+				o.Polling = PollingInterval
+				o.Interval = v.ToInteger()
+			case reflect.String:
+				if p, ok := pollingTypeToID[v.ToString().String()]; ok {
+					o.Polling = p
+					break
 				}
+				fallthrough
+			default:
+				return fmt.Errorf("wrong polling option value: %q; "+
+					`possible values: "raf", "mutation" or number`, v)
 			}
 		}
 	}
