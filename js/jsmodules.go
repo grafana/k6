@@ -46,7 +46,7 @@ func getInternalJSModules() map[string]interface{} {
 			"k6/experimental/timers is now part of the k6 core, please change your imports to use k6/timers instead."+
 				" The k6/experimental/timers will be removed in k6 v0.52.0"),
 		"k6/experimental/tracing": tracing.New(),
-		"k6/experimental/browser": browser.New(),
+		"k6/experimental/browser": browser.NewSync(),
 		"k6/experimental/fs":      fs.New(),
 		"k6/net/grpc":             grpc.New(),
 		"k6/html":                 html.New(),
