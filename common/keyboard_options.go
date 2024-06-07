@@ -18,6 +18,7 @@ func NewKeyboardOptions() *KeyboardOptions {
 	}
 }
 
+// Parse parses the keyboard options.
 func (o *KeyboardOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {

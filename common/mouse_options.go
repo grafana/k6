@@ -36,6 +36,7 @@ func NewMouseClickOptions() *MouseClickOptions {
 	}
 }
 
+// Parse parses the mouse click options.
 func (o *MouseClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -68,6 +69,7 @@ func NewMouseDblClickOptions() *MouseDblClickOptions {
 	}
 }
 
+// Parse parses the mouse double click options.
 func (o *MouseDblClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -100,6 +102,7 @@ func NewMouseDownUpOptions() *MouseDownUpOptions {
 	}
 }
 
+// Parse parses the mouse down/up options.
 func (o *MouseDownUpOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -122,6 +125,7 @@ func NewMouseMoveOptions() *MouseMoveOptions {
 	}
 }
 
+// Parse parses the mouse move options.
 func (o *MouseMoveOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {

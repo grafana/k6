@@ -40,6 +40,7 @@ func NewPageEmulateMediaOptions(defaultMedia MediaType, defaultColorScheme Color
 	}
 }
 
+// Parse parses the page emulate media options.
 func (o *PageEmulateMediaOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -65,6 +66,7 @@ func NewPageReloadOptions(defaultWaitUntil LifecycleEvent, defaultTimeout time.D
 	}
 }
 
+// Parse parses the page reload options.
 func (o *PageReloadOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -97,6 +99,7 @@ func NewPageScreenshotOptions() *PageScreenshotOptions {
 	}
 }
 
+// Parse parses the page screenshot options.
 func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {

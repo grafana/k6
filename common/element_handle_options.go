@@ -135,6 +135,7 @@ func NewElementHandleBaseOptions(defaultTimeout time.Duration) *ElementHandleBas
 	}
 }
 
+// Parse parses the ElementHandleBaseOptions from the given opts.
 func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if !sobekValueExists(opts) {
 		return nil
@@ -162,6 +163,7 @@ func NewElementHandleBasePointerOptions(defaultTimeout time.Duration) *ElementHa
 	}
 }
 
+// Parse parses the ElementHandleBasePointerOptions from the given opts.
 func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
@@ -192,6 +194,7 @@ func NewElementHandleCheckOptions(defaultTimeout time.Duration) *ElementHandleCh
 	}
 }
 
+// Parse parses the ElementHandleCheckOptions from the given opts.
 func (o *ElementHandleCheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	return o.ElementHandleBasePointerOptions.Parse(ctx, opts)
 }
@@ -267,6 +270,7 @@ func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleCl
 	}
 }
 
+// Parse parses the ElementHandleClickOptions from the given opts.
 func (o *ElementHandleClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
@@ -311,6 +315,7 @@ func NewElementHandleDblclickOptions(defaultTimeout time.Duration) *ElementHandl
 	}
 }
 
+// Parse parses the ElementHandleDblclickOptions from the given opts.
 func (o *ElementHandleDblclickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
@@ -351,6 +356,7 @@ func NewElementHandleHoverOptions(defaultTimeout time.Duration) *ElementHandleHo
 	}
 }
 
+// Parse parses the ElementHandleHoverOptions from the given opts.
 func (o *ElementHandleHoverOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
@@ -380,6 +386,7 @@ func NewElementHandlePressOptions(defaultTimeout time.Duration) *ElementHandlePr
 	}
 }
 
+// Parse parses the ElementHandlePressOptions from the given opts.
 func (o *ElementHandlePressOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -416,6 +423,7 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 	}
 }
 
+// Parse parses the ElementHandleScreenshotOptions from the given opts.
 func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -456,6 +464,7 @@ func NewElementHandleSetCheckedOptions(defaultTimeout time.Duration) *ElementHan
 	}
 }
 
+// Parse parses the ElementHandleSetCheckedOptions from the given opts.
 func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 
@@ -482,6 +491,7 @@ func NewElementHandleTapOptions(defaultTimeout time.Duration) *ElementHandleTapO
 	}
 }
 
+// Parse parses the ElementHandleTapOptions from the given opts.
 func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
@@ -511,6 +521,7 @@ func NewElementHandleTypeOptions(defaultTimeout time.Duration) *ElementHandleTyp
 	}
 }
 
+// Parse parses the ElementHandleTypeOptions from the given opts.
 func (o *ElementHandleTypeOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
@@ -543,6 +554,7 @@ func NewElementHandleWaitForElementStateOptions(defaultTimeout time.Duration) *E
 	}
 }
 
+// Parse parses the ElementHandleWaitForElementStateOptions from the given opts.
 func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
