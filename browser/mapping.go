@@ -5,23 +5,23 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 
 	k6common "go.k6.io/k6/js/common"
 )
 
-// mapping is a type for mapping our module API to Goja.
+// mapping is a type for mapping our module API to sobek.
 // It acts like a bridge and allows adding wildcard methods
 // and customization over our API.
 type mapping = map[string]any
 
-// mapBrowserToGoja maps the browser API to the JS module.
+// mapBrowserToSobek maps the browser API to the JS module.
 // The motivation of this mapping was to support $ and $$ wildcard
 // methods.
 // See issue #661 for more details.
-func mapBrowserToGoja(vu moduleVU) *goja.Object {
+func mapBrowserToSobek(vu moduleVU) *sobek.Object {
 	var (
 		rt  = vu.Runtime()
 		obj = rt.NewObject()
@@ -37,7 +37,7 @@ func mapBrowserToGoja(vu moduleVU) *goja.Object {
 }
 
 func parseFrameClickOptions(
-	ctx context.Context, opts goja.Value, defaultTimeout time.Duration,
+	ctx context.Context, opts sobek.Value, defaultTimeout time.Duration,
 ) (*common.FrameClickOptions, error) {
 	copts := common.NewFrameClickOptions(defaultTimeout)
 	if err := copts.Parse(ctx, opts); err != nil {

@@ -1,7 +1,7 @@
 package browser
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 )
@@ -10,7 +10,7 @@ import (
 func mapConsoleMessage(vu moduleVU, cm *common.ConsoleMessage) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"args": func() *goja.Object {
+		"args": func() *sobek.Object {
 			var (
 				margs []mapping
 				args  = cm.Args
@@ -24,14 +24,14 @@ func mapConsoleMessage(vu moduleVU, cm *common.ConsoleMessage) mapping {
 		},
 		// page(), text() and type() are defined as
 		// functions in order to match Playwright's API
-		"page": func() *goja.Object {
+		"page": func() *sobek.Object {
 			mp := mapPage(vu, cm.Page)
 			return rt.ToValue(mp).ToObject(rt)
 		},
-		"text": func() *goja.Object {
+		"text": func() *sobek.Object {
 			return rt.ToValue(cm.Text).ToObject(rt)
 		},
-		"type": func() *goja.Object {
+		"type": func() *sobek.Object {
 			return rt.ToValue(cm.Type).ToObject(rt)
 		},
 	}

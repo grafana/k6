@@ -6,7 +6,7 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 type ctxKey int
@@ -23,7 +23,7 @@ func WithVU(ctx context.Context, vu k6modules.VU) context.Context {
 }
 
 // GetVU returns the attached k6 VU instance from ctx, which can be used to
-// retrieve the goja runtime and other k6 objects relevant to the currently
+// retrieve the sobek runtime and other k6 objects relevant to the currently
 // executing VU.
 // See https://github.com/grafana/k6/blob/v0.37.0/js/initcontext.go#L168-L186
 func GetVU(ctx context.Context) k6modules.VU {
@@ -49,7 +49,7 @@ func GetCustomMetrics(ctx context.Context) *CustomMetrics {
 }
 
 // Runtime is a convenience function for getting a k6 VU runtime.
-func Runtime(ctx context.Context) *goja.Runtime {
+func Runtime(ctx context.Context) *sobek.Runtime {
 	return GetVU(ctx).Runtime()
 }
 

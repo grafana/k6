@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
@@ -27,7 +27,7 @@ import (
 
 // VU is a k6 VU instance.
 // TODO: Do we still need this VU wrapper?
-// ToGojaValue can be a helper function that takes a goja.Runtime (although it's
+// ToSobekValue can be a helper function that takes a sobek.Runtime (although it's
 // not much of a helper from calling ToValue(i) directly...), and we can access
 // EventLoop from modulestest.Runtime.EventLoop.
 type VU struct {
@@ -38,8 +38,8 @@ type VU struct {
 	TestRT    *k6modulestest.Runtime
 }
 
-// ToGojaValue is a convenience method for converting any value to a goja value.
-func (v *VU) ToGojaValue(i any) goja.Value { return v.Runtime().ToValue(i) }
+// ToSobekValue is a convenience method for converting any value to a sobek value.
+func (v *VU) ToSobekValue(i any) sobek.Value { return v.Runtime().ToValue(i) }
 
 // ActivateVU mimicks activation of the VU as in k6.
 // It transitions the VU from the init stage to the execution stage by
@@ -127,24 +127,24 @@ func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, op
 }
 
 // RunOnEventLoop runs the given JavaScript code on the VU's event loop and
-// returns the result as a goja.Value.
-func (v *VU) RunOnEventLoop(tb testing.TB, js string, args ...any) (goja.Value, error) {
+// returns the result as a sobek.Value.
+func (v *VU) RunOnEventLoop(tb testing.TB, js string, args ...any) (sobek.Value, error) {
 	tb.Helper()
 
 	return v.TestRT.RunOnEventLoop(fmt.Sprintf(js, args...))
 }
 
 // RunAsync runs the given JavaScript code on the VU's event loop and returns
-// the result as a goja.Value.
-func (v *VU) RunAsync(tb testing.TB, js string, args ...any) (goja.Value, error) {
+// the result as a sobek.Value.
+func (v *VU) RunAsync(tb testing.TB, js string, args ...any) (sobek.Value, error) {
 	tb.Helper()
 
 	return v.RunOnEventLoop(tb, fmt.Sprintf("(async function() { "+js+" })();", args...))
 }
 
 // RunPromise runs the given JavaScript code on the VU's event loop and returns
-// the result as a *goja.Promise.
-func (v *VU) RunPromise(tb testing.TB, js string, args ...any) *goja.Promise {
+// the result as a *sobek.Promise.
+func (v *VU) RunPromise(tb testing.TB, js string, args ...any) *sobek.Promise {
 	tb.Helper()
 
 	gv, err := v.RunAsync(tb, js, args...)
@@ -152,7 +152,7 @@ func (v *VU) RunPromise(tb testing.TB, js string, args ...any) *goja.Promise {
 	return ToPromise(tb, gv)
 }
 
-// SetVar sets a variable in the VU's Goja runtime's global scope.
+// SetVar sets a variable in the VU's sobek runtime's global scope.
 func (v *VU) SetVar(tb testing.TB, name string, value any) {
 	tb.Helper()
 
@@ -160,12 +160,12 @@ func (v *VU) SetVar(tb testing.TB, name string, value any) {
 	require.NoError(tb, err, "setting variable %q to %v", name, value)
 }
 
-// ToPromise asserts and returns a goja.Value as a *goja.Promise.
-func ToPromise(tb testing.TB, gv goja.Value) *goja.Promise {
+// ToPromise asserts and returns a sobek.Value as a *sobek.Promise.
+func ToPromise(tb testing.TB, gv sobek.Value) *sobek.Promise {
 	tb.Helper()
 
-	p, ok := gv.Export().(*goja.Promise)
-	require.True(tb, ok, "got: %T, want *goja.Promise", gv.Export())
+	p, ok := gv.Export().(*sobek.Promise)
+	require.True(tb, ok, "got: %T, want *sobek.Promise", gv.Export())
 	return p
 }
 

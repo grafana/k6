@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 )
@@ -135,8 +135,8 @@ func NewElementHandleBaseOptions(defaultTimeout time.Duration) *ElementHandleBas
 	}
 }
 
-func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts goja.Value) error {
-	if !gojaValueExists(opts) {
+func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts sobek.Value) error {
+	if !sobekValueExists(opts) {
 		return nil
 	}
 	gopts := opts.ToObject(k6ext.Runtime(ctx))
@@ -162,12 +162,12 @@ func NewElementHandleBasePointerOptions(defaultTimeout time.Duration) *ElementHa
 	}
 }
 
-func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleBasePointerOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -192,7 +192,7 @@ func NewElementHandleCheckOptions(defaultTimeout time.Duration) *ElementHandleCh
 	}
 }
 
-func (o *ElementHandleCheckOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleCheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	return o.ElementHandleBasePointerOptions.Parse(ctx, opts)
 }
 
@@ -204,8 +204,8 @@ func NewElementHandleSetInputFilesOptions(defaultTimeout time.Duration) *Element
 }
 
 // addFile to the struct. Input value can only be a file descriptor object.
-func (f *Files) addFile(ctx context.Context, file goja.Value) error {
-	if !gojaValueExists(file) {
+func (f *Files) addFile(ctx context.Context, file sobek.Value) error {
+	if !sobekValueExists(file) {
 		return nil
 	}
 	rt := k6ext.Runtime(ctx)
@@ -224,10 +224,10 @@ func (f *Files) addFile(ctx context.Context, file goja.Value) error {
 	return nil
 }
 
-// Parse parses the Files struct from the given goja.Value.
-func (f *Files) Parse(ctx context.Context, files goja.Value) error {
+// Parse parses the Files struct from the given sobek.Value.
+func (f *Files) Parse(ctx context.Context, files sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if !gojaValueExists(files) {
+	if !sobekValueExists(files) {
 		return nil
 	}
 
@@ -249,7 +249,7 @@ func (f *Files) Parse(ctx context.Context, files goja.Value) error {
 }
 
 // Parse parses the ElementHandleSetInputFilesOption from the given opts.
-func (o *ElementHandleSetInputFilesOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleSetInputFilesOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -267,12 +267,12 @@ func NewElementHandleClickOptions(defaultTimeout time.Duration) *ElementHandleCl
 	}
 }
 
-func (o *ElementHandleClickOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -311,12 +311,12 @@ func NewElementHandleDblclickOptions(defaultTimeout time.Duration) *ElementHandl
 	}
 }
 
-func (o *ElementHandleDblclickOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleDblclickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -351,12 +351,12 @@ func NewElementHandleHoverOptions(defaultTimeout time.Duration) *ElementHandleHo
 	}
 }
 
-func (o *ElementHandleHoverOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleHoverOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -380,9 +380,9 @@ func NewElementHandlePressOptions(defaultTimeout time.Duration) *ElementHandlePr
 	}
 }
 
-func (o *ElementHandlePressOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandlePressOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -416,9 +416,9 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 	}
 }
 
-func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		formatSpecified := false
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
@@ -456,14 +456,14 @@ func NewElementHandleSetCheckedOptions(defaultTimeout time.Duration) *ElementHan
 	}
 }
 
-func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
 
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -482,12 +482,12 @@ func NewElementHandleTapOptions(defaultTimeout time.Duration) *ElementHandleTapO
 	}
 }
 
-func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -511,9 +511,9 @@ func NewElementHandleTypeOptions(defaultTimeout time.Duration) *ElementHandleTyp
 	}
 }
 
-func (o *ElementHandleTypeOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleTypeOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -543,9 +543,9 @@ func NewElementHandleWaitForElementStateOptions(defaultTimeout time.Duration) *E
 	}
 }
 
-func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opts goja.Value) error {
+func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {

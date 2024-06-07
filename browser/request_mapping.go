@@ -1,7 +1,7 @@
 package browser
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -11,22 +11,22 @@ import (
 func mapRequest(vu moduleVU, r *common.Request) mapping {
 	rt := vu.Runtime()
 	maps := mapping{
-		"allHeaders": func() *goja.Promise {
+		"allHeaders": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return r.AllHeaders(), nil
 			})
 		},
-		"frame": func() *goja.Object {
+		"frame": func() *sobek.Object {
 			mf := mapFrame(vu, r.Frame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
-		"headerValue": func(name string) *goja.Promise {
+		"headerValue": func(name string) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return r.HeaderValue(name), nil
 			})
 		},
 		"headers": r.Headers,
-		"headersArray": func() *goja.Promise {
+		"headersArray": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return r.HeadersArray(), nil
 			})
@@ -48,7 +48,7 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 			return rt.NewArrayBuffer(p)
 		},
 		"resourceType": r.ResourceType,
-		"response": func() *goja.Promise {
+		"response": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				resp := r.Response()
 				if resp == nil {

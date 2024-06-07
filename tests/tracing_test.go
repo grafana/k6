@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
@@ -158,7 +158,7 @@ func TestTracing(t *testing.T) {
 	}
 }
 
-func setupTestTracing(t *testing.T, rt *goja.Runtime) {
+func setupTestTracing(t *testing.T, rt *sobek.Runtime) {
 	t.Helper()
 
 	// Declare a global page var that we can use
@@ -185,11 +185,11 @@ func assertJSInEventLoop(t *testing.T, vu *k6test.VU, js string) {
 	_, err := rt.RunString(f)
 	require.NoError(t, err)
 
-	test, ok := goja.AssertFunction(rt.Get("test"))
+	test, ok := sobek.AssertFunction(rt.Get("test"))
 	require.True(t, ok)
 
 	err = vu.Loop.Start(func() error {
-		_, err := test(goja.Undefined())
+		_, err := test(sobek.Undefined())
 		return err
 	})
 	require.NoError(t, err)

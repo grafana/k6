@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -87,7 +87,7 @@ func TestPageEmulateMedia(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	err := p.EmulateMedia(tb.toGojaValue(emulateMediaOpts{
+	err := p.EmulateMedia(tb.toSobekValue(emulateMediaOpts{
 		Media:         "print",
 		ColorScheme:   "dark",
 		ReducedMotion: "reduce",
@@ -203,12 +203,12 @@ func TestPageEvaluateMapping(t *testing.T) {
 		{
 			name:   "arrow_func_no_return",
 			script: "() => {2}",
-			want:   goja.Null(),
+			want:   sobek.Null(),
 		},
 		{
 			name:   "full_func_no_return",
 			script: "function() {3}",
-			want:   goja.Null(),
+			want:   sobek.Null(),
 		},
 		{
 			name:   "async_func",
@@ -226,19 +226,19 @@ func TestPageEvaluateMapping(t *testing.T) {
 			defer cleanUp()
 
 			// Test script as non string input
-			vu.SetVar(t, "p", &goja.Object{})
+			vu.SetVar(t, "p", &sobek.Object{})
 			got := vu.RunPromise(t, `
 				p = await browser.newPage()
 				return await p.evaluate(%s)
 			`, tt.script)
-			assert.Equal(t, vu.ToGojaValue(tt.want), got.Result())
+			assert.Equal(t, vu.ToSobekValue(tt.want), got.Result())
 
 			// Test script as string input
 			got = vu.RunPromise(t,
 				`return await p.evaluate("%s")`,
 				tt.script,
 			)
-			assert.Equal(t, vu.ToGojaValue(tt.want), got.Result())
+			assert.Equal(t, vu.ToSobekValue(tt.want), got.Result())
 		})
 	}
 }
@@ -272,7 +272,7 @@ func TestPageEvaluateMappingError(t *testing.T) {
 			defer cleanUp()
 
 			// Test script as non string input
-			vu.SetVar(t, "p", &goja.Object{})
+			vu.SetVar(t, "p", &sobek.Object{})
 			_, err := vu.RunAsync(t, `
 				p = await browser.newPage()
 				await p.evaluate(%s)
@@ -403,7 +403,7 @@ func TestPageInnerHTML(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.InnerHTML("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
+		_, err = p.InnerHTML("p", tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"}))
 		require.Error(t, err)
 	})
 }
@@ -438,7 +438,7 @@ func TestPageInnerText(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, err = p.InnerText("p", tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"}))
+		_, err = p.InnerText("p", tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"}))
 		require.Error(t, err)
 	})
 }
@@ -474,7 +474,7 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, _, err = p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
+		_, _, err = p.TextContent("p", tb.toSobekValue(jsFrameBaseOpts{
 			Timeout: "100",
 		}))
 		require.Error(t, err)
@@ -487,7 +487,7 @@ func TestPageTextContent(t *testing.T) {
 		p := tb.NewPage(nil)
 		err := p.SetContent(sampleHTML, nil)
 		require.NoError(t, err)
-		_, _, err = p.TextContent("p", tb.toGojaValue(jsFrameBaseOpts{
+		_, _, err = p.TextContent("p", tb.toSobekValue(jsFrameBaseOpts{
 			Timeout: "100",
 		}))
 		require.Error(t, err)
@@ -615,7 +615,7 @@ func TestPageScreenshotFullpage(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	err := p.SetViewportSize(tb.toGojaValue(struct {
+	err := p.SetViewportSize(tb.toSobekValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{
@@ -723,7 +723,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, _, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		vu.SetVar(t, "page", &goja.Object{})
+		vu.SetVar(t, "page", &sobek.Object{})
 		_, err := vu.RunOnEventLoop(t, `fn = () => {
 			if (typeof window._cnt == 'undefined') window._cnt = 0;
 			if (window._cnt >= 50) return true;
@@ -754,7 +754,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		assert.Contains(t, *log, "ok: null")
 
 		p := vu.RunPromise(t, `return await page.evaluate(() => window._arg);`)
-		require.Equal(t, p.State(), goja.PromiseStateFulfilled)
+		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
 		assert.Equal(t, "raf_arg", p.Result().String())
 	})
 
@@ -779,7 +779,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		assert.Contains(t, *log, "ok: null")
 
 		p := vu.RunPromise(t, `return await page.evaluate(() => window._args);`)
-		require.Equal(t, p.State(), goja.PromiseStateFulfilled)
+		require.Equal(t, p.State(), sobek.PromiseStateFulfilled)
 		var gotArgs []int
 		_ = rt.ExportTo(p.Result(), &gotArgs)
 		assert.Equal(t, args, gotArgs)
@@ -814,7 +814,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, _, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		vu.SetVar(t, "page", &goja.Object{})
+		vu.SetVar(t, "page", &sobek.Object{})
 		_, err := vu.RunAsync(t, `
 			page = await browser.newPage();
 			await page.evaluate(() => {
@@ -845,7 +845,7 @@ func TestPageWaitForFunction(t *testing.T) {
 		vu, _, log, cleanUp := startIteration(t)
 		defer cleanUp()
 
-		vu.SetVar(t, "page", &goja.Object{})
+		vu.SetVar(t, "page", &sobek.Object{})
 		_, err := vu.RunAsync(t, `
 			fn = () => document.querySelector('h1') !== null
 
@@ -1262,12 +1262,12 @@ func TestPageOn(t *testing.T) {
 	}
 }
 
-func assertExceptionContains(t *testing.T, rt *goja.Runtime, fn func(), expErrMsg string) {
+func assertExceptionContains(t *testing.T, rt *sobek.Runtime, fn func(), expErrMsg string) {
 	t.Helper()
 
-	cal, _ := goja.AssertFunction(rt.ToValue(fn))
+	cal, _ := sobek.AssertFunction(rt.ToValue(fn))
 
-	_, err := cal(goja.Undefined())
+	_, err := cal(sobek.Undefined())
 	require.ErrorContains(t, err, expErrMsg)
 }
 
@@ -1383,7 +1383,7 @@ func TestPageWaitForSelector(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			_, err = page.WaitForSelector(tc.selector, tb.toGojaValue(tc.opts))
+			_, err = page.WaitForSelector(tc.selector, tb.toSobekValue(tc.opts))
 			tc.errAssert(t, err)
 		})
 	}
@@ -1614,7 +1614,7 @@ func TestPageIsVisible(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			got, err := page.IsVisible(tc.selector, tb.toGojaValue(tc.options))
+			got, err := page.IsVisible(tc.selector, tb.toSobekValue(tc.options))
 
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)
@@ -1685,7 +1685,7 @@ func TestPageIsHidden(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			got, err := page.IsHidden(tc.selector, tb.toGojaValue(tc.options))
+			got, err := page.IsHidden(tc.selector, tb.toSobekValue(tc.options))
 
 			if tc.wantErr != "" {
 				assert.ErrorContains(t, err, tc.wantErr)

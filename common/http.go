@@ -12,7 +12,7 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -179,12 +179,12 @@ func (r *Request) Frame() *Frame {
 }
 
 // HeaderValue returns the value of the given header.
-func (r *Request) HeaderValue(name string) goja.Value {
+func (r *Request) HeaderValue(name string) sobek.Value {
 	rt := r.vu.Runtime()
 	headers := r.AllHeaders()
 	val, ok := headers[strings.ToLower(name)]
 	if !ok {
-		return goja.Null()
+		return sobek.Null()
 	}
 	return rt.ToValue(val)
 }
@@ -248,7 +248,7 @@ func (r *Request) Size() HTTPMessageSize {
 }
 
 // Timing returns the request timing information.
-func (r *Request) Timing() goja.Value {
+func (r *Request) Timing() sobek.Value {
 	type resourceTiming struct {
 		StartTime             float64 `js:"startTime"`
 		DomainLookupStart     float64 `js:"domainLookupStart"`

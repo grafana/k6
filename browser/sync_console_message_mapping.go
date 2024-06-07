@@ -1,7 +1,7 @@
 package browser
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 )
@@ -10,7 +10,7 @@ import (
 func syncMapConsoleMessage(vu moduleVU, cm *common.ConsoleMessage) mapping {
 	rt := vu.Runtime()
 	return mapping{
-		"args": func() *goja.Object {
+		"args": func() *sobek.Object {
 			var (
 				margs []mapping
 				args  = cm.Args

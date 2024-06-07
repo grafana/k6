@@ -3,14 +3,14 @@ package browser
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	k6common "go.k6.io/k6/js/common"
 )
 
-// syncMapBrowserToGoja maps the browser API to the JS module as a
+// syncMapBrowserToSobek maps the browser API to the JS module as a
 // synchronous version.
-func syncMapBrowserToGoja(vu moduleVU) *goja.Object {
+func syncMapBrowserToSobek(vu moduleVU) *sobek.Object {
 	var (
 		rt  = vu.Runtime()
 		obj = rt.NewObject()

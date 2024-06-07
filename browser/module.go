@@ -1,6 +1,6 @@
 // Package browser is the browser module's entry point, and
 // initializer of various global types, and a translation layer
-// between Goja and the internal business logic.
+// between sobek and the internal business logic.
 //
 // It initializes and drives the downstream components by passing
 // the necessary concrete dependencies.
@@ -14,7 +14,7 @@ import (
 	_ "net/http/pprof" //nolint:gosec
 	"sync"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/env"
@@ -44,7 +44,7 @@ type (
 
 	// JSModule exposes the properties available to the JS script.
 	JSModule struct {
-		Browser         *goja.Object
+		Browser         *sobek.Object
 		Devices         map[string]common.Device
 		NetworkProfiles map[string]common.NetworkProfile `js:"networkProfiles"`
 	}
@@ -93,9 +93,9 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 
 	// decide whether to map the browser module to the async JS API or
 	// the sync one.
-	mapper := mapBrowserToGoja
+	mapper := mapBrowserToSobek
 	if m.isSync {
-		mapper = syncMapBrowserToGoja
+		mapper = syncMapBrowserToSobek
 	}
 
 	return &ModuleInstance{

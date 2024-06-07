@@ -113,7 +113,7 @@ func TestBasicAuth(t *testing.T) {
 
 		browser := newTestBrowser(t, withHTTPServer())
 		bc, err := browser.NewContext(
-			browser.toGojaValue(struct {
+			browser.toSobekValue(struct {
 				HttpCredentials *common.Credentials `js:"httpCredentials"` //nolint:revive
 			}{
 				HttpCredentials: &common.Credentials{

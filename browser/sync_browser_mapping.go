@@ -1,7 +1,7 @@
 package browser
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // syncMapBrowser is like mapBrowser but returns synchronous functions.
@@ -29,7 +29,7 @@ func syncMapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return b.IsConnected(), nil
 		},
-		"newContext": func(opts goja.Value) (*goja.Object, error) {
+		"newContext": func(opts sobek.Value) (*sobek.Object, error) {
 			b, err := vu.browser()
 			if err != nil {
 				return nil, err
@@ -61,7 +61,7 @@ func syncMapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return b.Version(), nil
 		},
-		"newPage": func(opts goja.Value) (mapping, error) {
+		"newPage": func(opts sobek.Value) (mapping, error) {
 			b, err := vu.browser()
 			if err != nil {
 				return nil, err

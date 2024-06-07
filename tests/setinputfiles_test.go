@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,8 +16,8 @@ func TestSetInputFiles(t *testing.T) {
 
 	type file map[string]interface{}
 	type indexedFn func(idx int, propName string) interface{}
-	type testFn func(tb *testBrowser, page *common.Page, files goja.Value) error
-	type setupFn func(tb *testBrowser) (goja.Value, func())
+	type testFn func(tb *testBrowser, page *common.Page, files sobek.Value) error
+	type setupFn func(tb *testBrowser) (sobek.Value, func())
 	type checkFn func(t *testing.T,
 		getFileCountFn func() interface{},
 		getFilePropFn indexedFn,
@@ -35,13 +35,13 @@ func TestSetInputFiles(t *testing.T) {
 	  <button id="button1">Click</button>
 	`
 
-	defaultTestPage := func(tb *testBrowser, page *common.Page, files goja.Value) error {
-		return page.SetInputFiles("#upload", files, tb.toGojaValue(nil))
+	defaultTestPage := func(tb *testBrowser, page *common.Page, files sobek.Value) error {
+		return page.SetInputFiles("#upload", files, tb.toSobekValue(nil))
 	}
-	defaultTestElementHandle := func(tb *testBrowser, page *common.Page, files goja.Value) error {
-		handle, err := page.WaitForSelector("#upload", tb.toGojaValue(nil))
+	defaultTestElementHandle := func(tb *testBrowser, page *common.Page, files sobek.Value) error {
+		handle, err := page.WaitForSelector("#upload", tb.toSobekValue(nil))
 		assert.NoError(t, err)
-		return handle.SetInputFiles(files, tb.toGojaValue(nil))
+		return handle.SetInputFiles(files, tb.toSobekValue(nil))
 	}
 
 	testCases := []struct {
@@ -52,8 +52,8 @@ func TestSetInputFiles(t *testing.T) {
 	}{
 		{
 			name: "set_one_file_with_object",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				return tb.toGojaValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			setup: func(tb *testBrowser) (sobek.Value, func()) {
+				return tb.toSobekValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
 			},
 			tests: []testFn{defaultTestPage, defaultTestElementHandle},
 			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
@@ -69,8 +69,8 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "set_two_files_with_array_of_objects",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				return tb.toGojaValue(
+			setup: func(tb *testBrowser) (sobek.Value, func()) {
+				return tb.toSobekValue(
 					[]file{
 						{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="},
 						{"name": "test.xml", "mimetype": "text/xml", "buffer": "MDEyMzQ1Njc4OTAxMjM0"},
@@ -93,8 +93,8 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "set_nil",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				return tb.toGojaValue(nil), nil
+			setup: func(tb *testBrowser) (sobek.Value, func()) {
+				return tb.toSobekValue(nil), nil
 			},
 			tests: []testFn{defaultTestPage, defaultTestElementHandle},
 			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropertyFn indexedFn, err error) {
@@ -106,8 +106,8 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "set_invalid_parameter",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				return tb.toGojaValue([]int{12345}), nil
+			setup: func(tb *testBrowser) (sobek.Value, func()) {
+				return tb.toSobekValue([]int{12345}), nil
 			},
 			tests: []testFn{defaultTestPage, defaultTestElementHandle},
 			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
@@ -119,17 +119,17 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "test_injected_script_notinput",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				return tb.toGojaValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			setup: func(tb *testBrowser) (sobek.Value, func()) {
+				return tb.toSobekValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
 			},
 			tests: []testFn{
-				func(tb *testBrowser, page *common.Page, files goja.Value) error {
-					return page.SetInputFiles("#button1", files, tb.toGojaValue(nil))
+				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
+					return page.SetInputFiles("#button1", files, tb.toSobekValue(nil))
 				},
-				func(tb *testBrowser, page *common.Page, files goja.Value) error {
-					handle, err := page.WaitForSelector("#button1", tb.toGojaValue(nil))
+				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
+					handle, err := page.WaitForSelector("#button1", tb.toSobekValue(nil))
 					assert.NoError(t, err)
-					return handle.SetInputFiles(files, tb.toGojaValue(nil))
+					return handle.SetInputFiles(files, tb.toSobekValue(nil))
 				},
 			},
 			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {
@@ -142,17 +142,17 @@ func TestSetInputFiles(t *testing.T) {
 		},
 		{
 			name: "test_injected_script_notfile",
-			setup: func(tb *testBrowser) (goja.Value, func()) {
-				return tb.toGojaValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
+			setup: func(tb *testBrowser) (sobek.Value, func()) {
+				return tb.toSobekValue(file{"name": "test.json", "mimetype": "text/json", "buffer": "MDEyMzQ1Njc4OQ=="}), nil
 			},
 			tests: []testFn{
-				func(tb *testBrowser, page *common.Page, files goja.Value) error {
-					return page.SetInputFiles("#textinput", files, tb.toGojaValue(nil))
+				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
+					return page.SetInputFiles("#textinput", files, tb.toSobekValue(nil))
 				},
-				func(tb *testBrowser, page *common.Page, files goja.Value) error {
-					handle, err := page.WaitForSelector("#textinput", tb.toGojaValue(nil))
+				func(tb *testBrowser, page *common.Page, files sobek.Value) error {
+					handle, err := page.WaitForSelector("#textinput", tb.toSobekValue(nil))
 					assert.NoError(t, err)
-					return handle.SetInputFiles(files, tb.toGojaValue(nil))
+					return handle.SetInputFiles(files, tb.toSobekValue(nil))
 				},
 			},
 			check: func(t *testing.T, getFileCountFn func() interface{}, getFilePropFn indexedFn, err error) {

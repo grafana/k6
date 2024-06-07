@@ -412,7 +412,7 @@ func TestLifecycleReload(t *testing.T) {
 				}
 				tt.pingJSTextAssert(result)
 
-				opts := tb.toGojaValue(common.PageReloadOptions{
+				opts := tb.toSobekValue(common.PageReloadOptions{
 					WaitUntil: tt.waitUntil,
 					Timeout:   30 * time.Second,
 				})

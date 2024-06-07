@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
@@ -253,7 +253,7 @@ func withSkipClose() func(*testBrowser) {
 
 // NewPage is a wrapper around Browser.NewPage that fails the test if an
 // error occurs. Added this helper to avoid boilerplate code in tests.
-func (b *testBrowser) NewPage(opts goja.Value) *common.Page {
+func (b *testBrowser) NewPage(opts sobek.Value) *common.Page {
 	b.t.Helper()
 
 	p, err := b.Browser.NewPage(opts)
@@ -285,13 +285,13 @@ func (b *testBrowser) context() context.Context { return b.ctx }
 func (b *testBrowser) cancelContext() { b.cancel() }
 
 // runtime returns a VU runtime.
-func (b *testBrowser) runtime() *goja.Runtime { return b.vu.Runtime() }
+func (b *testBrowser) runtime() *sobek.Runtime { return b.vu.Runtime() }
 
-// toGojaValue converts a value to goja value.
-func (b *testBrowser) toGojaValue(i any) goja.Value { return b.runtime().ToValue(i) }
+// toSobekValue converts a value to sobek value.
+func (b *testBrowser) toSobekValue(i any) sobek.Value { return b.runtime().ToValue(i) }
 
-// runJavaScript in the goja runtime.
-func (b *testBrowser) runJavaScript(s string, args ...any) (goja.Value, error) {
+// runJavaScript in the sobek runtime.
+func (b *testBrowser) runJavaScript(s string, args ...any) (sobek.Value, error) {
 	b.t.Helper()
 	v, err := b.runtime().RunString(fmt.Sprintf(s, args...))
 	if err != nil {

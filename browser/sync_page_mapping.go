@@ -3,7 +3,7 @@ package browser
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -15,7 +15,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	maps := mapping{
 		"bringToFront": p.BringToFront,
 		"check":        p.Check,
-		"click": func(selector string, opts goja.Value) (*goja.Promise, error) {
+		"click": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts, err := parseFrameClickOptions(vu.Context(), opts, p.Timeout())
 			if err != nil {
 				return nil, err
@@ -26,7 +26,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
-		"close": func(opts goja.Value) error {
+		"close": func(opts sobek.Value) error {
 			vu.taskQueueRegistry.close(p.TargetID())
 
 			return p.Close(opts) //nolint:wrapcheck
@@ -34,7 +34,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"content":  p.Content,
 		"context":  p.Context,
 		"dblclick": p.Dblclick,
-		"dispatchEvent": func(selector, typ string, eventInit, opts goja.Value) error {
+		"dispatchEvent": func(selector, typ string, eventInit, opts sobek.Value) error {
 			popts := common.NewFrameDispatchEventOptions(p.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return fmt.Errorf("parsing page dispatch event options: %w", err)
@@ -43,10 +43,10 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"emulateMedia":            p.EmulateMedia,
 		"emulateVisionDeficiency": p.EmulateVisionDeficiency,
-		"evaluate": func(pageFunction goja.Value, gargs ...goja.Value) (any, error) {
+		"evaluate": func(pageFunction sobek.Value, gargs ...sobek.Value) (any, error) {
 			return p.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
 		},
-		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) (mapping, error) {
+		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (mapping, error) {
 			jsh, err := p.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -55,7 +55,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"fill":  p.Fill,
 		"focus": p.Focus,
-		"frames": func() *goja.Object {
+		"frames": func() *sobek.Object {
 			var (
 				mfrs []mapping
 				frs  = p.Frames()
@@ -65,7 +65,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			return rt.ToValue(mfrs).ToObject(rt)
 		},
-		"getAttribute": func(selector string, name string, opts goja.Value) (any, error) {
+		"getAttribute": func(selector string, name string, opts sobek.Value) (any, error) {
 			v, ok, err := p.GetAttribute(selector, name, opts)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -75,7 +75,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}
 			return v, nil
 		},
-		"goto": func(url string, opts goja.Value) (*goja.Promise, error) {
+		"goto": func(url string, opts sobek.Value) (*sobek.Promise, error) {
 			gopts := common.NewFrameGotoOptions(
 				p.Referrer(),
 				p.NavigationTimeout(),
@@ -104,21 +104,21 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
 		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
-		"locator": func(selector string, opts goja.Value) *goja.Object {
+		"locator": func(selector string, opts sobek.Value) *sobek.Object {
 			ml := syncMapLocator(vu, p.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
 		},
-		"mainFrame": func() *goja.Object {
+		"mainFrame": func() *sobek.Object {
 			mf := syncMapFrame(vu, p.MainFrame())
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
-		"on": func(event string, handler goja.Callable) error {
+		"on": func(event string, handler sobek.Callable) error {
 			tq := vu.taskQueueRegistry.get(p.TargetID())
 
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := syncMapConsoleMessage(vu, m)
-				_, err := handler(goja.Undefined(), vu.Runtime().ToValue(mapping))
+				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
 			runInTaskQueue := func(m *common.ConsoleMessage) {
@@ -134,7 +134,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"opener": p.Opener,
 		"press":  p.Press,
-		"reload": func(opts goja.Value) (*goja.Object, error) {
+		"reload": func(opts sobek.Value) (*sobek.Object, error) {
 			resp, err := p.Reload(opts)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -144,7 +144,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 
 			return rt.ToValue(r).ToObject(rt), nil
 		},
-		"screenshot": func(opts goja.Value) (*goja.ArrayBuffer, error) {
+		"screenshot": func(opts sobek.Value) (*sobek.ArrayBuffer, error) {
 			ctx := vu.Context()
 
 			popts := common.NewPageScreenshotOptions()
@@ -168,7 +168,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"setExtraHTTPHeaders":         p.SetExtraHTTPHeaders,
 		"setInputFiles":               p.SetInputFiles,
 		"setViewportSize":             p.SetViewportSize,
-		"tap": func(selector string, opts goja.Value) (*goja.Promise, error) {
+		"tap": func(selector string, opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameTapOptions(p.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page tap options: %w", err)
@@ -177,7 +177,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, p.Tap(selector, popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent": func(selector string, opts goja.Value) (any, error) {
+		"textContent": func(selector string, opts sobek.Value) (any, error) {
 			v, ok, err := p.TextContent(selector, opts)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -195,7 +195,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"uncheck":         p.Uncheck,
 		"url":             p.URL,
 		"viewportSize":    p.ViewportSize,
-		"waitForFunction": func(pageFunc, opts goja.Value, args ...goja.Value) (*goja.Promise, error) {
+		"waitForFunction": func(pageFunc, opts sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
 			js, popts, pargs, err := parseWaitForFunctionArgs(
 				vu.Context(), p.Timeout(), pageFunc, opts, args...,
 			)
@@ -208,7 +208,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			}), nil
 		},
 		"waitForLoadState": p.WaitForLoadState,
-		"waitForNavigation": func(opts goja.Value) (*goja.Promise, error) {
+		"waitForNavigation": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewFrameWaitForNavigationOptions(p.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing page wait for navigation options: %w", err)
@@ -222,7 +222,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return syncMapResponse(vu, resp), nil
 			}), nil
 		},
-		"waitForSelector": func(selector string, opts goja.Value) (mapping, error) {
+		"waitForSelector": func(selector string, opts sobek.Value) (mapping, error) {
 			eh, err := p.WaitForSelector(selector, opts)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
@@ -230,7 +230,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return syncMapElementHandle(vu, eh), nil
 		},
 		"waitForTimeout": p.WaitForTimeout,
-		"workers": func() *goja.Object {
+		"workers": func() *sobek.Object {
 			var mws []mapping
 			for _, w := range p.Workers() {
 				mw := syncMapWorker(vu, w)

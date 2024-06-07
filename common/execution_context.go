@@ -157,8 +157,8 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 func (e *ExecutionContext) eval(
 	apiCtx context.Context, opts evalOptions, js string, args ...any,
 ) (any, error) {
-	if escapesGojaValues(args...) {
-		return nil, errors.New("goja.Value escaped")
+	if escapesSobekValues(args...) {
+		return nil, errors.New("sobek.Value escaped")
 	}
 	e.logger.Debugf(
 		"ExecutionContext:eval",
@@ -299,8 +299,8 @@ func (e *ExecutionContext) getInjectedScript(apiCtx context.Context) (JSHandleAP
 // Eval evaluates the provided JavaScript within this execution context and
 // returns a value or handle.
 func (e *ExecutionContext) Eval(apiCtx context.Context, js string, args ...any) (any, error) {
-	if escapesGojaValues(args...) {
-		return nil, errors.New("goja.Value escaped")
+	if escapesSobekValues(args...) {
+		return nil, errors.New("sobek.Value escaped")
 	}
 	opts := evalOptions{
 		forceCallable: true,
@@ -317,8 +317,8 @@ func (e *ExecutionContext) Eval(apiCtx context.Context, js string, args ...any) 
 // EvalHandle evaluates the provided JavaScript within this execution context
 // and returns a JSHandle.
 func (e *ExecutionContext) EvalHandle(apiCtx context.Context, js string, args ...any) (JSHandleAPI, error) {
-	if escapesGojaValues(args...) {
-		return nil, errors.New("goja.Value escaped")
+	if escapesSobekValues(args...) {
+		return nil, errors.New("sobek.Value escaped")
 	}
 	opts := evalOptions{
 		forceCallable: true,

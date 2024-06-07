@@ -51,7 +51,7 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t)
-	bctx, err := tb.NewContext(tb.toGojaValue(struct {
+	bctx, err := tb.NewContext(tb.toSobekValue(struct {
 		Viewport common.Viewport `js:"viewport"`
 	}{
 		Viewport: common.Viewport{
@@ -77,7 +77,7 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t, withHTTPServer())
-	bctx, err := tb.NewContext(tb.toGojaValue(struct {
+	bctx, err := tb.NewContext(tb.toSobekValue(struct {
 		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
 	}{
 		ExtraHTTPHeaders: map[string]string{

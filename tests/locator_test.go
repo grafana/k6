@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -16,7 +16,7 @@ import (
 // than one element matches the locator's selector.
 
 // Note:
-// We skip adding t.Parallel to subtests because goja or our code might race.
+// We skip adding t.Parallel to subtests because sobek or our code might race.
 
 type jsFrameWaitForSelectorOpts struct {
 	jsFrameBaseOpts
@@ -228,7 +228,7 @@ func TestLocator(t *testing.T) {
 		{
 			"SelectOption", func(tb *testBrowser, p *common.Page) {
 				l := p.Locator("#selectElement", nil)
-				rv, err := l.SelectOption(tb.toGojaValue(`option text 2`), nil)
+				rv, err := l.SelectOption(tb.toSobekValue(`option text 2`), nil)
 				require.NoError(t, err)
 				require.Len(t, rv, 1)
 				require.Equal(t, "option text 2", rv[0])
@@ -267,14 +267,14 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"WaitFor state:visible", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
+				opts := tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})
 				lo := p.Locator("#link", nil)
 				require.NoError(t, lo.WaitFor(opts))
 			},
 		},
 		{
 			"WaitFor state:attached", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
+				opts := tb.toSobekValue(jsFrameWaitForSelectorOpts{
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "attached",
 				})
@@ -284,7 +284,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"WaitFor state:hidden", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
+				opts := tb.toSobekValue(jsFrameWaitForSelectorOpts{
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "hidden",
 				})
@@ -294,7 +294,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"WaitFor state:detached", func(tb *testBrowser, p *common.Page) {
-				opts := tb.toGojaValue(jsFrameWaitForSelectorOpts{
+				opts := tb.toSobekValue(jsFrameWaitForSelectorOpts{
 					jsFrameBaseOpts: jsFrameBaseOpts{Timeout: "100"},
 					State:           "detached",
 				})
@@ -322,8 +322,8 @@ func TestLocator(t *testing.T) {
 		})
 	}
 
-	timeout := func(tb *testBrowser) goja.Value {
-		return tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
+	timeout := func(tb *testBrowser) sobek.Value {
+		return tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})
 	}
 	sanityTests := []struct {
 		name string
@@ -403,7 +403,7 @@ func TestLocator(t *testing.T) {
 		},
 		{
 			"SelectOption", func(l *common.Locator, tb *testBrowser) error {
-				_, err := l.SelectOption(tb.toGojaValue(""), timeout(tb))
+				_, err := l.SelectOption(tb.toSobekValue(""), timeout(tb))
 				return err
 			},
 		},
@@ -548,8 +548,8 @@ func TestLocatorElementState(t *testing.T) {
 		})
 	}
 
-	timeout := func(tb *testBrowser) goja.Value {
-		return tb.toGojaValue(jsFrameBaseOpts{Timeout: "100"})
+	timeout := func(tb *testBrowser) sobek.Value {
+		return tb.toSobekValue(jsFrameBaseOpts{Timeout: "100"})
 	}
 	sanityTests := []struct {
 		name string

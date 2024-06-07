@@ -6,11 +6,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/keyboardlayout"
-
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
+
+	"github.com/grafana/xk6-browser/keyboardlayout"
 )
 
 const (
@@ -62,7 +62,7 @@ func (k *Keyboard) Up(key string) error {
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
 // A press message consists of successive key down and up messages.
-func (k *Keyboard) Press(key string, opts goja.Value) error {
+func (k *Keyboard) Press(key string, opts sobek.Value) error {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
 		return fmt.Errorf("parsing keyboard options: %w", err)
@@ -88,7 +88,7 @@ func (k *Keyboard) InsertText(text string) error {
 //
 // It sends an insertText message if a character is not among
 // valid characters in the keyboard's layout.
-func (k *Keyboard) Type(text string, opts goja.Value) error {
+func (k *Keyboard) Type(text string, opts sobek.Value) error {
 	kbdOpts := NewKeyboardOptions()
 	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
 		return fmt.Errorf("parsing keyboard options: %w", err)

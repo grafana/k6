@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"reflect"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6error"
@@ -15,14 +15,14 @@ import (
 func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen,gocognit,cyclop
 	rt := vu.Runtime()
 	return mapping{
-		"addCookies": func(cookies []*common.Cookie) *goja.Promise {
+		"addCookies": func(cookies []*common.Cookie) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.AddCookies(cookies) //nolint:wrapcheck
 			})
 		},
-		"addInitScript": func(script goja.Value) *goja.Promise {
+		"addInitScript": func(script sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				if !gojaValueExists(script) {
+				if !sobekValueExists(script) {
 					return nil, nil
 				}
 
@@ -30,7 +30,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				switch script.ExportType() {
 				case reflect.TypeOf(string("")):
 					source = script.String()
-				case reflect.TypeOf(goja.Object{}):
+				case reflect.TypeOf(sobek.Object{}):
 					opts := script.ToObject(rt)
 					for _, k := range opts.Keys() {
 						if k == "content" {
@@ -38,7 +38,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 						}
 					}
 				default:
-					_, isCallable := goja.AssertFunction(script)
+					_, isCallable := sobek.AssertFunction(script)
 					if !isCallable {
 						source = fmt.Sprintf("(%s);", script.ToString().String())
 					} else {
@@ -53,27 +53,27 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			// the browser is grabbed from VU.
 			return mapBrowser(vu)
 		},
-		"clearCookies": func() *goja.Promise {
+		"clearCookies": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.ClearCookies() //nolint:wrapcheck
 			})
 		},
-		"clearPermissions": func() *goja.Promise {
+		"clearPermissions": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.ClearPermissions() //nolint:wrapcheck
 			})
 		},
-		"close": func() *goja.Promise {
+		"close": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.Close() //nolint:wrapcheck
 			})
 		},
-		"cookies": func(urls ...string) *goja.Promise {
+		"cookies": func(urls ...string) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return bc.Cookies(urls...) //nolint:wrapcheck
 			})
 		},
-		"grantPermissions": func(permissions []string, opts goja.Value) *goja.Promise {
+		"grantPermissions": func(permissions []string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				popts := common.NewGrantPermissionsOptions()
 				popts.Parse(vu.Context(), opts)
@@ -83,22 +83,22 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		},
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
-		"setGeolocation": func(geolocation goja.Value) *goja.Promise {
+		"setGeolocation": func(geolocation sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.SetGeolocation(geolocation) //nolint:wrapcheck
 			})
 		},
-		"setHTTPCredentials": func(httpCredentials goja.Value) *goja.Promise {
+		"setHTTPCredentials": func(httpCredentials sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.SetHTTPCredentials(httpCredentials) //nolint:staticcheck,wrapcheck
 			})
 		},
-		"setOffline": func(offline bool) *goja.Promise {
+		"setOffline": func(offline bool) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, bc.SetOffline(offline) //nolint:wrapcheck
 			})
 		},
-		"waitForEvent": func(event string, optsOrPredicate goja.Value) (*goja.Promise, error) {
+		"waitForEvent": func(event string, optsOrPredicate sobek.Value) (*sobek.Promise, error) {
 			ctx := vu.Context()
 			popts := common.NewWaitForEventOptions(
 				bc.Timeout(),
@@ -120,7 +120,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 						// before returning the result to the caller.
 						c := make(chan bool)
 						tq.Queue(func() error {
-							var resp goja.Value
+							var resp sobek.Value
 							resp, err = popts.PredicateFn(vu.Runtime().ToValue(p))
 							rtn = resp.ToBoolean()
 							close(c)
@@ -145,7 +145,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				return mapPage(vu, p), nil
 			}), nil
 		},
-		"pages": func() *goja.Object {
+		"pages": func() *sobek.Object {
 			var (
 				mpages []mapping
 				pages  = bc.Pages()
@@ -160,7 +160,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 
 			return rt.ToValue(mpages).ToObject(rt)
 		},
-		"newPage": func() *goja.Promise {
+		"newPage": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				page, err := bc.NewPage()
 				if err != nil {

@@ -3,7 +3,7 @@ package tests
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/browser"
@@ -15,7 +15,7 @@ import (
 // force all tests that work with this to go through the mapping layer.
 // This returns a cleanup function which should be deferred.
 // The opts are passed to k6test.NewVU as is without any modification.
-func startIteration(t *testing.T, opts ...any) (*k6test.VU, *goja.Runtime, *[]string, func()) {
+func startIteration(t *testing.T, opts ...any) (*k6test.VU, *sobek.Runtime, *[]string, func()) {
 	t.Helper()
 
 	vu := k6test.NewVU(t, opts...)
@@ -25,7 +25,7 @@ func startIteration(t *testing.T, opts ...any) (*k6test.VU, *goja.Runtime, *[]st
 	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
 	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
 
-	// Setting the mapped browser into the vu's goja runtime.
+	// Setting the mapped browser into the vu's sobek runtime.
 	require.NoError(t, rt.Set("browser", jsMod.Browser))
 
 	// Setting log, which is used by the callers to assert that certain actions

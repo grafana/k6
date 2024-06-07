@@ -7,19 +7,19 @@ import (
 	"strings"
 	"time"
 
+	cdpbrowser "github.com/chromedp/cdproto/browser"
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/storage"
+	"github.com/chromedp/cdproto/target"
+	"github.com/grafana/sobek"
+
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
-
-	cdpbrowser "github.com/chromedp/cdproto/browser"
-	"github.com/chromedp/cdproto/cdp"
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/storage"
-	"github.com/chromedp/cdproto/target"
-	"github.com/dop251/goja"
 )
 
 // waitForEventType represents the event types that can be used when working
@@ -260,7 +260,7 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 // SetGeolocation overrides the geo location of the user.
-func (b *BrowserContext) SetGeolocation(geolocation goja.Value) error {
+func (b *BrowserContext) SetGeolocation(geolocation sobek.Value) error {
 	b.logger.Debugf("BrowserContext:SetGeolocation", "bctxid:%v", b.id)
 
 	g := NewGeolocation()
@@ -284,7 +284,7 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) error {
 // See for details:
 // - https://github.com/microsoft/playwright/issues/2196#issuecomment-627134837
 // - https://github.com/microsoft/playwright/pull/2763
-func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) error {
+func (b *BrowserContext) SetHTTPCredentials(httpCredentials sobek.Value) error {
 	b.logger.Warnf("setHTTPCredentials", "setHTTPCredentials is deprecated."+
 		" Create a new BrowserContext with httpCredentials instead.")
 	b.logger.Debugf("BrowserContext:SetHTTPCredentials", "bctxid:%v", b.id)

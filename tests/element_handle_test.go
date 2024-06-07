@@ -182,7 +182,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 
 	tb := newTestBrowser(t, withFileServer())
 	bc, err := tb.NewContext(
-		tb.toGojaValue(struct {
+		tb.toSobekValue(struct {
 			Viewport common.Viewport `js:"viewport"`
 		}{
 			Viewport: common.Viewport{
@@ -412,7 +412,7 @@ func TestElementHandleScreenshot(t *testing.T) {
 	tb := newTestBrowser(t)
 	p := tb.NewPage(nil)
 
-	err := p.SetViewportSize(tb.toGojaValue(struct {
+	err := p.SetViewportSize(tb.toSobekValue(struct {
 		Width  float64 `js:"width"`
 		Height float64 `js:"height"`
 	}{Width: 800, Height: 600}))
@@ -486,7 +486,7 @@ func TestElementHandleWaitForSelector(t *testing.T) {
 		}
 	`)
 	require.NoError(t, err)
-	element, err := root.WaitForSelector(".element-to-appear", tb.toGojaValue(struct {
+	element, err := root.WaitForSelector(".element-to-appear", tb.toSobekValue(struct {
 		Timeout int64 `js:"timeout"`
 	}{Timeout: 1000}))
 	require.NoError(t, err)

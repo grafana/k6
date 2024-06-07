@@ -9,7 +9,7 @@ import (
 	"time"
 
 	cdpruntime "github.com/chromedp/cdproto/runtime"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 )
@@ -36,8 +36,8 @@ func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, ob
 func convertArgument(
 	ctx context.Context, execCtx *ExecutionContext, arg any,
 ) (*cdpruntime.CallArgument, error) {
-	if escapesGojaValues(arg) {
-		return nil, errors.New("goja.Value escaped")
+	if escapesSobekValues(arg) {
+		return nil, errors.New("sobek.Value escaped")
 	}
 	switch a := arg.(type) {
 	case int64:
@@ -220,26 +220,26 @@ func TrimQuotes(s string) string {
 	return s
 }
 
-// gojaValueExists returns true if a given value is not nil and exists
-// (defined and not null) in the goja runtime.
-func gojaValueExists(v goja.Value) bool {
-	return v != nil && !goja.IsUndefined(v) && !goja.IsNull(v)
+// sobekValueExists returns true if a given value is not nil and exists
+// (defined and not null) in the sobek runtime.
+func sobekValueExists(v sobek.Value) bool {
+	return v != nil && !sobek.IsUndefined(v) && !sobek.IsNull(v)
 }
 
-// asGojaValue return v as a goja value.
-// panics if v is not a goja value.
-func asGojaValue(ctx context.Context, v any) goja.Value {
-	gv, ok := v.(goja.Value)
+// asSobekValue return v as a sobek value.
+// panics if v is not a sobek value.
+func asSobekValue(ctx context.Context, v any) sobek.Value {
+	gv, ok := v.(sobek.Value)
 	if !ok {
 		k6ext.Panic(ctx, "unexpected type %T", v)
 	}
 	return gv
 }
 
-// gojaValueToString returns v as string.
-// panics if v is not a goja value.
-func gojaValueToString(ctx context.Context, v any) string {
-	return asGojaValue(ctx, v).String()
+// sobekValueToString returns v as string.
+// panics if v is not a sobek value.
+func sobekValueToString(ctx context.Context, v any) string {
+	return asSobekValue(ctx, v).String()
 }
 
 // convert is a helper function to convert any value to a given type.
@@ -253,11 +253,11 @@ func convert[T any](from any, to *T) error {
 }
 
 // TODO:
-// remove this temporary helper after ensuring the goja-free
+// remove this temporary helper after ensuring the sobek-free
 // business logic works.
-func escapesGojaValues(args ...any) bool {
+func escapesSobekValues(args ...any) bool {
 	for _, arg := range args {
-		if _, ok := arg.(goja.Value); ok {
+		if _, ok := arg.(sobek.Value); ok {
 			return true
 		}
 	}

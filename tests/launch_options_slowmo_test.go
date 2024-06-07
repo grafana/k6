@@ -54,7 +54,7 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				err := p.EmulateMedia(tb.toGojaValue(struct {
+				err := p.EmulateMedia(tb.toSobekValue(struct {
 					Media string `js:"media"`
 				}{
 					Media: "print",
@@ -149,7 +149,7 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testPageSlowMoImpl(t, tb, func(_ *testBrowser, p *common.Page) {
-				_, err := p.SelectOption("select", tb.toGojaValue("foo"), nil)
+				_, err := p.SelectOption("select", tb.toSobekValue("foo"), nil)
 				require.NoError(t, err)
 			})
 		})
@@ -281,7 +281,7 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			t.Parallel()
 			tb := newTestBrowser(t, withFileServer())
 			testFrameSlowMoImpl(t, tb, func(_ *testBrowser, f *common.Frame) {
-				_, err := f.SelectOption("select", tb.toGojaValue("foo"), nil)
+				_, err := f.SelectOption("select", tb.toSobekValue("foo"), nil)
 				require.NoError(t, err)
 			})
 		})

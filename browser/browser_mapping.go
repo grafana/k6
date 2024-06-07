@@ -3,7 +3,7 @@ package browser
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -19,7 +19,7 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return mapBrowserContext(vu, b.Context()), nil
 		},
-		"closeContext": func() *goja.Promise {
+		"closeContext": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {
@@ -35,7 +35,7 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return b.IsConnected(), nil
 		},
-		"newContext": func(opts goja.Value) (*goja.Promise, error) {
+		"newContext": func(opts sobek.Value) (*sobek.Promise, error) {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {
@@ -69,7 +69,7 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return b.Version(), nil
 		},
-		"newPage": func(opts goja.Value) *goja.Promise {
+		"newPage": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {

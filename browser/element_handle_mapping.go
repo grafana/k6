@@ -3,7 +3,7 @@ package browser
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -13,17 +13,17 @@ import (
 func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,cyclop,funlen
 	rt := vu.Runtime()
 	maps := mapping{
-		"boundingBox": func() *goja.Promise {
+		"boundingBox": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.BoundingBox(), nil
 			})
 		},
-		"check": func(opts goja.Value) *goja.Promise {
+		"check": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Check(opts) //nolint:wrapcheck
 			})
 		},
-		"click": func(opts goja.Value) (*goja.Promise, error) {
+		"click": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewElementHandleClickOptions(eh.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element click options: %w", err)
@@ -34,7 +34,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, err //nolint:wrapcheck
 			}), nil
 		},
-		"contentFrame": func() *goja.Promise {
+		"contentFrame": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				f, err := eh.ContentFrame()
 				if err != nil {
@@ -43,27 +43,27 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return mapFrame(vu, f), nil
 			})
 		},
-		"dblclick": func(opts goja.Value) *goja.Promise {
+		"dblclick": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Dblclick(opts) //nolint:wrapcheck
 			})
 		},
-		"dispatchEvent": func(typ string, eventInit goja.Value) *goja.Promise {
+		"dispatchEvent": func(typ string, eventInit sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.DispatchEvent(typ, exportArg(eventInit)) //nolint:wrapcheck
 			})
 		},
-		"fill": func(value string, opts goja.Value) *goja.Promise {
+		"fill": func(value string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Fill(value, opts) //nolint:wrapcheck
 			})
 		},
-		"focus": func() *goja.Promise {
+		"focus": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Focus() //nolint:wrapcheck
 			})
 		},
-		"getAttribute": func(name string) *goja.Promise {
+		"getAttribute": func(name string) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				s, ok, err := eh.GetAttribute(name)
 				if err != nil {
@@ -75,57 +75,57 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return s, nil
 			})
 		},
-		"hover": func(opts goja.Value) *goja.Promise {
+		"hover": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Hover(opts) //nolint:wrapcheck
 			})
 		},
-		"innerHTML": func() *goja.Promise {
+		"innerHTML": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.InnerHTML() //nolint:wrapcheck
 			})
 		},
-		"innerText": func() *goja.Promise {
+		"innerText": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.InnerText() //nolint:wrapcheck
 			})
 		},
-		"inputValue": func(opts goja.Value) *goja.Promise {
+		"inputValue": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.InputValue(opts) //nolint:wrapcheck
 			})
 		},
-		"isChecked": func() *goja.Promise {
+		"isChecked": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.IsChecked() //nolint:wrapcheck
 			})
 		},
-		"isDisabled": func() *goja.Promise {
+		"isDisabled": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.IsDisabled() //nolint:wrapcheck
 			})
 		},
-		"isEditable": func() *goja.Promise {
+		"isEditable": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.IsEditable() //nolint:wrapcheck
 			})
 		},
-		"isEnabled": func() *goja.Promise {
+		"isEnabled": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.IsEnabled() //nolint:wrapcheck
 			})
 		},
-		"isHidden": func() *goja.Promise {
+		"isHidden": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.IsHidden() //nolint:wrapcheck
 			})
 		},
-		"isVisible": func() *goja.Promise {
+		"isVisible": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.IsVisible() //nolint:wrapcheck
 			})
 		},
-		"ownerFrame": func() *goja.Promise {
+		"ownerFrame": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				f, err := eh.OwnerFrame()
 				if err != nil {
@@ -134,12 +134,12 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return mapFrame(vu, f), nil
 			})
 		},
-		"press": func(key string, opts goja.Value) *goja.Promise {
+		"press": func(key string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Press(key, opts) //nolint:wrapcheck
 			})
 		},
-		"screenshot": func(opts goja.Value) (*goja.Promise, error) {
+		"screenshot": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewElementHandleScreenshotOptions(eh.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element handle screenshot options: %w", err)
@@ -156,27 +156,27 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return &ab, nil
 			}), nil
 		},
-		"scrollIntoViewIfNeeded": func(opts goja.Value) *goja.Promise {
+		"scrollIntoViewIfNeeded": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.ScrollIntoViewIfNeeded(opts) //nolint:wrapcheck
 			})
 		},
-		"selectOption": func(values goja.Value, opts goja.Value) *goja.Promise {
+		"selectOption": func(values sobek.Value, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return eh.SelectOption(values, opts) //nolint:wrapcheck
 			})
 		},
-		"selectText": func(opts goja.Value) *goja.Promise {
+		"selectText": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.SelectText(opts) //nolint:wrapcheck
 			})
 		},
-		"setInputFiles": func(files goja.Value, opts goja.Value) *goja.Promise {
+		"setInputFiles": func(files sobek.Value, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.SetInputFiles(files, opts) //nolint:wrapcheck
 			})
 		},
-		"tap": func(opts goja.Value) (*goja.Promise, error) {
+		"tap": func(opts sobek.Value) (*sobek.Promise, error) {
 			popts := common.NewElementHandleTapOptions(eh.Timeout())
 			if err := popts.Parse(vu.Context(), opts); err != nil {
 				return nil, fmt.Errorf("parsing element tap options: %w", err)
@@ -185,7 +185,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.Tap(popts) //nolint:wrapcheck
 			}), nil
 		},
-		"textContent": func() *goja.Promise {
+		"textContent": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				s, ok, err := eh.TextContent()
 				if err != nil {
@@ -197,22 +197,22 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return s, nil
 			})
 		},
-		"type": func(text string, opts goja.Value) *goja.Promise {
+		"type": func(text string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Type(text, opts) //nolint:wrapcheck
 			})
 		},
-		"uncheck": func(opts goja.Value) *goja.Promise {
+		"uncheck": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.Uncheck(opts) //nolint:wrapcheck
 			})
 		},
-		"waitForElementState": func(state string, opts goja.Value) *goja.Promise {
+		"waitForElementState": func(state string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.WaitForElementState(state, opts) //nolint:wrapcheck
 			})
 		},
-		"waitForSelector": func(selector string, opts goja.Value) *goja.Promise {
+		"waitForSelector": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				eh, err := eh.WaitForSelector(selector, opts)
 				if err != nil {
@@ -222,7 +222,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			})
 		},
 	}
-	maps["$"] = func(selector string) *goja.Promise {
+	maps["$"] = func(selector string) *sobek.Promise {
 		return k6ext.Promise(vu.Context(), func() (any, error) {
 			eh, err := eh.Query(selector, common.StrictModeOff)
 			if err != nil {
@@ -239,7 +239,7 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 			return ehm, nil
 		})
 	}
-	maps["$$"] = func(selector string) *goja.Promise {
+	maps["$$"] = func(selector string) *sobek.Promise {
 		return k6ext.Promise(vu.Context(), func() (any, error) {
 			ehs, err := eh.QueryAll(selector)
 			if err != nil {

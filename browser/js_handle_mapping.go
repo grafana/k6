@@ -1,7 +1,7 @@
 package browser
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/k6ext"
@@ -13,12 +13,12 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 		"asElement": func() mapping {
 			return mapElementHandle(vu, jsh.AsElement())
 		},
-		"dispose": func() *goja.Promise {
+		"dispose": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, jsh.Dispose() //nolint:wrapcheck
 			})
 		},
-		"evaluate": func(pageFunc goja.Value, gargs ...goja.Value) *goja.Promise {
+		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				args := make([]any, 0, len(gargs))
 				for _, a := range gargs {
@@ -27,7 +27,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				return jsh.Evaluate(pageFunc.String(), args...) //nolint:wrapcheck
 			})
 		},
-		"evaluateHandle": func(pageFunc goja.Value, gargs ...goja.Value) *goja.Promise {
+		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				h, err := jsh.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
 				if err != nil {
@@ -36,7 +36,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				return mapJSHandle(vu, h), nil
 			})
 		},
-		"getProperties": func() *goja.Promise {
+		"getProperties": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				props, err := jsh.GetProperties()
 				if err != nil {
@@ -50,7 +50,7 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 				return dst, nil
 			})
 		},
-		"jsonValue": func() *goja.Promise {
+		"jsonValue": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return jsh.JSONValue() //nolint:wrapcheck
 			})

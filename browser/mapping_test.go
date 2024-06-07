@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/common"
@@ -61,7 +61,7 @@ func TestMappings(t *testing.T) {
 
 	var (
 		vu = &k6modulestest.VU{
-			RuntimeField: goja.New(),
+			RuntimeField: sobek.New(),
 			InitEnvField: &k6common.InitEnvironment{
 				TestPreInitState: &k6lib.TestPreInitState{
 					Registry: k6metrics.NewRegistry(),
@@ -86,7 +86,7 @@ func TestMappings(t *testing.T) {
 			method := typ.Method(i)
 			require.NotNil(t, method)
 
-			// goja uses methods that starts with lowercase.
+			// sobek uses methods that starts with lowercase.
 			// so we need to convert the first letter to lowercase.
 			m := toFirstLetterLower(method.Name)
 
@@ -264,8 +264,8 @@ type browserAPI interface {
 	Context() *common.BrowserContext
 	CloseContext()
 	IsConnected() bool
-	NewContext(opts goja.Value) (*common.BrowserContext, error)
-	NewPage(opts goja.Value) (*common.Page, error)
+	NewContext(opts sobek.Value) (*common.BrowserContext, error)
+	NewPage(opts sobek.Value) (*common.Page, error)
 	On(string) (bool, error)
 	UserAgent() string
 	Version() string
@@ -274,85 +274,85 @@ type browserAPI interface {
 // browserContextAPI is the public interface of a CDP browser context.
 type browserContextAPI interface {
 	AddCookies(cookies []*common.Cookie) error
-	AddInitScript(script goja.Value, arg goja.Value) error
+	AddInitScript(script sobek.Value, arg sobek.Value) error
 	Browser() *common.Browser
 	ClearCookies() error
 	ClearPermissions() error
 	Close() error
 	Cookies(urls ...string) ([]*common.Cookie, error)
-	GrantPermissions(permissions []string, opts goja.Value) error
+	GrantPermissions(permissions []string, opts sobek.Value) error
 	NewPage() (*common.Page, error)
 	Pages() []*common.Page
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
-	SetGeolocation(geolocation goja.Value) error
-	SetHTTPCredentials(httpCredentials goja.Value) error
+	SetGeolocation(geolocation sobek.Value) error
+	SetHTTPCredentials(httpCredentials sobek.Value) error
 	SetOffline(offline bool) error
-	WaitForEvent(event string, optsOrPredicate goja.Value) (any, error)
+	WaitForEvent(event string, optsOrPredicate sobek.Value) (any, error)
 }
 
 // pageAPI is the interface of a single browser tab.
 type pageAPI interface {
 	BringToFront() error
-	Check(selector string, opts goja.Value) error
-	Click(selector string, opts goja.Value) error
-	Close(opts goja.Value) error
+	Check(selector string, opts sobek.Value) error
+	Click(selector string, opts sobek.Value) error
+	Close(opts sobek.Value) error
 	Content() (string, error)
 	Context() *common.BrowserContext
-	Dblclick(selector string, opts goja.Value) error
-	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value)
-	EmulateMedia(opts goja.Value) error
+	Dblclick(selector string, opts sobek.Value) error
+	DispatchEvent(selector string, typ string, eventInit sobek.Value, opts sobek.Value)
+	EmulateMedia(opts sobek.Value) error
 	EmulateVisionDeficiency(typ string) error
-	Evaluate(pageFunc goja.Value, arg ...goja.Value) (any, error)
-	EvaluateHandle(pageFunc goja.Value, arg ...goja.Value) (common.JSHandleAPI, error)
-	Fill(selector string, value string, opts goja.Value) error
-	Focus(selector string, opts goja.Value) error
+	Evaluate(pageFunc sobek.Value, arg ...sobek.Value) (any, error)
+	EvaluateHandle(pageFunc sobek.Value, arg ...sobek.Value) (common.JSHandleAPI, error)
+	Fill(selector string, value string, opts sobek.Value) error
+	Focus(selector string, opts sobek.Value) error
 	Frames() []*common.Frame
-	GetAttribute(selector string, name string, opts goja.Value) (string, bool, error)
+	GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error)
 	GetKeyboard() *common.Keyboard
 	GetMouse() *common.Mouse
 	GetTouchscreen() *common.Touchscreen
-	Goto(url string, opts goja.Value) (*common.Response, error)
-	Hover(selector string, opts goja.Value) error
-	InnerHTML(selector string, opts goja.Value) (string, error)
-	InnerText(selector string, opts goja.Value) (string, error)
-	InputValue(selector string, opts goja.Value) (string, error)
-	IsChecked(selector string, opts goja.Value) (bool, error)
+	Goto(url string, opts sobek.Value) (*common.Response, error)
+	Hover(selector string, opts sobek.Value) error
+	InnerHTML(selector string, opts sobek.Value) (string, error)
+	InnerText(selector string, opts sobek.Value) (string, error)
+	InputValue(selector string, opts sobek.Value) (string, error)
+	IsChecked(selector string, opts sobek.Value) (bool, error)
 	IsClosed() bool
-	IsDisabled(selector string, opts goja.Value) (bool, error)
-	IsEditable(selector string, opts goja.Value) (bool, error)
-	IsEnabled(selector string, opts goja.Value) (bool, error)
-	IsHidden(selector string, opts goja.Value) (bool, error)
-	IsVisible(selector string, opts goja.Value) (bool, error)
-	Locator(selector string, opts goja.Value) *common.Locator
+	IsDisabled(selector string, opts sobek.Value) (bool, error)
+	IsEditable(selector string, opts sobek.Value) (bool, error)
+	IsEnabled(selector string, opts sobek.Value) (bool, error)
+	IsHidden(selector string, opts sobek.Value) (bool, error)
+	IsVisible(selector string, opts sobek.Value) (bool, error)
+	Locator(selector string, opts sobek.Value) *common.Locator
 	MainFrame() *common.Frame
 	On(event string, handler func(*common.ConsoleMessage) error) error
 	Opener() pageAPI
-	Press(selector string, key string, opts goja.Value) error
+	Press(selector string, key string, opts sobek.Value) error
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
-	Reload(opts goja.Value) *common.Response
-	Screenshot(opts goja.Value) ([]byte, error)
-	SelectOption(selector string, values goja.Value, opts goja.Value) ([]string, error)
-	SetContent(html string, opts goja.Value) error
+	Reload(opts sobek.Value) *common.Response
+	Screenshot(opts sobek.Value) ([]byte, error)
+	SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error)
+	SetContent(html string, opts sobek.Value) error
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
 	SetExtraHTTPHeaders(headers map[string]string) error
-	SetInputFiles(selector string, files goja.Value, opts goja.Value) error
-	SetViewportSize(viewportSize goja.Value) error
-	Tap(selector string, opts goja.Value) error
-	TextContent(selector string, opts goja.Value) (string, bool, error)
+	SetInputFiles(selector string, files sobek.Value, opts sobek.Value) error
+	SetViewportSize(viewportSize sobek.Value) error
+	Tap(selector string, opts sobek.Value) error
+	TextContent(selector string, opts sobek.Value) (string, bool, error)
 	ThrottleCPU(common.CPUProfile) error
 	ThrottleNetwork(common.NetworkProfile) error
 	Title() (string, error)
-	Type(selector string, text string, opts goja.Value) error
-	Uncheck(selector string, opts goja.Value) error
+	Type(selector string, text string, opts sobek.Value) error
+	Uncheck(selector string, opts sobek.Value) error
 	URL() (string, error)
 	ViewportSize() map[string]float64
-	WaitForFunction(fn, opts goja.Value, args ...goja.Value) (any, error)
-	WaitForLoadState(state string, opts goja.Value) error
-	WaitForNavigation(opts goja.Value) (*common.Response, error)
-	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
+	WaitForFunction(fn, opts sobek.Value, args ...sobek.Value) (any, error)
+	WaitForLoadState(state string, opts sobek.Value) error
+	WaitForNavigation(opts sobek.Value) (*common.Response, error)
+	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 	Workers() []*common.Worker
 }
@@ -367,54 +367,54 @@ type consoleMessageAPI interface {
 
 // frameAPI is the interface of a CDP target frame.
 type frameAPI interface {
-	Check(selector string, opts goja.Value) error
+	Check(selector string, opts sobek.Value) error
 	ChildFrames() []*common.Frame
-	Click(selector string, opts goja.Value) error
+	Click(selector string, opts sobek.Value) error
 	Content() (string, error)
-	Dblclick(selector string, opts goja.Value) error
-	DispatchEvent(selector string, typ string, eventInit goja.Value, opts goja.Value) error
+	Dblclick(selector string, opts sobek.Value) error
+	DispatchEvent(selector string, typ string, eventInit sobek.Value, opts sobek.Value) error
 	// EvaluateWithContext for internal use only
-	EvaluateWithContext(ctx context.Context, pageFunc goja.Value, args ...goja.Value) (any, error)
-	Evaluate(pageFunc goja.Value, args ...goja.Value) (any, error)
-	EvaluateHandle(pageFunc goja.Value, args ...goja.Value) (common.JSHandleAPI, error)
-	Fill(selector string, value string, opts goja.Value) error
-	Focus(selector string, opts goja.Value) error
+	EvaluateWithContext(ctx context.Context, pageFunc sobek.Value, args ...sobek.Value) (any, error)
+	Evaluate(pageFunc sobek.Value, args ...sobek.Value) (any, error)
+	EvaluateHandle(pageFunc sobek.Value, args ...sobek.Value) (common.JSHandleAPI, error)
+	Fill(selector string, value string, opts sobek.Value) error
+	Focus(selector string, opts sobek.Value) error
 	FrameElement() (*common.ElementHandle, error)
-	GetAttribute(selector string, name string, opts goja.Value) (string, bool, error)
-	Goto(url string, opts goja.Value) (*common.Response, error)
-	Hover(selector string, opts goja.Value) error
-	InnerHTML(selector string, opts goja.Value) (string, error)
-	InnerText(selector string, opts goja.Value) (string, error)
-	InputValue(selector string, opts goja.Value) (string, error)
-	IsChecked(selector string, opts goja.Value) (bool, error)
+	GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error)
+	Goto(url string, opts sobek.Value) (*common.Response, error)
+	Hover(selector string, opts sobek.Value) error
+	InnerHTML(selector string, opts sobek.Value) (string, error)
+	InnerText(selector string, opts sobek.Value) (string, error)
+	InputValue(selector string, opts sobek.Value) (string, error)
+	IsChecked(selector string, opts sobek.Value) (bool, error)
 	IsDetached() bool
-	IsDisabled(selector string, opts goja.Value) (bool, error)
-	IsEditable(selector string, opts goja.Value) (bool, error)
-	IsEnabled(selector string, opts goja.Value) (bool, error)
-	IsHidden(selector string, opts goja.Value) (bool, error)
-	IsVisible(selector string, opts goja.Value) (bool, error)
+	IsDisabled(selector string, opts sobek.Value) (bool, error)
+	IsEditable(selector string, opts sobek.Value) (bool, error)
+	IsEnabled(selector string, opts sobek.Value) (bool, error)
+	IsHidden(selector string, opts sobek.Value) (bool, error)
+	IsVisible(selector string, opts sobek.Value) (bool, error)
 	ID() string
 	LoaderID() string
-	Locator(selector string, opts goja.Value) *common.Locator
+	Locator(selector string, opts sobek.Value) *common.Locator
 	Name() string
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
 	Page() *common.Page
 	ParentFrame() *common.Frame
-	Press(selector string, key string, opts goja.Value) error
-	SelectOption(selector string, values goja.Value, opts goja.Value) ([]string, error)
-	SetContent(html string, opts goja.Value) error
-	SetInputFiles(selector string, files goja.Value, opts goja.Value)
-	Tap(selector string, opts goja.Value) error
-	TextContent(selector string, opts goja.Value) (string, bool, error)
+	Press(selector string, key string, opts sobek.Value) error
+	SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error)
+	SetContent(html string, opts sobek.Value) error
+	SetInputFiles(selector string, files sobek.Value, opts sobek.Value)
+	Tap(selector string, opts sobek.Value) error
+	TextContent(selector string, opts sobek.Value) (string, bool, error)
 	Title() string
-	Type(selector string, text string, opts goja.Value) error
-	Uncheck(selector string, opts goja.Value) error
+	Type(selector string, text string, opts sobek.Value) error
+	Uncheck(selector string, opts sobek.Value) error
 	URL() string
-	WaitForFunction(pageFunc, opts goja.Value, args ...goja.Value) (any, error)
-	WaitForLoadState(state string, opts goja.Value) error
-	WaitForNavigation(opts goja.Value) (*common.Response, error)
-	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
+	WaitForFunction(pageFunc, opts sobek.Value, args ...sobek.Value) (any, error)
+	WaitForLoadState(state string, opts sobek.Value) error
+	WaitForNavigation(opts sobek.Value) (*common.Response, error)
+	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 	WaitForTimeout(timeout int64)
 }
 
@@ -423,18 +423,18 @@ type elementHandleAPI interface {
 	common.JSHandleAPI
 
 	BoundingBox() (*common.Rect, error)
-	Check(opts goja.Value) error
-	Click(opts goja.Value) error
+	Check(opts sobek.Value) error
+	Click(opts sobek.Value) error
 	ContentFrame() (*common.Frame, error)
-	Dblclick(opts goja.Value) error
-	DispatchEvent(typ string, props goja.Value) error
-	Fill(value string, opts goja.Value) error
+	Dblclick(opts sobek.Value) error
+	DispatchEvent(typ string, props sobek.Value) error
+	Fill(value string, opts sobek.Value) error
 	Focus() error
 	GetAttribute(name string) (string, bool, error)
-	Hover(opts goja.Value) error
+	Hover(opts sobek.Value) error
 	InnerHTML() (string, error)
 	InnerText() (string, error)
-	InputValue(opts goja.Value) (string, error)
+	InputValue(opts sobek.Value) (string, error)
 	IsChecked() (bool, error)
 	IsDisabled() (bool, error)
 	IsEditable() (bool, error)
@@ -442,37 +442,37 @@ type elementHandleAPI interface {
 	IsHidden() (bool, error)
 	IsVisible() (bool, error)
 	OwnerFrame() (*common.Frame, error)
-	Press(key string, opts goja.Value) error
+	Press(key string, opts sobek.Value) error
 	Query(selector string) (*common.ElementHandle, error)
 	QueryAll(selector string) ([]*common.ElementHandle, error)
-	Screenshot(opts goja.Value) (goja.ArrayBuffer, error)
-	ScrollIntoViewIfNeeded(opts goja.Value) error
-	SelectOption(values goja.Value, opts goja.Value) ([]string, error)
-	SelectText(opts goja.Value) error
-	SetInputFiles(files goja.Value, opts goja.Value) error
-	Tap(opts goja.Value) error
+	Screenshot(opts sobek.Value) (sobek.ArrayBuffer, error)
+	ScrollIntoViewIfNeeded(opts sobek.Value) error
+	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
+	SelectText(opts sobek.Value) error
+	SetInputFiles(files sobek.Value, opts sobek.Value) error
+	Tap(opts sobek.Value) error
 	TextContent() (string, bool, error)
-	Type(text string, opts goja.Value) error
-	Uncheck(opts goja.Value) error
-	WaitForElementState(state string, opts goja.Value) error
-	WaitForSelector(selector string, opts goja.Value) (*common.ElementHandle, error)
+	Type(text string, opts sobek.Value) error
+	Uncheck(opts sobek.Value) error
+	WaitForElementState(state string, opts sobek.Value) error
+	WaitForSelector(selector string, opts sobek.Value) (*common.ElementHandle, error)
 }
 
 // requestAPI is the interface of an HTTP request.
 type requestAPI interface {
 	AllHeaders() map[string]string
 	Frame() *common.Frame
-	HeaderValue(string) goja.Value
+	HeaderValue(string) sobek.Value
 	Headers() map[string]string
 	HeadersArray() []common.HTTPHeader
 	IsNavigationRequest() bool
 	Method() string
 	PostData() string
-	PostDataBuffer() goja.ArrayBuffer
+	PostDataBuffer() sobek.ArrayBuffer
 	ResourceType() string
 	Response() *common.Response
 	Size() common.HTTPMessageSize
-	Timing() goja.Value
+	Timing() sobek.Value
 	URL() string
 }
 
@@ -500,30 +500,30 @@ type responseAPI interface {
 // locatorAPI represents a way to find element(s) on a page at any moment.
 type locatorAPI interface {
 	Clear(opts *common.FrameFillOptions) error
-	Click(opts goja.Value) error
-	Dblclick(opts goja.Value) error
-	Check(opts goja.Value) error
-	Uncheck(opts goja.Value) error
-	IsChecked(opts goja.Value) (bool, error)
-	IsEditable(opts goja.Value) (bool, error)
-	IsEnabled(opts goja.Value) (bool, error)
-	IsDisabled(opts goja.Value) (bool, error)
-	IsVisible(opts goja.Value) (bool, error)
-	IsHidden(opts goja.Value) (bool, error)
-	Fill(value string, opts goja.Value) error
-	Focus(opts goja.Value) error
-	GetAttribute(name string, opts goja.Value) (string, bool, error)
-	InnerHTML(opts goja.Value) (string, error)
-	InnerText(opts goja.Value) (string, error)
-	TextContent(opts goja.Value) (string, bool, error)
-	InputValue(opts goja.Value) (string, error)
-	SelectOption(values goja.Value, opts goja.Value) ([]string, error)
-	Press(key string, opts goja.Value) error
-	Type(text string, opts goja.Value) error
-	Hover(opts goja.Value) error
-	Tap(opts goja.Value) error
-	DispatchEvent(typ string, eventInit, opts goja.Value)
-	WaitFor(opts goja.Value) error
+	Click(opts sobek.Value) error
+	Dblclick(opts sobek.Value) error
+	Check(opts sobek.Value) error
+	Uncheck(opts sobek.Value) error
+	IsChecked(opts sobek.Value) (bool, error)
+	IsEditable(opts sobek.Value) (bool, error)
+	IsEnabled(opts sobek.Value) (bool, error)
+	IsDisabled(opts sobek.Value) (bool, error)
+	IsVisible(opts sobek.Value) (bool, error)
+	IsHidden(opts sobek.Value) (bool, error)
+	Fill(value string, opts sobek.Value) error
+	Focus(opts sobek.Value) error
+	GetAttribute(name string, opts sobek.Value) (string, bool, error)
+	InnerHTML(opts sobek.Value) (string, error)
+	InnerText(opts sobek.Value) (string, error)
+	TextContent(opts sobek.Value) (string, bool, error)
+	InputValue(opts sobek.Value) (string, error)
+	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
+	Press(key string, opts sobek.Value) error
+	Type(text string, opts sobek.Value) error
+	Hover(opts sobek.Value) error
+	Tap(opts sobek.Value) error
+	DispatchEvent(typ string, eventInit, opts sobek.Value)
+	WaitFor(opts sobek.Value) error
 }
 
 // keyboardAPI is the interface of a keyboard input device.
@@ -531,8 +531,8 @@ type keyboardAPI interface {
 	Down(key string) error
 	Up(key string) error
 	InsertText(char string) error
-	Press(key string, opts goja.Value) error
-	Type(text string, opts goja.Value) error
+	Press(key string, opts sobek.Value) error
+	Type(text string, opts sobek.Value) error
 }
 
 // touchscreenAPI is the interface of a touchscreen.
@@ -542,11 +542,11 @@ type touchscreenAPI interface {
 
 // mouseAPI is the interface of a mouse input device.
 type mouseAPI interface {
-	Click(x float64, y float64, opts goja.Value) error
-	DblClick(x float64, y float64, opts goja.Value) error
-	Down(opts goja.Value) error
-	Up(opts goja.Value) error
-	Move(x float64, y float64, opts goja.Value) error
+	Click(x float64, y float64, opts sobek.Value) error
+	DblClick(x float64, y float64, opts sobek.Value) error
+	Down(opts sobek.Value) error
+	Up(opts sobek.Value) error
+	Move(x float64, y float64, opts sobek.Value) error
 }
 
 // workerAPI is the interface of a web worker.
