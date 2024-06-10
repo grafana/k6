@@ -203,8 +203,8 @@ github.com/grafana/xk6-redis/redis
 # github.com/grafana/xk6-webcrypto v0.3.0
 ## explicit; go 1.19
 github.com/grafana/xk6-webcrypto/webcrypto
-# github.com/grafana/xk6-websockets v0.4.0
-## explicit; go 1.18
+# github.com/grafana/xk6-websockets v0.5.1
+## explicit; go 1.20
 github.com/grafana/xk6-websockets/websockets
 github.com/grafana/xk6-websockets/websockets/events
 # github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
