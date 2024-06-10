@@ -297,12 +297,12 @@ func (mi *ModuleInstance) NewReadableStreamDefaultReader(call sobek.ConstructorC
 func NewReadableStreamFromReader(vu modules.VU, reader io.Reader) *sobek.Object {
 	rt := vu.Runtime()
 	return newReadableStream(vu, sobek.ConstructorCall{
-		Arguments: []sobek.Value{rt.ToValue(underlyingSourceForReader(vu, reader))},
+		Arguments: []sobek.Value{rt.ToValue(underlyingSourceFromReader(vu, reader))},
 		This:      rt.NewObject(),
 	})
 }
 
-func underlyingSourceForReader(vu modules.VU, reader io.Reader) *sobek.Object {
+func underlyingSourceFromReader(vu modules.VU, reader io.Reader) *sobek.Object {
 	rt := vu.Runtime()
 
 	underlyingSource := vu.Runtime().NewObject()

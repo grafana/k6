@@ -10,7 +10,7 @@ import (
 	"go.k6.io/k6/js/modulestest"
 )
 
-func TestNewReadableStreamForReader(t *testing.T) {
+func TestNewReadableStreamFromReader(t *testing.T) {
 	t.Parallel()
 
 	// The value to be streamed.
