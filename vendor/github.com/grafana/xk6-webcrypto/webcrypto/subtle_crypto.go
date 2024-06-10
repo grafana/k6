@@ -7,7 +7,7 @@ import (
 	"hash"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -39,8 +39,8 @@ type SubtleCrypto struct {
 //
 // The `data` parameter should contain the data to be encryption.
 func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
-	algorithm, key, data goja.Value,
-) *goja.Promise {
+	algorithm, key, data sobek.Value,
+) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -132,8 +132,8 @@ func (sc *SubtleCrypto) Encrypt( //nolint:dupl // we have two similar methods
 //
 // The `data` parameter should contain the data to be decrypted.
 func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
-	algorithm, key, data goja.Value,
-) *goja.Promise {
+	algorithm, key, data sobek.Value,
+) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -223,7 +223,7 @@ func (sc *SubtleCrypto) Decrypt( //nolint:dupl // we have two similar methods
 // `algorithm` identifies a public-key cryptosystem, this is the private key.
 //
 // The `data` parameter should contain the data to be signed.
-func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) Sign(algorithm, key, data sobek.Value) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -321,7 +321,7 @@ func (sc *SubtleCrypto) Sign(algorithm, key, data goja.Value) *goja.Promise {
 // The `signature` parameter should contain the signature to be verified.
 //
 // The `data` parameter should contain the original signed data.
-func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) Verify(algorithm, key, signature, data sobek.Value) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -415,7 +415,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data goja.Value) *goja
 //   - SHA-512
 //
 // The `data` parameter should contain the data to be digested.
-func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Promise {
+func (sc *SubtleCrypto) Digest(algorithm sobek.Value, data sobek.Value) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -496,7 +496,9 @@ func (sc *SubtleCrypto) Digest(algorithm goja.Value, data goja.Value) *goja.Prom
 // using `SubtleCrypto.ExportKey` or `SubtleCrypto.WrapKey`.
 //
 // The `keyUsages` parameter is an array of strings indicating what the key can be used for.
-func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyUsages []CryptoKeyUsage) *goja.Promise {
+func (sc *SubtleCrypto) GenerateKey(
+	algorithm sobek.Value, extractable bool, keyUsages []CryptoKeyUsage,
+) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var keyGenerator KeyGenerator
@@ -596,12 +598,12 @@ func (sc *SubtleCrypto) GenerateKey(algorithm goja.Value, extractable bool, keyU
 //
 //nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) DeriveKey(
-	algorithm goja.Value,
-	baseKey goja.Value,
-	derivedKeyAlgorithm goja.Value,
+	algorithm sobek.Value,
+	baseKey sobek.Value,
+	derivedKeyAlgorithm sobek.Value,
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
-) *goja.Promise {
+) *sobek.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -633,10 +635,10 @@ func (sc *SubtleCrypto) DeriveKey(
 //
 // The `length` parameter is the number of bits to derive. The number should be a multiple of 8.
 func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of error handling
-	algorithm goja.Value,
-	baseKey goja.Value,
+	algorithm sobek.Value,
+	baseKey sobek.Value,
 	length int,
-) *goja.Promise {
+) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -776,11 +778,11 @@ func (sc *SubtleCrypto) DeriveBits( //nolint:funlen,gocognit // we have a lot of
 //   - for HKDF: pass the string "HKDF"
 func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
-	keyData goja.Value,
-	algorithm goja.Value,
+	keyData sobek.Value,
+	algorithm sobek.Value,
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
-) *goja.Promise {
+) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -877,8 +879,8 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 // The `key` parameter is the key to export, as a CryptoKey object.
 func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
-	key goja.Value,
-) *goja.Promise {
+	key sobek.Value,
+) *sobek.Promise {
 	rt := sc.vu.Runtime()
 
 	var (
@@ -996,10 +998,10 @@ func isBinaryExportedFormat(format KeyFormat) bool {
 //nolint:revive // remove the nolint directive when the method is implemented
 func (sc *SubtleCrypto) WrapKey(
 	format KeyFormat,
-	key goja.Value,
-	wrappingKey goja.Value,
-	wrapAlgorithm goja.Value,
-) *goja.Promise {
+	key sobek.Value,
+	wrappingKey sobek.Value,
+	wrapAlgorithm sobek.Value,
+) *sobek.Promise {
 	// TODO: implementation
 	return nil
 }
@@ -1052,12 +1054,12 @@ func (sc *SubtleCrypto) WrapKey(
 func (sc *SubtleCrypto) UnwrapKey(
 	format KeyFormat,
 	wrappedKey []byte,
-	unwrappingKey goja.Value,
-	unwrapAlgo goja.Value,
-	unwrappedKeyAlgo goja.Value,
+	unwrappingKey sobek.Value,
+	unwrapAlgo sobek.Value,
+	unwrappedKeyAlgo sobek.Value,
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
-) *goja.Promise {
+) *sobek.Promise {
 	// TODO: implementation
 	return nil
 }

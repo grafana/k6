@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"hash"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -44,7 +44,7 @@ func (hkgp HMACKeyGenParams) hash() string {
 // not present as described in the hmac `generateKey` [specification].
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#hmac-operations
-func newHMACKeyGenParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*HMACKeyGenParams, error) {
+func newHMACKeyGenParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*HMACKeyGenParams, error) {
 	// The specification doesn't explicitly tell us what to do if the
 	// hash field is not present, but we assume it's a mandatory field
 	// and throw an error if it's not present.
@@ -243,7 +243,7 @@ func (hip HMACImportParams) hash() string {
 
 // newHMACImportParams creates a new HMACImportParams object from the given
 // algorithm and params objects.
-func newHMACImportParams(rt *goja.Runtime, normalized Algorithm, params goja.Value) (*HMACImportParams, error) {
+func newHMACImportParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*HMACImportParams, error) {
 	// The specification doesn't explicitly tell us what to do if the
 	// hash field is not present, but we assume it's a mandatory field
 	// and throw an error if it's not present.

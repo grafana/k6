@@ -3,7 +3,7 @@ package webcrypto
 import (
 	"errors"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // CryptoKeyGenerationResult represents the result of a key generation operation.
@@ -114,7 +114,7 @@ func (ck *CryptoKey) ContainsUsage(usage CryptoKeyUsage) bool {
 // CryptoKeyType represents the type of a key.
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
-// to ensure it is handled as a string by goja.
+// to ensure it is handled as a string by sobek.
 type CryptoKeyType = string
 
 const (
@@ -137,7 +137,7 @@ const (
 // CryptoKeyUsage represents the usage of a key.
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
-// to ensure it is handled as a string by goja.
+// to ensure it is handled as a string by sobek.
 type CryptoKeyUsage = string
 
 const (
@@ -177,7 +177,7 @@ type KeyGenerator interface {
 	GenerateKey(extractable bool, keyUsages []CryptoKeyUsage) (CryptoKeyGenerationResult, error)
 }
 
-func newKeyGenerator(rt *goja.Runtime, normalized Algorithm, params goja.Value) (KeyGenerator, error) {
+func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyGenerator, error) {
 	var kg KeyGenerator
 	var err error
 
@@ -205,7 +205,7 @@ type KeyImporter interface {
 	ImportKey(format KeyFormat, keyData []byte, keyUsages []CryptoKeyUsage) (*CryptoKey, error)
 }
 
-func newKeyImporter(rt *goja.Runtime, normalized Algorithm, params goja.Value) (KeyImporter, error) {
+func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (KeyImporter, error) {
 	var ki KeyImporter
 	var err error
 
@@ -260,7 +260,7 @@ func contains[T comparable](container []T, element T) bool {
 // KeyFormat represents the format of a CryptoKey.
 //
 // Note that it is defined as an alias of string, instead of a dedicated type,
-// to ensure it is handled as a string by goja.
+// to ensure it is handled as a string by sobek.
 type KeyFormat = string
 
 const (
@@ -280,7 +280,7 @@ const (
 // KeyLength holds the length of the key, in bits.
 //
 // Note that it is defined as an alias of uint16, instead of a dedicated type,
-// to ensure it is handled as a number by goja.
+// to ensure it is handled as a number by sobek.
 type KeyLength = uint16
 
 const (
