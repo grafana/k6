@@ -3,7 +3,7 @@ package webcrypto
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // Encrypter is an interface for encrypting data.
@@ -23,14 +23,14 @@ type EncryptDecrypter interface {
 }
 
 // newEncryptDecrypter instantiates an EncryptDecrypter based on the provided
-// algorithm and parameters `goja.Value`.
+// algorithm and parameters `sobek.Value`.
 //
 // The returned instance can be used to encrypt/decrypt data using the
 // corresponding AES algorithm.
 func newEncryptDecrypter(
-	rt *goja.Runtime,
+	rt *sobek.Runtime,
 	algorithm Algorithm,
-	params goja.Value,
+	params sobek.Value,
 ) (EncryptDecrypter, error) {
 	var ed EncryptDecrypter
 	var paramsObjectName string

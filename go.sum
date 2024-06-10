@@ -93,8 +93,8 @@ github.com/grafana/xk6-output-prometheus-remote v0.3.1 h1:X23rQzlJD8dXWB31DkxR4u
 github.com/grafana/xk6-output-prometheus-remote v0.3.1/go.mod h1:0JLAm4ONsNUlNoxJXAwOCfA6GtDwTPs557OplAvE+3o=
 github.com/grafana/xk6-redis v0.2.0 h1:iXmAKVlAxafZ/h8ptuXTFhGu63IFsyDI8QjUgWm66BU=
 github.com/grafana/xk6-redis v0.2.0/go.mod h1:B3PA9PAPJa2/WUfNJCdQwZrbb6D4e6UHIk8dssQbj7w=
-github.com/grafana/xk6-webcrypto v0.3.0 h1:piwiTrLTQDbuzC4CK0dVjbzQqNhIoGjWXrflf++W8aE=
-github.com/grafana/xk6-webcrypto v0.3.0/go.mod h1:Jk+UKbo+w/RCQH0hi+Hoy7Uj2HWd+dwEBjn1EDpwY0w=
+github.com/grafana/xk6-webcrypto v0.4.0 h1:CXRGkvVg8snYEyGCq3d5XGzDPxTPJ1m5CS68jPdtZZk=
+github.com/grafana/xk6-webcrypto v0.4.0/go.mod h1:+THllImZ8OWlsFc8llWqvzzjottlGdXq/7rIQ16zmFs=
 github.com/grafana/xk6-websockets v0.5.1 h1:wymI6UWpwDorv3mEInytrQjC9cmXYxQFygBOCMY1q6k=
 github.com/grafana/xk6-websockets v0.5.1/go.mod h1:yPadv8R00MPCnV+GGSlYV/vwVgxKRCiiJoIfWsNGoQg=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
