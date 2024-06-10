@@ -4,7 +4,7 @@ package redis
 import (
 	"errors"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -66,7 +66,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 // Client is initially configured, but in a disconnected state.
 // The connection is automatically established when using any of the Redis
 // commands exposed by the Client.
-func (mi *ModuleInstance) NewClient(call goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) NewClient(call sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 
 	if len(call.Arguments) != 1 {
