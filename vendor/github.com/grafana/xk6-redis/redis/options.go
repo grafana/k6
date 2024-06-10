@@ -87,7 +87,7 @@ type sentinelOptions struct {
 }
 
 // newOptionsFromObject validates and instantiates an options struct from its
-// map representation as exported from goja.Runtime.
+// map representation as exported from sobek.Runtime.
 func newOptionsFromObject(obj map[string]interface{}) (*redis.UniversalOptions, error) {
 	var options interface{}
 	if cluster, ok := obj["cluster"].(map[string]interface{}); ok {

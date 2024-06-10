@@ -18,7 +18,7 @@ require (
 	github.com/grafana/xk6-browser v1.5.2-0.20240607140836-ffcc1f5169ad
 	github.com/grafana/xk6-dashboard v0.7.4
 	github.com/grafana/xk6-output-prometheus-remote v0.4.0
-	github.com/grafana/xk6-redis v0.2.0
+	github.com/grafana/xk6-redis v0.3.0
 	github.com/grafana/xk6-webcrypto v0.4.0
 	github.com/grafana/xk6-websockets v0.5.1
 	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
