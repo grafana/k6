@@ -49,7 +49,7 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/browser": newWarnExperimentalModule(browser.NewSync(),
 			"Please update your imports to use k6/browser instead of k6/experimental/browser,"+
 				" which will be removed after September 23rd. Ensure your scripts are migrated by then."+
-				"For more information, see the migration guide at the link:"+
+				" For more information, see the migration guide at the link:"+
 				" https://grafana.com/docs/k6/latest/using-k6-browser/migrating-to-k6-v0-52/"),
 		"k6/browser":         browser.New(),
 		"k6/experimental/fs": fs.New(),
