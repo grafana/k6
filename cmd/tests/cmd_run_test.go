@@ -2319,6 +2319,39 @@ func TestBrowserPermissions(t *testing.T) {
 	}
 }
 
+func TestBrowserExperimentalImport(t *testing.T) {
+	t.Parallel()
+
+	const script = `
+		import { browser } from 'k6/experimental/browser';
+
+		export const options = {
+			scenarios: {
+					browser: {
+					executor: 'shared-iterations',
+					options: {
+						browser: {
+							type: 'chromium',
+						},
+					},
+				},
+			},
+		}
+
+		export default function() {
+			browser.isConnected()
+		};
+	`
+
+	const wantExitCode = 108
+	ts := getSingleFileTestState(t, script, []string{}, wantExitCode)
+	ts.Env["K6_BROWSER_EXECUTABLE_PATH"] = "k6-browser-fake-cmd"
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	loglines := ts.LoggerHook.Drain()
+
+	assert.Contains(t, loglines[0].Message, "use k6/browser instead of k6/experimental/browser")
+}
+
 func TestSetupTimeout(t *testing.T) {
 	t.Parallel()
 	ts := NewGlobalTestState(t)
