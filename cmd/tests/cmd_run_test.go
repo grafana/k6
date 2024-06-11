@@ -2262,7 +2262,7 @@ func TestBrowserPermissions(t *testing.T) {
 			name:             "browser option not set",
 			options:          "",
 			expectedExitCode: 0,
-			expectedError:    "GoError: browser not found in registry. make sure to set browser type option in scenario definition in order to use the browser module",
+			expectedError:    "browser not found in registry. make sure to set browser type option in scenario definition in order to use the browser module",
 		},
 		// When we do supply the correct browser options,
 		// we expect that the browser module will start
@@ -2300,12 +2300,12 @@ func TestBrowserPermissions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			script := fmt.Sprintf(`
-			import { browser } from 'k6/experimental/browser';
+			import { browser } from 'k6/browser';
 
 			%s
 
 			export default function() {
-			  browser.isConnected();
+			  browser.isConnected()
 			};
 			`, tt.options)
 
