@@ -61,5 +61,9 @@ docker-compose up -d
 2. Run with the just build `k6:
 
 ```bash
-K6_OTEL_METRIC_PREFIX=k6_ ./k6 run -o xk6-opentelemetry examples/script.js
-```
+ K6_OTEL_GRPC_EXPORTER_INSECURE=true K6_OTEL_METRIC_PREFIX=k6_ ./k6 run --tag testid=1 -o xk6-opentelemetry examples/script.js
+ ```
+
+3. Open Grafana http://localhost:3000/ and navigate to the `k6 OpenTelemetry Prometheus` dashboard.
+
+![Demo k6's OpenTelemetry](./images/demo-dashboard.png)
