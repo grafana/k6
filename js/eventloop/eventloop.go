@@ -108,7 +108,7 @@ func (e *EventLoop) wakeup() {
 // This ensures that the actual work happens asynchronously, while the Promise
 // is immediately returned and the main thread resumes execution. It also
 // ensures that the Promise resolution happens safely back on the main thread
-// once the async work is done, as required by goja and all other JS runtimes.
+// once the async work is done, as required by Sobek and all other JS runtimes.
 //
 // TODO: rename to ReservePendingCallback or something more appropriate?
 func (e *EventLoop) RegisterCallback() (enqueueCallback func(func() error)) {
@@ -132,7 +132,7 @@ func (e *EventLoop) RegisterCallback() (enqueueCallback func(func() error)) {
 }
 
 func (e *EventLoop) promiseRejectionTracker(p *sobek.Promise, op sobek.PromiseRejectionOperation) {
-	// No locking necessary here as the goja runtime will call this synchronously
+	// No locking necessary here as the Sobek runtime will call this synchronously
 	// Read Notes on https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
 	if op == sobek.PromiseRejectionReject {
 		e.pendingPromiseRejections[p] = struct{}{}

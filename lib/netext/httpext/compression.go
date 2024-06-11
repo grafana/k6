@@ -182,7 +182,7 @@ func readResponseBody(
 		// Copy the data to a new slice before we return the buffer to the pool,
 		// because buf.Bytes() points to the underlying buffer byte slice.
 		// The ArrayBuffer wrapping will be done in the js/modules/k6/http
-		// package to avoid a reverse dependency, since it depends on goja.
+		// package to avoid a reverse dependency, since it depends on Sobek.
 		binData := make([]byte, buf.Len())
 		copy(binData, buf.Bytes())
 		result = binData

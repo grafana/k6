@@ -71,11 +71,11 @@ func MethodName(_ reflect.Type, m reflect.Method) string {
 type FieldNameMapper struct{}
 
 // FieldName is part of the sobek.FieldNameMapper interface
-// https://godoc.org/github.com/dop251/goja#FieldNameMapper
+// https://godoc.org/github.com/grafana/sobek#FieldNameMapper
 func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
 	return FieldName(t, f)
 }
 
 // MethodName is part of the sobek.FieldNameMapper interface
-// https://godoc.org/github.com/dop251/goja#FieldNameMapper
+// https://godoc.org/github.com/grafana/sobek#FieldNameMapper
 func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string { return MethodName(t, m) }

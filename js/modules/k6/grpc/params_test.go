@@ -142,7 +142,7 @@ func TestCallParamsTimeOutParse(t *testing.T) {
 // newParamsTestRuntime creates a new test runtime
 // that could be used to test the params
 // it also moves to the VU context and creates the params
-// goja value that could be used in the tests
+// Sobek value that could be used in the tests
 func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime, sobek.Value) {
 	t.Helper()
 
