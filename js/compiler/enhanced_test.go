@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dop251/goja/parser"
 	"github.com/grafana/sobek"
+	"github.com/grafana/sobek/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib"

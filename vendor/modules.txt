@@ -105,16 +105,6 @@ github.com/dgryski/go-rendezvous
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20240610225006-393f6d42497b
-## explicit; go 1.20
-github.com/dop251/goja
-github.com/dop251/goja/ast
-github.com/dop251/goja/file
-github.com/dop251/goja/ftoa
-github.com/dop251/goja/ftoa/internal/fast
-github.com/dop251/goja/parser
-github.com/dop251/goja/token
-github.com/dop251/goja/unistring
 # github.com/evanw/esbuild v0.21.2
 ## explicit; go 1.13
 github.com/evanw/esbuild/internal/api_helpers
@@ -173,9 +163,16 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grafana/sobek v0.0.0-20240613124309-cb36746e8fee
+# github.com/grafana/sobek v0.0.0-20240611084759-1a77bdaf1a4a
 ## explicit; go 1.20
 github.com/grafana/sobek
+github.com/grafana/sobek/ast
+github.com/grafana/sobek/file
+github.com/grafana/sobek/ftoa
+github.com/grafana/sobek/ftoa/internal/fast
+github.com/grafana/sobek/parser
+github.com/grafana/sobek/token
+github.com/grafana/sobek/unistring
 # github.com/grafana/xk6-browser v1.6.0
 ## explicit; go 1.20
 github.com/grafana/xk6-browser/browser
