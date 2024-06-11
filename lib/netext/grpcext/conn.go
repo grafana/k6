@@ -151,7 +151,7 @@ func (c *Conn) Invoke(
 		sterr := status.Convert(err)
 		response.Status = sterr.Code()
 
-		// (rogchap) when you access a JSON property in goja, you are actually accessing the underling
+		// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
 		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
 		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
 		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when

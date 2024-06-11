@@ -79,9 +79,9 @@ func (s Selection) emptySelection() Selection {
 	return s.Eq(s.Size())
 }
 
-func (s Selection) buildMatcher(v sobek.Value, gojaFn sobek.Callable) func(int, *goquery.Selection) bool {
+func (s Selection) buildMatcher(v sobek.Value, sobekFn sobek.Callable) func(int, *goquery.Selection) bool {
 	return func(idx int, sel *goquery.Selection) bool {
-		fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
+		fnRes, fnErr := sobekFn(v, s.rt.ToValue(idx), s.rt.ToValue(sel))
 		if fnErr != nil {
 			common.Throw(s.rt, fnErr)
 		}
@@ -181,12 +181,12 @@ func (s Selection) Has(arg interface{}) Selection {
 }
 
 func (s Selection) Not(v sobek.Value) Selection {
-	gojaFn, isFn := sobek.AssertFunction(v)
+	sobekFn, isFn := sobek.AssertFunction(v)
 	if !isFn {
 		return s.varargFnCall(v, s.sel.Not, s.sel.NotSelection, s.sel.NotNodes)
 	}
 
-	return Selection{s.rt, s.sel.NotFunction(s.buildMatcher(v, gojaFn)), s.URL}
+	return Selection{s.rt, s.sel.NotFunction(s.buildMatcher(v, sobekFn)), s.URL}
 }
 
 func (s Selection) Next(def ...string) Selection {
@@ -357,13 +357,13 @@ func (s Selection) Children(def ...string) Selection {
 }
 
 func (s Selection) Each(v sobek.Value) Selection {
-	gojaFn, isFn := sobek.AssertFunction(v)
+	sobekFn, isFn := sobek.AssertFunction(v)
 	if !isFn {
 		common.Throw(s.rt, errors.New("the argument to each() must be a function"))
 	}
 
 	fn := func(idx int, _ *goquery.Selection) {
-		if _, err := gojaFn(v, s.rt.ToValue(idx), selToElement(Selection{s.rt, s.sel.Eq(idx), s.URL})); err != nil {
+		if _, err := sobekFn(v, s.rt.ToValue(idx), selToElement(Selection{s.rt, s.sel.Eq(idx), s.URL})); err != nil {
 			common.Throw(s.rt, fmt.Errorf("the function passed to each() failed: %w", err))
 		}
 	}
@@ -380,12 +380,12 @@ func (s Selection) Filter(v sobek.Value) Selection {
 		return Selection{s.rt, s.sel.FilterSelection(val.sel), s.URL}
 	}
 
-	gojaFn, isFn := sobek.AssertFunction(v)
+	sobekFn, isFn := sobek.AssertFunction(v)
 	if !isFn {
 		common.Throw(s.rt, errors.New("the argument to filter() must be a function, a selector or a selection"))
 	}
 
-	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, gojaFn)), s.URL}
+	return Selection{s.rt, s.sel.FilterFunction(s.buildMatcher(v, sobekFn)), s.URL}
 }
 
 func (s Selection) Is(v sobek.Value) bool {
@@ -397,18 +397,18 @@ func (s Selection) Is(v sobek.Value) bool {
 		return s.sel.IsSelection(val.sel)
 
 	default:
-		gojaFn, isFn := sobek.AssertFunction(v)
+		sobekFn, isFn := sobek.AssertFunction(v)
 		if !isFn {
 			common.Throw(s.rt, errors.New("the argument to is() must be a function, a selector or a selection"))
 		}
 
-		return s.sel.IsFunction(s.buildMatcher(v, gojaFn))
+		return s.sel.IsFunction(s.buildMatcher(v, sobekFn))
 	}
 }
 
 // Map implements ES5 Array.prototype.map
 func (s Selection) Map(v sobek.Value) []sobek.Value {
-	gojaFn, isFn := sobek.AssertFunction(v)
+	sobekFn, isFn := sobek.AssertFunction(v)
 	if !isFn {
 		common.Throw(s.rt, errors.New("the argument to map() must be a function"))
 	}
@@ -417,7 +417,7 @@ func (s Selection) Map(v sobek.Value) []sobek.Value {
 	s.sel.Each(func(idx int, sel *goquery.Selection) {
 		selection := &Selection{sel: sel, URL: s.URL, rt: s.rt}
 
-		if fnRes, fnErr := gojaFn(v, s.rt.ToValue(idx), s.rt.ToValue(selection)); fnErr == nil {
+		if fnRes, fnErr := sobekFn(v, s.rt.ToValue(idx), s.rt.ToValue(selection)); fnErr == nil {
 			values = append(values, fnRes)
 		}
 	})

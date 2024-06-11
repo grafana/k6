@@ -20,7 +20,7 @@ var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jar
 // CookieJar is cookiejar.Jar wrapper to be used in js scripts
 type CookieJar struct {
 	moduleInstance *ModuleInstance
-	// js is to make it not be accessible from inside goja/js, the json is
+	// js is to make it not be accessible from inside Sobek/js, the json is
 	// for when it is returned from setup().
 	Jar *cookiejar.Jar `js:"-" json:"-"`
 }

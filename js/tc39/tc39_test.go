@@ -60,7 +60,7 @@ var (
 		"top-level-await",             // not supported at all
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
 
-		// from goja
+		// from Sobek
 		"Symbol.asyncIterator",
 		"regexp-named-groups",
 		"regexp-dotall",

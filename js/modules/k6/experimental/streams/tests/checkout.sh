@@ -13,7 +13,7 @@ git sparse-checkout set resources streams
 git fetch origin --depth=1 "${sha}"
 git checkout ${sha}
 
-# Apply custom patches needed to run the tests in k6/goja
+# Apply custom patches needed to run the tests in k6/Sobek
 for patch in ../*.patch
 do
     git apply "$patch"

@@ -566,12 +566,12 @@ func (r *Runner) runPart(
 }
 
 //nolint:gochecknoglobals
-var gojaPromiseType = reflect.TypeOf((*sobek.Promise)(nil))
+var sobekPromiseType = reflect.TypeOf((*sobek.Promise)(nil))
 
 // unPromisify gets the result of v if it is a promise, otherwise returns v
 func unPromisify(v sobek.Value) sobek.Value {
 	if !common.IsNullish(v) {
-		if v.ExportType() == gojaPromiseType {
+		if v.ExportType() == sobekPromiseType {
 			p, ok := v.Export().(*sobek.Promise)
 			if !ok {
 				panic("Something that was promise did not export to a promise; this shouldn't happen")
@@ -757,7 +757,7 @@ func (u *ActiveVU) RunOnce() error {
 
 	u.incrIteration()
 	if err := u.Runtime.Set("__ITER", u.iteration); err != nil {
-		panic(fmt.Errorf("error setting __ITER in goja runtime: %w", err))
+		panic(fmt.Errorf("error setting __ITER in Sobek runtime: %w", err))
 	}
 
 	ctx, cancel := context.WithCancel(u.RunContext)

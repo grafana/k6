@@ -111,11 +111,11 @@ func (s *sharedArrays) get(rt *sobek.Runtime, name string, call sobek.Callable) 
 }
 
 func getShareArrayFromCall(rt *sobek.Runtime, call sobek.Callable) sharedArray {
-	gojaValue, err := call(sobek.Undefined())
+	sobekValue, err := call(sobek.Undefined())
 	if err != nil {
 		common.Throw(rt, err)
 	}
-	obj := gojaValue.ToObject(rt)
+	obj := sobekValue.ToObject(rt)
 	if obj.ClassName() != "Array" {
 		common.Throw(rt, errors.New("only arrays can be made into SharedArray")) // TODO better error
 	}
