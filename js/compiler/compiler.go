@@ -210,7 +210,7 @@ func (c *Compiler) compileImpl(
 	code := src
 
 	if i := strings.Index(code, "__decorate(["); i != -1 {
-		code = c.decorate(code, i)
+		code = c.decorate(code, 0)
 	}
 
 	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
@@ -268,110 +268,17 @@ func (c *Compiler) compileImpl(
 //	@param start
 //	@return string
 func (c *Compiler) decorate(code string, start int) string {
-	deco := newClassDecorate(code, 0)
-	for deco.endIndex > -1 {
-		deco = newClassDecorate(deco.code, deco.endIndex+1)
-	}
-	return deco.Code()
-}
-
-type classDecorate struct {
-	className string
-	code      string
-	endIndex  int
-}
-
-// decorate
-//
-//	@Description: 更改源码，调整修饰器代码位置
-//	@receiver c
-//	@param code
-//	@param start
-//	@return string
-func newClassDecorate(jsCode string, startIndex int) *classDecorate {
-	// lxd
-	this := &classDecorate{code: jsCode, endIndex: -1}
-	if startIndex >= len(jsCode) {
-		return this
-	}
-	headCode := ""
-	code := jsCode
-	if startIndex > 0 {
-		headCode = jsCode[:startIndex]
-		code = jsCode[startIndex:]
-	}
-
-	// 1. find the class name
-	i := strings.Index(code, " = /** @class */ (function () {")
-	if i == -1 {
-		i = strings.Index(code, " = /** @class */function () {")
-		if i == -1 {
-			return this
+	for {
+		deco, ok := newClassCode(code, start)
+		if !ok {
+			break
 		}
-
+		deco.replace()
+		code = code[:deco.start] + deco.code + code[deco.end:]
+		start = deco.start + len(deco.code)
+		//fmt.Println(code)
 	}
-	n := strings.LastIndex(code[0:i], "var ")
-	if n == -1 {
-		return this
-	}
-	className := code[n+len("var ") : i]
-	this.className = className
-	hasClass := false
-	start := strings.Index(code, fmt.Sprintf("%s = __decorate([", className))
-	classEnd := 0
-	if start > -1 {
-		endStr := fmt.Sprintf(`], %s);`, className)
-		end := strings.Index(code, endStr)
-
-		if end > -1 {
-			end = end + len(endStr)
-			newCode := code[start:end]
-			newCode = strings.ReplaceAll(newCode, fmt.Sprintf("%s = ", className), "")
-			newCode = strings.ReplaceAll(newCode, fmt.Sprintf("], %s);", className), "], this);")
-			code = code[0:start] + newCode + "\n    }\n" + code[end:]
-			this.endIndex = end
-			hasClass = true
-			classEnd = end
-		}
-	}
-
-	// 2. find the method decorator
-	methodEnd := 0
-	start = strings.Index(code, "__decorate([")
-	if start > -1 {
-		endChar := ", void 0);"
-		end := strings.LastIndex(code, endChar)
-		if end > -1 {
-			end = end + len(endChar)
-			decorate := code[start:end]
-			if className != "" {
-				decorate = strings.ReplaceAll(decorate, className+".prototype", "this")
-				st := -1
-				for i := start; i >= 0; i-- {
-					if code[i] == '}' {
-						st = i
-						break
-					}
-				}
-				decorate = "\n     // lxd \n    " + decorate + "\n"
-				if !hasClass {
-					decorate += "}"
-				}
-				code = code[:st] + decorate + code[end:]
-				methodEnd = end
-			}
-		}
-	}
-	this.endIndex = classEnd
-	if classEnd < methodEnd {
-		this.endIndex = methodEnd
-	}
-	this.code = headCode + code
-	return this
-}
-
-func (d *classDecorate) Code() string {
-	return d.code
+	return code
 }
 
 type babel struct {
