@@ -49,7 +49,7 @@ func TestJSHandleEvaluate(t *testing.T) {
 			require.NotNil(t, result)
 
 			got, err := result.Evaluate(tt.pageFunc, tt.args...)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, got)
 		})
 	}
@@ -98,11 +98,11 @@ func TestJSHandleEvaluateHandle(t *testing.T) {
 			require.NotNil(t, result)
 
 			got, err := result.EvaluateHandle(tt.pageFunc, tt.args...)
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.NotNil(t, got)
 
 			j, err := got.JSONValue()
-			assert.NoError(t, err)
+			require.NoError(t, err)
 			assert.Equal(t, tt.expected, j)
 		})
 	}
