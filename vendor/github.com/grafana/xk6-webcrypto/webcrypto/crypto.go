@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/dop251/goja"
 	"github.com/google/uuid"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -35,7 +35,7 @@ type Crypto struct {
 // generator.
 //
 // [specification]: https://www.w3.org/TR/WebCryptoAPI/#Crypto-method-getRandomValues
-func (c *Crypto) GetRandomValues(typedArray goja.Value) goja.Value {
+func (c *Crypto) GetRandomValues(typedArray sobek.Value) sobek.Value {
 	acceptedTypes := []JSType{
 		Int8ArrayConstructor,
 		Uint8ArrayConstructor,

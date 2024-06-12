@@ -7,6 +7,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"io"
+	"math"
 	"net/http"
 	"net/url"
 	"time"
@@ -117,7 +118,7 @@ func newWriteRequestBody(series []*prompb.TimeSeries) ([]byte, error) {
 	}
 	if snappy.MaxEncodedLen(len(b)) < 0 {
 		return nil, fmt.Errorf("the protobuf message is too large to be handled by Snappy encoder; "+
-			"size: %d, limit: %d", len(b), 0xffffffff)
+			"size: %d, limit: %d", len(b), math.MaxUint32)
 	}
 	return snappy.Encode(nil, b), nil
 }

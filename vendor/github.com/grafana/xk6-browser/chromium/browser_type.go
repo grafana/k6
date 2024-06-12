@@ -36,7 +36,7 @@ type BrowserType struct {
 }
 
 // NewBrowserType registers our custom k6 metrics, creates method mappings on
-// the goja runtime, and returns a new Chrome browser type.
+// the sobek runtime, and returns a new Chrome browser type.
 func NewBrowserType(vu k6modules.VU) *BrowserType {
 	// NOTE: vu.InitEnv() *must* be called from the script init scope,
 	// otherwise it will return nil.

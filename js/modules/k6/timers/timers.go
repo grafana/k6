@@ -2,12 +2,14 @@
 package timers
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"github.com/sirupsen/logrus"
 
 	"github.com/grafana/sobek"
+	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
 
@@ -126,6 +128,15 @@ func (e *Timers) timerInitialization(
 		timeout = 0
 	}
 
+	name := setTimeoutName
+	if repeat {
+		name = setIntervalName
+	}
+
+	if callback == nil {
+		common.Throw(e.vu.Runtime(), fmt.Errorf("%s's callback isn't a callable function", name))
+	}
+
 	task := func() error {
 		// Specification 8.1: If id does not exist in global's map of active timers, then abort these steps.
 		if _, exist := e.timers[id]; !exist {
@@ -145,11 +156,6 @@ func (e *Timers) timerInitialization(
 		}
 
 		return err
-	}
-
-	name := setTimeoutName
-	if repeat {
-		name = setIntervalName
 	}
 
 	e.runAfterTimeout(&timer{

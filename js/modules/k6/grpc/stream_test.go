@@ -14,6 +14,7 @@ import (
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
 	"google.golang.org/grpc/status"
@@ -362,4 +363,46 @@ func TestStream_Wrappers(t *testing.T) {
 		"Result: Hey John",
 	},
 	)
+}
+
+func TestStream_UndefinedHandler(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	stub := grpc_wrappers_testing.Register(ts.httpBin.ServerGRPC)
+	stub.TestStreamImplementation = func(stream grpc_wrappers_testing.Service_TestStreamServer) error {
+		return stream.SendAndClose(&wrappers.StringValue{
+			Value: "test",
+		})
+	}
+
+	replace := func(code string) (sobek.Value, error) {
+		return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
+	}
+
+	initString := codeBlock{
+		code: `
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/httpmultibin/grpc_wrappers_testing/test.proto");`,
+	}
+	vuString := codeBlock{
+		code: `
+		client.connect("GRPCBIN_ADDR");
+		let stream = new grpc.Stream(client, "grpc.wrappers.testing.Service/TestStream");
+		stream.on('data', undefined);
+
+		stream.end();
+		`,
+	}
+
+	val, err := replace(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	_, err = replace(vuString.code)
+	ts.EventLoop.WaitOnRegistered()
+
+	require.ErrorContains(t, err, "handler for \"data\" event isn't a callable function")
 }

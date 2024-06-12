@@ -173,10 +173,10 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grafana/sobek v0.0.0-20240606091932-2da0e9e5f3e7
+# github.com/grafana/sobek v0.0.0-20240607083612-4f0cd64f4e78
 ## explicit; go 1.20
 github.com/grafana/sobek
-# github.com/grafana/xk6-browser v1.5.1
+# github.com/grafana/xk6-browser v1.5.2-0.20240607140836-ffcc1f5169ad
 ## explicit; go 1.20
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium
@@ -189,22 +189,22 @@ github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
 github.com/grafana/xk6-browser/trace
-# github.com/grafana/xk6-dashboard v0.7.3
-## explicit; go 1.19
+# github.com/grafana/xk6-dashboard v0.7.4
+## explicit; go 1.20
 github.com/grafana/xk6-dashboard/dashboard
-# github.com/grafana/xk6-output-prometheus-remote v0.3.1
-## explicit; go 1.18
+# github.com/grafana/xk6-output-prometheus-remote v0.4.0
+## explicit; go 1.20
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
 github.com/grafana/xk6-output-prometheus-remote/pkg/stale
-# github.com/grafana/xk6-redis v0.2.0
-## explicit; go 1.19
+# github.com/grafana/xk6-redis v0.3.0
+## explicit; go 1.20
 github.com/grafana/xk6-redis/redis
-# github.com/grafana/xk6-webcrypto v0.3.0
-## explicit; go 1.19
+# github.com/grafana/xk6-webcrypto v0.4.0
+## explicit; go 1.20
 github.com/grafana/xk6-webcrypto/webcrypto
-# github.com/grafana/xk6-websockets v0.4.0
-## explicit; go 1.18
+# github.com/grafana/xk6-websockets v0.5.1
+## explicit; go 1.20
 github.com/grafana/xk6-websockets/websockets
 github.com/grafana/xk6-websockets/websockets/events
 # github.com/grpc-ecosystem/go-grpc-middleware v1.4.0

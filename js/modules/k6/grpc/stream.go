@@ -293,9 +293,13 @@ func (s *stream) processSendError(err error) {
 	})
 }
 
-// on registers a listener for a certain event type
-func (s *stream) on(event string, listener func(sobek.Value) (sobek.Value, error)) {
-	if err := s.eventListeners.add(event, listener); err != nil {
+// on registers a handler for a certain event type
+func (s *stream) on(event string, handler func(sobek.Value) (sobek.Value, error)) {
+	if handler == nil {
+		common.Throw(s.vu.Runtime(), fmt.Errorf("handler for %q event isn't a callable function", event))
+	}
+
+	if err := s.eventListeners.add(event, handler); err != nil {
 		s.vu.State().Logger.Warnf("can't register %s event handler: %s", event, err)
 	}
 }
