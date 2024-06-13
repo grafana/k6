@@ -304,7 +304,15 @@ func parseArgs(flags map[string]any) ([]string, error) {
 	for name, value := range flags {
 		switch value := value.(type) {
 		case string:
-			args = append(args, fmt.Sprintf("--%s=%s", name, value))
+			var arg string
+			if strings.TrimSpace(value) != "" {
+				arg = fmt.Sprintf("--%s=%s", name, value)
+			} else {
+				// If the value is empty, we don't include it in the args list.
+				// Otherwise, it will produce "--name=" which is invalid.
+				arg = fmt.Sprintf("--%s", name)
+			}
+			args = append(args, arg)
 		case bool:
 			if value {
 				args = append(args, fmt.Sprintf("--%s", name))
