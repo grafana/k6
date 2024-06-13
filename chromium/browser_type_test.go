@@ -4,6 +4,7 @@ import (
 	"io/fs"
 	"net"
 	"path/filepath"
+	"sort"
 	"testing"
 
 	"github.com/grafana/xk6-browser/common"
@@ -248,6 +249,89 @@ func TestExecutablePath(t *testing.T) {
 				return
 			}
 			assert.NoError(t, err)
+		})
+	}
+}
+
+func TestParseArgs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name  string
+		flags map[string]any
+		want  []string
+	}{
+		{
+			name: "string_flag_with_value",
+			flags: map[string]any{
+				"flag1": "value1",
+				"flag2": "value2",
+			},
+			want: []string{
+				"--flag1=value1",
+				"--flag2=value2",
+				"--remote-debugging-port=0",
+			},
+		},
+		{
+			name: "string_flag_with_empty_value",
+			flags: map[string]any{
+				"flag1": "",
+				"flag2": "value2",
+			},
+			want: []string{
+				"--flag1",
+				"--flag2=value2",
+				"--remote-debugging-port=0",
+			},
+		},
+		{
+			name: "bool_flag_true",
+			flags: map[string]any{
+				"flag1": true,
+				"flag2": true,
+			},
+			want: []string{
+				"--flag1",
+				"--flag2",
+				"--remote-debugging-port=0",
+			},
+		},
+		{
+			name: "bool_flag_false",
+			flags: map[string]any{
+				"flag1": false,
+				"flag2": true,
+			},
+			want: []string{
+				"--flag2",
+				"--remote-debugging-port=0",
+			},
+		},
+		{
+			name: "invalid_flag_type",
+			flags: map[string]any{
+				"flag1": 123,
+			},
+			want: nil,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			got, err := parseArgs(tt.flags)
+
+			if tt.want == nil {
+				assert.Error(t, err)
+				return
+			}
+			require.NoError(t, err)
+			sort.StringSlice(tt.want).Sort()
+			sort.StringSlice(got).Sort()
+			assert.Equal(t, tt.want, got)
 		})
 	}
 }
