@@ -1,12 +1,14 @@
 package opentelemetry
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"time"
 
+	"github.com/mstoykov/envconfig"
 	k6Const "go.k6.io/k6/lib/consts"
-	"go.k6.io/k6/output"
+	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -17,147 +19,166 @@ const (
 	httpExporterType = "http"
 )
 
-// Config is the config for the template collector
+// Config represents the configuration for the OpenTelemetry output
 type Config struct {
 	// ServiceName is the name of the service to use for the metrics
 	// export, if not set it will use "k6"
-	ServiceName string
+	ServiceName null.String `json:"serviceName" envconfig:"K6_OTEL_SERVICE_NAME"`
 	// ServiceVersion is the version of the service to use for the metrics
 	// export, if not set it will use k6's library version
-	ServiceVersion string
+	ServiceVersion null.String `json:"serviceVersion" envconfig:"K6_OTEL_SERVICE_VERSION"`
 	// MetricPrefix is the prefix to use for the metrics
-	MetricPrefix string
+	MetricPrefix null.String `json:"metricPrefix" envconfig:"K6_OTEL_METRIC_PREFIX"`
 	// FlushInterval is the interval at which to flush metrics from the k6
-	FlushInterval time.Duration
+	FlushInterval types.NullDuration `json:"flushInterval" envconfig:"K6_OTEL_FLUSH_INTERVAL"`
 
 	// ExporterType sets the type of OpenTelemetry Exporter to use
-	ExporterType string
+	ExporterType null.String `json:"exporterType" envconfig:"K6_OTEL_EXPORTER_TYPE"`
 	// ExportInterval configures the intervening time between metrics exports
-	ExportInterval time.Duration
+	ExportInterval types.NullDuration `json:"exportInterval" envconfig:"K6_OTEL_EXPORT_INTERVAL"`
 
 	// HTTPExporterInsecure disables client transport security for the Exporter's HTTP
 	// connection.
-	HTTPExporterInsecure null.Bool
+	HTTPExporterInsecure null.Bool `json:"httpExporterInsecure" envconfig:"K6_OTEL_HTTP_EXPORTER_INSECURE"`
 	// HTTPExporterEndpoint sets the target endpoint the OpenTelemetry Exporter
 	// will connect to.
-	HTTPExporterEndpoint string
+	HTTPExporterEndpoint null.String `json:"httpExporterEndpoint" envconfig:"K6_OTEL_HTTP_EXPORTER_ENDPOINT"`
 	// HTTPExporterURLPath sets the target URL path the OpenTelemetry Exporter
-	HTTPExporterURLPath string
+	HTTPExporterURLPath null.String `json:"httpExporterURLPath" envconfig:"K6_OTEL_HTTP_EXPORTER_URL_PATH"`
 
 	// GRPCExporterEndpoint sets the target endpoint the OpenTelemetry Exporter
 	// will connect to.
-	GRPCExporterEndpoint string
+	GRPCExporterEndpoint null.String `json:"grpcExporterEndpoint" envconfig:"K6_OTEL_GRPC_EXPORTER_ENDPOINT"`
 	// GRPCExporterInsecure disables client transport security for the Exporter's gRPC
 	// connection.
-	GRPCExporterInsecure null.Bool
+	GRPCExporterInsecure null.Bool `json:"grpcExporterInsecure" envconfig:"K6_OTEL_GRPC_EXPORTER_INSECURE"`
 }
 
-// NewConfig creates and validates a new config
-func NewConfig(p output.Params) (Config, error) {
-	cfg := Config{
-		ServiceName:    "k6",
-		ServiceVersion: k6Const.Version,
-		MetricPrefix:   "",
-		ExporterType:   grpcExporterType,
-
-		HTTPExporterInsecure: null.BoolFrom(false),
-		HTTPExporterEndpoint: "localhost:4318",
-		HTTPExporterURLPath:  "/v1/metrics",
-
-		GRPCExporterInsecure: null.BoolFrom(false),
-		GRPCExporterEndpoint: "localhost:4317",
-
-		ExportInterval: 1 * time.Second,
-		FlushInterval:  1 * time.Second,
-	}
-
-	var err error
-	for k, v := range p.Environment {
-		switch k {
-		case "K6_OTEL_SERVICE_NAME":
-			cfg.ServiceName = v
-		case "K6_OTEL_SERVICE_VERSION":
-			cfg.ServiceVersion = v
-		case "K6_OTEL_METRIC_PREFIX":
-			cfg.MetricPrefix = v
-		case "K6_OTEL_EXPORT_INTERVAL":
-			cfg.ExportInterval, err = time.ParseDuration(v)
-			if err != nil {
-				return cfg, fmt.Errorf("error parsing environment variable 'K6_OTEL_EXPORT_INTERVAL': %w", err)
-			}
-		case "K6_OTEL_FLUSH_INTERVAL":
-			cfg.FlushInterval, err = time.ParseDuration(v)
-			if err != nil {
-				return cfg, fmt.Errorf("error parsing environment variable 'K6_OTEL_FLUSH_INTERVAL': %w", err)
-			}
-		case "K6_OTEL_EXPORTER_TYPE":
-			cfg.ExporterType = v
-		case "K6_OTEL_GRPC_EXPORTER_ENDPOINT":
-			cfg.GRPCExporterEndpoint = v
-		case "K6_OTEL_HTTP_EXPORTER_ENDPOINT":
-			cfg.HTTPExporterEndpoint = v
-		case "K6_OTEL_HTTP_EXPORTER_URL_PATH":
-			cfg.HTTPExporterURLPath = v
-		case "K6_OTEL_HTTP_EXPORTER_INSECURE":
-			cfg.HTTPExporterInsecure, err = parseBool(k, v)
-			if err != nil {
-				return cfg, err
-			}
-		case "K6_OTEL_GRPC_EXPORTER_INSECURE":
-			cfg.GRPCExporterInsecure, err = parseBool(k, v)
-			if err != nil {
-				return cfg, err
-			}
+// GetConsolidatedConfig combines the options' values from the different sources
+// and returns the merged options. The Order of precedence used is documented
+// in the k6 Documentation https://grafana.com/docs/k6/latest/using-k6/k6-options/how-to/#order-of-precedence.
+func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (Config, error) {
+	cfg := newDefaultConfig()
+	if jsonRawConf != nil {
+		jsonConf, err := parseJSON(jsonRawConf)
+		if err != nil {
+			return cfg, fmt.Errorf("parse JSON options failed: %w", err)
 		}
+		cfg = cfg.Apply(jsonConf)
 	}
 
-	// TDOO: consolidated config
+	if len(env) > 0 {
+		envConf, err := parseEnvs(env)
+		if err != nil {
+			return cfg, fmt.Errorf("parse environment variables options failed: %w", err)
+		}
+		cfg = cfg.Apply(envConf)
+	}
 
-	if err = cfg.Validate(); err != nil {
+	if err := cfg.Validate(); err != nil {
 		return cfg, fmt.Errorf("error validating OpenTelemetry output config: %w", err)
 	}
 
 	return cfg, nil
 }
 
-func parseBool(k, v string) (null.Bool, error) {
-	bv := null.NewBool(false, false)
+// newDefaultConfig creates a new default config with default values
+func newDefaultConfig() Config {
+	return Config{
+		ServiceName:    null.StringFrom("k6"),
+		ServiceVersion: null.StringFrom(k6Const.Version),
+		ExporterType:   null.StringFrom(grpcExporterType),
 
-	err := bv.UnmarshalText([]byte(v))
-	if err != nil {
-		return bv, fmt.Errorf("error parsing %q environment variable: %w", k, err)
+		HTTPExporterInsecure: null.BoolFrom(false),
+		HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
+		HTTPExporterURLPath:  null.StringFrom("/v1/metrics"),
+
+		GRPCExporterInsecure: null.BoolFrom(false),
+		GRPCExporterEndpoint: null.StringFrom("localhost:4317"),
+
+		ExportInterval: types.NullDurationFrom(1 * time.Second),
+		FlushInterval:  types.NullDurationFrom(1 * time.Second),
+	}
+}
+
+// Apply applies the new config to the existing one
+func (cfg Config) Apply(v Config) Config {
+	if v.ServiceName.Valid {
+		cfg.ServiceName = v.ServiceName
 	}
 
-	return bv, nil
+	if v.ServiceVersion.Valid {
+		cfg.ServiceVersion = v.ServiceVersion
+	}
+
+	if v.MetricPrefix.Valid {
+		cfg.MetricPrefix = v.MetricPrefix
+	}
+
+	if v.FlushInterval.Valid {
+		cfg.FlushInterval = v.FlushInterval
+	}
+
+	if v.ExporterType.Valid {
+		cfg.ExporterType = v.ExporterType
+	}
+
+	if v.ExportInterval.Valid {
+		cfg.ExportInterval = v.ExportInterval
+	}
+
+	if v.HTTPExporterInsecure.Valid {
+		cfg.HTTPExporterInsecure = v.HTTPExporterInsecure
+	}
+
+	if v.HTTPExporterEndpoint.Valid {
+		cfg.HTTPExporterEndpoint = v.HTTPExporterEndpoint
+	}
+
+	if v.HTTPExporterURLPath.Valid {
+		cfg.HTTPExporterURLPath = v.HTTPExporterURLPath
+	}
+
+	if v.GRPCExporterEndpoint.Valid {
+		cfg.GRPCExporterEndpoint = v.GRPCExporterEndpoint
+	}
+
+	if v.GRPCExporterInsecure.Valid {
+		cfg.GRPCExporterInsecure = v.GRPCExporterInsecure
+	}
+
+	return cfg
 }
 
 // Validate validates the config
-func (c Config) Validate() error {
-	if c.ServiceName == "" {
+func (cfg Config) Validate() error {
+	if cfg.ServiceName.String == "" {
 		return errors.New("providing service name is required")
 	}
 
-	if c.ServiceVersion == "" {
+	// TODO: it's not actually required, but we should probably have a default
+	// check if it works without it
+	if cfg.ServiceVersion.String == "" {
 		return errors.New("providing service version is required")
 	}
 
-	if c.ExporterType != grpcExporterType && c.ExporterType != httpExporterType {
+	if cfg.ExporterType.String != grpcExporterType && cfg.ExporterType.String != httpExporterType {
 		return fmt.Errorf(
 			"unsupported exporter type %q, currently only %q and %q are supported",
-			c.ExporterType,
+			cfg.ExporterType.String,
 			grpcExporterType,
 			httpExporterType,
 		)
 	}
 
-	if c.ExporterType == grpcExporterType {
-		if c.GRPCExporterEndpoint == "" {
+	if cfg.ExporterType.String == grpcExporterType {
+		if cfg.GRPCExporterEndpoint.String == "" {
 			return errors.New("gRPC exporter endpoint is required")
 		}
 	}
 
-	if c.ExporterType == httpExporterType {
-		if c.HTTPExporterEndpoint == "" {
+	if cfg.ExporterType.String == httpExporterType {
+		if cfg.HTTPExporterEndpoint.String == "" {
 			return errors.New("HTTP exporter endpoint is required")
 		}
 	}
@@ -166,24 +187,43 @@ func (c Config) Validate() error {
 }
 
 // String returns a string representation of the config
-func (c Config) String() string {
+func (cfg Config) String() string {
 	var endpoint string
-	exporter := c.ExporterType
+	exporter := cfg.ExporterType.String
 
-	if c.ExporterType == httpExporterType {
+	if cfg.ExporterType.String == httpExporterType {
 		endpoint = "http"
-		if !c.HTTPExporterInsecure.Bool {
+		if !cfg.HTTPExporterInsecure.Bool {
 			endpoint += "s"
 		}
 
-		endpoint += "://" + c.HTTPExporterEndpoint + c.HTTPExporterURLPath
+		endpoint += "://" + cfg.HTTPExporterEndpoint.String + cfg.HTTPExporterURLPath.String
 	} else {
-		endpoint = c.GRPCExporterEndpoint
+		endpoint = cfg.GRPCExporterEndpoint.String
 
-		if c.GRPCExporterInsecure.Bool {
+		if cfg.GRPCExporterInsecure.Bool {
 			exporter += " (insecure)"
 		}
 	}
 
 	return fmt.Sprintf("%s, %s", exporter, endpoint)
+}
+
+// parseJSON parses the supplied JSON into a Config.
+func parseJSON(data json.RawMessage) (Config, error) {
+	var c Config
+	err := json.Unmarshal(data, &c)
+	return c, err
+}
+
+// parseEnvs parses the supplied environment variables into a Config.
+func parseEnvs(env map[string]string) (Config, error) {
+	cfg := Config{}
+
+	err := envconfig.Process("", &cfg, func(key string) (string, bool) {
+		v, ok := env[key]
+		return v, ok
+	})
+
+	return cfg, err
 }

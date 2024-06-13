@@ -32,7 +32,7 @@ var _ output.WithStopWithTestError = new(Output)
 
 // New creates an instance of the collector
 func New(p output.Params) (*Output, error) {
-	conf, err := NewConfig(p)
+	conf, err := GetConsolidatedConfig(p.JSONConfig, p.Environment)
 	if err != nil {
 		return nil, err
 	}
@@ -78,8 +78,8 @@ func (o *Output) Start() error {
 
 	res, err := resource.Merge(resource.Default(),
 		resource.NewWithAttributes(semconv.SchemaURL,
-			semconv.ServiceName(o.config.ServiceName),
-			semconv.ServiceVersion(o.config.ServiceVersion),
+			semconv.ServiceName(o.config.ServiceName.String),
+			semconv.ServiceVersion(o.config.ServiceVersion.String),
 		))
 	if err != nil {
 		return fmt.Errorf("failed to create OpenTelemetry resource: %w", err)
@@ -90,12 +90,12 @@ func (o *Output) Start() error {
 		metric.WithReader(
 			metric.NewPeriodicReader(
 				exp,
-				metric.WithInterval(o.config.ExportInterval),
+				metric.WithInterval(o.config.ExportInterval.TimeDuration()),
 			),
 		),
 	)
 
-	pf, err := output.NewPeriodicFlusher(o.config.FlushInterval, o.flushMetrics)
+	pf, err := output.NewPeriodicFlusher(o.config.FlushInterval.TimeDuration(), o.flushMetrics)
 	if err != nil {
 		return err
 	}
@@ -188,5 +188,5 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 }
 
 func normalizeMetricName(cfg Config, name string) string {
-	return cfg.MetricPrefix + name
+	return cfg.MetricPrefix.String + name
 }
