@@ -304,15 +304,7 @@ func parseArgs(flags map[string]any) ([]string, error) {
 	for name, value := range flags {
 		switch value := value.(type) {
 		case string:
-			var arg string
-			if strings.TrimSpace(value) != "" {
-				arg = fmt.Sprintf("--%s=%s", name, value)
-			} else {
-				// If the value is empty, we don't include it in the args list.
-				// Otherwise, it will produce "--name=" which is invalid.
-				arg = fmt.Sprintf("--%s", name)
-			}
-			args = append(args, arg)
+			args = append(args, parseStringArg(name, value))
 		case bool:
 			if value {
 				args = append(args, fmt.Sprintf("--%s", name))
@@ -330,6 +322,15 @@ func parseArgs(flags map[string]any) ([]string, error) {
 	// args = append(args, common.BlankPage)
 	// args = append(args, "--no-startup-window")
 	return args, nil
+}
+
+func parseStringArg(flag string, value string) string {
+	if strings.TrimSpace(value) == "" {
+		// If the value is empty, we don't include it in the args list.
+		// Otherwise, it will produce "--name=" which is invalid.
+		return fmt.Sprintf("--%s", flag)
+	}
+	return fmt.Sprintf("--%s=%s", flag, value)
 }
 
 func prepareFlags(lopts *common.BrowserOptions, k6opts *k6lib.Options) (map[string]any, error) {
