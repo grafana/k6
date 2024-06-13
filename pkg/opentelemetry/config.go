@@ -7,6 +7,8 @@ import (
 	"time"
 
 	"github.com/mstoykov/envconfig"
+	"go.k6.io/k6/errext"
+	"go.k6.io/k6/errext/exitcodes"
 	k6Const "go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/types"
 	"gopkg.in/guregu/null.v3"
@@ -76,7 +78,11 @@ func GetConsolidatedConfig(jsonRawConf json.RawMessage, env map[string]string) (
 	}
 
 	if err := cfg.Validate(); err != nil {
-		return cfg, fmt.Errorf("error validating OpenTelemetry output config: %w", err)
+		// TODO: check why k6's still exiting with 255
+		return cfg, errext.WithExitCodeIfNone(
+			fmt.Errorf("error validating OpenTelemetry output config: %w", err),
+			exitcodes.InvalidConfig,
+		)
 	}
 
 	return cfg, nil
@@ -220,7 +226,7 @@ func parseJSON(data json.RawMessage) (Config, error) {
 func parseEnvs(env map[string]string) (Config, error) {
 	cfg := Config{}
 
-	err := envconfig.Process("", &cfg, func(key string) (string, bool) {
+	err := envconfig.Process("K6_OTEL_", &cfg, func(key string) (string, bool) {
 		v, ok := env[key]
 		return v, ok
 	})
