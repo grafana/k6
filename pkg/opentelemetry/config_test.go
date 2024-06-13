@@ -36,7 +36,7 @@ func TestConfig(t *testing.T) {
 			},
 		},
 
-		"environment success overwrite": {
+		"environment success merge": {
 			env: map[string]string{"K6_OTEL_GRPC_EXPORTER_ENDPOINT": "else", "K6_OTEL_EXPORT_INTERVAL": "4ms"},
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
@@ -52,7 +52,63 @@ func TestConfig(t *testing.T) {
 			},
 		},
 
-		"JSON success overwrite": {
+		"environment complete overwrite": {
+			env: map[string]string{
+				"K6_OTEL_SERVICE_NAME":           "foo",
+				"K6_OTEL_SERVICE_VERSION":        "v0.0.99",
+				"K6_OTEL_EXPORTER_TYPE":          "http",
+				"K6_OTEL_EXPORT_INTERVAL":        "4ms",
+				"K6_OTEL_HTTP_EXPORTER_INSECURE": "true",
+				"K6_OTEL_HTTP_EXPORTER_ENDPOINT": "localhost:5555",
+				"K6_OTEL_HTTP_EXPORTER_URL_PATH": "/foo/bar",
+				"K6_OTEL_GRPC_EXPORTER_INSECURE": "true",
+				"K6_OTEL_GRPC_EXPORTER_ENDPOINT": "else",
+				"K6_OTEL_FLUSH_INTERVAL":         "13s",
+			},
+			expectedConfig: Config{
+				ServiceName:          null.StringFrom("foo"),
+				ServiceVersion:       null.StringFrom("v0.0.99"),
+				ExporterType:         null.StringFrom(httpExporterType),
+				ExportInterval:       types.NullDurationFrom(4 * time.Millisecond),
+				HTTPExporterInsecure: null.NewBool(true, true),
+				HTTPExporterEndpoint: null.StringFrom("localhost:5555"),
+				HTTPExporterURLPath:  null.StringFrom("/foo/bar"),
+				GRPCExporterInsecure: null.NewBool(true, true),
+				GRPCExporterEndpoint: null.StringFrom("else"),
+				FlushInterval:        types.NullDurationFrom(13 * time.Second),
+			},
+		},
+
+		"JSON complete overwrite": {
+			jsonRaw: json.RawMessage(
+				`{` +
+					`"serviceName":"bar",` +
+					`"serviceVersion":"v2.0.99",` +
+					`"exporterType":"http",` +
+					`"exportInterval":"15ms",` +
+					`"httpExporterInsecure":true,` +
+					`"httpExporterEndpoint":"localhost:5555",` +
+					`"httpExporterURLPath":"/foo/bar",` +
+					`"grpcExporterInsecure":true,` +
+					`"grpcExporterEndpoint":"else",` +
+					`"flushInterval":"13s"` +
+					`}`,
+			),
+			expectedConfig: Config{
+				ServiceName:          null.StringFrom("bar"),
+				ServiceVersion:       null.StringFrom("v2.0.99"),
+				ExporterType:         null.StringFrom(httpExporterType),
+				ExportInterval:       types.NullDurationFrom(15 * time.Millisecond),
+				HTTPExporterInsecure: null.NewBool(true, true),
+				HTTPExporterEndpoint: null.StringFrom("localhost:5555"),
+				HTTPExporterURLPath:  null.StringFrom("/foo/bar"),
+				GRPCExporterInsecure: null.NewBool(true, true),
+				GRPCExporterEndpoint: null.StringFrom("else"),
+				FlushInterval:        types.NullDurationFrom(13 * time.Second),
+			},
+		},
+
+		"JSON success merge": {
 			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"http://localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
