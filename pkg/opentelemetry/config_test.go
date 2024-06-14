@@ -68,6 +68,7 @@ func TestConfig(t *testing.T) {
 				"K6_OTEL_TLS_CERTIFICATE":          "cert_path",
 				"K6_OTEL_TLS_CLIENT_CERTIFICATE":   "client_cert_path",
 				"K6_OTEL_TLS_CLIENT_KEY":           "client_key_path",
+				"K6_OTEL_HEADERS":                  "key1=value1,key2=value2",
 			},
 			expectedConfig: Config{
 				ServiceName:           null.StringFrom("foo"),
@@ -84,6 +85,7 @@ func TestConfig(t *testing.T) {
 				TLSCertificate:        null.StringFrom("cert_path"),
 				TLSClientCertificate:  null.StringFrom("client_cert_path"),
 				TLSClientKey:          null.StringFrom("client_key_path"),
+				Headers:               null.StringFrom("key1=value1,key2=value2"),
 			},
 		},
 
@@ -103,7 +105,8 @@ func TestConfig(t *testing.T) {
 					`"tlsInsecureSkipVerify":true,` +
 					`"tlsCertificate":"cert_path",` +
 					`"tlsClientCertificate":"client_cert_path",` +
-					`"tlsClientKey":"client_key_path"` +
+					`"tlsClientKey":"client_key_path",` +
+					`"headers":"key1=value1,key2=value2"` +
 					`}`,
 			),
 			expectedConfig: Config{
@@ -121,6 +124,7 @@ func TestConfig(t *testing.T) {
 				TLSCertificate:        null.StringFrom("cert_path"),
 				TLSClientCertificate:  null.StringFrom("client_cert_path"),
 				TLSClientKey:          null.StringFrom("client_key_path"),
+				Headers:               null.StringFrom("key1=value1,key2=value2"),
 			},
 		},
 

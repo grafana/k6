@@ -18,6 +18,7 @@ It's worth to mention that the extension is using the [OpenTelemetry Go SDK](htt
 
 * `K6_OTEL_EXPORT_INTERVAL` - configures the intervening time between metrics exports. Default is `10s`.
 * `K6_OTEL_EXPORTER_TYPE` - metric exporter type. Default is `grpc`.
+* `K6_OTEL_HEADERS` - headers in W3C Correlation-Context format without additional semi-colon delimited metadata (i.e. "k1=v1,k2=v2"). Passes the headers to the exporter.
 
 #### TLS configuration
 

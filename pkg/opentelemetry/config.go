@@ -39,6 +39,9 @@ type Config struct {
 	// ExportInterval configures the intervening time between metrics exports
 	ExportInterval types.NullDuration `json:"exportInterval" envconfig:"K6_OTEL_EXPORT_INTERVAL"`
 
+	// Headers in W3C Correlation-Context format without additional semi-colon delimited metadata (i.e. "k1=v1,k2=v2")
+	Headers null.String `json:"headers" envconfig:"K6_OTEL_HEADERS"`
+
 	// TLSInsecureSkipVerify disables verification of the server's certificate chain
 	TLSInsecureSkipVerify null.Bool `json:"tlsInsecureSkipVerify" envconfig:"K6_OTEL_TLS_INSECURE_SKIP_VERIFY"`
 	// TLSCertificate is the path to the certificate file (rootCAs) to use for the exporter's TLS connection
@@ -177,6 +180,10 @@ func (cfg Config) Apply(v Config) Config {
 
 	if v.TLSClientKey.Valid {
 		cfg.TLSClientKey = v.TLSClientKey
+	}
+
+	if v.Headers.Valid {
+		cfg.Headers = v.Headers
 	}
 
 	return cfg
