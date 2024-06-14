@@ -39,6 +39,16 @@ type Config struct {
 	// ExportInterval configures the intervening time between metrics exports
 	ExportInterval types.NullDuration `json:"exportInterval" envconfig:"K6_OTEL_EXPORT_INTERVAL"`
 
+	// TLSInsecureSkipVerify disables verification of the server's certificate chain
+	TLSInsecureSkipVerify null.Bool `json:"tlsInsecureSkipVerify" envconfig:"K6_OTEL_TLS_INSECURE_SKIP_VERIFY"`
+	// TLSCertificate is the path to the certificate file (rootCAs) to use for the exporter's TLS connection
+	TLSCertificate null.String `json:"tlsCertificate" envconfig:"K6_OTEL_TLS_CERTIFICATE"`
+	// TLSClientCertificate is the path to the certificate file (must be PEM encoded data)
+	// to use for the exporter's TLS connection
+	TLSClientCertificate null.String `json:"tlsClientCertificate" envconfig:"K6_OTEL_TLS_CLIENT_CERTIFICATE"`
+	// TLSClientKey is the path to the private key file (must be PEM encoded data) to use for the exporter's TLS connection
+	TLSClientKey null.String `json:"tlsClientKey" envconfig:"K6_OTEL_TLS_CLIENT_KEY"`
+
 	// HTTPExporterInsecure disables client transport security for the Exporter's HTTP
 	// connection.
 	HTTPExporterInsecure null.Bool `json:"httpExporterInsecure" envconfig:"K6_OTEL_HTTP_EXPORTER_INSECURE"`
@@ -151,6 +161,22 @@ func (cfg Config) Apply(v Config) Config {
 
 	if v.GRPCExporterInsecure.Valid {
 		cfg.GRPCExporterInsecure = v.GRPCExporterInsecure
+	}
+
+	if v.TLSInsecureSkipVerify.Valid {
+		cfg.TLSInsecureSkipVerify = v.TLSInsecureSkipVerify
+	}
+
+	if v.TLSCertificate.Valid {
+		cfg.TLSCertificate = v.TLSCertificate
+	}
+
+	if v.TLSClientCertificate.Valid {
+		cfg.TLSClientCertificate = v.TLSClientCertificate
+	}
+
+	if v.TLSClientKey.Valid {
+		cfg.TLSClientKey = v.TLSClientKey
 	}
 
 	return cfg

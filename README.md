@@ -19,6 +19,15 @@ It's worth to mention that the extension is using the [OpenTelemetry Go SDK](htt
 * `K6_OTEL_EXPORT_INTERVAL` - configures the intervening time between metrics exports. Default is `10s`.
 * `K6_OTEL_EXPORTER_TYPE` - metric exporter type. Default is `grpc`.
 
+#### TLS configuration
+
+* `K6_OTEL_TLS_INSECURE_SKIP_VERIFY` - disables server certificate verification.
+* `K6_OTEL_TLS_CERTIFICATE` - path to the certificate file for TLS credentials.
+* `K6_OTEL_TLS_CLIENT_CERTIFICATE` - path to the client certificate file (must be PEM encoded data).
+* `K6_OTEL_TLS_CLIENT_KEY` - path to the client key file (must be PEM encoded data).
+
+If TLS configuration is provided, the exporter will use it.
+
 #### GRPC exporter
 
 * `K6_OTEL_GRPC_EXPORTER_INSECURE` - disables client transport security for the gRPC exporter.
