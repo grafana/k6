@@ -135,7 +135,7 @@ func newClassCode(code string, start int) (*classCode, bool) {
 	}, true
 }
 
-const initCode = "\n    if (this.$init) { this.$init(); } \n    }"
+const initCode = "\n    if (this.__init) { this.__init(); } \n    }"
 
 func (c *classCode) replace() {
 	className := c.className
@@ -195,7 +195,7 @@ func between(str, start, end string) *betweenCode {
 		return nil
 	}
 	str = str[n:]
-	m := strings.Index(str, end)
+	m := strings.LastIndex(str, end)
 	if m == -1 {
 		return nil
 	}

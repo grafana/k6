@@ -129,3 +129,6 @@ require (
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
 	gopkg.in/ini.v1 v1.67.0 // indirect
 )
+
+
+replace github.com/dop251/goja => ../../liuxd6825/goja

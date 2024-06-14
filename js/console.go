@@ -82,7 +82,15 @@ func (c console) valueString(v goja.Value) string {
 	if !ok {
 		return v.String()
 	}
-
+	obj, ok := v.(*goja.Object)
+	if ok {
+		obj.MarshalJSON()
+		b, err := json.Marshal(obj.Export())
+		if err != nil {
+			return v.String()
+		}
+		return string(b)
+	}
 	b, err := json.Marshal(mv)
 	if err != nil {
 		return v.String()

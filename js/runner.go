@@ -886,7 +886,7 @@ func (u *VU) runFn(
 	endTime := time.Now()
 	var exception *goja.Exception
 	if errors.As(err, &exception) {
-		err = &scriptExceptionError{inner: exception}
+		err = &ScriptExceptionError{inner: exception}
 	}
 
 	if u.Runner.Bundle.Options.NoVUConnectionReuse.Bool {
@@ -917,7 +917,7 @@ func (u *ActiveVU) incrIteration() {
 	}
 }
 
-type scriptExceptionError struct {
+type ScriptExceptionError struct {
 	inner *goja.Exception
 }
 
@@ -926,29 +926,33 @@ var _ interface {
 	errext.HasExitCode
 	errext.HasHint
 	errext.HasAbortReason
-} = &scriptExceptionError{}
+} = &ScriptExceptionError{}
 
-func (s *scriptExceptionError) Error() string {
+func (s *ScriptExceptionError) Error() string {
 	// this calls String instead of error so that by default if it's printed to print the stacktrace
 	return s.inner.String()
 }
 
-func (s *scriptExceptionError) StackTrace() string {
-	return s.inner.String()
-}
-
-func (s *scriptExceptionError) Unwrap() error {
+func (s *ScriptExceptionError) Inner() *goja.Exception {
 	return s.inner
 }
 
-func (s *scriptExceptionError) Hint() string {
+func (s *ScriptExceptionError) StackTrace() string {
+	return s.inner.String()
+}
+
+func (s *ScriptExceptionError) Unwrap() error {
+	return s.inner
+}
+
+func (s *ScriptExceptionError) Hint() string {
 	return "script exception"
 }
 
-func (s *scriptExceptionError) AbortReason() errext.AbortReason {
+func (s *ScriptExceptionError) AbortReason() errext.AbortReason {
 	return errext.AbortedByScriptError
 }
 
-func (s *scriptExceptionError) ExitCode() exitcodes.ExitCode {
+func (s *ScriptExceptionError) ExitCode() exitcodes.ExitCode {
 	return exitcodes.ScriptException
 }
