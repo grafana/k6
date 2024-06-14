@@ -1085,6 +1085,7 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen,cyc
 	)
 	select {
 	case <-p.ctx.Done():
+		err = fmt.Errorf("reloading page: %w", p.ctx.Err())
 	case <-timeoutCtx.Done():
 		err = wrapTimeoutError(timeoutCtx.Err())
 	case event := <-waitForFrameNavigation:
