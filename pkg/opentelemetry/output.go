@@ -148,23 +148,25 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 	attributeSet := newAttributeSet(entry.Tags)
 	attributeSetOpt := otelMetric.WithAttributeSet(attributeSet)
 
+	unit := normalizeUnit(entry.Metric.Contains)
+
 	switch entry.Metric.Type {
 	case metrics.Counter:
-		counter, err := o.metricsRegistry.getOrCreateCounter(name)
+		counter, err := o.metricsRegistry.getOrCreateCounter(name, unit)
 		if err != nil {
 			return err
 		}
 
 		counter.Add(ctx, entry.Value, attributeSetOpt)
 	case metrics.Gauge:
-		gauge, err := o.metricsRegistry.getOrCreateGauge(name)
+		gauge, err := o.metricsRegistry.getOrCreateGauge(name, unit)
 		if err != nil {
 			return err
 		}
 
 		gauge.Set(entry.Value, attributeSet)
 	case metrics.Trend:
-		trend, err := o.metricsRegistry.getOrCreateHistogram(name)
+		trend, err := o.metricsRegistry.getOrCreateHistogram(name, unit)
 		if err != nil {
 			return err
 		}
@@ -189,4 +191,15 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 
 func normalizeMetricName(cfg Config, name string) string {
 	return cfg.MetricPrefix.String + name
+}
+
+func normalizeUnit(vt metrics.ValueType) string {
+	switch vt {
+	case metrics.Time:
+		return "ms"
+	case metrics.Data:
+		return "By"
+	default:
+		return ""
+	}
 }

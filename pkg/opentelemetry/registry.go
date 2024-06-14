@@ -27,7 +27,7 @@ func newRegistry(meter otelMetric.Meter, logger logrus.FieldLogger) *registry {
 	}
 }
 
-func (r *registry) getOrCreateCounter(name string) (otelMetric.Float64Counter, error) {
+func (r *registry) getOrCreateCounter(name, unit string) (otelMetric.Float64Counter, error) {
 	if counter, ok := r.counters.Load(name); ok {
 		if v, ok := counter.(otelMetric.Float64Counter); ok {
 			return v, nil
@@ -36,7 +36,12 @@ func (r *registry) getOrCreateCounter(name string) (otelMetric.Float64Counter, e
 		return nil, fmt.Errorf("metric %q is not a counter", name)
 	}
 
-	c, err := r.meter.Float64Counter(name)
+	opts := []otelMetric.Float64CounterOption{}
+	if unit != "" {
+		opts = append(opts, otelMetric.WithUnit(unit))
+	}
+
+	c, err := r.meter.Float64Counter(name, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create counter for %q: %w", name, err)
 	}
@@ -47,7 +52,7 @@ func (r *registry) getOrCreateCounter(name string) (otelMetric.Float64Counter, e
 	return c, nil
 }
 
-func (r *registry) getOrCreateHistogram(name string) (otelMetric.Float64Histogram, error) {
+func (r *registry) getOrCreateHistogram(name, unit string) (otelMetric.Float64Histogram, error) {
 	if histogram, ok := r.histograms.Load(name); ok {
 		if v, ok := histogram.(otelMetric.Float64Histogram); ok {
 			return v, nil
@@ -56,7 +61,12 @@ func (r *registry) getOrCreateHistogram(name string) (otelMetric.Float64Histogra
 		return nil, fmt.Errorf("metric %q is not a histogram", name)
 	}
 
-	h, err := r.meter.Float64Histogram(name)
+	opts := []otelMetric.Float64HistogramOption{}
+	if unit != "" {
+		opts = append(opts, otelMetric.WithUnit(unit))
+	}
+
+	h, err := r.meter.Float64Histogram(name, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create histogram for %q: %w", name, err)
 	}
@@ -115,7 +125,7 @@ func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Coun
 	return nonZeroCounter, totalCounter, nil
 }
 
-func (r *registry) getOrCreateGauge(name string) (*Float64Gauge, error) {
+func (r *registry) getOrCreateGauge(name, unit string) (*Float64Gauge, error) {
 	if gauge, ok := r.gauges.Load(name); ok {
 		if v, ok := gauge.(*Float64Gauge); ok {
 			return v, nil
@@ -125,7 +135,16 @@ func (r *registry) getOrCreateGauge(name string) (*Float64Gauge, error) {
 	}
 
 	g := NewFloat64Gauge()
-	_, err := r.meter.Float64ObservableGauge(name, otelMetric.WithFloat64Callback(g.Callback))
+
+	opts := []otelMetric.Float64ObservableGaugeOption{
+		otelMetric.WithFloat64Callback(g.Callback),
+	}
+
+	if unit != "" {
+		opts = append(opts, otelMetric.WithUnit(unit))
+	}
+
+	_, err := r.meter.Float64ObservableGauge(name, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gauge for %q: %w", name, err)
 	}
