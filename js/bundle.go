@@ -211,7 +211,7 @@ func (b *Bundle) populateExports(updateOptions bool, exports *goja.Object) error
 			if err := dec.Decode(&b.Options); err != nil {
 				if uerr := json.Unmarshal(data, &b.Options); uerr != nil {
 					return errext.WithAbortReasonIfNone(
-						errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig),
+						errext.WithExitCodeIfNone(uerr, exitcodes.InvalidConfig),
 						errext.AbortedByScriptError,
 					)
 				}
