@@ -268,8 +268,10 @@ func TestArchiveStdout(t *testing.T) {
 
 	newRootCommand(ts.GlobalState).execute()
 
-	_, err := ts.FS.Stat("archive.tar")
-	require.ErrorIs(t, err, fs.ErrNotExist)
+	for _, filename := range []string{"-", "archive.tar"} {
+		_, err := ts.FS.Stat(filename)
+		require.ErrorIsf(t, err, fs.ErrNotExist, "%q should not exist", filename)
+	}
 
 	require.GreaterOrEqual(t, len(ts.Stdout.Bytes()), 32)
 }
