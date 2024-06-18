@@ -63,7 +63,7 @@ func (c *cmdArchive) flagSet() *pflag.FlagSet {
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
 	flags.StringVarP(
 		&c.archiveOut, "archive-out", "O", c.archiveOut,
-		"archive output filename. The special value - will cause the archive to be output to stdout.",
+		"archive output filename. Dash (-) is a reserved value that causes the archive to be output to stdout.",
 	)
 	flags.BoolVarP(
 		&c.excludeEnvVars,
