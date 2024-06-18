@@ -16,7 +16,7 @@ It's worth to mention that the extension is using the [OpenTelemetry Go SDK](htt
 
 ### OpenTelemetry-specific configuration
 
-* `K6_OTEL_EXPORT_INTERVAL` - configures the intervening time between metrics exports. Default is `1s`.
+* `K6_OTEL_EXPORT_INTERVAL` - configures the intervening time between metrics exports. Default is `10s`.
 * `K6_OTEL_EXPORTER_TYPE` - metric exporter type. Default is `grpc`.
 
 #### GRPC exporter

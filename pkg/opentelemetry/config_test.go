@@ -31,7 +31,7 @@ func TestConfig(t *testing.T) {
 				HTTPExporterURLPath:  null.StringFrom("/v1/metrics"),
 				GRPCExporterInsecure: null.NewBool(false, true),
 				GRPCExporterEndpoint: null.StringFrom("localhost:4317"),
-				ExportInterval:       types.NullDurationFrom(1 * time.Second),
+				ExportInterval:       types.NullDurationFrom(10 * time.Second),
 				FlushInterval:        types.NullDurationFrom(1 * time.Second),
 			},
 		},
