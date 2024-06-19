@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -355,6 +356,91 @@ func TestStream_ReceiveAllServerResponsesAfterEndWithDiscardedMessages(t *testin
 		"Data: {}",
 		"End called",
 	}, ts.callRecorder.Recorded())
+}
+
+func TestStream_ReceiveMetadata(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	stub := &featureExplorerStub{}
+
+	savedFeatures := []*grpcservice.Feature{
+		{
+			Name: "foo",
+			Location: &grpcservice.Point{
+				Latitude:  1,
+				Longitude: 2,
+			},
+		},
+		{
+			Name: "bar",
+			Location: &grpcservice.Point{
+				Latitude:  3,
+				Longitude: 4,
+			},
+		},
+	}
+
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+		for _, feature := range savedFeatures {
+			// adding a delay to make server response "slower"
+			time.Sleep(200 * time.Millisecond)
+
+			if err := stream.Send(feature); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	grpcservice.RegisterFeatureExplorerServer(ts.httpBin.ServerGRPC, stub)
+
+	initString := codeBlock{
+		code: `
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+	}
+	vuString := codeBlock{
+		code: `
+		client.connect("GRPCBIN_ADDR");
+		let stream = new grpc.Stream(client, "main.FeatureExplorer/ListFeatures")
+		stream.on('data', function (data, meta) {
+			call(meta.ts);
+		});
+		stream.on('end', function (_, meta) {
+			call(meta.ts);
+		});
+		stream.write({
+			lo: {
+			  latitude: 1,
+			  longitude: 2,
+			},
+			hi: {
+			  latitude: 1,
+			  longitude: 2,
+			},
+		});
+		stream.end();
+		`,
+	}
+
+	val, err := ts.Run(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	val, err = ts.RunOnEventLoop(vuString.code)
+
+	assertResponse(t, vuString, err, val, ts)
+
+	for _, call := range ts.callRecorder.Recorded() {
+		seconds, err := strconv.ParseInt(call, 10, 64)
+		assert.NoError(t, err)
+		metaTS := time.Unix(seconds, 0)
+		assert.WithinDuration(t, time.Now(), metaTS, 1*time.Minute)
+	}
 }
 
 // featureExplorerStub is a stub for FeatureExplorerServer

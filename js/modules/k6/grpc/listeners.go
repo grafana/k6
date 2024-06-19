@@ -27,7 +27,7 @@ type eventListener struct {
 
 	// this return sobek.value *and* error in order to return error on exception instead of panic
 	// https://pkg.go.dev/github.com/grafana/sobek#hdr-Functions
-	list []func(sobek.Value) (sobek.Value, error)
+	list []func(sobek.Value, sobek.Value) (sobek.Value, error)
 }
 
 // newListener creates a new listener of a certain type
@@ -38,7 +38,7 @@ func newListener(eventType string) *eventListener {
 }
 
 // add adds a listener to the listener list
-func (l *eventListener) add(fn func(sobek.Value) (sobek.Value, error)) {
+func (l *eventListener) add(fn func(sobek.Value, sobek.Value) (sobek.Value, error)) {
 	l.list = append(l.list, fn)
 }
 
@@ -59,7 +59,7 @@ func (l *eventListeners) getType(t string) *eventListener {
 }
 
 // add adds a listener to the listeners
-func (l *eventListeners) add(t string, f func(sobek.Value) (sobek.Value, error)) error {
+func (l *eventListeners) add(t string, f func(sobek.Value, sobek.Value) (sobek.Value, error)) error {
 	list := l.getType(t)
 
 	if list == nil {
@@ -72,11 +72,11 @@ func (l *eventListeners) add(t string, f func(sobek.Value) (sobek.Value, error))
 }
 
 // all returns all possible listeners for a certain event type or an empty array
-func (l *eventListeners) all(t string) []func(sobek.Value) (sobek.Value, error) {
+func (l *eventListeners) all(t string) []func(sobek.Value, sobek.Value) (sobek.Value, error) {
 	list := l.getType(t)
 
 	if list == nil {
-		return []func(sobek.Value) (sobek.Value, error){}
+		return []func(sobek.Value, sobek.Value) (sobek.Value, error){}
 	}
 
 	return list.list

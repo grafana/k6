@@ -33,6 +33,10 @@ const (
 	closed
 )
 
+const (
+	timestampMetadata = "ts"
+)
+
 type stream struct {
 	vu     modules.VU
 	client *Client
@@ -143,12 +147,13 @@ func (s *stream) loop() {
 }
 
 func (s *stream) queueMessage(msg interface{}) {
+	now := time.Now()
 	metrics.PushIfNotDone(s.vu.Context(), s.vu.State().Samples, metrics.Sample{
 		TimeSeries: metrics.TimeSeries{
 			Metric: s.instanceMetrics.StreamsMessagesReceived,
 			Tags:   s.tagsAndMeta.Tags,
 		},
-		Time:     time.Now(),
+		Time:     now,
 		Metadata: s.tagsAndMeta.Metadata,
 		Value:    1,
 	})
@@ -157,8 +162,14 @@ func (s *stream) queueMessage(msg interface{}) {
 		rt := s.vu.Runtime()
 		listeners := s.eventListeners.all(eventData)
 
+		metadataObj := rt.NewObject()
+		err := metadataObj.Set(timestampMetadata, rt.ToValue(now.Unix()))
+		if err != nil {
+			return err
+		}
+
 		for _, messageListener := range listeners {
-			if _, err := messageListener(rt.ToValue(msg)); err != nil {
+			if _, err := messageListener(rt.ToValue(msg), metadataObj); err != nil {
 				// TODO(olegbespalov) consider logging the error
 				_ = s.closeWithError(err)
 
@@ -294,7 +305,7 @@ func (s *stream) processSendError(err error) {
 }
 
 // on registers a handler for a certain event type
-func (s *stream) on(event string, handler func(sobek.Value) (sobek.Value, error)) {
+func (s *stream) on(event string, handler func(sobek.Value, sobek.Value) (sobek.Value, error)) {
 	if handler == nil {
 		common.Throw(s.vu.Runtime(), fmt.Errorf("handler for %q event isn't a callable function", event))
 	}
@@ -384,8 +395,15 @@ func (s *stream) callErrorListeners(e error) error {
 		s.logger.Warnf("no handlers for error registered, but an error happened: %s", e)
 	}
 
+	now := time.Now()
+	metadataObj := rt.NewObject()
+	err := metadataObj.Set(timestampMetadata, rt.ToValue(now.Unix()))
+	if err != nil {
+		return err
+	}
+
 	for _, errorListener := range list {
-		if _, err := errorListener(rt.ToValue(obj)); err != nil {
+		if _, err := errorListener(rt.ToValue(obj), metadataObj); err != nil {
 			return err
 		}
 	}
@@ -426,10 +444,16 @@ func extractError(e error) grpcError {
 }
 
 func (s *stream) callEventListeners(eventType string) error {
+	now := time.Now()
 	rt := s.vu.Runtime()
 
+	metadataObj := rt.NewObject()
+	err := metadataObj.Set(timestampMetadata, rt.ToValue(now.Unix()))
+	if err != nil {
+		return err
+	}
 	for _, listener := range s.eventListeners.all(eventType) {
-		if _, err := listener(rt.ToValue(struct{}{})); err != nil {
+		if _, err := listener(rt.ToValue(struct{}{}), metadataObj); err != nil {
 			return err
 		}
 	}
