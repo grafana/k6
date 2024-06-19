@@ -176,7 +176,7 @@ github.com/gorilla/websocket
 # github.com/grafana/sobek v0.0.0-20240613124309-cb36746e8fee
 ## explicit; go 1.20
 github.com/grafana/sobek
-# github.com/grafana/xk6-browser v1.5.2-0.20240607140836-ffcc1f5169ad
+# github.com/grafana/xk6-browser v1.6.0
 ## explicit; go 1.20
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium

@@ -1085,6 +1085,7 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen,cyc
 	)
 	select {
 	case <-p.ctx.Done():
+		err = fmt.Errorf("reloading page: %w", p.ctx.Err())
 	case <-timeoutCtx.Done():
 		err = wrapTimeoutError(timeoutCtx.Err())
 	case event := <-waitForFrameNavigation:
@@ -1099,7 +1100,11 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen,cyc
 	}
 
 	var resp *Response
-	if req := navigationEvent.newDocument.request; req != nil {
+
+	// Sometimes the new document is not yet available when the navigation event is emitted.
+	newDocument := navigationEvent.newDocument
+	if newDocument != nil && newDocument.request != nil {
+		req := newDocument.request
 		req.responseMu.RLock()
 		resp = req.response
 		req.responseMu.RUnlock()

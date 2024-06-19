@@ -85,8 +85,8 @@ github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
 github.com/grafana/sobek v0.0.0-20240613124309-cb36746e8fee h1:KjQPRiLoSZMz+oMdEyh8fE/rurMpx3lpRH8PIR66nzo=
 github.com/grafana/sobek v0.0.0-20240613124309-cb36746e8fee/go.mod h1:4uA93vCOP7fFfkAEByuRieuU72pAc5DH05b71yCIVsQ=
-github.com/grafana/xk6-browser v1.5.2-0.20240607140836-ffcc1f5169ad h1:q3sB942oYrD7NlcsS9hz26I9W+EKfpKVmhKe7dWUp3s=
-github.com/grafana/xk6-browser v1.5.2-0.20240607140836-ffcc1f5169ad/go.mod h1:xLaGGhTMHIRsMvkVWFYh9RPy87kG2n4L4Or6DeI8U+o=
+github.com/grafana/xk6-browser v1.6.0 h1:x8ZfBwiUJRRKNEw+Asr5ae9o2gFvYU1Ll/4dDMNIPZ8=
+github.com/grafana/xk6-browser v1.6.0/go.mod h1:xLaGGhTMHIRsMvkVWFYh9RPy87kG2n4L4Or6DeI8U+o=
 github.com/grafana/xk6-dashboard v0.7.4 h1:0ZRPTAXW+6A3Xqq/a/OaIZhxUt1SOMwUFff0IPwBHrs=
 github.com/grafana/xk6-dashboard v0.7.4/go.mod h1:300QyQ+OQAYz/L/AzB5tKzPeBY5eKh2wl1NsRmCbsx4=
 github.com/grafana/xk6-output-prometheus-remote v0.4.0 h1:7k3xjuKaD9BwcX8iuu5v6PtAK1L53kvx1r8BaTUfRH4=
