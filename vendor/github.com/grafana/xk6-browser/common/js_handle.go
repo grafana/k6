@@ -124,6 +124,7 @@ func (h *BaseJSHandle) dispose() error {
 
 // Evaluate will evaluate provided page function within an execution context.
 func (h *BaseJSHandle) Evaluate(pageFunc string, args ...any) (any, error) {
+	args = append([]any{h}, args...)
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
 		return nil, fmt.Errorf("evaluating element: %w", err)
@@ -134,6 +135,7 @@ func (h *BaseJSHandle) Evaluate(pageFunc string, args ...any) (any, error) {
 
 // EvaluateHandle will evaluate provided page function within an execution context.
 func (h *BaseJSHandle) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error) {
+	args = append([]any{h}, args...)
 	eh, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {
 		return nil, fmt.Errorf("evaluating handle for element: %w", err)
