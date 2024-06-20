@@ -2028,21 +2028,6 @@ func TestEventSystemError(t *testing.T) {
 			expExitCode: exitcodes.ScriptException,
 		},
 		{
-			name: "invalid",
-			script: `
-				export const options = {
-					vus: 'this is an invalid type',
-				}
-				
-				export default function () {}
-			`,
-			expLog: []string{
-				"got event Exit with data '&{Error:could not initialize '-': could not load JS test 'file:///-': strconv.ParseInt: parsing \"this is an invalid type\": invalid syntax}'",
-				"could not initialize '-': could not load JS test 'file:///-': strconv.ParseInt: parsing \"this is an invalid type\": invalid syntax",
-			},
-			expExitCode: exitcodes.InvalidConfig,
-		},
-		{
 			name: "throw",
 			script: `
 				export let options = {

@@ -147,6 +147,12 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			expExitCode:  exitcodes.ScriptException,
 		},
 		{
+			testFilename: "invalid_option.js",
+			name:         "run should fail with exit status 104 if an invalid option value exists",
+			expErr:       "this is an invalid type",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
 			testFilename: "thresholds/non_existing_metric.js",
 			name:         "run should fail with exit status 104 on a threshold applied to a non existing metric",
 			expErr:       "invalid threshold",
