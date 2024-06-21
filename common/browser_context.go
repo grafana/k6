@@ -90,6 +90,11 @@ type BrowserContext struct {
 func NewBrowserContext(
 	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *log.Logger,
 ) (*BrowserContext, error) {
+	// set the default options if none provided.
+	if opts == nil {
+		opts = NewBrowserContextOptions()
+	}
+
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -101,7 +106,7 @@ func NewBrowserContext(
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
 
-	if opts != nil && len(opts.Permissions) > 0 {
+	if len(opts.Permissions) > 0 {
 		err := b.GrantPermissions(opts.Permissions, NewGrantPermissionsOptions())
 		if err != nil {
 			return nil, err

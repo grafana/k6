@@ -51,14 +51,12 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t)
-	bctx, err := tb.NewContext(tb.toSobekValue(struct {
-		Viewport common.Viewport `js:"viewport"`
-	}{
-		Viewport: common.Viewport{
-			Width:  800,
-			Height: 600,
-		},
-	}))
+	opts := common.NewBrowserContextOptions()
+	opts.Viewport = &common.Viewport{
+		Width:  800,
+		Height: 600,
+	}
+	bctx, err := tb.NewContext(opts)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		if err := bctx.Close(); err != nil {
@@ -77,19 +75,19 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t, withHTTPServer())
-	bctx, err := tb.NewContext(tb.toSobekValue(struct {
-		ExtraHTTPHeaders map[string]string `js:"extraHTTPHeaders"`
-	}{
-		ExtraHTTPHeaders: map[string]string{
-			"Some-Header": "Some-Value",
-		},
-	}))
+
+	opts := common.NewBrowserContextOptions()
+	opts.ExtraHTTPHeaders = map[string]string{
+		"Some-Header": "Some-Value",
+	}
+	bctx, err := tb.NewContext(opts)
 	require.NoError(t, err)
 	t.Cleanup(func() {
 		if err := bctx.Close(); err != nil {
 			t.Log("closing browser context:", err)
 		}
 	})
+
 	p, err := bctx.NewPage()
 	require.NoError(t, err)
 

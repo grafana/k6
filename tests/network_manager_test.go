@@ -112,21 +112,20 @@ func TestBasicAuth(t *testing.T) {
 		tb.Helper()
 
 		browser := newTestBrowser(t, withHTTPServer())
-		bc, err := browser.NewContext(
-			browser.toSobekValue(struct {
-				HttpCredentials *common.Credentials `js:"httpCredentials"` //nolint:revive
-			}{
-				HttpCredentials: &common.Credentials{
-					Username: user,
-					Password: pass,
-				},
-			}))
+
+		bcopts := common.NewBrowserContextOptions()
+		bcopts.HttpCredentials = &common.Credentials{
+			Username: validUser,
+			Password: validPassword,
+		}
+		bc, err := browser.NewContext(bcopts)
 		require.NoError(t, err)
+
 		p, err := bc.NewPage()
 		require.NoError(t, err)
 
 		url := browser.url(
-			fmt.Sprintf("/basic-auth/%s/%s", validUser, validPassword),
+			fmt.Sprintf("/basic-auth/%s/%s", user, pass),
 		)
 		opts := &common.FrameGotoOptions{
 			WaitUntil: common.LifecycleEventLoad,

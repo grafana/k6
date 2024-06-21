@@ -264,8 +264,8 @@ type browserAPI interface {
 	Context() *common.BrowserContext
 	CloseContext()
 	IsConnected() bool
-	NewContext(opts sobek.Value) (*common.BrowserContext, error)
-	NewPage(opts sobek.Value) (*common.Page, error)
+	NewContext(opts *common.BrowserContextOptions) (*common.BrowserContext, error)
+	NewPage(opts *common.BrowserContextOptions) (*common.Page, error)
 	On(string) (bool, error)
 	UserAgent() string
 	Version() string

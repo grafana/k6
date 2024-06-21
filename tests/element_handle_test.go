@@ -181,17 +181,15 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	)
 
 	tb := newTestBrowser(t, withFileServer())
-	bc, err := tb.NewContext(
-		tb.toSobekValue(struct {
-			Viewport common.Viewport `js:"viewport"`
-		}{
-			Viewport: common.Viewport{
-				Width:  500,
-				Height: 240,
-			},
-		}),
-	)
+
+	bcopts := common.NewBrowserContextOptions()
+	bcopts.Viewport = &common.Viewport{
+		Width:  500,
+		Height: 240,
+	}
+	bc, err := tb.NewContext(bcopts)
 	require.NoError(t, err)
+
 	p, err := bc.NewPage()
 	require.NoError(t, err)
 

@@ -253,7 +253,7 @@ func withSkipClose() func(*testBrowser) {
 
 // NewPage is a wrapper around Browser.NewPage that fails the test if an
 // error occurs. Added this helper to avoid boilerplate code in tests.
-func (b *testBrowser) NewPage(opts sobek.Value) *common.Page {
+func (b *testBrowser) NewPage(opts *common.BrowserContextOptions) *common.Page {
 	b.t.Helper()
 
 	p, err := b.Browser.NewPage(opts)
