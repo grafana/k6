@@ -178,6 +178,12 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			configFilename: "invalid.json",
 		},
 		{
+			testFilename: "invalid_scenario.js",
+			name:         "run should fail with exit status 104 if an invalid scenario exists",
+			expErr:       "specified executor type",
+			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
 			testFilename: "thresholds/non_existing_metric.js",
 			name:         "run should fail with exit status 104 on a threshold applied to a non existing metric",
 			expErr:       "invalid threshold",
