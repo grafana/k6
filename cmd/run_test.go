@@ -119,6 +119,7 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 		expErr, expLogOutput string
 		expExitCode          exitcodes.ExitCode
 		extraArgs            []string
+		envVars              map[string]string
 	}{
 		{
 			testFilename: "abort.js",
@@ -151,6 +152,22 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			name:         "run should fail with exit status 104 if an invalid option value exists",
 			expErr:       "this is an invalid type",
 			expExitCode:  exitcodes.InvalidConfig,
+		},
+		{
+			testFilename: "option_env.js",
+			name:         "run should fail with exit status 104 if an invalid option is set through env variable",
+			expErr:       "envconfig.Process",
+			expExitCode:  exitcodes.InvalidConfig,
+			envVars: map[string]string{
+				"K6_DURATION": "fails",
+			},
+		},
+		{
+			testFilename: "option_env.js",
+			name:         "run should fail with exit status 104 if an invalid option is set through k6 variable",
+			expErr:       "invalid duration",
+			expExitCode:  exitcodes.InvalidConfig,
+			extraArgs:    []string{"--env", "DURATION=fails"},
 		},
 		{
 			testFilename: "thresholds/non_existing_metric.js",
@@ -208,6 +225,10 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			ts := tests.NewGlobalTestState(t)
 			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
+
+			if tc.envVars != nil {
+				ts.Env = tc.envVars
+			}
 
 			ts.ExpectedExitCode = int(tc.expExitCode)
 			newRootCommand(ts.GlobalState).execute()
