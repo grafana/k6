@@ -15,7 +15,7 @@ require (
 	go.opentelemetry.io/otel/sdk v1.26.0
 	go.opentelemetry.io/otel/sdk/metric v1.26.0
 	google.golang.org/grpc v1.63.2
-	gopkg.in/guregu/null.v3 v3.5.0
+	gopkg.in/guregu/null.v3 v3.3.0
 )
 
 require (
