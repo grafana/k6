@@ -166,7 +166,7 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
 	fileConf, err := readDiskConfig(gs)
 	if err != nil {
-		return conf, err
+		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 	envConf, err := readEnvConfig(gs.Env)
 	if err != nil {

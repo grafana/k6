@@ -118,6 +118,7 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 		testFilename, name   string
 		expErr, expLogOutput string
 		expExitCode          exitcodes.ExitCode
+		configFilename       string
 		extraArgs            []string
 		envVars              map[string]string
 	}{
@@ -168,6 +169,13 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			expErr:       "invalid duration",
 			expExitCode:  exitcodes.InvalidConfig,
 			extraArgs:    []string{"--env", "DURATION=fails"},
+		},
+		{
+			testFilename:   "option_env.js",
+			name:           "run should fail with exit status 104 if an invalid option is set in a config file",
+			expErr:         "invalid duration",
+			expExitCode:    exitcodes.InvalidConfig,
+			configFilename: "invalid.json",
 		},
 		{
 			testFilename: "thresholds/non_existing_metric.js",
@@ -226,6 +234,12 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.testFilename), testScript, 0o644))
 			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
+			if tc.configFilename != "" {
+				configFile, err := os.ReadFile(path.Join("testdata", "config", tc.configFilename)) //nolint:forbidigo
+				require.NoError(t, err)
+				require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.configFilename), configFile, 0o644))
+				ts.Flags.ConfigFilePath = path.Join(ts.Cwd, tc.configFilename)
+			}
 			if tc.envVars != nil {
 				ts.Env = tc.envVars
 			}
