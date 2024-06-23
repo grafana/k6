@@ -89,7 +89,7 @@ func TestNewBundle(t *testing.T) {
 	t.Run("Error", func(t *testing.T) {
 		t.Parallel()
 		_, err := getSimpleBundle(t, "/script.js", `throw new Error("aaaa");`)
-		exception := new(scriptExceptionError)
+		exception := new(ScriptExceptionError)
 		require.ErrorAs(t, err, &exception)
 		require.EqualError(t, err, "Error: aaaa\n\tat file:///script.js:1:34(3)\n")
 	})

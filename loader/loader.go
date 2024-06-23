@@ -67,6 +67,20 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 	}
 
 	if moduleSpecifier[0] == '.' || moduleSpecifier[0] == '/' || filepath.IsAbs(moduleSpecifier) {
+
+		/* if moduleSpecifier[0] == '.' && moduleSpecifier[1] == '.' {
+			paths := strings.Split(pwd.Path, "/")
+			length := len(paths) - 1
+			if length > 0 && paths[length] == "" {
+				paths = paths[:length]
+			}
+			parent := paths[length-1]
+			pwd.Path = strings.Join(paths[:length-1], "/")
+			if pwd.Path == "" {
+				pwd.Path = "/"
+			}
+			moduleSpecifier = parent + moduleSpecifier[2:]
+		} */
 		return resolveFilePath(pwd, moduleSpecifier)
 	}
 

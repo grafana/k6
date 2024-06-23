@@ -3,6 +3,7 @@ package modules
 import (
 	"fmt"
 	"net/url"
+	"path/filepath"
 	"strings"
 
 	"github.com/dop251/goja"
@@ -124,6 +125,10 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 		if mr.locked {
 			return nil, fmt.Errorf(notPreviouslyResolvedModule, arg)
 		}
+
+		if strings.Contains(arg, "..") {
+			arg = absPath(basePWD.Path, arg)
+		}
 		// Fall back to loading
 		data, err := mr.loadCJS(specifier, arg)
 		if err != nil {
@@ -135,6 +140,66 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 
 		return mod, err
 	}
+}
+
+// AbsPath
+//
+//	@Description: 取绝对路径
+//	@param pwd 当前路径
+//	@param filename 待相对路径的文件名， 如：../c.txt 或 ./c.txt
+//	@return string 绝对路径
+func absPath(pwd string, filename string) string {
+	if pwd == "" {
+		return filename
+	}
+	if !strings.Contains(filename, "../") && !strings.Contains(filename, "./") {
+		return filepath.Join(pwd, filename)
+	}
+	if strings.HasPrefix(filename, "/") {
+		return filename
+	}
+	var res []string
+	paths := splitFilePath(pwd)
+	names := splitFilePath(filename)
+	ok := false
+	start := 0
+	for i, name := range names {
+		if len(paths) > 0 {
+			if name == ".." {
+				start = i
+				paths = paths[:len(paths)-1]
+				ok = true
+			} else if name == "." {
+				start = i
+				ok = true
+				continue
+			} else if name == "" {
+				continue
+			} else {
+				break
+			}
+		}
+	}
+	if ok {
+		names = names[start+1:]
+		res = append(paths, names...)
+	} else {
+		res = names
+	}
+
+	return strings.Join(res, "/")
+}
+
+func splitFilePath(filename string) []string {
+	var res []string
+	paths := strings.Split(filename, "/")
+	if paths[len(paths)-1] == "" {
+		paths = paths[:len(paths)-1]
+	}
+	for _, path := range paths {
+		res = append(res, path)
+	}
+	return res
 }
 
 func getArg(arg string) string {
