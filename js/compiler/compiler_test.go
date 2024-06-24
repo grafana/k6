@@ -241,3 +241,26 @@ func TestMinimalSourceMap(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, hook.Drain())
 }
+
+func TestMixingImportExport(t *testing.T) {
+	t.Parallel()
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	logger.Out = io.Discard
+	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
+	logger.AddHook(hook)
+
+	compiler := New(logger)
+	compiler.Options = Options{
+		CompatibilityMode: lib.CompatibilityModeExtended,
+		Strict:            true,
+	}
+	_, _, err := compiler.Compile("export let s = 5;\nmodule.exports = 'something';", "somefile", false)
+	require.NoError(t, err)
+	entries := hook.Drain()
+	require.Len(t, entries, 1)
+	msg, err := entries[0].String() // we need this in order to get the field error
+	require.NoError(t, err)
+
+	require.Contains(t, msg, `it was noticed that it mixes`)
+}

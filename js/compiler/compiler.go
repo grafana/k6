@@ -251,7 +251,15 @@ func (c *Compiler) compileImpl(
 			return nil, code, err
 		}
 		// the compatibility mode "decreases" here as we shouldn't transform twice
-		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+		var prg *sobek.Program
+		prg, code, err = c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+		if err == nil && strings.Contains(src, "module.exports") {
+			c.logger.Warningf(
+				"While compiling %q it was noticed that it mixes import/export syntax (ESM) and commonJS module.exports. "+
+					"This isn't standard behaviour and will soon not work. Please use one or the other.",
+				filename)
+		}
+		return prg, code, err
 	}
 
 	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
