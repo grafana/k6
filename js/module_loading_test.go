@@ -682,3 +682,9 @@ func TestOptionsAreNotGloballyWritable(t *testing.T) {
 
 	require.EqualValues(t, time.Minute*5, r2.GetOptions().MinIterationDuration.Duration)
 }
+
+func TestDefaultNamedExports(t *testing.T) {
+	t.Parallel()
+	_, err := getSimpleRunner(t, "/main.js", `export default function main() {}`)
+	require.NoError(t, err)
+}

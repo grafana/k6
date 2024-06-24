@@ -62,7 +62,11 @@ func (bi *BundleInstance) getCallableExport(name string) sobek.Callable {
 }
 
 func (bi *BundleInstance) getExported(name string) sobek.Value {
-	return bi.mainModuleInstance.GetBindingValue(name)
+	re, ambigiuous := bi.mainModule.ResolveExport(name)
+	if ambigiuous || re == nil {
+		return nil
+	}
+	return bi.mainModuleInstance.GetBindingValue(re.BindingName)
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
