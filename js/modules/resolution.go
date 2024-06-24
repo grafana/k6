@@ -81,6 +81,13 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	}
 	prg, isESM, err := mr.compiler.Parse(string(data), specifier.String(), false)
 	if err != nil {
+		var newError error
+		prg, isESM, newError = mr.compiler.Parse(string(data), specifier.String(), true)
+		if newError == nil {
+			err = newError
+		}
+	}
+	if err != nil {
 		mr.cache[specifier.String()] = moduleCacheElement{err: err}
 		return nil, err
 	}
