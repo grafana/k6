@@ -258,7 +258,7 @@ func (c *Compiler) compileImpl(
 				"During the compilation of %q, it has been detected that the file combines ECMAScript modules (ESM) "+
 					"import/export syntax with commonJS module.exports. "+
 					"Mixing these two module systems is non-standard and will not be supported anymore in future releases. "+
-					"Please ensure to solely one or the other syntax.",
+					"Please ensure to use solely one or the other syntax.",
 				filename)
 		}
 		return prg, code, err
