@@ -255,8 +255,10 @@ func (c *Compiler) compileImpl(
 		prg, code, err = c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
 		if err == nil && strings.Contains(src, "module.exports") {
 			c.logger.Warningf(
-				"During the compilation of %q, it has been detected that the file combines ECMAScript modules (ESM)  import/export syntax with commonJS module.exports. "+
-					"Mixing these two module systems is non-standard and will not be supported anymore in future releases. Please ensure to solely one or the other syntax.",
+				"During the compilation of %q, it has been detected that the file combines ECMAScript modules (ESM) "+
+					"import/export syntax with commonJS module.exports. "+
+					"Mixing these two module systems is non-standard and will not be supported anymore in future releases. "+
+					"Please ensure to solely one or the other syntax.",
 				filename)
 		}
 		return prg, code, err
