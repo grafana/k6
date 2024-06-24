@@ -262,5 +262,5 @@ func TestMixingImportExport(t *testing.T) {
 	msg, err := entries[0].String() // we need this in order to get the field error
 	require.NoError(t, err)
 
-	require.Contains(t, msg, `it was noticed that it mixes`)
+	require.Contains(t, msg, `it has been detected that the file combines`)
 }
