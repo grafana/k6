@@ -119,7 +119,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 	}
 }
 
-func TestLoadExportsIsUsableInModule(t *testing.T) {
+func TestLoadExportsIsntUsableInModule(t *testing.T) {
 	t.Parallel()
 	fileSystem := fsext.NewMemMapFs()
 	require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(`
