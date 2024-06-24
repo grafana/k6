@@ -64,6 +64,25 @@ func TestOpenPathResolution(t *testing.T) {
 				`,
 			},
 		},
+		"space in path": {
+			fsMap: map[string]any{
+				"/A/B D/data.txt": "data file",
+				"/A/C D/B/script.js": `
+					// Here the path is relative to this module but to the one calling
+					module.exports = () =>  open("./../data.txt");
+				`,
+				"/A/B D/B/script.js": `
+					module.exports = require("./../../C D/B/script.js")();
+				`,
+				"/A/A/A/A/script.js": `
+					let data = require("./../../../B D/B/script.js");
+					if (data != "data file") {
+						throw new Error("wrong content " + data);
+					}
+					export default function() {}
+				`,
+			},
+		},
 	}
 
 	for name, testCase := range testCases {

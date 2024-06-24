@@ -150,7 +150,10 @@ func (r *LegacyRequireImpl) CurrentlyRequiredModule() (*url.URL, error) {
 	case strings.HasPrefix(fileStr, "file://"):
 		u = new(url.URL)
 		u.Scheme = "file"
-		u.Path = strings.TrimPrefix(fileStr, "file://")
+		u.Path, err = url.PathUnescape(strings.TrimPrefix(fileStr, "file://"))
+		if err != nil {
+			return nil, err
+		}
 	case strings.HasPrefix(fileStr, "https://"):
 		var err error
 		u, err = url.Parse(fileStr)
