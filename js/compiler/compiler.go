@@ -251,7 +251,17 @@ func (c *Compiler) compileImpl(
 			return nil, code, err
 		}
 		// the compatibility mode "decreases" here as we shouldn't transform twice
-		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+		var prg *sobek.Program
+		prg, code, err = c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+		if err == nil && strings.Contains(src, "module.exports") {
+			c.logger.Warningf(
+				"During the compilation of %q, it has been detected that the file combines ECMAScript modules (ESM) "+
+					"import/export syntax with commonJS module.exports. "+
+					"Mixing these two module systems is non-standard and will not be supported anymore in future releases. "+
+					"Please ensure to use solely one or the other syntax.",
+				filename)
+		}
+		return prg, code, err
 	}
 
 	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
