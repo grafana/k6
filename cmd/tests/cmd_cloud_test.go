@@ -288,3 +288,17 @@ func TestCloudWithArchive(t *testing.T) {
 	assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 	assert.Contains(t, stdout, `test status: Finished`)
 }
+
+// FIXME: This test fails because our test setup leaves stdout empty
+//func TestCloudArgs(t *testing.T) {
+//	t.Parallel()
+//
+//	// ts := NewGlobalTestState(t)
+//	ts := getSimpleCloudTestState(t, nil, nil, nil, nil)
+//	ts.CmdArgs = []string{"k6", "cloud", "run"}
+//	ts.ExpectedExitCode = -1
+//	cmd.ExecuteWithGlobalState(ts.GlobalState)
+//
+//	stdout := ts.Stdout.String()
+//	assert.Contains(t, stdout, `accepts 1 or 2 arg(s), received 0`)
+//}
