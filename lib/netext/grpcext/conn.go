@@ -73,6 +73,7 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 		return getState().Dialer.DialContext(ctx, "tcp", addr)
 	}
 
+	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	return []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.FailOnNonTempDialError(true),
@@ -84,6 +85,7 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 
 // Dial establish a gRPC connection.
 func Dial(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, error) {
+	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	conn, err := grpc.DialContext(ctx, addr, options...)
 	if err != nil {
 		return nil, err
