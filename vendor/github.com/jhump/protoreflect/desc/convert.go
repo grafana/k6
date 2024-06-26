@@ -95,9 +95,7 @@ func convertFile(d protoreflect.FileDescriptor, fd *descriptorpb.FileDescriptorP
 	ret.deps = make([]*FileDescriptor, len(fd.GetDependency()))
 	for i := 0; i < d.Imports().Len(); i++ {
 		f := d.Imports().Get(i).FileDescriptor
-		if c := cache.get(f); c != nil {
-			ret.deps[i] = c.(*FileDescriptor)
-		} else if c, err := wrapFile(f, cache); err != nil {
+		if c, err := wrapFile(f, cache); err != nil {
 			return nil, err
 		} else {
 			ret.deps[i] = c

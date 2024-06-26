@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -255,6 +255,13 @@ func VisitChildren(n CompositeNode, v Visitor) error {
 //
 // Visitors can be supplied to a Walk operation or passed to a call
 // to Visit or VisitChildren.
+//
+// Note that there are some AST node types defined in this package
+// that do not have corresponding visit methods. These are synthetic
+// node types, that have specialized use from the parser, but never
+// appear in an actual AST (which is always rooted at FileNode).
+// These include SyntheticMapField, SyntheticOneof,
+// SyntheticGroupMessageNode, and SyntheticMapEntryNode.
 type Visitor interface {
 	// VisitFileNode is invoked when visiting a *FileNode in the AST.
 	VisitFileNode(*FileNode) error

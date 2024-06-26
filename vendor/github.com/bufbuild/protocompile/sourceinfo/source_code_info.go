@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -45,6 +45,11 @@ type OptionSourceInfo struct {
 	// The source info path to this element. If this element represents a
 	// declaration with an array-literal value, the last element of the
 	// path is the index of the first item in the array.
+	// If the first element is negative, it indicates the number of path
+	// components to remove from the path to the relevant options. This is
+	// used for field pseudo-options, so that the path indicates a field on
+	// the descriptor, which is a parent of the options message (since that
+	// is how the pseudo-options are actually stored).
 	Path []int32
 	// Children can be an *ArrayLiteralSourceInfo, a *MessageLiteralSourceInfo,
 	// or nil, depending on whether the option's value is an
@@ -132,7 +137,7 @@ func (e extraOptionLocationsOption) apply(info *sourceCodeInfo) {
 }
 
 func generateSourceInfoForFile(opts OptionIndex, sci *sourceCodeInfo, file *ast.FileNode) {
-	path := make([]int32, 0, 10)
+	path := make([]int32, 0, 16)
 
 	sci.newLocWithoutComments(file, nil)
 
@@ -168,7 +173,10 @@ func generateSourceInfoForFile(opts OptionIndex, sci *sourceCodeInfo, file *ast.
 			generateSourceCodeInfoForEnum(opts, sci, child, append(path, internal.FileEnumsTag, enumIndex))
 			enumIndex++
 		case *ast.ExtendNode:
-			generateSourceCodeInfoForExtensions(opts, sci, child, &extendIndex, &msgIndex, append(path, internal.FileExtensionsTag), append(dup(path), internal.FileMessagesTag))
+			extsPath := append(path, internal.FileExtensionsTag) //nolint:gocritic // intentionally creating new slice var
+			// we clone the path here so that append can't mutate extsPath, since they may share storage
+			msgsPath := append(internal.ClonePath(path), internal.FileMessagesTag)
+			generateSourceCodeInfoForExtensions(opts, sci, child, &extendIndex, &msgIndex, extsPath, msgsPath)
 		case *ast.ServiceNode:
 			generateSourceCodeInfoForService(opts, sci, child, append(path, internal.FileServicesTag, svcIndex))
 			svcIndex++
@@ -257,6 +265,18 @@ func generateSourceInfoForOptionChildren(sci *sourceCodeInfo, n ast.ValueNode, p
 					continue
 				}
 				fullPath := combinePathsForOption(pathPrefix, fieldInfo.Path)
+				locationNode := ast.Node(fieldNode)
+				if fieldNode.Name.IsAnyTypeReference() && fullPath[len(fullPath)-1] == internal.AnyValueTag {
+					// This is a special expanded Any. So also insert a location
+					// for the type URL field.
+					typeURLPath := make([]int32, len(fullPath))
+					copy(typeURLPath, fullPath)
+					typeURLPath[len(typeURLPath)-1] = internal.AnyTypeURLTag
+					sci.newLoc(fieldNode.Name, fullPath)
+					// And create the next location so it's just the value,
+					// not the full field definition.
+					locationNode = fieldNode.Val
+				}
 				_, isArrayLiteral := fieldNode.Val.(*ast.ArrayLiteralNode)
 				if !isArrayLiteral {
 					// We don't include this with an array literal since the path
@@ -264,7 +284,7 @@ func generateSourceInfoForOptionChildren(sci *sourceCodeInfo, n ast.ValueNode, p
 					// it would be redundant with the child info we add next, and
 					// it wouldn't be entirely correct since it only indicates the
 					// index of the first element in the array (and not the others).
-					sci.newLoc(fieldNode, fullPath)
+					sci.newLoc(locationNode, fullPath)
 				}
 				generateSourceInfoForOptionChildren(sci, fieldNode.Val, pathPrefix, fullPath, fieldInfo.Children)
 			}
@@ -290,10 +310,10 @@ func generateSourceCodeInfoForMessage(opts OptionIndex, sci *sourceCodeInfo, n a
 	case *ast.MessageNode:
 		openBrace = n.OpenBrace
 		decls = n.Decls
-	case *ast.GroupNode:
+	case *ast.SyntheticGroupMessageNode:
 		openBrace = n.OpenBrace
 		decls = n.Decls
-	case *ast.MapFieldNode:
+	case *ast.SyntheticMapEntryNode:
 		sci.newLoc(n, path)
 		// map entry so nothing else to do
 		return
@@ -317,18 +337,24 @@ func generateSourceCodeInfoForMessage(opts OptionIndex, sci *sourceCodeInfo, n a
 			generateSourceCodeInfoForField(opts, sci, child, append(path, internal.MessageFieldsTag, fieldIndex))
 			fieldIndex++
 		case *ast.GroupNode:
-			fldPath := path
-			fldPath = append(fldPath, internal.MessageFieldsTag, fieldIndex)
+			fldPath := append(path, internal.MessageFieldsTag, fieldIndex) //nolint:gocritic // intentionally creating new slice var
 			generateSourceCodeInfoForField(opts, sci, child, fldPath)
 			fieldIndex++
-			generateSourceCodeInfoForMessage(opts, sci, child, fldPath, append(dup(path), internal.MessageNestedMessagesTag, nestedMsgIndex))
+			// we clone the path here so that append can't mutate fldPath, since they may share storage
+			msgPath := append(internal.ClonePath(path), internal.MessageNestedMessagesTag, nestedMsgIndex)
+			generateSourceCodeInfoForMessage(opts, sci, child.AsMessage(), fldPath, msgPath)
 			nestedMsgIndex++
 		case *ast.MapFieldNode:
 			generateSourceCodeInfoForField(opts, sci, child, append(path, internal.MessageFieldsTag, fieldIndex))
 			fieldIndex++
 			nestedMsgIndex++
 		case *ast.OneofNode:
-			generateSourceCodeInfoForOneof(opts, sci, child, &fieldIndex, &nestedMsgIndex, append(path, internal.MessageFieldsTag), append(dup(path), internal.MessageNestedMessagesTag), append(dup(path), internal.MessageOneofsTag, oneofIndex))
+			fldsPath := append(path, internal.MessageFieldsTag) //nolint:gocritic // intentionally creating new slice var
+			// we clone the path here and below so that append ops can't mutate
+			// fldPath or msgsPath, since they may otherwise share storage
+			msgsPath := append(internal.ClonePath(path), internal.MessageNestedMessagesTag)
+			ooPath := append(internal.ClonePath(path), internal.MessageOneofsTag, oneofIndex)
+			generateSourceCodeInfoForOneof(opts, sci, child, &fieldIndex, &nestedMsgIndex, fldsPath, msgsPath, ooPath)
 			oneofIndex++
 		case *ast.MessageNode:
 			generateSourceCodeInfoForMessage(opts, sci, child, nil, append(path, internal.MessageNestedMessagesTag, nestedMsgIndex))
@@ -337,7 +363,10 @@ func generateSourceCodeInfoForMessage(opts OptionIndex, sci *sourceCodeInfo, n a
 			generateSourceCodeInfoForEnum(opts, sci, child, append(path, internal.MessageEnumsTag, nestedEnumIndex))
 			nestedEnumIndex++
 		case *ast.ExtendNode:
-			generateSourceCodeInfoForExtensions(opts, sci, child, &extendIndex, &nestedMsgIndex, append(path, internal.MessageExtensionsTag), append(dup(path), internal.MessageNestedMessagesTag))
+			extsPath := append(path, internal.MessageExtensionsTag) //nolint:gocritic // intentionally creating new slice var
+			// we clone the path here so that append can't mutate extsPath, since they may share storage
+			msgsPath := append(internal.ClonePath(path), internal.MessageNestedMessagesTag)
+			generateSourceCodeInfoForExtensions(opts, sci, child, &extendIndex, &nestedMsgIndex, extsPath, msgsPath)
 		case *ast.ExtensionRangeNode:
 			generateSourceCodeInfoForExtensionRanges(opts, sci, child, &extRangeIndex, append(path, internal.MessageExtensionRangesTag))
 		case *ast.ReservedNode:
@@ -440,7 +469,7 @@ func generateSourceCodeInfoForExtensions(opts OptionIndex, sci *sourceCodeInfo, 
 			fldPath = append(fldPath, *extendIndex)
 			generateSourceCodeInfoForField(opts, sci, decl, fldPath)
 			*extendIndex++
-			generateSourceCodeInfoForMessage(opts, sci, decl, fldPath, append(msgPath, *msgIndex))
+			generateSourceCodeInfoForMessage(opts, sci, decl.AsMessage(), fldPath, append(msgPath, *msgIndex))
 			*msgIndex++
 		}
 	}
@@ -463,7 +492,7 @@ func generateSourceCodeInfoForOneof(opts OptionIndex, sci *sourceCodeInfo, n *as
 			fldPath = append(fldPath, *fieldIndex)
 			generateSourceCodeInfoForField(opts, sci, child, fldPath)
 			*fieldIndex++
-			generateSourceCodeInfoForMessage(opts, sci, child, fldPath, append(nestedMsgPath, *nestedMsgIndex))
+			generateSourceCodeInfoForMessage(opts, sci, child.AsMessage(), fldPath, append(nestedMsgPath, *nestedMsgIndex))
 			*nestedMsgIndex++
 		}
 	}
@@ -604,8 +633,6 @@ type sourceCodeInfo struct {
 }
 
 func (sci *sourceCodeInfo) newLocWithoutComments(n ast.Node, path []int32) {
-	dup := make([]int32, len(path))
-	copy(dup, path)
 	var start, end ast.SourcePos
 	if n == sci.file {
 		// For files, we don't want to consider trailing EOF token
@@ -628,7 +655,7 @@ func (sci *sourceCodeInfo) newLocWithoutComments(n ast.Node, path []int32) {
 		start, end = info.Start(), info.End()
 	}
 	sci.locs = append(sci.locs, &descriptorpb.SourceCodeInfo_Location{
-		Path: dup,
+		Path: internal.ClonePath(path),
 		Span: makeSpan(start, end),
 	})
 }
@@ -636,11 +663,9 @@ func (sci *sourceCodeInfo) newLocWithoutComments(n ast.Node, path []int32) {
 func (sci *sourceCodeInfo) newLoc(n ast.Node, path []int32) {
 	info := sci.file.NodeInfo(n)
 	if !sci.extraComments {
-		dup := make([]int32, len(path))
-		copy(dup, path)
 		start, end := info.Start(), info.End()
 		sci.locs = append(sci.locs, &descriptorpb.SourceCodeInfo_Location{
-			Path: dup,
+			Path: internal.ClonePath(path),
 			Span: makeSpan(start, end),
 		})
 	} else {
@@ -701,13 +726,11 @@ func (sci *sourceCodeInfo) newLocWithGivenComments(nodeInfo ast.NodeInfo, detach
 		detached[i] = sci.combineComments(cmts)
 	}
 
-	dup := make([]int32, len(path))
-	copy(dup, path)
 	sci.locs = append(sci.locs, &descriptorpb.SourceCodeInfo_Location{
 		LeadingDetachedComments: detached,
 		LeadingComments:         lead,
 		TrailingComments:        trail,
-		Path:                    dup,
+		Path:                    internal.ClonePath(path),
 		Span:                    makeSpan(nodeInfo.Start(), nodeInfo.End()),
 	})
 }
@@ -932,8 +955,4 @@ func (sci *sourceCodeInfo) combineComments(comments comments) string {
 		}
 	}
 	return buf.String()
-}
-
-func dup(p []int32) []int32 {
-	return append(([]int32)(nil), p...)
 }
