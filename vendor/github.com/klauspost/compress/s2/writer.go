@@ -239,6 +239,9 @@ func (w *Writer) ReadFrom(r io.Reader) (n int64, err error) {
 			}
 		}
 		if n2 == 0 {
+			if cap(inbuf) >= w.obufLen {
+				w.buffers.Put(inbuf)
+			}
 			break
 		}
 		n += int64(n2)
@@ -314,9 +317,9 @@ func (w *Writer) AddSkippableBlock(id uint8, data []byte) (err error) {
 		hWriter := make(chan result)
 		w.output <- hWriter
 		if w.snappy {
-			hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunkSnappy)}
+			hWriter <- result{startOffset: w.uncompWritten, b: magicChunkSnappyBytes}
 		} else {
-			hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunk)}
+			hWriter <- result{startOffset: w.uncompWritten, b: magicChunkBytes}
 		}
 	}
 
@@ -370,9 +373,9 @@ func (w *Writer) EncodeBuffer(buf []byte) (err error) {
 		hWriter := make(chan result)
 		w.output <- hWriter
 		if w.snappy {
-			hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunkSnappy)}
+			hWriter <- result{startOffset: w.uncompWritten, b: magicChunkSnappyBytes}
 		} else {
-			hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunk)}
+			hWriter <- result{startOffset: w.uncompWritten, b: magicChunkBytes}
 		}
 	}
 
@@ -478,9 +481,9 @@ func (w *Writer) write(p []byte) (nRet int, errRet error) {
 			hWriter := make(chan result)
 			w.output <- hWriter
 			if w.snappy {
-				hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunkSnappy)}
+				hWriter <- result{startOffset: w.uncompWritten, b: magicChunkSnappyBytes}
 			} else {
-				hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunk)}
+				hWriter <- result{startOffset: w.uncompWritten, b: magicChunkBytes}
 			}
 		}
 
@@ -560,6 +563,9 @@ func (w *Writer) writeFull(inbuf []byte) (errRet error) {
 
 	if w.concurrency == 1 {
 		_, err := w.writeSync(inbuf[obufHeaderLen:])
+		if cap(inbuf) >= w.obufLen {
+			w.buffers.Put(inbuf)
+		}
 		return err
 	}
 
@@ -569,9 +575,9 @@ func (w *Writer) writeFull(inbuf []byte) (errRet error) {
 		hWriter := make(chan result)
 		w.output <- hWriter
 		if w.snappy {
-			hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunkSnappy)}
+			hWriter <- result{startOffset: w.uncompWritten, b: magicChunkSnappyBytes}
 		} else {
-			hWriter <- result{startOffset: w.uncompWritten, b: []byte(magicChunk)}
+			hWriter <- result{startOffset: w.uncompWritten, b: magicChunkBytes}
 		}
 	}
 
@@ -637,9 +643,9 @@ func (w *Writer) writeSync(p []byte) (nRet int, errRet error) {
 		var n int
 		var err error
 		if w.snappy {
-			n, err = w.writer.Write([]byte(magicChunkSnappy))
+			n, err = w.writer.Write(magicChunkSnappyBytes)
 		} else {
-			n, err = w.writer.Write([]byte(magicChunk))
+			n, err = w.writer.Write(magicChunkBytes)
 		}
 		if err != nil {
 			return 0, w.err(err)
@@ -937,7 +943,7 @@ func WriterUncompressed() WriterOption {
 
 // WriterBlockSize allows to override the default block size.
 // Blocks will be this size or smaller.
-// Minimum size is 4KB and and maximum size is 4MB.
+// Minimum size is 4KB and maximum size is 4MB.
 //
 // Bigger blocks may give bigger throughput on systems with many cores,
 // and will increase compression slightly, but it will limit the possible

@@ -60,7 +60,7 @@
 //
 // The d variable is implicitly R_DST - R_DBASE,  and len(dst)-d is R_DEND - R_DST.
 // The s variable is implicitly R_SRC - R_SBASE, and len(src)-s is R_SEND - R_SRC.
-TEXT ·s2Decode(SB), NOSPLIT, $56-64
+TEXT ·s2Decode(SB), NOSPLIT, $56-56
 	// Initialize R_SRC, R_DST and R_DBASE-R_SEND.
 	MOVD dst_base+0(FP), R_DBASE
 	MOVD dst_len+8(FP), R_DLEN
