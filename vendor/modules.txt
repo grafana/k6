@@ -10,7 +10,7 @@ github.com/Azure/go-ntlmssp
 # github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 ## explicit
 github.com/DataDog/datadog-go/statsd
-# github.com/PuerkitoBio/goquery v1.9.1
+# github.com/PuerkitoBio/goquery v1.9.2
 ## explicit; go 1.18
 github.com/PuerkitoBio/goquery
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
