@@ -386,11 +386,13 @@ func (e *Exception) String() string {
 }
 
 func (e *Exception) Error() string {
-	if e == nil || e.val == nil {
+	if e == nil {
 		return "<nil>"
 	}
 	var b bytes.Buffer
-	b.WriteString(e.val.String())
+	if e.val != nil {
+		b.WriteString(e.val.String())
+	}
 	e.writeShortStack(&b)
 	return b.String()
 }
@@ -409,6 +411,10 @@ func (e *Exception) Unwrap() error {
 		}
 	}
 	return nil
+}
+
+func (e *Exception) Stack() []StackFrame {
+	return e.stack
 }
 
 func (r *Runtime) createIterProto(val *Object) objectImpl {

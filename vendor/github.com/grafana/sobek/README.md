@@ -1,4 +1,4 @@
-sobek
+Sobek
 ====
 
 ECMAScript 5.1(+) implementation in Go.
