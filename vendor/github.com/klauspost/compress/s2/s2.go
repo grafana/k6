@@ -109,7 +109,11 @@ const (
 	chunkTypeStreamIdentifier = 0xff
 )
 
-var crcTable = crc32.MakeTable(crc32.Castagnoli)
+var (
+	crcTable              = crc32.MakeTable(crc32.Castagnoli)
+	magicChunkSnappyBytes = []byte(magicChunkSnappy) // Can be passed to functions where it escapes.
+	magicChunkBytes       = []byte(magicChunk)       // Can be passed to functions where it escapes.
+)
 
 // crc implements the checksum specified in section 3 of
 // https://github.com/google/snappy/blob/master/framing_format.txt
