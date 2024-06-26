@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -585,7 +585,7 @@ func (t *task) link(parseRes parser.Result, deps linker.Files, overrideDescripto
 		return nil, err
 	}
 	// now that options are interpreted, we can do some additional checks
-	if err := file.ValidateOptions(t.h); err != nil {
+	if err := file.ValidateOptions(t.h, t.e.sym); err != nil {
 		return nil, err
 	}
 	if t.r.explicitFile {

@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -106,6 +106,7 @@ func recreateNodeIndexForMessage(orig, clone *result, origProto, cloneProto *des
 	}
 	for i, origExtr := range origProto.ExtensionRange {
 		cloneExtr := cloneProto.ExtensionRange[i]
+		updateNodeIndex(orig, clone, asExtsNode(origExtr), asExtsNode(cloneExtr))
 		updateNodeIndexWithOptions[*descriptorpb.ExtensionRangeOptions](orig, clone, origExtr, cloneExtr)
 	}
 	for i, origRr := range origProto.ReservedRange {
