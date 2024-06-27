@@ -396,14 +396,14 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID int64, logger logrus.Fie
 // this exists only to make the check in the init context.
 type requireImpl struct {
 	inInitContext func() bool
-	internal      *modules.LegacyRequireImpl
+	modSys        *modules.ModuleSystem
 }
 
 func (r *requireImpl) require(specifier string) (*sobek.Object, error) {
 	if !r.inInitContext() {
 		return nil, fmt.Errorf(cantBeUsedOutsideInitContextMsg, "require")
 	}
-	return r.internal.Require(specifier)
+	return r.modSys.Require(specifier)
 }
 
 func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *modules.ModuleSystem) {
@@ -415,7 +415,7 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 
 	impl := requireImpl{
 		inInitContext: func() bool { return vu.state == nil },
-		internal:      modules.NewLegacyRequireImpl(vu, modSys),
+		modSys:        modSys,
 	}
 
 	mustSet("require", impl.require)
@@ -430,7 +430,7 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 			return nil, errors.New("open() can't be used with an empty filename")
 		}
 		// This uses the pwd from the requireImpl
-		pwd, err := impl.internal.CurrentlyRequiredModule()
+		pwd, err := modSys.CurrentlyRequiredModule()
 		if err != nil {
 			return nil, err
 		}

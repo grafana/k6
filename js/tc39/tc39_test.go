@@ -25,7 +25,6 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/parser"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modulestest"
@@ -701,8 +700,6 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 		comp, base)
 
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
-	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms)
-	require.NoError(ctx.t, vm.Set("require", impl.Require))
 	moduleRuntime.VU.InitEnvField.CWD = base
 
 	early = false

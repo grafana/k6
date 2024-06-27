@@ -10,71 +10,23 @@ import (
 	"go.k6.io/k6/loader"
 )
 
-// LegacyRequireImpl is a legacy implementation of `require()` that is not compatible with
-// CommonJS as it loads modules relative to the currently required file,
-// instead of relative to the file the `require()` is written in.
-// See https://github.com/grafana/k6/issues/2674
-type LegacyRequireImpl struct {
-	vu      VU
-	modules *ModuleSystem
-}
-
-// NewLegacyRequireImpl creates a new LegacyRequireImpl
-func NewLegacyRequireImpl(vu VU, ms *ModuleSystem) *LegacyRequireImpl {
-	return &LegacyRequireImpl{
-		vu:      vu,
-		modules: ms,
-	}
-}
-
-const issueLink = "https://github.com/grafana/k6/issues/3534"
-
-func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier, parentModuleStr, parentModuleStr2 string) {
-	if r.modules.resolver.locked {
-		return
-	}
-	normalizePathToURL := func(path string) string {
-		u, err := url.Parse(path)
-		if err != nil {
-			return path
-		}
-		return loader.Dir(u).String()
-	}
-	parentModuleStrDir := normalizePathToURL(parentModuleStr)
-	parentModuleStr2Dir := normalizePathToURL(parentModuleStr2)
-	if parentModuleStr != parentModuleStr2 {
-		r.vu.InitEnv().Logger.Warnf(
-			`The "wrong" path (%q) and the path actually used by k6 (%q) to resolve %q are different. `+
-				`This will break in the future please see %s.`,
-			parentModuleStrDir, parentModuleStr2Dir, specifier, issueLink)
-	}
-}
-
 // Require is the actual call that implements require
-func (r *LegacyRequireImpl) Require(specifier string) (*sobek.Object, error) {
+func (ms *ModuleSystem) Require(specifier string) (*sobek.Object, error) {
 	if specifier == "" {
 		return nil, errors.New("require() can't be used with an empty specifier")
 	}
 
-	rt := r.vu.Runtime()
-	parentModuleStr := getCurrentModuleScript(r.vu)
-	parentModuleStr2, err := getPreviousRequiringFile(r.vu)
-	if err != nil {
-		return nil, err
-	}
-	if parentModuleStr != parentModuleStr2 {
-		r.warnUserOnPathResolutionDifferences(specifier, parentModuleStr, parentModuleStr2)
-		parentModuleStr = parentModuleStr2
-	}
+	rt := ms.vu.Runtime()
+	parentModuleStr := getCurrentModuleScript(ms.vu)
 
-	parentModule, _ := r.modules.resolver.sobekModuleResolver(nil, parentModuleStr)
-	m, err := r.modules.resolver.sobekModuleResolver(parentModule, specifier)
+	parentModule, _ := ms.resolver.sobekModuleResolver(nil, parentModuleStr)
+	m, err := ms.resolver.sobekModuleResolver(parentModule, specifier)
 	if err != nil {
 		return nil, err
 	}
 	if wm, ok := m.(*goModule); ok {
 		var gmi *goModuleInstance
-		gmi, err = r.modules.getModuleInstanceFromGoModule(rt, wm)
+		gmi, err = ms.getModuleInstanceFromGoModule(rt, wm)
 		if err != nil {
 			return nil, err
 		}
@@ -87,7 +39,7 @@ func (r *LegacyRequireImpl) Require(specifier string) (*sobek.Object, error) {
 	}
 	var promise *sobek.Promise
 	if c, ok := m.(sobek.CyclicModuleRecord); ok {
-		promise = rt.CyclicModuleRecordEvaluate(c, r.modules.resolver.sobekModuleResolver)
+		promise = rt.CyclicModuleRecordEvaluate(c, ms.resolver.sobekModuleResolver)
 	} else {
 		panic("shouldn't happen")
 	}
@@ -137,8 +89,8 @@ func (ms *ModuleSystem) getModuleInstanceFromGoModule(
 
 // CurrentlyRequiredModule returns the module that is currently being required.
 // It is mostly used for old and somewhat buggy behaviour of the `open` call
-func (r *LegacyRequireImpl) CurrentlyRequiredModule() (*url.URL, error) {
-	fileStr, err := getPreviousRequiringFile(r.vu)
+func (ms *ModuleSystem) CurrentlyRequiredModule() (*url.URL, error) {
+	fileStr, err := getPreviousRequiringFile(ms.vu)
 	if err != nil {
 		return nil, err
 	}
