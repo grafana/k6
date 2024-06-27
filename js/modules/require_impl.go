@@ -2,6 +2,7 @@ package modules
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 
@@ -14,113 +15,175 @@ import (
 // instead of relative to the file the `require()` is written in.
 // See https://github.com/grafana/k6/issues/2674
 type LegacyRequireImpl struct {
-	vu                      VU
-	modules                 *ModuleSystem
-	currentlyRequiredModule *url.URL
+	vu      VU
+	modules *ModuleSystem
 }
 
 // NewLegacyRequireImpl creates a new LegacyRequireImpl
-func NewLegacyRequireImpl(vu VU, ms *ModuleSystem, pwd url.URL) *LegacyRequireImpl {
+func NewLegacyRequireImpl(vu VU, ms *ModuleSystem) *LegacyRequireImpl {
 	return &LegacyRequireImpl{
-		vu:                      vu,
-		modules:                 ms,
-		currentlyRequiredModule: &pwd,
+		vu:      vu,
+		modules: ms,
 	}
 }
 
 const issueLink = "https://github.com/grafana/k6/issues/3534"
 
+func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier, parentModuleStr, parentModuleStr2 string) {
+	if r.modules.resolver.locked {
+		return
+	}
+	normalizePathToURL := func(path string) string {
+		u, err := url.Parse(path)
+		if err != nil {
+			return path
+		}
+		return loader.Dir(u).String()
+	}
+	parentModuleStrDir := normalizePathToURL(parentModuleStr)
+	parentModuleStr2Dir := normalizePathToURL(parentModuleStr2)
+	if parentModuleStr != parentModuleStr2 {
+		r.vu.InitEnv().Logger.Warnf(
+			`The "wrong" path (%q) and the path actually used by k6 (%q) to resolve %q are different. `+
+				`This will break in the future please see %s.`,
+			parentModuleStrDir, parentModuleStr2Dir, specifier, issueLink)
+	}
+}
+
 // Require is the actual call that implements require
 func (r *LegacyRequireImpl) Require(specifier string) (*sobek.Object, error) {
-	// TODO remove this in the future when we address https://github.com/grafana/k6/issues/2674
-	// This is currently needed as each time require is called we need to record it's new pwd
-	// to be used if a require *or* open is used within the file as they are relative to the
-	// latest call to require.
-	//
-	// This is *not* the actual require behaviour defined in commonJS as it is actually always relative
-	// to the file it is in. This is unlikely to be an issue but this code is here to keep backwards
-	// compatibility *for now*.
-	//
-	// With native ESM this won't even be possible as `require` might not be called - instead an import
-	// might be used in which case we won't be able to be doing this hack. In that case we either will
-	// need some Sobek specific helper or to use stack traces.
-	currentPWD := r.currentlyRequiredModule
-	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") {
-		defer func() {
-			r.currentlyRequiredModule = currentPWD
-		}()
-		fileURL, err := loader.Resolve(r.currentlyRequiredModule, specifier)
-		if err != nil {
-			return nil, err
-		}
-		// In theory we can give that downwards, but this makes the code more tightly coupled
-		// plus as explained above this will be removed in the future so the code reflects more
-		// closely what will be needed then
-		if fileURL.Scheme == "file" && !r.modules.resolver.locked {
-			r.warnUserOnPathResolutionDifferences(specifier)
-		}
-		r.currentlyRequiredModule = loader.Dir(fileURL)
-	}
-
 	if specifier == "" {
 		return nil, errors.New("require() can't be used with an empty specifier")
 	}
 
-	return r.modules.Require(currentPWD, specifier)
+	rt := r.vu.Runtime()
+	parentModuleStr := getCurrentModuleScript(r.vu)
+	parentModuleStr2, err := getPreviousRequiringFile(r.vu)
+	if err != nil {
+		return nil, err
+	}
+	if parentModuleStr != parentModuleStr2 {
+		r.warnUserOnPathResolutionDifferences(specifier, parentModuleStr, parentModuleStr2)
+		parentModuleStr = parentModuleStr2
+	}
+
+	parentModule, _ := r.modules.resolver.sobekModuleResolver(nil, parentModuleStr)
+	m, err := r.modules.resolver.sobekModuleResolver(parentModule, specifier)
+	if err != nil {
+		return nil, err
+	}
+	if wm, ok := m.(*goModule); ok {
+		var gmi *goModuleInstance
+		gmi, err = r.modules.getModuleInstanceFromGoModule(rt, wm)
+		if err != nil {
+			return nil, err
+		}
+		exports := toESModuleExports(gmi.mi.Exports())
+		return rt.ToValue(exports).ToObject(rt), nil
+	}
+	err = m.Link()
+	if err != nil {
+		return nil, err
+	}
+	var promise *sobek.Promise
+	if c, ok := m.(sobek.CyclicModuleRecord); ok {
+		promise = rt.CyclicModuleRecordEvaluate(c, r.modules.resolver.sobekModuleResolver)
+	} else {
+		panic("shouldn't happen")
+	}
+	switch promise.State() {
+	case sobek.PromiseStateRejected:
+		err = promise.Result().Export().(error) //nolint:forcetypeassert
+	case sobek.PromiseStateFulfilled:
+	default:
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cjs, ok := m.(*cjsModule); ok {
+		return rt.GetModuleInstance(cjs).(*cjsModuleInstance).exports, nil //nolint:forcetypeassert
+	}
+	return rt.NamespaceObjectFor(m), nil // TODO fix this probably needs to be more exteneted
+}
+
+func (ms *ModuleSystem) getModuleInstanceFromGoModule(
+	rt *sobek.Runtime, wm *goModule,
+) (wmi *goModuleInstance, err error) {
+	mi := rt.GetModuleInstance(wm)
+	if mi == nil {
+		err = wm.Link()
+		if err != nil {
+			return nil, err
+		}
+		promise := rt.CyclicModuleRecordEvaluate(wm, ms.resolver.sobekModuleResolver)
+		switch promise.State() {
+		case sobek.PromiseStateRejected:
+			err = promise.Result().Export().(error) //nolint:forcetypeassert
+		case sobek.PromiseStateFulfilled:
+		default:
+			panic("TLA in go modules is not supported in k6 at the moment")
+		}
+		if err != nil {
+			return nil, err
+		}
+		mi = rt.GetModuleInstance(wm)
+	}
+	gmi, ok := mi.(*goModuleInstance)
+	if !ok {
+		panic("a goModule instance is of not goModuleInstance type. This is a k6 bug please report!")
+	}
+	return gmi, nil
 }
 
 // CurrentlyRequiredModule returns the module that is currently being required.
 // It is mostly used for old and somewhat buggy behaviour of the `open` call
-func (r *LegacyRequireImpl) CurrentlyRequiredModule() url.URL {
-	return *r.currentlyRequiredModule
-}
+func (r *LegacyRequireImpl) CurrentlyRequiredModule() (*url.URL, error) {
+	fileStr, err := getPreviousRequiringFile(r.vu)
+	if err != nil {
+		return nil, err
+	}
 
-func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string) {
-	normalizePathToURL := func(path string) (*url.URL, error) {
-		u, err := url.Parse(path)
+	var u *url.URL
+	switch {
+	// this works around windows URLs like file://C:/some/path
+	// url.Parse will think of C: as hostname
+	case strings.HasPrefix(fileStr, "file://"):
+		u = new(url.URL)
+		u.Scheme = "file"
+		u.Path = strings.TrimPrefix(fileStr, "file://")
+	case strings.HasPrefix(fileStr, "https://"):
+		var err error
+		u, err = url.Parse(fileStr)
 		if err != nil {
 			return nil, err
 		}
-		return loader.Dir(u), nil
+	default:
+		return nil, fmt.Errorf("couldn't parse %q as module url - this is a k6 bug, please report it", fileStr)
 	}
-	// Warn users on their require depending on the none standard k6 behaviour.
-	logger := r.vu.InitEnv().Logger
-	correct, err := normalizePathToURL(getCurrentModuleScript(r.vu))
-	if err != nil {
-		logger.Warningf("Couldn't get the \"correct\" path to resolve specifier %q against: %q"+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			specifier, err, issueLink)
-	} else if r.currentlyRequiredModule.String() != correct.String() {
-		logger.Warningf("The \"wrong\" path (%q) and the path actually used by k6 (%q) to resolve %q are different. "+
-			"Please report to issue %s. "+
-			"This will not currently break your script but *WILL* in the future, please report this!!!",
-			correct, r.currentlyRequiredModule, specifier, issueLink)
+	return loader.Dir(u), nil
+}
+
+func toESModuleExports(exp Exports) interface{} {
+	if exp.Named == nil {
+		return exp.Default
+	}
+	if exp.Default == nil {
+		return exp.Named
 	}
 
-	k6behaviourString, err := getPreviousRequiringFile(r.vu)
-	if err != nil {
-		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			specifier, err, issueLink)
-		return
+	result := make(map[string]interface{}, len(exp.Named)+2)
+
+	for k, v := range exp.Named {
+		result[k] = v
 	}
-	k6behaviour, err := normalizePathToURL(k6behaviourString)
-	if err != nil {
-		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			specifier, err, issueLink)
-		return
-	}
-	if r.currentlyRequiredModule.String() != k6behaviour.String() {
-		// this should always be equal, but check anyway to be certain we won't break something
-		logger.Warningf("The \"wrong\" path (%q) and the path actually used by k6 (%q) to resolve %q are different. "+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			k6behaviour, r.currentlyRequiredModule, specifier, issueLink)
-	}
+	// Maybe check that those weren't set
+	result["default"] = exp.Default
+	// this so babel works with the `default` when it transpiles from ESM to commonjs.
+	// This should probably be removed once we have support for ESM directly. So that require doesn't get support for
+	// that while ESM has.
+	result["__esModule"] = true
+
+	return result
 }
 
 func getCurrentModuleScript(vu VU) string {
@@ -158,5 +221,9 @@ func getPreviousRequiringFile(vu VU) (string, error) {
 	}
 
 	// fallback
-	return vu.InitEnv().CWD.JoinPath("./-").String(), nil
+	result := frames[len(frames)-1].SrcName()
+	if result == "file:///-" {
+		return vu.InitEnv().CWD.JoinPath("./-").String(), nil
+	}
+	return result, nil
 }

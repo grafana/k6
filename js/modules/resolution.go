@@ -15,37 +15,35 @@ const notPreviouslyResolvedModule = "the module %q was not previously resolved d
 // FileLoader is a type alias for a function that returns the contents of the referenced file.
 type FileLoader func(specifier *url.URL, name string) ([]byte, error)
 
-type module interface {
-	instantiate(vu VU) moduleInstance
-}
-
-type moduleInstance interface {
-	execute() error
-	exports() *sobek.Object
-}
 type moduleCacheElement struct {
-	mod module
+	mod sobek.ModuleRecord
 	err error
 }
 
 // ModuleResolver knows how to get base Module that can be initialized
 type ModuleResolver struct {
 	cache     map[string]moduleCacheElement
-	goModules map[string]interface{}
+	goModules map[string]any
 	loadCJS   FileLoader
 	compiler  *compiler.Compiler
 	locked    bool
+	reverse   map[any]*url.URL // maybe use sobek.ModuleRecord as key
+	base      *url.URL
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
 // goModules is map of import file to a go module
 // loadCJS is used to load commonjs files
-func NewModuleResolver(goModules map[string]interface{}, loadCJS FileLoader, c *compiler.Compiler) *ModuleResolver {
+func NewModuleResolver(
+	goModules map[string]any, loadCJS FileLoader, c *compiler.Compiler, base *url.URL,
+) *ModuleResolver {
 	return &ModuleResolver{
 		goModules: goModules,
 		cache:     make(map[string]moduleCacheElement),
 		loadCJS:   loadCJS,
 		compiler:  c,
+		reverse:   make(map[any]*url.URL),
+		base:      base,
 	}
 }
 
@@ -57,7 +55,7 @@ func (mr *ModuleResolver) resolveSpecifier(basePWD *url.URL, arg string) (*url.U
 	return specifier, nil
 }
 
-func (mr *ModuleResolver) requireModule(name string) (module, error) {
+func (mr *ModuleResolver) requireModule(name string) (sobek.ModuleRecord, error) {
 	if mr.locked {
 		return nil, fmt.Errorf(notPreviouslyResolvedModule, name)
 	}
@@ -65,14 +63,14 @@ func (mr *ModuleResolver) requireModule(name string) (module, error) {
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
 	}
-	if m, ok := mod.(Module); ok {
-		return &goModule{Module: m}, nil
+	k6m, ok := mod.(Module)
+	if !ok {
+		return &baseGoModule{m: mod}, nil
 	}
-
-	return &baseGoModule{mod: mod}, nil
+	return &goModule{m: k6m}, nil
 }
 
-func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byte) (module, error) {
+func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byte) (sobek.ModuleRecord, error) {
 	specifier, err := mr.resolveSpecifier(basePWD, arg)
 	if err != nil {
 		return nil, err
@@ -81,8 +79,18 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	if cached, ok := mr.cache[specifier.String()]; ok {
 		return cached.mod, cached.err
 	}
-
-	mod, err := cjsModuleFromString(specifier, data, mr.compiler)
+	prg, isESM, err := mr.compiler.Parse(string(data), specifier.String(), false)
+	if err != nil {
+		mr.cache[specifier.String()] = moduleCacheElement{err: err}
+		return nil, err
+	}
+	var mod sobek.ModuleRecord
+	if isESM {
+		mod, err = sobek.ModuleFromAST(prg, mr.sobekModuleResolver)
+	} else {
+		mod, err = cjsModuleFromString(specifier, data, mr.compiler)
+	}
+	mr.reverse[mod] = specifier
 	mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
 	return mod, err
 }
@@ -95,14 +103,19 @@ func (mr *ModuleResolver) Lock() {
 	mr.locked = true
 }
 
-func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) {
-	if cached, ok := mr.cache[arg]; ok {
-		return cached.mod, cached.err
-	}
+// fix
+type vubox struct {
+	vu VU
+}
+
+func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (sobek.ModuleRecord, error) {
 	switch {
 	case arg == "k6", strings.HasPrefix(arg, "k6/"):
 		// Builtin or external modules ("k6", "k6/*", or "k6/x/*") are handled
 		// specially, as they don't exist on the filesystem.
+		if cached, ok := mr.cache[arg]; ok {
+			return cached.mod, cached.err
+		}
 		mod, err := mr.requireModule(arg)
 		mr.cache[arg] = moduleCacheElement{mod: mod, err: err}
 		return mod, err
@@ -125,10 +138,7 @@ func (mr *ModuleResolver) resolve(basePWD *url.URL, arg string) (module, error) 
 			mr.cache[specifier.String()] = moduleCacheElement{err: err}
 			return nil, err
 		}
-		mod, err := cjsModuleFromString(specifier, data, mr.compiler)
-		mr.cache[specifier.String()] = moduleCacheElement{mod: mod, err: err}
-
-		return mod, err
+		return mr.resolveLoaded(basePWD, arg, data)
 	}
 }
 
@@ -145,39 +155,45 @@ func (mr *ModuleResolver) Imported() []string {
 	return modules
 }
 
+func (mr *ModuleResolver) sobekModuleResolver(
+	referencingScriptOrModule any, specifier string,
+) (sobek.ModuleRecord, error) {
+	return mr.resolve(mr.reversePath(referencingScriptOrModule), specifier)
+}
+
+func (mr *ModuleResolver) reversePath(referencingScriptOrModule interface{}) *url.URL {
+	p, ok := mr.reverse[referencingScriptOrModule]
+	if !ok {
+		if referencingScriptOrModule != nil {
+			panic("fix this")
+		}
+		return mr.base
+	}
+
+	if p.String() == "file:///-" {
+		return mr.base
+	}
+	return p.JoinPath("..")
+}
+
 // ModuleSystem is implementing an ESM like module system to resolve js modules for k6 usage
 type ModuleSystem struct {
 	vu            VU
-	instanceCache map[module]moduleInstance
+	instanceCache map[sobek.ModuleRecord]sobek.ModuleInstance
 	resolver      *ModuleResolver
 }
 
 // NewModuleSystem returns a new ModuleSystem for the provide VU using the provided resoluter
 func NewModuleSystem(resolver *ModuleResolver, vu VU) *ModuleSystem {
+	rt := vu.Runtime()
+	// TODO:figure out if we can remove this
+	_ = rt.GlobalObject().DefineDataProperty("vubox",
+		rt.ToValue(vubox{vu: vu}), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_FALSE)
 	return &ModuleSystem{
 		resolver:      resolver,
-		instanceCache: make(map[module]moduleInstance),
+		instanceCache: make(map[sobek.ModuleRecord]sobek.ModuleInstance),
 		vu:            vu,
 	}
-}
-
-// Require is called when a module/file needs to be loaded by a script
-func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*sobek.Object, error) {
-	mod, err := ms.resolver.resolve(pwd, arg)
-	if err != nil {
-		return nil, err
-	}
-	if instance, ok := ms.instanceCache[mod]; ok {
-		return instance.exports(), nil
-	}
-
-	instance := mod.instantiate(ms.vu)
-	ms.instanceCache[mod] = instance
-	if err = instance.execute(); err != nil {
-		return nil, err
-	}
-
-	return instance.exports(), nil
 }
 
 // RunSourceData runs the provided sourceData and adds it to the cache.
@@ -186,22 +202,58 @@ func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*sobek.Object, error)
 //
 // TODO: this API will likely change as native ESM support will likely not let us have the exports
 // as one big sobek.Value that we can manipulate
-func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (sobek.Value, error) {
+func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (sobek.ModuleRecord, error) {
 	specifier := source.URL.String()
 	pwd := source.URL.JoinPath("../")
 	if _, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data); err != nil {
 		return nil, err // TODO wrap as this should never happen
 	}
-	return ms.Require(pwd, specifier)
+
+	mod, err := ms.resolver.resolve(pwd, specifier)
+	if err != nil {
+		return nil, err // TODO wrap as this should never happen
+	}
+	err = mod.Link()
+	if err != nil {
+		return nil, err // TODO wrap as this should never happen
+	}
+	ci, ok := mod.(sobek.CyclicModuleRecord)
+	if !ok {
+		// TODO double check this works - this isn't really a case either way.
+		return mod, nil
+	}
+	rt := ms.vu.Runtime()
+	promise := rt.CyclicModuleRecordEvaluate(ci, ms.resolver.sobekModuleResolver)
+	switch promise.State() {
+	case sobek.PromiseStateRejected:
+		return nil, promise.Result().Export().(error) //nolint:forcetypeassert
+	case sobek.PromiseStateFulfilled:
+		return mod, nil
+	default:
+		panic("TLA not supported in k6 at the moment") // TODO drop this by end of PR
+	}
 }
 
 // ExportGloballyModule sets all exports of the provided module name on the globalThis.
 // effectively making them globally available
 func ExportGloballyModule(rt *sobek.Runtime, modSys *ModuleSystem, moduleName string) {
-	t, _ := modSys.Require(nil, moduleName)
+	m, err := modSys.resolver.resolve(nil, moduleName)
+	if err != nil {
+		panic(err)
+	}
+	wm, ok := m.(*goModule)
+	if !ok {
+		panic("bad")
+	}
+	var gmi *goModuleInstance
+	gmi, err = modSys.getModuleInstanceFromGoModule(rt, wm)
+	if err != nil {
+		panic(err)
+	}
+	exports := gmi.getDefaultExport().ToObject(rt)
 
-	for _, key := range t.Keys() {
-		if err := rt.Set(key, t.Get(key)); err != nil {
+	for _, key := range exports.Keys() {
+		if err := rt.Set(key, exports.Get(key)); err != nil {
 			panic(fmt.Errorf("failed to set '%s' global object: %w", key, err))
 		}
 	}

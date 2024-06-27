@@ -51,7 +51,7 @@ func (mi *ModuleInstance) newMetric(call sobek.ConstructorCall, t metrics.Metric
 		}
 		return o, nil
 	}))
-	v, err := c(call.This, call.Arguments...)
+	v, err := c(nil, call.Arguments...)
 	if err != nil {
 		return nil, err
 	}

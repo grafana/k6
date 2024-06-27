@@ -41,6 +41,7 @@ func NewRuntime(t testing.TB) *Runtime {
 			Logger:   testutils.NewLogger(t),
 			Registry: metrics.NewRegistry(),
 		},
+		CWD: new(url.URL),
 	}
 
 	eventloop := eventloop.New(vu)
@@ -73,7 +74,7 @@ func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.Fil
 		goModules["k6/timers"] = timers.New()
 	}
 
-	r.mr = modules.NewModuleResolver(goModules, loader, c)
+	r.mr = modules.NewModuleResolver(goModules, loader, c, r.VU.InitEnvField.CWD)
 	return r.innerSetupModuleSystem()
 }
 
@@ -113,7 +114,7 @@ func (r *Runtime) RunOnEventLoop(code string) (value sobek.Value, err error) {
 
 func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
-	impl := modules.NewLegacyRequireImpl(r.VU, ms, url.URL{})
+	impl := modules.NewLegacyRequireImpl(r.VU, ms)
 	modules.ExportGloballyModule(r.VU.RuntimeField, ms, "k6/timers")
 	return r.VU.RuntimeField.Set("require", impl.Require)
 }

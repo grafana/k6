@@ -112,7 +112,7 @@ func TestNewBundle(t *testing.T) {
 		t.Parallel()
 		_, err := getSimpleBundle(t, "/script.js", "\x00")
 		require.NotNil(t, err)
-		require.Contains(t, err.Error(), "SyntaxError: file:///script.js: Unexpected character '\x00' (1:0)\n> 1 | \x00\n")
+		require.Contains(t, err.Error(), "file:///script.js: Line 1:1 Unexpected token ILLEGAL (and 1 more errors)")
 	})
 	t.Run("Error", func(t *testing.T) {
 		t.Parallel()
@@ -124,7 +124,7 @@ func TestNewBundle(t *testing.T) {
 	t.Run("InvalidExports", func(t *testing.T) {
 		t.Parallel()
 		_, err := getSimpleBundle(t, "/script.js", `module.exports = null`)
-		require.EqualError(t, err, "exports must be an object")
+		require.EqualError(t, err, "GoError: exports must be an object\n") // TODO: try to remove the GoError from herer
 	})
 	t.Run("DefaultUndefined", func(t *testing.T) {
 		t.Parallel()
@@ -561,12 +561,14 @@ func TestNewBundleFromArchive(t *testing.T) {
 		checkArchive(t, arc, baseCompatModeRtOpts, "")
 	})
 
+	/* TODO remove completely - this no longer makes sense
 	t.Run("es6_archive_with_wrong_compat_mode", func(t *testing.T) {
 		t.Parallel()
 		arc, err := getArchive(t, es6Code, baseCompatModeRtOpts)
 		require.Error(t, err)
 		require.Nil(t, arc)
 	})
+	*/
 
 	t.Run("messed_up_archive", func(t *testing.T) {
 		t.Parallel()

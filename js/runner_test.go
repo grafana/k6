@@ -181,7 +181,7 @@ func TestOptionsSettingToScript(t *testing.T) {
 		t.Run(fmt.Sprintf("Variant#%d", i), func(t *testing.T) {
 			t.Parallel()
 			data := variant + `
-					exports.default = function() {
+					export default function() {
 						if (!options) {
 							throw new Error("Expected options to be defined!");
 						}
@@ -549,7 +549,8 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			mod := mod
 			t.Run(mod, func(t *testing.T) {
 				t.Run("Source", func(t *testing.T) {
-					_, err := getSimpleRunner(t, "/script.js", fmt.Sprintf(`import "%s"; exports.default = function() {}`, mod), rtOpts)
+					_, err := getSimpleRunner(t, "/script.js",
+						fmt.Sprintf(`import "%s"; export default function() {}`, mod), rtOpts)
 					require.NoError(t, err)
 				})
 			})
@@ -563,8 +564,8 @@ func TestRunnerIntegrationImports(t *testing.T) {
 			"Absolute":       {"/path/script.js", "/path/to/lib.js"},
 			"Relative":       {"/path/script.js", "./to/lib.js"},
 			"Adjacent":       {"/path/to/script.js", "./lib.js"},
-			"STDIN-Absolute": {"-", "/path/to/lib.js"},
-			"STDIN-Relative": {"-", "./path/to/lib.js"},
+			"STDIN-Absolute": {"/-", "/path/to/lib.js"},
+			"STDIN-Relative": {"/-", "./path/to/lib.js"},
 		}
 		for name, data := range testdata {
 			name, data := name, data

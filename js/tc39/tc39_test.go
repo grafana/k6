@@ -71,9 +71,7 @@ var (
 		"tail-call-optimization",
 		"Temporal",
 		"import-assertions",
-		"dynamic-import",
 		"logical-assignment-operators",
-		"import.meta",
 		"Atomics",
 		"Atomics.waitAsync",
 		"FinalizationRegistry",
@@ -630,7 +628,7 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 	return err
 }
 
-func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *sobek.Runtime, expectsError bool) (early bool, origErr, err error) {
+func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *sobek.Runtime, _ bool) (early bool, origErr, err error) {
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
@@ -655,11 +653,6 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *s
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeBase}
 	p, _, err = comp.Compile(src, name, true)
 	origErr = err
-	if err != nil && !expectsError {
-		comp.Options.CompatibilityMode = ctx.compatibilityMode
-		p, _, err = comp.Compile(src, name, true)
-	}
-
 	if err != nil {
 		return early, origErr, err
 	}
@@ -699,16 +692,16 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 	defer ctx.compilerPool.Put(comp)
 	comp.Options = compiler.Options{Strict: false, CompatibilityMode: ctx.compatibilityMode}
 
+	u := &url.URL{Scheme: "file", Path: "/" + path.Join(ctx.base, name)}
+	base := u.JoinPath("..")
 	mr := modules.NewModuleResolver(nil,
 		func(specifier *url.URL, _ string) ([]byte, error) {
 			return fs.ReadFile(currentFS, specifier.Path[1:])
 		},
-		comp)
-	u := &url.URL{Scheme: "file", Path: path.Join(ctx.base, name)}
+		comp, base)
 
-	base := u.JoinPath("..")
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
-	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms, *base)
+	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms)
 	require.NoError(ctx.t, vm.Set("require", impl.Require))
 	moduleRuntime.VU.InitEnvField.CWD = base
 
