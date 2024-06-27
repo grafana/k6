@@ -114,7 +114,6 @@ func (r *Runtime) RunOnEventLoop(code string) (value sobek.Value, err error) {
 
 func (r *Runtime) innerSetupModuleSystem() error {
 	ms := modules.NewModuleSystem(r.mr, r.VU)
-	impl := modules.NewLegacyRequireImpl(r.VU, ms)
 	modules.ExportGloballyModule(r.VU.RuntimeField, ms, "k6/timers")
-	return r.VU.RuntimeField.Set("require", impl.Require)
+	return r.VU.RuntimeField.Set("require", ms.Require)
 }
