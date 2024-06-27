@@ -944,8 +944,8 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		rootPath += "c:/"
 	}
-	assert.Contains(t, stdout, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:9(3))\n\tat `+
-		rootPath+`test/bar.js:3:3(3)\n\tat setup (`+rootPath+`test/test.js:5:3(9))\n" hint="script exception"`)
+	assert.Contains(t, stdout, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:10(3))\n\tat default (`+
+		rootPath+`test/bar.js:3:7(3))\n\tat setup (`+rootPath+`test/test.js:5:7(8))\n" hint="script exception"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=123 run_status=7 tainted=false`)
 	assert.Contains(t, stdout, "bogus summary")
 }
@@ -2105,10 +2105,10 @@ func TestEventSystemError(t *testing.T) {
 				"got event Init with data '<nil>'",
 				"got event TestStart with data '<nil>'",
 				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at file:///-:11:16(6)}'",
+				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at default (file:///-:11:16(5))}'",
 				"got event TestEnd with data '<nil>'",
-				"got event Exit with data '&{Error:test aborted: oops! at file:///-:11:16(6)}'",
-				"test aborted: oops! at file:///-:11:16(6)",
+				"got event Exit with data '&{Error:test aborted: oops! at default (file:///-:11:16(5))}'",
+				"test aborted: oops! at default (file:///-:11:16(5))",
 			},
 			expExitCode: exitcodes.ScriptAborted,
 		},
@@ -2117,8 +2117,8 @@ func TestEventSystemError(t *testing.T) {
 			script: "undefinedVar",
 			expLog: []string{
 				"got event Exit with data '&{Error:could not initialize '-': could not load JS test " +
-					"'file:///-': ReferenceError: undefinedVar is not defined\n\tat file:///-:2:0(12)\n}'",
-				"ReferenceError: undefinedVar is not defined\n\tat file:///-:2:0(12)\n",
+					"'file:///-': ReferenceError: undefinedVar is not defined\n\tat file:///-:2:1(8)\n}'",
+				"ReferenceError: undefinedVar is not defined\n\tat file:///-:2:1(8)\n",
 			},
 			expExitCode: exitcodes.ScriptException,
 		},
@@ -2137,11 +2137,11 @@ func TestEventSystemError(t *testing.T) {
 				"got event Init with data '<nil>'",
 				"got event TestStart with data '<nil>'",
 				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:Error: oops!\n\tat file:///-:9:11(3)\n}'",
-				"Error: oops!\n\tat file:///-:9:11(3)\n",
+				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
+				"Error: oops!\n\tat default (file:///-:9:12(3))\n",
 				"got event IterStart with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:Error: oops!\n\tat file:///-:9:11(3)\n}'",
-				"Error: oops!\n\tat file:///-:9:11(3)\n",
+				"got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
+				"Error: oops!\n\tat default (file:///-:9:12(3))\n",
 				"got event TestEnd with data '<nil>'",
 				"got event Exit with data '&{Error:<nil>}'",
 			},

@@ -1,78 +1,119 @@
 package modules
 
 import (
-	"fmt"
-	"net/url"
+	"errors"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/js/common"
-	"go.k6.io/k6/js/compiler"
+	"github.com/grafana/sobek/ast"
 )
 
 // cjsModule represents a commonJS module
 type cjsModule struct {
-	prg *sobek.Program
-	url *url.URL
+	prg                    *sobek.Program
+	exportedNames          []string
+	exportedNamesCallbacks []func([]string)
 }
 
-var _ module = &cjsModule{}
+func newCjsModule(prg *sobek.Program) sobek.ModuleRecord {
+	return &cjsModule{prg: prg}
+}
+
+func (cm *cjsModule) Link() error { return nil }
+
+func (cm *cjsModule) InitializeEnvironment() error { return nil }
+
+func (cm *cjsModule) Instantiate(_ *sobek.Runtime) (sobek.CyclicModuleInstance, error) {
+	return &cjsModuleInstance{w: cm}, nil
+}
+
+func (cm *cjsModule) RequestedModules() []string { return nil }
+
+func (cm *cjsModule) Evaluate(_ *sobek.Runtime) *sobek.Promise {
+	panic("this shouldn't be called in the current implementation")
+}
+
+func (cm *cjsModule) GetExportedNames(callback func([]string), _ ...sobek.ModuleRecord) bool {
+	if cm.exportedNames != nil {
+		callback(cm.exportedNames)
+		return true
+	}
+	cm.exportedNamesCallbacks = append(cm.exportedNamesCallbacks, callback)
+	return false
+}
+
+func (cm *cjsModule) ResolveExport(exportName string, _ ...sobek.ResolveSetElement) (*sobek.ResolvedBinding, bool) {
+	return &sobek.ResolvedBinding{
+		Module:      cm,
+		BindingName: exportName,
+	}, false
+}
 
 type cjsModuleInstance struct {
-	mod       *cjsModule
-	moduleObj *sobek.Object
-	vu        VU
+	w                *cjsModule
+	exports          *sobek.Object
+	isEsModuleMarked bool
 }
 
-func (c *cjsModule) instantiate(vu VU) moduleInstance {
-	return &cjsModuleInstance{vu: vu, mod: c}
-}
+func (cmi *cjsModuleInstance) HasTLA() bool { return false }
 
-func (c *cjsModuleInstance) execute() error {
-	rt := c.vu.Runtime()
-	exports := rt.NewObject()
-	c.moduleObj = rt.NewObject()
-	err := c.moduleObj.Set("exports", exports)
+func (cmi *cjsModuleInstance) RequestedModules() []string { return cmi.w.RequestedModules() }
+
+func (cmi *cjsModuleInstance) ExecuteModule(rt *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
+	v, err := rt.RunProgram(cmi.w.prg)
 	if err != nil {
-		return fmt.Errorf("error while getting ready to import commonJS, couldn't set exports property of module: %w",
-			err)
+		return nil, err
 	}
 
-	// Run the program.
-	f, err := rt.RunProgram(c.mod.prg)
-	if err != nil {
-		return err
+	module := rt.NewObject()
+	cmi.exports = rt.NewObject()
+	_ = module.Set("exports", cmi.exports)
+	call, ok := sobek.AssertFunction(v)
+	if !ok {
+		panic("Somehow a CommonJS module is not wrapped in a function - " +
+			"this is a k6 bug, please report it (https://github.com/grafana/k6/issues)")
 	}
-	if call, ok := sobek.AssertFunction(f); ok {
-		if _, err = call(exports, c.moduleObj, exports); err != nil {
-			return err
+	if _, err = call(cmi.exports, module, cmi.exports); err != nil {
+		return nil, err
+	}
+
+	exportsV := module.Get("exports")
+	if sobek.IsNull(exportsV) {
+		return nil, errors.New("CommonJS's exports must not be null")
+	}
+	cmi.exports = exportsV.ToObject(rt)
+
+	// this will be called multiple times we only need to update this on the first VU
+	if cmi.w.exportedNames == nil {
+		cmi.w.exportedNames = cmi.exports.Keys()
+		if cmi.w.exportedNames == nil { // workaround if a CommonJS module does not have exports
+			cmi.w.exportedNames = make([]string, 0)
+		}
+		for _, callback := range cmi.w.exportedNamesCallbacks {
+			callback(cmi.w.exportedNames)
 		}
 	}
-
-	return nil
+	__esModule := cmi.exports.Get("__esModule") //nolint:revive,stylecheck
+	cmi.isEsModuleMarked = __esModule != nil && __esModule.ToBoolean()
+	return cmi, nil
 }
 
-func (c *cjsModuleInstance) exports() *sobek.Object {
-	exportsV := c.moduleObj.Get("exports")
-	if common.IsNullish(exportsV) {
-		return nil
+func (cmi *cjsModuleInstance) GetBindingValue(name string) sobek.Value {
+	if name == jsDefaultExportIdentifier {
+		d := cmi.exports.Get(jsDefaultExportIdentifier)
+		if d != nil {
+			return d
+		}
+		return cmi.exports
 	}
-	return exportsV.ToObject(c.vu.Runtime())
+
+	return cmi.exports.Get(name)
 }
 
 // cjsModuleFromString is a helper function which returns CJSModule given the argument it has.
-// It is mostly a wrapper around compiler.Compiler@Compile
-//
-// TODO: extract this to not make this package dependant on compilers.
-// this is potentially a moot point after ESM when the compiler will likely get mostly dropped.
-func cjsModuleFromString(fileURL *url.URL, data []byte, c *compiler.Compiler) (*cjsModule, error) {
-	astProgram, _, err := c.Parse(string(data), fileURL.String(), true)
+func cjsModuleFromString(prg *ast.Program) (sobek.ModuleRecord, error) {
+	pgm, err := sobek.CompileAST(prg, true)
 	if err != nil {
 		return nil, err
 	}
-	pgm, err := sobek.CompileAST(astProgram, true)
-	if err != nil {
-		return nil, err
-	}
-
-	return &cjsModule{prg: pgm, url: fileURL}, nil
+	return newCjsModule(pgm), nil
 }
