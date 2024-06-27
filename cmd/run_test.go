@@ -149,13 +149,13 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			expExitCode:  exitcodes.ScriptException,
 		},
 		{
-			testFilename: "invalid_option.js",
+			testFilename: "invalidconfig/invalid_option.js",
 			name:         "run should fail with exit status 104 if an invalid option value exists",
 			expErr:       "this is an invalid type",
 			expExitCode:  exitcodes.InvalidConfig,
 		},
 		{
-			testFilename: "option_env.js",
+			testFilename: "invalidconfig/option_env.js",
 			name:         "run should fail with exit status 104 if an invalid option is set through env variable",
 			expErr:       "envconfig.Process",
 			expExitCode:  exitcodes.InvalidConfig,
@@ -164,21 +164,21 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			},
 		},
 		{
-			testFilename: "option_env.js",
+			testFilename: "invalidconfig/option_env.js",
 			name:         "run should fail with exit status 104 if an invalid option is set through k6 variable",
 			expErr:       "invalid duration",
 			expExitCode:  exitcodes.InvalidConfig,
 			extraArgs:    []string{"--env", "DURATION=fails"},
 		},
 		{
-			testFilename:   "option_env.js",
+			testFilename:   "invalidconfig/option_env.js",
 			name:           "run should fail with exit status 104 if an invalid option is set in a config file",
 			expErr:         "invalid duration",
 			expExitCode:    exitcodes.InvalidConfig,
-			configFilename: "invalid.json",
+			configFilename: "invalidconfig/invalid.json",
 		},
 		{
-			testFilename: "invalid_scenario.js",
+			testFilename: "invalidconfig/invalid_scenario.js",
 			name:         "run should fail with exit status 104 if an invalid scenario exists",
 			expErr:       "specified executor type",
 			expExitCode:  exitcodes.InvalidConfig,
@@ -241,7 +241,7 @@ func TestRunScriptErrorsAndAbort(t *testing.T) {
 			ts.CmdArgs = append([]string{"k6", "run", tc.testFilename}, tc.extraArgs...)
 
 			if tc.configFilename != "" {
-				configFile, err := os.ReadFile(path.Join("testdata", "config", tc.configFilename)) //nolint:forbidigo
+				configFile, err := os.ReadFile(path.Join("testdata", tc.configFilename)) //nolint:forbidigo
 				require.NoError(t, err)
 				require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, tc.configFilename), configFile, 0o644))
 				ts.Flags.ConfigFilePath = path.Join(ts.Cwd, tc.configFilename)
