@@ -42,7 +42,7 @@ github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f h1:lO4WD4F/r
 github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f/go.mod h1:cuUVRXasLTGF7a8hSLbxyZXjz+1KgoB3wDUb6vlszIc=
 github.com/dlclark/regexp2 v1.9.0 h1:pTK/l/3qYIKaRXuHnEnIf7Y5NxfRPfpb7dis6/gdlVI=
 github.com/dlclark/regexp2 v1.9.0/go.mod h1:DHkYz0B9wPfa6wondMfaivmHpzrQ3v9q8cnmRbL6yW8=
-github.com/dop251/goja v0.0.0-20240516125602-ccbae20bcec2 h1:OFTHt+yJDo/uaIKMGjEKzc3DGhrpQZoqvMUIloZv6ZY=
+github.com/dop251/goja v0.0.0-20240610225006-393f6d42497b h1:fMKDnOAKCGXSZBphY/ilLtu7cmwMnjqE+xJxUkfkpCY=
 github.com/envoyproxy/go-control-plane v0.9.0/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.1-0.20191026205805-5f8ba28d4473/go.mod h1:YTl/9mNaCwkRvm6d1a2C3ymFceY/DCBVvsKhRF0iEA4=
 github.com/envoyproxy/go-control-plane v0.9.4/go.mod h1:6rpuAdCZL397s3pYoYcLgu1mIlRU8Am5FuJP05cCM98=
@@ -84,8 +84,8 @@ github.com/gorilla/websocket v1.5.1 h1:gmztn0JnHVt9JZquRuzLw3g4wouNVzKL15iLr/zn/
 github.com/gorilla/websocket v1.5.1/go.mod h1:x3kM2JMyaluk02fnUJpQuwD2dCS5NDG2ZHL0uE0tcaY=
 github.com/grafana/sobek v0.0.0-20240626131919-5be1e93c7efc h1:4aFnXIV4UQu+5NL3ZlmYxTZ5hVUXu/U/TKsvBUt5wsA=
 github.com/grafana/sobek v0.0.0-20240626131919-5be1e93c7efc/go.mod h1:tUEHKWaMrxFGrMgjeAH85OEceCGQiSl6a/6Wckj/Vf4=
-github.com/grafana/xk6-browser v1.6.0 h1:x8ZfBwiUJRRKNEw+Asr5ae9o2gFvYU1Ll/4dDMNIPZ8=
-github.com/grafana/xk6-browser v1.6.0/go.mod h1:xLaGGhTMHIRsMvkVWFYh9RPy87kG2n4L4Or6DeI8U+o=
+github.com/grafana/xk6-browser v1.6.1-0.20240701105714-29f6ef3049fe h1:uE7e1Lzris7YuM5mRLulkUGBIL9WmPHvLrA2RyZLyy8=
+github.com/grafana/xk6-browser v1.6.1-0.20240701105714-29f6ef3049fe/go.mod h1:TNngUsbmV3I5NDVklGxjpAR2znEjYEsBtHQirGw8nAI=
 github.com/grafana/xk6-dashboard v0.7.4 h1:0ZRPTAXW+6A3Xqq/a/OaIZhxUt1SOMwUFff0IPwBHrs=
 github.com/grafana/xk6-dashboard v0.7.4/go.mod h1:300QyQ+OQAYz/L/AzB5tKzPeBY5eKh2wl1NsRmCbsx4=
 github.com/grafana/xk6-output-prometheus-remote v0.4.0 h1:7k3xjuKaD9BwcX8iuu5v6PtAK1L53kvx1r8BaTUfRH4=

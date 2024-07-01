@@ -144,16 +144,25 @@ func createWaitForEventHandler(
 				if stringSliceContains(events, ev.typ) {
 					if predicateFn != nil {
 						if predicateFn(ev.data) {
-							ch <- ev.data
+							select {
+							case ch <- ev.data:
+							case <-evCancelCtx.Done():
+								return
+							}
 						}
 					} else {
-						ch <- nil
+						select {
+						case ch <- nil:
+						case <-evCancelCtx.Done():
+							return
+						}
 					}
 					close(ch)
 
 					// We wait for one matching event only,
 					// then remove event handler by cancelling context and stopping goroutine.
 					evCancelFn()
+
 					return
 				}
 			}
@@ -185,9 +194,12 @@ func createWaitForEventPredicateHandler(
 			case ev := <-chEvHandler:
 				if stringSliceContains(events, ev.typ) &&
 					predicateFn != nil && predicateFn(ev.data) {
-					ch <- ev.data
-					close(ch)
-					evCancelFn()
+					select {
+					case ch <- ev.data:
+						close(ch)
+						evCancelFn()
+					case <-evCancelCtx.Done():
+					}
 					return
 				}
 			}
