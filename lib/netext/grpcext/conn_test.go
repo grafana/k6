@@ -64,6 +64,28 @@ func TestInvokeWithCallOptions(t *testing.T) {
 	assert.NotNil(t, res)
 }
 
+func TestInvokeWithDiscardResponseMessage(t *testing.T) {
+	t.Parallel()
+
+	reply := func(_, _ *dynamicpb.Message, opts ...grpc.CallOption) error {
+		assert.Len(t, opts, 3) // two by default plus one injected
+		return nil
+	}
+
+	c := Conn{raw: invokemock(reply)}
+	r := InvokeRequest{
+		Method:                 "/hello.HelloService/NoOp",
+		MethodDescriptor:       methodFromProto("NoOp"),
+		DiscardResponseMessage: true,
+		Message:                []byte(`{}`),
+		Metadata:               metadata.New(nil),
+	}
+	res, err := c.Invoke(context.Background(), r, grpc.UseCompressor("fakeone"))
+	require.NoError(t, err)
+	assert.NotNil(t, res)
+	assert.Nil(t, res.Message)
+}
+
 func TestInvokeReturnError(t *testing.T) {
 	t.Parallel()
 

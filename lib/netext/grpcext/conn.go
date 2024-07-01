@@ -30,12 +30,13 @@ import (
 
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
-	Method           string
-	MethodDescriptor protoreflect.MethodDescriptor
-	Timeout          time.Duration
-	TagsAndMeta      *metrics.TagsAndMeta
-	Message          []byte
-	Metadata         metadata.MD
+	Method                 string
+	MethodDescriptor       protoreflect.MethodDescriptor
+	Timeout                time.Duration
+	TagsAndMeta            *metrics.TagsAndMeta
+	DiscardResponseMessage bool
+	Message                []byte
+	Metadata               metadata.MD
 }
 
 // InvokeResponse represents a gRPC response.
@@ -165,7 +166,7 @@ func (c *Conn) Invoke(
 		response.Error = errMsg
 	}
 
-	if resp != nil {
+	if resp != nil && !req.DiscardResponseMessage {
 		msg, err := convert(marshaler, resp)
 		if err != nil {
 			return nil, fmt.Errorf("unable to convert response object to JSON: %w", err)

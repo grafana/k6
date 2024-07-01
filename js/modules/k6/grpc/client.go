@@ -365,12 +365,13 @@ func (c *Client) buildInvokeRequest(
 	p.SetSystemTags(state, c.addr, method)
 
 	return grpcext.InvokeRequest{
-		Method:           method,
-		MethodDescriptor: methodDesc,
-		Timeout:          p.Timeout,
-		Message:          b,
-		TagsAndMeta:      &p.TagsAndMeta,
-		Metadata:         p.Metadata,
+		Method:                 method,
+		MethodDescriptor:       methodDesc,
+		Timeout:                p.Timeout,
+		DiscardResponseMessage: p.DiscardResponseMessage,
+		Message:                b,
+		TagsAndMeta:            &p.TagsAndMeta,
+		Metadata:               p.Metadata,
 	}, nil
 }
 

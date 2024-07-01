@@ -18,9 +18,10 @@ import (
 // callParams is the parameters that can be passed to a gRPC calls
 // like invoke or newStream.
 type callParams struct {
-	Metadata    metadata.MD
-	TagsAndMeta metrics.TagsAndMeta
-	Timeout     time.Duration
+	Metadata               metadata.MD
+	TagsAndMeta            metrics.TagsAndMeta
+	Timeout                time.Duration
+	DiscardResponseMessage bool
 }
 
 // newCallParams constructs the call parameters from the input value.
@@ -58,6 +59,8 @@ func newCallParams(vu modules.VU, input sobek.Value) (*callParams, error) {
 			if err != nil {
 				return result, fmt.Errorf("invalid timeout value: %w", err)
 			}
+		case "discardResponseMessage":
+			result.DiscardResponseMessage = params.Get(k).ToBoolean()
 		default:
 			return result, fmt.Errorf("unknown param: %q", k)
 		}
