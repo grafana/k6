@@ -15,7 +15,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -247,7 +246,6 @@ type tc39BenchmarkItem struct {
 type tc39BenchmarkData []tc39BenchmarkItem
 
 type tc39TestCtx struct {
-	compilerPool   *compiler.Pool
 	base           string
 	t              *testing.T
 	prgCache       map[string]*sobek.Program
@@ -409,11 +407,10 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 		_ = vm.Set("print", t.Log)
 	}
 	var early bool
-	var origErr error
 	if meta.hasFlag("module") {
-		early, origErr, err = ctx.runTC39Module(name, src, meta.Includes, vm)
+		early, err = ctx.runTC39Module(name, src, meta.Includes, vm)
 	} else {
-		early, origErr, err = ctx.runTC39Script(name, src, meta.Includes, vm, meta.Negative.Type != "")
+		early, err = ctx.runTC39Script(name, src, meta.Includes, vm, meta.Negative.Type != "")
 	}
 
 	if err == nil {
@@ -444,9 +441,6 @@ func (ctx *tc39TestCtx) runTC39Test(t testing.TB, name, src string, meta *tc39Me
 	errType := getErrType(name, err, failf)
 
 	if errType != "" && errType != meta.Negative.Type {
-		if meta.Negative.Type == "SyntaxError" && origErr != nil && getErrType(name, origErr, failf) == meta.Negative.Type {
-			return
-		}
 		// vm.vm.prg.dumpCode(t.Logf)
 		failf("%s: unexpected error type (%s), expected (%s)", name, errType, meta.Negative.Type)
 		return
@@ -604,11 +598,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*sobek.Program, error) {
 			return nil, err
 		}
 
-		str := string(b)
-		comp := ctx.compilerPool.Get()
-		defer ctx.compilerPool.Put(comp)
-		comp.Options = compiler.Options{Strict: false, CompatibilityMode: ctx.compatibilityMode}
-		prg, _, err = comp.Compile(str, name, true)
+		prg, _, err = ctx.compiler().Compile(string(b), name, true)
 		if err != nil {
 			return nil, err
 		}
@@ -627,77 +617,70 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 	return err
 }
 
-func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *sobek.Runtime, _ bool) (early bool, origErr, err error) {
+func (ctx *tc39TestCtx) compiler() *compiler.Compiler {
+	comp := compiler.New(testutils.NewLogger(ctx.t))
+	comp.Options.CompatibilityMode = ctx.compatibilityMode
+	return comp
+}
+
+func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *sobek.Runtime, _ bool) (early bool, err error) {
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
-		return early, origErr, err
+		return early, err
 	}
 
 	err = ctx.runFile(ctx.base, path.Join("harness", "sta.js"), vm)
 	if err != nil {
-		return early, origErr, err
+		return early, err
 	}
 
 	for _, include := range includes {
 		err = ctx.runFile(ctx.base, path.Join("harness", include), vm)
 		if err != nil {
-			return early, origErr, err
+			return early, err
 		}
 	}
 
-	var p *sobek.Program
-	comp := ctx.compilerPool.Get()
-	defer ctx.compilerPool.Put(comp)
-	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeBase}
-	p, _, err = comp.Compile(src, name, true)
-	origErr = err
+	p, _, err := ctx.compiler().Compile(src, name, true)
 	if err != nil {
-		return early, origErr, err
+		return early, err
 	}
 
 	early = false
 	_, err = vm.RunProgram(p)
 
-	return early, origErr, err
+	return early, err
 }
 
-func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *sobek.Runtime) (early bool, origErr, err error) {
-	currentFS := os.DirFS(".")
-	if err != nil {
-		panic(err)
-	}
+func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *sobek.Runtime) (early bool, err error) {
 	moduleRuntime := modulestest.NewRuntime(ctx.t)
 	moduleRuntime.VU.RuntimeField = vm
 	early = true
 	err = ctx.runFile(ctx.base, path.Join("harness", "assert.js"), vm)
 	if err != nil {
-		return early, origErr, err
+		return early, err
 	}
 
 	err = ctx.runFile(ctx.base, path.Join("harness", "sta.js"), vm)
 	if err != nil {
-		return early, origErr, err
+		return early, err
 	}
 
 	for _, include := range includes {
 		err = ctx.runFile(ctx.base, path.Join("harness", include), vm)
 		if err != nil {
-			return early, origErr, err
+			return early, err
 		}
 	}
-
-	comp := ctx.compilerPool.Get()
-	defer ctx.compilerPool.Put(comp)
-	comp.Options = compiler.Options{Strict: false, CompatibilityMode: ctx.compatibilityMode}
 
 	u := &url.URL{Scheme: "file", Path: "/" + path.Join(ctx.base, name)}
 	base := u.JoinPath("..")
 	mr := modules.NewModuleResolver(nil,
 		func(specifier *url.URL, _ string) ([]byte, error) {
-			return fs.ReadFile(currentFS, specifier.Path[1:])
+			return fs.ReadFile(os.DirFS("."), specifier.Path[1:])
 		},
-		comp, base)
+		ctx.compiler(), base)
 
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
 	moduleRuntime.VU.InitEnvField.CWD = base
@@ -708,7 +691,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 		URL:  u,
 	})
 
-	return early, origErr, err
+	return early, err
 }
 
 func (ctx *tc39TestCtx) runTC39Tests(name string) {
@@ -768,7 +751,6 @@ func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {
 
 	ctx := &tc39TestCtx{
 		base:              tc39BASE,
-		compilerPool:      compiler.NewPool(testutils.NewLogger(t), runtime.GOMAXPROCS(0)),
 		compatibilityMode: compatibilityMode,
 	}
 	ctx.init()

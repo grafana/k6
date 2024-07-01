@@ -232,36 +232,3 @@ func (c *compilationState) increaseMappingsByOne(sourceMap []byte) ([]byte, erro
 
 	return json.Marshal(m)
 }
-
-// Pool is a pool of compilers so it can be used easier in parallel tests as they have their own babel.
-type Pool struct {
-	c chan *Compiler
-}
-
-// NewPool creates a Pool that will be using the provided logger and will preallocate (in parallel)
-// the count of compilers each with their own babel.
-func NewPool(logger logrus.FieldLogger, count int) *Pool {
-	c := &Pool{
-		c: make(chan *Compiler, count),
-	}
-	go func() {
-		for i := 0; i < count; i++ {
-			go func() {
-				co := New(logger)
-				c.Put(co)
-			}()
-		}
-	}()
-
-	return c
-}
-
-// Get a compiler from the pool.
-func (c *Pool) Get() *Compiler {
-	return <-c.c
-}
-
-// Put a compiler back in the pool.
-func (c *Pool) Put(co *Compiler) {
-	c.c <- co
-}
