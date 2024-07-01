@@ -14,7 +14,6 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
 	"github.com/gorilla/websocket"
-	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -569,7 +568,7 @@ func (b *Browser) IsConnected() bool {
 }
 
 // NewContext creates a new incognito-like browser context.
-func (b *Browser) NewContext(opts sobek.Value) (*BrowserContext, error) {
+func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, error) {
 	_, span := TraceAPICall(b.ctx, "", "browser.newContext")
 	defer span.End()
 
@@ -588,14 +587,7 @@ func (b *Browser) NewContext(opts sobek.Value) (*BrowserContext, error) {
 		return nil, err
 	}
 
-	browserCtxOpts := NewBrowserContextOptions()
-	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
-		err := fmt.Errorf("parsing newContext options: %w", err)
-		spanRecordError(span, err)
-		return nil, err
-	}
-
-	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, opts, b.logger)
 	if err != nil {
 		err := fmt.Errorf("new context: %w", err)
 		spanRecordError(span, err)
@@ -610,7 +602,7 @@ func (b *Browser) NewContext(opts sobek.Value) (*BrowserContext, error) {
 }
 
 // NewPage creates a new tab in the browser window.
-func (b *Browser) NewPage(opts sobek.Value) (*Page, error) {
+func (b *Browser) NewPage(opts *BrowserContextOptions) (*Page, error) {
 	_, span := TraceAPICall(b.ctx, "", "browser.newPage")
 	defer span.End()
 
