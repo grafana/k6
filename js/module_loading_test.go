@@ -688,3 +688,37 @@ func TestDefaultNamedExports(t *testing.T) {
 	_, err := getSimpleRunner(t, "/main.js", `export default function main() {}`)
 	require.NoError(t, err)
 }
+
+func TestStarImport(t *testing.T) {
+	t.Parallel()
+	fs := fsext.NewMemMapFs()
+	err := writeToFs(fs, map[string]any{
+		"/commonjs_file.js": `exports.something = 5;`,
+	})
+	require.NoError(t, err)
+
+	r1, err := getSimpleRunner(t, "/script.js", `
+		import * as cjs from "./commonjs_file.js"; // commonjs
+		import * as k6 from "k6"; // "new" go module
+		// TODO: test with basic go module maybe
+
+		if (cjs.something != 5) {
+			throw "cjs.something has wrong value" + cjs.something;
+		}
+		if (typeof k6.sleep != "function") {
+			throw "k6.sleep has wrong type" + typeof k6.sleep;
+		}
+		export default () => {}
+	`, fs)
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	_, err = NewFromArchive(&lib.TestPreInitState{
+		Logger:         testutils.NewLogger(t),
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+	}, arc)
+	require.NoError(t, err)
+}

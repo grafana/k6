@@ -65,7 +65,7 @@ func (mr *ModuleResolver) requireModule(name string) (sobek.ModuleRecord, error)
 	}
 	k6m, ok := mod.(Module)
 	if !ok {
-		return &baseGoModule{m: mod}, nil
+		return &basicGoModule{m: mod}, nil
 	}
 	return &goModule{m: k6m}, nil
 }

@@ -1,16 +1,14 @@
 package modules
 
 import (
-	"sync"
-
 	"github.com/grafana/sobek"
 )
 
 // This sobek.ModuleRecord wrapper for go/js module which conforms to modules.Module interface
 type goModule struct {
-	m             Module
-	once          sync.Once
-	exportedNames []string
+	m                      Module
+	exportedNames          []string
+	exportedNamesCallbacks []func([]string)
 }
 
 func (gm *goModule) Link() error {
@@ -26,15 +24,17 @@ func (gm *goModule) InitializeEnvironment() error {
 }
 
 func (gm *goModule) Instantiate(rt *sobek.Runtime) (sobek.CyclicModuleInstance, error) {
+	// TODO(@mstoykov): try to work around this in some way maybe hostDefined on Module
 	vu := rt.GlobalObject().Get("vubox").Export().(vubox).vu //nolint:forcetypeassert
 	mi := gm.m.NewModuleInstance(vu)
-	gm.once.Do(func() {
-		named := mi.Exports().Named
-		gm.exportedNames = make([]string, len(named))
-		for name := range named {
-			gm.exportedNames = append(gm.exportedNames, name)
-		}
-	})
+	named := mi.Exports().Named
+	gm.exportedNames = make([]string, len(named))
+	for name := range named {
+		gm.exportedNames = append(gm.exportedNames, name)
+	}
+	for _, callback := range gm.exportedNamesCallbacks {
+		callback(gm.exportedNames)
+	}
 	return &goModuleInstance{rt: rt, mi: mi}, nil
 }
 
@@ -43,9 +43,12 @@ func (gm *goModule) Evaluate(_ *sobek.Runtime) *sobek.Promise {
 }
 
 func (gm *goModule) GetExportedNames(callback func([]string), _ ...sobek.ModuleRecord) bool {
-	gm.once.Do(func() { panic("this shouldn't happen") })
-	callback(gm.exportedNames)
-	return true
+	if gm.exportedNames != nil {
+		callback(gm.exportedNames)
+		return true
+	}
+	gm.exportedNamesCallbacks = append(gm.exportedNamesCallbacks, callback)
+	return false
 }
 
 func (gm *goModule) ResolveExport(exportName string, _ ...sobek.ResolveSetElement) (*sobek.ResolvedBinding, bool) {
