@@ -8,7 +8,6 @@ import (
 )
 
 func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
-
 	switch v := v.(type) {
 	case *ast.BlockStatement:
 		c.compileBlockStatement(v, needResult)
@@ -52,6 +51,10 @@ func (c *compiler) compileStatement(v ast.Statement, needResult bool) {
 	case *ast.WithStatement:
 		c.compileWithStatement(v, needResult)
 	case *ast.DebuggerStatement:
+	case *ast.ImportDeclaration:
+		// this is already done, earlier
+	case *ast.ExportDeclaration:
+		c.compileExportDeclaration(v)
 	default:
 		c.assert(false, int(v.Idx0())-1, "Unknown statement type: %T", v)
 		panic("unreachable")
@@ -776,6 +779,165 @@ func (c *compiler) emitVarAssign(name unistring.String, offset int, init compile
 			c.emitNamedOrConst(init, name)
 			c.p.addSrcMap(offset)
 			c.emit(initValueP)
+		}
+	}
+}
+
+func (c *compiler) compileExportDeclaration(expr *ast.ExportDeclaration) {
+	switch {
+	case expr.Variable != nil:
+		c.compileVariableStatement(expr.Variable)
+	case expr.LexicalDeclaration != nil:
+		c.compileLexicalDeclaration(expr.LexicalDeclaration)
+	case expr.ClassDeclaration != nil:
+		cls := expr.ClassDeclaration
+		if expr.IsDefault {
+			c.emitLexicalAssign("default", int(cls.Class.Class)-1, c.compileClassLiteral(cls.Class, false))
+		} else {
+			c.compileClassDeclaration(cls)
+		}
+	case expr.HoistableDeclaration != nil: // already handled
+	case expr.AssignExpression != nil:
+		assign := expr.AssignExpression
+		c.compileLexicalDeclaration(&ast.LexicalDeclaration{
+			Idx:   assign.Idx0(),
+			Token: token.CONST,
+			List: []*ast.Binding{
+				{
+					Target: &ast.Identifier{
+						Name: unistring.String("default"),
+						Idx:  assign.Idx0(),
+					},
+					Initializer: assign,
+				},
+			},
+		})
+	case expr.ExportFromClause != nil:
+		from := expr.ExportFromClause
+		module, err := c.hostResolveImportedModule(c.module, expr.FromClause.ModuleSpecifier.String())
+		if err != nil {
+			c.throwSyntaxError(int(expr.Idx0()), err.Error())
+		}
+		if from.NamedExports == nil { // star export - nothing to do
+			return
+		}
+		for _, name := range from.NamedExports.ExportsList {
+			value, ambiguous := module.ResolveExport(name.IdentifierName.String())
+
+			if ambiguous || value == nil { // also ambiguous
+				continue // ambiguous import already reported
+			}
+
+			n := name.Alias
+			if n.String() == "" {
+				n = name.IdentifierName
+			}
+			localB, _ := c.scope.lookupName(n)
+			if localB == nil {
+				c.throwSyntaxError(int(expr.Idx0()), "couldn't lookup  %s", n)
+			}
+			identifier := name.IdentifierName.String()
+			localB.getIndirect = func(vm *vm) Value {
+				return vm.r.modules[module].GetBindingValue(identifier)
+			}
+		}
+	}
+}
+
+func (c *compiler) compileImportDeclaration(expr *ast.ImportDeclaration) {
+	if expr.FromClause == nil {
+		return // import "specifier";
+	}
+	module, err := c.hostResolveImportedModule(c.module, expr.FromClause.ModuleSpecifier.String())
+	if err != nil {
+		c.throwSyntaxError(int(expr.Idx0()), err.Error())
+	}
+	if expr.ImportClause != nil {
+		if namespace := expr.ImportClause.NameSpaceImport; namespace != nil {
+			idx := expr.Idx
+			c.emitLexicalAssign(
+				namespace.ImportedBinding,
+				int(idx),
+				c.compileEmitterExpr(func() {
+					c.emit(importNamespace{
+						module: module,
+					})
+				}, idx),
+			)
+		}
+		if named := expr.ImportClause.NamedImports; named != nil {
+			for _, name := range named.ImportsList {
+				value, ambiguous := module.ResolveExport(name.IdentifierName.String())
+
+				if ambiguous || value == nil {
+					continue // ambiguous import already reports
+				}
+				n := name.Alias
+				if n.String() == "" {
+					n = name.IdentifierName
+				}
+				if value.BindingName == "*namespace*" {
+					idx := expr.Idx
+					c.emitLexicalAssign(
+						n,
+						int(idx),
+						c.compileEmitterExpr(func() {
+							c.emit(importNamespace{
+								module: value.Module,
+							})
+						}, idx),
+					)
+					continue
+				}
+
+				c.checkIdentifierLName(n, int(expr.Idx))
+				localB, _ := c.scope.lookupName(n)
+				if localB == nil {
+					c.throwSyntaxError(int(expr.Idx0()), "couldn't lookup  %s", n)
+				}
+				identifier := unistring.NewFromString(value.BindingName).String()
+				localB.getIndirect = func(vm *vm) Value {
+					m := vm.r.modules[value.Module]
+					return m.GetBindingValue(identifier)
+				}
+				localB.markAccessPoint()
+				c.emit(initIndirect{getter: localB.getIndirect})
+
+			}
+		}
+
+		if def := expr.ImportClause.ImportedDefaultBinding; def != nil {
+			value, ambiguous := module.ResolveExport("default")
+
+			if ambiguous || value == nil {
+				return // already handled
+			}
+
+			localB, _ := c.scope.lookupName(def.Name)
+			if localB == nil {
+				c.throwSyntaxError(int(expr.Idx0()), "couldn't lookup  %s", def.Name)
+			}
+			if value.BindingName == "*namespace*" {
+				idx := expr.Idx
+				c.emitLexicalAssign(
+					def.Name,
+					int(idx),
+					c.compileEmitterExpr(func() {
+						c.emit(importNamespace{
+							module: value.Module,
+						})
+					}, idx),
+				)
+			} else {
+				identifier := unistring.NewFromString(value.BindingName).String()
+				localB.getIndirect = func(vm *vm) Value {
+					m := vm.r.modules[value.Module]
+					v := m.GetBindingValue(identifier)
+					return v
+				}
+				localB.markAccessPoint()
+				c.emit(initIndirect{getter: localB.getIndirect})
+			}
 		}
 	}
 }

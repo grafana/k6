@@ -772,7 +772,7 @@ func (o *Object) baseObject(*Runtime) *Object {
 //
 // In all other cases returns own enumerable non-symbol properties as map[string]interface{}.
 //
-// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
 func (o *Object) Export() interface{} {
 	return o.self.export(&objectExportCtx{})
 }
@@ -787,20 +787,20 @@ func (o *Object) hash(*maphash.Hash) uint64 {
 }
 
 // Get an object's property by name.
-// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
 func (o *Object) Get(name string) Value {
 	return o.self.getStr(unistring.NewFromString(name), nil)
 }
 
 // GetSymbol returns the value of a symbol property. Use one of the Sym* values for well-known
 // symbols (such as SymIterator, SymToStringTag, etc...).
-// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
 func (o *Object) GetSymbol(sym *Symbol) Value {
 	return o.self.getSym(sym, nil)
 }
 
 // Keys returns a list of Object's enumerable keys.
-// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
 func (o *Object) Keys() (keys []string) {
 	iter := &enumerableIter{
 		o:       o,
@@ -813,8 +813,18 @@ func (o *Object) Keys() (keys []string) {
 	return
 }
 
+// GetOwnPropertyNames returns a list of all own string properties of the Object, similar to Object.getOwnPropertyNames()
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
+func (o *Object) GetOwnPropertyNames() (keys []string) {
+	for item, next := o.self.iterateStringKeys()(); next != nil; item, next = next() {
+		keys = append(keys, item.name.String())
+	}
+
+	return
+}
+
 // Symbols returns a list of Object's enumerable symbol properties.
-// This method will panic with an *Exception if a JavaScript exception is thrown in the process.
+// This method will panic with an *Exception if a JavaScript exception is thrown in the process. Use Runtime.Try to catch these.
 func (o *Object) Symbols() []*Symbol {
 	symbols := o.self.symbols(false, nil)
 	ret := make([]*Symbol, len(symbols))

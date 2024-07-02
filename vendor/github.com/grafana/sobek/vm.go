@@ -3,6 +3,7 @@ package sobek
 import (
 	"fmt"
 	"math"
+	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -27,6 +28,7 @@ type stash struct {
 	obj       *Object
 
 	outer *stash
+	vm    *vm
 
 	// If this is a top-level function stash, sets the type of the function. If set, dynamic var declarations
 	// created by direct eval go here.
@@ -456,6 +458,10 @@ func (s *stash) getByName(name unistring.String) (v Value, exists bool) {
 			} else {
 				v = _undefined
 			}
+		} else if idx&maskIndirect != 0 {
+			var f func(*vm) Value
+			_ = s.vm.r.ExportTo(v, &f)
+			v = f(s.vm)
 		}
 		return v, true
 	}
@@ -542,6 +548,7 @@ func (s *stash) deleteBinding(name unistring.String) {
 func (vm *vm) newStash() {
 	vm.stash = &stash{
 		outer: vm.stash,
+		vm:    vm, // TODO fix
 	}
 	vm.stashAllocs++
 }
@@ -755,8 +762,7 @@ func (vm *vm) handleThrow(arg interface{}) *Exception {
 		}
 		if int(tf.callStackLen) < len(vm.callStack) {
 			ctx := &vm.callStack[tf.callStackLen]
-			vm.prg, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args =
-				ctx.prg, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args
+			vm.prg, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args = ctx.prg, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args
 			vm.callStack = vm.callStack[:tf.callStackLen]
 		}
 		vm.sp = int(tf.sp)
@@ -851,8 +857,7 @@ func (vm *vm) peek() Value {
 }
 
 func (vm *vm) saveCtx(ctx *context) {
-	ctx.prg, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args =
-		vm.prg, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args
+	ctx.prg, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args = vm.prg, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args
 }
 
 func (vm *vm) pushCtx() {
@@ -867,8 +872,7 @@ func (vm *vm) pushCtx() {
 }
 
 func (vm *vm) restoreCtx(ctx *context) {
-	vm.prg, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args =
-		ctx.prg, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args
+	vm.prg, vm.stash, vm.privEnv, vm.newTarget, vm.result, vm.pc, vm.sb, vm.args = ctx.prg, ctx.stash, ctx.privEnv, ctx.newTarget, ctx.result, ctx.pc, ctx.sb, ctx.args
 }
 
 func (vm *vm) popCtx() {
@@ -1159,6 +1163,66 @@ type initStack1P int
 func (s initStack1P) exec(vm *vm) {
 	vm.initStack1(int(s))
 	vm.sp--
+}
+
+type importNamespace struct {
+	module ModuleRecord
+}
+
+func (i importNamespace) exec(vm *vm) {
+	vm.push(vm.r.NamespaceObjectFor(i.module))
+	vm.pc++
+}
+
+type export struct {
+	idx      uint32
+	callback func(*vm, func() Value)
+}
+
+func (e export) exec(vm *vm) {
+	// from loadStash
+	level := int(e.idx >> 24)
+	idx := uint32(e.idx & 0x00FFFFFF)
+	stash := vm.stash
+	for i := 0; i < level; i++ {
+		stash = stash.outer
+	}
+	e.callback(vm, func() Value {
+		return stash.getByIdx(idx)
+	})
+	vm.pc++
+}
+
+type exportLex struct {
+	idx      uint32
+	callback func(*vm, func() Value)
+}
+
+func (e exportLex) exec(vm *vm) {
+	// from loadStashLex
+	level := int(e.idx >> 24)
+	idx := uint32(e.idx & 0x00FFFFFF)
+	stash := vm.stash
+	for i := 0; i < level; i++ {
+		stash = stash.outer
+	}
+	e.callback(vm, func() Value {
+		v := stash.getByIdx(idx)
+		if v == nil {
+			panic(errAccessBeforeInit)
+		}
+		return v
+	})
+	vm.pc++
+}
+
+type exportIndirect struct {
+	callback func(*vm)
+}
+
+func (e exportIndirect) exec(vm *vm) {
+	e.callback(vm)
+	vm.pc++
 }
 
 type storeStackP int
@@ -2620,6 +2684,22 @@ func (s initStash) exec(vm *vm) {
 	vm.initLocal(int(s))
 }
 
+type initIndirect struct {
+	idx    uint32
+	getter func(vm *vm) Value
+}
+
+func (s initIndirect) exec(vm *vm) {
+	level := int(s.idx) >> 24
+	idx := uint32(s.idx & 0x00FFFFFF)
+	stash := vm.stash
+	for i := 0; i < level; i++ {
+		stash = stash.outer
+	}
+	stash.initByIdx(idx, vm.r.ToValue(s.getter))
+	vm.pc++
+}
+
 type initStashP uint32
 
 func (s initStashP) exec(vm *vm) {
@@ -2765,6 +2845,15 @@ type setGlobalStrict unistring.String
 
 func (s setGlobalStrict) exec(vm *vm) {
 	vm.r.setGlobal(unistring.String(s), vm.peek(), true)
+	vm.pc++
+}
+
+// Load a var indirectly from another module
+type loadIndirect func(vm *vm) Value
+
+func (g loadIndirect) exec(vm *vm) {
+	v := nilSafe(g(vm))
+	vm.push(v)
 	vm.pc++
 }
 
@@ -3374,11 +3463,15 @@ func (numargs call) exec(vm *vm) {
 	n := int(numargs)
 	v := vm.stack[vm.sp-n-1] // callee
 	obj := vm.toCallee(v)
+
 	obj.self.vmCall(vm, n)
 }
 
 func (vm *vm) clearStack() {
 	sp := vm.sp
+	if sp > len(vm.stack) {
+		time.Sleep(time.Second)
+	}
 	stackTail := vm.stack[sp:]
 	for i := range stackTail {
 		stackTail[i] = nil
@@ -3723,6 +3816,41 @@ func (n *newAsyncFunc) exec(vm *vm) {
 	vm.pc++
 }
 
+type loadModulePromise struct {
+	moduleCore ModuleRecord
+}
+
+func (n *loadModulePromise) exec(vm *vm) {
+	mi := vm.r.modules[n.moduleCore].(*SourceTextModuleInstance)
+	vm.push(mi.pcap.promise)
+	vm.pc++
+}
+
+type newModule struct {
+	newAsyncFunc
+	moduleCore ModuleRecord
+}
+
+func (n *newModule) exec(vm *vm) {
+	obj := vm.r.newAsyncFunc(n.name, n.length, n.strict)
+	obj.prg = n.prg
+	obj.stash = vm.stash
+	obj.privEnv = vm.privEnv
+	obj.src = n.source
+	vm.push(obj.val)
+	vm.pc++
+}
+
+type setModulePromise struct {
+	moduleCore ModuleRecord
+}
+
+func (n *setModulePromise) exec(vm *vm) {
+	mi := vm.r.modules[n.moduleCore].(*SourceTextModuleInstance)
+	mi.asyncPromise = vm.pop().Export().(*Promise)
+	vm.pc++
+}
+
 type newGeneratorFunc struct {
 	newFunc
 }
@@ -3791,7 +3919,7 @@ func getFuncObject(v Value) *Object {
 		}
 		return o
 	}
-	if v == _undefined {
+	if v == _undefined || v == _null {
 		return nil
 	}
 	panic(typeError("Value is not an Object"))
@@ -3827,6 +3955,12 @@ func (n *newArrowFunc) _exec(vm *vm, obj *arrowFuncObject) {
 	}
 	vm.push(obj.val)
 	vm.pc++
+}
+
+type ambiguousImport unistring.String
+
+func (a ambiguousImport) exec(vm *vm) {
+	panic(vm.r.newError(vm.r.getSyntaxError(), "Ambiguous import for name %s", a))
 }
 
 func (n *newArrowFunc) exec(vm *vm) {
@@ -4210,7 +4344,6 @@ end:
 		return valueTrue
 	}
 	return valueFalse
-
 }
 
 type _op_lt struct{}
@@ -4536,6 +4669,65 @@ func (_loadNewTarget) exec(vm *vm) {
 	} else {
 		vm.push(_undefined)
 	}
+	vm.pc++
+}
+
+type _loadImportMeta struct{}
+
+var loadImportMeta _loadImportMeta
+
+func (_loadImportMeta) exec(vm *vm) {
+	// https://262.ecma-international.org/13.0/#sec-meta-properties-runtime-semantics-evaluation
+	t := vm.r.GetActiveScriptOrModule()
+	m := t.(ModuleRecord) // There should be now way for this to have compiled
+	vm.push(vm.r.getImportMetaFor(m))
+	vm.pc++
+}
+
+type _loadDynamicImport struct{}
+
+var dynamicImport _loadDynamicImport
+
+func (_loadDynamicImport) exec(vm *vm) {
+	// https://262.ecma-international.org/13.0/#sec-import-call-runtime-semantics-evaluation
+	vm.push(vm.r.ToValue(func(specifier Value) Value { // TODO remove this function
+		t := vm.r.GetActiveScriptOrModule()
+
+		pcap := vm.r.newPromiseCapability(vm.r.getPromise())
+		var specifierStr String
+		err := vm.r.try(func() {
+			specifierStr = specifier.toString()
+		})
+		if err != nil {
+			if ex, ok := err.(*Exception); ok {
+				pcap.reject(vm.r.ToValue(ex.val))
+			} else {
+				pcap.reject(vm.r.ToValue(err))
+			}
+			return pcap.promise
+		}
+		if vm.r.importModuleDynamically == nil {
+			pcap.reject(asciiString("dynamic modules not enabled in the host program"))
+		} else {
+			pcapInput := vm.r.newPromiseCapability(vm.r.getPromise())
+			onFullfill := vm.r.ToValue(func(call FunctionCall) Value {
+				pcap.resolve(call.Argument(0))
+				return nil
+			})
+			rejectionClosure := vm.r.ToValue(func(call FunctionCall) Value {
+				v := call.Argument(0)
+				if v.ExportType() == reflect.TypeOf(&Exception{}) {
+					v = v.Export().(*Exception).Value()
+				}
+
+				pcap.reject(v)
+				return nil
+			})
+			vm.r.performPromiseThen(pcapInput.promise.Export().(*Promise), onFullfill, rejectionClosure, nil)
+			vm.r.importModuleDynamically(t, specifierStr, pcapInput)
+		}
+		return pcap.promise
+	}))
 	vm.pc++
 }
 
