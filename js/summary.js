@@ -233,8 +233,7 @@ function nonTrendMetricValueForSum(metric, timeUnit) {
     case 'rate':
       return [
         humanizeValue(metric.values.rate, metric, timeUnit),
-        succMark + ' ' + metric.values.passes,
-        failMark + ' ' + metric.values.fails,
+	      `${metric.values.passes} out of ${metric.values.passes + metric.values.fails}`,
       ]
     default:
       return ['[no data]']
