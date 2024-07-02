@@ -311,6 +311,19 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "InvokeDiscardResponseMessage",
+			initString: codeBlock{
+				code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`,
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.invoke("grpc.testing.TestService/EmptyCall", {}, { discardResponseMessage: true })`,
+			},
+		},
+		{
 			name: "Invoke",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
@@ -334,6 +347,32 @@ func TestClient(t *testing.T) {
 			},
 		},
 		{
+			name: "InvokeDiscardResponseMessage",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+					return &grpc_testing.Empty{}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				var resp = client.invoke("grpc.testing.TestService/EmptyCall", {}, { discardResponseMessage: true })
+				if (resp.status !== grpc.StatusOK) {
+					throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
+				}
+				if (resp.message !== null) {
+					throw new Error("unexpected message: " + JSON.stringify(resp.message))
+				}`,
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
+					samplesBuf := metrics.GetBufferedSamples(samples)
+					assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+				},
+			},
+		},
+		{
 			name: "AsyncInvoke",
 			initString: codeBlock{code: `
 				var client = new grpc.Client();
@@ -349,6 +388,36 @@ func TestClient(t *testing.T) {
 				client.asyncInvoke("grpc.testing.TestService/EmptyCall", {}).then(function(resp) {
 					if (resp.status !== grpc.StatusOK) {
 						throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
+					}
+				}, (err) => {
+					throw new Error("unexpected error: " + err)
+				})
+				`,
+				asserts: func(t *testing.T, rb *httpmultibin.HTTPMultiBin, samples chan metrics.SampleContainer, _ error) {
+					samplesBuf := metrics.GetBufferedSamples(samples)
+					assertMetricEmitted(t, metrics.GRPCReqDurationName, samplesBuf, rb.Replacer.Replace("GRPCBIN_ADDR/grpc.testing.TestService/EmptyCall"))
+				},
+			},
+		},
+		{
+			name: "AsyncInvokeDiscardResponseMessage",
+			initString: codeBlock{code: `
+				var client = new grpc.Client();
+				client.load([], "../../../../lib/testutils/httpmultibin/grpc_testing/test.proto");`},
+			setup: func(tb *httpmultibin.HTTPMultiBin) {
+				tb.GRPCStub.EmptyCallFunc = func(context.Context, *grpc_testing.Empty) (*grpc_testing.Empty, error) {
+					return &grpc_testing.Empty{}, nil
+				}
+			},
+			vuString: codeBlock{
+				code: `
+				client.connect("GRPCBIN_ADDR");
+				client.asyncInvoke("grpc.testing.TestService/EmptyCall", {}, { discardResponseMessage: true }).then(function(resp) {
+					if (resp.status !== grpc.StatusOK) {
+						throw new Error("unexpected error: " + JSON.stringify(resp.error) + "or status: " + resp.status)
+					}
+					if (resp.message !== null) {
+						throw new Error("unexpected message: " + JSON.stringify(resp.message))
 					}
 				}, (err) => {
 					throw new Error("unexpected error: " + err)
