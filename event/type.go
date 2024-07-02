@@ -18,12 +18,14 @@ const (
 	IterEnd
 	// Exit is emitted when the k6 process is about to exit.
 	Exit
+	// TestSummaryGenerated is emitted when the summary is generated.
+	TestSummaryGenerated
 )
 
 //nolint:gochecknoglobals
 var (
 	// GlobalEvents are emitted once per test run.
-	GlobalEvents = []Type{Init, TestStart, TestEnd, Exit}
+	GlobalEvents = []Type{Init, TestStart, TestEnd, TestSummaryGenerated, Exit}
 	// VUEvents are emitted multiple times per each VU.
 	VUEvents = []Type{IterStart, IterEnd}
 )
@@ -40,4 +42,14 @@ type IterData struct {
 	VUID         uint64
 	ScenarioName string
 	Error        error
+}
+
+// SummaryData is the data sent in the TestSummaryGenerated event.
+type SummaryData struct {
+	Summary map[string]interface{}
+}
+
+// String Overiding for tests
+func (s *SummaryData) String() string {
+	return "&{Summary:map[...]...}"
 }

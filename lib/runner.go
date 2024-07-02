@@ -81,7 +81,9 @@ type Runner interface {
 	// function in the script.
 	IsExecutable(string) bool
 
-	HandleSummary(context.Context, *Summary) (map[string]io.Reader, error)
+	// Returns the summary for stdout/stderr, and
+	// summary supplied to test script handleSummary function.
+	HandleSummary(context.Context, *Summary) (map[string]io.Reader, map[string]interface{}, error)
 }
 
 // UIState describes the state of the UI, which might influence what
