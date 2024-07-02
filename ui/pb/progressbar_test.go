@@ -1,20 +1,23 @@
 package pb
 
 import (
+	"bytes"
+	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/lib/testutils"
+	"io"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 )
 
-// TODO(imiric): Consider adding logging tests for 100% pb coverage.
-// Unfortunately the following introduces an import cycle: pb -> lib -> pb
-// func getTestLogger() *logger.Entry {
-// 	logHook := testutils.NewLogHook(logrus.WarnLevel)
-// 	testLog := logrus.New()
-// 	testLog.AddHook(logHook)
-// 	testLog.SetOutput(io.Discard)
-// 	return logrus.NewEntry(testLog)
-// }
+func getTestLogger() *logger.Entry {
+	logHook := testutils.NewLogHook(logrus.WarnLevel)
+	testLog := logrus.New()
+	testLog.AddHook(logHook)
+	testLog.SetOutput(io.Discard)
+	return logrus.NewEntry(testLog)
+}
 
 func TestProgressBarRender(t *testing.T) {
 	t.Parallel()
@@ -74,6 +77,19 @@ func TestProgressBarRender(t *testing.T) {
 		t.Run(tc.expected, func(t *testing.T) {
 			t.Parallel()
 			pbar := New(tc.options...)
+
+			buf := new(bytes.Buffer)
+			logger := getTestLogger()
+			logger.SetOutput(buf)
+
+			_ = pbar.Render(0, tc.pbWidthDelta).String()
+
+			logOutput := buf.String()
+			expectedLogMessage := "exceeds valid range, clamped between 0 and 1"
+			if !strings.Contains(logOutput, expectedLogMessage) {
+				t.Errorf("Expected log message not found in logs: %s", logOutput)
+			}
+
 			assert.NotNil(t, pbar)
 			assert.Equal(t, tc.expected, pbar.Render(0, tc.pbWidthDelta).String())
 		})

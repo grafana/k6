@@ -2201,7 +2201,7 @@ func TestSystemTags(t *testing.T) {
 			require.NoError(t, r.SetOptions(r.GetOptions().Apply(lib.Options{
 				Throw:                 null.BoolFrom(false),
 				TLSVersion:            &lib.TLSVersions{Max: tls.VersionTLS13},
-				SystemTags:            metrics.ToSystemTagSet([]string{tc.tag}),
+				SystemTags:            metrics.ToSystemTagSet([]string{tc.tag})[0],
 				InsecureSkipTLSVerify: null.BoolFrom(true),
 			})))
 
