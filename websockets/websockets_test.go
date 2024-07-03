@@ -89,6 +89,8 @@ type testState struct {
 
 	callRecorder *callRecorder
 	errors       chan error
+
+	module *WebSocketsAPI
 }
 
 // callRecorder a helper type that records all calls
@@ -152,6 +154,7 @@ func newTestState(t testing.TB) testState {
 
 	m := new(RootModule).NewModuleInstance(runtime.VU)
 	require.NoError(t, runtime.VU.RuntimeField.Set("WebSocket", m.Exports().Named["WebSocket"]))
+	require.NoError(t, runtime.VU.RuntimeField.Set("Blob", m.Exports().Named["Blob"]))
 	require.NoError(t, runtime.VU.RuntimeField.Set("call", recorder.Call))
 
 	runtime.MoveToVUContext(state)
@@ -162,6 +165,7 @@ func newTestState(t testing.TB) testState {
 		callRecorder: recorder,
 		errors:       make(chan error, 50),
 		t:            t,
+		module:       m.(*WebSocketsAPI),
 	}
 }
 
@@ -210,6 +214,22 @@ func TestBasic(t *testing.T) {
 		var ws = new WebSocket("WSBIN_URL/ws-echo")
 		ws.addEventListener("open", () => {
 			ws.send("something")
+			ws.close()
+		})
+	`))
+	require.NoError(t, err)
+	samples := metrics.GetBufferedSamples(ts.samples)
+	assertSessionMetricsEmitted(t, samples, "", sr("WSBIN_URL/ws-echo"), http.StatusSwitchingProtocols, "")
+}
+
+func TestBasicSendBlob(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	sr := ts.tb.Replacer.Replace
+	_, err := ts.runtime.RunOnEventLoop(sr(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			ws.send(new Blob(["something"]))
 			ws.close()
 		})
 	`))
@@ -313,10 +333,99 @@ func TestBinaryState(t *testing.T) {
 			throw new Error("Expects ws.binaryType to not be writable")
 		}
 	`))
+	require.Error(t, err)
+	require.ErrorContains(t, err, binarytypeError)
+	logs := hook.Drain()
+	require.Len(t, logs, 0)
+}
+
+func TestBinaryType_Default(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+	ts.runtime.VU.StateField.Logger = logger
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo-invalid")
+		ws.addEventListener("open", () => {
+			const sent = new Uint8Array([164,41]).buffer
+			ws.send(sent)
+			ws.onmessage = (e) => {
+				if (!(e.data instanceof Blob)) {
+					throw new Error("Wrong event.data type; expected: Blob, got: "+ typeof e.data)
+				}
+
+				if (sent.byteLength !== e.data.arrayBuffer().byteLength) {
+					throw new Error("The data received isn't equal to the data sent")
+				}
+
+				ws.close()
+			}
+		})
+	`))
+	require.Error(t, err)
+	require.ErrorContains(t, err, binarytypeError)
+	logs := hook.Drain()
+	require.Len(t, logs, 0)
+}
+
+func TestBinaryType_Blob(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+	ts.runtime.VU.StateField.Logger = logger
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.binaryType = "blob"
+		ws.addEventListener("open", () => {
+			const sent = new Uint8Array([164,41]).buffer
+			ws.send(sent)
+			ws.onmessage = (e) => {
+				if (!(e.data instanceof Blob)) {
+					throw new Error("Wrong event.data type; expected: Blob, got: "+ typeof e.data)
+				}
+
+				e.data.arrayBuffer().then((ab) => {
+					if (sent.byteLength !== ab.byteLength) {
+						throw new Error("The data received isn't equal to the data sent")
+					}
+				})
+
+				ws.close()
+			}
+		})
+	`))
 	require.NoError(t, err)
 	logs := hook.Drain()
-	require.Len(t, logs, 1)
-	require.Contains(t, logs[0].Message, binarytypeWarning)
+	require.Len(t, logs, 0)
+}
+
+func TestBinaryType_ArrayBuffer(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+	ts.runtime.VU.StateField.Logger = logger
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.binaryType = "arraybuffer"
+		ws.addEventListener("open", () => {
+			const sent = new Uint8Array([164,41]).buffer
+			ws.send(sent)
+			ws.onmessage = (e) => {
+				if (!(e.data instanceof ArrayBuffer)) {
+					throw new Error("Wrong event.data type; expected: ArrayBuffer, got: "+ typeof e.data)
+				}
+
+				if (sent.byteLength !== e.data.byteLength) {
+					throw new Error("The data received isn't equal to the data sent")
+				}
+
+				ws.close()
+			}
+		})
+	`))
+	require.NoError(t, err)
+	logs := hook.Drain()
+	require.Len(t, logs, 0)
 }
 
 func TestExceptionDontPanic(t *testing.T) {

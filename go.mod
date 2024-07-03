@@ -4,11 +4,11 @@ go 1.20
 
 require (
 	github.com/gorilla/websocket v1.5.1
-	github.com/grafana/sobek v0.0.0-20240606091932-2da0e9e5f3e7
+	github.com/grafana/sobek v0.0.0-20240607083612-4f0cd64f4e78
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
-	go.k6.io/k6 v0.51.1-0.20240606120708-bd114fdbd683
+	go.k6.io/k6 v0.51.1-0.20240612130226-3415ce6edc99
 	go.uber.org/goleak v1.3.0
 	gopkg.in/guregu/null.v3 v3.3.0
 )
@@ -54,10 +54,10 @@ require (
 	go.opentelemetry.io/otel/sdk v1.24.0 // indirect
 	go.opentelemetry.io/otel/trace v1.24.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.1.0 // indirect
-	golang.org/x/crypto v0.21.0 // indirect
-	golang.org/x/net v0.23.0 // indirect
-	golang.org/x/sys v0.18.0 // indirect
-	golang.org/x/text v0.14.0 // indirect
+	golang.org/x/crypto v0.24.0 // indirect
+	golang.org/x/net v0.26.0 // indirect
+	golang.org/x/sys v0.21.0 // indirect
+	golang.org/x/text v0.16.0 // indirect
 	golang.org/x/time v0.5.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240227224415-6ceb2ff114de // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240227224415-6ceb2ff114de // indirect

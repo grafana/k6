@@ -6,7 +6,6 @@ This is meant to try to implement the specification as close as possible without
 
 1. not reporting errors
 2. not allowing some ports and other security workarounds
-3. supporting Blob as message
 
 It supports additional k6 specific features such as:
 
@@ -41,7 +40,9 @@ It is implemented using the [xk6](https://k6.io/blog/extending-k6-with-xk6/) sys
 
 ## Discrepancies with the specifications
 
-* `binaryType` is an `ArrayBuffer` by default instead of "Blob" and will throw an exception if it's tried to be changed as "Blob" is not supported by k6.
+* `binaryType` does not have a default value (in contrast to the spec, [which suggests `"blob"` as default](https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/binaryType)),
+so in order to successfully receive binary messages a `binaryType` must be explicitly set either to `"arraybuffer"` (for `ArrayBuffer`)
+or `"blob"` (for `Blob`).
 
 ## Contributing
 
