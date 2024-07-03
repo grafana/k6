@@ -18,7 +18,7 @@ Through the rest of the development cycle dependencies shouldn't be updated unle
 
 
 The last part predominantly goes for `golang.org/x/*` and particularly `golang.org/x/net` which usually have updates through the development of Go itself.
-[Goja](https://github.com/dop251/goja) has special considerations as it's heavily used and bug fixes there or new features usually have high impact on k6. Which means that we usually try to update it whenever something new lands there.
+[Sobek](https://github.com/grafana/sobek) has special considerations as it's heavily used and bug fixes there or new features usually have high impact on k6. Which means that we usually try to update it whenever something new lands there.
 
 As the stability of any k6 release is pretty essential, this should be done only when adequate testing can be done, and in general, the changelog for each dependency should be consulted on what has changed.
 
@@ -55,10 +55,10 @@ You can use the command `modtools check --direct-only` provided you, to update i
 Commit dependencies one by one with a message like `Update <dependency> from vX.Y.Z to vX.Y.Z` and a relevant changelog for k6. Sometimes that means "nothing of relevance for k6", sometimes it means a list of bug fixes or new features.
 
 It's preferable to make multiple PRs - in most cases you can split them in three:
-- update for goja - which usually needs to happen.
+- update for Sobek - which usually needs to happen.
 - update for `golang.org/x/*` - also again happen literally every release
 - everything else - this in general doesn't include more than 5-6 small updates.
 
 Further splitting is recommended if PRs become too big.
 
-When updating goja it's recommended to run the tc39 tests in `js/tc39`. And if needed, update the breaking ones as explained in an [Introduction to a k6's TC39 testing](./js/tc39/README.md).
+When updating Sobek it's recommended to run the tc39 tests in `js/tc39`. And if needed, update the breaking ones as explained in an [Introduction to a k6's TC39 testing](./js/tc39/README.md).

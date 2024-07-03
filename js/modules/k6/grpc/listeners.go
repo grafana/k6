@@ -26,7 +26,7 @@ type eventListener struct {
 	eventType string
 
 	// this return sobek.value *and* error in order to return error on exception instead of panic
-	// https://pkg.go.dev/github.com/dop251/goja#hdr-Functions
+	// https://pkg.go.dev/github.com/grafana/sobek#hdr-Functions
 	list []func(sobek.Value) (sobek.Value, error)
 }
 

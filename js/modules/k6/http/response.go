@@ -16,7 +16,7 @@ import (
 	"go.k6.io/k6/lib/netext/httpext"
 )
 
-// Response is a representation of an HTTP response to be returned to the goja VM
+// Response is a representation of an HTTP response to be returned to the Sobek VM
 type Response struct {
 	*httpext.Response `js:"-"`
 	client            *Client
@@ -61,7 +61,7 @@ func (res *Response) HTML(selector ...string) html.Selection {
 	return sel
 }
 
-// JSON parses the body of a response as JSON and returns it to the goja VM.
+// JSON parses the body of a response as JSON and returns it to the Sobek VM.
 func (res *Response) JSON(selector ...string) sobek.Value {
 	rt := res.client.moduleInstance.vu.Runtime()
 

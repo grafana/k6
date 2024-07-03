@@ -9,8 +9,8 @@ import (
 	"github.com/grafana/sobek"
 )
 
-// NewRandSource is copied from goja's source code:
-// https://github.com/dop251/goja/blob/master/goja/main.go#L44
+// NewRandSource is copied from Sobek's source code:
+// https://github.com/grafana/sobek/blob/master/sobek/main.go#L44
 // The returned RandSource is NOT safe for concurrent use:
 // https://golang.org/pkg/math/rand/#NewSource
 func NewRandSource() sobek.RandSource {

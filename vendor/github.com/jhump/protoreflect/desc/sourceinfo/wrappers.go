@@ -2,7 +2,6 @@ package sourceinfo
 
 import (
 	"fmt"
-
 	"google.golang.org/protobuf/reflect/protoreflect"
 )
 
@@ -14,6 +13,14 @@ import (
 type fileDescriptor struct {
 	protoreflect.FileDescriptor
 	locs protoreflect.SourceLocations
+}
+
+func (f fileDescriptor) Edition() int32 {
+	ed, ok := f.FileDescriptor.(interface{ Edition() int32 })
+	if ok {
+		return ed.Edition()
+	}
+	return 0
 }
 
 func (f fileDescriptor) ParentFile() protoreflect.FileDescriptor {

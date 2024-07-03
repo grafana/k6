@@ -10,7 +10,7 @@ github.com/Azure/go-ntlmssp
 # github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 ## explicit
 github.com/DataDog/datadog-go/statsd
-# github.com/PuerkitoBio/goquery v1.9.1
+# github.com/PuerkitoBio/goquery v1.9.2
 ## explicit; go 1.18
 github.com/PuerkitoBio/goquery
 # github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
@@ -26,8 +26,8 @@ github.com/andybalholm/cascadia
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/bufbuild/protocompile v0.8.0
-## explicit; go 1.19
+# github.com/bufbuild/protocompile v0.10.0
+## explicit; go 1.20
 github.com/bufbuild/protocompile
 github.com/bufbuild/protocompile/ast
 github.com/bufbuild/protocompile/internal
@@ -105,16 +105,6 @@ github.com/dgryski/go-rendezvous
 ## explicit; go 1.13
 github.com/dlclark/regexp2
 github.com/dlclark/regexp2/syntax
-# github.com/dop251/goja v0.0.0-20240610225006-393f6d42497b
-## explicit; go 1.20
-github.com/dop251/goja
-github.com/dop251/goja/ast
-github.com/dop251/goja/file
-github.com/dop251/goja/ftoa
-github.com/dop251/goja/ftoa/internal/fast
-github.com/dop251/goja/parser
-github.com/dop251/goja/token
-github.com/dop251/goja/unistring
 # github.com/evanw/esbuild v0.21.2
 ## explicit; go 1.13
 github.com/evanw/esbuild/internal/api_helpers
@@ -142,7 +132,7 @@ github.com/evanw/esbuild/internal/runtime
 github.com/evanw/esbuild/internal/sourcemap
 github.com/evanw/esbuild/internal/xxhash
 github.com/evanw/esbuild/pkg/api
-# github.com/fatih/color v1.16.0
+# github.com/fatih/color v1.17.0
 ## explicit; go 1.17
 github.com/fatih/color
 # github.com/fsnotify/fsnotify v1.5.4
@@ -173,10 +163,17 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grafana/sobek v0.0.0-20240613124309-cb36746e8fee
+# github.com/grafana/sobek v0.0.0-20240626131919-5be1e93c7efc
 ## explicit; go 1.20
 github.com/grafana/sobek
-# github.com/grafana/xk6-browser v1.6.0
+github.com/grafana/sobek/ast
+github.com/grafana/sobek/file
+github.com/grafana/sobek/ftoa
+github.com/grafana/sobek/ftoa/internal/fast
+github.com/grafana/sobek/parser
+github.com/grafana/sobek/token
+github.com/grafana/sobek/unistring
+# github.com/grafana/xk6-browser v1.6.1-0.20240701105714-29f6ef3049fe
 ## explicit; go 1.20
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium
@@ -189,7 +186,7 @@ github.com/grafana/xk6-browser/keyboardlayout
 github.com/grafana/xk6-browser/log
 github.com/grafana/xk6-browser/storage
 github.com/grafana/xk6-browser/trace
-# github.com/grafana/xk6-dashboard v0.7.4
+# github.com/grafana/xk6-dashboard v0.7.5
 ## explicit; go 1.20
 github.com/grafana/xk6-dashboard/dashboard
 # github.com/grafana/xk6-output-prometheus-remote v0.4.0
@@ -225,8 +222,8 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.15.6
-## explicit; go 1.18
+# github.com/jhump/protoreflect v1.16.0
+## explicit; go 1.19
 github.com/jhump/protoreflect/desc
 github.com/jhump/protoreflect/desc/internal
 github.com/jhump/protoreflect/desc/protoparse
@@ -237,7 +234,7 @@ github.com/jhump/protoreflect/internal
 # github.com/josharian/intern v1.0.0
 ## explicit; go 1.5
 github.com/josharian/intern
-# github.com/klauspost/compress v1.17.7
+# github.com/klauspost/compress v1.17.9
 ## explicit; go 1.20
 github.com/klauspost/compress
 github.com/klauspost/compress/flate
@@ -412,7 +409,7 @@ go.uber.org/goleak/internal/stack
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
 golang.org/x/crypto/ripemd160
-# golang.org/x/crypto/x509roots/fallback v0.0.0-20240604170348-d4e7c9cb6cb8
+# golang.org/x/crypto/x509roots/fallback v0.0.0-20240624163532-1c7450041f58
 ## explicit; go 1.20
 golang.org/x/crypto/x509roots/fallback
 # golang.org/x/net v0.26.0
@@ -458,14 +455,14 @@ golang.org/x/text/unicode/rangetable
 # golang.org/x/time v0.5.0
 ## explicit; go 1.18
 golang.org/x/time/rate
-# google.golang.org/genproto/googleapis/api v0.0.0-20240227224415-6ceb2ff114de
+# google.golang.org/genproto/googleapis/api v0.0.0-20240318140521-94a12d6c2237
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/api/httpbody
-# google.golang.org/genproto/googleapis/rpc v0.0.0-20240227224415-6ceb2ff114de
+# google.golang.org/genproto/googleapis/rpc v0.0.0-20240318140521-94a12d6c2237
 ## explicit; go 1.19
 google.golang.org/genproto/googleapis/rpc/errdetails
 google.golang.org/genproto/googleapis/rpc/status
-# google.golang.org/grpc v1.63.2
+# google.golang.org/grpc v1.64.0
 ## explicit; go 1.19
 google.golang.org/grpc
 google.golang.org/grpc/attributes
@@ -517,6 +514,7 @@ google.golang.org/grpc/peer
 google.golang.org/grpc/reflection
 google.golang.org/grpc/reflection/grpc_reflection_v1
 google.golang.org/grpc/reflection/grpc_reflection_v1alpha
+google.golang.org/grpc/reflection/internal
 google.golang.org/grpc/resolver
 google.golang.org/grpc/resolver/dns
 google.golang.org/grpc/serviceconfig
@@ -524,8 +522,8 @@ google.golang.org/grpc/stats
 google.golang.org/grpc/status
 google.golang.org/grpc/tap
 google.golang.org/grpc/test/bufconn
-# google.golang.org/protobuf v1.33.0
-## explicit; go 1.17
+# google.golang.org/protobuf v1.34.2
+## explicit; go 1.20
 google.golang.org/protobuf/encoding/protojson
 google.golang.org/protobuf/encoding/prototext
 google.golang.org/protobuf/encoding/protowire
@@ -533,6 +531,7 @@ google.golang.org/protobuf/internal/descfmt
 google.golang.org/protobuf/internal/descopts
 google.golang.org/protobuf/internal/detrand
 google.golang.org/protobuf/internal/editiondefaults
+google.golang.org/protobuf/internal/editionssupport
 google.golang.org/protobuf/internal/encoding/defval
 google.golang.org/protobuf/internal/encoding/json
 google.golang.org/protobuf/internal/encoding/messageset

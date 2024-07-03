@@ -73,6 +73,7 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 		return getState().Dialer.DialContext(ctx, "tcp", addr)
 	}
 
+	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	return []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.FailOnNonTempDialError(true),
@@ -84,6 +85,7 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 
 // Dial establish a gRPC connection.
 func Dial(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, error) {
+	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	conn, err := grpc.DialContext(ctx, addr, options...)
 	if err != nil {
 		return nil, err
@@ -151,7 +153,7 @@ func (c *Conn) Invoke(
 		sterr := status.Convert(err)
 		response.Status = sterr.Code()
 
-		// (rogchap) when you access a JSON property in goja, you are actually accessing the underling
+		// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
 		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
 		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
 		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when

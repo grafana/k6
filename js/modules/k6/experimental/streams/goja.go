@@ -59,7 +59,7 @@ func promiseThen(
 	return newPromise, nil
 }
 
-// isNumber returns true if the given goja value holds a number
+// isNumber returns true if the given sobek.Value holds a number
 func isNumber(value sobek.Value) bool {
 	_, isFloat := value.Export().(float64)
 	_, isInt := value.Export().(int64)

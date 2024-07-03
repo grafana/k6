@@ -10,7 +10,7 @@ import (
 )
 
 // mapBrowser to the JS module.
-func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
+func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
 	return mapping{
 		"context": func() (mapping, error) {
 			b, err := vu.browser()
@@ -36,23 +36,24 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			return b.IsConnected(), nil
 		},
 		"newContext": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewBrowserContextOptions()
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {
 					return nil, err
 				}
-				bctx, err := b.NewContext(opts)
+				bctx, err := b.NewContext(popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
-
 				if err := initBrowserContext(bctx, vu.testRunID); err != nil {
 					return nil, err
 				}
 
-				m := mapBrowserContext(vu, bctx)
-
-				return m, nil
+				return mapBrowserContext(vu, bctx), nil
 			}), nil
 		},
 		"userAgent": func() (string, error) {
@@ -69,23 +70,26 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			}
 			return b.Version(), nil
 		},
-		"newPage": func(opts sobek.Value) *sobek.Promise {
+		"newPage": func(opts sobek.Value) (*sobek.Promise, error) {
+			popts := common.NewBrowserContextOptions()
+			if err := popts.Parse(vu.Context(), opts); err != nil {
+				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				b, err := vu.browser()
 				if err != nil {
 					return nil, err
 				}
-				page, err := b.NewPage(opts)
+				page, err := b.NewPage(popts)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
-
 				if err := initBrowserContext(b.Context(), vu.testRunID); err != nil {
 					return nil, err
 				}
 
 				return mapPage(vu, page), nil
-			})
+			}), nil
 		},
 	}
 }

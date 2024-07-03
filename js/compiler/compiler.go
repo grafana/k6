@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja/parser"
 	"github.com/go-sourcemap/sourcemap"
 	"github.com/grafana/sobek"
+	"github.com/grafana/sobek/parser"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/lib"
@@ -30,26 +30,26 @@ var (
 		// "presets": []string{"latest"},
 		"plugins": []interface{}{
 			// es2015 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2015/src/index.js
-			// in goja
+			// in Sobek
 			// []interface{}{"transform-es2015-template-literals", map[string]interface{}{"loose": false, "spec": false}},
-			// "transform-es2015-literals", // in goja
-			// "transform-es2015-function-name", // in goja
-			// []interface{}{"transform-es2015-arrow-functions", map[string]interface{}{"spec": false}}, // in goja
-			// "transform-es2015-block-scoped-functions", // in goja
-			// []interface{}{"transform-es2015-classes", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-object-super", // in goja
-			// "transform-es2015-shorthand-properties", // in goja
-			// "transform-es2015-duplicate-keys", // in goja
-			// []interface{}{"transform-es2015-computed-properties", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-for-of", // in goja
-			// "transform-es2015-sticky-regex", // in goja
-			// "transform-es2015-unicode-regex", // in goja
-			// "check-es2015-constants", // in goja
-			// []interface{}{"transform-es2015-spread", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-parameters", // in goja
-			// []interface{}{"transform-es2015-destructuring", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-block-scoping", // in goja
-			// "transform-es2015-typeof-symbol", // in goja
+			// "transform-es2015-literals", // in Sobek
+			// "transform-es2015-function-name", // in Sobek
+			// []interface{}{"transform-es2015-arrow-functions", map[string]interface{}{"spec": false}}, // in Sobek
+			// "transform-es2015-block-scoped-functions", // in Sobek
+			// []interface{}{"transform-es2015-classes", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-object-super", // in Sobek
+			// "transform-es2015-shorthand-properties", // in Sobek
+			// "transform-es2015-duplicate-keys", // in Sobek
+			// []interface{}{"transform-es2015-computed-properties", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-for-of", // in Sobek
+			// "transform-es2015-sticky-regex", // in Sobek
+			// "transform-es2015-unicode-regex", // in Sobek
+			// "check-es2015-constants", // in Sobek
+			// []interface{}{"transform-es2015-spread", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-parameters", // in Sobek
+			// []interface{}{"transform-es2015-destructuring", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-block-scoping", // in Sobek
+			// "transform-es2015-typeof-symbol", // in Sobek
 			// all the other module plugins are just dropped
 			[]interface{}{"transform-es2015-modules-commonjs", map[string]interface{}{"loose": false}},
 			// "transform-regenerator", // Doesn't really work unless regeneratorRuntime is also added
@@ -58,7 +58,7 @@ var (
 			// "transform-exponentiation-operator",
 
 			// es2017 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2017/src/index.js
-			// "syntax-trailing-function-commas", // in goja
+			// "syntax-trailing-function-commas", // in Sobek
 			// "transform-async-to-generator", // Doesn't really work unless regeneratorRuntime is also added
 		},
 		"ast":           false,
@@ -172,12 +172,12 @@ type compilationState struct {
 }
 
 // Compile the program in the given CompatibilityMode, wrapping it between pre and post code
-// TODO isESM will be used once goja support ESM modules natively
+// TODO isESM will be used once Sobek support ESM modules natively
 func (c *Compiler) Compile(src, filename string, isESM bool) (*sobek.Program, string, error) {
 	return c.compileImpl(src, filename, !isESM, c.Options.CompatibilityMode, nil)
 }
 
-// sourceMapLoader is to be used with goja's WithSourceMapLoader
+// sourceMapLoader is to be used with Sobek's WithSourceMapLoader
 // it not only gets the file from disk in the simple case, but also returns it if the map was generated from babel
 // additioanlly it fixes off by one error in commonjs dependencies due to having to wrap them in a function.
 func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
@@ -406,7 +406,7 @@ func (b *babel) transformImpl(
 		return code, nil, nil
 	}
 
-	// this is to make goja try to load a sourcemap.
+	// this is to make Sobek try to load a sourcemap.
 	// it is a special url as it should never leak outside of this code
 	// additionally the alternative support from babel is to embed *the whole* sourcemap at the end
 	code += "\n//# sourceMappingURL=" + sourceMapURLFromBabel

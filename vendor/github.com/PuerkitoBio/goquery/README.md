@@ -40,6 +40,7 @@ Please note that starting with version `v1.9.0` of goquery, Go 1.18+ is required
 
 **Note that goquery's API is now stable, and will not break.**
 
+*    **2024-04-29 (v1.9.2)** : Update `go.mod` dependencies.
 *    **2024-02-29 (v1.9.1)** : Improve allocation and performance of the `Map` function and `Selection.Map` method, better document the cascadia differences (thanks [@jwilsson](https://github.com/jwilsson)).
 *    **2024-02-22 (v1.9.0)** : Add a generic `Map` function, **goquery now requires Go version 1.18+** (thanks [@Fesaa](https://github.com/Fesaa)).
 *    **2023-02-18 (v1.8.1)** : Update `go.mod` dependencies, update CI workflow.

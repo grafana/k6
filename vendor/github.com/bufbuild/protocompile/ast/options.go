@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -43,12 +43,12 @@ type OptionNode struct {
 	Semicolon *RuneNode // absent for compact options
 }
 
-func (n *OptionNode) fileElement()    {}
-func (n *OptionNode) msgElement()     {}
-func (n *OptionNode) oneofElement()   {}
-func (n *OptionNode) enumElement()    {}
-func (n *OptionNode) serviceElement() {}
-func (n *OptionNode) methodElement()  {}
+func (*OptionNode) fileElement()    {}
+func (*OptionNode) msgElement()     {}
+func (*OptionNode) oneofElement()   {}
+func (*OptionNode) enumElement()    {}
+func (*OptionNode) serviceElement() {}
+func (*OptionNode) methodElement()  {}
 
 // NewOptionNode creates a new *OptionNode for a full option declaration (as
 // used in files, messages, oneofs, enums, services, and methods). All arguments
@@ -393,3 +393,21 @@ func (e *CompactOptionsNode) GetElements() []*OptionNode {
 	}
 	return e.Options
 }
+
+// NodeWithOptions represents a node in the AST that contains
+// option statements.
+type NodeWithOptions interface {
+	Node
+	RangeOptions(func(*OptionNode) bool)
+}
+
+var _ NodeWithOptions = FileDeclNode(nil)
+var _ NodeWithOptions = MessageDeclNode(nil)
+var _ NodeWithOptions = OneofDeclNode(nil)
+var _ NodeWithOptions = (*EnumNode)(nil)
+var _ NodeWithOptions = (*ServiceNode)(nil)
+var _ NodeWithOptions = RPCDeclNode(nil)
+var _ NodeWithOptions = FieldDeclNode(nil)
+var _ NodeWithOptions = EnumValueDeclNode(nil)
+var _ NodeWithOptions = (*ExtensionRangeNode)(nil)
+var _ NodeWithOptions = NoSourceNode{}
