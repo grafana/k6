@@ -28,7 +28,8 @@ type RootModule struct{}
 
 // WebSocketsAPI is the k6 extension implementing the websocket API as defined in https://websockets.spec.whatwg.org
 type WebSocketsAPI struct { //nolint:revive
-	vu modules.VU
+	vu              modules.VU
+	blobConstructor sobek.Value
 }
 
 var _ modules.Module = &RootModule{}
@@ -42,9 +43,11 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 
 // Exports implements the modules.Instance interface's Exports
 func (r *WebSocketsAPI) Exports() modules.Exports {
+	r.blobConstructor = r.vu.Runtime().ToValue(r.blob)
 	return modules.Exports{
 		Named: map[string]interface{}{
 			"WebSocket": r.websocket,
+			"Blob":      r.blobConstructor,
 		},
 	}
 }
@@ -64,7 +67,9 @@ const (
 )
 
 type webSocket struct {
-	vu             modules.VU
+	vu              modules.VU
+	blobConstructor sobek.Value
+
 	url            *url.URL
 	conn           *websocket.Conn
 	tagsAndMeta    *metrics.TagsAndMeta
@@ -91,14 +96,6 @@ type webSocket struct {
 type ping struct {
 	counter    int
 	timestamps map[string]time.Time
-}
-
-func isString(o *sobek.Object, rt *sobek.Runtime) bool {
-	return o.Prototype().Get("constructor") == rt.GlobalObject().Get("String")
-}
-
-func isArray(o *sobek.Object, rt *sobek.Runtime) bool {
-	return o.Prototype().Get("constructor") == rt.GlobalObject().Get("Array")
 }
 
 func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
@@ -128,17 +125,18 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 	}
 
 	w := &webSocket{
-		vu:             r.vu,
-		url:            url,
-		tq:             taskqueue.New(r.vu.RegisterCallback),
-		readyState:     CONNECTING,
-		builtinMetrics: r.vu.State().BuiltinMetrics,
-		done:           make(chan struct{}),
-		writeQueueCh:   make(chan message),
-		eventListeners: newEventListeners(),
-		obj:            rt.NewObject(),
-		tagsAndMeta:    params.tagsAndMeta,
-		sendPings:      ping{timestamps: make(map[string]time.Time)},
+		vu:              r.vu,
+		blobConstructor: r.blobConstructor,
+		url:             url,
+		tq:              taskqueue.New(r.vu.RegisterCallback),
+		readyState:      CONNECTING,
+		builtinMetrics:  r.vu.State().BuiltinMetrics,
+		done:            make(chan struct{}),
+		writeQueueCh:    make(chan message),
+		eventListeners:  newEventListeners(),
+		obj:             rt.NewObject(),
+		tagsAndMeta:     params.tagsAndMeta,
+		sendPings:       ping{timestamps: make(map[string]time.Time)},
 	}
 
 	// Maybe have this after the goroutine below ?!?
@@ -203,13 +201,11 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 			return rt.ToValue(w.binaryType)
 		}), rt.ToValue(func(s string) error {
 			switch s {
-			case blobBinaryType:
-				return errors.New("blob is currently not supported, only arraybuffer is")
-			case arraybufferBinaryType:
+			case blobBinaryType, arraybufferBinaryType:
 				w.binaryType = s
 				return nil
 			default:
-				return fmt.Errorf("unknown binaryType %s, the supported one is arraybuffer", s)
+				return fmt.Errorf(`unknown binaryType %s, the supported ones are "blob" and "arraybuffer"`, s)
 			}
 		}), sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 
@@ -425,8 +421,9 @@ func (w *webSocket) loop() {
 	}
 }
 
-const binarytypeWarning = `You have not set a Websocket binaryType to "arraybuffer", but you got a binary response. ` +
-	`This has been done automatically now, but in the future this will not work.`
+const binarytypeError = `websocket's binaryType hasn't been set to either "blob" or "arraybuffer", ` +
+	`but a binary message has been received. ` +
+	`"blob" is still not the default so the websocket is erroring out`
 
 func (w *webSocket) queueMessage(msg *message) {
 	w.tq.Queue(func() error {
@@ -448,13 +445,25 @@ func (w *webSocket) queueMessage(msg *message) {
 		ev := w.newEvent(events.MESSAGE, msg.t)
 
 		if msg.mtype == websocket.BinaryMessage {
-			if w.binaryType == "" {
-				w.binaryType = arraybufferBinaryType
-				w.vu.State().Logger.Warn(binarytypeWarning)
+			var data any
+			// Lets error out for a k6 release, at least, when there's no binaryType set.
+			// In the future, we'll use "blob" as default, as per spec:
+			// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/binaryType
+			switch w.binaryType {
+			case "":
+				return errors.New(binarytypeError)
+			case blobBinaryType:
+				var err error
+				data, err = rt.New(w.blobConstructor, rt.ToValue([]interface{}{msg.data}))
+				if err != nil {
+					return fmt.Errorf("failed to create Blob: %w", err)
+				}
+			case arraybufferBinaryType:
+				data = rt.NewArrayBuffer(msg.data)
+			default:
+				return fmt.Errorf(`unknown binaryType %s, the supported ones are "blob" and "arraybuffer"`, w.binaryType)
 			}
-			// TODO this technically could be BLOB , but we don't support that
-			ab := rt.NewArrayBuffer(msg.data)
-			must(rt, ev.DefineDataProperty("data", rt.ToValue(ab), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
+			must(rt, ev.DefineDataProperty("data", rt.ToValue(data), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 		} else {
 			must(
 				rt,
@@ -615,6 +624,21 @@ func (w *webSocket) send(msg sobek.Value) {
 			data:  b,
 			t:     time.Now(),
 		}
+	case map[string]interface{}:
+		rt := w.vu.Runtime()
+		obj := msg.ToObject(rt)
+		if !isBlob(obj, w.blobConstructor) {
+			common.Throw(rt, fmt.Errorf("unsupported send type %T", o))
+		}
+
+		b := extractBytes(obj, rt)
+		w.bufferedAmount += len(b)
+		w.writeQueueCh <- message{
+			mtype: websocket.BinaryMessage,
+			data:  b,
+			t:     time.Now(),
+		}
+
 	default:
 		common.Throw(w.vu.Runtime(), fmt.Errorf("unsupported send type %T", o))
 	}
