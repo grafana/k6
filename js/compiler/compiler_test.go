@@ -70,9 +70,11 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		src := `1+(function() { return 2; })()`
-		pgm, code, err := c.Compile(src, "script.js", true)
+		prg, code, err := c.Parse(src, "script.js", false)
 		require.NoError(t, err)
 		assert.Equal(t, src, code)
+		pgm, err := sobek.CompileAST(prg, true)
+		require.NoError(t, err)
 		v, err := sobek.New().RunProgram(pgm)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), v.Export())
@@ -82,18 +84,23 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		src := `exports.d=1+(function() { return 2; })()`
-		pgm, code, err := c.Compile(src, "script.js", false)
+		prg, code, err := c.Parse(src, "script.js", true)
+		require.NoError(t, err)
+		pgm, err := sobek.CompileAST(prg, true)
 		require.NoError(t, err)
 		assert.Equal(t, "(function(module, exports){exports.d=1+(function() { return 2; })()\n})\n", code)
 		rt := sobek.New()
 		v, err := rt.RunProgram(pgm)
-		require.NoError(t, err)
-		fn, ok := sobek.AssertFunction(v)
-		require.True(t, ok, "not a function")
-		exp := make(map[string]sobek.Value)
-		_, err = fn(sobek.Undefined(), sobek.Undefined(), rt.ToValue(exp))
-		require.NoError(t, err)
-		assert.Equal(t, int64(3), exp["d"].Export())
+		if assert.NoError(t, err) {
+			fn, ok := sobek.AssertFunction(v)
+			if assert.True(t, ok, "not a function") {
+				exp := make(map[string]sobek.Value)
+				_, err := fn(sobek.Undefined(), sobek.Undefined(), rt.ToValue(exp))
+				if assert.NoError(t, err) {
+					assert.Equal(t, int64(3), exp["d"].Export())
+				}
+			}
+		}
 	})
 
 	t.Run("ES5 Invalid", func(t *testing.T) {
@@ -101,7 +108,7 @@ func TestCompile(t *testing.T) {
 		c := New(testutils.NewLogger(t))
 		src := `1+(function() { return 2; )()`
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		_, _, err := c.Compile(src, "script.js", false)
+		_, _, err := c.Parse(src, "script.js", false)
 		assert.IsType(t, &sobek.Exception{}, err)
 		assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:26)
 > 1 | 1+(function() { return 2; )()`)
@@ -110,10 +117,11 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		pgm, code, err := c.Compile(`import "something"`, "script.js", true)
+		prg, code, err := c.Parse(`import "something"`, "script.js", false)
 		require.NoError(t, err)
-		assert.Equal(t, `"use strict";require("something");`,
-			code)
+		assert.Equal(t, `"use strict";require("something");`, code)
+		pgm, err := sobek.CompileAST(prg, true)
+		require.NoError(t, err)
 		rt := sobek.New()
 		var requireCalled bool
 		require.NoError(t, rt.Set("require", func(s string) {
@@ -126,12 +134,13 @@ func TestCompile(t *testing.T) {
 	})
 
 	t.Run("Wrap", func(t *testing.T) {
+		// This only works with `require` as wrapping means the import/export won't be top level and that is forbidden
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		pgm, code, err := c.Compile(`import "something";`, "script.js", false)
+		prg, code, err := c.Parse(`require("something");`, "script.js", true)
 		require.NoError(t, err)
-		assert.Equal(t, `(function(module, exports){"use strict";require("something");
+		assert.Equal(t, `(function(module, exports){require("something");
 })
 `, code)
 		var requireCalled bool
@@ -140,6 +149,9 @@ func TestCompile(t *testing.T) {
 			assert.Equal(t, "something", s)
 			requireCalled = true
 		}))
+
+		pgm, err := sobek.CompileAST(prg, true)
+		require.NoError(t, err)
 		v, err := rt.RunProgram(pgm)
 		require.NoError(t, err)
 		fn, ok := sobek.AssertFunction(v)
@@ -153,7 +165,7 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		_, _, err := c.Compile(`1+(=>2)()`, "script.js", true)
+		_, _, err := c.Parse(`1+(=>2)()`, "script.js", false)
 		assert.IsType(t, &sobek.Exception{}, err)
 		assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
 > 1 | 1+(=>2)()`)
@@ -167,8 +179,10 @@ func TestCorruptSourceMap(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	logger.Out = io.Discard
-	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
-	logger.AddHook(hook)
+	hook := testutils.SimpleLogrusHook{
+		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
+	}
+	logger.AddHook(&hook)
 
 	compiler := New(logger)
 	compiler.Options = Options{
@@ -177,7 +191,7 @@ func TestCorruptSourceMap(t *testing.T) {
 			return corruptSourceMap, nil
 		},
 	}
-	_, _, err := compiler.Compile("var s = 5;\n//# sourceMappingURL=somefile", "somefile", false)
+	_, _, err := compiler.Parse("var s = 5;\n//# sourceMappingURL=somefile", "somefile", false)
 	require.NoError(t, err)
 	entries := hook.Drain()
 	require.Len(t, entries, 1)
@@ -190,14 +204,17 @@ func TestCorruptSourceMap(t *testing.T) {
 
 func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
 	t.Parallel()
+	// This test is now kind of pointless
 	// this a valid source map for the go implementation but babel doesn't like it
 	corruptSourceMap := []byte(`{"mappings": ";"}`)
 
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	logger.Out = io.Discard
-	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
-	logger.AddHook(hook)
+	hook := testutils.SimpleLogrusHook{
+		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
+	}
+	logger.AddHook(&hook)
 
 	compiler := New(logger)
 	compiler.Options = Options{
@@ -207,7 +224,9 @@ func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
 			return corruptSourceMap, nil
 		},
 	}
-	_, _, err := compiler.Compile("import 'something';\n//# sourceMappingURL=somefile", "somefile", false)
+	prg, _, err := compiler.Parse("import 'something';\n//# sourceMappingURL=somefile", "somefile", false)
+	require.NoError(t, err)
+	_, err = sobek.CompileAST(prg, true)
 	require.NoError(t, err)
 	entries := hook.Drain()
 	require.Len(t, entries, 1)
@@ -226,8 +245,10 @@ func TestMinimalSourceMap(t *testing.T) {
 	logger := logrus.New()
 	logger.SetLevel(logrus.DebugLevel)
 	logger.Out = io.Discard
-	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
-	logger.AddHook(hook)
+	hook := testutils.SimpleLogrusHook{
+		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
+	}
+	logger.AddHook(&hook)
 
 	compiler := New(logger)
 	compiler.Options = Options{
@@ -237,7 +258,7 @@ func TestMinimalSourceMap(t *testing.T) {
 			return corruptSourceMap, nil
 		},
 	}
-	_, _, err := compiler.Compile("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
+	_, _, err := compiler.Parse("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
 	require.NoError(t, err)
 	require.Empty(t, hook.Drain())
 }
@@ -255,7 +276,7 @@ func TestMixingImportExport(t *testing.T) {
 		CompatibilityMode: lib.CompatibilityModeExtended,
 		Strict:            true,
 	}
-	_, _, err := compiler.Compile("export let s = 5;\nmodule.exports = 'something';", "somefile", false)
+	_, _, err := compiler.Parse("export let s = 5;\nmodule.exports = 'something';", "somefile", false)
 	require.NoError(t, err)
 	entries := hook.Drain()
 	require.Len(t, entries, 1)
