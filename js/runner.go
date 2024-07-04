@@ -363,7 +363,7 @@ func (r *Runner) IsExecutable(name string) bool {
 
 // HandleSummary calls the specified summary callback, if supplied.
 func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (
-	map[string]io.Reader, map[string]interface{}, error,
+	map[string]io.Reader, error,
 ) {
 	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 
@@ -380,7 +380,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (
 
 	vu, err := r.newVU(summaryCtx, 0, 0, out)
 	if err != nil {
-		return nil, nil, err
+		return nil, err
 	}
 
 	go func() {
@@ -394,7 +394,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (
 	if fn != nil {
 		handleSummaryFn, ok := goja.AssertFunction(fn)
 		if !ok {
-			return nil, nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
+			return nil, fmt.Errorf("exported identifier %s must be a function", consts.HandleSummaryFn)
 		}
 
 		callbackResult, _, _, err = vu.runFn(summaryCtx, false, handleSummaryFn, nil, vu.Runtime.ToValue(summaryDataForJS))
@@ -407,11 +407,11 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (
 	wrapper := strings.Replace(summaryWrapperLambdaCode, "/*JSLIB_SUMMARY_CODE*/", jslibSummaryCode, 1)
 	handleSummaryWrapperRaw, err := vu.Runtime.RunString(wrapper)
 	if err != nil {
-		return nil, nil, fmt.Errorf("unexpected error while getting the summary wrapper: %w", err)
+		return nil, fmt.Errorf("unexpected error while getting the summary wrapper: %w", err)
 	}
 	handleSummaryWrapper, ok := goja.AssertFunction(handleSummaryWrapperRaw)
 	if !ok {
-		return nil, nil, fmt.Errorf("unexpected error did not get a callable summary wrapper")
+		return nil, fmt.Errorf("unexpected error did not get a callable summary wrapper")
 	}
 
 	wrapperArgs := []goja.Value{
@@ -422,14 +422,13 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 
 	if deadlineError := r.checkDeadline(summaryCtx, consts.HandleSummaryFn, rawResult, err); deadlineError != nil {
-		return nil, nil, deadlineError
+		return nil, deadlineError
 	}
 
 	if err != nil {
-		return nil, nil, fmt.Errorf("unexpected error while generating the summary: %w", err)
+		return nil, fmt.Errorf("unexpected error while generating the summary: %w", err)
 	}
-	res, err := getSummaryResult(rawResult)
-	return res, summaryDataForJS, err
+	return getSummaryResult(rawResult)
 }
 
 func (r *Runner) checkDeadline(ctx context.Context, name string, result goja.Value, err error) error {

@@ -62,7 +62,7 @@ func TestTextSummary(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			result, _, err := runner.HandleSummary(context.Background(), summary)
+			result, err := runner.HandleSummary(context.Background(), summary)
 			require.NoError(t, err)
 
 			require.Len(t, result, 1)
@@ -116,7 +116,7 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	)
 	require.NoError(t, err)
 
-	result, _, err := runner.HandleSummary(context.Background(), summary)
+	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)
@@ -307,7 +307,7 @@ func TestOldJSONExport(t *testing.T) {
 	require.NoError(t, err)
 
 	summary := createTestSummary(t)
-	result, _, err := runner.HandleSummary(context.Background(), summary)
+	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -577,7 +577,7 @@ func TestRawHandleSummaryData(t *testing.T) {
 	require.NoError(t, err)
 
 	summary := createTestSummary(t)
-	result, _, err := runner.HandleSummary(context.Background(), summary)
+	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 2)
@@ -591,33 +591,6 @@ func TestRawHandleSummaryData(t *testing.T) {
 	newRawData, err := io.ReadAll(result["rawdata.json"])
 	require.NoError(t, err)
 	assert.JSONEq(t, expectedHandleSummaryRawData, string(newRawData))
-}
-
-func TestJSDataSuppliedToHandleSummary(t *testing.T) {
-	t.Parallel()
-	runner, err := getSimpleRunner(
-		t, "/script.js",
-		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
-		exports.default = function() { /* we don't run this, metrics are mocked */ };
-		exports.handleSummary = function(data) {
-			return {'rawdata.json': JSON.stringify(data)};
-		};
-		`,
-	)
-
-	require.NoError(t, err)
-
-	summary := createTestSummary(t)
-	result, jsData, err := runner.HandleSummary(context.Background(), summary)
-	delete(jsData, "setup_data")
-	require.NoError(t, err)
-	jsonString, jerr := json.Marshal(jsData)
-	require.NoError(t, jerr)
-	require.NotNil(t, result["rawdata.json"])
-	newRawData, err := io.ReadAll(result["rawdata.json"])
-	require.NoError(t, err)
-	assert.JSONEq(t, string(newRawData), string(jsonString))
 }
 
 func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
@@ -639,7 +612,7 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	runner.SetSetupData([]byte("5"))
 
 	summary := createTestSummary(t)
-	result, _, err := runner.HandleSummary(context.Background(), summary)
+	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -662,7 +635,7 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	runner.SetSetupData([]byte("5"))
 
 	summary := createTestSummary(t)
-	result, _, err := runner.HandleSummary(context.Background(), summary)
+	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 	dataWithSetup, err := io.ReadAll(result["dataWithSetup.json"])
 	require.NoError(t, err)
@@ -687,7 +660,7 @@ func TestWrongSummaryHandlerExportTypes(t *testing.T) {
 			require.NoError(t, err)
 
 			summary := createTestSummary(t)
-			_, _, err = runner.HandleSummary(context.Background(), summary)
+			_, err = runner.HandleSummary(context.Background(), summary)
 			require.Error(t, err)
 		})
 	}
@@ -712,7 +685,7 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	require.NoError(t, err)
 
 	summary := createTestSummary(t)
-	result, _, err := runner.HandleSummary(context.Background(), summary)
+	result, err := runner.HandleSummary(context.Background(), summary)
 	require.NoError(t, err)
 
 	require.Len(t, result, 1)

@@ -24,7 +24,7 @@ type MiniRunner struct {
 	Fn              func(ctx context.Context, state *lib.State, out chan<- metrics.SampleContainer) error
 	SetupFn         func(ctx context.Context, out chan<- metrics.SampleContainer) ([]byte, error)
 	TeardownFn      func(ctx context.Context, out chan<- metrics.SampleContainer) error
-	HandleSummaryFn func(context.Context, *lib.Summary) (map[string]io.Reader, map[string]interface{}, error)
+	HandleSummaryFn func(context.Context, *lib.Summary) (map[string]io.Reader, error)
 
 	SetupData []byte
 
@@ -118,12 +118,12 @@ func (r *MiniRunner) SetOptions(opts lib.Options) error {
 
 // HandleSummary calls the specified summary callback, if supplied.
 func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (
-	map[string]io.Reader, map[string]interface{}, error,
+	map[string]io.Reader, error,
 ) {
 	if r.HandleSummaryFn != nil {
 		return r.HandleSummaryFn(ctx, s)
 	}
-	return nil, nil, nil //nolint:nilnilnil
+	return nil, nil //nolint:nilnil
 }
 
 // VU is a mock VU, spawned by a MiniRunner.

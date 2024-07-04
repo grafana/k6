@@ -88,7 +88,7 @@ type Runner interface {
 
 	// Returns the summary for stdout/stderr, and
 	// summary supplied to test script handleSummary function.
-	HandleSummary(context.Context, *Summary) (map[string]io.Reader, map[string]interface{}, error)
+	HandleSummary(context.Context, *Summary) (map[string]io.Reader, error)
 }
 
 // UIState describes the state of the UI, which might influence what
@@ -105,4 +105,10 @@ type Summary struct {
 	TestRunDuration time.Duration // TODO: use lib.ExecutionState-based interface instead?
 	NoColor         bool          // TODO: drop this when noColor is part of the (runtime) options
 	UIState         UIState
+}
+
+
+// String Overiding for tests
+func (s *Summary) String() string {
+	return "&{Summary:map[...]...}"
 }

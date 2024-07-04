@@ -43,13 +43,3 @@ type IterData struct {
 	ScenarioName string
 	Error        error
 }
-
-// SummaryData is the data sent in the TestSummaryGenerated event.
-type SummaryData struct {
-	Summary map[string]interface{}
-}
-
-// String Overiding for tests
-func (s *SummaryData) String() string {
-	return "&{Summary:map[...]...}"
-}
