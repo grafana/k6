@@ -81,8 +81,6 @@ type Runner interface {
 	// function in the script.
 	IsExecutable(string) bool
 
-	// Returns the summary for stdout/stderr, and
-	// summary supplied to test script handleSummary function.
 	HandleSummary(context.Context, *Summary) (map[string]io.Reader, error)
 }
 

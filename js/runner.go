@@ -349,9 +349,7 @@ func (r *Runner) IsExecutable(name string) bool {
 }
 
 // HandleSummary calls the specified summary callback, if supplied.
-func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (
-	map[string]io.Reader, error,
-) {
+func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
 	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 
 	out := make(chan metrics.SampleContainer, 100)

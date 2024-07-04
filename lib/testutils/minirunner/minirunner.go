@@ -108,9 +108,7 @@ func (r *MiniRunner) SetOptions(opts lib.Options) error {
 }
 
 // HandleSummary calls the specified summary callback, if supplied.
-func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (
-	map[string]io.Reader, error,
-) {
+func (r *MiniRunner) HandleSummary(ctx context.Context, s *lib.Summary) (map[string]io.Reader, error) {
 	if r.HandleSummaryFn != nil {
 		return r.HandleSummaryFn(ctx, s)
 	}
