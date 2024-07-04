@@ -18,8 +18,14 @@ import (
 // GroupSeparator for group IDs.
 const GroupSeparator = "::"
 
+// RootGroupPath is the id of the root group
+//
+// Note(@mstoykov): the constant shouldn't be used in all tests in order to not couple the tests too much with it.
+// Changing this will be a breaking change and in this way it will be more obvious.
+const RootGroupPath = ""
+
 // ErrNameContainsGroupSeparator is emitted if you attempt to instantiate a Group or Check that contains the separator.
-var ErrNameContainsGroupSeparator = errors.New("group and check names may not contain '::'")
+var ErrNameContainsGroupSeparator = errors.New("group and check names may not contain '" + GroupSeparator + "'")
 
 // StageFields defines the fields used for a Stage; this is a dumb hack to make the JSON code
 // cleaner. pls fix.
@@ -107,13 +113,13 @@ type Group struct {
 // The root group must be created with the name "" and parent set to nil; this is the only case
 // where a nil parent or empty name is allowed.
 func NewGroup(name string, parent *Group) (*Group, error) {
-	if strings.Contains(name, GroupSeparator) {
-		return nil, ErrNameContainsGroupSeparator
-	}
-
-	path := name
+	old := RootGroupPath
 	if parent != nil {
-		path = parent.Path + GroupSeparator + path
+		old = parent.Path
+	}
+	path, err := NewGroupPath(old, name)
+	if err != nil {
+		return nil, err
 	}
 
 	hash := md5.Sum([]byte(path)) //nolint:gosec
@@ -145,6 +151,17 @@ func (g *Group) Group(name string) (*Group, error) {
 		g.OrderedGroups = append(g.OrderedGroups, group)
 	}
 	return group, nil
+}
+
+// NewGroupPath ...
+func NewGroupPath(old, path string) (string, error) {
+	if strings.Contains(path, GroupSeparator) {
+		return "", ErrNameContainsGroupSeparator
+	}
+	if old == RootGroupPath && path == RootGroupPath {
+		return RootGroupPath, nil
+	}
+	return old + GroupSeparator + path, nil
 }
 
 // Check creates a child check belonging to this group.

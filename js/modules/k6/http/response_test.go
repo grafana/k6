@@ -9,6 +9,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 )
 
@@ -109,7 +110,6 @@ func TestResponse(t *testing.T) {
 	samples := ts.samples
 	rt := ts.runtime.VU.Runtime()
 	state := ts.runtime.VU.State()
-	root := state.Group
 	sr := tb.Replacer.Replace
 
 	tb.Mux.HandleFunc("/myforms/get", myFormHandler)
@@ -147,17 +147,14 @@ func TestResponse(t *testing.T) {
 		})
 
 		t.Run("group", func(t *testing.T) {
-			g, err := root.Group("my group")
+			groupName, err := lib.NewGroupPath(lib.RootGroupPath, "my group")
 			require.NoError(t, err)
-			old := state.Group
-			state.Group = g
 			state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-				tagsAndMeta.SetTag("group", g.Path)
+				tagsAndMeta.SetTag("group", groupName)
 			})
 			defer func() {
-				state.Group = old
 				state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
-					tagsAndMeta.SetTag("group", old.Path)
+					tagsAndMeta.SetTag("group", "")
 				})
 			}()
 

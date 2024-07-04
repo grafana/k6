@@ -105,6 +105,10 @@ func NewFrameSession(
 		logger:               l,
 	}
 
+	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return nil, fmt.Errorf("run if waiting for debugger to attach: %w", err)
+	}
+
 	var parentNM *NetworkManager
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
@@ -402,8 +406,10 @@ func (fs *FrameSession) initFrameTree() error {
 		return fmt.Errorf("got a nil page frame tree")
 	}
 
+	// Any new frame may have a child frame, not just mainframes.
+	fs.handleFrameTree(frameTree, fs.isMainFrame())
+
 	if fs.isMainFrame() {
-		fs.handleFrameTree(frameTree)
 		fs.initRendererEvents()
 	}
 	return nil
@@ -507,7 +513,9 @@ func (fs *FrameSession) initOptions() error {
 	if err := fs.updateGeolocation(true); err != nil {
 		return err
 	}
-	fs.updateExtraHTTPHeaders(true)
+	if err := fs.updateExtraHTTPHeaders(true); err != nil {
+		return err
+	}
 
 	var reqIntercept bool
 	if state.Options.BlockedHostnames.Trie != nil ||
@@ -518,8 +526,12 @@ func (fs *FrameSession) initOptions() error {
 		return err
 	}
 
-	fs.updateOffline(true)
-	fs.updateHTTPCredentials(true)
+	if err := fs.updateOffline(true); err != nil {
+		return err
+	}
+	if err := fs.updateHTTPCredentials(true); err != nil {
+		return err
+	}
 	if err := fs.updateEmulateMedia(true); err != nil {
 		return err
 	}
@@ -531,8 +543,6 @@ func (fs *FrameSession) initOptions() error {
 	      promises.push(this._evaluateOnNewDocument(source, 'main'));
 	  for (const source of this._crPage._page._evaluateOnNewDocumentSources)
 	      promises.push(this._evaluateOnNewDocument(source, 'main'));*/
-
-	optActions = append(optActions, cdpruntime.RunIfWaitingForDebugger())
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
@@ -575,19 +585,19 @@ func (fs *FrameSession) isMainFrame() bool {
 	return fs.targetID == fs.page.targetID
 }
 
-func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
+func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
 	fs.logger.Debugf("FrameSession:handleFrameTree",
-		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		"fid:%v sid:%v tid:%v", frameTree.Frame.ID, fs.session.ID(), fs.targetID)
 
 	if frameTree.Frame.ParentID != "" {
 		fs.onFrameAttached(frameTree.Frame.ID, frameTree.Frame.ParentID)
 	}
-	fs.onFrameNavigated(frameTree.Frame, true)
+	fs.onFrameNavigated(frameTree.Frame, initialFrame)
 	if frameTree.ChildFrames == nil {
 		return
 	}
 	for _, child := range frameTree.ChildFrames {
-		fs.handleFrameTree(child)
+		fs.handleFrameTree(child, initialFrame)
 	}
 }
 
@@ -745,7 +755,9 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.Fram
 		"sid:%v tid:%v fid:%v reason:%s",
 		fs.session.ID(), fs.targetID, frameID, reason)
 
-	fs.manager.frameDetached(frameID, reason)
+	if err := fs.manager.frameDetached(frameID, reason); err != nil {
+		k6ext.Panic(fs.ctx, "handling frameDetached event: %w", err)
+	}
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
@@ -1054,7 +1066,7 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 	return nil
 }
 
-func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
+func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateExtraHTTPHeaders", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// Merge extra headers from browser context and page, where page specific headers ake precedence.
@@ -1066,8 +1078,12 @@ func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
 		mergedHeaders[k] = v
 	}
 	if !initial || len(mergedHeaders) > 0 {
-		fs.networkManager.SetExtraHTTPHeaders(mergedHeaders)
+		if err := fs.networkManager.SetExtraHTTPHeaders(mergedHeaders); err != nil {
+			return fmt.Errorf("updating extra HTTP headers: %w", err)
+		}
 	}
+
+	return nil
 }
 
 func (fs *FrameSession) updateGeolocation(initial bool) error {
@@ -1083,25 +1099,32 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 			return fmt.Errorf("%w", err)
 		}
 	}
+
 	return nil
 }
 
-func (fs *FrameSession) updateHTTPCredentials(initial bool) {
+func (fs *FrameSession) updateHTTPCredentials(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateHttpCredentials", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	credentials := fs.page.browserCtx.opts.HttpCredentials
 	if !initial || credentials != nil {
-		fs.networkManager.Authenticate(credentials)
+		return fs.networkManager.Authenticate(credentials)
 	}
+
+	return nil
 }
 
-func (fs *FrameSession) updateOffline(initial bool) {
+func (fs *FrameSession) updateOffline(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateOffline", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	offline := fs.page.browserCtx.opts.Offline
 	if !initial || offline {
-		fs.networkManager.SetOfflineMode(offline)
+		if err := fs.networkManager.SetOfflineMode(offline); err != nil {
+			return fmt.Errorf("updating offline mode for frame %v: %w", fs.targetID, err)
+		}
 	}
+
+	return nil
 }
 
 func (fs *FrameSession) throttleNetwork(networkProfile NetworkProfile) error {

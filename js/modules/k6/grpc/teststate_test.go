@@ -8,7 +8,7 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/modulestest"
@@ -83,12 +83,12 @@ type testState struct {
 }
 
 // Run replaces the httpbin address and runs the code.
-func (ts *testState) Run(code string) (goja.Value, error) {
+func (ts *testState) Run(code string) (sobek.Value, error) {
 	return ts.VU.Runtime().RunString(ts.httpBin.Replacer.Replace(code))
 }
 
 // RunOnEventLoop replaces the httpbin address and run the code on event loop
-func (ts *testState) RunOnEventLoop(code string) (goja.Value, error) {
+func (ts *testState) RunOnEventLoop(code string) (sobek.Value, error) {
 	return ts.Runtime.RunOnEventLoop(ts.httpBin.Replacer.Replace(code))
 }
 
@@ -142,13 +142,8 @@ func newTestState(t *testing.T) testState {
 // ToVUContext moves the test state to the VU context.
 func (ts *testState) ToVUContext() {
 	registry := metrics.NewRegistry()
-	root, err := lib.NewGroup("", nil)
-	if err != nil {
-		panic(err)
-	}
 
 	state := &lib.State{
-		Group:     root,
 		Dialer:    ts.httpBin.Dialer,
 		TLSConfig: ts.httpBin.TLSClientConfig,
 		Samples:   ts.samples,

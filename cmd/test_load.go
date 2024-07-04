@@ -277,6 +277,7 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 		Runner:           lct.initRunner,
 		Options:          lct.derivedConfig.Options, // we will always run with the derived options
 		RunTags:          lct.preInitState.Registry.RootTagSet().WithTagsFromMap(configToReinject.RunTags),
+		GroupSummary:     lib.NewGroupSummary(lct.preInitState.Logger),
 	}, nil
 }
 

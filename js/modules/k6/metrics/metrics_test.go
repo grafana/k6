@@ -6,7 +6,7 @@ import (
 	"io"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -27,7 +27,7 @@ type addTestValue struct {
 
 type addTest struct {
 	val          addTestValue
-	rt           *goja.Runtime
+	rt           *sobek.Runtime
 	hook         *testutils.SimpleLogrusHook
 	samples      chan metrics.SampleContainer
 	isThrow      bool
@@ -100,7 +100,7 @@ func TestMetrics(t *testing.T) {
 						mtyp:      mtyp,
 						valueType: valueType,
 					}
-					test.rt = goja.New()
+					test.rt = sobek.New()
 					test.rt.SetFieldNameMapper(common.FieldNameMapper{})
 					registry := metrics.NewRegistry()
 					mii := &modulestest.VU{
@@ -169,7 +169,7 @@ func TestMetrics(t *testing.T) {
 
 func TestMetricGetName(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	mii := &modulestest.VU{
@@ -197,7 +197,7 @@ func TestMetricGetName(t *testing.T) {
 
 func TestMetricDuplicates(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	mii := &modulestest.VU{

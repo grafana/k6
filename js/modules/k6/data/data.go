@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"sync"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -67,7 +67,7 @@ const asyncFunctionNotSupportedMsg = "SharedArray constructor does not support a
 
 // sharedArray is a constructor returning a shareable read-only array
 // indentified by the name and having their contents be whatever the call returns
-func (d *Data) sharedArray(call goja.ConstructorCall) *goja.Object {
+func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 	rt := d.vu.Runtime()
 
 	if d.vu.State() != nil {
@@ -84,7 +84,7 @@ func (d *Data) sharedArray(call goja.ConstructorCall) *goja.Object {
 		common.Throw(rt, errors.New(asyncFunctionNotSupportedMsg))
 	}
 
-	fn, ok := goja.AssertFunction(val)
+	fn, ok := sobek.AssertFunction(val)
 	if !ok {
 		common.Throw(rt, errors.New("a function is expected as the second argument of SharedArray's constructor"))
 	}
@@ -93,7 +93,7 @@ func (d *Data) sharedArray(call goja.ConstructorCall) *goja.Object {
 	return array.wrap(rt).ToObject(rt)
 }
 
-func (s *sharedArrays) get(rt *goja.Runtime, name string, call goja.Callable) sharedArray {
+func (s *sharedArrays) get(rt *sobek.Runtime, name string, call sobek.Callable) sharedArray {
 	s.mu.RLock()
 	array, ok := s.data[name]
 	s.mu.RUnlock()
@@ -110,21 +110,21 @@ func (s *sharedArrays) get(rt *goja.Runtime, name string, call goja.Callable) sh
 	return array
 }
 
-func getShareArrayFromCall(rt *goja.Runtime, call goja.Callable) sharedArray {
-	gojaValue, err := call(goja.Undefined())
+func getShareArrayFromCall(rt *sobek.Runtime, call sobek.Callable) sharedArray {
+	sobekValue, err := call(sobek.Undefined())
 	if err != nil {
 		common.Throw(rt, err)
 	}
-	obj := gojaValue.ToObject(rt)
+	obj := sobekValue.ToObject(rt)
 	if obj.ClassName() != "Array" {
 		common.Throw(rt, errors.New("only arrays can be made into SharedArray")) // TODO better error
 	}
 	arr := make([]string, obj.Get("length").ToInteger())
 
-	stringify, _ := goja.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("stringify"))
-	var val goja.Value
+	stringify, _ := sobek.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("stringify"))
+	var val sobek.Value
 	for i := range arr {
-		val, err = stringify(goja.Undefined(), obj.Get(strconv.Itoa(i)))
+		val, err = stringify(sobek.Undefined(), obj.Get(strconv.Itoa(i)))
 		if err != nil {
 			panic(err)
 		}

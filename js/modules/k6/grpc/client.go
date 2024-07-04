@@ -15,7 +15,7 @@ import (
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/netext/grpcext"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/jhump/protoreflect/desc"
 	"github.com/jhump/protoreflect/desc/protoparse"
 	"google.golang.org/grpc"
@@ -205,7 +205,7 @@ func buildTLSConfigFromMap(parentConfig *tls.Config, tlsConfigMap map[string]int
 }
 
 // Connect is a block dial to the gRPC server at the given address (host:port)
-func (c *Client) Connect(addr string, params goja.Value) (bool, error) {
+func (c *Client) Connect(addr string, params sobek.Value) (bool, error) {
 	state := c.vu.State()
 	if state == nil {
 		return false, common.NewInitContextError("connecting to a gRPC server in the init context is not supported")
@@ -276,8 +276,8 @@ func (c *Client) Connect(addr string, params goja.Value) (bool, error) {
 // Invoke creates and calls a unary RPC by fully qualified method name
 func (c *Client) Invoke(
 	method string,
-	req goja.Value,
-	params goja.Value,
+	req sobek.Value,
+	params sobek.Value,
 ) (*grpcext.InvokeResponse, error) {
 	grpcReq, err := c.buildInvokeRequest(method, req, params)
 	if err != nil {
@@ -290,9 +290,9 @@ func (c *Client) Invoke(
 // AsyncInvoke creates and calls a unary RPC by fully qualified method name asynchronously
 func (c *Client) AsyncInvoke(
 	method string,
-	req goja.Value,
-	params goja.Value,
-) *goja.Promise {
+	req sobek.Value,
+	params sobek.Value,
+) *sobek.Promise {
 	grpcReq, err := c.buildInvokeRequest(method, req, params)
 
 	promise, resolve, reject := c.vu.Runtime().NewPromise()
@@ -321,8 +321,8 @@ func (c *Client) AsyncInvoke(
 // buildInvokeRequest creates a new InvokeRequest from the given method name, request object and parameters
 func (c *Client) buildInvokeRequest(
 	method string,
-	req goja.Value,
-	params goja.Value,
+	req sobek.Value,
+	params sobek.Value,
 ) (grpcext.InvokeRequest, error) {
 	grpcReq := grpcext.InvokeRequest{}
 
@@ -385,7 +385,7 @@ func (c *Client) Close() error {
 	return err
 }
 
-// MethodInfo holds information on any parsed method descriptors that can be used by the goja VM
+// MethodInfo holds information on any parsed method descriptors that can be used by the Sobek VM
 type MethodInfo struct {
 	Package         string
 	Service         string

@@ -155,8 +155,20 @@ func (fd *FileDescriptor) String() string {
 }
 
 // IsProto3 returns true if the file declares a syntax of "proto3".
+//
+// When this returns false, the file is either syntax "proto2" (if
+// Edition() returns zero) or the file uses editions.
 func (fd *FileDescriptor) IsProto3() bool {
 	return fd.wrapped.Syntax() == protoreflect.Proto3
+}
+
+// Edition returns the edition of the file. If the file does not
+// use editions syntax, zero is returned.
+func (fd *FileDescriptor) Edition() descriptorpb.Edition {
+	if fd.wrapped.Syntax() == protoreflect.Editions {
+		return fd.proto.GetEdition()
+	}
+	return 0
 }
 
 // GetDependencies returns all of this file's dependencies. These correspond to

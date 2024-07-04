@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -43,7 +43,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	}
 }
 
-func (mi *ModuleInstance) setTimeout(f goja.Callable, t float64) {
+func (mi *ModuleInstance) setTimeout(f sobek.Callable, t float64) {
 	if f == nil {
 		common.Throw(mi.vu.Runtime(), errors.New("setTimeout requires a function as first argument"))
 	}
@@ -55,7 +55,7 @@ func (mi *ModuleInstance) setTimeout(f goja.Callable, t float64) {
 		select {
 		case <-timer.C:
 			runOnLoop(func() error {
-				_, err := f(goja.Undefined())
+				_, err := f(sobek.Undefined())
 				return err
 			})
 		case <-mi.vu.Context().Done():

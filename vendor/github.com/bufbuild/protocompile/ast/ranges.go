@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -33,7 +33,7 @@ type ExtensionRangeNode struct {
 	Semicolon *RuneNode
 }
 
-func (e *ExtensionRangeNode) msgElement() {}
+func (*ExtensionRangeNode) msgElement() {}
 
 // NewExtensionRangeNode creates a new *ExtensionRangeNode. All args must be
 // non-nil except opts, which may be nil.
@@ -87,6 +87,14 @@ func NewExtensionRangeNode(keyword *KeywordNode, ranges []*RangeNode, commas []*
 		Commas:    commas,
 		Options:   opts,
 		Semicolon: semicolon,
+	}
+}
+
+func (e *ExtensionRangeNode) RangeOptions(fn func(*OptionNode) bool) {
+	for _, opt := range e.Options.Options {
+		if !fn(opt) {
+			return
+		}
 	}
 }
 

@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	"github.com/chromedp/cdproto/cdp"
@@ -21,8 +20,8 @@ import (
 // JSHandleAPI interface.
 type JSHandleAPI interface {
 	AsElement() *ElementHandle
-	Dispose()
-	Evaluate(pageFunc string, args ...any) any
+	Dispose() error
+	Evaluate(pageFunc string, args ...any) (any, error)
 	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
 	JSONValue() (string, error)
@@ -79,30 +78,33 @@ func (h *BaseJSHandle) AsElement() *ElementHandle {
 }
 
 // Dispose releases the remote object.
-func (h *BaseJSHandle) Dispose() {
-	if err := h.dispose(); err != nil {
-		// We do not want to panic on an error when the error is a closed
-		// context. The reason the context would be closed is due to the
-		// iteration ending and therefore the associated browser and its assets
-		// will be automatically deleted.
-		if errors.Is(err, context.Canceled) {
-			h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
-			return
-		}
-		// The following error indicates that the object we're trying to release
-		// cannot be found, which would mean that the object has already been
-		// removed/deleted. This can occur when a navigation occurs, usually when
-		// a page contains an iframe.
-		if strings.Contains(err.Error(), "Cannot find context with specified id") {
-			h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
-			return
-		}
-
-		k6ext.Panic(h.ctx, "dispose: %w", err)
+func (h *BaseJSHandle) Dispose() error {
+	err := h.dispose()
+	if err == nil { // no error
+		return nil
 	}
+
+	// We do not want to return an error when the error is a closed
+	// context. The reason the context would be closed is due to the
+	// iteration ending and therefore the associated browser and its assets
+	// will be automatically deleted.
+	if errors.Is(err, context.Canceled) {
+		h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
+		return nil
+	}
+	// The following error indicates that the object we're trying to release
+	// cannot be found, which would mean that the object has already been
+	// removed/deleted. This can occur when a navigation occurs, usually when
+	// a page contains an iframe.
+	if strings.Contains(err.Error(), "Cannot find context with specified id") {
+		h.logger.Debugf("BaseJSHandle:Dispose", "%v", err)
+		return nil
+	}
+
+	return fmt.Errorf("disposing element with ID %s: %w", h.remoteObject.ObjectID, err)
 }
 
-// dispose is like Dispose, but does not panic.
+// dispose sends a command to the browser to release the remote object.
 func (h *BaseJSHandle) dispose() error {
 	if h.disposed {
 		return nil
@@ -121,16 +123,19 @@ func (h *BaseJSHandle) dispose() error {
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (h *BaseJSHandle) Evaluate(pageFunc string, args ...any) any {
+func (h *BaseJSHandle) Evaluate(pageFunc string, args ...any) (any, error) {
+	args = append([]any{h}, args...)
 	res, err := h.execCtx.Eval(h.ctx, pageFunc, args...)
 	if err != nil {
-		k6ext.Panic(h.ctx, "%w", err)
+		return nil, fmt.Errorf("evaluating element: %w", err)
 	}
-	return res
+
+	return res, nil
 }
 
 // EvaluateHandle will evaluate provided page function within an execution context.
 func (h *BaseJSHandle) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error) {
+	args = append([]any{h}, args...)
 	eh, err := h.execCtx.EvalHandle(h.ctx, pageFunc, args...)
 	if err != nil {
 		return nil, fmt.Errorf("evaluating handle for element: %w", err)

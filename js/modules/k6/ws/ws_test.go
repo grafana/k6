@@ -85,11 +85,8 @@ func newTestState(t testing.TB) testState {
 	testRuntime := modulestest.NewRuntime(t)
 	samples := make(chan metrics.SampleContainer, 1000)
 
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
 	registry := metrics.NewRegistry()
 	state := &lib.State{
-		Group:  root,
 		Dialer: tb.Dialer,
 		Options: lib.Options{
 			SystemTags: metrics.NewSystemTagSet(

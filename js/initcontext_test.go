@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -47,13 +47,13 @@ func TestRequire(t *testing.T) {
 			bi, err := b.Instantiate(context.Background(), 0)
 			assert.NoError(t, err, "instance error")
 
-			_, defaultOk := goja.AssertFunction(bi.getExported("default"))
+			_, defaultOk := sobek.AssertFunction(bi.getExported("default"))
 			assert.True(t, defaultOk, "default export is not a function")
 			assert.Equal(t, "abc123", bi.getExported("dummy").String())
 
 			k6 := bi.getExported("_k6").ToObject(bi.Runtime)
 			require.NotNil(t, k6)
-			_, groupOk := goja.AssertFunction(k6.Get("group"))
+			_, groupOk := sobek.AssertFunction(k6.Get("group"))
 			assert.True(t, groupOk, "k6.group is not a function")
 		})
 
@@ -70,11 +70,11 @@ func TestRequire(t *testing.T) {
 			bi, err := b.Instantiate(context.Background(), 0)
 			require.NoError(t, err)
 
-			_, defaultOk := goja.AssertFunction(bi.getExported("default"))
+			_, defaultOk := sobek.AssertFunction(bi.getExported("default"))
 			assert.True(t, defaultOk, "default export is not a function")
 			assert.Equal(t, "abc123", bi.getExported("dummy").String())
 
-			_, groupOk := goja.AssertFunction(bi.getExported("_group"))
+			_, groupOk := sobek.AssertFunction(bi.getExported("_group"))
 			assert.True(t, groupOk, "{ group } is not a function")
 		})
 	})
@@ -196,7 +196,7 @@ func TestRequire(t *testing.T) {
 
 			bi, err := b.Instantiate(context.Background(), 0)
 			require.NoError(t, err)
-			_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+			_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 			assert.NoError(t, err)
 		})
 	})
@@ -342,9 +342,6 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
 
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
-
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	logger.Out = io.Discard
@@ -354,7 +351,6 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	bi.moduleVUImpl.state = &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
-		Group:   root,
 		Transport: &http.Transport{
 			DialContext: (netext.NewDialer(
 				net.Dialer{
@@ -374,7 +370,7 @@ func TestRequestWithBinaryFile(t *testing.T) {
 	defer cancel()
 	bi.moduleVUImpl.ctx = ctx
 
-	v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.NoError(t, err)
 	require.NotNil(t, v)
 	assert.Equal(t, true, v.Export())
@@ -488,9 +484,6 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
 
-	root, err := lib.NewGroup("", nil)
-	require.NoError(t, err)
-
 	logger := logrus.New()
 	logger.Level = logrus.DebugLevel
 	logger.Out = io.Discard
@@ -500,7 +493,6 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 	bi.moduleVUImpl.state = &lib.State{
 		Options: lib.Options{},
 		Logger:  logger,
-		Group:   root,
 		Transport: &http.Transport{
 			DialContext: (netext.NewDialer(
 				net.Dialer{
@@ -520,7 +512,7 @@ func TestRequestWithMultipleBinaryFiles(t *testing.T) {
 	defer cancel()
 	bi.moduleVUImpl.ctx = ctx
 
-	v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.NoError(t, err)
 	require.NotNil(t, v)
 	assert.Equal(t, true, v.Export())
@@ -537,7 +529,7 @@ func Test__VU(t *testing.T) {
 	require.NoError(t, err)
 	bi, err := b.Instantiate(context.Background(), 5)
 	require.NoError(t, err)
-	v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.NoError(t, err)
 	assert.Equal(t, int64(5), v.Export())
 }
@@ -569,9 +561,9 @@ export default function(){
 
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
-	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
-	exception := new(goja.Exception)
+	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
 	require.Equal(t, exception.String(), "exception in line 2\n\tat f2 (file:///module1.js:2:4(2))\n\tat file:///script.js:5:4(3)\n")
 }
@@ -603,9 +595,9 @@ export default function(){
 
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
-	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
-	exception := new(goja.Exception)
+	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
 	require.Equal(t, exception.String(), "exception in line 2\n\tat file:///module1.js:2:5(2)\n\tat file:///script.js:5:4(3)\n")
 }
@@ -633,9 +625,9 @@ export default function () {
 
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
-	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
-	exception := new(goja.Exception)
+	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
 	require.Equal(t, "cool is cool\n\tat webpack:///./test1.ts:2:4(2)\n\tat webpack:///./test1.ts:5:4(3)\n\tat file:///script.js:4:2(4)\n", exception.String())
 }
@@ -664,9 +656,9 @@ export default function () {
 
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
-	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
-	exception := new(goja.Exception)
+	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
 	// TODO figure out why those are not the same as the one in the previous test TestSourceMapsExternal
 	// likely settings in the transpilers
@@ -694,9 +686,9 @@ export default function () {
 
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
-	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
-	exception := new(goja.Exception)
+	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
 	// TODO figure out why those are not the same as the one in the previous test TestSourceMapsExternal
 	// likely settings in the transpilers
@@ -764,9 +756,9 @@ var script_default = () => {
 
 	bi, err := b.Instantiate(context.Background(), 0)
 	require.NoError(t, err)
-	_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+	_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 	require.Error(t, err)
-	exception := new(goja.Exception)
+	exception := new(sobek.Exception)
 	require.ErrorAs(t, err, &exception)
 	// TODO figure out why those are not the same as the one in the previous test TestSourceMapsExternal
 	// likely settings in the transpilers

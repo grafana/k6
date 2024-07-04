@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"net/url"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/lib/fsext"
@@ -18,7 +18,7 @@ const cantBeUsedOutsideInitContextMsg = `the "%s" function is only available in 
 // openImpl implements openImpl() in the init context and will read and return the
 // contents of a file. If the second argument is "b" it returns an ArrayBuffer
 // instance, otherwise a string representation.
-func openImpl(rt *goja.Runtime, fs fsext.Fs, basePWD *url.URL, filename string, args ...string) (goja.Value, error) {
+func openImpl(rt *sobek.Runtime, fs fsext.Fs, basePWD *url.URL, filename string, args ...string) (sobek.Value, error) {
 	data, err := readFile(fs, fsext.Abs(basePWD.Path, filename))
 	if err != nil {
 		return nil, err

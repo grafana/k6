@@ -4,7 +4,7 @@ package webcrypto
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -47,7 +47,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 	}}
 }
 
-func newCryptoObject(vu modules.VU) *goja.Object {
+func newCryptoObject(vu modules.VU) *sobek.Object {
 	rt := vu.Runtime()
 
 	obj := rt.NewObject()
@@ -77,7 +77,7 @@ func newCryptoObject(vu modules.VU) *goja.Object {
 	return obj
 }
 
-func newSubtleCryptoObject(vu modules.VU) *goja.Object {
+func newSubtleCryptoObject(vu modules.VU) *sobek.Object {
 	rt := vu.Runtime()
 
 	obj := rt.NewObject()
@@ -135,13 +135,13 @@ func newSubtleCryptoObject(vu modules.VU) *goja.Object {
 	return obj
 }
 
-// setReadOnlyPropertyOf sets a read-only property on the given [goja.Object].
-func setReadOnlyPropertyOf(obj *goja.Object, name string, value goja.Value) error {
+// setReadOnlyPropertyOf sets a read-only property on the given [sobek.Object].
+func setReadOnlyPropertyOf(obj *sobek.Object, name string, value sobek.Value) error {
 	err := obj.DefineDataProperty(name,
 		value,
-		goja.FLAG_FALSE,
-		goja.FLAG_FALSE,
-		goja.FLAG_TRUE,
+		sobek.FLAG_FALSE,
+		sobek.FLAG_FALSE,
+		sobek.FLAG_TRUE,
 	)
 	if err != nil {
 		return fmt.Errorf("unable to define %s read-only property on TextEncoder object; reason: %w", name, err)

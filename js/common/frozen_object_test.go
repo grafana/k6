@@ -3,7 +3,7 @@ package common
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -11,7 +11,7 @@ import (
 func TestFrozenObject(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
+	rt := sobek.New()
 	obj := rt.NewObject()
 	require.NoError(t, obj.Set("foo", "bar"))
 	require.NoError(t, rt.Set("obj", obj))

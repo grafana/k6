@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/loader"
 )
 
@@ -31,7 +31,7 @@ func NewLegacyRequireImpl(vu VU, ms *ModuleSystem, pwd url.URL) *LegacyRequireIm
 const issueLink = "https://github.com/grafana/k6/issues/3534"
 
 // Require is the actual call that implements require
-func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
+func (r *LegacyRequireImpl) Require(specifier string) (*sobek.Object, error) {
 	// TODO remove this in the future when we address https://github.com/grafana/k6/issues/2674
 	// This is currently needed as each time require is called we need to record it's new pwd
 	// to be used if a require *or* open is used within the file as they are relative to the
@@ -43,21 +43,21 @@ func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
 	//
 	// With native ESM this won't even be possible as `require` might not be called - instead an import
 	// might be used in which case we won't be able to be doing this hack. In that case we either will
-	// need some goja specific helper or to use stack traces as goja_nodejs does.
+	// need some Sobek specific helper or to use stack traces.
 	currentPWD := r.currentlyRequiredModule
 	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") {
 		defer func() {
 			r.currentlyRequiredModule = currentPWD
 		}()
-		// In theory we can give that downwards, but this makes the code more tightly coupled
-		// plus as explained above this will be removed in the future so the code reflects more
-		// closely what will be needed then
-		if !r.modules.resolver.locked {
-			r.warnUserOnPathResolutionDifferences(specifier)
-		}
 		fileURL, err := loader.Resolve(r.currentlyRequiredModule, specifier)
 		if err != nil {
 			return nil, err
+		}
+		// In theory we can give that downwards, but this makes the code more tightly coupled
+		// plus as explained above this will be removed in the future so the code reflects more
+		// closely what will be needed then
+		if fileURL.Scheme == "file" && !r.modules.resolver.locked {
+			r.warnUserOnPathResolutionDifferences(specifier)
 		}
 		r.currentlyRequiredModule = loader.Dir(fileURL)
 	}
@@ -84,9 +84,8 @@ func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string
 		return loader.Dir(u), nil
 	}
 	// Warn users on their require depending on the none standard k6 behaviour.
-	rt := r.vu.Runtime()
 	logger := r.vu.InitEnv().Logger
-	correct, err := normalizePathToURL(getCurrentModuleScript(rt))
+	correct, err := normalizePathToURL(getCurrentModuleScript(r.vu))
 	if err != nil {
 		logger.Warningf("Couldn't get the \"correct\" path to resolve specifier %q against: %q"+
 			"Please report to issue %s. "+
@@ -99,7 +98,7 @@ func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string
 			correct, r.currentlyRequiredModule, specifier, issueLink)
 	}
 
-	k6behaviourString, err := getPreviousRequiringFile(rt)
+	k6behaviourString, err := getPreviousRequiringFile(r.vu)
 	if err != nil {
 		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
 			"Please report to issue %s. "+
@@ -124,24 +123,33 @@ func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string
 	}
 }
 
-func getCurrentModuleScript(rt *goja.Runtime) string {
+func getCurrentModuleScript(vu VU) string {
+	rt := vu.Runtime()
 	var parent string
-	var buf [2]goja.StackFrame
+	var buf [2]sobek.StackFrame
 	frames := rt.CaptureCallStack(2, buf[:0])
+	if len(frames) == 0 || frames[1].SrcName() == "file:///-" {
+		return vu.InitEnv().CWD.JoinPath("./-").String()
+	}
 	parent = frames[1].SrcName()
 
 	return parent
 }
 
-func getPreviousRequiringFile(rt *goja.Runtime) (string, error) {
-	var buf [1000]goja.StackFrame
+func getPreviousRequiringFile(vu VU) (string, error) {
+	rt := vu.Runtime()
+	var buf [1000]sobek.StackFrame
 	frames := rt.CaptureCallStack(1000, buf[:0])
 
 	for i, frame := range frames[1:] { // first one should be the current require
 		// TODO have this precalculated automatically
 		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
 			// we need to get the one *before* but as we skip the first one the index matches ;)
-			return frames[i].SrcName(), nil
+			result := frames[i].SrcName()
+			if result == "file:///-" {
+				return vu.InitEnv().CWD.JoinPath("./-").String(), nil
+			}
+			return result, nil
 		}
 	}
 	// hopefully nobody is calling `require` with 1000 big stack :crossedfingers:
@@ -150,5 +158,5 @@ func getPreviousRequiringFile(rt *goja.Runtime) (string, error) {
 	}
 
 	// fallback
-	return frames[len(frames)-1].SrcName(), nil
+	return vu.InitEnv().CWD.JoinPath("./-").String(), nil
 }

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -14,8 +14,8 @@ import (
 	"go.k6.io/k6/js/modulestest"
 )
 
-func makeRuntime(t *testing.T) *goja.Runtime {
-	rt := goja.New()
+func makeRuntime(t *testing.T) *sobek.Runtime {
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{

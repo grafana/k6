@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -186,7 +186,7 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 	t.Parallel()
 
 	var (
-		rt    = goja.New()
+		rt    = sobek.New()
 		state = &lib.State{}
 		ctx   = context.Background()
 	)
@@ -205,7 +205,7 @@ func TestAbortTest(t *testing.T) { //nolint:tparallel
 	prove := func(t *testing.T, script, reason string) {
 		_, err := rt.RunString(script)
 		require.NotNil(t, err)
-		var x *goja.InterruptedError
+		var x *sobek.InterruptedError
 		assert.ErrorAs(t, err, &x)
 		v, ok := x.Value().(*errext.InterruptError)
 		require.True(t, ok)
@@ -226,7 +226,7 @@ func TestOptionsTestFull(t *testing.T) {
 	expected := `{"paused":true,"scenarios":{"const-vus":{"executor":"constant-vus","options":{"browser":{"someOption":true}},"startTime":"10s","gracefulStop":"30s","env":{"FOO":"bar"},"exec":"default","tags":{"tagkey":"tagvalue"},"vus":50,"duration":"10m0s"}},"executionSegment":"0:1/4","executionSegmentSequence":"0,1/4,1/2,1","noSetup":true,"setupTimeout":"1m0s","noTeardown":true,"teardownTimeout":"5m0s","rps":100,"dns":{"ttl":"1m","select":"roundRobin","policy":"any"},"maxRedirects":3,"userAgent":"k6-user-agent","batch":15,"batchPerHost":5,"httpDebug":"full","insecureSkipTLSVerify":true,"tlsCipherSuites":["TLS_ECDHE_RSA_WITH_AES_128_GCM_SHA256"],"tlsVersion":{"min":"tls1.2","max":"tls1.3"},"tlsAuth":[{"domains":["example.com"],"cert":"mycert.pem","key":"mycert-key.pem","password":"mypwd"}],"throw":true,"thresholds":{"http_req_duration":[{"threshold":"rate>0.01","abortOnFail":true,"delayAbortEval":"10s"}]},"blacklistIPs":["192.0.2.0/24"],"blockHostnames":["test.k6.io","*.example.com"],"hosts":{"test.k6.io":"1.2.3.4:8443"},"noConnectionReuse":true,"noVUConnectionReuse":true,"minIterationDuration":"10s","ext":{"ext-one":{"rawkey":"rawvalue"}},"summaryTrendStats":["avg","min","max"],"summaryTimeUnit":"ms","systemTags":["iter","vu"],"tags":null,"metricSamplesBufferSize":8,"noCookiesReset":true,"discardResponseBodies":true,"consoleOutput":"loadtest.log","tags":{"runtag-key":"runtag-value"},"localIPs":"192.168.20.12-192.168.20.15,192.168.10.0/27"}`
 
 	var (
-		rt    = goja.New()
+		rt    = sobek.New()
 		state = &lib.State{
 			Options: lib.Options{
 				Paused: null.BoolFrom(true),
@@ -394,7 +394,7 @@ func TestOptionsTestFull(t *testing.T) {
 func TestOptionsTestSetPropertyDenied(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
+	rt := sobek.New()
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
@@ -419,7 +419,7 @@ func TestOptionsTestSetPropertyDenied(t *testing.T) {
 func TestScenarioNoAvailableInInitContext(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
+	rt := sobek.New()
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
@@ -447,7 +447,7 @@ func TestScenarioNoAvailableInInitContext(t *testing.T) {
 func TestOptionsNoAvailableInInitContext(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
+	rt := sobek.New()
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
@@ -464,7 +464,7 @@ func TestOptionsNoAvailableInInitContext(t *testing.T) {
 func TestVUDefaultDetails(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
+	rt := sobek.New()
 	m, ok := New().NewModuleInstance(
 		&modulestest.VU{
 			RuntimeField: rt,
@@ -491,7 +491,7 @@ func TestVUDefaultDetails(t *testing.T) {
 
 func TestTagsDynamicObjectGet(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
+	rt := sobek.New()
 	tdo := tagsDynamicObject{
 		runtime: rt,
 		state: &lib.State{
@@ -505,7 +505,7 @@ func TestTagsDynamicObjectGet(t *testing.T) {
 
 func TestTagsDynamicObjectSet(t *testing.T) {
 	t.Parallel()
-	rt := goja.New()
+	rt := sobek.New()
 	tdo := tagsDynamicObject{
 		runtime: rt,
 		state: &lib.State{

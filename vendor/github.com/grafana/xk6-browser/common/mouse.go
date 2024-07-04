@@ -2,13 +2,12 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"time"
-
-	"github.com/grafana/xk6-browser/k6ext"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // Mouse represents a mouse input device.
@@ -35,13 +34,25 @@ func NewMouse(ctx context.Context, s session, f *Frame, ts *TimeoutSettings, k *
 	}
 }
 
+// Click will trigger a series of MouseMove, MouseDown and MouseUp events in the browser.
+func (m *Mouse) Click(x float64, y float64, opts sobek.Value) error {
+	mouseOpts := NewMouseClickOptions()
+	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
+		return fmt.Errorf("parsing mouse click options: %w", err)
+	}
+	if err := m.click(x, y, mouseOpts); err != nil {
+		return fmt.Errorf("clicking on x:%f y:%f: %w", x, y, err)
+	}
+	return nil
+}
+
 func (m *Mouse) click(x float64, y float64, opts *MouseClickOptions) error {
 	mouseDownUpOpts := opts.ToMouseDownUpOptions()
 	if err := m.move(x, y, NewMouseMoveOptions()); err != nil {
 		return err
 	}
 	for i := 0; i < int(mouseDownUpOpts.ClickCount); i++ {
-		if err := m.down(x, y, mouseDownUpOpts); err != nil {
+		if err := m.down(mouseDownUpOpts); err != nil {
 			return err
 		}
 		if opts.Delay != 0 {
@@ -52,28 +63,90 @@ func (m *Mouse) click(x float64, y float64, opts *MouseClickOptions) error {
 			case <-t.C:
 			}
 		}
-		if err := m.up(x, y, mouseDownUpOpts); err != nil {
+		if err := m.up(mouseDownUpOpts); err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+// DblClick will trigger Click twice in quick succession.
+func (m *Mouse) DblClick(x float64, y float64, opts sobek.Value) error {
+	mouseOpts := NewMouseDblClickOptions()
+	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
+		return fmt.Errorf("parsing double click options: %w", err)
+	}
+	if err := m.click(x, y, mouseOpts.ToMouseClickOptions()); err != nil {
+		return fmt.Errorf("double clicking on x:%f y:%f: %w", x, y, err)
 	}
 	return nil
 }
 
-func (m *Mouse) down(x float64, y float64, opts *MouseDownUpOptions) error {
+// Down will trigger a MouseDown event in the browser.
+func (m *Mouse) Down(opts sobek.Value) error {
+	mouseOpts := NewMouseDownUpOptions()
+	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
+		return fmt.Errorf("parsing mouse down options: %w", err)
+	}
+	if err := m.down(mouseOpts); err != nil {
+		return fmt.Errorf("pressing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
+	}
+	return nil
+}
+
+func (m *Mouse) down(opts *MouseDownUpOptions) error {
 	m.button = input.MouseButton(opts.Button)
 	action := input.DispatchMouseEvent(input.MousePressed, m.x, m.y).
 		WithButton(input.MouseButton(opts.Button)).
 		WithModifiers(input.Modifier(m.keyboard.modifiers)).
 		WithClickCount(opts.ClickCount)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		return err
+		return fmt.Errorf("mouse down: %w", err)
+	}
+	return nil
+}
+
+// Up will trigger a MouseUp event in the browser.
+func (m *Mouse) Up(opts sobek.Value) error {
+	mouseOpts := NewMouseDownUpOptions()
+	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
+		return fmt.Errorf("parsing mouse up options: %w", err)
+	}
+	if err := m.up(mouseOpts); err != nil {
+		return fmt.Errorf("releasing the mouse button on x:%f y:%f: %w", m.x, m.y, err)
+	}
+	return nil
+}
+
+func (m *Mouse) up(opts *MouseDownUpOptions) error {
+	m.button = input.None
+	action := input.DispatchMouseEvent(input.MouseReleased, m.x, m.y).
+		WithButton(input.MouseButton(opts.Button)).
+		WithModifiers(input.Modifier(m.keyboard.modifiers)).
+		WithClickCount(opts.ClickCount)
+	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
+		return fmt.Errorf("mouse up: %w", err)
+	}
+
+	return nil
+}
+
+// Move will trigger a MouseMoved event in the browser.
+func (m *Mouse) Move(x float64, y float64, opts sobek.Value) error {
+	mouseOpts := NewMouseMoveOptions()
+	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
+		return fmt.Errorf("parsing mouse move options: %w", err)
+	}
+	if err := m.move(x, y, mouseOpts); err != nil {
+		return fmt.Errorf("moving the mouse pointer to x:%f y:%f: %w", x, y, err)
 	}
 	return nil
 }
 
 func (m *Mouse) move(x float64, y float64, opts *MouseMoveOptions) error {
-	var fromX float64 = m.x
-	var fromY float64 = m.y
+	fromX := m.x
+	fromY := m.y
 	m.x = x
 	m.y = y
 	for i := int64(1); i <= opts.Steps; i++ {
@@ -83,100 +156,9 @@ func (m *Mouse) move(x float64, y float64, opts *MouseMoveOptions) error {
 			WithButton(m.button).
 			WithModifiers(input.Modifier(m.keyboard.modifiers))
 		if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (m *Mouse) up(x float64, y float64, opts *MouseDownUpOptions) error {
-	m.button = input.None
-	action := input.DispatchMouseEvent(input.MouseReleased, m.x, m.y).
-		WithButton(input.MouseButton(opts.Button)).
-		WithModifiers(input.Modifier(m.keyboard.modifiers)).
-		WithClickCount(opts.ClickCount)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		return err
-	}
-	return nil
-}
-
-// Click will trigger a series of MouseMove, MouseDown and MouseUp events in the browser.
-func (m *Mouse) Click(x float64, y float64, opts goja.Value) {
-	mouseOpts := NewMouseClickOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse click options: %w", err)
-	}
-	if err := m.click(x, y, mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "clicking on x:%f y:%f: %w", x, y, err)
-	}
-}
-
-func (m *Mouse) DblClick(x float64, y float64, opts goja.Value) {
-	mouseOpts := NewMouseDblClickOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing double click options: %w", err)
-	}
-	if err := m.click(x, y, mouseOpts.ToMouseClickOptions()); err != nil {
-		k6ext.Panic(m.ctx, "double clicking on x:%f y:%f: %w", x, y, err)
-	}
-}
-
-// Down will trigger a MouseDown event in the browser.
-func (m *Mouse) Down(x float64, y float64, opts goja.Value) {
-	mouseOpts := NewMouseDownUpOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse down options: %w", err)
-	}
-	if err := m.down(x, y, mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "pressing the mouse button on x:%f y:%f: %w", x, y, err)
-	}
-}
-
-// Move will trigger a MouseMoved event in the browser.
-func (m *Mouse) Move(x float64, y float64, opts goja.Value) {
-	mouseOpts := NewMouseDownUpOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse move options: %w", err)
-	}
-	if err := m.down(x, y, mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "moving the mouse pointer to x:%f y:%f: %w", x, y, err)
-	}
-}
-
-// Up will trigger a MouseUp event in the browser.
-func (m *Mouse) Up(x float64, y float64, opts goja.Value) {
-	mouseOpts := NewMouseDownUpOptions()
-	if err := mouseOpts.Parse(m.ctx, opts); err != nil {
-		k6ext.Panic(m.ctx, "parsing mouse up options: %w", err)
-	}
-	if err := m.up(x, y, mouseOpts); err != nil {
-		k6ext.Panic(m.ctx, "releasing the mouse button on x:%f y:%f: %w", x, y, err)
-	}
-}
-
-// Wheel will trigger a MouseWheel event in the browser
-/*func (m *Mouse) Wheel(opts goja.Value) {
-	var deltaX float64 = 0.0
-	var deltaY float64 = 0.0
-
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "deltaX":
-				deltaX = opts.Get(k).ToFloat()
-			case "deltaY":
-				deltaY = opts.Get(k).ToFloat()
-			}
+			return fmt.Errorf("mouse move: %w", err)
 		}
 	}
 
-	action := input.DispatchMouseEvent(input.MouseWheel, m.x, m.y).
-		WithModifiers(input.Modifier(m.keyboard.modifiers)).
-		WithDeltaX(deltaX).
-		WithDeltaY(deltaY)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6Throw(m.ctx, "mouse down: %w", err)
-	}
-}*/
+	return nil
+}

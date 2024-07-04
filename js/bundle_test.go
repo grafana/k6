@@ -13,7 +13,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -68,6 +68,34 @@ func getSimpleBundle(tb testing.TB, filename, data string, opts ...interface{}) 
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
 			Data: []byte(data),
+		},
+		map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()},
+	)
+}
+
+func getSimpleBundleStdin(tb testing.TB, pwd *url.URL, data string, opts ...interface{}) (*Bundle, error) {
+	fs := fsext.NewMemMapFs()
+	var rtOpts *lib.RuntimeOptions
+	var logger logrus.FieldLogger
+	for _, o := range opts {
+		switch opt := o.(type) {
+		case fsext.Fs:
+			fs = opt
+		case lib.RuntimeOptions:
+			rtOpts = &opt
+		case logrus.FieldLogger:
+			logger = opt
+		default:
+			tb.Fatalf("unknown test option %q", opt)
+		}
+	}
+
+	return NewBundle(
+		getTestPreInitState(tb, logger, rtOpts),
+		&loader.SourceData{
+			URL:  &url.URL{Path: "/-", Scheme: "file"},
+			Data: []byte(data),
+			PWD:  pwd,
 		},
 		map[string]fsext.Fs{"file": fs, "https": fsext.NewMemMapFs()},
 	)
@@ -159,7 +187,7 @@ func TestNewBundle(t *testing.T) {
 			}{
 				{
 					"InvalidCompat", "es1", `export default function() {};`,
-					`invalid compatibility mode "es1". Use: "extended", "base"`,
+					`invalid compatibility mode "es1". Use: "extended", "base", "experimental_enhanced"`,
 				},
 				// ES2015 modules are not supported
 				{
@@ -202,7 +230,7 @@ BigInt(1231412444)`,
 				Expr, Error string
 			}{
 				"Array":    {`[]`, "json: cannot unmarshal array into Go value of type lib.Options"},
-				"Function": {`function(){}`, "error parsing script options: json: unsupported type: func(goja.FunctionCall) goja.Value"},
+				"Function": {`function(){}`, "error parsing script options: json: unsupported type: func(sobek.FunctionCall) sobek.Value"},
 			}
 			for name, data := range invalidOptions {
 				t.Run(name, func(t *testing.T) {
@@ -480,7 +508,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		require.Equal(t, lib.Options{VUs: null.IntFrom(12345)}, b.Options)
 		bi, err := b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
-		val, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+		val, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 		require.NoError(t, err)
 		require.Equal(t, "hi!", val.Export())
 	}
@@ -573,7 +601,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 		require.NoError(t, err)
 		bi, err := b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
-		val, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+		val, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 		require.NoError(t, err)
 		require.Equal(t, int64(999), val.Export())
 	})
@@ -719,7 +747,7 @@ func TestOpen(t *testing.T) {
 						t.Run(source, func(t *testing.T) {
 							bi, err := b.Instantiate(context.Background(), 0)
 							require.NoError(t, err)
-							v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+							v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 							require.NoError(t, err)
 							require.Equal(t, "hi", v.Export())
 						})
@@ -754,7 +782,7 @@ func TestBundleInstantiate(t *testing.T) {
 
 		bi, err := b.Instantiate(context.Background(), 0)
 		require.NoError(t, err)
-		v, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+		v, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 		require.NoError(t, err)
 		require.Equal(t, true, v.Export())
 	})
@@ -821,7 +849,7 @@ func TestBundleEnv(t *testing.T) {
 
 			bi, err := b.Instantiate(context.Background(), 0)
 			require.NoError(t, err)
-			_, err = bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+			_, err = bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 			require.NoError(t, err)
 		})
 	}
@@ -859,7 +887,7 @@ func TestBundleNotSharable(t *testing.T) {
 				require.NoError(t, err)
 				for j := 0; j < iters; j++ {
 					require.NoError(t, bi.Runtime.Set("__ITER", j))
-					_, err := bi.getCallableExport(consts.DefaultFn)(goja.Undefined())
+					_, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 					require.NoError(t, err)
 				}
 			}

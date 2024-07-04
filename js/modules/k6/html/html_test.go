@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -66,8 +66,8 @@ const testXML = `
 </ListAllMyBucketsResult>
 `
 
-func getTestModuleInstance(t testing.TB) (*goja.Runtime, *ModuleInstance) {
-	rt := goja.New()
+func getTestModuleInstance(t testing.TB) (*sobek.Runtime, *ModuleInstance) {
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -92,7 +92,7 @@ func getTestModuleInstance(t testing.TB) (*goja.Runtime, *ModuleInstance) {
 	return rt, mi
 }
 
-func getTestRuntimeAndModuleInstanceWithDoc(t testing.TB, html string) (*goja.Runtime, *ModuleInstance) {
+func getTestRuntimeAndModuleInstanceWithDoc(t testing.TB, html string) (*sobek.Runtime, *ModuleInstance) {
 	t.Helper()
 
 	rt, mi := getTestModuleInstance(t)
@@ -106,7 +106,7 @@ func getTestRuntimeAndModuleInstanceWithDoc(t testing.TB, html string) (*goja.Ru
 	return rt, mi
 }
 
-func getTestRuntimeWithDoc(t testing.TB, html string) *goja.Runtime {
+func getTestRuntimeWithDoc(t testing.TB, html string) *sobek.Runtime {
 	t.Helper()
 
 	rt, _ := getTestRuntimeAndModuleInstanceWithDoc(t, html)
@@ -175,7 +175,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Unset", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("h1").attr("class")`)
 			if assert.NoError(t, err) {
-				assert.True(t, goja.IsUndefined(v), "v is not undefined: %v", v)
+				assert.True(t, sobek.IsUndefined(v), "v is not undefined: %v", v)
 			}
 
 			t.Run("Default", func(t *testing.T) {
@@ -296,7 +296,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Invalid arg", func(t *testing.T) {
 			_, err := rt.RunString(`doc.find("#select_multi option").each("");`)
 			if assert.Error(t, err) {
-				assert.IsType(t, &goja.Exception{}, err)
+				assert.IsType(t, &sobek.Exception{}, err)
 				assert.Contains(t, err.Error(), "must be a function")
 			}
 		})
@@ -411,7 +411,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Valid", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("#select_multi option").map(function(idx, val) { return val.text() })`)
 			if assert.NoError(t, err) {
-				mapped, ok := v.Export().([]goja.Value)
+				mapped, ok := v.Export().([]sobek.Value)
 				assert.True(t, ok)
 				assert.Equal(t, 3, len(mapped))
 				assert.Equal(t, "option 1", mapped[0].String())
@@ -447,14 +447,14 @@ func TestParseHTML(t *testing.T) {
 		t.Run("Invalid arg", func(t *testing.T) {
 			_, err := rt.RunString(`doc.find("#select_multi option").map("");`)
 			if assert.Error(t, err) {
-				assert.IsType(t, &goja.Exception{}, err)
+				assert.IsType(t, &sobek.Exception{}, err)
 				assert.Contains(t, err.Error(), "must be a function")
 			}
 		})
 		t.Run("Map with attr must return string", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("#select_multi").map(function(idx, val) { return val.attr("name") })`)
 			if assert.NoError(t, err) {
-				mapped, ok := v.Export().([]goja.Value)
+				mapped, ok := v.Export().([]sobek.Value)
 				assert.True(t, ok)
 				assert.Equal(t, 1, len(mapped))
 				assert.Equal(t, "select_multi", mapped[0].String())
@@ -813,7 +813,7 @@ func TestParseHTML(t *testing.T) {
 		t.Run("No args", func(t *testing.T) {
 			v, err := rt.RunString(`doc.find("body").children().get()`)
 			if assert.NoError(t, err) {
-				elems, ok := v.Export().([]goja.Value)
+				elems, ok := v.Export().([]sobek.Value)
 
 				assert.True(t, ok)
 				assert.Equal(t, "h1", elems[0].Export().(Element).NodeName())

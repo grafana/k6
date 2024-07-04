@@ -17,7 +17,7 @@ import (
 	"golang.org/x/crypto/md4"       //nolint:staticcheck // #nosec G501 // MD4 is weak, but we need it for compatibility
 	"golang.org/x/crypto/ripemd160" // no lint:staticcheck // #nosec G501 // RIPEMD160 is weak, but we need it for compatibility
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -74,7 +74,7 @@ func (c *Crypto) Exports() modules.Exports {
 }
 
 // randomBytes returns random data of the given size.
-func (c *Crypto) randomBytes(size int) (*goja.ArrayBuffer, error) {
+func (c *Crypto) randomBytes(size int) (*sobek.ArrayBuffer, error) {
 	if size < 1 {
 		return nil, errors.New("invalid size")
 	}
@@ -215,9 +215,9 @@ func (c *Crypto) parseHashFunc(a string) func() hash.Hash {
 	return h
 }
 
-// Hasher wraps an hash.Hash with goja.Runtime.
+// Hasher wraps an hash.Hash with sobek.Runtime.
 type Hasher struct {
-	runtime *goja.Runtime
+	runtime *sobek.Runtime
 	hash    hash.Hash
 }
 

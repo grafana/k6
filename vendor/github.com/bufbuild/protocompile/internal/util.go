@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -217,6 +217,23 @@ func ComputePath(d protoreflect.Descriptor) (protoreflect.SourcePath, bool) {
 		}
 		d = p
 	}
+}
+
+// CanPack returns true if a repeated field of the given kind
+// can use packed encoding.
+func CanPack(k protoreflect.Kind) bool {
+	switch k {
+	case protoreflect.MessageKind, protoreflect.GroupKind, protoreflect.StringKind, protoreflect.BytesKind:
+		return false
+	default:
+		return true
+	}
+}
+
+func ClonePath(path protoreflect.SourcePath) protoreflect.SourcePath {
+	clone := make(protoreflect.SourcePath, len(path))
+	copy(clone, path)
+	return clone
 }
 
 func reverse(p protoreflect.SourcePath) protoreflect.SourcePath {

@@ -114,7 +114,8 @@ func printExecutionDescription(
 	default:
 		for _, out := range outputs {
 			desc := out.Description()
-			if desc == engine.IngesterDescription {
+			switch desc {
+			case engine.IngesterDescription, lib.GroupSummaryDescription:
 				continue
 			}
 			if strings.HasPrefix(desc, dashboard.OutputName) {
@@ -262,13 +263,13 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 		return
 	}
 
-	var errTermGetSize bool
+	var terminalSizeUnknown bool
 	termWidth := defaultTermWidth
 	if gs.Stdout.IsTTY {
 		tw, _, err := term.GetSize(gs.Stdout.RawOutFd)
 		if !(tw > 0) || err != nil {
-			errTermGetSize = true
-			logger.WithError(err).Warn("error getting terminal size")
+			terminalSizeUnknown = true
+			logger.WithError(err).Debug("can't get terminal size")
 		} else {
 			termWidth = tw
 		}
@@ -352,7 +353,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 			gs.OutMutex.Unlock()
 			return
 		case <-winch:
-			if gs.Stdout.IsTTY && !errTermGetSize {
+			if gs.Stdout.IsTTY && !terminalSizeUnknown {
 				// More responsive progress bar resizing on platforms with SIGWINCH (*nix)
 				tw, _, err := term.GetSize(stdoutFD)
 				if tw > 0 && err == nil {
@@ -361,7 +362,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 			}
 		case <-ticker.C:
 			// Default ticker-based progress bar resizing
-			if gs.Stdout.IsTTY && !errTermGetSize && winch == nil {
+			if gs.Stdout.IsTTY && !terminalSizeUnknown && winch == nil {
 				tw, _, err := term.GetSize(stdoutFD)
 				if tw > 0 && err == nil {
 					termWidth = tw

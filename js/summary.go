@@ -7,7 +7,7 @@ import (
 	"io"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
@@ -104,7 +104,7 @@ func summarizeMetricsToObject(data *lib.Summary, options lib.Options, setupData 
 			return m
 		}
 	} else {
-		setupDataI = goja.Undefined()
+		setupDataI = sobek.Undefined()
 	}
 
 	m["setup_data"] = setupDataI
@@ -138,8 +138,8 @@ func exportGroup(group *lib.Group) map[string]interface{} {
 	}
 }
 
-func getSummaryResult(rawResult goja.Value) (map[string]io.Reader, error) {
-	if goja.IsNull(rawResult) || goja.IsUndefined(rawResult) {
+func getSummaryResult(rawResult sobek.Value) (map[string]io.Reader, error) {
+	if sobek.IsNull(rawResult) || sobek.IsUndefined(rawResult) {
 		return nil, nil //nolint:nilnil // this is actually valid result in this case
 	}
 

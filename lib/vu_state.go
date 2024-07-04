@@ -42,9 +42,6 @@ type State struct {
 	// Logger instance for every VU.
 	Logger logrus.FieldLogger
 
-	// Current group; all emitted metrics are tagged with this.
-	Group *Group
-
 	// Networking equipment.
 	Dialer DialContexter
 

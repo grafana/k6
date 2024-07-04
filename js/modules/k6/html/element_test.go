@@ -3,7 +3,7 @@ package html
 import (
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -206,7 +206,7 @@ func TestElement(t *testing.T) {
 
 		v, err := rt.RunString(`doc.find("div").get(0).childNodes()`)
 		if assert.NoError(t, err) {
-			nodes, ok := v.Export().([]goja.Value)
+			nodes, ok := v.Export().([]sobek.Value)
 
 			assert.True(t, ok)
 			assert.Equal(t, 9, len(nodes))
@@ -220,7 +220,7 @@ func TestElement(t *testing.T) {
 
 		v, err := rt.RunString(`doc.find("div").get(0).children()`)
 		if assert.NoError(t, err) {
-			nodes, ok := v.Export().([]goja.Value)
+			nodes, ok := v.Export().([]sobek.Value)
 
 			assert.True(t, ok)
 			assert.Equal(t, 4, len(nodes))
@@ -358,7 +358,7 @@ func TestElement(t *testing.T) {
 
 		v, err := rt.RunString(`doc.find("body").get(0).getElementsByClassName("class2")`)
 		if assert.NoError(t, err) {
-			elems, ok := v.Export().([]goja.Value)
+			elems, ok := v.Export().([]sobek.Value)
 
 			assert.True(t, ok)
 			assert.Equal(t, "div_elem", elems[0].Export().(Element).Id())
@@ -371,7 +371,7 @@ func TestElement(t *testing.T) {
 
 		v, err := rt.RunString(`doc.find("body").get(0).getElementsByTagName("span")`)
 		if assert.NoError(t, err) {
-			elems, ok := v.Export().([]goja.Value)
+			elems, ok := v.Export().([]sobek.Value)
 
 			assert.True(t, ok)
 			assert.Equal(t, 2, len(elems))
@@ -392,7 +392,7 @@ func TestElement(t *testing.T) {
 
 		v, err := rt.RunString(`doc.find("body").get(0).querySelectorAll("span")`)
 		if assert.NoError(t, err) {
-			elems, ok := v.Export().([]goja.Value)
+			elems, ok := v.Export().([]sobek.Value)
 
 			assert.True(t, ok)
 			assert.Len(t, elems, 2)

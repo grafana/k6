@@ -269,7 +269,7 @@ func (c *Color) Printf(format string, a ...interface{}) (n int, err error) {
 // On Windows, users should wrap w with colorable.NewColorable() if w is of
 // type *os.File.
 func (c *Color) Fprintln(w io.Writer, a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(w, c.wrap(fmt.Sprint(a...)))
+	return fmt.Fprintln(w, c.wrap(sprintln(a...)))
 }
 
 // Println formats using the default formats for its operands and writes to
@@ -278,7 +278,7 @@ func (c *Color) Fprintln(w io.Writer, a ...interface{}) (n int, err error) {
 // encountered. This is the standard fmt.Print() method wrapped with the given
 // color.
 func (c *Color) Println(a ...interface{}) (n int, err error) {
-	return fmt.Fprintln(Output, c.wrap(fmt.Sprint(a...)))
+	return fmt.Fprintln(Output, c.wrap(sprintln(a...)))
 }
 
 // Sprint is just like Print, but returns a string instead of printing it.
@@ -288,7 +288,7 @@ func (c *Color) Sprint(a ...interface{}) string {
 
 // Sprintln is just like Println, but returns a string instead of printing it.
 func (c *Color) Sprintln(a ...interface{}) string {
-	return fmt.Sprintln(c.Sprint(a...))
+	return c.wrap(sprintln(a...)) + "\n"
 }
 
 // Sprintf is just like Printf, but returns a string instead of printing it.
@@ -370,7 +370,7 @@ func (c *Color) SprintfFunc() func(format string, a ...interface{}) string {
 // string. Windows users should use this in conjunction with color.Output.
 func (c *Color) SprintlnFunc() func(a ...interface{}) string {
 	return func(a ...interface{}) string {
-		return fmt.Sprintln(c.Sprint(a...))
+		return c.wrap(sprintln(a...)) + "\n"
 	}
 }
 
@@ -647,4 +647,9 @@ func HiCyanString(format string, a ...interface{}) string { return colorString(f
 // foreground.
 func HiWhiteString(format string, a ...interface{}) string {
 	return colorString(format, FgHiWhite, a...)
+}
+
+// sprintln is a helper function to format a string with fmt.Sprintln and trim the trailing newline.
+func sprintln(a ...interface{}) string {
+	return strings.TrimSuffix(fmt.Sprintln(a...), "\n")
 }

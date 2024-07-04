@@ -4,14 +4,14 @@ import (
 	"errors"
 	"math"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // ValueWithSize holds a value and its corresponding size.
 //
 // It is used to store values in the queue.
 type ValueWithSize struct {
-	Value goja.Value
+	Value sobek.Value
 	Size  float64
 }
 
@@ -19,13 +19,13 @@ type ValueWithSize struct {
 type QueueWithSizes struct {
 	Queue          []ValueWithSize
 	QueueTotalSize float64
-	runtime        *goja.Runtime
+	runtime        *sobek.Runtime
 }
 
 // NewQueueWithSizes creates a new queue of values with sizes, as described in the [specification].
 //
 // [specification]: https://streams.spec.whatwg.org/#queue-with-sizes
-func NewQueueWithSizes(runtime *goja.Runtime) *QueueWithSizes {
+func NewQueueWithSizes(runtime *sobek.Runtime) *QueueWithSizes {
 	return &QueueWithSizes{
 		Queue:   make([]ValueWithSize, 0),
 		runtime: runtime,
@@ -35,7 +35,7 @@ func NewQueueWithSizes(runtime *goja.Runtime) *QueueWithSizes {
 // Enqueue adds a value to the queue, and implements the specification's [EnqueueValueWithSize] abstract operation.
 //
 // [EnqueueValueWithSize]: https://streams.spec.whatwg.org/#enqueue-value-with-size
-func (q *QueueWithSizes) Enqueue(value goja.Value, size float64) error {
+func (q *QueueWithSizes) Enqueue(value sobek.Value, size float64) error {
 	if math.IsNaN(size) || size < 0 || math.IsInf(size, 1) { // Check for +Inf
 		return newRangeError(q.runtime, "size must be a finite, non-NaN number")
 	}
@@ -56,7 +56,7 @@ func (q *QueueWithSizes) Enqueue(value goja.Value, size float64) error {
 // It implements the [DequeueValue] abstract operation.
 //
 // [DequeueValue]: https://streams.spec.whatwg.org/#abstract-opdef-dequeue-value
-func (q *QueueWithSizes) Dequeue() (goja.Value, error) {
+func (q *QueueWithSizes) Dequeue() (sobek.Value, error) {
 	if len(q.Queue) == 0 {
 		return nil, newError(AssertionError, "queue is empty")
 	}
@@ -76,7 +76,7 @@ func (q *QueueWithSizes) Dequeue() (goja.Value, error) {
 // It implements the [PeekQueueValue] abstract operation.
 //
 // [PeekQueueValue]: https://streams.spec.whatwg.org/#abstract-opdef-peek-queue-value
-func (q *QueueWithSizes) Peek() (goja.Value, error) {
+func (q *QueueWithSizes) Peek() (sobek.Value, error) {
 	if len(q.Queue) == 0 {
 		return nil, errors.New("queue is empty")
 	}

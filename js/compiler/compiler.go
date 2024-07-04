@@ -14,9 +14,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja"
-	"github.com/dop251/goja/parser"
 	"github.com/go-sourcemap/sourcemap"
+	"github.com/grafana/sobek"
+	"github.com/grafana/sobek/parser"
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/lib"
@@ -30,26 +30,26 @@ var (
 		// "presets": []string{"latest"},
 		"plugins": []interface{}{
 			// es2015 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2015/src/index.js
-			// in goja
+			// in Sobek
 			// []interface{}{"transform-es2015-template-literals", map[string]interface{}{"loose": false, "spec": false}},
-			// "transform-es2015-literals", // in goja
-			// "transform-es2015-function-name", // in goja
-			// []interface{}{"transform-es2015-arrow-functions", map[string]interface{}{"spec": false}}, // in goja
-			// "transform-es2015-block-scoped-functions", // in goja
-			// []interface{}{"transform-es2015-classes", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-object-super", // in goja
-			// "transform-es2015-shorthand-properties", // in goja
-			// "transform-es2015-duplicate-keys", // in goja
-			// []interface{}{"transform-es2015-computed-properties", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-for-of", // in goja
-			// "transform-es2015-sticky-regex", // in goja
-			// "transform-es2015-unicode-regex", // in goja
-			// "check-es2015-constants", // in goja
-			// []interface{}{"transform-es2015-spread", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-parameters", // in goja
-			// []interface{}{"transform-es2015-destructuring", map[string]interface{}{"loose": false}}, // in goja
-			// "transform-es2015-block-scoping", // in goja
-			// "transform-es2015-typeof-symbol", // in goja
+			// "transform-es2015-literals", // in Sobek
+			// "transform-es2015-function-name", // in Sobek
+			// []interface{}{"transform-es2015-arrow-functions", map[string]interface{}{"spec": false}}, // in Sobek
+			// "transform-es2015-block-scoped-functions", // in Sobek
+			// []interface{}{"transform-es2015-classes", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-object-super", // in Sobek
+			// "transform-es2015-shorthand-properties", // in Sobek
+			// "transform-es2015-duplicate-keys", // in Sobek
+			// []interface{}{"transform-es2015-computed-properties", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-for-of", // in Sobek
+			// "transform-es2015-sticky-regex", // in Sobek
+			// "transform-es2015-unicode-regex", // in Sobek
+			// "check-es2015-constants", // in Sobek
+			// []interface{}{"transform-es2015-spread", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-parameters", // in Sobek
+			// []interface{}{"transform-es2015-destructuring", map[string]interface{}{"loose": false}}, // in Sobek
+			// "transform-es2015-block-scoping", // in Sobek
+			// "transform-es2015-typeof-symbol", // in Sobek
 			// all the other module plugins are just dropped
 			[]interface{}{"transform-es2015-modules-commonjs", map[string]interface{}{"loose": false}},
 			// "transform-regenerator", // Doesn't really work unless regeneratorRuntime is also added
@@ -58,7 +58,7 @@ var (
 			// "transform-exponentiation-operator",
 
 			// es2017 https://github.com/babel/babel/blob/v6.26.0/packages/babel-preset-es2017/src/index.js
-			// "syntax-trailing-function-commas", // in goja
+			// "syntax-trailing-function-commas", // in Sobek
 			// "transform-async-to-generator", // Doesn't really work unless regeneratorRuntime is also added
 		},
 		"ast":           false,
@@ -72,11 +72,11 @@ var (
 	maxSrcLenForBabelSourceMap     = 250 * 1024 //nolint:gochecknoglobals
 	maxSrcLenForBabelSourceMapOnce sync.Once    //nolint:gochecknoglobals
 
-	onceBabelCode      sync.Once     //nolint:gochecknoglobals
-	globalBabelCode    *goja.Program //nolint:gochecknoglobals
-	errGlobalBabelCode error         //nolint:gochecknoglobals
-	onceBabel          sync.Once     //nolint:gochecknoglobals
-	globalBabel        *babel        //nolint:gochecknoglobals
+	onceBabelCode      sync.Once      //nolint:gochecknoglobals
+	globalBabelCode    *sobek.Program //nolint:gochecknoglobals
+	errGlobalBabelCode error          //nolint:gochecknoglobals
+	onceBabel          sync.Once      //nolint:gochecknoglobals
+	globalBabel        *babel         //nolint:gochecknoglobals
 )
 
 const (
@@ -84,7 +84,7 @@ const (
 	sourceMapURLFromBabel             = "k6://internal-should-not-leak/file.map"
 )
 
-// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a goja.Program
+// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a sobek.Program
 type Compiler struct {
 	logger  logrus.FieldLogger
 	babel   *babel
@@ -172,12 +172,12 @@ type compilationState struct {
 }
 
 // Compile the program in the given CompatibilityMode, wrapping it between pre and post code
-// TODO isESM will be used once goja support ESM modules natively
-func (c *Compiler) Compile(src, filename string, isESM bool) (*goja.Program, string, error) {
+// TODO isESM will be used once Sobek support ESM modules natively
+func (c *Compiler) Compile(src, filename string, isESM bool) (*sobek.Program, string, error) {
 	return c.compileImpl(src, filename, !isESM, c.Options.CompatibilityMode, nil)
 }
 
-// sourceMapLoader is to be used with goja's WithSourceMapLoader
+// sourceMapLoader is to be used with Sobek's WithSourceMapLoader
 // it not only gets the file from disk in the simple case, but also returns it if the map was generated from babel
 // additioanlly it fixes off by one error in commonjs dependencies due to having to wrap them in a function.
 func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
@@ -206,7 +206,7 @@ func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
 
 func (c *Compiler) compileImpl(
 	src, filename string, wrap bool, compatibilityMode lib.CompatibilityMode, srcMap []byte,
-) (*goja.Program, string, error) {
+) (*sobek.Program, string, error) {
 	code := src
 	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
 	if wrap {
@@ -239,36 +239,60 @@ func (c *Compiler) compileImpl(
 		c.logger.WithError(state.srcMapError).Warnf("Couldn't load source map for %s", filename)
 		ast, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps)
 	}
-	if err != nil {
-		if compatibilityMode == lib.CompatibilityModeExtended {
-			code, state.srcMap, err = c.Transform(src, filename, state.srcMap)
-			if err != nil {
-				return nil, code, err
-			}
-			// the compatibility mode "decreases" here as we shouldn't transform twice
-			return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
-		}
-		return nil, code, err
+
+	if err == nil {
+		pgm, err := sobek.CompileAST(ast, c.Options.Strict)
+		return pgm, code, err
 	}
-	pgm, err := goja.CompileAST(ast, c.Options.Strict)
-	return pgm, code, err
+
+	if compatibilityMode == lib.CompatibilityModeExtended {
+		code, state.srcMap, err = c.Transform(src, filename, state.srcMap)
+		if err != nil {
+			return nil, code, err
+		}
+		// the compatibility mode "decreases" here as we shouldn't transform twice
+		var prg *sobek.Program
+		prg, code, err = c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+		if err == nil && strings.Contains(src, "module.exports") {
+			c.logger.Warningf(
+				"During the compilation of %q, it has been detected that the file combines ECMAScript modules (ESM) "+
+					"import/export syntax with commonJS module.exports. "+
+					"Mixing these two module systems is non-standard and will not be supported anymore in future releases. "+
+					"Please ensure to use solely one or the other syntax.",
+				filename)
+		}
+		return prg, code, err
+	}
+
+	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+		code, state.srcMap, err = esbuildTransform(src, filename)
+		if err != nil {
+			return nil, code, err
+		}
+		if c.Options.SourceMapLoader != nil {
+			// This hack is required for the source map to work
+			code += "\n//# sourceMappingURL=" + sourceMapURLFromBabel
+		}
+		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+	}
+	return nil, code, err
 }
 
 type babel struct {
-	vm        *goja.Runtime
-	this      goja.Value
-	transform goja.Callable
+	vm        *sobek.Runtime
+	this      sobek.Value
+	transform sobek.Callable
 	m         sync.Mutex
 }
 
 func newBabel() (*babel, error) {
 	onceBabelCode.Do(func() {
-		globalBabelCode, errGlobalBabelCode = goja.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
+		globalBabelCode, errGlobalBabelCode = sobek.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
 	})
 	if errGlobalBabelCode != nil {
 		return nil, errGlobalBabelCode
 	}
-	vm := goja.New()
+	vm := sobek.New()
 	_, err := vm.RunProgram(globalBabelCode)
 	if err != nil {
 		return nil, err
@@ -382,7 +406,7 @@ func (b *babel) transformImpl(
 		return code, nil, nil
 	}
 
-	// this is to make goja try to load a sourcemap.
+	// this is to make Sobek try to load a sourcemap.
 	// it is a special url as it should never leak outside of this code
 	// additionally the alternative support from babel is to embed *the whole* sourcemap at the end
 	code += "\n//# sourceMappingURL=" + sourceMapURLFromBabel
@@ -390,8 +414,8 @@ func (b *babel) transformImpl(
 	if err != nil {
 		return code, nil, err
 	}
-	c, _ := goja.AssertFunction(stringify)
-	mapAsJSON, err := c(goja.Undefined(), vO.Get("map"))
+	c, _ := sobek.AssertFunction(stringify)
+	mapAsJSON, err := c(sobek.Undefined(), vO.Get("map"))
 	if err != nil {
 		return code, nil, err
 	}

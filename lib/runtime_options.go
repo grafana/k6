@@ -15,11 +15,13 @@ type CompatibilityMode uint8
 const (
 	// CompatibilityModeExtended achieves ES6+ compatibility with Babel
 	CompatibilityModeExtended CompatibilityMode = iota + 1
-	// CompatibilityModeBase is standard goja ES5.1+
+	// CompatibilityModeBase is standard Sobek ES5.1+
 	CompatibilityModeBase
+	// CompatibilityModeExperimentalEnhanced achieves TypeScript and ES6+ compatibility with esbuild
+	CompatibilityModeExperimentalEnhanced
 )
 
-// RuntimeOptions are settings passed onto the goja JS runtime
+// RuntimeOptions are settings passed onto the Sobek JS runtime
 type RuntimeOptions struct {
 	TestType null.String `json:"-"`
 

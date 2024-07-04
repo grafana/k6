@@ -92,20 +92,16 @@ func TestGroup(t *testing.T) {
 		t.Parallel()
 		tc := testCaseRuntime(t)
 		state := tc.testRuntime.VU.State()
-		root := state.Group
 		require.NoError(t, tc.testRuntime.VU.Runtime().Set("fn", func() {
 			groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
 			require.True(t, ok)
 			assert.Equal(t, groupTag, "::my group")
-			assert.Equal(t, state.Group.Name, "my group")
-			assert.Equal(t, state.Group.Parent, root)
 		}))
 		_, err := tc.testRuntime.RunOnEventLoop(`k6.group("my group", fn)`)
 		assert.NoError(t, err)
-		assert.Equal(t, state.Group, root)
 		groupTag, ok := state.Tags.GetCurrentValues().Tags.Get("group")
 		require.True(t, ok)
-		assert.Equal(t, groupTag, root.Name)
+		assert.Equal(t, groupTag, "")
 	})
 
 	t.Run("Invalid", func(t *testing.T) {
@@ -349,29 +345,6 @@ func TestCheckTypes(t *testing.T) {
 	}
 }
 
-func TestCheckContextExpiry(t *testing.T) {
-	t.Parallel()
-
-	tc := testCaseRuntime(t)
-
-	v, err := tc.testRuntime.RunOnEventLoop(`value = k6.check(null, { "check": true })`)
-	require.NoError(t, err)
-	assert.Equal(t, true, v.Export())
-
-	check, _ := tc.testRuntime.VU.State().Group.Check("check")
-	assert.Equal(t, int64(1), check.Passes)
-	assert.Equal(t, int64(0), check.Fails)
-
-	tc.testRuntime.CancelContext()
-
-	v, err = tc.testRuntime.RunOnEventLoop(`k6.check(null, { "check": true })`)
-	require.NoError(t, err)
-	assert.Equal(t, true, v.Export())
-
-	assert.Equal(t, int64(1), check.Passes)
-	assert.Equal(t, int64(0), check.Fails)
-}
-
 func TestCheckTags(t *testing.T) {
 	t.Parallel()
 	tc := testCaseRuntime(t)
@@ -408,16 +381,13 @@ func testCaseRuntime(t testing.TB) *testCase {
 	require.NoError(t, testRuntime.VU.RuntimeField.Set("k6", m.Exports().Named))
 
 	registry := metrics.NewRegistry()
-	root, err := lib.NewGroup("", nil)
-	assert.NoError(t, err)
 	samples := make(chan metrics.SampleContainer, 1000)
 	state := &lib.State{
-		Group: root,
 		Options: lib.Options{
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		Samples:        samples,
-		Tags:           lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{"group": root.Path})),
+		Tags:           lib.NewVUStateTags(registry.RootTagSet().WithTagsFromMap(map[string]string{"group": lib.RootGroupPath})),
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
 	}
 	testRuntime.MoveToVUContext(state)

@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/loader"
 )
@@ -21,7 +21,7 @@ type module interface {
 
 type moduleInstance interface {
 	execute() error
-	exports() *goja.Object
+	exports() *sobek.Object
 }
 type moduleCacheElement struct {
 	mod module
@@ -162,7 +162,7 @@ func NewModuleSystem(resolver *ModuleResolver, vu VU) *ModuleSystem {
 }
 
 // Require is called when a module/file needs to be loaded by a script
-func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) {
+func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*sobek.Object, error) {
 	mod, err := ms.resolver.resolve(pwd, arg)
 	if err != nil {
 		return nil, err
@@ -185,8 +185,8 @@ func (ms *ModuleSystem) Require(pwd *url.URL, arg string) (*goja.Object, error) 
 // it will be used instead of reevaluating the source from the provided SourceData.
 //
 // TODO: this API will likely change as native ESM support will likely not let us have the exports
-// as one big goja.Value that we can manipulate
-func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (goja.Value, error) {
+// as one big sobek.Value that we can manipulate
+func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (sobek.Value, error) {
 	specifier := source.URL.String()
 	pwd := source.URL.JoinPath("../")
 	if _, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data); err != nil {
@@ -197,7 +197,7 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (goja.Value, er
 
 // ExportGloballyModule sets all exports of the provided module name on the globalThis.
 // effectively making them globally available
-func ExportGloballyModule(rt *goja.Runtime, modSys *ModuleSystem, moduleName string) {
+func ExportGloballyModule(rt *sobek.Runtime, modSys *ModuleSystem, moduleName string) {
 	t, _ := modSys.Require(nil, moduleName)
 
 	for _, key := range t.Keys() {

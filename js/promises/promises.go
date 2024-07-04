@@ -2,19 +2,19 @@
 package promises
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/modules"
 )
 
 // New can be used to create promises that will be dispatched to k6's event loop.
 //
-// Calling the function will create a goja promise and return its `resolve` and `reject` callbacks, wrapped
+// Calling the function will create a Sobek promise and return its `resolve` and `reject` callbacks, wrapped
 // in such a way that it will block the k6 JavaScript runtime's event loop from exiting before they are
 // called, even if the promise isn't resolved by the time the current script ends executing.
 //
 // A typical usage would be:
 //
-//	   func myAsynchronousFunc(vu modules.VU) *(goja.Promise) {
+//	   func myAsynchronousFunc(vu modules.VU) *(sobek.Promise) {
 //		    promise, resolve, reject := promises.New(vu)
 //		    go func() {
 //		        v, err := someAsyncFunc()
@@ -27,7 +27,7 @@ import (
 //		    }()
 //		    return promise
 //		  }
-func New(vu modules.VU) (p *goja.Promise, resolve func(result any), reject func(reason any)) {
+func New(vu modules.VU) (p *sobek.Promise, resolve func(result any), reject func(reason any)) {
 	p, resolveFunc, rejectFunc := vu.Runtime().NewPromise()
 	callback := vu.RegisterCallback()
 

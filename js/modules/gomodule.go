@@ -1,7 +1,7 @@
 package modules
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // baseGoModule is a go module that does not implement modules.Module interface
@@ -19,14 +19,14 @@ func (b *baseGoModule) instantiate(vu VU) moduleInstance {
 type baseGoModuleInstance struct {
 	mod      interface{}
 	vu       VU
-	exportsO *goja.Object // this is so we only initialize the exports once per instance
+	exportsO *sobek.Object // this is so we only initialize the exports once per instance
 }
 
 func (b *baseGoModuleInstance) execute() error {
 	return nil
 }
 
-func (b *baseGoModuleInstance) exports() *goja.Object {
+func (b *baseGoModuleInstance) exports() *sobek.Object {
 	if b.exportsO == nil {
 		// TODO check this does not panic a lot
 		rt := b.vu.Runtime()
@@ -50,7 +50,7 @@ type goModuleInstance struct {
 	Instance
 	module   *goModule
 	vu       VU
-	exportsO *goja.Object // this is so we only initialize the exports once per instance
+	exportsO *sobek.Object // this is so we only initialize the exports once per instance
 }
 
 var _ moduleInstance = &goModuleInstance{}
@@ -60,7 +60,7 @@ func (gi *goModuleInstance) execute() error {
 	return nil
 }
 
-func (gi *goModuleInstance) exports() *goja.Object {
+func (gi *goModuleInstance) exports() *sobek.Object {
 	if gi.exportsO == nil {
 		rt := gi.vu.Runtime()
 		gi.exportsO = rt.ToValue(toESModuleExports(gi.Instance.Exports())).ToObject(rt)

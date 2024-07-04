@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -73,7 +73,7 @@ func TestCompile(t *testing.T) {
 		pgm, code, err := c.Compile(src, "script.js", true)
 		require.NoError(t, err)
 		assert.Equal(t, src, code)
-		v, err := goja.New().RunProgram(pgm)
+		v, err := sobek.New().RunProgram(pgm)
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), v.Export())
 	})
@@ -85,13 +85,13 @@ func TestCompile(t *testing.T) {
 		pgm, code, err := c.Compile(src, "script.js", false)
 		require.NoError(t, err)
 		assert.Equal(t, "(function(module, exports){exports.d=1+(function() { return 2; })()\n})\n", code)
-		rt := goja.New()
+		rt := sobek.New()
 		v, err := rt.RunProgram(pgm)
 		require.NoError(t, err)
-		fn, ok := goja.AssertFunction(v)
+		fn, ok := sobek.AssertFunction(v)
 		require.True(t, ok, "not a function")
-		exp := make(map[string]goja.Value)
-		_, err = fn(goja.Undefined(), goja.Undefined(), rt.ToValue(exp))
+		exp := make(map[string]sobek.Value)
+		_, err = fn(sobek.Undefined(), sobek.Undefined(), rt.ToValue(exp))
 		require.NoError(t, err)
 		assert.Equal(t, int64(3), exp["d"].Export())
 	})
@@ -102,7 +102,7 @@ func TestCompile(t *testing.T) {
 		src := `1+(function() { return 2; )()`
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
 		_, _, err := c.Compile(src, "script.js", false)
-		assert.IsType(t, &goja.Exception{}, err)
+		assert.IsType(t, &sobek.Exception{}, err)
 		assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:26)
 > 1 | 1+(function() { return 2; )()`)
 	})
@@ -114,7 +114,7 @@ func TestCompile(t *testing.T) {
 		require.NoError(t, err)
 		assert.Equal(t, `"use strict";require("something");`,
 			code)
-		rt := goja.New()
+		rt := sobek.New()
 		var requireCalled bool
 		require.NoError(t, rt.Set("require", func(s string) {
 			assert.Equal(t, "something", s)
@@ -135,16 +135,16 @@ func TestCompile(t *testing.T) {
 })
 `, code)
 		var requireCalled bool
-		rt := goja.New()
+		rt := sobek.New()
 		require.NoError(t, rt.Set("require", func(s string) {
 			assert.Equal(t, "something", s)
 			requireCalled = true
 		}))
 		v, err := rt.RunProgram(pgm)
 		require.NoError(t, err)
-		fn, ok := goja.AssertFunction(v)
+		fn, ok := sobek.AssertFunction(v)
 		require.True(t, ok, "not a function")
-		_, err = fn(goja.Undefined())
+		_, err = fn(sobek.Undefined())
 		assert.NoError(t, err)
 		require.True(t, requireCalled)
 	})
@@ -154,7 +154,7 @@ func TestCompile(t *testing.T) {
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
 		_, _, err := c.Compile(`1+(=>2)()`, "script.js", true)
-		assert.IsType(t, &goja.Exception{}, err)
+		assert.IsType(t, &sobek.Exception{}, err)
 		assert.Contains(t, err.Error(), `SyntaxError: script.js: Unexpected token (1:3)
 > 1 | 1+(=>2)()`)
 	})
@@ -240,4 +240,27 @@ func TestMinimalSourceMap(t *testing.T) {
 	_, _, err := compiler.Compile("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
 	require.NoError(t, err)
 	require.Empty(t, hook.Drain())
+}
+
+func TestMixingImportExport(t *testing.T) {
+	t.Parallel()
+	logger := logrus.New()
+	logger.SetLevel(logrus.DebugLevel)
+	logger.Out = io.Discard
+	hook := testutils.NewLogHook(logrus.InfoLevel, logrus.WarnLevel)
+	logger.AddHook(hook)
+
+	compiler := New(logger)
+	compiler.Options = Options{
+		CompatibilityMode: lib.CompatibilityModeExtended,
+		Strict:            true,
+	}
+	_, _, err := compiler.Compile("export let s = 5;\nmodule.exports = 'something';", "somefile", false)
+	require.NoError(t, err)
+	entries := hook.Drain()
+	require.Len(t, entries, 1)
+	msg, err := entries[0].String() // we need this in order to get the field error
+	require.NoError(t, err)
+
+	require.Contains(t, msg, `it has been detected that the file combines`)
 }
