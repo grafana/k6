@@ -65,9 +65,14 @@ func (c *cjsModuleInstance) exports() *sobek.Object {
 // TODO: extract this to not make this package dependant on compilers.
 // this is potentially a moot point after ESM when the compiler will likely get mostly dropped.
 func cjsModuleFromString(fileURL *url.URL, data []byte, c *compiler.Compiler) (*cjsModule, error) {
-	pgm, _, err := c.Compile(string(data), fileURL.String(), false)
+	astProgram, _, err := c.Parse(string(data), fileURL.String(), true)
 	if err != nil {
 		return nil, err
 	}
+	pgm, err := sobek.CompileAST(astProgram, true)
+	if err != nil {
+		return nil, err
+	}
+
 	return &cjsModule{prg: pgm, url: fileURL}, nil
 }

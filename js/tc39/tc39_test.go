@@ -603,11 +603,7 @@ func (ctx *tc39TestCtx) compile(base, name string) (*sobek.Program, error) {
 			return nil, err
 		}
 
-		str := string(b)
-		comp := ctx.compilerPool.Get()
-		defer ctx.compilerPool.Put(comp)
-		comp.Options = compiler.Options{CompatibilityMode: ctx.compatibilityMode}
-		prg, _, err = comp.Compile(str, name, true)
+		prg, err = ctx.compileOnly(string(b), name, ctx.compatibilityMode)
 		if err != nil {
 			return nil, err
 		}
@@ -624,6 +620,17 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 	}
 	_, err = vm.RunProgram(prg)
 	return err
+}
+
+func (ctx *tc39TestCtx) compileOnly(src, name string, compatibilityMode lib.CompatibilityMode) (*sobek.Program, error) {
+	comp := ctx.compilerPool.Get()
+	defer ctx.compilerPool.Put(comp)
+	comp.Options = compiler.Options{Strict: false, CompatibilityMode: compatibilityMode}
+	astProgram, _, err := comp.Parse(src, name, false)
+	if err != nil {
+		return nil, err
+	}
+	return sobek.CompileAST(astProgram, false)
 }
 
 func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *sobek.Runtime, expectsError bool) (early bool, err error) {
@@ -645,14 +652,9 @@ func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *s
 		}
 	}
 
-	var p *sobek.Program
-	comp := ctx.compilerPool.Get()
-	defer ctx.compilerPool.Put(comp)
-	comp.Options = compiler.Options{Strict: false, CompatibilityMode: lib.CompatibilityModeBase}
-	p, _, err = comp.Compile(src, name, true)
+	p, err := ctx.compileOnly(src, name, lib.CompatibilityModeBase)
 	if err != nil && !expectsError {
-		comp.Options.CompatibilityMode = ctx.compatibilityMode
-		p, _, err = comp.Compile(src, name, true)
+		p, err = ctx.compileOnly(src, name, lib.CompatibilityModeExtended)
 	}
 	if err != nil {
 		return early, err
