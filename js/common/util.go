@@ -17,7 +17,7 @@ func Throw(rt *sobek.Runtime, err error) {
 	panic(rt.NewGoError(err)) // this catches the stack unlike rt.ToValue
 }
 
-// GetReader tries to return an io.Reader value from an exported goja value.
+// GetReader tries to return an io.Reader value from an exported Sobek value.
 func GetReader(data interface{}) (io.Reader, error) {
 	switch r := data.(type) {
 	case string:

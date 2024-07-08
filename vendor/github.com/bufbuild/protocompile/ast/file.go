@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -19,7 +19,7 @@ import "fmt"
 // FileDeclNode is a placeholder interface for AST nodes that represent files.
 // This allows NoSourceNode to be used in place of *FileNode for some usages.
 type FileDeclNode interface {
-	Node
+	NodeWithOptions
 	Name() string
 	NodeInfo(n Node) NodeInfo
 }
@@ -134,6 +134,16 @@ func (f *FileNode) Items() Sequence[Item] {
 
 func (f *FileNode) Tokens() Sequence[Token] {
 	return f.fileInfo.Tokens()
+}
+
+func (f *FileNode) RangeOptions(fn func(*OptionNode) bool) {
+	for _, decl := range f.Decls {
+		if opt, ok := decl.(*OptionNode); ok {
+			if !fn(opt) {
+				return
+			}
+		}
+	}
 }
 
 // FileElement is an interface implemented by all AST nodes that are

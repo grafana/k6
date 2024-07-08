@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -151,11 +151,6 @@ type result struct {
 	// interpreting options.
 	usedImports map[string]struct{}
 
-	// A map of descriptor options messages to their pre-serialized bytes (using
-	// a canonical serialization format based on how protoc renders options to
-	// bytes).
-	optionBytes map[proto.Message][]byte
-
 	// A map of AST nodes that represent identifiers in ast.FieldReferenceNodes
 	// to their fully-qualified name. The identifiers are for field names in
 	// message literals (in option values) that are extension fields. These names
@@ -201,8 +196,23 @@ func (r *result) Syntax() protoreflect.Syntax {
 		return protoreflect.Proto2
 	case "proto3":
 		return protoreflect.Proto3
+	case "editions":
+		return protoreflect.Editions
 	default:
 		return 0 // ???
+	}
+}
+
+func (r *result) Edition() int32 {
+	switch r.Syntax() {
+	case protoreflect.Proto2:
+		return int32(descriptorpb.Edition_EDITION_PROTO2)
+	case protoreflect.Proto3:
+		return int32(descriptorpb.Edition_EDITION_PROTO3)
+	case protoreflect.Editions:
+		return int32(r.FileDescriptorProto().GetEdition())
+	default:
+		return int32(descriptorpb.Edition_EDITION_UNKNOWN) // ???
 	}
 }
 
@@ -299,141 +309,6 @@ func asSourceLocations(srcInfoProtos []*descriptorpb.SourceCodeInfo_Location) []
 		prev[str] = &locs[i]
 	}
 	return locs
-}
-
-// AddOptionBytes associates the given opts (an options message encoded in the
-// binary format) with the given options protobuf message. The protobuf message
-// should exist in the hierarchy of this result's FileDescriptorProto. This
-// allows the FileDescriptorProto to be marshaled to bytes in a way that
-// preserves the way options are defined in source (just as is done by protoc,
-// but not possible when only using the generated Go types and standard
-// marshaling APIs in the protobuf runtime).
-func (r *result) AddOptionBytes(pm proto.Message, opts []byte) {
-	if r.optionBytes == nil {
-		r.optionBytes = map[proto.Message][]byte{}
-	}
-	r.optionBytes[pm] = append(r.optionBytes[pm], opts...)
-}
-
-func (r *result) CanonicalProto() *descriptorpb.FileDescriptorProto {
-	origFd := r.FileDescriptorProto()
-	// make a copy that we can mutate
-	fd := proto.Clone(origFd).(*descriptorpb.FileDescriptorProto) //nolint:errcheck
-
-	r.storeOptionBytesInFile(fd, origFd)
-
-	return fd
-}
-
-func (r *result) storeOptionBytes(opts, origOpts proto.Message) {
-	optionBytes := r.optionBytes[origOpts]
-	if len(optionBytes) == 0 {
-		// If we don't know about this options message, leave it alone.
-		return
-	}
-	proto.Reset(opts)
-	opts.ProtoReflect().SetUnknown(optionBytes)
-}
-
-func (r *result) storeOptionBytesInFile(fd, origFd *descriptorpb.FileDescriptorProto) {
-	if fd.Options != nil {
-		r.storeOptionBytes(fd.Options, origFd.Options)
-	}
-
-	for i, md := range fd.MessageType {
-		origMd := origFd.MessageType[i]
-		r.storeOptionBytesInMessage(md, origMd)
-	}
-
-	for i, ed := range fd.EnumType {
-		origEd := origFd.EnumType[i]
-		r.storeOptionBytesInEnum(ed, origEd)
-	}
-
-	for i, exd := range fd.Extension {
-		origExd := origFd.Extension[i]
-		r.storeOptionBytesInField(exd, origExd)
-	}
-
-	for i, sd := range fd.Service {
-		origSd := origFd.Service[i]
-		if sd.Options != nil {
-			r.storeOptionBytes(sd.Options, origSd.Options)
-		}
-
-		for j, mtd := range sd.Method {
-			origMtd := origSd.Method[j]
-			if mtd.Options != nil {
-				r.storeOptionBytes(mtd.Options, origMtd.Options)
-			}
-		}
-	}
-}
-
-func (r *result) storeOptionBytesInMessage(md, origMd *descriptorpb.DescriptorProto) {
-	if md.GetOptions().GetMapEntry() {
-		// Map entry messages are synthesized. They won't have any option bytes
-		// since they don't actually appear in the source and thus have any option
-		// declarations in the source.
-		return
-	}
-
-	if md.Options != nil {
-		r.storeOptionBytes(md.Options, origMd.Options)
-	}
-
-	for i, fld := range md.Field {
-		origFld := origMd.Field[i]
-		r.storeOptionBytesInField(fld, origFld)
-	}
-
-	for i, ood := range md.OneofDecl {
-		origOod := origMd.OneofDecl[i]
-		if ood.Options != nil {
-			r.storeOptionBytes(ood.Options, origOod.Options)
-		}
-	}
-
-	for i, exr := range md.ExtensionRange {
-		origExr := origMd.ExtensionRange[i]
-		if exr.Options != nil {
-			r.storeOptionBytes(exr.Options, origExr.Options)
-		}
-	}
-
-	for i, nmd := range md.NestedType {
-		origNmd := origMd.NestedType[i]
-		r.storeOptionBytesInMessage(nmd, origNmd)
-	}
-
-	for i, ed := range md.EnumType {
-		origEd := origMd.EnumType[i]
-		r.storeOptionBytesInEnum(ed, origEd)
-	}
-
-	for i, exd := range md.Extension {
-		origExd := origMd.Extension[i]
-		r.storeOptionBytesInField(exd, origExd)
-	}
-}
-
-func (r *result) storeOptionBytesInEnum(ed, origEd *descriptorpb.EnumDescriptorProto) {
-	if ed.Options != nil {
-		r.storeOptionBytes(ed.Options, origEd.Options)
-	}
-
-	for i, evd := range ed.Value {
-		origEvd := origEd.Value[i]
-		if evd.Options != nil {
-			r.storeOptionBytes(evd.Options, origEvd.Options)
-		}
-	}
-}
-
-func (r *result) storeOptionBytesInField(fld, origFld *descriptorpb.FieldDescriptorProto) {
-	if fld.Options != nil {
-		r.storeOptionBytes(fld.Options, origFld.Options)
-	}
 }
 
 type fileImports struct {
@@ -856,6 +731,11 @@ func (e *enumDescriptor) ReservedRanges() protoreflect.EnumRanges {
 	return e.rsvdRanges
 }
 
+func (e *enumDescriptor) IsClosed() bool {
+	enumType := resolveFeature(e, enumTypeField)
+	return descriptorpb.FeatureSet_EnumType(enumType.Enum()) == descriptorpb.FeatureSet_CLOSED
+}
+
 type enumRanges struct {
 	protoreflect.EnumRanges
 	ranges [][2]protoreflect.EnumNumber
@@ -1167,6 +1047,14 @@ func (f *fldDescriptor) Cardinality() protoreflect.Cardinality {
 	case descriptorpb.FieldDescriptorProto_LABEL_REQUIRED:
 		return protoreflect.Required
 	case descriptorpb.FieldDescriptorProto_LABEL_OPTIONAL:
+		if f.Syntax() == protoreflect.Editions {
+			// Editions does not use label to indicate required. It instead
+			// uses a feature, and label is always optional.
+			fieldPresence := descriptorpb.FeatureSet_FieldPresence(resolveFeature(f, fieldPresenceField).Enum())
+			if fieldPresence == descriptorpb.FeatureSet_LEGACY_REQUIRED {
+				return protoreflect.Required
+			}
+		}
 		return protoreflect.Optional
 	default:
 		return 0
@@ -1174,6 +1062,14 @@ func (f *fldDescriptor) Cardinality() protoreflect.Cardinality {
 }
 
 func (f *fldDescriptor) Kind() protoreflect.Kind {
+	if f.proto.GetType() == descriptorpb.FieldDescriptorProto_TYPE_MESSAGE && f.Syntax() == protoreflect.Editions {
+		// In editions, "group encoding" (aka "delimited encoding") is toggled
+		// via a feature. So we report group kind when that feature is enabled.
+		messageEncoding := resolveFeature(f, messageEncodingField)
+		if descriptorpb.FeatureSet_MessageEncoding(messageEncoding.Enum()) == descriptorpb.FeatureSet_DELIMITED {
+			return protoreflect.GroupKind
+		}
+	}
 	return protoreflect.Kind(f.proto.GetType())
 }
 
@@ -1199,10 +1095,13 @@ func (f *fldDescriptor) HasPresence() bool {
 	if f.proto.GetLabel() == descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
 		return false
 	}
-	return f.IsExtension() ||
-		f.Syntax() == protoreflect.Proto2 ||
+	if f.IsExtension() ||
 		f.Kind() == protoreflect.MessageKind || f.Kind() == protoreflect.GroupKind ||
-		f.proto.OneofIndex != nil
+		f.proto.OneofIndex != nil {
+		return true
+	}
+	fieldPresence := descriptorpb.FeatureSet_FieldPresence(resolveFeature(f, fieldPresenceField).Enum())
+	return fieldPresence == descriptorpb.FeatureSet_EXPLICIT || fieldPresence == descriptorpb.FeatureSet_LEGACY_REQUIRED
 }
 
 func (f *fldDescriptor) IsExtension() bool {
@@ -1229,30 +1128,16 @@ func (f *fldDescriptor) IsWeak() bool {
 }
 
 func (f *fldDescriptor) IsPacked() bool {
+	if f.Cardinality() != protoreflect.Repeated || !internal.CanPack(f.Kind()) {
+		return false
+	}
 	opts := f.proto.GetOptions()
-	if opts.GetPacked() {
-		return true
-	}
 	if opts != nil && opts.Packed != nil {
-		// explicitly not packed
-		return false
+		// packed option is set explicitly
+		return *opts.Packed
 	}
-
-	// proto3 defaults to packed for repeated scalar numeric fields
-	if f.file.Syntax() != protoreflect.Proto3 {
-		return false
-	}
-	if f.proto.GetLabel() != descriptorpb.FieldDescriptorProto_LABEL_REPEATED {
-		return false
-	}
-	switch f.proto.GetType() {
-	case descriptorpb.FieldDescriptorProto_TYPE_GROUP, descriptorpb.FieldDescriptorProto_TYPE_MESSAGE,
-		descriptorpb.FieldDescriptorProto_TYPE_BYTES, descriptorpb.FieldDescriptorProto_TYPE_STRING:
-		return false
-	default:
-		// all others can be packed
-		return true
-	}
+	fieldEncoding := resolveFeature(f, repeatedFieldEncodingField)
+	return descriptorpb.FeatureSet_RepeatedFieldEncoding(fieldEncoding.Enum()) == descriptorpb.FeatureSet_PACKED
 }
 
 func (f *fldDescriptor) IsList() bool {

@@ -294,7 +294,7 @@ func TestLoadCycle(t *testing.T) {
 	require.NoError(t, fsext.WriteFile(fileSystem, "/counter.js", []byte(`
 			let main = require("./main.js");
 			exports.count = 5;
-			export function a() {
+			exports.a = function() {
 				return main.message;
 			}
 	`), fs.ModePerm))
@@ -303,15 +303,14 @@ func TestLoadCycle(t *testing.T) {
 			let counter = require("./counter.js");
 			let count = counter.count;
 			let a = counter.a;
-			let message= "Eval complete";
-			exports.message = message;
+			exports.message = "Eval complete";
 
-			export default function() {
+			exports.default = function() {
 				if (count != 5) {
 					throw new Error("Wrong value of count "+ count);
 				}
 				let aMessage = a();
-				if (aMessage != message) {
+				if (aMessage != exports.message) {
 					throw new Error("Wrong value of a() "+ aMessage);
 				}
 			}
@@ -682,4 +681,45 @@ func TestOptionsAreNotGloballyWritable(t *testing.T) {
 	require.NoError(t, err)
 
 	require.EqualValues(t, time.Minute*5, r2.GetOptions().MinIterationDuration.Duration)
+}
+
+func TestDefaultNamedExports(t *testing.T) {
+	t.Parallel()
+	_, err := getSimpleRunner(t, "/main.js", `export default function main() {}`,
+		lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+	require.NoError(t, err)
+}
+
+func TestStarImport(t *testing.T) {
+	t.Parallel()
+	fs := fsext.NewMemMapFs()
+	err := writeToFs(fs, map[string]any{
+		"/commonjs_file.js": `exports.something = 5;`,
+	})
+	require.NoError(t, err)
+
+	r1, err := getSimpleRunner(t, "/script.js", `
+		import * as cjs from "./commonjs_file.js"; // commonjs
+		import * as k6 from "k6"; // "new" go module
+		// TODO: test with basic go module maybe
+
+		if (cjs.something != 5) {
+			throw "cjs.something has wrong value" + cjs.something;
+		}
+		if (typeof k6.sleep != "function") {
+			throw "k6.sleep has wrong type" + typeof k6.sleep;
+		}
+		export default () => {}
+	`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	_, err = NewFromArchive(&lib.TestPreInitState{
+		Logger:         testutils.NewLogger(t),
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+	}, arc)
+	require.NoError(t, err)
 }

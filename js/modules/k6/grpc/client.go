@@ -385,7 +385,7 @@ func (c *Client) Close() error {
 	return err
 }
 
-// MethodInfo holds information on any parsed method descriptors that can be used by the goja VM
+// MethodInfo holds information on any parsed method descriptors that can be used by the Sobek VM
 type MethodInfo struct {
 	Package         string
 	Service         string

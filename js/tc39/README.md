@@ -1,6 +1,6 @@
 # Introduction to a k6's TC39 testing
 
-The point of this module is to test k6 goja+babel and k6 goja+esbuild combo against the tc39 test suite.
+The point of this module is to test k6 Sobek+babel and k6 Sobek+esbuild combo against the tc39 test suite.
 
 Ways to use it:
 1. run ./checkout.sh to checkout the last commit sha of [test262](https://github.com/tc39/test262)
@@ -8,13 +8,13 @@ Ways to use it:
 2. Run `go test &> out.log`
 
 The full list of failing tests, and the error, is in `breaking_test_errors-*.json`. All errors list there with the corresponding error will *not* be counted as errors - this is what the test expects, those specific errors.
-Due to changes to goja it is not uncommon for the error to change, or there to be now a new error on previously passing test, or (hopefully) a test that was not passing but now is.
+Due to changes to soben it is not uncommon for the error to change, or there to be now a new error on previously passing test, or (hopefully) a test that was not passing but now is.
 In all of those cases `breaking_test_errors-*.json` needs to be updated. Run the test with `-update` flag to update: `go test -update`
 
 NOTE: some text editors/IDEs will try to parse files ending in `json` as JSON, which given the size of `breaking_test_errors-*.json` might be a problem when it's not actually a JSON (before the edit). So it might be a better idea to name it something different if editing by hand and fix it later.
 
-This is a modified version of [the code in the goja
-repo](https://github.com/dop251/goja/blob/master/tc39_test.go)
+This is a modified version of [the code in the original goja
+repo](https://github.com/dop251/goja/blob/master/tc39_test.go) that Sobek was forked from.
 
 
 ## Reasons for recording breaking_test_errors.json

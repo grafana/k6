@@ -43,7 +43,7 @@ func (r *LegacyRequireImpl) Require(specifier string) (*sobek.Object, error) {
 	//
 	// With native ESM this won't even be possible as `require` might not be called - instead an import
 	// might be used in which case we won't be able to be doing this hack. In that case we either will
-	// need some goja specific helper or to use stack traces as goja_nodejs does.
+	// need some Sobek specific helper or to use stack traces.
 	currentPWD := r.currentlyRequiredModule
 	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") {
 		defer func() {

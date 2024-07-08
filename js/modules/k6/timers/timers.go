@@ -64,7 +64,7 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 func (e *Timers) Exports() modules.Exports {
 	return modules.Exports{
 		Named: map[string]interface{}{
-			// TODO the usage of `ToValue` here is so that goja doesn't do it automatically later
+			// TODO the usage of `ToValue` here is so that Sobek doesn't do it automatically later
 			// which will effectively create new instance each time it is accessed.
 			"setTimeout":    e.vu.Runtime().ToValue(e.setTimeout),
 			"clearTimeout":  e.vu.Runtime().ToValue(e.clearTimeout),
