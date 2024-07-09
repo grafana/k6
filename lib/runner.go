@@ -100,7 +100,6 @@ type Summary struct {
 	UIState         UIState
 }
 
-
 // String Overiding for tests
 func (s *Summary) String() string {
 	return "&{Summary:map[...]...}"
