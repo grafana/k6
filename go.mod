@@ -1,6 +1,6 @@
 module github.com/grafana/xk6-output-opentelemetry
 
-go 1.21
+go 1.20
 
 require (
 	github.com/mstoykov/atlas v0.0.0-20220811071828-388f114305dd
