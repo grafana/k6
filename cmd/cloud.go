@@ -330,7 +330,7 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
 		"enable showing of logs when a test is executed in the cloud")
 	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
-		"only upload the test to the cloud without actually starting a test run")
+		"(deprecated) only upload the test to the cloud without actually starting a test run")
 
 	return flags
 }

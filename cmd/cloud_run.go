@@ -30,7 +30,6 @@ type cmdCloudRun struct {
 
 	showCloudLogs bool
 	exitOnRunning bool
-	uploadOnly    bool
 }
 
 func getCmdCloudRun(gs *state.GlobalState) *cobra.Command {
@@ -38,7 +37,6 @@ func getCmdCloudRun(gs *state.GlobalState) *cobra.Command {
 		gs:            gs,
 		showCloudLogs: true,
 		exitOnRunning: false,
-		uploadOnly:    false,
 	}
 
 	exampleText := getExampleText(gs, `
@@ -92,15 +90,6 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, _ []string) error {
 		}
 		if !cmd.Flags().Changed("exit-on-running") {
 			c.exitOnRunning = exitOnRunningValue
-		}
-	}
-	if uploadOnlyEnv, ok := c.gs.Env["K6_CLOUD_UPLOAD_ONLY"]; ok {
-		uploadOnlyValue, err := strconv.ParseBool(uploadOnlyEnv)
-		if err != nil {
-			return fmt.Errorf("parsing K6_CLOUD_UPLOAD_ONLY returned an error: %w", err)
-		}
-		if !cmd.Flags().Changed("upload-only") {
-			c.uploadOnly = uploadOnlyValue
 		}
 	}
 
@@ -207,12 +196,7 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	modifyAndPrintBar(c.gs, progressBar, pb.WithConstProgress(0, "Uploading archive"))
 
 	var cloudTestRun *cloudapi.CreateTestRunResponse
-	if c.uploadOnly {
-		cloudTestRun, err = client.UploadTestOnly(name, cloudConfig.ProjectID.Int64, arc)
-	} else {
-		cloudTestRun, err = client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
-	}
-
+	cloudTestRun, err = client.StartCloudTestRun(name, cloudConfig.ProjectID.Int64, arc)
 	if err != nil {
 		return err
 	}
@@ -367,8 +351,6 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		"exits when test reaches the running status")
 	flags.BoolVar(&c.showCloudLogs, "show-logs", c.showCloudLogs,
 		"enable showing of logs when a test is executed in the cloud")
-	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
-		"only upload the test to the cloud without actually starting a test run")
 
 	return flags
 }
