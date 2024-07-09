@@ -93,6 +93,9 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.Token = token
 	default:
 		form := ui.Form{
+			Banner: "Enter your token to authenticate with k6 Cloud.\n" +
+				"Please, consult the k6 Cloud documentation for instructions on how to generate one:\n" +
+				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
 			Fields: []ui.Field{
 				ui.StringField{
 					Key:   "Token",
