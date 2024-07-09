@@ -17,10 +17,13 @@ import (
 	"go.k6.io/k6/output/statsd"
 
 	"github.com/grafana/xk6-dashboard/dashboard"
+	"github.com/grafana/xk6-output-opentelemetry/pkg/opentelemetry"
 	"github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite"
 )
 
 // builtinOutput marks the available builtin outputs.
+//
+// NOTE: that the enumer is the github.com/dmarkham/enumer
 //
 //go:generate enumer -type=builtinOutput -trimprefix builtinOutput -transform=kebab -output builtin_output_gen.go
 type builtinOutput uint32
@@ -34,6 +37,7 @@ const (
 	builtinOutputJSON
 	builtinOutputKafka
 	builtinOutputStatsd
+	builtinOutputExperimentalOpentelemetry
 )
 
 // TODO: move this to an output sub-module after we get rid of the old collectors?
@@ -63,6 +67,9 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 			return remotewrite.New(params)
 		},
 		"web-dashboard": dashboard.New,
+		builtinOutputExperimentalOpentelemetry.String(): func(params output.Params) (output.Output, error) {
+			return opentelemetry.New(params)
+		},
 	}
 
 	exts := ext.Get(ext.OutputExtension)
