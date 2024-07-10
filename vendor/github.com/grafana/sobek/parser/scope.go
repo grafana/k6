@@ -6,17 +6,21 @@ import (
 )
 
 type _scope struct {
-	outer           *_scope
-	allowIn         bool
-	allowLet        bool
-	inIteration     bool
-	inSwitch        bool
-	inFuncParams    bool
-	inFunction      bool
-	inAsync         bool
-	allowAwait      bool
-	allowYield      bool
-	declarationList []*ast.VariableDeclaration
+	outer             *_scope
+	allowIn           bool
+	allowLet          bool
+	allowImportExport bool
+	inIteration       bool
+	inSwitch          bool
+	inFuncParams      bool
+	inFunction        bool
+	inAsync           bool
+	allowAwait        bool
+	allowYield        bool
+	declarationList   []*ast.VariableDeclaration
+	importEntries     []*ast.ImportDeclaration
+	exportEntries     []*ast.ExportDeclaration
+	hasTLA            bool
 
 	labels []unistring.String
 }

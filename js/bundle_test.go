@@ -192,7 +192,7 @@ func TestNewBundle(t *testing.T) {
 				// ES2015 modules are not supported
 				{
 					"Modules", "base", `export default function() {};`,
-					"file:///script.js: Line 1:28 Unexpected reserved word (and 2 more errors)",
+					"file:///script.js: Line 1:28 export not supported in script (and 3 more errors)",
 				},
 				// BigInt is not supported
 				{
@@ -532,7 +532,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 		checkArchive(t, arc, lib.RuntimeOptions{}, "") // default options
 		checkArchive(t, arc, extCompatModeRtOpts, "")
-		checkArchive(t, arc, baseCompatModeRtOpts, "Unexpected reserved word")
+		checkArchive(t, arc, baseCompatModeRtOpts, "export not supported in script")
 	})
 
 	t.Run("es6_script_explicit", func(t *testing.T) {
@@ -543,7 +543,7 @@ func TestNewBundleFromArchive(t *testing.T) {
 
 		checkArchive(t, arc, lib.RuntimeOptions{}, "")
 		checkArchive(t, arc, extCompatModeRtOpts, "")
-		checkArchive(t, arc, baseCompatModeRtOpts, "Unexpected reserved word")
+		checkArchive(t, arc, baseCompatModeRtOpts, "export not supported in script")
 	})
 
 	t.Run("es5_script_with_extended", func(t *testing.T) {
@@ -579,10 +579,10 @@ func TestNewBundleFromArchive(t *testing.T) {
 		t.Parallel()
 		arc, err := getArchive(t, es6Code, extCompatModeRtOpts)
 		require.NoError(t, err)
-		arc.CompatibilityMode = "blah"                                           // intentionally break the archive
-		checkArchive(t, arc, lib.RuntimeOptions{}, "invalid compatibility mode") // fails when it uses the archive one
-		checkArchive(t, arc, extCompatModeRtOpts, "")                            // works when I force the compat mode
-		checkArchive(t, arc, baseCompatModeRtOpts, "Unexpected reserved word")   // failes because of ES6
+		arc.CompatibilityMode = "blah"                                               // intentionally break the archive
+		checkArchive(t, arc, lib.RuntimeOptions{}, "invalid compatibility mode")     // fails when it uses the archive one
+		checkArchive(t, arc, extCompatModeRtOpts, "")                                // works when I force the compat mode
+		checkArchive(t, arc, baseCompatModeRtOpts, "export not supported in script") // failes because of ES6
 	})
 
 	t.Run("script_options_dont_overwrite_metadata", func(t *testing.T) {

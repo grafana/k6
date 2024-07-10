@@ -16,6 +16,7 @@ import (
 
 	"github.com/go-sourcemap/sourcemap"
 	"github.com/grafana/sobek"
+	"github.com/grafana/sobek/ast"
 	"github.com/grafana/sobek/parser"
 	"github.com/sirupsen/logrus"
 
@@ -159,102 +160,99 @@ type Options struct {
 	Strict            bool
 }
 
-// compilationState is helper struct to keep the state of a compilation
-type compilationState struct {
+// parsingState is helper struct to keep the state of a compilation
+type parsingState struct {
 	// set when we couldn't load external source map so we can try parsing without loading it
 	couldntLoadSourceMap bool
 	// srcMap is the current full sourceMap that has been generated read so far
-	srcMap      []byte
-	srcMapError error
-	wrapped     bool // whether the original source is wrapped in a function to make it a commonjs module
+	srcMap            []byte
+	srcMapError       error
+	wrapped           bool // whether the original source is wrapped in a function to make it a commonjs module
+	compatibilityMode lib.CompatibilityMode
+	logger            logrus.FieldLogger
+
+	loader func(string) ([]byte, error)
 
 	compiler *Compiler
 }
 
-// Compile the program in the given CompatibilityMode, wrapping it between pre and post code
-// TODO isESM will be used once Sobek support ESM modules natively
-func (c *Compiler) Compile(src, filename string, isESM bool) (*sobek.Program, string, error) {
-	return c.compileImpl(src, filename, !isESM, c.Options.CompatibilityMode, nil)
+// Parse parses the provided source. It wraps as the same as CommonJS support.
+// The returned program can be compiled directly by Sobek.
+// Additionally, it returns the end code that has been parsed including any required transformations.
+func (c *Compiler) Parse(
+	src, filename string, wrap bool,
+) (prg *ast.Program, finalCode string, err error) {
+	state := &parsingState{
+		loader:            c.Options.SourceMapLoader,
+		wrapped:           wrap,
+		compatibilityMode: c.Options.CompatibilityMode,
+		logger:            c.logger,
+		compiler:          c,
+	}
+	return state.parseImpl(src, filename, wrap)
 }
 
 // sourceMapLoader is to be used with Sobek's WithSourceMapLoader
 // it not only gets the file from disk in the simple case, but also returns it if the map was generated from babel
 // additioanlly it fixes off by one error in commonjs dependencies due to having to wrap them in a function.
-func (c *compilationState) sourceMapLoader(path string) ([]byte, error) {
+func (ps *parsingState) sourceMapLoader(path string) ([]byte, error) {
 	if path == sourceMapURLFromBabel {
-		if c.wrapped {
-			return c.increaseMappingsByOne(c.srcMap)
+		if ps.wrapped {
+			return ps.increaseMappingsByOne(ps.srcMap)
 		}
-		return c.srcMap, nil
+		return ps.srcMap, nil
 	}
-	c.srcMap, c.srcMapError = c.compiler.Options.SourceMapLoader(path)
-	if c.srcMapError != nil {
-		c.couldntLoadSourceMap = true
-		return nil, c.srcMapError
+	ps.srcMap, ps.srcMapError = ps.loader(path)
+	if ps.srcMapError != nil {
+		ps.couldntLoadSourceMap = true
+		return nil, ps.srcMapError
 	}
-	_, c.srcMapError = sourcemap.Parse(path, c.srcMap)
-	if c.srcMapError != nil {
-		c.couldntLoadSourceMap = true
-		c.srcMap = nil
-		return nil, c.srcMapError
+	_, ps.srcMapError = sourcemap.Parse(path, ps.srcMap)
+	if ps.srcMapError != nil {
+		ps.couldntLoadSourceMap = true
+		ps.srcMap = nil
+		return nil, ps.srcMapError
 	}
-	if c.wrapped {
-		return c.increaseMappingsByOne(c.srcMap)
+	if ps.wrapped {
+		return ps.increaseMappingsByOne(ps.srcMap)
 	}
-	return c.srcMap, nil
+	return ps.srcMap, nil
 }
 
-func (c *Compiler) compileImpl(
-	src, filename string, wrap bool, compatibilityMode lib.CompatibilityMode, srcMap []byte,
-) (*sobek.Program, string, error) {
+func (ps *parsingState) parseImpl(src, filename string, wrap bool) (*ast.Program, string, error) {
 	code := src
-	state := compilationState{srcMap: srcMap, compiler: c, wrapped: wrap}
-	if wrap {
-		conditionalNewLine := ""
-		if index := strings.LastIndex(code, "//# sourceMappingURL="); index != -1 {
-			// the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
-			conditionalNewLine = "\n"
-			newCode, err := state.updateInlineSourceMap(code, index)
-			if err != nil {
-				c.logger.Warnf("while compiling %q, couldn't update its inline sourcemap which might lead "+
-					"to some line numbers being off: %s", filename, err)
-			} else {
-				code = newCode
-			}
-
-			// if there is no sourcemap - bork only the first line of code, but leave the remaining ones.
-		}
-		code = "(function(module, exports){" + conditionalNewLine + code + "\n})\n"
+	if wrap { // the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
+		code = ps.wrap(code, filename)
+		ps.wrapped = true
 	}
 	opts := parser.WithDisableSourceMaps
-	if c.Options.SourceMapLoader != nil {
-		opts = parser.WithSourceMapLoader(state.sourceMapLoader)
+	if ps.loader != nil {
+		opts = parser.WithSourceMapLoader(ps.sourceMapLoader)
 	}
-	ast, err := parser.ParseFile(nil, filename, code, 0, opts)
+	prg, err := parser.ParseFile(nil, filename, code, 0, opts)
 
-	if state.couldntLoadSourceMap {
-		state.couldntLoadSourceMap = false // reset
+	if ps.couldntLoadSourceMap {
+		ps.couldntLoadSourceMap = false // reset
 		// we probably don't want to abort scripts which have source maps but they can't be found,
 		// this also will be a breaking change, so if we couldn't we retry with it disabled
-		c.logger.WithError(state.srcMapError).Warnf("Couldn't load source map for %s", filename)
-		ast, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps)
+		ps.logger.WithError(ps.srcMapError).Warnf("Couldn't load source map for %s", filename)
+		prg, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps)
 	}
 
 	if err == nil {
-		pgm, err := sobek.CompileAST(ast, c.Options.Strict)
-		return pgm, code, err
+		return prg, code, nil
 	}
 
-	if compatibilityMode == lib.CompatibilityModeExtended {
-		code, state.srcMap, err = c.Transform(src, filename, state.srcMap)
+	if ps.compatibilityMode == lib.CompatibilityModeExtended {
+		code, ps.srcMap, err = ps.compiler.Transform(src, filename, ps.srcMap)
 		if err != nil {
 			return nil, code, err
 		}
-		// the compatibility mode "decreases" here as we shouldn't transform twice
-		var prg *sobek.Program
-		prg, code, err = c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+		ps.wrapped = false
+		ps.compatibilityMode = lib.CompatibilityModeBase
+		prg, code, err = ps.parseImpl(code, filename, wrap)
 		if err == nil && strings.Contains(src, "module.exports") {
-			c.logger.Warningf(
+			ps.logger.Warningf(
 				"During the compilation of %q, it has been detected that the file combines ECMAScript modules (ESM) "+
 					"import/export syntax with commonJS module.exports. "+
 					"Mixing these two module systems is non-standard and will not be supported anymore in future releases. "+
@@ -263,52 +261,41 @@ func (c *Compiler) compileImpl(
 		}
 		return prg, code, err
 	}
-
-	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
-		code, state.srcMap, err = esbuildTransform(src, filename)
+	if ps.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+		code, ps.srcMap, err = esbuildTransform(src, filename)
 		if err != nil {
-			return nil, code, err
+			return nil, "", err
 		}
-		if c.Options.SourceMapLoader != nil {
+		if ps.loader != nil {
 			// This hack is required for the source map to work
 			code += "\n//# sourceMappingURL=" + sourceMapURLFromBabel
 		}
-		return c.compileImpl(code, filename, wrap, lib.CompatibilityModeBase, state.srcMap)
+		ps.wrapped = false
+		ps.compatibilityMode = lib.CompatibilityModeBase
+		return ps.parseImpl(code, filename, wrap)
 	}
-	return nil, code, err
+	return nil, "", err
 }
 
-type babel struct {
-	vm        *sobek.Runtime
-	this      sobek.Value
-	transform sobek.Callable
-	m         sync.Mutex
+func (ps *parsingState) wrap(code, filename string) string {
+	conditionalNewLine := ""
+	if index := strings.LastIndex(code, "//# sourceMappingURL="); index != -1 {
+		// the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
+		conditionalNewLine = "\n"
+		newCode, err := ps.updateInlineSourceMap(code, index)
+		if err != nil {
+			ps.logger.Warnf("while compiling %q, couldn't update its inline sourcemap which might lead "+
+				"to some line numbers being off: %s", filename, err)
+		} else {
+			code = newCode
+		}
+
+		// if there is no sourcemap - bork only the first line of code, but leave the remaining ones.
+	}
+	return "(function(module, exports){" + conditionalNewLine + code + "\n})\n"
 }
 
-func newBabel() (*babel, error) {
-	onceBabelCode.Do(func() {
-		globalBabelCode, errGlobalBabelCode = sobek.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
-	})
-	if errGlobalBabelCode != nil {
-		return nil, errGlobalBabelCode
-	}
-	vm := sobek.New()
-	_, err := vm.RunProgram(globalBabelCode)
-	if err != nil {
-		return nil, err
-	}
-
-	this := vm.Get("Babel")
-	bObj := this.ToObject(vm)
-	result := &babel{vm: vm, this: this}
-	if err = vm.ExportTo(bObj.Get("transform"), &result.transform); err != nil {
-		return nil, err
-	}
-
-	return result, err
-}
-
-func (c *compilationState) updateInlineSourceMap(code string, index int) (string, error) {
+func (ps *parsingState) updateInlineSourceMap(code string, index int) (string, error) {
 	nextnewline := strings.Index(code[index:], "\n")
 	if nextnewline == -1 {
 		nextnewline = len(code[index:])
@@ -321,19 +308,19 @@ func (c *compilationState) updateInlineSourceMap(code string, index int) (string
 		if err != nil {
 			return code, err
 		}
-		b, err = c.increaseMappingsByOne(b)
+		b, err = ps.increaseMappingsByOne(b)
 		if err != nil {
 			return code, err
 		}
 		encoded := base64.StdEncoding.EncodeToString(b)
-		code = code[:index] + "//# sourcemappingurl=data:application/json;base64," + encoded + code[nextnewline:]
+		code = code[:index] + "//# sourceMappingURL=data:application/json;base64," + encoded + code[index+nextnewline:]
 	}
 	return code, nil
 }
 
 // increaseMappingsByOne increases the lines in the sourcemap by line so that it fixes the case where we need to wrap a
 // required file in a function to support/emulate commonjs
-func (c *compilationState) increaseMappingsByOne(sourceMap []byte) ([]byte, error) {
+func (ps *parsingState) increaseMappingsByOne(sourceMap []byte) ([]byte, error) {
 	var err error
 	m := make(map[string]interface{})
 	if err = json.Unmarshal(sourceMap, &m); err != nil {
@@ -356,7 +343,7 @@ func (c *compilationState) increaseMappingsByOne(sourceMap []byte) ([]byte, erro
 	} else {
 		// we have mappings but it's not a string - this is some kind of error
 		// we still won't abort the test but just not load the sourcemap
-		c.couldntLoadSourceMap = true
+		ps.couldntLoadSourceMap = true
 		return nil, errors.New(`missing "mappings" in sourcemap`)
 	}
 
@@ -481,4 +468,34 @@ func verifySourceMapForBabel(srcMap []byte) error {
 		return fmt.Errorf("source map missing required 'sources' field")
 	}
 	return nil
+}
+
+type babel struct {
+	vm        *sobek.Runtime
+	this      sobek.Value
+	transform sobek.Callable
+	m         sync.Mutex
+}
+
+func newBabel() (*babel, error) {
+	onceBabelCode.Do(func() {
+		globalBabelCode, errGlobalBabelCode = sobek.Compile("<internal/k6/compiler/lib/babel.min.js>", babelSrc, false)
+	})
+	if errGlobalBabelCode != nil {
+		return nil, errGlobalBabelCode
+	}
+	vm := sobek.New()
+	_, err := vm.RunProgram(globalBabelCode)
+	if err != nil {
+		return nil, err
+	}
+
+	this := vm.Get("Babel")
+	bObj := this.ToObject(vm)
+	result := &babel{vm: vm, this: this}
+	if err = vm.ExportTo(bObj.Get("transform"), &result.transform); err != nil {
+		return nil, err
+	}
+
+	return result, err
 }
