@@ -91,14 +91,14 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	defer func() {
-		waitExitDone := emitEvent(&event.Event{
-			Type: event.Exit,
-			Data: &event.ExitData{Error: err},
-		})
-		waitExitDone()
-		c.gs.Events.UnsubscribeAll()
-	}()
+	// defer func() {
+	// 	waitExitDone := emitEvent(&event.Event{
+	// 		Type: event.Exit,
+	// 		Data: &event.ExitData{Error: err},
+	// 	})
+	// 	waitExitDone()
+	// 	c.gs.Events.UnsubscribeAll()
+	// }()
 
 	test, controller, err := c.loadConfiguredTest(cmd, args)
 	if err != nil {
