@@ -7,7 +7,7 @@
 // Deprecated: MD4 is cryptographically broken and should only be used
 // where compatibility with legacy systems, not security, is the goal. Instead,
 // use a secure hash like SHA-256 (from crypto/sha256).
-package md4 // import "golang.org/x/crypto/md4"
+package md4
 
 import (
 	"crypto"
