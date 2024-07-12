@@ -23,9 +23,22 @@ Features
  * Capable of running Babel, Typescript compiler and pretty much anything written in ES5.
  * Sourcemaps.
  * Most of ES6 functionality, still work in progress, see https://github.com/grafana/sobek/milestone/1?closed=1
+ * Experimental ESM support.
 
 Known incompatibilities and caveats
 -----------------------------------
+
+### ESM support
+
+ECMAScript Modules or ESM for short was implemented and merged in this fork to facilitate the needs of [k6](https://github.com/grafana/k6/) as such some compromises were taken in favor of time.
+
+In general the API is very close to the specification, which unfortunately does *not* translate greatly to actual usage.
+
+For this reason it is very likely that it will be updated in breaking manner in the future and there is currently no concrete documentation around it.
+
+For any usage info or bare documentation it is recommended to look at the tests in [modules_test.go](https://github.com/grafana/sobek/blob/main/modules_test.go) and [modules_integration_test.go](https://github.com/grafana/sobek/blob/main/modules_integration_test.go).
+
+Also of note is that due to the nature of ESM you need to have an event loop implementation to use it. That is still not provided by Sobek and likely never will be.
 
 ### WeakMap
 WeakMap is implemented by embedding references to the values into the keys. This means that as long
@@ -132,7 +145,6 @@ do not just base it on a couple of examples that work fine.
 Current Status
 --------------
 
- * There should be no breaking changes in the API, however it may be extended.
  * Some of the AnnexB functionality is missing.
 
 Basic Example

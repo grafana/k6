@@ -977,7 +977,7 @@ func (c *compiler) compileModule(module *SourceTextModuleRecord) {
 	for _, in := range module.indirectExportEntries {
 		v, ambiguous := module.ResolveExport(in.exportName)
 		if v == nil || ambiguous {
-			c.compileAmbiguousImport(unistring.NewFromString(in.importName))
+			c.compileImportError(ambiguous, in.moduleRequest, in.exportName, in.offset)
 		}
 	}
 
@@ -1057,7 +1057,7 @@ func (c *compiler) compileImportEntry(in importEntry) {
 	if in.importName != "*" {
 		resolution, ambiguous := importedModule.ResolveExport(in.importName)
 		if resolution == nil || ambiguous {
-			c.compileAmbiguousImport(unistring.NewFromString(in.importName))
+			c.compileImportError(ambiguous, in.moduleRequest, in.importName, in.offset)
 			return
 		}
 	}
@@ -1102,7 +1102,7 @@ func (c *compiler) compileIndirectExportEntry(entry exportEntry) {
 	}
 	b, ambiguous := otherModule.ResolveExport(entry.importName)
 	if ambiguous || b == nil {
-		c.compileAmbiguousImport(unistring.NewFromString(entry.importName))
+		c.compileImportError(ambiguous, entry.moduleRequest, entry.importName, entry.offset)
 		return
 	}
 
@@ -1213,8 +1213,23 @@ func (c *compiler) compile(in *ast.Program, strict, inGlobal bool, evalVm *vm) {
 	c.stringCache = nil
 }
 
-func (c *compiler) compileAmbiguousImport(name unistring.String) {
-	c.emit(ambiguousImport(name))
+func (c *compiler) compileImportError(ambiguous bool, module, identifier string, offset int) {
+	if ambiguous {
+		c.compileSyntaxError(
+			fmt.Sprintf("The requested module %q contains conflicting star exports for name %q",
+				module, identifier),
+			offset)
+	} else {
+		c.compileSyntaxError(
+			fmt.Sprintf("The requested module %q does not provide an export named %q",
+				module, identifier),
+			offset)
+	}
+}
+
+func (c *compiler) compileSyntaxError(msg string, offset int) {
+	c.p.addSrcMap(offset)
+	c.emit(runtimeSyntaxError(msg))
 }
 
 func (c *compiler) compileDeclList(v []*ast.VariableDeclaration, inFunc bool) {
