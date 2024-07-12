@@ -118,7 +118,6 @@ func TestCorruptSourceMap(t *testing.T) {
 
 	compiler := New(logger)
 	compiler.Options = Options{
-		Strict: true,
 		SourceMapLoader: func(string) ([]byte, error) {
 			return corruptSourceMap, nil
 		},
@@ -134,41 +133,8 @@ func TestCorruptSourceMap(t *testing.T) {
 	require.Contains(t, msg, `json: cannot unmarshal number into Go struct field v3.mappings of type string`)
 }
 
-func TestCorruptSourceMapOnlyForBabel(t *testing.T) {
-	t.Parallel()
-	// This test is now kind of pointless
-	// this a valid source map for the go implementation but babel doesn't like it
-	corruptSourceMap := []byte(`{"mappings": ";"}`)
-
-	logger := logrus.New()
-	logger.SetLevel(logrus.DebugLevel)
-	logger.Out = io.Discard
-	hook := testutils.SimpleLogrusHook{
-		HookedLevels: []logrus.Level{logrus.InfoLevel, logrus.WarnLevel},
-	}
-	logger.AddHook(&hook)
-
-	compiler := New(logger)
-	compiler.Options = Options{
-		CompatibilityMode: lib.CompatibilityModeExtended,
-		Strict:            true,
-		SourceMapLoader: func(string) ([]byte, error) {
-			return corruptSourceMap, nil
-		},
-	}
-	prg, _, err := compiler.Parse("import 'something';\n//# sourceMappingURL=somefile", "somefile", false)
-	require.NoError(t, err)
-	_, err = sobek.CompileAST(prg, true)
-	require.NoError(t, err)
-	require.Empty(t, hook.Drain())
-	_, err = sobek.CompileAST(prg, true)
-	require.NoError(t, err)
-	require.Empty(t, hook.Drain())
-}
-
 func TestMinimalSourceMap(t *testing.T) {
 	t.Parallel()
-	// this is the minimal sourcemap valid for both go and babel implementations
 	corruptSourceMap := []byte(`{"version":3,"mappings":";","sources":[]}`)
 
 	logger := logrus.New()
@@ -182,7 +148,6 @@ func TestMinimalSourceMap(t *testing.T) {
 	compiler := New(logger)
 	compiler.Options = Options{
 		CompatibilityMode: lib.CompatibilityModeExtended,
-		Strict:            true,
 		SourceMapLoader: func(string) ([]byte, error) {
 			return corruptSourceMap, nil
 		},

@@ -13,9 +13,9 @@ import (
 type CompatibilityMode uint8
 
 const (
-	// CompatibilityModeExtended achieves ES6+ compatibility with Babel
+	// CompatibilityModeExtended adds global as alias for globalThis on top of the base
 	CompatibilityModeExtended CompatibilityMode = iota + 1
-	// CompatibilityModeBase is standard Sobek ES5.1+
+	// CompatibilityModeBase is standard Sobek
 	CompatibilityModeBase
 	// CompatibilityModeExperimentalEnhanced achieves TypeScript and ES6+ compatibility with esbuild
 	CompatibilityModeExperimentalEnhanced
@@ -28,7 +28,7 @@ type RuntimeOptions struct {
 	// Whether to pass the actual system environment variables to the JS runtime
 	IncludeSystemEnvVars null.Bool `json:"includeSystemEnvVars"`
 
-	// JS compatibility mode: "extended" (Goja+Babel) or "base" (plain Goja)
+	// JS compatibility mode: "extended" (Sobek+global) or "base" (plain Sobek)
 	//
 	// TODO: when we resolve https://github.com/k6io/k6/issues/883, we probably
 	// should use the CompatibilityMode type directly... but by then, we'd need to have
