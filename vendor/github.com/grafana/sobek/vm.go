@@ -3957,10 +3957,10 @@ func (n *newArrowFunc) _exec(vm *vm, obj *arrowFuncObject) {
 	vm.pc++
 }
 
-type ambiguousImport unistring.String
+type runtimeSyntaxError string
 
-func (a ambiguousImport) exec(vm *vm) {
-	panic(vm.r.newError(vm.r.getSyntaxError(), "Ambiguous import for name %s", a))
+func (a runtimeSyntaxError) exec(vm *vm) {
+	panic(vm.r.newError(vm.r.getSyntaxError(), (string)(a)))
 }
 
 func (n *newArrowFunc) exec(vm *vm) {
