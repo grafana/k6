@@ -341,13 +341,13 @@ func (s *ServeMux) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if override := r.Header.Get("X-HTTP-Method-Override"); override != "" && s.isPathLengthFallback(r) {
-		r.Method = strings.ToUpper(override)
 		if err := r.ParseForm(); err != nil {
 			_, outboundMarshaler := MarshalerForRequest(s, r)
 			sterr := status.Error(codes.InvalidArgument, err.Error())
 			s.errorHandler(ctx, s, outboundMarshaler, w, r, sterr)
 			return
 		}
+		r.Method = strings.ToUpper(override)
 	}
 
 	var pathComponents []string

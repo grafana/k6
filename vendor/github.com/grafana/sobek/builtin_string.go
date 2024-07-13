@@ -825,21 +825,16 @@ func (r *Runtime) stringproto_split(call FunctionCall) Value {
 
 	separator := separatorValue.String()
 
-	excess := false
 	str := s.String()
-	if limit > len(str) {
-		limit = len(str)
-	}
 	splitLimit := limit
 	if limit > 0 {
 		splitLimit = limit + 1
-		excess = true
 	}
 
 	// TODO handle invalid UTF-16
 	split := strings.SplitN(str, separator, splitLimit)
 
-	if excess && len(split) > limit {
+	if limit > 0 && len(split) > limit {
 		split = split[:limit]
 	}
 

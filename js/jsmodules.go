@@ -43,12 +43,13 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
 		"k6/experimental/timers": newWarnExperimentalModule(timers.New(),
-			"k6/experimental/timers is now part of the k6 core, please change your imports to use k6/timers instead."+
-				" The k6/experimental/timers will be removed in k6 v0.52.0"),
+			"Please update your imports to use k6/timers instead of k6/experimental/timers,"+
+				" which will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+
+				" There are no API changes, so this is a drop in replacement."),
 		"k6/experimental/tracing": tracing.New(),
 		"k6/experimental/browser": newWarnExperimentalModule(browser.NewSync(),
 			"Please update your imports to use k6/browser instead of k6/experimental/browser,"+
-				" which will be removed after September 23rd, 2024. Ensure your scripts are migrated by then."+
+				" which will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+
 				" For more information, see the migration guide at the link:"+
 				" https://grafana.com/docs/k6/latest/using-k6-browser/migrating-to-k6-v0-52/"),
 		"k6/browser":         browser.New(),

@@ -7,11 +7,11 @@ import (
 	"strings"
 )
 
-const _builtinOutputName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsd"
+const _builtinOutputName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetry"
 
-var _builtinOutputIndex = [...]uint8{0, 5, 8, 15, 41, 49, 53, 58, 64}
+var _builtinOutputIndex = [...]uint8{0, 5, 8, 15, 41, 49, 53, 58, 64, 90}
 
-const _builtinOutputLowerName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsd"
+const _builtinOutputLowerName = "cloudcsvdatadogexperimental-prometheus-rwinfluxdbjsonkafkastatsdexperimental-opentelemetry"
 
 func (i builtinOutput) String() string {
 	if i >= builtinOutput(len(_builtinOutputIndex)-1) {
@@ -32,9 +32,10 @@ func _builtinOutputNoOp() {
 	_ = x[builtinOutputJSON-(5)]
 	_ = x[builtinOutputKafka-(6)]
 	_ = x[builtinOutputStatsd-(7)]
+	_ = x[builtinOutputExperimentalOpentelemetry-(8)]
 }
 
-var _builtinOutputValues = []builtinOutput{builtinOutputCloud, builtinOutputCSV, builtinOutputDatadog, builtinOutputExperimentalPrometheusRW, builtinOutputInfluxdb, builtinOutputJSON, builtinOutputKafka, builtinOutputStatsd}
+var _builtinOutputValues = []builtinOutput{builtinOutputCloud, builtinOutputCSV, builtinOutputDatadog, builtinOutputExperimentalPrometheusRW, builtinOutputInfluxdb, builtinOutputJSON, builtinOutputKafka, builtinOutputStatsd, builtinOutputExperimentalOpentelemetry}
 
 var _builtinOutputNameToValueMap = map[string]builtinOutput{
 	_builtinOutputName[0:5]:        builtinOutputCloud,
@@ -53,6 +54,8 @@ var _builtinOutputNameToValueMap = map[string]builtinOutput{
 	_builtinOutputLowerName[53:58]: builtinOutputKafka,
 	_builtinOutputName[58:64]:      builtinOutputStatsd,
 	_builtinOutputLowerName[58:64]: builtinOutputStatsd,
+	_builtinOutputName[64:90]:      builtinOutputExperimentalOpentelemetry,
+	_builtinOutputLowerName[64:90]: builtinOutputExperimentalOpentelemetry,
 }
 
 var _builtinOutputNames = []string{
@@ -64,6 +67,7 @@ var _builtinOutputNames = []string{
 	_builtinOutputName[49:53],
 	_builtinOutputName[53:58],
 	_builtinOutputName[58:64],
+	_builtinOutputName[64:90],
 }
 
 // builtinOutputString retrieves an enum value from the enum constants string name.
