@@ -26,7 +26,10 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
+
+var emptyDescriptor = (&emptypb.Empty{}).ProtoReflect().Descriptor()
 
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
@@ -134,7 +137,13 @@ func (c *Conn) Invoke(
 
 	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta})
 
-	resp := dynamicpb.NewMessage(req.MethodDescriptor.Output())
+	var resp *dynamicpb.Message
+	if req.DiscardResponseMessage {
+		resp = dynamicpb.NewMessage(emptyDescriptor)
+	} else {
+		resp = dynamicpb.NewMessage(req.MethodDescriptor.Output())
+	}
+
 	header, trailer := metadata.New(nil), metadata.New(nil)
 
 	copts := make([]grpc.CallOption, 0, len(opts)+2)
