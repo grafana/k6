@@ -353,6 +353,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
   # Run a k6 archive in the Grafana k6 cloud
   $ {{.}} cloud run archive.tar
 
+  # Upload the test script to the k6 Cloud (without starting a test run)
+  $ {{.}} cloud upload script.js
+
   # [deprecated] Run a k6 script in the Grafana k6 cloud
   $ {{.}} cloud script.js
 
@@ -379,6 +382,7 @@ This will execute the test on the k6 cloud service. Use "k6 login cloud" to auth
 	// Register `k6 cloud` subcommands
 	cloudCmd.AddCommand(getCmdCloudRun(gs))
 	cloudCmd.AddCommand(getCmdCloudLogin(gs))
+	cloudCmd.AddCommand(getCmdCloudUpload(gs))
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
