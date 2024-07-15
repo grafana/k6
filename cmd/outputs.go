@@ -61,7 +61,9 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 		},
 		builtinOutputDatadog.String(): func(_ output.Params) (output.Output, error) {
 			return nil, errors.New("the datadog output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
-				"please use the statsd output with env. variable K6_STATSD_ENABLE_TAGS=true instead")
+				"please use the statsd output extension https://github.com/LeonAdato/xk6-output-statsd with environment " +
+				"variable K6_STATSD_ENABLE_TAGS=true or an experimental opentelemetry output instead",
+			)
 		},
 		builtinOutputExperimentalPrometheusRW.String(): func(params output.Params) (output.Output, error) {
 			return remotewrite.New(params)
