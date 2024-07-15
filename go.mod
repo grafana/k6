@@ -6,7 +6,6 @@ toolchain go1.21.13
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
-	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 	github.com/PuerkitoBio/goquery v1.9.2
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.0
