@@ -116,6 +116,21 @@ func (h *fileHook) Listen(ctx context.Context) {
 				h.fallbackLogger.Errorf("failed to write a log message to a logfile: %w", err)
 			}
 		case <-ctx.Done():
+			// This context is cancelled after the command finishes executing, so it is guaranteed that no more lines
+			// will be sent to the channel. However, as it is buffered, it may still have items on it, so we drain any
+			// pending log lines that may be there.
+		drainloop:
+			for {
+				select {
+				case entry := <-h.loglines:
+					if _, err := h.bw.Write(entry); err != nil {
+						h.fallbackLogger.Errorf("failed to write a log message to a logfile: %w", err)
+					}
+				default:
+					break drainloop
+				}
+			}
+
 			if err := h.bw.Flush(); err != nil {
 				h.fallbackLogger.Errorf("failed to flush buffer: %w", err)
 			}
