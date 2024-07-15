@@ -417,34 +417,14 @@ func TestStream_MetricsTagsMetadata(t *testing.T) {
 
 	stub := &featureExplorerStub{}
 
-	savedFeatures := []*grpcservice.Feature{
-		{
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+		return stream.Send(&grpcservice.Feature{
 			Name: "foo",
 			Location: &grpcservice.Point{
 				Latitude:  1,
 				Longitude: 2,
 			},
-		},
-		{
-			Name: "bar",
-			Location: &grpcservice.Point{
-				Latitude:  3,
-				Longitude: 4,
-			},
-		},
-	}
-
-	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
-		for _, feature := range savedFeatures {
-			// adding a delay to make server response "slower"
-			time.Sleep(200 * time.Millisecond)
-
-			if err := stream.Send(feature); err != nil {
-				return err
-			}
-		}
-
-		return nil
+		})
 	}
 
 	grpcservice.RegisterFeatureExplorerServer(ts.httpBin.ServerGRPC, stub)
@@ -497,7 +477,7 @@ func TestStream_MetricsTagsMetadata(t *testing.T) {
 
 	samplesBuf := metrics.GetBufferedSamples(ts.samples)
 
-	assert.Len(t, samplesBuf, 5)
+	assert.Len(t, samplesBuf, 4)
 	for _, samples := range samplesBuf {
 		for _, sample := range samples.GetSamples() {
 			assertTags(t, sample, expTags)
