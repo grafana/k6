@@ -24,7 +24,7 @@ import (
 	"go.k6.io/k6/ui/pb"
 )
 
-// cmdCloudRun handles the `k6 cloud` sub-command
+// cmdCloudRun handles the `k6 cloud run` sub-command
 type cmdCloudRun struct {
 	gs *state.GlobalState
 
@@ -42,22 +42,27 @@ func getCmdCloudRun(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
-  # Run a test in the Grafana k6 cloud
+  # Run a test script in Grafana Cloud k6
   $ {{.}} cloud run script.js
 
-  # Run a test in the Grafana k6 cloud with a specific token
-  $ {{.}} cloud run  --token <YOUR_API_TOKEN> script.js`[1:])
+  # Run a test archive in Grafana Cloud k6
+  $ {{.}} cloud run archive.tar
 
-	// FIXME: when the command is "k6 cloud run" without an script/archive, we should display an error and the help
+  # Read a test script or archive from stdin and run it in Grafana Cloud k6
+  $ {{.}} cloud run - < script.js`[1:])
+
 	cloudRunCmd := &cobra.Command{
 		Use:   cloudRunCommandName,
-		Short: "Run a test in the Grafana k6 cloud",
-		Long: `Run a test in the Grafana k6 cloud.
+		Short: "Run a test in Grafana Cloud k6",
+		Long: `Run a test in Grafana Cloud k6.
 
-This will execute the test in the Grafana k6 cloud service. Using this command requires to be authenticated
-against the Grafana k6 cloud. Use the "k6 cloud login" command to authenticate.`,
+This will execute the test in the Grafana Cloud k6 service. Using this command requires to be authenticated
+against Grafana Cloud k6. Use the "k6 cloud login" command to authenticate.`,
 		Example: exampleText,
-		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+		Args: exactArgsWithMsg(1,
+			"the k6 cloud run command expects a single argument consisting in either a path to a script or "+
+				"archive file, or the \"-\" symbol indicating the script or archive should be read from stdin",
+		),
 		PreRunE: c.preRun,
 		RunE:    c.run,
 	}
@@ -154,7 +159,7 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	}
 	if !cloudConfig.Token.Valid {
 		return errors.New( //nolint:golint
-			"not logged in, please login to the Grafana k6 Cloud " +
+			"not logged in, please login to the Grafana Cloud k6 " +
 				"using the `k6 cloud login` command",
 		)
 	}

@@ -41,10 +41,10 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 
 	loginCloudCommand := &cobra.Command{
 		Use:   cloudLoginCommandName,
-		Short: "Authenticate with Grafana k6 Cloud",
+		Short: "Authenticate with Grafana Cloud k6",
 		Long: `Authenticate with Grafana Cloud k6.
 
-This command will authenticate you with Grafana Cloud k6. Once authenticated,
+This command will authenticate you with Grafana Cloud k6.
 Once authenticated you can start running tests in the cloud by using the "k6 cloud"
 command, or by executing a test locally and outputting samples to the cloud using
 the "k6 run -o cloud" command.
@@ -144,7 +144,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 
 		if res.Token == "" {
 			return errors.New("your account does not appear to have an active API token, please consult the " +
-				"Grafana k6 cloud documentation for instructions on how to generate " +
+				"Grafana Cloud k6 documentation for instructions on how to generate " +
 				"one: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
 		}
 
