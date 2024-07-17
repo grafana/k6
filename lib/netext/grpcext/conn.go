@@ -29,7 +29,7 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-var emptyDescriptor = (&emptypb.Empty{}).ProtoReflect().Descriptor()
+var emptyDescriptor = (&emptypb.Empty{}).ProtoReflect().Descriptor() //nolint:gochecknoglobals
 
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
