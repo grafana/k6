@@ -46,7 +46,11 @@ func getInternalJSModules() map[string]interface{} {
 			"The exports of `k6/experimental/timers` are globally available, so no need to import them."+
 				" The module will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+
 				" There are no API changes, so this is a drop-in replacement and is also available under `k6/timers`."),
-		"k6/experimental/tracing": tracing.New(),
+		"k6/experimental/tracing": newWarnExperimentalModule(tracing.New(),
+			"k6/experimental/tracing is now deprecated. All of it functionality is available as pure javascript module."+
+				" More info available at the docs:"+
+				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"+
+				" The module will be removed after November 11th, 2024 (v0.55.0). Ensure your scripts are migrated by then."),
 		"k6/experimental/browser": newWarnExperimentalModule(browser.NewSync(),
 			"Please update your imports to use k6/browser instead of k6/experimental/browser,"+
 				" which will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+
