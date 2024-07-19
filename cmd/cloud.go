@@ -8,6 +8,7 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -367,8 +368,8 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 This will execute the test in the Grafana Cloud k6 service. Be sure to run the "k6 cloud login" command prior to
 authenticate with Grafana Cloud k6.`,
 		Args: exactCloudArgs(),
-		Deprecated: `the k6 team is in the process of modifying and deprecating the "k6 cloud" command behavior. In the future, the "cloud"
-command will only display a help text, instead of running tests in the Grafana Cloud k6.
+		Deprecated: `the k6 team is in the process of modifying and deprecating the "k6 cloud" command behavior.
+In the future, the "cloud" command will only display a help text, instead of running tests in the Grafana Cloud k6.
 
 To run tests in the cloud, users are now invited to migrate to the "k6 cloud run" command instead.
 `,
@@ -389,11 +390,20 @@ To run tests in the cloud, users are now invited to migrate to the "k6 cloud run
 
 func exactCloudArgs() cobra.PositionalArgs {
 	return func(_ *cobra.Command, args []string) error {
+		const baseErrMsg = "the k6 cloud command expects either a subcommand such as `run` or `login`, or " +
+			"a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
+			"the command to read the test content from stdin"
+
 		if len(args) == 0 {
+			return fmt.Errorf(baseErrMsg + "; " + "received no arguments")
+		}
+
+		hasSubcommand := len(args) >= 1 && (args[0] == "run" || args[0] == "login")
+		if !hasSubcommand {
 			return fmt.Errorf(
-				"the k6 cloud command accepts 1 argument consisting in either in "+
-					"a subcommand such as `run` or `cloud`, or the path to a script/archive, or "+
-					"the `-` symbol, received: %d arguments instead", len(args))
+				baseErrMsg+"; "+"received %d arguments %q, and none of them is a subcommand",
+				len(args), strings.Join(args, " "),
+			)
 		}
 
 		return nil
