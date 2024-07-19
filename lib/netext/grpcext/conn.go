@@ -29,8 +29,6 @@ import (
 	"google.golang.org/protobuf/types/known/emptypb"
 )
 
-var emptyDescriptor = (&emptypb.Empty{}).ProtoReflect().Descriptor() //nolint:gochecknoglobals
-
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
 	Method                 string
@@ -139,7 +137,7 @@ func (c *Conn) Invoke(
 
 	var resp *dynamicpb.Message
 	if req.DiscardResponseMessage {
-		resp = dynamicpb.NewMessage(emptyDescriptor)
+		resp = dynamicpb.NewMessage((&emptypb.Empty{}).ProtoReflect().Descriptor())
 	} else {
 		resp = dynamicpb.NewMessage(req.MethodDescriptor.Output())
 	}
