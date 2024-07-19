@@ -8,7 +8,7 @@ index c5c375e17..57d201b57 100644
          Promise.resolve().then(function() {
 -            this.all_loaded = true
 +            // This is the test environment used when we run tests from Go
-+            // code and with the Goja/k6 runtime. However, we don't want
++            // code and with the Sobek/k6 runtime. However, we don't want
 +            // all tests to be marked as loaded "by default", as it would
 +            // make some of the tests to not be executed at all.
 +            // this.all_loaded = true

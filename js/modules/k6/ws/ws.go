@@ -166,7 +166,7 @@ func (mi *WS) Connect(url string, args ...sobek.Value) (*HTTPResponse, error) {
 	// since we use custom closing logic to call user's event
 	// handlers and for cleanup. See closeConnection.
 	// closeConnection is not set directly as a handler here to
-	// avoid race conditions when calling the Goja runtime.
+	// avoid race conditions when calling the Sobek runtime.
 	socket.conn.SetCloseHandler(func(_ int, _ string) error { return nil })
 
 	// Pass ping/pong events through the main control loop
