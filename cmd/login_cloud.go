@@ -33,15 +33,14 @@ func getCmdLoginCloud(gs *state.GlobalState) *cobra.Command {
 	loginCloudCommand := &cobra.Command{
 		Use:   "cloud",
 		Short: "Authenticate with k6 Cloud",
-		Long: `[deprecation notice]
-This command is deprecated and will be removed in a future release. Please use the
-"k6 cloud login" command instead.
-
-Authenticate with Grafana Cloud k6.
+		Long: `Authenticate with Grafana Cloud k6.
 
 This will set the default token used when just "k6 run -o cloud" is passed.`,
 		Example: exampleText,
 		Args:    cobra.NoArgs,
+		Deprecated: `and will be removed in a future release.
+Please use the "k6 cloud login" command instead.
+`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			currentDiskConf, err := readDiskConfig(gs)
 			if err != nil {

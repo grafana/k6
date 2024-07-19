@@ -390,7 +390,7 @@ To run tests in the cloud, users are now invited to migrate to the "k6 cloud run
 
 func exactCloudArgs() cobra.PositionalArgs {
 	return func(_ *cobra.Command, args []string) error {
-		const baseErrMsg = "the k6 cloud command expects either a subcommand such as `run` or `login`, or " +
+		const baseErrMsg = `the "k6 cloud" command expects either a subcommand such as "run" or "login", or ` +
 			"a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
 			"the command to read the test content from stdin"
 
@@ -398,11 +398,11 @@ func exactCloudArgs() cobra.PositionalArgs {
 			return fmt.Errorf(baseErrMsg + "; " + "received no arguments")
 		}
 
-		hasSubcommand := len(args) >= 1 && (args[0] == "run" || args[0] == "login")
-		if !hasSubcommand {
+		hasSubcommand := args[0] == "run" || args[0] == "login"
+		if len(args) > 1 && !hasSubcommand {
 			return fmt.Errorf(
-				baseErrMsg+"; "+"received %d arguments %q, and none of them is a subcommand",
-				len(args), strings.Join(args, " "),
+				baseErrMsg+"; "+"received %d arguments %q, and %s is not a valid subcommand",
+				len(args), strings.Join(args, " "), args[0],
 			)
 		}
 

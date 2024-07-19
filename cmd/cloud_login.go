@@ -30,16 +30,16 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 
 	// loginCloudCommand represents the 'cloud login' command
 	exampleText := getExampleText(gs, `
-  # Log in with an email/password.
+  # Log in with an email/password
   {{.}} cloud login
 
-  # Store a token in k6's persistent configuration.
+  # Store a token in k6's persistent configuration
   {{.}} cloud login -t <YOUR_TOKEN>
 
-  # Display the stored token.
+  # Display the stored token
   {{.}} cloud login -s
   
-  # Reset the stored token.
+  # Reset the stored token
   {{.}} cloud login -r`[1:])
 
 	loginCloudCommand := &cobra.Command{
