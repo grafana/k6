@@ -13,9 +13,9 @@ import (
 type CompatibilityMode uint8
 
 const (
-	// CompatibilityModeExtended adds global as alias for globalThis on top of the base
+	// CompatibilityModeExtended adds `global` as an alias for `globalThis` on top of the base mode
 	CompatibilityModeExtended CompatibilityMode = iota + 1
-	// CompatibilityModeBase is standard Sobek
+	// CompatibilityModeBase is standard Sobek, which means pure vanilla JS following ECMAScript standards.
 	CompatibilityModeBase
 	// CompatibilityModeExperimentalEnhanced achieves TypeScript and ES6+ compatibility with esbuild
 	CompatibilityModeExperimentalEnhanced
