@@ -106,8 +106,9 @@ func TestOpenPathResolution(t *testing.T) {
 func TestRequirePathResolution(t *testing.T) {
 	t.Parallel()
 	testCases := map[string]struct {
-		fsMap        map[string]any
-		expectedLogs []string
+		fsMap         map[string]any
+		expectedLogs  []string
+		expectedError string
 	}{
 		"simple": {
 			fsMap: map[string]any{
@@ -140,7 +141,24 @@ func TestRequirePathResolution(t *testing.T) {
 			fsMap: map[string]any{
 				"/A/B/data.js": "module.exports='export content'",
 				"/A/C/B/script.js": `
-					// Here the path is relative to this module but to the one calling
+					module.exports = () =>  require("./../../B/data.js");
+				`,
+				"/A/B/B/script.js": `
+					module.exports = require("./../../C/B/script.js")();
+				`,
+				"/A/A/A/A/script.js": `
+					let data = require("./../../../B/B/script.js");
+					if (data != "export content") {
+						throw new Error("wrong content " + data);
+					}
+					export default function() {}
+				`,
+			},
+		},
+		"complex wrong": {
+			fsMap: map[string]any{
+				"/A/B/data.js": "module.exports='export content'",
+				"/A/C/B/script.js": `
 					module.exports = () =>  require("./../data.js");
 				`,
 				"/A/B/B/script.js": `
@@ -154,16 +172,35 @@ func TestRequirePathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
-			expectedLogs: []string{
-				`The "wrong" path ("file:///A/C/B/") and the path actually used by k6 ("file:///A/B/B/") to resolve "./../data.js" are different`,
-			},
+			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk.`,
 		},
 		"ESM and require": {
 			fsMap: map[string]any{
 				"/A/B/data.js": "module.exports='export content'",
 				"/A/C/B/script.js": `
 					export default function () {
-						// Here the path is relative to this module but to the one calling
+						// Here the path is relative to this module not the calling one
+						return require("./../../B/data.js");
+					}
+				`,
+				"/A/B/B/script.js": `
+					import s from "./../../C/B/script.js"
+					export default require("./../../C/B/script.js").default();
+				`,
+				"/A/A/A/A/script.js": `
+					import data from "./../../../B/B/script.js"
+					if (data != "export content") {
+						throw new Error("wrong content " + data);
+					}
+					export default function() {}
+				`,
+			},
+		},
+		"ESM and require wrong": {
+			fsMap: map[string]any{
+				"/A/B/data.js": "module.exports='export content'",
+				"/A/C/B/script.js": `
+					export default function () {
 						return require("./../data.js");
 					}
 				`,
@@ -179,16 +216,36 @@ func TestRequirePathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
-			expectedLogs: []string{
-				`The "wrong" path ("file:///A/C/B/") and the path actually used by k6 ("file:///A/B/B/") to resolve "./../data.js" are different`,
-			},
+			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk.`,
 		},
 		"full ESM": {
 			fsMap: map[string]any{
 				"/A/B/data.js": "export default 'export content'",
 				"/A/C/B/script.js": `
 					export default function () {
-						// Here the path is relative to this module but to the one calling
+						// Here the path is relative to this module not the calling one
+						return require("./../../B/data.js").default;
+					}
+				`,
+				"/A/B/B/script.js": `
+					import s from "./../../C/B/script.js"
+					let l = s();
+					export default l;
+				`,
+				"/A/A/A/A/script.js": `
+					import data from "./../../../B/B/script.js"
+					if (data != "export content") {
+						throw new Error("wrong content " + data);
+					}
+					export default function() {}
+				`,
+			},
+		},
+		"full ESM wrong": {
+			fsMap: map[string]any{
+				"/A/B/data.js": "export default 'export content'",
+				"/A/C/B/script.js": `
+					export default function () {
 						return require("./../data.js").default;
 					}
 				`,
@@ -205,9 +262,7 @@ func TestRequirePathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
-			expectedLogs: []string{
-				`The "wrong" path ("file:///A/C/B/") and the path actually used by k6 ("file:///A/B/B/") to resolve "./../data.js" are different`,
-			},
+			expectedError: `The moduleSpecifier "./../data.js" couldn't be found on local disk.`,
 		},
 	}
 	for name, testCase := range testCases {
@@ -221,6 +276,11 @@ func TestRequirePathResolution(t *testing.T) {
 			require.NoError(t, err)
 			logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
 			b, err := getSimpleBundle(t, "/main.js", `export { default } from "/A/A/A/A/script.js"`, fs, logger)
+
+			if testCase.expectedError != "" {
+				require.ErrorContains(t, err, testCase.expectedError)
+				return
+			}
 			require.NoError(t, err)
 
 			_, err = b.Instantiate(context.Background(), 0)
@@ -254,6 +314,10 @@ func TestRequirePathResolution(t *testing.T) {
 			logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
 
 			b, err := getSimpleBundleStdin(t, pwd, testCase.fsMap["/A/A/A/A/script.js"].(string), fs, logger)
+			if testCase.expectedError != "" {
+				require.ErrorContains(t, err, testCase.expectedError)
+				return
+			}
 			require.NoError(t, err)
 
 			_, err = b.Instantiate(context.Background(), 0)

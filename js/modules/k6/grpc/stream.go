@@ -75,11 +75,10 @@ func defineStream(rt *sobek.Runtime, s *stream) {
 }
 
 func (s *stream) beginStream(p *callParams) error {
-	tags := s.vu.State().Tags.GetCurrentValues()
 	req := &grpcext.StreamRequest{
 		Method:           s.method,
 		MethodDescriptor: s.methodDescriptor,
-		TagsAndMeta:      &tags,
+		TagsAndMeta:      &p.TagsAndMeta,
 		Metadata:         p.Metadata,
 	}
 

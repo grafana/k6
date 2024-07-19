@@ -6,8 +6,8 @@ import (
 	"github.com/grafana/sobek"
 )
 
-// UnwrapGojaInterruptedError returns the internal error handled by Sobek.
-func UnwrapGojaInterruptedError(err error) error {
+// UnwrapSobekInterruptedError returns the internal error handled by Sobek.
+func UnwrapSobekInterruptedError(err error) error {
 	var sobekErr *sobek.InterruptedError
 	if errors.As(err, &sobekErr) {
 		if e, ok := sobekErr.Value().(error); ok {

@@ -119,7 +119,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 	}
 }
 
-func TestLoadExportsIsUsableInModule(t *testing.T) {
+func TestLoadExportsIsntUsableInModule(t *testing.T) {
 	t.Parallel()
 	fileSystem := fsext.NewMemMapFs()
 	require.NoError(t, fsext.WriteFile(fileSystem, "/A.js", []byte(`
@@ -168,7 +168,7 @@ func TestLoadExportsIsUsableInModule(t *testing.T) {
 			initVU, err := r.NewVU(ctx, 1, 1, ch)
 			require.NoError(t, err)
 			vu := initVU.Activate(&lib.VUActivationParams{RunContext: ctx})
-			require.NoError(t, vu.RunOnce())
+			require.ErrorContains(t, vu.RunOnce(), `you are trying to access identifier "exports"`)
 		})
 	}
 }

@@ -13,7 +13,7 @@ func esbuildTransform(src, filename string) (code string, srcMap []byte, err err
 		Sourcefile:     filename,
 		Loader:         api.LoaderJS,
 		Target:         api.ESNext,
-		Format:         api.FormatCommonJS,
+		Format:         api.FormatDefault,
 		Sourcemap:      api.SourceMapExternal,
 		SourcesContent: api.SourcesContentInclude,
 		LegalComments:  api.LegalCommentsNone,

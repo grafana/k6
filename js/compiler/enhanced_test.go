@@ -69,9 +69,10 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		prg, code, err := c.Parse(`import "something"`, "script.js", false)
+		prg, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false)
 		require.NoError(t, err)
-		assert.Equal(t, `var import_something = require("something");
+		assert.Equal(t, `let t = "something";
+require(t);
 `, code)
 		pgm, err := sobek.CompileAST(prg, true)
 		require.NoError(t, err)
@@ -90,9 +91,10 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
 		c.Options.SourceMapLoader = func(_ string) ([]byte, error) { return nil, nil }
-		_, code, err := c.Parse(`import "something"`, "script.js", false)
+		_, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false)
 		require.NoError(t, err)
-		assert.Equal(t, `var import_something = require("something");
+		assert.Equal(t, `let t = "something";
+require(t);
 
 //# sourceMappingURL=k6://internal-should-not-leak/file.map`, code)
 	})

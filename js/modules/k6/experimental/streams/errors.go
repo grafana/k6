@@ -28,7 +28,7 @@ func newJsError(rt *sobek.Runtime, base sobek.Value, kind errorKind, message str
 //
 // We need to use it because whenever we need to return a [TypeError]
 // or a [RangeError], we want to use original JS errors, which can be
-// retrieved from Goja, for instance with: sobek.Runtime.Get("TypeError").
+// retrieved from Sobek, for instance with: sobek.Runtime.Get("TypeError").
 //
 // However, that is implemented as a [*sobek.Object], but sometimes we
 // need to return that error as a Go [error], or even keep the instance

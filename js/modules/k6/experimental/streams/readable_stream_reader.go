@@ -23,7 +23,7 @@ type ReadableStreamReader interface {
 //
 // It implements the [ReadableStreamReaderGeneric] mixin from the specification.
 //
-// Because we are in the context of Goja, we cannot really define properties
+// Because we are in the context of Sobek, we cannot really define properties
 // the same way as in the spec, so we use getters/setters instead.
 //
 // [ReadableStreamReaderGeneric]: https://streams.spec.whatwg.org/#readablestreamgenericreader

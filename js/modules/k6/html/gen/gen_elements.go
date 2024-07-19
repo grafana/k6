@@ -331,11 +331,11 @@ func main() {
 			TemplateType       templateType
 			TemplateArgs       []templateArg
 		}
-		TemplateTypes struct{ String, URL, Enum, Bool, GojaEnum, Int, Const templateType }
+		TemplateTypes struct{ String, URL, Enum, Bool, SobekEnum, Int, Const templateType }
 	}{
 		collector.elemInfos,
 		funcDefs,
-		struct{ String, URL, Enum, Bool, GojaEnum, Int, Const templateType }{
+		struct{ String, URL, Enum, Bool, SobekEnum, Int, Const templateType }{
 			stringTemplate, urlTemplate, enumTemplate, boolTemplate, nullableEnumTemplate, intTemplate, constTemplate,
 		},
 	})
@@ -408,7 +408,7 @@ func ({{ receiverName $funcDef.Elem }} {{$funcDef.Elem}}) {{$funcDef.Method}}() 
 	default:
 		return "{{ index $funcDef.TemplateArgs 0 }}"
 	}
-{{- else if eq $funcDef.TemplateType $templateTypes.GojaEnum }}
+{{- else if eq $funcDef.TemplateType $templateTypes.SobekEnum }}
 	attrVal, exists := {{ receiverName $funcDef.Elem }}.sel.sel.Attr("{{ $funcDef.Attr }}")
 	if !exists {
 		return sobek.Undefined()

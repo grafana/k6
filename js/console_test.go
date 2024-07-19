@@ -101,7 +101,7 @@ func extractLogger(vu lib.ActiveVU) *logrus.Logger {
 	}
 }
 
-func TestConsoleLogWithGojaNativeObject(t *testing.T) {
+func TestConsoleLogWithSobekNativeObject(t *testing.T) {
 	t.Parallel()
 
 	rt := sobek.New()

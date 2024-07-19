@@ -10,6 +10,7 @@ import (
 
 	"go.k6.io/k6/lib/testutils/grpcservice"
 	"go.k6.io/k6/lib/testutils/httpmultibin/grpc_wrappers_testing"
+	"go.k6.io/k6/metrics"
 
 	"github.com/golang/protobuf/ptypes/wrappers"
 	"github.com/grafana/sobek"
@@ -405,4 +406,89 @@ func TestStream_UndefinedHandler(t *testing.T) {
 	ts.EventLoop.WaitOnRegistered()
 
 	require.ErrorContains(t, err, "handler for \"data\" event isn't a callable function")
+}
+
+// TestStream_MetricsTagsMetadata tests that the metrics tags are correctly
+// added to samples.
+func TestStream_MetricsTagsMetadata(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	stub := &featureExplorerStub{}
+
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+		return stream.Send(&grpcservice.Feature{
+			Name: "foo",
+			Location: &grpcservice.Point{
+				Latitude:  1,
+				Longitude: 2,
+			},
+		})
+	}
+
+	grpcservice.RegisterFeatureExplorerServer(ts.httpBin.ServerGRPC, stub)
+
+	initString := codeBlock{
+		code: `
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+	}
+	vuString := codeBlock{
+		code: `
+		client.connect("GRPCBIN_ADDR");
+
+		let params = {
+			tags: { "tag1": "value1" },
+		};
+
+		let stream = new grpc.Stream(client, "main.FeatureExplorer/ListFeatures", params)
+		stream.on('data', function (data) {
+			call('Feature:' + data.name);
+		});
+		stream.on('end', function () {
+			call('End called');
+		});
+
+		stream.write({
+			lo: {
+			  latitude: 1,
+			  longitude: 2,
+			},
+			hi: {
+			  latitude: 1,
+			  longitude: 2,
+			},
+		});
+		stream.end();
+		`,
+	}
+
+	val, err := ts.Run(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	val, err = ts.RunOnEventLoop(vuString.code)
+
+	assertResponse(t, vuString, err, val, ts)
+
+	expTags := map[string]string{"tag1": "value1"}
+
+	samplesBuf := metrics.GetBufferedSamples(ts.samples)
+
+	assert.Len(t, samplesBuf, 4)
+	for _, samples := range samplesBuf {
+		for _, sample := range samples.GetSamples() {
+			assertTags(t, sample, expTags)
+		}
+	}
+}
+
+func assertTags(t *testing.T, sample metrics.Sample, tags map[string]string) {
+	for k, v := range tags {
+		tag, ok := sample.Tags.Get(k)
+		assert.True(t, ok)
+		assert.Equal(t, tag, v)
+	}
 }

@@ -15,7 +15,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"
 	"sort"
 	"strings"
 	"sync"
@@ -25,7 +24,6 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/parser"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modulestest"
@@ -71,9 +69,7 @@ var (
 		"tail-call-optimization",
 		"Temporal",
 		"import-assertions",
-		"dynamic-import",
 		"logical-assignment-operators",
-		"import.meta",
 		"Atomics",
 		"Atomics.waitAsync",
 		"FinalizationRegistry",
@@ -250,7 +246,6 @@ type tc39BenchmarkItem struct {
 type tc39BenchmarkData []tc39BenchmarkItem
 
 type tc39TestCtx struct {
-	compilerPool   *compiler.Pool
 	base           string
 	t              *testing.T
 	prgCache       map[string]*sobek.Program
@@ -623,14 +618,17 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 }
 
 func (ctx *tc39TestCtx) compileOnly(src, name string, compatibilityMode lib.CompatibilityMode) (*sobek.Program, error) {
-	comp := ctx.compilerPool.Get()
-	defer ctx.compilerPool.Put(comp)
-	comp.Options = compiler.Options{Strict: false, CompatibilityMode: compatibilityMode}
+	comp := ctx.compiler()
+	comp.Options = compiler.Options{CompatibilityMode: compatibilityMode}
 	astProgram, _, err := comp.Parse(src, name, false)
 	if err != nil {
 		return nil, err
 	}
 	return sobek.CompileAST(astProgram, false)
+}
+
+func (ctx *tc39TestCtx) compiler() *compiler.Compiler {
+	return compiler.New(testutils.NewLogger(ctx.t))
 }
 
 func (ctx *tc39TestCtx) runTC39Script(name, src string, includes []string, vm *sobek.Runtime, expectsError bool) (early bool, err error) {
@@ -687,20 +685,15 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 		}
 	}
 
-	comp := ctx.compilerPool.Get()
-	defer ctx.compilerPool.Put(comp)
-	comp.Options = compiler.Options{Strict: false, CompatibilityMode: ctx.compatibilityMode}
-	u := &url.URL{Scheme: "file", Path: path.Join(ctx.base, name)}
+	u := &url.URL{Scheme: "file", Path: "/" + path.Join(ctx.base, name)}
 	base := u.JoinPath("..")
 	mr := modules.NewModuleResolver(nil,
 		func(specifier *url.URL, _ string) ([]byte, error) {
 			return fs.ReadFile(os.DirFS("."), specifier.Path[1:])
 		},
-		comp)
+		ctx.compiler(), base)
 
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
-	impl := modules.NewLegacyRequireImpl(moduleRuntime.VU, ms, *base)
-	require.NoError(ctx.t, vm.Set("require", impl.Require))
 	moduleRuntime.VU.InitEnvField.CWD = base
 
 	early = false
@@ -769,7 +762,6 @@ func runTestTC39(t *testing.T, compatibilityMode lib.CompatibilityMode) {
 
 	ctx := &tc39TestCtx{
 		base:              tc39BASE,
-		compilerPool:      compiler.NewPool(testutils.NewLogger(t), runtime.GOMAXPROCS(0)),
 		compatibilityMode: compatibilityMode,
 	}
 	ctx.init()
