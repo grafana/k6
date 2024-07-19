@@ -281,7 +281,6 @@ func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 	c := compiler.New(logger)
 	c.Options = compiler.Options{
 		CompatibilityMode: b.CompatibilityMode,
-		Strict:            true,
 		SourceMapLoader:   generateSourceMapLoader(logger, b.filesystems),
 	}
 	return c

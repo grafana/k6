@@ -1,5 +1,5 @@
 // Package compiler implements additional functionality for k6 to compile js code.
-// more specifically transpiling through babel in case that is needed.
+// more specifically wrapping code in CommonJS wrapper or transforming it through esbuild for typescript support.
 // TODO this package name makes little sense now that it only parses and tranforms javascript.
 // Although people do call such transformation - compilation, so maybe it is still fine
 package compiler
@@ -18,10 +18,7 @@ import (
 	"go.k6.io/k6/lib"
 )
 
-// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a sobek.Program
-const sourceMapURLFromBabel = "k6://internal-should-not-leak/file.map"
-
-// A Compiler compiles JavaScript source code (ES5.1 or ES6) into a sobek.Program
+// A Compiler compiles JavaScript or TypeScript source code into a sobek.Program
 type Compiler struct {
 	logger  logrus.FieldLogger
 	Options Options
@@ -36,19 +33,17 @@ func New(logger logrus.FieldLogger) *Compiler {
 type Options struct {
 	CompatibilityMode lib.CompatibilityMode
 	SourceMapLoader   func(string) ([]byte, error)
-	Strict            bool
 }
 
-// parsingState is helper struct to keep the state of a compilation
+// parsingState is helper struct to keep the state of a parsing
 type parsingState struct {
 	// set when we couldn't load external source map so we can try parsing without loading it
 	couldntLoadSourceMap bool
 	// srcMap is the current full sourceMap that has been generated read so far
 	srcMap            []byte
 	srcMapError       error
-	wrapped           bool // whether the original source is wrapped in a function to make it a commonjs module
+	commonJSWrapped   bool // whether the original source is wrapped in a function to make it a CommonJS module
 	compatibilityMode lib.CompatibilityMode
-	logger            logrus.FieldLogger
 	compiler          *Compiler
 
 	loader func(string) ([]byte, error)
@@ -58,24 +53,84 @@ type parsingState struct {
 // The returned program can be compiled directly by Sobek.
 // Additionally, it returns the end code that has been parsed including any required transformations.
 func (c *Compiler) Parse(
-	src, filename string, wrap bool,
+	src, filename string, commonJSWrap bool,
 ) (prg *ast.Program, finalCode string, err error) {
 	state := &parsingState{
 		loader:            c.Options.SourceMapLoader,
-		wrapped:           wrap,
 		compatibilityMode: c.Options.CompatibilityMode,
-		logger:            c.logger,
+		commonJSWrapped:   commonJSWrap,
 		compiler:          c,
 	}
-	return state.parseImpl(src, filename, wrap)
+	return state.parseImpl(src, filename, commonJSWrap)
 }
 
-// sourceMapLoader is to be used with Sobek's WithSourceMapLoader
-// it not only gets the file from disk in the simple case, but also returns it if the map was generated from babel
-// additioanlly it fixes off by one error in commonjs dependencies due to having to wrap them in a function.
+func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast.Program, string, error) {
+	code := src
+	if commonJSWrap { // the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
+		code = ps.wrap(code, filename)
+		ps.commonJSWrapped = true
+	}
+	opts := parser.WithDisableSourceMaps
+	if ps.loader != nil {
+		opts = parser.WithSourceMapLoader(ps.sourceMapLoader)
+	}
+	prg, err := parser.ParseFile(nil, filename, code, 0, opts, parser.IsModule)
+
+	if ps.couldntLoadSourceMap {
+		ps.couldntLoadSourceMap = false // reset
+		// we probably don't want to abort scripts which have source maps but they can't be found,
+		// this also will be a breaking change, so if we couldn't we retry with it disabled
+		ps.compiler.logger.WithError(ps.srcMapError).Warnf("Couldn't load source map for %s", filename)
+		prg, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps, parser.IsModule)
+	}
+
+	if err == nil {
+		return prg, code, nil
+	}
+
+	if ps.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+		code, ps.srcMap, err = esbuildTransform(src, filename)
+		if err != nil {
+			return nil, "", err
+		}
+		if ps.loader != nil {
+			// This hack is required for the source map to work
+			code += "\n//# sourceMappingURL=" + internalSourceMapURL
+		}
+		ps.commonJSWrapped = false
+		ps.compatibilityMode = lib.CompatibilityModeBase
+		return ps.parseImpl(code, filename, commonJSWrap)
+	}
+	return nil, "", err
+}
+
+func (ps *parsingState) wrap(code, filename string) string {
+	conditionalNewLine := ""
+	if index := strings.LastIndex(code, "//# sourceMappingURL="); index != -1 {
+		// the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
+		conditionalNewLine = "\n"
+		newCode, err := ps.updateInlineSourceMap(code, index)
+		if err != nil {
+			ps.compiler.logger.Warnf("while parsing %q, couldn't update its inline sourcemap which might lead "+
+				"to some line numbers being off: %s", filename, err)
+		} else {
+			code = newCode
+		}
+
+		// if there is no sourcemap - bork only the first line of code, but leave the remaining ones.
+	}
+	return "(function(module, exports){" + conditionalNewLine + code + "\n})\n"
+}
+
+const internalSourceMapURL = "k6://internal-should-not-leak/file.map"
+
+// sourceMapLoader is to be used with Sobek's WithSourceMapLoader to add more than just loading files from disk.
+// It additionally:
+// - Loads a source-map if the it was generated from internal process.
+// - It additioanlly fixes off-by-one error for CommonJS dependencies due to having to wrap them in a functions.
 func (ps *parsingState) sourceMapLoader(path string) ([]byte, error) {
-	if path == sourceMapURLFromBabel {
-		if ps.wrapped {
+	if path == internalSourceMapURL {
+		if ps.commonJSWrapped {
 			return ps.increaseMappingsByOne(ps.srcMap)
 		}
 		return ps.srcMap, nil
@@ -91,68 +146,10 @@ func (ps *parsingState) sourceMapLoader(path string) ([]byte, error) {
 		ps.srcMap = nil
 		return nil, ps.srcMapError
 	}
-	if ps.wrapped {
+	if ps.commonJSWrapped {
 		return ps.increaseMappingsByOne(ps.srcMap)
 	}
 	return ps.srcMap, nil
-}
-
-func (ps *parsingState) parseImpl(src, filename string, wrap bool) (*ast.Program, string, error) {
-	code := src
-	if wrap { // the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
-		code = ps.wrap(code, filename)
-		ps.wrapped = true
-	}
-	opts := parser.WithDisableSourceMaps
-	if ps.loader != nil {
-		opts = parser.WithSourceMapLoader(ps.sourceMapLoader)
-	}
-	prg, err := parser.ParseFile(nil, filename, code, 0, opts, parser.IsModule)
-
-	if ps.couldntLoadSourceMap {
-		ps.couldntLoadSourceMap = false // reset
-		// we probably don't want to abort scripts which have source maps but they can't be found,
-		// this also will be a breaking change, so if we couldn't we retry with it disabled
-		ps.logger.WithError(ps.srcMapError).Warnf("Couldn't load source map for %s", filename)
-		prg, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps, parser.IsModule)
-	}
-
-	if err == nil {
-		return prg, code, nil
-	}
-
-	if ps.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
-		code, ps.srcMap, err = esbuildTransform(src, filename)
-		if err != nil {
-			return nil, "", err
-		}
-		if ps.loader != nil {
-			// This hack is required for the source map to work
-			code += "\n//# sourceMappingURL=" + sourceMapURLFromBabel
-		}
-		ps.wrapped = false
-		ps.compatibilityMode = lib.CompatibilityModeBase
-		return ps.parseImpl(code, filename, wrap)
-	}
-	return nil, "", err
-}
-
-func (ps *parsingState) wrap(code, filename string) string {
-	conditionalNewLine := ""
-	if index := strings.LastIndex(code, "//# sourceMappingURL="); index != -1 {
-		// the lines in the sourcemap (if available) will be fixed by increaseMappingsByOne
-		conditionalNewLine = "\n"
-		newCode, err := ps.updateInlineSourceMap(code, index)
-		if err != nil {
-			ps.logger.Warnf("while compiling %q, couldn't update its inline sourcemap which might lead "+
-				"to some line numbers being off: %s", filename, err)
-		} else {
-			code = newCode
-		}
-
-		// if there is no sourcemap - bork only the first line of code, but leave the remaining ones.
-	}
-	return "(function(module, exports){" + conditionalNewLine + code + "\n})\n"
 }
 
 func (ps *parsingState) updateInlineSourceMap(code string, index int) (string, error) {
