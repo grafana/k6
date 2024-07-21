@@ -53,7 +53,7 @@ func NewScheduler(trs *lib.TestRunState, controller Controller) (*Scheduler, err
 	// Only take executors which have work.
 	for _, sc := range executorConfigs {
 		if !sc.HasWork(et) {
-			trs.Logger.Warnf(
+			trs.Logger.Debugf(
 				"Executor '%s' is disabled for segment %s due to lack of work!",
 				sc.GetName(), options.ExecutionSegment,
 			)
