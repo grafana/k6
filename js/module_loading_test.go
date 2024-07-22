@@ -723,3 +723,28 @@ func TestStarImport(t *testing.T) {
 	}, arc)
 	require.NoError(t, err)
 }
+
+func TestIndirectExportDefault(t *testing.T) {
+	t.Parallel()
+	fs := fsext.NewMemMapFs()
+	err := writeToFs(fs, map[string]any{
+		"/other.js": `export function some() {};`,
+	})
+	require.NoError(t, err)
+
+	r1, err := getSimpleRunner(t, "/script.js", `
+		import { some as default } from "./other.js";
+		export { default };
+	`, fs)
+	require.NoError(t, err)
+
+	arc := r1.MakeArchive()
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	_, err = NewFromArchive(&lib.TestPreInitState{
+		Logger:         testutils.NewLogger(t),
+		BuiltinMetrics: builtinMetrics,
+		Registry:       registry,
+	}, arc)
+	require.NoError(t, err)
+}
