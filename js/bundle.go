@@ -50,9 +50,8 @@ type BundleInstance struct {
 	// TODO: maybe just have a reference to the Bundle? or save and pass rtOpts?
 	env map[string]string
 
-	mainModule         sobek.ModuleRecord
-	mainModuleInstance sobek.ModuleInstance
-	moduleVUImpl       *moduleVUImpl
+	mainModule   sobek.ModuleRecord
+	moduleVUImpl *moduleVUImpl
 }
 
 func (bi *BundleInstance) getCallableExport(name string) sobek.Callable {
@@ -66,7 +65,13 @@ func (bi *BundleInstance) getExported(name string) sobek.Value {
 	if ambigiuous || re == nil {
 		return nil
 	}
-	return bi.mainModuleInstance.GetBindingValue(re.BindingName)
+	moduleInstance := bi.Runtime.GetModuleInstance(re.Module)
+	if moduleInstance == nil {
+		panic(fmt.Sprintf("couldn't load module instance while resolving identifier %q - this is a k6 bug "+
+			", please report it (https://github.com/grafana/k6/issues)", re.BindingName))
+	}
+
+	return moduleInstance.GetBindingValue(re.BindingName)
 }
 
 // NewBundle creates a new bundle from a source file and a filesystem.
@@ -327,11 +332,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	callback := func() error { // this exists so that Sobek catches uncatchable panics such as Interrupt
 		var err error
 		bi.mainModule, err = modSys.RunSourceData(b.sourceData)
-		if err != nil {
-			return err
-		}
-		bi.mainModuleInstance = rt.GetModuleInstance(bi.mainModule)
-		return nil
+		return err
 	}
 
 	call, _ := sobek.AssertFunction(vuImpl.runtime.ToValue(callback))
