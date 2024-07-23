@@ -13,16 +13,17 @@ import (
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
 	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui/pb"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"go.k6.io/k6/cmd/state"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -34,7 +35,6 @@ type cmdCloud struct {
 	uploadOnly    bool
 }
 
-//nolint:dupl // function duplicated from the deprecated `k6 cloud` command, stmt can go when the command is remove
 func (c *cmdCloud) preRun(cmd *cobra.Command, _ []string) error {
 	// TODO: refactor (https://github.com/loadimpact/k6/issues/883)
 	//
@@ -119,7 +119,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
-		return errors.New("Not logged in, please use `k6 cloud login`") //nolint:golint,stylecheck
+		return errors.New( //nolint:golint
+			"not logged in, please login to the Grafana Cloud k6 " +
+				"using the \"k6 cloud login\" command",
+		)
 	}
 
 	// Display config warning if needed
@@ -345,6 +348,12 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
+  # [deprecated] Run a k6 script in the Grafana Cloud k6
+  $ {{.}} cloud script.js
+
+  # [deprecated] Run a k6 archive in the Grafana Cloud k6
+  $ {{.}} cloud archive.tar
+
   # Authenticate with Grafana Cloud k6
   $ {{.}} cloud login
 
@@ -352,13 +361,7 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
   $ {{.}} cloud run script.js
 
   # Run a k6 archive in the Grafana Cloud k6
-  $ {{.}} cloud run archive.tar
-
-  # [deprecated] Run a k6 script in the Grafana Cloud k6
-  $ {{.}} cloud script.js
-
-  # [deprecated] Run a k6 archive in the Grafana Cloud k6
-  $ {{.}} cloud archive.tar`[1:])
+  $ {{.}} cloud run archive.tar`[1:])
 
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
