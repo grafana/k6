@@ -76,10 +76,11 @@ func defineStream(rt *sobek.Runtime, s *stream) {
 
 func (s *stream) beginStream(p *callParams) error {
 	req := &grpcext.StreamRequest{
-		Method:           s.method,
-		MethodDescriptor: s.methodDescriptor,
-		TagsAndMeta:      &p.TagsAndMeta,
-		Metadata:         p.Metadata,
+		Method:                 s.method,
+		MethodDescriptor:       s.methodDescriptor,
+		DiscardResponseMessage: p.DiscardResponseMessage,
+		TagsAndMeta:            &p.TagsAndMeta,
+		Metadata:               p.Metadata,
 	}
 
 	ctx := s.vu.Context()
