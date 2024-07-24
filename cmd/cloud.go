@@ -120,7 +120,7 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 	}
 	if !cloudConfig.Token.Valid {
 		return errors.New( //nolint:golint
-			"not logged in, please login to the Grafana Cloud k6 " +
+			"not logged in, please login first to the Grafana Cloud k6 " +
 				"using the \"k6 cloud login\" command",
 		)
 	}
@@ -366,9 +366,9 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
-		Long: `Run a test archive in the Grafana Cloud k6.
+		Long: `Run a test in the Grafana Cloud k6.
 
-This will execute the test in the Grafana Cloud k6 service. Be sure to run the "k6 cloud login" command prior to
+This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6 service. Be sure to run the "k6 cloud login" command prior to
 authenticate with Grafana Cloud k6.`,
 		Args: exactCloudArgs(),
 		Deprecated: `the k6 team is in the process of modifying and deprecating the "k6 cloud" command behavior.
