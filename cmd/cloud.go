@@ -8,20 +8,22 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
 	"github.com/fatih/color"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
-
 	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui/pb"
+
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+
+	"go.k6.io/k6/cmd/state"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -117,7 +119,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
-		return errors.New("Not logged in, please use `k6 login cloud`.") //nolint:golint,revive,stylecheck
+		return errors.New( //nolint:golint
+			"not logged in, please login first to the Grafana Cloud k6 " +
+				"using the \"k6 cloud login\" command",
+		)
 	}
 
 	// Display config warning if needed
@@ -343,20 +348,67 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
-  {{.}} cloud script.js`[1:])
+  # [deprecated] Run a k6 script in the Grafana Cloud k6
+  $ {{.}} cloud script.js
+
+  # [deprecated] Run a k6 archive in the Grafana Cloud k6
+  $ {{.}} cloud archive.tar
+
+  # Authenticate with Grafana Cloud k6
+  $ {{.}} cloud login
+
+  # Run a k6 script in the Grafana Cloud k6
+  $ {{.}} cloud run script.js
+
+  # Run a k6 archive in the Grafana Cloud k6
+  $ {{.}} cloud run archive.tar`[1:])
 
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
-		Long: `Run a test on the cloud.
+		Long: `Run a test in the Grafana Cloud k6.
 
-This will execute the test on the k6 cloud service. Use "k6 login cloud" to authenticate.`,
-		Example: exampleText,
-		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
+service. Be sure to run the "k6 cloud login" command prior to authenticate with Grafana Cloud k6.`,
+		Args: exactCloudArgs(),
+		Deprecated: `the k6 team is in the process of modifying and deprecating the "k6 cloud" command behavior.
+In the future, the "cloud" command will only display a help text, instead of running tests in the Grafana Cloud k6.
+
+To run tests in the cloud, users are now invited to migrate to the "k6 cloud run" command instead.
+`,
 		PreRunE: c.preRun,
 		RunE:    c.run,
+		Example: exampleText,
 	}
+
+	// Register `k6 cloud` subcommands
+	cloudCmd.AddCommand(getCmdCloudRun(gs))
+	cloudCmd.AddCommand(getCmdCloudLogin(gs))
+
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
+
 	return cloudCmd
+}
+
+func exactCloudArgs() cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		const baseErrMsg = `the "k6 cloud" command expects either a subcommand such as "run" or "login", or ` +
+			"a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
+			"the command to read the test content from stdin"
+
+		if len(args) == 0 {
+			return fmt.Errorf(baseErrMsg + "; " + "received no arguments")
+		}
+
+		hasSubcommand := args[0] == "run" || args[0] == "login"
+		if len(args) > 1 && !hasSubcommand {
+			return fmt.Errorf(
+				baseErrMsg+"; "+"received %d arguments %q, and %s is not a valid subcommand",
+				len(args), strings.Join(args, " "), args[0],
+			)
+		}
+
+		return nil
+	}
 }
