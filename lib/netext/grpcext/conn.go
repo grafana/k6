@@ -51,11 +51,12 @@ type InvokeResponse struct {
 
 // StreamRequest represents a gRPC stream request.
 type StreamRequest struct {
-	Method           string
-	MethodDescriptor protoreflect.MethodDescriptor
-	Timeout          time.Duration
-	TagsAndMeta      *metrics.TagsAndMeta
-	Metadata         metadata.MD
+	Method                 string
+	MethodDescriptor       protoreflect.MethodDescriptor
+	Timeout                time.Duration
+	DiscardResponseMessage bool
+	TagsAndMeta            *metrics.TagsAndMeta
+	Metadata               metadata.MD
 }
 
 type clientConnCloser interface {
@@ -204,9 +205,10 @@ func (c *Conn) NewStream(
 	}
 
 	return &Stream{
-		raw:              stream,
-		method:           req.Method,
-		methodDescriptor: req.MethodDescriptor,
+		raw:                    stream,
+		method:                 req.Method,
+		methodDescriptor:       req.MethodDescriptor,
+		discardResponseMessage: req.DiscardResponseMessage,
 	}, nil
 }
 
