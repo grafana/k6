@@ -30,8 +30,9 @@ func getCmdCloudRun(gs *state.GlobalState) *cobra.Command {
 		Short: "Run a test in Grafana Cloud k6",
 		Long: `Run a test in Grafana Cloud k6.
 
-This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6 service. Using this command requires to be authenticated
-against Grafana Cloud k6. Use the "k6 cloud login" command to authenticate.`,
+This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
+service. Using this command requires to be authenticated against Grafana Cloud k6.
+Use the "k6 cloud login" command to authenticate.`,
 		Example: exampleText,
 		Args: exactArgsWithMsg(1,
 			"the k6 cloud run command expects a single argument consisting in either a path to a script or "+
