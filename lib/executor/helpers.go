@@ -128,7 +128,7 @@ func getIterationRunner(
 					// TODO don't count this as a full iteration?
 					logger.WithField("source", "stacktrace").Error(exception.StackTrace())
 				} else {
-					logger.Error(err.Error())
+					logger.WithField("source", "throwable").Error(err.Error())
 				}
 				// TODO: investigate context cancelled errors
 			}
