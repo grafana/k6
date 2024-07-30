@@ -87,7 +87,7 @@ func (ms *ModuleSystem) getModuleInstanceFromGoModule(wm *goModule) (wmi *goModu
 	return gmi, nil
 }
 
-// Resolve returns what the provided speicifer will get resolved to if it was to be imported
+// Resolve returns what the provided specifier will get resolved to if it was to be imported
 // To be used by other parts to get the path
 func (ms *ModuleSystem) Resolve(mr sobek.ModuleRecord, specifier string) (*url.URL, error) {
 	if specifier == "" {
