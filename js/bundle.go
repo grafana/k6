@@ -453,13 +453,16 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 	warnAboutModuleMixing("exports")
 
 	rt.SetFinalImportMeta(func(o *sobek.Object, mr sobek.ModuleRecord) {
-		_ = o.Set("resolve", func(specifier string) (string, error) {
+		err := o.Set("resolve", func(specifier string) (string, error) {
 			u, err := modSys.Resolve(mr, specifier)
 			if err != nil {
 				return "", err
 			}
 			return u.String(), nil
 		})
+		if err != nil {
+			panic("error while creating `import.meta.resolve`: " + err.Error())
+		}
 	})
 }
 
