@@ -2,6 +2,7 @@ package executor
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"runtime"
 	"sync"
@@ -392,4 +393,26 @@ func TestConstantArrivalRateActiveVUs(t *testing.T) {
 
 	assert.GreaterOrEqual(t, running, int64(5))
 	assert.LessOrEqual(t, running, int64(10))
+}
+
+func TestErrorSource(t *testing.T) {
+	t.Parallel()
+
+	runner := simpleRunner(func(_ context.Context, _ *lib.State) error {
+		return errors.New("Test error")
+	})
+
+	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
+	defer test.cancel()
+
+	engineOut := make(chan metrics.SampleContainer, 1)
+	require.NoError(t, test.executor.Run(test.ctx, engineOut))
+	
+	entries := test.logHook.Drain()
+	require.NotEmpty(t, entries)
+	for _, entry := range entries {
+		require.Equal(t, "throwable", entry.Data["source"])
+		require.Equal(t, "Test error", entry.Message)
+		require.Equal(t, logrus.ErrorLevel, entry.Level)
+	}
 }

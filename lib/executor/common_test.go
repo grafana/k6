@@ -47,7 +47,7 @@ func setupExecutor(t testing.TB, config lib.ExecutorConfig, es *lib.ExecutionSta
 	ctx, cancel := context.WithCancel(context.Background())
 	engineOut := make(chan metrics.SampleContainer, 100) // TODO: return this for more complicated tests?
 
-	logHook := testutils.NewLogHook(logrus.WarnLevel)
+	logHook := testutils.NewLogHook(logrus.WarnLevel, logrus.ErrorLevel)
 	testLog := logrus.New()
 	testLog.AddHook(logHook)
 	testLog.SetOutput(io.Discard)
