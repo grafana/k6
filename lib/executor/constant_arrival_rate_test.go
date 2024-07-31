@@ -405,7 +405,7 @@ func TestErrorSource(t *testing.T) {
 	test := setupExecutorTest(t, "", "", lib.Options{}, runner, getTestConstantArrivalRateConfig())
 	defer test.cancel()
 
-	engineOut := make(chan metrics.SampleContainer, 1)
+	engineOut := make(chan metrics.SampleContainer, 1000)
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
 
 	entries := test.logHook.Drain()
