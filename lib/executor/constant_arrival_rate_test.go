@@ -407,7 +407,7 @@ func TestErrorSource(t *testing.T) {
 
 	engineOut := make(chan metrics.SampleContainer, 1)
 	require.NoError(t, test.executor.Run(test.ctx, engineOut))
-	
+
 	entries := test.logHook.Drain()
 	require.NotEmpty(t, entries)
 	for _, entry := range entries {
