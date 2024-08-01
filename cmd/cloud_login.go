@@ -23,6 +23,13 @@ type cmdCloudLogin struct {
 	globalState *state.GlobalState
 }
 
+const warning = `
+[Warning]
+Support for authentication with email and password will be removed after November 11th, 2024 (v0.55.0). 
+Ensure you migrate to token-based authentication by then.
+
+`
+
 func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 	c := &cmdCloudLogin{
 		globalState: gs,
@@ -45,13 +52,14 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 	loginCloudCommand := &cobra.Command{
 		Use:   cloudLoginCommandName,
 		Short: "Authenticate with Grafana Cloud k6",
-		Long: `Authenticate with Grafana Cloud k6.
+		Long: fmt.Sprintf(`Authenticate with Grafana Cloud k6.
 
 This command will authenticate you with Grafana Cloud k6.
 Once authenticated you can start running tests in the cloud by using the "k6 cloud run"
 command, or by executing a test locally and outputting samples to the cloud using
 the "k6 run -o cloud" command.
-`,
+%s
+`, warning),
 		Example: exampleText,
 		Args:    cobra.NoArgs,
 		RunE:    c.run,
@@ -68,6 +76,9 @@ the "k6 run -o cloud" command.
 //
 //nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
+	warnColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgRed)
+	printToStdout(c.globalState, warnColor.Sprint(warning))
+
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
 		return err
