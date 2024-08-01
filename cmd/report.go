@@ -13,15 +13,24 @@ import (
 )
 
 type report struct {
-	Version    string         `json:"k6_version"`
-	Executors  map[string]int `json:"executors"`
-	VUsMax     int64          `json:"vus_max"`
-	Iterations uint64         `json:"iterations"`
-	Duration   string         `json:"duration"`
-	GoOS       string         `json:"goos"`
-	GoArch     string         `json:"goarch"`
-	Modules    []string       `json:"modules"`
-	Outputs    []string       `json:"outputs"`
+	Version        string         `json:"k6_version"`
+	Executors      map[string]int `json:"executors"`
+	VUsMax         int64          `json:"vus_max"`
+	Iterations     uint64         `json:"iterations"`
+	Duration       string         `json:"duration"`
+	GoOS           string         `json:"goos"`
+	GoArch         string         `json:"goarch"`
+	Modules        []string       `json:"modules"`
+	Outputs        []string       `json:"outputs"`
+	CloudTestRunID string         `json:"cloud_test_run_id"`
+}
+
+func (r *report) SetTestRunIDFromEnvs(envs map[string]string) {
+	id, ok := envs["K6_CLOUDRUN_TEST_RUN_ID"]
+	if !ok {
+		return
+	}
+	r.CloudTestRunID = id
 }
 
 func createReport(execScheduler *execution.Scheduler, importedModules []string, outputs []string) report {
@@ -71,15 +80,16 @@ func createReport(execScheduler *execution.Scheduler, importedModules []string, 
 
 	execState := execScheduler.GetState()
 	return report{
-		Version:    consts.Version,
-		Executors:  executors,
-		VUsMax:     execState.GetInitializedVUsCount(),
-		Iterations: execState.GetFullIterationCount(),
-		Duration:   execState.GetCurrentTestRunDuration().String(),
-		GoOS:       runtime.GOOS,
-		GoArch:     runtime.GOARCH,
-		Modules:    publicModules,
-		Outputs:    publicOutputs,
+		Version:        consts.Version,
+		Executors:      executors,
+		VUsMax:         execState.GetInitializedVUsCount(),
+		Iterations:     execState.GetFullIterationCount(),
+		Duration:       execState.GetCurrentTestRunDuration().String(),
+		GoOS:           runtime.GOOS,
+		GoArch:         runtime.GOARCH,
+		Modules:        publicModules,
+		Outputs:        publicOutputs,
+		CloudTestRunID: "",
 	}
 }
 
@@ -91,10 +101,13 @@ func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *
 	}
 
 	r := createReport(execScheduler, test.moduleResolver.Imported(), outputs)
+	r.SetTestRunIDFromEnvs(test.preInitState.RuntimeOptions.Env)
+
 	body, err := json.Marshal(r)
 	if err != nil {
 		return err
 	}
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://reports.k6.io", bytes.NewBuffer(body))
 	if err != nil {
 		return err

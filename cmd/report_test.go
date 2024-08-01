@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -59,4 +60,36 @@ func TestCreateReport(t *testing.T) {
 	assert.NotEqual(t, "0s", r.Duration)
 	assert.ElementsMatch(t, []string{"k6", "k6/http", "k6/experimental/webcrypto"}, r.Modules)
 	assert.ElementsMatch(t, []string{"json"}, r.Outputs)
+}
+
+func TestReportSetTestRunIDFromEnvs(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		envs  map[string]string
+		expID string
+	}{
+		{
+			envs:  map[string]string{},
+			expID: "",
+		},
+		{
+			envs:  map[string]string{"K6_CLOUDRUN_TEST_RUN_ID": "my-fake-cloud-id"},
+			expID: "my-fake-cloud-id",
+		},
+		{
+			envs:  map[string]string{"NOT_THE_RIGHT_KEY": "my-fake-cloud-id"},
+			expID: "",
+		},
+	}
+
+	for i, tcase := range tests {
+		tcase := tcase
+		t.Run(fmt.Sprintf("case#%d", i), func(t *testing.T) {
+			t.Parallel()
+			r := report{}
+			r.SetTestRunIDFromEnvs(tcase.envs)
+			assert.Equal(t, tcase.expID, r.CloudTestRunID)
+		})
+	}
 }
