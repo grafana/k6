@@ -70,18 +70,26 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 		code = ps.wrap(code, filename)
 		ps.commonJSWrapped = true
 	}
-	opts := parser.WithDisableSourceMaps
+	var opts []parser.Option
 	if ps.loader != nil {
-		opts = parser.WithSourceMapLoader(ps.sourceMapLoader)
+		opts = append(opts, parser.WithSourceMapLoader(ps.sourceMapLoader))
+	} else {
+		opts = append(opts, parser.WithDisableSourceMaps)
 	}
-	prg, err := parser.ParseFile(nil, filename, code, 0, opts, parser.IsModule)
+
+	if !commonJSWrap {
+		opts = append(opts, parser.IsModule)
+	}
+
+	prg, err := parser.ParseFile(nil, filename, code, 0, opts...)
 
 	if ps.couldntLoadSourceMap {
 		ps.couldntLoadSourceMap = false // reset
 		// we probably don't want to abort scripts which have source maps but they can't be found,
 		// this also will be a breaking change, so if we couldn't we retry with it disabled
 		ps.compiler.logger.WithError(ps.srcMapError).Warnf("Couldn't load source map for %s", filename)
-		prg, err = parser.ParseFile(nil, filename, code, 0, parser.WithDisableSourceMaps, parser.IsModule)
+		ps.loader = nil
+		return ps.parseImpl(src, filename, commonJSWrap)
 	}
 
 	if err == nil {

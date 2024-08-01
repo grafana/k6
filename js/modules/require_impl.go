@@ -87,6 +87,17 @@ func (ms *ModuleSystem) getModuleInstanceFromGoModule(wm *goModule) (wmi *goModu
 	return gmi, nil
 }
 
+// Resolve returns what the provided specifier will get resolved to if it was to be imported
+// To be used by other parts to get the path
+func (ms *ModuleSystem) Resolve(mr sobek.ModuleRecord, specifier string) (*url.URL, error) {
+	if specifier == "" {
+		return nil, errors.New("require() can't be used with an empty specifier")
+	}
+
+	baseModuleURL := ms.resolver.reversePath(mr)
+	return ms.resolver.resolveSpecifier(baseModuleURL, specifier)
+}
+
 // CurrentlyRequiredModule returns the module that is currently being required.
 // It is mostly used for old and somewhat buggy behaviour of the `open` call
 func (ms *ModuleSystem) CurrentlyRequiredModule() (*url.URL, error) {
