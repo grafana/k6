@@ -76,7 +76,7 @@ the "k6 run -o cloud" command.
 //
 //nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
-	warnColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgRed)
+	warnColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgYellow)
 	printToStdout(c.globalState, warnColor.Sprint(warning))
 
 	currentDiskConf, err := readDiskConfig(c.globalState)
