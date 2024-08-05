@@ -5,29 +5,29 @@ package kontext;
 option go_package = "./proto";
 
 service KontextKV {
-	rpc Get(GetRequest) returns (GetResponse) {}
-	rpc Set(SetRequest) returns (SetResponse) {}
+  rpc Get(GetRequest) returns (GetResponse) {}
+  rpc Set(SetRequest) returns (SetResponse) {}
 }
 
 enum StatusCode {
-	Ok = 0;
-	NotFound = 1;
+    Ok = 0;
+    NotFound = 1;  // change to nil?
 }
 
 message GetRequest {
-	string key = 1;
+  string key = 1;
 }
 
 message GetResponse {
-	optional StatusCode code = 1;
-	optional bytes data = 2;
+    optional StatusCode code = 1;
+    optional bytes data = 2;
 }
 
 message SetRequest {
-	string key = 1;
-	bytes data = 2;
+    string key = 1;
+    bytes data = 2;
 }
 
 message SetResponse {
-	optional StatusCode code = 1;
+    optional StatusCode code = 1;
 }

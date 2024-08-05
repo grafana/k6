@@ -3,7 +3,9 @@
 package kontext
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
@@ -54,9 +56,20 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 
 // NewKontext creates a new Kontext object.
 func (mi *ModuleInstance) NewKontext(_ sobek.ConstructorCall) *sobek.Object {
-	kv, err := NewLocalKontext(mi.vu, mi.rm.db)
-	if err != nil {
-		common.Throw(mi.vu.Runtime(), fmt.Errorf("failed to create new Kontext instance: %w", err))
+	serviceURL, hasServiceURL := os.LookupEnv(k6ServiceURLEnvironmentVariable)
+
+	var kv Kontexter
+	var err error
+	if hasServiceURL {
+		kv, err = NewCloudKontext(mi.vu, serviceURL)
+		if err != nil {
+			common.Throw(mi.vu.Runtime(), fmt.Errorf("failed to create new Kontext instance: %w", err))
+		}
+	} else {
+		kv, err = NewLocalKontext(mi.vu, mi.rm.db)
+		if err != nil {
+			common.Throw(mi.vu.Runtime(), fmt.Errorf("failed to create new Kontext instance: %w", err))
+		}
 	}
 
 	k := &Kontext{
@@ -80,18 +93,24 @@ func (k *Kontext) Get(key sobek.Value) *sobek.Promise {
 	promise, resolve, reject := promises.New(k.vu)
 
 	go func() {
-		value, err := k.kv.Get(key.String())
+		jsonValue, err := k.kv.Get(key.String())
 		if err != nil {
 			reject(err)
 			return
 		}
 
-		if value == nil {
+		if jsonValue == nil {
 			reject(KontextKeyNotFoundError)
 			return
 		}
 
-		resolve(k.vu.Runtime().ToValue(value))
+		var value any
+		if err := json.Unmarshal(jsonValue, &value); err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(value)
 	}()
 
 	return promise
@@ -101,8 +120,14 @@ func (k *Kontext) Get(key sobek.Value) *sobek.Promise {
 func (k *Kontext) Set(key sobek.Value, value sobek.Value) *sobek.Promise {
 	promise, resolve, reject := promises.New(k.vu)
 
+	jsonValue, err := json.Marshal(value.Export())
+	if err != nil {
+		reject(fmt.Errorf("failed to marshal value to json"))
+		return promise
+	}
+
 	go func() {
-		err := k.kv.Set(key.String(), value)
+		err := k.kv.Set(key.String(), jsonValue)
 		if err != nil {
 			reject(err)
 			return
