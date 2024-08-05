@@ -11,7 +11,7 @@ service KontextKV {
 
 enum StatusCode {
     Ok = 0;
-    NotFound = 1;  // change to nil?
+    Nil = 1;
 }
 
 message GetRequest {
