@@ -11,6 +11,8 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/promises"
+
+	pyroscope "github.com/grafana/pyroscope-go"
 )
 
 type (
@@ -41,6 +43,24 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface and returns a new
 // instance of our module for the given VU.
 func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	pyroscope.Start(pyroscope.Config{
+		ApplicationName: "k6.hack.kontext",
+
+		// replace this with the address of pyroscope server
+
+		// you can disable logging by setting this to nil
+		Logger: pyroscope.StandardLogger,
+
+		// by default all profilers are enabled,
+		// but you can select the ones you want to use:
+		ProfileTypes: []pyroscope.ProfileType{
+			pyroscope.ProfileCPU,
+			pyroscope.ProfileAllocObjects,
+			pyroscope.ProfileAllocSpace,
+			pyroscope.ProfileInuseObjects,
+			pyroscope.ProfileInuseSpace,
+		},
+	})
 	return &ModuleInstance{vu: vu, rm: rm}
 }
 
@@ -92,8 +112,10 @@ type Kontext struct {
 func (k *Kontext) Get(key sobek.Value) *sobek.Promise {
 	promise, resolve, reject := promises.New(k.vu)
 
+	keyStr := key.String()
+
 	go func() {
-		jsonValue, err := k.kv.Get(key.String())
+		jsonValue, err := k.kv.Get(keyStr)
 		if err != nil {
 			reject(err)
 			return

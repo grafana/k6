@@ -163,6 +163,18 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
+# github.com/grafana/pyroscope-go v1.1.1
+## explicit; go 1.17
+github.com/grafana/pyroscope-go
+github.com/grafana/pyroscope-go/internal/flameql
+github.com/grafana/pyroscope-go/internal/pprof
+github.com/grafana/pyroscope-go/internal/sortedmap
+github.com/grafana/pyroscope-go/upstream
+github.com/grafana/pyroscope-go/upstream/remote
+# github.com/grafana/pyroscope-go/godeltaprof v0.1.6
+## explicit; go 1.16
+github.com/grafana/pyroscope-go/godeltaprof
+github.com/grafana/pyroscope-go/godeltaprof/internal/pprof
 # github.com/grafana/sobek v0.0.0-20240711133011-3a280d337ef4
 ## explicit; go 1.20
 github.com/grafana/sobek
