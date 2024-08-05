@@ -4,6 +4,8 @@ import (
 	"errors"
 	"sync"
 
+	"go.k6.io/k6/js/modules/k6/experimental/kontext"
+
 	"go.k6.io/k6/ext"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -67,6 +69,7 @@ func getInternalJSModules() map[string]interface{} {
 			"k6/experimental/grpc has been graduated, please use k6/net/grpc instead." +
 				" See https://grafana.com/docs/k6/latest/javascript-api/k6-net-grpc/ for more information.",
 		),
+		"k6/kontext": kontext.New(),
 	}
 }
 
