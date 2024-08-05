@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"encoding/json"
-	"errors"
 	"fmt"
 	"syscall"
 
@@ -13,7 +12,6 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui"
 )
 
@@ -30,7 +28,7 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 
 	// loginCloudCommand represents the 'cloud login' command
 	exampleText := getExampleText(gs, `
-  # Log in with an email/password
+  # Prompt for a Grafana Cloud k6 token
   {{.}} cloud login
 
   # Store a token in k6's persistent configuration
@@ -65,8 +63,6 @@ the "k6 run -o cloud" command.
 }
 
 // run is the code that runs when the user executes `k6 cloud login`
-//
-//nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
@@ -80,18 +76,6 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if jsonerr := json.Unmarshal(currentJSONConfigRaw, &currentJSONConfig); jsonerr != nil {
 			return jsonerr
 		}
-	}
-
-	// We want to use this fully consolidated config for things like
-	// host addresses, so users can overwrite them with env vars.
-	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		currentJSONConfigRaw, c.globalState.Env, "", nil, nil)
-	if err != nil {
-		return err
-	}
-
-	if warn != "" {
-		c.globalState.Logger.Warn(warn)
 	}
 
 	// But we don't want to save them back to the JSON file, we only
@@ -110,15 +94,13 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.Token = token
 	default:
 		form := ui.Form{
-			Banner: "Please enter your Grafana Cloud k6 credentials",
+			Banner: "Enter your token to authenticate with Grafana Cloud k6.\n" +
+				"Please, consult the Grafana Cloud k6 documentation for instructions on how to generate one:\n" +
+				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication",
 			Fields: []ui.Field{
-				ui.StringField{
-					Key:   "Email",
-					Label: "Email",
-				},
 				ui.PasswordField{
-					Key:   "Password",
-					Label: "Password",
+					Key:   "Token",
+					Label: "Token",
 				},
 			},
 		}
@@ -130,29 +112,7 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if err != nil {
 			return err
 		}
-		email := vals["Email"]
-		password := vals["Password"]
-
-		client := cloudapi.NewClient(
-			c.globalState.Logger,
-			"",
-			consolidatedCurrentConfig.Host.String,
-			consts.Version,
-			consolidatedCurrentConfig.Timeout.TimeDuration())
-
-		var res *cloudapi.LoginResponse
-		res, err = client.Login(email, password)
-		if err != nil {
-			return err
-		}
-
-		if res.Token == "" {
-			return errors.New("your account does not appear to have an active API token, please consult the " +
-				"Grafana Cloud k6 documentation for instructions on how to generate " +
-				"one: https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
-		}
-
-		newCloudConf.Token = null.StringFrom(res.Token)
+		newCloudConf.Token = null.StringFrom(vals["Token"])
 	}
 
 	if currentDiskConf.Collectors == nil {
