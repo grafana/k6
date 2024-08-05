@@ -2,7 +2,6 @@ package kontext
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -90,18 +89,13 @@ func (lk *LocalKontext) Get(key string) ([]byte, error) {
 
 // Set sets a value in the local kontext database.
 func (lk *LocalKontext) Set(key string, value []byte) error {
-	jsonValue, err := json.Marshal(value)
-	if err != nil {
-		return fmt.Errorf("setting key %s failed: %w", key, err)
-	}
-
-	err = lk.db.handle.Update(func(tx *bolt.Tx) error {
+	err := lk.db.handle.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(lk.bucket)
 		if bucket == nil {
 			return fmt.Errorf("bucket not found")
 		}
 
-		return bucket.Put([]byte(key), jsonValue)
+		return bucket.Put([]byte(key), value)
 	})
 	if err != nil {
 		return fmt.Errorf("setting key %s failed: %w", key, err)
