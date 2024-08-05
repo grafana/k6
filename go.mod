@@ -1,6 +1,8 @@
 module go.k6.io/k6
 
-go 1.20
+go 1.21
+
+toolchain go1.22.3
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
@@ -56,6 +58,8 @@ require (
 	gopkg.in/guregu/null.v3 v3.3.0
 	gopkg.in/yaml.v3 v3.0.1
 )
+
+require go.etcd.io/bbolt v1.3.10
 
 require (
 	buf.build/gen/go/gogo/protobuf/protocolbuffers/go v1.31.0-20210810001428-4df00b267f94.1 // indirect
