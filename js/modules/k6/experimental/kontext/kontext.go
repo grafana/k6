@@ -391,7 +391,7 @@ func (lk *LocalKontext) incrBy(key string, n int64) (int64, error) {
 			n = 0
 			encoded, err := json.Marshal(&n)
 			if err != nil {
-				return fmt.Errorf("marshalling value to json failed: %w", err)
+				return fmt.Errorf("marshalling value to json failed: %w: %w", ErrKontextWrongType, err)
 			}
 			err = bucket.Put([]byte(key), encoded)
 			if err != nil {
@@ -404,7 +404,7 @@ func (lk *LocalKontext) incrBy(key string, n int64) (int64, error) {
 		var prev int64
 		err := json.Unmarshal(currentValue, &prev)
 		if err != nil {
-			return fmt.Errorf("unmarshalling value to json failed: %w", err)
+			return fmt.Errorf("unmarshalling value to json failed: %w: %w", ErrKontextWrongType, err)
 		}
 
 		prev += n
@@ -418,6 +418,7 @@ func (lk *LocalKontext) incrBy(key string, n int64) (int64, error) {
 			return fmt.Errorf("putting updated value failed: %w", err)
 		}
 
+		newN = prev
 		return nil
 	})
 	if err != nil {
