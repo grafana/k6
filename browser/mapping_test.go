@@ -505,6 +505,7 @@ type locatorAPI interface {
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
 	Dblclick(opts sobek.Value) error
+	SetChecked(checked bool, opts sobek.Value) error
 	Check(opts sobek.Value) error
 	Uncheck(opts sobek.Value) error
 	IsChecked(opts sobek.Value) (bool, error)
