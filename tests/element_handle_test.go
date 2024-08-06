@@ -573,3 +573,29 @@ func TestElementHandleTextContentEmpty(t *testing.T) {
 	require.True(t, ok)
 	require.Empty(t, got)
 }
+
+func TestElementHandleSetChecked(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+
+	err := p.SetContent(`<input type="checkbox">`, nil)
+	require.NoError(t, err)
+	element, err := p.Query("input")
+	require.NoError(t, err)
+	checked, err := element.IsChecked()
+	require.NoError(t, err)
+	require.False(t, checked, "expected checkbox to be unchecked")
+
+	err = element.SetChecked(true, nil)
+	require.NoError(t, err)
+	checked, err = element.IsChecked()
+	require.NoError(t, err)
+	assert.True(t, checked, "expected checkbox to be checked")
+
+	err = element.SetChecked(false, nil)
+	require.NoError(t, err)
+	checked, err = element.IsChecked()
+	require.NoError(t, err)
+	assert.False(t, checked, "expected checkbox to be unchecked")
+}
