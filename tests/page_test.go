@@ -609,6 +609,29 @@ func TestPageIsChecked(t *testing.T) {
 	assert.False(t, checked, "expected checkbox to be unchecked")
 }
 
+func TestPageSetChecked(t *testing.T) {
+	t.Parallel()
+
+	p := newTestBrowser(t).NewPage(nil)
+	err := p.SetContent(`<input id="el" type="checkbox">`, nil)
+	require.NoError(t, err)
+	checked, err := p.IsChecked("#el", nil)
+	require.NoError(t, err)
+	assert.False(t, checked)
+
+	err = p.SetChecked("#el", true, nil)
+	require.NoError(t, err)
+	checked, err = p.IsChecked("#el", nil)
+	require.NoError(t, err)
+	assert.True(t, checked)
+
+	err = p.SetChecked("#el", false, nil)
+	require.NoError(t, err)
+	checked, err = p.IsChecked("#el", nil)
+	require.NoError(t, err)
+	assert.False(t, checked)
+}
+
 func TestPageScreenshotFullpage(t *testing.T) {
 	t.Parallel()
 
