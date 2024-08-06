@@ -132,7 +132,7 @@ func (k *Kontext) Get(key sobek.Value) *sobek.Promise {
 		}
 
 		if jsonValue == nil {
-			reject(ErrKontextKeyNotFoundError)
+			reject(ErrKontextKeyNotFound)
 			return
 		}
 
@@ -256,6 +256,34 @@ func (k *Kontext) Rpop(key sobek.Value) *sobek.Promise {
 		}
 
 		resolve(value)
+	}()
+
+	return promise
+}
+
+// Size exposes the operation of getting the size of a list to the k6 runtime.
+func (k *Kontext) Size(key sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(k.vu)
+
+	if common.IsNullish(key) {
+		reject(fmt.Errorf("key must be a non-empty string"))
+		return promise
+	}
+
+	// Everything is a reference in JS, so we need to immediately copy the
+	// content of the argument before using it in the promise goroutine, to
+	// avoid future modifications to the argument affecting the promise (in case a variable
+	// is used as the argument, as opposed to a static string).
+	keyStr := key.String()
+
+	go func() {
+		size, err := k.kv.Size(keyStr)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(size)
 	}()
 
 	return promise

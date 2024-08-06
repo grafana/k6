@@ -18,8 +18,11 @@ import (
 
 // FIXME: we need to centralize the json marshaling in a single place, either here, or at the module level
 
-// ErrKontextKeyNotFoundError is the error returned when a key is not found in the kontext.
-var ErrKontextKeyNotFoundError = errors.New("key not found")
+// ErrKontextKeyNotFound is the error returned when a key is not found in the kontext.
+var ErrKontextKeyNotFound = errors.New("key not found")
+
+// ErrKontextWrongType is the error returned when the type of the value in the kontext is not the expected one.
+var ErrKontextWrongType = errors.New("wrong type")
 
 const k6ServiceURLEnvironmentVariable = "K6_KONTEXT_SERVICE_URL"
 
@@ -33,8 +36,14 @@ type Setter interface {
 	Set(key string, value []byte) error
 }
 
+// Sizer is the interface encapsulating the action of getting the size of a key in the kontext.
+type Sizer interface {
+	Size(key string) (int64, error)
+}
+
 // Lister is the interface encapsulating the actions of interacting with a list in the kontext.
 type Lister interface {
+	Sizer
 	LeftPush(key string, value any) (int64, error)
 	RightPush(key string, value any) (int64, error)
 	RightPop(key string) (any, error)
@@ -93,7 +102,7 @@ func (lk *LocalKontext) Get(key string) ([]byte, error) {
 	}
 
 	if jsonValue == nil {
-		return nil, fmt.Errorf("getting key %s failed: %w", key, ErrKontextKeyNotFoundError)
+		return nil, fmt.Errorf("getting key %s failed: %w", key, ErrKontextKeyNotFound)
 	}
 
 	return jsonValue, nil
@@ -221,7 +230,7 @@ func (lk *LocalKontext) LeftPop(key string) (any, error) {
 		// Get the current value
 		currentValue := bucket.Get([]byte(key))
 		if currentValue == nil {
-			return ErrKontextKeyNotFoundError
+			return ErrKontextKeyNotFound
 		}
 
 		// Unmarshal the current value as a slice of any
@@ -272,7 +281,7 @@ func (lk *LocalKontext) RightPop(key string) (any, error) {
 		// Get the current value
 		currentValue := bucket.Get([]byte(key))
 		if currentValue == nil {
-			return ErrKontextKeyNotFoundError
+			return ErrKontextKeyNotFound
 		}
 
 		// Unmarshal the current value as a slice of any
@@ -308,6 +317,39 @@ func (lk *LocalKontext) RightPop(key string) (any, error) {
 	}
 
 	return poppedValue, nil
+}
+
+func (lk *LocalKontext) Size(key string) (int64, error) {
+	var size int64
+
+	err := lk.db.handle.View(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(lk.bucket)
+		if bucket == nil {
+			return fmt.Errorf("bucket not found")
+		}
+
+		// Get the current value
+		currentValue := bucket.Get([]byte(key))
+		if currentValue == nil {
+			return ErrKontextKeyNotFound
+		}
+
+		// TODO: we currently only support lists, but we could support any other type really.
+		// Unmarshal the current value as a slice of any
+		var currentSlice []any
+		if err := json.Unmarshal(currentValue, &currentSlice); err != nil {
+			return fmt.Errorf("unmarshalling value as list failed: %w: %w", ErrKontextWrongType, err)
+		}
+
+		size = int64(len(currentSlice))
+
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("getting size of key %s failed: %w", key, err)
+	}
+
+	return size, nil
 }
 
 // CloudKontext is a Kontext implementation that uses the Grafana Cloud k6 service to store key-value pairs.
@@ -463,4 +505,19 @@ func (c CloudKontext) RightPop(key string) (any, error) {
 	}
 
 	return value, nil
+}
+
+func (c CloudKontext) Size(key string) (int64, error) {
+	ctx := context.Background()
+
+	response, err := c.client.Size(ctx, &proto.SizeRequest{Key: key})
+	if err != nil {
+		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed: %w", key, err)
+	}
+
+	if response.GetCode() != proto.StatusCode_Nil {
+		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed", key)
+	}
+
+	return response.Count, nil
 }
