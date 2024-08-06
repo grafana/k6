@@ -50,11 +50,18 @@ type Lister interface {
 	LeftPop(key string) (any, error)
 }
 
+// Incrementer is the interface encapsulating the actions of adding to an integer in the kontext.
+type Incrementer interface {
+	Incr(key string) (int64, error)
+	Decr(key string) (int64, error)
+}
+
 // Kontexter is the interface that all Kontext implementations must implement.
 type Kontexter interface {
 	Getter
 	Setter
 	Lister
+	Incrementer
 }
 
 // LocalKontext is a Kontext implementation that uses a local BoltDB database to store key-value pairs.
@@ -361,6 +368,65 @@ func (lk *LocalKontext) Size(key string) (int64, error) {
 	return size, nil
 }
 
+func (lk *LocalKontext) Incr(key string) (int64, error) {
+	return lk.incrBy(key, 1)
+}
+
+func (lk *LocalKontext) Decr(key string) (int64, error) {
+	return lk.incrBy(key, -1)
+}
+
+func (lk *LocalKontext) incrBy(key string, n int64) (int64, error) {
+	var newN int64
+
+	err := lk.db.handle.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(lk.bucket)
+		if bucket == nil {
+			return fmt.Errorf("bucket not found")
+		}
+
+		// Get the current value
+		currentValue := bucket.Get([]byte(key))
+		if currentValue == nil {
+			n = 0
+			encoded, err := json.Marshal(&n)
+			if err != nil {
+				return fmt.Errorf("marshalling value to json failed: %w", err)
+			}
+			err = bucket.Put([]byte(key), encoded)
+			if err != nil {
+				return fmt.Errorf("putting updated value failed: %w", err)
+			}
+
+			return nil
+		}
+
+		var prev int64
+		err := json.Unmarshal(currentValue, &prev)
+		if err != nil {
+			return fmt.Errorf("unmarshalling value to json failed: %w", err)
+		}
+
+		prev += n
+
+		encoded, err := json.Marshal(&prev)
+		if err != nil {
+			return fmt.Errorf("marshalling value to json failed: %w", err)
+		}
+		err = bucket.Put([]byte(key), encoded)
+		if err != nil {
+			return fmt.Errorf("putting updated value failed: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return 0, fmt.Errorf("incrby of key %s failed: %w", key, err)
+	}
+
+	return newN, nil
+}
+
 // CloudKontext is a Kontext implementation that uses the Grafana Cloud k6 service to store key-value pairs.
 type CloudKontext struct {
 	// vu is the VU instance that this kontext instance belongs to
@@ -536,6 +602,33 @@ func (c CloudKontext) Size(key string) (int64, error) {
 
 	if response.GetCode() != proto.StatusCode_Nil {
 		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed", key)
+	}
+
+	return response.Count, nil
+
+}
+
+func (c CloudKontext) Incr(key string) (int64, error) {
+	return c.incrBy(key, 1)
+}
+
+func (c CloudKontext) Decr(key string) (int64, error) {
+	return c.incrBy(key, -1)
+}
+
+func (c CloudKontext) incrBy(key string, n int64) (int64, error) {
+	ctx := context.Background()
+
+	response, err := c.client.IncrBy(ctx, &proto.IncrByRequest{Key: key, Count: n})
+
+	switch {
+	case err != nil:
+		return 0, fmt.Errorf("incr key %s in kontext grpc service failed: %w", key, err)
+	case response.Code == proto.StatusCode_Ok:
+	case response.Code == proto.StatusCode_WrongType:
+		return 0, fmt.Errorf("incr key %s from kontext grpc service failed; reason: value is of wrong type", key)
+	default:
+		return 0, fmt.Errorf("incr key %s in kontext grpc got unexpected status: %v", key, response.Code)
 	}
 
 	return response.Count, nil

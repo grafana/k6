@@ -272,3 +272,59 @@ func (k *Kontext) Size(key sobek.Value) *sobek.Promise {
 
 	return promise
 }
+
+// Incr exposes the operation of increasing an integer value by one.
+func (k *Kontext) Incr(key sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(k.vu)
+
+	if common.IsNullish(key) {
+		reject(fmt.Errorf("key must be a non-empty string"))
+		return promise
+	}
+
+	// Everything is a reference in JS, so we need to immediately copy the
+	// content of the argument before using it in the promise goroutine, to
+	// avoid future modifications to the argument affecting the promise (in case a variable
+	// is used as the argument, as opposed to a static string).
+	keyStr := key.String()
+
+	go func() {
+		n, err := k.kv.Incr(keyStr)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(n)
+	}()
+
+	return promise
+}
+
+// Decr exposes the operation of decreasing an integer value by one.
+func (k *Kontext) Decr(key sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(k.vu)
+
+	if common.IsNullish(key) {
+		reject(fmt.Errorf("key must be a non-empty string"))
+		return promise
+	}
+
+	// Everything is a reference in JS, so we need to immediately copy the
+	// content of the argument before using it in the promise goroutine, to
+	// avoid future modifications to the argument affecting the promise (in case a variable
+	// is used as the argument, as opposed to a static string).
+	keyStr := key.String()
+
+	go func() {
+		n, err := k.kv.Decr(keyStr)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(n)
+	}()
+
+	return promise
+}

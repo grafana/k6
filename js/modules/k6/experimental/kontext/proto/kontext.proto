@@ -8,10 +8,9 @@ service KontextKV {
   rpc Get(GetRequest) returns (GetResponse) {}
   rpc Set(SetRequest) returns (SetResponse) {}
   rpc Del(DelRequest) returns (DelResponse) {}
-  rpc Incr(IncrDecrRequest) returns (IncrDecrResponse) {}
-  rpc Decr(IncrDecrRequest) returns (IncrDecrResponse) {}
-  rpc GetDel(GetDelRequest) returns (GetDelResponse) {}
-  rpc GetSet(GetSetRequest) returns (GetSetResponse) {}
+  rpc IncrBy(IncrByRequest) returns (IncrByResponse) {}
+  rpc GetDel(GetRequest) returns (GetResponse) {}
+  rpc GetSet(SetRequest) returns (GetResponse) {}
   rpc Lpush(PushRequest) returns (PushResponse) {}
   rpc Lpop(PopRequest) returns (PopResponse) {}
   rpc Rpush(PushRequest) returns (PushResponse) {}
@@ -51,32 +50,14 @@ message DelResponse {
     int64 count = 1;
 }
 
-message IncrDecrRequest {
+message IncrByRequest {
     string key = 1;
-}
-
-message IncrDecrResponse {
-    StatusCode code = 1;
     int64 count = 2;
 }
 
-message GetDelRequest {
-    string key = 1;
-}
-
-message GetDelResponse {
+message IncrByResponse {
     StatusCode code = 1;
-    bytes data = 2;
-}
-
-message GetSetRequest {
-    string key = 1;
-    bytes data = 2;
-}
-
-message GetSetResponse {
-    StatusCode code = 1;
-    bytes data = 2;
+    int64 count = 2;
 }
 
 message PushRequest {
@@ -85,7 +66,8 @@ message PushRequest {
 }
 
 message PushResponse {
-    int64 count = 1;
+    StatusCode code = 1;
+    int64 count = 2;
 }
 
 message PopRequest {

@@ -22,8 +22,7 @@ const (
 	KontextKV_Get_FullMethodName    = "/kontext.KontextKV/Get"
 	KontextKV_Set_FullMethodName    = "/kontext.KontextKV/Set"
 	KontextKV_Del_FullMethodName    = "/kontext.KontextKV/Del"
-	KontextKV_Incr_FullMethodName   = "/kontext.KontextKV/Incr"
-	KontextKV_Decr_FullMethodName   = "/kontext.KontextKV/Decr"
+	KontextKV_IncrBy_FullMethodName = "/kontext.KontextKV/IncrBy"
 	KontextKV_GetDel_FullMethodName = "/kontext.KontextKV/GetDel"
 	KontextKV_GetSet_FullMethodName = "/kontext.KontextKV/GetSet"
 	KontextKV_Lpush_FullMethodName  = "/kontext.KontextKV/Lpush"
@@ -40,10 +39,9 @@ type KontextKVClient interface {
 	Get(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Set(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*SetResponse, error)
 	Del(ctx context.Context, in *DelRequest, opts ...grpc.CallOption) (*DelResponse, error)
-	Incr(ctx context.Context, in *IncrDecrRequest, opts ...grpc.CallOption) (*IncrDecrResponse, error)
-	Decr(ctx context.Context, in *IncrDecrRequest, opts ...grpc.CallOption) (*IncrDecrResponse, error)
-	GetDel(ctx context.Context, in *GetDelRequest, opts ...grpc.CallOption) (*GetDelResponse, error)
-	GetSet(ctx context.Context, in *GetSetRequest, opts ...grpc.CallOption) (*GetSetResponse, error)
+	IncrBy(ctx context.Context, in *IncrByRequest, opts ...grpc.CallOption) (*IncrByResponse, error)
+	GetDel(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error)
+	GetSet(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*GetResponse, error)
 	Lpush(ctx context.Context, in *PushRequest, opts ...grpc.CallOption) (*PushResponse, error)
 	Lpop(ctx context.Context, in *PopRequest, opts ...grpc.CallOption) (*PopResponse, error)
 	Rpush(ctx context.Context, in *PushRequest, opts ...grpc.CallOption) (*PushResponse, error)
@@ -89,29 +87,19 @@ func (c *kontextKVClient) Del(ctx context.Context, in *DelRequest, opts ...grpc.
 	return out, nil
 }
 
-func (c *kontextKVClient) Incr(ctx context.Context, in *IncrDecrRequest, opts ...grpc.CallOption) (*IncrDecrResponse, error) {
+func (c *kontextKVClient) IncrBy(ctx context.Context, in *IncrByRequest, opts ...grpc.CallOption) (*IncrByResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(IncrDecrResponse)
-	err := c.cc.Invoke(ctx, KontextKV_Incr_FullMethodName, in, out, cOpts...)
+	out := new(IncrByResponse)
+	err := c.cc.Invoke(ctx, KontextKV_IncrBy_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *kontextKVClient) Decr(ctx context.Context, in *IncrDecrRequest, opts ...grpc.CallOption) (*IncrDecrResponse, error) {
+func (c *kontextKVClient) GetDel(ctx context.Context, in *GetRequest, opts ...grpc.CallOption) (*GetResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(IncrDecrResponse)
-	err := c.cc.Invoke(ctx, KontextKV_Decr_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *kontextKVClient) GetDel(ctx context.Context, in *GetDelRequest, opts ...grpc.CallOption) (*GetDelResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetDelResponse)
+	out := new(GetResponse)
 	err := c.cc.Invoke(ctx, KontextKV_GetDel_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -119,9 +107,9 @@ func (c *kontextKVClient) GetDel(ctx context.Context, in *GetDelRequest, opts ..
 	return out, nil
 }
 
-func (c *kontextKVClient) GetSet(ctx context.Context, in *GetSetRequest, opts ...grpc.CallOption) (*GetSetResponse, error) {
+func (c *kontextKVClient) GetSet(ctx context.Context, in *SetRequest, opts ...grpc.CallOption) (*GetResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetSetResponse)
+	out := new(GetResponse)
 	err := c.cc.Invoke(ctx, KontextKV_GetSet_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -186,10 +174,9 @@ type KontextKVServer interface {
 	Get(context.Context, *GetRequest) (*GetResponse, error)
 	Set(context.Context, *SetRequest) (*SetResponse, error)
 	Del(context.Context, *DelRequest) (*DelResponse, error)
-	Incr(context.Context, *IncrDecrRequest) (*IncrDecrResponse, error)
-	Decr(context.Context, *IncrDecrRequest) (*IncrDecrResponse, error)
-	GetDel(context.Context, *GetDelRequest) (*GetDelResponse, error)
-	GetSet(context.Context, *GetSetRequest) (*GetSetResponse, error)
+	IncrBy(context.Context, *IncrByRequest) (*IncrByResponse, error)
+	GetDel(context.Context, *GetRequest) (*GetResponse, error)
+	GetSet(context.Context, *SetRequest) (*GetResponse, error)
 	Lpush(context.Context, *PushRequest) (*PushResponse, error)
 	Lpop(context.Context, *PopRequest) (*PopResponse, error)
 	Rpush(context.Context, *PushRequest) (*PushResponse, error)
@@ -214,16 +201,13 @@ func (UnimplementedKontextKVServer) Set(context.Context, *SetRequest) (*SetRespo
 func (UnimplementedKontextKVServer) Del(context.Context, *DelRequest) (*DelResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Del not implemented")
 }
-func (UnimplementedKontextKVServer) Incr(context.Context, *IncrDecrRequest) (*IncrDecrResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Incr not implemented")
+func (UnimplementedKontextKVServer) IncrBy(context.Context, *IncrByRequest) (*IncrByResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method IncrBy not implemented")
 }
-func (UnimplementedKontextKVServer) Decr(context.Context, *IncrDecrRequest) (*IncrDecrResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Decr not implemented")
-}
-func (UnimplementedKontextKVServer) GetDel(context.Context, *GetDelRequest) (*GetDelResponse, error) {
+func (UnimplementedKontextKVServer) GetDel(context.Context, *GetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetDel not implemented")
 }
-func (UnimplementedKontextKVServer) GetSet(context.Context, *GetSetRequest) (*GetSetResponse, error) {
+func (UnimplementedKontextKVServer) GetSet(context.Context, *SetRequest) (*GetResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetSet not implemented")
 }
 func (UnimplementedKontextKVServer) Lpush(context.Context, *PushRequest) (*PushResponse, error) {
@@ -316,44 +300,26 @@ func _KontextKV_Del_Handler(srv interface{}, ctx context.Context, dec func(inter
 	return interceptor(ctx, in, info, handler)
 }
 
-func _KontextKV_Incr_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IncrDecrRequest)
+func _KontextKV_IncrBy_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(IncrByRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(KontextKVServer).Incr(ctx, in)
+		return srv.(KontextKVServer).IncrBy(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: KontextKV_Incr_FullMethodName,
+		FullMethod: KontextKV_IncrBy_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KontextKVServer).Incr(ctx, req.(*IncrDecrRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _KontextKV_Decr_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(IncrDecrRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(KontextKVServer).Decr(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: KontextKV_Decr_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KontextKVServer).Decr(ctx, req.(*IncrDecrRequest))
+		return srv.(KontextKVServer).IncrBy(ctx, req.(*IncrByRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _KontextKV_GetDel_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetDelRequest)
+	in := new(GetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -365,13 +331,13 @@ func _KontextKV_GetDel_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: KontextKV_GetDel_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KontextKVServer).GetDel(ctx, req.(*GetDelRequest))
+		return srv.(KontextKVServer).GetDel(ctx, req.(*GetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
 func _KontextKV_GetSet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetSetRequest)
+	in := new(SetRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
@@ -383,7 +349,7 @@ func _KontextKV_GetSet_Handler(srv interface{}, ctx context.Context, dec func(in
 		FullMethod: KontextKV_GetSet_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(KontextKVServer).GetSet(ctx, req.(*GetSetRequest))
+		return srv.(KontextKVServer).GetSet(ctx, req.(*SetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -498,12 +464,8 @@ var KontextKV_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _KontextKV_Del_Handler,
 		},
 		{
-			MethodName: "Incr",
-			Handler:    _KontextKV_Incr_Handler,
-		},
-		{
-			MethodName: "Decr",
-			Handler:    _KontextKV_Decr_Handler,
+			MethodName: "IncrBy",
+			Handler:    _KontextKV_IncrBy_Handler,
 		},
 		{
 			MethodName: "GetDel",
