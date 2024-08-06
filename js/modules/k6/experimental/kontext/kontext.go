@@ -15,8 +15,8 @@ import (
 	"go.k6.io/k6/js/modules"
 )
 
-// KontextKeyNotFoundError is the error returned when a key is not found in the kontext.
-var KontextKeyNotFoundError = errors.New("key not found")
+// ErrKontextKeyNotFoundError is the error returned when a key is not found in the kontext.
+var ErrKontextKeyNotFoundError = errors.New("key not found")
 
 const k6ServiceURLEnvironmentVariable = "K6_KONTEXT_SERVICE_URL"
 
@@ -81,7 +81,7 @@ func (lk *LocalKontext) Get(key string) ([]byte, error) {
 	}
 
 	if jsonValue == nil {
-		return nil, fmt.Errorf("getting key %s failed: %w", key, KontextKeyNotFoundError)
+		return nil, fmt.Errorf("getting key %s failed: %w", key, ErrKontextKeyNotFoundError)
 	}
 
 	return jsonValue, nil
@@ -137,7 +137,7 @@ func (c CloudKontext) Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("getting key %s from kontext grpc service failed: %w", key, err)
 	}
 
-	if response.GetCode() != proto.StatusCode_Ok {
+	if response.GetCode() != proto.StatusCode_Nil {
 		return nil, fmt.Errorf("getting key %s from kontext grpc service failed", key)
 	}
 
@@ -153,7 +153,7 @@ func (c CloudKontext) Set(key string, value []byte) error {
 		return fmt.Errorf("setting key %s in kontext grpc service failed: %w", key, err)
 	}
 
-	if response.GetCode() != proto.StatusCode_Ok {
+	if response.GetCode() != proto.StatusCode_Nil {
 		return fmt.Errorf("setting key %s in kontext grpc service failed", key)
 	}
 

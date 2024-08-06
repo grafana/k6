@@ -7,20 +7,31 @@ option go_package = "./proto";
 service KontextKV {
   rpc Get(GetRequest) returns (GetResponse) {}
   rpc Set(SetRequest) returns (SetResponse) {}
+  rpc Del(DelRequest) returns (DelResponse) {}
+  rpc Incr(IncrDecrRequest) returns (IncrDecrResponse) {}
+  rpc Decr(IncrDecrRequest) returns (IncrDecrResponse) {}
+  rpc GetDel(GetDelRequest) returns (GetDelResponse) {}
+  rpc GetSet(GetSetRequest) returns (GetSetResponse) {}
+  rpc Lpush(PushRequest) returns (PushResponse) {}
+  rpc Lpop(PopRequest) returns (PopResponse) {}
+  rpc Rpush(PushRequest) returns (PushResponse) {}
+  rpc Rpop(PopRequest) returns (PopResponse) {}
+  rpc Size(SizeRequest) returns (SizeResponse) {}
 }
 
 enum StatusCode {
     Ok = 0;
     Nil = 1;
+    WrongType = 2;
 }
 
 message GetRequest {
-  string key = 1;
+    string key = 1;
 }
 
 message GetResponse {
-    optional StatusCode code = 1;
-    optional bytes data = 2;
+    StatusCode code = 1;
+    bytes data = 2;
 }
 
 message SetRequest {
@@ -29,5 +40,67 @@ message SetRequest {
 }
 
 message SetResponse {
-    optional StatusCode code = 1;
+    StatusCode code = 1;
+}
+
+message DelRequest {
+    string key = 1;
+}
+
+message DelResponse {
+    int64 count = 1;
+}
+
+message IncrDecrRequest {
+    string key = 1;
+}
+
+message IncrDecrResponse {
+    int64 count = 1;
+}
+
+message GetDelRequest {
+    string key = 1;
+}
+
+message GetDelResponse {
+    StatusCode code = 1;
+    bytes data = 2;
+}
+
+message GetSetRequest {
+    string key = 1;
+    bytes data = 2;
+}
+
+message GetSetResponse {
+    StatusCode code = 1;
+    bytes data = 2;
+}
+
+message PushRequest {
+    string key = 1;
+    bytes data = 2;
+}
+
+message PushResponse {
+    int64 count = 1;
+}
+
+message PopRequest {
+    string key = 1;
+}
+
+message PopResponse {
+    StatusCode code = 1;
+    bytes data = 2;
+}
+
+message SizeRequest {
+    string key = 1;
+}
+
+message SizeResponse {
+    StatusCode code = 1;
+    int64 count = 2;
 }

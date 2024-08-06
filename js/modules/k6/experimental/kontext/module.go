@@ -122,7 +122,7 @@ func (k *Kontext) Get(key sobek.Value) *sobek.Promise {
 		}
 
 		if jsonValue == nil {
-			reject(KontextKeyNotFoundError)
+			reject(ErrKontextKeyNotFoundError)
 			return
 		}
 
