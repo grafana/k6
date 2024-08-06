@@ -460,7 +460,7 @@ func (c CloudKontext) Get(key string) (any, error) {
 		return nil, fmt.Errorf("getting key %s from kontext grpc service failed: %w", key, err)
 	}
 
-	if response.GetCode() != proto.StatusCode_Nil {
+	if response.Code == proto.StatusCode_Nil {
 		return nil, fmt.Errorf("getting key %s from kontext grpc service failed", key)
 	}
 
@@ -486,7 +486,7 @@ func (c CloudKontext) Set(key string, value any) error {
 		return fmt.Errorf("setting key %s in kontext grpc service failed: %w", key, err)
 	}
 
-	if response.GetCode() != proto.StatusCode_Nil {
+	if response.Code == proto.StatusCode_Nil {
 		return fmt.Errorf("setting key %s in kontext grpc service failed", key)
 	}
 
@@ -536,13 +536,13 @@ func (c CloudKontext) LeftPop(key string) (any, error) {
 		return nil, fmt.Errorf("right popping key %s in kontext grpc service failed: %w", key, err)
 	}
 
-	if response.GetCode() != proto.StatusCode_Nil {
+	if response.Code == proto.StatusCode_Nil {
 		return nil, fmt.Errorf(
 			"right popping key %s from kontext grpc service failed; reason: cannot "+
 				"rpop from nil value", key)
 	}
 
-	if response.GetCode() != proto.StatusCode_WrongType {
+	if response.Code == proto.StatusCode_WrongType {
 		return nil, fmt.Errorf(
 			"right popping key %s from kontext grpc service failed; reason: value "+
 				"is of wrong type", key)
@@ -569,14 +569,14 @@ func (c CloudKontext) RightPop(key string) (any, error) {
 		return nil, fmt.Errorf("right popping key %s in kontext grpc service failed: %w", key, err)
 	}
 
-	if response.GetCode() != proto.StatusCode_Nil {
+	if response.Code == proto.StatusCode_Nil {
 		return nil, fmt.Errorf(
 			"right popping key %s from kontext grpc service failed; reason: cannot rpop from nil value",
 			key,
 		)
 	}
 
-	if response.GetCode() != proto.StatusCode_WrongType {
+	if response.Code == proto.StatusCode_WrongType {
 		return nil, fmt.Errorf("right popping key %s from kontext grpc service failed; reason: value is of wrong type", key)
 	}
 
@@ -600,7 +600,7 @@ func (c CloudKontext) Size(key string) (int64, error) {
 		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed: %w", key, err)
 	}
 
-	if response.GetCode() != proto.StatusCode_Nil {
+	if response.Code == proto.StatusCode_Nil {
 		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed", key)
 	}
 
