@@ -403,6 +403,7 @@ type frameAPI interface {
 	ParentFrame() *common.Frame
 	Press(selector string, key string, opts sobek.Value) error
 	SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error)
+	SetChecked(selector string, checked bool, opts sobek.Value) error
 	SetContent(html string, opts sobek.Value) error
 	SetInputFiles(selector string, files sobek.Value, opts sobek.Value)
 	Tap(selector string, opts sobek.Value) error
