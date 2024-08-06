@@ -3,7 +3,6 @@
 package kontext
 
 import (
-	"encoding/json"
 	"fmt"
 	"os"
 
@@ -125,19 +124,8 @@ func (k *Kontext) Get(key sobek.Value) *sobek.Promise {
 	keyStr := key.String()
 
 	go func() {
-		jsonValue, err := k.kv.Get(keyStr)
+		value, err := k.kv.Get(keyStr)
 		if err != nil {
-			reject(err)
-			return
-		}
-
-		if jsonValue == nil {
-			reject(ErrKontextKeyNotFound)
-			return
-		}
-
-		var value any
-		if err := json.Unmarshal(jsonValue, &value); err != nil {
 			reject(err)
 			return
 		}
@@ -152,14 +140,10 @@ func (k *Kontext) Get(key sobek.Value) *sobek.Promise {
 func (k *Kontext) Set(key sobek.Value, value sobek.Value) *sobek.Promise {
 	promise, resolve, reject := promises.New(k.vu)
 
-	jsonValue, err := json.Marshal(value.Export())
-	if err != nil {
-		reject(fmt.Errorf("failed to marshal value to json"))
-		return promise
-	}
+	exportedValue := value.Export()
 
 	go func() {
-		err := k.kv.Set(key.String(), jsonValue)
+		err := k.kv.Set(key.String(), exportedValue)
 		if err != nil {
 			reject(err)
 			return

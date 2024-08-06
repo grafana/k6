@@ -28,12 +28,12 @@ const k6ServiceURLEnvironmentVariable = "K6_KONTEXT_SERVICE_URL"
 
 // Getter is the interface encapsulating the action of getting a key from the kontext.
 type Getter interface {
-	Get(key string) ([]byte, error)
+	Get(key string) (any, error)
 }
 
 // Setter is the interface encapsulating the action of setting a key in the kontext.
 type Setter interface {
-	Set(key string, value []byte) error
+	Set(key string, value any) error
 }
 
 // Sizer is the interface encapsulating the action of getting the size of a key in the kontext.
@@ -83,8 +83,8 @@ func NewLocalKontext(vu modules.VU, db *db) (*LocalKontext, error) {
 }
 
 // Get retrieves a value from the local kontext database.
-func (lk *LocalKontext) Get(key string) ([]byte, error) {
-	var jsonValue []byte
+func (lk *LocalKontext) Get(key string) (any, error) {
+	var value any
 
 	// Get the value from the database within a BoltDB transaction
 	err := lk.db.handle.View(func(tx *bolt.Tx) error {
@@ -93,7 +93,11 @@ func (lk *LocalKontext) Get(key string) ([]byte, error) {
 			return nil
 		}
 
-		jsonValue = bucket.Get([]byte(key))
+		jsonValue := bucket.Get([]byte(key))
+
+		if err := json.Unmarshal(jsonValue, &value); err != nil {
+			return fmt.Errorf("unmarshalling value failed: %w", err)
+		}
 
 		return nil
 	})
@@ -101,22 +105,27 @@ func (lk *LocalKontext) Get(key string) ([]byte, error) {
 		return nil, err
 	}
 
-	if jsonValue == nil {
+	if value == nil {
 		return nil, fmt.Errorf("getting key %s failed: %w", key, ErrKontextKeyNotFound)
 	}
 
-	return jsonValue, nil
+	return value, nil
 }
 
 // Set sets a value in the local kontext database.
-func (lk *LocalKontext) Set(key string, value []byte) error {
+func (lk *LocalKontext) Set(key string, value any) error {
 	err := lk.db.handle.Update(func(tx *bolt.Tx) error {
 		bucket := tx.Bucket(lk.bucket)
 		if bucket == nil {
 			return fmt.Errorf("bucket not found")
 		}
 
-		return bucket.Put([]byte(key), value)
+		encoded, err := json.Marshal(value)
+		if err != nil {
+			return fmt.Errorf("marshalling value to json failed: %w", err)
+		}
+
+		return bucket.Put([]byte(key), encoded)
 	})
 	if err != nil {
 		return fmt.Errorf("setting key %s failed: %w", key, err)
@@ -378,7 +387,7 @@ func NewCloudKontext(vu modules.VU, serviceURL string) (*CloudKontext, error) {
 }
 
 // Get retrieves a value from the Grafana Cloud k6 service.
-func (c CloudKontext) Get(key string) ([]byte, error) {
+func (c CloudKontext) Get(key string) (any, error) {
 	ctx := context.Background()
 	response, err := c.client.Get(ctx, &proto.GetRequest{Key: key})
 	if err != nil {
@@ -389,14 +398,24 @@ func (c CloudKontext) Get(key string) ([]byte, error) {
 		return nil, fmt.Errorf("getting key %s from kontext grpc service failed", key)
 	}
 
-	return response.GetData(), nil
+	var value any
+	if err := json.Unmarshal(response.GetData(), &value); err != nil {
+		return nil, fmt.Errorf("unmarshalling value failed: %w", err)
+	}
+
+	return value, nil
 }
 
 // Set sets a value in the Grafana Cloud k6 service.
-func (c CloudKontext) Set(key string, value []byte) error {
+func (c CloudKontext) Set(key string, value any) error {
 	ctx := context.Background()
 
-	response, err := c.client.Set(ctx, &proto.SetRequest{Key: key, Data: value})
+	encodedValue, err := json.Marshal(value)
+	if err != nil {
+		return fmt.Errorf("marshalling value to json failed: %w", err)
+	}
+
+	response, err := c.client.Set(ctx, &proto.SetRequest{Key: key, Data: encodedValue})
 	if err != nil {
 		return fmt.Errorf("setting key %s in kontext grpc service failed: %w", key, err)
 	}
