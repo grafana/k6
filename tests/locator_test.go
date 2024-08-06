@@ -33,17 +33,25 @@ func TestLocator(t *testing.T) {
 	}{
 		{
 			"Check", func(_ *testBrowser, p *common.Page) {
+				check := func() bool {
+					v, err := p.Evaluate(`() => window.check`)
+					require.NoError(t, err)
+					return asBool(t, v)
+				}
 				t.Run("check", func(t *testing.T) {
-					check := func() bool {
-						v, err := p.Evaluate(`() => window.check`)
-						require.NoError(t, err)
-						return asBool(t, v)
-					}
 					l := p.Locator("#inputCheckbox", nil)
 					require.False(t, check(), "should be unchecked first")
 					require.NoError(t, l.Check(nil))
 					require.True(t, check(), "cannot not check the input box")
 					require.NoError(t, l.Uncheck(nil))
+					require.False(t, check(), "cannot not uncheck the input box")
+				})
+				t.Run("setChecked", func(t *testing.T) {
+					l := p.Locator("#inputCheckbox", nil)
+					require.False(t, check(), "should be unchecked first")
+					require.NoError(t, l.SetChecked(true, nil))
+					require.True(t, check(), "cannot not check the input box")
+					require.NoError(t, l.SetChecked(false, nil))
 					require.False(t, check(), "cannot not uncheck the input box")
 				})
 				t.Run("is_checked", func(t *testing.T) {
@@ -399,6 +407,11 @@ func TestLocator(t *testing.T) {
 		{
 			"Press", func(l *common.Locator, tb *testBrowser) error {
 				return l.Press("a", timeout(tb))
+			},
+		},
+		{
+			"SetChecked", func(l *common.Locator, tb *testBrowser) error {
+				return l.SetChecked(true, timeout(tb))
 			},
 		},
 		{
