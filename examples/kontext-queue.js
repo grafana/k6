@@ -32,7 +32,7 @@ export async function orderCreation() {
 
 	console.log(`[creation] waiting for next user order`)
 	await kontext.set("order_id", orderId + 1);
-	sleep(Math.random() * 1);
+	sleep(getRandomNumber(1, 3));
 }
 
 export async function orderProcessing() {
@@ -43,15 +43,19 @@ export async function orderProcessing() {
 			order = await kontext.rpop("orders");
 		} catch (e) {
 			// console.log(`[processing] no order to process`);
-			sleep(2);
+			sleep(getRandomNumber(1, 3));
 			continue
 		}
 
 		if (order == null) {
-			sleep(2);
+			sleep(getRandomNumber(1, 3));
 			continue
 		}
 
 		console.log(`[processing] processing order: ${order}`);
 	} while (order < 10);
+}
+
+function getRandomNumber(min, max) {
+	return Math.floor(Math.random() * (max - min + 1)) + min;
 }

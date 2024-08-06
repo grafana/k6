@@ -171,6 +171,7 @@ func (k *Kontext) Set(key sobek.Value, value sobek.Value) *sobek.Promise {
 	return promise
 }
 
+// Lpush exposes the operation of pushing a value to the left of a list to the k6 runtime.
 func (k *Kontext) Lpush(key sobek.Value, value sobek.Value) *sobek.Promise {
 	promise, resolve, reject := promises.New(k.vu)
 
@@ -187,6 +188,52 @@ func (k *Kontext) Lpush(key sobek.Value, value sobek.Value) *sobek.Promise {
 	return promise
 }
 
+// Rpush exposes the operation of pushing a value to the right of a list to the k6 runtime.
+func (k *Kontext) Rpush(key sobek.Value, value sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(k.vu)
+
+	go func() {
+		n, err := k.kv.RightPush(key.String(), value.Export())
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(n)
+	}()
+
+	return promise
+}
+
+// Lpop exposes the operation of popping a value from the left of a list to the k6 runtime.
+func (k *Kontext) Lpop(key sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(k.vu)
+
+	if common.IsNullish(key) {
+		reject(fmt.Errorf("key must be a non-empty string"))
+		return promise
+	}
+
+	// Everything is a reference in JS, so we need to immediately copy the
+	// content of the argument before using it in the promise goroutine, to
+	// avoid future modifications to the argument affecting the promise (in case a variable
+	// is used as the argument, as opposed to a static string).
+	keyStr := key.String()
+
+	go func() {
+		value, err := k.kv.LeftPop(keyStr)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(value)
+	}()
+
+	return promise
+}
+
+// Rpop exposes the operation of popping a value from the right of a list to the k6 runtime.
 func (k *Kontext) Rpop(key sobek.Value) *sobek.Promise {
 	promise, resolve, reject := promises.New(k.vu)
 

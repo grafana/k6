@@ -36,7 +36,9 @@ type Setter interface {
 // Lister is the interface encapsulating the actions of interacting with a list in the kontext.
 type Lister interface {
 	LeftPush(key string, value any) (int64, error)
+	RightPush(key string, value any) (int64, error)
 	RightPop(key string) (any, error)
+	LeftPop(key string) (any, error)
 }
 
 // Kontexter is the interface that all Kontext implementations must implement.
@@ -137,7 +139,53 @@ func (lk *LocalKontext) LeftPush(key string, value any) (int64, error) {
 		}
 
 		// Unmarshal the current value as a slice of any
-		var currentSlice []interface{}
+		var currentSlice []any
+		if err := json.Unmarshal(currentValue, &currentSlice); err != nil {
+			return fmt.Errorf("unmarshalling current value failed: %w", err)
+		}
+
+		// Prepare the value(s) to the current slice
+		currentSlice = append([]any{value}, currentSlice...)
+
+		// Marshal the current slice
+		currentSliceBytes, err := json.Marshal(currentSlice)
+		if err != nil {
+			return fmt.Errorf("marshalling current slice failed: %w", err)
+		}
+
+		return bucket.Put([]byte(key), currentSliceBytes)
+	})
+	if err != nil {
+		return 0, fmt.Errorf("left pushing key %s failed: %w", key, err)
+	}
+
+	return updatedCount, nil
+}
+
+// RightPush pushes a value to the right of a list stored in the local kontext database.
+func (lk *LocalKontext) RightPush(key string, value any) (int64, error) {
+	updatedCount := int64(0)
+
+	err := lk.db.handle.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(lk.bucket)
+		if bucket == nil {
+			return fmt.Errorf("bucket not found")
+		}
+
+		// Get the current value
+		currentValue := bucket.Get([]byte(key))
+		if currentValue == nil {
+			// If the current value is nil, create a new slice with the new value
+			newSliceBytes, err := json.Marshal([]any{value})
+			if err != nil {
+				return fmt.Errorf("marshalling new slice failed: %w", err)
+			}
+
+			return bucket.Put([]byte(key), newSliceBytes)
+		}
+
+		// Unmarshal the current value as a slice of any
+		var currentSlice []any
 		if err := json.Unmarshal(currentValue, &currentSlice); err != nil {
 			return fmt.Errorf("unmarshalling current value failed: %w", err)
 		}
@@ -158,6 +206,57 @@ func (lk *LocalKontext) LeftPush(key string, value any) (int64, error) {
 	}
 
 	return updatedCount, nil
+}
+
+// LeftPop pops the first element from a list stored in the local kontext database.
+func (lk *LocalKontext) LeftPop(key string) (any, error) {
+	var poppedValue any
+
+	err := lk.db.handle.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(lk.bucket)
+		if bucket == nil {
+			return fmt.Errorf("bucket not found")
+		}
+
+		// Get the current value
+		currentValue := bucket.Get([]byte(key))
+		if currentValue == nil {
+			return ErrKontextKeyNotFoundError
+		}
+
+		// Unmarshal the current value as a slice of any
+		var currentSlice []interface{}
+		if err := json.Unmarshal(currentValue, &currentSlice); err != nil {
+			// FIXME: we should probably return a "wrong type" error here
+			return fmt.Errorf("unmarshalling current value failed: %w", err)
+		}
+
+		// If the list is empty leave the popped value set to nil and return
+		if len(currentSlice) == 0 {
+			return nil
+		}
+
+		// Otherwise pop the last element from the slice
+		poppedValue = currentSlice[0]
+		currentSlice = currentSlice[1:]
+
+		// Marshal the current slice
+		encodedCurrentSlice, err := json.Marshal(currentSlice)
+		if err != nil {
+			return fmt.Errorf("marshalling current slice failed: %w", err)
+		}
+
+		if err := bucket.Put([]byte(key), encodedCurrentSlice); err != nil {
+			return fmt.Errorf("putting updated value failed: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("right popping key %s failed: %w", key, err)
+	}
+
+	return poppedValue, nil
 }
 
 // RightPop pops the last element from a list stored in the local kontext database.
@@ -267,6 +366,7 @@ func (c CloudKontext) Set(key string, value []byte) error {
 	return nil
 }
 
+// LeftPush pushes a value to the left of a list stored in the Grafana Cloud k6 service.
 func (c CloudKontext) LeftPush(key string, value any) (int64, error) {
 	ctx := context.Background()
 
@@ -283,6 +383,57 @@ func (c CloudKontext) LeftPush(key string, value any) (int64, error) {
 	return response.Count, nil
 }
 
+// RightPush pushes a value to the right of a list stored in the Grafana Cloud k6 service.
+func (c CloudKontext) RightPush(key string, value any) (int64, error) {
+	ctx := context.Background()
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return 0, fmt.Errorf("marshalling value to json failed: %w", err)
+	}
+
+	response, err := c.client.Rpush(ctx, &proto.PushRequest{Key: key, Data: encoded})
+	if err != nil {
+		return 0, fmt.Errorf("left pushing key %s in kontext grpc service failed: %w", key, err)
+	}
+
+	return response.Count, nil
+}
+
+// LeftPop pops the first element from a list stored in the Grafana Cloud k6 service.
+func (c CloudKontext) LeftPop(key string) (any, error) {
+	ctx := context.Background()
+
+	response, err := c.client.Lpop(ctx, &proto.PopRequest{Key: key})
+	if err != nil {
+		return nil, fmt.Errorf("right popping key %s in kontext grpc service failed: %w", key, err)
+	}
+
+	if response.GetCode() != proto.StatusCode_Nil {
+		return nil, fmt.Errorf(
+			"right popping key %s from kontext grpc service failed; reason: cannot "+
+				"rpop from nil value", key)
+	}
+
+	if response.GetCode() != proto.StatusCode_WrongType {
+		return nil, fmt.Errorf(
+			"right popping key %s from kontext grpc service failed; reason: value "+
+				"is of wrong type", key)
+	}
+
+	var value any
+	if err := json.Unmarshal(response.GetData(), &value); err != nil {
+		return nil, fmt.Errorf(
+			"right popping key %s from kontext grpc service failed; reason: unmarshalling value failed: %w",
+			key,
+			err,
+		)
+	}
+
+	return value, nil
+}
+
+// RightPop pops the last element from a list stored in the Grafana Cloud k6 service.
 func (c CloudKontext) RightPop(key string) (any, error) {
 	ctx := context.Background()
 
@@ -292,7 +443,10 @@ func (c CloudKontext) RightPop(key string) (any, error) {
 	}
 
 	if response.GetCode() != proto.StatusCode_Nil {
-		return nil, fmt.Errorf("right popping key %s from kontext grpc service failed; reason: cannot rpop from nil value", key)
+		return nil, fmt.Errorf(
+			"right popping key %s from kontext grpc service failed; reason: cannot rpop from nil value",
+			key,
+		)
 	}
 
 	if response.GetCode() != proto.StatusCode_WrongType {
@@ -301,7 +455,11 @@ func (c CloudKontext) RightPop(key string) (any, error) {
 
 	var value any
 	if err := json.Unmarshal(response.GetData(), &value); err != nil {
-		return nil, fmt.Errorf("right popping key %s from kontext grpc service failed; reason: unmarshalling value failed: %w", key, err)
+		return nil, fmt.Errorf(
+			"right popping key %s from kontext grpc service failed; reason: unmarshalling value failed: %w",
+			key,
+			err,
+		)
 	}
 
 	return value, nil
