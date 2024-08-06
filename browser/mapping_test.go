@@ -449,6 +449,7 @@ type elementHandleAPI interface {
 	ScrollIntoViewIfNeeded(opts sobek.Value) error
 	SelectOption(values sobek.Value, opts sobek.Value) ([]string, error)
 	SelectText(opts sobek.Value) error
+	SetChecked(checked bool, opts sobek.Value) error
 	SetInputFiles(files sobek.Value, opts sobek.Value) error
 	Tap(opts sobek.Value) error
 	TextContent() (string, bool, error)
