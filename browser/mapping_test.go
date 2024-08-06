@@ -334,6 +334,7 @@ type pageAPI interface {
 	Reload(opts sobek.Value) *common.Response
 	Screenshot(opts sobek.Value) ([]byte, error)
 	SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error)
+	SetChecked(selector string, checked bool, opts sobek.Value) error
 	SetContent(html string, opts sobek.Value) error
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
