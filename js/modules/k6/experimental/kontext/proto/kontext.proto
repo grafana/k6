@@ -56,7 +56,8 @@ message IncrDecrRequest {
 }
 
 message IncrDecrResponse {
-    int64 count = 1;
+    StatusCode code = 1;
+    int64 count = 2;
 }
 
 message GetDelRequest {
