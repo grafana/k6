@@ -2,6 +2,7 @@ package kontext
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 
@@ -14,6 +15,8 @@ import (
 	bolt "go.etcd.io/bbolt"
 	"go.k6.io/k6/js/modules"
 )
+
+// FIXME: we need to centralize the json marshaling in a single place, either here, or at the module level
 
 // ErrKontextKeyNotFoundError is the error returned when a key is not found in the kontext.
 var ErrKontextKeyNotFoundError = errors.New("key not found")
@@ -30,10 +33,17 @@ type Setter interface {
 	Set(key string, value []byte) error
 }
 
+// Lister is the interface encapsulating the actions of interacting with a list in the kontext.
+type Lister interface {
+	LeftPush(key string, value any) (int64, error)
+	RightPop(key string) (any, error)
+}
+
 // Kontexter is the interface that all Kontext implementations must implement.
 type Kontexter interface {
 	Getter
 	Setter
+	Lister
 }
 
 // LocalKontext is a Kontext implementation that uses a local BoltDB database to store key-value pairs.
@@ -104,6 +114,103 @@ func (lk *LocalKontext) Set(key string, value []byte) error {
 	return nil
 }
 
+// LeftPush pushes a value to the left of a list stored in the local kontext database.
+func (lk *LocalKontext) LeftPush(key string, value any) (int64, error) {
+	updatedCount := int64(0)
+
+	err := lk.db.handle.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(lk.bucket)
+		if bucket == nil {
+			return fmt.Errorf("bucket not found")
+		}
+
+		// Get the current value
+		currentValue := bucket.Get([]byte(key))
+		if currentValue == nil {
+			// If the current value is nil, create a new slice with the new value
+			newSliceBytes, err := json.Marshal([]any{value})
+			if err != nil {
+				return fmt.Errorf("marshalling new slice failed: %w", err)
+			}
+
+			return bucket.Put([]byte(key), newSliceBytes)
+		}
+
+		// Unmarshal the current value as a slice of any
+		var currentSlice []interface{}
+		if err := json.Unmarshal(currentValue, &currentSlice); err != nil {
+			return fmt.Errorf("unmarshalling current value failed: %w", err)
+		}
+
+		// Prepare the value(s) to the current slice
+		currentSlice = append(currentSlice, value)
+
+		// Marshal the current slice
+		currentSliceBytes, err := json.Marshal(currentSlice)
+		if err != nil {
+			return fmt.Errorf("marshalling current slice failed: %w", err)
+		}
+
+		return bucket.Put([]byte(key), currentSliceBytes)
+	})
+	if err != nil {
+		return 0, fmt.Errorf("left pushing key %s failed: %w", key, err)
+	}
+
+	return updatedCount, nil
+}
+
+// RightPop pops the last element from a list stored in the local kontext database.
+func (lk *LocalKontext) RightPop(key string) (any, error) {
+	var poppedValue any
+
+	err := lk.db.handle.Update(func(tx *bolt.Tx) error {
+		bucket := tx.Bucket(lk.bucket)
+		if bucket == nil {
+			return fmt.Errorf("bucket not found")
+		}
+
+		// Get the current value
+		currentValue := bucket.Get([]byte(key))
+		if currentValue == nil {
+			return ErrKontextKeyNotFoundError
+		}
+
+		// Unmarshal the current value as a slice of any
+		var currentSlice []interface{}
+		if err := json.Unmarshal(currentValue, &currentSlice); err != nil {
+			// FIXME: we should probably return a "wrong type" error here
+			return fmt.Errorf("unmarshalling current value failed: %w", err)
+		}
+
+		// If the list is empty leave the popped value set to nil and return
+		if len(currentSlice) == 0 {
+			return nil
+		}
+
+		// Otherwise pop the last element from the slice
+		poppedValue = currentSlice[len(currentSlice)-1]
+		currentSlice = currentSlice[:len(currentSlice)-1]
+
+		// Marshal the current slice
+		encodedCurrentSlice, err := json.Marshal(currentSlice)
+		if err != nil {
+			return fmt.Errorf("marshalling current slice failed: %w", err)
+		}
+
+		if err := bucket.Put([]byte(key), encodedCurrentSlice); err != nil {
+			return fmt.Errorf("putting updated value failed: %w", err)
+		}
+
+		return nil
+	})
+	if err != nil {
+		return nil, fmt.Errorf("right popping key %s failed: %w", key, err)
+	}
+
+	return poppedValue, nil
+}
+
 // CloudKontext is a Kontext implementation that uses the Grafana Cloud k6 service to store key-value pairs.
 type CloudKontext struct {
 	// vu is the VU instance that this kontext instance belongs to
@@ -158,4 +265,44 @@ func (c CloudKontext) Set(key string, value []byte) error {
 	}
 
 	return nil
+}
+
+func (c CloudKontext) LeftPush(key string, value any) (int64, error) {
+	ctx := context.Background()
+
+	encoded, err := json.Marshal(value)
+	if err != nil {
+		return 0, fmt.Errorf("marshalling value to json failed: %w", err)
+	}
+
+	response, err := c.client.Lpush(ctx, &proto.PushRequest{Key: key, Data: encoded})
+	if err != nil {
+		return 0, fmt.Errorf("left pushing key %s in kontext grpc service failed: %w", key, err)
+	}
+
+	return response.Count, nil
+}
+
+func (c CloudKontext) RightPop(key string) (any, error) {
+	ctx := context.Background()
+
+	response, err := c.client.Rpop(ctx, &proto.PopRequest{Key: key})
+	if err != nil {
+		return nil, fmt.Errorf("right popping key %s in kontext grpc service failed: %w", key, err)
+	}
+
+	if response.GetCode() != proto.StatusCode_Nil {
+		return nil, fmt.Errorf("right popping key %s from kontext grpc service failed; reason: cannot rpop from nil value", key)
+	}
+
+	if response.GetCode() != proto.StatusCode_WrongType {
+		return nil, fmt.Errorf("right popping key %s from kontext grpc service failed; reason: value is of wrong type", key)
+	}
+
+	var value any
+	if err := json.Unmarshal(response.GetData(), &value); err != nil {
+		return nil, fmt.Errorf("right popping key %s from kontext grpc service failed; reason: unmarshalling value failed: %w", key, err)
+	}
+
+	return value, nil
 }

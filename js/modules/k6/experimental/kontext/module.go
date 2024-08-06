@@ -43,13 +43,15 @@ func New() *RootModule {
 // NewModuleInstance implements the modules.Module interface and returns a new
 // instance of our module for the given VU.
 func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
-	pyroscope.Start(pyroscope.Config{
+	// For the Hackathon purpose, we are using Pyroscope to profile the module
+	// execution. This is not necessary for the module to work.
+	_, err := pyroscope.Start(pyroscope.Config{
 		ApplicationName: "k6.hack.kontext",
 
 		// replace this with the address of pyroscope server
 
 		// you can disable logging by setting this to nil
-		Logger: pyroscope.StandardLogger,
+		Logger: nil,
 
 		// by default all profilers are enabled,
 		// but you can select the ones you want to use:
@@ -61,6 +63,10 @@ func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 			pyroscope.ProfileInuseSpace,
 		},
 	})
+	if err != nil {
+		panic(fmt.Errorf("failed to start pyroscope client: %w", err))
+	}
+
 	return &ModuleInstance{vu: vu, rm: rm}
 }
 
@@ -76,6 +82,10 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 
 // NewKontext creates a new Kontext object.
 func (mi *ModuleInstance) NewKontext(_ sobek.ConstructorCall) *sobek.Object {
+	if mi.vu.State() != nil {
+		common.Throw(mi.vu.Runtime(), fmt.Errorf("kontext instances can only be created in the init context"))
+	}
+
 	serviceURL, hasServiceURL := os.LookupEnv(k6ServiceURLEnvironmentVariable)
 
 	var kv Kontexter
@@ -156,6 +166,49 @@ func (k *Kontext) Set(key sobek.Value, value sobek.Value) *sobek.Promise {
 		}
 
 		resolve(nil)
+	}()
+
+	return promise
+}
+
+func (k *Kontext) Lpush(key sobek.Value, value sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(k.vu)
+
+	go func() {
+		n, err := k.kv.LeftPush(key.String(), value.Export())
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(n)
+	}()
+
+	return promise
+}
+
+func (k *Kontext) Rpop(key sobek.Value) *sobek.Promise {
+	promise, resolve, reject := promises.New(k.vu)
+
+	if common.IsNullish(key) {
+		reject(fmt.Errorf("key must be a non-empty string"))
+		return promise
+	}
+
+	// Everything is a reference in JS, so we need to immediately copy the
+	// content of the argument before using it in the promise goroutine, to
+	// avoid future modifications to the argument affecting the promise (in case a variable
+	// is used as the argument, as opposed to a static string).
+	keyStr := key.String()
+
+	go func() {
+		value, err := k.kv.RightPop(keyStr)
+		if err != nil {
+			reject(err)
+			return
+		}
+
+		resolve(value)
 	}()
 
 	return promise
