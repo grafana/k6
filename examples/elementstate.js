@@ -51,5 +51,17 @@ export default async function() {
     'unchecked': isUnchecked,
   });
 
+  // Change state and check again
+  await page.$(".unchecked").then(e => e.setChecked(true))
+  await page.$(".checked").then(e => e.setChecked(false))
+
+  let isUncheckedChecked = await page.$(".unchecked").then((e) => e.isChecked());
+  let isCheckedUnchecked = !await page.$(".checked").then((e) => e.isChecked());
+
+  check(page, {
+    isUncheckedChecked: isUncheckedChecked,
+    isCheckedUnchecked: isCheckedUnchecked,
+  });
+
   await page.close();
 }
