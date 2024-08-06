@@ -129,19 +129,23 @@ func TestConfig(t *testing.T) {
 		},
 
 		"JSON success merge": {
-			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"http://localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
+			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
 			expectedConfig: Config{
 				ServiceName:          null.StringFrom("k6"),
 				ServiceVersion:       null.StringFrom(k6Const.Version),
 				ExporterType:         null.StringFrom(httpExporterType),
 				HTTPExporterInsecure: null.NewBool(false, true),
-				HTTPExporterEndpoint: null.StringFrom("http://localhost:5566"),
+				HTTPExporterEndpoint: null.StringFrom("localhost:5566"),
 				HTTPExporterURLPath:  null.StringFrom("/lorem/ipsum"),
 				GRPCExporterInsecure: null.NewBool(false, true),         // default
 				GRPCExporterEndpoint: null.StringFrom("localhost:4317"), // default
 				ExportInterval:       types.NullDurationFrom(15 * time.Millisecond),
 				FlushInterval:        types.NullDurationFrom(1 * time.Second),
 			},
+		},
+		"no scheme in http exporter": {
+			jsonRaw: json.RawMessage(`{"exporterType":"http","httpExporterEndpoint":"http://localhost:5566","httpExporterURLPath":"/lorem/ipsum", "exportInterval":"15ms"}`),
+			err:     `config: HTTP exporter endpoint must only be host and port, no scheme`,
 		},
 
 		"early error env": {
