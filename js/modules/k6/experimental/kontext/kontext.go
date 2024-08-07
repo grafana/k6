@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/metadata"
 
 	"go.k6.io/k6/js/modules/k6/experimental/kontext/proto"
 
@@ -27,6 +28,7 @@ var ErrKontextWrongType = errors.New("wrong type")
 
 const k6ServiceURLEnvironmentVariable = "K6_KONTEXT_SERVICE_URL"
 const secureEnvironmentVariable = "K6_KONTEXT_SECURE"
+const testRunIDHeader = "X-Test-Run-ID"
 
 // Getter is the interface encapsulating the action of getting a key from the kontext.
 type Getter interface {
@@ -437,13 +439,16 @@ type CloudKontext struct {
 
 	// client holds the gRPC client that communicates with the Grafana Cloud k6 service.
 	client proto.KontextKVClient
+
+	// testRunID holds the current test run ID, if any.
+	testRunID string
 }
 
 // Ensure that CloudKontext implements the Kontexter interface.
 var _ Kontexter = &CloudKontext{}
 
 // NewCloudKontext creates a new CloudKontext instance.
-func NewCloudKontext(vu modules.VU, serviceURL string, secure bool) (*CloudKontext, error) {
+func NewCloudKontext(vu modules.VU, serviceURL string, secure bool, testRunID string) (*CloudKontext, error) {
 	// create a gRPC connection to the server
 	opts := []grpc.DialOption{}
 	if secure {
@@ -453,6 +458,7 @@ func NewCloudKontext(vu modules.VU, serviceURL string, secure bool) (*CloudKonte
 	} else {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
+
 	conn, err := grpc.NewClient(serviceURL, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial gRPC server: %w", err)
@@ -460,12 +466,18 @@ func NewCloudKontext(vu modules.VU, serviceURL string, secure bool) (*CloudKonte
 
 	client := proto.NewKontextKVClient(conn)
 
-	return &CloudKontext{vu: vu, client: client}, nil
+	return &CloudKontext{vu: vu, client: client, testRunID: testRunID}, nil
+}
+
+func (c CloudKontext) context() context.Context {
+	ctx := context.Background()
+	metadata.AppendToOutgoingContext(ctx, testRunIDHeader, c.testRunID)
+	return ctx
 }
 
 // Get retrieves a value from the Grafana Cloud k6 service.
 func (c CloudKontext) Get(key string) (any, error) {
-	ctx := context.Background()
+	ctx := c.context()
 	response, err := c.client.Get(ctx, &proto.GetRequest{Key: key})
 	if err != nil {
 		return nil, fmt.Errorf("getting key %s from kontext grpc service failed: %w", key, err)
@@ -485,7 +497,7 @@ func (c CloudKontext) Get(key string) (any, error) {
 
 // Set sets a value in the Grafana Cloud k6 service.
 func (c CloudKontext) Set(key string, value any) error {
-	ctx := context.Background()
+	ctx := c.context()
 
 	encodedValue, err := json.Marshal(value)
 	if err != nil {
@@ -523,7 +535,7 @@ func (c CloudKontext) LeftPush(key string, value any) (int64, error) {
 
 // RightPush pushes a value to the right of a list stored in the Grafana Cloud k6 service.
 func (c CloudKontext) RightPush(key string, value any) (int64, error) {
-	ctx := context.Background()
+	ctx := c.context()
 
 	encoded, err := json.Marshal(value)
 	if err != nil {
@@ -540,7 +552,7 @@ func (c CloudKontext) RightPush(key string, value any) (int64, error) {
 
 // LeftPop pops the first element from a list stored in the Grafana Cloud k6 service.
 func (c CloudKontext) LeftPop(key string) (any, error) {
-	ctx := context.Background()
+	ctx := c.context()
 
 	response, err := c.client.Lpop(ctx, &proto.PopRequest{Key: key})
 	if err != nil {
@@ -573,7 +585,7 @@ func (c CloudKontext) LeftPop(key string) (any, error) {
 
 // RightPop pops the last element from a list stored in the Grafana Cloud k6 service.
 func (c CloudKontext) RightPop(key string) (any, error) {
-	ctx := context.Background()
+	ctx := c.context()
 
 	response, err := c.client.Rpop(ctx, &proto.PopRequest{Key: key})
 	switch {
@@ -604,7 +616,7 @@ func (c CloudKontext) RightPop(key string) (any, error) {
 }
 
 func (c CloudKontext) Size(key string) (int64, error) {
-	ctx := context.Background()
+	ctx := c.context()
 	response, err := c.client.Size(ctx, &proto.SizeRequest{Key: key})
 
 	switch {
@@ -630,7 +642,7 @@ func (c CloudKontext) Decr(key string) (int64, error) {
 }
 
 func (c CloudKontext) incrBy(key string, n int64) (int64, error) {
-	ctx := context.Background()
+	ctx := c.context()
 	response, err := c.client.IncrBy(ctx, &proto.IncrByRequest{Key: key, Count: n})
 
 	switch {

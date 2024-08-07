@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"sync"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
@@ -15,14 +16,18 @@ import (
 	pyroscope "github.com/grafana/pyroscope-go"
 )
 
+const k6TestRunID = "K6_CLOUD_PUSH_REF_ID"
+
 type (
 	// RootModule is the global module instance that will create instances of our
 	// module for each VU.
 	RootModule struct {
-		db *db
+		db        *db
+		initOnce  *sync.Once
+		testRunID string
 	}
 
-	// ModuleInstance represents an instance of the fs module for a single VU.
+	// ModuleInstance represents an instance of the module for a single VU.
 	ModuleInstance struct {
 		vu modules.VU
 
@@ -37,12 +42,16 @@ var (
 
 // New returns a pointer to a new [RootModule] instance.
 func New() *RootModule {
-	return &RootModule{db: newDB()}
+	return &RootModule{db: newDB(), initOnce: &sync.Once{}}
 }
 
 // NewModuleInstance implements the modules.Module interface and returns a new
 // instance of our module for the given VU.
 func (rm *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
+	rm.initOnce.Do(func() {
+		// TODO: Check if this is correct.
+		rm.testRunID, _ = vu.InitEnv().LookupEnv(k6TestRunID)
+	})
 	// For the Hackathon purpose, we are using Pyroscope to profile the module
 	// execution. This is not necessary for the module to work.
 	_, err := pyroscope.Start(pyroscope.Config{
@@ -92,9 +101,12 @@ func (mi *ModuleInstance) NewKontext(_ sobek.ConstructorCall) *sobek.Object {
 	var kv Kontexter
 	var err error
 	if hasServiceURL {
-		kv, err = NewCloudKontext(mi.vu, serviceURL, secure)
+		kv, err = NewCloudKontext(mi.vu, serviceURL, secure, mi.rm.testRunID)
 		if err != nil {
 			common.Throw(mi.vu.Runtime(), fmt.Errorf("failed to create new Kontext instance: %w", err))
+		}
+		if mi.rm.testRunID == "" {
+			mi.vu.InitEnv().Logger.Warn("Kontext module is missing a test run ID")
 		}
 	} else {
 		kv, err = NewLocalKontext(mi.vu, mi.rm.db)
