@@ -5,6 +5,7 @@ package kontext
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
@@ -86,11 +87,12 @@ func (mi *ModuleInstance) NewKontext(_ sobek.ConstructorCall) *sobek.Object {
 	}
 
 	serviceURL, hasServiceURL := os.LookupEnv(k6ServiceURLEnvironmentVariable)
+	secure := strings.ToLower(os.Getenv(secureEnvironmentVariable)) != "false"
 
 	var kv Kontexter
 	var err error
 	if hasServiceURL {
-		kv, err = NewCloudKontext(mi.vu, serviceURL)
+		kv, err = NewCloudKontext(mi.vu, serviceURL, secure)
 		if err != nil {
 			common.Throw(mi.vu.Runtime(), fmt.Errorf("failed to create new Kontext instance: %w", err))
 		}

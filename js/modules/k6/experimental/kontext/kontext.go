@@ -2,13 +2,14 @@ package kontext
 
 import (
 	"context"
+	"crypto/tls"
 	"encoding/json"
 	"errors"
 	"fmt"
 
-	"google.golang.org/grpc/credentials/insecure"
-
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 
 	"go.k6.io/k6/js/modules/k6/experimental/kontext/proto"
 
@@ -25,6 +26,7 @@ var ErrKontextKeyNotFound = errors.New("key not found")
 var ErrKontextWrongType = errors.New("wrong type")
 
 const k6ServiceURLEnvironmentVariable = "K6_KONTEXT_SERVICE_URL"
+const secureEnvironmentVariable = "K6_KONTEXT_SECURE"
 
 // Getter is the interface encapsulating the action of getting a key from the kontext.
 type Getter interface {
@@ -441,9 +443,17 @@ type CloudKontext struct {
 var _ Kontexter = &CloudKontext{}
 
 // NewCloudKontext creates a new CloudKontext instance.
-func NewCloudKontext(vu modules.VU, serviceURL string) (*CloudKontext, error) {
+func NewCloudKontext(vu modules.VU, serviceURL string, secure bool) (*CloudKontext, error) {
 	// create a gRPC connection to the server
-	conn, err := grpc.NewClient(serviceURL, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	opts := []grpc.DialOption{}
+	if secure {
+		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(&tls.Config{
+			MinVersion: tls.VersionTLS13,
+		})))
+	} else {
+		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	}
+	conn, err := grpc.NewClient(serviceURL, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to dial gRPC server: %w", err)
 	}
@@ -566,19 +576,19 @@ func (c CloudKontext) RightPop(key string) (any, error) {
 	ctx := context.Background()
 
 	response, err := c.client.Rpop(ctx, &proto.PopRequest{Key: key})
-	if err != nil {
+	switch {
+	case err != nil:
 		return nil, fmt.Errorf("right popping key %s in kontext grpc service failed: %w", key, err)
-	}
-
-	if response.Code == proto.StatusCode_Nil {
+	case response.Code == proto.StatusCode_Ok:
+	case response.Code == proto.StatusCode_Nil:
 		return nil, fmt.Errorf(
 			"right popping key %s from kontext grpc service failed; reason: cannot rpop from nil value",
 			key,
 		)
-	}
-
-	if response.Code == proto.StatusCode_WrongType {
+	case response.Code == proto.StatusCode_WrongType:
 		return nil, fmt.Errorf("right popping key %s from kontext grpc service failed; reason: value is of wrong type", key)
+	default:
+		return 0, fmt.Errorf("rpop key %s in kontext grpc got unexpected status: %v", key, response.Code)
 	}
 
 	var value any
@@ -595,14 +605,16 @@ func (c CloudKontext) RightPop(key string) (any, error) {
 
 func (c CloudKontext) Size(key string) (int64, error) {
 	ctx := context.Background()
-
 	response, err := c.client.Size(ctx, &proto.SizeRequest{Key: key})
-	if err != nil {
-		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed: %w", key, err)
-	}
 
-	if response.Code == proto.StatusCode_Nil {
+	switch {
+	case err != nil:
+		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed: %w", key, err)
+	case response.Code == proto.StatusCode_Ok:
+	case response.Code == proto.StatusCode_Nil:
 		return 0, fmt.Errorf("getting size of key %s in kontext grpc service failed", key)
+	default:
+		return 0, fmt.Errorf("size key %s in kontext grpc got unexpected status: %v", key, response.Code)
 	}
 
 	return response.Count, nil
@@ -619,7 +631,6 @@ func (c CloudKontext) Decr(key string) (int64, error) {
 
 func (c CloudKontext) incrBy(key string, n int64) (int64, error) {
 	ctx := context.Background()
-
 	response, err := c.client.IncrBy(ctx, &proto.IncrByRequest{Key: key, Count: n})
 
 	switch {
