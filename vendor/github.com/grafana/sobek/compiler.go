@@ -1465,11 +1465,13 @@ func (c *compiler) compileLexicalDeclarations(list []ast.Statement, scopeDeclare
 				c.createLexicalBindings(lex.LexicalDeclaration)
 			} else if lex.ClassDeclaration != nil {
 				declareScope()
-				if lex.IsDefault {
-					c.createLexicalIdBinding("default", false, int(lex.Idx0())-1)
-				} else {
+				if lex.ClassDeclaration.Class.Name != nil {
 					cls := lex.ClassDeclaration
 					c.createLexicalIdBinding(cls.Class.Name.Name, false, int(cls.Class.Name.Idx)-1)
+				}
+
+				if lex.IsDefault {
+					c.createLexicalIdBinding("default", false, int(lex.Idx0())-1)
 				}
 			} else if lex.IsDefault {
 				switch {
