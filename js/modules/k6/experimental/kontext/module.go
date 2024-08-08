@@ -99,6 +99,9 @@ func (mi *ModuleInstance) NewKontext(_ sobek.ConstructorCall) *sobek.Object {
 	var err error
 
 	if serviceURL, hasServiceURL := os.LookupEnv(k6ServiceURLEnvironmentVariable); hasServiceURL {
+		if serviceURL == "" {
+			common.Throw(mi.vu.Runtime(), fmt.Errorf("Kontext module is missing the kontext serviceURL"))
+		}
 		kontextAuthToken := os.Getenv(k6ServiceAuthEnvironmentVariable)
 		if kontextAuthToken == "" {
 			common.Throw(mi.vu.Runtime(), fmt.Errorf("Kontext module is missing the kontext	authToken"))
