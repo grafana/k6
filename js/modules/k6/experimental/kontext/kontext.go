@@ -27,6 +27,7 @@ var ErrKontextKeyNotFound = errors.New("key not found")
 var ErrKontextWrongType = errors.New("wrong type")
 
 const k6ServiceURLEnvironmentVariable = "K6_KONTEXT_SERVICE_URL"
+const k6ServiceAuthEnvironmentVariable = "K6_KONTEXT_AUTH_TOKEN"
 const secureEnvironmentVariable = "K6_KONTEXT_SECURE"
 const testRunIDHeader = "X-Test-Run-ID"
 
@@ -447,8 +448,24 @@ type CloudKontext struct {
 // Ensure that CloudKontext implements the Kontexter interface.
 var _ Kontexter = &CloudKontext{}
 
+// kontextTokenAuth implements the credentials.PerRPCCredentials interface
+// to send the authorization token to the k6-cloud-kontext server.
+type kontextTokenAuth struct {
+	Token string
+}
+
+func (t *kontextTokenAuth) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
+	return map[string]string{
+		"authorization": "Bearer " + t.Token,
+	}, nil
+}
+
+func (t *kontextTokenAuth) RequireTransportSecurity() bool {
+	return true
+}
+
 // NewCloudKontext creates a new CloudKontext instance.
-func NewCloudKontext(vu modules.VU, serviceURL string, secure bool, testRunID string) (*CloudKontext, error) {
+func NewCloudKontext(vu modules.VU, serviceURL string, secure bool, testRunID string, authToken string) (*CloudKontext, error) {
 	// create a gRPC connection to the server
 	opts := []grpc.DialOption{}
 	if secure {
@@ -458,6 +475,10 @@ func NewCloudKontext(vu modules.VU, serviceURL string, secure bool, testRunID st
 	} else {
 		opts = append(opts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 	}
+
+	opts = append(opts, grpc.WithPerRPCCredentials(&kontextTokenAuth{
+		Token: authToken,
+	}))
 
 	conn, err := grpc.NewClient(serviceURL, opts...)
 	if err != nil {

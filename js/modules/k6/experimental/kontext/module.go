@@ -95,13 +95,17 @@ func (mi *ModuleInstance) NewKontext(_ sobek.ConstructorCall) *sobek.Object {
 		common.Throw(mi.vu.Runtime(), fmt.Errorf("kontext instances can only be created in the init context"))
 	}
 
-	serviceURL, hasServiceURL := os.LookupEnv(k6ServiceURLEnvironmentVariable)
-	secure := strings.ToLower(os.Getenv(secureEnvironmentVariable)) != "false"
-
 	var kv Kontexter
 	var err error
-	if hasServiceURL {
-		kv, err = NewCloudKontext(mi.vu, serviceURL, secure, mi.rm.testRunID)
+
+	if serviceURL, hasServiceURL := os.LookupEnv(k6ServiceURLEnvironmentVariable); hasServiceURL {
+		kontextAuthToken := os.Getenv(k6ServiceAuthEnvironmentVariable)
+		if kontextAuthToken == "" {
+			common.Throw(mi.vu.Runtime(), fmt.Errorf("Kontext module is missing the kontext	authToken"))
+		}
+		secure := strings.ToLower(os.Getenv(secureEnvironmentVariable)) != "false"
+
+		kv, err = NewCloudKontext(mi.vu, serviceURL, secure, mi.rm.testRunID, kontextAuthToken)
 		if err != nil {
 			common.Throw(mi.vu.Runtime(), fmt.Errorf("failed to create new Kontext instance: %w", err))
 		}
