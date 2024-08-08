@@ -792,7 +792,12 @@ func (c *compiler) compileExportDeclaration(expr *ast.ExportDeclaration) {
 	case expr.ClassDeclaration != nil:
 		cls := expr.ClassDeclaration
 		if expr.IsDefault {
-			c.emitLexicalAssign("default", int(cls.Class.Class)-1, c.compileClassLiteral(cls.Class, false))
+			if cls.Class.Name == nil {
+				c.emitLexicalAssign("default", int(cls.Class.Class)-1, c.compileClassLiteral(cls.Class, false))
+				return
+			}
+			c.compileClassDeclaration(cls)
+			c.emitLexicalAssign("default", int(cls.Class.Class)-1, c.compileIdentifierExpression(cls.Class.Name))
 		} else {
 			c.compileClassDeclaration(cls)
 		}

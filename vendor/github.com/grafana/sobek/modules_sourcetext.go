@@ -301,9 +301,13 @@ func exportEntriesFromAst(declarations []*ast.ExportDeclaration) []exportEntry {
 		} else if exportDeclaration.ClassDeclaration != nil {
 			cls := exportDeclaration.ClassDeclaration.Class
 			if exportDeclaration.IsDefault {
+				localName := "default"
+				if cls.Name != nil {
+					localName = cls.Name.Name.String()
+				}
 				result = append(result, exportEntry{
 					exportName: "default",
-					localName:  "default",
+					localName:  localName,
 					lex:        true,
 					offset:     int(exportDeclaration.Idx0()),
 				})
