@@ -336,7 +336,8 @@ jobs:
       - name: Rename binaries
         # To be consistent with the filenames used in dl.k6.io
         run: |
-          curl -Lso "dist/k6-v0.53.0-amd64.msi"  "https://github.com/grafana/k6/releases/download/v0.53.0/k6-v0.53.0-windows-amd64.msi"
+          mkdir dist
+          curl -Lso "dist/k6-v0.53.0-amd64.msi" "https://github.com/grafana/k6/releases/download/v0.53.0/k6-v0.53.0-windows-amd64.msi"
           curl -Lso "dist/k6-v0.53.0-amd64.rpm" "https://github.com/grafana/k6/releases/download/v0.53.0/k6-v0.53.0-linux-amd64.rpm"
           curl -Lso "dist/k6-v0.53.0-amd64.deb" "https://github.com/grafana/k6/releases/download/v0.53.0/k6-v0.53.0-linux-amd64.deb"
       - name: Setup docker compose environment
