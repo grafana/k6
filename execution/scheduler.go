@@ -463,8 +463,10 @@ func (e *Scheduler) Run(globalCtx, runCtx context.Context, samplesOut chan<- met
 	// its properties in their init context executions.
 	withExecStateCtx := lib.WithExecutionState(runCtx, e.state)
 
-	// Run setup() before any executors, if it's not disabled
-	if !e.state.Test.Options.NoSetup.Bool {
+	// Run setup() before any executors, if it's not disabled.
+	// When SetupTimeout is 0, setuo() is disabled.
+	shouldSetup := !e.state.Test.Options.NoSetup.Bool && (e.state.Test.Options.SetupTimeout.Valid && e.state.Test.Options.SetupTimeout.Duration != 0)
+	if shouldSetup {
 		e.state.SetExecutionStatus(lib.ExecutionStatusSetup)
 		e.initProgress.Modify(pb.WithConstProgress(1, "setup()"))
 		actuallyRanSetup := false
