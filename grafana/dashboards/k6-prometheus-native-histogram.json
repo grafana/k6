@@ -223,7 +223,7 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "avg(k6_vus{testid=~\"$testid\"})",
+          "expr": "sum(k6_vus{testid=~\"$testid\"})",
           "instant": false,
           "legendFormat": "vus",
           "range": true,
