@@ -61,16 +61,19 @@ func (rd *arrayRuneReader) ReadRune() (r rune, size int, err error) {
 type regexpPattern struct {
 	src string
 
-	global, ignoreCase, multiline, sticky, unicode bool
+	global, ignoreCase, multiline, dotAll, sticky, unicode bool
 
 	regexpWrapper  *regexpWrapper
 	regexp2Wrapper *regexp2Wrapper
 }
 
-func compileRegexp2(src string, multiline, ignoreCase bool) (*regexp2Wrapper, error) {
+func compileRegexp2(src string, multiline, dotAll, ignoreCase bool) (*regexp2Wrapper, error) {
 	var opts regexp2.RegexOptions = regexp2.ECMAScript
 	if multiline {
 		opts |= regexp2.Multiline
+	}
+	if dotAll {
+		opts |= regexp2.Singleline
 	}
 	if ignoreCase {
 		opts |= regexp2.IgnoreCase
@@ -87,7 +90,7 @@ func (p *regexpPattern) createRegexp2() {
 	if p.regexp2Wrapper != nil {
 		return
 	}
-	rx, err := compileRegexp2(p.src, p.multiline, p.ignoreCase)
+	rx, err := compileRegexp2(p.src, p.multiline, p.dotAll, p.ignoreCase)
 	if err != nil {
 		// At this point the regexp should have been successfully converted to re2, if it fails now, it's a bug.
 		panic(err)
@@ -175,6 +178,7 @@ func (p *regexpPattern) clone() *regexpPattern {
 		global:     p.global,
 		ignoreCase: p.ignoreCase,
 		multiline:  p.multiline,
+		dotAll:     p.dotAll,
 		sticky:     p.sticky,
 		unicode:    p.unicode,
 	}

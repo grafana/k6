@@ -1604,6 +1604,10 @@ func (re *Regexp) getRunner() *runner {
 // run using re.  (The cache empties when re gets garbage collected.)
 func (re *Regexp) putRunner(r *runner) {
 	re.muRun.Lock()
+	r.runtext = nil
+	if r.runmatch != nil {
+		r.runmatch.text = nil
+	}
 	re.runner = append(re.runner, r)
 	re.muRun.Unlock()
 }
