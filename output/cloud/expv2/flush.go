@@ -86,7 +86,7 @@ func (f *metricsFlusher) flush() error {
 }
 
 func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
-	// TODO remove after go 1.21 becomes the minimum supported version - it has `minInt` in it
+	// TODO remove after go 1.21 becomes the minimum supported version - it has `min` in it
 	minInt := func(a, b int) int {
 		if a < b {
 			return a
