@@ -20,8 +20,8 @@ func getCmdScale(gs *state.GlobalState) *cobra.Command {
   Use the global --address flag to specify the URL to the API server.`,
 		RunE: func(cmd *cobra.Command, _ []string) error {
 			vus := getNullInt64(cmd.Flags(), "vus")
-			max := getNullInt64(cmd.Flags(), "max")
-			if !vus.Valid && !max.Valid {
+			maxVUs := getNullInt64(cmd.Flags(), "max")
+			if !vus.Valid && !maxVUs.Valid {
 				return errors.New("Specify either -u/--vus or -m/--max") //nolint:golint,stylecheck
 			}
 
@@ -29,7 +29,7 @@ func getCmdScale(gs *state.GlobalState) *cobra.Command {
 			if err != nil {
 				return err
 			}
-			status, err := c.SetStatus(gs.Ctx, v1.Status{VUs: vus, VUsMax: max})
+			status, err := c.SetStatus(gs.Ctx, v1.Status{VUs: vus, VUsMax: maxVUs})
 			if err != nil {
 				return err
 			}

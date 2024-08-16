@@ -1294,7 +1294,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			"",
 		},
 		"UnsupportedVersion": {
-			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}}, //nolint:staticcheck
+			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
 			unsupportedVersionErrorMsg,
 		},
 	}

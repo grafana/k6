@@ -429,7 +429,7 @@ func TestConfigMapParsingAndValidation(t *testing.T) {
 		tc := tc
 		t.Run(fmt.Sprintf("TestCase#%d", i), func(t *testing.T) {
 			t.Parallel()
-			t.Logf(tc.rawJSON)
+			t.Log(tc.rawJSON)
 			var result lib.ScenarioConfigs
 			err := json.Unmarshal([]byte(tc.rawJSON), &result)
 			if tc.expected.parseError {
