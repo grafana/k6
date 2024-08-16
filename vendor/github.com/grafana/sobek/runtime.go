@@ -1729,7 +1729,9 @@ Note that Value.Export() for a `Date` value returns time.Time in local timezone.
 
 # Maps
 
-Maps with string or integer key type are converted into host objects that largely behave like a JavaScript Object.
+Maps with string, integer, or float key types are converted into host objects that largely behave like a JavaScript Object.
+One noticeable difference is that the key order is not stable, as with maps in Go.
+Keys are converted to strings following the fmt.Sprintf("%v") convention.
 
 # Maps with methods
 

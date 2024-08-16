@@ -1153,6 +1153,95 @@ func (r *Runtime) typedArrayProto_toStringTag(call FunctionCall) Value {
 	return _undefined
 }
 
+func (r *Runtime) typedArrayProto_with(call FunctionCall) Value {
+	o := call.This.ToObject(r)
+	ta, ok := o.self.(*typedArrayObject)
+	if !ok {
+		panic(r.NewTypeError("%s is not a valid TypedArray", r.objectproto_toString(FunctionCall{This: call.This})))
+	}
+	length := ta.length
+	relativeIndex := call.Argument(0).ToInteger()
+	var actualIndex int
+
+	if relativeIndex >= 0 {
+		actualIndex = toIntStrict(relativeIndex)
+	} else {
+		actualIndex = toIntStrict(int64(length) + relativeIndex)
+	}
+	if !ta.isValidIntegerIndex(actualIndex) {
+		panic(r.newError(r.getRangeError(), "Invalid typed array index"))
+	}
+
+	// TODO BigInt
+	// 7. If O.[[ContentType]] is BIGINT, let numericValue be ? ToBigInt(value).
+	// 8. Else, let numericValue be ? ToNumber(value).
+	numericValue := call.Argument(1).ToNumber()
+
+	a := r.typedArrayCreate(ta.defaultCtor, intToValue(int64(length)))
+	for k := 0; k < length; k++ {
+		var fromValue Value
+		if k == actualIndex {
+			fromValue = numericValue
+		} else {
+			fromValue = ta.typedArray.get(ta.offset + k)
+		}
+		a.typedArray.set(ta.offset+k, fromValue)
+	}
+	return a.val
+}
+
+func (r *Runtime) typedArrayProto_toReversed(call FunctionCall) Value {
+	o := call.This.ToObject(r)
+	ta, ok := o.self.(*typedArrayObject)
+	if !ok {
+		panic(r.NewTypeError("%s is not a valid TypedArray", r.objectproto_toString(FunctionCall{This: call.This})))
+	}
+	length := ta.length
+
+	a := r.typedArrayCreate(ta.defaultCtor, intToValue(int64(length)))
+
+	for k := 0; k < length; k++ {
+		from := length - k - 1
+		fromValue := ta.typedArray.get(ta.offset + from)
+		a.typedArray.set(ta.offset+k, fromValue)
+	}
+
+	return a.val
+}
+
+func (r *Runtime) typedArrayProto_toSorted(call FunctionCall) Value {
+	o := call.This.ToObject(r)
+	ta, ok := o.self.(*typedArrayObject)
+	if !ok {
+		panic(r.NewTypeError("%s is not a valid TypedArray", r.objectproto_toString(FunctionCall{This: call.This})))
+	}
+
+	var compareFn func(FunctionCall) Value
+	arg := call.Argument(0)
+	if arg != _undefined {
+		if arg, ok := arg.(*Object); ok {
+			compareFn, _ = arg.self.assertCallable()
+		}
+		if compareFn == nil {
+			panic(r.NewTypeError("The comparison function must be either a function or undefined"))
+		}
+	}
+
+	length := ta.length
+
+	a := r.typedArrayCreate(ta.defaultCtor, intToValue(int64(length)))
+	copy(a.viewedArrayBuf.data, ta.viewedArrayBuf.data)
+
+	ctx := typedArraySortCtx{
+		ta:      a,
+		compare: compareFn,
+	}
+
+	sort.Stable(&ctx)
+
+	return a.val
+}
+
 func (r *Runtime) newTypedArray([]Value, *Object) *Object {
 	panic(r.NewTypeError("Abstract class TypedArray not directly constructable"))
 }
@@ -1543,6 +1632,9 @@ func createTypedArrayProtoTemplate() *objectTemplate {
 	t.putStr("sort", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_sort, "sort", 1) })
 	t.putStr("subarray", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_subarray, "subarray", 2) })
 	t.putStr("toLocaleString", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_toLocaleString, "toLocaleString", 0) })
+	t.putStr("with", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_with, "with", 2) })
+	t.putStr("toReversed", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_toReversed, "toReversed", 0) })
+	t.putStr("toSorted", func(r *Runtime) Value { return r.methodProp(r.typedArrayProto_toSorted, "toSorted", 1) })
 	t.putStr("toString", func(r *Runtime) Value { return valueProp(r.getArrayToString(), true, false, true) })
 	t.putStr("values", func(r *Runtime) Value { return valueProp(r.getTypedArrayValues(), true, false, true) })
 

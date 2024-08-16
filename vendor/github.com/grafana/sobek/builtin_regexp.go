@@ -183,7 +183,7 @@ func compileRegexpFromValueString(patternStr String, flags string) (*regexpPatte
 }
 
 func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
-	var global, ignoreCase, multiline, sticky, unicode bool
+	var global, ignoreCase, multiline, dotAll, sticky, unicode bool
 	var wrapper *regexpWrapper
 	var wrapper2 *regexp2Wrapper
 
@@ -205,6 +205,12 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 					return
 				}
 				multiline = true
+			case 's':
+				if dotAll {
+					invalidFlags()
+					return
+				}
+				dotAll = true
 			case 'i':
 				if ignoreCase {
 					invalidFlags()
@@ -235,11 +241,14 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 		patternStr = convertRegexpToUtf16(patternStr)
 	}
 
-	re2Str, err1 := parser.TransformRegExp(patternStr)
+	re2Str, err1 := parser.TransformRegExp(patternStr, dotAll)
 	if err1 == nil {
 		re2flags := ""
 		if multiline {
 			re2flags += "m"
+		}
+		if dotAll {
+			re2flags += "s"
 		}
 		if ignoreCase {
 			re2flags += "i"
@@ -259,7 +268,7 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 			err = err1
 			return
 		}
-		wrapper2, err = compileRegexp2(patternStr, multiline, ignoreCase)
+		wrapper2, err = compileRegexp2(patternStr, multiline, dotAll, ignoreCase)
 		if err != nil {
 			err = fmt.Errorf("Invalid regular expression (regexp2): %s (%v)", patternStr, err)
 			return
@@ -273,6 +282,7 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 		global:         global,
 		ignoreCase:     ignoreCase,
 		multiline:      multiline,
+		dotAll:         dotAll,
 		sticky:         sticky,
 		unicode:        unicode,
 	}
@@ -431,6 +441,9 @@ func (r *Runtime) regexpproto_toString(call FunctionCall) Value {
 		if this.pattern.multiline {
 			sb.WriteRune('m')
 		}
+		if this.pattern.dotAll {
+			sb.WriteRune('s')
+		}
 		if this.pattern.unicode {
 			sb.WriteRune('u')
 		}
@@ -538,6 +551,20 @@ func (r *Runtime) regexpproto_getMultiline(call FunctionCall) Value {
 	}
 }
 
+func (r *Runtime) regexpproto_getDotAll(call FunctionCall) Value {
+	if this, ok := r.toObject(call.This).self.(*regexpObject); ok {
+		if this.pattern.dotAll {
+			return valueTrue
+		} else {
+			return valueFalse
+		}
+	} else if call.This == r.global.RegExpPrototype {
+		return _undefined
+	} else {
+		panic(r.NewTypeError("Method RegExp.prototype.dotAll getter called on incompatible receiver %s", r.objectproto_toString(FunctionCall{This: call.This})))
+	}
+}
+
 func (r *Runtime) regexpproto_getIgnoreCase(call FunctionCall) Value {
 	if this, ok := r.toObject(call.This).self.(*regexpObject); ok {
 		if this.pattern.ignoreCase {
@@ -581,7 +608,7 @@ func (r *Runtime) regexpproto_getSticky(call FunctionCall) Value {
 }
 
 func (r *Runtime) regexpproto_getFlags(call FunctionCall) Value {
-	var global, ignoreCase, multiline, sticky, unicode bool
+	var global, ignoreCase, multiline, dotAll, sticky, unicode bool
 
 	thisObj := r.toObject(call.This)
 	size := 0
@@ -600,6 +627,12 @@ func (r *Runtime) regexpproto_getFlags(call FunctionCall) Value {
 	if v := thisObj.self.getStr("multiline", nil); v != nil {
 		multiline = v.ToBoolean()
 		if multiline {
+			size++
+		}
+	}
+	if v := thisObj.self.getStr("dotAll", nil); v != nil {
+		dotAll = v.ToBoolean()
+		if dotAll {
 			size++
 		}
 	}
@@ -626,6 +659,9 @@ func (r *Runtime) regexpproto_getFlags(call FunctionCall) Value {
 	}
 	if multiline {
 		sb.WriteByte('m')
+	}
+	if dotAll {
+		sb.WriteByte('s')
 	}
 	if unicode {
 		sb.WriteByte('u')
@@ -1270,6 +1306,11 @@ func (r *Runtime) getRegExpPrototype() *Object {
 		o.setOwnStr("multiline", &valueProperty{
 			configurable: true,
 			getterFunc:   r.newNativeFunc(r.regexpproto_getMultiline, "get multiline", 0),
+			accessor:     true,
+		}, false)
+		o.setOwnStr("dotAll", &valueProperty{
+			configurable: true,
+			getterFunc:   r.newNativeFunc(r.regexpproto_getDotAll, "get dotAll", 0),
 			accessor:     true,
 		}, false)
 		o.setOwnStr("ignoreCase", &valueProperty{

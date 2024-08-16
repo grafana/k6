@@ -1,6 +1,7 @@
 package sobek
 
 import (
+	"fmt"
 	"reflect"
 
 	"github.com/grafana/sobek/unistring"
@@ -114,7 +115,7 @@ func (o *objectGoMapReflect) _put(key reflect.Value, val Value, throw bool) bool
 			}
 			o.fieldsValue.SetMapIndex(key, v)
 		} else {
-			o.val.runtime.typeErrorResult(throw, "Cannot set property %s, object is not extensible", key.String())
+			o.val.runtime.typeErrorResult(throw, "Cannot set property %v, object is not extensible", key)
 			return false
 		}
 		return true
@@ -241,7 +242,7 @@ func (i *gomapReflectPropIter) next() (propIterItem, iterNextFunc) {
 		v := i.o.fieldsValue.MapIndex(key)
 		i.idx++
 		if v.IsValid() {
-			return propIterItem{name: newStringValue(key.String()), enumerable: _ENUM_TRUE}, i.next
+			return propIterItem{name: i.o.keyToString(key), enumerable: _ENUM_TRUE}, i.next
 		}
 	}
 
@@ -258,8 +259,36 @@ func (o *objectGoMapReflect) iterateStringKeys() iterNextFunc {
 func (o *objectGoMapReflect) stringKeys(_ bool, accum []Value) []Value {
 	// all own keys are enumerable
 	for _, key := range o.fieldsValue.MapKeys() {
-		accum = append(accum, newStringValue(key.String()))
+		accum = append(accum, o.keyToString(key))
 	}
 
 	return accum
+}
+
+func (*objectGoMapReflect) keyToString(key reflect.Value) String {
+	kind := key.Kind()
+
+	if kind == reflect.String {
+		return newStringValue(key.String())
+	}
+
+	str := fmt.Sprintf("%v", key)
+
+	switch kind {
+	case reflect.Int,
+		reflect.Int8,
+		reflect.Int16,
+		reflect.Int32,
+		reflect.Int64,
+		reflect.Uint,
+		reflect.Uint8,
+		reflect.Uint16,
+		reflect.Uint32,
+		reflect.Uint64,
+		reflect.Float32,
+		reflect.Float64:
+		return asciiString(str)
+	default:
+		return newStringValue(str)
+	}
 }

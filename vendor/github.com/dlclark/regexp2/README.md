@@ -4,10 +4,17 @@ Regexp2 is a feature-rich RegExp engine for Go.  It doesn't have constant time g
 ## Basis of the engine
 The engine is ported from the .NET framework's System.Text.RegularExpressions.Regex engine.  That engine was open sourced in 2015 under the MIT license.  There are some fundamental differences between .NET strings and Go strings that required a bit of borrowing from the Go framework regex engine as well.  I cleaned up a couple of the dirtier bits during the port (regexcharclass.cs was terrible), but the parse tree, code emmitted, and therefore patterns matched should be identical.
 
+## New Code Generation
+For extra performance use `regexp2` with [`regexp2cg`](https://github.com/dlclark/regexp2cg). It is a code generation utility for `regexp2` and you can likely improve your regexp runtime performance by 3-10x in hot code paths. As always you should benchmark your specifics to confirm the results. Give it a try!
+
 ## Installing
 This is a go-gettable library, so install is easy:
 
-    go get github.com/dlclark/regexp2/...
+    go get github.com/dlclark/regexp2
+
+To use the new Code Generation (while it's in beta) you'll need to use the `code_gen` branch:
+
+    go get github.com/dlclark/regexp2@code_gen
 
 ## Usage
 Usage is similar to the Go `regexp` package.  Just like in `regexp`, you start by converting a regex into a state machine via the `Compile` or `MustCompile` methods.  They ultimately do the same thing, but `MustCompile` will panic if the regex is invalid.  You can then use the provided `Regexp` struct to find matches repeatedly.  A `Regexp` struct is safe to use across goroutines.

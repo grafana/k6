@@ -122,7 +122,19 @@ func (r *Runtime) newErrorObject(proto *Object, class string) *errorObject {
 func (r *Runtime) builtin_Error(args []Value, proto *Object) *Object {
 	obj := r.newErrorObject(proto, classError)
 	if len(args) > 0 && args[0] != _undefined {
-		obj._putProp("message", args[0], true, false, true)
+		obj._putProp("message", args[0].ToString(), true, false, true)
+	}
+	if len(args) > 1 && args[1] != _undefined {
+		if options, ok := args[1].(*Object); ok {
+			if options.hasProperty(asciiString("cause")) {
+				obj.defineOwnPropertyStr("cause", PropertyDescriptor{
+					Writable:     FLAG_TRUE,
+					Enumerable:   FLAG_FALSE,
+					Configurable: FLAG_TRUE,
+					Value:        options.Get("cause"),
+				}, true)
+			}
+		}
 	}
 	return obj.val
 }
@@ -137,6 +149,19 @@ func (r *Runtime) builtin_AggregateError(args []Value, proto *Object) *Object {
 		errors = r.iterableToList(args[0], nil)
 	}
 	obj._putProp("errors", r.newArrayValues(errors), true, false, true)
+
+	if len(args) > 2 && args[2] != _undefined {
+		if options, ok := args[2].(*Object); ok {
+			if options.hasProperty(asciiString("cause")) {
+				obj.defineOwnPropertyStr("cause", PropertyDescriptor{
+					Writable:     FLAG_TRUE,
+					Enumerable:   FLAG_FALSE,
+					Configurable: FLAG_TRUE,
+					Value:        options.Get("cause"),
+				}, true)
+			}
+		}
+	}
 
 	return obj.val
 }
