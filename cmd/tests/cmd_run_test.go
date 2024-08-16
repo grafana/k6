@@ -2344,35 +2344,77 @@ func TestBrowserExperimentalImport(t *testing.T) {
 }
 
 func TestSetupTimeout(t *testing.T) {
-	t.Parallel()
-	ts := NewGlobalTestState(t)
-	ts.ExpectedExitCode = int(exitcodes.SetupTimeout)
-	ts.CmdArgs = []string{"k6", "run", "-"}
-	ts.Stdin = bytes.NewBufferString(`
-		import { sleep } from 'k6';
+	t.Run("setupTimeout option is 1s", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		ts.ExpectedExitCode = int(exitcodes.SetupTimeout)
+		ts.CmdArgs = []string{"k6", "run", "-"}
+		ts.Stdin = bytes.NewBufferString(`
+			import { sleep } from 'k6';
 
-		export const options = {
-			setupTimeout: '1s',
-		};
+			export const options = {
+				setupTimeout: '1s',
+			};
 
-		export function setup() { sleep(100000); };
-		export default function() {}
-	`)
+			export function setup() { sleep(100000); };
+			export default function() {}
+		`)
 
-	start := time.Now()
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
-	elapsed := time.Since(start)
-	assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of setupTimeout")
-	assert.Less(
-		t, elapsed, 5*time.Second,
-		"expected less time to have passed because setupTimeout ",
-	)
+		start := time.Now()
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		elapsed := time.Since(start)
+		assert.Greater(t, elapsed, 1*time.Second, "expected more time to have passed because of setupTimeout")
+		assert.Less(
+			t, elapsed, 5*time.Second,
+			"expected less time to have passed because setupTimeout ",
+		)
 
-	stdout := ts.Stdout.String()
-	t.Log(stdout)
-	stderr := ts.Stderr.String()
-	t.Log(stderr)
-	assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
+	})
+	t.Run("disabled setup() 0s setupTimeout with script", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		ts.ExpectedExitCode = 0
+		ts.CmdArgs = []string{"k6", "run", "-"}
+		ts.Stdin = bytes.NewBufferString(`
+			export const options = {
+				setupTimeout: '0s',
+			};
+
+			export function setup() { console.log("setup() invoked"); };
+			export default function() {}
+		`)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.NotContains(t, stdout, "setup() invoked")
+	})
+	t.Run("disabled setup() 0s setupTimeout with env", func(t *testing.T) {
+		t.Parallel()
+		ts := NewGlobalTestState(t)
+		ts.ExpectedExitCode = 0
+		ts.CmdArgs = []string{"k6", "run", "-"}
+		ts.Env["K6_SETUP_TIMEOUT=0s"] = "0s"
+		ts.Stdin = bytes.NewBufferString(`
+			export function setup() { console.log("setup() invoked"); };
+
+			export default function() {}
+		`)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+		stderr := ts.Stderr.String()
+		t.Log(stderr)
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.NotContains(t, stdout, "setup() invoked")
+	})
 }
 
 func TestTypeScriptSupport(t *testing.T) {
