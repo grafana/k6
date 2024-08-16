@@ -39,7 +39,7 @@ func (f Form) Run(r io.Reader, w io.Writer) (map[string]string, error) {
 			if extra := field.GetLabelExtra(); extra != "" {
 				displayLabel += " " + color.New(color.Faint, color.FgCyan).Sprint("["+extra+"]")
 			}
-			if _, err := fmt.Fprintf(w, "  "+displayLabel+": "); err != nil {
+			if _, err := fmt.Fprint(w, "  "+displayLabel+": "); err != nil {
 				return nil, err
 			}
 
@@ -47,7 +47,10 @@ func (f Form) Run(r io.Reader, w io.Writer) (map[string]string, error) {
 			s, err := field.GetContents(r)
 
 			if _, ok := field.(PasswordField); ok {
-				fmt.Fprint(w, "\n")
+				_, err := fmt.Fprint(w, "\n")
+				if err != nil {
+					return nil, err
+				}
 			}
 
 			color.Unset()

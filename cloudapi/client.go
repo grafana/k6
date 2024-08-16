@@ -212,7 +212,7 @@ func shouldRetry(resp *http.Response, err error, attempt, maxAttempts int) bool 
 		return true
 	}
 
-	if resp.StatusCode >= 500 || resp.StatusCode == 429 {
+	if resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests {
 		return true
 	}
 

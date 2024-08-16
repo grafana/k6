@@ -153,7 +153,7 @@ func methodFromProto(method string) protoreflect.MethodDescriptor {
 			// otherwise the parser will try to parse "google/protobuf/descriptor.proto"
 			// with exactly the same name as the one we are trying to parse for testing
 			if filename != path {
-				return nil, nil
+				return nil, nil //nolint:nilnil
 			}
 
 			b := `

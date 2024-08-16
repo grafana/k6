@@ -188,7 +188,6 @@ func (r *Runner) newVU(
 					"deprecation - https://pkg.go.dev/crypto/tls@go1.17#Config.",
 			)
 		})
-		//nolint:staticcheck // ignore SA1019 we can deprecate it but we have to continue to support the previous code.
 		tlsConfig.NameToCertificate = nameToCert
 	}
 	transport := &http.Transport{
