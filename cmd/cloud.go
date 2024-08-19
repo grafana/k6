@@ -366,16 +366,15 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
-		Long: `Run a test in the Grafana Cloud k6.
+		Long: `The original behavior of the "k6 cloud" command described below is deprecated.
+In future versions, the "cloud" command will only display a help text and will no longer run tests
+in Grafana Cloud k6. To continue running tests in the cloud, please transition to using the "k6 cloud run" command.
+
+Run a test in the Grafana Cloud k6.
 
 This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
 service. Be sure to run the "k6 cloud login" command prior to authenticate with Grafana Cloud k6.`,
-		Args: exactCloudArgs(),
-		Deprecated: `the k6 team is in the process of modifying and deprecating the "k6 cloud" command behavior.
-In the future, the "cloud" command will only display a help text, instead of running tests in the Grafana Cloud k6.
-
-To run tests in the cloud, users are now invited to migrate to the "k6 cloud run" command instead.
-`,
+		Args:    exactCloudArgs(),
 		PreRunE: c.preRun,
 		RunE:    c.run,
 		Example: exampleText,
