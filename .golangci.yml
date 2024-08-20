@@ -19,6 +19,7 @@ issues:
    # files (due to common repeats and long functions in test code)
    - path: _(test|gen)\.go
      linters:
+       - canonicalheader
        - cyclop
        - dupl
        - gocognit
@@ -68,6 +69,7 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - canonicalheader
     - contextcheck
     - cyclop
     - dogsled
@@ -79,6 +81,7 @@ linters:
     - errorlint
     - exhaustive
     - exportloopref
+    - fatcontext
     - forbidigo
     - forcetypeassert
     - funlen
