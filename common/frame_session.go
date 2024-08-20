@@ -121,17 +121,23 @@ func NewFrameSession(
 		return nil, err
 	}
 
-	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
-	var windowID browser.WindowID
-	if windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		l.Debugf(
-			"NewFrameSession:GetWindowForTarget",
-			"sid:%v tid:%v err:%v",
-			s.ID(), tid, err)
+	// When a frame creates a new FrameSession without UI (e.g. some iframes) we cannot
+	// retrieve the windowID. Doing so would lead to an error from chromium. For now all
+	// iframes that are attached are setup with hasUIWindow as false which seems to work
+	// as expected for iframes with and without UI elements.
+	if hasUIWindow {
+		action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
+		var windowID browser.WindowID
+		if windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			l.Debugf(
+				"NewFrameSession:GetWindowForTarget",
+				"sid:%v tid:%v err:%v",
+				s.ID(), tid, err)
 
-		return nil, fmt.Errorf("getting browser window ID: %w", err)
+			return nil, fmt.Errorf("getting browser window ID: %w", err)
+		}
+		fs.windowID = &windowID
 	}
-	fs.windowID = &windowID
 
 	fs.initEvents()
 	if err = fs.initFrameTree(); err != nil {
@@ -1191,18 +1197,20 @@ func (fs *FrameSession) updateViewport() error {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
-	// add an inset to viewport depending on the operating system.
-	// this won't add an inset if we're running in headless mode.
-	viewport.calculateInset(
-		fs.page.browserCtx.browser.browserOpts.Headless,
-		runtime.GOOS,
-	)
-	action2 := browser.SetWindowBounds(*fs.windowID, &browser.Bounds{
-		Width:  viewport.Width,
-		Height: viewport.Height,
-	})
-	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("setting window bounds: %w", err)
+	if fs.windowID != nil {
+		// add an inset to viewport depending on the operating system.
+		// this won't add an inset if we're running in headless mode.
+		viewport.calculateInset(
+			fs.page.browserCtx.browser.browserOpts.Headless,
+			runtime.GOOS,
+		)
+		action2 := browser.SetWindowBounds(*fs.windowID, &browser.Bounds{
+			Width:  viewport.Width,
+			Height: viewport.Height,
+		})
+		if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			return fmt.Errorf("setting window bounds: %w", err)
+		}
 	}
 
 	return nil
