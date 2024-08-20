@@ -20,7 +20,7 @@ const (
 	// MaxRetries specifies max retry attempts
 	MaxRetries = 3
 
-	k6IdempotencyKeyHeader = "k6-Idempotency-Key"
+	k6IdempotencyKeyHeader = "K6-Idempotency-Key"
 )
 
 // Client handles communication with the k6 Cloud API.
