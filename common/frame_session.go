@@ -57,7 +57,8 @@ type FrameSession struct {
 	k6Metrics *k6ext.CustomMetrics
 
 	targetID target.ID
-	windowID browser.WindowID
+	// windowID can be nil when it is associated to an iframe.
+	windowID *browser.WindowID
 
 	// To understand the concepts of Isolated Worlds, Contexts and Frames and
 	// the relationship betwween them have a look at the following doc:
@@ -121,7 +122,8 @@ func NewFrameSession(
 	}
 
 	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
-	if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+	var windowID browser.WindowID
+	if windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 		l.Debugf(
 			"NewFrameSession:GetWindowForTarget",
 			"sid:%v tid:%v err:%v",
@@ -129,6 +131,7 @@ func NewFrameSession(
 
 		return nil, fmt.Errorf("getting browser window ID: %w", err)
 	}
+	fs.windowID = &windowID
 
 	fs.initEvents()
 	if err = fs.initFrameTree(); err != nil {
@@ -1193,7 +1196,7 @@ func (fs *FrameSession) updateViewport() error {
 		fs.page.browserCtx.browser.browserOpts.Headless,
 		runtime.GOOS,
 	)
-	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
+	action2 := browser.SetWindowBounds(*fs.windowID, &browser.Bounds{
 		Width:  viewport.Width,
 		Height: viewport.Height,
 	})
