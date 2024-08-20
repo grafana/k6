@@ -3,10 +3,6 @@ package cmd
 import (
 	"fmt"
 
-	"go.k6.io/k6/errext/exitcodes"
-
-	"go.k6.io/k6/errext"
-
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.k6.io/k6/execution"
@@ -96,28 +92,15 @@ Use the "k6 cloud login" command to authenticate.`,
 
 func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
-		if cmd.Flags().Changed("exit-on-running") {
-			return errext.WithExitCodeIfNone(
-				fmt.Errorf("the --local-execution flag is not compatible with the --exit-on-running flag"),
-				exitcodes.InvalidConfig,
-			)
-		}
-
-		if cmd.Flags().Changed("show-logs") {
-			return errext.WithExitCodeIfNone(
-				fmt.Errorf("the --local-execution flag is not compatible with the --show-logs flag"),
-				exitcodes.InvalidConfig,
-			)
-		}
-
 		return nil
 	}
 
 	if c.linger {
-		return errext.WithExitCodeIfNone(
-			fmt.Errorf("the --linger flag can only be used in conjunction with the --local-execution flag"),
-			exitcodes.InvalidConfig,
-		)
+		return fmt.Errorf("the --linger flag can only be used in conjunction with the --local-execution flag")
+	}
+
+	if c.noUsageReport {
+		return fmt.Errorf("the --no-usage-report can only be used in conjunction with the --local-execution flag")
 	}
 
 	return c.deprecatedCloudCmd.preRun(cmd, args)
@@ -125,10 +108,18 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
+		if cmd.Flags().Changed("exit-on-running") {
+			return fmt.Errorf("the --local-execution flag is not compatible with the --exit-on-running flag")
+		}
+
+		if cmd.Flags().Changed("show-logs") {
+			return fmt.Errorf("the --local-execution flag is not compatible with the --show-logs flag")
+		}
+
 		return c.runCmd.run(cmd, args)
 	}
 
-	// When running the `k6 cloud run` command explicitly disable the usage report.
+	// When executing in the cloud, we enforce the usage report to be deactivated.
 	c.noUsageReport = true
 
 	return c.deprecatedCloudCmd.run(cmd, args)
@@ -150,8 +141,7 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		&c.noUsageReport,
 		"no-usage-report",
 		c.noUsageReport,
-		"only when using the local-execution mode, don't send anonymous usage "+
-			"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
+		"only when using the local-execution mode, don't send anonymous stats to the developers",
 	)
 
 	return flags
