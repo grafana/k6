@@ -83,7 +83,7 @@ type FrameSession struct {
 //
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger,
+	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
@@ -997,7 +997,8 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		fs.ctx,
 		fs.page.browserCtx.getSession(sid),
 		fs.page, fs, ti.TargetID,
-		fs.logger)
+		fs.logger,
+		false)
 	if err != nil {
 		return fmt.Errorf("attaching iframe target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)

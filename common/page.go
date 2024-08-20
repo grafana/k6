@@ -296,7 +296,7 @@ func NewPage(
 
 	var err error
 	p.frameManager = NewFrameManager(ctx, s, &p, p.timeoutSettings, p.logger)
-	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger)
+	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger, true)
 	if err != nil {
 		p.logger.Debugf("Page:NewPage:NewFrameSession:return", "sid:%v tid:%v err:%v",
 			p.sessionID(), tid, err)
