@@ -382,7 +382,7 @@ To run tests in the cloud, users are now invited to migrate to the "k6 cloud run
 	}
 
 	// Register `k6 cloud` subcommands
-	cloudCmd.AddCommand(getCmdCloudRun(gs))
+	cloudCmd.AddCommand(getCmdCloudRun(c))
 	cloudCmd.AddCommand(getCmdCloudLogin(gs))
 
 	cloudCmd.Flags().SortFlags = false
