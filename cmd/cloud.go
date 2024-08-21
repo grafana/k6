@@ -12,18 +12,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui/pb"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"go.k6.io/k6/cmd/state"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -335,6 +334,9 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"enable showing of logs when a test is executed in the cloud")
 	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
 		"only upload the test to the cloud without actually starting a test run")
+	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
+		panic(err)
+	}
 
 	return flags
 }
@@ -384,6 +386,7 @@ To run tests in the cloud, users are now invited to migrate to the "k6 cloud run
 	// Register `k6 cloud` subcommands
 	cloudCmd.AddCommand(getCmdCloudRun(gs))
 	cloudCmd.AddCommand(getCmdCloudLogin(gs))
+	cloudCmd.AddCommand(getCmdCloudUpload(c))
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
