@@ -375,9 +375,13 @@ func TestSchedulerSystemTags(t *testing.T) {
 				if s.Tags == expTrailPVUTags || s.Tags == expTrailSITags {
 					gotCorrectTags++
 				}
-			case *netext.NetTrail:
-				if s.Tags == expNetTrailPVUTags || s.Tags == expNetTrailSITags {
-					gotCorrectTags++
+			default:
+				for _, sample := range s.GetSamples() {
+					if sample.Metric.Name == metrics.DataSentName {
+						if sample.Tags == expNetTrailPVUTags || sample.Tags == expNetTrailSITags {
+							gotCorrectTags++
+						}
+					}
 				}
 			}
 
@@ -497,10 +501,12 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 							gotTrailTag = true
 						}
 					}
-					if netTrail, ok := sample.(*netext.NetTrail); ok && !gotNetTrailTag {
-						tags := netTrail.Tags.Map()
-						if v, ok := tags["customTag"]; ok && v == "value" {
-							gotNetTrailTag = true
+					for _, s := range sample.GetSamples() {
+						if s.Metric.Name == metrics.DataSentName && !gotNetTrailTag {
+							tags := s.Tags.Map()
+							if v, ok := tags["customTag"]; ok && v == "value" {
+								gotNetTrailTag = true
+							}
 						}
 					}
 				case <-done:
@@ -692,11 +698,15 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 					gotSampleTags++
 				}
 			}
-		case *netext.NetTrail:
-			tags := s.Tags.Map()
-			for _, expTags := range expectedNetTrailTags {
-				if reflect.DeepEqual(expTags, tags) {
-					gotSampleTags++
+		case metrics.Samples:
+			for _, sample := range s.GetSamples() {
+				if sample.Metric.Name == metrics.DataSentName {
+					tags := sample.Tags.Map()
+					for _, expTags := range expectedNetTrailTags {
+						if reflect.DeepEqual(expTags, tags) {
+							gotSampleTags++
+						}
+					}
 				}
 			}
 		case metrics.ConnectedSamples:

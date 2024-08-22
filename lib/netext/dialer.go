@@ -76,7 +76,7 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 func (d *Dialer) GetTrail(
 	startTime, endTime time.Time, fullIteration bool, emitIterations bool, ctm metrics.TagsAndMeta,
 	builtinMetrics *metrics.BuiltinMetrics,
-) *NetTrail {
+) metrics.SampleContainer {
 	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
 	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
 	samples := []metrics.Sample{
@@ -122,15 +122,7 @@ func (d *Dialer) GetTrail(
 		}
 	}
 
-	return &NetTrail{
-		BytesRead:     bytesRead,
-		BytesWritten:  bytesWritten,
-		FullIteration: fullIteration,
-		StartTime:     startTime,
-		EndTime:       endTime,
-		Tags:          ctm.Tags,
-		Samples:       samples,
-	}
+	return metrics.Samples(samples)
 }
 
 func (d *Dialer) getDialAddr(addr string) (string, error) {
@@ -206,36 +198,6 @@ func (d *Dialer) getConfiguredHost(addr, host, port string) (*types.Host, error)
 	}
 
 	return nil, nil //nolint:nilnil
-}
-
-// NetTrail contains information about the exchanged data size and length of a
-// series of connections from a particular netext.Dialer
-type NetTrail struct {
-	BytesRead     int64
-	BytesWritten  int64
-	FullIteration bool
-	StartTime     time.Time
-	EndTime       time.Time
-	Tags          *metrics.TagSet
-	Samples       []metrics.Sample
-}
-
-// Ensure that interfaces are implemented correctly
-var _ metrics.ConnectedSampleContainer = &NetTrail{}
-
-// GetSamples implements the metrics.SampleContainer interface.
-func (ntr *NetTrail) GetSamples() []metrics.Sample {
-	return ntr.Samples
-}
-
-// GetTags implements the metrics.ConnectedSampleContainer interface.
-func (ntr *NetTrail) GetTags() *metrics.TagSet {
-	return ntr.Tags
-}
-
-// GetTime implements the metrics.ConnectedSampleContainer interface.
-func (ntr *NetTrail) GetTime() time.Time {
-	return ntr.EndTime
 }
 
 // Conn wraps net.Conn and keeps track of sent and received data size

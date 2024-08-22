@@ -8,7 +8,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/cloudapi/insights"
-	"go.k6.io/k6/lib/netext"
 	"go.k6.io/k6/lib/netext/httpext"
 	"go.k6.io/k6/metrics"
 )
@@ -50,9 +49,6 @@ func Test_Collector_CollectRequestMetadatas_FiltersAndStoresHTTPTrailsAsRequestM
 		},
 		&httpext.Trail{
 			// HTTP trail without trace ID should be ignored
-		},
-		&netext.NetTrail{
-			// Net trail should be ignored
 		},
 		&httpext.Trail{
 			EndTime:  time.Unix(20, 0),
