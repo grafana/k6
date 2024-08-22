@@ -69,17 +69,14 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
-// GetTrail creates a new NetTrail instance with the Dialer
+// Sample creates a new NetTrail instance with the Dialer
 // sent and received data metrics and the supplied times and tags.
-// TODO: Refactor this according to
-// https://github.com/k6io/k6/pull/1203#discussion_r337938370
-func (d *Dialer) GetTrail(
-	startTime, endTime time.Time, fullIteration bool, emitIterations bool, ctm metrics.TagsAndMeta,
-	builtinMetrics *metrics.BuiltinMetrics,
+func (d *Dialer) Sample(
+	endTime time.Time, ctm metrics.TagsAndMeta, builtinMetrics *metrics.BuiltinMetrics,
 ) metrics.SampleContainer {
 	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
 	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
-	samples := []metrics.Sample{
+	return metrics.Samples([]metrics.Sample{
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.DataSent,
@@ -98,31 +95,7 @@ func (d *Dialer) GetTrail(
 			Metadata: ctm.Metadata,
 			Value:    float64(bytesRead),
 		},
-	}
-	if fullIteration {
-		samples = append(samples, metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: builtinMetrics.IterationDuration,
-				Tags:   ctm.Tags,
-			},
-			Time:     endTime,
-			Metadata: ctm.Metadata,
-			Value:    metrics.D(endTime.Sub(startTime)),
-		})
-		if emitIterations {
-			samples = append(samples, metrics.Sample{
-				TimeSeries: metrics.TimeSeries{
-					Metric: builtinMetrics.Iterations,
-					Tags:   ctm.Tags,
-				},
-				Time:     endTime,
-				Metadata: ctm.Metadata,
-				Value:    1,
-			})
-		}
-	}
-
-	return metrics.Samples(samples)
+	})
 }
 
 func (d *Dialer) getDialAddr(addr string) (string, error) {

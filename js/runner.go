@@ -865,13 +865,42 @@ func (u *VU) runFn(
 		u.Transport.CloseIdleConnections()
 	}
 
-	u.state.Samples <- u.Dialer.GetTrail(
-		startTime, endTime, isFullIteration,
-		isDefault, u.state.Tags.GetCurrentValues(), u.Runner.preInitState.BuiltinMetrics)
+	builtinMetrics := u.Runner.preInitState.BuiltinMetrics
+	ctm := u.state.Tags.GetCurrentValues()
+	u.state.Samples <- u.Dialer.Sample(endTime, ctm, builtinMetrics)
+
+	if isFullIteration && isDefault {
+		u.state.Samples <- iterationSamples(startTime, endTime, ctm, builtinMetrics)
+	}
 
 	v = unPromisify(v)
 
 	return v, isFullIteration, endTime.Sub(startTime), err
+}
+
+func iterationSamples(
+	startTime, endTime time.Time, ctm metrics.TagsAndMeta, builtinMetrics *metrics.BuiltinMetrics,
+) metrics.Samples {
+	return metrics.Samples([]metrics.Sample{
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.IterationDuration,
+				Tags:   ctm.Tags,
+			},
+			Time:     endTime,
+			Metadata: ctm.Metadata,
+			Value:    metrics.D(endTime.Sub(startTime)),
+		},
+		{
+			TimeSeries: metrics.TimeSeries{
+				Metric: builtinMetrics.Iterations,
+				Tags:   ctm.Tags,
+			},
+			Time:     endTime,
+			Metadata: ctm.Metadata,
+			Value:    1,
+		},
+	})
 }
 
 func (u *ActiveVU) incrIteration() {

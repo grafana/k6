@@ -1285,7 +1285,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			Value: expValue,
 		}
 	}
-	getDummyTrail := func(group string, emitIterations bool, addExpTags ...string) metrics.SampleContainer {
+	getNetworkSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
 		expTags := []string{"group", group}
 		expTags = append(expTags, addExpTags...)
 		dialer := netext.NewDialer(
@@ -1294,25 +1294,56 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		)
 
 		ctm := metrics.TagsAndMeta{Tags: getTags(piState.Registry, expTags...)}
-		return dialer.GetTrail(time.Now(), time.Now(), true, emitIterations, ctm, piState.BuiltinMetrics)
+		return dialer.Sample(time.Now(), ctm, piState.BuiltinMetrics)
+	}
+
+	getIterationsSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
+		expTags := []string{"group", group}
+		expTags = append(expTags, addExpTags...)
+		ctm := metrics.TagsAndMeta{Tags: getTags(piState.Registry, expTags...)}
+		startTime := time.Now()
+		endTime := time.Now()
+
+		return metrics.Samples([]metrics.Sample{
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: piState.BuiltinMetrics.IterationDuration,
+					Tags:   ctm.Tags,
+				},
+				Time:     endTime,
+				Metadata: ctm.Metadata,
+				Value:    metrics.D(endTime.Sub(startTime)),
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: piState.BuiltinMetrics.Iterations,
+					Tags:   ctm.Tags,
+				},
+				Time:     endTime,
+				Metadata: ctm.Metadata,
+				Value:    1,
+			},
+		})
 	}
 
 	// Initially give a long time (5s) for the execScheduler to start
 	expectIn(0, 5000, getSample(1, testCounter, "group", "::setup", "place", "setupBeforeSleep"))
 	expectIn(900, 1100, getSample(2, testCounter, "group", "::setup", "place", "setupAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::setup", false))
+	expectIn(0, 100, getNetworkSamples("::setup"))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep", "scenario", "default"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep", "scenario", "default"))
-	expectIn(0, 100, getDummyTrail("", true, "scenario", "default"))
+	expectIn(0, 100, getNetworkSamples("", "scenario", "default"))
+	expectIn(0, 100, getIterationsSamples("", "scenario", "default"))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep", "scenario", "default"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep", "scenario", "default"))
-	expectIn(0, 100, getDummyTrail("", true, "scenario", "default"))
+	expectIn(0, 100, getNetworkSamples("", "scenario", "default"))
+	expectIn(0, 100, getIterationsSamples("", "scenario", "default"))
 
 	expectIn(0, 1000, getSample(3, testCounter, "group", "::teardown", "place", "teardownBeforeSleep"))
 	expectIn(900, 1100, getSample(4, testCounter, "group", "::teardown", "place", "teardownAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::teardown", false))
+	expectIn(0, 100, getNetworkSamples("::teardown"))
 
 	for {
 		select {
