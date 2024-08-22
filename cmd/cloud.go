@@ -14,6 +14,7 @@ import (
 
 	"github.com/fatih/color"
 	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
@@ -22,8 +23,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"go.k6.io/k6/cmd/state"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -313,9 +312,16 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
 	}
 
+	//nolint:stylecheck,golint
 	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
+		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
+		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
+		// when thresholds have been crossed (failed). So, we report this situation as such.
+		if testProgress.RunStatus == cloudapi.RunStatusFinished {
+			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
+		}
+
 		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		//nolint:stylecheck,golint
 		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
 	}
 
