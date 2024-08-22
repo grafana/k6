@@ -69,10 +69,10 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
-// Sample creates a new NetTrail instance with the Dialer
-// sent and received data metrics and the supplied times and tags.
-func (d *Dialer) Sample(
-	endTime time.Time, ctm metrics.TagsAndMeta, builtinMetrics *metrics.BuiltinMetrics,
+// IOSamples returns samples for data send and received since it last call and zeros out.
+// It uses the provided time as the sample time and tags and builtinMetrics to build the samples.
+func (d *Dialer) IOSamples(
+	sampleTime time.Time, ctm metrics.TagsAndMeta, builtinMetrics *metrics.BuiltinMetrics,
 ) metrics.SampleContainer {
 	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
 	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
@@ -82,7 +82,7 @@ func (d *Dialer) Sample(
 				Metric: builtinMetrics.DataSent,
 				Tags:   ctm.Tags,
 			},
-			Time:     endTime,
+			Time:     sampleTime,
 			Metadata: ctm.Metadata,
 			Value:    float64(bytesWritten),
 		},
@@ -91,7 +91,7 @@ func (d *Dialer) Sample(
 				Metric: builtinMetrics.DataReceived,
 				Tags:   ctm.Tags,
 			},
-			Time:     endTime,
+			Time:     sampleTime,
 			Metadata: ctm.Metadata,
 			Value:    float64(bytesRead),
 		},

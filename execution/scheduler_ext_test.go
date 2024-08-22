@@ -363,8 +363,8 @@ func TestSchedulerSystemTags(t *testing.T) {
 
 	expTrailPVUTags := expCommonTrailTags.With("scenario", "per_vu_test")
 	expTrailSITags := expCommonTrailTags.With("scenario", "shared_test")
-	expNetTrailPVUTags := testRunState.RunTags.With("group", "").With("scenario", "per_vu_test")
-	expNetTrailSITags := testRunState.RunTags.With("group", "").With("scenario", "shared_test")
+	expDataSentPVUTags := testRunState.RunTags.With("group", "").With("scenario", "per_vu_test")
+	expDataSentSITags := testRunState.RunTags.With("group", "").With("scenario", "shared_test")
 
 	var gotCorrectTags int
 	for {
@@ -378,7 +378,7 @@ func TestSchedulerSystemTags(t *testing.T) {
 			default:
 				for _, sample := range s.GetSamples() {
 					if sample.Metric.Name == metrics.DataSentName {
-						if sample.Tags == expNetTrailPVUTags || sample.Tags == expNetTrailSITags {
+						if sample.Tags == expDataSentPVUTags || sample.Tags == expDataSentSITags {
 							gotCorrectTags++
 						}
 					}
@@ -491,7 +491,7 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 				defer stopEmission()
 				require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 			}()
-			var gotTrailTag, gotNetTrailTag bool
+			var gotTrailTag, gotDataSentTag bool
 			for {
 				select {
 				case sample := <-samples:
@@ -502,15 +502,15 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 						}
 					}
 					for _, s := range sample.GetSamples() {
-						if s.Metric.Name == metrics.DataSentName && !gotNetTrailTag {
+						if s.Metric.Name == metrics.DataSentName && !gotDataSentTag {
 							tags := s.Tags.Map()
 							if v, ok := tags["customTag"]; ok && v == "value" {
-								gotNetTrailTag = true
+								gotDataSentTag = true
 							}
 						}
 					}
 				case <-done:
-					if !gotTrailTag || !gotNetTrailTag {
+					if !gotTrailTag || !gotDataSentTag {
 						assert.FailNow(t, "a sample with expected tag wasn't received")
 					}
 					return
@@ -1294,7 +1294,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		)
 
 		ctm := metrics.TagsAndMeta{Tags: getTags(piState.Registry, expTags...)}
-		return dialer.Sample(time.Now(), ctm, piState.BuiltinMetrics)
+		return dialer.IOSamples(time.Now(), ctm, piState.BuiltinMetrics)
 	}
 
 	getIterationsSamples := func(group string, addExpTags ...string) metrics.SampleContainer {

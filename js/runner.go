@@ -867,7 +867,7 @@ func (u *VU) runFn(
 
 	builtinMetrics := u.Runner.preInitState.BuiltinMetrics
 	ctm := u.state.Tags.GetCurrentValues()
-	u.state.Samples <- u.Dialer.Sample(endTime, ctm, builtinMetrics)
+	u.state.Samples <- u.Dialer.IOSamples(endTime, ctm, builtinMetrics)
 
 	if isFullIteration && isDefault {
 		u.state.Samples <- iterationSamples(startTime, endTime, ctm, builtinMetrics)
