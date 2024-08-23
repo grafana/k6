@@ -57,7 +57,9 @@ type FrameSession struct {
 	k6Metrics *k6ext.CustomMetrics
 
 	targetID target.ID
-	windowID browser.WindowID
+	// windowID can be 0 when it is associated to an iframe or frame with no UI.
+	windowID    browser.WindowID
+	hasUIWindow bool
 
 	// To understand the concepts of Isolated Worlds, Contexts and Frames and
 	// the relationship betwween them have a look at the following doc:
@@ -82,7 +84,7 @@ type FrameSession struct {
 //
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger,
+	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
@@ -103,6 +105,7 @@ func NewFrameSession(
 		vu:                   k6ext.GetVU(ctx),
 		k6Metrics:            k6Metrics,
 		logger:               l,
+		hasUIWindow:          hasUIWindow,
 	}
 
 	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
@@ -120,14 +123,20 @@ func NewFrameSession(
 		return nil, err
 	}
 
-	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
-	if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		l.Debugf(
-			"NewFrameSession:GetWindowForTarget",
-			"sid:%v tid:%v err:%v",
-			s.ID(), tid, err)
+	// When a frame creates a new FrameSession without UI (e.g. some iframes) we cannot
+	// retrieve the windowID. Doing so would lead to an error from chromium. For now all
+	// iframes that are attached are setup with hasUIWindow as false which seems to work
+	// as expected for iframes with and without UI elements.
+	if fs.hasUIWindow {
+		action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
+		if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			l.Debugf(
+				"NewFrameSession:GetWindowForTarget",
+				"sid:%v tid:%v err:%v",
+				s.ID(), tid, err)
 
-		return nil, fmt.Errorf("getting browser window ID: %w", err)
+			return nil, fmt.Errorf("getting browser window ID: %w", err)
+		}
 	}
 
 	fs.initEvents()
@@ -994,7 +1003,8 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		fs.ctx,
 		fs.page.browserCtx.getSession(sid),
 		fs.page, fs, ti.TargetID,
-		fs.logger)
+		fs.logger,
+		false)
 	if err != nil {
 		return fmt.Errorf("attaching iframe target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)
@@ -1187,18 +1197,20 @@ func (fs *FrameSession) updateViewport() error {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
-	// add an inset to viewport depending on the operating system.
-	// this won't add an inset if we're running in headless mode.
-	viewport.calculateInset(
-		fs.page.browserCtx.browser.browserOpts.Headless,
-		runtime.GOOS,
-	)
-	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
-		Width:  viewport.Width,
-		Height: viewport.Height,
-	})
-	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("setting window bounds: %w", err)
+	if fs.hasUIWindow {
+		// add an inset to viewport depending on the operating system.
+		// this won't add an inset if we're running in headless mode.
+		viewport.calculateInset(
+			fs.page.browserCtx.browser.browserOpts.Headless,
+			runtime.GOOS,
+		)
+		action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
+			Width:  viewport.Width,
+			Height: viewport.Height,
+		})
+		if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			return fmt.Errorf("setting window bounds: %w", err)
+		}
 	}
 
 	return nil
