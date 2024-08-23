@@ -77,7 +77,7 @@ func (o *Output) Start() error {
 	}
 
 	res, err := resource.Merge(resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL,
+		resource.NewSchemaless(
 			semconv.ServiceName(o.config.ServiceName.String),
 			semconv.ServiceVersion(o.config.ServiceVersion.String),
 		))
