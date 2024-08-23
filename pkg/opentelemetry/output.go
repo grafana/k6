@@ -164,7 +164,7 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 			return err
 		}
 
-		gauge.Set(entry.Value, attributeSet)
+		gauge.Record(ctx, entry.Value, attributeSetOpt)
 	case metrics.Trend:
 		trend, err := o.metricsRegistry.getOrCreateHistogram(name, unit)
 		if err != nil {
