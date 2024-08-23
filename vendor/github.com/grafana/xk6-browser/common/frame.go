@@ -645,6 +645,37 @@ func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
 	return nil
 }
 
+func (f *Frame) setChecked(selector string, checked bool, opts *FrameCheckOptions) error {
+	setChecked := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+		return nil, handle.setChecked(apiCtx, checked, p)
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, setChecked, &opts.ElementHandleBasePointerOptions,
+	)
+	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err)
+	}
+
+	return nil
+}
+
+// SetChecked sets the checked state of the first element found that matches the selector.
+func (f *Frame) SetChecked(selector string, checked bool, opts sobek.Value) error {
+	f.log.Debugf("Frame:SetChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	popts := NewFrameCheckOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		return fmt.Errorf("parsing frame set check options: %w", err)
+	}
+	if err := f.setChecked(selector, checked, popts); err != nil {
+		return fmt.Errorf("setting checked %q: %w", selector, err)
+	}
+
+	applySlowMo(f.ctx)
+
+	return nil
+}
+
 // Uncheck the first found element that matches the selector.
 func (f *Frame) Uncheck(selector string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)

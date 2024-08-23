@@ -192,6 +192,11 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return f.SelectOption(selector, values, opts) //nolint:wrapcheck
 			})
 		},
+		"setChecked": func(selector string, checked bool, opts sobek.Value) *sobek.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, f.SetChecked(selector, checked, opts) //nolint:wrapcheck
+			})
+		},
 		"setContent": func(html string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, f.SetContent(html, opts) //nolint:wrapcheck
