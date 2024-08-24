@@ -406,10 +406,7 @@ func (o Options) Apply(opts Options) Options {
 	if opts.NoSetup.Valid {
 		o.NoSetup = opts.NoSetup
 	}
-	// Run setup() before any executors, if it's not disabled.
-	// When SetupTimeout is 0, setuo() is disabled.
-
-	if opts.SetupTimeout.Valid && opts.SetupTimeout.Duration != 0 {
+	if opts.SetupTimeout.Valid {
 		o.SetupTimeout = opts.SetupTimeout
 	}
 	if opts.NoTeardown.Valid {
