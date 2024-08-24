@@ -1,4 +1,4 @@
-# v1.57.2
+# v1.60.1
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   timeout: 5m
@@ -19,6 +19,7 @@ issues:
    # files (due to common repeats and long functions in test code)
    - path: _(test|gen)\.go
      linters:
+       - canonicalheader
        - cyclop
        - dupl
        - gocognit
@@ -68,6 +69,7 @@ linters:
     - asciicheck
     - bidichk
     - bodyclose
+    - canonicalheader
     - contextcheck
     - cyclop
     - dogsled
@@ -79,6 +81,7 @@ linters:
     - errorlint
     - exhaustive
     - exportloopref
+    - fatcontext
     - forbidigo
     - forcetypeassert
     - funlen

@@ -19,6 +19,7 @@ type reflectionClient struct {
 // It is called in the connect function the first time the Client.Connect function is called.
 func (rc *reflectionClient) Reflect(ctx context.Context) (*descriptorpb.FileDescriptorSet, error) {
 	client := grpcreflect.NewClientAuto(ctx, rc.Conn)
+	client.AllowMissingFileDescriptors()
 
 	services, err := client.ListServices()
 	if err != nil {

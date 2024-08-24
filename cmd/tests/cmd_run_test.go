@@ -1434,14 +1434,14 @@ func sum(vals []float64) (sum float64) {
 	return sum
 }
 
-func max(vals []float64) float64 {
-	max := vals[0]
+func maxFloat64(vals []float64) float64 {
+	result := vals[0]
 	for _, val := range vals {
-		if max < val {
-			max = val
+		if result < val {
+			result = val
 		}
 	}
-	return max
+	return result
 }
 
 func TestActiveVUsCount(t *testing.T) {
@@ -1499,8 +1499,8 @@ func TestActiveVUsCount(t *testing.T) {
 	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 	// t.Log(string(jsonResults))
-	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus_max", nil)))
-	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus", nil)))
+	assert.Equal(t, float64(10), maxFloat64(getSampleValues(t, jsonResults, "vus_max", nil)))
+	assert.Equal(t, float64(10), maxFloat64(getSampleValues(t, jsonResults, "vus", nil)))
 	assert.Equal(t, float64(0), sum(getSampleValues(t, jsonResults, "iterations", nil)))
 
 	logEntries := ts.LoggerHook.Drain()

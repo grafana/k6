@@ -110,14 +110,13 @@ func GetFixedLengthDuration(d, maxDuration time.Duration) (result string) {
 	return string(buf[i:])
 }
 
-// Clampf returns the given value, "clamped" to the range [min, max].
-// This is copied from lib/util.go to avoid circular imports.
-func Clampf(val, min, max float64) float64 {
+// Clampf returns the given value, "clamped" to the range [floor, ceiling].
+func Clampf(val, floor, ceiling float64) float64 {
 	switch {
-	case val < min:
-		return min
-	case val > max:
-		return max
+	case val < floor:
+		return floor
+	case val > ceiling:
+		return ceiling
 	default:
 		return val
 	}

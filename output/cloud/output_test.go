@@ -94,13 +94,14 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 	handler := func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/v1/tests":
-			fmt.Fprintf(w, `{
+			_, err := fmt.Fprintf(w, `{
 "reference_id": "12345",
 "config": {
 	"metricPushInterval": "10ms",
 	"aggregationPeriod": "40s"
 }
 }`)
+			require.NoError(t, err)
 		case "/v1/tests/12345":
 			w.WriteHeader(http.StatusOK)
 		default:

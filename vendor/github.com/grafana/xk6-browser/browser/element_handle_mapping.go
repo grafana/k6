@@ -171,6 +171,11 @@ func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:
 				return nil, eh.SelectText(opts) //nolint:wrapcheck
 			})
 		},
+		"setChecked": func(checked bool, opts sobek.Value) *sobek.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, eh.SetChecked(checked, opts) //nolint:wrapcheck
+			})
+		},
 		"setInputFiles": func(files sobek.Value, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, eh.SetInputFiles(files, opts) //nolint:wrapcheck

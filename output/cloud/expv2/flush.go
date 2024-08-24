@@ -87,7 +87,7 @@ func (f *metricsFlusher) flush() error {
 
 func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 	// TODO remove after go 1.21 becomes the minimum supported version - it has `min` in it
-	min := func(a, b int) int {
+	minInt := func(a, b int) int {
 		if a < b {
 			return a
 		}
@@ -95,7 +95,7 @@ func (f *metricsFlusher) flushBatches(batches []*pbcloud.MetricSet) error {
 	}
 
 	var (
-		workers  = min(len(batches), f.batchPushConcurrency)
+		workers  = minInt(len(batches), f.batchPushConcurrency)
 		errs     = make(chan error, workers)
 		feed     = make(chan *pbcloud.MetricSet)
 		finalErr error

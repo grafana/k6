@@ -263,6 +263,11 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return p.SelectOption(selector, values, opts) //nolint:wrapcheck
 			})
 		},
+		"setChecked": func(selector string, checked bool, opts sobek.Value) *sobek.Promise {
+			return k6ext.Promise(vu.Context(), func() (any, error) {
+				return nil, p.SetChecked(selector, checked, opts) //nolint:wrapcheck
+			})
+		},
 		"setContent": func(html string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return nil, p.SetContent(html, opts) //nolint:wrapcheck

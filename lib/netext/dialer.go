@@ -69,23 +69,20 @@ func (d *Dialer) DialContext(ctx context.Context, proto, addr string) (net.Conn,
 	return conn, err
 }
 
-// GetTrail creates a new NetTrail instance with the Dialer
-// sent and received data metrics and the supplied times and tags.
-// TODO: Refactor this according to
-// https://github.com/k6io/k6/pull/1203#discussion_r337938370
-func (d *Dialer) GetTrail(
-	startTime, endTime time.Time, fullIteration bool, emitIterations bool, ctm metrics.TagsAndMeta,
-	builtinMetrics *metrics.BuiltinMetrics,
-) *NetTrail {
+// IOSamples returns samples for data send and received since it last call and zeros out.
+// It uses the provided time as the sample time and tags and builtinMetrics to build the samples.
+func (d *Dialer) IOSamples(
+	sampleTime time.Time, ctm metrics.TagsAndMeta, builtinMetrics *metrics.BuiltinMetrics,
+) metrics.SampleContainer {
 	bytesWritten := atomic.SwapInt64(&d.BytesWritten, 0)
 	bytesRead := atomic.SwapInt64(&d.BytesRead, 0)
-	samples := []metrics.Sample{
+	return metrics.Samples([]metrics.Sample{
 		{
 			TimeSeries: metrics.TimeSeries{
 				Metric: builtinMetrics.DataSent,
 				Tags:   ctm.Tags,
 			},
-			Time:     endTime,
+			Time:     sampleTime,
 			Metadata: ctm.Metadata,
 			Value:    float64(bytesWritten),
 		},
@@ -94,43 +91,11 @@ func (d *Dialer) GetTrail(
 				Metric: builtinMetrics.DataReceived,
 				Tags:   ctm.Tags,
 			},
-			Time:     endTime,
+			Time:     sampleTime,
 			Metadata: ctm.Metadata,
 			Value:    float64(bytesRead),
 		},
-	}
-	if fullIteration {
-		samples = append(samples, metrics.Sample{
-			TimeSeries: metrics.TimeSeries{
-				Metric: builtinMetrics.IterationDuration,
-				Tags:   ctm.Tags,
-			},
-			Time:     endTime,
-			Metadata: ctm.Metadata,
-			Value:    metrics.D(endTime.Sub(startTime)),
-		})
-		if emitIterations {
-			samples = append(samples, metrics.Sample{
-				TimeSeries: metrics.TimeSeries{
-					Metric: builtinMetrics.Iterations,
-					Tags:   ctm.Tags,
-				},
-				Time:     endTime,
-				Metadata: ctm.Metadata,
-				Value:    1,
-			})
-		}
-	}
-
-	return &NetTrail{
-		BytesRead:     bytesRead,
-		BytesWritten:  bytesWritten,
-		FullIteration: fullIteration,
-		StartTime:     startTime,
-		EndTime:       endTime,
-		Tags:          ctm.Tags,
-		Samples:       samples,
-	}
+	})
 }
 
 func (d *Dialer) getDialAddr(addr string) (string, error) {
@@ -206,36 +171,6 @@ func (d *Dialer) getConfiguredHost(addr, host, port string) (*types.Host, error)
 	}
 
 	return nil, nil //nolint:nilnil
-}
-
-// NetTrail contains information about the exchanged data size and length of a
-// series of connections from a particular netext.Dialer
-type NetTrail struct {
-	BytesRead     int64
-	BytesWritten  int64
-	FullIteration bool
-	StartTime     time.Time
-	EndTime       time.Time
-	Tags          *metrics.TagSet
-	Samples       []metrics.Sample
-}
-
-// Ensure that interfaces are implemented correctly
-var _ metrics.ConnectedSampleContainer = &NetTrail{}
-
-// GetSamples implements the metrics.SampleContainer interface.
-func (ntr *NetTrail) GetSamples() []metrics.Sample {
-	return ntr.Samples
-}
-
-// GetTags implements the metrics.ConnectedSampleContainer interface.
-func (ntr *NetTrail) GetTags() *metrics.TagSet {
-	return ntr.Tags
-}
-
-// GetTime implements the metrics.ConnectedSampleContainer interface.
-func (ntr *NetTrail) GetTime() time.Time {
-	return ntr.EndTime
 }
 
 // Conn wraps net.Conn and keeps track of sent and received data size

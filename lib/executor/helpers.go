@@ -30,13 +30,13 @@ func sumStagesDuration(stages []Stage) (result time.Duration) {
 }
 
 func getStagesUnscaledMaxTarget(unscaledStartValue int64, stages []Stage) int64 {
-	max := unscaledStartValue
+	result := unscaledStartValue
 	for _, s := range stages {
-		if s.Target.Int64 > max {
-			max = s.Target.Int64
+		if s.Target.Int64 > result {
+			result = s.Target.Int64
 		}
 	}
-	return max
+	return result
 }
 
 // validateTargetShifts validates the VU Target shifts.

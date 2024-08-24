@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
@@ -19,7 +19,8 @@ func TestTLS13Support(t *testing.T) {
 
 	ts.tb.Mux.HandleFunc("/tls-version", http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		ver := req.TLS.Version
-		fmt.Fprint(resp, lib.SupportedTLSVersionsToString[lib.TLSVersion(ver)])
+		_, err := fmt.Fprint(resp, lib.SupportedTLSVersionsToString[lib.TLSVersion(ver)])
+		require.NoError(t, err)
 	}))
 
 	// We don't expect any failed requests
@@ -32,5 +33,5 @@ func TestTLS13Support(t *testing.T) {
 			throw new Error("unexpected tls version: " + resp.body);
 		}
 	`))
-	assert.NoError(t, err)
+	require.NoError(t, err)
 }
