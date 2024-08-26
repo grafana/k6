@@ -26,7 +26,7 @@ func TestK6CloudUpload(t *testing.T) {
 
 		ts := getSimpleCloudTestState(t, nil, setupK6CloudUploadCmd, nil, nil, nil)
 		delete(ts.Env, "K6_CLOUD_TOKEN")
-		ts.ExpectedExitCode = -1 // TODO: use a more specific exit code?
+		ts.ExpectedExitCode = -1
 		cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 		stdout := ts.Stdout.String()

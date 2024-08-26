@@ -335,7 +335,7 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
 		"only upload the test to the cloud without actually starting a test run")
 	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
-		panic(err)
+		panic(err) // Should never happen
 	}
 
 	return flags
