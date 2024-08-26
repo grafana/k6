@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"hash/maphash"
 	"math"
-	"math/big"
 	"reflect"
 	"strconv"
 	"unsafe"
@@ -142,7 +141,6 @@ type valueProperty struct {
 var (
 	errAccessBeforeInit = referenceError("Cannot access a variable before initialization")
 	errAssignToConst    = typeError("Assignment to constant variable.")
-	errMixBigIntType    = typeError("Cannot mix BigInt and other types, use explicit conversions")
 )
 
 func propGetter(o Value, v Value, r *Runtime) *Object {
@@ -220,8 +218,6 @@ func (i valueInt) Equals(other Value) bool {
 	switch o := other.(type) {
 	case valueInt:
 		return i == o
-	case *valueBigInt:
-		return (*big.Int)(o).Cmp(big.NewInt(int64(i))) == 0
 	case valueFloat:
 		return float64(i) == float64(o)
 	case String:
@@ -647,15 +643,6 @@ func (f valueFloat) Equals(other Value) bool {
 		return f == o
 	case valueInt:
 		return float64(f) == float64(o)
-	case *valueBigInt:
-		if IsInfinity(f) || math.IsNaN(float64(f)) {
-			return false
-		}
-		if f := big.NewFloat(float64(f)); f.IsInt() {
-			i, _ := f.Int(nil)
-			return (*big.Int)(o).Cmp(i) == 0
-		}
-		return false
 	case String, valueBool:
 		return float64(f) == o.ToFloat()
 	case *Object:
@@ -741,7 +728,7 @@ func (o *Object) Equals(other Value) bool {
 	}
 
 	switch o1 := other.(type) {
-	case valueInt, valueFloat, *valueBigInt, String, *Symbol:
+	case valueInt, valueFloat, String, *Symbol:
 		return o.toPrimitive().Equals(other)
 	case valueBool:
 		return o.Equals(o1.ToNumber())

@@ -123,10 +123,6 @@ func parseDate(layout, value string, defaultLocation *time.Location) (time.Time,
 				p, value = value[1:7], value[7:]
 				year, err = atoi(p)
 				if neg {
-					if year == 0 {
-						err = errBad
-						break
-					}
 					year = -year
 				}
 			} else {

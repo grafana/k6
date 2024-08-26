@@ -1,6 +1,7 @@
 package sobek
 
 import (
+	"github.com/grafana/sobek/unistring"
 	"math"
 	"strings"
 	"sync"
@@ -8,8 +9,6 @@ import (
 	"unicode/utf8"
 
 	"github.com/grafana/sobek/parser"
-	"github.com/grafana/sobek/unistring"
-
 	"golang.org/x/text/collate"
 	"golang.org/x/text/language"
 	"golang.org/x/text/unicode/norm"
@@ -333,7 +332,7 @@ func (r *Runtime) stringproto_indexOf(call FunctionCall) Value {
 	r.checkObjectCoercible(call.This)
 	value := call.This.toString()
 	target := call.Argument(0).toString()
-	pos := call.Argument(1).ToNumber().ToInteger()
+	pos := call.Argument(1).ToInteger()
 
 	if pos < 0 {
 		pos = 0
@@ -1090,10 +1089,8 @@ func (r *Runtime) getString() *Object {
 	return ret
 }
 
-var (
-	stringProtoTemplate     *objectTemplate
-	stringProtoTemplateOnce sync.Once
-)
+var stringProtoTemplate *objectTemplate
+var stringProtoTemplateOnce sync.Once
 
 func getStringProtoTemplate() *objectTemplate {
 	stringProtoTemplateOnce.Do(func() {
