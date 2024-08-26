@@ -69,6 +69,7 @@ Update go.mod for submodules to depend on the new release which will happen in t
        ```
 
    - Move all the `Unreleased` changes into a new section following the title scheme (`[<new tag>] - <date of release>`).
+   - Make sure the new section is under the comment for released section, like `<!-- Released section -->`, so it is protected from being overwritten in the future.
    - Update all the appropriate links at the bottom.
 
 4. Push the changes to upstream and create a Pull Request on GitHub.

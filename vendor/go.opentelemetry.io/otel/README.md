@@ -47,20 +47,29 @@ stop ensuring compatibility with these versions in the following manner:
 
 Currently, this project supports the following environments.
 
-| OS      | Go Version | Architecture |
-|---------|------------|--------------|
-| Ubuntu  | 1.22       | amd64        |
-| Ubuntu  | 1.21       | amd64        |
-| Ubuntu  | 1.22       | 386          |
-| Ubuntu  | 1.21       | 386          |
-| Linux   | 1.22       | arm64        |
-| Linux   | 1.21       | arm64        |
-| MacOS   | 1.22       | amd64        |
-| MacOS   | 1.21       | amd64        |
-| Windows | 1.22       | amd64        |
-| Windows | 1.21       | amd64        |
-| Windows | 1.22       | 386          |
-| Windows | 1.21       | 386          |
+| OS       | Go Version | Architecture |
+|----------|------------|--------------|
+| Ubuntu   | 1.23       | amd64        |
+| Ubuntu   | 1.22       | amd64        |
+| Ubuntu   | 1.21       | amd64        |
+| Ubuntu   | 1.23       | 386          |
+| Ubuntu   | 1.22       | 386          |
+| Ubuntu   | 1.21       | 386          |
+| Linux    | 1.23       | arm64        |
+| Linux    | 1.22       | arm64        |
+| Linux    | 1.21       | arm64        |
+| macOS 13 | 1.23       | amd64        |
+| macOS 13 | 1.22       | amd64        |
+| macOS 13 | 1.21       | amd64        |
+| macOS    | 1.23       | arm64        |
+| macOS    | 1.22       | arm64        |
+| macOS    | 1.21       | arm64        |
+| Windows  | 1.23       | amd64        |
+| Windows  | 1.22       | amd64        |
+| Windows  | 1.21       | amd64        |
+| Windows  | 1.23       | 386          |
+| Windows  | 1.22       | 386          |
+| Windows  | 1.21       | 386          |
 
 While this project should work for other systems, no compatibility guarantees
 are made for those systems currently.

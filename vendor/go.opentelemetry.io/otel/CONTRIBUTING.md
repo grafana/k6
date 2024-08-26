@@ -650,7 +650,7 @@ should be canceled.
 ### Become an Approver or a Maintainer
 
 See the [community membership document in OpenTelemetry community
-repo](https://github.com/open-telemetry/community/blob/main/community-membership.md).
+repo](https://github.com/open-telemetry/community/blob/main/guides/contributor/membership.md).
 
 [Approver]: #approvers
 [Maintainer]: #maintainers
