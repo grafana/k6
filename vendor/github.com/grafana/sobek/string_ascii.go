@@ -4,6 +4,7 @@ import (
 	"hash/maphash"
 	"io"
 	"math"
+	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
@@ -114,7 +115,7 @@ func isRangeErr(err error) bool {
 }
 
 func (s asciiString) _toFloat() (float64, error) {
-	ss := strings.TrimSpace(string(s))
+	ss := strings.ToLower(strings.TrimSpace(string(s)))
 	if ss == "" {
 		return 0, nil
 	}
@@ -122,7 +123,14 @@ func (s asciiString) _toFloat() (float64, error) {
 		var f float64
 		return -f, nil
 	}
+
 	f, err := strconv.ParseFloat(ss, 64)
+	if err == nil && math.IsInf(f, 0) {
+		if strings.HasPrefix(ss, "inf") || strings.HasPrefix(ss, "-inf") || strings.HasPrefix(ss, "+inf") {
+			// We handle "Infinity" separately, prevent from being parsed as Infinity due to strconv.ParseFloat() permissive syntax
+			return 0, strconv.ErrSyntax
+		}
+	}
 	if isRangeErr(err) {
 		err = nil
 	}
@@ -237,6 +245,14 @@ func (s asciiString) Equals(other Value) bool {
 			return o1 == o.ToFloat()
 		}
 		return false
+	}
+
+	if o, ok := other.(*valueBigInt); ok {
+		bigInt, err := stringToBigInt(s.toTrimmedUTF8())
+		if err != nil {
+			return false
+		}
+		return bigInt.Cmp((*big.Int)(o)) == 0
 	}
 
 	if o, ok := other.(*Object); ok {

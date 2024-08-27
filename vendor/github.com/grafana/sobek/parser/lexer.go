@@ -3,6 +3,7 @@ package parser
 import (
 	"errors"
 	"fmt"
+	"math/big"
 	"strconv"
 	"strings"
 	"unicode"
@@ -911,7 +912,9 @@ func parseNumberLiteral(literal string) (value interface{}, err error) {
 	err = parseIntErr
 
 	if err.(*strconv.NumError).Err == strconv.ErrRange {
-		if len(literal) > 2 && literal[0] == '0' && (literal[1] == 'X' || literal[1] == 'x') {
+		if len(literal) > 2 &&
+			literal[0] == '0' && (literal[1] == 'X' || literal[1] == 'x') &&
+			literal[len(literal)-1] != 'n' {
 			// Could just be a very large number (e.g. 0x8000000000000000)
 			var value float64
 			literal = literal[2:]
@@ -924,6 +927,21 @@ func parseNumberLiteral(literal string) (value interface{}, err error) {
 			}
 			return value, nil
 		}
+	}
+
+	if len(literal) > 1 && literal[len(literal)-1] == 'n' {
+		if literal[0] == '0' {
+			if len(literal) > 2 && isDecimalDigit(rune(literal[1])) {
+				goto error
+			}
+		}
+		// Parse as big.Int
+		bigInt := new(big.Int)
+		_, ok := bigInt.SetString(literal[:len(literal)-1], 0)
+		if !ok {
+			goto error
+		}
+		return bigInt, nil
 	}
 
 error:
@@ -1171,6 +1189,10 @@ func (self *_parser) scanNumericLiteral(decimalPoint bool) (token.Token, string)
 		}
 	}
 end:
+	if self.chr == 'n' || self.chr == 'N' {
+		self.read()
+		return tkn, self.str[offset:self.chrOffset]
+	}
 	if isIdentifierStart(self.chr) || isDecimalDigit(self.chr) {
 		return token.ILLEGAL, self.str[offset:self.chrOffset]
 	}
