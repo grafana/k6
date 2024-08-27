@@ -3,7 +3,10 @@
 package data
 
 import (
+	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"strconv"
 	"sync"
 
@@ -90,7 +93,55 @@ func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 	}
 
 	array := d.shared.get(rt, name, fn)
-	return array.wrap(rt).ToObject(rt)
+	return array.Wrap(rt).ToObject(rt)
+}
+
+// Reader is the interface that wraps the basic Read method.
+//
+// The data module Reader interface is implemented by types that can read data from a source, such
+// as a CSV file, etc.
+type Reader interface {
+	Read() ([]string, error)
+}
+
+// NewSharedArrayFrom creates a new shared array from the provided data.
+//
+// This function is not exposed to the JS runtime. It is used internally to instantiate
+// shared arrays without having to go through the whole JS runtime machinery, which effectively has
+// a big performance impact (e.g. when filling a shared array from a CSV file).
+//
+// This function takes an explicit runtime argument to retain control over which VU runtime it is
+// executed in. This is important because the shared array underlying implementation relies on maintaining
+// a single instance of arrays for the whole test setup and VUs.
+func (d *Data) NewSharedArrayFrom(rt *sobek.Runtime, name string, r Reader) *sobek.Object {
+	if name == "" {
+		common.Throw(rt, errors.New("empty name provided to SharedArray's constructor"))
+	}
+
+	var arr []string
+	for {
+		record, err := r.Read()
+		if errors.Is(err, io.EOF) {
+			break
+		}
+		if err != nil {
+			common.Throw(rt, fmt.Errorf("failed to read record; reason: %w", err))
+		}
+
+		marshaled, err := json.Marshal(record)
+		if err != nil {
+			common.Throw(rt, err)
+		}
+
+		arr = append(arr, string(marshaled))
+	}
+
+	d.shared.mu.Lock()
+	defer d.shared.mu.Unlock()
+	array := sharedArray{arr: arr}
+	d.shared.data[name] = array
+
+	return array.Wrap(rt).ToObject(rt)
 }
 
 func (s *sharedArrays) get(rt *sobek.Runtime, name string, call sobek.Callable) sharedArray {
@@ -121,10 +172,10 @@ func getShareArrayFromCall(rt *sobek.Runtime, call sobek.Callable) sharedArray {
 	}
 	arr := make([]string, obj.Get("length").ToInteger())
 
-	stringify, _ := sobek.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("stringify"))
+	stringifyFunc, _ := sobek.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("stringify"))
 	var val sobek.Value
 	for i := range arr {
-		val, err = stringify(sobek.Undefined(), obj.Get(strconv.Itoa(i)))
+		val, err = stringifyFunc(sobek.Undefined(), obj.Get(strconv.Itoa(i)))
 		if err != nil {
 			panic(err)
 		}
