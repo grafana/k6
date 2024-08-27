@@ -104,6 +104,32 @@ func (l *Locator) dblclick(opts *FrameDblclickOptions) error {
 	return l.frame.dblclick(l.selector, opts)
 }
 
+// SetChecked sets the checked state of the element using locator's selector
+// with strict mode on.
+func (l *Locator) SetChecked(checked bool, opts sobek.Value) error {
+	l.log.Debugf(
+		"Locator:SetChecked", "fid:%s furl:%q sel:%q checked:%v opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, checked, opts,
+	)
+
+	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing set checked options: %w", err)
+	}
+	if err := l.setChecked(checked, copts); err != nil {
+		return fmt.Errorf("setting %q checked to %v: %w", l.selector, checked, err)
+	}
+
+	applySlowMo(l.ctx)
+
+	return nil
+}
+
+func (l *Locator) setChecked(checked bool, opts *FrameCheckOptions) error {
+	opts.Strict = true
+	return l.frame.setChecked(l.selector, checked, opts)
+}
+
 // Check on an element using locator's selector with strict mode on.
 func (l *Locator) Check(opts sobek.Value) error {
 	l.log.Debugf("Locator:Check", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)

@@ -12,18 +12,17 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui/pb"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-
-	"go.k6.io/k6/cmd/state"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -313,9 +312,16 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
 	}
 
+	//nolint:stylecheck,golint
 	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
+		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
+		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
+		// when thresholds have been crossed (failed). So, we report this situation as such.
+		if testProgress.RunStatus == cloudapi.RunStatusFinished {
+			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
+		}
+
 		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		//nolint:stylecheck,golint
 		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
 	}
 
@@ -335,6 +341,9 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"enable showing of logs when a test is executed in the cloud")
 	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
 		"only upload the test to the cloud without actually starting a test run")
+	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
+		panic(err) // Should never happen
+	}
 
 	return flags
 }
@@ -366,16 +375,15 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
-		Long: `Run a test in the Grafana Cloud k6.
+		Long: `The original behavior of the "k6 cloud" command described below is deprecated.
+In future versions, the "cloud" command will only display a help text and will no longer run tests
+in Grafana Cloud k6. To continue running tests in the cloud, please transition to using the "k6 cloud run" command.
+
+Run a test in the Grafana Cloud k6.
 
 This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
 service. Be sure to run the "k6 cloud login" command prior to authenticate with Grafana Cloud k6.`,
-		Args: exactCloudArgs(),
-		Deprecated: `the k6 team is in the process of modifying and deprecating the "k6 cloud" command behavior.
-In the future, the "cloud" command will only display a help text, instead of running tests in the Grafana Cloud k6.
-
-To run tests in the cloud, users are now invited to migrate to the "k6 cloud run" command instead.
-`,
+		Args:    exactCloudArgs(),
 		PreRunE: c.preRun,
 		RunE:    c.run,
 		Example: exampleText,
@@ -384,6 +392,7 @@ To run tests in the cloud, users are now invited to migrate to the "k6 cloud run
 	// Register `k6 cloud` subcommands
 	cloudCmd.AddCommand(getCmdCloudRun(gs))
 	cloudCmd.AddCommand(getCmdCloudLogin(gs))
+	cloudCmd.AddCommand(getCmdCloudUpload(c))
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())

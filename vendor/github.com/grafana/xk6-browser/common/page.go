@@ -296,7 +296,7 @@ func NewPage(
 
 	var err error
 	p.frameManager = NewFrameManager(ctx, s, &p, p.timeoutSettings, p.logger)
-	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger)
+	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger, true)
 	if err != nil {
 		p.logger.Debugf("Page:NewPage:NewFrameSession:return", "sid:%v tid:%v err:%v",
 			p.sessionID(), tid, err)
@@ -626,6 +626,13 @@ func (p *Page) BringToFront() error {
 	}
 
 	return nil
+}
+
+// SetChecked sets the checked state of the element matching the provided selector.
+func (p *Page) SetChecked(selector string, checked bool, opts sobek.Value) error {
+	p.logger.Debugf("Page:SetChecked", "sid:%v selector:%s checked:%t", p.sessionID(), selector, checked)
+
+	return p.MainFrame().SetChecked(selector, checked, opts)
 }
 
 // Check checks an element matching the provided selector.
