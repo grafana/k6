@@ -127,7 +127,15 @@ function assert_goodCryptoKey(key, algorithm, extractable, usages, kind) {
         assert_equals(key.algorithm.length, algorithm.length, "Correct length");
     }
     if (["HMAC", "RSASSA-PKCS1-v1_5", "RSA-PSS"].includes(registeredAlgorithmName)) {
-        assert_equals(key.algorithm.hash.name.toUpperCase(), algorithm.hash.toUpperCase(), "Correct hash function");
+        // TODO: temporary hack
+        // check if algorithm.hash is a string or an object
+        if (typeof algorithm.hash === "object") {
+            hashName = algorithm.hash.name.toUpperCase();
+        } else {
+            hashName = algorithm.hash.toUpperCase();
+        }
+        
+        assert_equals(hashName, algorithm.hash.toUpperCase(), "Correct hash function");
     }
 
     if (/^(?:Ed|X)(?:25519|448)$/.test(key.algorithm.name)) {

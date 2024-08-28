@@ -89,9 +89,7 @@ type PBKDF2Params struct {
 // RSAHashedKeyGenParams represents the object that should be passed as the algorithm
 // parameter into `SubtleCrypto.GenerateKey`, when generating an RSA key pair.
 type RSAHashedKeyGenParams struct {
-	// Name should be set to AlgorithmKindRsassPkcs1v15,
-	// AlgorithmKindRsaPss, or AlgorithmKindRsaOaep.
-	Name AlgorithmIdentifier
+	Algorithm
 
 	// ModulusLength holds (a Number) the length of the RSA modulus, in bits.
 	// This should be at least 2048. Some organizations are now recommending
@@ -105,7 +103,7 @@ type RSAHashedKeyGenParams struct {
 	// Hash represents the name of the digest function to use. You can
 	// use any of the following: DigestKindSha256, DigestKindSha384,
 	// or DigestKindSha512.
-	Hash string
+	Hash any
 }
 
 // RSAHashedImportParams represents the object that should be passed as the

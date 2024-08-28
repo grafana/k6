@@ -35,6 +35,9 @@ const (
 	// QuotaExceededError is the error thrown if the byteLength of a typedArray
 	// exceeds 65,536.
 	QuotaExceededError = "QuotaExceededError"
+
+	// NotImplemented means that we have not implemented the feature yet.
+	NotImplemented = "NotImplemented"
 )
 
 // Error represents a custom error emitted by the
