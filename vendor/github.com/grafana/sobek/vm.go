@@ -3,6 +3,7 @@ package sobek
 import (
 	"fmt"
 	"math"
+	"math/big"
 	"reflect"
 	"strconv"
 	"strings"
@@ -210,6 +211,48 @@ func (r *stashRefConst) set(v Value) {
 }
 
 type objRef struct {
+	base   *Object
+	name   Value
+	this   Value
+	strict bool
+
+	nameConverted bool
+}
+
+func (r *objRef) getKey() Value {
+	if !r.nameConverted {
+		r.name = toPropertyKey(r.name)
+		r.nameConverted = true
+	}
+	return r.name
+}
+
+func (r *objRef) get() Value {
+	return r.base.get(r.getKey(), r.this)
+}
+
+func (r *objRef) set(v Value) {
+	key := r.getKey()
+	if r.this != nil {
+		r.base.set(key, v, r.this, r.strict)
+	} else {
+		r.base.setOwn(key, v, r.strict)
+	}
+}
+
+func (r *objRef) init(v Value) {
+	if r.this != nil {
+		r.base.set(r.getKey(), v, r.this, r.strict)
+	} else {
+		r.base.setOwn(r.getKey(), v, r.strict)
+	}
+}
+
+func (r *objRef) refname() unistring.String {
+	return r.getKey().string()
+}
+
+type objStrRef struct {
 	base    *Object
 	name    unistring.String
 	this    Value
@@ -217,11 +260,11 @@ type objRef struct {
 	binding bool
 }
 
-func (r *objRef) get() Value {
+func (r *objStrRef) get() Value {
 	return r.base.self.getStr(r.name, r.this)
 }
 
-func (r *objRef) set(v Value) {
+func (r *objStrRef) set(v Value) {
 	if r.strict && r.binding && !r.base.self.hasOwnPropertyStr(r.name) {
 		panic(referenceError(fmt.Sprintf("%s is not defined", r.name)))
 	}
@@ -232,7 +275,7 @@ func (r *objRef) set(v Value) {
 	}
 }
 
-func (r *objRef) init(v Value) {
+func (r *objStrRef) init(v Value) {
 	if r.this != nil {
 		r.base.setStr(r.name, v, r.this, r.strict)
 	} else {
@@ -240,7 +283,7 @@ func (r *objRef) init(v Value) {
 	}
 }
 
-func (r *objRef) refname() unistring.String {
+func (r *objStrRef) refname() unistring.String {
 	return r.name
 }
 
@@ -375,17 +418,20 @@ func floatToValue(f float64) (result Value) {
 	return valueFloat(f)
 }
 
-func assertInt64(v Value) (int64, bool) {
-	num := v.ToNumber()
-	if i, ok := num.(valueInt); ok {
-		return int64(i), true
-	}
-	if f, ok := num.(valueFloat); ok {
-		if i, ok := floatToInt(float64(f)); ok {
-			return i, true
+func toNumeric(value Value) Value {
+	switch v := value.(type) {
+	case valueInt, *valueBigInt:
+		return v
+	case valueFloat:
+		return floatToValue(float64(v))
+	case *Object:
+		primValue := v.toPrimitiveNumber()
+		if bigint, ok := primValue.(*valueBigInt); ok {
+			return bigint
 		}
+		return primValue.ToNumber()
 	}
-	return 0, false
+	return value.ToNumber()
 }
 
 func (s *valueStack) expand(idx int) {
@@ -471,7 +517,7 @@ func (s *stash) getByName(name unistring.String) (v Value, exists bool) {
 func (s *stash) getRefByName(name unistring.String, strict bool) ref {
 	if obj := s.obj; obj != nil {
 		if stashObjHas(obj, name) {
-			return &objRef{
+			return &objStrRef{
 				base:    obj,
 				name:    name,
 				strict:  strict,
@@ -1258,7 +1304,7 @@ type _toNumber struct{}
 var toNumber _toNumber
 
 func (_toNumber) exec(vm *vm) {
-	vm.stack[vm.sp-1] = vm.stack[vm.sp-1].ToNumber()
+	vm.stack[vm.sp-1] = toNumeric(vm.stack[vm.sp-1])
 	vm.pc++
 }
 
@@ -1292,13 +1338,26 @@ func (_add) exec(vm *vm) {
 		}
 		ret = leftString.Concat(rightString)
 	} else {
-		if leftInt, ok := left.(valueInt); ok {
-			if rightInt, ok := right.(valueInt); ok {
-				ret = intToValue(int64(leftInt) + int64(rightInt))
-			} else {
-				ret = floatToValue(float64(leftInt) + right.ToFloat())
+		switch left := left.(type) {
+		case valueInt:
+			switch right := right.(type) {
+			case valueInt:
+				ret = intToValue(int64(left) + int64(right))
+			case *valueBigInt:
+				panic(errMixBigIntType)
+			default:
+				ret = floatToValue(float64(left) + right.ToFloat())
 			}
-		} else {
+		case *valueBigInt:
+			if right, ok := right.(*valueBigInt); ok {
+				ret = (*valueBigInt)(new(big.Int).Add((*big.Int)(left), (*big.Int)(right)))
+			} else {
+				panic(errMixBigIntType)
+			}
+		default:
+			if _, ok := right.(*valueBigInt); ok {
+				panic(errMixBigIntType)
+			}
 			ret = floatToValue(left.ToFloat() + right.ToFloat())
 		}
 	}
@@ -1316,13 +1375,30 @@ func (_sub) exec(vm *vm) {
 	right := vm.stack[vm.sp-1]
 	left := vm.stack[vm.sp-2]
 
+	left = toNumeric(left)
+	right = toNumeric(right)
+
 	var result Value
 
-	if left, ok := left.(valueInt); ok {
-		if right, ok := right.(valueInt); ok {
+	switch left := left.(type) {
+	case valueInt:
+		switch right := right.(type) {
+		case valueInt:
 			result = intToValue(int64(left) - int64(right))
 			goto end
+		case *valueBigInt:
+			panic(errMixBigIntType)
 		}
+	case valueFloat:
+		if _, ok := right.(*valueBigInt); ok {
+			panic(errMixBigIntType)
+		}
+	case *valueBigInt:
+		if right, ok := right.(*valueBigInt); ok {
+			result = (*valueBigInt)(new(big.Int).Sub((*big.Int)(left), (*big.Int)(right)))
+			goto end
+		}
+		panic(errMixBigIntType)
 	}
 
 	result = floatToValue(left.ToFloat() - right.ToFloat())
@@ -1337,13 +1413,15 @@ type _mul struct{}
 var mul _mul
 
 func (_mul) exec(vm *vm) {
-	left := vm.stack[vm.sp-2]
-	right := vm.stack[vm.sp-1]
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
 
 	var result Value
 
-	if left, ok := assertInt64(left); ok {
-		if right, ok := assertInt64(right); ok {
+	switch left := left.(type) {
+	case valueInt:
+		switch right := right.(type) {
+		case valueInt:
 			if left == 0 && right == -1 || left == -1 && right == 0 {
 				result = _negativeZero
 				goto end
@@ -1351,11 +1429,22 @@ func (_mul) exec(vm *vm) {
 			res := left * right
 			// check for overflow
 			if left == 0 || right == 0 || res/left == right {
-				result = intToValue(res)
+				result = intToValue(int64(res))
 				goto end
 			}
-
+		case *valueBigInt:
+			panic(errMixBigIntType)
 		}
+	case valueFloat:
+		if _, ok := right.(*valueBigInt); ok {
+			panic(errMixBigIntType)
+		}
+	case *valueBigInt:
+		if right, ok := right.(*valueBigInt); ok {
+			result = (*valueBigInt)(new(big.Int).Mul((*big.Int)(left), (*big.Int)(right)))
+			goto end
+		}
+		panic(errMixBigIntType)
 	}
 
 	result = floatToValue(left.ToFloat() * right.ToFloat())
@@ -1372,7 +1461,29 @@ var exp _exp
 
 func (_exp) exec(vm *vm) {
 	vm.sp--
-	vm.stack[vm.sp-1] = pow(vm.stack[vm.sp-1], vm.stack[vm.sp])
+	x := vm.stack[vm.sp-1]
+	y := vm.stack[vm.sp]
+
+	x = toNumeric(x)
+	y = toNumeric(y)
+
+	var result Value
+	if x, ok := x.(*valueBigInt); ok {
+		if y, ok := y.(*valueBigInt); ok {
+			if (*big.Int)(y).Cmp(big.NewInt(0)) < 0 {
+				panic(vm.r.newError(vm.r.getRangeError(), "exponent must be positive"))
+			}
+			result = (*valueBigInt)(new(big.Int).Exp((*big.Int)(x), (*big.Int)(y), nil))
+			goto end
+		}
+		panic(errMixBigIntType)
+	} else if _, ok := y.(*valueBigInt); ok {
+		panic(errMixBigIntType)
+	}
+
+	result = pow(x, y)
+end:
+	vm.stack[vm.sp-1] = result
 	vm.pc++
 }
 
@@ -1381,10 +1492,32 @@ type _div struct{}
 var div _div
 
 func (_div) exec(vm *vm) {
-	left := vm.stack[vm.sp-2].ToFloat()
-	right := vm.stack[vm.sp-1].ToFloat()
+	leftValue := toNumeric(vm.stack[vm.sp-2])
+	rightValue := toNumeric(vm.stack[vm.sp-1])
 
-	var result Value
+	var (
+		result      Value
+		left, right float64
+	)
+
+	if left, ok := leftValue.(*valueBigInt); ok {
+		if right, ok := rightValue.(*valueBigInt); ok {
+			if (*big.Int)(right).Cmp(big.NewInt(0)) == 0 {
+				panic(vm.r.newError(vm.r.getRangeError(), "Division by zero"))
+			}
+			if (*big.Int)(left).CmpAbs((*big.Int)(right)) < 0 {
+				result = (*valueBigInt)(big.NewInt(0))
+			} else {
+				i, _ := new(big.Int).QuoRem((*big.Int)(left), (*big.Int)(right), big.NewInt(0))
+				result = (*valueBigInt)(i)
+			}
+			goto end
+		}
+		panic(errMixBigIntType)
+	} else if _, ok := rightValue.(*valueBigInt); ok {
+		panic(errMixBigIntType)
+	}
+	left, right = leftValue.ToFloat(), rightValue.ToFloat()
 
 	if math.IsNaN(left) || math.IsNaN(right) {
 		result = _NaN
@@ -1440,25 +1573,48 @@ type _mod struct{}
 var mod _mod
 
 func (_mod) exec(vm *vm) {
-	left := vm.stack[vm.sp-2]
-	right := vm.stack[vm.sp-1]
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
 
 	var result Value
 
-	if leftInt, ok := assertInt64(left); ok {
-		if rightInt, ok := assertInt64(right); ok {
-			if rightInt == 0 {
+	switch left := left.(type) {
+	case valueInt:
+		switch right := right.(type) {
+		case valueInt:
+			if right == 0 {
 				result = _NaN
 				goto end
 			}
-			r := leftInt % rightInt
-			if r == 0 && leftInt < 0 {
+			r := left % right
+			if r == 0 && left < 0 {
 				result = _negativeZero
 			} else {
-				result = intToValue(leftInt % rightInt)
+				result = intToValue(int64(left % right))
+			}
+			goto end
+		case *valueBigInt:
+			panic(errMixBigIntType)
+		}
+	case valueFloat:
+		if _, ok := right.(*valueBigInt); ok {
+			panic(errMixBigIntType)
+		}
+	case *valueBigInt:
+		if right, ok := right.(*valueBigInt); ok {
+			switch {
+			case (*big.Int)(right).Cmp(big.NewInt(0)) == 0:
+				panic(vm.r.newError(vm.r.getRangeError(), "Division by zero"))
+			case (*big.Int)(left).Cmp(big.NewInt(0)) < 0:
+				abs := new(big.Int).Abs((*big.Int)(left))
+				v := new(big.Int).Mod(abs, (*big.Int)(right))
+				result = (*valueBigInt)(v.Neg(v))
+			default:
+				result = (*valueBigInt)(new(big.Int).Mod((*big.Int)(left), (*big.Int)(right)))
 			}
 			goto end
 		}
+		panic(errMixBigIntType)
 	}
 
 	result = floatToValue(math.Mod(left.ToFloat(), right.ToFloat()))
@@ -1477,13 +1633,16 @@ func (_neg) exec(vm *vm) {
 
 	var result Value
 
-	if i, ok := assertInt64(operand); ok {
-		if i == 0 {
+	switch n := toNumeric(operand).(type) {
+	case *valueBigInt:
+		result = (*valueBigInt)(new(big.Int).Neg((*big.Int)(n)))
+	case valueInt:
+		if n == 0 {
 			result = _negativeZero
 		} else {
-			result = valueInt(-i)
+			result = -n
 		}
-	} else {
+	default:
 		f := operand.ToFloat()
 		if !math.IsNaN(f) {
 			f = -f
@@ -1511,14 +1670,15 @@ var inc _inc
 func (_inc) exec(vm *vm) {
 	v := vm.stack[vm.sp-1]
 
-	if i, ok := assertInt64(v); ok {
-		v = intToValue(i + 1)
-		goto end
+	switch n := v.(type) {
+	case *valueBigInt:
+		v = (*valueBigInt)(new(big.Int).Add((*big.Int)(n), big.NewInt(1)))
+	case valueInt:
+		v = intToValue(int64(n + 1))
+	default:
+		v = valueFloat(n.ToFloat() + 1)
 	}
 
-	v = valueFloat(v.ToFloat() + 1)
-
-end:
 	vm.stack[vm.sp-1] = v
 	vm.pc++
 }
@@ -1530,14 +1690,15 @@ var dec _dec
 func (_dec) exec(vm *vm) {
 	v := vm.stack[vm.sp-1]
 
-	if i, ok := assertInt64(v); ok {
-		v = intToValue(i - 1)
-		goto end
+	switch n := v.(type) {
+	case *valueBigInt:
+		v = (*valueBigInt)(new(big.Int).Sub((*big.Int)(n), big.NewInt(1)))
+	case valueInt:
+		v = intToValue(int64(n - 1))
+	default:
+		v = valueFloat(n.ToFloat() - 1)
 	}
 
-	v = valueFloat(v.ToFloat() - 1)
-
-end:
 	vm.stack[vm.sp-1] = v
 	vm.pc++
 }
@@ -1547,9 +1708,23 @@ type _and struct{}
 var and _and
 
 func (_and) exec(vm *vm) {
-	left := toInt32(vm.stack[vm.sp-2])
-	right := toInt32(vm.stack[vm.sp-1])
-	vm.stack[vm.sp-2] = intToValue(int64(left & right))
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
+	var result Value
+
+	if left, ok := left.(*valueBigInt); ok {
+		if right, ok := right.(*valueBigInt); ok {
+			result = (*valueBigInt)(new(big.Int).And((*big.Int)(left), (*big.Int)(right)))
+			goto end
+		}
+		panic(errMixBigIntType)
+	} else if _, ok := right.(*valueBigInt); ok {
+		panic(errMixBigIntType)
+	}
+
+	result = intToValue(int64(toInt32(left) & toInt32(right)))
+end:
+	vm.stack[vm.sp-2] = result
 	vm.sp--
 	vm.pc++
 }
@@ -1559,9 +1734,23 @@ type _or struct{}
 var or _or
 
 func (_or) exec(vm *vm) {
-	left := toInt32(vm.stack[vm.sp-2])
-	right := toInt32(vm.stack[vm.sp-1])
-	vm.stack[vm.sp-2] = intToValue(int64(left | right))
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
+	var result Value
+
+	if left, ok := left.(*valueBigInt); ok {
+		if right, ok := right.(*valueBigInt); ok {
+			result = (*valueBigInt)(new(big.Int).Or((*big.Int)(left), (*big.Int)(right)))
+			goto end
+		}
+		panic(errMixBigIntType)
+	} else if _, ok := right.(*valueBigInt); ok {
+		panic(errMixBigIntType)
+	}
+
+	result = intToValue(int64(toInt32(left) | toInt32(right)))
+end:
+	vm.stack[vm.sp-2] = result
 	vm.sp--
 	vm.pc++
 }
@@ -1571,9 +1760,23 @@ type _xor struct{}
 var xor _xor
 
 func (_xor) exec(vm *vm) {
-	left := toInt32(vm.stack[vm.sp-2])
-	right := toInt32(vm.stack[vm.sp-1])
-	vm.stack[vm.sp-2] = intToValue(int64(left ^ right))
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
+	var result Value
+
+	if left, ok := left.(*valueBigInt); ok {
+		if right, ok := right.(*valueBigInt); ok {
+			result = (*valueBigInt)(new(big.Int).Xor((*big.Int)(left), (*big.Int)(right)))
+			goto end
+		}
+		panic(errMixBigIntType)
+	} else if _, ok := right.(*valueBigInt); ok {
+		panic(errMixBigIntType)
+	}
+
+	result = intToValue(int64(toInt32(left) ^ toInt32(right)))
+end:
+	vm.stack[vm.sp-2] = result
 	vm.sp--
 	vm.pc++
 }
@@ -1583,8 +1786,14 @@ type _bnot struct{}
 var bnot _bnot
 
 func (_bnot) exec(vm *vm) {
-	op := toInt32(vm.stack[vm.sp-1])
-	vm.stack[vm.sp-1] = intToValue(int64(^op))
+	v := vm.stack[vm.sp-1]
+	switch n := toNumeric(v).(type) {
+	case *valueBigInt:
+		v = (*valueBigInt)(new(big.Int).Not((*big.Int)(n)))
+	default:
+		v = intToValue(int64(^toInt32(n)))
+	}
+	vm.stack[vm.sp-1] = v
 	vm.pc++
 }
 
@@ -1593,9 +1802,28 @@ type _sal struct{}
 var sal _sal
 
 func (_sal) exec(vm *vm) {
-	left := toInt32(vm.stack[vm.sp-2])
-	right := toUint32(vm.stack[vm.sp-1])
-	vm.stack[vm.sp-2] = intToValue(int64(left << (right & 0x1F)))
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
+	var result Value
+
+	if left, ok := left.(*valueBigInt); ok {
+		if right, ok := right.(*valueBigInt); ok {
+			n := uint((*big.Int)(right).Uint64())
+			if (*big.Int)(right).Sign() < 0 {
+				result = (*valueBigInt)(new(big.Int).Rsh((*big.Int)(left), n))
+			} else {
+				result = (*valueBigInt)(new(big.Int).Lsh((*big.Int)(left), n))
+			}
+			goto end
+		}
+		panic(errMixBigIntType)
+	} else if _, ok := right.(*valueBigInt); ok {
+		panic(errMixBigIntType)
+	}
+
+	result = intToValue(int64(toInt32(left) << (toUint32(right) & 0x1F)))
+end:
+	vm.stack[vm.sp-2] = result
 	vm.sp--
 	vm.pc++
 }
@@ -1605,9 +1833,28 @@ type _sar struct{}
 var sar _sar
 
 func (_sar) exec(vm *vm) {
-	left := toInt32(vm.stack[vm.sp-2])
-	right := toUint32(vm.stack[vm.sp-1])
-	vm.stack[vm.sp-2] = intToValue(int64(left >> (right & 0x1F)))
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
+	var result Value
+
+	if left, ok := left.(*valueBigInt); ok {
+		if right, ok := right.(*valueBigInt); ok {
+			n := uint((*big.Int)(right).Uint64())
+			if (*big.Int)(right).Sign() < 0 {
+				result = (*valueBigInt)(new(big.Int).Lsh((*big.Int)(left), n))
+			} else {
+				result = (*valueBigInt)(new(big.Int).Rsh((*big.Int)(left), n))
+			}
+			goto end
+		}
+		panic(errMixBigIntType)
+	} else if _, ok := right.(*valueBigInt); ok {
+		panic(errMixBigIntType)
+	}
+
+	result = intToValue(int64(toInt32(left) >> (toUint32(right) & 0x1F)))
+end:
+	vm.stack[vm.sp-2] = result
 	vm.sp--
 	vm.pc++
 }
@@ -1617,9 +1864,17 @@ type _shr struct{}
 var shr _shr
 
 func (_shr) exec(vm *vm) {
-	left := toUint32(vm.stack[vm.sp-2])
-	right := toUint32(vm.stack[vm.sp-1])
-	vm.stack[vm.sp-2] = intToValue(int64(left >> (right & 0x1F)))
+	left := toNumeric(vm.stack[vm.sp-2])
+	right := toNumeric(vm.stack[vm.sp-1])
+
+	if _, ok := left.(*valueBigInt); ok {
+		_ = toNumeric(right)
+		panic(vm.r.NewTypeError("BigInts have no unsigned right shift, use >> instead"))
+	} else if _, ok := right.(*valueBigInt); ok {
+		panic(vm.r.NewTypeError("BigInts have no unsigned right shift, use >> instead"))
+	}
+
+	vm.stack[vm.sp-2] = intToValue(int64(toUint32(left) >> (toUint32(right) & 0x1F)))
 	vm.sp--
 	vm.pc++
 }
@@ -1652,10 +1907,10 @@ var getElemRef _getElemRef
 
 func (_getElemRef) exec(vm *vm) {
 	obj := vm.stack[vm.sp-2].ToObject(vm.r)
-	propName := toPropertyKey(vm.stack[vm.sp-1])
+	propName := vm.stack[vm.sp-1]
 	vm.refStack = append(vm.refStack, &objRef{
 		base: obj,
-		name: propName.string(),
+		name: propName,
 	})
 	vm.sp -= 2
 	vm.pc++
@@ -1667,10 +1922,10 @@ var getElemRefRecv _getElemRefRecv
 
 func (_getElemRefRecv) exec(vm *vm) {
 	obj := vm.stack[vm.sp-1].ToObject(vm.r)
-	propName := toPropertyKey(vm.stack[vm.sp-2])
+	propName := vm.stack[vm.sp-2]
 	vm.refStack = append(vm.refStack, &objRef{
 		base: obj,
-		name: propName.string(),
+		name: propName,
 		this: vm.stack[vm.sp-3],
 	})
 	vm.sp -= 3
@@ -1683,10 +1938,10 @@ var getElemRefStrict _getElemRefStrict
 
 func (_getElemRefStrict) exec(vm *vm) {
 	obj := vm.stack[vm.sp-2].ToObject(vm.r)
-	propName := toPropertyKey(vm.stack[vm.sp-1])
+	propName := vm.stack[vm.sp-1]
 	vm.refStack = append(vm.refStack, &objRef{
 		base:   obj,
-		name:   propName.string(),
+		name:   propName,
 		strict: true,
 	})
 	vm.sp -= 2
@@ -1699,10 +1954,10 @@ var getElemRefRecvStrict _getElemRefRecvStrict
 
 func (_getElemRefRecvStrict) exec(vm *vm) {
 	obj := vm.stack[vm.sp-1].ToObject(vm.r)
-	propName := toPropertyKey(vm.stack[vm.sp-2])
+	propName := vm.stack[vm.sp-2]
 	vm.refStack = append(vm.refStack, &objRef{
 		base:   obj,
-		name:   propName.string(),
+		name:   propName,
 		this:   vm.stack[vm.sp-3],
 		strict: true,
 	})
@@ -1972,7 +2227,7 @@ func (d deletePropStrict) exec(vm *vm) {
 type getPropRef unistring.String
 
 func (p getPropRef) exec(vm *vm) {
-	vm.refStack = append(vm.refStack, &objRef{
+	vm.refStack = append(vm.refStack, &objStrRef{
 		base: vm.stack[vm.sp-1].ToObject(vm.r),
 		name: unistring.String(p),
 	})
@@ -1983,7 +2238,7 @@ func (p getPropRef) exec(vm *vm) {
 type getPropRefRecv unistring.String
 
 func (p getPropRefRecv) exec(vm *vm) {
-	vm.refStack = append(vm.refStack, &objRef{
+	vm.refStack = append(vm.refStack, &objStrRef{
 		this: vm.stack[vm.sp-2],
 		base: vm.stack[vm.sp-1].ToObject(vm.r),
 		name: unistring.String(p),
@@ -1995,7 +2250,7 @@ func (p getPropRefRecv) exec(vm *vm) {
 type getPropRefStrict unistring.String
 
 func (p getPropRefStrict) exec(vm *vm) {
-	vm.refStack = append(vm.refStack, &objRef{
+	vm.refStack = append(vm.refStack, &objStrRef{
 		base:   vm.stack[vm.sp-1].ToObject(vm.r),
 		name:   unistring.String(p),
 		strict: true,
@@ -2007,7 +2262,7 @@ func (p getPropRefStrict) exec(vm *vm) {
 type getPropRefRecvStrict unistring.String
 
 func (p getPropRefRecvStrict) exec(vm *vm) {
-	vm.refStack = append(vm.refStack, &objRef{
+	vm.refStack = append(vm.refStack, &objStrRef{
 		this:   vm.stack[vm.sp-2],
 		base:   vm.stack[vm.sp-1].ToObject(vm.r),
 		name:   unistring.String(p),
@@ -2394,11 +2649,11 @@ var getElem _getElem
 func (_getElem) exec(vm *vm) {
 	v := vm.stack[vm.sp-2]
 	obj := v.baseObject(vm.r)
-	propName := toPropertyKey(vm.stack[vm.sp-1])
 	if obj == nil {
-		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", propName.String()))
+		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", vm.stack[vm.sp-1]))
 		return
 	}
+	propName := toPropertyKey(vm.stack[vm.sp-1])
 
 	vm.stack[vm.sp-2] = nilSafe(obj.get(propName, v))
 
@@ -2412,13 +2667,13 @@ var getElemRecv _getElemRecv
 
 func (_getElemRecv) exec(vm *vm) {
 	recv := vm.stack[vm.sp-3]
-	propName := toPropertyKey(vm.stack[vm.sp-2])
 	v := vm.stack[vm.sp-1]
 	obj := v.baseObject(vm.r)
 	if obj == nil {
-		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", propName.String()))
+		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", vm.stack[vm.sp-2]))
 		return
 	}
+	propName := toPropertyKey(vm.stack[vm.sp-2])
 
 	vm.stack[vm.sp-3] = nilSafe(obj.get(propName, recv))
 
@@ -2452,12 +2707,12 @@ var getElemCallee _getElemCallee
 func (_getElemCallee) exec(vm *vm) {
 	v := vm.stack[vm.sp-2]
 	obj := v.baseObject(vm.r)
-	propName := toPropertyKey(vm.stack[vm.sp-1])
 	if obj == nil {
-		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", propName.String()))
+		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", vm.stack[vm.sp-1]))
 		return
 	}
 
+	propName := toPropertyKey(vm.stack[vm.sp-1])
 	prop := obj.get(propName, v)
 	if prop == nil {
 		prop = memberUnresolved{valueUnresolved{r: vm.r, ref: propName.string()}}
@@ -2475,12 +2730,12 @@ func (_getElemRecvCallee) exec(vm *vm) {
 	recv := vm.stack[vm.sp-3]
 	v := vm.stack[vm.sp-2]
 	obj := v.baseObject(vm.r)
-	propName := toPropertyKey(vm.stack[vm.sp-1])
 	if obj == nil {
-		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", propName.String()))
+		vm.throw(vm.r.NewTypeError("Cannot read property '%s' of undefined", vm.stack[vm.sp-1]))
 		return
 	}
 
+	propName := toPropertyKey(vm.stack[vm.sp-1])
 	prop := obj.get(propName, recv)
 	if prop == nil {
 		prop = memberUnresolved{valueUnresolved{r: vm.r, ref: propName.string()}}
@@ -2734,7 +2989,7 @@ func (s resolveVar1) exec(vm *vm) {
 		}
 	}
 
-	ref = &objRef{
+	ref = &objStrRef{
 		base:    vm.r.globalObject,
 		name:    name,
 		binding: true,
@@ -2788,9 +3043,6 @@ func (d deleteGlobal) exec(vm *vm) {
 	var ret bool
 	if vm.r.globalObject.self.hasPropertyStr(name) {
 		ret = vm.r.globalObject.self.deleteStr(name, false)
-		if ret {
-			delete(vm.r.global.varNames, name)
-		}
 	} else {
 		ret = true
 	}
@@ -2815,7 +3067,7 @@ func (s resolveVar1Strict) exec(vm *vm) {
 	}
 
 	if vm.r.globalObject.self.hasPropertyStr(name) {
-		ref = &objRef{
+		ref = &objStrRef{
 			base:    vm.r.globalObject,
 			name:    name,
 			binding: true,
@@ -4010,18 +4262,12 @@ func (vm *vm) checkBindVarsGlobal(names []unistring.String) {
 }
 
 func (vm *vm) createGlobalVarBindings(names []unistring.String, d bool) {
-	globalVarNames := vm.r.global.varNames
-	if globalVarNames == nil {
-		globalVarNames = make(map[unistring.String]struct{})
-		vm.r.global.varNames = globalVarNames
-	}
 	o := vm.r.globalObject.self
-	if bo, ok := o.(*baseObject); ok {
+	if bo, ok := o.(*templatedObject); ok {
 		for _, name := range names {
 			if !bo.hasOwnPropertyStr(name) && bo.extensible {
 				bo._putProp(name, _undefined, true, true, d)
 			}
-			globalVarNames[name] = struct{}{}
 		}
 	} else {
 		var cf Flag
@@ -4040,21 +4286,15 @@ func (vm *vm) createGlobalVarBindings(names []unistring.String, d bool) {
 				}, true)
 				o.setOwnStr(name, _undefined, false)
 			}
-			globalVarNames[name] = struct{}{}
 		}
 	}
 }
 
 func (vm *vm) createGlobalFuncBindings(names []unistring.String, d bool) {
-	globalVarNames := vm.r.global.varNames
-	if globalVarNames == nil {
-		globalVarNames = make(map[unistring.String]struct{})
-		vm.r.global.varNames = globalVarNames
-	}
 	o := vm.r.globalObject.self
 	b := vm.sp - len(names)
-	var shortcutObj *baseObject
-	if o, ok := o.(*baseObject); ok {
+	var shortcutObj *templatedObject
+	if o, ok := o.(*templatedObject); ok {
 		shortcutObj = o
 	}
 	for i, name := range names {
@@ -4082,7 +4322,6 @@ func (vm *vm) createGlobalFuncBindings(names []unistring.String, d bool) {
 				o.setOwnStr(name, desc.Value, false) // not a bug, see https://262.ecma-international.org/#sec-createglobalfunctionbinding
 			}
 		}
-		globalVarNames[name] = struct{}{}
 	}
 	vm.sp = b
 }
@@ -4112,9 +4351,6 @@ func (vm *vm) checkBindLexGlobal(names []unistring.String) {
 	o := vm.r.globalObject.self
 	s := &vm.r.global.stash
 	for _, name := range names {
-		if _, exists := vm.r.global.varNames[name]; exists {
-			goto fail
-		}
 		if _, exists := s.names[name]; exists {
 			goto fail
 		}
@@ -4314,30 +4550,93 @@ func toPrimitive(v Value) Value {
 
 func cmp(px, py Value) Value {
 	var ret bool
-	var nx, ny float64
+	xs, isPxString := px.(String)
+	ys, isPyString := py.(String)
 
-	if xs, ok := px.(String); ok {
-		if ys, ok := py.(String); ok {
-			ret = xs.CompareTo(ys) < 0
+	if isPxString && isPyString {
+		ret = xs.CompareTo(ys) < 0
+		goto end
+	} else {
+		if px, ok := px.(*valueBigInt); ok && isPyString {
+			ny, err := stringToBigInt(ys.toTrimmedUTF8())
+			if err != nil {
+				return _undefined
+			}
+			ret = (*big.Int)(px).Cmp(ny) < 0
+			goto end
+		}
+		if py, ok := py.(*valueBigInt); ok && isPxString {
+			nx, err := stringToBigInt(xs.toTrimmedUTF8())
+			if err != nil {
+				return _undefined
+			}
+			ret = nx.Cmp((*big.Int)(py)) < 0
 			goto end
 		}
 	}
 
-	if xi, ok := px.(valueInt); ok {
-		if yi, ok := py.(valueInt); ok {
-			ret = xi < yi
+	px = toNumeric(px)
+	py = toNumeric(py)
+
+	switch nx := px.(type) {
+	case valueInt:
+		switch ny := py.(type) {
+		case valueInt:
+			ret = nx < ny
+			goto end
+		case *valueBigInt:
+			ret = big.NewInt(int64(nx)).Cmp((*big.Int)(ny)) < 0
+			goto end
+		}
+	case valueFloat:
+		switch ny := py.(type) {
+		case *valueBigInt:
+			switch {
+			case math.IsNaN(float64(nx)):
+				return _undefined
+			case nx == _negativeInf:
+				ret = true
+				goto end
+			}
+			if nx := big.NewFloat(float64(nx)); nx.IsInt() {
+				nx, _ := nx.Int(nil)
+				ret = nx.Cmp((*big.Int)(ny)) < 0
+			} else {
+				ret = nx.Cmp(new(big.Float).SetInt((*big.Int)(ny))) < 0
+			}
+			goto end
+		}
+	case *valueBigInt:
+		switch ny := py.(type) {
+		case valueInt:
+			ret = (*big.Int)(nx).Cmp(big.NewInt(int64(ny))) < 0
+			goto end
+		case valueFloat:
+			switch {
+			case math.IsNaN(float64(ny)):
+				return _undefined
+			case ny == _positiveInf:
+				ret = true
+				goto end
+			}
+			if ny := big.NewFloat(float64(ny)); ny.IsInt() {
+				ny, _ := ny.Int(nil)
+				ret = (*big.Int)(nx).Cmp(ny) < 0
+			} else {
+				ret = new(big.Float).SetInt((*big.Int)(nx)).Cmp(ny) < 0
+			}
+			goto end
+		case *valueBigInt:
+			ret = (*big.Int)(nx).Cmp((*big.Int)(ny)) < 0
 			goto end
 		}
 	}
 
-	nx = px.ToFloat()
-	ny = py.ToFloat()
-
-	if math.IsNaN(nx) || math.IsNaN(ny) {
+	if nx, ny := px.ToFloat(), py.ToFloat(); math.IsNaN(nx) || math.IsNaN(ny) {
 		return _undefined
+	} else {
+		ret = nx < ny
 	}
-
-	ret = nx < ny
 
 end:
 	if ret {
@@ -4751,6 +5050,8 @@ func (_typeof) exec(vm *vm) {
 		r = stringString
 	case valueInt, valueFloat:
 		r = stringNumber
+	case *valueBigInt:
+		r = stringBigInt
 	case *Symbol:
 		r = stringSymbol
 	default:
