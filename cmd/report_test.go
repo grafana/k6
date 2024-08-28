@@ -12,6 +12,7 @@ import (
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/usage"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -51,12 +52,13 @@ func TestCreateReport(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	s.GetState().MarkEnded()
 
-	r := createReport(s, importedModules, outputs)
-	assert.Equal(t, consts.Version, r.Version)
-	assert.Equal(t, map[string]int{"shared-iterations": 1}, r.Executors)
-	assert.Equal(t, 6, int(r.VUsMax))
-	assert.Equal(t, 170, int(r.Iterations))
-	assert.NotEqual(t, "0s", r.Duration)
-	assert.ElementsMatch(t, []string{"k6", "k6/http", "k6/experimental/webcrypto"}, r.Modules)
-	assert.ElementsMatch(t, []string{"json"}, r.Outputs)
+	m := createReport(usage.New(), s, importedModules, outputs)
+
+	assert.Equal(t, consts.Version, m["k6_version"])
+	assert.Equal(t, map[string]interface{}{"shared-iterations": int64(1)}, m["executors"])
+	assert.EqualValues(t, 6, m["vus_max"])
+	assert.EqualValues(t, 170, m["iterations"])
+	assert.NotEqual(t, "0s", m["duration"])
+	assert.ElementsMatch(t, []string{"k6", "k6/http", "k6/experimental/webcrypto"}, m["modules"])
+	assert.ElementsMatch(t, []string{"json"}, m["outputs"])
 }

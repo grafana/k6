@@ -10,28 +10,17 @@ import (
 
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/usage"
 )
 
-type report struct {
-	Version    string         `json:"k6_version"`
-	Executors  map[string]int `json:"executors"`
-	VUsMax     int64          `json:"vus_max"`
-	Iterations uint64         `json:"iterations"`
-	Duration   string         `json:"duration"`
-	GoOS       string         `json:"goos"`
-	GoArch     string         `json:"goarch"`
-	Modules    []string       `json:"modules"`
-	Outputs    []string       `json:"outputs"`
-}
-
-func createReport(execScheduler *execution.Scheduler, importedModules []string, outputs []string) report {
-	executors := make(map[string]int)
+func createReport(
+	u *usage.Usage, execScheduler *execution.Scheduler, importedModules []string, outputs []string,
+) map[string]any {
 	for _, ec := range execScheduler.GetExecutorConfigs() {
-		executors[ec.GetType()]++
+		u.Count("executors/"+ec.GetType(), 1)
 	}
 
 	// collect the report only with k6 public modules
-	publicModules := make([]string, 0, len(importedModules))
 	for _, module := range importedModules {
 		// Exclude JS modules extensions to prevent to leak
 		// any user's custom extensions
@@ -44,7 +33,7 @@ func createReport(execScheduler *execution.Scheduler, importedModules []string, 
 		if !strings.HasPrefix(module, "k6") {
 			continue
 		}
-		publicModules = append(publicModules, module)
+		u.Strings("modules", module)
 	}
 
 	builtinOutputs := builtinOutputStrings()
@@ -57,7 +46,6 @@ func createReport(execScheduler *execution.Scheduler, importedModules []string, 
 	}
 
 	// collect only the used outputs that are builtin
-	publicOutputs := make([]string, 0, len(builtinOutputs))
 	for _, o := range outputs {
 		// TODO:
 		// if !slices.Contains(builtinOutputs, o) {
@@ -66,21 +54,17 @@ func createReport(execScheduler *execution.Scheduler, importedModules []string, 
 		if !builtinOutputsIndex[o] {
 			continue
 		}
-		publicOutputs = append(publicOutputs, o)
+		u.Strings("outputs", o)
 	}
 
+	u.String("k6_version", consts.Version)
 	execState := execScheduler.GetState()
-	return report{
-		Version:    consts.Version,
-		Executors:  executors,
-		VUsMax:     execState.GetInitializedVUsCount(),
-		Iterations: execState.GetFullIterationCount(),
-		Duration:   execState.GetCurrentTestRunDuration().String(),
-		GoOS:       runtime.GOOS,
-		GoArch:     runtime.GOARCH,
-		Modules:    publicModules,
-		Outputs:    publicOutputs,
-	}
+	u.Count("vus_max", execState.GetInitializedVUsCount())
+	u.Count("iterations", int64(execState.GetFullIterationCount()))
+	u.String("duration", execState.GetCurrentTestRunDuration().String())
+	u.String("goos", runtime.GOOS)
+	u.String("goarch", runtime.GOARCH)
+	return u.Map()
 }
 
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
@@ -90,8 +74,7 @@ func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *
 		outputs = append(outputs, outputName)
 	}
 
-	r := createReport(execScheduler, test.moduleResolver.Imported(), outputs)
-	body, err := json.Marshal(r)
+	body, err := json.Marshal(createReport(test.usage, execScheduler, test.moduleResolver.Imported(), outputs))
 	if err != nil {
 		return err
 	}

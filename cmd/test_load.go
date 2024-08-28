@@ -22,6 +22,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 const (
@@ -41,6 +42,7 @@ type loadedTest struct {
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
 	moduleResolver *modules.ModuleResolver
+	usage          *usage.Usage
 }
 
 func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
@@ -86,6 +88,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		fs:             gs.FS,
 		fileSystems:    fileSystems,
 		preInitState:   state,
+		usage:          usage.New(),
 	}
 
 	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)

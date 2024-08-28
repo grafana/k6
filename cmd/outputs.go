@@ -118,6 +118,7 @@ func createOutputs(
 		ScriptOptions:  test.derivedConfig.Options,
 		RuntimeOptions: test.preInitState.RuntimeOptions,
 		ExecutionPlan:  executionPlan,
+		Usage:          test.usage,
 	}
 
 	outputs := test.derivedConfig.Out
