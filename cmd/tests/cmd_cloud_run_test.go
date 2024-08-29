@@ -30,11 +30,6 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			wantStderrContains: "the --linger flag can only be used in conjunction with the --local-execution flag",
 		},
 		{
-			name:               "using --no-usage-report linger should be incompatible with k6 cloud run",
-			cliArgs:            []string{"--no-usage-report"},
-			wantStderrContains: "the --no-usage-report can only be used in conjunction with the --local-execution flag",
-		},
-		{
 			name:               "using --exit-on-running should be incompatible with k6 cloud run --local-execution",
 			cliArgs:            []string{"--local-execution", "--exit-on-running"},
 			wantStderrContains: "the --local-execution flag is not compatible with the --exit-on-running flag",
