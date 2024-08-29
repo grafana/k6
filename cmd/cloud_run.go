@@ -92,22 +92,6 @@ Use the "k6 cloud login" command to authenticate.`,
 
 func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
-		return nil
-	}
-
-	if c.linger {
-		return fmt.Errorf("the --linger flag can only be used in conjunction with the --local-execution flag")
-	}
-
-	if c.noUsageReport {
-		return fmt.Errorf("the --no-usage-report can only be used in conjunction with the --local-execution flag")
-	}
-
-	return c.deprecatedCloudCmd.preRun(cmd, args)
-}
-
-func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
-	if c.localExecution {
 		if cmd.Flags().Changed("exit-on-running") {
 			return fmt.Errorf("the --local-execution flag is not compatible with the --exit-on-running flag")
 		}
@@ -116,10 +100,26 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("the --local-execution flag is not compatible with the --show-logs flag")
 		}
 
+		return nil
+	}
+
+	if c.linger {
+		return fmt.Errorf("the --linger flag can only be used in conjunction with the --local-execution flag")
+	}
+
+	return c.deprecatedCloudCmd.preRun(cmd, args)
+}
+
+func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
+	if c.localExecution {
+		// Note that when running the k6 cloud run command with the --local-execution
+		// flag, we handle the no-usage-report flag here as we would do in the k6 run
+		// command.
 		return c.runCmd.run(cmd, args)
 	}
 
-	// When executing in the cloud, we enforce the usage report to be deactivated.
+	// When running the k6 cloud run command and executing in the cloud however, we
+	// explicitly disable the usage report.
 	c.noUsageReport = true
 
 	return c.deprecatedCloudCmd.run(cmd, args)
