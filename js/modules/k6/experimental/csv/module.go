@@ -101,10 +101,10 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 
 	rt := mi.vu.Runtime()
 
-	// 1. Make sure the Goja object is a fs.File (sobek operation)
+	// 1. Make sure the Sobek object is a fs.File (sobek operation)
 	var fileObj fs.File
 	if err := mi.vu.Runtime().ExportTo(file, &fileObj); err != nil {
-		reject(fmt.Errorf("first arg doesn't appear to be a *file.File instance"))
+		reject(fmt.Errorf("first arg doesn't appear to be a *file.File instance, it's %T", file))
 		return promise
 	}
 
@@ -150,7 +150,7 @@ func (mi *ModuleInstance) NewParser(call sobek.ConstructorCall) *sobek.Object {
 		common.Throw(rt, fmt.Errorf("parser constructor takes at least one non-nil source argument"))
 	}
 
-	// 1. Make sure the Goja object is a fs.File (sobek operation)
+	// 1. Make sure the Sobek object is a fs.File (sobek operation)
 	var file fs.File
 	if err := mi.vu.Runtime().ExportTo(call.Argument(0), &file); err != nil {
 		common.Throw(mi.vu.Runtime(), fmt.Errorf("first arg doesn't appear to be a *file.File instance"))
@@ -246,13 +246,9 @@ func newDefaultParserOptions() options {
 	}
 }
 
-// newParserOptions creates a new options instance from the given Goja object.
+// newParserOptions creates a new options instance from the given Sobek object.
 func newParserOptionsFrom(obj *sobek.Object) (options, error) {
-	// Initialize default options
-	options := options{
-		Delimiter:     ',',
-		SkipFirstLine: false,
-	}
+	options := newDefaultParserOptions()
 
 	if obj == nil {
 		return options, nil

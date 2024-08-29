@@ -130,7 +130,7 @@ func (d *Data) NewSharedArrayFrom(rt *sobek.Runtime, name string, r Reader) *sob
 
 		marshaled, err := json.Marshal(record)
 		if err != nil {
-			common.Throw(rt, err)
+			common.Throw(rt, fmt.Errorf("failed to marshal record; reason: %w", err))
 		}
 
 		arr = append(arr, string(marshaled))
