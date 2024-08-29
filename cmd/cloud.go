@@ -317,7 +317,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
 		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
 		// when thresholds have been crossed (failed). So, we report this situation as such.
-		if testProgress.RunStatus == cloudapi.RunStatusFinished {
+		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
+			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
 			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
 		}
 
