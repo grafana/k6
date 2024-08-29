@@ -67,7 +67,7 @@ type regexpPattern struct {
 	regexp2Wrapper *regexp2Wrapper
 }
 
-func compileRegexp2(src string, multiline, dotAll, ignoreCase bool) (*regexp2Wrapper, error) {
+func compileRegexp2(src string, multiline, dotAll, ignoreCase, unicode bool) (*regexp2Wrapper, error) {
 	var opts regexp2.RegexOptions = regexp2.ECMAScript
 	if multiline {
 		opts |= regexp2.Multiline
@@ -77,6 +77,9 @@ func compileRegexp2(src string, multiline, dotAll, ignoreCase bool) (*regexp2Wra
 	}
 	if ignoreCase {
 		opts |= regexp2.IgnoreCase
+	}
+	if unicode {
+		opts |= regexp2.Unicode
 	}
 	regexp2Pattern, err1 := regexp2.Compile(src, opts)
 	if err1 != nil {
@@ -90,7 +93,7 @@ func (p *regexpPattern) createRegexp2() {
 	if p.regexp2Wrapper != nil {
 		return
 	}
-	rx, err := compileRegexp2(p.src, p.multiline, p.dotAll, p.ignoreCase)
+	rx, err := compileRegexp2(p.src, p.multiline, p.dotAll, p.ignoreCase, p.unicode)
 	if err != nil {
 		// At this point the regexp should have been successfully converted to re2, if it fails now, it's a bug.
 		panic(err)

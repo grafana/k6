@@ -241,7 +241,7 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 		patternStr = convertRegexpToUtf16(patternStr)
 	}
 
-	re2Str, err1 := parser.TransformRegExp(patternStr, dotAll)
+	re2Str, err1 := parser.TransformRegExp(patternStr, dotAll, unicode)
 	if err1 == nil {
 		re2flags := ""
 		if multiline {
@@ -268,7 +268,7 @@ func compileRegexp(patternStr, flags string) (p *regexpPattern, err error) {
 			err = err1
 			return
 		}
-		wrapper2, err = compileRegexp2(patternStr, multiline, dotAll, ignoreCase)
+		wrapper2, err = compileRegexp2(patternStr, multiline, dotAll, ignoreCase, unicode)
 		if err != nil {
 			err = fmt.Errorf("Invalid regular expression (regexp2): %s (%v)", patternStr, err)
 			return

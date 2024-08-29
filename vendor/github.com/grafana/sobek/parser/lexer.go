@@ -633,9 +633,13 @@ func (self *_parser) skipWhiteSpace() {
 	}
 }
 
-func (self *_parser) scanMantissa(base int) {
-	for digitValue(self.chr) < base {
+func (self *_parser) scanMantissa(base int, allowSeparator bool) {
+	for digitValue(self.chr) < base || (allowSeparator && self.chr == '_') {
+		afterUnderscore := self.chr == '_'
 		self.read()
+		if afterUnderscore && !isDigit(self.chr, base) {
+			self.error(self.chrOffset, "Only one underscore is allowed as numeric separator")
+		}
 	}
 }
 
@@ -1140,7 +1144,7 @@ func (self *_parser) scanNumericLiteral(decimalPoint bool) (token.Token, string)
 
 	if decimalPoint {
 		offset--
-		self.scanMantissa(10)
+		self.scanMantissa(10, true)
 	} else {
 		if self.chr == '0' {
 			self.read()
@@ -1156,7 +1160,7 @@ func (self *_parser) scanNumericLiteral(decimalPoint bool) (token.Token, string)
 				// no-op
 			default:
 				// legacy octal
-				self.scanMantissa(8)
+				self.scanMantissa(8, false)
 				goto end
 			}
 			if base > 0 {
@@ -1164,15 +1168,15 @@ func (self *_parser) scanNumericLiteral(decimalPoint bool) (token.Token, string)
 				if !isDigit(self.chr, base) {
 					return token.ILLEGAL, self.str[offset:self.chrOffset]
 				}
-				self.scanMantissa(base)
+				self.scanMantissa(base, true)
 				goto end
 			}
 		} else {
-			self.scanMantissa(10)
+			self.scanMantissa(10, true)
 		}
 		if self.chr == '.' {
 			self.read()
-			self.scanMantissa(10)
+			self.scanMantissa(10, true)
 		}
 	}
 
@@ -1183,7 +1187,7 @@ func (self *_parser) scanNumericLiteral(decimalPoint bool) (token.Token, string)
 		}
 		if isDecimalDigit(self.chr) {
 			self.read()
-			self.scanMantissa(10)
+			self.scanMantissa(10, true)
 		} else {
 			return token.ILLEGAL, self.str[offset:self.chrOffset]
 		}
