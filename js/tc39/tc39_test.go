@@ -76,7 +76,6 @@ var (
 		"Atomics.pause",
 		"FinalizationRegistry",
 		"WeakRef",
-		"numeric-separator-literal",
 		"__getter__",
 		"__setter__",
 		"ShadowRealm",
@@ -163,6 +162,11 @@ var (
 		"test/language/expressions/compound-assignment/S11.13.2_A7.10_T2.js": true,
 		"test/language/expressions/compound-assignment/S11.13.2_A7.10_T1.js": true,
 		"test/language/expressions/assignment/S11.13.1_A7_T3.js":             true,
+
+		// timezone (apparently it depends on local timezone settings)
+		"test/built-ins/Date/prototype/toISOString/15.9.5.43-0-8.js":  true,
+		"test/built-ins/Date/prototype/toISOString/15.9.5.43-0-9.js":  true,
+		"test/built-ins/Date/prototype/toISOString/15.9.5.43-0-10.js": true,
 	}
 	pathBasedBlock = []string{ // This completely skips any path matching it without any kind of message
 		"test/annexB/built-ins/Date",
