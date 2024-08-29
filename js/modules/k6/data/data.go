@@ -96,11 +96,11 @@ func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 	return array.Wrap(rt).ToObject(rt)
 }
 
-// Reader is the interface that wraps the basic Read method.
+// RecordReader is the interface that wraps the action of reading records from a resource.
 //
-// The data module Reader interface is implemented by types that can read data from a source, such
-// as a CSV file, etc.
-type Reader interface {
+// The data module RecordReader interface is implemented by types that can read data that can be
+// treated as records, from data sources such as a CSV file, etc.
+type RecordReader interface {
 	Read() ([]string, error)
 }
 
@@ -113,7 +113,7 @@ type Reader interface {
 // This function takes an explicit runtime argument to retain control over which VU runtime it is
 // executed in. This is important because the shared array underlying implementation relies on maintaining
 // a single instance of arrays for the whole test setup and VUs.
-func (d *Data) NewSharedArrayFrom(rt *sobek.Runtime, name string, r Reader) *sobek.Object {
+func (d *Data) NewSharedArrayFrom(rt *sobek.Runtime, name string, r RecordReader) *sobek.Object {
 	if name == "" {
 		common.Throw(rt, errors.New("empty name provided to SharedArray's constructor"))
 	}
