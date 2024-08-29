@@ -185,7 +185,7 @@ type browserRegistry struct {
 	stopped atomic.Bool // testing purposes
 }
 
-type browserBuildFunc func(ctx context.Context) (*common.Browser, error)
+type browserBuildFunc func(ctx, k6Ctx context.Context) (*common.Browser, error)
 
 func newBrowserRegistry(
 	backgroundCtx context.Context,
@@ -195,7 +195,7 @@ func newBrowserRegistry(
 	tracesMetadata map[string]string,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
-	builder := func(backgroundCtx context.Context) (*common.Browser, error) {
+	builder := func(backgroundCtx, k6Ctx context.Context) (*common.Browser, error) {
 		var (
 			err                    error
 			b                      *common.Browser
@@ -203,13 +203,13 @@ func newBrowserRegistry(
 		)
 
 		if isRemoteBrowser {
-			b, err = bt.Connect(backgroundCtx, wsURL)
+			b, err = bt.Connect(backgroundCtx, k6Ctx, wsURL)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
 		} else {
 			var pid int
-			b, pid, err = bt.Launch(backgroundCtx)
+			b, pid, err = bt.Launch(backgroundCtx, k6Ctx)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -295,7 +295,7 @@ func (r *browserRegistry) handleIterEvents( //nolint:funlen
 			tracerCtx := common.WithTracer(ctx, r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
 
-			b, err := r.buildFn(tracedCtx)
+			b, err := r.buildFn(tracedCtx, tracedCtx)
 			if err != nil {
 				e.Done()
 				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
