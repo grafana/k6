@@ -52,7 +52,6 @@ var (
 		false)
 
 	featuresBlockList = []string{
-		"BigInt",                      // not supported at all
 		"IsHTMLDDA",                   // not supported at all
 		"async-iteration",             // not supported at all
 		"top-level-await",             // not supported at all
@@ -60,11 +59,13 @@ var (
 
 		// from Sobek
 		"Symbol.asyncIterator",
+		"resizable-arraybuffer",
 		"regexp-named-groups",
-		"regexp-dotall",
-		"regexp-unicode-property-escapes",
+		"regexp-duplicate-named-groups",
 		"regexp-unicode-property-escapes",
 		"regexp-match-indices",
+		"regexp-modifiers",
+		"RegExp.escape",
 		"legacy-regexp",
 		"tail-call-optimization",
 		"Temporal",
@@ -72,6 +73,7 @@ var (
 		"logical-assignment-operators",
 		"Atomics",
 		"Atomics.waitAsync",
+		"Atomics.pause",
 		"FinalizationRegistry",
 		"WeakRef",
 		"numeric-separator-literal",
@@ -79,10 +81,27 @@ var (
 		"__setter__",
 		"ShadowRealm",
 		"SharedArrayBuffer",
-		"error-cause",
-		"resizable-arraybuffer", // stage 3 as of 2021 https://github.com/tc39/proposal-resizablearraybuffer
+		"decorators",
 
-		"array-find-from-last", // stage 3 as of 2021 https://github.com/tc39/proposal-array-find-from-last
+		"regexp-duplicate-named-groups",
+		"regexp-v-flag",
+		"iterator-helpers",
+		"symbols-as-weakmap-keys",
+		"uint8array-base64",
+		"String.prototype.toWellFormed",
+		"explicit-resource-management",
+		"set-methods",
+		"promise-try",
+		"promise-with-resolvers",
+		"array-grouping",
+		"Math.sumPrecise",
+		"Float16Array",
+		"arraybuffer-transfer",
+		"Array.fromAsync",
+		"String.prototype.isWellFormed",
+
+		"source-phase-imports",
+		"import-attributes",
 	}
 	skipWords = []string{}
 	skipList  = map[string]bool{

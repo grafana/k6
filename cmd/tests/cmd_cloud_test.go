@@ -257,6 +257,27 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		t.Log(stdout)
 		assert.Contains(t, stdout, `Thresholds have been crossed`)
 	})
+
+	t.Run("TestCloudAbortedThreshold", func(t *testing.T) {
+		t.Parallel()
+
+		progressCallback := func() cloudapi.TestProgressResponse {
+			return cloudapi.TestProgressResponse{
+				RunStatusText: "Finished",
+				RunStatus:     cloudapi.RunStatusAbortedThreshold,
+				ResultStatus:  cloudapi.ResultStatusFailed,
+				Progress:      1.0,
+			}
+		}
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
+		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `Thresholds have been crossed`)
+	})
 }
 
 func cloudTestStartSimple(tb testing.TB, testRunID int) http.Handler {
