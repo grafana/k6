@@ -188,10 +188,14 @@ type browserRegistry struct {
 type browserBuildFunc func(ctx context.Context) (*common.Browser, error)
 
 func newBrowserRegistry(
-	ctx context.Context, vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry, tracesMetadata map[string]string,
+	backgroundCtx context.Context,
+	vu k6modules.VU,
+	remote *remoteRegistry,
+	pids *pidRegistry,
+	tracesMetadata map[string]string,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
-	builder := func(ctx context.Context) (*common.Browser, error) {
+	builder := func(backgroundCtx context.Context) (*common.Browser, error) {
 		var (
 			err                    error
 			b                      *common.Browser
@@ -199,13 +203,13 @@ func newBrowserRegistry(
 		)
 
 		if isRemoteBrowser {
-			b, err = bt.Connect(ctx, wsURL)
+			b, err = bt.Connect(backgroundCtx, wsURL)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
 		} else {
 			var pid int
-			b, pid, err = bt.Launch(ctx)
+			b, pid, err = bt.Launch(backgroundCtx)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -235,13 +239,13 @@ func newBrowserRegistry(
 	}
 
 	go r.handleExitEvent(exitCh, unsubscribe)
-	go r.handleIterEvents(ctx, eventsCh, unsubscribe)
+	go r.handleIterEvents(backgroundCtx, eventsCh, unsubscribe)
 
 	return r
 }
 
 func (r *browserRegistry) handleIterEvents( //nolint:funlen
-	ctx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
+	backgroundCtx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
 ) {
 	var (
 		ok   bool
@@ -287,6 +291,7 @@ func (r *browserRegistry) handleIterEvents( //nolint:funlen
 
 			// Wrap the tracer into the browser context to make it accessible for the other
 			// components that inherit the context so these can use it to trace their actions.
+			ctx := backgroundCtx
 			tracerCtx := common.WithTracer(ctx, r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
 

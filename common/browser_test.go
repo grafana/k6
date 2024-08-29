@@ -171,7 +171,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		}
 
 		var cancel func()
-		tc.b.ctx, cancel = context.WithCancel(tc.b.ctx)
+		tc.b.backgroundCtx, cancel = context.WithCancel(tc.b.backgroundCtx)
 		// let newPageInContext return a context cancelation error by canceling the context before
 		// running the method.
 		cancel()
