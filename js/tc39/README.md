@@ -22,8 +22,6 @@ There are few things to keep in mind when maintaining the tests.
 In all of those cases `breaking_test_errors-*.json` needs to be updated. Run the test with `-update` flag to update: `go test -update`.
 * Important to mention that there should be a balance between just updating the list of the errors and actually fixing errors. So it's recommended to check the diff of the `breaking_test_errors-*.json` and case by case decide if the error should be updated or the test should be fixed.
 
-> [!NOTE]
-> some text editors/IDEs will try to parse files ending in `json` as JSON, which given the size of `breaking_test_errors-*.json` might be a problem when it's not actually a JSON (before the edit). So it might be a better idea to name it something different if editing by hand and fix it later.
 
 ## Reasons for recording breaking_test_errors.json
 
