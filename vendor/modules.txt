@@ -163,7 +163,7 @@ github.com/google/uuid
 # github.com/gorilla/websocket v1.5.1
 ## explicit; go 1.20
 github.com/gorilla/websocket
-# github.com/grafana/sobek v0.0.0-20240823144814-3c582bfdac82
+# github.com/grafana/sobek v0.0.0-20240829081756-447e8c611945
 ## explicit; go 1.20
 github.com/grafana/sobek
 github.com/grafana/sobek/ast

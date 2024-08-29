@@ -41,7 +41,8 @@ type _RegExp_parser struct {
 	goRegexp   strings.Builder
 	passOffset int
 
-	dotAll bool // Enable dotAll mode
+	dotAll  bool // Enable dotAll mode
+	unicode bool
 }
 
 // TransformRegExp transforms a JavaScript pattern into  a Go "regexp" pattern.
@@ -57,16 +58,17 @@ type _RegExp_parser struct {
 //
 // If the pattern is invalid (not valid even in JavaScript), then this function
 // returns an empty string and a generic error.
-func TransformRegExp(pattern string, dotAll bool) (transformed string, err error) {
+func TransformRegExp(pattern string, dotAll, unicode bool) (transformed string, err error) {
 
 	if pattern == "" {
 		return "", nil
 	}
 
 	parser := _RegExp_parser{
-		str:    pattern,
-		length: len(pattern),
-		dotAll: dotAll,
+		str:     pattern,
+		length:  len(pattern),
+		dotAll:  dotAll,
+		unicode: unicode,
 	}
 	err = parser.parse()
 	if err != nil {
@@ -292,7 +294,7 @@ func (self *_RegExp_parser) scanEscape(inClass bool) {
 
 	case 'u':
 		self.read()
-		if self.chr == '{' {
+		if self.chr == '{' && self.unicode {
 			self.read()
 			length, base = 0, 16
 		} else {
@@ -392,7 +394,8 @@ func (self *_RegExp_parser) scanEscape(inClass bool) {
 			digit := uint32(digitValue(self.chr))
 			if digit >= base {
 				// Not a valid digit
-				goto skip
+				self.error(true, "Invalid Unicode escape")
+				return
 			}
 			self.read()
 		}
