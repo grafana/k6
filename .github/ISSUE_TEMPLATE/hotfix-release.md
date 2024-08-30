@@ -11,7 +11,7 @@ labels: ["release"]
 
 ## Release Activities
 
-Note, the assumption is a minor branch release already exists from generated from the latest minor release. It has the name in the form `release-v<major>.<minor>.x`.
+Note, the assumption is a minor branch release already exists from the latest minor release. This branch is named in the format `release-v<major>.<minor>.x`.
 
 #### Documentation
 

@@ -57,8 +57,8 @@ labels: ["release"]
 - [ ] Merge the release notes PR.
 - [ ] Pull locally the previously merged changes.
 - [ ] Switch on the release branch then cherry-pick the release notes changes.
-- [ ] Directly from the relaese branch, create and push a new tag of the form `v<major>.<minor>.<patch>` using git: `git tag v0.5x.0 -m "v0.5x.0"`.
-- [ ] Delete the previous minor's relaese branch. Note, in a major version only the latest minor is actively maintained.
+- [ ] Directly from the release branch, create and push a new tag of the form `v<major>.<minor>.<patch>` using git: `git tag v0.5x.0 -m "v0.5x.0"`.
+- [ ] Delete the previous minor's release branch. Note, in a major version only the latest minor is actively maintained.
 
 #### Announcements
 
