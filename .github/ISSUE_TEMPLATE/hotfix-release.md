@@ -33,6 +33,10 @@ Note, the assumption is a minor branch release already exists from the latest mi
 
 The steps are the same as the previous, with the unique exception that the patch pull request has to be directly merged against the release branch instead of being cherry-picked.
 
+#### In k6 repository, if the defect affects the latest release and the `master` branch but they are not anymore the same compatible code.
+
+The union of the previous steps have to be executed, where the changes have to be applied independently to both branches without cherry-picking. Each version get a dedicated patch.
+
 #### Announcements
 
 - [ ] Publish a link to the new GitHub release in the #k6-changelog channel.
