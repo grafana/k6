@@ -16,7 +16,7 @@ repo](https://github.com/dop251/goja/blob/master/tc39_test.go) that Sobek was fo
 
 There are few things to keep in mind when maintaining the tests.
 
-* For the most of the version we aim to have the same version of the test suite as the one that [uses Sobek](https://github.com/grafana/sobek/blob/main/.tc39_test262_checkout.sh#L3). So if the Sobek brings a new version of the test suite, we should update the version of the test suite in this package as well.
+* For most of the time, we aim to have the same version (commit hash) of the test suite as the one that [uses Sobek](https://github.com/grafana/sobek/blob/main/.tc39_test262_checkout.sh#L3). So if Sobek brings a new version of the test suite, we should update the version of the test suite in this package as well.
 * The new version of Sobek could bring a new functionality, so you might need to re-evaluate the `featuresBlockList`, `skipList` and any other list in the `tc39_test.go` file. The way to go is also keeping this lists closer to the Sobek, however they are not the same, so you might need to adjust them.
 * Due to changes to Sobek it's common for the error to change, or there to be now a new error on the previously passing test, or (hopefully) a test that was not passing but now is.
 In all of those cases `breaking_test_errors-*.json` needs to be updated. Run the test with `-update` flag to update: `go test -update`.
