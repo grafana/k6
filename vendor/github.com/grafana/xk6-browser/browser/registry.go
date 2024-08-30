@@ -224,6 +224,7 @@ func newBrowserRegistry(
 
 	exitSubID, exitCh := vu.Events().Global.Subscribe(
 		k6event.Exit,
+		k6event.Abort,
 	)
 	iterSubID, eventsCh := vu.Events().Local.Subscribe(
 		k6event.IterStart,
