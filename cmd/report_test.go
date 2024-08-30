@@ -55,7 +55,7 @@ func TestCreateReport(t *testing.T) {
 	m := createReport(usage.New(), s, importedModules, outputs)
 
 	assert.Equal(t, consts.Version, m["k6_version"])
-	assert.Equal(t, map[string]interface{}{"shared-iterations": int64(1)}, m["executors"])
+	assert.Equal(t, map[string]interface{}{"shared-iterations": uint64(1)}, m["executors"])
 	assert.EqualValues(t, 6, m["vus_max"])
 	assert.EqualValues(t, 170, m["iterations"])
 	assert.NotEqual(t, "0s", m["duration"])

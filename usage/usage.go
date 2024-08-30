@@ -60,8 +60,8 @@ func (u *Usage) Strings(k, v string) {
 	}
 }
 
-// Count adds the provided value to a given key. Creating the key if needed
-func (u *Usage) Count(k string, v int64) {
+// Uint64 adds the provided value to a given key. Creating the key if needed
+func (u *Usage) Uint64(k string, v uint64) {
 	u.l.Lock()
 	defer u.l.Unlock()
 	oldV, ok := u.m[k]
@@ -70,7 +70,7 @@ func (u *Usage) Count(k string, v int64) {
 		return
 	}
 	switch oldV := oldV.(type) {
-	case int64:
+	case uint64:
 		u.m[k] = oldV + v
 	default:
 		// TODO: error, panic?, nothing, log?
@@ -102,9 +102,9 @@ func (u *Usage) Map() map[string]any {
 		}
 		keyLevel, ok := topLevelMap[post]
 		switch value := v.(type) {
-		case int64:
+		case uint64:
 			switch i := keyLevel.(type) {
-			case int64:
+			case uint64:
 				keyLevel = i + value
 			default:
 				// TODO:panic? error?

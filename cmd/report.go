@@ -17,7 +17,7 @@ func createReport(
 	u *usage.Usage, execScheduler *execution.Scheduler, importedModules []string, outputs []string,
 ) map[string]any {
 	for _, ec := range execScheduler.GetExecutorConfigs() {
-		u.Count("executors/"+ec.GetType(), 1)
+		u.Uint64("executors/"+ec.GetType(), 1)
 	}
 
 	// collect the report only with k6 public modules
@@ -59,8 +59,8 @@ func createReport(
 
 	u.String("k6_version", consts.Version)
 	execState := execScheduler.GetState()
-	u.Count("vus_max", execState.GetInitializedVUsCount())
-	u.Count("iterations", int64(execState.GetFullIterationCount()))
+	u.Uint64("vus_max", uint64(execState.GetInitializedVUsCount()))
+	u.Uint64("iterations", execState.GetFullIterationCount())
 	u.String("duration", execState.GetCurrentTestRunDuration().String())
 	u.String("goos", runtime.GOOS)
 	u.String("goarch", runtime.GOARCH)
