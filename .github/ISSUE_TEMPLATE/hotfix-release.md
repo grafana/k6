@@ -26,8 +26,8 @@ Note, the assumption is a minor branch release already exists from the latest mi
       2. the release notes
 - [ ] Open, get approvals and merge on the already existing release branch a separate pull-request for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/lib/consts/consts.go#L11-L12). Note, `master` should be already on a next major/minor version.
 - [ ] Pull locally the previously merged changes.
-- [ ] Create and push a new tag of the form `vX.Y.Z` using git: `git tag v0.5x.0 -m "v0.5x.0"`.
-- [ ] If the defect affects DefinitelyTyped's definitions, open a pull request in the `DefinitelyTyped/DefinitelyTyped` repository by creating a branch on the `grafana/k6-DefinitelyTyped` fork, to update the k6 type definitions for the new release.
+- [ ] Create and push a new tag of the form `vX.Y.Z` using git. For instance, if the current release is v0.52, the command could look like `git tag v0.52.1 -m "v0.52.1"` if this is the first hotfix.
+- [ ] If the defect affects DefinitelyTyped's definitions, open a pull request in the `DefinitelyTyped/DefinitelyTyped` repository by creating a branch on the `grafana/k6-DefinitelyTyped` fork, to update the k6 type definitions.
 
 #### In k6 repository, if the defect affects the latest release but not the `master` branch
 
