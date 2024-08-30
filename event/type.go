@@ -18,12 +18,14 @@ const (
 	IterEnd
 	// Exit is emitted when the k6 process is about to exit.
 	Exit
+	// Abort is a temporary event that will be emitted when a gracefulStop occurs.
+	Abort
 )
 
 //nolint:gochecknoglobals
 var (
 	// GlobalEvents are emitted once per test run.
-	GlobalEvents = []Type{Init, TestStart, TestEnd, Exit}
+	GlobalEvents = []Type{Init, TestStart, TestEnd, Exit, Abort}
 	// VUEvents are emitted multiple times per each VU.
 	VUEvents = []Type{IterStart, IterEnd}
 )
