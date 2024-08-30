@@ -52,7 +52,7 @@ labels: ["release"]
 
 #### In k6 repository
 
-- [ ] Make sure all the patches have been cherry-picked on the release branch.
+- [ ] Ensure that all the patches have been cherry-picked to other branches where necessary.
 - [ ] Merge the release notes pull-request.
 - [ ] Pull locally the previously merged changes.
 - [ ] Switch on the release branch then cherry-pick the release notes changes.
