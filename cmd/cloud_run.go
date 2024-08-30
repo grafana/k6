@@ -118,8 +118,7 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 		return c.runCmd.run(cmd, args)
 	}
 
-	// When running the k6 cloud run command and executing in the cloud however, we
-	// explicitly disable the usage report.
+	// When running the `k6 cloud run` command explicitly disable the usage report.
 	c.noUsageReport = true
 
 	return c.deprecatedCloudCmd.run(cmd, args)
