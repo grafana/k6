@@ -136,12 +136,18 @@ func (d *Data) NewSharedArrayFrom(rt *sobek.Runtime, name string, r RecordReader
 		arr = append(arr, string(marshaled))
 	}
 
-	d.shared.mu.Lock()
-	defer d.shared.mu.Unlock()
-	array := sharedArray{arr: arr}
-	d.shared.data[name] = array
+	return d.shared.set(name, arr).Wrap(rt).ToObject(rt)
+}
 
-	return array.Wrap(rt).ToObject(rt)
+// set is a helper method to set a shared array in the underlying shared arrays map.
+func (s *sharedArrays) set(name string, arr []string) sharedArray {
+	// FIXME (@oleiade): we should probably return an error if the name is empty?
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	array := sharedArray{arr: arr}
+	s.data[name] = array
+
+	return array
 }
 
 func (s *sharedArrays) get(rt *sobek.Runtime, name string, call sobek.Callable) sharedArray {

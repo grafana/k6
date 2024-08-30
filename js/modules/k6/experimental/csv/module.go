@@ -27,9 +27,6 @@ type (
 	// RootModule is the global module instance that will create instances of our
 	// module for each VU.
 	RootModule struct {
-		// FIXME: we end up instantiating the data module ourselves, which would live side by side with other
-		// usages of the data module. This works, but might not be ideal. Is there a way for us to import the module
-		// in a way that we reuse a global test scope's data module instance?
 		dataModuleInstance *data.Data
 	}
 
@@ -78,7 +75,8 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 
 // Parser is a CSV parser.
 type Parser struct {
-	CurrentLine atomic.Int64
+	// currentLine holds the current line number being read by the parser.
+	currentLine atomic.Int64
 
 	// reader is the CSV reader that enables to read records from the provided
 	// input file.
@@ -104,7 +102,7 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 	// 1. Make sure the Sobek object is a fs.File (sobek operation)
 	var fileObj fs.File
 	if err := mi.vu.Runtime().ExportTo(file, &fileObj); err != nil {
-		reject(fmt.Errorf("first arg doesn't appear to be a *file.File instance, it's %T", file))
+		reject(fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", file))
 		return promise
 	}
 
@@ -113,7 +111,7 @@ func (mi *ModuleInstance) Parse(file sobek.Value, options sobek.Value) *sobek.Pr
 		var err error
 		parserOptions, err = newParserOptionsFrom(options.ToObject(rt))
 		if err != nil {
-			reject(fmt.Errorf("encountered an error while interpreting Parser options; reason: %w", err))
+			reject(fmt.Errorf("failed to interpret the provided Parser options; reason: %w", err))
 			return promise
 		}
 	}
@@ -147,13 +145,16 @@ func (mi *ModuleInstance) NewParser(call sobek.ConstructorCall) *sobek.Object {
 	}
 
 	if len(call.Arguments) < 1 || sobek.IsUndefined(call.Argument(0)) {
-		common.Throw(rt, fmt.Errorf("parser constructor takes at least one non-nil source argument"))
+		common.Throw(rt, fmt.Errorf("csv Parser constructor takes at least one non-nil source argument"))
 	}
 
-	// 1. Make sure the Sobek object is a fs.File (sobek operation)
+	// 1. Make sure the Sobek object is a fs.File (Sobek operation)
 	var file fs.File
 	if err := mi.vu.Runtime().ExportTo(call.Argument(0), &file); err != nil {
-		common.Throw(mi.vu.Runtime(), fmt.Errorf("first arg doesn't appear to be a *file.File instance"))
+		common.Throw(
+			mi.vu.Runtime(),
+			fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", call.Argument(0)),
+		)
 	}
 
 	options := newDefaultParserOptions()
@@ -200,7 +201,7 @@ func (p *Parser) Next() *sobek.Promise {
 			}
 		}
 
-		p.CurrentLine.Add(1)
+		p.currentLine.Add(1)
 
 		resolve(parseResult{Done: done, Value: records})
 	}()
