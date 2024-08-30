@@ -14,7 +14,6 @@ labels: ["release"]
 ### At the beginning of the cycle
 
 - [ ] Obtain the Release coordinator's contact from the `@k6-browser` team and co-assign the issue to them.
-- [ ] Open and merge a pull-request for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/lib/consts/consts.go#L11-L12).
 - [ ] Create a new `release-notes-v<major>.<minor>.<patch>` (e.g. `release-notes-v0.51.0`) long-lived branch and add a new release notes file using the available [template](https://github.com/grafana/k6/blob/master/release%20notes/template.md) to the [repository's `release notes` folder](https://github.com/grafana/k6/blob/master/release%20notes).
 - [ ] Go through the potential [dependencies updates](https://github.com/grafana/k6/blob/master/Dependencies.md) and create a dedicated pull-request if any of them is relevant to this release.
 - [ ] Create a new `release-v<major>.<minor>.<patch>` (e.g. `release-v0.51.0`) long-lived branch on the [grafana/k6-DefinitelyTyped](https://github.com/grafana/k6-DefinitelyTyped) fork repository.
@@ -26,6 +25,7 @@ labels: ["release"]
 
 - [ ] Ensure that all pull-requests from a release milestone are merged.
 - [ ] Ensure that browser and other experimental modules (if needed) have been updated to their latest version.
+- [ ] Open and merge a pull-request for bumping [the k6 Go project's version](https://github.com/grafana/k6/blob/master/lib/consts/consts.go#L11-L12).
 - [ ] Open a new release branch with the format `release-v0.<minor>.x` (e.g. `release-v0.51.x`). Note, if during the next two weeks, any patch relevant for the release is merged on `master` then remember to cherry-pick it on the release branch.
 
 #### ~ 1 week before the release date
