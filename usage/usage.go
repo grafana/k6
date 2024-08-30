@@ -20,28 +20,8 @@ func New() *Usage {
 	}
 }
 
-// String appends the provided value to a slice of strings that is the value.
-// If called only a single time, the value will be just a string not a slice
-func (u *Usage) String(k, v string) {
-	u.l.Lock()
-	defer u.l.Unlock()
-	oldV, ok := u.m[k]
-	if !ok {
-		u.m[k] = v
-		return
-	}
-	switch oldV := oldV.(type) {
-	case string:
-		u.m[k] = []string{oldV, v}
-	case []string:
-		u.m[k] = append(oldV, v)
-	default:
-		// TODO: error, panic?, nothing, log?
-	}
-}
-
 // Strings appends the provided value to a slice of strings that is the value.
-// Unlike String it
+// Appending to the slice if the key is already there.
 func (u *Usage) Strings(k, v string) {
 	u.l.Lock()
 	defer u.l.Unlock()
@@ -106,15 +86,6 @@ func (u *Usage) Map() map[string]any {
 			switch i := keyLevel.(type) {
 			case uint64:
 				keyLevel = i + value
-			default:
-				// TODO:panic? error?
-			}
-		case string:
-			switch i := keyLevel.(type) {
-			case string:
-				keyLevel = append([]string(nil), i, value)
-			case []string:
-				keyLevel = append(i, value) //nolint:gocritic // we assign to the final value
 			default:
 				// TODO:panic? error?
 			}

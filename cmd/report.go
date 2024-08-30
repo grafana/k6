@@ -56,15 +56,17 @@ func createReport(
 		}
 		u.Strings("outputs", o)
 	}
-
-	u.String("k6_version", consts.Version)
 	execState := execScheduler.GetState()
 	u.Uint64("vus_max", uint64(execState.GetInitializedVUsCount()))
 	u.Uint64("iterations", execState.GetFullIterationCount())
-	u.String("duration", execState.GetCurrentTestRunDuration().String())
-	u.String("goos", runtime.GOOS)
-	u.String("goarch", runtime.GOARCH)
-	return u.Map()
+	m := u.Map()
+
+	m["k6_version"] = consts.Version
+	m["duration"] = execState.GetCurrentTestRunDuration().String()
+	m["goos"] = runtime.GOOS
+	m["goarch"] = runtime.GOARCH
+
+	return m
 }
 
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {

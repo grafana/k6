@@ -345,7 +345,7 @@ func (out *Output) startVersionedOutput() error {
 	}
 	var err error
 
-	out.usage.String("output.cloud.test_run_id", out.testRunID)
+	out.usage.Strings("cloud/test_run_id", out.testRunID)
 
 	// TODO: move here the creation of a new cloudapi.Client
 	// so in the case the config has been overwritten the client uses the correct
