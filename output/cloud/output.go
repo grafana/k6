@@ -345,7 +345,10 @@ func (out *Output) startVersionedOutput() error {
 	}
 	var err error
 
-	out.usage.Strings("cloud/test_run_id", out.testRunID)
+	usageErr := out.usage.Strings("cloud/test_run_id", out.testRunID)
+	if usageErr != nil {
+		out.logger.Warning("Couldn't report test run id to usage as part of writing to k6 cloud")
+	}
 
 	// TODO: move here the creation of a new cloudapi.Client
 	// so in the case the config has been overwritten the client uses the correct

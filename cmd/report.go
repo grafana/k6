@@ -15,9 +15,12 @@ import (
 
 func createReport(
 	u *usage.Usage, execScheduler *execution.Scheduler, importedModules []string, outputs []string,
-) map[string]any {
+) (map[string]any, error) {
 	for _, ec := range execScheduler.GetExecutorConfigs() {
-		u.Uint64("executors/"+ec.GetType(), 1)
+		err := u.Uint64("executors/"+ec.GetType(), 1)
+		if err != nil { // TODO report it as an error but still send the report?
+			return nil, err
+		}
 	}
 
 	// collect the report only with k6 public modules
@@ -33,7 +36,7 @@ func createReport(
 		if !strings.HasPrefix(module, "k6") {
 			continue
 		}
-		u.Strings("modules", module)
+		_ = u.Strings("modules", module) // TODO this will be moved and the error can be logged there
 	}
 
 	builtinOutputs := builtinOutputStrings()
@@ -54,19 +57,23 @@ func createReport(
 		if !builtinOutputsIndex[o] {
 			continue
 		}
-		u.Strings("outputs", o)
+		_ = u.Strings("outputs", o) // TODO this will be moved and the error can be logged there
 	}
 	execState := execScheduler.GetState()
-	u.Uint64("vus_max", uint64(execState.GetInitializedVUsCount()))
-	u.Uint64("iterations", execState.GetFullIterationCount())
-	m := u.Map()
+	m, err := u.Map()
 
-	m["k6_version"] = consts.Version
-	m["duration"] = execState.GetCurrentTestRunDuration().String()
-	m["goos"] = runtime.GOOS
-	m["goarch"] = runtime.GOARCH
+	if m != nil {
+		m["k6_version"] = consts.Version
+		m["duration"] = execState.GetCurrentTestRunDuration().String()
+		m["goos"] = runtime.GOOS
+		m["goarch"] = runtime.GOARCH
+		m["goarch"] = runtime.GOARCH
+		m["goarch"] = runtime.GOARCH
+		m["vus_max"] = uint64(execState.GetInitializedVUsCount())
+		m["iterations"] = execState.GetFullIterationCount()
+	}
 
-	return m
+	return m, err
 }
 
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
@@ -76,7 +83,12 @@ func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *
 		outputs = append(outputs, outputName)
 	}
 
-	body, err := json.Marshal(createReport(test.usage, execScheduler, test.moduleResolver.Imported(), outputs))
+	m, err := createReport(test.usage, execScheduler, test.moduleResolver.Imported(), outputs)
+	if err != nil {
+		// TODO actually log the error but continue if there is something to report
+		return err
+	}
+	body, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}

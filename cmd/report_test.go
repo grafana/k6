@@ -52,7 +52,8 @@ func TestCreateReport(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	s.GetState().MarkEnded()
 
-	m := createReport(usage.New(), s, importedModules, outputs)
+	m, err := createReport(usage.New(), s, importedModules, outputs)
+	require.NoError(t, err)
 
 	assert.Equal(t, consts.Version, m["k6_version"])
 	assert.Equal(t, map[string]interface{}{"shared-iterations": uint64(1)}, m["executors"])
