@@ -616,7 +616,8 @@ func TestVURunContext(t *testing.T) {
 		exports.default = function() { fn(); }
 	`)
 	require.NoError(t, err)
-	require.NoError(t, r1.SetOptions(r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)})))
+	opt, _ := r1.GetOptions().Apply(lib.Options{Throw: null.BoolFrom(true)})
+	require.NoError(t, r1.SetOptions(opt))
 
 	registry := metrics.NewRegistry()
 	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
@@ -975,7 +976,8 @@ func TestVUIntegrationInsecureRequests(t *testing.T) {
         exports.default = function() { http.get("https://mybadssl.localhost/"); }
 				`)
 			require.NoError(t, err)
-			require.NoError(t, r1.SetOptions(lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)))
+			opt, _ := lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)
+			require.NoError(t, r1.SetOptions(opt))
 
 			r1.Bundle.Options.Hosts, err = types.NewNullHosts(map[string]types.Host{
 				"mybadssl.localhost": *mybadsslHostname,
@@ -1312,8 +1314,8 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 				`)
 			require.NoError(t, err)
 
-			opts := lib.Options{Throw: null.BoolFrom(true)}
-			require.NoError(t, r1.SetOptions(opts.Apply(data.opts)))
+			opts, _ := lib.Options{Throw: null.BoolFrom(true)}.Apply(data.opts)
+			require.NoError(t, r1.SetOptions(opts))
 
 			r1.Bundle.Options.Hosts, err = types.NewNullHosts(map[string]types.Host{
 				"sha256-badssl.localhost": *mybadsslHostname,
@@ -2199,12 +2201,13 @@ func TestSystemTags(t *testing.T) {
 				exports.noop = function() {};
 			`), lib.RuntimeOptions{CompatibilityMode: null.StringFrom("base")})
 			require.NoError(t, err)
-			require.NoError(t, r.SetOptions(r.GetOptions().Apply(lib.Options{
+			opt, _ := r.GetOptions().Apply(lib.Options{
 				Throw:                 null.BoolFrom(false),
 				TLSVersion:            &lib.TLSVersions{Max: tls.VersionTLS13},
 				SystemTags:            metrics.ToSystemTagSet([]string{tc.tag}),
 				InsecureSkipTLSVerify: null.BoolFrom(true),
-			})))
+			})
+			require.NoError(t, r.SetOptions(opt))
 
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()

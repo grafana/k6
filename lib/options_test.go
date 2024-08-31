@@ -21,31 +21,31 @@ func TestOptions(t *testing.T) {
 	t.Parallel()
 	t.Run("Paused", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{Paused: null.BoolFrom(true)})
+		opts, _ := Options{}.Apply(Options{Paused: null.BoolFrom(true)})
 		assert.True(t, opts.Paused.Valid)
 		assert.True(t, opts.Paused.Bool)
 	})
 	t.Run("VUs", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{VUs: null.IntFrom(12345)})
+		opts, _ := Options{}.Apply(Options{VUs: null.IntFrom(12345)})
 		assert.True(t, opts.VUs.Valid)
 		assert.Equal(t, int64(12345), opts.VUs.Int64)
 	})
 	t.Run("Duration", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{Duration: types.NullDurationFrom(2 * time.Minute)})
+		opts, _ := Options{}.Apply(Options{Duration: types.NullDurationFrom(2 * time.Minute)})
 		assert.True(t, opts.Duration.Valid)
 		assert.Equal(t, "2m0s", opts.Duration.String())
 	})
 	t.Run("Iterations", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{Iterations: null.IntFrom(1234)})
+		opts, _ := Options{}.Apply(Options{Iterations: null.IntFrom(1234)})
 		assert.True(t, opts.Iterations.Valid)
 		assert.Equal(t, int64(1234), opts.Iterations.Int64)
 	})
 	t.Run("Stages", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{Stages: []Stage{
+		opts, _ := Options{}.Apply(Options{Stages: []Stage{
 			{Duration: types.NullDurationFrom(1 * time.Second), Target: null.IntFrom(10)},
 			{Duration: types.NullDurationFrom(2 * time.Second), Target: null.IntFrom(20)},
 		}})
@@ -57,57 +57,67 @@ func TestOptions(t *testing.T) {
 		assert.Equal(t, int64(20), opts.Stages[1].Target.Int64)
 
 		emptyStages := []Stage{}
-		assert.Equal(t, emptyStages, Options{}.Apply(Options{Stages: []Stage{{}}}).Stages)
-		assert.Equal(t, emptyStages, Options{}.Apply(Options{Stages: []Stage{}}).Stages)
-		assert.Equal(t, emptyStages, opts.Apply(Options{Stages: []Stage{}}).Stages)
-		assert.Equal(t, emptyStages, opts.Apply(Options{Stages: []Stage{{}}}).Stages)
+		emptyStagesOpts, _ := Options{}.Apply(Options{Stages: []Stage{{}}})
+		assert.Equal(t, emptyStages, emptyStagesOpts.Stages)
+		emptyStagesOpts, _ = Options{}.Apply(Options{Stages: []Stage{}})
+		assert.Equal(t, emptyStages, emptyStagesOpts.Stages)
+		emptyStagesOpts, _ = opts.Apply(Options{Stages: []Stage{}})
+		assert.Equal(t, emptyStages, emptyStagesOpts.Stages)
+		emptyStagesOpts, _ = opts.Apply(Options{Stages: []Stage{{}}})
+		assert.Equal(t, emptyStages, emptyStagesOpts.Stages)
 
-		assert.Equal(t, opts.Stages, opts.Apply(opts).Stages)
+		applyiedOpt, _ := opts.Apply(opts)
+		assert.Equal(t, opts.Stages, applyiedOpt.Stages)
 
 		oneStage := []Stage{{Duration: types.NullDurationFrom(5 * time.Second), Target: null.IntFrom(50)}}
-		assert.Equal(t, oneStage, opts.Apply(Options{Stages: oneStage}).Stages)
-		assert.Equal(t, oneStage, Options{}.Apply(opts).Apply(Options{Stages: oneStage}).Apply(Options{Stages: oneStage}).Stages)
+		oneStageAppliedOpt, _ := opts.Apply(Options{Stages: oneStage})
+		assert.Equal(t, oneStage, oneStageAppliedOpt.Stages)
+
+		pipedAppliedOpt, _ := Options{}.Apply(opts)
+		pipedAppliedOpt, _ = pipedAppliedOpt.Apply(Options{Stages: oneStage})
+		pipedAppliedOpt, _ = pipedAppliedOpt.Apply(Options{Stages: oneStage})
+		assert.Equal(t, oneStage, pipedAppliedOpt.Stages)
 	})
 	// Execution overwriting is tested by the config consolidation test in cmd
 	t.Run("RPS", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
+		opts, _ := Options{}.Apply(Options{RPS: null.IntFrom(12345)})
 		assert.True(t, opts.RPS.Valid)
 		assert.Equal(t, int64(12345), opts.RPS.Int64)
 	})
 	t.Run("MaxRedirects", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{MaxRedirects: null.IntFrom(12345)})
+		opts, _ := Options{}.Apply(Options{MaxRedirects: null.IntFrom(12345)})
 		assert.True(t, opts.MaxRedirects.Valid)
 		assert.Equal(t, int64(12345), opts.MaxRedirects.Int64)
 	})
 	t.Run("UserAgent", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{UserAgent: null.StringFrom("foo")})
+		opts, _ := Options{}.Apply(Options{UserAgent: null.StringFrom("foo")})
 		assert.True(t, opts.UserAgent.Valid)
 		assert.Equal(t, "foo", opts.UserAgent.String)
 	})
 	t.Run("Batch", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{Batch: null.IntFrom(12345)})
+		opts, _ := Options{}.Apply(Options{Batch: null.IntFrom(12345)})
 		assert.True(t, opts.Batch.Valid)
 		assert.Equal(t, int64(12345), opts.Batch.Int64)
 	})
 	t.Run("BatchPerHost", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{BatchPerHost: null.IntFrom(12345)})
+		opts, _ := Options{}.Apply(Options{BatchPerHost: null.IntFrom(12345)})
 		assert.True(t, opts.BatchPerHost.Valid)
 		assert.Equal(t, int64(12345), opts.BatchPerHost.Int64)
 	})
 	t.Run("HTTPDebug", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{HTTPDebug: null.StringFrom("foo")})
+		opts, _ := Options{}.Apply(Options{HTTPDebug: null.StringFrom("foo")})
 		assert.True(t, opts.HTTPDebug.Valid)
 		assert.Equal(t, "foo", opts.HTTPDebug.String)
 	})
 	t.Run("InsecureSkipTLSVerify", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
+		opts, _ := Options{}.Apply(Options{InsecureSkipTLSVerify: null.BoolFrom(true)})
 		assert.True(t, opts.InsecureSkipTLSVerify.Valid)
 		assert.True(t, opts.InsecureSkipTLSVerify.Bool)
 	})
@@ -117,7 +127,7 @@ func TestOptions(t *testing.T) {
 			suiteName, suiteID := suiteName, suiteID
 			t.Run(suiteName, func(t *testing.T) {
 				t.Parallel()
-				opts := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
+				opts, _ := Options{}.Apply(Options{TLSCipherSuites: &TLSCipherSuites{suiteID}})
 
 				assert.NotNil(t, opts.TLSCipherSuites)
 				assert.Len(t, *(opts.TLSCipherSuites), 1)
@@ -161,7 +171,7 @@ func TestOptions(t *testing.T) {
 	t.Run("TLSVersion", func(t *testing.T) {
 		t.Parallel()
 		versions := TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
-		opts := Options{}.Apply(Options{TLSVersion: &versions})
+		opts, _ := Options{}.Apply(Options{TLSVersion: &versions})
 
 		assert.NotNil(t, opts.TLSVersion)
 		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30))
@@ -265,7 +275,7 @@ func TestOptions(t *testing.T) {
 					"-----END EC PRIVATE KEY-----",
 			}, nil},
 		}
-		opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
+		opts, _ := Options{}.Apply(Options{TLSAuth: tlsAuth})
 		assert.Equal(t, tlsAuth, opts.TLSAuth)
 
 		t.Run("Roundtrip", func(t *testing.T) {
@@ -380,7 +390,7 @@ func TestOptions(t *testing.T) {
 						Password: null.StringFrom(tc.password),
 					}, nil},
 				}
-				opts := Options{}.Apply(Options{TLSAuth: tlsAuth})
+				opts, _ := Options{}.Apply(Options{TLSAuth: tlsAuth})
 				assert.Equal(t, tlsAuth, opts.TLSAuth)
 
 				t.Run("Roundtrip", func(t *testing.T) {
@@ -401,25 +411,25 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("NoConnectionReuse", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})
+		opts, _ := Options{}.Apply(Options{NoConnectionReuse: null.BoolFrom(true)})
 		assert.True(t, opts.NoConnectionReuse.Valid)
 		assert.True(t, opts.NoConnectionReuse.Bool)
 	})
 	t.Run("NoVUConnectionReuse", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{NoVUConnectionReuse: null.BoolFrom(true)})
+		opts, _ := Options{}.Apply(Options{NoVUConnectionReuse: null.BoolFrom(true)})
 		assert.True(t, opts.NoVUConnectionReuse.Valid)
 		assert.True(t, opts.NoVUConnectionReuse.Bool)
 	})
 	t.Run("NoCookiesReset", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{NoCookiesReset: null.BoolFrom(true)})
+		opts, _ := Options{}.Apply(Options{NoCookiesReset: null.BoolFrom(true)})
 		assert.True(t, opts.NoCookiesReset.Valid)
 		assert.True(t, opts.NoCookiesReset.Bool)
 	})
 	t.Run("BlacklistIPs", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{
+		opts, _ := Options{}.Apply(Options{
 			BlacklistIPs: []*IPNet{{
 				IPNet: net.IPNet{
 					IP:   net.IPv4bcast,
@@ -449,7 +459,7 @@ func TestOptions(t *testing.T) {
 		t.Parallel()
 		blockedHostnames, err := types.NewNullHostnameTrie([]string{"test.k6.io", "*valid.pattern"})
 		require.NoError(t, err)
-		opts := Options{}.Apply(Options{BlockedHostnames: blockedHostnames})
+		opts, _ := Options{}.Apply(Options{BlockedHostnames: blockedHostnames})
 		assert.NotNil(t, opts.BlockedHostnames)
 		assert.Equal(t, blockedHostnames, opts.BlockedHostnames)
 	})
@@ -463,7 +473,7 @@ func TestOptions(t *testing.T) {
 			"test.loadimpact.com": *host,
 		})
 		assert.NoError(t, err)
-		opts := Options{}.Apply(Options{Hosts: hosts})
+		opts, _ := Options{}.Apply(Options{Hosts: hosts})
 		assert.NotNil(t, opts.Hosts)
 		assert.NotEmpty(t, opts.Hosts)
 
@@ -472,14 +482,14 @@ func TestOptions(t *testing.T) {
 
 	t.Run("Throws", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{Throw: null.BoolFrom(true)})
+		opts, _ := Options{}.Apply(Options{Throw: null.BoolFrom(true)})
 		assert.True(t, opts.Throw.Valid)
 		assert.Equal(t, true, opts.Throw.Bool)
 	})
 
 	t.Run("Thresholds", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{Thresholds: map[string]metrics.Thresholds{
+		opts, _ := Options{}.Apply(Options{Thresholds: map[string]metrics.Thresholds{
 			"metric": {
 				Thresholds: []*metrics.Threshold{{}},
 			},
@@ -490,7 +500,7 @@ func TestOptions(t *testing.T) {
 	t.Run("External", func(t *testing.T) {
 		t.Parallel()
 		ext := map[string]json.RawMessage{"a": json.RawMessage("1")}
-		opts := Options{}.Apply(Options{External: ext})
+		opts, _ := Options{}.Apply(Options{External: ext})
 		assert.Equal(t, ext, opts.External)
 	})
 
@@ -504,7 +514,7 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("SystemTags", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{SystemTags: metrics.NewSystemTagSet(metrics.TagProto)})
+		opts, _ := Options{}.Apply(Options{SystemTags: metrics.NewSystemTagSet(metrics.TagProto)})
 		assert.NotNil(t, opts.SystemTags)
 		assert.NotEmpty(t, opts.SystemTags)
 		assert.True(t, opts.SystemTags.Has(metrics.TagProto))
@@ -540,18 +550,18 @@ func TestOptions(t *testing.T) {
 	t.Run("SummaryTrendStats", func(t *testing.T) {
 		t.Parallel()
 		stats := []string{"myStat1", "myStat2"}
-		opts := Options{}.Apply(Options{SummaryTrendStats: stats})
+		opts, _ := Options{}.Apply(Options{SummaryTrendStats: stats})
 		assert.Equal(t, stats, opts.SummaryTrendStats)
 	})
 	t.Run("RunTags", func(t *testing.T) {
 		t.Parallel()
 		tags := map[string]string{"myTag": "hello"}
-		opts := Options{}.Apply(Options{RunTags: tags})
+		opts, _ := Options{}.Apply(Options{RunTags: tags})
 		assert.Equal(t, tags, opts.RunTags)
 	})
 	t.Run("DiscardResponseBodies", func(t *testing.T) {
 		t.Parallel()
-		opts := Options{}.Apply(Options{DiscardResponseBodies: null.BoolFrom(true)})
+		opts, _ := Options{}.Apply(Options{DiscardResponseBodies: null.BoolFrom(true)})
 		assert.True(t, opts.DiscardResponseBodies.Valid)
 		assert.True(t, opts.DiscardResponseBodies.Bool)
 	})
@@ -560,7 +570,7 @@ func TestOptions(t *testing.T) {
 		clientIPRanges := types.NullIPPool{}
 		err := clientIPRanges.UnmarshalText([]byte("129.112.232.12,123.12.0.0/32"))
 		require.NoError(t, err)
-		opts := Options{}.Apply(Options{LocalIPs: clientIPRanges})
+		opts, _ := Options{}.Apply(Options{LocalIPs: clientIPRanges})
 		assert.NotNil(t, opts.LocalIPs)
 	})
 }
