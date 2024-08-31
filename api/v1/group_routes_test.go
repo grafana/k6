@@ -31,7 +31,9 @@ func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 }
 
 func getTestRunState(tb testing.TB, options lib.Options, runner lib.Runner) *lib.TestRunState {
-	require.NoError(tb, runner.SetOptions(runner.GetOptions().Apply(options)))
+	opt, _ := runner.GetOptions().Apply(options)
+	require.NoError(tb, runner.SetOptions(opt))
+
 	piState := getTestPreInitState(tb)
 	return &lib.TestRunState{
 		TestPreInitState: piState,
