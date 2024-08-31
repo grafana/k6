@@ -280,10 +280,10 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	var leftLen int64
 	for _, pb := range pbs {
 		l := pb.Left()
-		leftLen = lib.Max(int64(len(l)), leftLen)
+		leftLen = max(int64(len(l)), leftLen)
 	}
 	// Limit to maximum left text length
-	maxLeft := int(lib.Min(leftLen, maxLeftLength))
+	maxLeft := int(min(leftLen, maxLeftLength))
 
 	var progressBarsLastRenderLock sync.Mutex
 	var progressBarsLastRender []byte

@@ -272,6 +272,91 @@ func TestStream_ReceiveAllServerResponsesAfterEnd(t *testing.T) {
 	)
 }
 
+func TestStream_ReceiveAllServerResponsesAfterEndWithDiscardedMessages(t *testing.T) {
+	t.Parallel()
+
+	ts := newTestState(t)
+
+	stub := &featureExplorerStub{}
+
+	savedFeatures := []*grpcservice.Feature{
+		{
+			Name: "foo",
+			Location: &grpcservice.Point{
+				Latitude:  1,
+				Longitude: 2,
+			},
+		},
+		{
+			Name: "bar",
+			Location: &grpcservice.Point{
+				Latitude:  3,
+				Longitude: 4,
+			},
+		},
+	}
+
+	stub.listFeatures = func(_ *grpcservice.Rectangle, stream grpcservice.FeatureExplorer_ListFeaturesServer) error {
+		for _, feature := range savedFeatures {
+			// adding a delay to make server response "slower"
+			time.Sleep(200 * time.Millisecond)
+
+			if err := stream.Send(feature); err != nil {
+				return err
+			}
+		}
+
+		return nil
+	}
+
+	grpcservice.RegisterFeatureExplorerServer(ts.httpBin.ServerGRPC, stub)
+
+	initString := codeBlock{
+		code: `
+		var client = new grpc.Client();
+		client.load([], "../../../../lib/testutils/grpcservice/route_guide.proto");`,
+	}
+	vuString := codeBlock{
+		code: `
+		client.connect("GRPCBIN_ADDR");
+		let stream = new grpc.Stream(client, "main.FeatureExplorer/ListFeatures", { discardResponseMessage: true })
+		stream.on('data', function (data) {
+			call('Data: ' + JSON.stringify(data));
+		});
+		stream.on('end', function () {
+			call('End called');
+		});
+
+		stream.write({
+			lo: {
+			  latitude: 1,
+			  longitude: 2,
+			},
+			hi: {
+			  latitude: 1,
+			  longitude: 2,
+			},
+		});
+		stream.end();
+		`,
+	}
+
+	val, err := ts.Run(initString.code)
+	assertResponse(t, initString, err, val, ts)
+
+	ts.ToVUContext()
+
+	val, err = ts.RunOnEventLoop(vuString.code)
+
+	assertResponse(t, vuString, err, val, ts)
+
+	assert.Equal(t, []string{
+		"Data: {}",
+		"Data: {}",
+		"End called",
+	}, ts.callRecorder.Recorded())
+}
+
 // featureExplorerStub is a stub for FeatureExplorerServer
 // it has ability to override methods
 type featureExplorerStub struct {

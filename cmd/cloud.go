@@ -12,7 +12,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/fatih/color"
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
@@ -21,6 +20,7 @@ import (
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui/pb"
 
+	"github.com/fatih/color"
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 )
@@ -317,7 +317,8 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
 		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
 		// when thresholds have been crossed (failed). So, we report this situation as such.
-		if testProgress.RunStatus == cloudapi.RunStatusFinished {
+		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
+			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
 			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
 		}
 
@@ -341,6 +342,9 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"enable showing of logs when a test is executed in the cloud")
 	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
 		"only upload the test to the cloud without actually starting a test run")
+	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
+		panic(err) // Should never happen
+	}
 
 	return flags
 }
@@ -389,6 +393,7 @@ service. Be sure to run the "k6 cloud login" command prior to authenticate with 
 	// Register `k6 cloud` subcommands
 	cloudCmd.AddCommand(getCmdCloudRun(gs))
 	cloudCmd.AddCommand(getCmdCloudLogin(gs))
+	cloudCmd.AddCommand(getCmdCloudUpload(c))
 
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
