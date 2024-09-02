@@ -3,8 +3,10 @@ package execution
 import (
 	"context"
 	"sync"
+	"time"
 
 	"github.com/sirupsen/logrus"
+	"go.k6.io/k6/event"
 )
 
 // testAbortKey is the key used to store the abort function for the context of
@@ -12,6 +14,13 @@ import (
 // cancel the whole execution tree, while at the same time providing all of the
 // details for why they cancelled it via the attached error.
 type testAbortKey struct{}
+
+// EventAbortEmitter is used to abstract the event.System abort method.
+// It especially helps for tests where we can hide the implementation
+// and use a mock instead.
+type EventAbortEmitter interface {
+	Emit(event *event.Event) (wait func(context.Context) error)
+}
 
 type testAbortController struct {
 	cancel context.CancelFunc
@@ -21,7 +30,23 @@ type testAbortController struct {
 	reason error      // see errext package, you can wrap errors to attach exit status, run status, etc.
 }
 
-func (tac *testAbortController) abort(err error) {
+func (tac *testAbortController) abort(ctx context.Context, events EventAbortEmitter, err error) {
+	// This is a temporary abort signal. It should be removed once
+	// https://github.com/grafana/xk6-browser/issues/1410 is complete.
+	waitDone := events.Emit(&event.Event{
+		Type: event.Abort,
+	})
+	// Unlike in run.go where the timeout is 30 minutes, it is being set to
+	// 5 seconds here. Since this is a temporary event, it doesn't need to
+	// abide by the same rules as the other events. This is only being used
+	// by the browser module, and we know it can process the abort event within
+	// 5 seconds, this is good enough in the short term.
+	waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Second)
+	defer waitCancel()
+	if werr := waitDone(waitCtx); werr != nil {
+		tac.logger.WithError(werr).Warn()
+	}
+
 	tac.lock.Lock()
 	defer tac.lock.Unlock()
 	if tac.reason != nil {
@@ -48,7 +73,7 @@ func (tac *testAbortController) getReason() error {
 // API test stopping both work.
 func NewTestRunContext(
 	ctx context.Context, logger logrus.FieldLogger,
-) (newCtx context.Context, abortTest func(reason error)) {
+) (newCtx context.Context, abortTest func(ctx context.Context, events EventAbortEmitter, err error)) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	controller := &testAbortController{
@@ -61,10 +86,10 @@ func NewTestRunContext(
 
 // AbortTestRun will cancel the test run context with the given reason if the
 // provided context is actually a TestRuncontext or a child of one.
-func AbortTestRun(ctx context.Context, err error) bool {
+func AbortTestRun(ctx context.Context, events EventAbortEmitter, err error) bool {
 	if x := ctx.Value(testAbortKey{}); x != nil {
 		if v, ok := x.(*testAbortController); ok {
-			v.abort(err)
+			v.abort(ctx, events, err)
 			return true
 		}
 	}

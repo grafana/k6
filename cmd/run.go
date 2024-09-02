@@ -222,7 +222,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 			logger.WithError(err).Error("Received error to stop from output")
 		}
 		// TODO: attach run status and exit code?
-		runAbort(err)
+		runAbort(globalCtx, c.gs.Events, err)
 	})
 	samples := make(chan metrics.SampleContainer, test.derivedConfig.MetricSamplesBufferSize.Int64)
 	waitOutputsFlushed, stopOutputs, err := outputManager.Start(samples)
@@ -240,6 +240,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	if !testRunState.RuntimeOptions.NoThresholds.Bool {
 		finalizeThresholds := metricsEngine.StartThresholdCalculations(
+			globalCtx, c.gs.Events,
 			metricsIngester, runAbort, executionState.GetCurrentTestRunDuration,
 		)
 		handleFinalThresholdCalculation := func() {
@@ -347,17 +348,9 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 	// Trap Interrupts, SIGINTs and SIGTERMs.
 	// TODO: move upwards, right after runCtx is created
 	gracefulStop := func(sig os.Signal) {
-		// This is a temporary abort signal. It should be removed
-		// once https://github.com/grafana/xk6-browser/issues/1410
-		// is complete.
-		waitAbortDone := emitEvent(&event.Event{
-			Type: event.Abort,
-		})
-		waitAbortDone()
-
 		logger.WithField("sig", sig).Debug("Stopping k6 in response to signal...")
 		// first abort the test run this way, to propagate the error
-		runAbort(errext.WithAbortReasonIfNone(
+		runAbort(globalCtx, c.gs.Events, errext.WithAbortReasonIfNone(
 			errext.WithExitCodeIfNone(
 				fmt.Errorf("test run was aborted because k6 received a '%s' signal", sig), exitcodes.ExternalAbort,
 			), errext.AbortedByUser,

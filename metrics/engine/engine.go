@@ -3,6 +3,7 @@
 package engine
 
 import (
+	"context"
 	"fmt"
 	"sort"
 	"strings"
@@ -13,6 +14,7 @@ import (
 	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/metrics"
 	"gopkg.in/guregu/null.v3"
@@ -159,8 +161,9 @@ func (me *MetricsEngine) InitSubMetricsAndThresholds(options lib.Options, onlyLo
 // StartThresholdCalculations spins up a new goroutine to crunch thresholds and
 // returns a callback that will stop the goroutine and finalizes calculations.
 func (me *MetricsEngine) StartThresholdCalculations(
+	ctx context.Context, events execution.EventAbortEmitter,
 	ingester *OutputIngester,
-	abortRun func(error),
+	abortRun func(context.Context, execution.EventAbortEmitter, error),
 	getCurrentTestRunDuration func() time.Duration,
 ) (finalize func() (breached []string)) {
 	if len(me.metricsWithThresholds) == 0 {
@@ -188,7 +191,7 @@ func (me *MetricsEngine) StartThresholdCalculations(
 					err = errext.WithAbortReasonIfNone(
 						errext.WithExitCodeIfNone(err, exitcodes.ThresholdsHaveFailed), errext.AbortedByThreshold,
 					)
-					abortRun(err)
+					abortRun(ctx, events, err)
 				}
 			case <-stop:
 				return

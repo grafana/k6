@@ -15,6 +15,7 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/js"
@@ -25,6 +26,14 @@ import (
 	"go.k6.io/k6/metrics/engine"
 	"go.k6.io/k6/output"
 )
+
+type eventAbortEmitterMock struct{}
+
+func (e *eventAbortEmitterMock) Emit(event *event.Event) (wait func(context.Context) error) {
+	return func(ctx context.Context) error {
+		return nil
+	}
+}
 
 func TestSetupData(t *testing.T) {
 	t.Parallel()
@@ -147,9 +156,12 @@ func TestSetupData(t *testing.T) {
 			globalCtx, globalCancel := context.WithCancel(context.Background())
 			defer globalCancel()
 			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
-			defer runAbort(fmt.Errorf("unexpected abort"))
+			ebe := &eventAbortEmitterMock{}
+			defer runAbort(globalCtx, ebe, fmt.Errorf("unexpected abort"))
 
-			outputManager := output.NewManager([]output.Output{metricsEngine.CreateIngester()}, testState.Logger, runAbort)
+			outputManager := output.NewManager([]output.Output{metricsEngine.CreateIngester()}, testState.Logger, func(err error) {
+				runAbort(globalCtx, ebe, err)
+			})
 			samples := make(chan metrics.SampleContainer, 1000)
 			_, stopOutputs, err := outputManager.Start(samples)
 			require.NoError(t, err)

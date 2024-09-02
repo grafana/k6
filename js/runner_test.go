@@ -33,6 +33,7 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/execution/local"
 	"go.k6.io/k6/js/modules/k6"
@@ -282,6 +283,14 @@ func TestMetricName(t *testing.T) {
 	require.Error(t, err)
 }
 
+type eventAbortEmitterMock struct{}
+
+func (e *eventAbortEmitterMock) Emit(event *event.Event) (wait func(context.Context) error) {
+	return func(ctx context.Context) error {
+		return nil
+	}
+}
+
 func TestDataIsolation(t *testing.T) {
 	t.Parallel()
 
@@ -374,7 +383,10 @@ func TestDataIsolation(t *testing.T) {
 	runCtx, runAbort := execution.NewTestRunContext(globalCtx, testRunState.Logger)
 
 	mockOutput := mockoutput.New()
-	outputManager := output.NewManager([]output.Output{mockOutput}, testRunState.Logger, runAbort)
+	ebe := &eventAbortEmitterMock{}
+	outputManager := output.NewManager([]output.Output{mockOutput}, testRunState.Logger, func(err error) {
+		runAbort(globalCtx, ebe, err)
+	})
 	samples := make(chan metrics.SampleContainer, 1000)
 	waitForMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
 	require.NoError(t, err)
@@ -388,7 +400,7 @@ func TestDataIsolation(t *testing.T) {
 
 	select {
 	case <-time.After(20 * time.Second):
-		runAbort(fmt.Errorf("unexpected abort"))
+		runAbort(globalCtx, ebe, fmt.Errorf("unexpected abort"))
 		t.Fatal("Test timed out")
 	case err := <-errC:
 		stopEmission()

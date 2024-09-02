@@ -125,9 +125,12 @@ func TestPatchStatus(t *testing.T) {
 			globalCtx, globalCancel := context.WithCancel(context.Background())
 			defer globalCancel()
 			runCtx, runAbort := execution.NewTestRunContext(globalCtx, testState.Logger)
-			defer runAbort(fmt.Errorf("unexpected abort"))
+			ebe := &eventAbortEmitterMock{}
+			defer runAbort(globalCtx, ebe, fmt.Errorf("unexpected abort"))
 
-			outputManager := output.NewManager([]output.Output{metricsEngine.CreateIngester()}, testState.Logger, runAbort)
+			outputManager := output.NewManager([]output.Output{metricsEngine.CreateIngester()}, testState.Logger, func(err error) {
+				runAbort(globalCtx, ebe, err)
+			})
 			samples := make(chan metrics.SampleContainer, 1000)
 			waitMetricsFlushed, stopOutputs, err := outputManager.Start(samples)
 			require.NoError(t, err)
@@ -147,7 +150,7 @@ func TestPatchStatus(t *testing.T) {
 			wg := &sync.WaitGroup{}
 			wg.Add(1)
 			defer func() {
-				runAbort(fmt.Errorf("custom cancel signal"))
+				runAbort(globalCtx, ebe, fmt.Errorf("custom cancel signal"))
 				waitMetricsFlushed()
 				wg.Wait()
 			}()

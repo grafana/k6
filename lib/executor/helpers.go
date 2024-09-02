@@ -10,6 +10,7 @@ import (
 	"github.com/sirupsen/logrus"
 
 	"go.k6.io/k6/errext"
+	"go.k6.io/k6/event"
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/types"
@@ -86,10 +87,10 @@ func validateStages(stages []Stage) []error {
 
 // handleInterrupt returns true if err is InterruptError and if so it
 // cancels the executor context passed with ctx.
-func handleInterrupt(ctx context.Context, err error) bool {
+func handleInterrupt(ctx context.Context, events *event.System, err error) bool {
 	if err != nil {
 		if errext.IsInterruptError(err) {
-			execution.AbortTestRun(ctx, err)
+			execution.AbortTestRun(ctx, events, err)
 			return true
 		}
 	}
@@ -118,7 +119,7 @@ func getIterationRunner(
 			return false
 		default:
 			if err != nil {
-				if handleInterrupt(ctx, err) {
+				if handleInterrupt(ctx, executionState.Test.Events, err) {
 					executionState.AddInterruptedIterations(1)
 					return false
 				}

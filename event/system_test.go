@@ -84,7 +84,7 @@ func TestEventSystem(t *testing.T) {
 		var (
 			doneMx     sync.RWMutex
 			processed  = make(map[Type]int)
-			emitEvents = []Type{Init, TestStart, IterStart, IterEnd, TestEnd, Exit}
+			emitEvents = []Type{Init, TestStart, IterStart, IterEnd, TestEnd, Exit, Abort}
 			data       int
 		)
 		for _, et := range emitEvents {

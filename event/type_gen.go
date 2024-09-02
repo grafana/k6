@@ -6,9 +6,9 @@ import (
 	"fmt"
 )
 
-const _TypeName = "InitTestStartTestEndIterStartIterEndExit"
+const _TypeName = "InitTestStartTestEndIterStartIterEndExitAbort"
 
-var _TypeIndex = [...]uint8{0, 4, 13, 20, 29, 36, 40}
+var _TypeIndex = [...]uint8{0, 4, 13, 20, 29, 36, 40, 45}
 
 func (i Type) String() string {
 	i -= 1
@@ -18,7 +18,7 @@ func (i Type) String() string {
 	return _TypeName[_TypeIndex[i]:_TypeIndex[i+1]]
 }
 
-var _TypeValues = []Type{1, 2, 3, 4, 5, 6}
+var _TypeValues = []Type{1, 2, 3, 4, 5, 6, 7}
 
 var _TypeNameToValueMap = map[string]Type{
 	_TypeName[0:4]:   1,
@@ -27,6 +27,7 @@ var _TypeNameToValueMap = map[string]Type{
 	_TypeName[20:29]: 4,
 	_TypeName[29:36]: 5,
 	_TypeName[36:40]: 6,
+	_TypeName[40:45]: 7,
 }
 
 // TypeString retrieves an enum value from the enum constants string name.

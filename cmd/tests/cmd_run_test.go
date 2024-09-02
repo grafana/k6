@@ -2106,6 +2106,7 @@ func TestEventSystemError(t *testing.T) {
 				"got event TestStart with data '<nil>'",
 				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
 				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at default (file:///-:11:16(5))}'",
+				"got event Abort with data '<nil>'",
 				"got event TestEnd with data '<nil>'",
 				"got event Exit with data '&{Error:test aborted: oops! at default (file:///-:11:16(5))}'",
 				"test aborted: oops! at default (file:///-:11:16(5))",
