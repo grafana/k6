@@ -103,7 +103,7 @@ func (s *System) Emit(event *Event) (wait func(context.Context) error) {
 	s.logger.WithFields(logrus.Fields{
 		"subscribers": totalSubs,
 		"event":       event.Type,
-	}).Trace("Emitted event")
+	}).Info("Emitted event")
 
 	return func(ctx context.Context) error {
 		var doneCount int

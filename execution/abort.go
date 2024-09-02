@@ -43,6 +43,7 @@ func (tac *testAbortController) abort(ctx context.Context, events EventAbortEmit
 	// 5 seconds, this is good enough in the short term.
 	waitCtx, waitCancel := context.WithTimeout(ctx, 5*time.Second)
 	defer waitCancel()
+	tac.logger.Infof("abort event fired due to '%s'", err)
 	if werr := waitDone(waitCtx); werr != nil {
 		tac.logger.WithError(werr).Warn()
 	}
