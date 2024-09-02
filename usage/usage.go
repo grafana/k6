@@ -95,7 +95,7 @@ func (u *Usage) Map() (map[string]any, error) {
 	return result, errors.Join(errs...)
 }
 
-// replace with map.Keys from go 1.23 after that is the minimal version
+// TODO: replace with map.Keys from go 1.23 after that is the minimal version
 func mapKeys(m map[string]any) []string {
 	keys := make([]string, 0, len(m))
 	for k := range m {
