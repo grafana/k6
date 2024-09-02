@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/mstoykov/envconfig"
@@ -217,8 +218,14 @@ func (cfg Config) Validate() error {
 	}
 
 	if cfg.ExporterType.String == httpExporterType {
-		if cfg.HTTPExporterEndpoint.String == "" {
+		endpoint := cfg.HTTPExporterEndpoint.String
+		if endpoint == "" {
 			return errors.New("HTTP exporter endpoint is required")
+		}
+
+		if strings.HasPrefix(endpoint, "http://") ||
+			strings.HasPrefix(endpoint, "https://") {
+			return errors.New("HTTP exporter endpoint must only be host and port, no scheme")
 		}
 	}
 

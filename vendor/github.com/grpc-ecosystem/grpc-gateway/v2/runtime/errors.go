@@ -71,7 +71,7 @@ func HTTPStatusFromCode(code codes.Code) int {
 	case codes.DataLoss:
 		return http.StatusInternalServerError
 	default:
-		grpclog.Infof("Unknown gRPC error code: %v", code)
+		grpclog.Warningf("Unknown gRPC error code: %v", code)
 		return http.StatusInternalServerError
 	}
 }
@@ -114,17 +114,17 @@ func DefaultHTTPErrorHandler(ctx context.Context, mux *ServeMux, marshaler Marsh
 
 	buf, merr := marshaler.Marshal(pb)
 	if merr != nil {
-		grpclog.Infof("Failed to marshal error message %q: %v", s, merr)
+		grpclog.Errorf("Failed to marshal error message %q: %v", s, merr)
 		w.WriteHeader(http.StatusInternalServerError)
 		if _, err := io.WriteString(w, fallback); err != nil {
-			grpclog.Infof("Failed to write response: %v", err)
+			grpclog.Errorf("Failed to write response: %v", err)
 		}
 		return
 	}
 
 	md, ok := ServerMetadataFromContext(ctx)
 	if !ok {
-		grpclog.Infof("Failed to extract ServerMetadata from context")
+		grpclog.Error("Failed to extract ServerMetadata from context")
 	}
 
 	handleForwardResponseServerMetadata(w, mux, md)
@@ -148,7 +148,7 @@ func DefaultHTTPErrorHandler(ctx context.Context, mux *ServeMux, marshaler Marsh
 
 	w.WriteHeader(st)
 	if _, err := w.Write(buf); err != nil {
-		grpclog.Infof("Failed to write response: %v", err)
+		grpclog.Errorf("Failed to write response: %v", err)
 	}
 
 	if doForwardTrailers {
