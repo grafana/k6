@@ -62,7 +62,7 @@ type ReadOnlySpan interface {
 	// InstrumentationLibrary returns information about the instrumentation
 	// library that created the span.
 	// Deprecated: please use InstrumentationScope instead.
-	InstrumentationLibrary() instrumentation.Library
+	InstrumentationLibrary() instrumentation.Library //nolint:staticcheck // This method needs to be define for backwards compatibility
 	// Resource returns information about the entity that produced the span.
 	Resource() *resource.Resource
 	// DroppedAttributes returns the number of attributes dropped by the span
@@ -642,7 +642,7 @@ func (s *recordingSpan) InstrumentationScope() instrumentation.Scope {
 
 // InstrumentationLibrary returns the instrumentation.Library associated with
 // the Tracer that created this span.
-func (s *recordingSpan) InstrumentationLibrary() instrumentation.Library {
+func (s *recordingSpan) InstrumentationLibrary() instrumentation.Library { //nolint:staticcheck // This method needs to be define for backwards compatibility
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	return s.tracer.instrumentationScope
