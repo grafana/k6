@@ -2,18 +2,7 @@
 // source: internal/shared/otlp/envconfig/envconfig.go.tmpl
 
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package envconfig // import "go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracehttp/internal/envconfig"
 
@@ -26,6 +15,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"go.opentelemetry.io/otel/internal/global"
 )
@@ -174,12 +164,16 @@ func stringToHeader(value string) map[string]string {
 			global.Error(errors.New("missing '="), "parse headers", "input", header)
 			continue
 		}
-		name, err := url.PathUnescape(n)
-		if err != nil {
-			global.Error(err, "escape header key", "key", n)
+
+		trimmedName := strings.TrimSpace(n)
+
+		// Validate the key.
+		if !isValidHeaderKey(trimmedName) {
+			global.Error(errors.New("invalid header key"), "parse headers", "key", trimmedName)
 			continue
 		}
-		trimmedName := strings.TrimSpace(name)
+
+		// Only decode the value.
 		value, err := url.PathUnescape(v)
 		if err != nil {
 			global.Error(err, "escape header value", "value", v)
@@ -199,4 +193,23 @@ func createCertPool(certBytes []byte) (*x509.CertPool, error) {
 		return nil, errors.New("failed to append certificate to the cert pool")
 	}
 	return cp, nil
+}
+
+func isValidHeaderKey(key string) bool {
+	if key == "" {
+		return false
+	}
+	for _, c := range key {
+		if !isTokenChar(c) {
+			return false
+		}
+	}
+	return true
+}
+
+func isTokenChar(c rune) bool {
+	return c <= unicode.MaxASCII && (unicode.IsLetter(c) ||
+		unicode.IsDigit(c) ||
+		c == '!' || c == '#' || c == '$' || c == '%' || c == '&' || c == '\'' || c == '*' ||
+		c == '+' || c == '-' || c == '.' || c == '^' || c == '_' || c == '`' || c == '|' || c == '~')
 }
