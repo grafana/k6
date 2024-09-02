@@ -55,7 +55,7 @@ func (u *Usage) Uint64(k string, v uint64) error {
 	case uint64:
 		u.m[k] = oldVUint64 + v
 	default:
-		return fmt.Errorf("!value of key %s is not uint64 as expected but %T", k, oldV)
+		return fmt.Errorf("value of key %s is not uint64 as expected but %T", k, oldV)
 		// TODO: error, panic?, nothing, log?
 	}
 	return nil
