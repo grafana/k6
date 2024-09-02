@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package aggregate // import "go.opentelemetry.io/otel/sdk/metric/internal/aggregate"
 
@@ -41,9 +30,9 @@ func newLimiter[V any](aggregation int) limiter[V] {
 // aggregation cardinality limit for the existing measurements. If it will,
 // overflowSet is returned. Otherwise, if it will not exceed the limit, or the
 // limit is not set (limit <= 0), attr is returned.
-func (l limiter[V]) Attributes(attrs attribute.Set, measurements map[attribute.Set]V) attribute.Set {
+func (l limiter[V]) Attributes(attrs attribute.Set, measurements map[attribute.Distinct]V) attribute.Set {
 	if l.aggLimit > 0 {
-		_, exists := measurements[attrs]
+		_, exists := measurements[attrs.Equivalent()]
 		if !exists && len(measurements) >= l.aggLimit-1 {
 			return overflowSet
 		}

@@ -125,32 +125,27 @@ func (r *registry) getOrCreateCountersForRate(name string) (otelMetric.Int64Coun
 	return nonZeroCounter, totalCounter, nil
 }
 
-func (r *registry) getOrCreateGauge(name, unit string) (*Float64Gauge, error) {
+func (r *registry) getOrCreateGauge(name, unit string) (otelMetric.Float64Gauge, error) {
 	if gauge, ok := r.gauges.Load(name); ok {
-		if v, ok := gauge.(*Float64Gauge); ok {
+		if v, ok := gauge.(otelMetric.Float64Gauge); ok {
 			return v, nil
 		}
 
 		return nil, fmt.Errorf("metric %q is not a gauge", name)
 	}
 
-	g := NewFloat64Gauge()
-
-	opts := []otelMetric.Float64ObservableGaugeOption{
-		otelMetric.WithFloat64Callback(g.Callback),
-	}
-
+	opts := []otelMetric.Float64GaugeOption{}
 	if unit != "" {
 		opts = append(opts, otelMetric.WithUnit(unit))
 	}
 
-	_, err := r.meter.Float64ObservableGauge(name, opts...)
+	gauge, err := r.meter.Float64Gauge(name, opts...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gauge for %q: %w", name, err)
 	}
 
 	r.logger.Debugf("registered gauge metric %q ", name)
 
-	r.gauges.Store(name, g)
-	return g, nil
+	r.gauges.Store(name, gauge)
+	return gauge, nil
 }

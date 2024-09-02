@@ -77,7 +77,7 @@ func (o *Output) Start() error {
 	}
 
 	res, err := resource.Merge(resource.Default(),
-		resource.NewWithAttributes(semconv.SchemaURL,
+		resource.NewSchemaless(
 			semconv.ServiceName(o.config.ServiceName.String),
 			semconv.ServiceVersion(o.config.ServiceVersion.String),
 		))
@@ -164,7 +164,7 @@ func (o *Output) dispatch(entry metrics.Sample) error {
 			return err
 		}
 
-		gauge.Set(entry.Value, attributeSet)
+		gauge.Record(ctx, entry.Value, attributeSetOpt)
 	case metrics.Trend:
 		trend, err := o.metricsRegistry.getOrCreateHistogram(name, unit)
 		if err != nil {
