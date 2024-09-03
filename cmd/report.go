@@ -67,8 +67,6 @@ func createReport(
 		m["duration"] = execState.GetCurrentTestRunDuration().String()
 		m["goos"] = runtime.GOOS
 		m["goarch"] = runtime.GOARCH
-		m["goarch"] = runtime.GOARCH
-		m["goarch"] = runtime.GOARCH
 		m["vus_max"] = uint64(execState.GetInitializedVUsCount())
 		m["iterations"] = execState.GetFullIterationCount()
 	}
