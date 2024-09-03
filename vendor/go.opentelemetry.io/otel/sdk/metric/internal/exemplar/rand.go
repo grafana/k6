@@ -1,16 +1,5 @@
 // Copyright The OpenTelemetry Authors
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
+// SPDX-License-Identifier: Apache-2.0
 
 package exemplar // import "go.opentelemetry.io/otel/sdk/metric/internal/exemplar"
 
@@ -18,17 +7,21 @@ import (
 	"context"
 	"math"
 	"math/rand"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
 )
 
-// rng is used to make sampling decisions.
-//
-// Do not use crypto/rand. There is no reason for the decrease in performance
-// given this is not a security sensitive decision.
-var rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+var (
+	// rng is used to make sampling decisions.
+	//
+	// Do not use crypto/rand. There is no reason for the decrease in performance
+	// given this is not a security sensitive decision.
+	rng = rand.New(rand.NewSource(time.Now().UnixNano()))
+	// Ensure concurrent safe accecess to rng and its underlying source.
+	rngMu sync.Mutex
+)
 
 // random returns, as a float64, a uniform pseudo-random number in the open
 // interval (0.0,1.0).
@@ -50,6 +43,9 @@ func random() float64 {
 	//
 	// There are likely many other methods to explore here as well.
 
+	rngMu.Lock()
+	defer rngMu.Unlock()
+
 	f := rng.Float64()
 	for f == 0 {
 		f = rng.Float64()
@@ -61,14 +57,14 @@ func random() float64 {
 // are k or less measurements made, the Reservoir will sample each one. If
 // there are more than k, the Reservoir will then randomly sample all
 // additional measurement with a decreasing probability.
-func FixedSize[N int64 | float64](k int) Reservoir[N] {
-	r := &randRes[N]{storage: newStorage[N](k)}
+func FixedSize(k int) Reservoir {
+	r := &randRes{storage: newStorage(k)}
 	r.reset()
 	return r
 }
 
-type randRes[N int64 | float64] struct {
-	*storage[N]
+type randRes struct {
+	*storage
 
 	// count is the number of measurement seen.
 	count int64
@@ -80,7 +76,7 @@ type randRes[N int64 | float64] struct {
 	w float64
 }
 
-func (r *randRes[N]) Offer(ctx context.Context, t time.Time, n N, a []attribute.KeyValue) {
+func (r *randRes) Offer(ctx context.Context, t time.Time, n Value, a []attribute.KeyValue) {
 	// The following algorithm is "Algorithm L" from Li, Kim-Hung (4 December
 	// 1994). "Reservoir-Sampling Algorithms of Time Complexity
 	// O(n(1+log(N/n)))". ACM Transactions on Mathematical Software. 20 (4):
@@ -136,7 +132,7 @@ func (r *randRes[N]) Offer(ctx context.Context, t time.Time, n N, a []attribute.
 }
 
 // reset resets r to the initial state.
-func (r *randRes[N]) reset() {
+func (r *randRes) reset() {
 	// This resets the number of exemplars known.
 	r.count = 0
 	// Random index inserts should only happen after the storage is full.
@@ -158,7 +154,7 @@ func (r *randRes[N]) reset() {
 
 // advance updates the count at which the offered measurement will overwrite an
 // existing exemplar.
-func (r *randRes[N]) advance() {
+func (r *randRes) advance() {
 	// Calculate the next value in the random number series.
 	//
 	// The current value of r.w is based on the max of a distribution of random
@@ -185,7 +181,7 @@ func (r *randRes[N]) advance() {
 	r.next += int64(math.Log(random())/math.Log(1-r.w)) + 1
 }
 
-func (r *randRes[N]) Collect(dest *[]metricdata.Exemplar[N]) {
+func (r *randRes) Collect(dest *[]Exemplar) {
 	r.storage.Collect(dest)
 	// Call reset here even though it will reset r.count and restart the random
 	// number series. This will persist any old exemplars as long as no new
