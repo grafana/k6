@@ -219,6 +219,10 @@ func TestBrowserUserAgent(t *testing.T) {
 }
 
 func TestBrowserCrashErr(t *testing.T) {
+	// Skip until we get answer from Chromium team in an open issue
+	// https://issues.chromium.org/issues/364089353.
+	t.Skip("Skipping until we get response from Chromium team")
+
 	t.Parallel()
 
 	// create a new VU in an environment that requires a bad remote-debugging-port.

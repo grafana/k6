@@ -36,6 +36,10 @@ func (t *testingT) Fatalf(format string, args ...any) {
 }
 
 func TestTestBrowserWithLookupFunc(t *testing.T) {
+	// Skip until we get answer from Chromium team in an open issue
+	// https://issues.chromium.org/issues/364089353.
+	t.Skip("Skipping until we get response from Chromium team")
+
 	tt := &testingT{TB: t}
 	// this operation is expected to fail because the remote debugging port is
 	// invalid, practically testing that the InitEnv.LookupEnv is used.
