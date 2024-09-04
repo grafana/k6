@@ -61,6 +61,13 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
+// ValidateTokenResponse is the response of a token validation.
+type ValidateTokenResponse struct {
+	IsValid bool   `json:"is_valid"`
+	Message string `json:"message"`
+	Token   string `json:"token-info"`
+}
+
 func (c *Client) handleLogEntriesFromCloud(ctrr CreateTestRunResponse) {
 	logger := c.logger.WithField("source", "grafana-k6-cloud")
 	for _, logEntry := range ctrr.Logs {
@@ -257,4 +264,28 @@ func (c *Client) Login(email string, password string) (*LoginResponse, error) {
 	}
 
 	return &lr, nil
+}
+
+// ValidateToken calls the endpoint to validate the Client's token and returns the result.
+func (c *Client) ValidateToken() (*ValidateTokenResponse, error) {
+	url := fmt.Sprintf("%s/validate-token", c.baseURL)
+
+	data := struct {
+		Token string `json:"token"`
+	}{
+		c.token,
+	}
+
+	req, err := c.NewRequest("POST", url, data)
+	if err != nil {
+		return nil, err
+	}
+
+	vtr := ValidateTokenResponse{}
+	err = c.Do(req, &vtr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &vtr, nil
 }

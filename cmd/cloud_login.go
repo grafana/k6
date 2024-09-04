@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"syscall"
 
@@ -12,6 +13,7 @@ import (
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
+	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui"
 )
 
@@ -63,6 +65,8 @@ the "k6 run -o cloud" command.
 }
 
 // run is the code that runs when the user executes `k6 cloud login`
+//
+//nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
@@ -78,6 +82,18 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		}
 	}
 
+	// We want to use this fully consolidated config for things like
+	// host addresses, so users can overwrite them with env vars.
+	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		currentJSONConfigRaw, c.globalState.Env, "", nil, nil)
+	if err != nil {
+		return err
+	}
+
+	if warn != "" {
+		c.globalState.Logger.Warn(warn)
+	}
+
 	// But we don't want to save them back to the JSON file, we only
 	// want to save what already existed there and the login details.
 	newCloudConf := currentJSONConfig
@@ -90,6 +106,9 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.Token = null.StringFromPtr(nil)
 		printToStdout(c.globalState, "  token reset\n")
 	case show.Bool:
+		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
+		printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
+		return nil
 	case token.Valid:
 		newCloudConf.Token = token
 	default:
@@ -115,6 +134,26 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		newCloudConf.Token = null.StringFrom(vals["Token"])
 	}
 
+	if newCloudConf.Token.Valid {
+		client := cloudapi.NewClient(
+			c.globalState.Logger,
+			newCloudConf.Token.String,
+			consolidatedCurrentConfig.Host.String,
+			consts.Version,
+			consolidatedCurrentConfig.Timeout.TimeDuration(),
+		)
+
+		var res *cloudapi.ValidateTokenResponse
+		res, err = client.ValidateToken()
+		if err != nil {
+			return err
+		}
+
+		if !res.IsValid {
+			return errors.New(`your API token is invalid, please generate a new one at https://app.k6.io/account/api-token`)
+		}
+	}
+
 	if currentDiskConf.Collectors == nil {
 		currentDiskConf.Collectors = make(map[string]json.RawMessage)
 	}
@@ -127,10 +166,6 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	if newCloudConf.Token.Valid {
-		valueColor := getColor(c.globalState.Flags.NoColor || !c.globalState.Stdout.IsTTY, color.FgCyan)
-		if !c.globalState.Flags.Quiet {
-			printToStdout(c.globalState, fmt.Sprintf("  token: %s\n", valueColor.Sprint(newCloudConf.Token.String)))
-		}
 		printToStdout(c.globalState, fmt.Sprintf(
 			"Logged in successfully, token saved in %s\n", c.globalState.Flags.ConfigFilePath,
 		))
