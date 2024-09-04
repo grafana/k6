@@ -125,9 +125,6 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
-		// Note that when running the k6 cloud run command with the --local-execution
-		// flag, we handle the no-usage-report flag here as we would do in the k6 run
-		// command.
 		return c.runCmd.run(cmd, args)
 	}
 
