@@ -3,6 +3,10 @@ package cmd
 import (
 	"fmt"
 
+	"go.k6.io/k6/errext/exitcodes"
+
+	"go.k6.io/k6/errext"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
 	"go.k6.io/k6/execution"
@@ -93,18 +97,27 @@ Use the "k6 cloud login" command to authenticate.`,
 func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
 		if cmd.Flags().Changed("exit-on-running") {
-			return fmt.Errorf("the --local-execution flag is not compatible with the --exit-on-running flag")
+			return errext.WithExitCodeIfNone(
+				fmt.Errorf("the --local-execution flag is not compatible with the --exit-on-running flag"),
+				exitcodes.InvalidConfig,
+			)
 		}
 
 		if cmd.Flags().Changed("show-logs") {
-			return fmt.Errorf("the --local-execution flag is not compatible with the --show-logs flag")
+			return errext.WithExitCodeIfNone(
+				fmt.Errorf("the --local-execution flag is not compatible with the --show-logs flag"),
+				exitcodes.InvalidConfig,
+			)
 		}
 
 		return nil
 	}
 
 	if c.linger {
-		return fmt.Errorf("the --linger flag can only be used in conjunction with the --local-execution flag")
+		return errext.WithExitCodeIfNone(
+			fmt.Errorf("the --linger flag can only be used in conjunction with the --local-execution flag"),
+			exitcodes.InvalidConfig,
+		)
 	}
 
 	return c.deprecatedCloudCmd.preRun(cmd, args)

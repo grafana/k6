@@ -3,6 +3,8 @@ package tests
 import (
 	"testing"
 
+	"go.k6.io/k6/errext/exitcodes"
+
 	"github.com/stretchr/testify/assert"
 	"go.k6.io/k6/cmd"
 )
@@ -48,7 +50,7 @@ func TestCloudRunCommandIncompatibleFlags(t *testing.T) {
 			t.Parallel()
 
 			ts := getSimpleCloudTestState(t, nil, setupK6CloudRunCmd, tc.cliArgs, nil, nil)
-			ts.ExpectedExitCode = -1
+			ts.ExpectedExitCode = int(exitcodes.InvalidConfig)
 			cmd.ExecuteWithGlobalState(ts.GlobalState)
 
 			stderr := ts.Stderr.String()
