@@ -47,6 +47,13 @@ type Config struct {
 	NoUsageReport null.Bool `json:"noUsageReport" envconfig:"K6_NO_USAGE_REPORT"`
 	WebDashboard  null.Bool `json:"webDashboard" envconfig:"K6_WEB_DASHBOARD"`
 
+	// NoArchiveUpload is an option that is only used when running in local-execution mode with the cloud run
+	// command.
+	//
+	// Because the implementation of k6 cloud run calls the same code as the k6 run command under the hood, we
+	// need to be able to pass down a configuration option that is only relevant to the cloud run command.
+	NoArchiveUpload null.Bool `json:"noArchiveUpload" envconfig:"K6_NO_ARCHIVE_UPLOAD"`
+
 	// TODO: deprecate
 	Collectors map[string]json.RawMessage `json:"collectors"`
 }
@@ -74,6 +81,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.WebDashboard.Valid {
 		c.WebDashboard = cfg.WebDashboard
+	}
+	if cfg.NoArchiveUpload.Valid {
+		c.NoArchiveUpload = cfg.NoArchiveUpload
 	}
 	if len(cfg.Collectors) > 0 {
 		c.Collectors = cfg.Collectors
@@ -106,6 +116,11 @@ func getConfig(flags *pflag.FlagSet) (Config, error) {
 		Out:           out,
 		Linger:        getNullBool(flags, "linger"),
 		NoUsageReport: getNullBool(flags, "no-usage-report"),
+
+		// As the "run" and the "cloud run" commands share the same implementation
+		// we enforce the run command to ignore the no-archive-upload flag, and always
+		// set it to true (do not upload).
+		NoArchiveUpload: null.NewBool(true, true),
 	}, nil
 }
 
