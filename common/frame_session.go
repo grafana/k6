@@ -78,6 +78,11 @@ type FrameSession struct {
 	// Keep a reference to the main frame span so we can end it
 	// when FrameSession.ctx is Done
 	mainFrameSpan trace.Span
+	// The initial navigation when a new page is created navigates to about:blank.
+	// We want to make sure that the the navigation span is created for this in
+	// onFrameNavigated, but subsequent calls to onFrameNavigated in the same
+	// mainframe never again create a navigation span.
+	initialNavDone bool
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
@@ -782,6 +787,14 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 			frame.URL+frame.URLFragment, err)
 	}
 
+	// Only create a navigation span once from here, since a new page navigating
+	// to about:blank doesn't call onFrameStartedLoading. All subsequent
+	// navigations call onFrameStartedLoading.
+	if fs.initialNavDone {
+		return
+	}
+
+	fs.initialNavDone = true
 	fs.processNavigationSpan(frame.URL, frame.ID)
 }
 
@@ -849,6 +862,11 @@ func (fs *FrameSession) onFrameStartedLoading(frameID cdp.FrameID) {
 	fs.logger.Debugf("FrameSession:onFrameStartedLoading",
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, frameID)
+
+	frame, ok := fs.manager.getFrameByID(frameID)
+	if ok {
+		fs.processNavigationSpan(frame.URL(), frame.id)
+	}
 
 	fs.manager.frameLoadingStarted(frameID)
 }
