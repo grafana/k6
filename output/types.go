@@ -68,6 +68,13 @@ type WithThresholds interface {
 	SetThresholds(map[string]metrics.Thresholds)
 }
 
+// WithArchive is an output that can receive the archive object in order
+// to upload it to the cloud.
+type WithArchive interface {
+	Output
+	SetArchive(archive *lib.Archive)
+}
+
 // WithTestRunStop is an output that can stop the test run mid-way through,
 // interrupting the whole test run execution if some internal condition occurs,
 // completely independently from the thresholds. It requires a callback function
