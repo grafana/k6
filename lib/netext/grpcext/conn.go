@@ -26,16 +26,18 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
-	Method           string
-	MethodDescriptor protoreflect.MethodDescriptor
-	Timeout          time.Duration
-	TagsAndMeta      *metrics.TagsAndMeta
-	Message          []byte
-	Metadata         metadata.MD
+	Method                 string
+	MethodDescriptor       protoreflect.MethodDescriptor
+	Timeout                time.Duration
+	TagsAndMeta            *metrics.TagsAndMeta
+	DiscardResponseMessage bool
+	Message                []byte
+	Metadata               metadata.MD
 }
 
 // InvokeResponse represents a gRPC response.
@@ -49,11 +51,12 @@ type InvokeResponse struct {
 
 // StreamRequest represents a gRPC stream request.
 type StreamRequest struct {
-	Method           string
-	MethodDescriptor protoreflect.MethodDescriptor
-	Timeout          time.Duration
-	TagsAndMeta      *metrics.TagsAndMeta
-	Metadata         metadata.MD
+	Method                 string
+	MethodDescriptor       protoreflect.MethodDescriptor
+	Timeout                time.Duration
+	DiscardResponseMessage bool
+	TagsAndMeta            *metrics.TagsAndMeta
+	Metadata               metadata.MD
 }
 
 type clientConnCloser interface {
@@ -133,7 +136,13 @@ func (c *Conn) Invoke(
 
 	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta})
 
-	resp := dynamicpb.NewMessage(req.MethodDescriptor.Output())
+	var resp *dynamicpb.Message
+	if req.DiscardResponseMessage {
+		resp = dynamicpb.NewMessage((&emptypb.Empty{}).ProtoReflect().Descriptor())
+	} else {
+		resp = dynamicpb.NewMessage(req.MethodDescriptor.Output())
+	}
+
 	header, trailer := metadata.New(nil), metadata.New(nil)
 
 	copts := make([]grpc.CallOption, 0, len(opts)+2)
@@ -165,7 +174,7 @@ func (c *Conn) Invoke(
 		response.Error = errMsg
 	}
 
-	if resp != nil {
+	if resp != nil && !req.DiscardResponseMessage {
 		msg, err := convert(marshaler, resp)
 		if err != nil {
 			return nil, fmt.Errorf("unable to convert response object to JSON: %w", err)
@@ -196,9 +205,10 @@ func (c *Conn) NewStream(
 	}
 
 	return &Stream{
-		raw:              stream,
-		method:           req.Method,
-		methodDescriptor: req.MethodDescriptor,
+		raw:                    stream,
+		method:                 req.Method,
+		methodDescriptor:       req.MethodDescriptor,
+		discardResponseMessage: req.DiscardResponseMessage,
 	}, nil
 }
 

@@ -139,6 +139,47 @@ func TestCallParamsTimeOutParse(t *testing.T) {
 	}
 }
 
+func TestCallParamsDiscardResponseMessageParse(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name                   string
+		JSON                   string
+		DiscardResponseMessage bool
+	}{
+		{
+			Name:                   "Empty",
+			JSON:                   `{}`,
+			DiscardResponseMessage: false,
+		},
+		{
+			Name:                   "DiscardResponseMessageFalse",
+			JSON:                   `{ discardResponseMessage: false }`,
+			DiscardResponseMessage: false,
+		},
+		{
+			Name:                   "DiscardResponseMessageTrue",
+			JSON:                   `{ discardResponseMessage: true }`,
+			DiscardResponseMessage: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+
+			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
+
+			p, err := newCallParams(testRuntime.VU, params)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.DiscardResponseMessage, p.DiscardResponseMessage)
+		})
+	}
+}
+
 // newParamsTestRuntime creates a new test runtime
 // that could be used to test the params
 // it also moves to the VU context and creates the params

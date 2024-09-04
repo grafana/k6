@@ -794,10 +794,9 @@ func TestVUIntegrationMetrics(t *testing.T) {
 			require.NoError(t, err)
 			sampleCount := 0
 			builtinMetrics := r.preInitState.BuiltinMetrics
-			for i, sampleC := range metrics.GetBufferedSamples(samples) {
-				for j, s := range sampleC.GetSamples() {
-					sampleCount++
-					switch i + j {
+			for _, sampleC := range metrics.GetBufferedSamples(samples) {
+				for _, s := range sampleC.GetSamples() {
+					switch sampleCount {
 					case 0:
 						assert.Equal(t, 5.0, s.Value)
 						assert.Equal(t, "my_metric", s.Metric.Name)
@@ -814,6 +813,7 @@ func TestVUIntegrationMetrics(t *testing.T) {
 						assert.Same(t, builtinMetrics.Iterations, s.Metric, "`iterations` sample is after `iteration_duration`")
 						assert.Equal(t, float64(1), s.Value)
 					}
+					sampleCount++
 				}
 			}
 			assert.Equal(t, sampleCount, 5)

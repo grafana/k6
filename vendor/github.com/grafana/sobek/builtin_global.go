@@ -2,7 +2,6 @@ package sobek
 
 import (
 	"errors"
-	"github.com/grafana/sobek/unistring"
 	"io"
 	"math"
 	"regexp"
@@ -10,13 +9,13 @@ import (
 	"strings"
 	"sync"
 	"unicode/utf8"
+
+	"github.com/grafana/sobek/unistring"
 )
 
 const hexUpper = "0123456789ABCDEF"
 
-var (
-	parseFloatRegexp = regexp.MustCompile(`^([+-]?(?:Infinity|[0-9]*\.?[0-9]*(?:[eE][+-]?[0-9]+)?))`)
-)
+var parseFloatRegexp = regexp.MustCompile(`^([+-]?(?:Infinity|[0-9]*\.?[0-9]*(?:[eE][+-]?[0-9]+)?))`)
 
 func (r *Runtime) builtin_isNaN(call FunctionCall) Value {
 	if math.IsNaN(call.Argument(0).ToFloat()) {
@@ -339,6 +338,7 @@ func createGlobalObjectTemplate() *objectTemplate {
 	t.putStr("Array", func(r *Runtime) Value { return valueProp(r.getArray(), true, false, true) })
 	t.putStr("String", func(r *Runtime) Value { return valueProp(r.getString(), true, false, true) })
 	t.putStr("Number", func(r *Runtime) Value { return valueProp(r.getNumber(), true, false, true) })
+	t.putStr("BigInt", func(r *Runtime) Value { return valueProp(r.getBigInt(), true, false, true) })
 	t.putStr("RegExp", func(r *Runtime) Value { return valueProp(r.getRegExp(), true, false, true) })
 	t.putStr("Date", func(r *Runtime) Value { return valueProp(r.getDate(), true, false, true) })
 	t.putStr("Boolean", func(r *Runtime) Value { return valueProp(r.getBoolean(), true, false, true) })
@@ -389,8 +389,10 @@ func createGlobalObjectTemplate() *objectTemplate {
 	return t
 }
 
-var globalObjectTemplate *objectTemplate
-var globalObjectTemplateOnce sync.Once
+var (
+	globalObjectTemplate     *objectTemplate
+	globalObjectTemplateOnce sync.Once
+)
 
 func getGlobalObjectTemplate() *objectTemplate {
 	globalObjectTemplateOnce.Do(func() {

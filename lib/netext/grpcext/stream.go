@@ -12,15 +12,17 @@ import (
 	"google.golang.org/protobuf/encoding/protojson"
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/dynamicpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // Stream is the wrapper around the grpc.ClientStream
 // with some handy methods.
 type Stream struct {
-	method           string
-	methodDescriptor protoreflect.MethodDescriptor
-	raw              grpc.ClientStream
-	marshaler        protojson.MarshalOptions
+	method                 string
+	methodDescriptor       protoreflect.MethodDescriptor
+	discardResponseMessage bool
+	raw                    grpc.ClientStream
+	marshaler              protojson.MarshalOptions
 }
 
 // ErrCanceled canceled by client (k6)
@@ -35,6 +37,10 @@ func (s *Stream) ReceiveConverted() (interface{}, error) {
 		return nil, err
 	}
 
+	if s.discardResponseMessage {
+		return struct{}{}, err
+	}
+
 	msg, errConv := convert(s.marshaler, raw)
 	if errConv != nil {
 		return nil, errConv
@@ -43,9 +49,14 @@ func (s *Stream) ReceiveConverted() (interface{}, error) {
 	return msg, err
 }
 
-func (s *Stream) receive() (*dynamicpb.Message, error) {
-	msg := dynamicpb.NewMessage(s.methodDescriptor.Output())
-	err := s.raw.RecvMsg(msg)
+func (s *Stream) receive() (msg *dynamicpb.Message, err error) {
+	if s.discardResponseMessage {
+		msg = dynamicpb.NewMessage((&emptypb.Empty{}).ProtoReflect().Descriptor())
+	} else {
+		msg = dynamicpb.NewMessage(s.methodDescriptor.Output())
+	}
+
+	err = s.raw.RecvMsg(msg)
 
 	// io.EOF means that the stream has been closed successfully
 	if err == nil || errors.Is(err, io.EOF) {

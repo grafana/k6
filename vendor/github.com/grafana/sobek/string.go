@@ -24,6 +24,7 @@ var (
 	stringString      String = asciiString("string")
 	stringSymbol      String = asciiString("symbol")
 	stringNumber      String = asciiString("number")
+	stringBigInt      String = asciiString("bigint")
 	stringNaN         String = asciiString("NaN")
 	stringInfinity           = asciiString("Infinity")
 	stringNegInfinity        = asciiString("-Infinity")

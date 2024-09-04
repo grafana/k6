@@ -10,14 +10,14 @@ import (
 	"path/filepath"
 	"testing"
 
-	"go.k6.io/k6/lib/testutils"
-
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd"
+	"go.k6.io/k6/errext/exitcodes"
+	"go.k6.io/k6/lib/fsext"
+	"go.k6.io/k6/lib/testutils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cloudapi"
-	"go.k6.io/k6/lib/fsext"
 )
 
 func TestK6Cloud(t *testing.T) {
@@ -235,6 +235,48 @@ func runCloudTests(t *testing.T, setupCmd setupCommandFunc) {
 		assert.Contains(t, stdout, `hello world from archive`)
 		assert.Contains(t, stdout, `output: https://app.k6.io/runs/123`)
 		assert.Contains(t, stdout, `test status: Finished`)
+	})
+
+	t.Run("TestCloudThresholdsHaveFailed", func(t *testing.T) {
+		t.Parallel()
+
+		progressCallback := func() cloudapi.TestProgressResponse {
+			return cloudapi.TestProgressResponse{
+				RunStatusText: "Finished",
+				RunStatus:     cloudapi.RunStatusFinished,
+				ResultStatus:  cloudapi.ResultStatusFailed,
+				Progress:      1.0,
+			}
+		}
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
+		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `Thresholds have been crossed`)
+	})
+
+	t.Run("TestCloudAbortedThreshold", func(t *testing.T) {
+		t.Parallel()
+
+		progressCallback := func() cloudapi.TestProgressResponse {
+			return cloudapi.TestProgressResponse{
+				RunStatusText: "Finished",
+				RunStatus:     cloudapi.RunStatusAbortedThreshold,
+				ResultStatus:  cloudapi.ResultStatusFailed,
+				Progress:      1.0,
+			}
+		}
+		ts := getSimpleCloudTestState(t, nil, setupCmd, nil, nil, progressCallback)
+		ts.ExpectedExitCode = int(exitcodes.ThresholdsHaveFailed)
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, `Thresholds have been crossed`)
 	})
 }
 

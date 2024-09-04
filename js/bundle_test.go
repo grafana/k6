@@ -189,13 +189,6 @@ func TestNewBundle(t *testing.T) {
 					"InvalidCompat", "es1", `export default function() {};`,
 					`invalid compatibility mode "es1". Use: "extended", "base", "experimental_enhanced"`,
 				},
-				// BigInt is not supported
-				{
-					"BigInt", "base",
-					`module.exports.default = function() {};
-BigInt(1231412444)`,
-					"ReferenceError: BigInt is not defined\n\tat file:///script.js:2:7(7)\n",
-				},
 			}
 
 			for _, tc := range testCases {

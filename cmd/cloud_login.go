@@ -29,16 +29,16 @@ func getCmdCloudLogin(gs *state.GlobalState) *cobra.Command {
 	// loginCloudCommand represents the 'cloud login' command
 	exampleText := getExampleText(gs, `
   # Prompt for a Grafana Cloud k6 token
-  {{.}} cloud login
+  $ {{.}} cloud login
 
   # Store a token in k6's persistent configuration
-  {{.}} cloud login -t <YOUR_TOKEN>
+  $ {{.}} cloud login -t <YOUR_TOKEN>
 
   # Display the stored token
-  {{.}} cloud login -s
+  $ {{.}} cloud login -s
   
   # Reset the stored token
-  {{.}} cloud login -r`[1:])
+  $ {{.}} cloud login -r`[1:])
 
 	loginCloudCommand := &cobra.Command{
 		Use:   cloudLoginCommandName,

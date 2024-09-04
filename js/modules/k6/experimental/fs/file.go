@@ -4,8 +4,6 @@ import (
 	"io"
 	"path/filepath"
 	"sync/atomic"
-
-	"go.k6.io/k6/lib"
 )
 
 // file is an abstraction for interacting with files.
@@ -55,7 +53,7 @@ func (f *file) Read(into []byte) (n int, err error) {
 
 	// Calculate the effective new offset
 	targetOffset := currentOffset + int64(len(into))
-	newOffset := lib.Min(targetOffset, fileSize)
+	newOffset := min(targetOffset, fileSize)
 
 	// Read the data into the provided slice, and update
 	// the offset accordingly
