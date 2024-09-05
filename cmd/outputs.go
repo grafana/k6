@@ -137,6 +137,12 @@ func createOutputs(
 				outputType, getPossibleIDList(outputConstructors),
 			)
 		}
+		if _, builtinErr := builtinOutputString(outputType); builtinErr == nil {
+			err := test.usage.Strings("outputs", outputType)
+			if err != nil {
+				gs.Logger.WithError(err).Warnf("Couldn't report usage for output %q", outputType)
+			}
+		}
 
 		params := baseParams
 		params.OutputType = outputType

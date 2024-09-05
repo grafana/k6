@@ -14,7 +14,7 @@ import (
 )
 
 func createReport(
-	u *usage.Usage, execScheduler *execution.Scheduler, importedModules []string, outputs []string,
+	u *usage.Usage, execScheduler *execution.Scheduler, importedModules []string,
 ) (map[string]any, error) {
 	for _, ec := range execScheduler.GetExecutorConfigs() {
 		err := u.Uint64("executors/"+ec.GetType(), 1)
@@ -39,26 +39,6 @@ func createReport(
 		_ = u.Strings("modules", module) // TODO this will be moved and the error can be logged there
 	}
 
-	builtinOutputs := builtinOutputStrings()
-
-	// TODO: migrate to slices.Contains as soon as the k6 support
-	// for Go1.20 will be over.
-	builtinOutputsIndex := make(map[string]bool, len(builtinOutputs))
-	for _, bo := range builtinOutputs {
-		builtinOutputsIndex[bo] = true
-	}
-
-	// collect only the used outputs that are builtin
-	for _, o := range outputs {
-		// TODO:
-		// if !slices.Contains(builtinOutputs, o) {
-		// 	continue
-		// }
-		if !builtinOutputsIndex[o] {
-			continue
-		}
-		_ = u.Strings("outputs", o) // TODO this will be moved and the error can be logged there
-	}
 	execState := execScheduler.GetState()
 	m, err := u.Map()
 
@@ -75,13 +55,7 @@ func createReport(
 }
 
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
-	outputs := make([]string, 0, len(test.derivedConfig.Out))
-	for _, o := range test.derivedConfig.Out {
-		outputName, _ := parseOutputArgument(o)
-		outputs = append(outputs, outputName)
-	}
-
-	m, err := createReport(test.usage, execScheduler, test.moduleResolver.Imported(), outputs)
+	m, err := createReport(test.usage, execScheduler, test.moduleResolver.Imported())
 	if err != nil {
 		// TODO actually log the error but continue if there is something to report
 		return err

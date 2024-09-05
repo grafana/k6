@@ -27,11 +27,6 @@ func TestCreateReport(t *testing.T) {
 		"k6/x/custom-extension",
 	}
 
-	outputs := []string{
-		"json",
-		"xk6-output-custom-example",
-	}
-
 	logger := testutils.NewLogger(t)
 	opts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(10),
@@ -52,7 +47,7 @@ func TestCreateReport(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	s.GetState().MarkEnded()
 
-	m, err := createReport(usage.New(), s, importedModules, outputs)
+	m, err := createReport(usage.New(), s, importedModules)
 	require.NoError(t, err)
 
 	assert.Equal(t, consts.Version, m["k6_version"])
@@ -61,5 +56,4 @@ func TestCreateReport(t *testing.T) {
 	assert.EqualValues(t, 170, m["iterations"])
 	assert.NotEqual(t, "0s", m["duration"])
 	assert.ElementsMatch(t, []string{"k6", "k6/http", "k6/experimental/webcrypto"}, m["modules"])
-	assert.ElementsMatch(t, []string{"json"}, m["outputs"])
 }
