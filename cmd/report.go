@@ -12,37 +12,27 @@ import (
 	"go.k6.io/k6/usage"
 )
 
-func createReport(u *usage.Usage, execScheduler *execution.Scheduler) (map[string]any, error) {
+func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string]any {
+	execState := execScheduler.GetState()
+	m := u.Map()
+
+	m["k6_version"] = consts.Version
+	m["duration"] = execState.GetCurrentTestRunDuration().String()
+	m["goos"] = runtime.GOOS
+	m["goarch"] = runtime.GOARCH
+	m["vus_max"] = uint64(execState.GetInitializedVUsCount())
+	m["iterations"] = execState.GetFullIterationCount()
 	executors := make(map[string]int)
 	for _, ec := range execScheduler.GetExecutorConfigs() {
 		executors[ec.GetType()]++
 	}
-	execState := execScheduler.GetState()
-	m, err := u.Map()
+	m["executors"] = executors
 
-	if m != nil {
-		m["k6_version"] = consts.Version
-		m["duration"] = execState.GetCurrentTestRunDuration().String()
-		m["goos"] = runtime.GOOS
-		m["goarch"] = runtime.GOARCH
-		m["vus_max"] = uint64(execState.GetInitializedVUsCount())
-		m["iterations"] = execState.GetFullIterationCount()
-		executors := make(map[string]int)
-		for _, ec := range execScheduler.GetExecutorConfigs() {
-			executors[ec.GetType()]++
-		}
-		m["executors"] = executors
-	}
-
-	return m, err
+	return m
 }
 
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
-	m, err := createReport(test.preInitState.Usage, execScheduler)
-	if err != nil {
-		// TODO actually log the error but continue if there is something to report
-		return err
-	}
+	m := createReport(test.preInitState.Usage, execScheduler)
 	body, err := json.Marshal(m)
 	if err != nil {
 		return err

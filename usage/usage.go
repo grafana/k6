@@ -2,9 +2,7 @@
 package usage
 
 import (
-	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 )
@@ -25,81 +23,87 @@ func New() *Usage {
 
 // Strings appends the provided value to a slice of strings that is the value.
 // Appending to the slice if the key is already there.
-func (u *Usage) Strings(k, v string) error {
+// It also works out level of keys
+func (u *Usage) Strings(originalKey, value string) error {
 	u.l.Lock()
 	defer u.l.Unlock()
-	oldV, ok := u.m[k]
+	m, newKey, err := u.createLevel(originalKey)
+	if err != nil {
+		return err
+	}
+	oldV, ok := m[newKey]
 	if !ok {
-		u.m[k] = []string{v}
+		m[newKey] = []string{value}
 		return nil
 	}
-	switch oldV := oldV.(type) {
+	switch oldValue := oldV.(type) {
 	case []string:
-		u.m[k] = append(oldV, v)
+		m[newKey] = append(oldValue, value)
 	default:
-		return fmt.Errorf("value of key %s is not []string as expected but %T", k, oldV)
+		return fmt.Errorf("value of key %s is not []string as expected but %T", originalKey, oldValue)
 	}
 	return nil
 }
 
-// Uint64 adds the provided value to a given key. Creating the key if needed
-func (u *Usage) Uint64(k string, v uint64) error {
+// Uint64 adds the provided value to a given key. Creating the key if needed and working out levels of keys
+func (u *Usage) Uint64(originalKey string, value uint64) error {
 	u.l.Lock()
 	defer u.l.Unlock()
-	oldV, ok := u.m[k]
+	m, newKey, err := u.createLevel(originalKey)
+	if err != nil {
+		return err
+	}
+
+	oldValue, ok := m[newKey]
 	if !ok {
-		u.m[k] = v
+		m[newKey] = value
 		return nil
 	}
-	switch oldVUint64 := oldV.(type) {
+	switch oldVUint64 := oldValue.(type) {
 	case uint64:
-		u.m[k] = oldVUint64 + v
+		m[newKey] = oldVUint64 + value
 	default:
-		return fmt.Errorf("value of key %s is not uint64 as expected but %T", k, oldV)
-		// TODO: error, panic?, nothing, log?
+		return fmt.Errorf("value of key %s is not uint64 as expected but %T", originalKey, oldValue)
 	}
 	return nil
 }
 
-// Map returns a copy of the internal map plus making subusages from keys that have a slash in them
-// only a single level is being respected
-func (u *Usage) Map() (map[string]any, error) {
-	u.l.Lock()
-	defer u.l.Unlock()
-	var errs []error
-
-	keys := mapKeys(u.m)
-	sort.Strings(keys)
-	result := make(map[string]any, len(u.m))
-	for _, k := range keys {
-		v := u.m[k]
-		prefix, post, found := strings.Cut(k, "/")
-		if !found {
-			result[k] = v
-			continue
-		}
-
-		topLevel, ok := result[prefix]
-		if !ok {
-			topLevel = make(map[string]any)
-			result[prefix] = topLevel
-		}
-		topLevelMap, ok := topLevel.(map[string]any)
-		if !ok {
-			errs = append(errs, fmt.Errorf("key %s was expected to be a map[string]any but was %T", prefix, topLevel))
-			continue
-		}
-		topLevelMap[post] = v
+func (u *Usage) createLevel(key string) (map[string]any, string, error) {
+	levelKey, subLevelKey, found := strings.Cut(key, "/")
+	if !found {
+		return u.m, key, nil
+	}
+	if strings.Contains(subLevelKey, "/") {
+		return nil, "", fmt.Errorf("only one level is permitted in usages: %q", key)
 	}
 
-	return result, errors.Join(errs...)
+	level, ok := u.m[levelKey]
+	if !ok {
+		level = make(map[string]any)
+		u.m[levelKey] = level
+	}
+	levelMap, ok := level.(map[string]any)
+	if !ok {
+		return nil, "", fmt.Errorf("new level %q for key %q as the key was already used for %T", levelKey, key, level)
+	}
+	return levelMap, subLevelKey, nil
 }
 
-// TODO: replace with map.Keys from go 1.23 after that is the minimal version
-func mapKeys(m map[string]any) []string {
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
+// Map returns a copy of the internal map
+func (u *Usage) Map() map[string]any {
+	u.l.Lock()
+	defer u.l.Unlock()
+
+	return deepClone(u.m)
+}
+
+func deepClone(m map[string]any) map[string]any {
+	result := make(map[string]any, len(m))
+	for k, v := range m {
+		if newM, ok := v.(map[string]any); ok {
+			v = deepClone(newM)
+		}
+		result[k] = v
 	}
-	return keys
+	return result
 }

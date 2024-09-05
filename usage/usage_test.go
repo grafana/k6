@@ -21,11 +21,10 @@ func TestErrors(t *testing.T) {
 		"test2/one is not uint64 as expected but []string")
 
 	require.NoError(t, u.Strings("test3", "some"))
-	require.NoError(t, u.Strings("test3/one", "one"))
+	require.ErrorContains(t, u.Strings("test3/one", "one"),
+		`new level "test3" for key "test3/one" as the key was already used for []string`)
 
-	m, err := u.Map()
-	require.ErrorContains(t, err,
-		"key test3 was expected to be a map[string]any but was []string")
+	m := u.Map()
 	require.EqualValues(t, map[string]any{
 		"test": map[string]any{
 			"one":   uint64(1),

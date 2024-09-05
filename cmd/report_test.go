@@ -38,7 +38,7 @@ func TestCreateReport(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	s.GetState().MarkEnded()
 
-	m, err := createReport(usage.New(), s)
+	m := createReport(usage.New(), s)
 	require.NoError(t, err)
 
 	assert.Equal(t, consts.Version, m["k6_version"])
