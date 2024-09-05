@@ -118,7 +118,7 @@ func createOutputs(
 		ScriptOptions:  test.derivedConfig.Options,
 		RuntimeOptions: test.preInitState.RuntimeOptions,
 		ExecutionPlan:  executionPlan,
-		Usage:          test.usage,
+		Usage:          test.preInitState.Usage,
 	}
 
 	outputs := test.derivedConfig.Out
@@ -138,7 +138,7 @@ func createOutputs(
 			)
 		}
 		if _, builtinErr := builtinOutputString(outputType); builtinErr == nil {
-			err := test.usage.Strings("outputs", outputType)
+			err := test.preInitState.Usage.Strings("outputs", outputType)
 			if err != nil {
 				gs.Logger.WithError(err).Warnf("Couldn't report usage for output %q", outputType)
 			}

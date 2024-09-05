@@ -6,39 +6,17 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
-	"strings"
 
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/usage"
 )
 
-func createReport(
-	u *usage.Usage, execScheduler *execution.Scheduler, importedModules []string,
-) (map[string]any, error) {
+func createReport(u *usage.Usage, execScheduler *execution.Scheduler) (map[string]any, error) {
+	executors := make(map[string]int)
 	for _, ec := range execScheduler.GetExecutorConfigs() {
-		err := u.Uint64("executors/"+ec.GetType(), 1)
-		if err != nil { // TODO report it as an error but still send the report?
-			return nil, err
-		}
+		executors[ec.GetType()]++
 	}
-
-	// collect the report only with k6 public modules
-	for _, module := range importedModules {
-		// Exclude JS modules extensions to prevent to leak
-		// any user's custom extensions
-		if strings.HasPrefix(module, "k6/x") {
-			continue
-		}
-		// Exclude any import not starting with the k6 prefix
-		// that identifies a k6 built-in stable or experimental module.
-		// For example, it doesn't include any modules imported from the file system.
-		if !strings.HasPrefix(module, "k6") {
-			continue
-		}
-		_ = u.Strings("modules", module) // TODO this will be moved and the error can be logged there
-	}
-
 	execState := execScheduler.GetState()
 	m, err := u.Map()
 
@@ -49,13 +27,18 @@ func createReport(
 		m["goarch"] = runtime.GOARCH
 		m["vus_max"] = uint64(execState.GetInitializedVUsCount())
 		m["iterations"] = execState.GetFullIterationCount()
+		executors := make(map[string]int)
+		for _, ec := range execScheduler.GetExecutorConfigs() {
+			executors[ec.GetType()]++
+		}
+		m["executors"] = executors
 	}
 
 	return m, err
 }
 
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
-	m, err := createReport(test.usage, execScheduler, test.moduleResolver.Imported())
+	m, err := createReport(test.preInitState.Usage, execScheduler)
 	if err != nil {
 		// TODO actually log the error but continue if there is something to report
 		return err

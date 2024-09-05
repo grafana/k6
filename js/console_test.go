@@ -21,6 +21,7 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 func TestConsoleContext(t *testing.T) {
@@ -73,6 +74,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
 			LookupEnv:      func(_ string) (val string, ok bool) { return "", false },
+			Usage:          usage.New(),
 		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
@@ -110,6 +112,7 @@ func getSimpleArchiveRunner(tb testing.TB, arc *lib.Archive, opts ...interface{}
 			RuntimeOptions: rtOpts,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
+			Usage:          usage.New(),
 		}, arc)
 }
 

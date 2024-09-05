@@ -17,6 +17,7 @@ import (
 	"go.k6.io/k6/lib/testutils/minirunner"
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/metrics/engine"
+	"go.k6.io/k6/usage"
 )
 
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
@@ -27,6 +28,7 @@ func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
+		Usage:          usage.New(),
 	}
 }
 

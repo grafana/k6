@@ -42,7 +42,6 @@ type loadedTest struct {
 	initRunner     lib.Runner // TODO: rename to something more appropriate
 	keyLogger      io.Closer
 	moduleResolver *modules.ModuleResolver
-	usage          *usage.Usage
 }
 
 func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*loadedTest, error) {
@@ -79,6 +78,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 			val, ok := gs.Env[key]
 			return val, ok
 		},
+		Usage: usage.New(),
 	}
 
 	test := &loadedTest{
@@ -88,7 +88,6 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 		fs:             gs.FS,
 		fileSystems:    fileSystems,
 		preInitState:   state,
-		usage:          usage.New(),
 	}
 
 	gs.Logger.Debugf("Initializing k6 runner for '%s' (%s)...", sourceRootPath, resolvedPath)

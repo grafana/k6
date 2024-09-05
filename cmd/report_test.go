@@ -18,15 +18,6 @@ import (
 
 func TestCreateReport(t *testing.T) {
 	t.Parallel()
-	importedModules := []string{
-		"k6/http",
-		"my-custom-module",
-		"k6/experimental/webcrypto",
-		"file:custom-from-file-system",
-		"k6",
-		"k6/x/custom-extension",
-	}
-
 	logger := testutils.NewLogger(t)
 	opts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(10),
@@ -47,13 +38,12 @@ func TestCreateReport(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	s.GetState().MarkEnded()
 
-	m, err := createReport(usage.New(), s, importedModules)
+	m, err := createReport(usage.New(), s)
 	require.NoError(t, err)
 
 	assert.Equal(t, consts.Version, m["k6_version"])
-	assert.Equal(t, map[string]interface{}{"shared-iterations": uint64(1)}, m["executors"])
+	assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
 	assert.EqualValues(t, 6, m["vus_max"])
 	assert.EqualValues(t, 170, m["iterations"])
 	assert.NotEqual(t, "0s", m["duration"])
-	assert.ElementsMatch(t, []string{"k6", "k6/http", "k6/experimental/webcrypto"}, m["modules"])
 }
