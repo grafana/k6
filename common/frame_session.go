@@ -242,6 +242,11 @@ func (fs *FrameSession) initEvents() {
 			// If there is an active span for main frame,
 			// end it before exiting so it can be flushed
 			if fs.mainFrameSpan != nil {
+				// The url needs to be added here instead of at the start of the span
+				// because at the start of the span we don't know the correct url for
+				// the page we're navigating to. At the end of the span we do have this
+				// information.
+				fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrame().URL()))
 				fs.mainFrameSpan.End()
 				fs.mainFrameSpan = nil
 			}
@@ -795,10 +800,10 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 	}
 
 	fs.initialNavDone = true
-	fs.processNavigationSpan(frame.URL, frame.ID)
+	fs.processNavigationSpan(frame.ID)
 }
 
-func (fs *FrameSession) processNavigationSpan(url string, id cdp.FrameID) {
+func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
 	newFrame, ok := fs.manager.getFrameByID(id)
 	if !ok {
 		return
@@ -812,11 +817,16 @@ func (fs *FrameSession) processNavigationSpan(url string, id cdp.FrameID) {
 
 	// End the navigation span if it is non-nil
 	if fs.mainFrameSpan != nil {
+		// The url needs to be added here instead of at the start of the span
+		// because at the start of the span we don't know the correct url for
+		// the page we're navigating to. At the end of the span we do have this
+		// information.
+		fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrame().URL()))
 		fs.mainFrameSpan.End()
 	}
 
 	_, fs.mainFrameSpan = TraceNavigation(
-		fs.ctx, fs.targetID.String(), trace.WithAttributes(attribute.String("navigation.url", url)),
+		fs.ctx, fs.targetID.String(),
 	)
 
 	spanID := fs.mainFrameSpan.SpanContext().SpanID().String()
@@ -863,10 +873,7 @@ func (fs *FrameSession) onFrameStartedLoading(frameID cdp.FrameID) {
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, frameID)
 
-	frame, ok := fs.manager.getFrameByID(frameID)
-	if ok {
-		fs.processNavigationSpan(frame.URL(), frame.id)
-	}
+	fs.processNavigationSpan(frameID)
 
 	fs.manager.frameLoadingStarted(frameID)
 }
