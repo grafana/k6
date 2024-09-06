@@ -62,14 +62,7 @@ exports.default = function() {
 	assert.Equal(t, logrus.InfoLevel, entries[0].Level)
 	assert.Equal(t, "once", entries[0].Message)
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         logger,
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, r1.MakeArchive())
+	r2, err := getSimpleArchiveRunner(t, r1.MakeArchive(), logger)
 	require.NoError(t, err)
 	entries = hook.Drain()
 	require.Len(t, entries, 1)
