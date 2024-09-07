@@ -114,12 +114,10 @@ func setupExecutorTest(
 	et, err := lib.NewExecutionTuple(segment, &sequence)
 	require.NoError(t, err)
 
-	segmentOpt, _ := lib.Options{
+	options := lib.Options{
 		ExecutionSegment:         segment,
 		ExecutionSegmentSequence: &sequence,
-	}.Apply(runner.GetOptions())
-
-	options, _ := segmentOpt.Apply(extraOptions)
+	}.Apply(runner.GetOptions()).Apply(extraOptions)
 
 	testRunState := getTestRunState(t, options, runner)
 
