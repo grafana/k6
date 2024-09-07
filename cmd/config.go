@@ -57,12 +57,8 @@ func (c Config) Validate() []error {
 }
 
 // Apply the provided config on top of the current one, returning a new one. The provided config has priority.
-func (c Config) Apply(cfg Config) (Config, error) {
-	options, err := c.Options.Apply(cfg.Options)
-	if err != nil {
-		return c, err
-	}
-	c.Options = options
+func (c Config) Apply(cfg Config) Config {
+	c.Options = c.Options.Apply(cfg.Options)
 	if len(cfg.Out) > 0 {
 		c.Out = cfg.Out
 	}
@@ -78,7 +74,7 @@ func (c Config) Apply(cfg Config) (Config, error) {
 	if len(cfg.Collectors) > 0 {
 		c.Collectors = cfg.Collectors
 	}
-	return c, nil
+	return c
 }
 
 // Returns a Config but only parses the Options inside.
@@ -181,25 +177,11 @@ func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib
 		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
-	conf, err = cliConf.Apply(fileConf)
-	if err != nil {
-		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-	}
+	conf = cliConf.Apply(fileConf)
 
-	conf, err = conf.Apply(Config{Options: runnerOpts})
-	if err != nil {
-		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-	}
+	conf = conf.Apply(Config{Options: runnerOpts})
 
-	conf, err = conf.Apply(envConf)
-	if err != nil {
-		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-	}
-
-	conf, err = conf.Apply(cliConf)
-	if err != nil {
-		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
-	}
+	conf = conf.Apply(envConf).Apply(cliConf)
 	conf = applyDefault(conf)
 
 	// TODO(imiric): Move this validation where it makes sense in the configuration

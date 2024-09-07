@@ -122,20 +122,20 @@ func TestConfigApply(t *testing.T) {
 	t.Parallel()
 	t.Run("Linger", func(t *testing.T) {
 		t.Parallel()
-		conf, _ := Config{}.Apply(Config{Linger: null.BoolFrom(true)})
+		conf := Config{}.Apply(Config{Linger: null.BoolFrom(true)})
 		assert.Equal(t, null.BoolFrom(true), conf.Linger)
 	})
 	t.Run("NoUsageReport", func(t *testing.T) {
 		t.Parallel()
-		conf, _ := Config{}.Apply(Config{NoUsageReport: null.BoolFrom(true)})
+		conf := Config{}.Apply(Config{NoUsageReport: null.BoolFrom(true)})
 		assert.Equal(t, null.BoolFrom(true), conf.NoUsageReport)
 	})
 	t.Run("Out", func(t *testing.T) {
 		t.Parallel()
-		conf, _ := Config{}.Apply(Config{Out: []string{"influxdb"}})
+		conf := Config{}.Apply(Config{Out: []string{"influxdb"}})
 		assert.Equal(t, []string{"influxdb"}, conf.Out)
 
-		conf, _ = Config{}.Apply(Config{Out: []string{"influxdb", "json"}})
+		conf = Config{}.Apply(Config{Out: []string{"influxdb", "json"}})
 		assert.Equal(t, []string{"influxdb", "json"}, conf.Out)
 	})
 }

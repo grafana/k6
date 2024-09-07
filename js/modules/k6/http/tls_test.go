@@ -25,7 +25,7 @@ func TestTLS13Support(t *testing.T) {
 
 	// We don't expect any failed requests
 	state.Options.Throw = null.BoolFrom(true)
-	_, _ = state.Options.Apply(lib.Options{TLSVersion: &lib.TLSVersions{Max: tls.VersionTLS13}})
+	state.Options.Apply(lib.Options{TLSVersion: &lib.TLSVersions{Max: tls.VersionTLS13}})
 
 	_, err := ts.runtime.VU.Runtime().RunString(ts.tb.Replacer.Replace(`
 		var resp = http.get("HTTPSBIN_URL/tls-version");

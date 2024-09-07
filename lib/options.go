@@ -5,7 +5,6 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
-	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -354,7 +353,7 @@ type Options struct {
 //	a.Apply(b) // Options{VUs: null.IntFrom(5)}
 //
 //nolint:funlen,gocognit,cyclop
-func (o Options) Apply(opts Options) (Options, error) {
+func (o Options) Apply(opts Options) Options {
 	if opts.Paused.Valid {
 		o.Paused = opts.Paused
 	}
@@ -407,9 +406,7 @@ func (o Options) Apply(opts Options) (Options, error) {
 	if opts.NoSetup.Valid {
 		o.NoSetup = opts.NoSetup
 	}
-	if opts.SetupTimeout.Valid && opts.SetupTimeout.Duration <= 0 {
-		return o, errors.New("setupTimeout must be positive")
-	} else if opts.SetupTimeout.Valid {
+	if opts.SetupTimeout.Valid {
 		o.SetupTimeout = opts.SetupTimeout
 	}
 	if opts.NoTeardown.Valid {
@@ -515,7 +512,7 @@ func (o Options) Apply(opts Options) (Options, error) {
 		o.DNS.Policy = opts.DNS.Policy
 	}
 
-	return o, nil
+	return o
 }
 
 // Validate checks if all of the specified options make sense

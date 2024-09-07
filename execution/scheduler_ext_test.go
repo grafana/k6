@@ -64,12 +64,9 @@ func newTestScheduler(
 		runner = &minirunner.MiniRunner{}
 	}
 	ctx, cancel = context.WithCancel(context.Background())
-
-	bufferSizeOpt, _ := lib.Options{
+	newOpts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		MetricSamplesBufferSize: null.NewInt(200, false),
-	}.Apply(runner.GetOptions())
-	appliedOpt, _ := bufferSizeOpt.Apply(opts)
-	newOpts, err := executor.DeriveScenariosFromShortcuts(appliedOpt, nil)
+	}.Apply(runner.GetOptions()).Apply(opts), nil)
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, getTestPreInitState(t), newOpts, runner)
@@ -331,11 +328,9 @@ func TestSchedulerSystemTags(t *testing.T) {
 		}, nil)
 	require.NoError(t, err)
 
-	opt, _ := runner.GetOptions().Apply(lib.Options{
+	require.NoError(t, runner.SetOptions(runner.GetOptions().Apply(lib.Options{
 		SystemTags: &metrics.DefaultSystemTagSet,
-	})
-
-	require.NoError(t, runner.SetOptions(opt))
+	})))
 
 	testRunState := getTestRunState(t, piState, runner.GetOptions(), runner)
 	execScheduler, err := execution.NewScheduler(testRunState, local.NewController())
@@ -1196,15 +1191,13 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)
 
-	appliedOpt, _ := runner.GetOptions().Apply(lib.Options{
+	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
 		Iterations:      null.IntFrom(2),
 		VUs:             null.IntFrom(1),
 		SystemTags:      &metrics.DefaultSystemTagSet,
 		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
 		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
-	})
-
-	options, err := executor.DeriveScenariosFromShortcuts(appliedOpt, nil)
+	}), nil)
 	require.NoError(t, err)
 
 	testRunState := getTestRunState(t, piState, options, runner)
