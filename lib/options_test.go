@@ -824,7 +824,7 @@ func TestValidate(t *testing.T) {
 					assert.Len(t, errorsSlice, 1)
 				} else {
 					assert.Len(t, errorsSlice, 0)
-					assert.Equal(t, opts.SetupTimeout.Duration, sec)
+					assert.Equal(t, time.Duration(opts.SetupTimeout.Duration), sec)
 				}
 			})
 		}
