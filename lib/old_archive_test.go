@@ -9,6 +9,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	"go.k6.io/k6/lib/testutils"
+
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/lib/fsext"
@@ -70,7 +72,7 @@ func TestOldArchive(t *testing.T) {
 		t.Run(filename, func(t *testing.T) {
 			t.Parallel()
 			metadata := `{"filename": "` + filename + `", "options": {}}`
-			fs := makeMemMapFs(t, map[string][]byte{
+			fs := testutils.MakeMemMapFs(t, map[string][]byte{
 				// files
 				"/files/example.com/path/to.js": []byte(`example.com file`),
 				"/files/_/C/something/path":     []byte(`windows file`),
@@ -88,13 +90,13 @@ func TestOldArchive(t *testing.T) {
 			require.NoError(t, err)
 
 			expectedFilesystems := map[string]fsext.Fs{
-				"file": makeMemMapFs(t, map[string][]byte{
+				"file": testutils.MakeMemMapFs(t, map[string][]byte{
 					"/C:/something/path":  []byte(`windows file`),
 					"/absolulte/path":     []byte(`unix file`),
 					"/C:/something/path2": []byte(`windows script`),
 					"/absolulte/path2":    []byte(`unix script`),
 				}),
-				"https": makeMemMapFs(t, map[string][]byte{
+				"https": testutils.MakeMemMapFs(t, map[string][]byte{
 					"/example.com/path/to.js":  []byte(`example.com file`),
 					"/example.com/path/too.js": []byte(`example.com script`),
 				}),
@@ -110,7 +112,7 @@ func TestOldArchive(t *testing.T) {
 
 func TestUnknownPrefix(t *testing.T) {
 	t.Parallel()
-	fs := makeMemMapFs(t, map[string][]byte{
+	fs := testutils.MakeMemMapFs(t, map[string][]byte{
 		"/strange/something": []byte(`github file`),
 	})
 	buf, err := dumpMemMapFsToBuf(fs)
@@ -174,7 +176,7 @@ func TestFilenamePwdResolve(t *testing.T) {
 		"options": {}
 	}`
 
-		buf, err := dumpMemMapFsToBuf(makeMemMapFs(t, map[string][]byte{
+		buf, err := dumpMemMapFsToBuf(testutils.MakeMemMapFs(t, map[string][]byte{
 			"/metadata.json": []byte(metadata),
 		}))
 		require.NoError(t, err)
@@ -241,7 +243,7 @@ func TestDerivedExecutionDiscarding(t *testing.T) {
 	}
 
 	for _, test := range tests {
-		buf, err := dumpMemMapFsToBuf(makeMemMapFs(t, map[string][]byte{
+		buf, err := dumpMemMapFsToBuf(testutils.MakeMemMapFs(t, map[string][]byte{
 			"/metadata.json": []byte(test.metadata),
 		}))
 		require.NoError(t, err)

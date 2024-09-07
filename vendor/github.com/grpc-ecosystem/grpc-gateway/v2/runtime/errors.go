@@ -71,7 +71,7 @@ func HTTPStatusFromCode(code codes.Code) int {
 	case codes.DataLoss:
 		return http.StatusInternalServerError
 	default:
-		grpclog.Infof("Unknown gRPC error code: %v", code)
+		grpclog.Warningf("Unknown gRPC error code: %v", code)
 		return http.StatusInternalServerError
 	}
 }
@@ -93,6 +93,7 @@ func HTTPError(ctx context.Context, mux *ServeMux, marshaler Marshaler, w http.R
 func DefaultHTTPErrorHandler(ctx context.Context, mux *ServeMux, marshaler Marshaler, w http.ResponseWriter, r *http.Request, err error) {
 	// return Internal when Marshal failed
 	const fallback = `{"code": 13, "message": "failed to marshal error message"}`
+	const fallbackRewriter = `{"code": 13, "message": "failed to rewrite error message"}`
 
 	var customStatus *HTTPStatusError
 	if errors.As(err, &customStatus) {
@@ -100,31 +101,40 @@ func DefaultHTTPErrorHandler(ctx context.Context, mux *ServeMux, marshaler Marsh
 	}
 
 	s := status.Convert(err)
-	pb := s.Proto()
 
 	w.Header().Del("Trailer")
 	w.Header().Del("Transfer-Encoding")
 
-	contentType := marshaler.ContentType(pb)
+	respRw, err := mux.forwardResponseRewriter(ctx, s.Proto())
+	if err != nil {
+		grpclog.Errorf("Failed to rewrite error message %q: %v", s, err)
+		w.WriteHeader(http.StatusInternalServerError)
+		if _, err := io.WriteString(w, fallbackRewriter); err != nil {
+			grpclog.Errorf("Failed to write response: %v", err)
+		}
+		return
+	}
+
+	contentType := marshaler.ContentType(respRw)
 	w.Header().Set("Content-Type", contentType)
 
 	if s.Code() == codes.Unauthenticated {
 		w.Header().Set("WWW-Authenticate", s.Message())
 	}
 
-	buf, merr := marshaler.Marshal(pb)
+	buf, merr := marshaler.Marshal(respRw)
 	if merr != nil {
-		grpclog.Infof("Failed to marshal error message %q: %v", s, merr)
+		grpclog.Errorf("Failed to marshal error message %q: %v", s, merr)
 		w.WriteHeader(http.StatusInternalServerError)
 		if _, err := io.WriteString(w, fallback); err != nil {
-			grpclog.Infof("Failed to write response: %v", err)
+			grpclog.Errorf("Failed to write response: %v", err)
 		}
 		return
 	}
 
 	md, ok := ServerMetadataFromContext(ctx)
 	if !ok {
-		grpclog.Infof("Failed to extract ServerMetadata from context")
+		grpclog.Error("Failed to extract ServerMetadata from context")
 	}
 
 	handleForwardResponseServerMetadata(w, mux, md)
@@ -148,7 +158,7 @@ func DefaultHTTPErrorHandler(ctx context.Context, mux *ServeMux, marshaler Marsh
 
 	w.WriteHeader(st)
 	if _, err := w.Write(buf); err != nil {
-		grpclog.Infof("Failed to write response: %v", err)
+		grpclog.Errorf("Failed to write response: %v", err)
 	}
 
 	if doForwardTrailers {
