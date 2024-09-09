@@ -103,7 +103,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			dataToUpload: "here's some data",
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
-					"operation": "upload",
+					"operation": "upload_post",
 					"files":[{"name":"screenshots/some/path/file.png"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
@@ -119,7 +119,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			dataToUpload: "here's some data",
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
-					"operation": "upload",
+					"operation": "upload_post",
 					"files":[{"name":"screenshots/some/path/file.png"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
@@ -135,7 +135,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			dataToUpload: "here's some data",
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
-					"operation": "upload",
+					"operation": "upload_post",
 					"files":[{"name":"screenshots/some/path/file.png"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
@@ -151,7 +151,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			dataToUpload: "here's some data",
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
-					"operation": "upload",
+					"operation": "upload_post",
 					"files":[{"name":"screenshots/some/path/file.png"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
@@ -168,7 +168,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			dataToUpload: "here's some data",
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
-					"operation": "upload",
+					"operation": "upload_post",
 					"files":[{"name":"screenshots/some/path/file.png"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
