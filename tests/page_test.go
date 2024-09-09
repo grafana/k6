@@ -1370,7 +1370,7 @@ func TestPageWaitForSelector(t *testing.T) {
 			opts: map[string]any{
 				// set a timeout smaller than the time
 				// it takes the element to show up
-				"timeout": "50",
+				"timeout": "1",
 			},
 			selector: "#my-div",
 			errAssert: func(t *testing.T, e error) {
