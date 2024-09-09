@@ -30,7 +30,7 @@ const (
 type Browser struct {
 	backgroundCtx context.Context
 	vuCtx         context.Context
-	cancelFn      context.CancelFunc
+	vuCtxCancelFn context.CancelFunc
 
 	state int64
 
@@ -89,12 +89,12 @@ type browserVersion struct {
 // NewBrowser creates a new browser, connects to it, then returns it.
 func NewBrowser(
 	backgroundCtx, vuCtx context.Context,
-	cancel context.CancelFunc,
+	vuCtxCancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) (*Browser, error) {
-	b := newBrowser(backgroundCtx, vuCtx, cancel, browserProc, browserOpts, logger)
+	b := newBrowser(backgroundCtx, vuCtx, vuCtxCancelFn, browserProc, browserOpts, logger)
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
@@ -111,7 +111,7 @@ func NewBrowser(
 // newBrowser returns a ready to use Browser without connecting to an actual browser.
 func newBrowser(
 	backgroundCtx, vuCtx context.Context,
-	cancelFn context.CancelFunc,
+	vuCtxCancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
@@ -119,7 +119,7 @@ func newBrowser(
 	return &Browser{
 		backgroundCtx:       backgroundCtx,
 		vuCtx:               vuCtx,
-		cancelFn:            cancelFn,
+		vuCtxCancelFn:       vuCtxCancelFn,
 		state:               int64(BrowserStateOpen),
 		browserProc:         browserProc,
 		browserOpts:         browserOpts,
@@ -211,8 +211,12 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 		defer func() {
 			b.logger.Debugf("Browser:initEvents:defer", "ctx err: %v", cancelCtx.Err())
 			b.browserProc.didLoseConnection()
-			if b.cancelFn != nil {
-				b.cancelFn()
+			// Closing the vuCtx incase it hasn't already been closed. Very likely
+			// already closed since the vuCtx is controlled by the k6 iteration,
+			// whereas the backgroundCtx is controlled by the k6 event system. k6
+			// iteration ends before the event system.
+			if b.vuCtxCancelFn != nil {
+				b.vuCtxCancelFn()
 			}
 		}()
 		for {
