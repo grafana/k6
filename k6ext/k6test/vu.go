@@ -139,7 +139,9 @@ func (v *VU) RunOnEventLoop(tb testing.TB, js string, args ...any) (sobek.Value,
 func (v *VU) RunAsync(tb testing.TB, js string, args ...any) (sobek.Value, error) {
 	tb.Helper()
 
-	return v.RunOnEventLoop(tb, fmt.Sprintf("(async function() { "+js+" })();", args...))
+	jsWithArgs := fmt.Sprintf(js, args...)
+
+	return v.RunOnEventLoop(tb, "(async function() { %s })();", jsWithArgs)
 }
 
 // RunPromise runs the given JavaScript code on the VU's event loop and returns
