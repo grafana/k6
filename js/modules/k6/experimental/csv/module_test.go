@@ -60,7 +60,7 @@ func TestParserConstructor(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("constructing a parser with options valid options should succeed", func(t *testing.T) {
+	t.Run("constructing a parser with valid options should succeed", func(t *testing.T) {
 		t.Parallel()
 
 		r, err := newConfiguredRuntime(t)
