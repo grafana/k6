@@ -176,8 +176,10 @@ func readResponseBody(resp *http.Response) (string, error) {
 	rb := struct {
 		Service string `json:"service"`
 		URLs    []struct {
-			Name         string `json:"name"`
-			PreSignedURL string `json:"pre_signed_url"` //nolint:tagliatelle
+			Name         string            `json:"name"`
+			PreSignedURL string            `json:"pre_signed_url"` //nolint:tagliatelle
+			Method       string            `json:"method"`
+			FormFields   map[string]string `json:"form_fields"` //nolint:tagliatelle
 		} `json:"urls"`
 	}{}
 
