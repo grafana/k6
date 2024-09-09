@@ -99,8 +99,19 @@ func TestTmpDirCleanup(t *testing.T) {
 
 	b.Close()
 
-	matches, err = filepath.Glob(tmpDirPath + "/xk6-browser-data-*")
-	assert.NoError(t, err)
+	// We need to wait for something (k6 browser, chromium or the os) to
+	// actually complete the removal of the directory. It's a race condition.
+	// To try to mitigate the issue, we're adding a retry which waits half a
+	// second if the dir still exits.
+	for i := 0; i < 5; i++ {
+		matches, err = filepath.Glob(tmpDirPath + "/xk6-browser-data-*")
+		assert.NoError(t, err)
+		if len(matches) == 0 {
+			break
+		}
+		time.Sleep(time.Millisecond * 500)
+	}
+
 	assert.Empty(t, matches, "a dir shouldn't exist which matches the pattern `xk6-browser-data-*`")
 }
 
