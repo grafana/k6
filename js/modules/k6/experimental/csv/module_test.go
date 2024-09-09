@@ -84,9 +84,6 @@ func TestParserConstructor(t *testing.T) {
 
 		r, err := newConfiguredRuntime(t)
 		require.NoError(t, err)
-		r.MoveToVUContext(&lib.State{
-			Tags: lib.NewVUStateTags(metrics.NewRegistry().RootTagSet()),
-		})
 
 		_, err = r.RunOnEventLoop(wrapInAsyncLambda(`
 			// Regardless of whether a file is passed, the parser should not be constructed in the VU context.
@@ -94,7 +91,7 @@ func TestParserConstructor(t *testing.T) {
 		`))
 
 		require.Error(t, err)
-		require.Contains(t, err.Error(), "csv Parser constructor must be called in the init context")
+		require.Contains(t, err.Error(), "csv Parser constructor takes at least one non-nil source argument")
 	})
 
 	t.Run("constructing a parser in VU context should fail", func(t *testing.T) {
@@ -107,8 +104,9 @@ func TestParserConstructor(t *testing.T) {
 		})
 
 		_, err = r.RunOnEventLoop(wrapInAsyncLambda(`
-			// Regardless of whether a file is passed, the parser should not be constructed in the VU context.
-			const parser = new csv.Parser(null);
+			// Note that we pass an empty object here as opening a real file here would lead to the fs.open call
+			// itself to fail (as we're not in the init context).
+			const parser = new csv.Parser({}, { delimiter: ';', skipFirstLine: true, fromLine: 0, toLine: 10 });
 		`))
 
 		require.Error(t, err)
@@ -350,6 +348,40 @@ func TestParserNext(t *testing.T) {
 			const { done } = await parser.next();
 			if (!done) {
 				throw new Error("Expected to be done, but got done=false");
+			}
+		`, testFilePath)))
+
+		require.NoError(t, err)
+	})
+
+	t.Run("calling next on a parser that has reached EOF should return done=true and no value", func(t *testing.T) {
+		t.Parallel()
+
+		r, err := newConfiguredRuntime(t)
+		require.NoError(t, err)
+
+		// Ensure the testdata.csv file is present on the test filesystem.
+		r.VU.InitEnvField.FileSystems["file"] = newTestFs(t, func(fs fsext.Fs) error {
+			return fsext.WriteFile(fs, testFilePath, []byte(csvTestData), 0o644)
+		})
+
+		_, err = r.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
+			const file = await fs.open(%q);
+			const parser = new csv.Parser(file);
+
+			// Parse the entire file
+			let { done, value } = await parser.next();
+			while (!done) {
+				({ done, value } = await parser.next());
+			}
+
+			// The parser should be done now
+			({ done, value } = await parser.next());
+			if (!done) {
+				throw new Error("Expected to be done, but got done=false");
+			}
+			if (!Array.isArray(value) || value.length !== 0) {
+				throw new Error("Expected value to be a zero length array, but got " + value);
 			}
 		`, testFilePath)))
 

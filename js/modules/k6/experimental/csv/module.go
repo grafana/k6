@@ -148,9 +148,14 @@ func (mi *ModuleInstance) NewParser(call sobek.ConstructorCall) *sobek.Object {
 		common.Throw(rt, fmt.Errorf("csv Parser constructor takes at least one non-nil source argument"))
 	}
 
+	fileArg := call.Argument(0)
+	if common.IsNullish(fileArg) {
+		common.Throw(rt, fmt.Errorf("csv Parser constructor takes at least one non-nil source argument"))
+	}
+
 	// 1. Make sure the Sobek object is a fs.File (Sobek operation)
 	var file fs.File
-	if err := mi.vu.Runtime().ExportTo(call.Argument(0), &file); err != nil {
+	if err := mi.vu.Runtime().ExportTo(fileArg, &file); err != nil {
 		common.Throw(
 			mi.vu.Runtime(),
 			fmt.Errorf("first argument expected to be a fs.File instance, got %T instead", call.Argument(0)),
@@ -194,7 +199,8 @@ func (p *Parser) Next() *sobek.Promise {
 		records, err = p.reader.Read()
 		if err != nil {
 			if errors.Is(err, io.EOF) {
-				done = true
+				resolve(parseResult{Done: true, Value: []string{}})
+				return
 			} else {
 				reject(err)
 				return
@@ -278,7 +284,7 @@ func newParserOptionsFrom(obj *sobek.Object) (options, error) {
 		options.ToLine = null.IntFrom(v.ToInteger())
 	}
 
-	if options.FromLine.Valid && options.ToLine.Valid && options.FromLine.Int64 > options.ToLine.Int64 {
+	if options.FromLine.Valid && options.ToLine.Valid && options.FromLine.Int64 >= options.ToLine.Int64 {
 		return options, fmt.Errorf("fromLine must be less than or equal to toLine")
 	}
 

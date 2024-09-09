@@ -18,9 +18,7 @@ func TestNewReaderFrom(t *testing.T) {
 		t.Parallel()
 
 		_, err := NewReaderFrom(nil, options{})
-		if err == nil {
-			t.Error("NewReaderFrom() error = nil, wantErr true")
-		}
+		require.Error(t, err)
 	})
 
 	t.Run("instantiating a new reader with the fromLine option less than 0 should fail", func(t *testing.T) {

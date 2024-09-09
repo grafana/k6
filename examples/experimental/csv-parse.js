@@ -19,6 +19,10 @@ let csvRecords;
 
 
 export default async function() {
+	// The csvRecords a SharedArray. Each element is a record from the CSV file, represented as an array
+	// where each element is a field from the CSV record.
+	//
+	// Thus, `csvRecords[scenario.iterationInTest]` will give us the record for the current iteration.
 	console.log(csvRecords[scenario.iterationInTest])
 }
 

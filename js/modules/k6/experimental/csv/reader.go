@@ -47,19 +47,21 @@ func NewReaderFrom(r io.Reader, options options) (*Reader, error) {
 	}
 
 	var (
-		fromLineSet      = options.FromLine.Valid
-		toLineSet        = options.ToLine.Valid
-		skipFirstLineSet = options.SkipFirstLine
+		fromLineSet        = options.FromLine.Valid
+		toLineSet          = options.ToLine.Valid
+		skipFirstLineSet   = options.SkipFirstLine
+		fromLineIsPositive = fromLineSet && options.FromLine.Int64 >= 0
+		toLineIsPositive   = toLineSet && options.ToLine.Int64 >= 0
 	)
 
-	// If set, the fromLine option should be greater than 0.
-	if fromLineSet && options.FromLine.Int64 < 0 {
-		return nil, fmt.Errorf("the 'fromLine' option must be greater than 0; got %d", options.FromLine.Int64)
+	// If set, the fromLine option should either be greater than or equal to 0.
+	if fromLineSet && !fromLineIsPositive {
+		return nil, fmt.Errorf("the 'fromLine' option must be greater than or equal to 0; got %d", options.FromLine.Int64)
 	}
 
-	// If set, the toLine option should be greater than 0.
-	if toLineSet && options.ToLine.Int64 < 0 {
-		return nil, fmt.Errorf("the 'toLine' option must be greater than 0; got %d", options.ToLine.Int64)
+	// If set, the toLine option should be strictly greater than or equal to 0.
+	if toLineSet && !toLineIsPositive {
+		return nil, fmt.Errorf("the 'toLine' option must be greater than or equal to 0; got %d", options.ToLine.Int64)
 	}
 
 	// if the `fromLine` and `toLine` options are set, and `fromLine` is greater or equal to `toLine`, we return an error.

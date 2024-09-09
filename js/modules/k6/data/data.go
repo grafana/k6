@@ -93,7 +93,7 @@ func (d *Data) sharedArray(call sobek.ConstructorCall) *sobek.Object {
 	}
 
 	array := d.shared.get(rt, name, fn)
-	return array.Wrap(rt).ToObject(rt)
+	return array.wrap(rt).ToObject(rt)
 }
 
 // RecordReader is the interface that wraps the action of reading records from a resource.
@@ -136,12 +136,11 @@ func (d *Data) NewSharedArrayFrom(rt *sobek.Runtime, name string, r RecordReader
 		arr = append(arr, string(marshaled))
 	}
 
-	return d.shared.set(name, arr).Wrap(rt).ToObject(rt)
+	return d.shared.set(name, arr).wrap(rt).ToObject(rt)
 }
 
 // set is a helper method to set a shared array in the underlying shared arrays map.
 func (s *sharedArrays) set(name string, arr []string) sharedArray {
-	// FIXME (@oleiade): we should probably return an error if the name is empty?
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	array := sharedArray{arr: arr}

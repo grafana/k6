@@ -20,7 +20,7 @@ type wrappedSharedArray struct {
 	parse    sobek.Callable
 }
 
-func (s sharedArray) Wrap(rt *sobek.Runtime) sobek.Value {
+func (s sharedArray) wrap(rt *sobek.Runtime) sobek.Value {
 	freeze, _ := sobek.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("freeze"))
 	isFrozen, _ := sobek.AssertFunction(rt.GlobalObject().Get("Object").ToObject(rt).Get("isFrozen"))
 	parse, _ := sobek.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("parse"))
