@@ -213,7 +213,9 @@ func TestRemoteFilePersister(t *testing.T) {
 							"service": "aws_s3",
 							"urls": [{
 								"name": "%s",
-								"pre_signed_url": "%s"
+								"pre_signed_url": "%s",
+								"method": "POST",
+								"form_fields": {"key":"a", "value":"b", "key2":"c", "value2":"d"}
 							}]
 							}`, basePath, s.URL+uploadEndpoint)
 
