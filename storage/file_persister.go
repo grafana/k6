@@ -154,7 +154,7 @@ func buildPresignedRequestBody(basePath, path string) ([]byte, error) {
 		} `json:"files"`
 	}{
 		Service:   "aws_s3",
-		Operation: "upload",
+		Operation: "upload_post",
 		Files: []struct {
 			Name string `json:"name"`
 		}{
