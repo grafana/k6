@@ -65,8 +65,6 @@ the "k6 run -o cloud" command.
 }
 
 // run is the code that runs when the user executes `k6 cloud login`
-//
-//nolint:funlen
 func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	currentDiskConf, err := readDiskConfig(c.globalState)
 	if err != nil {
@@ -80,18 +78,6 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		if jsonerr := json.Unmarshal(currentJSONConfigRaw, &currentJSONConfig); jsonerr != nil {
 			return jsonerr
 		}
-	}
-
-	// We want to use this fully consolidated config for things like
-	// host addresses, so users can overwrite them with env vars.
-	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
-		currentJSONConfigRaw, c.globalState.Env, "", nil, nil)
-	if err != nil {
-		return err
-	}
-
-	if warn != "" {
-		c.globalState.Logger.Warn(warn)
 	}
 
 	// But we don't want to save them back to the JSON file, we only
@@ -135,24 +121,9 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 	}
 
 	if newCloudConf.Token.Valid {
-		client := cloudapi.NewClient(
-			c.globalState.Logger,
-			newCloudConf.Token.String,
-			consolidatedCurrentConfig.Host.String,
-			consts.Version,
-			consolidatedCurrentConfig.Timeout.TimeDuration(),
-		)
-
-		var res *cloudapi.ValidateTokenResponse
-		res, err = client.ValidateToken()
+		err := validateToken(c.globalState, currentJSONConfigRaw, newCloudConf.Token.String)
 		if err != nil {
-			return fmt.Errorf("can't validate the API token: %s", err.Error())
-		}
-
-		if !res.IsValid {
-			return errors.New("your API token is invalid - " +
-				"please, consult the Grafana Cloud k6 documentation for instructions on how to generate a new one:\n" +
-				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
+			return err
 		}
 	}
 
@@ -172,5 +143,41 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 			"Logged in successfully, token saved in %s\n", c.globalState.Flags.ConfigFilePath,
 		))
 	}
+	return nil
+}
+
+func validateToken(gs *state.GlobalState, jsonRawConf json.RawMessage, token string) error {
+	// We want to use this fully consolidated config for things like
+	// host addresses, so users can overwrite them with env vars.
+	consolidatedCurrentConfig, warn, err := cloudapi.GetConsolidatedConfig(
+		jsonRawConf, gs.Env, "", nil, nil)
+	if err != nil {
+		return err
+	}
+
+	if warn != "" {
+		gs.Logger.Warn(warn)
+	}
+
+	client := cloudapi.NewClient(
+		gs.Logger,
+		token,
+		consolidatedCurrentConfig.Host.String,
+		consts.Version,
+		consolidatedCurrentConfig.Timeout.TimeDuration(),
+	)
+
+	var res *cloudapi.ValidateTokenResponse
+	res, err = client.ValidateToken()
+	if err != nil {
+		return fmt.Errorf("can't validate the API token: %s", err.Error())
+	}
+
+	if !res.IsValid {
+		return errors.New("your API token is invalid - " +
+			"please, consult the Grafana Cloud k6 documentation for instructions on how to generate a new one:\n" +
+			"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
+	}
+
 	return nil
 }
