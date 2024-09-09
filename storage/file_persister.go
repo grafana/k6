@@ -63,6 +63,17 @@ type RemoteFilePersister struct {
 	httpClient *http.Client
 }
 
+// PresignedURLResponse holds the response from a presigned generation request.
+type PresignedURLResponse struct {
+	Service string `json:"service"`
+	URLs    []struct {
+		Name         string            `json:"name"`
+		PreSignedURL string            `json:"pre_signed_url"` //nolint:tagliatelle
+		Method       string            `json:"method"`
+		FormFields   map[string]string `json:"form_fields"` //nolint:tagliatelle
+	} `json:"urls"`
+}
+
 // NewRemoteFilePersister creates a new instance of RemoteFilePersister.
 func NewRemoteFilePersister(
 	preSignedURLGetterURL string,
@@ -173,15 +184,7 @@ func buildPresignedRequestBody(basePath, path string) ([]byte, error) {
 }
 
 func readResponseBody(resp *http.Response) (string, error) {
-	rb := struct {
-		Service string `json:"service"`
-		URLs    []struct {
-			Name         string            `json:"name"`
-			PreSignedURL string            `json:"pre_signed_url"` //nolint:tagliatelle
-			Method       string            `json:"method"`
-			FormFields   map[string]string `json:"form_fields"` //nolint:tagliatelle
-		} `json:"urls"`
-	}{}
+	var rb PresignedURLResponse
 
 	decoder := json.NewDecoder(resp.Body)
 	err := decoder.Decode(&rb)
