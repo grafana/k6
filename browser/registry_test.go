@@ -296,6 +296,48 @@ func TestBrowserRegistry(t *testing.T) {
 
 		assert.True(t, browserRegistry.stopped.Load())
 	})
+
+	// This test ensures that the chromium browser's lifecycle is not controlled
+	// by the vu context.
+	t.Run("dont_close_browser_on_vu_context_close", func(t *testing.T) {
+		t.Parallel()
+
+		vu := k6test.NewVU(t)
+		var cancel context.CancelFunc
+		vu.CtxField, cancel = context.WithCancel(vu.CtxField)
+		browserRegistry := newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+
+		vu.ActivateVU()
+
+		// Send a few IterStart events
+		vu.StartIteration(t, k6test.WithIteration(0))
+
+		// Verify browsers are initialized
+		browserRegistry.mu.RLock()
+		assert.Equal(t, 1, len(browserRegistry.m))
+		browserRegistry.mu.RUnlock()
+
+		// Cancel the "iteration" by closing the context.
+		cancel()
+
+		// Verify browsers are still alive
+		browserRegistry.mu.RLock()
+		assert.Equal(t, 1, len(browserRegistry.m))
+		browserRegistry.mu.RUnlock()
+
+		// Do cleanup by sending the Exit event
+		events, ok := vu.EventsField.Global.(*k6event.System)
+		require.True(t, ok, "want *k6event.System; got %T", events)
+		waitDone := events.Emit(&k6event.Event{
+			Type: k6event.Exit,
+		})
+		require.NoError(t, waitDone(context.Background()), "error waiting on Exit done")
+
+		// Verify there are no browsers left
+		browserRegistry.mu.RLock()
+		assert.Equal(t, 0, len(browserRegistry.m))
+		browserRegistry.mu.RUnlock()
+	})
 }
 
 func TestParseTracesMetadata(t *testing.T) {
