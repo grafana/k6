@@ -178,7 +178,7 @@ type File struct {
 	// Path holds the name of the file, as presented to [Open].
 	Path string `json:"path"`
 
-	// Impl contains the actual implementation of the file logic, and
+	// ReadSeekStater contains the actual implementation of the file logic, and
 	// interacts with the underlying file system.
 	//
 	// Note that we explicitly omit exposing this to JS to avoid leaking
