@@ -24,7 +24,7 @@ env:
   APP_NAME: "k6"
   DOCKER_IMAGE_ID: "grafana/k6"
   GHCR_IMAGE_ID: ${{ github.repository }}
-  DEFAULT_GO_VERSION: "1.22.x"
+  DEFAULT_GO_VERSION: "1.23.x"
 
 jobs:
   configure:
