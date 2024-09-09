@@ -93,6 +93,7 @@ func TestRemoteFilePersister(t *testing.T) {
 		dataToUpload            string
 		wantPresignedURLBody    string
 		wantPresignedHeaders    map[string]string
+		wantPresignedURLMethod  string
 		uploadResponse          int
 		getPresignedURLResponse int
 		wantError               string
@@ -110,6 +111,24 @@ func TestRemoteFilePersister(t *testing.T) {
 				"Authorization": "token asd123",
 				"Run_id":        "123456",
 			},
+			wantPresignedURLMethod:  http.MethodPost,
+			uploadResponse:          http.StatusOK,
+			getPresignedURLResponse: http.StatusOK,
+		},
+		{
+			name:         "upload_file",
+			path:         "some/path/file.png",
+			dataToUpload: "here's some data",
+			wantPresignedURLBody: `{
+					"service":"aws_s3",
+					"operation": "upload_post",
+					"files":[{"name":"screenshots/some/path/file.png"}]
+				}`,
+			wantPresignedHeaders: map[string]string{
+				"Authorization": "token asd123",
+				"Run_id":        "123456",
+			},
+			wantPresignedURLMethod:  http.MethodPut, // accepts dynamic methods
 			uploadResponse:          http.StatusOK,
 			getPresignedURLResponse: http.StatusOK,
 		},
@@ -126,6 +145,7 @@ func TestRemoteFilePersister(t *testing.T) {
 				"Authorization": "token asd123",
 				"Run_id":        "123456",
 			},
+			wantPresignedURLMethod:  http.MethodPost,
 			getPresignedURLResponse: http.StatusTooManyRequests,
 			wantError:               "getting presigned url: server returned 429 (too many requests)",
 		},
@@ -142,6 +162,7 @@ func TestRemoteFilePersister(t *testing.T) {
 				"Authorization": "token asd123",
 				"Run_id":        "123456",
 			},
+			wantPresignedURLMethod:  http.MethodPost,
 			getPresignedURLResponse: http.StatusInternalServerError,
 			wantError:               "getting presigned url: server returned 500 (internal server error)",
 		},
@@ -158,6 +179,7 @@ func TestRemoteFilePersister(t *testing.T) {
 				"Authorization": "token asd123",
 				"Run_id":        "123456",
 			},
+			wantPresignedURLMethod:  http.MethodPost,
 			uploadResponse:          http.StatusTooManyRequests,
 			getPresignedURLResponse: http.StatusOK,
 			wantError:               "uploading: server returned 429 (too many requests)",
@@ -175,6 +197,7 @@ func TestRemoteFilePersister(t *testing.T) {
 				"Authorization": "token asd123",
 				"Run_id":        "123456",
 			},
+			wantPresignedURLMethod:  http.MethodPost,
 			uploadResponse:          http.StatusInternalServerError,
 			getPresignedURLResponse: http.StatusOK,
 			wantError:               "uploading: server returned 500 (internal server error)",
@@ -214,10 +237,10 @@ func TestRemoteFilePersister(t *testing.T) {
 							"urls": [{
 								"name": "%s",
 								"pre_signed_url": "%s",
-								"method": "POST",
+								"method": "%s",
 								"form_fields": {"key":"a", "value":"b", "key2":"c", "value2":"d"}
 							}]
-							}`, basePath, s.URL+uploadEndpoint)
+							}`, basePath, s.URL+uploadEndpoint, tt.wantPresignedURLMethod)
 
 					require.NoError(t, err)
 				},
@@ -228,6 +251,8 @@ func TestRemoteFilePersister(t *testing.T) {
 			mux.HandleFunc(uploadEndpoint, http.HandlerFunc(
 				func(w http.ResponseWriter, r *http.Request) {
 					defer r.Body.Close() //nolint:errcheck
+
+					assert.Equal(t, tt.wantPresignedURLMethod, r.Method)
 
 					bb, err := io.ReadAll(r.Body)
 					require.NoError(t, err)
