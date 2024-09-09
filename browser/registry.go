@@ -185,7 +185,7 @@ type browserRegistry struct {
 	stopped atomic.Bool // testing purposes
 }
 
-type browserBuildFunc func(ctx, k6Ctx context.Context) (*common.Browser, error)
+type browserBuildFunc func(ctx, vuCtx context.Context) (*common.Browser, error)
 
 func newBrowserRegistry(
 	backgroundCtx context.Context,
@@ -195,7 +195,7 @@ func newBrowserRegistry(
 	tracesMetadata map[string]string,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
-	builder := func(backgroundCtx, k6Ctx context.Context) (*common.Browser, error) {
+	builder := func(backgroundCtx, vuCtx context.Context) (*common.Browser, error) {
 		var (
 			err                    error
 			b                      *common.Browser
@@ -203,13 +203,13 @@ func newBrowserRegistry(
 		)
 
 		if isRemoteBrowser {
-			b, err = bt.Connect(backgroundCtx, k6Ctx, wsURL)
+			b, err = bt.Connect(backgroundCtx, vuCtx, wsURL)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
 		} else {
 			var pid int
-			b, pid, err = bt.Launch(backgroundCtx, k6Ctx)
+			b, pid, err = bt.Launch(backgroundCtx, vuCtx)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}

@@ -93,13 +93,13 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(backgroundCtx, k6Ctx context.Context, wsEndpoint string) (*common.Browser, error) {
-	k6Ctx, browserOpts, logger, err := b.init(k6Ctx, true)
+func (b *BrowserType) Connect(backgroundCtx, vuCtx context.Context, wsEndpoint string) (*common.Browser, error) {
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, true)
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, err := b.connect(backgroundCtx, k6Ctx, wsEndpoint, browserOpts, logger)
+	bp, err := b.connect(backgroundCtx, vuCtx, wsEndpoint, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -112,7 +112,7 @@ func (b *BrowserType) Connect(backgroundCtx, k6Ctx context.Context, wsEndpoint s
 }
 
 func (b *BrowserType) connect(
-	backgroundCtx, k6Ctx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
+	backgroundCtx, vuCtx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
 ) (*common.Browser, error) {
 	browserProc, err := b.link(backgroundCtx, wsURL, logger)
 	if browserProc == nil {
@@ -121,7 +121,7 @@ func (b *BrowserType) connect(
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
-	browserCtx, browserCtxCancel := context.WithCancel(k6Ctx)
+	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(
 		backgroundCtx, browserCtx, browserCtxCancel, browserProc, opts, logger,
@@ -148,13 +148,13 @@ func (b *BrowserType) link(
 
 // Launch allocates a new Chrome browser process and returns a new Browser value,
 // which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch(backgroundCtx, k6Ctx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
-	k6Ctx, browserOpts, logger, err := b.init(k6Ctx, false)
+func (b *BrowserType) Launch(backgroundCtx, vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, pid, err := b.launch(backgroundCtx, k6Ctx, browserOpts, logger)
+	bp, pid, err := b.launch(backgroundCtx, vuCtx, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -167,7 +167,7 @@ func (b *BrowserType) Launch(backgroundCtx, k6Ctx context.Context) (_ *common.Br
 }
 
 func (b *BrowserType) launch(
-	backgroundCtx, k6Ctx context.Context, opts *common.BrowserOptions, logger *log.Logger,
+	backgroundCtx, vuCtx context.Context, opts *common.BrowserOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
 	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
 	if err != nil {
@@ -192,7 +192,7 @@ func (b *BrowserType) launch(
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
-	browserCtx, browserCtxCancel := context.WithCancel(k6Ctx)
+	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(backgroundCtx, browserCtx, browserCtxCancel,
 		browserProc, opts, logger)

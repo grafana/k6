@@ -29,7 +29,7 @@ const (
 // Browser stores a Browser context.
 type Browser struct {
 	backgroundCtx context.Context
-	k6Ctx         context.Context
+	vuCtx         context.Context
 	cancelFn      context.CancelFunc
 
 	state int64
@@ -88,13 +88,13 @@ type browserVersion struct {
 
 // NewBrowser creates a new browser, connects to it, then returns it.
 func NewBrowser(
-	backgroundCtx, k6Ctx context.Context,
+	backgroundCtx, vuCtx context.Context,
 	cancel context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) (*Browser, error) {
-	b := newBrowser(backgroundCtx, k6Ctx, cancel, browserProc, browserOpts, logger)
+	b := newBrowser(backgroundCtx, vuCtx, cancel, browserProc, browserOpts, logger)
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
@@ -110,7 +110,7 @@ func NewBrowser(
 
 // newBrowser returns a ready to use Browser without connecting to an actual browser.
 func newBrowser(
-	backgroundCtx, k6Ctx context.Context,
+	backgroundCtx, vuCtx context.Context,
 	cancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
@@ -118,7 +118,7 @@ func newBrowser(
 ) *Browser {
 	return &Browser{
 		backgroundCtx:       backgroundCtx,
-		k6Ctx:               k6Ctx,
+		vuCtx:               vuCtx,
 		cancelFn:            cancelFn,
 		state:               int64(BrowserStateOpen),
 		browserProc:         browserProc,
@@ -149,7 +149,7 @@ func (b *Browser) connect() error {
 	}
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
-	b.defaultContext, err = NewBrowserContext(b.k6Ctx, b, "", NewBrowserContextOptions(), b.logger)
+	b.defaultContext, err = NewBrowserContext(b.vuCtx, b, "", NewBrowserContextOptions(), b.logger)
 	if err != nil {
 		return fmt.Errorf("browser connect: %w", err)
 	}
@@ -161,7 +161,7 @@ func (b *Browser) disposeContext(id cdp.BrowserContextID) error {
 	b.logger.Debugf("Browser:disposeContext", "bctxid:%v", id)
 
 	action := target.DisposeBrowserContext(id)
-	if err := action.Do(cdp.WithExecutor(b.k6Ctx, b.conn)); err != nil {
+	if err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
 		return fmt.Errorf("disposing browser context ID %s: %w", id, err)
 	}
 
@@ -220,7 +220,7 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
 					if err := b.onAttachedToTarget(ev); err != nil {
-						k6ext.Panic(b.k6Ctx, "browser is attaching to target: %w", err)
+						k6ext.Panic(b.vuCtx, "browser is attaching to target: %w", err)
 					}
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
@@ -234,7 +234,7 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 	}()
 
 	action := target.SetAutoAttach(true, true).WithFlatten(true)
-	if err := action.Do(cdp.WithExecutor(b.k6Ctx, b.conn)); err != nil {
+	if err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
 		return fmt.Errorf("internal error while auto-attaching to browser pages: %w", err)
 	}
 
@@ -242,7 +242,7 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 	// However making a dummy call afterwards fixes this.
 	// This can be removed after https://chromium-review.googlesource.com/c/chromium/src/+/2885888 lands in stable.
 	action2 := target.GetTargetInfo()
-	if _, err := action2.Do(cdp.WithExecutor(b.k6Ctx, b.conn)); err != nil {
+	if _, err := action2.Do(cdp.WithExecutor(b.vuCtx, b.conn)); err != nil {
 		return fmt.Errorf("internal error while getting browser target info: %w", err)
 	}
 
@@ -302,7 +302,7 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 		}
 		b.pagesMu.RUnlock()
 	}
-	p, err := NewPage(b.k6Ctx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
+	p, err := NewPage(b.vuCtx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
 		return nil // Ignore this page.
 	}
@@ -391,10 +391,10 @@ func (b *Browser) isPageAttachmentErrorIgnorable(ev *target.EventAttachedToTarge
 	}
 	// No need to register the page if the test run is over.
 	select {
-	case <-b.k6Ctx.Done():
+	case <-b.vuCtx.Done():
 		b.logger.Debugf("Browser:isPageAttachmentErrorIgnorable:return:<-ctx.Done",
 			"sid:%v tid:%v pageType:%s err:%v",
-			ev.SessionID, targetPage.TargetID, targetPage.Type, b.k6Ctx.Err())
+			ev.SessionID, targetPage.TargetID, targetPage.Type, b.vuCtx.Err())
 		return true
 	default:
 	}
@@ -442,7 +442,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		return nil, fmt.Errorf("missing browser context %s, current context is %s", id, b.context.id)
 	}
 
-	ctx, cancel := context.WithTimeout(b.k6Ctx, b.browserOpts.Timeout)
+	ctx, cancel := context.WithTimeout(b.vuCtx, b.browserOpts.Timeout)
 	defer cancel()
 
 	// buffer of one is for sending the target ID whether an event handler
@@ -572,7 +572,7 @@ func (b *Browser) IsConnected() bool {
 
 // NewContext creates a new incognito-like browser context.
 func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, error) {
-	_, span := TraceAPICall(b.k6Ctx, "", "browser.newContext")
+	_, span := TraceAPICall(b.vuCtx, "", "browser.newContext")
 	defer span.End()
 
 	if b.context != nil {
@@ -582,7 +582,7 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 	}
 
 	action := target.CreateBrowserContext().WithDisposeOnDetach(true)
-	browserContextID, err := action.Do(cdp.WithExecutor(b.k6Ctx, b.conn))
+	browserContextID, err := action.Do(cdp.WithExecutor(b.vuCtx, b.conn))
 	b.logger.Debugf("Browser:NewContext", "bctxid:%v", browserContextID)
 	if err != nil {
 		err := fmt.Errorf("creating browser context ID %s: %w", browserContextID, err)
@@ -590,7 +590,7 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 		return nil, err
 	}
 
-	browserCtx, err := NewBrowserContext(b.k6Ctx, b, browserContextID, opts, b.logger)
+	browserCtx, err := NewBrowserContext(b.vuCtx, b, browserContextID, opts, b.logger)
 	if err != nil {
 		err := fmt.Errorf("new context: %w", err)
 		spanRecordError(span, err)
@@ -606,7 +606,7 @@ func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, erro
 
 // NewPage creates a new tab in the browser window.
 func (b *Browser) NewPage(opts *BrowserContextOptions) (*Page, error) {
-	_, span := TraceAPICall(b.k6Ctx, "", "browser.newPage")
+	_, span := TraceAPICall(b.vuCtx, "", "browser.newPage")
 	defer span.End()
 
 	browserCtx, err := b.NewContext(opts)
@@ -635,8 +635,8 @@ func (b *Browser) On(event string) (bool, error) {
 	select {
 	case <-b.browserProc.lostConnection:
 		return true, nil
-	case <-b.k6Ctx.Done():
-		return false, fmt.Errorf("browser.on promise rejected: %w", b.k6Ctx.Err())
+	case <-b.vuCtx.Done():
+		return false, fmt.Errorf("browser.on promise rejected: %w", b.vuCtx.Err())
 	}
 }
 
@@ -663,7 +663,7 @@ func (b *Browser) fetchVersion() (browserVersion, error) {
 	)
 	bv.protocolVersion, bv.product, bv.revision, bv.userAgent, bv.jsVersion, err = cdpbrowser.
 		GetVersion().
-		Do(cdp.WithExecutor(b.k6Ctx, b.conn))
+		Do(cdp.WithExecutor(b.vuCtx, b.conn))
 	if err != nil {
 		return browserVersion{}, fmt.Errorf("getting browser version information: %w", err)
 	}
