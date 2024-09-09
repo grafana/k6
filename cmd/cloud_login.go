@@ -146,11 +146,13 @@ func (c *cmdCloudLogin) run(cmd *cobra.Command, _ []string) error {
 		var res *cloudapi.ValidateTokenResponse
 		res, err = client.ValidateToken()
 		if err != nil {
-			return err
+			return fmt.Errorf("can't validate the API token: %s", err.Error())
 		}
 
 		if !res.IsValid {
-			return errors.New(`your API token is invalid, please generate a new one at https://app.k6.io/account/api-token`)
+			return errors.New("your API token is invalid - " +
+				"please, consult the Grafana Cloud k6 documentation for instructions on how to generate a new one:\n" +
+				"https://grafana.com/docs/grafana-cloud/testing/k6/author-run/tokens-and-cli-authentication")
 		}
 	}
 
