@@ -127,7 +127,7 @@ func TestWebVitalMetricNoInteraction(t *testing.T) {
 	// wait until the page is completely loaded.
 	page := browser.NewPage(nil)
 	opts := &common.FrameGotoOptions{
-		WaitUntil: common.LifecycleEventDOMContentLoad,
+		WaitUntil: common.LifecycleEventNetworkIdle,
 		Timeout:   common.DefaultTimeout,
 	}
 	resp, err := page.Goto(
