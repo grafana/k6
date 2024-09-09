@@ -201,10 +201,10 @@ func (p *Parser) Next() *sobek.Promise {
 			if errors.Is(err, io.EOF) {
 				resolve(parseResult{Done: true, Value: []string{}})
 				return
-			} else {
-				reject(err)
-				return
 			}
+
+			reject(err)
+			return
 		}
 
 		p.currentLine.Add(1)
