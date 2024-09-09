@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"mime/multipart"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -97,12 +98,7 @@ func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.
 		return fmt.Errorf("getting presigned url: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(
-		ctx,
-		psResp.URLs[0].Method,
-		psResp.URLs[0].PreSignedURL,
-		data,
-	)
+	req, err := newUploadRequest(ctx, psResp, data)
 	if err != nil {
 		return fmt.Errorf("creating upload request: %w", err)
 	}
@@ -203,4 +199,49 @@ func readResponseBody(resp *http.Response) (PresignedURLResponse, error) {
 	}
 
 	return rb, nil
+}
+
+// newUploadRequest creates a new HTTP request to upload a file as a multipart
+// form to the presigned URL received from the server.
+func newUploadRequest(
+	ctx context.Context,
+	resp PresignedURLResponse,
+	data io.Reader,
+) (*http.Request, error) {
+	// we don't support multiple presigned URLs at the moment.
+	psu := resp.URLs[0]
+
+	// copy all form fields received from a presigned URL
+	// response to the multipart form fields.
+	var form bytes.Buffer
+	fw := multipart.NewWriter(&form)
+	for k, v := range psu.FormFields {
+		if err := fw.WriteField(k, v); err != nil {
+			return nil, fmt.Errorf("writing form field key %q and value %q: %w", k, v, err)
+		}
+	}
+	// attach the file data to the form.
+	ff, err := fw.CreateFormFile("file", psu.Name)
+	if err != nil {
+		return nil, fmt.Errorf("creating multipart form file: %w", err)
+	}
+	if _, err := io.Copy(ff, data); err != nil {
+		return nil, fmt.Errorf("copying file data to multipart form: %w", err)
+	}
+	if err := fw.Close(); err != nil {
+		return nil, fmt.Errorf("closing multipart form writer: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(
+		ctx,
+		psu.Method,
+		psu.PreSignedURL,
+		&form,
+	)
+	if err != nil {
+		return nil, fmt.Errorf("creating new request: %w", err)
+	}
+	req.Header.Set("Content-Type", fw.FormDataContentType())
+
+	return req, nil
 }

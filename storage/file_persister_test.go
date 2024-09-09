@@ -257,9 +257,10 @@ func TestRemoteFilePersister(t *testing.T) {
 					bb, err := io.ReadAll(r.Body)
 					require.NoError(t, err)
 
-					// Ensures that the data is uploaded to the server and matches
-					// what was sent.
-					assert.Equal(t, tt.dataToUpload, string(bb))
+					// Ensures that the data is uploaded to the server and includes
+					// what was sent. We omit the multipart form fields and only look
+					// for the file data.
+					assert.Contains(t, string(bb), tt.dataToUpload)
 
 					w.WriteHeader(tt.uploadResponse)
 				}))
