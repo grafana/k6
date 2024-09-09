@@ -20,7 +20,7 @@ type Reader struct {
 	options options
 }
 
-// NewReaderFrom creates a new CSV reader from the provided csv.Reader.
+// NewReaderFrom creates a new CSV reader from the provided io.Reader.
 //
 // It will check whether the first line should be skipped and consume it if necessary.
 // It will also check whether the reader should start from a specific line and skip lines until that line is reached.
