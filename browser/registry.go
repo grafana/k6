@@ -187,6 +187,15 @@ type browserRegistry struct {
 
 type browserBuildFunc func(ctx, vuCtx context.Context) (*common.Browser, error)
 
+// newBrowserRegistry should only take a background context, not a context from
+// k6 (i.e. vu). The reason for this is that we want to control the chromium
+// lifecycle with the k6 event system.
+//
+// The k6 event system gives this extension time to properly cleanup any running
+// chromium subprocesses or connections to a remote chromium instance.
+//
+// A vu context (a context on an iteration) doesn't allow us to do this. Once k6
+// closes a vu context, it basically pulls the rug from under the extensions feet.
 func newBrowserRegistry(
 	backgroundCtx context.Context,
 	vu k6modules.VU,
@@ -289,13 +298,16 @@ func (r *browserRegistry) handleIterEvents( //nolint:funlen
 			// so we can get access to the k6 TracerProvider.
 			r.initTracesRegistry()
 
-			// Wrap the tracer into the browser context to make it accessible for the other
-			// components that inherit the context so these can use it to trace their actions.
-			ctx := backgroundCtx
+			// Wrap the tracer into the VU context to make it accessible for the
+			// other components during the iteration that inherit the VU context.
+			//
+			// All browser APIs should work with the vu context, and allow the
+			// k6 iteration control its lifecycle.
+			ctx := r.vu.Context()
 			tracerCtx := common.WithTracer(ctx, r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
 
-			b, err := r.buildFn(tracedCtx, tracedCtx)
+			b, err := r.buildFn(backgroundCtx, tracedCtx)
 			if err != nil {
 				e.Done()
 				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
