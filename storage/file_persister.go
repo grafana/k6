@@ -92,12 +92,17 @@ func NewRemoteFilePersister(
 
 // Persist will upload the contents of data to a remote location.
 func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) (err error) {
-	pURL, err := r.getPreSignedURL(ctx, path)
+	psResp, err := r.getPreSignedURL(ctx, path)
 	if err != nil {
 		return fmt.Errorf("getting presigned url: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPut, pURL, data)
+	req, err := http.NewRequestWithContext(
+		ctx,
+		psResp.URLs[0].Method,
+		psResp.URLs[0].PreSignedURL,
+		data,
+	)
 	if err != nil {
 		return fmt.Errorf("creating upload request: %w", err)
 	}
@@ -127,16 +132,17 @@ func checkStatusCode(resp *http.Response) error {
 	return nil
 }
 
-// getPreSignedURL will retrieve the presigned url for the current file.
-func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) (string, error) {
+// getPreSignedURL will request a new presigned URL from the remote server for the given path.
+// Returns a [PresignedURLResponse] that contains the presigned URL details.
+func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) (PresignedURLResponse, error) {
 	b, err := buildPresignedRequestBody(r.basePath, path)
 	if err != nil {
-		return "", fmt.Errorf("building request body: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("building request body: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.preSignedURLGetterURL, bytes.NewReader(b))
 	if err != nil {
-		return "", fmt.Errorf("creating request: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", err)
 	}
 
 	for k, v := range r.headers {
@@ -145,12 +151,12 @@ func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) 
 
 	resp, err := r.httpClient.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("performing request: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("performing request: %w", err)
 	}
 	defer resp.Body.Close() //nolint:errcheck
 
 	if err := checkStatusCode(resp); err != nil {
-		return "", err
+		return PresignedURLResponse{}, err
 	}
 
 	return readResponseBody(resp)
@@ -183,18 +189,18 @@ func buildPresignedRequestBody(basePath, path string) ([]byte, error) {
 	return bb, nil
 }
 
-func readResponseBody(resp *http.Response) (string, error) {
+func readResponseBody(resp *http.Response) (PresignedURLResponse, error) {
 	var rb PresignedURLResponse
 
 	decoder := json.NewDecoder(resp.Body)
 	err := decoder.Decode(&rb)
 	if err != nil {
-		return "", fmt.Errorf("decoding response body: %w", err)
+		return PresignedURLResponse{}, fmt.Errorf("decoding response body: %w", err)
 	}
 
 	if len(rb.URLs) == 0 {
-		return "", errors.New("missing presigned url in response body")
+		return PresignedURLResponse{}, errors.New("missing presigned url in response body")
 	}
 
-	return rb.URLs[0].PreSignedURL, nil
+	return rb, nil
 }
