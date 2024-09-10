@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 type runtimeOptionsTestCase struct {
@@ -70,6 +71,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 			RuntimeOptions: rtOpts,
 			Registry:       registry,
 			BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+			Usage:          usage.New(),
 		},
 	}
 
@@ -89,6 +91,7 @@ func testRuntimeOptionsCase(t *testing.T, tc runtimeOptionsTestCase) {
 				RuntimeOptions: rtOpts,
 				Registry:       registry,
 				BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+				Usage:          usage.New(),
 			},
 		}
 	}

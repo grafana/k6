@@ -22,6 +22,7 @@ import (
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 const (
@@ -77,6 +78,7 @@ func loadLocalTest(gs *state.GlobalState, cmd *cobra.Command, args []string) (*l
 			val, ok := gs.Env[key]
 			return val, ok
 		},
+		Usage: usage.New(),
 	}
 
 	test := &loadedTest{

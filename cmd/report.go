@@ -6,92 +6,34 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
-	"strings"
 
 	"go.k6.io/k6/execution"
 	"go.k6.io/k6/lib/consts"
+	"go.k6.io/k6/usage"
 )
 
-type report struct {
-	Version    string         `json:"k6_version"`
-	Executors  map[string]int `json:"executors"`
-	VUsMax     int64          `json:"vus_max"`
-	Iterations uint64         `json:"iterations"`
-	Duration   string         `json:"duration"`
-	GoOS       string         `json:"goos"`
-	GoArch     string         `json:"goarch"`
-	Modules    []string       `json:"modules"`
-	Outputs    []string       `json:"outputs"`
-}
+func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string]any {
+	execState := execScheduler.GetState()
+	m := u.Map()
 
-func createReport(execScheduler *execution.Scheduler, importedModules []string, outputs []string) report {
+	m["k6_version"] = consts.Version
+	m["duration"] = execState.GetCurrentTestRunDuration().String()
+	m["goos"] = runtime.GOOS
+	m["goarch"] = runtime.GOARCH
+	m["vus_max"] = uint64(execState.GetInitializedVUsCount())
+	m["iterations"] = execState.GetFullIterationCount()
 	executors := make(map[string]int)
 	for _, ec := range execScheduler.GetExecutorConfigs() {
 		executors[ec.GetType()]++
 	}
+	m["executors"] = executors
 
-	// collect the report only with k6 public modules
-	publicModules := make([]string, 0, len(importedModules))
-	for _, module := range importedModules {
-		// Exclude JS modules extensions to prevent to leak
-		// any user's custom extensions
-		if strings.HasPrefix(module, "k6/x") {
-			continue
-		}
-		// Exclude any import not starting with the k6 prefix
-		// that identifies a k6 built-in stable or experimental module.
-		// For example, it doesn't include any modules imported from the file system.
-		if !strings.HasPrefix(module, "k6") {
-			continue
-		}
-		publicModules = append(publicModules, module)
-	}
-
-	builtinOutputs := builtinOutputStrings()
-
-	// TODO: migrate to slices.Contains as soon as the k6 support
-	// for Go1.20 will be over.
-	builtinOutputsIndex := make(map[string]bool, len(builtinOutputs))
-	for _, bo := range builtinOutputs {
-		builtinOutputsIndex[bo] = true
-	}
-
-	// collect only the used outputs that are builtin
-	publicOutputs := make([]string, 0, len(builtinOutputs))
-	for _, o := range outputs {
-		// TODO:
-		// if !slices.Contains(builtinOutputs, o) {
-		// 	continue
-		// }
-		if !builtinOutputsIndex[o] {
-			continue
-		}
-		publicOutputs = append(publicOutputs, o)
-	}
-
-	execState := execScheduler.GetState()
-	return report{
-		Version:    consts.Version,
-		Executors:  executors,
-		VUsMax:     execState.GetInitializedVUsCount(),
-		Iterations: execState.GetFullIterationCount(),
-		Duration:   execState.GetCurrentTestRunDuration().String(),
-		GoOS:       runtime.GOOS,
-		GoArch:     runtime.GOARCH,
-		Modules:    publicModules,
-		Outputs:    publicOutputs,
-	}
+	return m
 }
 
 func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *loadedAndConfiguredTest) error {
-	outputs := make([]string, 0, len(test.derivedConfig.Out))
-	for _, o := range test.derivedConfig.Out {
-		outputName, _ := parseOutputArgument(o)
-		outputs = append(outputs, outputName)
-	}
-
-	r := createReport(execScheduler, test.moduleResolver.Imported(), outputs)
-	body, err := json.Marshal(r)
+	m := createReport(test.preInitState.Usage, execScheduler)
+	body, err := json.Marshal(m)
 	if err != nil {
 		return err
 	}

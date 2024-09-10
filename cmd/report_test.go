@@ -12,25 +12,12 @@ import (
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/lib/executor"
 	"go.k6.io/k6/lib/testutils"
+	"go.k6.io/k6/usage"
 	"gopkg.in/guregu/null.v3"
 )
 
 func TestCreateReport(t *testing.T) {
 	t.Parallel()
-	importedModules := []string{
-		"k6/http",
-		"my-custom-module",
-		"k6/experimental/webcrypto",
-		"file:custom-from-file-system",
-		"k6",
-		"k6/x/custom-extension",
-	}
-
-	outputs := []string{
-		"json",
-		"xk6-output-custom-example",
-	}
-
 	logger := testutils.NewLogger(t)
 	opts, err := executor.DeriveScenariosFromShortcuts(lib.Options{
 		VUs:        null.IntFrom(10),
@@ -51,12 +38,12 @@ func TestCreateReport(t *testing.T) {
 	time.Sleep(10 * time.Millisecond)
 	s.GetState().MarkEnded()
 
-	r := createReport(s, importedModules, outputs)
-	assert.Equal(t, consts.Version, r.Version)
-	assert.Equal(t, map[string]int{"shared-iterations": 1}, r.Executors)
-	assert.Equal(t, 6, int(r.VUsMax))
-	assert.Equal(t, 170, int(r.Iterations))
-	assert.NotEqual(t, "0s", r.Duration)
-	assert.ElementsMatch(t, []string{"k6", "k6/http", "k6/experimental/webcrypto"}, r.Modules)
-	assert.ElementsMatch(t, []string{"json"}, r.Outputs)
+	m := createReport(usage.New(), s)
+	require.NoError(t, err)
+
+	assert.Equal(t, consts.Version, m["k6_version"])
+	assert.EqualValues(t, map[string]int{"shared-iterations": 1}, m["executors"])
+	assert.EqualValues(t, 6, m["vus_max"])
+	assert.EqualValues(t, 170, m["iterations"])
+	assert.NotEqual(t, "0s", m["duration"])
 }
