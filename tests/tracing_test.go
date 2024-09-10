@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/grafana/sobek"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
@@ -30,6 +31,7 @@ const html = `
 </head>
 
 <body>
+	<a id="top" href="#bottom">Go to bottom</a>
 	<div class="main">
 		<h3>Click Counter</h3>
 		<button id="clickme">Click me: 0</button>
@@ -44,6 +46,7 @@ const html = `
 		button.innerHTML = "Click me: " + count;
 	};
     </script>
+	<div id="bottom"></div>
 </body>
 
 </html>
@@ -158,6 +161,137 @@ func TestTracing(t *testing.T) {
 	}
 }
 
+// This test is testing to ensure that correct number of navigation spans are created
+// and they are created in the correct order.
+func TestNavigationSpanCreation(t *testing.T) {
+	t.Parallel()
+
+	// Init tracing mocks
+	tracer := &mockTracer{
+		spans: make(map[string]struct{}),
+	}
+	tp := &mockTracerProvider{
+		tracer: tracer,
+	}
+	// Start test server
+	ts := httptest.NewServer(http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			fmt.Fprint(w, html)
+		},
+	))
+	defer ts.Close()
+
+	// Initialize VU and browser module
+	vu := k6test.NewVU(t, k6test.WithTracerProvider(tp))
+
+	rt := vu.Runtime()
+	root := browser.New()
+	mod := root.NewModuleInstance(vu)
+	jsMod, ok := mod.Exports().Default.(*browser.JSModule)
+	require.Truef(t, ok, "unexpected default mod export type %T", mod.Exports().Default)
+	require.NoError(t, rt.Set("browser", jsMod.Browser))
+	vu.ActivateVU()
+
+	testCases := []struct {
+		name     string
+		js       string
+		expected []string
+	}{
+		{
+			name: "goto",
+			js: fmt.Sprintf(`
+				page = await browser.newPage();
+				await page.goto('%s');
+				browser.closeContext();
+				`, ts.URL),
+			expected: []string{
+				"iteration",
+				"browser.newPage",
+				"browser.newContext",
+				"browserContext.newPage",
+				"navigation", // created when a new page is created
+				"page.goto",
+				"navigation", // created when a navigation occurs after goto
+			},
+		},
+		{
+			name: "reload",
+			js: fmt.Sprintf(`
+				page = await browser.newPage();
+				await page.goto('%s');
+				await page.reload();
+				browser.closeContext();
+				`, ts.URL),
+			expected: []string{
+				"iteration",
+				"browser.newPage",
+				"browser.newContext",
+				"browserContext.newPage",
+				"navigation", // created when a new page is created
+				"page.goto",
+				"navigation", // created when a navigation occurs after goto
+				"page.reload",
+				"navigation", // created when a navigation occurs after reload
+			},
+		},
+		{
+			name: "go_back",
+			js: fmt.Sprintf(`
+				page = await browser.newPage();
+				await page.goto('%s');
+				await page.evaluate(() => window.history.back());
+				browser.closeContext();
+				`, ts.URL),
+			expected: []string{
+				"iteration",
+				"browser.newPage",
+				"browser.newContext",
+				"browserContext.newPage",
+				"navigation", // created when a new page is created
+				"page.goto",
+				"navigation", // created when a navigation occurs after goto
+				"navigation", // created when going back to the previous page
+			},
+		},
+		{
+			name: "same_page_navigation",
+			js: fmt.Sprintf(`
+				page = await browser.newPage();
+				await page.goto('%s');
+				await page.locator('a[id=\"top\"]').click();
+				browser.closeContext();
+				`, ts.URL),
+			expected: []string{
+				"iteration",
+				"browser.newPage",
+				"browser.newContext",
+				"browserContext.newPage",
+				"navigation", // created when a new page is created
+				"page.goto",
+				"navigation", // created when a navigation occurs after goto
+				"locator.click",
+				"navigation", // created when navigating within the same page
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		// Cannot create new VUs that do not depend on each other due to the
+		// sync.Once in mod.NewModuleInstance, so we can't parallelize these
+		// subtests.
+		func() {
+			// Run the test
+			vu.StartIteration(t)
+			defer vu.EndIteration(t)
+
+			assertJSInEventLoop(t, vu, tc.js)
+
+			got := tracer.getOrderedSpan()
+			assert.Equal(t, tc.expected, got, fmt.Sprintf("%s failed", tc.name))
+		}()
+	}
+}
+
 func setupTestTracing(t *testing.T, rt *sobek.Runtime) {
 	t.Helper()
 
@@ -210,8 +344,9 @@ func (m *mockTracerProvider) Tracer(
 type mockTracer struct {
 	embedded.Tracer
 
-	mu    sync.Mutex
-	spans map[string]struct{}
+	mu           sync.Mutex
+	spans        map[string]struct{}
+	orderedSpans []string
 }
 
 func (m *mockTracer) Start(
@@ -221,6 +356,11 @@ func (m *mockTracer) Start(
 	defer m.mu.Unlock()
 
 	m.spans[spanName] = struct{}{}
+
+	// Ignore web_vital spans since they're non deterministic.
+	if spanName != "web_vital" {
+		m.orderedSpans = append(m.orderedSpans, spanName)
+	}
 
 	return ctx, browsertrace.NoopSpan{}
 }
@@ -237,4 +377,16 @@ func (m *mockTracer) verifySpans(spanNames ...string) error {
 	}
 
 	return nil
+}
+
+func (m *mockTracer) getOrderedSpan() []string {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	c := make([]string, len(m.orderedSpans))
+	copy(c, m.orderedSpans)
+
+	m.orderedSpans = []string{}
+
+	return c
 }
