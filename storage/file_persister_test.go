@@ -83,9 +83,11 @@ func TestLocalFilePersister(t *testing.T) {
 func TestRemoteFilePersister(t *testing.T) {
 	t.Parallel()
 
-	basePath := "screenshots"
-	presignedEndpoint := "/presigned"
-	uploadEndpoint := "/upload"
+	const (
+		basePath          = "screenshots"
+		presignedEndpoint = "/presigned"
+		uploadEndpoint    = "/upload"
+	)
 
 	tests := []struct {
 		name                    string
@@ -105,7 +107,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
-					"files":[{"name":"screenshots/some/path/file.png"}]
+					"files":[{"name":"%s"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
 				"Authorization": "token asd123",
@@ -122,7 +124,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
-					"files":[{"name":"screenshots/some/path/file.png"}]
+					"files":[{"name":"%s"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
 				"Authorization": "token asd123",
@@ -139,7 +141,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
-					"files":[{"name":"screenshots/some/path/file.png"}]
+					"files":[{"name":"%s"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
 				"Authorization": "token asd123",
@@ -156,7 +158,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
-					"files":[{"name":"screenshots/some/path/file.png"}]
+					"files":[{"name":"%s"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
 				"Authorization": "token asd123",
@@ -173,7 +175,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
-					"files":[{"name":"screenshots/some/path/file.png"}]
+					"files":[{"name":"%s"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
 				"Authorization": "token asd123",
@@ -191,7 +193,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
-					"files":[{"name":"screenshots/some/path/file.png"}]
+					"files":[{"name":"%s"}]
 				}`,
 			wantPresignedHeaders: map[string]string{
 				"Authorization": "token asd123",
@@ -221,12 +223,14 @@ func TestRemoteFilePersister(t *testing.T) {
 					bb, err := io.ReadAll(r.Body)
 					require.NoError(t, err)
 
-					// Ensures that the body of the request matches the
-					// expected format.
-					assert.JSONEq(t, tt.wantPresignedURLBody, string(bb))
+					// Does the response match the expected format?
+					wantPresignedURLBody := fmt.Sprintf(
+						tt.wantPresignedURLBody,
+						filepath.Join(basePath, tt.path),
+					)
+					assert.JSONEq(t, wantPresignedURLBody, string(bb))
 
-					// Ensures that the headers are sent to the server from
-					// the browser module.
+					// Do the HTTP headers are sent to the server from the browser module?
 					for k, v := range tt.wantPresignedHeaders {
 						assert.Equal(t, v, r.Header[k][0])
 					}
@@ -240,7 +244,7 @@ func TestRemoteFilePersister(t *testing.T) {
 								"method": "%s",
 								"form_fields": {"key":"a", "value":"b", "key2":"c", "value2":"d"}
 							}]
-							}`, basePath, s.URL+uploadEndpoint, tt.wantPresignedURLMethod)
+							}`, basePath+"/"+tt.path, s.URL+uploadEndpoint, tt.wantPresignedURLMethod)
 
 					require.NoError(t, err)
 				},
@@ -254,13 +258,22 @@ func TestRemoteFilePersister(t *testing.T) {
 
 					assert.Equal(t, tt.wantPresignedURLMethod, r.Method)
 
-					bb, err := io.ReadAll(r.Body)
+					// Does the multipart form data contain the file to upload?
+					file, header, err := r.FormFile("file")
 					require.NoError(t, err)
+					t.Cleanup(func() {
+						_ = file.Close()
+					})
+					cd := header.Header.Get("Content-Disposition")
+					assert.Equal(t, cd, `form-data; name="file"; filename="`+basePath+`/`+tt.path+`"`)
 
-					// Ensures that the data is uploaded to the server and includes
-					// what was sent. We omit the multipart form fields and only look
-					// for the file data.
-					assert.Contains(t, string(bb), tt.dataToUpload)
+					// Does the file content match the expected data?
+					bb, err := io.ReadAll(file)
+					require.NoError(t, err)
+					assert.Equal(t, string(bb), tt.dataToUpload)
+
+					// Is the content type set correctly to the binary data?
+					assert.Equal(t, "application/octet-stream", header.Header.Get("Content-Type"))
 
 					w.WriteHeader(tt.uploadResponse)
 				}))
