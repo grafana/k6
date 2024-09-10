@@ -391,7 +391,7 @@ service. Be sure to run the "k6 cloud login" command prior to authenticate with 
 	}
 
 	// Register `k6 cloud` subcommands
-	cloudCmd.AddCommand(getCmdCloudRun(gs))
+	cloudCmd.AddCommand(getCmdCloudRun(c))
 	cloudCmd.AddCommand(getCmdCloudLogin(gs))
 	cloudCmd.AddCommand(getCmdCloudUpload(c))
 
