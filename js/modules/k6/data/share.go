@@ -49,6 +49,7 @@ func (s wrappedSharedArray) Get(index int) sobek.Value {
 	if err != nil {
 		common.Throw(s.rt, err)
 	}
+
 	err = s.deepFreeze(s.rt, val)
 	if err != nil {
 		common.Throw(s.rt, err)
