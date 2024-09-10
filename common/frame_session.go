@@ -797,6 +797,11 @@ func (fs *FrameSession) processNavigationSpan(url string, id cdp.FrameID) {
 		return
 	}
 
+	// End the navigation span if it is non-nil
+	if fs.mainFrameSpan != nil {
+		fs.mainFrameSpan.End()
+	}
+
 	_, fs.mainFrameSpan = TraceNavigation(
 		fs.ctx, fs.targetID.String(), trace.WithAttributes(attribute.String("navigation.url", url)),
 	)
