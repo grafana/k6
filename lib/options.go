@@ -520,7 +520,7 @@ func (o Options) Apply(opts Options) Options {
 func (o Options) Validate() []error {
 	// TODO: validate all of the other options... that we should have already been validating...
 	// TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
-	var errorsSlice []error
+	var validationErrors []error
 	if o.ExecutionSegmentSequence != nil {
 		var segmentFound bool
 		for _, segment := range *o.ExecutionSegmentSequence {
@@ -530,18 +530,18 @@ func (o Options) Validate() []error {
 			}
 		}
 		if !segmentFound {
-			errorsSlice = append(errorsSlice,
+			validationErrors = append(validationErrors,
 				fmt.Errorf("provided segment %s can't be found in sequence %s",
 					o.ExecutionSegment, o.ExecutionSegmentSequence))
 		}
 	}
-	errorsSlice = append(errorsSlice, o.Scenarios.Validate()...)
+	validationErrors = append(validationErrors, o.Scenarios.Validate()...)
 
 	// Duration
 	if o.SetupTimeout.Valid && o.SetupTimeout.Duration <= 0 {
-		errorsSlice = append(errorsSlice, errors.New("setupTimeout must be positive"))
+		validationErrors = append(validationErrors, errors.New("setupTimeout must be positive"))
 	}
-	return errorsSlice
+	return validationErrors
 }
 
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each
