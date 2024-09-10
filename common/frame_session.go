@@ -782,25 +782,26 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 			frame.URL+frame.URLFragment, err)
 	}
 
+	fs.processNavigationSpan(frame.URL, frame.ID)
+}
+
+func (fs *FrameSession) processNavigationSpan(url string, id cdp.FrameID) {
+	newFrame, ok := fs.manager.getFrameByID(id)
+	if !ok {
+		return
+	}
+
 	// Trace navigation only for the main frame.
 	// TODO: How will this affect sub frames such as iframes?
-	if isMainFrame := frame.ParentID == ""; !isMainFrame {
+	if newFrame.page.frameManager.MainFrame() != newFrame {
 		return
 	}
 
 	_, fs.mainFrameSpan = TraceNavigation(
-		fs.ctx, fs.targetID.String(), trace.WithAttributes(attribute.String("navigation.url", frame.URL)),
+		fs.ctx, fs.targetID.String(), trace.WithAttributes(attribute.String("navigation.url", url)),
 	)
 
-	var (
-		spanID       = fs.mainFrameSpan.SpanContext().SpanID().String()
-		newFrame, ok = fs.manager.getFrameByID(frame.ID)
-	)
-
-	// Only set the k6SpanId reference if it's a new frame.
-	if !ok {
-		return
-	}
+	spanID := fs.mainFrameSpan.SpanContext().SpanID().String()
 
 	// Set k6SpanId property in the page so it can be retrieved when pushing
 	// the Web Vitals events from the page execution context and used to
