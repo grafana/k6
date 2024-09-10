@@ -1484,3 +1484,46 @@ func destroySamples(ctx context.Context, c <-chan metrics.SampleContainer) {
 		}
 	}
 }
+
+func TestArrayBufferViewSupport(t *testing.T) {
+	t.Parallel()
+	for _, name := range []string{ // Commented ones aren't support by Sobek
+		"Int8Array", "Int16Array", "Int32Array",
+		"Uint8Array", "Uint16Array", "Uint32Array", "Uint8ClampedArray",
+		// "BigInt64Array", "BigUint64Arrays",
+		/*"Float16Array", */ "Float32Array", "Float64Array",
+	} {
+		name := name
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			testArrayBufferViewSupport(t, name)
+		})
+	}
+}
+
+func testArrayBufferViewSupport(t *testing.T, viewName string) {
+	t.Helper()
+	ts := newTestState(t)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+	ts.runtime.VU.StateField.Logger = logger
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(fmt.Sprintf(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		ws.addEventListener("open", () => {
+			const sent = new %[1]s([164, 41])
+			ws.send(sent)
+			ws.onmessage = async (e) => {
+				const received = new %[1]s(await e.data.arrayBuffer());
+				for (let i = 0; i < sent.length; i++) {
+					if (sent.at(i) != received.at(i)) {
+						throw "Values at " + i + " were different " + sent.at(i) + " vs " + received.at(i);
+					}
+				}
+				ws.close()
+			}
+		})
+	`, viewName)))
+	require.NoError(t, err)
+	logs := hook.Drain()
+	require.Len(t, logs, 0)
+}

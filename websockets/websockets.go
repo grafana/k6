@@ -601,21 +601,9 @@ func (w *webSocket) send(msg sobek.Value) {
 			t:     time.Now(),
 		}
 	case *sobek.ArrayBuffer:
-		b := o.Bytes()
-		w.bufferedAmount += len(b)
-		w.writeQueueCh <- message{
-			mtype: websocket.BinaryMessage,
-			data:  b,
-			t:     time.Now(),
-		}
+		w.sendArrayBuffer(*o)
 	case sobek.ArrayBuffer:
-		b := o.Bytes()
-		w.bufferedAmount += len(b)
-		w.writeQueueCh <- message{
-			mtype: websocket.BinaryMessage,
-			data:  b,
-			t:     time.Now(),
-		}
+		w.sendArrayBuffer(o)
 	case map[string]interface{}:
 		rt := w.vu.Runtime()
 		obj := msg.ToObject(rt)
@@ -630,10 +618,57 @@ func (w *webSocket) send(msg sobek.Value) {
 			data:  b,
 			t:     time.Now(),
 		}
-
 	default:
-		common.Throw(w.vu.Runtime(), fmt.Errorf("unsupported send type %T", o))
+		rt := w.vu.Runtime()
+		isView, err := isArrayBufferView(rt, msg)
+		if err != nil {
+			common.Throw(rt,
+				fmt.Errorf("got error while trying to check if argument is ArrayBufferView: %w", err))
+		}
+		if !isView {
+			common.Throw(rt, fmt.Errorf("unsupported send type %T", o))
+		}
+
+		buffer := msg.ToObject(rt).Get("buffer")
+		ab, ok := buffer.Export().(sobek.ArrayBuffer)
+		if !ok {
+			common.Throw(rt,
+				fmt.Errorf("buffer of an ArrayBufferView was not an ArrayBuffer but %T", buffer.Export()))
+		}
+		w.sendArrayBuffer(ab)
 	}
+}
+
+func (w *webSocket) sendArrayBuffer(o sobek.ArrayBuffer) {
+	b := o.Bytes()
+	w.bufferedAmount += len(b)
+	w.writeQueueCh <- message{
+		mtype: websocket.BinaryMessage,
+		data:  b,
+		t:     time.Now(),
+	}
+}
+
+func isArrayBufferView(rt *sobek.Runtime, v sobek.Value) (bool, error) {
+	var isView sobek.Callable
+	var ok bool
+	exc := rt.Try(func() {
+		isView, ok = sobek.AssertFunction(
+			rt.Get("ArrayBuffer").ToObject(rt).Get("isView"))
+	})
+	if exc != nil {
+		return false, exc
+	}
+
+	if !ok {
+		return false, fmt.Errorf("couldn't get ArrayBuffer.isView as it isn't a function")
+	}
+
+	boolValue, err := isView(nil, v)
+	if err != nil {
+		return false, err
+	}
+	return boolValue.ToBoolean(), nil
 }
 
 // Ping sends a ping message over the websocket.
