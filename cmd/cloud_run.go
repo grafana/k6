@@ -150,7 +150,8 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		&c.noUsageReport,
 		"no-usage-report",
 		c.noUsageReport,
-		"only when using the local-execution mode, don't send anonymous usage stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
+		"only when using the local-execution mode, don't send anonymous usage "+
+			"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
 
 	return flags
