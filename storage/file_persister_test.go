@@ -158,7 +158,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			},
 			wantPresignedURLMethod:  http.MethodPost,
 			getPresignedURLResponse: http.StatusTooManyRequests,
-			wantError:               "getting presigned url: server returned 429 (too many requests)",
+			wantError:               "requesting presigned url: server returned 429 (too many requests)",
 		},
 		{
 			name:         "get_presigned_fails",
@@ -175,7 +175,7 @@ func TestRemoteFilePersister(t *testing.T) {
 			},
 			wantPresignedURLMethod:  http.MethodPost,
 			getPresignedURLResponse: http.StatusInternalServerError,
-			wantError:               "getting presigned url: server returned 500 (internal server error)",
+			wantError:               "requesting presigned url: server returned 500 (internal server error)",
 		},
 		{
 			name:         "upload_rate_limited",

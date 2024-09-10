@@ -53,13 +53,13 @@ func (l *LocalFilePersister) Persist(_ context.Context, path string, data io.Rea
 }
 
 // RemoteFilePersister is to be used when files created by the browser module need
-// to be uploaded to a remote location. This uses a preSignedURLGetterURL to
-// retrieve one pre-signed URL. The pre-signed url is used to upload the file
+// to be uploaded to a remote location. This uses a presignedURLRequestURL to
+// retrieve one presigned URL. The presigned url is used to upload the file
 // to the remote location.
 type RemoteFilePersister struct {
-	preSignedURLGetterURL string
-	headers               map[string]string
-	basePath              string
+	presignedURLRequestURL string
+	headers                map[string]string
+	basePath               string
 
 	httpClient *http.Client
 }
@@ -69,7 +69,7 @@ type PresignedURLResponse struct {
 	Service string `json:"service"`
 	URLs    []struct {
 		Name         string            `json:"name"`
-		PreSignedURL string            `json:"pre_signed_url"` //nolint:tagliatelle
+		PresignedURL string            `json:"pre_signed_url"` //nolint:tagliatelle
 		Method       string            `json:"method"`
 		FormFields   map[string]string `json:"form_fields"` //nolint:tagliatelle
 	} `json:"urls"`
@@ -77,14 +77,14 @@ type PresignedURLResponse struct {
 
 // NewRemoteFilePersister creates a new instance of RemoteFilePersister.
 func NewRemoteFilePersister(
-	preSignedURLGetterURL string,
+	presignedURLRequestURL string,
 	headers map[string]string,
 	basePath string,
 ) *RemoteFilePersister {
 	return &RemoteFilePersister{
-		preSignedURLGetterURL: preSignedURLGetterURL,
-		headers:               headers,
-		basePath:              basePath,
+		presignedURLRequestURL: presignedURLRequestURL,
+		headers:                headers,
+		basePath:               basePath,
 		httpClient: &http.Client{
 			Timeout: time.Second * 10,
 		},
@@ -93,12 +93,12 @@ func NewRemoteFilePersister(
 
 // Persist will upload the contents of data to a remote location.
 func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.Reader) (err error) {
-	psResp, err := r.getPreSignedURL(ctx, path)
+	psResp, err := r.requestPresignedURL(ctx, path)
 	if err != nil {
-		return fmt.Errorf("getting presigned url: %w", err)
+		return fmt.Errorf("requesting presigned url: %w", err)
 	}
 
-	req, err := newUploadRequest(ctx, psResp, data)
+	req, err := newFileUploadRequest(ctx, psResp, data)
 	if err != nil {
 		return fmt.Errorf("creating upload request: %w", err)
 	}
@@ -120,23 +120,20 @@ func (r *RemoteFilePersister) Persist(ctx context.Context, path string, data io.
 	return nil
 }
 
-func checkStatusCode(resp *http.Response) error {
-	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
-		return fmt.Errorf("server returned %d (%s)", resp.StatusCode, strings.ToLower(http.StatusText(resp.StatusCode)))
-	}
-
-	return nil
-}
-
-// getPreSignedURL will request a new presigned URL from the remote server for the given path.
-// Returns a [PresignedURLResponse] that contains the presigned URL details.
-func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) (PresignedURLResponse, error) {
+// requestPresignedURL will request a new presigned URL from the remote server
+// and returns a [PresignedURLResponse] that contains the presigned URL details.
+func (r *RemoteFilePersister) requestPresignedURL(ctx context.Context, path string) (PresignedURLResponse, error) {
 	b, err := buildPresignedRequestBody(r.basePath, path)
 	if err != nil {
 		return PresignedURLResponse{}, fmt.Errorf("building request body: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.preSignedURLGetterURL, bytes.NewReader(b))
+	req, err := http.NewRequestWithContext(
+		ctx,
+		http.MethodPost,
+		r.presignedURLRequestURL,
+		bytes.NewReader(b),
+	)
 	if err != nil {
 		return PresignedURLResponse{}, fmt.Errorf("creating request: %w", err)
 	}
@@ -155,7 +152,7 @@ func (r *RemoteFilePersister) getPreSignedURL(ctx context.Context, path string) 
 		return PresignedURLResponse{}, err
 	}
 
-	return readResponseBody(resp)
+	return readPresignedURLResponse(resp)
 }
 
 func buildPresignedRequestBody(basePath, path string) ([]byte, error) {
@@ -185,7 +182,7 @@ func buildPresignedRequestBody(basePath, path string) ([]byte, error) {
 	return bb, nil
 }
 
-func readResponseBody(resp *http.Response) (PresignedURLResponse, error) {
+func readPresignedURLResponse(resp *http.Response) (PresignedURLResponse, error) {
 	var rb PresignedURLResponse
 
 	decoder := json.NewDecoder(resp.Body)
@@ -201,9 +198,9 @@ func readResponseBody(resp *http.Response) (PresignedURLResponse, error) {
 	return rb, nil
 }
 
-// newUploadRequest creates a new HTTP request to upload a file as a multipart
+// newFileUploadRequest creates a new HTTP request to upload a file as a multipart
 // form to the presigned URL received from the server.
-func newUploadRequest(
+func newFileUploadRequest(
 	ctx context.Context,
 	resp PresignedURLResponse,
 	data io.Reader,
@@ -235,7 +232,7 @@ func newUploadRequest(
 	req, err := http.NewRequestWithContext(
 		ctx,
 		psu.Method,
-		psu.PreSignedURL,
+		psu.PresignedURL,
 		&form,
 	)
 	if err != nil {
@@ -244,4 +241,12 @@ func newUploadRequest(
 	req.Header.Set("Content-Type", fw.FormDataContentType())
 
 	return req, nil
+}
+
+func checkStatusCode(resp *http.Response) error {
+	if resp.StatusCode < http.StatusOK || resp.StatusCode >= http.StatusMultipleChoices {
+		return fmt.Errorf("server returned %d (%s)", resp.StatusCode, strings.ToLower(http.StatusText(resp.StatusCode)))
+	}
+
+	return nil
 }
