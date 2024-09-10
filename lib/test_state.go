@@ -9,6 +9,7 @@ import (
 	"go.k6.io/k6/event"
 	"go.k6.io/k6/lib/trace"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 // TestPreInitState contains all of the state that can be gathered and built
@@ -22,6 +23,7 @@ type TestPreInitState struct {
 	LookupEnv      func(key string) (val string, ok bool)
 	Logger         logrus.FieldLogger
 	TracerProvider *trace.TracerProvider
+	Usage          *usage.Usage
 }
 
 // TestRunState contains the pre-init state as well as all of the state and

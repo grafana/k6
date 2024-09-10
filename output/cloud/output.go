@@ -16,6 +16,7 @@ import (
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	cloudv2 "go.k6.io/k6/output/cloud/expv2"
+	"go.k6.io/k6/usage"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -61,6 +62,8 @@ type Output struct {
 
 	client       *cloudapi.Client
 	testStopFunc func(error)
+
+	usage *usage.Usage
 }
 
 // Verify that Output implements the wanted interfaces
@@ -135,6 +138,7 @@ func newOutput(params output.Params) (*Output, error) {
 		executionPlan: params.ExecutionPlan,
 		duration:      int64(duration / time.Second),
 		logger:        logger,
+		usage:         params.Usage,
 	}, nil
 }
 
@@ -340,6 +344,11 @@ func (out *Output) startVersionedOutput() error {
 		return errors.New("TestRunID is required")
 	}
 	var err error
+
+	usageErr := out.usage.Strings("cloud/test_run_id", out.testRunID)
+	if usageErr != nil {
+		out.logger.Warning("Couldn't report test run id to usage as part of writing to k6 cloud")
+	}
 
 	// TODO: move here the creation of a new cloudapi.Client
 	// so in the case the config has been overwritten the client uses the correct

@@ -103,8 +103,8 @@ func stringToInt(ss string) (int64, error) {
 	return strconv.ParseInt(ss, 10, 64)
 }
 
-func (s asciiString) _toInt() (int64, error) {
-	return stringToInt(strings.TrimSpace(string(s)))
+func (s asciiString) _toInt(trimmed string) (int64, error) {
+	return stringToInt(trimmed)
 }
 
 func isRangeErr(err error) bool {
@@ -114,18 +114,36 @@ func isRangeErr(err error) bool {
 	return false
 }
 
-func (s asciiString) _toFloat() (float64, error) {
-	ss := strings.ToLower(strings.TrimSpace(string(s)))
-	if ss == "" {
+func (s asciiString) _toFloat(trimmed string) (float64, error) {
+	if trimmed == "" {
 		return 0, nil
 	}
-	if ss == "-0" {
+	if trimmed == "-0" {
 		var f float64
 		return -f, nil
 	}
 
-	f, err := strconv.ParseFloat(ss, 64)
+	// Go allows underscores in numbers, when parsed as floats, but ECMAScript expect them to be interpreted as NaN.
+	if strings.ContainsRune(trimmed, '_') {
+		return 0, strconv.ErrSyntax
+	}
+
+	// Hexadecimal floats are not supported by ECMAScript.
+	if len(trimmed) >= 2 {
+		var prefix string
+		if trimmed[0] == '-' || trimmed[0] == '+' {
+			prefix = trimmed[1:]
+		} else {
+			prefix = trimmed
+		}
+		if len(prefix) >= 2 && prefix[0] == '0' && (prefix[1] == 'x' || prefix[1] == 'X') {
+			return 0, strconv.ErrSyntax
+		}
+	}
+
+	f, err := strconv.ParseFloat(trimmed, 64)
 	if err == nil && math.IsInf(f, 0) {
+		ss := strings.ToLower(trimmed)
 		if strings.HasPrefix(ss, "inf") || strings.HasPrefix(ss, "-inf") || strings.HasPrefix(ss, "+inf") {
 			// We handle "Infinity" separately, prevent from being parsed as Infinity due to strconv.ParseFloat() permissive syntax
 			return 0, strconv.ErrSyntax
@@ -138,18 +156,19 @@ func (s asciiString) _toFloat() (float64, error) {
 }
 
 func (s asciiString) ToInteger() int64 {
-	if s == "" {
+	ss := strings.TrimSpace(string(s))
+	if ss == "" {
 		return 0
 	}
-	if s == "Infinity" || s == "+Infinity" {
+	if ss == "Infinity" || ss == "+Infinity" {
 		return math.MaxInt64
 	}
-	if s == "-Infinity" {
+	if ss == "-Infinity" {
 		return math.MinInt64
 	}
-	i, err := s._toInt()
+	i, err := s._toInt(ss)
 	if err != nil {
-		f, err := s._toFloat()
+		f, err := s._toFloat(ss)
 		if err == nil {
 			return int64(f)
 		}
@@ -170,18 +189,19 @@ func (s asciiString) String() string {
 }
 
 func (s asciiString) ToFloat() float64 {
-	if s == "" {
+	ss := strings.TrimSpace(string(s))
+	if ss == "" {
 		return 0
 	}
-	if s == "Infinity" || s == "+Infinity" {
+	if ss == "Infinity" || ss == "+Infinity" {
 		return math.Inf(1)
 	}
-	if s == "-Infinity" {
+	if ss == "-Infinity" {
 		return math.Inf(-1)
 	}
-	f, err := s._toFloat()
+	f, err := s._toFloat(ss)
 	if err != nil {
-		i, err := s._toInt()
+		i, err := s._toInt(ss)
 		if err == nil {
 			return float64(i)
 		}
@@ -195,21 +215,22 @@ func (s asciiString) ToBoolean() bool {
 }
 
 func (s asciiString) ToNumber() Value {
-	if s == "" {
+	ss := strings.TrimSpace(string(s))
+	if ss == "" {
 		return intToValue(0)
 	}
-	if s == "Infinity" || s == "+Infinity" {
+	if ss == "Infinity" || ss == "+Infinity" {
 		return _positiveInf
 	}
-	if s == "-Infinity" {
+	if ss == "-Infinity" {
 		return _negativeInf
 	}
 
-	if i, err := s._toInt(); err == nil {
+	if i, err := s._toInt(ss); err == nil {
 		return intToValue(i)
 	}
 
-	if f, err := s._toFloat(); err == nil {
+	if f, err := s._toFloat(ss); err == nil {
 		return floatToValue(f)
 	}
 
@@ -230,7 +251,7 @@ func (s asciiString) Equals(other Value) bool {
 	}
 
 	if o, ok := other.(valueInt); ok {
-		if o1, e := s._toInt(); e == nil {
+		if o1, e := s._toInt(strings.TrimSpace(string(s))); e == nil {
 			return o1 == int64(o)
 		}
 		return false
@@ -241,7 +262,7 @@ func (s asciiString) Equals(other Value) bool {
 	}
 
 	if o, ok := other.(valueBool); ok {
-		if o1, e := s._toFloat(); e == nil {
+		if o1, e := s._toFloat(strings.TrimSpace(string(s))); e == nil {
 			return o1 == o.ToFloat()
 		}
 		return false

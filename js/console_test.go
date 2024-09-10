@@ -21,6 +21,7 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 func TestConsoleContext(t *testing.T) {
@@ -73,6 +74,7 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
 			LookupEnv:      func(_ string) (val string, ok bool) { return "", false },
+			Usage:          usage.New(),
 		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: filename, Scheme: "file"},
@@ -80,6 +82,38 @@ func getSimpleRunner(tb testing.TB, filename, data string, opts ...interface{}) 
 		},
 		fsResolvers,
 	)
+}
+
+func getSimpleArchiveRunner(tb testing.TB, arc *lib.Archive, opts ...interface{}) (*Runner, error) {
+	var (
+		rtOpts      = lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)}
+		logger      = testutils.NewLogger(tb)
+		fsResolvers = map[string]fsext.Fs{"file": fsext.NewMemMapFs(), "https": fsext.NewMemMapFs()}
+	)
+	for _, o := range opts {
+		switch opt := o.(type) {
+		case fsext.Fs:
+			fsResolvers["file"] = opt
+		case map[string]fsext.Fs:
+			fsResolvers = opt
+		case lib.RuntimeOptions:
+			rtOpts = opt
+		case logrus.FieldLogger:
+			logger = opt
+		default:
+			tb.Fatalf("unknown test option %q", opt)
+		}
+	}
+	registry := metrics.NewRegistry()
+	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
+	return NewFromArchive(
+		&lib.TestPreInitState{
+			Logger:         logger,
+			RuntimeOptions: rtOpts,
+			BuiltinMetrics: builtinMetrics,
+			Registry:       registry,
+			Usage:          usage.New(),
+		}, arc)
 }
 
 // TODO: remove the need for this function, see https://github.com/grafana/k6/issues/2968

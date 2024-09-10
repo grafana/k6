@@ -10,6 +10,8 @@ import (
 	"runtime"
 	"testing"
 
+	"go.k6.io/k6/lib/testutils"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -50,14 +52,6 @@ func TestNormalizeAndAnonymizePath(t *testing.T) {
 			assert.Equal(t, res, NormalizeAndAnonymizePath(res))
 		})
 	}
-}
-
-func makeMemMapFs(t *testing.T, input map[string][]byte) fsext.Fs {
-	fs := fsext.NewMemMapFs()
-	for path, data := range input {
-		require.NoError(t, fsext.WriteFile(fs, path, data, 0o644))
-	}
-	return fs
 }
 
 func getMapKeys(m map[string]fsext.Fs) []string {
@@ -129,13 +123,13 @@ func TestArchiveReadWrite(t *testing.T) {
 			Data:        []byte(`// a contents`),
 			PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
 			Filesystems: map[string]fsext.Fs{
-				"file": makeMemMapFs(t, map[string][]byte{
+				"file": testutils.MakeMemMapFs(t, map[string][]byte{
 					"/path/to/a.js":      []byte(`// a contents`),
 					"/path/to/b.js":      []byte(`// b contents`),
 					"/path/to/file1.txt": []byte(`hi!`),
 					"/path/to/file2.txt": []byte(`bye!`),
 				}),
-				"https": makeMemMapFs(t, map[string][]byte{
+				"https": testutils.MakeMemMapFs(t, map[string][]byte{
 					"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
 					"/github.com/loadimpact/k6/README.md": []byte(`README`),
 				}),
@@ -181,13 +175,13 @@ func TestArchiveReadWrite(t *testing.T) {
 				Data:        []byte(`// a contents`),
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.Pwd},
 				Filesystems: map[string]fsext.Fs{
-					"file": makeMemMapFs(t, map[string][]byte{
+					"file": testutils.MakeMemMapFs(t, map[string][]byte{
 						fmt.Sprintf("%s/a.js", entry.Pwd):      []byte(`// a contents`),
 						fmt.Sprintf("%s/b.js", entry.Pwd):      []byte(`// b contents`),
 						fmt.Sprintf("%s/file1.txt", entry.Pwd): []byte(`hi!`),
 						fmt.Sprintf("%s/file2.txt", entry.Pwd): []byte(`bye!`),
 					}),
-					"https": makeMemMapFs(t, map[string][]byte{
+					"https": testutils.MakeMemMapFs(t, map[string][]byte{
 						"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
 						"/github.com/loadimpact/k6/README.md": []byte(`README`),
 					}),
@@ -205,13 +199,13 @@ func TestArchiveReadWrite(t *testing.T) {
 				PwdURL:      &url.URL{Scheme: "file", Path: entry.PwdNormAnon},
 
 				Filesystems: map[string]fsext.Fs{
-					"file": makeMemMapFs(t, map[string][]byte{
+					"file": testutils.MakeMemMapFs(t, map[string][]byte{
 						fmt.Sprintf("%s/a.js", entry.PwdNormAnon):      []byte(`// a contents`),
 						fmt.Sprintf("%s/b.js", entry.PwdNormAnon):      []byte(`// b contents`),
 						fmt.Sprintf("%s/file1.txt", entry.PwdNormAnon): []byte(`hi!`),
 						fmt.Sprintf("%s/file2.txt", entry.PwdNormAnon): []byte(`bye!`),
 					}),
-					"https": makeMemMapFs(t, map[string][]byte{
+					"https": testutils.MakeMemMapFs(t, map[string][]byte{
 						"/cdnjs.com/libraries/Faker":          []byte(`// faker contents`),
 						"/github.com/loadimpact/k6/README.md": []byte(`README`),
 					}),
@@ -335,7 +329,7 @@ func TestStrangePaths(t *testing.T) {
 			Data:        []byte(`// ` + pathToChange + ` contents`),
 			PwdURL:      &url.URL{Scheme: "file", Path: path.Dir(pathToChange)},
 			Filesystems: map[string]fsext.Fs{
-				"file": makeMemMapFs(t, otherMap),
+				"file": testutils.MakeMemMapFs(t, otherMap),
 			},
 		}
 

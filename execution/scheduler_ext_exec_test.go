@@ -16,6 +16,7 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 // TODO: rewrite and/or move these as integration tests to reduce boilerplate
@@ -74,6 +75,7 @@ func TestExecutionInfoVUSharing(t *testing.T) {
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
+			Usage:          usage.New(),
 		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
@@ -187,6 +189,7 @@ func TestExecutionInfoScenarioIter(t *testing.T) {
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
+			Usage:          usage.New(),
 		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
@@ -269,6 +272,7 @@ func TestSharedIterationsStable(t *testing.T) {
 			Logger:         logger,
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
+			Usage:          usage.New(),
 		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "/script.js"},
@@ -404,6 +408,7 @@ func TestExecutionInfoAll(t *testing.T) {
 					Logger:         logger,
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,
+					Usage:          usage.New(),
 				},
 				&loader.SourceData{
 					URL:  &url.URL{Path: "/script.js"},

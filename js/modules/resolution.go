@@ -7,8 +7,10 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/ast"
+	"github.com/sirupsen/logrus"
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/usage"
 )
 
 const notPreviouslyResolvedModule = "the module %q was not previously resolved during initialization (__VU==0)"
@@ -32,6 +34,8 @@ type ModuleResolver struct {
 	locked    bool
 	reverse   map[any]*url.URL // maybe use sobek.ModuleRecord as key
 	base      *url.URL
+	usage     *usage.Usage
+	logger    logrus.FieldLogger
 }
 
 // NewModuleResolver returns a new module resolution instance that will resolve.
@@ -39,6 +43,7 @@ type ModuleResolver struct {
 // loadCJS is used to load commonjs files
 func NewModuleResolver(
 	goModules map[string]any, loadCJS FileLoader, c *compiler.Compiler, base *url.URL,
+	u *usage.Usage, logger logrus.FieldLogger,
 ) *ModuleResolver {
 	return &ModuleResolver{
 		goModules: goModules,
@@ -47,6 +52,8 @@ func NewModuleResolver(
 		compiler:  c,
 		reverse:   make(map[any]*url.URL),
 		base:      base,
+		usage:     u,
+		logger:    logger,
 	}
 }
 
@@ -65,6 +72,13 @@ func (mr *ModuleResolver) requireModule(name string) (sobek.ModuleRecord, error)
 	mod, ok := mr.goModules[name]
 	if !ok {
 		return nil, fmt.Errorf("unknown module: %s", name)
+	}
+	// we don't want to report extensions and we would have hit cache if this isn't the first time
+	if !strings.HasPrefix(name, "k6/x/") {
+		err := mr.usage.Strings("modules", name)
+		if err != nil {
+			mr.logger.WithError(err).Warnf("Error while reporting usage of module %q", name)
+		}
 	}
 	k6m, ok := mod.(Module)
 	if !ok {
