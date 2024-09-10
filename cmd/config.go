@@ -30,7 +30,11 @@ func configFlagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.StringArrayP("out", "o", []string{}, "`uri` for an external metrics database")
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
-	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
+	flags.Bool(
+		"no-usage-report",
+		false,
+		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
+	)
 	return flags
 }
 
