@@ -93,6 +93,7 @@ func TestRemoteFilePersister(t *testing.T) {
 		name                    string
 		path                    string
 		dataToUpload            string
+		multipartFormFields     map[string]string
 		wantPresignedURLBody    string
 		wantPresignedHeaders    map[string]string
 		wantPresignedURLMethod  string
@@ -104,6 +105,10 @@ func TestRemoteFilePersister(t *testing.T) {
 			name:         "upload_file",
 			path:         "some/path/file.png",
 			dataToUpload: "here's some data",
+			multipartFormFields: map[string]string{
+				"fooKey": "foo",
+				"barKey": "bar",
+			},
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
@@ -121,6 +126,10 @@ func TestRemoteFilePersister(t *testing.T) {
 			name:         "upload_file",
 			path:         "some/path/file.png",
 			dataToUpload: "here's some data",
+			multipartFormFields: map[string]string{ // provide different form fields then the previous test
+				"bazKey": "baz",
+				"quxKey": "qux",
+			},
 			wantPresignedURLBody: `{
 					"service":"aws_s3",
 					"operation": "upload_post",
@@ -235,6 +244,12 @@ func TestRemoteFilePersister(t *testing.T) {
 						assert.Equal(t, v, r.Header[k][0])
 					}
 
+					var formFields string
+					for k, v := range tt.multipartFormFields {
+						formFields += fmt.Sprintf(`"%s":"%s",`, k, v)
+					}
+					formFields = strings.TrimRight(formFields, ",")
+
 					w.WriteHeader(tt.getPresignedURLResponse)
 					_, err = fmt.Fprintf(w, `{
 							"service": "aws_s3",
@@ -242,9 +257,14 @@ func TestRemoteFilePersister(t *testing.T) {
 								"name": "%s",
 								"pre_signed_url": "%s",
 								"method": "%s",
-								"form_fields": {"key":"a", "value":"b", "key2":"c", "value2":"d"}
+								"form_fields": {%s}
 							}]
-							}`, basePath+"/"+tt.path, s.URL+uploadEndpoint, tt.wantPresignedURLMethod)
+							}`,
+						basePath+"/"+tt.path,
+						s.URL+uploadEndpoint,
+						tt.wantPresignedURLMethod,
+						formFields,
+					)
 
 					require.NoError(t, err)
 				},
