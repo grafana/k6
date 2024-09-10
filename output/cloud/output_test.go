@@ -20,6 +20,7 @@ import (
 	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 	cloudv2 "go.k6.io/k6/output/cloud/expv2"
+	"go.k6.io/k6/usage"
 	"gopkg.in/guregu/null.v3"
 )
 
@@ -121,6 +122,7 @@ func TestOutputCreateTestWithConfigOverwrite(t *testing.T) {
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
 	})
 	require.NoError(t, err)
 	require.NoError(t, out.Start())
@@ -147,6 +149,7 @@ func TestOutputStartVersionError(t *testing.T) {
 			"K6_CLOUD_API_VERSION": "99",
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
 	})
 	require.NoError(t, err)
 
@@ -170,6 +173,7 @@ func TestOutputStartVersionedOutputV2(t *testing.T) {
 			AggregationPeriod:  types.NullDurationFrom(1 * time.Hour),
 			MetricPushInterval: types.NullDurationFrom(1 * time.Hour),
 		},
+		usage: usage.New(),
 	}
 
 	o.client = cloudapi.NewClient(
@@ -190,6 +194,7 @@ func TestOutputStartVersionedOutputV1Error(t *testing.T) {
 		config: cloudapi.Config{
 			APIVersion: null.IntFrom(1),
 		},
+		usage: usage.New(),
 	}
 
 	err := o.startVersionedOutput()
@@ -217,6 +222,7 @@ func TestOutputStartWithTestRunID(t *testing.T) {
 			SystemTags: &metrics.DefaultSystemTagSet,
 		},
 		ScriptPath: &url.URL{Path: "/script.js"},
+		Usage:      usage.New(),
 	})
 	require.NoError(t, err)
 	require.NoError(t, out.Start())

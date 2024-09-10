@@ -30,6 +30,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
+	"go.k6.io/k6/usage"
 	"gopkg.in/yaml.v3"
 )
 
@@ -714,7 +715,7 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 		func(specifier *url.URL, _ string) ([]byte, error) {
 			return fs.ReadFile(os.DirFS("."), specifier.Path[1:])
 		},
-		ctx.compiler(), base)
+		ctx.compiler(), base, usage.New(), testutils.NewLogger(ctx.t))
 
 	ms := modules.NewModuleSystem(mr, moduleRuntime.VU)
 	moduleRuntime.VU.InitEnvField.CWD = base

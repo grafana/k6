@@ -32,6 +32,7 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
@@ -41,6 +42,7 @@ func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
+		Usage:          usage.New(),
 	}
 }
 
@@ -1112,6 +1114,7 @@ func TestDNSResolverCache(t *testing.T) {
 					Logger:         logger,
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,
+					Usage:          usage.New(),
 				},
 				&loader.SourceData{
 					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
@@ -1399,6 +1402,7 @@ func TestNewSchedulerHasWork(t *testing.T) {
 		Logger:         logger,
 		Registry:       registry,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		Usage:          usage.New(),
 	}
 	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)

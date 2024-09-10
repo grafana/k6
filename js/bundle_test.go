@@ -26,6 +26,7 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 const isWindows = runtime.GOOS == "windows"
@@ -43,6 +44,7 @@ func getTestPreInitState(tb testing.TB, logger logrus.FieldLogger, rtOpts *lib.R
 		RuntimeOptions: *rtOpts,
 		Registry:       reg,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
+		Usage:          usage.New(),
 	}
 }
 

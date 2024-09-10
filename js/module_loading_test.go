@@ -14,7 +14,6 @@ import (
 	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/httpmultibin"
 	"go.k6.io/k6/metrics"
 )
@@ -89,13 +88,7 @@ func TestLoadOnceGlobalVars(t *testing.T) {
 			require.NoError(t, err)
 
 			arc := r1.MakeArchive()
-			registry := metrics.NewRegistry()
-			builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-			r2, err := NewFromArchive(&lib.TestPreInitState{
-				Logger:         testutils.NewLogger(t),
-				BuiltinMetrics: builtinMetrics,
-				Registry:       registry,
-			}, arc)
+			r2, err := getSimpleArchiveRunner(t, arc)
 			require.NoError(t, err)
 
 			runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -146,14 +139,7 @@ func TestLoadExportsIsntUsableInModule(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -200,14 +186,7 @@ func TestLoadDoesntBreakHTTPGet(t *testing.T) {
 
 	require.NoError(t, r1.SetOptions(lib.Options{Hosts: types.NullHosts{Trie: tb.Dialer.Hosts}}))
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -252,14 +231,7 @@ func TestLoadGlobalVarsAreNotSharedBetweenVUs(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -321,14 +293,7 @@ func TestLoadCycle(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -390,14 +355,7 @@ func TestLoadCycleBinding(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -461,14 +419,7 @@ func TestBrowserified(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -511,14 +462,7 @@ func TestLoadingUnexistingModuleDoesntPanic(t *testing.T) {
 	require.NoError(t, arc.Write(buf))
 	arc, err = lib.ReadArchive(buf)
 	require.NoError(t, err)
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -554,14 +498,7 @@ func TestLoadingSourceMapsDoesntErrorOut(t *testing.T) {
 	arc, err = lib.ReadArchive(buf)
 	require.NoError(t, err)
 
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(
-		&lib.TestPreInitState{
-			Logger:         testutils.NewLogger(t),
-			BuiltinMetrics: builtinMetrics,
-			Registry:       registry,
-		}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -614,13 +551,7 @@ func TestOptionsAreGloballyReadable(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(&lib.TestPreInitState{
-		Logger:         testutils.NewLogger(t),
-		BuiltinMetrics: builtinMetrics,
-		Registry:       registry,
-	}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	runners := map[string]*Runner{"Source": r1, "Archive": r2}
@@ -671,13 +602,7 @@ func TestOptionsAreNotGloballyWritable(t *testing.T) {
 	// here it exists
 	require.EqualValues(t, time.Minute*5, r1.GetOptions().MinIterationDuration.Duration)
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	r2, err := NewFromArchive(&lib.TestPreInitState{
-		Logger:         testutils.NewLogger(t),
-		BuiltinMetrics: builtinMetrics,
-		Registry:       registry,
-	}, arc)
+	r2, err := getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 
 	require.EqualValues(t, time.Minute*5, r2.GetOptions().MinIterationDuration.Duration)
@@ -714,13 +639,7 @@ func TestStarImport(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	_, err = NewFromArchive(&lib.TestPreInitState{
-		Logger:         testutils.NewLogger(t),
-		BuiltinMetrics: builtinMetrics,
-		Registry:       registry,
-	}, arc)
+	_, err = getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 }
 
@@ -739,12 +658,6 @@ func TestIndirectExportDefault(t *testing.T) {
 	require.NoError(t, err)
 
 	arc := r1.MakeArchive()
-	registry := metrics.NewRegistry()
-	builtinMetrics := metrics.RegisterBuiltinMetrics(registry)
-	_, err = NewFromArchive(&lib.TestPreInitState{
-		Logger:         testutils.NewLogger(t),
-		BuiltinMetrics: builtinMetrics,
-		Registry:       registry,
-	}, arc)
+	_, err = getSimpleArchiveRunner(t, arc)
 	require.NoError(t, err)
 }

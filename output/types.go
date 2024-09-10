@@ -13,6 +13,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 // Params contains all possible constructor parameters an output may need.
@@ -30,6 +31,7 @@ type Params struct {
 	ScriptOptions  lib.Options
 	RuntimeOptions lib.RuntimeOptions
 	ExecutionPlan  []lib.ExecutionStep
+	Usage          *usage.Usage
 }
 
 // TODO: make v2 with buffered channels?

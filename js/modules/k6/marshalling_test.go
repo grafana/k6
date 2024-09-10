@@ -16,6 +16,7 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 func TestSetupDataMarshalling(t *testing.T) {
@@ -103,6 +104,7 @@ func TestSetupDataMarshalling(t *testing.T) {
 			Logger:         testutils.NewLogger(t),
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
+			Usage:          usage.New(),
 		},
 
 		&loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script},

@@ -15,6 +15,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 // Runtime is a helper struct that contains what is needed to run a (simple) module test
@@ -40,6 +41,7 @@ func NewRuntime(t testing.TB) *Runtime {
 		TestPreInitState: &lib.TestPreInitState{
 			Logger:   testutils.NewLogger(t),
 			Registry: metrics.NewRegistry(),
+			Usage:    usage.New(),
 		},
 		CWD: new(url.URL),
 	}
@@ -74,7 +76,8 @@ func (r *Runtime) SetupModuleSystem(goModules map[string]any, loader modules.Fil
 		goModules["k6/timers"] = timers.New()
 	}
 
-	r.mr = modules.NewModuleResolver(goModules, loader, c, r.VU.InitEnvField.CWD)
+	r.mr = modules.NewModuleResolver(
+		goModules, loader, c, r.VU.InitEnvField.CWD, r.VU.InitEnvField.Usage, r.VU.InitEnvField.Logger)
 	return r.innerSetupModuleSystem()
 }
 

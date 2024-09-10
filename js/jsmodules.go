@@ -13,6 +13,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/data"
 	"go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modules/k6/execution"
+	"go.k6.io/k6/js/modules/k6/experimental/csv"
 	"go.k6.io/k6/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/js/modules/k6/experimental/streams"
 	"go.k6.io/k6/js/modules/k6/experimental/tracing"
@@ -38,14 +39,13 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/encoding":                encoding.New(),
 		"k6/timers":                  timers.New(),
 		"k6/execution":               execution.New(),
+		"k6/experimental/csv":        csv.New(),
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/streams":    streams.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
-		"k6/experimental/timers": newWarnExperimentalModule(timers.New(),
-			"The exports of `k6/experimental/timers` are globally available, so no need to import them."+
-				" The module will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+
-				" There are no API changes, so this is a drop-in replacement and is also available under `k6/timers`."),
+		"k6/experimental/timers": newRemovedModule(
+			"k6/experimental/timers has been graduated, please use k6/timers instead."),
 		"k6/experimental/tracing": newWarnExperimentalModule(tracing.New(),
 			"k6/experimental/tracing is now deprecated. All of its functionality is available as pure javascript module."+
 				" More info available at the docs:"+

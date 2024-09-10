@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"go.k6.io/k6/lib/testutils"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
@@ -492,7 +494,7 @@ func TestArchiveRoundTripExecutorConfig(t *testing.T) {
 		Data:        []byte(`// a contents`),
 		PwdURL:      &url.URL{Scheme: "file", Path: "/path/to"},
 		Filesystems: map[string]fsext.Fs{
-			"file": makeMemMapFs(t, map[string][]byte{
+			"file": testutils.MakeMemMapFs(t, map[string][]byte{
 				"/path/to/a.js": []byte(`// a contents`),
 			}),
 		},
@@ -510,13 +512,4 @@ func TestArchiveRoundTripExecutorConfig(t *testing.T) {
 	require.True(t, ok)
 
 	assert.EqualValues(t, execCfg, execCfg2)
-}
-
-// copied from lib/archive_test.go
-func makeMemMapFs(t *testing.T, input map[string][]byte) fsext.Fs {
-	fs := fsext.NewMemMapFs()
-	for path, data := range input {
-		require.NoError(t, fsext.WriteFile(fs, path, data, 0o644))
-	}
-	return fs
 }
