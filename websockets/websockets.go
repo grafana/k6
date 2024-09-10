@@ -137,6 +137,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		obj:             rt.NewObject(),
 		tagsAndMeta:     params.tagsAndMeta,
 		sendPings:       ping{timestamps: make(map[string]time.Time)},
+		binaryType:      blobBinaryType,
 	}
 
 	// Maybe have this after the goroutine below ?!?
@@ -421,10 +422,6 @@ func (w *webSocket) loop() {
 	}
 }
 
-const binarytypeError = `websocket's binaryType hasn't been set to either "blob" or "arraybuffer", ` +
-	`but a binary message has been received. ` +
-	`"blob" is still not the default so the websocket is erroring out`
-
 func (w *webSocket) queueMessage(msg *message) {
 	w.tq.Queue(func() error {
 		if w.readyState != OPEN {
@@ -446,12 +443,7 @@ func (w *webSocket) queueMessage(msg *message) {
 
 		if msg.mtype == websocket.BinaryMessage {
 			var data any
-			// Lets error out for a k6 release, at least, when there's no binaryType set.
-			// In the future, we'll use "blob" as default, as per spec:
-			// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/binaryType
 			switch w.binaryType {
-			case "":
-				return errors.New(binarytypeError)
 			case blobBinaryType:
 				var err error
 				data, err = rt.New(w.blobConstructor, rt.ToValue([]interface{}{msg.data}))
@@ -461,7 +453,7 @@ func (w *webSocket) queueMessage(msg *message) {
 			case arraybufferBinaryType:
 				data = rt.NewArrayBuffer(msg.data)
 			default:
-				return fmt.Errorf(`unknown binaryType %s, the supported ones are "blob" and "arraybuffer"`, w.binaryType)
+				return fmt.Errorf(`unknown binaryType %q, the supported ones are "blob" and "arraybuffer"`, w.binaryType)
 			}
 			must(rt, ev.DefineDataProperty("data", rt.ToValue(data), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 		} else {

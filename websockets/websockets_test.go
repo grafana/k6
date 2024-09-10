@@ -319,8 +319,8 @@ func TestBinaryState(t *testing.T) {
 			}
 		})
 
-		if (ws.binaryType != "") {
-			throw new Error("Wrong binaryType value, expected empty got "+ ws.binaryType)
+		if (ws.binaryType != "blob") {
+			throw new Error("Wrong binaryType value, expected to be blob got "+ ws.binaryType)
 		}
 
 		var thrown = false;
@@ -330,11 +330,10 @@ func TestBinaryState(t *testing.T) {
 			thrown = true
 		}
 		if (!thrown) {
-			throw new Error("Expects ws.binaryType to not be writable")
+			throw new Error("Expects ws.binaryType to be writable only with valid values")
 		}
 	`))
-	require.Error(t, err)
-	require.ErrorContains(t, err, binarytypeError)
+	require.NoError(t, err)
 	logs := hook.Drain()
 	require.Len(t, logs, 0)
 }
@@ -349,21 +348,21 @@ func TestBinaryType_Default(t *testing.T) {
 		ws.addEventListener("open", () => {
 			const sent = new Uint8Array([164,41]).buffer
 			ws.send(sent)
-			ws.onmessage = (e) => {
+			ws.onmessage = async (e) => {
 				if (!(e.data instanceof Blob)) {
 					throw new Error("Wrong event.data type; expected: Blob, got: "+ typeof e.data)
 				}
+				const received = await e.data.arrayBuffer();
 
-				if (sent.byteLength !== e.data.arrayBuffer().byteLength) {
-					throw new Error("The data received isn't equal to the data sent")
+				if (sent.byteLength !== received.byteLength) {
+					throw new Error("The data received " + received.byteLength +" isn't equal to the data sent "+ sent.byteLength)
 				}
 
 				ws.close()
 			}
 		})
 	`))
-	require.Error(t, err)
-	require.ErrorContains(t, err, binarytypeError)
+	require.NoError(t, err)
 	logs := hook.Drain()
 	require.Len(t, logs, 0)
 }
