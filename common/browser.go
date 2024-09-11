@@ -17,8 +17,6 @@ import (
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
 )
 
 const (
@@ -72,8 +70,6 @@ type Browser struct {
 	// version caches the browser version information.
 	version browserVersion
 
-	vu k6modules.VU
-
 	logger *log.Logger
 }
 
@@ -125,7 +121,6 @@ func newBrowser(
 		browserOpts:         browserOpts,
 		pages:               make(map[target.ID]*Page),
 		sessionIDtoTargetID: make(map[target.SessionID]target.ID),
-		vu:                  k6ext.GetVU(backgroundCtx),
 		logger:              logger,
 	}
 }
