@@ -26,6 +26,9 @@ const (
 
 // Browser stores a Browser context.
 type Browser struct {
+	initContext  context.Context
+	initCancelFn context.CancelFunc
+
 	vuCtx         context.Context
 	vuCtxCancelFn context.CancelFunc
 
@@ -188,7 +191,9 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 	// Using backgroundCtx here. Using vuCtx would close the connection/subprocess
 	// and therefore shutdown chromium when the iteration ends which isn't what we
 	// want to happen. Chromium should only be closed by the k6 event system.
-	b.conn.on(context.Background(), []string{
+	b.initContext, b.initCancelFn = context.WithCancel(context.Background())
+
+	b.conn.on(b.initContext, []string{
 		cdproto.EventTargetAttachedToTarget,
 		cdproto.EventTargetDetachedFromTarget,
 		EventConnectionClose,
@@ -205,18 +210,23 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 				b.vuCtxCancelFn()
 			}
 		}()
-		for event := range chHandler {
-			if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
-				b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-				if err := b.onAttachedToTarget(ev); err != nil {
-					k6ext.Panic(b.vuCtx, "browser is attaching to target: %w", err)
-				}
-			} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
-				b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
-				b.onDetachedFromTarget(ev)
-			} else if event.typ == EventConnectionClose {
-				b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
+		for {
+			select {
+			case <-b.initContext.Done():
 				return
+			case event := <-chHandler:
+				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
+					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
+					if err := b.onAttachedToTarget(ev); err != nil {
+						k6ext.Panic(b.vuCtx, "browser is attaching to target: %w", err)
+					}
+				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
+					b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
+					b.onDetachedFromTarget(ev)
+				} else if event.typ == EventConnectionClose {
+					b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
+					return
+				}
 			}
 		}
 	}()
@@ -493,6 +503,8 @@ func (b *Browser) Close() {
 		if err := b.browserProc.Cleanup(); err != nil {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
+
+		b.initCancelFn()
 	}()
 
 	b.logger.Debugf("Browser:Close", "")
