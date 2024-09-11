@@ -168,13 +168,13 @@ func (b *BrowserType) link(
 // The separation is important to allow for the iteration to end when k6 requires
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
 // the events which allows the chromium subprocess to shutdown.
-func (b *BrowserType) Launch(backgroundCtx, vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
+func (b *BrowserType) Launch(vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
 	vuCtx, browserOpts, logger, err := b.init(vuCtx, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, pid, err := b.launch(backgroundCtx, vuCtx, browserOpts, logger)
+	bp, pid, err := b.launch(vuCtx, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -187,7 +187,7 @@ func (b *BrowserType) Launch(backgroundCtx, vuCtx context.Context) (_ *common.Br
 }
 
 func (b *BrowserType) launch(
-	backgroundCtx, vuCtx context.Context, opts *common.BrowserOptions, logger *log.Logger,
+	vuCtx context.Context, opts *common.BrowserOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
 	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
 	if err != nil {
@@ -205,7 +205,7 @@ func (b *BrowserType) launch(
 		return nil, 0, fmt.Errorf("finding browser executable: %w", err)
 	}
 
-	browserProc, err := b.allocate(backgroundCtx, path, flags, dataDir, logger)
+	browserProc, err := b.allocate(path, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -214,7 +214,7 @@ func (b *BrowserType) launch(
 	// cancellation and shutdown.
 	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
-	browser, err := common.NewBrowser(backgroundCtx, browserCtx, browserCtxCancel,
+	browser, err := common.NewBrowser(context.Background(), browserCtx, browserCtxCancel,
 		browserProc, opts, logger)
 	if err != nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
@@ -238,11 +238,11 @@ func (b *BrowserType) Name() string {
 
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
-	ctx context.Context, path string,
+	path string,
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
-	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
+	bProcCtx, bProcCtxCancel := context.WithCancel(context.Background())
 	defer func() {
 		if rerr != nil {
 			bProcCtxCancel()

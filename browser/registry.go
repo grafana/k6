@@ -217,7 +217,7 @@ func newBrowserRegistry(
 			}
 		} else {
 			var pid int
-			b, pid, err = bt.Launch(context.Background(), vuCtx)
+			b, pid, err = bt.Launch(vuCtx)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
