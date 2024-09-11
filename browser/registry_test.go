@@ -204,9 +204,8 @@ func TestBrowserRegistry(t *testing.T) {
 		t.Parallel()
 
 		var (
-			ctx             = context.Background()
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -246,9 +245,8 @@ func TestBrowserRegistry(t *testing.T) {
 		t.Parallel()
 
 		var (
-			ctx             = context.Background()
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -281,9 +279,8 @@ func TestBrowserRegistry(t *testing.T) {
 		t.Parallel()
 
 		var (
-			ctx             = context.Background()
 			vu              = k6test.NewVU(t)
-			browserRegistry = newBrowserRegistry(ctx, vu, remoteRegistry, &pidRegistry{}, nil)
+			browserRegistry = newBrowserRegistry(vu, remoteRegistry, &pidRegistry{}, nil)
 		)
 
 		vu.ActivateVU()
@@ -305,7 +302,7 @@ func TestBrowserRegistry(t *testing.T) {
 		vu := k6test.NewVU(t)
 		var cancel context.CancelFunc
 		vu.CtxField, cancel = context.WithCancel(vu.CtxField)
-		browserRegistry := newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
+		browserRegistry := newBrowserRegistry(vu, remoteRegistry, &pidRegistry{}, nil)
 
 		vu.ActivateVU()
 

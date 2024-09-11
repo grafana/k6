@@ -185,7 +185,7 @@ type browserRegistry struct {
 	stopped atomic.Bool // testing purposes
 }
 
-type browserBuildFunc func(ctx, vuCtx context.Context) (*common.Browser, error)
+type browserBuildFunc func(vuCtx context.Context) (*common.Browser, error)
 
 // newBrowserRegistry should only take a background context, not a context from
 // k6 (i.e. vu). The reason for this is that we want to control the chromium
@@ -197,14 +197,13 @@ type browserBuildFunc func(ctx, vuCtx context.Context) (*common.Browser, error)
 // A vu context (a context on an iteration) doesn't allow us to do this. Once k6
 // closes a vu context, it basically pulls the rug from under the extensions feet.
 func newBrowserRegistry(
-	backgroundCtx context.Context,
 	vu k6modules.VU,
 	remote *remoteRegistry,
 	pids *pidRegistry,
 	tracesMetadata map[string]string,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
-	builder := func(backgroundCtx, vuCtx context.Context) (*common.Browser, error) {
+	builder := func(vuCtx context.Context) (*common.Browser, error) {
 		var (
 			err                    error
 			b                      *common.Browser
@@ -212,13 +211,13 @@ func newBrowserRegistry(
 		)
 
 		if isRemoteBrowser {
-			b, err = bt.Connect(backgroundCtx, vuCtx, wsURL)
+			b, err = bt.Connect(context.Background(), vuCtx, wsURL)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
 		} else {
 			var pid int
-			b, pid, err = bt.Launch(backgroundCtx, vuCtx)
+			b, pid, err = bt.Launch(context.Background(), vuCtx)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -248,13 +247,13 @@ func newBrowserRegistry(
 	}
 
 	go r.handleExitEvent(exitCh, unsubscribe)
-	go r.handleIterEvents(backgroundCtx, eventsCh, unsubscribe)
+	go r.handleIterEvents(eventsCh, unsubscribe)
 
 	return r
 }
 
 func (r *browserRegistry) handleIterEvents( //nolint:funlen
-	backgroundCtx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
+	eventsCh <-chan *k6event.Event, unsubscribeFn func(),
 ) {
 	var (
 		ok   bool
@@ -307,7 +306,7 @@ func (r *browserRegistry) handleIterEvents( //nolint:funlen
 			tracerCtx := common.WithTracer(ctx, r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
 
-			b, err := r.buildFn(backgroundCtx, tracedCtx)
+			b, err := r.buildFn(tracedCtx)
 			if err != nil {
 				e.Done()
 				k6ext.Abort(vuCtx, "error building browser on IterStart: %v", err)
