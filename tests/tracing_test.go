@@ -202,7 +202,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 			js: fmt.Sprintf(`
 				page = await browser.newPage();
 				await page.goto('%s');
-				browser.closeContext();
+				page.close();
 				`, ts.URL),
 			expected: []string{
 				"iteration",
@@ -212,6 +212,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				"navigation", // created when a new page is created
 				"page.goto",
 				"navigation", // created when a navigation occurs after goto
+				"page.close",
 			},
 		},
 		{
@@ -220,7 +221,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				page = await browser.newPage();
 				await page.goto('%s');
 				await page.reload();
-				browser.closeContext();
+				page.close();
 				`, ts.URL),
 			expected: []string{
 				"iteration",
@@ -232,6 +233,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				"navigation", // created when a navigation occurs after goto
 				"page.reload",
 				"navigation", // created when a navigation occurs after reload
+				"page.close",
 			},
 		},
 		{
@@ -240,7 +242,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				page = await browser.newPage();
 				await page.goto('%s');
 				await page.evaluate(() => window.history.back());
-				browser.closeContext();
+				page.close();
 				`, ts.URL),
 			expected: []string{
 				"iteration",
@@ -251,6 +253,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				"page.goto",
 				"navigation", // created when a navigation occurs after goto
 				"navigation", // created when going back to the previous page
+				"page.close",
 			},
 		},
 		{
@@ -259,7 +262,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				page = await browser.newPage();
 				await page.goto('%s');
 				await page.locator('a[id=\"top\"]').click();
-				browser.closeContext();
+				page.close();
 				`, ts.URL),
 			expected: []string{
 				"iteration",
@@ -271,6 +274,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				"navigation", // created when a navigation occurs after goto
 				"locator.click",
 				"navigation", // created when navigating within the same page
+				"page.close",
 			},
 		},
 	}
