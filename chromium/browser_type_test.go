@@ -11,7 +11,6 @@ import (
 	"github.com/grafana/xk6-browser/env"
 
 	k6lib "go.k6.io/k6/lib"
-	"go.k6.io/k6/lib/types"
 	k6types "go.k6.io/k6/lib/types"
 
 	"github.com/stretchr/testify/assert"
@@ -95,7 +94,7 @@ func TestBrowserTypePrepareFlags(t *testing.T) {
 				`host-resolver-rules="MAP * www.example.com, EXCLUDE *.youtube.*"`,
 			}},
 			changeK6Opts: &k6lib.Options{
-				Hosts: types.NullHosts{Trie: hosts, Valid: true},
+				Hosts: k6types.NullHosts{Trie: hosts, Valid: true},
 			},
 			expChangedVal: "MAP * www.example.com, EXCLUDE *.youtube.*," +
 				"MAP httpbin.test.k6.io 127.0.0.1:8000,MAP test.k6.io 127.0.0.1:8000",
