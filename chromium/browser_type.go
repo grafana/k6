@@ -134,7 +134,7 @@ func (b *BrowserType) connect(
 	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(
-		context.Background(), browserCtx, browserCtxCancel, browserProc, opts, logger,
+		browserCtx, browserCtxCancel, browserProc, opts, logger,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to browser: %w", err)
@@ -214,7 +214,7 @@ func (b *BrowserType) launch(
 	// cancellation and shutdown.
 	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
-	browser, err := common.NewBrowser(context.Background(), browserCtx, browserCtxCancel,
+	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
 		browserProc, opts, logger)
 	if err != nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)

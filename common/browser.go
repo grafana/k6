@@ -26,7 +26,6 @@ const (
 
 // Browser stores a Browser context.
 type Browser struct {
-	backgroundCtx context.Context
 	vuCtx         context.Context
 	vuCtxCancelFn context.CancelFunc
 
@@ -80,13 +79,13 @@ type browserVersion struct {
 
 // NewBrowser creates a new browser, connects to it, then returns it.
 func NewBrowser(
-	backgroundCtx, vuCtx context.Context,
+	vuCtx context.Context,
 	vuCtxCancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) (*Browser, error) {
-	b := newBrowser(backgroundCtx, vuCtx, vuCtxCancelFn, browserProc, browserOpts, logger)
+	b := newBrowser(vuCtx, vuCtxCancelFn, browserProc, browserOpts, logger)
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
@@ -102,14 +101,13 @@ func NewBrowser(
 
 // newBrowser returns a ready to use Browser without connecting to an actual browser.
 func newBrowser(
-	backgroundCtx, vuCtx context.Context,
+	vuCtx context.Context,
 	vuCtxCancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) *Browser {
 	return &Browser{
-		backgroundCtx:       backgroundCtx,
 		vuCtx:               vuCtx,
 		vuCtxCancelFn:       vuCtxCancelFn,
 		state:               int64(BrowserStateOpen),
@@ -130,7 +128,7 @@ func (b *Browser) connect() error {
 	// from doing unnecessary work.
 	var err error
 	b.conn, err = NewConnection(
-		b.backgroundCtx,
+		context.Background(),
 		b.browserProc.WsURL(),
 		b.logger,
 		b.connectionOnAttachedToTarget,
@@ -185,13 +183,12 @@ func (b *Browser) getPages() []*Page {
 }
 
 func (b *Browser) initEvents() error { //nolint:cyclop
+	chHandler := make(chan Event)
+
 	// Using backgroundCtx here. Using vuCtx would close the connection/subprocess
 	// and therefore shutdown chromium when the iteration ends which isn't what we
 	// want to happen. Chromium should only be closed by the k6 event system.
-	cancelCtx, _ := context.WithCancel(b.backgroundCtx)
-	chHandler := make(chan Event)
-
-	b.conn.on(cancelCtx, []string{
+	b.conn.on(context.Background(), []string{
 		cdproto.EventTargetAttachedToTarget,
 		cdproto.EventTargetDetachedFromTarget,
 		EventConnectionClose,
@@ -199,7 +196,6 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 
 	go func() {
 		defer func() {
-			b.logger.Debugf("Browser:initEvents:defer", "ctx err: %v", cancelCtx.Err())
 			b.browserProc.didLoseConnection()
 			// Closing the vuCtx incase it hasn't already been closed. Very likely
 			// already closed since the vuCtx is controlled by the k6 iteration,
@@ -209,23 +205,18 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 				b.vuCtxCancelFn()
 			}
 		}()
-		for {
-			select {
-			case <-cancelCtx.Done():
-				return
-			case event := <-chHandler:
-				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
-					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-					if err := b.onAttachedToTarget(ev); err != nil {
-						k6ext.Panic(b.vuCtx, "browser is attaching to target: %w", err)
-					}
-				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
-					b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
-					b.onDetachedFromTarget(ev)
-				} else if event.typ == EventConnectionClose {
-					b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
-					return
+		for event := range chHandler {
+			if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
+				b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
+				if err := b.onAttachedToTarget(ev); err != nil {
+					k6ext.Panic(b.vuCtx, "browser is attaching to target: %w", err)
 				}
+			} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
+				b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
+				b.onDetachedFromTarget(ev)
+			} else if event.typ == EventConnectionClose {
+				b.logger.Debugf("Browser:initEvents:EventConnectionClose", "")
+				return
 			}
 		}
 	}()
@@ -519,7 +510,9 @@ func (b *Browser) Close() {
 	// command, which triggers the browser process to exit.
 	if !b.browserOpts.isRemoteBrowser {
 		var closeErr *websocket.CloseError
-		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.backgroundCtx, b.conn))
+		// Using a background context here since vu context will very likely be
+		// closed.
+		err := cdpbrowser.Close().Do(cdp.WithExecutor(context.Background(), b.conn))
 		if err != nil && !errors.As(err, &closeErr) {
 			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
