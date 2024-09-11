@@ -211,7 +211,7 @@ func newBrowserRegistry(
 		)
 
 		if isRemoteBrowser {
-			b, err = bt.Connect(context.Background(), vuCtx, wsURL)
+			b, err = bt.Connect(vuCtx, wsURL)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
