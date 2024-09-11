@@ -248,7 +248,7 @@ func TestStreamLogsToLogger(t *testing.T) {
 			require.NoError(t, err)
 
 			// wait the flush on the network
-			time.Sleep(5 * time.Millisecond)
+			time.Sleep(25 * time.Millisecond)
 			cancel()
 		})
 
