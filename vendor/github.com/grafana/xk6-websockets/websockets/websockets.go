@@ -137,6 +137,7 @@ func (r *WebSocketsAPI) websocket(c sobek.ConstructorCall) *sobek.Object {
 		obj:             rt.NewObject(),
 		tagsAndMeta:     params.tagsAndMeta,
 		sendPings:       ping{timestamps: make(map[string]time.Time)},
+		binaryType:      blobBinaryType,
 	}
 
 	// Maybe have this after the goroutine below ?!?
@@ -421,10 +422,6 @@ func (w *webSocket) loop() {
 	}
 }
 
-const binarytypeError = `websocket's binaryType hasn't been set to either "blob" or "arraybuffer", ` +
-	`but a binary message has been received. ` +
-	`"blob" is still not the default so the websocket is erroring out`
-
 func (w *webSocket) queueMessage(msg *message) {
 	w.tq.Queue(func() error {
 		if w.readyState != OPEN {
@@ -446,12 +443,7 @@ func (w *webSocket) queueMessage(msg *message) {
 
 		if msg.mtype == websocket.BinaryMessage {
 			var data any
-			// Lets error out for a k6 release, at least, when there's no binaryType set.
-			// In the future, we'll use "blob" as default, as per spec:
-			// https://developer.mozilla.org/en-US/docs/Web/API/WebSocket/binaryType
 			switch w.binaryType {
-			case "":
-				return errors.New(binarytypeError)
 			case blobBinaryType:
 				var err error
 				data, err = rt.New(w.blobConstructor, rt.ToValue([]interface{}{msg.data}))
@@ -461,7 +453,7 @@ func (w *webSocket) queueMessage(msg *message) {
 			case arraybufferBinaryType:
 				data = rt.NewArrayBuffer(msg.data)
 			default:
-				return fmt.Errorf(`unknown binaryType %s, the supported ones are "blob" and "arraybuffer"`, w.binaryType)
+				return fmt.Errorf(`unknown binaryType %q, the supported ones are "blob" and "arraybuffer"`, w.binaryType)
 			}
 			must(rt, ev.DefineDataProperty("data", rt.ToValue(data), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 		} else {
@@ -609,21 +601,9 @@ func (w *webSocket) send(msg sobek.Value) {
 			t:     time.Now(),
 		}
 	case *sobek.ArrayBuffer:
-		b := o.Bytes()
-		w.bufferedAmount += len(b)
-		w.writeQueueCh <- message{
-			mtype: websocket.BinaryMessage,
-			data:  b,
-			t:     time.Now(),
-		}
+		w.sendArrayBuffer(*o)
 	case sobek.ArrayBuffer:
-		b := o.Bytes()
-		w.bufferedAmount += len(b)
-		w.writeQueueCh <- message{
-			mtype: websocket.BinaryMessage,
-			data:  b,
-			t:     time.Now(),
-		}
+		w.sendArrayBuffer(o)
 	case map[string]interface{}:
 		rt := w.vu.Runtime()
 		obj := msg.ToObject(rt)
@@ -638,10 +618,57 @@ func (w *webSocket) send(msg sobek.Value) {
 			data:  b,
 			t:     time.Now(),
 		}
-
 	default:
-		common.Throw(w.vu.Runtime(), fmt.Errorf("unsupported send type %T", o))
+		rt := w.vu.Runtime()
+		isView, err := isArrayBufferView(rt, msg)
+		if err != nil {
+			common.Throw(rt,
+				fmt.Errorf("got error while trying to check if argument is ArrayBufferView: %w", err))
+		}
+		if !isView {
+			common.Throw(rt, fmt.Errorf("unsupported send type %T", o))
+		}
+
+		buffer := msg.ToObject(rt).Get("buffer")
+		ab, ok := buffer.Export().(sobek.ArrayBuffer)
+		if !ok {
+			common.Throw(rt,
+				fmt.Errorf("buffer of an ArrayBufferView was not an ArrayBuffer but %T", buffer.Export()))
+		}
+		w.sendArrayBuffer(ab)
 	}
+}
+
+func (w *webSocket) sendArrayBuffer(o sobek.ArrayBuffer) {
+	b := o.Bytes()
+	w.bufferedAmount += len(b)
+	w.writeQueueCh <- message{
+		mtype: websocket.BinaryMessage,
+		data:  b,
+		t:     time.Now(),
+	}
+}
+
+func isArrayBufferView(rt *sobek.Runtime, v sobek.Value) (bool, error) {
+	var isView sobek.Callable
+	var ok bool
+	exc := rt.Try(func() {
+		isView, ok = sobek.AssertFunction(
+			rt.Get("ArrayBuffer").ToObject(rt).Get("isView"))
+	})
+	if exc != nil {
+		return false, exc
+	}
+
+	if !ok {
+		return false, fmt.Errorf("couldn't get ArrayBuffer.isView as it isn't a function")
+	}
+
+	boolValue, err := isView(nil, v)
+	if err != nil {
+		return false, err
+	}
+	return boolValue.ToBoolean(), nil
 }
 
 // Ping sends a ping message over the websocket.
