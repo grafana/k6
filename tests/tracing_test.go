@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
-	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -399,7 +398,8 @@ func (m *mockTracer) cloneOrderedSpans() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	c := slices.Clone(m.orderedSpans)
+	c := make([]string, len(m.orderedSpans))
+	copy(c, m.orderedSpans)
 
 	m.orderedSpans = []string{}
 
