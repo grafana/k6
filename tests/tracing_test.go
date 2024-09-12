@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -298,7 +299,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 
 			assertJSInEventLoop(t, vu, tc.js)
 
-			got := tracer.getOrderedSpan()
+			got := tracer.cloneOrderedSpans()
 			// We can't use assert.Equal since the order of the span creation
 			// changes slightly on every test run. Instead we're going to make
 			// sure that the slice matches but not the order.
@@ -394,12 +395,11 @@ func (m *mockTracer) verifySpans(spanNames ...string) error {
 	return nil
 }
 
-func (m *mockTracer) getOrderedSpan() []string {
+func (m *mockTracer) cloneOrderedSpans() []string {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	c := make([]string, len(m.orderedSpans))
-	copy(c, m.orderedSpans)
+	c := slices.Clone(m.orderedSpans)
 
 	m.orderedSpans = []string{}
 
