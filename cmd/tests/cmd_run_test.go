@@ -616,7 +616,7 @@ func TestSetupTeardownThresholds(t *testing.T) {
 
 	stdOut := ts.Stdout.String()
 	t.Log(stdOut)
-	assert.Contains(t, stdOut, `✓ checks.........................: 100.00% ✓ 8`)
+	assert.Contains(t, stdOut, `✓ checks.........................: 100.00% 8 out of 8`)
 	assert.Contains(t, stdOut, `✓ http_reqs......................: 8`)
 	assert.Contains(t, stdOut, `✓ iterations.....................: 5`)
 	assert.Contains(t, stdOut, `✓ setup_teardown.................: 3`)
