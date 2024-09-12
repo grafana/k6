@@ -50,7 +50,7 @@ func getColor(noColor bool, attributes ...color.Attribute) *color.Color {
 }
 
 func getBanner(noColor bool) string {
-	c := getColor(noColor, color.FgCyan)
+	c := getColor(noColor, color.FgYellow)
 	return c.Sprint(consts.Banner())
 }
 
