@@ -219,9 +219,7 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.Equal(t, 3, browserRegistry.getBrowserCount())
 
 		// Verify iteration traces are started
-		browserRegistry.tr.mu.Lock()
-		assert.Equal(t, 3, len(browserRegistry.tr.m))
-		browserRegistry.tr.mu.Unlock()
+		assert.Equal(t, 3, browserRegistry.tr.getIterationTracesCount())
 
 		// Send IterEnd events
 		vu.EndIteration(t, k6test.WithIteration(0))
@@ -232,9 +230,7 @@ func TestBrowserRegistry(t *testing.T) {
 		assert.Equal(t, 0, browserRegistry.getBrowserCount())
 
 		// Verify iteration traces have been ended
-		browserRegistry.mu.RLock()
-		assert.Equal(t, 0, len(browserRegistry.m))
-		browserRegistry.mu.RUnlock()
+		assert.Equal(t, 0, browserRegistry.tr.getIterationTracesCount())
 	})
 
 	t.Run("close_browsers_on_exit_event", func(t *testing.T) {

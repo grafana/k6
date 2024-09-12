@@ -487,6 +487,15 @@ func (r *tracesRegistry) stop() {
 	}
 }
 
+// This is only used in a test. Avoids having to manipulate the mutex in the
+// test itself.
+func (r *tracesRegistry) getIterationTracesCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return len(r.m)
+}
+
 func parseTracesMetadata(envLookup env.LookupFunc) (map[string]string, error) {
 	var (
 		ok bool
