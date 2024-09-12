@@ -26,6 +26,9 @@ const (
 
 // Browser stores a Browser context.
 type Browser struct {
+	// These are internal contexts which control the lifecycle of the goroutine
+	// that handles incoming CDP commands. It is shutdown when browser.close()
+	// is called.
 	initContext  context.Context
 	initCancelFn context.CancelFunc
 
