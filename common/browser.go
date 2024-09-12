@@ -188,7 +188,7 @@ func (b *Browser) getPages() []*Page {
 func (b *Browser) initEvents() error { //nolint:cyclop
 	chHandler := make(chan Event)
 
-	// Using backgroundCtx here. Using vuCtx would close the connection/subprocess
+	// Using context.Background() here. Using vuCtx would close the connection/subprocess
 	// and therefore shutdown chromium when the iteration ends which isn't what we
 	// want to happen. Chromium should only be closed by the k6 event system.
 	b.initContext, b.initCancelFn = context.WithCancel(context.Background())
@@ -204,8 +204,8 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 			b.browserProc.didLoseConnection()
 			// Closing the vuCtx incase it hasn't already been closed. Very likely
 			// already closed since the vuCtx is controlled by the k6 iteration,
-			// whereas the backgroundCtx is controlled by the k6 event system. k6
-			// iteration ends before the event system.
+			// whereas the initContext is controlled by the k6 event system when
+			// browser.close() is called. k6 iteration ends before the event system.
 			if b.vuCtxCancelFn != nil {
 				b.vuCtxCancelFn()
 			}

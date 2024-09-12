@@ -94,11 +94,11 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 
 // Connect attaches k6 browser to an existing browser instance.
 //
-//   - backgroundCtx is used when connecting to the chromium instance. This context
-//     is controlled by the k6 event system (e.g. iterStart, iterEnd, etc) and so
-//     the connection's lifecycle is also controlled by the k6 event system.
-//   - vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
-//     its lifecycle.
+// vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
+// its lifecycle.
+//
+// context.background() is used when connecting to an instance of chromium. The
+// connection lifecycle should be handled by the k6 event system.
 //
 // The separation is important to allow for the iteration to end when k6 requires
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
@@ -159,11 +159,11 @@ func (b *BrowserType) link(
 // Launch allocates a new Chrome browser process and returns a new Browser value,
 // which can be used for controlling the Chrome browser.
 //
-//   - backgroundCtx is used when launching an instance of chromium. This context
-//     is controlled by the k6 event system (e.g. iterStart, iterEnd, etc) and so
-//     the chromium sub process's lifecycle is also controlled by the k6 event system.
-//   - vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
-//     its lifecycle.
+// vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
+// its lifecycle.
+//
+// context.background() is used when launching an instance of chromium. The
+// chromium lifecycle should be handled by the k6 event system.
 //
 // The separation is important to allow for the iteration to end when k6 requires
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
