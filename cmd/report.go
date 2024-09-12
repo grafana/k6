@@ -37,14 +37,18 @@ func reportUsage(ctx context.Context, execScheduler *execution.Scheduler, test *
 	if err != nil {
 		return err
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, "https://reports.k6.io", bytes.NewBuffer(body))
+
+	const usageStatsURL = "https://stats.grafana.org/k6-usage-report"
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, usageStatsURL, bytes.NewBuffer(body))
 	if err != nil {
 		return err
 	}
+
 	req.Header.Set("Content-Type", "application/json")
 	res, err := http.DefaultClient.Do(req)
 	if err == nil {
 		_ = res.Body.Close()
 	}
+
 	return err
 }
