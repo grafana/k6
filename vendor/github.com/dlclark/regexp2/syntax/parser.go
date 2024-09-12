@@ -553,10 +553,10 @@ func (p *parser) scanRegex() (*regexNode, error) {
 			}
 
 		case '.':
-			if p.useOptionE() {
-				p.addUnitSet(ECMAAnyClass())
-			} else if p.useOptionS() {
+			if p.useOptionS() {
 				p.addUnitSet(AnyClass())
+			} else if p.useOptionE() {
+				p.addUnitSet(ECMAAnyClass())
 			} else {
 				p.addUnitNotone('\n')
 			}
@@ -1311,6 +1311,17 @@ func (p *parser) scanBasicBackslash(scanOnly bool) (*regexNode, error) {
 
 // Scans X for \p{X} or \P{X}
 func (p *parser) parseProperty() (string, error) {
+	// RE2 and PCRE supports \pX syntax (no {} and only 1 letter unicode cats supported)
+	// since this is purely additive syntax it's not behind a flag
+	if p.charsRight() >= 1 && p.rightChar(0) != '{' {
+		ch := string(p.moveRightGetChar())
+		// check if it's a valid cat
+		if !isValidUnicodeCat(ch) {
+			return "", p.getErr(ErrUnknownSlashP, ch)
+		}
+		return ch, nil
+	}
+
 	if p.charsRight() < 3 {
 		return "", p.getErr(ErrIncompleteSlashP)
 	}
@@ -1427,7 +1438,7 @@ func (p *parser) scanCapname() string {
 	return string(p.pattern[startpos:p.textpos()])
 }
 
-//Scans contents of [] (not including []'s), and converts to a set.
+// Scans contents of [] (not including []'s), and converts to a set.
 func (p *parser) scanCharSet(caseInsensitive, scanOnly bool) (*CharSet, error) {
 	ch := '\x00'
 	chPrev := '\x00'

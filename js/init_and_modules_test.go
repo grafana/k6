@@ -19,6 +19,7 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 type CheckModule struct {
@@ -64,6 +65,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
 			RuntimeOptions: rtOptions,
+			Usage:          usage.New(),
 		},
 		&loader.SourceData{
 			URL:  &url.URL{Path: "blah", Scheme: "file"},
@@ -101,6 +103,7 @@ func TestNewJSRunnerWithCustomModule(t *testing.T) {
 			BuiltinMetrics: builtinMetrics,
 			Registry:       registry,
 			RuntimeOptions: rtOptions,
+			Usage:          usage.New(),
 		}, arc)
 	require.NoError(t, err)
 	assert.Equal(t, checkModule.initCtxCalled, 3) // changes because we need to get the exported functions

@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"runtime"
+	"slices"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -944,8 +945,8 @@ func TestAbortedByScriptSetupErrorWithDependency(t *testing.T) {
 	if runtime.GOOS == "windows" {
 		rootPath += "c:/"
 	}
-	assert.Contains(t, stdout, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:9(3))\n\tat `+
-		rootPath+`test/bar.js:3:3(3)\n\tat setup (`+rootPath+`test/test.js:5:3(9))\n" hint="script exception"`)
+	assert.Contains(t, stdout, `level=error msg="Error: baz\n\tat baz (`+rootPath+`test/bar.js:6:10(3))\n\tat default (`+
+		rootPath+`test/bar.js:3:7(3))\n\tat setup (`+rootPath+`test/test.js:5:7(8))\n" hint="script exception"`)
 	assert.Contains(t, stdout, `level=debug msg="Sending test finished" output=cloud ref=123 run_status=7 tainted=false`)
 	assert.Contains(t, stdout, "bogus summary")
 }
@@ -1434,16 +1435,6 @@ func sum(vals []float64) (sum float64) {
 	return sum
 }
 
-func max(vals []float64) float64 {
-	max := vals[0]
-	for _, val := range vals {
-		if max < val {
-			max = val
-		}
-	}
-	return max
-}
-
 func TestActiveVUsCount(t *testing.T) {
 	t.Parallel()
 
@@ -1499,8 +1490,8 @@ func TestActiveVUsCount(t *testing.T) {
 	jsonResults, err := fsext.ReadFile(ts.FS, "results.json")
 	require.NoError(t, err)
 	// t.Log(string(jsonResults))
-	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus_max", nil)))
-	assert.Equal(t, float64(10), max(getSampleValues(t, jsonResults, "vus", nil)))
+	assert.Equal(t, float64(10), slices.Max(getSampleValues(t, jsonResults, "vus_max", nil)))
+	assert.Equal(t, float64(10), slices.Max(getSampleValues(t, jsonResults, "vus", nil)))
 	assert.Equal(t, float64(0), sum(getSampleValues(t, jsonResults, "iterations", nil)))
 
 	logEntries := ts.LoggerHook.Drain()
@@ -2105,10 +2096,10 @@ func TestEventSystemError(t *testing.T) {
 				"got event Init with data '<nil>'",
 				"got event TestStart with data '<nil>'",
 				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at file:///-:11:16(6)}'",
+				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:test aborted: oops! at default (file:///-:11:16(5))}'",
 				"got event TestEnd with data '<nil>'",
-				"got event Exit with data '&{Error:test aborted: oops! at file:///-:11:16(6)}'",
-				"test aborted: oops! at file:///-:11:16(6)",
+				"got event Exit with data '&{Error:test aborted: oops! at default (file:///-:11:16(5))}'",
+				"test aborted: oops! at default (file:///-:11:16(5))",
 			},
 			expExitCode: exitcodes.ScriptAborted,
 		},
@@ -2117,8 +2108,8 @@ func TestEventSystemError(t *testing.T) {
 			script: "undefinedVar",
 			expLog: []string{
 				"got event Exit with data '&{Error:could not initialize '-': could not load JS test " +
-					"'file:///-': ReferenceError: undefinedVar is not defined\n\tat file:///-:2:0(12)\n}'",
-				"ReferenceError: undefinedVar is not defined\n\tat file:///-:2:0(12)\n",
+					"'file:///-': ReferenceError: undefinedVar is not defined\n\tat file:///-:2:1(8)\n}'",
+				"ReferenceError: undefinedVar is not defined\n\tat file:///-:2:1(8)\n",
 			},
 			expExitCode: exitcodes.ScriptException,
 		},
@@ -2137,11 +2128,11 @@ func TestEventSystemError(t *testing.T) {
 				"got event Init with data '<nil>'",
 				"got event TestStart with data '<nil>'",
 				"got event IterStart with data '{Iteration:0 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:Error: oops!\n\tat file:///-:9:11(3)\n}'",
-				"Error: oops!\n\tat file:///-:9:11(3)\n",
+				"got event IterEnd with data '{Iteration:0 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
+				"Error: oops!\n\tat default (file:///-:9:12(3))\n",
 				"got event IterStart with data '{Iteration:1 VUID:1 ScenarioName:default Error:<nil>}'",
-				"got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:Error: oops!\n\tat file:///-:9:11(3)\n}'",
-				"Error: oops!\n\tat file:///-:9:11(3)\n",
+				"got event IterEnd with data '{Iteration:1 VUID:1 ScenarioName:default Error:Error: oops!\n\tat default (file:///-:9:12(3))\n}'",
+				"Error: oops!\n\tat default (file:///-:9:12(3))\n",
 				"got event TestEnd with data '<nil>'",
 				"got event Exit with data '&{Error:<nil>}'",
 			},
@@ -2262,7 +2253,7 @@ func TestBrowserPermissions(t *testing.T) {
 			name:             "browser option not set",
 			options:          "",
 			expectedExitCode: 0,
-			expectedError:    "GoError: browser not found in registry. make sure to set browser type option in scenario definition in order to use the browser module",
+			expectedError:    "browser not found in registry. make sure to set browser type option in scenario definition in order to use the browser module",
 		},
 		// When we do supply the correct browser options,
 		// we expect that the browser module will start
@@ -2300,12 +2291,12 @@ func TestBrowserPermissions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
 			script := fmt.Sprintf(`
-			import { browser } from 'k6/experimental/browser';
+			import { browser } from 'k6/browser';
 
 			%s
 
 			export default function() {
-			  browser.isConnected();
+			  browser.isConnected()
 			};
 			`, tt.options)
 
@@ -2317,6 +2308,39 @@ func TestBrowserPermissions(t *testing.T) {
 			assert.Contains(t, loglines[0].Message, tt.expectedError)
 		})
 	}
+}
+
+func TestBrowserExperimentalImport(t *testing.T) {
+	t.Parallel()
+
+	const script = `
+		import { browser } from 'k6/experimental/browser';
+
+		export const options = {
+			scenarios: {
+					browser: {
+					executor: 'shared-iterations',
+					options: {
+						browser: {
+							type: 'chromium',
+						},
+					},
+				},
+			},
+		}
+
+		export default function() {
+			browser.isConnected()
+		};
+	`
+
+	const wantExitCode = 108
+	ts := getSingleFileTestState(t, script, []string{}, wantExitCode)
+	ts.Env["K6_BROWSER_EXECUTABLE_PATH"] = "k6-browser-fake-cmd"
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+	loglines := ts.LoggerHook.Drain()
+
+	assert.Contains(t, loglines[0].Message, "use k6/browser instead of k6/experimental/browser")
 }
 
 func TestSetupTimeout(t *testing.T) {
@@ -2349,4 +2373,33 @@ func TestSetupTimeout(t *testing.T) {
 	stderr := ts.Stderr.String()
 	t.Log(stderr)
 	assert.Contains(t, stderr, "setup() execution timed out after 1 seconds")
+}
+
+func TestTypeScriptSupport(t *testing.T) {
+	t.Parallel()
+	depScript := `
+		export default function(): number {
+			let p: number = 42;
+			return p;
+		}
+	`
+	mainScript := `
+		import bar from "./bar.ts";
+		let s: string = "something";
+		export default function() {
+			console.log(s, bar());
+		};
+	`
+
+	ts := NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "test.ts"), []byte(mainScript), 0o644))
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, "bar.ts"), []byte(depScript), 0o644))
+
+	ts.CmdArgs = []string{"k6", "run", "--compatibility-mode", "experimental_enhanced", "--quiet", "test.ts"}
+
+	cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+	stderr := ts.Stderr.String()
+	t.Log(stderr)
+	assert.Contains(t, stderr, `something 42`)
 }

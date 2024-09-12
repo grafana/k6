@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"net/http/cookiejar"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib/netext"
@@ -23,7 +23,7 @@ type ModuleInstance struct {
 	vu            modules.VU
 	rootModule    *RootModule
 	defaultClient *Client
-	exports       *goja.Object
+	exports       *sobek.Object
 }
 
 var (
@@ -68,16 +68,16 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	// TODO: refactor so the Client actually has better APIs and these are
 	// wrappers (facades) that convert the old k6 idiosyncratic APIs to the new
 	// proper Client ones that accept Request objects and don't suck
-	mustExport("get", func(url goja.Value, args ...goja.Value) (*Response, error) {
+	mustExport("get", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
 		// http.get(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
-		args = append([]goja.Value{goja.Undefined()}, args...)
+		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodGet, url, args...)
 	})
-	mustExport("head", func(url goja.Value, args ...goja.Value) (*Response, error) {
+	mustExport("head", func(url sobek.Value, args ...sobek.Value) (*Response, error) {
 		// http.head(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
-		args = append([]goja.Value{goja.Undefined()}, args...)
+		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
 	})
 	mustExport("post", mi.defaultClient.getMethodClosure(http.MethodPost))
@@ -115,7 +115,7 @@ func (mi *ModuleInstance) defineConstants() {
 	rt := mi.vu.Runtime()
 	mustAddProp := func(name, val string) {
 		err := mi.exports.DefineDataProperty(
-			name, rt.ToValue(val), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE,
+			name, rt.ToValue(val), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE,
 		)
 		if err != nil {
 			common.Throw(rt, err)
@@ -141,7 +141,7 @@ func (mi *ModuleInstance) defineConstants() {
 	mustAddProp("OCSP_REASON_AA_COMPROMISE", netext.OCSP_REASON_AA_COMPROMISE)
 }
 
-func (mi *ModuleInstance) newCookieJar(_ goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) newCookieJar(_ sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 	jar, err := cookiejar.New(nil)
 	if err != nil {
@@ -151,7 +151,7 @@ func (mi *ModuleInstance) newCookieJar(_ goja.ConstructorCall) *goja.Object {
 }
 
 // getVUCookieJar returns the active cookie jar for the current VU.
-func (mi *ModuleInstance) getVUCookieJar(_ goja.FunctionCall) goja.Value {
+func (mi *ModuleInstance) getVUCookieJar(_ sobek.FunctionCall) sobek.Value {
 	rt := mi.vu.Runtime()
 	if state := mi.vu.State(); state != nil {
 		return rt.ToValue(&CookieJar{mi, state.CookieJar})

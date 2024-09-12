@@ -50,7 +50,7 @@ func getColor(noColor bool, attributes ...color.Attribute) *color.Color {
 }
 
 func getBanner(noColor bool) string {
-	c := getColor(noColor, color.FgCyan)
+	c := getColor(noColor, color.FgYellow)
 	return c.Sprint(consts.Banner())
 }
 
@@ -263,13 +263,13 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 		return
 	}
 
-	var errTermGetSize bool
+	var terminalSizeUnknown bool
 	termWidth := defaultTermWidth
 	if gs.Stdout.IsTTY {
 		tw, _, err := term.GetSize(gs.Stdout.RawOutFd)
 		if !(tw > 0) || err != nil {
-			errTermGetSize = true
-			logger.WithError(err).Warn("error getting terminal size")
+			terminalSizeUnknown = true
+			logger.WithError(err).Debug("can't get terminal size")
 		} else {
 			termWidth = tw
 		}
@@ -280,10 +280,10 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 	var leftLen int64
 	for _, pb := range pbs {
 		l := pb.Left()
-		leftLen = lib.Max(int64(len(l)), leftLen)
+		leftLen = max(int64(len(l)), leftLen)
 	}
 	// Limit to maximum left text length
-	maxLeft := int(lib.Min(leftLen, maxLeftLength))
+	maxLeft := int(min(leftLen, maxLeftLength))
 
 	var progressBarsLastRenderLock sync.Mutex
 	var progressBarsLastRender []byte
@@ -353,7 +353,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 			gs.OutMutex.Unlock()
 			return
 		case <-winch:
-			if gs.Stdout.IsTTY && !errTermGetSize {
+			if gs.Stdout.IsTTY && !terminalSizeUnknown {
 				// More responsive progress bar resizing on platforms with SIGWINCH (*nix)
 				tw, _, err := term.GetSize(stdoutFD)
 				if tw > 0 && err == nil {
@@ -362,7 +362,7 @@ func showProgress(ctx context.Context, gs *state.GlobalState, pbs []*pb.Progress
 			}
 		case <-ticker.C:
 			// Default ticker-based progress bar resizing
-			if gs.Stdout.IsTTY && !errTermGetSize && winch == nil {
+			if gs.Stdout.IsTTY && !terminalSizeUnknown && winch == nil {
 				tw, _, err := term.GetSize(stdoutFD)
 				if tw > 0 && err == nil {
 					termWidth = tw

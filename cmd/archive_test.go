@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"testing"
@@ -252,4 +253,25 @@ func TestArchiveNotContainsEnv(t *testing.T) {
 	// then unpacked metadata should not contain any environment variables passed at the moment of archive creation
 	require.NoError(t, json.Unmarshal(data, &metadata))
 	require.Len(t, metadata.Env, 0)
+}
+
+func TestArchiveStdout(t *testing.T) {
+	t.Parallel()
+
+	// given some script that will be archived
+	fileName := "script.js"
+	testScript := []byte(`export default function () {}`)
+	ts := tests.NewGlobalTestState(t)
+	require.NoError(t, fsext.WriteFile(ts.FS, filepath.Join(ts.Cwd, fileName), testScript, 0o644))
+
+	ts.CmdArgs = []string{"k6", "archive", "-O", "-", fileName}
+
+	newRootCommand(ts.GlobalState).execute()
+
+	for _, filename := range []string{"-", "archive.tar"} {
+		_, err := ts.FS.Stat(filename)
+		require.ErrorIsf(t, err, fs.ErrNotExist, "%q should not exist", filename)
+	}
+
+	require.GreaterOrEqual(t, len(ts.Stdout.Bytes()), 32)
 }

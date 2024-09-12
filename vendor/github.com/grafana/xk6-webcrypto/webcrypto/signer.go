@@ -1,6 +1,6 @@
 package webcrypto
 
-import "github.com/dop251/goja"
+import "github.com/grafana/sobek"
 
 // SignerVerifier .
 type SignerVerifier interface {
@@ -8,7 +8,7 @@ type SignerVerifier interface {
 	Verify(key CryptoKey, signature, dataToVerify []byte) (bool, error)
 }
 
-func newSignerVerifier(rt *goja.Runtime, normalized Algorithm, params goja.Value) (SignerVerifier, error) {
+func newSignerVerifier(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (SignerVerifier, error) {
 	switch normalized.Name {
 	case HMAC:
 		return &hmacSignerVerifier{}, nil

@@ -7,19 +7,19 @@ import (
 	"strings"
 	"time"
 
+	cdpbrowser "github.com/chromedp/cdproto/browser"
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/storage"
+	"github.com/chromedp/cdproto/target"
+	"github.com/grafana/sobek"
+
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6error"
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
-
-	cdpbrowser "github.com/chromedp/cdproto/browser"
-	"github.com/chromedp/cdproto/cdp"
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/storage"
-	"github.com/chromedp/cdproto/target"
-	"github.com/dop251/goja"
 )
 
 // waitForEventType represents the event types that can be used when working
@@ -90,6 +90,11 @@ type BrowserContext struct {
 func NewBrowserContext(
 	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *log.Logger,
 ) (*BrowserContext, error) {
+	// set the default options if none provided.
+	if opts == nil {
+		opts = NewBrowserContextOptions()
+	}
+
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
@@ -101,7 +106,7 @@ func NewBrowserContext(
 		timeoutSettings:  NewTimeoutSettings(nil),
 	}
 
-	if opts != nil && len(opts.Permissions) > 0 {
+	if len(opts.Permissions) > 0 {
 		err := b.GrantPermissions(opts.Permissions, NewGrantPermissionsOptions())
 		if err != nil {
 			return nil, err
@@ -161,15 +166,16 @@ func (b *BrowserContext) ClearPermissions() error {
 }
 
 // Close shuts down the browser context.
-func (b *BrowserContext) Close() {
+func (b *BrowserContext) Close() error {
 	b.logger.Debugf("BrowserContext:Close", "bctxid:%v", b.id)
 
 	if b.id == "" {
-		k6ext.Panic(b.ctx, "default browser context can't be closed")
+		return fmt.Errorf("default browser context can't be closed")
 	}
 	if err := b.browser.disposeContext(b.id); err != nil {
-		k6ext.Panic(b.ctx, "disposing browser context: %w", err)
+		return fmt.Errorf("disposing browser context: %w", err)
 	}
+	return nil
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
@@ -259,20 +265,22 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 // SetGeolocation overrides the geo location of the user.
-func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
+func (b *BrowserContext) SetGeolocation(geolocation sobek.Value) error {
 	b.logger.Debugf("BrowserContext:SetGeolocation", "bctxid:%v", b.id)
 
 	g := NewGeolocation()
 	if err := g.Parse(b.ctx, geolocation); err != nil {
-		k6ext.Panic(b.ctx, "parsing geo location: %v", err)
+		return fmt.Errorf("parsing geo location: %w", err)
 	}
 
 	b.opts.Geolocation = g
 	for _, p := range b.browser.getPages() {
 		if err := p.updateGeolocation(); err != nil {
-			k6ext.Panic(b.ctx, "updating geo location in target ID %s: %w", p.targetID, err)
+			return fmt.Errorf("updating geo location in target ID %s: %w", p.targetID, err)
 		}
 	}
+
+	return nil
 }
 
 // SetHTTPCredentials sets username/password credentials to use for HTTP authentication.
@@ -281,30 +289,41 @@ func (b *BrowserContext) SetGeolocation(geolocation goja.Value) {
 // See for details:
 // - https://github.com/microsoft/playwright/issues/2196#issuecomment-627134837
 // - https://github.com/microsoft/playwright/pull/2763
-func (b *BrowserContext) SetHTTPCredentials(httpCredentials goja.Value) {
+func (b *BrowserContext) SetHTTPCredentials(httpCredentials sobek.Value) error {
 	b.logger.Warnf("setHTTPCredentials", "setHTTPCredentials is deprecated."+
 		" Create a new BrowserContext with httpCredentials instead.")
 	b.logger.Debugf("BrowserContext:SetHTTPCredentials", "bctxid:%v", b.id)
 
 	c := NewCredentials()
 	if err := c.Parse(b.ctx, httpCredentials); err != nil {
-		k6ext.Panic(b.ctx, "setting HTTP credentials: %w", err)
+		return fmt.Errorf("parsing HTTP credentials: %w", err)
 	}
 
 	b.opts.HttpCredentials = c
 	for _, p := range b.browser.getPages() {
-		p.updateHttpCredentials()
+		if err := p.updateHTTPCredentials(); err != nil {
+			return fmt.Errorf("setting HTTP credentials in target ID %s: %w", p.targetID, err)
+		}
 	}
+
+	return nil
 }
 
 // SetOffline toggles the browser's connectivity on/off.
-func (b *BrowserContext) SetOffline(offline bool) {
+func (b *BrowserContext) SetOffline(offline bool) error {
 	b.logger.Debugf("BrowserContext:SetOffline", "bctxid:%v offline:%t", b.id, offline)
 
 	b.opts.Offline = offline
 	for _, p := range b.browser.getPages() {
-		p.updateOffline()
+		if err := p.updateOffline(); err != nil {
+			return fmt.Errorf(
+				"setting offline status to %t for the browser context ID %s: %w",
+				offline, b.id, err,
+			)
+		}
 	}
+
+	return nil
 }
 
 // Timeout will return the default timeout or the one set by the user.

@@ -11,7 +11,6 @@ import (
 	"net/url"
 	"path"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -25,21 +24,6 @@ type SourceData struct {
 	URL  *url.URL
 	PWD  *url.URL
 }
-
-type loaderFunc func(logger logrus.FieldLogger, path string, parts []string) (string, error)
-
-//nolint:gochecknoglobals
-var (
-	loaders = []struct {
-		name string
-		fn   loaderFunc
-		expr *regexp.Regexp
-	}{
-		{"cdnjs", cdnjs, regexp.MustCompile(`^cdnjs\.com/libraries/([^/]+)(?:/([(\d\.)]+-?[^/]*))?(?:/(.*))?$`)},
-		{"github", github, regexp.MustCompile(`^github\.com/([^/]+)/([^/]+)/(.*)$`)},
-	}
-	errNoLoaderMatched = errors.New("no loader matched")
-)
 
 const (
 	httpsSchemeCouldntBeLoadedMsg = `The moduleSpecifier "%s" couldn't be retrieved from` +
@@ -85,13 +69,15 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 		}
 		return u, err
 	}
-	_, loader, _ := pickLoader(moduleSpecifier)
-	if loader != nil {
-		// here we only care if a loader is pickable, if it is and later there is an error in the loading
-		// from it we don't want to try another resolve
-		return &url.URL{Opaque: moduleSpecifier}, nil
-	}
 
+	if strings.HasPrefix(moduleSpecifier, "cdnjs.com") {
+		return nil, fmt.Errorf("cdnjs.com 'special' urls are no longer supported - please use real ones. " +
+			"You can get yours by going to cdnjs and copy-pasting the full url to the actual JavaScript file")
+	}
+	if strings.HasPrefix(moduleSpecifier, "github.com") {
+		return nil, fmt.Errorf("github.com 'special' urls are no longer supported - please use real ones. " +
+			"You can get yours by going to github and copy-pasting the full url to the actual raw JavaScript file")
+	}
 	return nil, unresolvableURLError(moduleSpecifier)
 }
 
@@ -127,9 +113,6 @@ func resolveFilePath(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 
 // Dir returns the directory for the path.
 func Dir(old *url.URL) *url.URL {
-	if old.Opaque != "" { // loader
-		return &url.URL{Opaque: path.Join(old.Opaque, "../")}
-	}
 	return old.ResolveReference(&url.URL{Path: "./"})
 }
 
@@ -147,8 +130,6 @@ func Load(
 
 	var pathOnFs string
 	switch {
-	case moduleSpecifier.Opaque != "": // This is loader
-		pathOnFs = filepath.Join(fsext.FilePathSeparator, moduleSpecifier.Opaque)
 	case moduleSpecifier.Scheme == "":
 		pathOnFs = path.Clean(moduleSpecifier.String())
 	default:
@@ -171,10 +152,6 @@ func Load(
 	data, err := fsext.ReadFile(filesystems[scheme], pathOnFs)
 
 	if err == nil {
-		if moduleSpecifier.Opaque != "" {
-			loaderName, _, _ := pickLoader(moduleSpecifier.Opaque)
-			logger.Warnf(magicURLsDeprecationWarning, originalModuleSpecifier, loaderName)
-		}
 		return &SourceData{URL: moduleSpecifier, Data: data}, nil
 	}
 	if !errors.Is(err, fs.ErrNotExist) {
@@ -186,13 +163,6 @@ func Load(
 	}
 
 	finalModuleSpecifierURL := moduleSpecifier
-
-	if moduleSpecifier.Opaque != "" { // This is a loader
-		finalModuleSpecifierURL, err = resolveUsingLoaders(logger, moduleSpecifier.Opaque)
-		if err != nil {
-			return nil, err
-		}
-	}
 
 	var result *SourceData
 	result, err = loadRemoteURL(logger, finalModuleSpecifierURL)
@@ -206,26 +176,6 @@ func Load(
 	_ = fsext.WriteFile(filesystems[scheme], pathOnFs, result.Data, 0o644)
 
 	return result, nil
-}
-
-const (
-	magicURLsDeprecationWarning = "Specifier %q resolved to use a non-conventional %[2]q loader. " +
-		"The used %[2]q loader is deprecated and will be removed in k6 v0.53.0."
-	magicURLsDeprecationWarningExtended = magicURLsDeprecationWarning + " Please use the real URL %q instead."
-)
-
-func resolveUsingLoaders(logger logrus.FieldLogger, name string) (*url.URL, error) {
-	loaderName, loader, loaderArgs := pickLoader(name)
-	if loader != nil {
-		urlString, err := loader(logger, name, loaderArgs)
-		if err != nil {
-			return nil, err
-		}
-		logger.Warnf(magicURLsDeprecationWarningExtended, name, loaderName, urlString)
-		return url.Parse(urlString)
-	}
-
-	return nil, errNoLoaderMatched
 }
 
 func loadRemoteURL(logger logrus.FieldLogger, u *url.URL) (*SourceData, error) {
@@ -251,16 +201,6 @@ func loadRemoteURL(logger logrus.FieldLogger, u *url.URL) (*SourceData, error) {
 	// <meta name="k6-import" content="github.com/myusername/repo/file.txt" />
 
 	return &SourceData{URL: u, Data: data}, nil
-}
-
-func pickLoader(path string) (string, loaderFunc, []string) {
-	for _, loader := range loaders {
-		matches := loader.expr.FindAllStringSubmatch(path, -1)
-		if len(matches) > 0 {
-			return loader.name, loader.fn, matches[0][1:]
-		}
-	}
-	return "", nil, nil
 }
 
 func fetch(logger logrus.FieldLogger, u string) ([]byte, error) {

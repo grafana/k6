@@ -16,8 +16,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -34,7 +34,7 @@ type (
 	// WS represents a module instance of the WebSocket module.
 	WS struct {
 		vu  modules.VU
-		obj *goja.Object
+		obj *sobek.Object
 	}
 )
 
@@ -69,11 +69,11 @@ var ErrWSInInitContext = common.NewInitContextError("using websockets in the ini
 
 // Socket is the representation of the websocket returned to the js.
 type Socket struct {
-	rt            *goja.Runtime
+	rt            *sobek.Runtime
 	ctx           context.Context //nolint:containedctx
 	conn          *websocket.Conn
-	eventHandlers map[string][]goja.Callable
-	scheduled     chan goja.Callable
+	eventHandlers map[string][]sobek.Callable
+	scheduled     chan sobek.Callable
 	done          chan struct{}
 	shutdownOnce  sync.Once
 
@@ -100,7 +100,7 @@ type message struct {
 }
 
 type wsConnectArgs struct {
-	setupFn           goja.Callable
+	setupFn           sobek.Callable
 	headers           http.Header
 	enableCompression bool
 	cookieJar         *cookiejar.Jar
@@ -117,7 +117,7 @@ func (mi *WS) Exports() modules.Exports {
 // Connect establishes a WebSocket connection based on the parameters provided.
 //
 //nolint:funlen
-func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
+func (mi *WS) Connect(url string, args ...sobek.Value) (*HTTPResponse, error) {
 	ctx := mi.vu.Context()
 	rt := mi.vu.Runtime()
 	state := mi.vu.State()
@@ -149,7 +149,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 	defer socket.Close()
 
 	// Run the user-provided set up function
-	if _, err := parsedArgs.setupFn(goja.Undefined(), rt.ToValue(&socket)); err != nil {
+	if _, err := parsedArgs.setupFn(sobek.Undefined(), rt.ToValue(&socket)); err != nil {
 		_ = socket.closeConnection(websocket.CloseGoingAway)
 		return nil, err
 	}
@@ -166,7 +166,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 	// since we use custom closing logic to call user's event
 	// handlers and for cleanup. See closeConnection.
 	// closeConnection is not set directly as a handler here to
-	// avoid race conditions when calling the Goja runtime.
+	// avoid race conditions when calling the Sobek runtime.
 	socket.conn.SetCloseHandler(func(_ int, _ string) error { return nil })
 
 	// Pass ping/pong events through the main control loop
@@ -226,7 +226,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 			_ = socket.closeConnection(code)
 
 		case scheduledFn := <-socket.scheduled:
-			if _, err := scheduledFn(goja.Undefined()); err != nil {
+			if _, err := scheduledFn(sobek.Undefined()); err != nil {
 				_ = socket.closeConnection(websocket.CloseGoingAway)
 				return nil, err
 			}
@@ -244,7 +244,7 @@ func (mi *WS) Connect(url string, args ...goja.Value) (*HTTPResponse, error) {
 }
 
 func (mi *WS) dial(
-	ctx context.Context, state *lib.State, rt *goja.Runtime, url string,
+	ctx context.Context, state *lib.State, rt *sobek.Runtime, url string,
 	args *wsConnectArgs,
 ) (*Socket, *http.Response, func(), error) {
 	// Overriding the NextProtos to avoid talking http2
@@ -294,9 +294,9 @@ func (mi *WS) dial(
 		ctx:                ctx,
 		rt:                 rt,
 		conn:               conn,
-		eventHandlers:      make(map[string][]goja.Callable),
+		eventHandlers:      make(map[string][]sobek.Callable),
 		pingSendTimestamps: make(map[string]time.Time),
-		scheduled:          make(chan goja.Callable),
+		scheduled:          make(chan sobek.Callable),
 		done:               make(chan struct{}),
 		samplesOutput:      state.Samples,
 		tagsAndMeta:        args.tagsAndMeta,
@@ -309,16 +309,16 @@ func (mi *WS) dial(
 }
 
 // On is used to configure what the websocket should do on each event.
-func (s *Socket) On(event string, handler goja.Value) {
-	if handler, ok := goja.AssertFunction(handler); ok {
+func (s *Socket) On(event string, handler sobek.Value) {
+	if handler, ok := sobek.AssertFunction(handler); ok {
 		s.eventHandlers[event] = append(s.eventHandlers[event], handler)
 	}
 }
 
-func (s *Socket) handleEvent(event string, args ...goja.Value) {
+func (s *Socket) handleEvent(event string, args ...sobek.Value) {
 	if handlers, ok := s.eventHandlers[event]; ok {
 		for _, handler := range handlers {
-			if _, err := handler(goja.Undefined(), args...); err != nil {
+			if _, err := handler(sobek.Undefined(), args...); err != nil {
 				common.Throw(s.rt, err)
 			}
 		}
@@ -343,20 +343,20 @@ func (s *Socket) Send(message string) {
 }
 
 // SendBinary writes the given ArrayBuffer message to the connection.
-func (s *Socket) SendBinary(message goja.Value) {
+func (s *Socket) SendBinary(message sobek.Value) {
 	if message == nil {
 		common.Throw(s.rt, errors.New("missing argument, expected ArrayBuffer"))
 	}
 
 	msg := message.Export()
-	if ab, ok := msg.(goja.ArrayBuffer); ok {
+	if ab, ok := msg.(sobek.ArrayBuffer); ok {
 		if err := s.conn.WriteMessage(websocket.BinaryMessage, ab.Bytes()); err != nil {
 			s.handleEvent("error", s.rt.ToValue(err))
 		}
 	} else {
 		var jsType string
 		switch {
-		case goja.IsNull(message), goja.IsUndefined(message):
+		case sobek.IsNull(message), sobek.IsUndefined(message):
 			jsType = message.String()
 		default:
 			jsType = message.ToObject(s.rt).Get("constructor").ToObject(s.rt).Get("name").String()
@@ -414,7 +414,7 @@ func (s *Socket) trackPong(pingID string) {
 
 // SetTimeout executes the provided function inside the socket's event loop after at least the provided
 // timeout, which is in ms, has elapsed
-func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs float64) error {
+func (s *Socket) SetTimeout(fn sobek.Callable, timeoutMs float64) error {
 	// Starts a goroutine, blocks once on the timeout and pushes the callable
 	// back to the main loop through the scheduled channel.
 	//
@@ -443,7 +443,7 @@ func (s *Socket) SetTimeout(fn goja.Callable, timeoutMs float64) error {
 
 // SetInterval executes the provided function inside the socket's event loop each interval time, which is
 // in ms
-func (s *Socket) SetInterval(fn goja.Callable, intervalMs float64) error {
+func (s *Socket) SetInterval(fn sobek.Callable, intervalMs float64) error {
 	// Starts a goroutine, blocks forever on the ticker and pushes the callable
 	// back to the main loop through the scheduled channel.
 	//
@@ -476,7 +476,7 @@ func (s *Socket) SetInterval(fn goja.Callable, intervalMs float64) error {
 }
 
 // Close closes the webscocket. If providede the first argument will be used as the code for the close message.
-func (s *Socket) Close(args ...goja.Value) {
+func (s *Socket) Close(args ...sobek.Value) {
 	code := websocket.CloseGoingAway
 	if len(args) > 0 {
 		code = int(args[0].ToInteger())
@@ -622,21 +622,21 @@ func wrapHTTPResponse(httpResponse *http.Response) (*HTTPResponse, error) {
 }
 
 //nolint:gocognit
-func parseConnectArgs(state *lib.State, rt *goja.Runtime, args ...goja.Value) (*wsConnectArgs, error) {
+func parseConnectArgs(state *lib.State, rt *sobek.Runtime, args ...sobek.Value) (*wsConnectArgs, error) {
 	// The params argument is optional
-	var callableV, paramsV goja.Value
+	var callableV, paramsV sobek.Value
 	switch len(args) {
 	case 2:
 		paramsV = args[0]
 		callableV = args[1]
 	case 1:
-		paramsV = goja.Undefined()
+		paramsV = sobek.Undefined()
 		callableV = args[0]
 	default:
 		return nil, errors.New("invalid number of arguments to ws.connect")
 	}
 	// Get the callable (required)
-	setupFn, isFunc := goja.AssertFunction(callableV)
+	setupFn, isFunc := sobek.AssertFunction(callableV)
 	if !isFunc {
 		return nil, errors.New("last argument to ws.connect must be a function")
 	}
@@ -651,7 +651,7 @@ func parseConnectArgs(state *lib.State, rt *goja.Runtime, args ...goja.Value) (*
 		tagsAndMeta: &tagsAndMeta,
 	}
 
-	if goja.IsUndefined(paramsV) || goja.IsNull(paramsV) {
+	if sobek.IsUndefined(paramsV) || sobek.IsNull(paramsV) {
 		return parsedArgs, nil
 	}
 
@@ -661,7 +661,7 @@ func parseConnectArgs(state *lib.State, rt *goja.Runtime, args ...goja.Value) (*
 		switch k {
 		case "headers":
 			headersV := params.Get(k)
-			if goja.IsUndefined(headersV) || goja.IsNull(headersV) {
+			if sobek.IsUndefined(headersV) || sobek.IsNull(headersV) {
 				continue
 			}
 			headersObj := headersV.ToObject(rt)
@@ -677,7 +677,7 @@ func parseConnectArgs(state *lib.State, rt *goja.Runtime, args ...goja.Value) (*
 			}
 		case "jar":
 			jarV := params.Get(k)
-			if goja.IsUndefined(jarV) || goja.IsNull(jarV) {
+			if sobek.IsUndefined(jarV) || sobek.IsNull(jarV) {
 				continue
 			}
 			if v, ok := jarV.Export().(*httpModule.CookieJar); ok {

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -18,14 +18,15 @@ import (
 // callParams is the parameters that can be passed to a gRPC calls
 // like invoke or newStream.
 type callParams struct {
-	Metadata    metadata.MD
-	TagsAndMeta metrics.TagsAndMeta
-	Timeout     time.Duration
+	Metadata               metadata.MD
+	TagsAndMeta            metrics.TagsAndMeta
+	Timeout                time.Duration
+	DiscardResponseMessage bool
 }
 
 // newCallParams constructs the call parameters from the input value.
 // if no input is given, the default values are used.
-func newCallParams(vu modules.VU, input goja.Value) (*callParams, error) {
+func newCallParams(vu modules.VU, input sobek.Value) (*callParams, error) {
 	result := &callParams{
 		Metadata:    metadata.New(nil),
 		TagsAndMeta: vu.State().Tags.GetCurrentValues(),
@@ -58,6 +59,8 @@ func newCallParams(vu modules.VU, input goja.Value) (*callParams, error) {
 			if err != nil {
 				return result, fmt.Errorf("invalid timeout value: %w", err)
 			}
+		case "discardResponseMessage":
+			result.DiscardResponseMessage = params.Get(k).ToBoolean()
 		default:
 			return result, fmt.Errorf("unknown param: %q", k)
 		}
@@ -67,7 +70,7 @@ func newCallParams(vu modules.VU, input goja.Value) (*callParams, error) {
 }
 
 // newMetadata constructs a metadata.MD from the input value.
-func newMetadata(input goja.Value) (metadata.MD, error) {
+func newMetadata(input sobek.Value) (metadata.MD, error) {
 	md := metadata.New(nil)
 
 	if common.IsNullish(input) {
@@ -130,7 +133,7 @@ type connectParams struct {
 	TLS                   map[string]interface{}
 }
 
-func newConnectParams(vu modules.VU, input goja.Value) (*connectParams, error) { //nolint:gocognit
+func newConnectParams(vu modules.VU, input sobek.Value) (*connectParams, error) { //nolint:gocognit
 	result := &connectParams{
 		IsPlaintext:           false,
 		UseReflectionProtocol: false,

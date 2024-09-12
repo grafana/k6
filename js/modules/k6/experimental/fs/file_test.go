@@ -2,7 +2,6 @@ package fs
 
 import (
 	"bytes"
-	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -21,7 +20,7 @@ func TestFileImpl(t *testing.T) {
 			offset   int64
 			wantInto []byte
 			wantN    int
-			wantErr  errorKind
+			wantErr  bool
 		}{
 			{
 				name:     "reading the entire file into a buffer fitting the whole file should succeed",
@@ -30,7 +29,7 @@ func TestFileImpl(t *testing.T) {
 				offset:   0,
 				wantInto: []byte("hello"),
 				wantN:    5,
-				wantErr:  0, // No error expected
+				wantErr:  false,
 			},
 			{
 				name:     "reading a file larger than the provided buffer should succeed",
@@ -39,7 +38,7 @@ func TestFileImpl(t *testing.T) {
 				offset:   0,
 				wantInto: []byte("hel"),
 				wantN:    3,
-				wantErr:  0, // No error expected
+				wantErr:  false,
 			},
 			{
 				name:     "reading a file larger than the provided buffer at an offset should succeed",
@@ -48,7 +47,7 @@ func TestFileImpl(t *testing.T) {
 				offset:   2,
 				wantInto: []byte("llo"),
 				wantN:    3,
-				wantErr:  0, // No error expected
+				wantErr:  false,
 			},
 			{
 				name:     "reading file data into a zero sized buffer should succeed",
@@ -57,7 +56,7 @@ func TestFileImpl(t *testing.T) {
 				offset:   0,
 				wantInto: []byte{},
 				wantN:    0,
-				wantErr:  0, // No error expected
+				wantErr:  false,
 			},
 			{
 				name:     "reading past the end of the file should fill the buffer and fail with EOF",
@@ -66,7 +65,8 @@ func TestFileImpl(t *testing.T) {
 				offset:   0,
 				wantInto: []byte{'h', 'e', 'l', 'l', 'o', 0, 0, 0, 0, 0},
 				wantN:    5,
-				wantErr:  EOFError,
+				wantErr:  true,
+				// wantErr:  EOFError,
 			},
 			{
 				name:     "reading into a prefilled buffer overrides its content",
@@ -75,7 +75,7 @@ func TestFileImpl(t *testing.T) {
 				offset:   0,
 				wantInto: []byte("hello!"),
 				wantN:    5,
-				wantErr:  EOFError,
+				wantErr:  true,
 			},
 			{
 				name:     "reading an empty file should fail with EOF",
@@ -84,7 +84,7 @@ func TestFileImpl(t *testing.T) {
 				offset:   0,
 				wantInto: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 				wantN:    0,
-				wantErr:  EOFError,
+				wantErr:  true,
 			},
 			{
 				name: "reading from the end of a file should fail with EOF",
@@ -94,7 +94,7 @@ func TestFileImpl(t *testing.T) {
 				offset:   5,
 				wantInto: []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0},
 				wantN:    0,
-				wantErr:  EOFError,
+				wantErr:  true,
 			},
 		}
 
@@ -110,20 +110,9 @@ func TestFileImpl(t *testing.T) {
 				}
 				f.offset.Store(tc.offset)
 
-				gotN, err := f.Read(tc.into)
+				gotN, gotErr := f.Read(tc.into)
 
-				// Cast the error to your custom error type to access its kind
-				var gotErr errorKind
-				if err != nil {
-					var fsErr *fsError
-					ok := errors.As(err, &fsErr)
-					if !ok {
-						t.Fatalf("unexpected error type: got %T, want %T", err, &fsError{})
-					}
-					gotErr = fsErr.kind
-				}
-
-				if gotN != tc.wantN || gotErr != tc.wantErr {
+				if gotN != tc.wantN || (gotErr != nil) != tc.wantErr {
 					t.Errorf("Read() = %d, %v, want %d, %v", gotN, gotErr, tc.wantN, tc.wantErr)
 				}
 

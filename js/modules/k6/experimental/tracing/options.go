@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 )
 
@@ -26,11 +26,11 @@ type options struct {
 // defaultSamplingRate is the default sampling rate applied to options.
 const defaultSamplingRate float64 = 1.0
 
-// newOptions returns a new options object from the given goja.Value.
+// newOptions returns a new options object from the given sobek.Value.
 //
 // Note that if the sampling field value is absent, or nullish, we'll
 // set it to the `defaultSamplingRate` value.
-func newOptions(rt *goja.Runtime, from goja.Value) (options, error) {
+func newOptions(rt *sobek.Runtime, from sobek.Value) (options, error) {
 	var opts options
 
 	if err := rt.ExportTo(from, &opts); err != nil {

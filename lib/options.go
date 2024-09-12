@@ -5,6 +5,7 @@ import (
 	"crypto/x509"
 	"encoding/json"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"net"
 	"reflect"
@@ -179,7 +180,7 @@ func decryptPrivateKey(privKey, password string) ([]byte, error) {
 	   being used here because it is deprecated due to it not supporting *good* crypography
 	   ultimately though we want to support something so we will be using it for now.
 	*/
-	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password)) //nolint:staticcheck
+	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password))
 	if err != nil {
 		return nil, err
 	}
@@ -519,7 +520,7 @@ func (o Options) Apply(opts Options) Options {
 func (o Options) Validate() []error {
 	// TODO: validate all of the other options... that we should have already been validating...
 	// TODO: maybe integrate an external validation lib: https://github.com/avelino/awesome-go#validation
-	var errors []error
+	var validationErrors []error
 	if o.ExecutionSegmentSequence != nil {
 		var segmentFound bool
 		for _, segment := range *o.ExecutionSegmentSequence {
@@ -529,12 +530,18 @@ func (o Options) Validate() []error {
 			}
 		}
 		if !segmentFound {
-			errors = append(errors,
+			validationErrors = append(validationErrors,
 				fmt.Errorf("provided segment %s can't be found in sequence %s",
 					o.ExecutionSegment, o.ExecutionSegmentSequence))
 		}
 	}
-	return append(errors, o.Scenarios.Validate()...)
+	validationErrors = append(validationErrors, o.Scenarios.Validate()...)
+
+	// Duration
+	if o.SetupTimeout.Valid && o.SetupTimeout.Duration <= 0 {
+		validationErrors = append(validationErrors, errors.New("setupTimeout must be positive"))
+	}
+	return validationErrors
 }
 
 // ForEachSpecified enumerates all struct fields and calls the supplied function with each

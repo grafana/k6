@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -394,12 +394,6 @@ func resolveFieldTypes(f *fldDescriptor, handler *reporter.Handler, s *Symbols, 
 		}
 		f.msgType = dsc
 	case protoreflect.EnumDescriptor:
-		proto3 := r.Syntax() == protoreflect.Proto3
-		enumIsProto3 := dsc.Syntax() == protoreflect.Proto3
-		if fld.GetExtendee() == "" && proto3 && !enumIsProto3 {
-			// fields in a proto3 message cannot refer to proto2 enums
-			return handler.HandleErrorf(file.NodeInfo(node.FieldType()), "%s: cannot use proto2 enum %s in a proto3 message", scope, fld.GetTypeName())
-		}
 		typeName := "." + string(dsc.FullName())
 		if fld.GetTypeName() != typeName {
 			fld.TypeName = proto.String(typeName)

@@ -19,7 +19,7 @@ import (
 	"github.com/chromedp/cdproto/runtime"
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/trace"
 
@@ -104,9 +104,9 @@ const (
 )
 
 // Parse parses the given screen options.
-func (s *Screen) Parse(ctx context.Context, screen goja.Value) error {
+func (s *Screen) Parse(ctx context.Context, screen sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if screen != nil && !goja.IsUndefined(screen) && !goja.IsNull(screen) {
+	if screen != nil && !sobek.IsUndefined(screen) && !sobek.IsNull(screen) {
 		screen := screen.ToObject(rt)
 		for _, k := range screen.Keys() {
 			switch k {
@@ -296,7 +296,7 @@ func NewPage(
 
 	var err error
 	p.frameManager = NewFrameManager(ctx, s, &p, p.timeoutSettings, p.logger)
-	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger)
+	p.mainFrameSession, err = NewFrameSession(ctx, s, &p, nil, tid, p.logger, true)
 	if err != nil {
 		p.logger.Debugf("Page:NewPage:NewFrameSession:return", "sid:%v tid:%v err:%v",
 			p.sessionID(), tid, err)
@@ -441,7 +441,7 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 	return parent.adoptBackendNodeID(mainWorld, backendNodeId)
 }
 
-func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.FrameID {
+func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.FrameID, error) {
 	p.logger.Debugf("Page:getOwnerFrame", "sid:%v", p.sessionID())
 
 	// document.documentElement has frameId of the owner frame
@@ -461,34 +461,37 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) cdp.Frame
 	result, err := h.execCtx.eval(apiCtx, opts, pageFn, h)
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v err:%v", p.sessionID(), err)
-		return ""
+		return "", nil
 	}
 	switch result.(type) {
 	case nil:
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v result:nil", p.sessionID())
-		return ""
+		return "", nil
 	}
 
 	documentElement := result.(*ElementHandle)
 	if documentElement == nil {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v docel:nil", p.sessionID())
-		return ""
+		return "", nil
 	}
 	if documentElement.remoteObject.ObjectID == "" {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v robjid:%q", p.sessionID(), "")
-		return ""
+		return "", nil
 	}
 
 	action := dom.DescribeNode().WithObjectID(documentElement.remoteObject.ObjectID)
 	node, err := action.Do(cdp.WithExecutor(p.ctx, p.session))
 	if err != nil {
 		p.logger.Debugf("Page:getOwnerFrame:DescribeNode:return", "sid:%v err:%v", p.sessionID(), err)
-		return ""
+		return "", nil
 	}
 
 	frameID := node.FrameID
-	documentElement.Dispose()
-	return frameID
+	if err := documentElement.Dispose(); err != nil {
+		return "", fmt.Errorf("disposing document element while getting owner frame: %w", err)
+	}
+
+	return frameID, nil
 }
 
 func (p *Page) attachFrameSession(fid cdp.FrameID, fs *FrameSession) {
@@ -538,15 +541,19 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 	return p.setEmulatedSize(NewEmulatedSize(viewport, screen))
 }
 
-func (p *Page) updateExtraHTTPHeaders() {
+func (p *Page) updateExtraHTTPHeaders() error {
 	p.logger.Debugf("Page:updateExtraHTTPHeaders", "sid:%v", p.sessionID())
 
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
-		fs.updateExtraHTTPHeaders(false)
+		if err := fs.updateExtraHTTPHeaders(false); err != nil {
+			return fmt.Errorf("updating extra HTTP headers: %w", err)
+		}
 	}
+
+	return nil
 }
 
 func (p *Page) updateGeolocation() error {
@@ -572,26 +579,34 @@ func (p *Page) updateGeolocation() error {
 	return nil
 }
 
-func (p *Page) updateOffline() {
+func (p *Page) updateOffline() error {
 	p.logger.Debugf("Page:updateOffline", "sid:%v", p.sessionID())
 
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
-		fs.updateOffline(false)
+		if err := fs.updateOffline(false); err != nil {
+			return fmt.Errorf("updating page frame sessions to offline: %w", err)
+		}
 	}
+
+	return nil
 }
 
-func (p *Page) updateHttpCredentials() {
+func (p *Page) updateHTTPCredentials() error {
 	p.logger.Debugf("Page:updateHttpCredentials", "sid:%v", p.sessionID())
 
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
 
 	for _, fs := range p.frameSessions {
-		fs.updateHTTPCredentials(false)
+		if err := fs.updateHTTPCredentials(false); err != nil {
+			return err
+		}
 	}
+
+	return nil
 }
 
 func (p *Page) viewportSize() Size {
@@ -602,32 +617,41 @@ func (p *Page) viewportSize() Size {
 }
 
 // BringToFront activates the browser tab for this page.
-func (p *Page) BringToFront() {
+func (p *Page) BringToFront() error {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
 
 	action := cdppage.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "bringing page to front: %w", err)
+		return fmt.Errorf("bringing page to front: %w", err)
 	}
+
+	return nil
+}
+
+// SetChecked sets the checked state of the element matching the provided selector.
+func (p *Page) SetChecked(selector string, checked bool, opts sobek.Value) error {
+	p.logger.Debugf("Page:SetChecked", "sid:%v selector:%s checked:%t", p.sessionID(), selector, checked)
+
+	return p.MainFrame().SetChecked(selector, checked, opts)
 }
 
 // Check checks an element matching the provided selector.
-func (p *Page) Check(selector string, opts goja.Value) {
+func (p *Page) Check(selector string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Check", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Check(selector, opts)
+	return p.MainFrame().Check(selector, opts)
 }
 
 // Uncheck unchecks an element matching the provided selector.
-func (p *Page) Uncheck(selector string, opts goja.Value) {
+func (p *Page) Uncheck(selector string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Uncheck", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Uncheck(selector, opts)
+	return p.MainFrame().Uncheck(selector, opts)
 }
 
 // IsChecked returns true if the first element that matches the selector
 // is checked. Otherwise, returns false.
-func (p *Page) IsChecked(selector string, opts goja.Value) bool {
+func (p *Page) IsChecked(selector string, opts sobek.Value) (bool, error) {
 	p.logger.Debugf("Page:IsChecked", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsChecked(selector, opts)
@@ -641,7 +665,7 @@ func (p *Page) Click(selector string, opts *FrameClickOptions) error {
 }
 
 // Close closes the page.
-func (p *Page) Close(_ goja.Value) error {
+func (p *Page) Close(_ sobek.Value) error {
 	p.logger.Debugf("Page:Close", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.close")
 	defer span.End()
@@ -687,7 +711,7 @@ func (p *Page) Close(_ goja.Value) error {
 }
 
 // Content returns the HTML content of the page.
-func (p *Page) Content() string {
+func (p *Page) Content() (string, error) {
 	p.logger.Debugf("Page:Content", "sid:%v", p.sessionID())
 
 	return p.MainFrame().Content()
@@ -699,10 +723,10 @@ func (p *Page) Context() *BrowserContext {
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (p *Page) Dblclick(selector string, opts goja.Value) {
+func (p *Page) Dblclick(selector string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Dblclick", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Dblclick(selector, opts)
+	return p.MainFrame().Dblclick(selector, opts)
 }
 
 // DispatchEvent dispatches an event on the page to the element that matches the provided selector.
@@ -712,12 +736,13 @@ func (p *Page) DispatchEvent(selector string, typ string, eventInit any, opts *F
 	return p.MainFrame().DispatchEvent(selector, typ, eventInit, opts)
 }
 
-func (p *Page) EmulateMedia(opts goja.Value) {
+// EmulateMedia emulates the given media type.
+func (p *Page) EmulateMedia(opts sobek.Value) error {
 	p.logger.Debugf("Page:EmulateMedia", "sid:%v", p.sessionID())
 
 	parsedOpts := NewPageEmulateMediaOptions(p.mediaType, p.colorScheme, p.reducedMotion)
 	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
-		k6ext.Panic(p.ctx, "parsing emulateMedia options: %w", err)
+		return fmt.Errorf("parsing emulateMedia options: %w", err)
 	}
 
 	p.mediaType = parsedOpts.Media
@@ -728,16 +753,18 @@ func (p *Page) EmulateMedia(opts goja.Value) {
 	for _, fs := range p.frameSessions {
 		if err := fs.updateEmulateMedia(false); err != nil {
 			p.frameSessionsMu.RUnlock()
-			k6ext.Panic(p.ctx, "emulating media: %w", err)
+			return fmt.Errorf("emulating media: %w", err)
 		}
 	}
 	p.frameSessionsMu.RUnlock()
 
 	applySlowMo(p.ctx)
+
+	return nil
 }
 
 // EmulateVisionDeficiency activates/deactivates emulation of a vision deficiency.
-func (p *Page) EmulateVisionDeficiency(typ string) {
+func (p *Page) EmulateVisionDeficiency(typ string) error {
 	p.logger.Debugf("Page:EmulateVisionDeficiency", "sid:%v typ:%s", p.sessionID(), typ)
 
 	validTypes := map[string]emulation.SetEmulatedVisionDeficiencyType{
@@ -750,19 +777,21 @@ func (p *Page) EmulateVisionDeficiency(typ string) {
 	}
 	t, ok := validTypes[typ]
 	if !ok {
-		k6ext.Panic(p.ctx, "unsupported vision deficiency: '%s'", typ)
+		return fmt.Errorf("unsupported vision deficiency: %s", typ)
 	}
 
 	action := emulation.SetEmulatedVisionDeficiency(t)
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
-		k6ext.Panic(p.ctx, "setting emulated vision deficiency %q: %w", typ, err)
+		return fmt.Errorf("setting emulated vision deficiency %q: %w", typ, err)
 	}
 
 	applySlowMo(p.ctx)
+
+	return nil
 }
 
 // Evaluate runs JS code within the execution context of the main frame of the page.
-func (p *Page) Evaluate(pageFunc string, args ...any) any {
+func (p *Page) Evaluate(pageFunc string, args ...any) (any, error) {
 	p.logger.Debugf("Page:Evaluate", "sid:%v", p.sessionID())
 
 	return p.MainFrame().Evaluate(pageFunc, args...)
@@ -779,16 +808,18 @@ func (p *Page) EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	return h, nil
 }
 
-func (p *Page) Fill(selector string, value string, opts goja.Value) {
+// Fill fills an input element with the provided value.
+func (p *Page) Fill(selector string, value string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Fill", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Fill(selector, value, opts)
+	return p.MainFrame().Fill(selector, value, opts)
 }
 
-func (p *Page) Focus(selector string, opts goja.Value) {
+// Focus focuses an element matching the provided selector.
+func (p *Page) Focus(selector string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Focus", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Focus(selector, opts)
+	return p.MainFrame().Focus(selector, opts)
 }
 
 // Frames returns a list of frames on the page.
@@ -797,7 +828,8 @@ func (p *Page) Frames() []*Frame {
 }
 
 // GetAttribute returns the attribute value of the element matching the provided selector.
-func (p *Page) GetAttribute(selector string, name string, opts goja.Value) any {
+// The second return value is true if the attribute exists, and false otherwise.
+func (p *Page) GetAttribute(selector string, name string, opts sobek.Value) (string, bool, error) {
 	p.logger.Debugf("Page:GetAttribute", "sid:%v selector:%s name:%s",
 		p.sessionID(), selector, name)
 
@@ -839,25 +871,29 @@ func (p *Page) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 	return resp, nil
 }
 
-func (p *Page) Hover(selector string, opts goja.Value) {
+// Hover hovers over an element matching the provided selector.
+func (p *Page) Hover(selector string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Hover", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Hover(selector, opts)
+	return p.MainFrame().Hover(selector, opts)
 }
 
-func (p *Page) InnerHTML(selector string, opts goja.Value) string {
+// InnerHTML returns the inner HTML of the element matching the provided selector.
+func (p *Page) InnerHTML(selector string, opts sobek.Value) (string, error) {
 	p.logger.Debugf("Page:InnerHTML", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InnerHTML(selector, opts)
 }
 
-func (p *Page) InnerText(selector string, opts goja.Value) string {
+// InnerText returns the inner text of the element matching the provided selector.
+func (p *Page) InnerText(selector string, opts sobek.Value) (string, error) {
 	p.logger.Debugf("Page:InnerText", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InnerText(selector, opts)
 }
 
-func (p *Page) InputValue(selector string, opts goja.Value) string {
+// InputValue returns the value of the input element matching the provided selector.
+func (p *Page) InputValue(selector string, opts sobek.Value) (string, error) {
 	p.logger.Debugf("Page:InputValue", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().InputValue(selector, opts)
@@ -870,19 +906,25 @@ func (p *Page) IsClosed() bool {
 	return p.closed
 }
 
-func (p *Page) IsDisabled(selector string, opts goja.Value) bool {
+// IsDisabled returns true if the first element that matches the selector
+// is disabled. Otherwise, returns false.
+func (p *Page) IsDisabled(selector string, opts sobek.Value) (bool, error) {
 	p.logger.Debugf("Page:IsDisabled", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsDisabled(selector, opts)
 }
 
-func (p *Page) IsEditable(selector string, opts goja.Value) bool {
+// IsEditable returns true if the first element that matches the selector
+// is editable. Otherwise, returns false.
+func (p *Page) IsEditable(selector string, opts sobek.Value) (bool, error) {
 	p.logger.Debugf("Page:IsEditable", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsEditable(selector, opts)
 }
 
-func (p *Page) IsEnabled(selector string, opts goja.Value) bool {
+// IsEnabled returns true if the first element that matches the selector
+// is enabled. Otherwise, returns false.
+func (p *Page) IsEnabled(selector string, opts sobek.Value) (bool, error) {
 	p.logger.Debugf("Page:IsEnabled", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsEnabled(selector, opts)
@@ -891,7 +933,7 @@ func (p *Page) IsEnabled(selector string, opts goja.Value) bool {
 // IsHidden will look for an element in the dom with given selector and see if
 // the element is hidden. It will not wait for a match to occur. If no elements
 // match `false` will be returned.
-func (p *Page) IsHidden(selector string, opts goja.Value) (bool, error) {
+func (p *Page) IsHidden(selector string, opts sobek.Value) (bool, error) {
 	p.logger.Debugf("Page:IsHidden", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsHidden(selector, opts)
@@ -899,14 +941,14 @@ func (p *Page) IsHidden(selector string, opts goja.Value) (bool, error) {
 
 // IsVisible will look for an element in the dom with given selector. It will
 // not wait for a match to occur. If no elements match `false` will be returned.
-func (p *Page) IsVisible(selector string, opts goja.Value) (bool, error) {
+func (p *Page) IsVisible(selector string, opts sobek.Value) (bool, error) {
 	p.logger.Debugf("Page:IsVisible", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().IsVisible(selector, opts)
 }
 
 // Locator creates and returns a new locator for this page (main frame).
-func (p *Page) Locator(selector string, opts goja.Value) *Locator {
+func (p *Page) Locator(selector string, opts sobek.Value) *Locator {
 	p.logger.Debugf("Page:Locator", "sid:%s sel: %q opts:%+v", p.sessionID(), selector, opts)
 
 	return p.MainFrame().Locator(selector, opts)
@@ -964,10 +1006,11 @@ func (p *Page) Opener() *Page {
 	return p.opener
 }
 
-func (p *Page) Press(selector string, key string, opts goja.Value) {
+// Press presses the given key for the first element found that matches the selector.
+func (p *Page) Press(selector string, key string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Press", "sid:%v selector:%s", p.sessionID(), selector)
 
-	p.MainFrame().Press(selector, key, opts)
+	return p.MainFrame().Press(selector, key, opts)
 }
 
 // Query returns the first element matching the specified selector.
@@ -985,44 +1028,46 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cyclop
+func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen,cyclop
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
 
-	parsedOpts := NewPageReloadOptions(
+	reloadOpts := NewPageReloadOptions(
 		LifecycleEventLoad,
 		p.timeoutSettings.navigationTimeout(),
 	)
-	if err := parsedOpts.Parse(p.ctx, opts); err != nil {
+	if err := reloadOpts.Parse(p.ctx, opts); err != nil {
 		err := fmt.Errorf("parsing reload options: %w", err)
 		spanRecordError(span, err)
 		return nil, err
 	}
 
-	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, parsedOpts.Timeout)
+	timeoutCtx, timeoutCancelFn := context.WithTimeout(p.ctx, reloadOpts.Timeout)
 	defer timeoutCancelFn()
 
-	ch, evCancelFn := createWaitForEventHandler(
-		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameNavigation},
-		func(data any) bool {
+	waitForFrameNavigation, cancelWaitingForFrameNavigation := createWaitForEventHandler(
+		timeoutCtx, p.frameManager.MainFrame(),
+		[]string{EventFrameNavigation},
+		func(_ any) bool {
 			return true // Both successful and failed navigations are considered
 		},
 	)
-	defer evCancelFn() // Remove event handler
+	defer cancelWaitingForFrameNavigation() // Remove event handler
 
-	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
-		timeoutCtx, p.frameManager.MainFrame(), []string{EventFrameAddLifecycle},
+	waitForLifecycleEvent, cancelWaitingForLifecycleEvent := createWaitForEventPredicateHandler(
+		timeoutCtx, p.frameManager.MainFrame(),
+		[]string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
-				return le.Event == parsedOpts.WaitUntil
+				return le.Event == reloadOpts.WaitUntil
 			}
 			return false
 		})
-	defer lifecycleEvtCancel()
+	defer cancelWaitingForLifecycleEvent()
 
-	action := cdppage.Reload()
-	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
+	reloadAction := cdppage.Reload()
+	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		err := fmt.Errorf("reloading page: %w", err)
 		spanRecordError(span, err)
 		return nil, err
@@ -1032,36 +1077,48 @@ func (p *Page) Reload(opts goja.Value) (*Response, error) { //nolint:funlen,cycl
 		if errors.Is(err, context.DeadlineExceeded) {
 			err = &k6ext.UserFriendlyError{
 				Err:     err,
-				Timeout: parsedOpts.Timeout,
+				Timeout: reloadOpts.Timeout,
 			}
 			return fmt.Errorf("reloading page: %w", err)
 		}
 		p.logger.Debugf("Page:Reload", "timeoutCtx done: %v", err)
 
-		return err // TODO maybe wrap this as well?
+		return fmt.Errorf("reloading page: %w", err)
 	}
 
-	var event *NavigationEvent
+	var (
+		navigationEvent *NavigationEvent
+		err             error
+	)
 	select {
 	case <-p.ctx.Done():
+		err = fmt.Errorf("reloading page: %w", p.ctx.Err())
 	case <-timeoutCtx.Done():
-		err := wrapTimeoutError(timeoutCtx.Err())
+		err = wrapTimeoutError(timeoutCtx.Err())
+	case event := <-waitForFrameNavigation:
+		var ok bool
+		if navigationEvent, ok = event.(*NavigationEvent); !ok {
+			err = fmt.Errorf("unexpected event data type: %T, expected *NavigationEvent", event)
+		}
+	}
+	if err != nil {
 		spanRecordError(span, err)
 		return nil, err
-	case data := <-ch:
-		event = data.(*NavigationEvent)
 	}
 
 	var resp *Response
-	req := event.newDocument.request
-	if req != nil {
+
+	// Sometimes the new document is not yet available when the navigation event is emitted.
+	newDocument := navigationEvent.newDocument
+	if newDocument != nil && newDocument.request != nil {
+		req := newDocument.request
 		req.responseMu.RLock()
 		resp = req.response
 		req.responseMu.RUnlock()
 	}
 
 	select {
-	case <-lifecycleEvtCh:
+	case <-waitForLifecycleEvent:
 	case <-timeoutCtx.Done():
 		err := wrapTimeoutError(timeoutCtx.Err())
 		spanRecordError(span, err)
@@ -1091,16 +1148,19 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 	return buf, err
 }
 
-func (p *Page) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
+// SelectOption selects the given options and returns the array of
+// option values of the first element found that matches the selector.
+func (p *Page) SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error) {
 	p.logger.Debugf("Page:SelectOption", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().SelectOption(selector, values, opts)
 }
 
-func (p *Page) SetContent(html string, opts goja.Value) {
+// SetContent replaces the entire HTML document content.
+func (p *Page) SetContent(html string, opts sobek.Value) error {
 	p.logger.Debugf("Page:SetContent", "sid:%v", p.sessionID())
 
-	p.MainFrame().SetContent(html, opts)
+	return p.MainFrame().SetContent(html, opts)
 }
 
 // SetDefaultNavigationTimeout sets the default navigation timeout in milliseconds.
@@ -1118,32 +1178,33 @@ func (p *Page) SetDefaultTimeout(timeout int64) {
 }
 
 // SetExtraHTTPHeaders sets default HTTP headers for page and whole frame hierarchy.
-func (p *Page) SetExtraHTTPHeaders(headers map[string]string) {
+func (p *Page) SetExtraHTTPHeaders(headers map[string]string) error {
 	p.logger.Debugf("Page:SetExtraHTTPHeaders", "sid:%v", p.sessionID())
 
 	p.extraHTTPHeaders = headers
-	p.updateExtraHTTPHeaders()
+	return p.updateExtraHTTPHeaders()
 }
 
 // SetInputFiles sets input files for the selected element.
-func (p *Page) SetInputFiles(selector string, files goja.Value, opts goja.Value) error {
+func (p *Page) SetInputFiles(selector string, files sobek.Value, opts sobek.Value) error {
 	p.logger.Debugf("Page:SetInputFiles", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().SetInputFiles(selector, files, opts)
 }
 
 // SetViewportSize will update the viewport width and height.
-func (p *Page) SetViewportSize(viewportSize goja.Value) {
+func (p *Page) SetViewportSize(viewportSize sobek.Value) error {
 	p.logger.Debugf("Page:SetViewportSize", "sid:%v", p.sessionID())
 
-	s := &Size{}
+	var s Size
 	if err := s.Parse(p.ctx, viewportSize); err != nil {
-		k6ext.Panic(p.ctx, "parsing viewport size: %w", err)
+		return fmt.Errorf("parsing viewport size: %w", err)
 	}
-	if err := p.setViewportSize(s); err != nil {
-		k6ext.Panic(p.ctx, "setting viewport size: %w", err)
+	if err := p.setViewportSize(&s); err != nil {
+		return fmt.Errorf("setting viewport size: %w", err)
 	}
-	applySlowMo(p.ctx)
+
+	return nil
 }
 
 // Tap will tap the element matching the provided selector.
@@ -1153,7 +1214,10 @@ func (p *Page) Tap(selector string, opts *FrameTapOptions) error {
 	return p.MainFrame().Tap(selector, opts)
 }
 
-func (p *Page) TextContent(selector string, opts goja.Value) string {
+// TextContent returns the textContent attribute of the first element found
+// that matches the selector. The second return value is true if the returned
+// text content is not null or empty, and false otherwise.
+func (p *Page) TextContent(selector string, opts sobek.Value) (string, bool, error) {
 	p.logger.Debugf("Page:TextContent", "sid:%v selector:%s", p.sessionID(), selector)
 
 	return p.MainFrame().TextContent(selector, opts)
@@ -1165,13 +1229,21 @@ func (p *Page) Timeout() time.Duration {
 	return p.defaultTimeout()
 }
 
-func (p *Page) Title() string {
+// Title returns the page title.
+func (p *Page) Title() (string, error) {
 	p.logger.Debugf("Page:Title", "sid:%v", p.sessionID())
 
-	// TODO: return error
+	js := `() => document.title`
+	v, err := p.Evaluate(js)
+	if err != nil {
+		return "", fmt.Errorf("getting page title: %w", err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("getting page title: expected string, got %T", v)
+	}
 
-	v := `() => document.title`
-	return p.Evaluate(v).(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // ThrottleCPU will slow the CPU down from chrome's perspective to simulate
@@ -1208,20 +1280,28 @@ func (p *Page) ThrottleNetwork(networkProfile NetworkProfile) error {
 	return nil
 }
 
-func (p *Page) Type(selector string, text string, opts goja.Value) {
+// Type text on the first element found matches the selector.
+func (p *Page) Type(selector string, text string, opts sobek.Value) error {
 	p.logger.Debugf("Page:Type", "sid:%v selector:%s text:%s", p.sessionID(), selector, text)
 
-	p.MainFrame().Type(selector, text, opts)
+	return p.MainFrame().Type(selector, text, opts)
 }
 
 // URL returns the location of the page.
-func (p *Page) URL() string {
+func (p *Page) URL() (string, error) {
 	p.logger.Debugf("Page:URL", "sid:%v", p.sessionID())
 
-	// TODO: return error
+	js := `() => document.location.toString()`
+	v, err := p.Evaluate(js)
+	if err != nil {
+		return "", fmt.Errorf("getting page URL: %w", err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("getting page URL: expected string, got %T", v)
+	}
 
-	v := `() => document.location.toString()`
-	return p.Evaluate(v).(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // ViewportSize will return information on the viewport width and height.
@@ -1242,10 +1322,10 @@ func (p *Page) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, jsA
 }
 
 // WaitForLoadState waits for the specified page life cycle event.
-func (p *Page) WaitForLoadState(state string, opts goja.Value) {
+func (p *Page) WaitForLoadState(state string, opts sobek.Value) error {
 	p.logger.Debugf("Page:WaitForLoadState", "sid:%v state:%q", p.sessionID(), state)
 
-	p.frameManager.MainFrame().WaitForLoadState(state, opts)
+	return p.frameManager.MainFrame().WaitForLoadState(state, opts)
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
@@ -1264,7 +1344,7 @@ func (p *Page) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (p *Page) WaitForSelector(selector string, opts goja.Value) (*ElementHandle, error) {
+func (p *Page) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
 	p.logger.Debugf("Page:WaitForSelector",
 		"sid:%v stid:%v ptid:%v selector:%s",
 		p.sessionID(), p.session.TargetID(), p.targetID, selector)

@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/js/common"
@@ -24,7 +24,7 @@ type (
 	// ModuleInstance represents an instance of the execution module.
 	ModuleInstance struct {
 		vu  modules.VU
-		obj *goja.Object
+		obj *sobek.Object
 	}
 )
 
@@ -44,14 +44,14 @@ func (*RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	mi := &ModuleInstance{vu: vu}
 	rt := vu.Runtime()
 	o := rt.NewObject()
-	defProp := func(name string, newInfo func() (*goja.Object, error)) {
-		err := o.DefineAccessorProperty(name, rt.ToValue(func() goja.Value {
+	defProp := func(name string, newInfo func() (*sobek.Object, error)) {
+		err := o.DefineAccessorProperty(name, rt.ToValue(func() sobek.Value {
 			obj, err := newInfo()
 			if err != nil {
 				common.Throw(rt, err)
 			}
 			return obj
-		}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 		if err != nil {
 			common.Throw(rt, err)
 		}
@@ -73,9 +73,9 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 
 var errRunInInitContext = errors.New("getting scenario information outside of the VU context is not supported")
 
-// newScenarioInfo returns a goja.Object with property accessors to retrieve
+// newScenarioInfo returns a sobek.Object with property accessors to retrieve
 // information about the scenario the current VU is running in.
-func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
+func (mi *ModuleInstance) newScenarioInfo() (*sobek.Object, error) {
 	rt := mi.vu.Runtime()
 	vuState := mi.vu.State()
 	if vuState == nil {
@@ -130,9 +130,9 @@ func (mi *ModuleInstance) newScenarioInfo() (*goja.Object, error) {
 //nolint:lll,gochecknoglobals
 var instanceInfoInitContextErr = common.NewInitContextError("getting instance information in the init context is not supported")
 
-// newInstanceInfo returns a goja.Object with property accessors to retrieve
+// newInstanceInfo returns a sobek.Object with property accessors to retrieve
 // information about the local instance stats.
-func (mi *ModuleInstance) newInstanceInfo() (*goja.Object, error) {
+func (mi *ModuleInstance) newInstanceInfo() (*sobek.Object, error) {
 	es := lib.GetExecutionState(mi.vu.Context())
 	if es == nil {
 		return nil, instanceInfoInitContextErr
@@ -163,19 +163,19 @@ func (mi *ModuleInstance) newInstanceInfo() (*goja.Object, error) {
 //nolint:gochecknoglobals
 var testInfoInitContextErr = common.NewInitContextError("getting test options in the init context is not supported")
 
-// newTestInfo returns a goja.Object with property accessors to retrieve
+// newTestInfo returns a sobek.Object with property accessors to retrieve
 // information and control execution of the overall test run.
-func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
-	// the cache of goja.Object in the optimal parsed form
+func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
+	// the cache of sobek.Object in the optimal parsed form
 	// for the consolidated and derived lib.Options
-	var optionsObject *goja.Object
+	var optionsObject *sobek.Object
 	rt := mi.vu.Runtime()
 	ti := map[string]func() interface{}{
 		// stop the test run
 		"abort": func() interface{} {
-			return func(msg goja.Value) {
+			return func(msg sobek.Value) {
 				reason := errext.AbortTest
-				if msg != nil && !goja.IsUndefined(msg) {
+				if msg != nil && !sobek.IsUndefined(msg) {
 					reason = fmt.Sprintf("%s: %s", reason, msg.String())
 				}
 				rt.Interrupt(&errext.InterruptError{Reason: reason})
@@ -203,9 +203,9 @@ func (mi *ModuleInstance) newTestInfo() (*goja.Object, error) {
 //nolint:gochecknoglobals
 var vuInfoInitContextErr = common.NewInitContextError("getting VU information in the init context is not supported")
 
-// newVUInfo returns a goja.Object with property accessors to retrieve
+// newVUInfo returns a sobek.Object with property accessors to retrieve
 // information about the currently executing VU.
-func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
+func (mi *ModuleInstance) newVUInfo() (*sobek.Object, error) {
 	vuState := mi.vu.State()
 	if vuState == nil {
 		return nil, vuInfoInitContextErr
@@ -262,11 +262,11 @@ func (mi *ModuleInstance) newVUInfo() (*goja.Object, error) {
 	return o, err
 }
 
-func newInfoObj(rt *goja.Runtime, props map[string]func() interface{}) (*goja.Object, error) {
+func newInfoObj(rt *sobek.Runtime, props map[string]func() interface{}) (*sobek.Object, error) {
 	o := rt.NewObject()
 
 	for p, get := range props {
-		err := o.DefineAccessorProperty(p, rt.ToValue(get), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		err := o.DefineAccessorProperty(p, rt.ToValue(get), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 		if err != nil {
 			return nil, err
 		}
@@ -276,11 +276,11 @@ func newInfoObj(rt *goja.Runtime, props map[string]func() interface{}) (*goja.Ob
 }
 
 // optionsAsObject maps the lib.Options struct that contains the consolidated
-// and derived options configuration in a goja.Object.
+// and derived options configuration in a sobek.Object.
 //
 // When values are not set then the default value returned from JSON is used.
 // Most of the lib.Options are Nullable types so they will be null on default.
-func optionsAsObject(rt *goja.Runtime, options lib.Options) (*goja.Object, error) {
+func optionsAsObject(rt *sobek.Runtime, options lib.Options) (*sobek.Object, error) {
 	b, err := json.Marshal(options)
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode the lib.Options as json: %w", err)
@@ -288,8 +288,8 @@ func optionsAsObject(rt *goja.Runtime, options lib.Options) (*goja.Object, error
 
 	// Using the native JS parser function guarantees getting
 	// the supported types for deep freezing the complex object.
-	jsonParse, _ := goja.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("parse"))
-	parsed, err := jsonParse(goja.Undefined(), rt.ToValue(string(b)))
+	jsonParse, _ := sobek.AssertFunction(rt.GlobalObject().Get("JSON").ToObject(rt).Get("parse"))
+	parsed, err := jsonParse(sobek.Undefined(), rt.ToValue(string(b)))
 	if err != nil {
 		common.Throw(rt, err)
 	}
@@ -303,7 +303,7 @@ func optionsAsObject(rt *goja.Runtime, options lib.Options) (*goja.Object, error
 		}
 	}
 	mustSetReadOnlyProperty := func(k string, v interface{}) {
-		defErr := obj.DefineDataProperty(k, rt.ToValue(v), goja.FLAG_FALSE, goja.FLAG_FALSE, goja.FLAG_TRUE)
+		defErr := obj.DefineDataProperty(k, rt.ToValue(v), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 		if err != nil {
 			common.Throw(rt, defErr)
 		}
@@ -314,13 +314,13 @@ func optionsAsObject(rt *goja.Runtime, options lib.Options) (*goja.Object, error
 	mustDelete("duration")
 	mustDelete("stages")
 
-	consoleOutput := goja.Null()
+	consoleOutput := sobek.Null()
 	if options.ConsoleOutput.Valid {
 		consoleOutput = rt.ToValue(options.ConsoleOutput.String)
 	}
 	mustSetReadOnlyProperty("consoleOutput", consoleOutput)
 
-	localIPs := goja.Null()
+	localIPs := sobek.Null()
 	if options.LocalIPs.Valid {
 		raw, marshalErr := options.LocalIPs.MarshalText()
 		if err != nil {
@@ -339,12 +339,12 @@ func optionsAsObject(rt *goja.Runtime, options lib.Options) (*goja.Object, error
 }
 
 type tagsDynamicObject struct {
-	runtime *goja.Runtime
+	runtime *sobek.Runtime
 	state   *lib.State
 }
 
 // Get a property value for the key. May return nil if the property does not exist.
-func (o *tagsDynamicObject) Get(key string) goja.Value {
+func (o *tagsDynamicObject) Get(key string) sobek.Value {
 	tcv := o.state.Tags.GetCurrentValues()
 	if tag, ok := tcv.Tags.Get(key); ok {
 		return o.runtime.ToValue(tag)
@@ -353,9 +353,9 @@ func (o *tagsDynamicObject) Get(key string) goja.Value {
 }
 
 // Set a property value for the key. It returns true if succeed. String, Boolean
-// and Number types are implicitly converted to the goja's relative string
+// and Number types are implicitly converted to the Sobek's relative string
 // representation. An exception is raised in case a denied type is provided.
-func (o *tagsDynamicObject) Set(key string, val goja.Value) bool {
+func (o *tagsDynamicObject) Set(key string, val sobek.Value) bool {
 	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
 		if err := common.ApplyCustomUserTag(tagsAndMeta, key, val); err != nil {
 			panic(o.runtime.NewTypeError(err.Error()))
@@ -396,12 +396,12 @@ func (o *tagsDynamicObject) Keys() []string {
 }
 
 type metadataDynamicObject struct {
-	runtime *goja.Runtime
+	runtime *sobek.Runtime
 	state   *lib.State
 }
 
 // Get a property value for the key. May return nil if the property does not exist.
-func (o *metadataDynamicObject) Get(key string) goja.Value {
+func (o *metadataDynamicObject) Get(key string) sobek.Value {
 	tcv := o.state.Tags.GetCurrentValues()
 	if metadatum, ok := tcv.Metadata[key]; ok {
 		return o.runtime.ToValue(metadatum)
@@ -410,9 +410,9 @@ func (o *metadataDynamicObject) Get(key string) goja.Value {
 }
 
 // Set a property value for the key. It returns true if successful. String, Boolean
-// and Number types are implicitly converted to the goja's relative string
+// and Number types are implicitly converted to the Sobek's relative string
 // representation. An exception is raised in case a denied type is provided.
-func (o *metadataDynamicObject) Set(key string, val goja.Value) bool {
+func (o *metadataDynamicObject) Set(key string, val sobek.Value) bool {
 	o.state.Tags.Modify(func(tagsAndMeta *metrics.TagsAndMeta) {
 		if err := common.ApplyCustomUserMetadata(tagsAndMeta, key, val); err != nil {
 			panic(o.runtime.NewTypeError(err.Error()))

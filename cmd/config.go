@@ -30,7 +30,11 @@ func configFlagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.StringArrayP("out", "o", []string{}, "`uri` for an external metrics database")
 	flags.BoolP("linger", "l", false, "keep the API server alive past test end")
-	flags.Bool("no-usage-report", false, "don't send anonymous stats to the developers")
+	flags.Bool(
+		"no-usage-report",
+		false,
+		"don't send anonymous usage"+"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
+	)
 	return flags
 }
 
@@ -168,15 +172,13 @@ func readEnvConfig(envMap map[string]string) (Config, error) {
 // TODO: add better validation, more explicit default values and improve consistency between formats
 // TODO: accumulate all errors and differentiate between the layers?
 func getConsolidatedConfig(gs *state.GlobalState, cliConf Config, runnerOpts lib.Options) (conf Config, err error) {
-	// TODO: use errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig) where it makes sense?
-
 	fileConf, err := readDiskConfig(gs)
 	if err != nil {
-		return conf, err
+		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 	envConf, err := readEnvConfig(gs.Env)
 	if err != nil {
-		return conf, err
+		return conf, errext.WithExitCodeIfNone(err, exitcodes.InvalidConfig)
 	}
 
 	conf = cliConf.Apply(fileConf)

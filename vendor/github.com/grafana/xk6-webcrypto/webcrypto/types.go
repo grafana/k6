@@ -3,7 +3,7 @@ package webcrypto
 import (
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // bitLength is a type alias for the length of a bits collection.
@@ -29,7 +29,7 @@ func ToBytes(data interface{}) ([]byte, error) {
 		return dt, nil
 	case string:
 		return []byte(dt), nil
-	case goja.ArrayBuffer:
+	case sobek.ArrayBuffer:
 		return dt.Bytes(), nil
 	default:
 		return nil, fmt.Errorf("invalid type %T, expected string, []byte or ArrayBuffer", data)

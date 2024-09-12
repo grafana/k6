@@ -419,7 +419,7 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 
 	// Check what the execScheduler.Run() error is.
 	if err != nil {
-		err = common.UnwrapGojaInterruptedError(err)
+		err = common.UnwrapSobekInterruptedError(err)
 		logger.WithError(err).Debug("Test finished with an error")
 		return err
 	}

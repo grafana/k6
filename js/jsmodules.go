@@ -13,6 +13,7 @@ import (
 	"go.k6.io/k6/js/modules/k6/data"
 	"go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modules/k6/execution"
+	"go.k6.io/k6/js/modules/k6/experimental/csv"
 	"go.k6.io/k6/js/modules/k6/experimental/fs"
 	"go.k6.io/k6/js/modules/k6/experimental/streams"
 	"go.k6.io/k6/js/modules/k6/experimental/tracing"
@@ -38,21 +39,30 @@ func getInternalJSModules() map[string]interface{} {
 		"k6/encoding":                encoding.New(),
 		"k6/timers":                  timers.New(),
 		"k6/execution":               execution.New(),
+		"k6/experimental/csv":        csv.New(),
 		"k6/experimental/redis":      redis.New(),
 		"k6/experimental/streams":    streams.New(),
 		"k6/experimental/webcrypto":  webcrypto.New(),
 		"k6/experimental/websockets": &expws.RootModule{},
-		"k6/experimental/timers": newWarnExperimentalModule(timers.New(),
-			"k6/experimental/timers is now part of the k6 core, please change your imports to use k6/timers instead."+
-				" The k6/experimental/timers will be removed in k6 v0.52.0"),
-		"k6/experimental/tracing": tracing.New(),
-		"k6/experimental/browser": browser.New(),
-		"k6/experimental/fs":      fs.New(),
-		"k6/net/grpc":             grpc.New(),
-		"k6/html":                 html.New(),
-		"k6/http":                 http.New(),
-		"k6/metrics":              metrics.New(),
-		"k6/ws":                   ws.New(),
+		"k6/experimental/timers": newRemovedModule(
+			"k6/experimental/timers has been graduated, please use k6/timers instead."),
+		"k6/experimental/tracing": newWarnExperimentalModule(tracing.New(),
+			"k6/experimental/tracing is now deprecated. All of its functionality is available as pure javascript module."+
+				" More info available at the docs:"+
+				" https://grafana.com/docs/k6/latest/javascript-api/jslib/http-instrumentation-tempo"+
+				" The module will be removed after November 11th, 2024 (v0.55.0). Ensure your scripts are migrated by then."),
+		"k6/experimental/browser": newWarnExperimentalModule(browser.NewSync(),
+			"Please update your imports to use k6/browser instead of k6/experimental/browser,"+
+				" which will be removed after September 23rd, 2024 (v0.54.0). Ensure your scripts are migrated by then."+
+				" For more information, see the migration guide at the link:"+
+				" https://grafana.com/docs/k6/latest/using-k6-browser/migrating-to-k6-v0-52/"),
+		"k6/browser":         browser.New(),
+		"k6/experimental/fs": fs.New(),
+		"k6/net/grpc":        grpc.New(),
+		"k6/html":            html.New(),
+		"k6/http":            http.New(),
+		"k6/metrics":         metrics.New(),
+		"k6/ws":              ws.New(),
 		"k6/experimental/grpc": newRemovedModule(
 			"k6/experimental/grpc has been graduated, please use k6/net/grpc instead." +
 				" See https://grafana.com/docs/k6/latest/javascript-api/k6-net-grpc/ for more information.",

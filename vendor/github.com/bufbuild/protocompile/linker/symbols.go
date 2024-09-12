@@ -1,4 +1,4 @@
-// Copyright 2020-2023 Buf Technologies, Inc.
+// Copyright 2020-2024 Buf Technologies, Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -38,6 +38,14 @@ const unknownFilePath = "<unknown file>"
 // This type is thread-safe.
 type Symbols struct {
 	pkgTrie packageSymbols
+
+	// We don't know the packages for these symbols, so we can't
+	// keep them in the pkgTrie. In vast majority of cases, this
+	// will always be empty/unused. When used, it ensures that
+	// multiple extension declarations don't refer to the same
+	// extension.
+	extDeclsMu sync.Mutex
+	extDecls   map[protoreflect.FullName]extDecl
 }
 
 type packageSymbols struct {
@@ -59,6 +67,12 @@ type symbolEntry struct {
 	isPackage   bool
 }
 
+type extDecl struct {
+	pos      ast.SourcePos
+	extendee protoreflect.FullName
+	tag      protoreflect.FieldNumber
+}
+
 // Import populates the symbol table with all symbols/elements and extension
 // tags present in the given file descriptor. If s is nil or if fd has already
 // been imported into s, this returns immediately without doing anything. If any
@@ -69,6 +83,10 @@ func (s *Symbols) Import(fd protoreflect.FileDescriptor, handler *reporter.Handl
 		return nil
 	}
 
+	if f, ok := fd.(protoreflect.FileImport); ok {
+		// unwrap any import instance
+		fd = f.FileDescriptor
+	}
 	if f, ok := fd.(*file); ok {
 		// unwrap any file instance
 		fd = f.FileDescriptor
@@ -540,6 +558,9 @@ func (s *packageSymbols) commitResultLocked(r *result) {
 	s.files[r] = struct{}{}
 }
 
+// AddExtension records the given extension, which is used to ensure that no two files
+// attempt to extend the same message using the same tag. The given pkg should be the
+// package that defines extendee.
 func (s *Symbols) AddExtension(pkg, extendee protoreflect.FullName, tag protoreflect.FieldNumber, span ast.SourceSpan, handler *reporter.Handler) error {
 	if pkg != "" {
 		if !strings.HasPrefix(string(extendee), string(pkg)+".") {
@@ -558,17 +579,38 @@ func (s *packageSymbols) addExtension(extendee protoreflect.FullName, tag protor
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	extNum := extNumber{extendee: extendee, tag: tag}
+	if existing, ok := s.exts[extNum]; ok {
+		return handler.HandleErrorf(span, "extension with tag %d for message %s already defined at %v", tag, extendee, existing)
+	}
+
 	if s.exts == nil {
 		s.exts = map[extNumber]ast.SourcePos{}
 	}
+	s.exts[extNum] = span.Start()
+	return nil
+}
 
-	extNum := extNumber{extendee: extendee, tag: tag}
-	if existing, ok := s.exts[extNum]; ok {
-		if err := handler.HandleErrorf(span, "extension with tag %d for message %s already defined at %v", tag, extendee, existing); err != nil {
-			return err
+// AddExtensionDeclaration records the given extension declaration, which is used to
+// ensure that no two declarations refer to the same extension.
+func (s *Symbols) AddExtensionDeclaration(extension, extendee protoreflect.FullName, tag protoreflect.FieldNumber, span ast.SourceSpan, handler *reporter.Handler) error {
+	s.extDeclsMu.Lock()
+	defer s.extDeclsMu.Unlock()
+	existing, ok := s.extDecls[extension]
+	if ok {
+		if existing.extendee == extendee && existing.tag == tag {
+			// This is a declaration that has already been added. Ignore.
+			return nil
 		}
-	} else {
-		s.exts[extNum] = span.Start()
+		return handler.HandleErrorf(span, "extension %s already declared as extending %s with tag %d at %v", extension, existing.extendee, existing.tag, existing.pos)
+	}
+	if s.extDecls == nil {
+		s.extDecls = map[protoreflect.FullName]extDecl{}
+	}
+	s.extDecls[extension] = extDecl{
+		pos:      span.Start(),
+		extendee: extendee,
+		tag:      tag,
 	}
 	return nil
 }

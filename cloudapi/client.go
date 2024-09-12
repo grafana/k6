@@ -20,7 +20,7 @@ const (
 	// MaxRetries specifies max retry attempts
 	MaxRetries = 3
 
-	k6IdempotencyKeyHeader = "k6-Idempotency-Key"
+	k6IdempotencyKeyHeader = "K6-Idempotency-Key"
 )
 
 // Client handles communication with the k6 Cloud API.
@@ -212,7 +212,7 @@ func shouldRetry(resp *http.Response, err error, attempt, maxAttempts int) bool 
 		return true
 	}
 
-	if resp.StatusCode >= 500 || resp.StatusCode == 429 {
+	if resp.StatusCode >= 500 || resp.StatusCode == http.StatusTooManyRequests {
 		return true
 	}
 

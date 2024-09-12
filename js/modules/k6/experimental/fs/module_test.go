@@ -95,7 +95,7 @@ func TestOpen(t *testing.T) {
 
 		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(`
 			try {
-				const file = await fs.open('bonjour.txt')	
+				const file = await fs.open('bonjour.txt')
 				throw 'unexpected promise resolution with result: ' + file;
 			} catch (err) {
 				if (err.name !== 'ForbiddenError') {
@@ -199,7 +199,7 @@ func TestOpen(t *testing.T) {
 func TestFile(t *testing.T) {
 	t.Parallel()
 
-	t.Run("stat method should succeed", func(t *testing.T) {
+	t.Run("Stat method should succeed", func(t *testing.T) {
 		t.Parallel()
 
 		runtime, err := newConfiguredRuntime(t)
@@ -338,7 +338,7 @@ func TestFile(t *testing.T) {
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
 		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
-			const file = await fs.open(%q);	
+			const file = await fs.open(%q);
 			let bytesRead;
 
 			// No argument should fail with TypeError.
@@ -406,11 +406,11 @@ func TestFile(t *testing.T) {
 		runtime.VU.InitEnvField.FileSystems["file"] = fs
 
 		_, err = runtime.RunOnEventLoop(wrapInAsyncLambda(fmt.Sprintf(`
-			// file size is 3 
+			// file size is 3
 			const file = await fs.open(%q);
 
 			// Create a buffer of size fileSize + 1
-			let buffer = new Uint8Array(4); 
+			let buffer = new Uint8Array(4);
 			let n = await file.read(buffer)
 			if (n !== 3) {
 				throw 'expected read to return 10, got ' + n + ' instead';
@@ -555,7 +555,7 @@ func TestFile(t *testing.T) {
 			// Invalid type offset should fail with TypeError.
 			try {
 				newOffset = await file.seek('abc')
-				throw "file.seek('abc') promise unexpectedly resolved with result: " + newOffset 
+				throw "file.seek('abc') promise unexpectedly resolved with result: " + newOffset
 			} catch (err) {
 				if (err.name !== 'TypeError') {
 					throw "file.seek('1') rejected with unexpected error: " + err
@@ -585,7 +585,7 @@ func TestFile(t *testing.T) {
 			// Invalid whence should fail with TypeError.
 			try {
 				newOffset = await file.seek(1, -1)
-				throw "file.seek(1, -1) promise unexpectedly resolved with result: " + newOffset 
+				throw "file.seek(1, -1) promise unexpectedly resolved with result: " + newOffset
 			} catch (err) {
 				if (err.name !== 'TypeError') {
 					throw "file.seek(1, -1) rejected with unexpected error: " + err

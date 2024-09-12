@@ -5,7 +5,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/mstoykov/k6-taskqueue-lib/taskqueue"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
@@ -57,7 +57,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 }
 
 // NewClient is the JS constructor for the grpc Client.
-func (mi *ModuleInstance) NewClient(_ goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) NewClient(_ sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 	return rt.ToValue(&Client{vu: mi.vu}).ToObject(rt)
 }
@@ -96,7 +96,7 @@ func (mi *ModuleInstance) Exports() modules.Exports {
 }
 
 // stream returns a new stream object
-func (mi *ModuleInstance) stream(c goja.ConstructorCall) *goja.Object {
+func (mi *ModuleInstance) stream(c sobek.ConstructorCall) *sobek.Object {
 	rt := mi.vu.Runtime()
 
 	client, err := extractClient(c.Argument(0), rt)
@@ -152,8 +152,8 @@ func (mi *ModuleInstance) stream(c goja.ConstructorCall) *goja.Object {
 	return s.obj
 }
 
-// extractClient extracts & validates a grpc.Client from a goja.Value.
-func extractClient(v goja.Value, rt *goja.Runtime) (*Client, error) {
+// extractClient extracts & validates a grpc.Client from a sobek.Value.
+func extractClient(v sobek.Value, rt *sobek.Runtime) (*Client, error) {
 	if common.IsNullish(v) {
 		return nil, errors.New("empty gRPC client")
 	}

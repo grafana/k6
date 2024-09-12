@@ -32,6 +32,7 @@ import (
 	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
@@ -41,6 +42,7 @@ func getTestPreInitState(tb testing.TB) *lib.TestPreInitState {
 		RuntimeOptions: lib.RuntimeOptions{},
 		Registry:       reg,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(reg),
+		Usage:          usage.New(),
 	}
 }
 
@@ -363,8 +365,8 @@ func TestSchedulerSystemTags(t *testing.T) {
 
 	expTrailPVUTags := expCommonTrailTags.With("scenario", "per_vu_test")
 	expTrailSITags := expCommonTrailTags.With("scenario", "shared_test")
-	expNetTrailPVUTags := testRunState.RunTags.With("group", "").With("scenario", "per_vu_test")
-	expNetTrailSITags := testRunState.RunTags.With("group", "").With("scenario", "shared_test")
+	expDataSentPVUTags := testRunState.RunTags.With("group", "").With("scenario", "per_vu_test")
+	expDataSentSITags := testRunState.RunTags.With("group", "").With("scenario", "shared_test")
 
 	var gotCorrectTags int
 	for {
@@ -375,9 +377,13 @@ func TestSchedulerSystemTags(t *testing.T) {
 				if s.Tags == expTrailPVUTags || s.Tags == expTrailSITags {
 					gotCorrectTags++
 				}
-			case *netext.NetTrail:
-				if s.Tags == expNetTrailPVUTags || s.Tags == expNetTrailSITags {
-					gotCorrectTags++
+			default:
+				for _, sample := range s.GetSamples() {
+					if sample.Metric.Name == metrics.DataSentName {
+						if sample.Tags == expDataSentPVUTags || sample.Tags == expDataSentSITags {
+							gotCorrectTags++
+						}
+					}
 				}
 			}
 
@@ -487,7 +493,7 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 				defer stopEmission()
 				require.NoError(t, execScheduler.Run(ctx, ctx, samples))
 			}()
-			var gotTrailTag, gotNetTrailTag bool
+			var gotTrailTag, gotDataSentTag bool
 			for {
 				select {
 				case sample := <-samples:
@@ -497,14 +503,16 @@ func TestSchedulerRunCustomTags(t *testing.T) {
 							gotTrailTag = true
 						}
 					}
-					if netTrail, ok := sample.(*netext.NetTrail); ok && !gotNetTrailTag {
-						tags := netTrail.Tags.Map()
-						if v, ok := tags["customTag"]; ok && v == "value" {
-							gotNetTrailTag = true
+					for _, s := range sample.GetSamples() {
+						if s.Metric.Name == metrics.DataSentName && !gotDataSentTag {
+							tags := s.Tags.Map()
+							if v, ok := tags["customTag"]; ok && v == "value" {
+								gotDataSentTag = true
+							}
 						}
 					}
 				case <-done:
-					if !gotTrailTag || !gotNetTrailTag {
+					if !gotTrailTag || !gotDataSentTag {
 						assert.FailNow(t, "a sample with expected tag wasn't received")
 					}
 					return
@@ -692,11 +700,15 @@ func TestSchedulerRunCustomConfigNoCrossover(t *testing.T) {
 					gotSampleTags++
 				}
 			}
-		case *netext.NetTrail:
-			tags := s.Tags.Map()
-			for _, expTags := range expectedNetTrailTags {
-				if reflect.DeepEqual(expTags, tags) {
-					gotSampleTags++
+		case metrics.Samples:
+			for _, sample := range s.GetSamples() {
+				if sample.Metric.Name == metrics.DataSentName {
+					tags := sample.Tags.Map()
+					for _, expTags := range expectedNetTrailTags {
+						if reflect.DeepEqual(expTags, tags) {
+							gotSampleTags++
+						}
+					}
 				}
 			}
 		case metrics.ConnectedSamples:
@@ -1102,6 +1114,7 @@ func TestDNSResolverCache(t *testing.T) {
 					Logger:         logger,
 					BuiltinMetrics: builtinMetrics,
 					Registry:       registry,
+					Usage:          usage.New(),
 				},
 				&loader.SourceData{
 					URL: &url.URL{Path: "/script.js"}, Data: []byte(script),
@@ -1275,7 +1288,7 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 			Value: expValue,
 		}
 	}
-	getDummyTrail := func(group string, emitIterations bool, addExpTags ...string) metrics.SampleContainer {
+	getNetworkSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
 		expTags := []string{"group", group}
 		expTags = append(expTags, addExpTags...)
 		dialer := netext.NewDialer(
@@ -1284,25 +1297,56 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 		)
 
 		ctm := metrics.TagsAndMeta{Tags: getTags(piState.Registry, expTags...)}
-		return dialer.GetTrail(time.Now(), time.Now(), true, emitIterations, ctm, piState.BuiltinMetrics)
+		return dialer.IOSamples(time.Now(), ctm, piState.BuiltinMetrics)
+	}
+
+	getIterationsSamples := func(group string, addExpTags ...string) metrics.SampleContainer {
+		expTags := []string{"group", group}
+		expTags = append(expTags, addExpTags...)
+		ctm := metrics.TagsAndMeta{Tags: getTags(piState.Registry, expTags...)}
+		startTime := time.Now()
+		endTime := time.Now()
+
+		return metrics.Samples([]metrics.Sample{
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: piState.BuiltinMetrics.IterationDuration,
+					Tags:   ctm.Tags,
+				},
+				Time:     endTime,
+				Metadata: ctm.Metadata,
+				Value:    metrics.D(endTime.Sub(startTime)),
+			},
+			{
+				TimeSeries: metrics.TimeSeries{
+					Metric: piState.BuiltinMetrics.Iterations,
+					Tags:   ctm.Tags,
+				},
+				Time:     endTime,
+				Metadata: ctm.Metadata,
+				Value:    1,
+			},
+		})
 	}
 
 	// Initially give a long time (5s) for the execScheduler to start
 	expectIn(0, 5000, getSample(1, testCounter, "group", "::setup", "place", "setupBeforeSleep"))
 	expectIn(900, 1100, getSample(2, testCounter, "group", "::setup", "place", "setupAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::setup", false))
+	expectIn(0, 100, getNetworkSamples("::setup"))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep", "scenario", "default"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep", "scenario", "default"))
-	expectIn(0, 100, getDummyTrail("", true, "scenario", "default"))
+	expectIn(0, 100, getNetworkSamples("", "scenario", "default"))
+	expectIn(0, 100, getIterationsSamples("", "scenario", "default"))
 
 	expectIn(0, 100, getSample(5, testCounter, "group", "", "place", "defaultBeforeSleep", "scenario", "default"))
 	expectIn(900, 1100, getSample(6, testCounter, "group", "", "place", "defaultAfterSleep", "scenario", "default"))
-	expectIn(0, 100, getDummyTrail("", true, "scenario", "default"))
+	expectIn(0, 100, getNetworkSamples("", "scenario", "default"))
+	expectIn(0, 100, getIterationsSamples("", "scenario", "default"))
 
 	expectIn(0, 1000, getSample(3, testCounter, "group", "::teardown", "place", "teardownBeforeSleep"))
 	expectIn(900, 1100, getSample(4, testCounter, "group", "::teardown", "place", "teardownAfterSleep"))
-	expectIn(0, 100, getDummyTrail("::teardown", false))
+	expectIn(0, 100, getNetworkSamples("::teardown"))
 
 	for {
 		select {
@@ -1358,6 +1402,7 @@ func TestNewSchedulerHasWork(t *testing.T) {
 		Logger:         logger,
 		Registry:       registry,
 		BuiltinMetrics: metrics.RegisterBuiltinMetrics(registry),
+		Usage:          usage.New(),
 	}
 	runner, err := js.New(piState, &loader.SourceData{URL: &url.URL{Path: "/script.js"}, Data: script}, nil)
 	require.NoError(t, err)

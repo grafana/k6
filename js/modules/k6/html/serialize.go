@@ -4,12 +4,12 @@ import (
 	neturl "net/url"
 
 	"github.com/PuerkitoBio/goquery"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 type FormValue struct {
 	Name  string
-	Value goja.Value
+	Value sobek.Value
 }
 
 func (s Selection) SerializeArray() []FormValue {
@@ -47,9 +47,9 @@ func (s Selection) SerializeArray() []FormValue {
 	return result
 }
 
-func (s Selection) SerializeObject() map[string]goja.Value {
+func (s Selection) SerializeObject() map[string]sobek.Value {
 	formValues := s.SerializeArray()
-	result := make(map[string]goja.Value)
+	result := make(map[string]sobek.Value)
 	for i := range formValues {
 		formValue := formValues[i]
 		result[formValue.Name] = formValue.Value

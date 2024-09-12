@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	httpmodule "go.k6.io/k6/js/modules/k6/http"
@@ -46,11 +46,11 @@ type Client struct {
 type (
 	// HTTPRequestFunc is a type alias representing the prototype of
 	// k6's http module's request function
-	HTTPRequestFunc func(method string, url goja.Value, args ...goja.Value) (*httpmodule.Response, error)
+	HTTPRequestFunc func(method string, url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error)
 
 	// HTTPAsyncRequestFunc is a type alias representing the prototype of
 	// k6's http module's asyncRequest function
-	HTTPAsyncRequestFunc func(method string, url goja.Value, args ...goja.Value) (*goja.Promise, error)
+	HTTPAsyncRequestFunc func(method string, url sobek.Value, args ...sobek.Value) (*sobek.Promise, error)
 )
 
 // NewClient instantiates a new tracing Client
@@ -65,14 +65,14 @@ func NewClient(vu modules.VU, opts options) (*Client, error) {
 	}
 	httpModuleObject := httpModule.ToObject(rt)
 
-	// Export the http module's request function goja.Callable as a Go function
+	// Export the http module's request function sobek.Callable as a Go function
 	var requestFunc HTTPRequestFunc
 	if err := rt.ExportTo(httpModuleObject.Get("request"), &requestFunc); err != nil {
 		return nil,
 			fmt.Errorf("failed initializing tracing client, unable to require http.request method; reason: %w", err)
 	}
 
-	// Export the http module's syncRequest function goja.Callable as a Go function
+	// Export the http module's syncRequest function sobek.Callable as a Go function
 	var asyncRequestFunc HTTPAsyncRequestFunc
 	if err := rt.ExportTo(httpModuleObject.Get("asyncRequest"), &asyncRequestFunc); err != nil {
 		return nil,
@@ -122,11 +122,11 @@ func (c *Client) Configure(opts options) error {
 
 // Request instruments the http module's request function with tracing headers,
 // and ensures the trace_id is emitted as part of the output's data points metadata.
-func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Request(method string, url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	var result *httpmodule.Response
 
 	var err error
-	err = c.instrumentedCall(func(args ...goja.Value) error {
+	err = c.instrumentedCall(func(args ...sobek.Value) error {
 		result, err = c.requestFunc(method, url, args...)
 		return err
 	}, args...)
@@ -138,10 +138,10 @@ func (c *Client) Request(method string, url goja.Value, args ...goja.Value) (*ht
 
 // AsyncRequest instruments the http module's asyncRequest function with tracing headers,
 // and ensures the trace_id is emitted as part of the output's data points metadata.
-func (c *Client) AsyncRequest(method string, url goja.Value, args ...goja.Value) (*goja.Promise, error) {
-	var result *goja.Promise
+func (c *Client) AsyncRequest(method string, url sobek.Value, args ...sobek.Value) (*sobek.Promise, error) {
+	var result *sobek.Promise
 	var err error
-	err = c.instrumentedCall(func(args ...goja.Value) error {
+	err = c.instrumentedCall(func(args ...sobek.Value) error {
 		result, err = c.asyncRequestFunc(method, url, args...)
 		return err
 	}, args...)
@@ -152,49 +152,49 @@ func (c *Client) AsyncRequest(method string, url goja.Value, args ...goja.Value)
 }
 
 // Del instruments the http module's delete method.
-func (c *Client) Del(url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Del(url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	return c.Request(http.MethodDelete, url, args...)
 }
 
 // Get instruments the http module's get method.
-func (c *Client) Get(url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Get(url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	// Here we prepend a null value that stands for the body parameter,
 	// that the request function expects as a first argument implicitly
-	args = append([]goja.Value{goja.Null()}, args...)
+	args = append([]sobek.Value{sobek.Null()}, args...)
 	return c.Request(http.MethodGet, url, args...)
 }
 
 // Head instruments the http module's head method.
-func (c *Client) Head(url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Head(url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	// NB: here we prepend a null value that stands for the body parameter,
 	// that the request function expects as a first argument implicitly
-	args = append([]goja.Value{goja.Null()}, args...)
+	args = append([]sobek.Value{sobek.Null()}, args...)
 	return c.Request(http.MethodHead, url, args...)
 }
 
 // Options instruments the http module's options method.
-func (c *Client) Options(url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Options(url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	return c.Request(http.MethodOptions, url, args...)
 }
 
 // Patch instruments the http module's patch method.
-func (c *Client) Patch(url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Patch(url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	return c.Request(http.MethodPatch, url, args...)
 }
 
 // Post instruments the http module's post method.
-func (c *Client) Post(url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Post(url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	return c.Request(http.MethodPost, url, args...)
 }
 
 // Put instruments the http module's put method.
-func (c *Client) Put(url goja.Value, args ...goja.Value) (*httpmodule.Response, error) {
+func (c *Client) Put(url sobek.Value, args ...sobek.Value) (*httpmodule.Response, error) {
 	return c.Request(http.MethodPut, url, args...)
 }
 
-func (c *Client) instrumentedCall(call func(args ...goja.Value) error, args ...goja.Value) error {
+func (c *Client) instrumentedCall(call func(args ...sobek.Value) error, args ...sobek.Value) error {
 	if len(args) == 0 {
-		args = []goja.Value{goja.Null()}
+		args = []sobek.Value{sobek.Null()}
 	}
 
 	traceContextHeader, encodedTraceID, err := c.generateTraceContext()
@@ -242,10 +242,10 @@ func (c *Client) generateTraceContext() (http.Header, string, error) {
 
 // instrumentArguments: expects args to be in the format expected by the
 // request method (body, params)
-func (c *Client) instrumentArguments(traceContext http.Header, args ...goja.Value) ([]goja.Value, error) {
+func (c *Client) instrumentArguments(traceContext http.Header, args ...sobek.Value) ([]sobek.Value, error) {
 	rt := c.vu.Runtime()
 
-	var paramsObj *goja.Object
+	var paramsObj *sobek.Object
 
 	switch len(args) {
 	case 2:

@@ -1,7 +1,7 @@
 package streams
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -10,8 +10,8 @@ import (
 type ReadableStreamReader interface {
 	ReadableStreamGenericReader
 
-	// Read returns a [goja.Promise] providing access to the next chunk in the stream's internal queue.
-	Read() *goja.Promise
+	// Read returns a [sobek.Promise] providing access to the next chunk in the stream's internal queue.
+	Read() *sobek.Promise
 
 	// ReleaseLock releases the reader's lock on the stream.
 	ReleaseLock()
@@ -23,7 +23,7 @@ type ReadableStreamReader interface {
 //
 // It implements the [ReadableStreamReaderGeneric] mixin from the specification.
 //
-// Because we are in the context of Goja, we cannot really define properties
+// Because we are in the context of Sobek, we cannot really define properties
 // the same way as in the spec, so we use getters/setters instead.
 //
 // [ReadableStreamReaderGeneric]: https://streams.spec.whatwg.org/#readablestreamgenericreader
@@ -34,26 +34,26 @@ type ReadableStreamGenericReader interface {
 	// SetStream sets the stream that owns this reader.
 	SetStream(stream *ReadableStream)
 
-	// GetClosed returns a [goja.Promise] that resolves when the stream is closed.
-	GetClosed() (p *goja.Promise, resolve func(any), reject func(any))
+	// GetClosed returns a [sobek.Promise] that resolves when the stream is closed.
+	GetClosed() (p *sobek.Promise, resolve func(any), reject func(any))
 
-	// SetClosed sets the [goja.Promise] that resolves when the stream is closed.
-	SetClosed(p *goja.Promise, resolve func(any), reject func(any))
+	// SetClosed sets the [sobek.Promise] that resolves when the stream is closed.
+	SetClosed(p *sobek.Promise, resolve func(any), reject func(any))
 
-	// Cancel returns a [goja.Promise] that resolves when the stream is canceled.
-	Cancel(reason goja.Value) *goja.Promise
+	// Cancel returns a [sobek.Promise] that resolves when the stream is canceled.
+	Cancel(reason sobek.Value) *sobek.Promise
 }
 
 // BaseReadableStreamReader is a base implement
 type BaseReadableStreamReader struct {
-	closedPromise            *goja.Promise
+	closedPromise            *sobek.Promise
 	closedPromiseResolveFunc func(resolve any)
 	closedPromiseRejectFunc  func(reason any)
 
 	// stream is a [ReadableStream] instance that owns this reader
 	stream *ReadableStream
 
-	runtime *goja.Runtime
+	runtime *sobek.Runtime
 	vu      modules.VU
 }
 
@@ -73,26 +73,26 @@ func (reader *BaseReadableStreamReader) SetStream(stream *ReadableStream) {
 }
 
 // GetClosed returns the reader's closed promise as well as its resolve and reject functions.
-func (reader *BaseReadableStreamReader) GetClosed() (p *goja.Promise, resolve func(any), reject func(any)) {
+func (reader *BaseReadableStreamReader) GetClosed() (p *sobek.Promise, resolve func(any), reject func(any)) {
 	return reader.closedPromise, reader.closedPromiseResolveFunc, reader.closedPromiseRejectFunc
 }
 
 // SetClosed sets the reader's closed promise as well as its resolve and reject functions.
-func (reader *BaseReadableStreamReader) SetClosed(p *goja.Promise, resolve func(any), reject func(any)) {
+func (reader *BaseReadableStreamReader) SetClosed(p *sobek.Promise, resolve func(any), reject func(any)) {
 	reader.closedPromise = p
 	reader.closedPromiseResolveFunc = resolve
 	reader.closedPromiseRejectFunc = reject
 }
 
-// Cancel returns a [goja.Promise] that resolves when the stream is canceled.
-func (reader *BaseReadableStreamReader) Cancel(reason goja.Value) *goja.Promise {
+// Cancel returns a [sobek.Promise] that resolves when the stream is canceled.
+func (reader *BaseReadableStreamReader) Cancel(reason sobek.Value) *sobek.Promise {
 	return reader.cancel(reason)
 }
 
 // cancel implements the [ReadableStreamReaderGenericCancel(reader, reason)] [specification] algorithm.
 //
 // [specification]: https://streams.spec.whatwg.org/#readable-stream-reader-generic-cancel
-func (reader *BaseReadableStreamReader) cancel(reason goja.Value) *goja.Promise {
+func (reader *BaseReadableStreamReader) cancel(reason sobek.Value) *sobek.Promise {
 	// 1. Let stream be reader.[[stream]].
 	stream := reader.stream
 
@@ -142,7 +142,7 @@ func (reader *BaseReadableStreamReader) release() {
 	// FIXME: See https://github.com/dop251/goja/issues/565
 	var (
 		err       error
-		doNothing = func(goja.Value) {}
+		doNothing = func(sobek.Value) {}
 	)
 	_, err = promiseThen(stream.vu.Runtime(), reader.closedPromise, doNothing, doNothing)
 	if err != nil {
@@ -196,7 +196,7 @@ func ReadableStreamReaderGenericInitialize(reader ReadableStreamGenericReader, s
 	// 4. Otherwise, if stream.[[state]] is "closed",
 	case ReadableStreamStateClosed:
 		// 4.1 Set reader.[[closedPromise]] to a promise resolved with undefined.
-		resolve(goja.Undefined())
+		resolve(sobek.Undefined())
 	// 5. Otherwise,
 	default:
 		// 5.1 Assert: stream.[[state]] is "errored".
@@ -215,7 +215,7 @@ func ReadableStreamReaderGenericInitialize(reader ReadableStreamGenericReader, s
 		// See https://github.com/dop251/goja/issues/565
 		var (
 			err       error
-			doNothing = func(goja.Value) {}
+			doNothing = func(sobek.Value) {}
 		)
 		_, err = promiseThen(stream.vu.Runtime(), promise, doNothing, doNothing)
 		if err != nil {

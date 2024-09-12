@@ -8,7 +8,7 @@ import (
 	"reflect"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 )
@@ -205,9 +205,10 @@ func NewFrameBaseOptions(defaultTimeout time.Duration) *FrameBaseOptions {
 	}
 }
 
-func (o *FrameBaseOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame base options.
+func (o *FrameBaseOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -228,7 +229,8 @@ func NewFrameCheckOptions(defaultTimeout time.Duration) *FrameCheckOptions {
 	}
 }
 
-func (o *FrameCheckOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame check options.
+func (o *FrameCheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -243,7 +245,8 @@ func NewFrameClickOptions(defaultTimeout time.Duration) *FrameClickOptions {
 	}
 }
 
-func (o *FrameClickOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame click options.
+func (o *FrameClickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleClickOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -258,7 +261,8 @@ func NewFrameDblClickOptions(defaultTimeout time.Duration) *FrameDblclickOptions
 	}
 }
 
-func (o *FrameDblclickOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame dblclick options.
+func (o *FrameDblclickOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleDblclickOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -273,7 +277,8 @@ func NewFrameFillOptions(defaultTimeout time.Duration) *FrameFillOptions {
 	}
 }
 
-func (o *FrameFillOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame fill options.
+func (o *FrameFillOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -289,9 +294,10 @@ func NewFrameGotoOptions(defaultReferer string, defaultTimeout time.Duration) *F
 	}
 }
 
-func (o *FrameGotoOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame goto options.
+func (o *FrameGotoOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -317,7 +323,8 @@ func NewFrameHoverOptions(defaultTimeout time.Duration) *FrameHoverOptions {
 	}
 }
 
-func (o *FrameHoverOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame hover options.
+func (o *FrameHoverOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleHoverOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -331,7 +338,8 @@ func NewFrameInnerHTMLOptions(defaultTimeout time.Duration) *FrameInnerHTMLOptio
 	}
 }
 
-func (o *FrameInnerHTMLOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame innerHTML options.
+func (o *FrameInnerHTMLOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -344,7 +352,8 @@ func NewFrameInnerTextOptions(defaultTimeout time.Duration) *FrameInnerTextOptio
 	}
 }
 
-func (o *FrameInnerTextOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame innerText options.
+func (o *FrameInnerTextOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -357,7 +366,8 @@ func NewFrameInputValueOptions(defaultTimeout time.Duration) *FrameInputValueOpt
 	}
 }
 
-func (o *FrameInputValueOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame inputValue options.
+func (o *FrameInputValueOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -370,7 +380,8 @@ func NewFrameIsCheckedOptions(defaultTimeout time.Duration) *FrameIsCheckedOptio
 	}
 }
 
-func (o *FrameIsCheckedOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame isChecked options.
+func (o *FrameIsCheckedOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -383,7 +394,8 @@ func NewFrameIsDisabledOptions(defaultTimeout time.Duration) *FrameIsDisabledOpt
 	}
 }
 
-func (o *FrameIsDisabledOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame isDisabled options.
+func (o *FrameIsDisabledOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -396,7 +408,8 @@ func NewFrameIsEditableOptions(defaultTimeout time.Duration) *FrameIsEditableOpt
 	}
 }
 
-func (o *FrameIsEditableOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame isEditable options.
+func (o *FrameIsEditableOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -409,7 +422,8 @@ func NewFrameIsEnabledOptions(defaultTimeout time.Duration) *FrameIsEnabledOptio
 	}
 }
 
-func (o *FrameIsEnabledOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame isEnabled options.
+func (o *FrameIsEnabledOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -421,7 +435,8 @@ func NewFrameIsHiddenOptions() *FrameIsHiddenOptions {
 	return &FrameIsHiddenOptions{}
 }
 
-func (o *FrameIsHiddenOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses FrameIsHiddenOptions from sobek.Value.
+func (o *FrameIsHiddenOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
@@ -431,7 +446,8 @@ func NewFrameIsVisibleOptions() *FrameIsVisibleOptions {
 	return &FrameIsVisibleOptions{}
 }
 
-func (o *FrameIsVisibleOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses FrameIsVisibleOptions from sobek.Value.
+func (o *FrameIsVisibleOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	o.Strict = parseStrict(ctx, opts)
 	return nil
 }
@@ -456,7 +472,8 @@ func NewFrameSelectOptionOptions(defaultTimeout time.Duration) *FrameSelectOptio
 	}
 }
 
-func (o *FrameSelectOptionOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame selectOption options.
+func (o *FrameSelectOptionOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -471,10 +488,11 @@ func NewFrameSetContentOptions(defaultTimeout time.Duration) *FrameSetContentOpt
 	}
 }
 
-func (o *FrameSetContentOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame setContent options.
+func (o *FrameSetContentOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -500,8 +518,8 @@ func NewFrameSetInputFilesOptions(defaultTimeout time.Duration) *FrameSetInputFi
 	}
 }
 
-// Parse parses FrameSetInputFilesOptions from goja.Value.
-func (o *FrameSetInputFilesOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses FrameSetInputFilesOptions from sobek.Value.
+func (o *FrameSetInputFilesOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleSetInputFilesOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -516,12 +534,13 @@ func NewFrameTapOptions(defaultTimeout time.Duration) *FrameTapOptions {
 	}
 }
 
-func (o *FrameTapOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame tap options.
+func (o *FrameTapOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -545,7 +564,8 @@ func NewFrameTextContentOptions(defaultTimeout time.Duration) *FrameTextContentO
 	}
 }
 
-func (o *FrameTextContentOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame textContent options.
+func (o *FrameTextContentOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.FrameBaseOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -572,7 +592,8 @@ func NewFrameUncheckOptions(defaultTimeout time.Duration) *FrameUncheckOptions {
 	}
 }
 
-func (o *FrameUncheckOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame uncheck options.
+func (o *FrameUncheckOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if err := o.ElementHandleBasePointerOptions.Parse(ctx, opts); err != nil {
 		return err
 	}
@@ -589,31 +610,32 @@ func NewFrameWaitForFunctionOptions(defaultTimeout time.Duration) *FrameWaitForF
 }
 
 // Parse JavaScript waitForFunction options.
-func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts goja.Value) error {
-	rt := k6ext.Runtime(ctx)
+func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts sobek.Value) error {
+	if !sobekValueExists(opts) {
+		return nil
+	}
 
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			v := opts.Get(k)
-			switch k {
-			case "timeout":
-				o.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
-			case "polling":
-				switch v.ExportType().Kind() { //nolint: exhaustive
-				case reflect.Int64:
-					o.Polling = PollingInterval
-					o.Interval = v.ToInteger()
-				case reflect.String:
-					if p, ok := pollingTypeToID[v.ToString().String()]; ok {
-						o.Polling = p
-						break
-					}
-					fallthrough
-				default:
-					return fmt.Errorf("wrong polling option value: %q; "+
-						`possible values: "raf", "mutation" or number`, v)
+	rt := k6ext.Runtime(ctx)
+	obj := opts.ToObject(rt)
+	for _, k := range obj.Keys() {
+		v := obj.Get(k)
+		switch k {
+		case "timeout":
+			o.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
+		case "polling":
+			switch v.ExportType().Kind() { //nolint: exhaustive
+			case reflect.Int64:
+				o.Polling = PollingInterval
+				o.Interval = v.ToInteger()
+			case reflect.String:
+				if p, ok := pollingTypeToID[v.ToString().String()]; ok {
+					o.Polling = p
+					break
 				}
+				fallthrough
+			default:
+				return fmt.Errorf("wrong polling option value: %q; "+
+					`possible values: "raf", "mutation" or number`, v)
 			}
 		}
 	}
@@ -627,9 +649,10 @@ func NewFrameWaitForLoadStateOptions(defaultTimeout time.Duration) *FrameWaitFor
 	}
 }
 
-func (o *FrameWaitForLoadStateOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame waitForLoadState options.
+func (o *FrameWaitForLoadStateOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -649,9 +672,10 @@ func NewFrameWaitForNavigationOptions(defaultTimeout time.Duration) *FrameWaitFo
 	}
 }
 
-func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame waitForNavigation options.
+func (o *FrameWaitForNavigationOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -678,10 +702,11 @@ func NewFrameWaitForSelectorOptions(defaultTimeout time.Duration) *FrameWaitForS
 	}
 }
 
-func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts goja.Value) error {
+// Parse parses the frame waitForSelector options.
+func (o *FrameWaitForSelectorOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
 
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			switch k {
@@ -715,11 +740,11 @@ func NewFrameDispatchEventOptions(defaultTimeout time.Duration) *FrameDispatchEv
 	}
 }
 
-func parseStrict(ctx context.Context, opts goja.Value) bool {
+func parseStrict(ctx context.Context, opts sobek.Value) bool {
 	var strict bool
 
 	rt := k6ext.Runtime(ctx)
-	if opts != nil && !goja.IsUndefined(opts) && !goja.IsNull(opts) {
+	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
 			if k == "strict" {

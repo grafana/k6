@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -20,8 +20,8 @@ func (MockReader) Read(_ []byte) (int, error) {
 	return -1, errors.New("Contrived failure")
 }
 
-func makeRuntime(t *testing.T) *goja.Runtime {
-	rt := goja.New()
+func makeRuntime(t *testing.T) *sobek.Runtime {
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	m, ok := New().NewModuleInstance(
@@ -73,7 +73,7 @@ func TestCryptoAlgorithms(t *testing.T) {
 	t.Run("RandomBytesFailure", func(t *testing.T) {
 		t.Parallel()
 
-		rt := goja.New()
+		rt := sobek.New()
 		rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 		m, ok := New().NewModuleInstance(
@@ -501,7 +501,7 @@ func TestHexEncode(t *testing.T) {
 	t.Parallel()
 	t.Run("Success", func(t *testing.T) {
 		t.Parallel()
-		rt := goja.New()
+		rt := sobek.New()
 		input := []byte{104, 101, 108, 108, 111}
 		testCases := []interface{}{
 			input, string(input), rt.NewArrayBuffer(input),
@@ -522,7 +522,7 @@ func TestHexEncode(t *testing.T) {
 		t.Parallel()
 
 		c := Crypto{vu: &modulestest.VU{
-			RuntimeField: goja.New(),
+			RuntimeField: sobek.New(),
 		}}
 
 		_, err := c.hexEncode(struct{}{})
@@ -534,7 +534,7 @@ func TestAWSv4(t *testing.T) {
 	t.Parallel()
 
 	// example values from https://docs.aws.amazon.com/general/latest/gr/signature-v4-examples.html
-	rt := goja.New()
+	rt := sobek.New()
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 
 	m, ok := New().NewModuleInstance(

@@ -1,7 +1,7 @@
 package streams
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"gopkg.in/guregu/null.v3"
 )
@@ -16,7 +16,7 @@ type UnderlyingSource struct {
 	// Typically, this is used to a adapt a push source by setting up relevant event listeners.
 	// If the setup process is asynchronous, it can return a Promise to signal success or
 	// failure; a rejected promise will error the stream.
-	Start goja.Value `json:"start"`
+	Start sobek.Value `json:"start"`
 
 	// PullFunc is  a function that is called whenever the stream's internal queue of chunks
 	// becomes not full, i.e. whenever the queue's desired size becomes positive.
@@ -26,7 +26,7 @@ type UnderlyingSource struct {
 	// This function will not be called until `start()` successfully completes. Additionally,
 	// it will only be called repeatedly if it enqueues at least one chunk or fulfills a
 	// BYOB request; a no-op `pull` implementation will not be continually called.
-	Pull goja.Value `json:"pull"`
+	Pull sobek.Value `json:"pull"`
 
 	// CancelFunc is a function that is called when the stream's or reader's `cancel()` method is
 	// called.
@@ -38,7 +38,7 @@ type UnderlyingSource struct {
 	// If the shutdown process is asynchronous, it can return a promise to signal success or
 	// failure; the result will be communicated via the return value of the cancel() method
 	// that was called. Throwing an exception is treated the same as returning a rejected promise.
-	Cancel goja.Value `json:"cancel"`
+	Cancel sobek.Value `json:"cancel"`
 
 	// Type is a string indicating the type of the underlying source.
 	Type ReadableStreamType `json:"type"`
@@ -64,18 +64,18 @@ type UnderlyingSource struct {
 }
 
 // UnderlyingSourceStartCallback is a function that is called immediately during the creation of a ReadableStream.
-type UnderlyingSourceStartCallback func(controller *goja.Object) goja.Value
+type UnderlyingSourceStartCallback func(controller *sobek.Object) sobek.Value
 
 // UnderlyingSourcePullCallback is a function that is called whenever the stream's internal queue of chunks
 // becomes not full, i.e. whenever the queue's desired size becomes positive.
-type UnderlyingSourcePullCallback func(controller *goja.Object) *goja.Promise
+type UnderlyingSourcePullCallback func(controller *sobek.Object) *sobek.Promise
 
 // UnderlyingSourceCancelCallback is a function that is called when the stream's or reader's `cancel()` method is
 // called.
-type UnderlyingSourceCancelCallback func(reason any) goja.Value
+type UnderlyingSourceCancelCallback func(reason any) sobek.Value
 
-// NewUnderlyingSourceFromObject creates a new UnderlyingSource from a goja.Object.
-func NewUnderlyingSourceFromObject(rt *goja.Runtime, obj *goja.Object) (UnderlyingSource, error) {
+// NewUnderlyingSourceFromObject creates a new UnderlyingSource from a sobek.Object.
+func NewUnderlyingSourceFromObject(rt *sobek.Runtime, obj *sobek.Object) (UnderlyingSource, error) {
 	var underlyingSource UnderlyingSource
 
 	if common.IsNullish(obj) {
@@ -86,7 +86,7 @@ func NewUnderlyingSourceFromObject(rt *goja.Runtime, obj *goja.Object) (Underlyi
 	// We only accept a valid underlyingSource.[[type]]
 	underlyingSourceType := obj.Get("type")
 	if underlyingSourceType != nil &&
-		!goja.IsUndefined(obj.Get("type")) &&
+		!sobek.IsUndefined(obj.Get("type")) &&
 		obj.Get("type").String() != ReadableStreamTypeBytes {
 		return underlyingSource, newTypeError(rt, "invalid underlying source type")
 	}

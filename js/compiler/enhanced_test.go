@@ -4,8 +4,8 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/dop251/goja"
-	"github.com/dop251/goja/parser"
+	"github.com/grafana/sobek"
+	"github.com/grafana/sobek/parser"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.k6.io/k6/lib"
@@ -61,7 +61,7 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		c := New(testutils.NewLogger(t))
 		src := `1+(function() { return 2; )()`
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		_, _, err := c.Compile(src, "script.js", false)
+		_, _, err := c.Parse(src, "script.js", false)
 		assert.IsType(t, &parser.Error{}, err)
 		assert.Contains(t, err.Error(), `script.js: Line 1:26 Unexpected ")"`)
 	})
@@ -69,11 +69,14 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		pgm, code, err := c.Compile(`import "something"`, "script.js", true)
+		prg, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false)
 		require.NoError(t, err)
-		assert.Equal(t, `var import_something = require("something");
+		assert.Equal(t, `let t = "something";
+require(t);
 `, code)
-		rt := goja.New()
+		pgm, err := sobek.CompileAST(prg, true)
+		require.NoError(t, err)
+		rt := sobek.New()
 		var requireCalled bool
 		require.NoError(t, rt.Set("require", func(s string) {
 			assert.Equal(t, "something", s)
@@ -88,9 +91,10 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
 		c.Options.SourceMapLoader = func(_ string) ([]byte, error) { return nil, nil }
-		_, code, err := c.Compile(`import "something"`, "script.js", true)
+		_, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false)
 		require.NoError(t, err)
-		assert.Equal(t, `var import_something = require("something");
+		assert.Equal(t, `let t = "something";
+require(t);
 
 //# sourceMappingURL=k6://internal-should-not-leak/file.map`, code)
 	})

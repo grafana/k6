@@ -3,7 +3,7 @@ package k6ext
 import (
 	"context"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // eventLoopDirective determines whether the event
@@ -18,20 +18,20 @@ const (
 // PromisifiedFunc is a type of the function to run as a promise.
 type PromisifiedFunc func() (result any, reason error)
 
-// Promise runs fn in a goroutine and returns a new goja.Promise.
+// Promise runs fn in a goroutine and returns a new sobek.Promise.
 //   - If fn returns a nil error, resolves the promise with the
 //     first result value fn returns.
 //   - Otherwise, rejects the promise with the error fn returns.
-func Promise(ctx context.Context, fn PromisifiedFunc) *goja.Promise {
+func Promise(ctx context.Context, fn PromisifiedFunc) *sobek.Promise {
 	return promise(ctx, fn, continueEventLoop)
 }
 
 // AbortingPromise is like Promise, but it aborts the event loop if an error occurs.
-func AbortingPromise(ctx context.Context, fn PromisifiedFunc) *goja.Promise {
+func AbortingPromise(ctx context.Context, fn PromisifiedFunc) *sobek.Promise {
 	return promise(ctx, fn, abortEventLoop)
 }
 
-func promise(ctx context.Context, fn PromisifiedFunc, d eventLoopDirective) *goja.Promise {
+func promise(ctx context.Context, fn PromisifiedFunc, d eventLoopDirective) *sobek.Promise {
 	var (
 		vu                 = GetVU(ctx)
 		cb                 = vu.RegisterCallback()

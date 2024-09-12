@@ -8,12 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
-
-	"github.com/fatih/color"
-	"github.com/spf13/cobra"
-	"github.com/spf13/pflag"
 
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/cmd/state"
@@ -22,6 +19,10 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/ui/pb"
+
+	"github.com/fatih/color"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 )
 
 // cmdCloud handles the `k6 cloud` sub-command
@@ -117,7 +118,10 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 	if !cloudConfig.Token.Valid {
-		return errors.New("Not logged in, please use `k6 login cloud`.") //nolint:golint,revive,stylecheck
+		return errors.New( //nolint:golint
+			"not logged in, please login first to the Grafana Cloud k6 " +
+				"using the \"k6 cloud login\" command",
+		)
 	}
 
 	// Display config warning if needed
@@ -308,9 +312,17 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		logger.WithField("run_status", testProgress.RunStatusText).Debug("Test finished")
 	}
 
+	//nolint:stylecheck,golint
 	if testProgress.ResultStatus == cloudapi.ResultStatusFailed {
+		// Although by looking at [ResultStatus] and [RunStatus] isn't self-explanatory,
+		// the scenario when the test run has finished, but it failed is an exceptional case for those situations
+		// when thresholds have been crossed (failed). So, we report this situation as such.
+		if testProgress.RunStatus == cloudapi.RunStatusFinished ||
+			testProgress.RunStatus == cloudapi.RunStatusAbortedThreshold {
+			return errext.WithExitCodeIfNone(errors.New("Thresholds have been crossed"), exitcodes.ThresholdsHaveFailed)
+		}
+
 		// TODO: use different exit codes for failed thresholds vs failed test (e.g. aborted by system/limit)
-		//nolint:stylecheck,golint
 		return errext.WithExitCodeIfNone(errors.New("The test has failed"), exitcodes.CloudTestRunFailed)
 	}
 
@@ -330,6 +342,9 @@ func (c *cmdCloud) flagSet() *pflag.FlagSet {
 		"enable showing of logs when a test is executed in the cloud")
 	flags.BoolVar(&c.uploadOnly, "upload-only", c.uploadOnly,
 		"only upload the test to the cloud without actually starting a test run")
+	if err := flags.MarkDeprecated("upload-only", "use \"k6 cloud upload\" instead"); err != nil {
+		panic(err) // Should never happen
+	}
 
 	return flags
 }
@@ -343,20 +358,67 @@ func getCmdCloud(gs *state.GlobalState) *cobra.Command {
 	}
 
 	exampleText := getExampleText(gs, `
-  {{.}} cloud script.js`[1:])
+  # [deprecated] Run a k6 script in the Grafana Cloud k6
+  $ {{.}} cloud script.js
+
+  # [deprecated] Run a k6 archive in the Grafana Cloud k6
+  $ {{.}} cloud archive.tar
+
+  # Authenticate with Grafana Cloud k6
+  $ {{.}} cloud login
+
+  # Run a k6 script in the Grafana Cloud k6
+  $ {{.}} cloud run script.js
+
+  # Run a k6 archive in the Grafana Cloud k6
+  $ {{.}} cloud run archive.tar`[1:])
 
 	cloudCmd := &cobra.Command{
 		Use:   "cloud",
 		Short: "Run a test on the cloud",
-		Long: `Run a test on the cloud.
+		Long: `The original behavior of the "k6 cloud" command described below is deprecated.
+In future versions, the "cloud" command will only display a help text and will no longer run tests
+in Grafana Cloud k6. To continue running tests in the cloud, please transition to using the "k6 cloud run" command.
 
-This will execute the test on the k6 cloud service. Use "k6 login cloud" to authenticate.`,
-		Example: exampleText,
-		Args:    exactArgsWithMsg(1, "arg should either be \"-\", if reading script from stdin, or a path to a script file"),
+Run a test in the Grafana Cloud k6.
+
+This will archive test script(s), including all necessary resources, and execute the test in the Grafana Cloud k6
+service. Be sure to run the "k6 cloud login" command prior to authenticate with Grafana Cloud k6.`,
+		Args:    exactCloudArgs(),
 		PreRunE: c.preRun,
 		RunE:    c.run,
+		Example: exampleText,
 	}
+
+	// Register `k6 cloud` subcommands
+	cloudCmd.AddCommand(getCmdCloudRun(c))
+	cloudCmd.AddCommand(getCmdCloudLogin(gs))
+	cloudCmd.AddCommand(getCmdCloudUpload(c))
+
 	cloudCmd.Flags().SortFlags = false
 	cloudCmd.Flags().AddFlagSet(c.flagSet())
+
 	return cloudCmd
+}
+
+func exactCloudArgs() cobra.PositionalArgs {
+	return func(_ *cobra.Command, args []string) error {
+		const baseErrMsg = `the "k6 cloud" command expects either a subcommand such as "run" or "login", or ` +
+			"a single argument consisting in a path to a script/archive, or the `-` symbol instructing " +
+			"the command to read the test content from stdin"
+
+		if len(args) == 0 {
+			return fmt.Errorf(baseErrMsg + "; " + "received no arguments")
+		}
+
+		hasSubcommand := args[0] == "run" || args[0] == "login"
+		if len(args) > 1 && !hasSubcommand {
+			return fmt.Errorf(
+				baseErrMsg+"; "+"received %d arguments %q, and %s is not a valid subcommand",
+				len(args), strings.Join(args, " "), args[0],
+			)
+		}
+
+		return nil
+	}
 }

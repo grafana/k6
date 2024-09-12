@@ -750,6 +750,12 @@ messageGroupDecl : fieldCardinality _GROUP identifier '=' _INT_LIT '{' messageBo
 	| fieldCardinality _GROUP identifier '=' _INT_LIT compactOptions '{' messageBody '}' semicolons {
 		$$ = newNodeWithRunes(ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, $4, $5, $6, $7, $8, $9), $10...)
 	}
+	| fieldCardinality _GROUP identifier '{' messageBody '}' semicolons {
+		$$ = newNodeWithRunes(ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, nil, nil, nil, $4, $5, $6), $7...)
+	}
+	| fieldCardinality _GROUP identifier compactOptions '{' messageBody '}' semicolons {
+		$$ = newNodeWithRunes(ast.NewGroupNode($1.ToKeyword(), $2.ToKeyword(), $3, nil, nil, $4, $5, $6, $7), $8...)
+	}
 
 oneofDecl : _ONEOF identifier '{' oneofBody '}' semicolons {
 		$$ = newNodeWithRunes(ast.NewOneofNode($1.ToKeyword(), $2, $3, $4, $5), $6...)
@@ -797,6 +803,12 @@ oneofFieldDecl : oneofElementTypeIdent identifier '=' _INT_LIT semicolon {
 	| oneofElementTypeIdent identifier '=' _INT_LIT compactOptions semicolon {
 		$$ = ast.NewFieldNode(nil, $1, $2, $3, $4, $5, $6)
 	}
+	| oneofElementTypeIdent identifier semicolon {
+		$$ = ast.NewFieldNode(nil, $1, $2, nil, nil, nil, $3)
+	}
+	| oneofElementTypeIdent identifier compactOptions semicolon {
+		$$ = ast.NewFieldNode(nil, $1, $2, nil, nil, $3, $4)
+	}
 
 oneofGroupDecl : _GROUP identifier '=' _INT_LIT '{' messageBody '}' {
 		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, nil, $5, $6, $7)
@@ -804,6 +816,13 @@ oneofGroupDecl : _GROUP identifier '=' _INT_LIT '{' messageBody '}' {
 	| _GROUP identifier '=' _INT_LIT compactOptions '{' messageBody '}' {
 		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, $3, $4, $5, $6, $7, $8)
 	}
+	| _GROUP identifier '{' messageBody '}' {
+		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, nil, nil, nil, $3, $4, $5)
+	}
+	| _GROUP identifier compactOptions '{' messageBody '}' {
+		$$ = ast.NewGroupNode(nil, $1.ToKeyword(), $2, nil, nil, $3, $4, $5, $6)
+	}
+
 
 mapFieldDecl : mapType identifier '=' _INT_LIT semicolons {
 	  semi, extra := protolex.(*protoLex).requireSemicolon($5)
@@ -812,6 +831,14 @@ mapFieldDecl : mapType identifier '=' _INT_LIT semicolons {
 	| mapType identifier '=' _INT_LIT compactOptions semicolons {
 		semi, extra := protolex.(*protoLex).requireSemicolon($6)
 		$$ = newNodeWithRunes(ast.NewMapFieldNode($1, $2, $3, $4, $5, semi), extra...)
+	}
+	| mapType identifier semicolons {
+	  semi, extra := protolex.(*protoLex).requireSemicolon($3)
+		$$ = newNodeWithRunes(ast.NewMapFieldNode($1, $2, nil, nil, nil, semi), extra...)
+	}
+	| mapType identifier compactOptions semicolons {
+		semi, extra := protolex.(*protoLex).requireSemicolon($4)
+		$$ = newNodeWithRunes(ast.NewMapFieldNode($1, $2, nil, nil, $3, semi), extra...)
 	}
 
 mapType : _MAP '<' mapKeyType ',' typeName '>' {
@@ -1035,6 +1062,23 @@ messageFieldDecl : fieldCardinality notGroupElementTypeIdent identifier '=' _INT
 		semis, extra := protolex.(*protoLex).requireSemicolon($6)
 		$$ = newNodeWithRunes(ast.NewFieldNode(nil, $1, $2, $3, $4, $5, semis), extra...)
 	}
+	| fieldCardinality notGroupElementTypeIdent identifier semicolons {
+		semis, extra := protolex.(*protoLex).requireSemicolon($4)
+		$$ = newNodeWithRunes(ast.NewFieldNode($1.ToKeyword(), $2, $3, nil, nil, nil, semis), extra...)
+	}
+	| fieldCardinality notGroupElementTypeIdent identifier compactOptions semicolons {
+		semis, extra := protolex.(*protoLex).requireSemicolon($5)
+		$$ = newNodeWithRunes(ast.NewFieldNode($1.ToKeyword(), $2, $3, nil, nil, $4, semis), extra...)
+	}
+	| msgElementTypeIdent identifier semicolons {
+		semis, extra := protolex.(*protoLex).requireSemicolon($3)
+		$$ = newNodeWithRunes(ast.NewFieldNode(nil, $1, $2, nil, nil, nil, semis), extra...)
+	}
+	| msgElementTypeIdent identifier compactOptions semicolons {
+		semis, extra := protolex.(*protoLex).requireSemicolon($4)
+		$$ = newNodeWithRunes(ast.NewFieldNode(nil, $1, $2, nil, nil, $3, semis), extra...)
+	}
+
 
 extensionDecl : _EXTEND typeName '{' extensionBody '}' semicolons {
 		$$ = newNodeWithRunes(ast.NewExtendNode($1.ToKeyword(), $2, $3, $4, $5), $6...)

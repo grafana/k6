@@ -160,11 +160,11 @@ func TestOptions(t *testing.T) {
 	})
 	t.Run("TLSVersion", func(t *testing.T) {
 		t.Parallel()
-		versions := TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionTLS12} //nolint:staticcheck
+		versions := TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionTLS12}
 		opts := Options{}.Apply(Options{TLSVersion: &versions})
 
 		assert.NotNil(t, opts.TLSVersion)
-		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30)) //nolint:staticcheck
+		assert.Equal(t, opts.TLSVersion.Min, TLSVersion(tls.VersionSSL30))
 		assert.Equal(t, opts.TLSVersion.Max, TLSVersion(tls.VersionTLS12))
 
 		t.Run("JSON", func(t *testing.T) {
@@ -788,4 +788,45 @@ func TestHost(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestValidate(t *testing.T) {
+	t.Parallel()
+	t.Run("setupTimeout", func(t *testing.T) {
+		t.Parallel()
+		testData := []struct {
+			input         string
+			expectFailure bool
+			expectOutput  types.Duration
+		}{
+			{
+				input:         "1s",
+				expectFailure: false,
+				expectOutput:  types.Duration(1 * time.Second),
+			},
+			{
+				input:         "0s",
+				expectFailure: true,
+			},
+			{
+				input:         "-1s",
+				expectFailure: true,
+			},
+		}
+		for _, data := range testData {
+			data := data
+			t.Run(data.input, func(t *testing.T) {
+				t.Parallel()
+				sec, _ := time.ParseDuration(data.input)
+				opts := Options{}.Apply(Options{SetupTimeout: types.NewNullDuration(sec, true)})
+				errorsSlice := opts.Validate()
+				if data.expectFailure {
+					assert.Len(t, errorsSlice, 1)
+				} else {
+					assert.Len(t, errorsSlice, 0)
+					assert.Equal(t, time.Duration(opts.SetupTimeout.Duration), sec)
+				}
+			})
+		}
+	})
 }

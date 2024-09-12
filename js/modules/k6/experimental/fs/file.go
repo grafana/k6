@@ -4,30 +4,31 @@ import (
 	"io"
 	"path/filepath"
 	"sync/atomic"
-
-	"go.k6.io/k6/lib"
 )
 
 // file is an abstraction for interacting with files.
 type file struct {
-	path string
+	path string `js:"path"`
 
 	// data holds a pointer to the file's data
-	data []byte
+	data []byte `js:"data"`
 
 	// offset holds the current offset in the file
 	//
 	// TODO: using an atomic here does not guarantee ordering of reads and seeks, and leaves
 	// the behavior not strictly defined. This is something we might want to address in the future, and
 	// is tracked as part of #3433.
-	offset atomic.Int64
+	offset atomic.Int64 `js:"offset"`
 }
 
 // Stat returns a FileInfo describing the named file.
-func (f *file) stat() *FileInfo {
+func (f *file) Stat() *FileInfo {
 	filename := filepath.Base(f.path)
 	return &FileInfo{Name: filename, Size: f.size()}
 }
+
+// Ensure that `file` implements the Stater interface.
+var _ Stater = (*file)(nil)
 
 // FileInfo holds information about a file.
 type FileInfo struct {
@@ -50,12 +51,12 @@ func (f *file) Read(into []byte) (n int, err error) {
 
 	// Check if we have reached the end of the file
 	if currentOffset == fileSize {
-		return 0, newFsError(EOFError, "EOF")
+		return 0, io.EOF
 	}
 
 	// Calculate the effective new offset
 	targetOffset := currentOffset + int64(len(into))
-	newOffset := lib.Min(targetOffset, fileSize)
+	newOffset := min(targetOffset, fileSize)
 
 	// Read the data into the provided slice, and update
 	// the offset accordingly
@@ -64,7 +65,7 @@ func (f *file) Read(into []byte) (n int, err error) {
 
 	// If we've reached or surpassed the end, set the error to EOF
 	if targetOffset > fileSize {
-		err = newFsError(EOFError, "EOF")
+		err = io.EOF
 	}
 
 	return n, err

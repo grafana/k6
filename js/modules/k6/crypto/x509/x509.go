@@ -2,7 +2,7 @@
 package x509
 
 import (
-	"crypto/dsa" //nolint:staticcheck // #nosec G505 // DSA is weak, but we need it for compatibility
+	"crypto/dsa" // #nosec G505 // DSA is weak, but we need it for compatibility
 	"crypto/ecdsa"
 	"crypto/rsa"
 	"crypto/sha1" // #nosec G505

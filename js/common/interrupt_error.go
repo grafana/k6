@@ -3,14 +3,14 @@ package common
 import (
 	"errors"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
-// UnwrapGojaInterruptedError returns the internal error handled by goja.
-func UnwrapGojaInterruptedError(err error) error {
-	var gojaErr *goja.InterruptedError
-	if errors.As(err, &gojaErr) {
-		if e, ok := gojaErr.Value().(error); ok {
+// UnwrapSobekInterruptedError returns the internal error handled by Sobek.
+func UnwrapSobekInterruptedError(err error) error {
+	var sobekErr *sobek.InterruptedError
+	if errors.As(err, &sobekErr) {
+		if e, ok := sobekErr.Value().(error); ok {
 			return e
 		}
 	}

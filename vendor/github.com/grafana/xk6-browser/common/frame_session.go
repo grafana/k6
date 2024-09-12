@@ -57,7 +57,9 @@ type FrameSession struct {
 	k6Metrics *k6ext.CustomMetrics
 
 	targetID target.ID
-	windowID browser.WindowID
+	// windowID can be 0 when it is associated to an iframe or frame with no UI.
+	windowID    browser.WindowID
+	hasUIWindow bool
 
 	// To understand the concepts of Isolated Worlds, Contexts and Frames and
 	// the relationship betwween them have a look at the following doc:
@@ -82,7 +84,7 @@ type FrameSession struct {
 //
 //nolint:funlen
 func NewFrameSession(
-	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger,
+	ctx context.Context, s session, p *Page, parent *FrameSession, tid target.ID, l *log.Logger, hasUIWindow bool,
 ) (_ *FrameSession, err error) {
 	l.Debugf("NewFrameSession", "sid:%v tid:%v", s.ID(), tid)
 
@@ -103,6 +105,11 @@ func NewFrameSession(
 		vu:                   k6ext.GetVU(ctx),
 		k6Metrics:            k6Metrics,
 		logger:               l,
+		hasUIWindow:          hasUIWindow,
+	}
+
+	if err := cdpruntime.RunIfWaitingForDebugger().Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+		return nil, fmt.Errorf("run if waiting for debugger to attach: %w", err)
 	}
 
 	var parentNM *NetworkManager
@@ -116,14 +123,20 @@ func NewFrameSession(
 		return nil, err
 	}
 
-	action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
-	if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		l.Debugf(
-			"NewFrameSession:GetWindowForTarget",
-			"sid:%v tid:%v err:%v",
-			s.ID(), tid, err)
+	// When a frame creates a new FrameSession without UI (e.g. some iframes) we cannot
+	// retrieve the windowID. Doing so would lead to an error from chromium. For now all
+	// iframes that are attached are setup with hasUIWindow as false which seems to work
+	// as expected for iframes with and without UI elements.
+	if fs.hasUIWindow {
+		action := browser.GetWindowForTarget().WithTargetID(fs.targetID)
+		if fs.windowID, _, err = action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			l.Debugf(
+				"NewFrameSession:GetWindowForTarget",
+				"sid:%v tid:%v err:%v",
+				s.ID(), tid, err)
 
-		return nil, fmt.Errorf("getting browser window ID: %w", err)
+			return nil, fmt.Errorf("getting browser window ID: %w", err)
+		}
 	}
 
 	fs.initEvents()
@@ -402,8 +415,10 @@ func (fs *FrameSession) initFrameTree() error {
 		return fmt.Errorf("got a nil page frame tree")
 	}
 
+	// Any new frame may have a child frame, not just mainframes.
+	fs.handleFrameTree(frameTree, fs.isMainFrame())
+
 	if fs.isMainFrame() {
-		fs.handleFrameTree(frameTree)
 		fs.initRendererEvents()
 	}
 	return nil
@@ -507,7 +522,9 @@ func (fs *FrameSession) initOptions() error {
 	if err := fs.updateGeolocation(true); err != nil {
 		return err
 	}
-	fs.updateExtraHTTPHeaders(true)
+	if err := fs.updateExtraHTTPHeaders(true); err != nil {
+		return err
+	}
 
 	var reqIntercept bool
 	if state.Options.BlockedHostnames.Trie != nil ||
@@ -518,8 +535,12 @@ func (fs *FrameSession) initOptions() error {
 		return err
 	}
 
-	fs.updateOffline(true)
-	fs.updateHTTPCredentials(true)
+	if err := fs.updateOffline(true); err != nil {
+		return err
+	}
+	if err := fs.updateHTTPCredentials(true); err != nil {
+		return err
+	}
 	if err := fs.updateEmulateMedia(true); err != nil {
 		return err
 	}
@@ -531,8 +552,6 @@ func (fs *FrameSession) initOptions() error {
 	      promises.push(this._evaluateOnNewDocument(source, 'main'));
 	  for (const source of this._crPage._page._evaluateOnNewDocumentSources)
 	      promises.push(this._evaluateOnNewDocument(source, 'main'));*/
-
-	optActions = append(optActions, cdpruntime.RunIfWaitingForDebugger())
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
@@ -575,19 +594,19 @@ func (fs *FrameSession) isMainFrame() bool {
 	return fs.targetID == fs.page.targetID
 }
 
-func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree) {
+func (fs *FrameSession) handleFrameTree(frameTree *cdppage.FrameTree, initialFrame bool) {
 	fs.logger.Debugf("FrameSession:handleFrameTree",
-		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
+		"fid:%v sid:%v tid:%v", frameTree.Frame.ID, fs.session.ID(), fs.targetID)
 
 	if frameTree.Frame.ParentID != "" {
 		fs.onFrameAttached(frameTree.Frame.ID, frameTree.Frame.ParentID)
 	}
-	fs.onFrameNavigated(frameTree.Frame, true)
+	fs.onFrameNavigated(frameTree.Frame, initialFrame)
 	if frameTree.ChildFrames == nil {
 		return
 	}
 	for _, child := range frameTree.ChildFrames {
-		fs.handleFrameTree(child)
+		fs.handleFrameTree(child, initialFrame)
 	}
 }
 
@@ -745,7 +764,9 @@ func (fs *FrameSession) onFrameDetached(frameID cdp.FrameID, reason cdppage.Fram
 		"sid:%v tid:%v fid:%v reason:%s",
 		fs.session.ID(), fs.targetID, frameID, reason)
 
-	fs.manager.frameDetached(frameID, reason)
+	if err := fs.manager.frameDetached(frameID, reason); err != nil {
+		k6ext.Panic(fs.ctx, "handling frameDetached event: %w", err)
+	}
 }
 
 func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
@@ -982,7 +1003,8 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		fs.ctx,
 		fs.page.browserCtx.getSession(sid),
 		fs.page, fs, ti.TargetID,
-		fs.logger)
+		fs.logger,
+		false)
 	if err != nil {
 		return fmt.Errorf("attaching iframe target ID %v to session ID %v: %w",
 			ti.TargetID, sid, err)
@@ -1054,7 +1076,7 @@ func (fs *FrameSession) updateEmulateMedia(initial bool) error {
 	return nil
 }
 
-func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
+func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateExtraHTTPHeaders", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// Merge extra headers from browser context and page, where page specific headers ake precedence.
@@ -1066,8 +1088,12 @@ func (fs *FrameSession) updateExtraHTTPHeaders(initial bool) {
 		mergedHeaders[k] = v
 	}
 	if !initial || len(mergedHeaders) > 0 {
-		fs.networkManager.SetExtraHTTPHeaders(mergedHeaders)
+		if err := fs.networkManager.SetExtraHTTPHeaders(mergedHeaders); err != nil {
+			return fmt.Errorf("updating extra HTTP headers: %w", err)
+		}
 	}
+
+	return nil
 }
 
 func (fs *FrameSession) updateGeolocation(initial bool) error {
@@ -1083,25 +1109,32 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 			return fmt.Errorf("%w", err)
 		}
 	}
+
 	return nil
 }
 
-func (fs *FrameSession) updateHTTPCredentials(initial bool) {
+func (fs *FrameSession) updateHTTPCredentials(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateHttpCredentials", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	credentials := fs.page.browserCtx.opts.HttpCredentials
 	if !initial || credentials != nil {
-		fs.networkManager.Authenticate(credentials)
+		return fs.networkManager.Authenticate(credentials)
 	}
+
+	return nil
 }
 
-func (fs *FrameSession) updateOffline(initial bool) {
+func (fs *FrameSession) updateOffline(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateOffline", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	offline := fs.page.browserCtx.opts.Offline
 	if !initial || offline {
-		fs.networkManager.SetOfflineMode(offline)
+		if err := fs.networkManager.SetOfflineMode(offline); err != nil {
+			return fmt.Errorf("updating offline mode for frame %v: %w", fs.targetID, err)
+		}
 	}
+
+	return nil
 }
 
 func (fs *FrameSession) throttleNetwork(networkProfile NetworkProfile) error {
@@ -1164,18 +1197,20 @@ func (fs *FrameSession) updateViewport() error {
 		return fmt.Errorf("emulating viewport: %w", err)
 	}
 
-	// add an inset to viewport depending on the operating system.
-	// this won't add an inset if we're running in headless mode.
-	viewport.calculateInset(
-		fs.page.browserCtx.browser.browserOpts.Headless,
-		runtime.GOOS,
-	)
-	action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
-		Width:  viewport.Width,
-		Height: viewport.Height,
-	})
-	if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
-		return fmt.Errorf("setting window bounds: %w", err)
+	if fs.hasUIWindow {
+		// add an inset to viewport depending on the operating system.
+		// this won't add an inset if we're running in headless mode.
+		viewport.calculateInset(
+			fs.page.browserCtx.browser.browserOpts.Headless,
+			runtime.GOOS,
+		)
+		action2 := browser.SetWindowBounds(fs.windowID, &browser.Bounds{
+			Width:  viewport.Width,
+			Height: viewport.Height,
+		})
+		if err := action2.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
+			return fmt.Errorf("setting window bounds: %w", err)
+		}
 	}
 
 	return nil

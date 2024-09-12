@@ -61,6 +61,13 @@ type LoginResponse struct {
 	Token string `json:"token"`
 }
 
+// ValidateTokenResponse is the response of a token validation.
+type ValidateTokenResponse struct {
+	IsValid bool   `json:"is_valid"`
+	Message string `json:"message"`
+	Token   string `json:"token-info"`
+}
+
 func (c *Client) handleLogEntriesFromCloud(ctrr CreateTestRunResponse) {
 	logger := c.logger.WithField("source", "grafana-k6-cloud")
 	for _, logEntry := range ctrr.Logs {
@@ -188,8 +195,7 @@ func (c *Client) TestFinished(referenceID string, thresholds ThresholdResult, ta
 
 // GetTestProgress for the provided referenceID.
 func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, error) {
-	url := fmt.Sprintf("%s/test-progress/%s", c.baseURL, referenceID)
-	req, err := c.NewRequest(http.MethodGet, url, nil)
+	req, err := c.NewRequest(http.MethodGet, c.baseURL+"/test-progress/"+referenceID, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -205,27 +211,22 @@ func (c *Client) GetTestProgress(referenceID string) (*TestProgressResponse, err
 
 // StopCloudTestRun tells the cloud to stop the test with the provided referenceID.
 func (c *Client) StopCloudTestRun(referenceID string) error {
-	url := fmt.Sprintf("%s/tests/%s/stop", c.baseURL, referenceID)
-
-	req, err := c.NewRequest("POST", url, nil)
+	req, err := c.NewRequest("POST", c.baseURL+"/tests/"+referenceID+"/stop", nil)
 	if err != nil {
 		return err
 	}
 
 	return c.Do(req, nil)
+}
+
+type validateOptionsRequest struct {
+	Options lib.Options `json:"options"`
 }
 
 // ValidateOptions sends the provided options to the cloud for validation.
 func (c *Client) ValidateOptions(options lib.Options) error {
-	url := fmt.Sprintf("%s/validate-options", c.baseURL)
-
-	data := struct {
-		Options lib.Options `json:"options"`
-	}{
-		options,
-	}
-
-	req, err := c.NewRequest("POST", url, data)
+	data := validateOptionsRequest{Options: options}
+	req, err := c.NewRequest("POST", c.baseURL+"/validate-options", data)
 	if err != nil {
 		return err
 	}
@@ -233,19 +234,15 @@ func (c *Client) ValidateOptions(options lib.Options) error {
 	return c.Do(req, nil)
 }
 
+type loginRequest struct {
+	Email    string `json:"email"`
+	Password string `json:"password"`
+}
+
 // Login the user with the specified email and password.
 func (c *Client) Login(email string, password string) (*LoginResponse, error) {
-	url := fmt.Sprintf("%s/login", c.baseURL)
-
-	data := struct {
-		Email    string `json:"email"`
-		Password string `json:"password"`
-	}{
-		email,
-		password,
-	}
-
-	req, err := c.NewRequest("POST", url, data)
+	data := loginRequest{Email: email, Password: password}
+	req, err := c.NewRequest("POST", c.baseURL+"/login", data)
 	if err != nil {
 		return nil, err
 	}
@@ -257,4 +254,25 @@ func (c *Client) Login(email string, password string) (*LoginResponse, error) {
 	}
 
 	return &lr, nil
+}
+
+type validateTokenRequest struct {
+	Token string `json:"token"`
+}
+
+// ValidateToken calls the endpoint to validate the Client's token and returns the result.
+func (c *Client) ValidateToken() (*ValidateTokenResponse, error) {
+	data := validateTokenRequest{Token: c.token}
+	req, err := c.NewRequest("POST", c.baseURL+"/validate-token", data)
+	if err != nil {
+		return nil, err
+	}
+
+	vtr := ValidateTokenResponse{}
+	err = c.Do(req, &vtr)
+	if err != nil {
+		return nil, err
+	}
+
+	return &vtr, nil
 }

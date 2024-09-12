@@ -1,7 +1,7 @@
 package streams
 
 import (
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"gopkg.in/guregu/null.v3"
 )
@@ -56,26 +56,26 @@ type ReadableStreamDefaultController struct {
 // Ensure that ReadableStreamDefaultController implements the ReadableStreamController interface.
 var _ ReadableStreamController = &ReadableStreamDefaultController{}
 
-// NewReadableStreamDefaultControllerObject creates a new [goja.Object] from a
+// NewReadableStreamDefaultControllerObject creates a new [sobek.Object] from a
 // [ReadableStreamDefaultController] instance.
-func NewReadableStreamDefaultControllerObject(controller *ReadableStreamDefaultController) (*goja.Object, error) {
+func NewReadableStreamDefaultControllerObject(controller *ReadableStreamDefaultController) (*sobek.Object, error) {
 	rt := controller.stream.runtime
 	obj := rt.NewObject()
 	objName := "ReadableStreamDefaultController"
 
-	err := obj.DefineAccessorProperty("desiredSize", rt.ToValue(func() goja.Value {
+	err := obj.DefineAccessorProperty("desiredSize", rt.ToValue(func() sobek.Value {
 		desiredSize := controller.getDesiredSize()
 		if !desiredSize.Valid {
-			return goja.Null()
+			return sobek.Null()
 		}
 		return rt.ToValue(desiredSize.Float64)
-	}), nil, goja.FLAG_FALSE, goja.FLAG_TRUE)
+	}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE)
 	if err != nil {
 		return nil, err
 	}
 
 	// Exposing the properties of the [ReadableStreamController] interface
-	if err := setReadOnlyPropertyOf(obj, objName, "constructor", rt.ToValue(func() goja.Value {
+	if err := setReadOnlyPropertyOf(obj, objName, "constructor", rt.ToValue(func() sobek.Value {
 		return rt.ToValue(&ReadableStreamDefaultController{})
 	})); err != nil {
 		return nil, err
@@ -118,7 +118,7 @@ func (controller *ReadableStreamDefaultController) Close() {
 // It implements the ReadableStreamDefaultController.enqueue(chunk) [specification] algorithm.
 //
 // [specification]: https://streams.spec.whatwg.org/#rs-default-controller-enqueue
-func (controller *ReadableStreamDefaultController) Enqueue(chunk goja.Value) {
+func (controller *ReadableStreamDefaultController) Enqueue(chunk sobek.Value) {
 	rt := controller.stream.vu.Runtime()
 
 	// 1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(this) is false, throw a TypeError exception.
@@ -138,9 +138,9 @@ func (controller *ReadableStreamDefaultController) Enqueue(chunk goja.Value) {
 // It implements the ReadableStreamDefaultController.error(e) [specification] algorithm.
 //
 // [specification]: https://streams.spec.whatwg.org/#rs-default-controller-error
-func (controller *ReadableStreamDefaultController) Error(err goja.Value) {
+func (controller *ReadableStreamDefaultController) Error(err sobek.Value) {
 	if err == nil {
-		err = goja.Undefined()
+		err = sobek.Undefined()
 	}
 	controller.error(err)
 }
@@ -153,7 +153,7 @@ func (controller *ReadableStreamDefaultController) Error(err goja.Value) {
 // algorithm.
 //
 // [specification]: https://streams.spec.whatwg.org/#readable-stream-default-controller-cancel-steps
-func (controller *ReadableStreamDefaultController) cancelSteps(reason any) *goja.Promise {
+func (controller *ReadableStreamDefaultController) cancelSteps(reason any) *sobek.Promise {
 	// 1. Perform ! ResetQueue(this).
 	controller.resetQueue()
 
@@ -164,7 +164,7 @@ func (controller *ReadableStreamDefaultController) cancelSteps(reason any) *goja
 	controller.clearAlgorithms()
 
 	// 4. Return result.
-	if p, ok := result.Export().(*goja.Promise); ok {
+	if p, ok := result.Export().(*sobek.Promise); ok {
 		return p
 	}
 
@@ -252,7 +252,7 @@ func (controller *ReadableStreamDefaultController) close() {
 // algorithm.
 //
 // [specification]: https://streams.spec.whatwg.org/#readable-stream-default-controller-enqueue
-func (controller *ReadableStreamDefaultController) enqueue(chunk goja.Value) error {
+func (controller *ReadableStreamDefaultController) enqueue(chunk sobek.Value) error {
 	// 1. If ! ReadableStreamDefaultControllerCanCloseOrEnqueue(controller) is false, return.
 	if !controller.canCloseOrEnqueue() {
 		return nil
@@ -268,7 +268,7 @@ func (controller *ReadableStreamDefaultController) enqueue(chunk goja.Value) err
 	} else { // 4. Otherwise,
 		// 4.1. Let result be the result of performing controller.[[strategySizeAlgorithm]],
 		// passing in chunk, and interpreting the result as a completion record.
-		size, err := controller.strategySizeAlgorithm(goja.Undefined(), chunk)
+		size, err := controller.strategySizeAlgorithm(sobek.Undefined(), chunk)
 		// 4.2 If result is an abrupt completion,
 		if err != nil {
 			// 4.2.1. Perform ! ReadableStreamDefaultControllerError(controller, result.[[Value]]).
@@ -408,7 +408,7 @@ func (controller *ReadableStreamDefaultController) callPullIfNeeded() {
 
 	_, err = promiseThen(controller.stream.vu.Runtime(), pullPromise,
 		// 7. Upon fulfillment of pullPromise
-		func(goja.Value) {
+		func(sobek.Value) {
 			// 7.1. Set controller.[[pulling]] to false.
 			controller.pulling = false
 
@@ -422,7 +422,7 @@ func (controller *ReadableStreamDefaultController) callPullIfNeeded() {
 		},
 
 		// 8. Upon rejection of pullPromise with reason e,
-		func(reason goja.Value) {
+		func(reason sobek.Value) {
 			// 8.1. Perform ! ReadableStreamDefaultControllerError(controller, e).
 			controller.error(reason)
 		},
@@ -485,6 +485,6 @@ func (controller *ReadableStreamDefaultController) getDesiredSize() null.Float {
 	return null.NewFloat(controller.strategyHWM-controller.queue.QueueTotalSize, true)
 }
 
-func (controller *ReadableStreamDefaultController) toObject() (*goja.Object, error) {
+func (controller *ReadableStreamDefaultController) toObject() (*sobek.Object, error) {
 	return NewReadableStreamDefaultControllerObject(controller)
 }

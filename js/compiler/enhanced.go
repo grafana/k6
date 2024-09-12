@@ -3,9 +3,9 @@ package compiler
 import (
 	"path/filepath"
 
-	"github.com/dop251/goja/file"
-	"github.com/dop251/goja/parser"
 	"github.com/evanw/esbuild/pkg/api"
+	"github.com/grafana/sobek/file"
+	"github.com/grafana/sobek/parser"
 )
 
 func esbuildTransform(src, filename string) (code string, srcMap []byte, err error) {
@@ -13,7 +13,7 @@ func esbuildTransform(src, filename string) (code string, srcMap []byte, err err
 		Sourcefile:     filename,
 		Loader:         api.LoaderJS,
 		Target:         api.ESNext,
-		Format:         api.FormatCommonJS,
+		Format:         api.FormatDefault,
 		Sourcemap:      api.SourceMapExternal,
 		SourcesContent: api.SourcesContentInclude,
 		LegalComments:  api.LegalCommentsNone,

@@ -25,7 +25,7 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 )
 
 // Credentials holds HTTP authentication credentials.
@@ -39,10 +39,10 @@ func NewCredentials() *Credentials {
 	return &Credentials{}
 }
 
-// Parse credentials details from a given goja credentials value.
-func (c *Credentials) Parse(ctx context.Context, credentials goja.Value) error {
+// Parse credentials details from a given sobek credentials value.
+func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
-	if credentials != nil && !goja.IsUndefined(credentials) && !goja.IsNull(credentials) {
+	if credentials != nil && !sobek.IsUndefined(credentials) && !sobek.IsNull(credentials) {
 		credentials := credentials.ToObject(rt)
 		for _, k := range credentials.Keys() {
 			switch k {
@@ -705,34 +705,40 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 }
 
 // Authenticate sets HTTP authentication credentials to use.
-func (m *NetworkManager) Authenticate(credentials *Credentials) {
+func (m *NetworkManager) Authenticate(credentials *Credentials) error {
 	m.credentials = credentials
 	if credentials != nil {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
-		k6ext.Panic(m.ctx, "setting authentication credentials: %w", err)
+		return fmt.Errorf("setting authentication credentials: %w", err)
 	}
+
+	return nil
 }
 
 // ExtraHTTPHeaders returns the currently set extra HTTP request headers.
-func (m *NetworkManager) ExtraHTTPHeaders() goja.Value {
+func (m *NetworkManager) ExtraHTTPHeaders() sobek.Value {
 	rt := m.vu.Runtime()
 	return rt.ToValue(m.extraHTTPHeaders)
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
-func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) {
-	action := network.SetExtraHTTPHeaders(headers)
-	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "setting extra HTTP headers: %w", err)
+func (m *NetworkManager) SetExtraHTTPHeaders(headers network.Headers) error {
+	err := network.
+		SetExtraHTTPHeaders(headers).
+		Do(cdp.WithExecutor(m.ctx, m.session))
+	if err != nil {
+		return fmt.Errorf("setting extra HTTP headers: %w", err)
 	}
+
+	return nil
 }
 
 // SetOfflineMode toggles offline mode on/off.
-func (m *NetworkManager) SetOfflineMode(offline bool) {
+func (m *NetworkManager) SetOfflineMode(offline bool) error {
 	if m.offline == offline {
-		return
+		return nil
 	}
 	m.offline = offline
 
@@ -743,8 +749,10 @@ func (m *NetworkManager) SetOfflineMode(offline bool) {
 		m.networkProfile.Upload,
 	)
 	if err := action.Do(cdp.WithExecutor(m.ctx, m.session)); err != nil {
-		k6ext.Panic(m.ctx, "setting offline mode: %w", err)
+		return fmt.Errorf("emulating network conditions: %w", err)
 	}
+
+	return nil
 }
 
 // ThrottleNetwork changes the network attributes in chrome to simulate slower

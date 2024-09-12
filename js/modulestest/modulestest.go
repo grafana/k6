@@ -3,7 +3,7 @@ package modulestest
 import (
 	"context"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/lib"
@@ -17,7 +17,7 @@ type VU struct {
 	InitEnvField          *common.InitEnvironment
 	EventsField           common.Events
 	StateField            *lib.State
-	RuntimeField          *goja.Runtime
+	RuntimeField          *sobek.Runtime
 	RegisterCallbackField func() func(f func() error)
 }
 
@@ -44,7 +44,7 @@ func (m *VU) State() *lib.State {
 }
 
 // Runtime returns internally set field to conform to modules.VU interface
-func (m *VU) Runtime() *goja.Runtime {
+func (m *VU) Runtime() *sobek.Runtime {
 	return m.RuntimeField
 }
 

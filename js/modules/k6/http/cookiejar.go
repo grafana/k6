@@ -9,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/common"
 )
 
@@ -20,7 +20,7 @@ var ErrJarForbiddenInInitContext = common.NewInitContextError("Making cookie jar
 // CookieJar is cookiejar.Jar wrapper to be used in js scripts
 type CookieJar struct {
 	moduleInstance *ModuleInstance
-	// js is to make it not be accessible from inside goja/js, the json is
+	// js is to make it not be accessible from inside Sobek/js, the json is
 	// for when it is returned from setup().
 	Jar *cookiejar.Jar `js:"-" json:"-"`
 }
@@ -41,7 +41,7 @@ func (j CookieJar) CookiesForURL(url string) map[string][]string {
 }
 
 // Set sets a cookie for a particular url with the given name value and additional opts
-func (j CookieJar) Set(url, name, value string, opts goja.Value) (bool, error) {
+func (j CookieJar) Set(url, name, value string, opts sobek.Value) (bool, error) {
 	rt := j.moduleInstance.vu.Runtime()
 
 	u, err := neturl.Parse(url)
@@ -51,7 +51,7 @@ func (j CookieJar) Set(url, name, value string, opts goja.Value) (bool, error) {
 
 	c := http.Cookie{Name: name, Value: value}
 	paramsV := opts
-	if paramsV != nil && !goja.IsUndefined(paramsV) && !goja.IsNull(paramsV) {
+	if paramsV != nil && !sobek.IsUndefined(paramsV) && !sobek.IsNull(paramsV) {
 		params := paramsV.ToObject(rt)
 		for _, k := range params.Keys() {
 			switch strings.ToLower(k) {

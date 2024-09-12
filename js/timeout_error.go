@@ -49,7 +49,7 @@ func (t timeoutError) AbortReason() errext.AbortReason {
 	return errext.AbortedByTimeout
 }
 
-// ExitCode returns the coresponding exit code value to the place.
+// ExitCode returns the corresponding exit code value to the place.
 func (t timeoutError) ExitCode() exitcodes.ExitCode {
 	// TODO: add handleSummary()
 	switch t.place {

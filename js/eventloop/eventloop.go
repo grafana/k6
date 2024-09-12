@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/js/modules"
 )
 
@@ -31,7 +31,7 @@ type EventLoop struct {
 	// pendingPromiseRejections are rejected promises with no handler,
 	// if there is something in this map at an end of an event loop then it will exit with an error.
 	// It's similar to what Deno and Node do.
-	pendingPromiseRejections map[*goja.Promise]struct{}
+	pendingPromiseRejections map[*sobek.Promise]struct{}
 }
 
 // New returns a new event loop with a few helpers attached to it:
@@ -40,7 +40,7 @@ type EventLoop struct {
 func New(vu modules.VU) *EventLoop {
 	e := &EventLoop{
 		wakeupCh:                 make(chan struct{}, 1),
-		pendingPromiseRejections: make(map[*goja.Promise]struct{}),
+		pendingPromiseRejections: make(map[*sobek.Promise]struct{}),
 		vu:                       vu,
 	}
 	vu.Runtime().SetPromiseRejectionTracker(e.promiseRejectionTracker)
@@ -82,7 +82,7 @@ func (e *EventLoop) wakeup() {
 //
 // A common pattern for async work is something like this:
 //
-//	func doAsyncWork(vu modules.VU) *goja.Promise {
+//	func doAsyncWork(vu modules.VU) *sobek.Promise {
 //	    enqueueCallback := vu.RegisterCallback()
 //	    p, resolve, reject := vu.Runtime().NewPromise()
 //
@@ -108,7 +108,7 @@ func (e *EventLoop) wakeup() {
 // This ensures that the actual work happens asynchronously, while the Promise
 // is immediately returned and the main thread resumes execution. It also
 // ensures that the Promise resolution happens safely back on the main thread
-// once the async work is done, as required by goja and all other JS runtimes.
+// once the async work is done, as required by Sobek and all other JS runtimes.
 //
 // TODO: rename to ReservePendingCallback or something more appropriate?
 func (e *EventLoop) RegisterCallback() (enqueueCallback func(func() error)) {
@@ -131,12 +131,12 @@ func (e *EventLoop) RegisterCallback() (enqueueCallback func(func() error)) {
 	}
 }
 
-func (e *EventLoop) promiseRejectionTracker(p *goja.Promise, op goja.PromiseRejectionOperation) {
-	// No locking necessary here as the goja runtime will call this synchronously
+func (e *EventLoop) promiseRejectionTracker(p *sobek.Promise, op sobek.PromiseRejectionOperation) {
+	// No locking necessary here as the Sobek runtime will call this synchronously
 	// Read Notes on https://tc39.es/ecma262/#sec-host-promise-rejection-tracker
-	if op == goja.PromiseRejectionReject {
+	if op == sobek.PromiseRejectionReject {
 		e.pendingPromiseRejections[p] = struct{}{}
-	} else { // goja.PromiseRejectionHandle so a promise that was previously rejected without handler now got one
+	} else { // sobek.PromiseRejectionHandle so a promise that was previously rejected without handler now got one
 		delete(e.pendingPromiseRejections, p)
 	}
 }
@@ -160,7 +160,7 @@ func (e *EventLoop) putInfront(queue []func() error) {
 // or a queued function returns an error. The provided firstCallback will be the first thing executed.
 // After Start returns the event loop can be reused as long as waitOnRegistered is called.
 func (e *EventLoop) Start(firstCallback func() error) error {
-	e.pendingPromiseRejections = make(map[*goja.Promise]struct{})
+	e.pendingPromiseRejections = make(map[*sobek.Promise]struct{})
 	e.queue = []func() error{firstCallback}
 	for {
 		queue, awaiting := e.popAll()
@@ -185,7 +185,7 @@ func (e *EventLoop) Start(firstCallback func() error) error {
 		// But that seems to be the case in other tools as well so it seems to not be that big of a problem.
 		for promise := range e.pendingPromiseRejections {
 			value := promise.Result()
-			if !goja.IsNull(value) && !goja.IsUndefined(value) {
+			if !sobek.IsNull(value) && !sobek.IsUndefined(value) {
 				if o := value.ToObject(e.vu.Runtime()); o != nil {
 					if stack := o.Get("stack"); stack != nil {
 						value = stack

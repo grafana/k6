@@ -67,15 +67,15 @@ func MethodName(_ reflect.Type, m reflect.Method) string {
 	return strings.ToLower(m.Name[0:1]) + m.Name[1:]
 }
 
-// FieldNameMapper for goja.Runtime.SetFieldNameMapper()
+// FieldNameMapper for sobek.Runtime.SetFieldNameMapper()
 type FieldNameMapper struct{}
 
-// FieldName is part of the goja.FieldNameMapper interface
-// https://godoc.org/github.com/dop251/goja#FieldNameMapper
+// FieldName is part of the sobek.FieldNameMapper interface
+// https://godoc.org/github.com/grafana/sobek#FieldNameMapper
 func (FieldNameMapper) FieldName(t reflect.Type, f reflect.StructField) string {
 	return FieldName(t, f)
 }
 
-// MethodName is part of the goja.FieldNameMapper interface
-// https://godoc.org/github.com/dop251/goja#FieldNameMapper
+// MethodName is part of the sobek.FieldNameMapper interface
+// https://godoc.org/github.com/grafana/sobek#FieldNameMapper
 func (FieldNameMapper) MethodName(t reflect.Type, m reflect.Method) string { return MethodName(t, m) }

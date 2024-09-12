@@ -40,7 +40,12 @@ func FileContentsFromMap(files map[string]string) FileAccessor {
 	return func(filename string) (io.ReadCloser, error) {
 		contents, ok := files[filename]
 		if !ok {
-			return nil, os.ErrNotExist
+			// Try changing path separators since user-provided
+			// map may use different separators.
+			contents, ok = files[filepath.ToSlash(filename)]
+			if !ok {
+				return nil, os.ErrNotExist
+			}
 		}
 		return ioutil.NopCloser(strings.NewReader(contents)), nil
 	}

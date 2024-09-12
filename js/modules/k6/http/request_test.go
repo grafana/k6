@@ -2115,6 +2115,7 @@ func TestRequestAndBatchTLS(t *testing.T) {
 			default:
 				panic(versionTest.Name + " unsupported")
 			}
+			s.TLS.MinVersion = tls.VersionTLS10
 			go func() {
 				_ = s.Config.Serve(s.Listener)
 			}()

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -139,11 +139,52 @@ func TestCallParamsTimeOutParse(t *testing.T) {
 	}
 }
 
+func TestCallParamsDiscardResponseMessageParse(t *testing.T) {
+	t.Parallel()
+
+	testCases := []struct {
+		Name                   string
+		JSON                   string
+		DiscardResponseMessage bool
+	}{
+		{
+			Name:                   "Empty",
+			JSON:                   `{}`,
+			DiscardResponseMessage: false,
+		},
+		{
+			Name:                   "DiscardResponseMessageFalse",
+			JSON:                   `{ discardResponseMessage: false }`,
+			DiscardResponseMessage: false,
+		},
+		{
+			Name:                   "DiscardResponseMessageTrue",
+			JSON:                   `{ discardResponseMessage: true }`,
+			DiscardResponseMessage: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		tc := tc
+
+		t.Run(tc.Name, func(t *testing.T) {
+			t.Parallel()
+
+			testRuntime, params := newParamsTestRuntime(t, tc.JSON)
+
+			p, err := newCallParams(testRuntime.VU, params)
+			require.NoError(t, err)
+
+			assert.Equal(t, tc.DiscardResponseMessage, p.DiscardResponseMessage)
+		})
+	}
+}
+
 // newParamsTestRuntime creates a new test runtime
 // that could be used to test the params
 // it also moves to the VU context and creates the params
-// goja value that could be used in the tests
-func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime, goja.Value) {
+// Sobek value that could be used in the tests
+func newParamsTestRuntime(t *testing.T, paramsJSON string) (*modulestest.Runtime, sobek.Value) {
 	t.Helper()
 
 	testRuntime := modulestest.NewRuntime(t)

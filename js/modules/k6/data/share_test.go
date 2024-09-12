@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/common"
@@ -102,7 +102,7 @@ func TestSharedArrayConstructorExceptions(t *testing.T) {
 			}
 
 			require.Error(t, err)
-			exc := new(goja.Exception)
+			exc := new(sobek.Exception)
 			require.True(t, errors.As(err, &exc))
 			require.Contains(t, exc.Error(), testCase.err)
 		})
@@ -156,7 +156,7 @@ func TestSharedArrayAnotherRuntimeExceptions(t *testing.T) {
 			}
 
 			require.Error(t, err)
-			exc := new(goja.Exception)
+			exc := new(sobek.Exception)
 			require.True(t, errors.As(err, &exc))
 			require.Contains(t, exc.Error(), testCase.err)
 		})
@@ -166,7 +166,7 @@ func TestSharedArrayAnotherRuntimeExceptions(t *testing.T) {
 func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 	t.Parallel()
 
-	rt := goja.New()
+	rt := sobek.New()
 	vu := &modulestest.VU{
 		RuntimeField: rt,
 		InitEnvField: &common.InitEnvironment{},
@@ -181,7 +181,7 @@ func TestSharedArrayAnotherRuntimeWorking(t *testing.T) {
 	require.NoError(t, err)
 
 	// create another Runtime with new ctx but keep the initEnv
-	rt = goja.New()
+	rt = sobek.New()
 	vu.RuntimeField = rt
 	vu.CtxField = context.Background()
 	require.NoError(t, rt.Set("data", m.Exports().Named))
@@ -224,7 +224,7 @@ func TestSharedArrayRaceInInitialization(t *testing.T) {
 	const instances = 10
 	const repeats = 100
 	for i := 0; i < repeats; i++ {
-		runtimes := make([]*goja.Runtime, instances)
+		runtimes := make([]*sobek.Runtime, instances)
 		for j := 0; j < instances; j++ {
 			runtime, err := newConfiguredRuntime(t)
 			require.NoError(t, err)

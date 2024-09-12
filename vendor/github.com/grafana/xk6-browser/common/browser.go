@@ -9,17 +9,16 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/log"
-
-	k6modules "go.k6.io/k6/js/modules"
-
 	"github.com/chromedp/cdproto"
 	cdpbrowser "github.com/chromedp/cdproto/browser"
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/target"
-	"github.com/dop251/goja"
 	"github.com/gorilla/websocket"
+
+	"github.com/grafana/xk6-browser/k6ext"
+	"github.com/grafana/xk6-browser/log"
+
+	k6modules "go.k6.io/k6/js/modules"
 )
 
 const (
@@ -68,9 +67,21 @@ type Browser struct {
 	// Used to display a warning when the browser is reclosed.
 	closed bool
 
+	// version caches the browser version information.
+	version browserVersion
+
 	vu k6modules.VU
 
 	logger *log.Logger
+}
+
+// browserVersion is a struct to hold the browser version information.
+type browserVersion struct {
+	protocolVersion string
+	product         string
+	revision        string
+	userAgent       string
+	jsVersion       string
 }
 
 // NewBrowser creates a new browser, connects to it, then returns it.
@@ -85,6 +96,13 @@ func NewBrowser(
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
+
+	// cache the browser version information.
+	var err error
+	if b.version, err = b.fetchVersion(); err != nil {
+		return nil, err
+	}
+
 	return b, nil
 }
 
@@ -172,7 +190,7 @@ func (b *Browser) getPages() []*Page {
 	return pages
 }
 
-func (b *Browser) initEvents() error {
+func (b *Browser) initEvents() error { //nolint:cyclop
 	var cancelCtx context.Context
 	cancelCtx, b.evCancelFn = context.WithCancel(b.ctx)
 	chHandler := make(chan Event)
@@ -198,7 +216,9 @@ func (b *Browser) initEvents() error {
 			case event := <-chHandler:
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onAttachedToTarget", "sid:%v tid:%v", ev.SessionID, ev.TargetInfo.TargetID)
-					b.onAttachedToTarget(ev)
+					if err := b.onAttachedToTarget(ev); err != nil {
+						k6ext.Panic(b.ctx, "browser is attaching to target: %w", err)
+					}
 				} else if ev, ok := event.data.(*target.EventDetachedFromTarget); ok {
 					b.logger.Debugf("Browser:initEvents:onDetachedFromTarget", "sid:%v", ev.SessionID)
 					b.onDetachedFromTarget(ev)
@@ -247,7 +267,7 @@ func (b *Browser) connectionOnAttachedToTarget(eva *target.EventAttachedToTarget
 }
 
 // onAttachedToTarget is called when a new page is attached to the browser.
-func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
+func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) error {
 	b.logger.Debugf("Browser:onAttachedToTarget", "sid:%v tid:%v bctxid:%v",
 		ev.SessionID, ev.TargetInfo.TargetID, ev.TargetInfo.BrowserContextID)
 
@@ -257,14 +277,14 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	)
 
 	if !b.isAttachedPageValid(ev, browserCtx) {
-		return // Ignore this page.
+		return nil // Ignore this page.
 	}
 	session := b.conn.getSession(ev.SessionID)
 	if session == nil {
 		b.logger.Debugf("Browser:onAttachedToTarget",
 			"session closed before attachToTarget is handled. sid:%v tid:%v",
 			ev.SessionID, targetPage.TargetID)
-		return // ignore
+		return nil // ignore
 	}
 
 	var (
@@ -281,17 +301,21 @@ func (b *Browser) onAttachedToTarget(ev *target.EventAttachedToTarget) {
 	}
 	p, err := NewPage(b.ctx, session, browserCtx, targetPage.TargetID, opener, isPage, b.logger)
 	if err != nil && b.isPageAttachmentErrorIgnorable(ev, session, err) {
-		return // Ignore this page.
+		return nil // Ignore this page.
 	}
 	if err != nil {
-		k6ext.Panic(b.ctx, "creating a new %s: %w", targetPage.Type, err)
+		return fmt.Errorf("creating a new %s: %w", targetPage.Type, err)
 	}
+
 	b.attachNewPage(p, ev) // Register the page as an active page.
+
 	// Emit the page event only for pages, not for background pages.
 	// Background pages are created by extensions.
 	if isPage {
 		browserCtx.emit(EventBrowserContextPage, p)
 	}
+
+	return nil
 }
 
 // attachNewPage registers the page as an active page and attaches the sessionID with the targetID.
@@ -529,8 +553,7 @@ func (b *Browser) CloseContext() error {
 	if b.context == nil {
 		return errors.New("cannot close context as none is active in browser")
 	}
-	b.context.Close()
-	return nil
+	return b.context.Close()
 }
 
 // Context returns the current browser context or nil.
@@ -545,7 +568,7 @@ func (b *Browser) IsConnected() bool {
 }
 
 // NewContext creates a new incognito-like browser context.
-func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
+func (b *Browser) NewContext(opts *BrowserContextOptions) (*BrowserContext, error) {
 	_, span := TraceAPICall(b.ctx, "", "browser.newContext")
 	defer span.End()
 
@@ -564,14 +587,7 @@ func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 		return nil, err
 	}
 
-	browserCtxOpts := NewBrowserContextOptions()
-	if err := browserCtxOpts.Parse(b.ctx, opts); err != nil {
-		err := fmt.Errorf("parsing newContext options: %w", err)
-		spanRecordError(span, err)
-		return nil, err
-	}
-
-	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, browserCtxOpts, b.logger)
+	browserCtx, err := NewBrowserContext(b.ctx, b, browserContextID, opts, b.logger)
 	if err != nil {
 		err := fmt.Errorf("new context: %w", err)
 		spanRecordError(span, err)
@@ -586,7 +602,7 @@ func (b *Browser) NewContext(opts goja.Value) (*BrowserContext, error) {
 }
 
 // NewPage creates a new tab in the browser window.
-func (b *Browser) NewPage(opts goja.Value) (*Page, error) {
+func (b *Browser) NewPage(opts *BrowserContextOptions) (*Page, error) {
 	_, span := TraceAPICall(b.ctx, "", "browser.newPage")
 	defer span.End()
 
@@ -623,26 +639,33 @@ func (b *Browser) On(event string) (bool, error) {
 
 // UserAgent returns the controlled browser's user agent string.
 func (b *Browser) UserAgent() string {
-	action := cdpbrowser.GetVersion()
-	_, _, _, ua, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
-	if err != nil {
-		k6ext.Panic(b.ctx, "getting browser user agent: %w", err)
-	}
-	return ua
+	return b.version.userAgent
 }
 
 // Version returns the controlled browser's version.
 func (b *Browser) Version() string {
-	action := cdpbrowser.GetVersion()
-	_, product, _, _, _, err := action.Do(cdp.WithExecutor(b.ctx, b.conn))
-	if err != nil {
-		k6ext.Panic(b.ctx, "getting browser version: %w", err)
-	}
+	product := b.version.product
 	i := strings.Index(product, "/")
 	if i == -1 {
 		return product
 	}
 	return product[i+1:]
+}
+
+// fetchVersion returns the browser version information.
+func (b *Browser) fetchVersion() (browserVersion, error) {
+	var (
+		bv  browserVersion
+		err error
+	)
+	bv.protocolVersion, bv.product, bv.revision, bv.userAgent, bv.jsVersion, err = cdpbrowser.
+		GetVersion().
+		Do(cdp.WithExecutor(b.ctx, b.conn))
+	if err != nil {
+		return browserVersion{}, fmt.Errorf("getting browser version information: %w", err)
+	}
+
+	return bv, nil
 }
 
 // WsURL returns the Websocket URL that the browser is listening on for CDP clients.

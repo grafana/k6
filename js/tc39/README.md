@@ -1,20 +1,26 @@
 # Introduction to a k6's TC39 testing
 
-The point of this module is to test k6 goja+babel and k6 goja+esbuild combo against the tc39 test suite.
+`js/tc39` package tests k6 [Sobek](https://github.com/grafana/sobek) and the k6 Sobek+esbuild combo against the tc39 test suite.
 
 Ways to use it:
 1. run ./checkout.sh to checkout the last commit sha of [test262](https://github.com/tc39/test262)
    that was tested with this module
 2. Run `go test &> out.log`
 
-The full list of failing tests, and the error, is in `breaking_test_errors-*.json`. All errors list there with the corresponding error will *not* be counted as errors - this is what the test expects, those specific errors.
-Due to changes to goja it is not uncommon for the error to change, or there to be now a new error on previously passing test, or (hopefully) a test that was not passing but now is.
-In all of those cases `breaking_test_errors-*.json` needs to be updated. Run the test with `-update` flag to update: `go test -update`
+The full list of failing tests, and the error, is in `breaking_test_errors-*.json`. All errors list there with the corresponding error will *not* be counted as errors - this is what the test expects, those specific errors. See reasons for this at the end of this document.
 
-NOTE: some text editors/IDEs will try to parse files ending in `json` as JSON, which given the size of `breaking_test_errors-*.json` might be a problem when it's not actually a JSON (before the edit). So it might be a better idea to name it something different if editing by hand and fix it later.
+This is a modified version of [the code in the original goja
+repo](https://github.com/dop251/goja/blob/master/tc39_test.go) that Sobek was forked from.
 
-This is a modified version of [the code in the goja
-repo](https://github.com/dop251/goja/blob/master/tc39_test.go)
+## Maintaining the tests
+
+There are few things to keep in mind when maintaining the tests.
+
+* For most of the time, we aim to have the same version (commit hash) of the test suite as the one that [uses Sobek](https://github.com/grafana/sobek/blob/main/.tc39_test262_checkout.sh#L3). So if Sobek brings a new version of the test suite, we should update the version of the test suite in this package as well.
+* The new version of Sobek could bring a new functionality, so you might need to re-evaluate the `featuresBlockList`, `skipList` and any other list in the `tc39_test.go` file. The way to go is also keeping this lists closer to the Sobek, however they are not the same, so you might need to adjust them.
+* Due to changes to Sobek it's common for the error to change, or there to be now a new error on the previously passing test, or (hopefully) a test that was not passing but now is.
+In all of those cases `breaking_test_errors-*.json` needs to be updated. Run the test with `-update` flag to update: `go test -update`.
+* Important to mention that there should be a balance between just updating the list of the errors and actually fixing errors. So it's recommended to check the diff of the `breaking_test_errors-*.json` and case by case decide if the error should be updated or the test should be fixed.
 
 
 ## Reasons for recording breaking_test_errors.json
@@ -27,6 +33,6 @@ This also means that, if the
 previous breakage was something a user can work around in a certain way, it now might be something
 else that the user can't workaround or have another problem.
 
-On top of that this more or less exist as k6 add babel to the mix and that changes which tests pass and how some of them fail. When we remove babel, it's very likely we will also remove this package as it won't be relevant anymore.
+Starting v0.53 k6 doesn't use Babel anymore, it now serves tests for `esbuild`, and for the parts uncovered by Sobek's test suite. It is still possible that we drop the whole package in the future.
 
 For these reasons, I decided that recording what breaks and checking that it doesn't change is better.

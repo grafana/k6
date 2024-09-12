@@ -2,146 +2,181 @@ package modules
 
 import (
 	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/sobek"
 	"go.k6.io/k6/loader"
 )
 
-// LegacyRequireImpl is a legacy implementation of `require()` that is not compatible with
-// CommonJS as it loads modules relative to the currently required file,
-// instead of relative to the file the `require()` is written in.
-// See https://github.com/grafana/k6/issues/2674
-type LegacyRequireImpl struct {
-	vu                      VU
-	modules                 *ModuleSystem
-	currentlyRequiredModule *url.URL
-}
-
-// NewLegacyRequireImpl creates a new LegacyRequireImpl
-func NewLegacyRequireImpl(vu VU, ms *ModuleSystem, pwd url.URL) *LegacyRequireImpl {
-	return &LegacyRequireImpl{
-		vu:                      vu,
-		modules:                 ms,
-		currentlyRequiredModule: &pwd,
-	}
-}
-
-const issueLink = "https://github.com/grafana/k6/issues/3534"
-
 // Require is the actual call that implements require
-func (r *LegacyRequireImpl) Require(specifier string) (*goja.Object, error) {
-	// TODO remove this in the future when we address https://github.com/grafana/k6/issues/2674
-	// This is currently needed as each time require is called we need to record it's new pwd
-	// to be used if a require *or* open is used within the file as they are relative to the
-	// latest call to require.
-	//
-	// This is *not* the actual require behaviour defined in commonJS as it is actually always relative
-	// to the file it is in. This is unlikely to be an issue but this code is here to keep backwards
-	// compatibility *for now*.
-	//
-	// With native ESM this won't even be possible as `require` might not be called - instead an import
-	// might be used in which case we won't be able to be doing this hack. In that case we either will
-	// need some goja specific helper or to use stack traces as goja_nodejs does.
-	currentPWD := r.currentlyRequiredModule
-	if specifier != "k6" && !strings.HasPrefix(specifier, "k6/") {
-		defer func() {
-			r.currentlyRequiredModule = currentPWD
-		}()
-		// In theory we can give that downwards, but this makes the code more tightly coupled
-		// plus as explained above this will be removed in the future so the code reflects more
-		// closely what will be needed then
-		if !r.modules.resolver.locked {
-			r.warnUserOnPathResolutionDifferences(specifier)
-		}
-		fileURL, err := loader.Resolve(r.currentlyRequiredModule, specifier)
-		if err != nil {
-			return nil, err
-		}
-		r.currentlyRequiredModule = loader.Dir(fileURL)
-	}
-
+func (ms *ModuleSystem) Require(specifier string) (*sobek.Object, error) {
 	if specifier == "" {
 		return nil, errors.New("require() can't be used with an empty specifier")
 	}
 
-	return r.modules.Require(currentPWD, specifier)
+	rt := ms.vu.Runtime()
+	parentModuleStr := getCurrentModuleScript(ms.vu)
+
+	parentModule, _ := ms.resolver.sobekModuleResolver(nil, parentModuleStr)
+	m, err := ms.resolver.sobekModuleResolver(parentModule, specifier)
+	if err != nil {
+		return nil, err
+	}
+	if wm, ok := m.(*goModule); ok {
+		var gmi *goModuleInstance
+		gmi, err = ms.getModuleInstanceFromGoModule(wm)
+		if err != nil {
+			return nil, err
+		}
+		exports := toESModuleExports(gmi.mi.Exports())
+		return rt.ToValue(exports).ToObject(rt), nil
+	}
+	err = m.Link()
+	if err != nil {
+		return nil, err
+	}
+	var promise *sobek.Promise
+	if c, ok := m.(sobek.CyclicModuleRecord); ok {
+		promise = rt.CyclicModuleRecordEvaluate(c, ms.resolver.sobekModuleResolver)
+	} else {
+		panic(fmt.Sprintf("expected sobek.CyclicModuleRecord, but for some reason got a %T", m))
+	}
+	switch promise.State() {
+	case sobek.PromiseStateRejected:
+		err = promise.Result().Export().(error) //nolint:forcetypeassert
+	case sobek.PromiseStateFulfilled:
+	default:
+	}
+	if err != nil {
+		return nil, err
+	}
+	if cjs, ok := m.(*cjsModule); ok {
+		return rt.GetModuleInstance(cjs).(*cjsModuleInstance).exports, nil //nolint:forcetypeassert
+	}
+	return rt.NamespaceObjectFor(m), nil
+}
+
+func (ms *ModuleSystem) getModuleInstanceFromGoModule(wm *goModule) (wmi *goModuleInstance, err error) {
+	rt := ms.vu.Runtime()
+	mi := rt.GetModuleInstance(wm)
+	if mi == nil {
+		err = wm.Link()
+		if err != nil {
+			return nil, err
+		}
+		promise := rt.CyclicModuleRecordEvaluate(wm, ms.resolver.sobekModuleResolver)
+		switch promise.State() {
+		case sobek.PromiseStateRejected:
+			err = promise.Result().Export().(error) //nolint:forcetypeassert
+		case sobek.PromiseStateFulfilled:
+		default:
+			panic("TLA in go modules is not supported in k6 at the moment")
+		}
+		if err != nil {
+			return nil, err
+		}
+		mi = rt.GetModuleInstance(wm)
+	}
+	gmi, ok := mi.(*goModuleInstance)
+	if !ok {
+		panic(fmt.Sprintf("a goModule instance is of not goModuleInstance type (got %T). "+
+			"This is a k6 bug please report it (https://github.com/grafana/k6/issues)", mi))
+	}
+	return gmi, nil
+}
+
+// Resolve returns what the provided specifier will get resolved to if it was to be imported
+// To be used by other parts to get the path
+func (ms *ModuleSystem) Resolve(mr sobek.ModuleRecord, specifier string) (*url.URL, error) {
+	if specifier == "" {
+		return nil, errors.New("require() can't be used with an empty specifier")
+	}
+
+	baseModuleURL := ms.resolver.reversePath(mr)
+	return ms.resolver.resolveSpecifier(baseModuleURL, specifier)
 }
 
 // CurrentlyRequiredModule returns the module that is currently being required.
 // It is mostly used for old and somewhat buggy behaviour of the `open` call
-func (r *LegacyRequireImpl) CurrentlyRequiredModule() url.URL {
-	return *r.currentlyRequiredModule
-}
+func (ms *ModuleSystem) CurrentlyRequiredModule() (*url.URL, error) {
+	fileStr, err := getPreviousRequiringFile(ms.vu)
+	if err != nil {
+		return nil, err
+	}
 
-func (r *LegacyRequireImpl) warnUserOnPathResolutionDifferences(specifier string) {
-	normalizePathToURL := func(path string) (*url.URL, error) {
-		u, err := url.Parse(path)
+	var u *url.URL
+	switch {
+	// this works around windows URLs like file://C:/some/path
+	// url.Parse will think of C: as hostname
+	case strings.HasPrefix(fileStr, "file://"):
+		u = new(url.URL)
+		u.Scheme = "file"
+		u.Path, err = url.PathUnescape(strings.TrimPrefix(fileStr, "file://"))
 		if err != nil {
 			return nil, err
 		}
-		return loader.Dir(u), nil
+	case strings.HasPrefix(fileStr, "https://"):
+		var err error
+		u, err = url.Parse(fileStr)
+		if err != nil {
+			return nil, err
+		}
+	default:
+		return nil, fmt.Errorf("couldn't parse %q as module url - this is a k6 bug, "+
+			"please report it (https://github.com/grafana/k6/issues)", fileStr)
 	}
-	// Warn users on their require depending on the none standard k6 behaviour.
-	rt := r.vu.Runtime()
-	logger := r.vu.InitEnv().Logger
-	correct, err := normalizePathToURL(getCurrentModuleScript(rt))
-	if err != nil {
-		logger.Warningf("Couldn't get the \"correct\" path to resolve specifier %q against: %q"+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			specifier, err, issueLink)
-	} else if r.currentlyRequiredModule.String() != correct.String() {
-		logger.Warningf("The \"wrong\" path (%q) and the path actually used by k6 (%q) to resolve %q are different. "+
-			"Please report to issue %s. "+
-			"This will not currently break your script but *WILL* in the future, please report this!!!",
-			correct, r.currentlyRequiredModule, specifier, issueLink)
-	}
-
-	k6behaviourString, err := getPreviousRequiringFile(rt)
-	if err != nil {
-		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			specifier, err, issueLink)
-		return
-	}
-	k6behaviour, err := normalizePathToURL(k6behaviourString)
-	if err != nil {
-		logger.Warningf("Couldn't get the \"wrong\" path to resolve specifier %q against: %q"+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			specifier, err, issueLink)
-		return
-	}
-	if r.currentlyRequiredModule.String() != k6behaviour.String() {
-		// this should always be equal, but check anyway to be certain we won't break something
-		logger.Warningf("The \"wrong\" path (%q) and the path actually used by k6 (%q) to resolve %q are different. "+
-			"Please report to issue %s. "+
-			"This will not currently break your script but it might mean that in the future it won't work",
-			k6behaviour, r.currentlyRequiredModule, specifier, issueLink)
-	}
+	return loader.Dir(u), nil
 }
 
-func getCurrentModuleScript(rt *goja.Runtime) string {
+func toESModuleExports(exp Exports) interface{} {
+	if exp.Named == nil {
+		return exp.Default
+	}
+	if exp.Default == nil {
+		return exp.Named
+	}
+
+	result := make(map[string]interface{}, len(exp.Named)+2)
+
+	for k, v := range exp.Named {
+		result[k] = v
+	}
+	result[jsDefaultExportIdentifier] = exp.Default
+	// This is to interop with any code that is transpiled by Babel or any similar tool.
+	result["__esModule"] = true
+
+	return result
+}
+
+func getCurrentModuleScript(vu VU) string {
+	rt := vu.Runtime()
 	var parent string
-	var buf [2]goja.StackFrame
+	var buf [2]sobek.StackFrame
 	frames := rt.CaptureCallStack(2, buf[:0])
+	if len(frames) == 0 || frames[1].SrcName() == "file:///-" {
+		return vu.InitEnv().CWD.JoinPath("./-").String()
+	}
 	parent = frames[1].SrcName()
 
 	return parent
 }
 
-func getPreviousRequiringFile(rt *goja.Runtime) (string, error) {
-	var buf [1000]goja.StackFrame
+func getPreviousRequiringFile(vu VU) (string, error) {
+	rt := vu.Runtime()
+	var buf [1000]sobek.StackFrame
 	frames := rt.CaptureCallStack(1000, buf[:0])
 
 	for i, frame := range frames[1:] { // first one should be the current require
 		// TODO have this precalculated automatically
 		if frame.FuncName() == "go.k6.io/k6/js.(*requireImpl).require-fm" {
 			// we need to get the one *before* but as we skip the first one the index matches ;)
-			return frames[i].SrcName(), nil
+			result := frames[i].SrcName()
+			if result == "file:///-" {
+				return vu.InitEnv().CWD.JoinPath("./-").String(), nil
+			}
+			return result, nil
 		}
 	}
 	// hopefully nobody is calling `require` with 1000 big stack :crossedfingers:
@@ -150,5 +185,9 @@ func getPreviousRequiringFile(rt *goja.Runtime) (string, error) {
 	}
 
 	// fallback
-	return frames[len(frames)-1].SrcName(), nil
+	result := frames[len(frames)-1].SrcName()
+	if result == "file:///-" {
+		return vu.InitEnv().CWD.JoinPath("./-").String(), nil
+	}
+	return result, nil
 }

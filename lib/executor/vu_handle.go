@@ -225,7 +225,7 @@ func (vh *vuHandle) runLoopsIfPossible(runIter func(context.Context, lib.ActiveV
 				// we need to cancel the context, to return the vu
 				// and because *we* did, lets reinitialize it
 				cancel()
-				vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx)
+				vh.ctx, vh.cancel = context.WithCancel(vh.parentCtx) //nolint:fatcontext // isn't actually on the same context
 			}
 			fallthrough // to set the state
 		case toHardStop:

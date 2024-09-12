@@ -33,15 +33,20 @@ func (c *cmdArchive) run(cmd *cobra.Command, args []string) error {
 
 	// Archive.
 	arc := testRunState.Runner.MakeArchive()
-	f, err := c.gs.FS.Create(c.archiveOut)
-	if err != nil {
-		return err
-	}
 
 	if c.excludeEnvVars {
 		c.gs.Logger.Debug("environment variables will be excluded from the archive")
 
 		arc.Env = nil
+	}
+
+	if c.archiveOut == "-" {
+		return arc.Write(c.gs.Stdout)
+	}
+
+	f, err := c.gs.FS.Create(c.archiveOut)
+	if err != nil {
+		return err
 	}
 
 	err = arc.Write(f)
@@ -56,7 +61,10 @@ func (c *cmdArchive) flagSet() *pflag.FlagSet {
 	flags.SortFlags = false
 	flags.AddFlagSet(optionFlagSet())
 	flags.AddFlagSet(runtimeOptionFlagSet(false))
-	flags.StringVarP(&c.archiveOut, "archive-out", "O", c.archiveOut, "archive output filename")
+	flags.StringVarP(
+		&c.archiveOut, "archive-out", "O", c.archiveOut,
+		"archive output filename. Dash (-) is a reserved value that causes the archive to be output to stdout.",
+	)
 	flags.BoolVarP(
 		&c.excludeEnvVars,
 		"exclude-env-vars",
@@ -77,7 +85,7 @@ func getCmdArchive(gs *state.GlobalState) *cobra.Command {
 	exampleText := getExampleText(gs, `
   # Archive a test run.
   {{.}} archive -u 10 -d 10s -O myarchive.tar script.js
-  
+
   # Run the resulting archive.
   {{.}} run myarchive.tar`[1:])
 

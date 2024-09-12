@@ -9,15 +9,15 @@ import (
 	"sync"
 	"time"
 
+	"github.com/chromedp/cdproto/cdp"
+	"github.com/chromedp/cdproto/network"
+	"github.com/chromedp/cdproto/runtime"
+	"github.com/grafana/sobek"
+
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
-
-	"github.com/chromedp/cdproto/cdp"
-	"github.com/chromedp/cdproto/network"
-	"github.com/chromedp/cdproto/runtime"
-	"github.com/dop251/goja"
 )
 
 // maxRetry controls how many times to retry if an action fails.
@@ -228,7 +228,7 @@ func (f *Frame) clearLifecycle() {
 	f.inflightRequestsMu.Unlock()
 }
 
-func (f *Frame) detach() {
+func (f *Frame) detach() error {
 	f.log.Debugf("Frame:detach", "fid:%s furl:%q", f.ID(), f.URL())
 
 	f.setDetached(true)
@@ -236,12 +236,18 @@ func (f *Frame) detach() {
 		f.parentFrame.removeChildFrame(f)
 	}
 	f.parentFrame = nil
+
 	// detach() is called by the same frame Goroutine that manages execution
 	// context switches. so this should be safe.
 	// we don't need to protect the following with executionContextMu.
-	if f.documentHandle != nil {
-		f.documentHandle.Dispose()
+	if f.documentHandle == nil {
+		return nil
 	}
+	if err := f.documentHandle.Dispose(); err != nil {
+		return fmt.Errorf("disposing document handle while detaching frame: %w", err)
+	}
+
+	return nil
 }
 
 func (f *Frame) defaultTimeout() time.Duration {
@@ -516,7 +522,7 @@ func (f *Frame) waitForSelectorRetry(
 	return nil, err
 }
 
-func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (_ *ElementHandle, rerr error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	document, err := f.document()
@@ -543,9 +549,14 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	// an element should belong to the current execution context.
 	// otherwise, we should adopt it to this execution context.
 	if ec != handle.execCtx {
-		defer handle.Dispose()
+		defer func() {
+			if err := handle.Dispose(); err != nil {
+				err = fmt.Errorf("disposing element handle: %w", err)
+				rerr = errors.Join(err, rerr)
+			}
+		}()
 		if handle, err = ec.adoptElementHandle(handle); err != nil {
-			return nil, fmt.Errorf("adopting element handle while waiting for selector %q: %w", selector, err)
+			return nil, fmt.Errorf("waiting for selector %q: adopting element handle: %w", selector, err)
 		}
 	}
 
@@ -604,17 +615,20 @@ func (f *Frame) click(selector string, opts *FrameClickOptions) error {
 }
 
 // Check clicks the first element found that matches selector.
-func (f *Frame) Check(selector string, opts goja.Value) {
+func (f *Frame) Check(selector string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Check", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameCheckOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing new frame check options: %w", err)
+		return fmt.Errorf("parsing new frame check options: %w", err)
 	}
 	if err := f.check(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "checking %q: %w", selector, err)
+		return fmt.Errorf("checking %q: %w", selector, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
@@ -631,18 +645,52 @@ func (f *Frame) check(selector string, opts *FrameCheckOptions) error {
 	return nil
 }
 
+func (f *Frame) setChecked(selector string, checked bool, opts *FrameCheckOptions) error {
+	setChecked := func(apiCtx context.Context, handle *ElementHandle, p *Position) (any, error) {
+		return nil, handle.setChecked(apiCtx, checked, p)
+	}
+	act := f.newPointerAction(
+		selector, DOMElementStateAttached, opts.Strict, setChecked, &opts.ElementHandleBasePointerOptions,
+	)
+	if _, err := call(f.ctx, act, opts.Timeout); err != nil {
+		return errorFromDOMError(err)
+	}
+
+	return nil
+}
+
+// SetChecked sets the checked state of the first element found that matches the selector.
+func (f *Frame) SetChecked(selector string, checked bool, opts sobek.Value) error {
+	f.log.Debugf("Frame:SetChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	popts := NewFrameCheckOptions(f.defaultTimeout())
+	if err := popts.Parse(f.ctx, opts); err != nil {
+		return fmt.Errorf("parsing frame set check options: %w", err)
+	}
+	if err := f.setChecked(selector, checked, popts); err != nil {
+		return fmt.Errorf("setting checked %q: %w", selector, err)
+	}
+
+	applySlowMo(f.ctx)
+
+	return nil
+}
+
 // Uncheck the first found element that matches the selector.
-func (f *Frame) Uncheck(selector string, opts goja.Value) {
+func (f *Frame) Uncheck(selector string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Uncheck", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameUncheckOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing frame uncheck options %q: %w", selector, err)
+		return fmt.Errorf("parsing frame uncheck options %q: %w", selector, err)
 	}
 	if err := f.uncheck(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "unchecking %q: %w", selector, err)
+		return fmt.Errorf("unchecking %q: %w", selector, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
@@ -661,19 +709,19 @@ func (f *Frame) uncheck(selector string, opts *FrameUncheckOptions) error {
 
 // IsChecked returns true if the first element that matches the selector
 // is checked. Otherwise, returns false.
-func (f *Frame) IsChecked(selector string, opts goja.Value) bool {
+func (f *Frame) IsChecked(selector string, opts sobek.Value) (bool, error) {
 	f.log.Debugf("Frame:IsChecked", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsCheckedOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is checked options: %w", err)
+		return false, fmt.Errorf("parsing is checked options: %w", err)
 	}
 	checked, err := f.isChecked(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking element is checked %q: %w", selector, err)
+		return false, fmt.Errorf("checking element is checked %q: %w", selector, err)
 	}
 
-	return checked
+	return checked, nil
 }
 
 func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, error) {
@@ -701,7 +749,7 @@ func (f *Frame) isChecked(selector string, opts *FrameIsCheckedOptions) (bool, e
 }
 
 // Content returns the HTML content of the frame.
-func (f *Frame) Content() string {
+func (f *Frame) Content() (string, error) {
 	f.log.Debugf("Frame:Content", "fid:%s furl:%q", f.ID(), f.URL())
 
 	js := `() => {
@@ -715,30 +763,40 @@ func (f *Frame) Content() string {
 		return content;
 	}`
 
-	// TODO: return error
+	v, err := f.Evaluate(js)
+	if err != nil {
+		return "", fmt.Errorf("getting frame content: %w", err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("getting frame content: expected string, got %T", v)
+	}
 
-	return f.Evaluate(js).(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // Dblclick double clicks an element matching provided selector.
-func (f *Frame) Dblclick(selector string, opts goja.Value) {
+func (f *Frame) Dblclick(selector string, opts sobek.Value) error {
 	f.log.Debugf("Frame:DblClick", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameDblClickOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing double click options: %w", err)
+		return fmt.Errorf("parsing double click options: %w", err)
 	}
 	if err := f.dblclick(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "double clicking on %q: %w", selector, err)
+		return fmt.Errorf("double clicking on %q: %w", selector, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 // dblclick is like Dblclick but takes parsed options and neither throws
 // an error, or applies slow motion.
 func (f *Frame) dblclick(selector string, opts *FrameDblclickOptions) error {
-	dblclick := func(apiCtx context.Context, eh *ElementHandle, p *Position) (any, error) {
-		return nil, eh.dblClick(p, opts.ToMouseClickOptions())
+	dblclick := func(_ context.Context, eh *ElementHandle, p *Position) (any, error) {
+		return nil, eh.dblclick(p, opts.ToMouseClickOptions())
 	}
 	act := f.newPointerAction(
 		selector, DOMElementStateAttached, opts.Strict, dblclick, &opts.ElementHandleBasePointerOptions,
@@ -785,7 +843,7 @@ func (f *Frame) dispatchEvent(selector, typ string, eventInit any, opts *FrameDi
 
 // EvaluateWithContext will evaluate provided page function within an execution context.
 // The passed in context will be used instead of the frame's context. The context must
-// be a derivative of one that contains the goja runtime.
+// be a derivative of one that contains the sobek runtime.
 func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc string, args ...any) (any, error) {
 	f.log.Debugf("Frame:EvaluateWithContext", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -806,15 +864,10 @@ func (f *Frame) EvaluateWithContext(ctx context.Context, pageFunc string, args .
 }
 
 // Evaluate will evaluate provided page function within an execution context.
-func (f *Frame) Evaluate(pageFunc string, args ...any) any {
+func (f *Frame) Evaluate(pageFunc string, args ...any) (any, error) {
 	f.log.Debugf("Frame:Evaluate", "fid:%s furl:%q", f.ID(), f.URL())
 
-	result, err := f.EvaluateWithContext(f.ctx, pageFunc, args...)
-	if err != nil {
-		k6ext.Panic(f.ctx, "%v", err)
-	}
-
-	return result
+	return f.EvaluateWithContext(f.ctx, pageFunc, args...)
 }
 
 // EvaluateGlobal will evaluate the given JS code in the global object.
@@ -839,18 +892,19 @@ func (f *Frame) EvaluateGlobal(ctx context.Context, js string) error {
 func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI, _ error) {
 	f.log.Debugf("Frame:EvaluateHandle", "fid:%s furl:%q", f.ID(), f.URL())
 
-	f.waitForExecutionContext(mainWorld)
+	evalHandle := func() (JSHandleAPI, error) {
+		f.executionContextMu.RLock()
+		defer f.executionContextMu.RUnlock()
 
-	var err error
-	f.executionContextMu.RLock()
-	{
 		ec := f.executionContexts[mainWorld]
 		if ec == nil {
-			k6ext.Panic(f.ctx, "evaluating handle for frame: execution context %q not found", mainWorld)
+			return nil, fmt.Errorf("evaluating handle for frame: execution context %q not found", mainWorld)
 		}
-		handle, err = ec.EvalHandle(f.ctx, pageFunc, args...)
+		return ec.EvalHandle(f.ctx, pageFunc, args...) //nolint:wrapcheck
 	}
-	f.executionContextMu.RUnlock()
+
+	f.waitForExecutionContext(mainWorld)
+	handle, err := evalHandle()
 	if err != nil {
 		return nil, fmt.Errorf("evaluating handle for frame: %w", err)
 	}
@@ -861,17 +915,20 @@ func (f *Frame) EvaluateHandle(pageFunc string, args ...any) (handle JSHandleAPI
 }
 
 // Fill fills out the first element found that matches the selector.
-func (f *Frame) Fill(selector, value string, opts goja.Value) {
+func (f *Frame) Fill(selector, value string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Fill", "fid:%s furl:%q sel:%q val:%q", f.ID(), f.URL(), selector, value)
 
 	popts := NewFrameFillOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing fill options: %w", err)
+		return fmt.Errorf("parsing fill options: %w", err)
 	}
 	if err := f.fill(selector, value, popts); err != nil {
-		k6ext.Panic(f.ctx, "filling %q with %q: %w", selector, value, err)
+		return fmt.Errorf("filling %q with %q: %w", selector, value, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
@@ -891,17 +948,20 @@ func (f *Frame) fill(selector, value string, opts *FrameFillOptions) error {
 }
 
 // Focus focuses on the first element that matches the selector.
-func (f *Frame) Focus(selector string, opts goja.Value) {
+func (f *Frame) Focus(selector string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Focus", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing focus options: %w", err)
+		return fmt.Errorf("parsing focus options: %w", err)
 	}
 	if err := f.focus(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "focusing %q: %w", selector, err)
+		return fmt.Errorf("focusing %q: %w", selector, err)
 	}
+
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) focus(selector string, opts *FrameBaseOptions) error {
@@ -931,24 +991,23 @@ func (f *Frame) FrameElement() (*ElementHandle, error) {
 }
 
 // GetAttribute of the first element found that matches the selector.
-func (f *Frame) GetAttribute(selector, name string, opts goja.Value) any {
+// The second return value is true if the attribute exists, and false otherwise.
+func (f *Frame) GetAttribute(selector, name string, opts sobek.Value) (string, bool, error) {
 	f.log.Debugf("Frame:GetAttribute", "fid:%s furl:%q sel:%q name:%s", f.ID(), f.URL(), selector, name)
 
 	popts := NewFrameBaseOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parse: %w", err)
+		return "", false, fmt.Errorf("parsing get attribute options: %w", err)
 	}
-	v, err := f.getAttribute(selector, name, popts)
+	s, ok, err := f.getAttribute(selector, name, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting attribute %q of %q: %w", name, selector, err)
+		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return s, ok, nil
 }
 
-func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (any, error) {
+func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (string, bool, error) {
 	getAttribute := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.getAttribute(apiCtx, name)
 	}
@@ -958,10 +1017,17 @@ func (f *Frame) getAttribute(selector, name string, opts *FrameBaseOptions) (any
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err)
+		return "", false, errorFromDOMError(err)
+	}
+	if v == nil {
+		return "", false, nil
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", false, fmt.Errorf("unexpected type %T (expecting string)", v)
 	}
 
-	return v, nil
+	return s, true, nil
 }
 
 // Referrer returns the referrer of the frame from the network manager
@@ -996,18 +1062,20 @@ func (f *Frame) Goto(url string, opts *FrameGotoOptions) (*Response, error) {
 }
 
 // Hover moves the pointer over the first element that matches the selector.
-func (f *Frame) Hover(selector string, opts goja.Value) {
+func (f *Frame) Hover(selector string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Hover", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameHoverOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing hover options: %w", err)
+		return fmt.Errorf("parsing hover options: %w", err)
 	}
 	if err := f.hover(selector, popts); err != nil {
-		k6ext.Panic(f.ctx, "hovering %q: %w", selector, err)
+		return fmt.Errorf("hovering %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
@@ -1026,21 +1094,19 @@ func (f *Frame) hover(selector string, opts *FrameHoverOptions) error {
 
 // InnerHTML returns the innerHTML attribute of the first element found
 // that matches the selector.
-func (f *Frame) InnerHTML(selector string, opts goja.Value) string {
+func (f *Frame) InnerHTML(selector string, opts sobek.Value) (string, error) {
 	f.log.Debugf("Frame:InnerHTML", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameInnerHTMLOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing inner HTML options: %w", err)
+		return "", fmt.Errorf("parsing inner HTML options: %w", err)
 	}
 	v, err := f.innerHTML(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting inner HTML of %q: %w", selector, err)
+		return "", fmt.Errorf("getting inner HTML of %q: %w", selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return v, nil
 }
 
 func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string, error) {
@@ -1068,21 +1134,19 @@ func (f *Frame) innerHTML(selector string, opts *FrameInnerHTMLOptions) (string,
 
 // InnerText returns the inner text of the first element found
 // that matches the selector.
-func (f *Frame) InnerText(selector string, opts goja.Value) string {
+func (f *Frame) InnerText(selector string, opts sobek.Value) (string, error) {
 	f.log.Debugf("Frame:InnerText", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameInnerTextOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing inner text options: %w", err)
+		return "", fmt.Errorf("parsing inner text options: %w", err)
 	}
 	v, err := f.innerText(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting inner text of %q: %w", selector, err)
+		return "", fmt.Errorf("getting inner text of %q: %w", selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return v, nil
 }
 
 func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string, error) {
@@ -1108,21 +1172,20 @@ func (f *Frame) innerText(selector string, opts *FrameInnerTextOptions) (string,
 	return gv, nil
 }
 
-// InputValue returns the input value of the first element found
-// that matches the selector.
-func (f *Frame) InputValue(selector string, opts goja.Value) string {
+// InputValue returns the input value of the first element found that matches the selector.
+func (f *Frame) InputValue(selector string, opts sobek.Value) (string, error) {
 	f.log.Debugf("Frame:InputValue", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameInputValueOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing input value options: %w", err)
+		return "", fmt.Errorf("parsing input value options: %w", err)
 	}
 	v, err := f.inputValue(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting input value of %q: %w", selector, err)
+		return "", fmt.Errorf("getting input value of %q: %w", selector, err)
 	}
 
-	return v
+	return v, nil
 }
 
 func (f *Frame) inputValue(selector string, opts *FrameInputValueOptions) (string, error) {
@@ -1163,19 +1226,19 @@ func (f *Frame) setDetached(detached bool) {
 
 // IsEditable returns true if the first element that matches the selector
 // is editable. Otherwise, returns false.
-func (f *Frame) IsEditable(selector string, opts goja.Value) bool {
+func (f *Frame) IsEditable(selector string, opts sobek.Value) (bool, error) {
 	f.log.Debugf("Frame:IsEditable", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsEditableOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "%w", err)
+		return false, fmt.Errorf("parsing is editable options: %w", err)
 	}
 	editable, err := f.isEditable(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q editable: %w", selector, err)
+		return false, fmt.Errorf("checking is %q editable: %w", selector, err)
 	}
 
-	return editable
+	return editable, nil
 }
 
 func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool, error) {
@@ -1204,19 +1267,19 @@ func (f *Frame) isEditable(selector string, opts *FrameIsEditableOptions) (bool,
 
 // IsEnabled returns true if the first element that matches the selector
 // is enabled. Otherwise, returns false.
-func (f *Frame) IsEnabled(selector string, opts goja.Value) bool {
+func (f *Frame) IsEnabled(selector string, opts sobek.Value) (bool, error) {
 	f.log.Debugf("Frame:IsEnabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsEnabledOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is enabled options: %w", err)
+		return false, fmt.Errorf("parsing is enabled options: %w", err)
 	}
 	enabled, err := f.isEnabled(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q enabled: %w", selector, err)
+		return false, fmt.Errorf("checking is %q enabled: %w", selector, err)
 	}
 
-	return enabled
+	return enabled, nil
 }
 
 func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, error) {
@@ -1245,19 +1308,19 @@ func (f *Frame) isEnabled(selector string, opts *FrameIsEnabledOptions) (bool, e
 
 // IsDisabled returns true if the first element that matches the selector
 // is disabled. Otherwise, returns false.
-func (f *Frame) IsDisabled(selector string, opts goja.Value) bool {
+func (f *Frame) IsDisabled(selector string, opts sobek.Value) (bool, error) {
 	f.log.Debugf("Frame:IsDisabled", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsDisabledOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing is disabled options: %w", err)
+		return false, fmt.Errorf("parsing is disabled options: %w", err)
 	}
 	disabled, err := f.isDisabled(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "checking is %q disabled: %w", selector, err)
+		return false, fmt.Errorf("checking is %q disabled: %w", selector, err)
 	}
 
-	return disabled
+	return disabled, nil
 }
 
 func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool, error) {
@@ -1286,7 +1349,7 @@ func (f *Frame) isDisabled(selector string, opts *FrameIsDisabledOptions) (bool,
 
 // IsHidden returns true if the first element that matches the selector
 // is hidden. Otherwise, returns false.
-func (f *Frame) IsHidden(selector string, opts goja.Value) (bool, error) {
+func (f *Frame) IsHidden(selector string, opts sobek.Value) (bool, error) {
 	f.log.Debugf("Frame:IsHidden", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsHiddenOptions()
@@ -1319,7 +1382,7 @@ func (f *Frame) isHidden(selector string, opts *FrameIsHiddenOptions) (bool, err
 
 // IsVisible returns true if the first element that matches the selector
 // is visible. Otherwise, returns false.
-func (f *Frame) IsVisible(selector string, opts goja.Value) (bool, error) {
+func (f *Frame) IsVisible(selector string, opts sobek.Value) (bool, error) {
 	f.log.Debugf("Frame:IsVisible", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameIsVisibleOptions()
@@ -1359,7 +1422,7 @@ func (f *Frame) ID() string {
 }
 
 // Locator creates and returns a new locator for this frame.
-func (f *Frame) Locator(selector string, opts goja.Value) *Locator {
+func (f *Frame) Locator(selector string, opts sobek.Value) *Locator {
 	f.log.Debugf("Frame:Locator", "fid:%s furl:%q selector:%q opts:%+v", f.ID(), f.URL(), selector, opts)
 
 	return NewLocator(f.ctx, selector, f, f.log)
@@ -1388,7 +1451,7 @@ func (f *Frame) Query(selector string, strict bool) (*ElementHandle, error) {
 
 	document, err := f.document()
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting document: %w", err)
+		return nil, fmt.Errorf("getting document: %w", err)
 	}
 	return document.Query(selector, strict)
 }
@@ -1399,7 +1462,7 @@ func (f *Frame) QueryAll(selector string) ([]*ElementHandle, error) {
 
 	document, err := f.document()
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting document: %w", err)
+		return nil, fmt.Errorf("getting document: %w", err)
 	}
 	return document.QueryAll(selector)
 }
@@ -1415,18 +1478,20 @@ func (f *Frame) ParentFrame() *Frame {
 }
 
 // Press presses the given key for the first element found that matches the selector.
-func (f *Frame) Press(selector, key string, opts goja.Value) {
+func (f *Frame) Press(selector, key string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Press", "fid:%s furl:%q sel:%q key:%q", f.ID(), f.URL(), selector, key)
 
 	popts := NewFramePressOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing press options: %w", err)
+		return fmt.Errorf("parsing press options: %w", err)
 	}
 	if err := f.press(selector, key, popts); err != nil {
-		k6ext.Panic(f.ctx, "pressing %q on %q: %w", key, selector, err)
+		return fmt.Errorf("pressing %q on %q: %w", key, selector, err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
@@ -1446,24 +1511,24 @@ func (f *Frame) press(selector, key string, opts *FramePressOptions) error {
 
 // SelectOption selects the given options and returns the array of
 // option values of the first element found that matches the selector.
-func (f *Frame) SelectOption(selector string, values goja.Value, opts goja.Value) []string {
+func (f *Frame) SelectOption(selector string, values sobek.Value, opts sobek.Value) ([]string, error) {
 	f.log.Debugf("Frame:SelectOption", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameSelectOptionOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing select option options: %w", err)
+		return nil, fmt.Errorf("parsing select option options: %w", err)
 	}
 	v, err := f.selectOption(selector, values, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "selecting option on %q: %w", selector, err)
+		return nil, fmt.Errorf("selecting option on %q: %w", selector, err)
 	}
 
 	applySlowMo(f.ctx)
 
-	return v
+	return v, nil
 }
 
-func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSelectOptionOptions) ([]string, error) {
+func (f *Frame) selectOption(selector string, values sobek.Value, opts *FrameSelectOptionOptions) ([]string, error) {
 	selectOption := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.selectOption(apiCtx, values)
 	}
@@ -1504,14 +1569,14 @@ func (f *Frame) selectOption(selector string, values goja.Value, opts *FrameSele
 }
 
 // SetContent replaces the entire HTML document content.
-func (f *Frame) SetContent(html string, opts goja.Value) {
+func (f *Frame) SetContent(html string, opts sobek.Value) error {
 	f.log.Debugf("Frame:SetContent", "fid:%s furl:%q", f.ID(), f.URL())
 
 	parsedOpts := NewFrameSetContentOptions(
 		f.manager.timeoutSettings.navigationTimeout(),
 	)
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing set content options: %w", err)
+		return fmt.Errorf("parsing set content options: %w", err)
 	}
 
 	js := `(html) => {
@@ -1528,14 +1593,16 @@ func (f *Frame) SetContent(html string, opts goja.Value) {
 		returnByValue: true,
 	}
 	if _, err := f.evaluate(f.ctx, utilityWorld, eopts, js, html); err != nil {
-		k6ext.Panic(f.ctx, "setting content: %w", err)
+		return fmt.Errorf("setting content: %w", err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 // SetInputFiles sets input files for the selected element.
-func (f *Frame) SetInputFiles(selector string, files goja.Value, opts goja.Value) error {
+func (f *Frame) SetInputFiles(selector string, files sobek.Value, opts sobek.Value) error {
 	f.log.Debugf("Frame:SetInputFiles", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameSetInputFilesOptions(f.defaultTimeout())
@@ -1602,25 +1669,24 @@ func (f *Frame) setInputFiles(selector string, files *Files, opts *FrameSetInput
 }
 
 // TextContent returns the textContent attribute of the first element found
-// that matches the selector.
-func (f *Frame) TextContent(selector string, opts goja.Value) string {
+// that matches the selector. The second return value is true if the returned
+// text content is not null or empty, and false otherwise.
+func (f *Frame) TextContent(selector string, opts sobek.Value) (string, bool, error) {
 	f.log.Debugf("Frame:TextContent", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	popts := NewFrameTextContentOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing text content options: %w", err)
+		return "", false, fmt.Errorf("parsing text content options: %w", err)
 	}
-	v, err := f.textContent(selector, popts)
+	v, ok, err := f.textContent(selector, popts)
 	if err != nil {
-		k6ext.Panic(f.ctx, "getting text content of %q: %w", selector, err)
+		return "", false, fmt.Errorf("getting text content of %q: %w", selector, err)
 	}
 
-	applySlowMo(f.ctx)
-
-	return v
+	return v, ok, nil
 }
 
-func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (string, error) {
+func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (string, bool, error) {
 	TextContent := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
 		return handle.textContent(apiCtx)
 	}
@@ -1630,17 +1696,17 @@ func (f *Frame) textContent(selector string, opts *FrameTextContentOptions) (str
 	)
 	v, err := call(f.ctx, act, opts.Timeout)
 	if err != nil {
-		return "", errorFromDOMError(err)
+		return "", false, errorFromDOMError(err)
 	}
 	if v == nil {
-		return "", nil
+		return "", false, nil
 	}
-	gv, ok := v.(string)
+	s, ok := v.(string)
 	if !ok {
-		return "", fmt.Errorf("unexpected type %T", v)
+		return "", false, fmt.Errorf("unexpected type %T (expecting string)", v)
 	}
 
-	return gv, nil
+	return s, true, nil
 }
 
 // Timeout will return the default timeout or the one set by the user.
@@ -1653,26 +1719,29 @@ func (f *Frame) Timeout() time.Duration {
 func (f *Frame) Title() string {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	v := `() => document.title`
+	script := `() => document.title`
 
 	// TODO: return error
 
-	return f.Evaluate(v).(string) //nolint:forcetypeassert
+	v, _ := f.Evaluate(script)
+	return v.(string) //nolint:forcetypeassert
 }
 
 // Type text on the first element found matches the selector.
-func (f *Frame) Type(selector, text string, opts goja.Value) {
+func (f *Frame) Type(selector, text string, opts sobek.Value) error {
 	f.log.Debugf("Frame:Type", "fid:%s furl:%q sel:%q text:%q", f.ID(), f.URL(), selector, text)
 
 	popts := NewFrameTypeOptions(f.defaultTimeout())
 	if err := popts.Parse(f.ctx, opts); err != nil {
-		k6ext.Panic(f.ctx, "parsing type options: %w", err)
+		return fmt.Errorf("parsing type options: %w", err)
 	}
 	if err := f.typ(selector, text, popts); err != nil {
-		k6ext.Panic(f.ctx, "typing %q in %q: %w", text, selector, err)
+		return fmt.Errorf("typing %q in %q: %w", text, selector, err)
 	}
 
 	applySlowMo(f.ctx)
+
+	return nil
 }
 
 func (f *Frame) typ(selector, text string, opts *FrameTypeOptions) error {
@@ -1792,45 +1861,48 @@ func (f *Frame) waitForFunction(
 
 // WaitForLoadState waits for the given load state to be reached.
 // This will unblock if that lifecycle event has already been received.
-func (f *Frame) WaitForLoadState(state string, opts goja.Value) {
+func (f *Frame) WaitForLoadState(state string, opts sobek.Value) error {
 	f.log.Debugf("Frame:WaitForLoadState", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 	defer f.log.Debugf("Frame:WaitForLoadState:return", "fid:%s furl:%q state:%s", f.ID(), f.URL(), state)
 
-	parsedOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
-	err := parsedOpts.Parse(f.ctx, opts)
-	if err != nil {
-		k6ext.Panic(f.ctx, "parsing waitForLoadState %q options: %v", state, err)
+	waitForLoadStateOpts := NewFrameWaitForLoadStateOptions(f.defaultTimeout())
+	if err := waitForLoadStateOpts.Parse(f.ctx, opts); err != nil {
+		return fmt.Errorf("parsing waitForLoadState %q options: %w", state, err)
 	}
 
-	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, parsedOpts.Timeout)
+	timeoutCtx, timeoutCancel := context.WithTimeout(f.ctx, waitForLoadStateOpts.Timeout)
 	defer timeoutCancel()
 
 	waitUntil := LifecycleEventLoad
 	if state != "" {
-		if err = waitUntil.UnmarshalText([]byte(state)); err != nil {
-			k6ext.Panic(f.ctx, "waiting for load state: %v", err)
+		if err := waitUntil.UnmarshalText([]byte(state)); err != nil {
+			return fmt.Errorf("unmarshaling wait for load state %q: %w", state, err)
 		}
 	}
 
-	lifecycleEvtCh, lifecycleEvtCancel := createWaitForEventPredicateHandler(
-		timeoutCtx, f, []string{EventFrameAddLifecycle},
+	lifecycleEvent, lifecycleEventCancel := createWaitForEventPredicateHandler(
+		timeoutCtx,
+		f,
+		[]string{EventFrameAddLifecycle},
 		func(data any) bool {
 			if le, ok := data.(FrameLifecycleEvent); ok {
 				return le.Event == waitUntil
 			}
 			return false
 		})
-	defer lifecycleEvtCancel()
+	defer lifecycleEventCancel()
 
 	if f.hasLifecycleEventFired(waitUntil) {
-		return
+		return nil
 	}
 
 	select {
-	case <-lifecycleEvtCh:
+	case <-lifecycleEvent:
 	case <-timeoutCtx.Done():
-		k6ext.Panic(f.ctx, "waiting for load state %q: %v", state, err)
+		return fmt.Errorf("waiting for load state %q: %w", state, timeoutCtx.Err())
 	}
+
+	return nil
 }
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
@@ -1922,7 +1994,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 }
 
 // WaitForSelector waits for the given selector to match the waiting criteria.
-func (f *Frame) WaitForSelector(selector string, opts goja.Value) (*ElementHandle, error) {
+func (f *Frame) WaitForSelector(selector string, opts sobek.Value) (*ElementHandle, error) {
 	parsedOpts := NewFrameWaitForSelectorOptions(f.defaultTimeout())
 	if err := parsedOpts.Parse(f.ctx, opts); err != nil {
 		return nil, fmt.Errorf("parsing wait for selector %q options: %w", selector, err)

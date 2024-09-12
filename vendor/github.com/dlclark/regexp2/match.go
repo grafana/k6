@@ -6,8 +6,9 @@ import (
 )
 
 // Match is a single regex result match that contains groups and repeated captures
-// 	-Groups
-//    -Capture
+//
+//		-Groups
+//	   -Capture
 type Match struct {
 	Group //embeded group 0
 
@@ -43,10 +44,10 @@ type Group struct {
 type Capture struct {
 	// the original string
 	text []rune
-	// the position in the original string where the first character of
-	// captured substring was found.
+	// Index is the position in the underlying rune slice where the first character of
+	// captured substring was found. Even if you pass in a string this will be in Runes.
 	Index int
-	// the length of the captured substring.
+	// Length is the number of runes in the captured substring.
 	Length int
 }
 
@@ -187,7 +188,8 @@ func (m *Match) addMatch(c, start, l int) {
 }
 
 // Nonpublic builder: Add a capture to balance the specified group.  This is used by the
-//                     balanced match construct. (?<foo-foo2>...)
+//
+//	balanced match construct. (?<foo-foo2>...)
 //
 // If there were no such thing as backtracking, this would be as simple as calling RemoveMatch(c).
 // However, since we have backtracking, we need to keep track of everything.

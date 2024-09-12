@@ -5,10 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/log"
+	"github.com/grafana/sobek"
 
-	"github.com/dop251/goja"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // Strict mode:
@@ -82,21 +81,20 @@ func (l *Locator) click(opts *FrameClickOptions) error {
 }
 
 // Dblclick double clicks on an element using locator's selector with strict mode on.
-func (l *Locator) Dblclick(opts goja.Value) {
+func (l *Locator) Dblclick(opts sobek.Value) error {
 	l.log.Debugf("Locator:Dblclick", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameDblClickOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing double click options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing double click options: %w", err)
 	}
-	if err = l.dblclick(copts); err != nil {
-		err = fmt.Errorf("double clicking on %q: %w", l.selector, err)
-		return
+	if err := l.dblclick(copts); err != nil {
+		return fmt.Errorf("double clicking on %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 // Dblclick is like Dblclick but takes parsed options and neither throws an
@@ -106,22 +104,47 @@ func (l *Locator) dblclick(opts *FrameDblclickOptions) error {
 	return l.frame.dblclick(l.selector, opts)
 }
 
-// Check on an element using locator's selector with strict mode on.
-func (l *Locator) Check(opts goja.Value) {
-	l.log.Debugf("Locator:Check", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
-
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
+// SetChecked sets the checked state of the element using locator's selector
+// with strict mode on.
+func (l *Locator) SetChecked(checked bool, opts sobek.Value) error {
+	l.log.Debugf(
+		"Locator:SetChecked", "fid:%s furl:%q sel:%q checked:%v opts:%+v",
+		l.frame.ID(), l.frame.URL(), l.selector, checked, opts,
+	)
 
 	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing check options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing set checked options: %w", err)
 	}
-	if err = l.check(copts); err != nil {
-		err = fmt.Errorf("checking %q: %w", l.selector, err)
-		return
+	if err := l.setChecked(checked, copts); err != nil {
+		return fmt.Errorf("setting %q checked to %v: %w", l.selector, checked, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
+}
+
+func (l *Locator) setChecked(checked bool, opts *FrameCheckOptions) error {
+	opts.Strict = true
+	return l.frame.setChecked(l.selector, checked, opts)
+}
+
+// Check on an element using locator's selector with strict mode on.
+func (l *Locator) Check(opts sobek.Value) error {
+	l.log.Debugf("Locator:Check", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
+
+	copts := NewFrameCheckOptions(l.frame.defaultTimeout())
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing check options: %w", err)
+	}
+	if err := l.check(copts); err != nil {
+		return fmt.Errorf("checking %q: %w", l.selector, err)
+	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 // check is like Check but takes parsed options and neither throws an
@@ -132,21 +155,20 @@ func (l *Locator) check(opts *FrameCheckOptions) error {
 }
 
 // Uncheck on an element using locator's selector with strict mode on.
-func (l *Locator) Uncheck(opts goja.Value) {
+func (l *Locator) Uncheck(opts sobek.Value) error {
 	l.log.Debugf("Locator:Uncheck", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameUncheckOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing uncheck options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing uncheck options: %w", err)
 	}
-	if err = l.uncheck(copts); err != nil {
-		err = fmt.Errorf("unchecking %q: %w", l.selector, err)
-		return
+	if err := l.uncheck(copts); err != nil {
+		return fmt.Errorf("unchecking %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 // uncheck is like Uncheck but takes parsed options and neither throws
@@ -158,19 +180,19 @@ func (l *Locator) uncheck(opts *FrameUncheckOptions) error {
 
 // IsChecked returns true if the element matches the locator's
 // selector and is checked. Otherwise, returns false.
-func (l *Locator) IsChecked(opts goja.Value) bool {
+func (l *Locator) IsChecked(opts sobek.Value) (bool, error) {
 	l.log.Debugf("Locator:IsChecked", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameIsCheckedOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing is checked options: %w", err)
+		return false, fmt.Errorf("parsing is checked options: %w", err)
 	}
 	checked, err := l.isChecked(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "checking is %q checked: %w", l.selector, err)
+		return false, fmt.Errorf("checking is %q checked: %w", l.selector, err)
 	}
 
-	return checked
+	return checked, nil
 }
 
 // isChecked is like IsChecked but takes parsed options and does not
@@ -182,19 +204,19 @@ func (l *Locator) isChecked(opts *FrameIsCheckedOptions) (bool, error) {
 
 // IsEditable returns true if the element matches the locator's
 // selector and is Editable. Otherwise, returns false.
-func (l *Locator) IsEditable(opts goja.Value) bool {
+func (l *Locator) IsEditable(opts sobek.Value) (bool, error) {
 	l.log.Debugf("Locator:IsEditable", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameIsEditableOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing is editable options: %w", err)
+		return false, fmt.Errorf("parsing is editable options: %w", err)
 	}
 	editable, err := l.isEditable(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "checking is %q editable: %w", l.selector, err)
+		return false, fmt.Errorf("checking is %q editable: %w", l.selector, err)
 	}
 
-	return editable
+	return editable, nil
 }
 
 // isEditable is like IsEditable but takes parsed options and does not
@@ -206,19 +228,19 @@ func (l *Locator) isEditable(opts *FrameIsEditableOptions) (bool, error) {
 
 // IsEnabled returns true if the element matches the locator's
 // selector and is Enabled. Otherwise, returns false.
-func (l *Locator) IsEnabled(opts goja.Value) bool {
+func (l *Locator) IsEnabled(opts sobek.Value) (bool, error) {
 	l.log.Debugf("Locator:IsEnabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameIsEnabledOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing is enabled options: %w", err)
+		return false, fmt.Errorf("parsing is enabled options: %w", err)
 	}
 	enabled, err := l.isEnabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "checking is %q enabled: %w", l.selector, err)
+		return false, fmt.Errorf("checking is %q enabled: %w", l.selector, err)
 	}
 
-	return enabled
+	return enabled, nil
 }
 
 // isEnabled is like IsEnabled but takes parsed options and does not
@@ -230,19 +252,19 @@ func (l *Locator) isEnabled(opts *FrameIsEnabledOptions) (bool, error) {
 
 // IsDisabled returns true if the element matches the locator's
 // selector and is disabled. Otherwise, returns false.
-func (l *Locator) IsDisabled(opts goja.Value) bool {
+func (l *Locator) IsDisabled(opts sobek.Value) (bool, error) {
 	l.log.Debugf("Locator:IsDisabled", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameIsDisabledOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing is disabled options: %w", err)
+		return false, fmt.Errorf("parsing is disabled options: %w", err)
 	}
 	disabled, err := l.isDisabled(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "checking is %q disabled: %w", l.selector, err)
+		return false, fmt.Errorf("checking is %q disabled: %w", l.selector, err)
 	}
 
-	return disabled
+	return disabled, nil
 }
 
 // IsDisabled is like IsDisabled but takes parsed options and does not
@@ -279,24 +301,23 @@ func (l *Locator) IsHidden() (bool, error) {
 }
 
 // Fill out the element using locator's selector with strict mode on.
-func (l *Locator) Fill(value string, opts goja.Value) {
+func (l *Locator) Fill(value string, opts sobek.Value) error {
 	l.log.Debugf(
 		"Locator:Fill", "fid:%s furl:%q sel:%q val:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, value, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameFillOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing fill options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing fill options: %w", err)
 	}
-	if err = l.fill(value, copts); err != nil {
-		err = fmt.Errorf("filling %q with %q: %w", l.selector, value, err)
-		return
+	if err := l.fill(value, copts); err != nil {
+		return fmt.Errorf("filling %q with %q: %w", l.selector, value, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) fill(value string, opts *FrameFillOptions) error {
@@ -305,21 +326,20 @@ func (l *Locator) fill(value string, opts *FrameFillOptions) error {
 }
 
 // Focus on the element using locator's selector with strict mode on.
-func (l *Locator) Focus(opts goja.Value) {
+func (l *Locator) Focus(opts sobek.Value) error {
 	l.log.Debugf("Locator:Focus", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing focus options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing focus options: %w", err)
 	}
-	if err = l.focus(copts); err != nil {
-		err = fmt.Errorf("focusing on %q: %w", l.selector, err)
-		return
+	if err := l.focus(copts); err != nil {
+		return fmt.Errorf("focusing on %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) focus(opts *FrameBaseOptions) error {
@@ -328,54 +348,45 @@ func (l *Locator) focus(opts *FrameBaseOptions) error {
 }
 
 // GetAttribute of the element using locator's selector with strict mode on.
-func (l *Locator) GetAttribute(name string, opts goja.Value) any {
+// The second return value is true if the attribute exists, and false otherwise.
+func (l *Locator) GetAttribute(name string, opts sobek.Value) (string, bool, error) {
 	l.log.Debugf(
 		"Locator:GetAttribute", "fid:%s furl:%q sel:%q name:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, name, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameBaseOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing get attribute options: %w", err)
-		return nil
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return "", false, fmt.Errorf("parsing get attribute options: %w", err)
 	}
-	var v any
-	if v, err = l.getAttribute(name, copts); err != nil {
-		err = fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
-		return nil
+	s, ok, err := l.getAttribute(name, copts)
+	if err != nil {
+		return "", false, fmt.Errorf("getting attribute %q of %q: %w", name, l.selector, err)
 	}
 
-	return v
+	return s, ok, nil
 }
 
-func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (any, error) {
+func (l *Locator) getAttribute(name string, opts *FrameBaseOptions) (string, bool, error) {
 	opts.Strict = true
 	return l.frame.getAttribute(l.selector, name, opts)
 }
 
 // InnerHTML returns the element's inner HTML that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InnerHTML(opts goja.Value) string {
+func (l *Locator) InnerHTML(opts sobek.Value) (string, error) {
 	l.log.Debugf("Locator:InnerHTML", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameInnerHTMLOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing inner HTML options: %w", err)
-		return ""
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return "", fmt.Errorf("parsing inner HTML options: %w", err)
 	}
-	var s string
-	if s, err = l.innerHTML(copts); err != nil {
-		err = fmt.Errorf("getting inner HTML of %q: %w", l.selector, err)
-		return ""
+	s, err := l.innerHTML(copts)
+	if err != nil {
+		return "", fmt.Errorf("getting inner HTML of %q: %w", l.selector, err)
 	}
 
-	return s
+	return s, nil
 }
 
 func (l *Locator) innerHTML(opts *FrameInnerHTMLOptions) (string, error) {
@@ -385,24 +396,19 @@ func (l *Locator) innerHTML(opts *FrameInnerHTMLOptions) (string, error) {
 
 // InnerText returns the element's inner text that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InnerText(opts goja.Value) string {
+func (l *Locator) InnerText(opts sobek.Value) (string, error) {
 	l.log.Debugf("Locator:InnerText", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameInnerTextOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing inner text options: %w", err)
-		return ""
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return "", fmt.Errorf("parsing inner text options: %w", err)
 	}
-	var s string
-	if s, err = l.innerText(copts); err != nil {
-		err = fmt.Errorf("getting inner text of %q: %w", l.selector, err)
-		return ""
+	s, err := l.innerText(copts)
+	if err != nil {
+		return "", fmt.Errorf("getting inner text of %q: %w", l.selector, err)
 	}
 
-	return s
+	return s, nil
 }
 
 func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
@@ -411,47 +417,44 @@ func (l *Locator) innerText(opts *FrameInnerTextOptions) (string, error) {
 }
 
 // TextContent returns the element's text content that matches
-// the locator's selector with strict mode on.
-func (l *Locator) TextContent(opts goja.Value) string {
+// the locator's selector with strict mode on. The second return
+// value is true if the returned text content is not null or empty,
+// and false otherwise.
+func (l *Locator) TextContent(opts sobek.Value) (string, bool, error) {
 	l.log.Debugf("Locator:TextContent", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameTextContentOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing text context options: %w", err)
-		return ""
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return "", false, fmt.Errorf("parsing text context options: %w", err)
 	}
-	var s string
-	if s, err = l.textContent(copts); err != nil {
-		err = fmt.Errorf("getting text content of %q: %w", l.selector, err)
-		return ""
+	s, ok, err := l.textContent(copts)
+	if err != nil {
+		return "", false, fmt.Errorf("getting text content of %q: %w", l.selector, err)
 	}
 
-	return s
+	return s, ok, nil
 }
 
-func (l *Locator) textContent(opts *FrameTextContentOptions) (string, error) {
+func (l *Locator) textContent(opts *FrameTextContentOptions) (string, bool, error) {
 	opts.Strict = true
 	return l.frame.textContent(l.selector, opts)
 }
 
 // InputValue returns the element's input value that matches
 // the locator's selector with strict mode on.
-func (l *Locator) InputValue(opts goja.Value) string {
+func (l *Locator) InputValue(opts sobek.Value) (string, error) {
 	l.log.Debugf("Locator:InputValue", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameInputValueOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing input value options: %w", err)
+		return "", fmt.Errorf("parsing input value options: %w", err)
 	}
 	v, err := l.inputValue(copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "getting input value of %q: %w", l.selector, err)
+		return "", fmt.Errorf("getting input value of %q: %w", l.selector, err)
 	}
 
-	return v
+	return v, nil
 }
 
 func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
@@ -462,46 +465,47 @@ func (l *Locator) inputValue(opts *FrameInputValueOptions) (string, error) {
 // SelectOption filters option values of the first element that matches
 // the locator's selector (with strict mode on), selects the options,
 // and returns the filtered options.
-func (l *Locator) SelectOption(values goja.Value, opts goja.Value) []string {
+func (l *Locator) SelectOption(values sobek.Value, opts sobek.Value) ([]string, error) {
 	l.log.Debugf("Locator:SelectOption", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	copts := NewFrameSelectOptionOptions(l.frame.defaultTimeout())
 	if err := copts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing select option options: %w", err)
+		return nil, fmt.Errorf("parsing select option options: %w", err)
 	}
 	v, err := l.selectOption(values, copts)
 	if err != nil {
-		k6ext.Panic(l.ctx, "selecting option on %q: %w", l.selector, err)
+		return nil, fmt.Errorf("selecting option on %q: %w", l.selector, err)
 	}
 
-	return v
+	applySlowMo(l.ctx)
+
+	return v, nil
 }
 
-func (l *Locator) selectOption(values goja.Value, opts *FrameSelectOptionOptions) ([]string, error) {
+func (l *Locator) selectOption(values sobek.Value, opts *FrameSelectOptionOptions) ([]string, error) {
 	opts.Strict = true
 	return l.frame.selectOption(l.selector, values, opts)
 }
 
 // Press the given key on the element found that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Press(key string, opts goja.Value) {
+func (l *Locator) Press(key string, opts sobek.Value) error {
 	l.log.Debugf(
 		"Locator:Press", "fid:%s furl:%q sel:%q key:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, key, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFramePressOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing press options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing press options: %w", err)
 	}
-	if err = l.press(key, copts); err != nil {
-		err = fmt.Errorf("pressing %q on %q: %w", key, l.selector, err)
-		return
+	if err := l.press(key, copts); err != nil {
+		return fmt.Errorf("pressing %q on %q: %w", key, l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) press(key string, opts *FramePressOptions) error {
@@ -511,7 +515,7 @@ func (l *Locator) press(key string, opts *FramePressOptions) error {
 
 // Type text on the element found that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Type(text string, opts goja.Value) error {
+func (l *Locator) Type(text string, opts sobek.Value) error {
 	l.log.Debugf(
 		"Locator:Type", "fid:%s furl:%q sel:%q text:%q opts:%+v",
 		l.frame.ID(), l.frame.URL(), l.selector, text, opts,
@@ -543,21 +547,20 @@ func (l *Locator) typ(text string, opts *FrameTypeOptions) error {
 
 // Hover moves the pointer over the element that matches the locator's
 // selector with strict mode on.
-func (l *Locator) Hover(opts goja.Value) {
+func (l *Locator) Hover(opts sobek.Value) error {
 	l.log.Debugf("Locator:Hover", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
 	copts := NewFrameHoverOptions(l.frame.defaultTimeout())
-	if err = copts.Parse(l.ctx, opts); err != nil {
-		err = fmt.Errorf("parsing hover options: %w", err)
-		return
+	if err := copts.Parse(l.ctx, opts); err != nil {
+		return fmt.Errorf("parsing hover options: %w", err)
 	}
-	if err = l.hover(copts); err != nil {
-		err = fmt.Errorf("hovering on %q: %w", l.selector, err)
-		return
+	if err := l.hover(copts); err != nil {
+		return fmt.Errorf("hovering on %q: %w", l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
+
+	return nil
 }
 
 func (l *Locator) hover(opts *FrameHoverOptions) error {
@@ -587,12 +590,11 @@ func (l *Locator) DispatchEvent(typ string, eventInit any, opts *FrameDispatchEv
 		l.frame.ID(), l.frame.URL(), l.selector, typ, eventInit, opts,
 	)
 
-	var err error
-	defer func() { panicOrSlowMo(l.ctx, err) }()
-
-	if err = l.dispatchEvent(typ, eventInit, opts); err != nil {
+	if err := l.dispatchEvent(typ, eventInit, opts); err != nil {
 		return fmt.Errorf("dispatching locator event %q to %q: %w", typ, l.selector, err)
 	}
+
+	applySlowMo(l.ctx)
 
 	return nil
 }
@@ -603,16 +605,18 @@ func (l *Locator) dispatchEvent(typ string, eventInit any, opts *FrameDispatchEv
 }
 
 // WaitFor waits for the element matching the locator's selector with strict mode on.
-func (l *Locator) WaitFor(opts goja.Value) {
+func (l *Locator) WaitFor(opts sobek.Value) error {
 	l.log.Debugf("Locator:WaitFor", "fid:%s furl:%q sel:%q opts:%+v", l.frame.ID(), l.frame.URL(), l.selector, opts)
 
 	popts := NewFrameWaitForSelectorOptions(l.frame.defaultTimeout())
 	if err := popts.Parse(l.ctx, opts); err != nil {
-		k6ext.Panic(l.ctx, "parsing wait for options: %w", err)
+		return fmt.Errorf("parsing wait for options: %w", err)
 	}
 	if err := l.waitFor(popts); err != nil {
-		k6ext.Panic(l.ctx, "waiting for %q: %w", l.selector, err)
+		return fmt.Errorf("waiting for %q: %w", l.selector, err)
 	}
+
+	return nil
 }
 
 func (l *Locator) waitFor(opts *FrameWaitForSelectorOptions) error {

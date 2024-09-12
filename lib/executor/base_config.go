@@ -1,6 +1,7 @@
 package executor
 
 import (
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -46,29 +47,29 @@ func NewBaseConfig(name, configType string) BaseConfig {
 }
 
 // Validate checks some basic things like present name, type, and a positive start time
-func (bc BaseConfig) Validate() (errors []error) {
+func (bc BaseConfig) Validate() (result []error) {
 	// Some just-in-case checks, since those things are likely checked in other places or
 	// even assigned by us:
 	if bc.Name == "" {
-		errors = append(errors, fmt.Errorf("scenario name can't be empty"))
+		result = append(result, errors.New("scenario name can't be empty"))
 	}
 	if !scenarioNameWhitelist.MatchString(bc.Name) {
-		errors = append(errors, fmt.Errorf(scenarioNameErr))
+		result = append(result, errors.New(scenarioNameErr))
 	}
 	if bc.Exec.Valid && bc.Exec.String == "" {
-		errors = append(errors, fmt.Errorf("exec value cannot be empty"))
+		result = append(result, errors.New("exec value cannot be empty"))
 	}
 	if bc.Type == "" {
-		errors = append(errors, fmt.Errorf("missing or empty type field"))
+		result = append(result, errors.New("missing or empty type field"))
 	}
 	// The actually reasonable checks:
 	if bc.StartTime.Duration < 0 {
-		errors = append(errors, fmt.Errorf("the startTime can't be negative"))
+		result = append(result, errors.New("the startTime can't be negative"))
 	}
 	if bc.GracefulStop.Duration < 0 {
-		errors = append(errors, fmt.Errorf("the gracefulStop timeout can't be negative"))
+		result = append(result, errors.New("the gracefulStop timeout can't be negative"))
 	}
-	return errors
+	return result
 }
 
 // GetName returns the name of the scenario.

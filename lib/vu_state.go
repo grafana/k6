@@ -13,6 +13,7 @@ import (
 	"golang.org/x/time/rate"
 
 	"go.k6.io/k6/metrics"
+	"go.k6.io/k6/usage"
 )
 
 // DialContexter is an interface that can dial with a context
@@ -81,6 +82,9 @@ type State struct {
 
 	// Tracing instrumentation.
 	TracerProvider TracerProvider
+
+	// Usage is a way to report usage statistics
+	Usage *usage.Usage
 }
 
 // VUStateTags wraps the current VU's tags and ensures a thread-safe way to

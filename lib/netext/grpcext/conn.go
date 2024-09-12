@@ -26,16 +26,18 @@ import (
 	"google.golang.org/protobuf/reflect/protoreflect"
 	"google.golang.org/protobuf/types/descriptorpb"
 	"google.golang.org/protobuf/types/dynamicpb"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 // InvokeRequest represents a unary gRPC request.
 type InvokeRequest struct {
-	Method           string
-	MethodDescriptor protoreflect.MethodDescriptor
-	Timeout          time.Duration
-	TagsAndMeta      *metrics.TagsAndMeta
-	Message          []byte
-	Metadata         metadata.MD
+	Method                 string
+	MethodDescriptor       protoreflect.MethodDescriptor
+	Timeout                time.Duration
+	TagsAndMeta            *metrics.TagsAndMeta
+	DiscardResponseMessage bool
+	Message                []byte
+	Metadata               metadata.MD
 }
 
 // InvokeResponse represents a gRPC response.
@@ -49,11 +51,12 @@ type InvokeResponse struct {
 
 // StreamRequest represents a gRPC stream request.
 type StreamRequest struct {
-	Method           string
-	MethodDescriptor protoreflect.MethodDescriptor
-	Timeout          time.Duration
-	TagsAndMeta      *metrics.TagsAndMeta
-	Metadata         metadata.MD
+	Method                 string
+	MethodDescriptor       protoreflect.MethodDescriptor
+	Timeout                time.Duration
+	DiscardResponseMessage bool
+	TagsAndMeta            *metrics.TagsAndMeta
+	Metadata               metadata.MD
 }
 
 type clientConnCloser interface {
@@ -73,6 +76,7 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 		return getState().Dialer.DialContext(ctx, "tcp", addr)
 	}
 
+	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	return []grpc.DialOption{
 		grpc.WithBlock(),
 		grpc.FailOnNonTempDialError(true),
@@ -84,6 +88,7 @@ func DefaultOptions(getState func() *lib.State) []grpc.DialOption {
 
 // Dial establish a gRPC connection.
 func Dial(ctx context.Context, addr string, options ...grpc.DialOption) (*Conn, error) {
+	//nolint:staticcheck // see https://github.com/grafana/k6/issues/3699
 	conn, err := grpc.DialContext(ctx, addr, options...)
 	if err != nil {
 		return nil, err
@@ -131,7 +136,13 @@ func (c *Conn) Invoke(
 
 	ctx = withRPCState(ctx, &rpcState{tagsAndMeta: req.TagsAndMeta})
 
-	resp := dynamicpb.NewMessage(req.MethodDescriptor.Output())
+	var resp *dynamicpb.Message
+	if req.DiscardResponseMessage {
+		resp = dynamicpb.NewMessage((&emptypb.Empty{}).ProtoReflect().Descriptor())
+	} else {
+		resp = dynamicpb.NewMessage(req.MethodDescriptor.Output())
+	}
+
 	header, trailer := metadata.New(nil), metadata.New(nil)
 
 	copts := make([]grpc.CallOption, 0, len(opts)+2)
@@ -151,7 +162,7 @@ func (c *Conn) Invoke(
 		sterr := status.Convert(err)
 		response.Status = sterr.Code()
 
-		// (rogchap) when you access a JSON property in goja, you are actually accessing the underling
+		// (rogchap) when you access a JSON property in Sobek, you are actually accessing the underling
 		// Go type (struct, map, slice etc); because these are dynamic messages the Unmarshaled JSON does
 		// not map back to a "real" field or value (as a normal Go type would). If we don't marshal and then
 		// unmarshal back to a map, you will get "undefined" when accessing JSON properties, even when
@@ -163,7 +174,7 @@ func (c *Conn) Invoke(
 		response.Error = errMsg
 	}
 
-	if resp != nil {
+	if resp != nil && !req.DiscardResponseMessage {
 		msg, err := convert(marshaler, resp)
 		if err != nil {
 			return nil, fmt.Errorf("unable to convert response object to JSON: %w", err)
@@ -194,9 +205,10 @@ func (c *Conn) NewStream(
 	}
 
 	return &Stream{
-		raw:              stream,
-		method:           req.Method,
-		methodDescriptor: req.MethodDescriptor,
+		raw:                    stream,
+		method:                 req.Method,
+		methodDescriptor:       req.MethodDescriptor,
+		discardResponseMessage: req.DiscardResponseMessage,
 	}, nil
 }
 
