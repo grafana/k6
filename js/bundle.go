@@ -197,7 +197,7 @@ func (b *Bundle) populateExports(updateOptions bool, bi *BundleInstance) error {
 			}
 			switch k {
 			case consts.Options:
-				if !updateOptions {
+				if !updateOptions || v == nil {
 					continue
 				}
 				var data []byte
