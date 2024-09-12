@@ -55,11 +55,11 @@ func FullVersion() string {
 // Banner returns the ASCII-art banner with the k6 logo and stylized website URL
 func Banner() string {
 	banner := strings.Join([]string{
-		`          /\      |‾‾| /‾‾/   /‾‾/   `,
-		`     /\  /  \     |  |/  /   /  /    `,
-		`    /  \/    \    |     (   /   ‾‾\  `,
-		`   /          \   |  |\  \ |  (‾)  | `,
-		`  / __________ \  |__| \__\ \_____/ .io`,
+		`         /\       Grafana  /‾‾/  `,
+		`    /\  /  \     |\  __   /  /   `,
+		`   /  \/    \    | |/ /  /   ‾‾\ `,
+		`  /          \   |   (  |  (‾)  |`,
+		` / __________ \  |_|\_\  \_____/ `,
 	}, "\n")
 
 	return banner
