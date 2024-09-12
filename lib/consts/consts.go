@@ -52,7 +52,7 @@ func FullVersion() string {
 	return fmt.Sprintf("%s (commit/%s, %s)", Version, commit, goVersionArch)
 }
 
-// Banner returns the ASCII-art banner with the k6 logo and stylized website URL
+// Banner returns the ASCII-art banner with the k6 logo
 func Banner() string {
 	banner := strings.Join([]string{
 		`         /\      Grafana   /‾‾/  `,
