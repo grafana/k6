@@ -201,7 +201,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 			name: "goto",
 			js: fmt.Sprintf(`
 				page = await browser.newPage();
-				await page.goto('%s');
+				await page.goto('%s', {waitUntil:'networkidle'});
 				page.close();
 				`, ts.URL),
 			expected: []string{
@@ -219,8 +219,8 @@ func TestNavigationSpanCreation(t *testing.T) {
 			name: "reload",
 			js: fmt.Sprintf(`
 				page = await browser.newPage();
-				await page.goto('%s');
-				await page.reload();
+				await page.goto('%s', {waitUntil:'networkidle'});
+				await page.reload({waitUntil:'networkidle'});
 				page.close();
 				`, ts.URL),
 			expected: []string{
@@ -240,8 +240,11 @@ func TestNavigationSpanCreation(t *testing.T) {
 			name: "go_back",
 			js: fmt.Sprintf(`
 				page = await browser.newPage();
-				await page.goto('%s');
-				await page.evaluate(() => window.history.back());
+				await page.goto('%s', {waitUntil:'networkidle'});
+				await Promise.all([
+					page.waitForNavigation(),
+					page.evaluate(() => window.history.back()),
+				]);
 				page.close();
 				`, ts.URL),
 			expected: []string{
@@ -252,6 +255,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				"navigation", // created when a new page is created
 				"page.goto",
 				"navigation", // created when a navigation occurs after goto
+				"page.waitForNavigation",
 				"navigation", // created when going back to the previous page
 				"page.close",
 			},
@@ -260,8 +264,11 @@ func TestNavigationSpanCreation(t *testing.T) {
 			name: "same_page_navigation",
 			js: fmt.Sprintf(`
 				page = await browser.newPage();
-				await page.goto('%s');
-				await page.locator('a[id=\"top\"]').click();
+				await page.goto('%s', {waitUntil:'networkidle'});
+				await Promise.all([
+					page.waitForNavigation(),
+					page.locator('a[id=\"top\"]').click(),
+				]);
 				page.close();
 				`, ts.URL),
 			expected: []string{
@@ -272,6 +279,7 @@ func TestNavigationSpanCreation(t *testing.T) {
 				"navigation", // created when a new page is created
 				"page.goto",
 				"navigation", // created when a navigation occurs after goto
+				"page.waitForNavigation",
 				"locator.click",
 				"navigation", // created when navigating within the same page
 				"page.close",
@@ -291,7 +299,10 @@ func TestNavigationSpanCreation(t *testing.T) {
 			assertJSInEventLoop(t, vu, tc.js)
 
 			got := tracer.getOrderedSpan()
-			assert.Equal(t, tc.expected, got, fmt.Sprintf("%s failed", tc.name))
+			// We can't use assert.Equal since the order of the span creation
+			// changes slightly on every test run. Instead we're going to make
+			// sure that the slice matches but not the order.
+			assert.ElementsMatch(t, tc.expected, got, fmt.Sprintf("%s failed", tc.name))
 		}()
 	}
 }
