@@ -216,10 +216,10 @@ func TestBrowserRegistry(t *testing.T) {
 		vu.StartIteration(t, k6test.WithIteration(2))
 
 		// Verify browsers are initialized
-		assert.Equal(t, 3, browserRegistry.getBrowserCount())
+		assert.Equal(t, 3, browserRegistry.browserCount())
 
 		// Verify iteration traces are started
-		assert.Equal(t, 3, browserRegistry.tr.getIterationTracesCount())
+		assert.Equal(t, 3, browserRegistry.tr.iterationTracesCount())
 
 		// Send IterEnd events
 		vu.EndIteration(t, k6test.WithIteration(0))
@@ -227,10 +227,10 @@ func TestBrowserRegistry(t *testing.T) {
 		vu.EndIteration(t, k6test.WithIteration(2))
 
 		// Verify there are no browsers left
-		assert.Equal(t, 0, browserRegistry.getBrowserCount())
+		assert.Equal(t, 0, browserRegistry.browserCount())
 
 		// Verify iteration traces have been ended
-		assert.Equal(t, 0, browserRegistry.tr.getIterationTracesCount())
+		assert.Equal(t, 0, browserRegistry.tr.iterationTracesCount())
 	})
 
 	t.Run("close_browsers_on_exit_event", func(t *testing.T) {
@@ -249,7 +249,7 @@ func TestBrowserRegistry(t *testing.T) {
 		vu.StartIteration(t, k6test.WithIteration(2))
 
 		// Verify browsers are initialized
-		assert.Equal(t, 3, browserRegistry.getBrowserCount())
+		assert.Equal(t, 3, browserRegistry.browserCount())
 
 		// Send Exit event
 		events, ok := vu.EventsField.Global.(*k6event.System)
@@ -260,7 +260,7 @@ func TestBrowserRegistry(t *testing.T) {
 		require.NoError(t, waitDone(context.Background()), "error waiting on Exit done")
 
 		// Verify there are no browsers left
-		assert.Equal(t, 0, browserRegistry.getBrowserCount())
+		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
 
 	t.Run("unsubscribe_on_non_browser_vu", func(t *testing.T) {
@@ -298,13 +298,13 @@ func TestBrowserRegistry(t *testing.T) {
 		vu.StartIteration(t, k6test.WithIteration(0))
 
 		// Verify browsers are initialized
-		assert.Equal(t, 1, browserRegistry.getBrowserCount())
+		assert.Equal(t, 1, browserRegistry.browserCount())
 
 		// Cancel the "iteration" by closing the context.
 		cancel()
 
 		// Verify browsers are still alive
-		assert.Equal(t, 1, browserRegistry.getBrowserCount())
+		assert.Equal(t, 1, browserRegistry.browserCount())
 
 		// Do cleanup by sending the Exit event
 		events, ok := vu.EventsField.Global.(*k6event.System)
@@ -315,7 +315,7 @@ func TestBrowserRegistry(t *testing.T) {
 		require.NoError(t, waitDone(context.Background()), "error waiting on Exit done")
 
 		// Verify there are no browsers left
-		assert.Equal(t, 0, browserRegistry.getBrowserCount())
+		assert.Equal(t, 0, browserRegistry.browserCount())
 	})
 }
 

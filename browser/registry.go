@@ -373,7 +373,7 @@ func (r *browserRegistry) deleteBrowser(id int64) {
 
 // This is only used in a test. Avoids having to manipulate the mutex in the
 // test itself.
-func (r *browserRegistry) getBrowserCount() int {
+func (r *browserRegistry) browserCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
@@ -489,7 +489,7 @@ func (r *tracesRegistry) stop() {
 
 // This is only used in a test. Avoids having to manipulate the mutex in the
 // test itself.
-func (r *tracesRegistry) getIterationTracesCount() int {
+func (r *tracesRegistry) iterationTracesCount() int {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
