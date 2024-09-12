@@ -246,7 +246,7 @@ func (fs *FrameSession) initEvents() {
 				// because at the start of the span we don't know the correct url for
 				// the page we're navigating to. At the end of the span we do have this
 				// information.
-				fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrame().URL()))
+				fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrameURL()))
 				fs.mainFrameSpan.End()
 				fs.mainFrameSpan = nil
 			}
@@ -821,7 +821,7 @@ func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
 		// because at the start of the span we don't know the correct url for
 		// the page we're navigating to. At the end of the span we do have this
 		// information.
-		fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrame().URL()))
+		fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrameURL()))
 		fs.mainFrameSpan.End()
 	}
 
