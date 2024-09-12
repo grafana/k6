@@ -214,6 +214,16 @@ func TestNewBundle(t *testing.T) {
 			`)
 			require.NoError(t, err)
 		})
+		t.Run("Null", func(t *testing.T) {
+			t.Parallel()
+			fs := fsext.NewMemMapFs()
+			require.NoError(t, fsext.WriteFile(fs, "/options.js", []byte("module.exports={}"), 0o644))
+			_, err := getSimpleBundle(t, "/script.js", `
+				export {options} from "./options.js";
+				export default function() {};
+			`, fs)
+			require.NoError(t, err)
+		})
 		t.Run("Invalid", func(t *testing.T) {
 			t.Parallel()
 			invalidOptions := map[string]struct {
