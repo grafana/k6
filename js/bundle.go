@@ -285,6 +285,7 @@ func (bi *BundleInstance) manipulateOptions(options lib.Options) error {
 
 func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 	c := compiler.New(logger)
+	c.WithUsage(b.preInitState.Usage)
 	c.Options = compiler.Options{
 		CompatibilityMode: b.CompatibilityMode,
 		SourceMapLoader:   generateSourceMapLoader(logger, b.filesystems),
