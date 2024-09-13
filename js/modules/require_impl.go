@@ -12,6 +12,10 @@ import (
 
 // Require is the actual call that implements require
 func (ms *ModuleSystem) Require(specifier string) (*sobek.Object, error) {
+	if err := ms.resolver.usage.Uint64("usage/require", 1); err != nil {
+		ms.resolver.logger.WithError(err).Warn("couldn't report usage")
+	}
+
 	if specifier == "" {
 		return nil, errors.New("require() can't be used with an empty specifier")
 	}
