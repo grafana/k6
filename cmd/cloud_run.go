@@ -25,6 +25,12 @@ type cmdCloudRun struct {
 	// noUsageReport stores the state of the --no-usage-report flag.
 	noUsageReport bool
 
+	// noArchiveUpload stores the state of the --no-archive-upload flag.
+	//
+	// This flag indicates to the local execution mode to not send the test
+	// archive to the cloud service.
+	noArchiveUpload bool
+
 	// runCmd holds an instance of the k6 run command that we store
 	// in order to be able to call its run method to support
 	// the --local-execution flag mode.
@@ -153,6 +159,12 @@ func (c *cmdCloudRun) flagSet() *pflag.FlagSet {
 		"only when using the local-execution mode, don't send anonymous usage "+
 			"stats (https://grafana.com/docs/k6/latest/set-up/usage-collection/)",
 	)
+	flags.BoolVar(
+		&c.noArchiveUpload,
+		"no-archive-upload",
+		c.noArchiveUpload,
+		"only when using the local-execution mode, don't upload the test archive to the cloud service",
+	)
 
 	return flags
 }
@@ -167,9 +179,10 @@ func getCloudRunLocalExecutionConfig(flags *pflag.FlagSet) (Config, error) {
 	out := []string{"cloud"}
 
 	return Config{
-		Options:       opts,
-		Out:           out,
-		Linger:        getNullBool(flags, "linger"),
-		NoUsageReport: getNullBool(flags, "no-usage-report"),
+		Options:         opts,
+		Out:             out,
+		Linger:          getNullBool(flags, "linger"),
+		NoUsageReport:   getNullBool(flags, "no-usage-report"),
+		NoArchiveUpload: getNullBool(flags, "no-archive-upload"),
 	}, nil
 }

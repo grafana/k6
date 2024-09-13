@@ -162,6 +162,14 @@ func createOutputs(
 			builtinMetricOut.SetBuiltinMetrics(test.preInitState.BuiltinMetrics)
 		}
 
+		// If the output is configured to support the archive, and supports it, we proceed
+		// with building an archive and setting it on the output instance.
+		if !test.derivedConfig.NoArchiveUpload.Bool {
+			if archiveOut, ok := out.(output.WithArchive); ok {
+				archiveOut.SetArchive(test.initRunner.MakeArchive())
+			}
+		}
+
 		result = append(result, out)
 	}
 

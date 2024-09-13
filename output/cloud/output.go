@@ -60,6 +60,14 @@ type Output struct {
 	duration      int64 // in seconds
 	thresholds    map[string][]*metrics.Threshold
 
+	// testArchive is the test archive to be uploaded to the cloud
+	// before the output is Start()-ed.
+	//
+	// It is set by the SetArchive method. If it is nil, the output
+	// will not upload any test archive, such as when the user
+	// uses the --no-archive-upload flag.
+	testArchive *lib.Archive
+
 	client       *cloudapi.Client
 	testStopFunc func(error)
 
@@ -187,6 +195,7 @@ func (out *Output) Start() error {
 		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)),
 		Thresholds: thresholds,
 		Duration:   out.duration,
+		Archive:    out.testArchive,
 	}
 
 	response, err := out.client.CreateTestRun(testRun)
@@ -234,6 +243,14 @@ func (out *Output) SetThresholds(scriptThresholds map[string]metrics.Thresholds)
 func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
 	out.testStopFunc = stopFunc
 }
+
+// SetArchive receives the test artifact to be uploaded to the cloud
+// before the output is Start()-ed.
+func (out *Output) SetArchive(archive *lib.Archive) {
+	out.testArchive = archive
+}
+
+var _ output.WithArchive = &Output{}
 
 // Stop gracefully stops all metric emission from the output: when all metric
 // samples are emitted, it makes a cloud API call to finish the test run.
