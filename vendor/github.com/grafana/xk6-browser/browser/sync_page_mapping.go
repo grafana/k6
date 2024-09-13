@@ -140,6 +140,10 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				return nil, err //nolint:wrapcheck
 			}
 
+			if resp == nil {
+				return nil, nil //nolint:nilnil
+			}
+
 			r := syncMapResponse(vu, resp)
 
 			return rt.ToValue(r).ToObject(rt), nil

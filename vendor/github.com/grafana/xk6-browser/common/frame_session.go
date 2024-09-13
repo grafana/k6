@@ -78,6 +78,11 @@ type FrameSession struct {
 	// Keep a reference to the main frame span so we can end it
 	// when FrameSession.ctx is Done
 	mainFrameSpan trace.Span
+	// The initial navigation when a new page is created navigates to about:blank.
+	// We want to make sure that the the navigation span is created for this in
+	// onFrameNavigated, but subsequent calls to onFrameNavigated in the same
+	// mainframe never again create a navigation span.
+	initialNavDone bool
 }
 
 // NewFrameSession initializes and returns a new FrameSession.
@@ -237,6 +242,11 @@ func (fs *FrameSession) initEvents() {
 			// If there is an active span for main frame,
 			// end it before exiting so it can be flushed
 			if fs.mainFrameSpan != nil {
+				// The url needs to be added here instead of at the start of the span
+				// because at the start of the span we don't know the correct url for
+				// the page we're navigating to. At the end of the span we do have this
+				// information.
+				fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrameURL()))
 				fs.mainFrameSpan.End()
 				fs.mainFrameSpan = nil
 			}
@@ -782,25 +792,44 @@ func (fs *FrameSession) onFrameNavigated(frame *cdp.Frame, initial bool) {
 			frame.URL+frame.URLFragment, err)
 	}
 
-	// Trace navigation only for the main frame.
-	// TODO: How will this affect sub frames such as iframes?
-	if isMainFrame := frame.ParentID == ""; !isMainFrame {
+	// Only create a navigation span once from here, since a new page navigating
+	// to about:blank doesn't call onFrameStartedLoading. All subsequent
+	// navigations call onFrameStartedLoading.
+	if fs.initialNavDone {
 		return
 	}
 
-	_, fs.mainFrameSpan = TraceNavigation(
-		fs.ctx, fs.targetID.String(), trace.WithAttributes(attribute.String("navigation.url", frame.URL)),
-	)
+	fs.initialNavDone = true
+	fs.processNavigationSpan(frame.ID)
+}
 
-	var (
-		spanID       = fs.mainFrameSpan.SpanContext().SpanID().String()
-		newFrame, ok = fs.manager.getFrameByID(frame.ID)
-	)
-
-	// Only set the k6SpanId reference if it's a new frame.
+func (fs *FrameSession) processNavigationSpan(id cdp.FrameID) {
+	newFrame, ok := fs.manager.getFrameByID(id)
 	if !ok {
 		return
 	}
+
+	// Trace navigation only for the main frame.
+	// TODO: How will this affect sub frames such as iframes?
+	if newFrame.page.frameManager.MainFrame() != newFrame {
+		return
+	}
+
+	// End the navigation span if it is non-nil
+	if fs.mainFrameSpan != nil {
+		// The url needs to be added here instead of at the start of the span
+		// because at the start of the span we don't know the correct url for
+		// the page we're navigating to. At the end of the span we do have this
+		// information.
+		fs.mainFrameSpan.SetAttributes(attribute.String("navigation.url", fs.manager.MainFrameURL()))
+		fs.mainFrameSpan.End()
+	}
+
+	_, fs.mainFrameSpan = TraceNavigation(
+		fs.ctx, fs.targetID.String(),
+	)
+
+	spanID := fs.mainFrameSpan.SpanContext().SpanID().String()
 
 	// Set k6SpanId property in the page so it can be retrieved when pushing
 	// the Web Vitals events from the page execution context and used to
@@ -843,6 +872,8 @@ func (fs *FrameSession) onFrameStartedLoading(frameID cdp.FrameID) {
 	fs.logger.Debugf("FrameSession:onFrameStartedLoading",
 		"sid:%v tid:%v fid:%v",
 		fs.session.ID(), fs.targetID, frameID)
+
+	fs.processNavigationSpan(frameID)
 
 	fs.manager.frameLoadingStarted(frameID)
 }

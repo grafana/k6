@@ -93,13 +93,23 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 }
 
 // Connect attaches k6 browser to an existing browser instance.
-func (b *BrowserType) Connect(ctx context.Context, wsEndpoint string) (*common.Browser, error) {
-	ctx, browserOpts, logger, err := b.init(ctx, true)
+//
+// vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
+// its lifecycle.
+//
+// context.background() is used when connecting to an instance of chromium. The
+// connection lifecycle should be handled by the k6 event system.
+//
+// The separation is important to allow for the iteration to end when k6 requires
+// the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
+// the events which allows the connection to close.
+func (b *BrowserType) Connect(vuCtx context.Context, wsEndpoint string) (*common.Browser, error) {
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, true)
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, err := b.connect(ctx, wsEndpoint, browserOpts, logger)
+	bp, err := b.connect(vuCtx, wsEndpoint, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -112,16 +122,16 @@ func (b *BrowserType) Connect(ctx context.Context, wsEndpoint string) (*common.B
 }
 
 func (b *BrowserType) connect(
-	ctx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
+	vuCtx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
 ) (*common.Browser, error) {
-	browserProc, err := b.link(ctx, wsURL, logger)
+	browserProc, err := b.link(wsURL, logger)
 	if browserProc == nil {
 		return nil, fmt.Errorf("connecting to browser: %w", err)
 	}
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
-	browserCtx, browserCtxCancel := context.WithCancel(ctx)
+	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(
 		browserCtx, browserCtxCancel, browserProc, opts, logger,
@@ -134,9 +144,9 @@ func (b *BrowserType) connect(
 }
 
 func (b *BrowserType) link(
-	ctx context.Context, wsURL string, logger *log.Logger,
+	wsURL string, logger *log.Logger,
 ) (*common.BrowserProcess, error) {
-	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
+	bProcCtx, bProcCtxCancel := context.WithCancel(context.Background())
 	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
 	if err != nil {
 		bProcCtxCancel()
@@ -148,13 +158,23 @@ func (b *BrowserType) link(
 
 // Launch allocates a new Chrome browser process and returns a new Browser value,
 // which can be used for controlling the Chrome browser.
-func (b *BrowserType) Launch(ctx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
-	ctx, browserOpts, logger, err := b.init(ctx, false)
+//
+// vuCtx is the context coming from the VU itself. The k6 vu/iteration controls
+// its lifecycle.
+//
+// context.background() is used when launching an instance of chromium. The
+// chromium lifecycle should be handled by the k6 event system.
+//
+// The separation is important to allow for the iteration to end when k6 requires
+// the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
+// the events which allows the chromium subprocess to shutdown.
+func (b *BrowserType) Launch(vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
+	vuCtx, browserOpts, logger, err := b.init(vuCtx, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, pid, err := b.launch(ctx, browserOpts, logger)
+	bp, pid, err := b.launch(vuCtx, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -167,7 +187,7 @@ func (b *BrowserType) Launch(ctx context.Context) (_ *common.Browser, browserPro
 }
 
 func (b *BrowserType) launch(
-	ctx context.Context, opts *common.BrowserOptions, logger *log.Logger,
+	vuCtx context.Context, opts *common.BrowserOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
 	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
 	if err != nil {
@@ -185,14 +205,14 @@ func (b *BrowserType) launch(
 		return nil, 0, fmt.Errorf("finding browser executable: %w", err)
 	}
 
-	browserProc, err := b.allocate(ctx, path, flags, dataDir, logger)
+	browserProc, err := b.allocate(path, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
 
 	// If this context is cancelled we'll initiate an extension wide
 	// cancellation and shutdown.
-	browserCtx, browserCtxCancel := context.WithCancel(ctx)
+	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
 		browserProc, opts, logger)
@@ -218,11 +238,11 @@ func (b *BrowserType) Name() string {
 
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
-	ctx context.Context, path string,
+	path string,
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
-	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
+	bProcCtx, bProcCtxCancel := context.WithCancel(context.Background())
 	defer func() {
 		if rerr != nil {
 			bProcCtxCancel()
