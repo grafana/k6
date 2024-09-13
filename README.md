@@ -1,4 +1,9 @@
-<p align="center"><a href="https://k6.io/"><img src="assets/k6-logo-with-grafana.svg" alt="k6" width="258" height="210" /></a></p>
+<p align="center">
+  <a href="https://k6.io/">
+    <img src="assets/logo.svg" alt="k6" width="210" height="210" /><br>
+    <img src="assets/grafana-labs.svg" alt="Grafana Labs" width="210" /><br>
+  </a>
+</p>
 
 <h3 align="center">Like unit testing, for performance</h3>
 <p align="center">Modern load testing for developers and testers in the DevOps era.</p>
@@ -35,7 +40,7 @@ Its core features are:
 - **Multiple Protocol support**. HTTP, WebSockets, gRPC, Browser, and more.
 - **Large extension ecosystem.** You can extend k6 to support your needs. And many people have already shared their extensions with the community!
 - **Flexible metrics storage and visualization**. Summary statistics or granular metrics, exported to the service of your choice.
-- **Native integration with Grafana cloud**. [SaaS solution](https://grafana.com/products/cloud/k6/) for test execution, metrics correlation, data analysis, and more. 
+- **Native integration with Grafana cloud**. [SaaS solution](https://grafana.com/products/cloud/k6/) for test execution, metrics correlation, data analysis, and more.
 
 This is what load testing looks like in the 21st century.
 
@@ -109,4 +114,3 @@ To get help, report bugs, suggest features, and discuss k6 with others, refer to
 ## License
 
 k6 is distributed under the [AGPL-3.0 license](https://github.com/grafana/k6/blob/master/LICENSE.md).
-
