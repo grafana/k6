@@ -173,8 +173,8 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/xk6-browser v1.7.1
-## explicit; go 1.20
+# github.com/grafana/xk6-browser v1.8.0
+## explicit; go 1.21
 github.com/grafana/xk6-browser/browser
 github.com/grafana/xk6-browser/chromium
 github.com/grafana/xk6-browser/common

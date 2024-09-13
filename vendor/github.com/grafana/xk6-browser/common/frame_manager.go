@@ -577,6 +577,14 @@ func (m *FrameManager) setMainFrame(f *Frame) {
 	m.mainFrame = f
 }
 
+// MainFrameURL returns the main frame's url.
+func (m *FrameManager) MainFrameURL() string {
+	m.mainFrameMu.RLock()
+	defer m.mainFrameMu.RUnlock()
+
+	return m.mainFrame.URL()
+}
+
 // NavigateFrame will navigate specified frame to specified URL.
 //
 //nolint:funlen,cyclop

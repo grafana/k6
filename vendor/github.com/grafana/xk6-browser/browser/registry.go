@@ -185,13 +185,25 @@ type browserRegistry struct {
 	stopped atomic.Bool // testing purposes
 }
 
-type browserBuildFunc func(ctx context.Context) (*common.Browser, error)
+type browserBuildFunc func(vuCtx context.Context) (*common.Browser, error)
 
+// newBrowserRegistry should only take a background context, not a context from
+// k6 (i.e. vu). The reason for this is that we want to control the chromium
+// lifecycle with the k6 event system.
+//
+// The k6 event system gives this extension time to properly cleanup any running
+// chromium subprocesses or connections to a remote chromium instance.
+//
+// A vu context (a context on an iteration) doesn't allow us to do this. Once k6
+// closes a vu context, it basically pulls the rug from under the extensions feet.
 func newBrowserRegistry(
-	ctx context.Context, vu k6modules.VU, remote *remoteRegistry, pids *pidRegistry, tracesMetadata map[string]string,
+	vu k6modules.VU,
+	remote *remoteRegistry,
+	pids *pidRegistry,
+	tracesMetadata map[string]string,
 ) *browserRegistry {
 	bt := chromium.NewBrowserType(vu)
-	builder := func(ctx context.Context) (*common.Browser, error) {
+	builder := func(vuCtx context.Context) (*common.Browser, error) {
 		var (
 			err                    error
 			b                      *common.Browser
@@ -199,13 +211,13 @@ func newBrowserRegistry(
 		)
 
 		if isRemoteBrowser {
-			b, err = bt.Connect(ctx, wsURL)
+			b, err = bt.Connect(vuCtx, wsURL)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
 		} else {
 			var pid int
-			b, pid, err = bt.Launch(ctx)
+			b, pid, err = bt.Launch(vuCtx)
 			if err != nil {
 				return nil, err //nolint:wrapcheck
 			}
@@ -235,13 +247,13 @@ func newBrowserRegistry(
 	}
 
 	go r.handleExitEvent(exitCh, unsubscribe)
-	go r.handleIterEvents(ctx, eventsCh, unsubscribe)
+	go r.handleIterEvents(eventsCh, unsubscribe)
 
 	return r
 }
 
 func (r *browserRegistry) handleIterEvents( //nolint:funlen
-	ctx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
+	eventsCh <-chan *k6event.Event, unsubscribeFn func(),
 ) {
 	var (
 		ok   bool
@@ -285,8 +297,12 @@ func (r *browserRegistry) handleIterEvents( //nolint:funlen
 			// so we can get access to the k6 TracerProvider.
 			r.initTracesRegistry()
 
-			// Wrap the tracer into the browser context to make it accessible for the other
-			// components that inherit the context so these can use it to trace their actions.
+			// Wrap the tracer into the VU context to make it accessible for the
+			// other components during the iteration that inherit the VU context.
+			//
+			// All browser APIs should work with the vu context, and allow the
+			// k6 iteration control its lifecycle.
+			ctx := r.vu.Context()
 			tracerCtx := common.WithTracer(ctx, r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
 
@@ -353,6 +369,15 @@ func (r *browserRegistry) deleteBrowser(id int64) {
 		b.Close()
 		delete(r.m, id)
 	}
+}
+
+// This is only used in a test. Avoids having to manipulate the mutex in the
+// test itself.
+func (r *browserRegistry) browserCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return len(r.m)
 }
 
 func (r *browserRegistry) clear() {
@@ -460,6 +485,15 @@ func (r *tracesRegistry) stop() {
 		v.rootSpan.End()
 		delete(r.m, k)
 	}
+}
+
+// This is only used in a test. Avoids having to manipulate the mutex in the
+// test itself.
+func (r *tracesRegistry) iterationTracesCount() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	return len(r.m)
 }
 
 func parseTracesMetadata(envLookup env.LookupFunc) (map[string]string, error) {
