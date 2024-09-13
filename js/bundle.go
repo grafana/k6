@@ -387,7 +387,17 @@ func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID int64, logger logrus.Fie
 	}
 
 	if b.CompatibilityMode == lib.CompatibilityModeExtended {
-		err = rt.Set("global", rt.GlobalObject())
+		globalThis := rt.GlobalObject()
+		err = globalThis.DefineAccessorProperty("global",
+			rt.ToValue(func() sobek.Value {
+				if err := b.preInitState.Usage.Uint64("usage/global", 1); err != nil {
+					b.preInitState.Logger.WithError(err).Warn("couldn't report usage")
+				}
+				return globalThis
+			}), rt.ToValue(func(newGlobal *sobek.Object) { // probably not a thing that will happen but still
+				globalThis = newGlobal
+			}),
+			sobek.FLAG_TRUE, sobek.FLAG_TRUE)
 		if err != nil {
 			return err
 		}
