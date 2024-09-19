@@ -128,13 +128,23 @@ func newBrowser(
 func (b *Browser) connect() error {
 	b.logger.Debugf("Browser:connect", "wsURL:%q", b.browserProc.WsURL())
 
+	// The browser needs its own context to correctly close dependencies such
+	// as the connection. It cannot rely on the vuCtx since that would close
+	// the connection too early. The connection and subprocess need to be
+	// shutdown at around the same time to allow for any last minute CDP
+	// cleanup messages to be sent to chromium.
+	b.initContext, b.initCancelFn = context.WithCancel(context.Background())
+
 	// connectionOnAttachedToTarget hooks into the connection to listen
 	// for target attachment events. this way, browser can manage the
 	// decision of target attachments. so that we can stop connection
 	// from doing unnecessary work.
+	//
+	// We need the connection to shutdown when browser.Close is called.
+	// This is why we're using the internal context.
 	var err error
 	b.conn, err = NewConnection(
-		context.Background(),
+		b.initContext,
 		b.browserProc.WsURL(),
 		b.logger,
 		b.connectionOnAttachedToTarget,
@@ -191,11 +201,9 @@ func (b *Browser) getPages() []*Page {
 func (b *Browser) initEvents() error { //nolint:cyclop
 	chHandler := make(chan Event)
 
-	// Using context.Background() here. Using vuCtx would close the connection/subprocess
+	// Using the internal context here. Using vuCtx would close the connection/subprocess
 	// and therefore shutdown chromium when the iteration ends which isn't what we
 	// want to happen. Chromium should only be closed by the k6 event system.
-	b.initContext, b.initCancelFn = context.WithCancel(context.Background())
-
 	b.conn.on(b.initContext, []string{
 		cdproto.EventTargetAttachedToTarget,
 		cdproto.EventTargetDetachedFromTarget,
@@ -493,6 +501,10 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 
 // Close shuts down the browser.
 func (b *Browser) Close() {
+	// This will help with some cleanup in the connection and event loop above in
+	// initEvents().
+	defer b.initCancelFn()
+
 	if b.closed {
 		b.logger.Warnf(
 			"Browser:Close",
@@ -506,8 +518,6 @@ func (b *Browser) Close() {
 		if err := b.browserProc.Cleanup(); err != nil {
 			b.logger.Errorf("Browser:Close", "cleaning up the user data directory: %v", err)
 		}
-
-		b.initCancelFn()
 	}()
 
 	b.logger.Debugf("Browser:Close", "")
@@ -525,9 +535,9 @@ func (b *Browser) Close() {
 	// command, which triggers the browser process to exit.
 	if !b.browserOpts.isRemoteBrowser {
 		var closeErr *websocket.CloseError
-		// Using a background context here since vu context will very likely be
+		// Using a internal context here since vu context will very likely be
 		// closed.
-		err := cdpbrowser.Close().Do(cdp.WithExecutor(context.Background(), b.conn))
+		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.initContext, b.conn))
 		if err != nil && !errors.As(err, &closeErr) {
 			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
