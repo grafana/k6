@@ -84,13 +84,14 @@ type browserVersion struct {
 
 // NewBrowser creates a new browser, connects to it, then returns it.
 func NewBrowser(
+	ctx context.Context,
 	vuCtx context.Context,
 	vuCtxCancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) (*Browser, error) {
-	b := newBrowser(vuCtx, vuCtxCancelFn, browserProc, browserOpts, logger)
+	b := newBrowser(ctx, vuCtx, vuCtxCancelFn, browserProc, browserOpts, logger)
 	if err := b.connect(); err != nil {
 		return nil, err
 	}
@@ -106,13 +107,23 @@ func NewBrowser(
 
 // newBrowser returns a ready to use Browser without connecting to an actual browser.
 func newBrowser(
+	ctx context.Context,
 	vuCtx context.Context,
 	vuCtxCancelFn context.CancelFunc,
 	browserProc *BrowserProcess,
 	browserOpts *BrowserOptions,
 	logger *log.Logger,
 ) *Browser {
+	// The browser needs its own context to correctly close dependencies such
+	// as the connection. It cannot rely on the vuCtx since that would close
+	// the connection too early. The connection and subprocess need to be
+	// shutdown at around the same time to allow for any last minute CDP
+	// cleanup messages to be sent to chromium.
+	ctx, cancelFn := context.WithCancel(ctx)
+
 	return &Browser{
+		browserCtx:          ctx,
+		browserCancelFn:     cancelFn,
 		vuCtx:               vuCtx,
 		vuCtxCancelFn:       vuCtxCancelFn,
 		state:               int64(BrowserStateOpen),
@@ -126,13 +137,6 @@ func newBrowser(
 
 func (b *Browser) connect() error {
 	b.logger.Debugf("Browser:connect", "wsURL:%q", b.browserProc.WsURL())
-
-	// The browser needs its own context to correctly close dependencies such
-	// as the connection. It cannot rely on the vuCtx since that would close
-	// the connection too early. The connection and subprocess need to be
-	// shutdown at around the same time to allow for any last minute CDP
-	// cleanup messages to be sent to chromium.
-	b.browserCtx, b.browserCancelFn = context.WithCancel(context.Background())
 
 	// connectionOnAttachedToTarget hooks into the connection to listen
 	// for target attachment events. this way, browser can manage the

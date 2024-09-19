@@ -80,7 +80,7 @@ func newTestBrowser(tb testing.TB, opts ...func(*testBrowser)) *testBrowser {
 	tbr.isBrowserTypeInitialized = true // some option require the browser type to be initialized.
 	tbr.applyOptions(opts...)           // apply post-init stage options.
 
-	b, pid, err := tbr.browserType.Launch(tbr.vu.Context())
+	b, pid, err := tbr.browserType.Launch(context.Background(), tbr.vu.Context())
 	if err != nil {
 		tb.Fatalf("testBrowser: %v", err)
 	}
