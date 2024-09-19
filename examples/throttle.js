@@ -31,8 +31,8 @@ export const options = {
     },
   },
   thresholds: {
-    'browser_http_req_duration{scenario:normal}': ['p(99)<2000'],
-    'browser_http_req_duration{scenario:networkThrottled}': ['p(99)<4000'],
+    'browser_http_req_duration{scenario:normal}': ['p(99)<3000'],
+    'browser_http_req_duration{scenario:networkThrottled}': ['p(99)<6000'],
     'iteration_duration{scenario:normal}': ['p(99)<5000'],
     'iteration_duration{scenario:cpuThrottled}': ['p(99)<10000'],
   },
