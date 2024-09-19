@@ -26,11 +26,10 @@ const (
 
 // Browser stores a Browser context.
 type Browser struct {
-	// These are internal contexts which control the lifecycle of the goroutine
-	// that handles incoming CDP commands. It is shutdown when browser.close()
-	// is called.
-	initContext  context.Context
-	initCancelFn context.CancelFunc
+	// These are internal contexts which control the lifecycle of the connection
+	// and eventLoop. It is shutdown when browser.close() is called.
+	internalCtx      context.Context
+	InternalCancelFn context.CancelFunc
 
 	vuCtx         context.Context
 	vuCtxCancelFn context.CancelFunc
@@ -133,7 +132,7 @@ func (b *Browser) connect() error {
 	// the connection too early. The connection and subprocess need to be
 	// shutdown at around the same time to allow for any last minute CDP
 	// cleanup messages to be sent to chromium.
-	b.initContext, b.initCancelFn = context.WithCancel(context.Background())
+	b.internalCtx, b.InternalCancelFn = context.WithCancel(context.Background())
 
 	// connectionOnAttachedToTarget hooks into the connection to listen
 	// for target attachment events. this way, browser can manage the
@@ -144,7 +143,7 @@ func (b *Browser) connect() error {
 	// This is why we're using the internal context.
 	var err error
 	b.conn, err = NewConnection(
-		b.initContext,
+		b.internalCtx,
 		b.browserProc.WsURL(),
 		b.logger,
 		b.connectionOnAttachedToTarget,
@@ -204,7 +203,7 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 	// Using the internal context here. Using vuCtx would close the connection/subprocess
 	// and therefore shutdown chromium when the iteration ends which isn't what we
 	// want to happen. Chromium should only be closed by the k6 event system.
-	b.conn.on(b.initContext, []string{
+	b.conn.on(b.internalCtx, []string{
 		cdproto.EventTargetAttachedToTarget,
 		cdproto.EventTargetDetachedFromTarget,
 		EventConnectionClose,
@@ -223,7 +222,7 @@ func (b *Browser) initEvents() error { //nolint:cyclop
 		}()
 		for {
 			select {
-			case <-b.initContext.Done():
+			case <-b.internalCtx.Done():
 				return
 			case event := <-chHandler:
 				if ev, ok := event.data.(*target.EventAttachedToTarget); ok {
@@ -503,7 +502,7 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 func (b *Browser) Close() {
 	// This will help with some cleanup in the connection and event loop above in
 	// initEvents().
-	defer b.initCancelFn()
+	defer b.InternalCancelFn()
 
 	if b.closed {
 		b.logger.Warnf(
@@ -537,7 +536,7 @@ func (b *Browser) Close() {
 		var closeErr *websocket.CloseError
 		// Using a internal context here since vu context will very likely be
 		// closed.
-		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.initContext, b.conn))
+		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.internalCtx, b.conn))
 		if err != nil && !errors.As(err, &closeErr) {
 			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
