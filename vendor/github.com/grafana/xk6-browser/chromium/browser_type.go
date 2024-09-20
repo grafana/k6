@@ -103,13 +103,13 @@ func (b *BrowserType) initContext(ctx context.Context) context.Context {
 // The separation is important to allow for the iteration to end when k6 requires
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
 // the events which allows the connection to close.
-func (b *BrowserType) Connect(vuCtx context.Context, wsEndpoint string) (*common.Browser, error) {
+func (b *BrowserType) Connect(ctx, vuCtx context.Context, wsEndpoint string) (*common.Browser, error) {
 	vuCtx, browserOpts, logger, err := b.init(vuCtx, true)
 	if err != nil {
 		return nil, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, err := b.connect(vuCtx, wsEndpoint, browserOpts, logger)
+	bp, err := b.connect(ctx, vuCtx, wsEndpoint, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -122,7 +122,7 @@ func (b *BrowserType) Connect(vuCtx context.Context, wsEndpoint string) (*common
 }
 
 func (b *BrowserType) connect(
-	vuCtx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
+	ctx, vuCtx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
 ) (*common.Browser, error) {
 	browserProc, err := b.link(wsURL, logger)
 	if browserProc == nil {
@@ -134,7 +134,7 @@ func (b *BrowserType) connect(
 	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
 	browser, err := common.NewBrowser(
-		browserCtx, browserCtxCancel, browserProc, opts, logger,
+		ctx, browserCtx, browserCtxCancel, browserProc, opts, logger,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("connecting to browser: %w", err)
@@ -168,13 +168,13 @@ func (b *BrowserType) link(
 // The separation is important to allow for the iteration to end when k6 requires
 // the iteration to end (e.g. during a SIGTERM) and unblocks k6 to then fire off
 // the events which allows the chromium subprocess to shutdown.
-func (b *BrowserType) Launch(vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
+func (b *BrowserType) Launch(ctx, vuCtx context.Context) (_ *common.Browser, browserProcessID int, _ error) {
 	vuCtx, browserOpts, logger, err := b.init(vuCtx, false)
 	if err != nil {
 		return nil, 0, fmt.Errorf("initializing browser type: %w", err)
 	}
 
-	bp, pid, err := b.launch(vuCtx, browserOpts, logger)
+	bp, pid, err := b.launch(ctx, vuCtx, browserOpts, logger)
 	if err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     err,
@@ -187,7 +187,7 @@ func (b *BrowserType) Launch(vuCtx context.Context) (_ *common.Browser, browserP
 }
 
 func (b *BrowserType) launch(
-	vuCtx context.Context, opts *common.BrowserOptions, logger *log.Logger,
+	ctx, vuCtx context.Context, opts *common.BrowserOptions, logger *log.Logger,
 ) (_ *common.Browser, pid int, _ error) {
 	flags, err := prepareFlags(opts, &(b.vu.State()).Options)
 	if err != nil {
@@ -214,7 +214,7 @@ func (b *BrowserType) launch(
 	// cancellation and shutdown.
 	browserCtx, browserCtxCancel := context.WithCancel(vuCtx)
 	b.Ctx = browserCtx
-	browser, err := common.NewBrowser(browserCtx, browserCtxCancel,
+	browser, err := common.NewBrowser(ctx, browserCtx, browserCtxCancel,
 		browserProc, opts, logger)
 	if err != nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)

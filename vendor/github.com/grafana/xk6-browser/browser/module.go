@@ -104,6 +104,7 @@ func (m *RootModule) NewModuleInstance(vu k6modules.VU) k6modules.Instance {
 				VU:          vu,
 				pidRegistry: m.PidRegistry,
 				browserRegistry: newBrowserRegistry(
+					context.Background(),
 					vu,
 					m.remoteRegistry,
 					m.PidRegistry,

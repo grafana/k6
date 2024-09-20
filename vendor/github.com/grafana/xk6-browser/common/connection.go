@@ -114,6 +114,7 @@ type Connection struct {
 	BaseEventEmitter
 
 	ctx          context.Context
+	cancelCtx    context.CancelFunc
 	wsURL        string
 	logger       *log.Logger
 	conn         *websocket.Conn
@@ -155,14 +156,18 @@ func NewConnection(
 		WriteBufferSize:  wsWriteBufferSize,
 	}
 
+	ctx, cancelCtx := context.WithCancel(ctx)
+
 	conn, _, connErr := wsd.DialContext(ctx, wsURL, header)
 	if connErr != nil {
+		cancelCtx()
 		return nil, connErr
 	}
 
 	c := Connection{
 		BaseEventEmitter:         NewBaseEventEmitter(ctx),
 		ctx:                      ctx,
+		cancelCtx:                cancelCtx,
 		wsURL:                    wsURL,
 		logger:                   logger,
 		conn:                     conn,
@@ -185,6 +190,8 @@ func NewConnection(
 
 func (c *Connection) close(code int) error {
 	c.logger.Debugf("Connection:close", "code:%d", code)
+
+	defer c.cancelCtx()
 
 	var err error
 	c.shutdownOnce.Do(func() {
