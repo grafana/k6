@@ -486,6 +486,11 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 		return "", nil
 	}
 
+	if node == nil {
+		p.logger.Debugf("Page:getOwnerFrame:node:nil:return", "sid:%v err:%v", p.sessionID(), err)
+		return "", nil
+	}
+
 	frameID := node.FrameID
 	if err := documentElement.Dispose(); err != nil {
 		return "", fmt.Errorf("disposing document element while getting owner frame: %w", err)
