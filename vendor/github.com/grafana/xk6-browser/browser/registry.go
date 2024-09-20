@@ -303,8 +303,7 @@ func (r *browserRegistry) handleIterEvents( //nolint:funlen
 			//
 			// All browser APIs should work with the vu context, and allow the
 			// k6 iteration control its lifecycle.
-			vuCtx := r.vu.Context()
-			tracerCtx := common.WithTracer(vuCtx, r.tr.tracer)
+			tracerCtx := common.WithTracer(r.vu.Context(), r.tr.tracer)
 			tracedCtx := r.tr.startIterationTrace(tracerCtx, data)
 
 			b, err := r.buildFn(ctx, tracedCtx)
