@@ -1558,9 +1558,15 @@ func (h *ElementHandle) newAction(
 
 	return func(apiCtx context.Context, resultCh chan any, errCh chan error) {
 		if res, err := actionFn(apiCtx); err != nil {
-			errCh <- err
+			select {
+			case <-apiCtx.Done():
+			case errCh <- err:
+			}
 		} else {
-			resultCh <- res
+			select {
+			case <-apiCtx.Done():
+			case resultCh <- res:
+			}
 		}
 	}
 }
@@ -1646,9 +1652,15 @@ func (h *ElementHandle) newPointerAction(
 
 	return func(apiCtx context.Context, resultCh chan any, errCh chan error) {
 		if res, err := retryPointerAction(apiCtx, pointerFn, opts); err != nil {
-			errCh <- err
+			select {
+			case <-apiCtx.Done():
+			case errCh <- err:
+			}
 		} else {
-			resultCh <- res
+			select {
+			case <-apiCtx.Done():
+			case resultCh <- res:
+			}
 		}
 	}
 }
