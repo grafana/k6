@@ -32,7 +32,7 @@ Special acknowledgment to the authors of [Playwright](https://playwright.dev/) a
 
 - Bring browser automation to the k6 testing platform while supporting core k6 features like VU executors, scenarios, metrics, checks, thresholds, logging, DNS remapping, IP blocklists, etc.
 - Test stability as the top priority by supporting non-flaky [selectors](https://playwright.dev/docs/api/class-selectors) combined with [auto-waiting](https://playwright.dev/docs/actionability/) for actions just like Playwright.
-- Aim for rough API compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is twofold: first, we don't want users to have to learn a completely new API just to use xk6-browser, and second, it opens up the possibility of using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for xk6-browser should we decide to support that in the future.
+- Aim for rough API compatibility with [Playwright](https://github.com/microsoft/playwright). The reason for this is twofold: first, we don't want users to have to learn a completely new API just to use xk6-browser, and second, it opens up the possibility of using the [Playwright RPC server](https://github.com/mxschmitt/playwright-go) as an optional backend for the k6 browser module should we decide to support that in the future.
 - Support for Chromium-compatible browsers first, and eventually Firefox and WebKit-based browsers.
 
 Please take a look at our [project roadmap](ROADMAP.md) for more details.
@@ -61,5 +61,5 @@ To find out more about xk6-browser or browser testing in general, check out the 
 
 **Note:** Since our API is still transitioning, some of the code snippets from the links below might be inaccurate, though the concepts should still be correct. For the latest, please take a look at our up-to-date [API documentation](https://grafana.com/docs/k6/latest/javascript-api/k6-browser).
 
-- [How to add browser-level APIs for web performance metrics](https://grafana.com/blog/2023/01/08/how-to-add-browser-level-apis-for-web-performance-metrics/) - This post explains how to get started with k6 browser, a k6 experimental module that adds browser-level APIs to interact with browsers and collect web performance metrics as part of your Grafana k6 tests.
+- [How to add browser-level APIs for web performance metrics](https://grafana.com/blog/2023/01/08/how-to-add-browser-level-apis-for-web-performance-metrics/) - This post explains how to get started with k6 browser to interact with browsers and collect web performance metrics as part of your Grafana k6 tests.
 - [Using k6 browser](https://grafana.com/docs/k6/latest/using-k6-browser/) - Get started with the k6 browser module.
