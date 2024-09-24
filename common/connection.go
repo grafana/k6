@@ -623,6 +623,7 @@ func (c *Connection) Execute(ctx context.Context, method string, params easyjson
 		Method: cdproto.MethodType(method),
 		Params: buf,
 	}
+
 	return c.send(evCancelCtx, msg, ch, res)
 }
 
