@@ -206,7 +206,7 @@ func (b *BrowserType) launch(
 		return nil, 0, fmt.Errorf("finding browser executable: %w", err)
 	}
 
-	browserProc, err := b.allocate(path, flags, dataDir, logger)
+	browserProc, err := b.allocate(ctx, path, flags, dataDir, logger)
 	if browserProc == nil {
 		return nil, 0, fmt.Errorf("launching browser: %w", err)
 	}
@@ -239,11 +239,12 @@ func (b *BrowserType) Name() string {
 
 // allocate starts a new Chromium browser process and returns it.
 func (b *BrowserType) allocate(
+	ctx context.Context,
 	path string,
 	flags map[string]any, dataDir *storage.Dir,
 	logger *log.Logger,
 ) (_ *common.BrowserProcess, rerr error) {
-	bProcCtx, bProcCtxCancel := context.WithCancel(context.Background())
+	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
 	defer func() {
 		if rerr != nil {
 			bProcCtxCancel()
