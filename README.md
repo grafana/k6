@@ -22,10 +22,6 @@
 
 **As of [k6 version 0.52.0](https://github.com/grafana/k6/releases/tag/v0.52.0), k6-browser is now bundled in k6 as a core module and usable without a separate binary or compilation step!**
 
-
-https://user-images.githubusercontent.com/10811379/220158567-cdef7ddc-96c5-41d9-854f-a25c5f67e4b3.mp4
-
-
 Special acknowledgment to the authors of [Playwright](https://playwright.dev/) and [Puppeteer](https://github.com/puppeteer/puppeteer) for their trailblazing work in this area. This project is heavily influenced and, in some regards, based on the code of those projects.
 
 ## Goals
