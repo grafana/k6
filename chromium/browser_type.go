@@ -124,7 +124,7 @@ func (b *BrowserType) Connect(ctx, vuCtx context.Context, wsEndpoint string) (*c
 func (b *BrowserType) connect(
 	ctx, vuCtx context.Context, wsURL string, opts *common.BrowserOptions, logger *log.Logger,
 ) (*common.Browser, error) {
-	browserProc, err := b.link(wsURL, logger)
+	browserProc, err := b.link(ctx, wsURL, logger)
 	if browserProc == nil {
 		return nil, fmt.Errorf("connecting to browser: %w", err)
 	}
@@ -144,9 +144,10 @@ func (b *BrowserType) connect(
 }
 
 func (b *BrowserType) link(
+	ctx context.Context,
 	wsURL string, logger *log.Logger,
 ) (*common.BrowserProcess, error) {
-	bProcCtx, bProcCtxCancel := context.WithCancel(context.Background())
+	bProcCtx, bProcCtxCancel := context.WithCancel(ctx)
 	p, err := common.NewRemoteBrowserProcess(bProcCtx, wsURL, bProcCtxCancel, logger)
 	if err != nil {
 		bProcCtxCancel()
