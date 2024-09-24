@@ -86,18 +86,16 @@ func (s *System) Emit(event *Event) (wait func(context.Context) error) {
 	doneCh := make(chan struct{}, s.eventBuffer)
 	doneFn := func() {
 		origDoneFn()
-		select {
-		case doneCh <- struct{}{}:
-		default:
-		}
+		// The done must be read by the reading side to prevent
+		// a goroutine that waits indefinitely.
+		doneCh <- struct{}{}
 	}
 	event.Done = doneFn
 
 	for _, evtCh := range s.subscribers[event.Type] {
-		select {
-		case evtCh <- event:
-		default:
-		}
+		// The event channel must read off the channel otherwise we would
+		// be dropping events.
+		evtCh <- event
 	}
 
 	s.logger.WithFields(logrus.Fields{
