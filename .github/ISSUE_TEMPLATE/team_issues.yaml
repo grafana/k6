@@ -17,13 +17,13 @@ body:
   - type: textarea
     attributes:
       label: How?
-      description: Do you have any suggestions/solutions on how to solve the issue?
+      Description: Do you have any suggestions/solutions for solving the issue?
     validations:
       required: false
   - type: textarea
     attributes:
       label: Tasks
-      description: Feel free to remove the tasklist items that are not relevant for this issue.
+      description: Feel free to remove the tasklist items that are not relevant to this issue.
       value: |
         ```[tasklist]
         ### Tasks
@@ -31,7 +31,7 @@ body:
         - [ ] PR
         - [ ] Docs PR
         - [ ] TypeScript Definitions PR
-        - [ ] Update the k6 release notes
+        - [ ] Update the k6 release notes and release tasks
         ```
     validations:
       required: false
