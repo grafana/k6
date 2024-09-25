@@ -623,7 +623,8 @@ func (c *Connection) Execute(ctx context.Context, method string, params easyjson
 		Method: cdproto.MethodType(method),
 		Params: buf,
 	}
-	return c.send(c.ctx, msg, ch, res)
+
+	return c.send(evCancelCtx, msg, ch, res)
 }
 
 // IgnoreIOErrors signals that the connection will soon be closed, so that any
