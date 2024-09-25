@@ -1,7 +1,15 @@
 <p align="center">
-  <a href="https://k6.io/">
-    <img src="assets/logo.svg" alt="k6" width="210" height="210" /><br>
-    <img src="assets/grafana-labs.svg" alt="Grafana Labs" width="210" /><br>
+  <a href="https://grafana.com/oss/k6/">
+    <picture>
+      <img src="assets/logo.svg" alt="Grafana k6" width="210" height="210" /><br>
+    </picture>
+    <br>
+    <picture>
+      <source media="(prefers-color-scheme: dark)" srcset="assets/grafana-labs-dark-theme.svg">
+      <source media="(prefers-color-scheme: light)" srcset="assets/grafana-labs.svg">
+      <img src="assets/grafana-labs.svg" alt="Grafana Labs" width="210" />
+    </picture>
+    <br>
   </a>
 </p>
 
