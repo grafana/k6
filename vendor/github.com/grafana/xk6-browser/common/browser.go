@@ -538,9 +538,14 @@ func (b *Browser) Close() {
 	// command, which triggers the browser process to exit.
 	if !b.browserOpts.isRemoteBrowser {
 		var closeErr *websocket.CloseError
-		// Using a internal context here since vu context will very likely be
-		// closed.
-		err := cdpbrowser.Close().Do(cdp.WithExecutor(b.browserCtx, b.conn))
+		// Using the internal context with a timeout of 10 seconds here since
+		// 1. vu context will very likely be closed;
+		// 2. there's a chance that the process has died but the connection still
+		//    thinks it's open.
+		toCtx, toCancelCtx := context.WithTimeout(b.browserCtx, time.Second*10)
+		defer toCancelCtx()
+
+		err := cdpbrowser.Close().Do(cdp.WithExecutor(toCtx, b.conn))
 		if err != nil && !errors.As(err, &closeErr) {
 			b.logger.Errorf("Browser:Close", "closing the browser: %v", err)
 		}
