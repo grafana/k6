@@ -1,4 +1,4 @@
-import { check, sleep } from 'k6';
+import { check } from 'k6';
 import { browser, devices } from 'k6/x/browser/async';
 
 export const options = {
@@ -43,7 +43,7 @@ export default async function() {
     });
 
     if (!__ENV.K6_BROWSER_HEADLESS) {
-      sleep(10);
+      await page.waitForTimeout(10000);
     }
   } finally {
     await page.close();
