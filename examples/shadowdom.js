@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -26,15 +26,17 @@ export default async function() {
     const shadowRoot = document.createElement('div');
     shadowRoot.id = 'shadow-root';
     shadowRoot.attachShadow({mode: 'open'});
-    shadowRoot.shadowRoot.innerHTML = '<p id="find">Shadow DOM</p>';
+    shadowRoot.shadowRoot.innerHTML = '<p id="shadow-dom">Shadow DOM</p>';
     document.body.appendChild(shadowRoot);
   });
 
-  const shadowEl = page.locator("#find");
-  const ok = await shadowEl.innerText() === "Shadow DOM";
-  check(shadowEl, {
-    "shadow element exists": (e) => e !== null,
-    "shadow element text is correct": () => ok,
+  await check(
+    page.locator('#shadow-dom'), {
+    'shadow element exists':
+      e => e !== null,
+    'shadow element text is correct':
+      async e => e.innerText()
+        .then(text => text === 'Shadow DOM'),
   });
 
   await page.close();
