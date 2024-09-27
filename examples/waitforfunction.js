@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -30,11 +30,16 @@ export default async function() {
       }, 1000);
     });
 
-    const ok = await page.waitForFunction("document.querySelector('h1')", {
-      polling: 'mutation',
-      timeout: 2000,
+    await check(page, {
+      'waitForFunction successfully resolved':
+        p => p.waitForFunction(
+          "document.querySelector('h1')", {
+            polling: 'mutation',
+            timeout: 2000
+          })
+          .then(e => e.innerHTML())
+          .then(text => text == 'Hello')
     });
-    check(ok, { 'waitForFunction successfully resolved': ok.innerHTML() == 'Hello' });
   } finally {
     await page.close();
   }
