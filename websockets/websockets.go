@@ -187,8 +187,8 @@ func defineWebsocket(rt *sobek.Runtime, w *webSocket) {
 	must(rt, w.obj.DefineDataProperty(
 		"url", rt.ToValue(w.url.String()), sobek.FLAG_FALSE, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty( // this needs to be with an accessor as we change the value
-		"readyState", rt.ToValue(func() ReadyState {
-			return w.readyState
+		"readyState", rt.ToValue(func() sobek.Value {
+			return rt.ToValue((uint)(w.readyState))
 		}), nil, sobek.FLAG_FALSE, sobek.FLAG_TRUE))
 	must(rt, w.obj.DefineAccessorProperty(
 		"bufferedAmount", rt.ToValue(func() sobek.Value { return rt.ToValue(w.bufferedAmount) }), nil,

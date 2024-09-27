@@ -1527,3 +1527,26 @@ func testArrayBufferViewSupport(t *testing.T, viewName string) {
 	logs := hook.Drain()
 	require.Len(t, logs, 0)
 }
+
+func TestReadyStateSwitch(t *testing.T) {
+	t.Parallel()
+	ts := newTestState(t)
+	logger, hook := testutils.NewLoggerWithHook(t, logrus.WarnLevel)
+	ts.runtime.VU.StateField.Logger = logger
+	_, err := ts.runtime.RunOnEventLoop(ts.tb.Replacer.Replace(`
+		var ws = new WebSocket("WSBIN_URL/ws-echo")
+		try {
+			switch (ws.readyState) {
+				case 0:
+					break;
+				default:
+					throw "ws.readyState doesn't get correct value in switch"
+			}
+		} finally {
+			ws.close()
+		}
+	`))
+	require.NoError(t, err)
+	logs := hook.Drain()
+	require.Len(t, logs, 0)
+}
