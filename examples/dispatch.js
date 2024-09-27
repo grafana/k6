@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -27,9 +27,10 @@ export default async function() {
     const contacts = page.locator('a[href="/contacts.php"]');
     await contacts.dispatchEvent("click");
 
-    const h3 = page.locator("h3");
-    const ok = await h3.textContent() == "Contact us";
-    check(ok, { "header": ok });
+    await check(page.locator('h3'), {
+      'header': async lo => lo.textContent()
+        .then(text => text == 'Contact us')
+    });
   } finally {
     await page.close();
   }
