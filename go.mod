@@ -3,7 +3,7 @@ module github.com/grafana/xk6-browser
 go 1.21
 
 require (
-	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2
+	github.com/chromedp/cdproto v0.0.0-20240919203636-12af5e8a671f
 	github.com/gorilla/websocket v1.5.1
 	github.com/grafana/sobek v0.0.0-20240829081756-447e8c611945
 	github.com/mailru/easyjson v0.7.7
