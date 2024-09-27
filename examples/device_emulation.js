@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser, devices } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -27,7 +27,7 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    await page.goto('https://k6.io/', { waitUntil: 'networkidle' });
+    await page.goto('https://test.k6.io/', { waitUntil: 'networkidle' });
     const dimensions = await page.evaluate(() => {
       return {
         width: document.documentElement.clientWidth,
@@ -36,7 +36,7 @@ export default async function() {
       };
     });
 
-    check(dimensions, {
+    await check(dimensions, {
       'width': d => d.width === device.viewport.width,
       'height': d => d.height === device.viewport.height,
       'scale': d => d.deviceScaleFactor === device.deviceScaleFactor,
