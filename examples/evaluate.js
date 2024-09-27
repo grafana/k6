@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -25,20 +25,21 @@ export default async function() {
     await page.goto("https://test.k6.io/", { waitUntil: "load" });
 
     // calling evaluate without arguments
-    let result = await page.evaluate(() => {
-        return Promise.resolve(5 * 42);
-    });
-    check(result, {
-      "result should be 210": (result) => result == 210,
-    });
+    await check(page, {
+      'result should be 210':
+        async p => p.evaluate(
+          () => 5 * 42
+        )
+        .then(r => r == 210)
+  });
 
     // calling evaluate with arguments
-    result = await page.evaluate(([x, y]) => {
-        return Promise.resolve(x * y);
-      }, [5, 5]
-    );
-    check(result, {
-      "result should be 25": (result) => result == 25,
+    await check(page, {
+      'result should be 25':
+        async p => p.evaluate(
+          ([x, y]) => x * y, [5, 5],
+        )
+        .then(r => r == 25),
     });
   } finally {
     await page.close();
