@@ -21,10 +21,10 @@ func TestRequest(t *testing.T) {
 	evt := &network.EventRequestWillBeSent{
 		RequestID: network.RequestID("1234"),
 		Request: &network.Request{
-			URL:      "https://test/post",
-			Method:   "POST",
-			Headers:  network.Headers(headers),
-			PostData: "hello",
+			URL:             "https://test/post",
+			Method:          "POST",
+			Headers:         network.Headers(headers),
+			PostDataEntries: []*network.PostDataEntry{{Bytes: "aGVsbG8="}}, // base64 encoded "hello"
 		},
 		Timestamp: &ts,
 		WallTime:  &wt,
@@ -42,10 +42,10 @@ func TestRequest(t *testing.T) {
 		evt := &network.EventRequestWillBeSent{
 			RequestID: network.RequestID("1234"),
 			Request: &network.Request{
-				URL:      ":",
-				Method:   "POST",
-				Headers:  network.Headers(headers),
-				PostData: "hello",
+				URL:             ":",
+				Method:          "POST",
+				Headers:         network.Headers(headers),
+				PostDataEntries: []*network.PostDataEntry{{Bytes: "aGVsbG8="}}, // base64 encoded "hello"
 			},
 			Timestamp: &ts,
 			WallTime:  &wt,

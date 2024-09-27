@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -48,7 +49,7 @@ type Request struct {
 	url                 *url.URL
 	method              string
 	headers             map[string][]string
-	postData            string
+	postDataEntries     []string
 	resourceType        string
 	isNavigationRequest bool
 	allowInterception   bool
@@ -103,13 +104,27 @@ func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
 	isNavigationRequest := string(ev.RequestID) == string(ev.LoaderID) &&
 		ev.Type == network.ResourceTypeDocument
 
+	pd := make([]string, 0, len(ev.Request.PostDataEntries))
+	for _, i := range ev.Request.PostDataEntries {
+		if i == nil {
+			continue
+		}
+
+		decodedBytes, err := base64.StdEncoding.DecodeString(i.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("decoding postData %q: %w", i.Bytes, err)
+		}
+
+		pd = append(pd, string(decodedBytes))
+	}
+
 	r := Request{
 		url:                 u,
 		frame:               rp.frame,
 		redirectChain:       rp.redirectChain,
 		requestID:           ev.RequestID,
 		method:              ev.Request.Method,
-		postData:            ev.Request.PostData,
+		postDataEntries:     pd,
 		resourceType:        ev.Type.String(),
 		isNavigationRequest: isNavigationRequest,
 		allowInterception:   rp.allowInterception,
@@ -215,13 +230,35 @@ func (r *Request) Method() string {
 }
 
 // PostData returns the request post data, if any.
+//
+// If will not attempt to fetch the data if it should have some but nothing is
+// cached locally: https://github.com/grafana/xk6-browser/issues/1470
+//
+// This relies on PostDataEntries. It will only ever return the 0th entry.
+// TODO: Create a PostDataEntries API when we have a better idea of when that
+// is needed.
 func (r *Request) PostData() string {
-	return r.postData
+	if len(r.postDataEntries) > 0 {
+		return r.postDataEntries[0]
+	}
+
+	return ""
 }
 
 // PostDataBuffer returns the request post data as an ArrayBuffer.
+//
+// If will not attempt to fetch the data if it should have some but nothing is
+// cached locally: https://github.com/grafana/xk6-browser/issues/1470
+//
+// This relies on PostDataEntries. It will only ever return the 0th entry.
+// TODO: Create a PostDataEntries API when we have a better idea of when that
+// is needed.
 func (r *Request) PostDataBuffer() []byte {
-	return []byte(r.postData)
+	if len(r.postDataEntries) > 0 {
+		return []byte(r.postDataEntries[0])
+	}
+
+	return nil
 }
 
 // ResourceType returns the request resource type.
@@ -236,8 +273,12 @@ func (r *Request) Response() *Response {
 
 // Size returns the size of the request.
 func (r *Request) Size() HTTPMessageSize {
+	var b int64
+	for _, p := range r.postDataEntries {
+		b += int64(len(p))
+	}
 	return HTTPMessageSize{
-		Body:    int64(len(r.postData)),
+		Body:    b,
 		Headers: r.headersSize(),
 	}
 }
