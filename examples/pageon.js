@@ -1,5 +1,5 @@
 import { browser } from 'k6/x/browser/async';
-import { check } from 'k6';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -23,16 +23,18 @@ export default async function() {
   try {
     await page.goto('https://test.k6.io/');
 
-    page.on('console', async(msg) => {
-        const jsonValue1 = await msg.args()[0].jsonValue();
-        const jsonValue2 = await msg.args()[1].jsonValue();
-        check(msg, {
-            'assertConsoleMessageType': msg => msg.type() == 'log',
-            'assertConsoleMessageText': msg => msg.text() == 'this is a console.log message 42',
-            'assertConsoleMessageArgs0': msg => jsonValue1 == 'this is a console.log message',
-            'assertConsoleMessageArgs1': msg => jsonValue2 == 42,
-        });
-    });
+    page.on('console', async msg => check(msg, {
+      'assert console message type':
+        msg => msg.type() == 'log',
+      'assert console message text':
+        msg => msg.text() == 'this is a console.log message 42',
+      'assert console message first argument':
+        msg => msg.args()[0].jsonValue()
+          .then(arg1 => arg1 == 'this is a console.log message'),
+      'assert console message second argument':
+        msg => msg.args()[1].jsonValue()
+          .then(arg2 => arg2 == 42)
+    }));
 
     await page.evaluate(() => console.log('this is a console.log message', 42));
   } finally {
