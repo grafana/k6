@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -23,8 +23,10 @@ export default async function() {
   const page = await context.newPage();
 
   try {
-    const res = await page.goto('http://test.k6.io/', { waitUntil: 'load' });
-    check(res, {
+    const res = await page.goto('http://test.k6.io/', {
+      waitUntil: 'load'
+    });
+    await check(res, {
       'null response': r => r === null,
     });
   } finally {
