@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -18,26 +18,20 @@ export const options = {
 }
 
 export default async function() {
-  const preferredColorScheme = 'dark';
-
   const context = await browser.newContext({
     // valid values are "light", "dark" or "no-preference"
-    colorScheme: preferredColorScheme,
+    colorScheme: 'dark',
   });
   const page = await context.newPage();
 
   try {
     await page.goto(
-      'https://googlechromelabs.github.io/dark-mode-toggle/demo/',
+      'https://test.k6.io',
       { waitUntil: 'load' },
     )
-    const colorScheme = await page.evaluate(() => {
-      return {
-        isDarkColorScheme: window.matchMedia('(prefers-color-scheme: dark)').matches
-      };
-    });
-    check(colorScheme, {
-      'isDarkColorScheme': cs => cs.isDarkColorScheme
+    await check(page, {
+      'isDarkColorScheme':
+        p => p.evaluate(() => window.matchMedia('(prefers-color-scheme: dark)').matches)
     });
   } finally {
     await page.close();
