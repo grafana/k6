@@ -1,5 +1,5 @@
-import { check } from 'k6';
 import { browser } from 'k6/x/browser/async';
+import { check } from 'https://jslib.k6.io/k6-utils/1.5.0/index.js';
 
 export const options = {
   scenarios: {
@@ -33,34 +33,37 @@ export default async function() {
   `);
 
   // Check state
-  let isVisible = await page.$('.visible').then(e => e.isVisible());
-  let isHidden = await page.$('.hidden').then(e => e.isHidden());
-  let isEditable = await page.$('.editable').then(e => e.isEditable());
-  let isEnabled = await page.$('.enabled').then(e => e.isEnabled());
-  let isDisabled = await page.$('.disabled').then(e => e.isDisabled());
-  let isChecked = await page.$('.checked').then(e => e.isChecked());
-  let isUnchecked = !await page.$('.unchecked').then(e => e.isChecked());
-
-  check(page, {
-    'visible': isVisible,
-    'hidden': isHidden,
-    'editable': isEditable,
-    'enabled': isEnabled,
-    'disabled': isDisabled,
-    'checked': isChecked,
-    'unchecked': isUnchecked,
+  await check(page, {
+    'is visible':
+      async p => p.$('.visible').then(e => e.isVisible()),
+    'is hidden':
+      async p => p.$('.hidden').then(e => e.isHidden()),
+    'is editable':
+      async p => p.$('.editable').then(e => e.isEditable()),
+    'is enabled':
+      async p => p.$('.enabled').then(e => e.isEnabled()),
+    'is disabled':
+      async p => p.$('.disabled').then(e => e.isDisabled()),
+    'is checked':
+      async p => p.$('.checked').then(e => e.isChecked()),
+    'is unchecked':
+      async p => p.$('.unchecked')
+        .then(async e => await e.isChecked() === false),
   });
 
   // Change state and check again
-  await page.$(".unchecked").then(e => e.setChecked(true))
-  await page.$(".checked").then(e => e.setChecked(false))
-
-  let isUncheckedChecked = await page.$(".unchecked").then((e) => e.isChecked());
-  let isCheckedUnchecked = !await page.$(".checked").then((e) => e.isChecked());
-
-  check(page, {
-    isUncheckedChecked: isUncheckedChecked,
-    isCheckedUnchecked: isCheckedUnchecked,
+  await check(page, {
+    'is unchecked checked':
+      async p => p.$(".unchecked")
+        .then(e => e.setChecked(true))
+        .then(() => p.$(".unchecked"))
+        .then(e => e.isChecked()),
+    'is checked unchecked':
+      async p => p.$(".checked")
+        .then(e => e.setChecked(false))
+        .then(() => p.$(".checked"))
+        .then(e => e.isChecked())
+        .then(checked => !checked),
   });
 
   await page.close();
