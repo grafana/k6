@@ -89,6 +89,24 @@ func TestConfig(t *testing.T) {
 			},
 		},
 
+		"OTEL environment variables": {
+			env: map[string]string{
+				"OTEL_SERVICE_NAME": "otel-service",
+			},
+			expectedConfig: Config{
+				ServiceName:          null.StringFrom("otel-service"),
+				ServiceVersion:       null.StringFrom(k6Const.Version),
+				ExporterType:         null.StringFrom(grpcExporterType),
+				HTTPExporterInsecure: null.NewBool(false, true),
+				HTTPExporterEndpoint: null.StringFrom("localhost:4318"),
+				HTTPExporterURLPath:  null.StringFrom("/v1/metrics"),
+				GRPCExporterInsecure: null.NewBool(false, true),
+				GRPCExporterEndpoint: null.StringFrom("localhost:4317"),
+				ExportInterval:       types.NullDurationFrom(10 * time.Second),
+				FlushInterval:        types.NullDurationFrom(1 * time.Second),
+			},
+		},
+
 		"JSON complete overwrite": {
 			jsonRaw: json.RawMessage(
 				`{` +
