@@ -25,14 +25,14 @@ export default async function() {
     await page.goto('https://test.k6.io/');
 
     await check(page, {
-      'Title with CSS selector':
-        p => p.$('header h1.title')
-          .then(e => e.textContent())
-          .then(title => title == 'test.k6.io'),
-      'Title with XPath selector':
-        p => p.$(`//header//h1[@class="title"]`)
-          .then(e => e.textContent())
-          .then(title => title == 'test.k6.io'),
+      'Title with CSS selector': async p => {
+        const e = await p.$('header h1.title');
+        return await e.textContent() === 'test.k6.io';
+      },
+      'Title with XPath selector': async p => {
+        const e = await p.$('//header//h1[@class="title"]');
+        return await e.textContent() === 'test.k6.io';
+      }
     });
   } finally {
     await page.close();
