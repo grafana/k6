@@ -42,15 +42,17 @@ export default async function() {
     ]);
 
     await check(page.locator('h2'), {
-      'header': async lo => lo.textContent()
-        .then(t => t == 'Welcome, admin!')
+      'header': async lo => {
+        return await lo.textContent() == 'Welcome, admin!'
+      }
     });
 
     // Check whether we receive cookies from the logged site.
     await check(context, {
-      'session cookie is set': async ctx => ctx.cookies()
-        .then(cookies => cookies.find(c => c.name == 'sid'))
-        .then(sessionID => typeof sessionID !== 'undefined')
+      'session cookie is set': async ctx => {
+        const cookies = await ctx.cookies();
+        return cookies.find(c => c.name == 'sid') !== undefined;
+      }
     });
   } finally {
     await page.close();
