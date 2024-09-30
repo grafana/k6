@@ -30,15 +30,16 @@ export default async function() {
       }, 1000);
     });
 
-    await check(page, {
-      'waitForFunction successfully resolved':
-        p => p.waitForFunction(
-          "document.querySelector('h1')", {
-            polling: 'mutation',
-            timeout: 2000
-          })
-          .then(e => e.innerHTML())
-          .then(text => text == 'Hello')
+    const e = await page.waitForFunction(
+      "document.querySelector('h1')", {
+        polling: 'mutation',
+        timeout: 2000
+      }
+    );
+    await check(e, {
+      'waitForFunction successfully resolved': async e => {
+        return await e.innerHTML() === 'Hello';
+      }
     });
   } finally {
     await page.close();
