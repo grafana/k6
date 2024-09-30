@@ -28,8 +28,10 @@ export default async function() {
     await contacts.dispatchEvent("click");
 
     await check(page.locator('h3'), {
-      'header': async lo => lo.textContent()
-        .then(text => text == 'Contact us')
+      'header': async lo => {
+        const text = await lo.textContent();
+        return text == 'Contact us';
+      }
     });
   } finally {
     await page.close();
