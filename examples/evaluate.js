@@ -26,20 +26,18 @@ export default async function() {
 
     // calling evaluate without arguments
     await check(page, {
-      'result should be 210':
-        async p => p.evaluate(
-          () => 5 * 42
-        )
-        .then(r => r == 210)
-  });
+      'result should be 210': async p => {
+        const n = await p.evaluate(() => 5 * 42);
+        return n == 210;
+      }
+    });
 
     // calling evaluate with arguments
     await check(page, {
-      'result should be 25':
-        async p => p.evaluate(
-          ([x, y]) => x * y, [5, 5],
-        )
-        .then(r => r == 25),
+      'result should be 25': async p => {
+        const n = await p.evaluate((x, y) => x * y, 5, 5);
+        return n == 25;
+      }
     });
   } finally {
     await page.close();
