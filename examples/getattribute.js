@@ -26,10 +26,10 @@ export default async function() {
       waitUntil: 'load',
     });
     await check(page, {
-      "GetAttribute('mode')":
-        async p => p.$('#dark-mode-toggle-3')
-          .then(e => e.getAttribute('mode'))
-          .then(m => m === 'light'),
+      "GetAttribute('mode')": async p => {
+        const e = await p.$('#dark-mode-toggle-3');
+        return await e.getAttribute('mode') === 'light';
+      }
     });
   } finally {
     await page.close();
