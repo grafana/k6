@@ -103,8 +103,8 @@ github.com/grafana/xk6-redis v0.3.0 h1:eV1YO0miPqGFilN8sL/3OdO6Mm+hZH2nsvJm5dkE0
 github.com/grafana/xk6-redis v0.3.0/go.mod h1:3e/U9i1Nm3WEaMy4nZSGMjVf8ZsFau+aXurYJhJ7MfQ=
 github.com/grafana/xk6-webcrypto v0.4.0 h1:CXRGkvVg8snYEyGCq3d5XGzDPxTPJ1m5CS68jPdtZZk=
 github.com/grafana/xk6-webcrypto v0.4.0/go.mod h1:+THllImZ8OWlsFc8llWqvzzjottlGdXq/7rIQ16zmFs=
-github.com/grafana/xk6-websockets v0.7.0 h1:oTdfQNISs3bEuALfPv9VvQgb3xOxbu3C/DBySf5DnOI=
-github.com/grafana/xk6-websockets v0.7.0/go.mod h1:D76ALTjp3bMugqx7ulseJ9TZrmSvDogieWxWXr8S0+A=
+github.com/grafana/xk6-websockets v0.7.1 h1:ONiw2xWvLzWjM1VtQlkMMFJGjVjn0LbigsC+wVw6ZxM=
+github.com/grafana/xk6-websockets v0.7.1/go.mod h1:D76ALTjp3bMugqx7ulseJ9TZrmSvDogieWxWXr8S0+A=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0 h1:UH//fgunKIs4JdUbpDl1VZCDaL56wXCB/5+wF6uHfaI=
 github.com/grpc-ecosystem/go-grpc-middleware v1.4.0/go.mod h1:g5qyo/la0ALbONm6Vbp88Yd8NsDy6rZz+RcrMPxvld8=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0 h1:asbCHRVmodnJTuQ3qamDwqVOIjwqUPTYmYuemVOx+Ys=
