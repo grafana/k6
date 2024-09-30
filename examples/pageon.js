@@ -24,16 +24,18 @@ export default async function() {
     await page.goto('https://test.k6.io/');
 
     page.on('console', async msg => check(msg, {
-      'assert console message type':
-        msg => msg.type() == 'log',
-      'assert console message text':
-        msg => msg.text() == 'this is a console.log message 42',
-      'assert console message first argument':
-        msg => msg.args()[0].jsonValue()
-          .then(arg1 => arg1 == 'this is a console.log message'),
-      'assert console message second argument':
-        msg => msg.args()[1].jsonValue()
-          .then(arg2 => arg2 == 42)
+      'assert console message type': msg =>
+        msg.type() == 'log',
+      'assert console message text': msg =>
+        msg.text() == 'this is a console.log message 42',
+      'assert console message first argument': async msg => {
+        const arg1 = await msg.args()[0].jsonValue();
+        return arg1 == 'this is a console.log message';
+      },
+      'assert console message second argument': async msg => {
+        const arg2 = await msg.args()[1].jsonValue();
+        return arg2 == 42;
+      }
     }));
 
     await page.evaluate(() => console.log('this is a console.log message', 42));
