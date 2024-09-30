@@ -34,36 +34,48 @@ export default async function() {
 
   // Check state
   await check(page, {
-    'is visible':
-      async p => p.$('.visible').then(e => e.isVisible()),
-    'is hidden':
-      async p => p.$('.hidden').then(e => e.isHidden()),
-    'is editable':
-      async p => p.$('.editable').then(e => e.isEditable()),
-    'is enabled':
-      async p => p.$('.enabled').then(e => e.isEnabled()),
-    'is disabled':
-      async p => p.$('.disabled').then(e => e.isDisabled()),
-    'is checked':
-      async p => p.$('.checked').then(e => e.isChecked()),
-    'is unchecked':
-      async p => p.$('.unchecked')
-        .then(async e => await e.isChecked() === false),
+    'is visible': async p => {
+      const e = await p.$('.visible');
+      return await e.isVisible();
+    },
+    'is hidden': async p => {
+      const e = await p.$('.hidden');
+      return await e.isHidden()
+    },
+    'is editable': async p => {
+      const e = await p.$('.editable');
+      return await e.isEditable();
+    },
+    'is enabled': async p => {
+      const e = await p.$('.enabled');
+      return await e.isEnabled();
+    },
+    'is disabled': async p => {
+      const e = await p.$('.disabled');
+      return await e.isDisabled();
+    },
+    'is checked': async p => {
+      const e = await p.$('.checked');
+      return await e.isChecked();
+    },
+    'is unchecked': async p => {
+      const e = await p.$('.unchecked');
+      return !await e.isChecked();
+    }
   });
 
   // Change state and check again
   await check(page, {
-    'is unchecked checked':
-      async p => p.$(".unchecked")
-        .then(e => e.setChecked(true))
-        .then(() => p.$(".unchecked"))
-        .then(e => e.isChecked()),
-    'is checked unchecked':
-      async p => p.$(".checked")
-        .then(e => e.setChecked(false))
-        .then(() => p.$(".checked"))
-        .then(e => e.isChecked())
-        .then(checked => !checked),
+    'is unchecked checked': async p => {
+      const e = await p.$(".unchecked");
+      await e.setChecked(true);
+      return e.isChecked();
+    },
+    'is checked unchecked': async p => {
+      const e = await p.$(".checked");
+      await e.setChecked(false);
+      return !await e.isChecked();
+    }
   });
 
   await page.close();
