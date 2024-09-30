@@ -30,13 +30,11 @@ export default async function() {
     document.body.appendChild(shadowRoot);
   });
 
-  await check(
-    page.locator('#shadow-dom'), {
-    'shadow element exists':
-      e => e !== null,
-    'shadow element text is correct':
-      async e => e.innerText()
-        .then(text => text === 'Shadow DOM'),
+  await check(page.locator('#shadow-dom'), {
+    'shadow element exists': e => e !== null,
+    'shadow element text is correct': async e => {
+      return await e.innerText() === 'Shadow DOM';
+    }
   });
 
   await page.close();
