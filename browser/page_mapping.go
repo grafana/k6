@@ -201,7 +201,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"mouse": mapMouse(vu, p.GetMouse()),
 		"on": func(event string, handler sobek.Callable) error {
-			tq := vu.taskQueueRegistry.get(p.TargetID())
+			tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
