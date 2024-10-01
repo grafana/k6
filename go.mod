@@ -11,7 +11,7 @@ require (
 	github.com/mstoykov/k6-taskqueue-lib v0.1.0
 	github.com/sirupsen/logrus v1.9.3
 	github.com/stretchr/testify v1.9.0
-	go.k6.io/k6 v0.53.1-0.20240925100229-86ab6e3ceee8
+	go.k6.io/k6 v0.54.0
 	go.opentelemetry.io/otel v1.29.0
 	go.opentelemetry.io/otel/trace v1.29.0
 	golang.org/x/net v0.28.0
