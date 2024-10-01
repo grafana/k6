@@ -40,7 +40,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"close": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// It's safe to close the taskqueue for this targetID (if one
+				// exists).
 				vu.taskQueueRegistry.close(p.TargetID())
+
 				return nil, p.Close(opts) //nolint:wrapcheck
 			})
 		},
