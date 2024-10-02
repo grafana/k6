@@ -231,6 +231,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			case common.EventPageMetricCalled:
 				runInTaskQueue = func(a any) {
 					tq.Queue(func() error {
+						_, ok := a.(*common.ExportedMetric)
+						if !ok {
+							return errors.New("incorrect metric message")
+						}
 						return nil
 					})
 				}

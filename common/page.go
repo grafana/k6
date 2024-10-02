@@ -363,6 +363,15 @@ func (p *Page) initEvents() {
 	}()
 }
 
+// ExportedMetric is the type that is exported to JS. It is currently only used to
+// match on the urlTag and return a name when a match is found.
+type ExportedMetric struct {
+}
+
+func (e *ExportedMetric) GroupURLTag() error {
+	return nil
+}
+
 func (p *Page) closeWorker(sessionID target.SessionID) {
 	p.logger.Debugf("Page:closeWorker", "sid:%v", sessionID)
 
