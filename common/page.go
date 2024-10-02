@@ -366,9 +366,17 @@ func (p *Page) initEvents() {
 // ExportedMetric is the type that is exported to JS. It is currently only used to
 // match on the urlTag and return a name when a match is found.
 type ExportedMetric struct {
+	ctx context.Context
+
 	// The url value from the metric's url tag. It will be used to match
 	// against the url grouping regexs.
 	urlTag string
+
+	// nameCh is used to return the url tag metric name when a match is found.
+	// It is also used to help sync the call to the handler and the caller.
+	// We need to wait for the handler to complete before proceeding to return
+	// the name of the url grouping.
+	nameCh chan<- string
 }
 
 // URLGroups will contain all the url groupings.
@@ -385,6 +393,14 @@ type URLGroup struct {
 	Name string
 }
 
+// Completed will allow the caller of the handler to know that the handler
+// has completed and therefore to continue the flow.
+func (e *ExportedMetric) Completed() {
+	close(e.nameCh)
+}
+
+// GroupURLTag will find a match given the URLGroups and the URL from the metric
+// tag and send the name via a channel back to the caller of the handler.
 func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, error), groups URLGroups) error {
 	for _, g := range groups.Groups {
 		if g.Name == "" {
@@ -399,6 +415,10 @@ func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, e
 		}
 
 		if val {
+			select {
+			case e.nameCh <- g.Name:
+			case <-e.ctx.Done():
+			}
 			return nil
 		}
 	}

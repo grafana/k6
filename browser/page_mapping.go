@@ -243,6 +243,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 						if !ok {
 							return errors.New("incorrect metric message")
 						}
+						// page.on('metric') needs to be synchronized so that
+						// the name can be returned back to the caller of the
+						// handler. Once the handler has complete we call
+						// Completed so that the caller knows that the handler
+						// has complete and to work with the new metric.
+						defer m.Completed()
 
 						if err := mapMsgAndHandleEvent(m); err != nil {
 							return fmt.Errorf("executing page.on handler: %w", err)
