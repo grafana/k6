@@ -181,7 +181,13 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = tags.With("url", req.URL())
+		if name, ok := m.frameManager.page.URLGroupingName(m.vu.Context(), req.URL()); ok {
+			tags = tags.With("url", name)
+			tags = tags.With("name", name)
+		} else {
+			tags = tags.With("url", req.URL())
+			tags = tags.With("name", req.URL())
+		}
 	}
 
 	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
@@ -234,7 +240,13 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = tags.With("url", url)
+		if name, ok := m.frameManager.page.URLGroupingName(m.vu.Context(), url); ok {
+			tags = tags.With("url", name)
+			tags = tags.With("name", name)
+		} else {
+			tags = tags.With("url", url)
+			tags = tags.With("name", url)
+		}
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags = tags.With("ip", ipAddress)
