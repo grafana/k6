@@ -1248,12 +1248,18 @@ func TestPageOn(t *testing.T) {
 			)
 
 			// Console Messages should be multiplexed for every registered handler
-			eventHandlerOne := func(cm *common.ConsoleMessage) {
+			eventHandlerOne := func(a any) {
+				cm, ok := a.(*common.ConsoleMessage)
+				assert.True(t, ok)
+
 				defer close(done1)
 				tc.assertFn(t, cm)
 			}
 
-			eventHandlerTwo := func(cm *common.ConsoleMessage) {
+			eventHandlerTwo := func(a any) {
+				cm, ok := a.(*common.ConsoleMessage)
+				assert.True(t, ok)
+
 				defer close(done2)
 				tc.assertFn(t, cm)
 			}

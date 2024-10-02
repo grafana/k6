@@ -181,8 +181,6 @@ func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
 	}
 }
 
-type consoleEventHandlerFunc func(*ConsoleMessage)
-
 // ConsoleMessage represents a page console message.
 type ConsoleMessage struct {
 	// Args represent the list of arguments passed to a console function call.
@@ -239,7 +237,7 @@ type Page struct {
 	backgroundPage bool
 
 	eventCh         chan Event
-	eventHandlers   map[string][]consoleEventHandlerFunc
+	eventHandlers   map[string][]func(any)
 	eventHandlersMu sync.RWMutex
 
 	mainFrameSession *FrameSession
@@ -278,7 +276,7 @@ func NewPage(
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
 		eventCh:          make(chan Event),
-		eventHandlers:    make(map[string][]consoleEventHandlerFunc),
+		eventHandlers:    make(map[string][]func(any)),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		vu:               k6ext.GetVU(ctx),
@@ -990,7 +988,7 @@ func (p *Page) NavigationTimeout() time.Duration {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event string, handler func(*ConsoleMessage)) error {
+func (p *Page) On(event string, handler func(any)) error {
 	if event != eventPageConsoleAPICalled {
 		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
 	}
@@ -999,7 +997,7 @@ func (p *Page) On(event string, handler func(*ConsoleMessage)) error {
 	defer p.eventHandlersMu.Unlock()
 
 	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
-		p.eventHandlers[eventPageConsoleAPICalled] = make([]consoleEventHandlerFunc, 0, 1)
+		p.eventHandlers[eventPageConsoleAPICalled] = make([]func(any), 0, 1)
 	}
 	p.eventHandlers[eventPageConsoleAPICalled] = append(p.eventHandlers[eventPageConsoleAPICalled], handler)
 

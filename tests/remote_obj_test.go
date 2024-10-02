@@ -81,7 +81,10 @@ func TestConsoleLogParse(t *testing.T) {
 
 			done := make(chan bool)
 
-			eventHandler := func(cm *common.ConsoleMessage) {
+			eventHandler := func(a any) {
+				cm, ok := a.(*common.ConsoleMessage)
+				assert.True(t, ok)
+
 				defer close(done)
 				assert.Equal(t, tt.want, cm.Text)
 			}
