@@ -228,6 +228,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 						return nil
 					})
 				}
+			default:
+				return fmt.Errorf("unknown page event: %q", event)
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck
