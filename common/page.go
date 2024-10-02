@@ -382,7 +382,7 @@ type URLGroup struct {
 	Name string
 }
 
-func (e *ExportedMetric) GroupURLTag(groups URLGroups) error {
+func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, error), groups URLGroups) error {
 	return nil
 }
 

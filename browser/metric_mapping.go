@@ -26,7 +26,18 @@ func mapMetric(vu moduleVU, cm *common.ExportedMetric) (mapping, error) {
 
 	return mapping{
 		"groupURLTag": func(urls common.URLGroups) error {
-			return cm.GroupURLTag(urls)
+			callback := func(pattern, url string) (bool, error) {
+				js := fmt.Sprintf(`_k6BrowserURLGroupingTest(%s, '%s')`, pattern, url)
+
+				val, err := rt.RunString(js)
+				if err != nil {
+					return false, fmt.Errorf("evaluating metric tag url grouping: %w", err)
+				}
+
+				return val.ToBoolean(), nil
+			}
+
+			return cm.GroupURLTag(callback, urls)
 		},
 	}, nil
 }
