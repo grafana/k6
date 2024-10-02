@@ -228,6 +228,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 						return nil
 					})
 				}
+			case common.EventPageMetricCalled:
+				runInTaskQueue = func(a any) {
+					tq.Queue(func() error {
+						return nil
+					})
+				}
 			default:
 				return fmt.Errorf("unknown page event: %q", event)
 			}

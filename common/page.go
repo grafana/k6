@@ -36,6 +36,7 @@ const (
 	webVitalBinding = "k6browserSendWebVitalMetric"
 
 	EventPageConsoleAPICalled = "console"
+	EventPageMetricCalled     = "metric"
 )
 
 // MediaType represents the type of media to emulate.
@@ -991,8 +992,9 @@ func (p *Page) NavigationTimeout() time.Duration {
 func (p *Page) On(event string, handler func(any)) error {
 	switch event {
 	case EventPageConsoleAPICalled:
+	case EventPageMetricCalled:
 	default:
-		return fmt.Errorf("unknown page event: %q, must be %q", event, EventPageConsoleAPICalled)
+		return fmt.Errorf("unknown page event: %q", event)
 	}
 
 	p.eventHandlersMu.Lock()
