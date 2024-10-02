@@ -207,23 +207,27 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"on": func(event string, handler sobek.Callable) error {
 			tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
-			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
-				mapping := mapConsoleMessage(vu, m)
-				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
-				return err
-			}
-			runInTaskQueue := func(a any) {
-				tq.Queue(func() error {
-					m, ok := a.(*common.ConsoleMessage)
-					if !ok {
-						return errors.New("incorrect message")
-					}
+			var runInTaskQueue func(any)
+			switch event {
+			case common.EventPageConsoleAPICalled:
+				mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
+					mapping := mapConsoleMessage(vu, m)
+					_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
+					return err
+				}
+				runInTaskQueue = func(a any) {
+					tq.Queue(func() error {
+						m, ok := a.(*common.ConsoleMessage)
+						if !ok {
+							return errors.New("incorrect console message")
+						}
 
-					if err := mapMsgAndHandleEvent(m); err != nil {
-						return fmt.Errorf("executing page.on handler: %w", err)
-					}
-					return nil
-				})
+						if err := mapMsgAndHandleEvent(m); err != nil {
+							return fmt.Errorf("executing page.on handler: %w", err)
+						}
+						return nil
+					})
+				}
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck
