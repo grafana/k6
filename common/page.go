@@ -366,6 +366,9 @@ func (p *Page) initEvents() {
 // ExportedMetric is the type that is exported to JS. It is currently only used to
 // match on the urlTag and return a name when a match is found.
 type ExportedMetric struct {
+	// The url value from the metric's url tag. It will be used to match
+	// against the url grouping regexs.
+	urlTag string
 }
 
 // URLGroups will contain all the url groupings.
@@ -383,6 +386,23 @@ type URLGroup struct {
 }
 
 func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, error), groups URLGroups) error {
+	for _, g := range groups.Groups {
+		if g.Name == "" {
+			return fmt.Errorf("name %q is invalid", g.Name)
+		}
+
+		// callback is a function that will perform the regex test in the Sobek
+		// runtime.
+		val, err := callBack(g.URL, e.urlTag)
+		if err != nil {
+			return err
+		}
+
+		if val {
+			return nil
+		}
+	}
+
 	return nil
 }
 
