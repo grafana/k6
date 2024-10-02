@@ -368,7 +368,21 @@ func (p *Page) initEvents() {
 type ExportedMetric struct {
 }
 
-func (e *ExportedMetric) GroupURLTag() error {
+// URLGroups will contain all the url groupings.
+type URLGroups struct {
+	Groups []URLGroup
+}
+
+// URLGroup contains the single url regex and the name to give to the metric
+// if a match is found.
+type URLGroup struct {
+	// This is a regex.
+	URL string
+	// The name to send back to the caller of the handler.
+	Name string
+}
+
+func (e *ExportedMetric) GroupURLTag(groups URLGroups) error {
 	return nil
 }
 
