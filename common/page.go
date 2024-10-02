@@ -35,7 +35,7 @@ const BlankPage = "about:blank"
 const (
 	webVitalBinding = "k6browserSendWebVitalMetric"
 
-	eventPageConsoleAPICalled = "console"
+	EventPageConsoleAPICalled = "console"
 )
 
 // MediaType represents the type of media to emulate.
@@ -990,9 +990,9 @@ func (p *Page) NavigationTimeout() time.Duration {
 // The only accepted event value is 'console'.
 func (p *Page) On(event string, handler func(any)) error {
 	switch event {
-	case eventPageConsoleAPICalled:
+	case EventPageConsoleAPICalled:
 	default:
-		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
+		return fmt.Errorf("unknown page event: %q, must be %q", event, EventPageConsoleAPICalled)
 	}
 
 	p.eventHandlersMu.Lock()
@@ -1382,7 +1382,7 @@ func (p *Page) TargetID() string {
 func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	// If there are no handlers for EventConsoleAPICalled, return
 	p.eventHandlersMu.RLock()
-	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
+	if _, ok := p.eventHandlers[EventPageConsoleAPICalled]; !ok {
 		p.eventHandlersMu.RUnlock()
 		return
 	}
@@ -1396,7 +1396,7 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[eventPageConsoleAPICalled] {
+	for _, h := range p.eventHandlers[EventPageConsoleAPICalled] {
 		h := h
 		h(m)
 	}
