@@ -229,11 +229,23 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					})
 				}
 			case common.EventPageMetricCalled:
+				mapMsgAndHandleEvent := func(m *common.ExportedMetric) error {
+					mapping, err := mapMetric(vu, m)
+					if err != nil {
+						return err
+					}
+					_, err = handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
+					return err
+				}
 				runInTaskQueue = func(a any) {
 					tq.Queue(func() error {
-						_, ok := a.(*common.ExportedMetric)
+						m, ok := a.(*common.ExportedMetric)
 						if !ok {
 							return errors.New("incorrect metric message")
+						}
+
+						if err := mapMsgAndHandleEvent(m); err != nil {
+							return fmt.Errorf("executing page.on handler: %w", err)
 						}
 						return nil
 					})
