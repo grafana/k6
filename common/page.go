@@ -989,17 +989,19 @@ func (p *Page) NavigationTimeout() time.Duration {
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
 func (p *Page) On(event string, handler func(any)) error {
-	if event != eventPageConsoleAPICalled {
+	switch event {
+	case eventPageConsoleAPICalled:
+	default:
 		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
 	}
 
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
-	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
-		p.eventHandlers[eventPageConsoleAPICalled] = make([]func(any), 0, 1)
+	if _, ok := p.eventHandlers[event]; !ok {
+		p.eventHandlers[event] = make([]func(any), 0, 1)
 	}
-	p.eventHandlers[eventPageConsoleAPICalled] = append(p.eventHandlers[eventPageConsoleAPICalled], handler)
+	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
 
 	return nil
 }
