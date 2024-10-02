@@ -363,6 +363,64 @@ func (p *Page) initEvents() {
 	}()
 }
 
+func (p *Page) URLGroupingName(ctx context.Context, urlTag string) (string, bool) {
+	p.eventHandlersMu.RLock()
+
+	// If there are no handlers for EventConsoleAPICalled.
+	if _, ok := p.eventHandlers[EventPageMetricCalled]; !ok {
+		p.eventHandlersMu.RUnlock()
+
+		return "", false
+	}
+	p.eventHandlersMu.RUnlock()
+
+	var name string
+	var nameChanged bool
+	ctx, cancel := context.WithCancel(ctx)
+	defer cancel()
+
+	p.eventHandlersMu.RLock()
+
+	for _, h := range p.eventHandlers[EventPageMetricCalled] {
+		// A handler can register another handler from within itself. This is
+		// the reason to unlock the mutex before calling the handler.
+		p.eventHandlersMu.RUnlock()
+
+		nameCh := make(chan string)
+		em := &ExportedMetric{
+			ctx:    ctx,
+			urlTag: urlTag,
+			nameCh: nameCh,
+		}
+
+		// handler runs on another goroutine.
+		h(em)
+
+		// We want to wait for the name to come in from the handler. When the
+		// nameCh is closed by the handler the name is returned back upstream.
+		ok := true
+		for ok {
+			select {
+			case n, o := <-nameCh:
+				ok = o
+				if ok {
+					name = n
+					nameChanged = true
+				}
+			case <-ctx.Done():
+				return "", false
+			}
+		}
+
+		p.eventHandlersMu.RLock()
+	}
+	p.eventHandlersMu.RUnlock()
+
+	p.logger.Debugf("URLGroupingName", "name: %q nameChanged: %v", name, nameChanged)
+
+	return name, nameChanged
+}
+
 // ExportedMetric is the type that is exported to JS. It is currently only used to
 // match on the urlTag and return a name when a match is found.
 type ExportedMetric struct {
