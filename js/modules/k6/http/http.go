@@ -79,7 +79,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		// http.get(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
 
-		// http.get method should not have more than two arguments
+		// get method should not have more than two arguments
 		validateArgCount("get",args...)
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodGet, url, args...)
@@ -88,7 +88,7 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 		// http.head(url, params) doesn't have a body argument, so we add undefined
 		// as the third argument to http.request(method, url, body, params)
 
-		// http.head method should not have more than two arguments
+		// head method should not have more than two arguments
 		validateArgCount("head",args...)
 		args = append([]sobek.Value{sobek.Undefined()}, args...)
 		return mi.defaultClient.Request(http.MethodHead, url, args...)
