@@ -58,7 +58,7 @@ func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error 
 }
 
 type metricInterceptor interface {
-	URLGroupingName(ctx context.Context, urlTag string) (string, bool)
+	urlGroupingName(ctx context.Context, urlTag string) (string, bool)
 }
 
 // NetworkManager manages all frames in HTML document.
@@ -188,7 +188,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		if name, ok := m.mi.URLGroupingName(m.vu.Context(), req.URL()); ok {
+		if name, ok := m.mi.urlGroupingName(m.vu.Context(), req.URL()); ok {
 			tags = tags.With("url", name)
 			tags = tags.With("name", name)
 		} else {
@@ -247,7 +247,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		if name, ok := m.mi.URLGroupingName(m.vu.Context(), url); ok {
+		if name, ok := m.mi.urlGroupingName(m.vu.Context(), url); ok {
 			tags = tags.With("url", name)
 			tags = tags.With("name", name)
 		} else {

@@ -363,7 +363,7 @@ func (p *Page) initEvents() {
 	}()
 }
 
-func (p *Page) URLGroupingName(ctx context.Context, urlTag string) (string, bool) {
+func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool) {
 	p.eventHandlersMu.RLock()
 
 	// If there are no handlers for EventConsoleAPICalled.
