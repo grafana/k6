@@ -55,7 +55,10 @@ func TestTextSummary(t *testing.T) {
 			runner, err := getSimpleRunner(
 				t, "/script.js",
 				fmt.Sprintf(`
-					exports.options = {summaryTrendStats: %s};
+					exports.options = {
+						summaryTrendStats: %s,
+						handleSummaryTimeout: '120s',
+					};
 					exports.default = function() {/* we don't run this, metrics are mocked */};
 				`, string(trendStats)),
 				lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
@@ -111,7 +114,12 @@ func TestTextSummaryWithSubMetrics(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t,
 		"/script.js",
-		"exports.default = function() {/* we don't run this, metrics are mocked */};",
+		`
+		exports.options = {
+			handleSummaryTimeout: '120s',
+		};
+		exports.default = function() {/* we don't run this, metrics are mocked */};
+		`,
 		lib.RuntimeOptions{CompatibilityMode: null.NewString("base", true)},
 	)
 	require.NoError(t, err)
@@ -295,7 +303,10 @@ func TestOldJSONExport(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {
+			summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"],
+			handleSummaryTimeout: '120s',
+		};
 		exports.default = function() {/* we don't run this, metrics are mocked */};
 		`,
 		lib.RuntimeOptions{
@@ -561,7 +572,10 @@ func TestRawHandleSummaryData(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {
+			summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"],
+			handleSummaryTimeout: '120s',
+		};
 		exports.default = function() { /* we don't run this, metrics are mocked */ };
 		exports.handleSummary = function(data) {
 			return {'rawdata.json': JSON.stringify(data)};
@@ -598,7 +612,10 @@ func TestRawHandleSummaryDataWithSetupData(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {
+			summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"],
+			handleSummaryTimeout: '120s',
+		};
 		exports.default = function() { /* we don't run this, metrics are mocked */ };
 		exports.handleSummary = function(data) {
 			if(data.setup_data != 5) {
@@ -624,7 +641,10 @@ func TestRawHandleSummaryPromise(t *testing.T) {
 	runner, err := getSimpleRunner(
 		t, "/script.js",
 		`
-		exports.options = {summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"]};
+		exports.options = {
+			summaryTrendStats: ["avg", "min", "med", "max", "p(90)", "p(95)", "p(99)", "count"],
+			handleSummaryTimeout: '120s',
+		};
 		exports.default = function() { /* we don't run this, metrics are mocked */ };
 		exports.handleSummary = async function(data) {
             return await Promise.resolve({'dataWithSetup.json': JSON.stringify(data)});
@@ -675,6 +695,9 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	logger.AddHook(logHook)
 
 	runner, err := getSimpleRunner(t, "/script.js", `
+			exports.options = {
+				handleSummaryTimeout: '120s',
+			};
 			exports.default = function() {/* we don't run this, metrics are mocked */};
 			exports.handleSummary = function(data) {
 				throw new Error('intentional error');
@@ -698,6 +721,6 @@ func TestExceptionInHandleSummaryFallsBackToTextSummary(t *testing.T) {
 	assert.Equal(t, 1, len(logErrors))
 	errMsg, err := logErrors[0].String()
 	require.NoError(t, err)
-	assert.Contains(t, errMsg, "\"Error: intentional error\\n\\tat file:///script.js:4:11(3)\\n")
+	assert.Contains(t, errMsg, "\"Error: intentional error\\n\\tat file:///script.js:7:11(3)\\n")
 	assert.Equal(t, logErrors[0].Data, logrus.Fields{"hint": "script exception"})
 }
