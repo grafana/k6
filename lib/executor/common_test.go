@@ -4,6 +4,7 @@ import (
 	"context"
 	"io"
 	"testing"
+	"time"
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
@@ -11,6 +12,7 @@ import (
 	"go.k6.io/k6/lib"
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/lib/testutils/minirunner"
+	"go.k6.io/k6/lib/types"
 	"go.k6.io/k6/metrics"
 )
 
@@ -117,6 +119,7 @@ func setupExecutorTest(
 	options := lib.Options{
 		ExecutionSegment:         segment,
 		ExecutionSegmentSequence: &sequence,
+		HandleSummaryTimeout:     types.NullDurationFrom(4 * time.Second),
 	}.Apply(runner.GetOptions()).Apply(extraOptions)
 
 	testRunState := getTestRunState(t, options, runner)

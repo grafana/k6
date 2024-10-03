@@ -1195,11 +1195,12 @@ func TestRealTimeAndSetupTeardownMetrics(t *testing.T) {
 	require.NoError(t, err)
 
 	options, err := executor.DeriveScenariosFromShortcuts(runner.GetOptions().Apply(lib.Options{
-		Iterations:      null.IntFrom(2),
-		VUs:             null.IntFrom(1),
-		SystemTags:      &metrics.DefaultSystemTagSet,
-		SetupTimeout:    types.NullDurationFrom(4 * time.Second),
-		TeardownTimeout: types.NullDurationFrom(4 * time.Second),
+		Iterations:           null.IntFrom(2),
+		VUs:                  null.IntFrom(1),
+		SystemTags:           &metrics.DefaultSystemTagSet,
+		SetupTimeout:         types.NullDurationFrom(4 * time.Second),
+		TeardownTimeout:      types.NullDurationFrom(4 * time.Second),
+		HandleSummaryTimeout: types.NullDurationFrom(4 * time.Second),
 	}), nil)
 	require.NoError(t, err)
 

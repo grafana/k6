@@ -137,12 +137,13 @@ func newTestCase(t testing.TB) *httpTestCase {
 	logger.AddHook(hook)
 
 	options := lib.Options{
-		MaxRedirects: null.IntFrom(10),
-		UserAgent:    null.StringFrom("TestUserAgent"),
-		Throw:        null.BoolFrom(true),
-		SystemTags:   &metrics.DefaultSystemTagSet,
-		Batch:        null.IntFrom(20),
-		BatchPerHost: null.IntFrom(20),
+		MaxRedirects:         null.IntFrom(10),
+		UserAgent:            null.StringFrom("TestUserAgent"),
+		Throw:                null.BoolFrom(true),
+		SystemTags:           &metrics.DefaultSystemTagSet,
+		Batch:                null.IntFrom(20),
+		BatchPerHost:         null.IntFrom(20),
+		HandleSummaryTimeout: types.NullDurationFrom(2 * time.Minute),
 		// HTTPDebug:    null.StringFrom("full"),
 	}
 	samples := make(chan metrics.SampleContainer, 1000)
