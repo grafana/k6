@@ -11,14 +11,17 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	k6metrics "go.k6.io/k6/metrics"
 
 	"github.com/grafana/xk6-browser/common"
+	"github.com/grafana/xk6-browser/k6ext/k6test"
 )
 
 type emulateMediaOpts struct {
@@ -1878,4 +1881,175 @@ func TestPageGetAttributeEmpty(t *testing.T) {
 	require.NoError(t, err)
 	require.True(t, ok)
 	assert.Equal(t, "", got)
+}
+
+func TestPageOnMetric(t *testing.T) {
+	t.Parallel()
+
+	// This page will perform many pings with a changing h query parameter.
+	// This URL should be grouped according to how page.on('metric') is used.
+	tb := newTestBrowser(t, withHTTPServer())
+	tb.withHandler("/home", func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `
+		<html>
+			<head></head>
+			<body>
+				<script type="module">
+					await ping();
+					async function ping() {
+						await fetch('/ping?h=2kq2lo6n06');
+						await fetch('/ping?h=ej0ypprcjk');
+					}
+				</script>
+			</body>
+		</html>`)
+		require.NoError(t, err)
+	})
+	tb.withHandler("/ping", func(w http.ResponseWriter, r *http.Request) {
+		_, err := fmt.Fprintf(w, `pong`)
+		require.NoError(t, err)
+	})
+
+	ignoreURLs := map[string]interface{}{
+		tb.url("/home"):        nil,
+		tb.url("/favicon.ico"): nil,
+	}
+
+	tests := []struct {
+		name string
+		fun  string
+		want string
+	}{
+		{
+			name: "single_page.on",
+			fun: `page.on('metric', (msg) => {
+				msg.groupURLTag({
+				  groups: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+					]
+				});
+			});`,
+			want: "ping-1",
+		},
+		{
+			name: "multi_groupURLTag",
+			fun: `page.on('metric', (msg) => {
+				msg.groupURLTag({
+				  groups: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+					]
+				});
+				msg.groupURLTag({
+					groups: [
+						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
+					  ]
+				  });
+			});`,
+			want: "ping-2",
+		},
+		{
+			name: "multi_groupURLTag_page.on",
+			fun: `page.on('metric', (msg) => {
+				msg.groupURLTag({
+				  groups: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+					]
+				});
+				msg.groupURLTag({
+					groups: [
+						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
+					  ]
+				  });
+			});
+			page.on('metric', (msg) => {
+				msg.groupURLTag({
+				  groups: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-3'},
+					]
+				});
+			});`,
+			want: "ping-3",
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			var foundAmended int
+			var foundUnamended int
+			var foundMu sync.RWMutex
+
+			done := make(chan bool)
+
+			samples := make(chan k6metrics.SampleContainer)
+			go func() {
+				defer close(done)
+				for e := range samples {
+					ss := e.GetSamples()
+					for _, s := range ss {
+						// At the moment all metrics that the browser emits contains
+						// both a url and name tag on each metric.
+						u, ok := s.TimeSeries.Tags.Get("url")
+						assert.True(t, ok)
+						n, ok := s.TimeSeries.Tags.Get("name")
+						assert.True(t, ok)
+
+						// The name and url tags should have the same value.
+						assert.Equal(t, u, n)
+
+						// If the url is in the ignoreURLs map then this will
+						// not have been matched on by the regex, so continue.
+						if _, ok := ignoreURLs[u]; ok {
+							foundMu.Lock()
+							foundUnamended++
+							foundMu.Unlock()
+							continue
+						}
+
+						// Url shouldn't contain any of the hash values, and should
+						// instead take the name that was supplied in the groupURLTag
+						// function on metric in page.on.
+						assert.Equal(t, tt.want, u)
+
+						foundMu.Lock()
+						foundAmended++
+						foundMu.Unlock()
+					}
+				}
+			}()
+
+			vu, _, _, cleanUp := startIteration(t, k6test.WithSamples(samples))
+			defer cleanUp()
+
+			// Some of the business logic is in the mapping layer unfortunately.
+			// To test everything is wried up correctly, we're required to work
+			// with RunPromise.
+			got := vu.RunPromise(t, `
+				const page = await browser.newPage()
+
+				%s
+				
+				await page.goto('%s', {waitUntil: 'networkidle'});
+
+				await page.close()
+			`, tt.fun, tb.url("/home"))
+			assert.True(t, got.Result().Equals(sobek.Null()))
+
+			close(samples)
+
+			<-done
+
+			// We want to make sure that we found at least one occurrence
+			// of a metric which matches our expectations.
+			foundMu.RLock()
+			assert.True(t, foundAmended > 0)
+			foundMu.RUnlock()
+
+			// We want to make sure that we found at least one occurrence
+			// of a metric which didn't match our expectations.
+			foundMu.RLock()
+			assert.True(t, foundUnamended > 0)
+			foundMu.RUnlock()
+		})
+	}
 }
