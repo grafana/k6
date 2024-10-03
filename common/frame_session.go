@@ -121,7 +121,7 @@ func NewFrameSession(
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
 	}
-	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM)
+	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM, fs.manager.page)
 	if err != nil {
 		l.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
 			s.ID(), tid, err)

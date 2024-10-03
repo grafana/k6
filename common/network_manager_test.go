@@ -209,6 +209,12 @@ func TestOnRequestPausedBlockedIPs(t *testing.T) {
 	}
 }
 
+type MetricInterceptorMock struct{}
+
+func (m *MetricInterceptorMock) URLGroupingName(ctx context.Context, urlTag string) (string, bool) {
+	return "", false
+}
+
 func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 	t.Parallel()
 
@@ -271,7 +277,7 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 
 			var (
 				vu = k6test.NewVU(t)
-				nm = &NetworkManager{ctx: vu.Context(), vu: vu, customMetrics: k6m}
+				nm = &NetworkManager{ctx: vu.Context(), vu: vu, customMetrics: k6m, mi: &MetricInterceptorMock{}}
 			)
 			vu.ActivateVU()
 

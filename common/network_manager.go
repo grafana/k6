@@ -57,6 +57,10 @@ func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error 
 	return nil
 }
 
+type metricInterceptor interface {
+	URLGroupingName(ctx context.Context, urlTag string) (string, bool)
+}
+
 // NetworkManager manages all frames in HTML document.
 type NetworkManager struct {
 	BaseEventEmitter
@@ -70,6 +74,7 @@ type NetworkManager struct {
 	resolver      k6netext.Resolver
 	vu            k6modules.VU
 	customMetrics *k6ext.CustomMetrics
+	mi            metricInterceptor
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
@@ -89,6 +94,7 @@ type NetworkManager struct {
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
 	ctx context.Context, customMetrics *k6ext.CustomMetrics, s session, fm *FrameManager, parent *NetworkManager,
+	mi metricInterceptor,
 ) (*NetworkManager, error) {
 	vu := k6ext.GetVU(ctx)
 	state := vu.State()
@@ -114,6 +120,7 @@ func NewNetworkManager(
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
 		networkProfile:   NewNetworkProfile(),
+		mi:               mi,
 	}
 	m.initEvents()
 	if err := m.initDomains(); err != nil {
@@ -181,7 +188,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		if name, ok := m.frameManager.page.URLGroupingName(m.vu.Context(), req.URL()); ok {
+		if name, ok := m.mi.URLGroupingName(m.vu.Context(), req.URL()); ok {
 			tags = tags.With("url", name)
 			tags = tags.With("name", name)
 		} else {
@@ -240,7 +247,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		if name, ok := m.frameManager.page.URLGroupingName(m.vu.Context(), url); ok {
+		if name, ok := m.mi.URLGroupingName(m.vu.Context(), url); ok {
 			tags = tags.With("url", name)
 			tags = tags.With("name", name)
 		} else {
