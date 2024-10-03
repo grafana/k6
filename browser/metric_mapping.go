@@ -8,7 +8,7 @@ import (
 
 // mapMetric to the JS module.
 func mapMetric(vu moduleVU, cm *common.ExportedMetric) (mapping, error) {
-	rt := vu.Runtime()
+	rt := vu.VU.Runtime()
 
 	// We're setting up the function in the Sobek context that will be reused
 	// for this VU.

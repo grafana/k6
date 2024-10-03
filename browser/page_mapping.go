@@ -212,7 +212,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			case common.EventPageConsoleAPICalled:
 				mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 					mapping := mapConsoleMessage(vu, m)
-					_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
+					_, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
 					return err
 				}
 				runInTaskQueue = func(a any) {
@@ -234,7 +234,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					if err != nil {
 						return err
 					}
-					_, err = handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
+					_, err = handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
 					return err
 				}
 				runInTaskQueue = func(a any) {
