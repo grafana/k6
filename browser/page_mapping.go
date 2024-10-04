@@ -229,14 +229,6 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					})
 				}
 			case common.EventPageMetricCalled:
-				mapMsgAndHandleEvent := func(m *common.ExportedMetric) error {
-					mapping, err := mapMetric(vu, m)
-					if err != nil {
-						return err
-					}
-					_, err = handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
-					return err
-				}
 				runInTaskQueue = func(a any) {
 					tq.Queue(func() error {
 						m, ok := a.(*common.ExportedMetric)
@@ -250,8 +242,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 						// has complete and to work with the new metric.
 						defer m.Completed()
 
-						if err := mapMsgAndHandleEvent(m); err != nil {
-							return fmt.Errorf("executing page.on handler: %w", err)
+						mapping, err := mapMetric(vu, m)
+						if err != nil {
+							return fmt.Errorf("mapping the metric: %w", err)
+						}
+
+						if _, err = handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping)); err != nil {
+							return fmt.Errorf("executing page.on('metric') handler: %w", err)
 						}
 						return nil
 					})
