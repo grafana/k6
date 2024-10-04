@@ -11,7 +11,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strconv"
-	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -1975,9 +1975,8 @@ func TestPageOnMetric(t *testing.T) {
 	for _, tt := range tests {
 		tt := tt
 		t.Run(tt.name, func(t *testing.T) {
-			var foundAmended int
-			var foundUnamended int
-			var foundMu sync.RWMutex
+			var foundAmended atomic.Int32
+			var foundUnamended atomic.Int32
 
 			done := make(chan bool)
 
@@ -2000,9 +1999,7 @@ func TestPageOnMetric(t *testing.T) {
 						// If the url is in the ignoreURLs map then this will
 						// not have been matched on by the regex, so continue.
 						if _, ok := ignoreURLs[u]; ok {
-							foundMu.Lock()
-							foundUnamended++
-							foundMu.Unlock()
+							foundUnamended.Add(1)
 							continue
 						}
 
@@ -2011,9 +2008,7 @@ func TestPageOnMetric(t *testing.T) {
 						// function on metric in page.on.
 						assert.Equal(t, tt.want, u)
 
-						foundMu.Lock()
-						foundAmended++
-						foundMu.Unlock()
+						foundAmended.Add(1)
 					}
 				}
 			}()
@@ -2041,15 +2036,11 @@ func TestPageOnMetric(t *testing.T) {
 
 			// We want to make sure that we found at least one occurrence
 			// of a metric which matches our expectations.
-			foundMu.RLock()
-			assert.True(t, foundAmended > 0)
-			foundMu.RUnlock()
+			assert.True(t, foundAmended.Load() > 0)
 
 			// We want to make sure that we found at least one occurrence
 			// of a metric which didn't match our expectations.
-			foundMu.RLock()
-			assert.True(t, foundUnamended > 0)
-			foundMu.RUnlock()
+			assert.True(t, foundUnamended.Load() > 0)
 		})
 	}
 }
