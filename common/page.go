@@ -363,6 +363,14 @@ func (p *Page) initEvents() {
 	}()
 }
 
+// urlGroupingName is used to check the incoming metric url tag against user
+// defined url regexes. When a match is found a user defined name, which is to
+// be used in the urls place in the url metric tag, is returned.
+//
+// The check is done by calling the handlers that were registered with
+// `page.on('metric')`. The user will need to use `GroupURLTag` to supply the
+// url regexes and the matching is done from within there. If a match is found,
+// the supplied name is returned back upstream to the caller of urlGroupingName.
 func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool) {
 	p.eventHandlersMu.RLock()
 
