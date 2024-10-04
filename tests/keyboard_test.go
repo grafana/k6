@@ -1,14 +1,16 @@
 package tests
 
 import (
+	"context"
 	_ "embed"
 	"runtime"
-	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/grafana/xk6-browser/common"
 	"github.com/grafana/xk6-browser/keyboardlayout"
 )
 
@@ -83,54 +85,72 @@ func TestKeyboardPress(t *testing.T) {
 	})
 
 	t.Run("control_or_meta", func(t *testing.T) {
-		t.Skip("FIXME") // See https://github.com/grafana/xk6-browser/issues/424
 		t.Parallel()
 
-		tb := newTestBrowser(t)
+		tb := newTestBrowser(t, withFileServer())
 		p := tb.NewPage(nil)
-		kb := p.GetKeyboard()
 
-		err := p.SetContent(`<input>`, nil)
-		require.NoError(t, err)
-		el, err := p.Query("input")
-		require.NoError(t, err)
-		require.NoError(t, p.Focus("input", nil))
-
-		inputVal := "abc"
-
-		// Type abc in input field
-		ss := strings.Split(inputVal, "")
-		for _, c := range ss {
-			require.NoError(t, kb.Press(c, nil))
+		// Navigate to page1
+		url := tb.staticURL("page1.html")
+		opts := &common.FrameGotoOptions{
+			Timeout: common.DefaultTimeout,
 		}
+		_, err := p.Goto(
+			url,
+			opts,
+		)
+		assert.NoError(t, err)
 
-		v, err := el.InputValue(nil)
-		require.NoError(t, err)
-		require.Equal(t, inputVal, v)
+		// Make sure the h1 header is "Page 1"
+		text, err := p.Locator("h1", nil).InnerText(nil)
+		assert.NoError(t, err)
+		assert.Equal(t, "Page 1", text)
 
-		// Select the content of the input field
-		require.NoError(t, kb.Down("Shift"))
-		for i := 0; i < len(inputVal); i++ {
-			require.NoError(t, kb.Press("ArrowLeft", nil))
-		}
-		// Should release the key but the selection should remain active.
-		require.NoError(t, kb.Up("Shift"))
+		ctx, cancel := context.WithTimeout(tb.context(), 5*time.Second)
+		defer cancel()
 
-		// "Cut" operation.
-		require.NoError(t, kb.Press("ControlOrMeta+x", nil))
+		bc := tb.Browser.Context()
+		var newTab *common.Page
 
-		// Input field should be empty after "cut" operation.
-		v, err = el.InputValue(nil)
-		require.NoError(t, err)
-		require.Equal(t, "", v)
+		// We want to meta/control click the link so that it opens in a new tab.
+		// At the same time we will wait for a new page creation with WaitForEvent.
+		err = tb.run(ctx,
+			func() error {
+				var resp any
+				resp, err := bc.WaitForEvent("page", nil, 5*time.Second)
+				if err != nil {
+					return err
+				}
 
-		// "Paste" operation.
-		require.NoError(t, kb.Press("ControlOrMeta+v", nil))
+				var ok bool
+				newTab, ok = resp.(*common.Page)
+				assert.True(t, ok)
 
-		// Input field should contain abc again after "paste" operation.
-		v, err = el.InputValue(nil)
-		require.NoError(t, err)
-		require.Equal(t, inputVal, v)
+				return nil
+			},
+			func() error {
+				kb := p.GetKeyboard()
+				assert.NoError(t, kb.Down("ControlOrMeta"))
+				err = p.Locator(`a[href="page2.html"]`, nil).Click(common.NewFrameClickOptions(p.Timeout()))
+				assert.NoError(t, err)
+				assert.NoError(t, kb.Up("ControlOrMeta"))
+
+				return nil
+			},
+		)
+		assert.NoError(t, err)
+
+		// Wait for the new tab to complete loading.
+		assert.NoError(t, newTab.WaitForLoadState("load", nil))
+
+		// Make sure the newTab has a different h1 heading.
+		text, err = newTab.Locator("h1", nil).InnerText(nil)
+		assert.NoError(t, err)
+		assert.Equal(t, "Page 2", text)
+
+		// Make sure there are two pages open.
+		pp := bc.Pages()
+		assert.Len(t, pp, 2)
 	})
 
 	t.Run("meta", func(t *testing.T) {
