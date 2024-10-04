@@ -389,7 +389,7 @@ func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 		// the reason to unlock the mutex before calling the handler.
 		p.eventHandlersMu.RUnlock()
 
-		em := &ExportedMetric{
+		em := &MetricEvent{
 			urlTag: urlTag,
 		}
 
@@ -411,9 +411,9 @@ func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 	return name, nameChanged
 }
 
-// ExportedMetric is the type that is exported to JS. It is currently only used to
+// MetricEvent is the type that is exported to JS. It is currently only used to
 // match on the urlTag and return a name when a match is found.
-type ExportedMetric struct {
+type MetricEvent struct {
 	// The URL value from the metric's url tag. It will be used to match
 	// against the URL grouping regexs.
 	urlTag string
@@ -440,7 +440,7 @@ type regexCallback func(pattern, url string) (bool, error)
 
 // Tag will find the first match given the URLGroups and the URL from
 // the metric tag and update the name field.
-func (e *ExportedMetric) Tag(callBack regexCallback, groups URLGroups) error {
+func (e *MetricEvent) Tag(callBack regexCallback, groups URLGroups) error {
 	for _, g := range groups.URLs {
 		name := strings.TrimSpace(g.Name)
 		if name == "" {

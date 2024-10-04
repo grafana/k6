@@ -6,8 +6,8 @@ import (
 	"github.com/grafana/xk6-browser/common"
 )
 
-// mapMetric to the JS module.
-func mapMetric(vu moduleVU, cm *common.ExportedMetric) (mapping, error) {
+// mapMetricEvent to the JS module.
+func mapMetricEvent(vu moduleVU, cm *common.MetricEvent) (mapping, error) {
 	rt := vu.VU.Runtime()
 
 	// We're setting up the function in the Sobek context that will be reused
@@ -21,7 +21,7 @@ func mapMetric(vu moduleVU, cm *common.ExportedMetric) (mapping, error) {
 		return r.test(url);
 	}`)
 	if err != nil {
-		return nil, fmt.Errorf("evaluating url grouping: %w", err)
+		return nil, fmt.Errorf("evaluating regex function: %w", err)
 	}
 
 	return mapping{
@@ -31,7 +31,7 @@ func mapMetric(vu moduleVU, cm *common.ExportedMetric) (mapping, error) {
 
 				val, err := rt.RunString(js)
 				if err != nil {
-					return false, fmt.Errorf("evaluating metric tag url grouping: %w", err)
+					return false, fmt.Errorf("matching url with regex: %w", err)
 				}
 
 				return val.ToBoolean(), nil

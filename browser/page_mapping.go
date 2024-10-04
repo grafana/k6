@@ -238,12 +238,12 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					tq.Queue(func() error {
 						defer close(c)
 
-						m, ok := a.(*common.ExportedMetric)
+						m, ok := a.(*common.MetricEvent)
 						if !ok {
 							return errors.New("incorrect metric message")
 						}
 
-						mapping, err := mapMetric(vu, m)
+						mapping, err := mapMetricEvent(vu, m)
 						if err != nil {
 							return fmt.Errorf("mapping the metric: %w", err)
 						}
