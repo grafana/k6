@@ -376,8 +376,6 @@ func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool
 
 	var name string
 	var nameChanged bool
-	ctx, cancel := context.WithCancel(ctx)
-	defer cancel()
 
 	p.eventHandlersMu.RLock()
 
@@ -386,30 +384,17 @@ func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool
 		// the reason to unlock the mutex before calling the handler.
 		p.eventHandlersMu.RUnlock()
 
-		nameCh := make(chan string)
 		em := &ExportedMetric{
-			ctx:    ctx,
 			urlTag: urlTag,
-			nameCh: nameCh,
 		}
 
-		// handler runs on another goroutine.
+		// Call and wait for the handler to complete.
 		h(em)
 
-		// We want to wait for the name to come in from the handler. When the
-		// nameCh is closed by the handler the name is returned back upstream.
-		ok := true
-		for ok {
-			select {
-			case n, o := <-nameCh:
-				ok = o
-				if ok {
-					name = n
-					nameChanged = true
-				}
-			case <-ctx.Done():
-				return "", false
-			}
+		// If a match was found then the name field in em will have been updated.
+		if em.name != nil {
+			name = *em.name
+			nameChanged = true
 		}
 
 		p.eventHandlersMu.RLock()
@@ -424,17 +409,12 @@ func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool
 // ExportedMetric is the type that is exported to JS. It is currently only used to
 // match on the urlTag and return a name when a match is found.
 type ExportedMetric struct {
-	ctx context.Context
-
 	// The URL value from the metric's url tag. It will be used to match
 	// against the URL grouping regexs.
 	urlTag string
 
-	// nameCh is used to return the url tag metric name when a match is found.
-	// It is also used to help sync the call to the handler and the caller.
-	// We need to wait for the handler to complete before proceeding to return
-	// the name of the URL grouping.
-	nameCh chan<- string
+	// When a match is found this name field should be updated.
+	name *string
 }
 
 // URLGroups will contain all the URL groupings.
@@ -451,14 +431,8 @@ type URLGroup struct {
 	Name string
 }
 
-// Completed will allow the caller of the handler to know that the handler
-// has completed and therefore to continue the flow.
-func (e *ExportedMetric) Completed() {
-	close(e.nameCh)
-}
-
-// GroupURLTag will find a match given the URLGroups and the URL from the metric
-// tag and send the name via a channel back to the caller of the handler.
+// GroupURLTag will find the first match given the URLGroups and the URL from
+// the metric tag and update the name field.
 func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, error), groups URLGroups) error {
 	for _, g := range groups.Groups {
 		name := strings.TrimSpace(g.Name)
@@ -474,10 +448,7 @@ func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, e
 		}
 
 		if val {
-			select {
-			case e.nameCh <- name:
-			case <-e.ctx.Done():
-			}
+			e.name = &name
 			return nil
 		}
 	}

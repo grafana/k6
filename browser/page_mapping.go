@@ -230,17 +230,18 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				}
 			case common.EventPageMetricCalled:
 				runInTaskQueue = func(a any) {
+					// The function on the taskqueue runs in its own goroutine
+					// so we need to use a channel to wait for it to complete
+					// since we're waiting for updates from the handler which
+					// will be written to the ExportedMetric.
+					c := make(chan bool)
 					tq.Queue(func() error {
+						defer close(c)
+
 						m, ok := a.(*common.ExportedMetric)
 						if !ok {
 							return errors.New("incorrect metric message")
 						}
-						// page.on('metric') needs to be synchronized so that
-						// the name can be returned back to the caller of the
-						// handler. Once the handler has complete we call
-						// Completed so that the caller knows that the handler
-						// has complete and to work with the new metric.
-						defer m.Completed()
 
 						mapping, err := mapMetric(vu, m)
 						if err != nil {
@@ -252,6 +253,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 						}
 						return nil
 					})
+					<-c
 				}
 			default:
 				return fmt.Errorf("unknown page event: %q", event)
