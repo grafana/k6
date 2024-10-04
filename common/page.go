@@ -380,12 +380,9 @@ func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool
 
 		return "", false
 	}
-	p.eventHandlersMu.RUnlock()
 
 	var name string
 	var nameChanged bool
-
-	p.eventHandlersMu.RLock()
 
 	for _, h := range p.eventHandlers[EventPageMetricCalled] {
 		// A handler can register another handler from within itself. This is

@@ -1970,6 +1970,24 @@ func TestPageOnMetric(t *testing.T) {
 			});`,
 			want: "ping-3",
 		},
+		{
+			name: "multi_page.on_call",
+			fun: `page.on('metric', (msg) => {
+				msg.groupURLTag({
+				  groups: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+					]
+				});
+				page.on('metric', (msg) => {
+					msg.groupURLTag({
+						groups: [
+							{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-4'},
+						]
+					});
+				});
+			});`,
+			want: "ping-4",
+		},
 	}
 
 	for _, tt := range tests {
