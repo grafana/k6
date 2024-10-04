@@ -3,6 +3,7 @@ package common
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -100,6 +101,8 @@ func (k *Keyboard) Type(text string, opts sobek.Value) error {
 }
 
 func (k *Keyboard) down(key string) error {
+	key = k.platformSpecificResolution(key)
+
 	keyInput := keyboardlayout.KeyInput(key)
 	if _, ok := k.layout.ValidKeys[keyInput]; !ok {
 		return fmt.Errorf("%q is not a valid key for layout %q", key, k.layoutName)
@@ -134,6 +137,8 @@ func (k *Keyboard) down(key string) error {
 }
 
 func (k *Keyboard) up(key string) error {
+	key = k.platformSpecificResolution(key)
+
 	keyInput := keyboardlayout.KeyInput(key)
 	if _, ok := k.layout.ValidKeys[keyInput]; !ok {
 		return fmt.Errorf("'%s' is not a valid key for layout '%s'", key, k.layoutName)
@@ -237,6 +242,17 @@ func (k *Keyboard) modifierBitFromKeyName(key string) int64 {
 		return ModifierKeyShift
 	}
 	return 0
+}
+
+func (k *Keyboard) platformSpecificResolution(key string) string {
+	if key == "ControlOrMeta" {
+		if runtime.GOOS == "darwin" {
+			key = "Meta"
+		} else {
+			key = "Control"
+		}
+	}
+	return key
 }
 
 func (k *Keyboard) comboPress(keys string, opts *KeyboardOptions) error {

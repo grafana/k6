@@ -3,6 +3,7 @@ package tests
 import (
 	_ "embed"
 	"runtime"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -79,6 +80,57 @@ func TestKeyboardPress(t *testing.T) {
 		v, err := el.InputValue(nil)
 		require.NoError(t, err)
 		require.Equal(t, "+=@6AbC", v)
+	})
+
+	t.Run("control_or_meta", func(t *testing.T) {
+		t.Skip("FIXME") // See https://github.com/grafana/xk6-browser/issues/424
+		t.Parallel()
+
+		tb := newTestBrowser(t)
+		p := tb.NewPage(nil)
+		kb := p.GetKeyboard()
+
+		err := p.SetContent(`<input>`, nil)
+		require.NoError(t, err)
+		el, err := p.Query("input")
+		require.NoError(t, err)
+		require.NoError(t, p.Focus("input", nil))
+
+		inputVal := "abc"
+
+		// Type abc in input field
+		ss := strings.Split(inputVal, "")
+		for _, c := range ss {
+			require.NoError(t, kb.Press(c, nil))
+		}
+
+		v, err := el.InputValue(nil)
+		require.NoError(t, err)
+		require.Equal(t, inputVal, v)
+
+		// Select the content of the input field
+		require.NoError(t, kb.Down("Shift"))
+		for i := 0; i < len(inputVal); i++ {
+			require.NoError(t, kb.Press("ArrowLeft", nil))
+		}
+		// Should release the key but the selection should remain active.
+		require.NoError(t, kb.Up("Shift"))
+
+		// "Cut" operation.
+		require.NoError(t, kb.Press("ControlOrMeta+x", nil))
+
+		// Input field should be empty after "cut" operation.
+		v, err = el.InputValue(nil)
+		require.NoError(t, err)
+		require.Equal(t, "", v)
+
+		// "Paste" operation.
+		require.NoError(t, kb.Press("ControlOrMeta+v", nil))
+
+		// Input field should contain abc again after "paste" operation.
+		v, err = el.InputValue(nil)
+		require.NoError(t, err)
+		require.Equal(t, inputVal, v)
 	})
 
 	t.Run("meta", func(t *testing.T) {
