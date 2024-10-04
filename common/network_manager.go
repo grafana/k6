@@ -188,13 +188,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		if name, ok := m.mi.urlGroupingName(m.vu.Context(), req.URL()); ok {
-			tags = tags.With("url", name)
-			tags = tags.With("name", name)
-		} else {
-			tags = tags.With("url", req.URL())
-			tags = tags.With("name", req.URL())
-		}
+		tags = handleURLTag(m.vu.Context(), m.mi, req.URL(), tags)
 	}
 
 	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
@@ -247,13 +241,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		if name, ok := m.mi.urlGroupingName(m.vu.Context(), url); ok {
-			tags = tags.With("url", name)
-			tags = tags.With("name", name)
-		} else {
-			tags = tags.With("url", url)
-			tags = tags.With("name", url)
-		}
+		tags = handleURLTag(m.vu.Context(), m.mi, url, tags)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags = tags.With("ip", ipAddress)
@@ -295,6 +283,22 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 			},
 		})
 	}
+}
+
+// handleURLTag will check if the url tag needs to be grouped by testing
+// against user supplied regex. If there's a match a user supplied name will
+// be used instead of the url for the url tag, otherwise the url will be used.
+func handleURLTag(ctx context.Context, mi metricInterceptor, url string, tags *k6metrics.TagSet) *k6metrics.TagSet {
+	if name, ok := mi.urlGroupingName(ctx, url); ok {
+		tags = tags.With("url", name)
+		tags = tags.With("name", name)
+		return tags
+	}
+
+	tags = tags.With("url", url)
+	tags = tags.With("name", url)
+
+	return tags
 }
 
 func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime) {
