@@ -436,9 +436,11 @@ type URLGroup struct {
 	Name string
 }
 
+type regexCallback func(pattern, url string) (bool, error)
+
 // GroupURLTag will find the first match given the URLGroups and the URL from
 // the metric tag and update the name field.
-func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, error), groups URLGroups) error {
+func (e *ExportedMetric) GroupURLTag(callBack regexCallback, groups URLGroups) error {
 	for _, g := range groups.URLs {
 		name := strings.TrimSpace(g.Name)
 		if name == "" {
