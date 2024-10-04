@@ -1910,7 +1910,7 @@ func TestPageOnMetric(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	ignoreURLs := map[string]interface{}{
+	ignoreURLs := map[string]any{
 		tb.url("/home"):        nil,
 		tb.url("/favicon.ico"): nil,
 	}

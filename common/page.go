@@ -426,18 +426,18 @@ func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool
 type ExportedMetric struct {
 	ctx context.Context
 
-	// The url value from the metric's url tag. It will be used to match
-	// against the url grouping regexs.
+	// The URL value from the metric's url tag. It will be used to match
+	// against the URL grouping regexs.
 	urlTag string
 
 	// nameCh is used to return the url tag metric name when a match is found.
 	// It is also used to help sync the call to the handler and the caller.
 	// We need to wait for the handler to complete before proceeding to return
-	// the name of the url grouping.
+	// the name of the URL grouping.
 	nameCh chan<- string
 }
 
-// URLGroups will contain all the url groupings.
+// URLGroups will contain all the URL groupings.
 type URLGroups struct {
 	Groups []URLGroup
 }
