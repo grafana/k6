@@ -461,7 +461,8 @@ func (e *ExportedMetric) Completed() {
 // tag and send the name via a channel back to the caller of the handler.
 func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, error), groups URLGroups) error {
 	for _, g := range groups.Groups {
-		if g.Name == "" {
+		name := strings.TrimSpace(g.Name)
+		if name == "" {
 			return fmt.Errorf("name %q is invalid", g.Name)
 		}
 
@@ -474,7 +475,7 @@ func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, e
 
 		if val {
 			select {
-			case e.nameCh <- g.Name:
+			case e.nameCh <- name:
 			case <-e.ctx.Done():
 			}
 			return nil
