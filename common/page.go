@@ -363,15 +363,15 @@ func (p *Page) initEvents() {
 	}()
 }
 
-// urlGroupingName is used to check the incoming metric url tag against user
+// urlTagName is used to check the incoming metric url tag against user
 // defined url regexes. When a match is found a user defined name, which is to
 // be used in the urls place in the url metric tag, is returned.
 //
 // The check is done by calling the handlers that were registered with
 // `page.on('metric')`. The user will need to use `Tag` to supply the
 // url regexes and the matching is done from within there. If a match is found,
-// the supplied name is returned back upstream to the caller of urlGroupingName.
-func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool) {
+// the supplied name is returned back upstream to the caller of urlTagName.
+func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 	p.eventHandlersMu.RLock()
 
 	// If there are no handlers for EventConsoleAPICalled.
@@ -406,7 +406,7 @@ func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool
 	}
 	p.eventHandlersMu.RUnlock()
 
-	p.logger.Debugf("URLGroupingName", "name: %q nameChanged: %v", name, nameChanged)
+	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", name, nameChanged)
 
 	return name, nameChanged
 }
