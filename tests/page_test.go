@@ -1921,6 +1921,7 @@ func TestPageOnMetric(t *testing.T) {
 		want string
 	}{
 		{
+			// Just a single page.on.
 			name: "single_page.on",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
@@ -1932,6 +1933,7 @@ func TestPageOnMetric(t *testing.T) {
 			want: "ping-1",
 		},
 		{
+			// A single page.on but with multiple calls to groupURLTag.
 			name: "multi_groupURLTag",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
@@ -1948,6 +1950,7 @@ func TestPageOnMetric(t *testing.T) {
 			want: "ping-2",
 		},
 		{
+			// Two page.on and in one of them multiple calls to groupURLTag.
 			name: "multi_groupURLTag_page.on",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
@@ -1971,6 +1974,7 @@ func TestPageOnMetric(t *testing.T) {
 			want: "ping-3",
 		},
 		{
+			// A single page.on but within it another page.on.
 			name: "multi_page.on_call",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
