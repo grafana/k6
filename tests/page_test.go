@@ -1924,7 +1924,7 @@ func TestPageOnMetric(t *testing.T) {
 			// Just a single page.on.
 			name: "single_page.on",
 			fun: `page.on('metric', (msg) => {
-				msg.groupURLTag({
+				msg.Tag({
 				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
@@ -1933,15 +1933,15 @@ func TestPageOnMetric(t *testing.T) {
 			want: "ping-1",
 		},
 		{
-			// A single page.on but with multiple calls to groupURLTag.
-			name: "multi_groupURLTag",
+			// A single page.on but with multiple calls to Tag.
+			name: "multi_tag",
 			fun: `page.on('metric', (msg) => {
-				msg.groupURLTag({
+				msg.Tag({
 				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
 				});
-				msg.groupURLTag({
+				msg.Tag({
 					urls: [
 						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
 					  ]
@@ -1950,22 +1950,22 @@ func TestPageOnMetric(t *testing.T) {
 			want: "ping-2",
 		},
 		{
-			// Two page.on and in one of them multiple calls to groupURLTag.
-			name: "multi_groupURLTag_page.on",
+			// Two page.on and in one of them multiple calls to Tag.
+			name: "multi_tag_page.on",
 			fun: `page.on('metric', (msg) => {
-				msg.groupURLTag({
+				msg.Tag({
 				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
 				});
-				msg.groupURLTag({
+				msg.Tag({
 					urls: [
 						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
 					  ]
 				  });
 			});
 			page.on('metric', (msg) => {
-				msg.groupURLTag({
+				msg.Tag({
 				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-3'},
 					]
@@ -1977,13 +1977,13 @@ func TestPageOnMetric(t *testing.T) {
 			// A single page.on but within it another page.on.
 			name: "multi_page.on_call",
 			fun: `page.on('metric', (msg) => {
-				msg.groupURLTag({
+				msg.Tag({
 				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
 				});
 				page.on('metric', (msg) => {
-					msg.groupURLTag({
+					msg.Tag({
 						urls: [
 							{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-4'},
 						]
@@ -2026,7 +2026,7 @@ func TestPageOnMetric(t *testing.T) {
 						}
 
 						// Url shouldn't contain any of the hash values, and should
-						// instead take the name that was supplied in the groupURLTag
+						// instead take the name that was supplied in the Tag
 						// function on metric in page.on.
 						assert.Equal(t, tt.want, u)
 

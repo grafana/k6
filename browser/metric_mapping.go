@@ -25,7 +25,7 @@ func mapMetric(vu moduleVU, cm *common.ExportedMetric) (mapping, error) {
 	}
 
 	return mapping{
-		"groupURLTag": func(urls common.URLGroups) error {
+		"Tag": func(urls common.URLGroups) error {
 			callback := func(pattern, url string) (bool, error) {
 				js := fmt.Sprintf(`_k6BrowserURLGroupingTest(%s, '%s')`, pattern, url)
 
@@ -37,7 +37,7 @@ func mapMetric(vu moduleVU, cm *common.ExportedMetric) (mapping, error) {
 				return val.ToBoolean(), nil
 			}
 
-			return cm.GroupURLTag(callback, urls)
+			return cm.Tag(callback, urls)
 		},
 	}, nil
 }

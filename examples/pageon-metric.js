@@ -17,7 +17,7 @@ export default async function() {
   const page = await browser.newPage();
 
   page.on('metric', (msg) => {
-    msg.groupURLTag({
+    msg.Tag({
       urls: [
         {url: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/, name:'test'},
       ]

@@ -368,7 +368,7 @@ func (p *Page) initEvents() {
 // be used in the urls place in the url metric tag, is returned.
 //
 // The check is done by calling the handlers that were registered with
-// `page.on('metric')`. The user will need to use `GroupURLTag` to supply the
+// `page.on('metric')`. The user will need to use `Tag` to supply the
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlGroupingName.
 func (p *Page) urlGroupingName(ctx context.Context, urlTag string) (string, bool) {
@@ -438,9 +438,9 @@ type URLGroup struct {
 
 type regexCallback func(pattern, url string) (bool, error)
 
-// GroupURLTag will find the first match given the URLGroups and the URL from
+// Tag will find the first match given the URLGroups and the URL from
 // the metric tag and update the name field.
-func (e *ExportedMetric) GroupURLTag(callBack regexCallback, groups URLGroups) error {
+func (e *ExportedMetric) Tag(callBack regexCallback, groups URLGroups) error {
 	for _, g := range groups.URLs {
 		name := strings.TrimSpace(g.Name)
 		if name == "" {
