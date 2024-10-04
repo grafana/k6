@@ -424,7 +424,7 @@ type ExportedMetric struct {
 
 // URLGroups will contain all the URL groupings.
 type URLGroups struct {
-	Groups []URLGroup
+	URLs []URLGroup `js:"urls"`
 }
 
 // URLGroup contains the single url regex and the name to give to the metric
@@ -439,7 +439,7 @@ type URLGroup struct {
 // GroupURLTag will find the first match given the URLGroups and the URL from
 // the metric tag and update the name field.
 func (e *ExportedMetric) GroupURLTag(callBack func(pattern, url string) (bool, error), groups URLGroups) error {
-	for _, g := range groups.Groups {
+	for _, g := range groups.URLs {
 		name := strings.TrimSpace(g.Name)
 		if name == "" {
 			return fmt.Errorf("name %q is invalid", g.Name)

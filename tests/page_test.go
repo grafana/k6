@@ -1925,7 +1925,7 @@ func TestPageOnMetric(t *testing.T) {
 			name: "single_page.on",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
-				  groups: [
+				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
 				});
@@ -1937,12 +1937,12 @@ func TestPageOnMetric(t *testing.T) {
 			name: "multi_groupURLTag",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
-				  groups: [
+				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
 				});
 				msg.groupURLTag({
-					groups: [
+					urls: [
 						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
 					  ]
 				  });
@@ -1954,19 +1954,19 @@ func TestPageOnMetric(t *testing.T) {
 			name: "multi_groupURLTag_page.on",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
-				  groups: [
+				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
 				});
 				msg.groupURLTag({
-					groups: [
+					urls: [
 						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
 					  ]
 				  });
 			});
 			page.on('metric', (msg) => {
 				msg.groupURLTag({
-				  groups: [
+				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-3'},
 					]
 				});
@@ -1978,13 +1978,13 @@ func TestPageOnMetric(t *testing.T) {
 			name: "multi_page.on_call",
 			fun: `page.on('metric', (msg) => {
 				msg.groupURLTag({
-				  groups: [
+				  urls: [
 						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
 					]
 				});
 				page.on('metric', (msg) => {
 					msg.groupURLTag({
-						groups: [
+						urls: [
 							{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-4'},
 						]
 					});

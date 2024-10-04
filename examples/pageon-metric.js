@@ -18,7 +18,7 @@ export default async function() {
 
   page.on('metric', (msg) => {
     msg.groupURLTag({
-      groups: [
+      urls: [
         {url: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/, name:'test'},
       ]
     });
