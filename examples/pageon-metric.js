@@ -16,8 +16,8 @@ export const options = {
 export default async function() {
   const page = await browser.newPage();
 
-  page.on('metric', (msg) => {
-    msg.Tag({
+  page.on('metric', (metric) => {
+    metric.Tag({
       urls: [
         {url: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/, name:'test'},
       ]
