@@ -421,14 +421,14 @@ type MetricEvent struct {
 	name *string
 }
 
-// URLGroups will contain all the URL groupings.
-type URLGroups struct {
-	URLs []URLGroup `js:"urls"`
+// URLOverrides will contain all the URL groupings.
+type URLOverrides struct {
+	URLs []URLOverride `js:"urls"`
 }
 
-// URLGroup contains the single url regex and the name to give to the metric
+// URLOverride contains the single url regex and the name to give to the metric
 // if a match is found.
-type URLGroup struct {
+type URLOverride struct {
 	// This is a regex.
 	URL string
 	// The name to send back to the caller of the handler.
@@ -437,18 +437,18 @@ type URLGroup struct {
 
 type regexCallback func(pattern, url string) (bool, error)
 
-// Tag will find the first match given the URLGroups and the URL from
+// Tag will find the first match given the URLOverrides and the URL from
 // the metric tag and update the name field.
-func (e *MetricEvent) Tag(callBack regexCallback, groups URLGroups) error {
-	for _, g := range groups.URLs {
-		name := strings.TrimSpace(g.Name)
+func (e *MetricEvent) Tag(callBack regexCallback, overrides URLOverrides) error {
+	for _, o := range overrides.URLs {
+		name := strings.TrimSpace(o.Name)
 		if name == "" {
-			return fmt.Errorf("name %q is invalid", g.Name)
+			return fmt.Errorf("name %q is invalid", o.Name)
 		}
 
 		// callback is a function that will perform the regex test in the Sobek
 		// runtime.
-		val, err := callBack(g.URL, e.urlTag)
+		val, err := callBack(o.URL, e.urlTag)
 		if err != nil {
 			return err
 		}
