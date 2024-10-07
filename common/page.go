@@ -371,7 +371,7 @@ func (p *Page) initEvents() {
 // `page.on('metric')`. The user will need to use `Tag` to supply the
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
-func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
+func (p *Page) urlTagName(ctx context.Context, url string) (string, bool) {
 	p.eventHandlersMu.RLock()
 
 	// If there are no handlers for EventConsoleAPICalled.
@@ -384,7 +384,7 @@ func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 	var newTagName string
 	var urlMatched bool
 	em := &MetricEvent{
-		urlTag: urlTag,
+		url: url,
 	}
 
 	for _, h := range p.eventHandlers[EventPageMetricCalled] {
@@ -415,7 +415,7 @@ func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 type MetricEvent struct {
 	// The URL value from the metric's url tag. It will be used to match
 	// against the URL grouping regexs.
-	urlTag string
+	url string
 
 	// When a match is found this name field should be updated.
 	name *string
@@ -439,16 +439,16 @@ type k6BrowserCheckRegEx func(pattern, url string) (bool, error)
 
 // Tag will find the first match given the URLTagPatterns and the URL from
 // the metric tag and update the name field.
-func (e *MetricEvent) Tag(callBack k6BrowserCheckRegEx, overrides URLTagPatterns) error {
+func (e *MetricEvent) Tag(matchesRegex k6BrowserCheckRegEx, overrides URLTagPatterns) error {
 	for _, o := range overrides.URLs {
 		name := strings.TrimSpace(o.TagName)
 		if name == "" {
 			return fmt.Errorf("name %q is invalid", o.TagName)
 		}
 
-		// callback is a function that will perform the regex test in the Sobek
+		// matchesRegex is a function that will perform the regex test in the Sobek
 		// runtime.
-		val, err := callBack(o.URLRegEx, e.urlTag)
+		val, err := matchesRegex(o.URLRegEx, e.url)
 		if err != nil {
 			return err
 		}
