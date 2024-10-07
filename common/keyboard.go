@@ -63,12 +63,7 @@ func (k *Keyboard) Up(key string) error {
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
 // A press message consists of successive key down and up messages.
-func (k *Keyboard) Press(key string, opts sobek.Value) error {
-	kbdOpts := NewKeyboardOptions()
-	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		return fmt.Errorf("parsing keyboard options: %w", err)
-	}
-
+func (k *Keyboard) Press(key string, kbdOpts *KeyboardOptions) error {
 	if err := k.comboPress(key, kbdOpts); err != nil {
 		return fmt.Errorf("pressing key: %w", err)
 	}

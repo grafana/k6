@@ -83,7 +83,7 @@ func TestKeyboardPress(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		k := NewKeyboard(vu.Context(), nil)
-		require.Error(t, k.Press("", nil))
+		require.Error(t, k.Press("", NewKeyboardOptions()))
 	})
 }
 

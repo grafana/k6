@@ -1,6 +1,8 @@
 package browser
 
 import (
+	"fmt"
+
 	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
@@ -21,7 +23,12 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 		},
 		"press": func(key string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, kb.Press(key, opts) //nolint:wrapcheck
+				kbdOpts := common.NewKeyboardOptions()
+				if err := kbdOpts.Parse(vu.Context(), opts); err != nil {
+					return nil, fmt.Errorf("parsing keyboard options: %w", err)
+				}
+
+				return nil, kb.Press(key, kbdOpts) //nolint:wrapcheck
 			})
 		},
 		"type": func(text string, opts sobek.Value) *sobek.Promise {
