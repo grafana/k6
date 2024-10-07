@@ -73,12 +73,16 @@ func TestRequest(t *testing.T) {
 
 	t.Run("HeaderValue()_key", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, "value", req.HeaderValue("key").Export())
+		got, ok := req.HeaderValue("key")
+		assert.True(t, ok)
+		assert.Equal(t, "value", got)
 	})
 
 	t.Run("HeaderValue()_KEY", func(t *testing.T) {
 		t.Parallel()
-		assert.Equal(t, "value", req.HeaderValue("KEY").Export())
+		got, ok := req.HeaderValue("KEY")
+		assert.True(t, ok)
+		assert.Equal(t, "value", got)
 	})
 
 	t.Run("Size()", func(t *testing.T) {

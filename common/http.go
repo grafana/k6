@@ -179,14 +179,10 @@ func (r *Request) Frame() *Frame {
 }
 
 // HeaderValue returns the value of the given header.
-func (r *Request) HeaderValue(name string) sobek.Value {
-	rt := r.vu.Runtime()
+func (r *Request) HeaderValue(name string) (string, bool) {
 	headers := r.AllHeaders()
 	val, ok := headers[strings.ToLower(name)]
-	if !ok {
-		return sobek.Null()
-	}
-	return rt.ToValue(val)
+	return val, ok
 }
 
 // Headers returns the request headers.
