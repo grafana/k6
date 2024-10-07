@@ -433,9 +433,9 @@ type URLTagPatterns struct {
 // if a match is found.
 type URLTagPattern struct {
 	// This is a regex that will be compared against the existing url tag.
-	URLRegEx string `js:"urlRegEx"`
+	URLRegEx string `js:"url"`
 	// The name to send back to the caller of the handler.
-	TagName string `js:"tagName"`
+	TagName string `js:"name"`
 }
 
 type k6BrowserCheckRegEx func(pattern, url string) (bool, error)
