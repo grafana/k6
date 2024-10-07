@@ -381,8 +381,8 @@ func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 		return "", false
 	}
 
-	var name string
-	var nameChanged bool
+	var newTagName string
+	var urlMatched bool
 	em := &MetricEvent{
 		urlTag: urlTag,
 	}
@@ -401,13 +401,13 @@ func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 
 	// If a match was found then the name field in em will have been updated.
 	if em.name != nil {
-		name = *em.name
-		nameChanged = true
+		newTagName = *em.name
+		urlMatched = true
 	}
 
-	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", name, nameChanged)
+	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", newTagName, urlMatched)
 
-	return name, nameChanged
+	return newTagName, urlMatched
 }
 
 // MetricEvent is the type that is exported to JS. It is currently only used to

@@ -289,9 +289,9 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 // against user supplied regex. If there's a match a user supplied name will
 // be used instead of the url for the url tag, otherwise the url will be used.
 func handleURLTag(ctx context.Context, mi metricInterceptor, url string, tags *k6metrics.TagSet) *k6metrics.TagSet {
-	if name, ok := mi.urlTagName(ctx, url); ok {
-		tags = tags.With("url", name)
-		tags = tags.With("name", name)
+	if newTagName, urlMatched := mi.urlTagName(ctx, url); urlMatched {
+		tags = tags.With("url", newTagName)
+		tags = tags.With("name", newTagName)
 		return tags
 	}
 
