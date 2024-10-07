@@ -435,11 +435,11 @@ type URLTagPattern struct {
 	TagName string `js:"tagName"`
 }
 
-type regexCallback func(pattern, url string) (bool, error)
+type k6BrowserCheckRegEx func(pattern, url string) (bool, error)
 
 // Tag will find the first match given the URLTagPatterns and the URL from
 // the metric tag and update the name field.
-func (e *MetricEvent) Tag(callBack regexCallback, overrides URLTagPatterns) error {
+func (e *MetricEvent) Tag(callBack k6BrowserCheckRegEx, overrides URLTagPatterns) error {
 	for _, o := range overrides.URLs {
 		name := strings.TrimSpace(o.TagName)
 		if name == "" {
