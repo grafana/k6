@@ -29,12 +29,12 @@ func mapMetricEvent(vu moduleVU, cm *common.MetricEvent) (mapping, error) {
 			callback := func(pattern, url string) (bool, error) {
 				js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, pattern, url)
 
-				val, err := rt.RunString(js)
+				matched, err := rt.RunString(js)
 				if err != nil {
 					return false, fmt.Errorf("matching url with regex: %w", err)
 				}
 
-				return val.ToBoolean(), nil
+				return matched.ToBoolean(), nil
 			}
 
 			return cm.Tag(callback, urls)
