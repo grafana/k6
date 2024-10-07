@@ -93,7 +93,11 @@ type NetworkManager struct {
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
-	ctx context.Context, customMetrics *k6ext.CustomMetrics, s session, fm *FrameManager, parent *NetworkManager,
+	ctx context.Context,
+	customMetrics *k6ext.CustomMetrics,
+	s session,
+	fm *FrameManager,
+	parent *NetworkManager,
 	mi metricInterceptor,
 ) (*NetworkManager, error) {
 	vu := k6ext.GetVU(ctx)
