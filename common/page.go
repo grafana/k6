@@ -383,28 +383,27 @@ func (p *Page) urlTagName(ctx context.Context, urlTag string) (string, bool) {
 
 	var name string
 	var nameChanged bool
+	em := &MetricEvent{
+		urlTag: urlTag,
+	}
 
 	for _, h := range p.eventHandlers[EventPageMetricCalled] {
 		// A handler can register another handler from within itself. This is
 		// the reason to unlock the mutex before calling the handler.
 		p.eventHandlersMu.RUnlock()
 
-		em := &MetricEvent{
-			urlTag: urlTag,
-		}
-
 		// Call and wait for the handler to complete.
 		h(em)
-
-		// If a match was found then the name field in em will have been updated.
-		if em.name != nil {
-			name = *em.name
-			nameChanged = true
-		}
 
 		p.eventHandlersMu.RLock()
 	}
 	p.eventHandlersMu.RUnlock()
+
+	// If a match was found then the name field in em will have been updated.
+	if em.name != nil {
+		name = *em.name
+		nameChanged = true
+	}
 
 	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", name, nameChanged)
 
