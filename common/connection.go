@@ -50,7 +50,7 @@ type executorEmitter interface {
 
 type connection interface {
 	executorEmitter
-	Close(...int)
+	Close()
 	IgnoreIOErrors()
 	getSession(target.SessionID) *Session
 }
@@ -567,11 +567,8 @@ func (c *Connection) sendLoop() {
 // It returns an error if sending the Close control frame fails.
 //
 // Optional code to override default websocket.CloseGoingAway (1001).
-func (c *Connection) Close(args ...int) {
+func (c *Connection) Close() {
 	code := websocket.CloseNormalClosure
-	if len(args) > 0 {
-		code = int(args[0])
-	}
 	c.logger.Debugf("connection:Close", "wsURL:%q code:%d", c.wsURL, code)
 	_ = c.close(code)
 }
