@@ -12,7 +12,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
-	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -243,24 +242,24 @@ func (r *Request) Size() HTTPMessageSize {
 	}
 }
 
-// Timing returns the request timing information.
-func (r *Request) Timing() sobek.Value {
-	type resourceTiming struct {
-		StartTime             float64 `js:"startTime"`
-		DomainLookupStart     float64 `js:"domainLookupStart"`
-		DomainLookupEnd       float64 `js:"domainLookupEnd"`
-		ConnectStart          float64 `js:"connectStart"`
-		SecureConnectionStart float64 `js:"secureConnectionStart"`
-		ConnectEnd            float64 `js:"connectEnd"`
-		RequestStart          float64 `js:"requestStart"`
-		ResponseStart         float64 `js:"responseStart"`
-		ResponseEnd           float64 `js:"responseEnd"`
-	}
+// resourceTiming is the type returned from request.timing.
+type resourceTiming struct {
+	StartTime             float64 `js:"startTime"`
+	DomainLookupStart     float64 `js:"domainLookupStart"`
+	DomainLookupEnd       float64 `js:"domainLookupEnd"`
+	ConnectStart          float64 `js:"connectStart"`
+	SecureConnectionStart float64 `js:"secureConnectionStart"`
+	ConnectEnd            float64 `js:"connectEnd"`
+	RequestStart          float64 `js:"requestStart"`
+	ResponseStart         float64 `js:"responseStart"`
+	ResponseEnd           float64 `js:"responseEnd"`
+}
 
-	rt := r.vu.Runtime()
+// Timing returns the request timing information.
+func (r *Request) Timing() *resourceTiming {
 	timing := r.response.timing
 
-	return rt.ToValue(&resourceTiming{
+	return &resourceTiming{
 		StartTime:             (timing.RequestTime - float64(r.timestamp.Unix()) + float64(r.wallTime.Unix())) * 1000,
 		DomainLookupStart:     timing.DNSStart,
 		DomainLookupEnd:       timing.DNSEnd,
@@ -270,7 +269,7 @@ func (r *Request) Timing() sobek.Value {
 		RequestStart:          timing.SendStart,
 		ResponseStart:         timing.ReceiveHeadersEnd,
 		ResponseEnd:           r.responseEndTiming,
-	})
+	}
 }
 
 // URL returns the request URL.
