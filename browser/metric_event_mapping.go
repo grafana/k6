@@ -25,7 +25,7 @@ func mapMetricEvent(vu moduleVU, cm *common.MetricEvent) (mapping, error) {
 	}
 
 	return mapping{
-		"Tag": func(urls common.URLOverrides) error {
+		"Tag": func(urls common.URLTagPatterns) error {
 			callback := func(pattern, url string) (bool, error) {
 				js := fmt.Sprintf(`_k6BrowserURLGroupingTest(%s, '%s')`, pattern, url)
 

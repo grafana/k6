@@ -19,7 +19,7 @@ export default async function() {
   page.on('metric', (metric) => {
     metric.Tag({
       urls: [
-        {url: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/, name:'test'},
+        {urlRegEx: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/, tagName:'test'},
       ]
     });
   });
