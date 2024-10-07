@@ -103,7 +103,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"isEnabled":  p.IsEnabled,
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
-		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
+		"keyboard":   syncMapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts sobek.Value) *sobek.Object {
 			ml := syncMapLocator(vu, p.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
