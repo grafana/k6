@@ -400,8 +400,8 @@ func (p *Page) urlTagName(ctx context.Context, url string) (string, bool) {
 	p.eventHandlersMu.RUnlock()
 
 	// If a match was found then the name field in em will have been updated.
-	if em.userProvidedTagName != nil {
-		newTagName = *em.userProvidedTagName
+	if em.isUserURLTagNameExist {
+		newTagName = em.userProvidedTagName
 		urlMatched = true
 	}
 
@@ -418,7 +418,10 @@ type MetricEvent struct {
 	url string
 
 	// When a match is found this userProvidedTagName field should be updated.
-	userProvidedTagName *string
+	userProvidedTagName string
+
+	// When a match is found this is set to true.
+	isUserURLTagNameExist bool
 }
 
 // URLTagPatterns will contain all the URL groupings.
@@ -448,13 +451,14 @@ func (e *MetricEvent) Tag(matchesRegex k6BrowserCheckRegEx, overrides URLTagPatt
 
 		// matchesRegex is a function that will perform the regex test in the Sobek
 		// runtime.
-		val, err := matchesRegex(o.URLRegEx, e.url)
+		matched, err := matchesRegex(o.URLRegEx, e.url)
 		if err != nil {
 			return err
 		}
 
-		if val {
-			e.userProvidedTagName = &name
+		if matched {
+			e.isUserURLTagNameExist = true
+			e.userProvidedTagName = name
 			return nil
 		}
 	}
