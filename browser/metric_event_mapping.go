@@ -13,7 +13,7 @@ func mapMetricEvent(vu moduleVU, cm *common.MetricEvent) (mapping, error) {
 	// We're setting up the function in the Sobek context that will be reused
 	// for this VU.
 	_, err := rt.RunString(`
-	function _k6BrowserURLGroupingTest(pattern, url) {
+	function _k6BrowserCheckRegEx(pattern, url) {
 		let r = pattern;
 		if (typeof pattern === 'string') {
 			r = new RegExp(pattern);
@@ -27,7 +27,7 @@ func mapMetricEvent(vu moduleVU, cm *common.MetricEvent) (mapping, error) {
 	return mapping{
 		"Tag": func(urls common.URLTagPatterns) error {
 			callback := func(pattern, url string) (bool, error) {
-				js := fmt.Sprintf(`_k6BrowserURLGroupingTest(%s, '%s')`, pattern, url)
+				js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, pattern, url)
 
 				val, err := rt.RunString(js)
 				if err != nil {
