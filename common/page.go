@@ -400,8 +400,8 @@ func (p *Page) urlTagName(ctx context.Context, url string) (string, bool) {
 	p.eventHandlersMu.RUnlock()
 
 	// If a match was found then the name field in em will have been updated.
-	if em.name != nil {
-		newTagName = *em.name
+	if em.userProvidedTagName != nil {
+		newTagName = *em.userProvidedTagName
 		urlMatched = true
 	}
 
@@ -417,8 +417,8 @@ type MetricEvent struct {
 	// against the URL grouping regexs.
 	url string
 
-	// When a match is found this name field should be updated.
-	name *string
+	// When a match is found this userProvidedTagName field should be updated.
+	userProvidedTagName *string
 }
 
 // URLTagPatterns will contain all the URL groupings.
@@ -454,7 +454,7 @@ func (e *MetricEvent) Tag(matchesRegex k6BrowserCheckRegEx, overrides URLTagPatt
 		}
 
 		if val {
-			e.name = &name
+			e.userProvidedTagName = &name
 			return nil
 		}
 	}
