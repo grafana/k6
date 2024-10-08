@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -568,10 +569,25 @@ func (f *Frame) waitFor(selector string, opts *FrameWaitForSelectorOptions) erro
 
 	document, err := f.document()
 	if err != nil {
+		if strings.Contains(err.Error(), "Cannot find context with specified id") {
+			return f.waitFor(selector, opts)
+		}
 		return err
 	}
 
 	_, err = document.waitForSelector(f.ctx, selector, opts)
+	if err != nil {
+		if strings.Contains(err.Error(), "Inspected target navigated or closed") {
+			return f.waitFor(selector, opts)
+		}
+		if strings.Contains(err.Error(), "Cannot find context with specified id") {
+			return f.waitFor(selector, opts)
+		}
+		if strings.Contains(err.Error(), "Execution context was destroyed") {
+			return f.waitFor(selector, opts)
+		}
+	}
+
 	return err
 }
 
