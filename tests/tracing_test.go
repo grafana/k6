@@ -143,6 +143,13 @@ func TestTracing(t *testing.T) {
 			},
 		},
 		{
+			name: "page.waitForTimeout",
+			js:   "page.waitForTimeout(10);",
+			spans: []string{
+				"page.waitForTimeout",
+			},
+		},
+		{
 			name: "web_vital",
 			js:   "page.close();", // on page.close, web vitals are collected and fired/received.
 			spans: []string{

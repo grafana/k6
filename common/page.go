@@ -1466,6 +1466,9 @@ func (p *Page) WaitForSelector(selector string, opts sobek.Value) (*ElementHandl
 func (p *Page) WaitForTimeout(timeout int64) {
 	p.logger.Debugf("Page:WaitForTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForTimeout")
+	defer span.End()
+
 	p.frameManager.MainFrame().WaitForTimeout(timeout)
 }
 
