@@ -39,16 +39,20 @@ func (s HTTPMessageSize) Total() int64 {
 
 // Request represents a browser HTTP request.
 type Request struct {
-	ctx                 context.Context
-	frame               *Frame
-	responseMu          sync.RWMutex
-	response            *Response
-	redirectChain       []*Request
-	requestID           network.RequestID
-	documentID          string
-	url                 *url.URL
-	method              string
-	headers             map[string][]string
+	ctx           context.Context
+	frame         *Frame
+	responseMu    sync.RWMutex
+	response      *Response
+	redirectChain []*Request
+	requestID     network.RequestID
+	documentID    string
+	url           *url.URL
+	method        string
+	headers       map[string][]string
+	// For now we're only going to work with the 0th entry of postDataEntries.
+	// We've not been able to reproduce a situation where more than one entry
+	// occupies the slice. Once we have a better idea of when more than one
+	// entry is in postDataEntries, we should look to export a new API.
 	postDataEntries     []string
 	resourceType        string
 	isNavigationRequest bool
