@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"errors"
 	"fmt"
 
 	"github.com/grafana/sobek"
@@ -122,14 +121,9 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
-			runInTaskQueue := func(a any) {
+			runInTaskQueue := func(a common.PageOnEvent) {
 				tq.Queue(func() error {
-					m, ok := a.(*common.ConsoleMessage)
-					if !ok {
-						return errors.New("incorrect message")
-					}
-
-					if err := mapMsgAndHandleEvent(m); err != nil {
+					if err := mapMsgAndHandleEvent(a.ConsoleMessage); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
 					return nil

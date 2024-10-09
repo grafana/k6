@@ -81,12 +81,9 @@ func TestConsoleLogParse(t *testing.T) {
 
 			done := make(chan bool)
 
-			eventHandler := func(a any) {
-				cm, ok := a.(*common.ConsoleMessage)
-				assert.True(t, ok)
-
+			eventHandler := func(a common.PageOnEvent) {
 				defer close(done)
-				assert.Equal(t, tt.want, cm.Text)
+				assert.Equal(t, tt.want, a.ConsoleMessage.Text)
 			}
 
 			// eventHandler will be called from a separate goroutine from within

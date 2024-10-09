@@ -2,7 +2,6 @@ package browser
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -207,7 +206,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"on": func(event string, handler sobek.Callable) error {
 			tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
-			var runInTaskQueue func(any)
+			var runInTaskQueue func(common.PageOnEvent)
 			switch event {
 			case common.EventPageConsoleAPICalled:
 				mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
@@ -215,21 +214,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					_, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
 					return err
 				}
-				runInTaskQueue = func(a any) {
+				runInTaskQueue = func(a common.PageOnEvent) {
 					tq.Queue(func() error {
-						m, ok := a.(*common.ConsoleMessage)
-						if !ok {
-							return errors.New("incorrect console message")
-						}
-
-						if err := mapMsgAndHandleEvent(m); err != nil {
+						if err := mapMsgAndHandleEvent(a.ConsoleMessage); err != nil {
 							return fmt.Errorf("executing page.on handler: %w", err)
 						}
 						return nil
 					})
 				}
 			case common.EventPageMetricCalled:
-				runInTaskQueue = func(a any) {
+				runInTaskQueue = func(a common.PageOnEvent) {
 					// The function on the taskqueue runs in its own goroutine
 					// so we need to use a channel to wait for it to complete
 					// since we're waiting for updates from the handler which
@@ -238,12 +232,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					tq.Queue(func() error {
 						defer close(c)
 
-						m, ok := a.(*common.MetricEvent)
-						if !ok {
-							return errors.New("incorrect metric message")
-						}
-
-						mapping := mapMetricEvent(vu, m)
+						mapping := mapMetricEvent(vu, a.Metric)
 						if _, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping)); err != nil {
 							return fmt.Errorf("executing page.on('metric') handler: %w", err)
 						}

@@ -238,7 +238,7 @@ type Page struct {
 	backgroundPage bool
 
 	eventCh         chan Event
-	eventHandlers   map[string][]func(any)
+	eventHandlers   map[string][]func(PageOnEvent)
 	eventHandlersMu sync.RWMutex
 
 	mainFrameSession *FrameSession
@@ -277,7 +277,7 @@ func NewPage(
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
 		eventCh:          make(chan Event),
-		eventHandlers:    make(map[string][]func(any)),
+		eventHandlers:    make(map[string][]func(PageOnEvent)),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		vu:               k6ext.GetVU(ctx),
@@ -393,7 +393,9 @@ func (p *Page) urlTagName(ctx context.Context, url string) (string, bool) {
 		p.eventHandlersMu.RUnlock()
 
 		// Call and wait for the handler to complete.
-		h(em)
+		h(PageOnEvent{
+			Metric: em,
+		})
 
 		p.eventHandlersMu.RLock()
 	}
@@ -1104,7 +1106,7 @@ type PageOnEvent struct {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event string, handler func(any)) error {
+func (p *Page) On(event string, handler func(PageOnEvent)) error {
 	switch event {
 	case EventPageConsoleAPICalled:
 	case EventPageMetricCalled:
@@ -1116,7 +1118,7 @@ func (p *Page) On(event string, handler func(any)) error {
 	defer p.eventHandlersMu.Unlock()
 
 	if _, ok := p.eventHandlers[event]; !ok {
-		p.eventHandlers[event] = make([]func(any), 0, 1)
+		p.eventHandlers[event] = make([]func(PageOnEvent), 0, 1)
 	}
 	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
 
@@ -1518,7 +1520,9 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	defer p.eventHandlersMu.RUnlock()
 	for _, h := range p.eventHandlers[EventPageConsoleAPICalled] {
 		h := h
-		h(m)
+		h(PageOnEvent{
+			ConsoleMessage: m,
+		})
 	}
 }
 
