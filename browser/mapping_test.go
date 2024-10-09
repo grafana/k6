@@ -196,8 +196,7 @@ func TestMappings(t *testing.T) {
 		"mapMetricEvent": {
 			apiInterface: (*metricEventAPI)(nil),
 			mapp: func() mapping {
-				m, _ := mapMetricEvent(moduleVU{VU: vu}, &common.MetricEvent{})
-				return m
+				return mapMetricEvent(moduleVU{VU: vu}, &common.MetricEvent{})
 			},
 		},
 		"mapTouchscreen": {
