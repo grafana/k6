@@ -621,7 +621,7 @@ func (l *Locator) WaitFor(opts sobek.Value) error {
 
 func (l *Locator) waitFor(opts *FrameWaitForSelectorOptions) error {
 	opts.Strict = true
-	return l.frame.waitFor(l.selector, opts)
+	return l.frame.waitFor(l.selector, opts, 20)
 }
 
 // DefaultTimeout returns the default timeout for the locator.
