@@ -1091,6 +1091,16 @@ func (p *Page) NavigationTimeout() time.Duration {
 	return p.frameManager.timeoutSettings.navigationTimeout()
 }
 
+// PageOnEvent represents a generic page event.
+// Use one of the fields to get the specific event data.
+type PageOnEvent struct {
+	// ConsoleMessage is the console message event.
+	ConsoleMessage *ConsoleMessage
+
+	// Metric is the metric event event.
+	Metric *MetricEvent
+}
+
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
