@@ -1251,14 +1251,14 @@ func TestPageOn(t *testing.T) {
 			)
 
 			// Console Messages should be multiplexed for every registered handler
-			eventHandlerOne := func(a common.PageOnEvent) {
+			eventHandlerOne := func(event common.PageOnEvent) {
 				defer close(done1)
-				tc.assertFn(t, a.ConsoleMessage)
+				tc.assertFn(t, event.ConsoleMessage)
 			}
 
-			eventHandlerTwo := func(a common.PageOnEvent) {
+			eventHandlerTwo := func(event common.PageOnEvent) {
 				defer close(done2)
-				tc.assertFn(t, a.ConsoleMessage)
+				tc.assertFn(t, event.ConsoleMessage)
 			}
 
 			// eventHandlerOne and eventHandlerTwo will be called from a

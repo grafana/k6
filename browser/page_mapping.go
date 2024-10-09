@@ -214,16 +214,16 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					_, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
 					return err
 				}
-				runInTaskQueue = func(a common.PageOnEvent) {
+				runInTaskQueue = func(event common.PageOnEvent) {
 					tq.Queue(func() error {
-						if err := mapMsgAndHandleEvent(a.ConsoleMessage); err != nil {
+						if err := mapMsgAndHandleEvent(event.ConsoleMessage); err != nil {
 							return fmt.Errorf("executing page.on handler: %w", err)
 						}
 						return nil
 					})
 				}
 			case common.EventPageMetricCalled:
-				runInTaskQueue = func(a common.PageOnEvent) {
+				runInTaskQueue = func(event common.PageOnEvent) {
 					// The function on the taskqueue runs in its own goroutine
 					// so we need to use a channel to wait for it to complete
 					// since we're waiting for updates from the handler which
@@ -232,7 +232,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 					tq.Queue(func() error {
 						defer close(c)
 
-						mapping := mapMetricEvent(vu, a.Metric)
+						mapping := mapMetricEvent(vu, event.Metric)
 						if _, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping)); err != nil {
 							return fmt.Errorf("executing page.on('metric') handler: %w", err)
 						}
