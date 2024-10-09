@@ -193,6 +193,13 @@ func TestMappings(t *testing.T) {
 				return mapConsoleMessage(moduleVU{VU: vu}, &common.ConsoleMessage{})
 			},
 		},
+		"mapMetricEvent": {
+			apiInterface: (*metricEventAPI)(nil),
+			mapp: func() mapping {
+				m, _ := mapMetricEvent(moduleVU{VU: vu}, &common.MetricEvent{})
+				return m
+			},
+		},
 		"mapTouchscreen": {
 			apiInterface: (*touchscreenAPI)(nil),
 			mapp: func() mapping {
