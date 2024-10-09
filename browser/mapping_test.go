@@ -366,6 +366,11 @@ type consoleMessageAPI interface {
 	Type() string
 }
 
+// metricEventAPI is the interface of a metric event.
+type metricEventAPI interface {
+	Tag(matchesRegex common.K6BrowserCheckRegEx, overrides common.URLTagPatterns) error
+}
+
 // frameAPI is the interface of a CDP target frame.
 type frameAPI interface {
 	Check(selector string, opts sobek.Value) error
