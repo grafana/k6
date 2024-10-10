@@ -190,7 +190,9 @@ func TestMappings(t *testing.T) {
 		"mapConsoleMessage": {
 			apiInterface: (*consoleMessageAPI)(nil),
 			mapp: func() mapping {
-				return mapConsoleMessage(moduleVU{VU: vu}, &common.ConsoleMessage{})
+				return mapConsoleMessage(moduleVU{VU: vu}, common.PageOnEvent{
+					ConsoleMessage: &common.ConsoleMessage{},
+				})
 			},
 		},
 		"mapMetricEvent": {
