@@ -58,7 +58,7 @@ func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error 
 }
 
 type metricInterceptor interface {
-	urlTagName(ctx context.Context, urlTag string) (string, bool)
+	urlTagName(urlTag string) (string, bool)
 }
 
 // NetworkManager manages all frames in HTML document.
@@ -192,7 +192,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.vu.Context(), m.mi, req.URL(), tags)
+		tags = handleURLTag(m.mi, req.URL(), tags)
 	}
 
 	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
@@ -245,7 +245,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(m.vu.Context(), m.mi, url, tags)
+		tags = handleURLTag(m.mi, url, tags)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags = tags.With("ip", ipAddress)
@@ -292,8 +292,8 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 // handleURLTag will check if the url tag needs to be grouped by testing
 // against user supplied regex. If there's a match a user supplied name will
 // be used instead of the url for the url tag, otherwise the url will be used.
-func handleURLTag(ctx context.Context, mi metricInterceptor, url string, tags *k6metrics.TagSet) *k6metrics.TagSet {
-	if newTagName, urlMatched := mi.urlTagName(ctx, url); urlMatched {
+func handleURLTag(mi metricInterceptor, url string, tags *k6metrics.TagSet) *k6metrics.TagSet {
+	if newTagName, urlMatched := mi.urlTagName(url); urlMatched {
 		tags = tags.With("url", newTagName)
 		tags = tags.With("name", newTagName)
 		return tags

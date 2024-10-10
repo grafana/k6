@@ -355,7 +355,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	state := fs.vu.State()
 	tags := state.Tags.GetCurrentValues().Tags
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = handleURLTag(fs.ctx, fs.page, wv.URL, tags)
+		tags = handleURLTag(fs.page, wv.URL, tags)
 	}
 
 	tags = tags.With("rating", wv.Rating)
