@@ -425,12 +425,15 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 
 	pageOnEvents := map[common.PageOnEventName]struct {
 		mapp func(vu moduleVU, event common.PageOnEvent) mapping
+		wait bool // should we wait for the handler to complete?
 	}{
 		common.EventPageConsoleAPICalled: {
 			mapp: mapConsoleMessage,
+			wait: false,
 		},
 		common.EventPageMetricCalled: {
 			mapp: mapMetricEvent,
+			wait: true,
 		},
 	}
 
@@ -461,8 +464,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
-		var wait bool // should we wait for the handler to complete?
-
 		queueHandler := func(event common.PageOnEvent) {
 			done := make(chan struct{})
 
@@ -482,7 +483,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				return nil
 			})
 
-			if wait {
+			if pageOnEvent.wait {
 				<-done
 			}
 		}
@@ -491,12 +492,10 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		switch eventName {
 		case common.EventPageConsoleAPICalled:
 			mapHandler = func(event common.PageOnEvent) {
-				wait = false
 				queueHandler(event)
 			}
 		case common.EventPageMetricCalled:
 			mapHandler = func(event common.PageOnEvent) {
-				wait = true
 				queueHandler(event)
 			}
 		}
