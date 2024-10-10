@@ -369,6 +369,15 @@ func (p *Page) initEvents() {
 	}()
 }
 
+// hasPageOnHandler returns true if there is a handler registered
+// for the given page on event.
+func hasPageOnHandler(p *Page, event PageOnEventName) bool {
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	_, ok := p.eventHandlers[event]
+	return ok
+}
+
 // MetricEvent is the type that is exported to JS. It is currently only used to
 // match on the urlTag and return a name when a match is found.
 type MetricEvent struct {
