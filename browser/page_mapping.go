@@ -447,9 +447,9 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
 
-		if eventName == common.EventPageMetricCalled {
-			if err := prepK6BrowserRegExChecker(rt); err != nil {
-				return err
+		if pageOnEvent.prep != nil {
+			if err := pageOnEvent.prep(); err != nil {
+				return fmt.Errorf("initiating page.on('%s'): %w", eventName, err)
 			}
 		}
 
