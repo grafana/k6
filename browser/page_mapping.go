@@ -423,13 +423,13 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error { //nolint:funlen
 	rt := vu.Runtime()
 
-	return func(eventName common.PageOnEventName, handler sobek.Callable) error {
+	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 		onEventPageConsoleAPICalled := func(event common.PageOnEvent) {
 			tq.Queue(func() error {
 				mapping := mapConsoleMessage(vu, event)
-				_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
+				_, err := handleEvent(sobek.Undefined(), rt.ToValue(mapping))
 				if err != nil {
 					return fmt.Errorf("executing page.on handler: %w", err)
 				}
@@ -447,7 +447,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				defer close(done)
 
 				mapping := mapMetricEvent(vu, event)
-				_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
+				_, err := handleEvent(sobek.Undefined(), rt.ToValue(mapping))
 				if err != nil {
 					return fmt.Errorf("executing page.on('metric') handler: %w", err)
 				}
