@@ -426,7 +426,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 	return func(event common.PageOnEventName, handler sobek.Callable) error {
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
-		var runInTaskQueue func(common.PageOnEvent)
+		var mapHandler func(common.PageOnEvent)
 		switch event {
 		case common.EventPageConsoleAPICalled:
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
@@ -434,7 +434,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
 				return err
 			}
-			runInTaskQueue = func(event common.PageOnEvent) {
+			mapHandler = func(event common.PageOnEvent) {
 				tq.Queue(func() error {
 					if err := mapMsgAndHandleEvent(event.ConsoleMessage); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
@@ -443,7 +443,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				})
 			}
 		case common.EventPageMetricCalled:
-			runInTaskQueue = func(event common.PageOnEvent) {
+			mapHandler = func(event common.PageOnEvent) {
 				// The function on the taskqueue runs in its own goroutine
 				// so we need to use a channel to wait for it to complete
 				// since we're waiting for updates from the handler which
@@ -484,7 +484,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
-		return p.On(event, runInTaskQueue) //nolint:wrapcheck
+		return p.On(event, mapHandler) //nolint:wrapcheck
 	}
 }
 
