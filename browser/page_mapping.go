@@ -457,23 +457,9 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		}
 
 		onEventPageMetricCalled := func(event common.PageOnEvent) {
-			// The function on the taskqueue runs in its own goroutine
-			// so we need to use a channel to wait for it to complete
-			// since we're waiting for updates from the handler which
-			// will be written to the ExportedMetric.
-			done := make(chan struct{})
-			tq.Queue(func() error {
-				defer close(done)
-
-				mapping := mapMetricEvent(vu, event)
-				_, err := handleEvent(sobek.Undefined(), rt.ToValue(mapping))
-				if err != nil {
-					return fmt.Errorf("executing page.on('metric') handler: %w", err)
-				}
-
-				return nil
-			})
-			<-done
+			mapp = mapMetricEvent
+			wait = true
+			queueHandler(event)
 		}
 
 		var mapHandler func(common.PageOnEvent)
