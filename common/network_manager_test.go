@@ -211,7 +211,7 @@ func TestOnRequestPausedBlockedIPs(t *testing.T) {
 
 type MetricInterceptorMock struct{}
 
-func (m *MetricInterceptorMock) urlTagName(urlTag string) (string, bool) {
+func (m *MetricInterceptorMock) urlTagName(_ string) (string, bool) {
 	return "", false
 }
 
