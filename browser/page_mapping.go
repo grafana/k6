@@ -442,9 +442,9 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			// so we need to use a channel to wait for it to complete
 			// since we're waiting for updates from the handler which
 			// will be written to the ExportedMetric.
-			c := make(chan bool)
+			done := make(chan struct{})
 			tq.Queue(func() error {
-				defer close(c)
+				defer close(done)
 
 				mapping := mapMetricEvent(vu, event)
 				_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
@@ -454,7 +454,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 
 				return nil
 			})
-			<-c
+			<-done
 		}
 
 		var mapHandler func(common.PageOnEvent)
