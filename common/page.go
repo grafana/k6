@@ -32,6 +32,9 @@ import (
 // BlankPage represents a blank page.
 const BlankPage = "about:blank"
 
+// PageOnEventName represents the name of the page.on event.
+type PageOnEventName string
+
 const (
 	webVitalBinding = "k6browserSendWebVitalMetric"
 
