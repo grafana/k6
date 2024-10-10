@@ -496,7 +496,6 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
 	for _, h := range p.eventHandlers[EventPageConsoleAPICalled] {
-		h := h
 		h(PageOnEvent{
 			ConsoleMessage: m,
 		})
