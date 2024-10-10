@@ -425,6 +425,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 
 	pageOnEvents := map[common.PageOnEventName]struct {
 		mapp func(vu moduleVU, event common.PageOnEvent) mapping
+		prep func() error
 		wait bool // should we wait for the handler to complete?
 	}{
 		common.EventPageConsoleAPICalled: {
