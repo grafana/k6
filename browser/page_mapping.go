@@ -435,7 +435,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 	}
 
 	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
-		_, ok := pageOnEvents[eventName]
+		pageOnEvent, ok := pageOnEvents[eventName]
 		if !ok {
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
@@ -462,7 +462,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 		var wait bool // should we wait for the handler to complete?
-		var mapp func(vu moduleVU, m common.PageOnEvent) mapping
 
 		queueHandler := func(event common.PageOnEvent) {
 			done := make(chan struct{})
@@ -470,9 +469,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			tq.Queue(func() error {
 				defer close(done)
 
+				mapping := pageOnEvent.mapp(vu, event)
+
 				_, err := handleEvent(
 					sobek.Undefined(),
-					rt.ToValue(mapp(vu, event)),
+					rt.ToValue(mapping),
 				)
 				if err != nil {
 					return fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
@@ -490,13 +491,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		switch eventName {
 		case common.EventPageConsoleAPICalled:
 			mapHandler = func(event common.PageOnEvent) {
-				mapp = mapConsoleMessage
 				wait = false
 				queueHandler(event)
 			}
 		case common.EventPageMetricCalled:
 			mapHandler = func(event common.PageOnEvent) {
-				mapp = mapMetricEvent
 				wait = true
 				queueHandler(event)
 			}
