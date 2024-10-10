@@ -488,6 +488,8 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
+		// Run the the event handler in the task queue to ensure that
+		// the handler is executed in the event loop.
 		return p.On(eventName, queueHandler) //nolint:wrapcheck
 	}
 }
