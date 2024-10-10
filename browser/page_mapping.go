@@ -449,17 +449,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				<-done
 			}
 		}
-		_ = queueHandler
 
 		onEventPageConsoleAPICalled := func(event common.PageOnEvent) {
-			tq.Queue(func() error {
-				mapping := mapConsoleMessage(vu, event)
-				_, err := handleEvent(sobek.Undefined(), rt.ToValue(mapping))
-				if err != nil {
-					return fmt.Errorf("executing page.on handler: %w", err)
-				}
-				return nil
-			})
+			mapp = mapConsoleMessage
+			wait = false
+			queueHandler(event)
 		}
 
 		onEventPageMetricCalled := func(event common.PageOnEvent) {
