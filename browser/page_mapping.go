@@ -423,7 +423,23 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error { //nolint:funlen
 	rt := vu.Runtime()
 
+	pageOnEvents := map[common.PageOnEventName]struct {
+		mapp func(vu moduleVU, event common.PageOnEvent) mapping
+	}{
+		common.EventPageConsoleAPICalled: {
+			mapp: mapConsoleMessage,
+		},
+		common.EventPageMetricCalled: {
+			mapp: mapMetricEvent,
+		},
+	}
+
 	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
+		_, ok := pageOnEvents[eventName]
+		if !ok {
+			return fmt.Errorf("unknown page on event: %q", eventName)
+		}
+
 		if eventName == common.EventPageMetricCalled {
 			// Register a custom regex function for the metric event
 			// that will be used to check URLs against the patterns.
@@ -484,8 +500,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				wait = true
 				queueHandler(event)
 			}
-		default:
-			return fmt.Errorf("unknown page event: %q", eventName)
 		}
 
 		return p.On(eventName, mapHandler) //nolint:wrapcheck
