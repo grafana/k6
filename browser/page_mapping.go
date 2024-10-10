@@ -437,29 +437,31 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			})
 		}
 
+		onEventPageMetricCalled := func(event common.PageOnEvent) {
+			// The function on the taskqueue runs in its own goroutine
+			// so we need to use a channel to wait for it to complete
+			// since we're waiting for updates from the handler which
+			// will be written to the ExportedMetric.
+			c := make(chan bool)
+			tq.Queue(func() error {
+				defer close(c)
+
+				mapping := mapMetricEvent(vu, event.Metric)
+				if _, err := handler(sobek.Undefined(), rt.ToValue(mapping)); err != nil {
+					return fmt.Errorf("executing page.on('metric') handler: %w", err)
+				}
+
+				return nil
+			})
+			<-c
+		}
+
 		var mapHandler func(common.PageOnEvent)
 		switch event {
 		case common.EventPageConsoleAPICalled:
 			mapHandler = onEventPageConsoleAPICalled
 		case common.EventPageMetricCalled:
-			mapHandler = func(event common.PageOnEvent) {
-				// The function on the taskqueue runs in its own goroutine
-				// so we need to use a channel to wait for it to complete
-				// since we're waiting for updates from the handler which
-				// will be written to the ExportedMetric.
-				c := make(chan bool)
-				tq.Queue(func() error {
-					defer close(c)
-
-					mapping := mapMetricEvent(vu, event.Metric)
-					if _, err := handler(sobek.Undefined(), rt.ToValue(mapping)); err != nil {
-						return fmt.Errorf("executing page.on('metric') handler: %w", err)
-					}
-
-					return nil
-				})
-				<-c
-			}
+			mapHandler = onEventPageMetricCalled
 		default:
 			return fmt.Errorf("unknown page event: %q", event)
 		}
