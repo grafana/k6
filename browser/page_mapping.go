@@ -424,10 +424,30 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 	rt := vu.Runtime()
 
 	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
+		if eventName == common.EventPageMetricCalled {
+			// Register a custom regex function for the metric event
+			// that will be used to check URLs against the patterns.
+			// This is needed because we want to use the JavaScript regex
+			// to comply with what users expect when using the `tag` method.
+			_, err := rt.RunString(`
+				function _k6BrowserCheckRegEx(pattern, url) {
+					let r = pattern;
+					if (typeof pattern === 'string') {
+						r = new RegExp(pattern);
+					}
+					return r.test(url);
+				}
+			`)
+			if err != nil {
+				return fmt.Errorf("evaluating regex function: %w", err)
+			}
+		}
+
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 		var wait bool // should we wait for the handler to complete?
 		var mapp func(vu moduleVU, m common.PageOnEvent) mapping
+
 		queueHandler := func(event common.PageOnEvent) {
 			done := make(chan struct{})
 
@@ -466,25 +486,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		default:
 			return fmt.Errorf("unknown page event: %q", eventName)
-		}
-
-		if eventName == common.EventPageMetricCalled {
-			// Register a custom regex function for the metric event
-			// that will be used to check URLs against the patterns.
-			// This is needed because we want to use the JavaScript regex
-			// to comply with what users expect when using the `tag` method.
-			_, err := rt.RunString(`
-				function _k6BrowserCheckRegEx(pattern, url) {
-					let r = pattern;
-					if (typeof pattern === 'string') {
-						r = new RegExp(pattern);
-					}
-					return r.test(url);
-				}
-			`)
-			if err != nil {
-				return fmt.Errorf("evaluating regex function: %w", err)
-			}
 		}
 
 		return p.On(eventName, mapHandler) //nolint:wrapcheck
