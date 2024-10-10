@@ -434,9 +434,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		},
 		common.EventPageMetricCalled: {
 			mapp: mapMetricEvent,
-			prep: func() error {
-				return prepK6BrowserRegExChecker(rt)
-			},
+			prep: prepK6BrowserRegExChecker(rt),
 			wait: true,
 		},
 	}
@@ -488,21 +486,23 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 // prepK6BrowserRegExChecker is a helper function to check the regex pattern
 // on Sobek runtime. Unlike Go's regexp package, Sobek's runtime checks
 // regex patterns using JavaScript's regular expression features.
-func prepK6BrowserRegExChecker(rt *sobek.Runtime) error {
-	_, err := rt.RunString(`
-		function _k6BrowserCheckRegEx(pattern, url) {
-			let r = pattern;
-			if (typeof pattern === 'string') {
-				r = new RegExp(pattern);
+func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
+	return func() error {
+		_, err := rt.RunString(`
+			function _k6BrowserCheckRegEx(pattern, url) {
+				let r = pattern;
+				if (typeof pattern === 'string') {
+					r = new RegExp(pattern);
+				}
+				return r.test(url);
 			}
-			return r.test(url);
+		`)
+		if err != nil {
+			return fmt.Errorf("evaluating regex function: %w", err)
 		}
-	`)
-	if err != nil {
-		return fmt.Errorf("evaluating regex function: %w", err)
-	}
 
-	return nil
+		return nil
+	}
 }
 
 func parseWaitForFunctionArgs(
