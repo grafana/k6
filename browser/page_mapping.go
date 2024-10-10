@@ -488,19 +488,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
-		var mapHandler func(common.PageOnEvent)
-		switch eventName {
-		case common.EventPageConsoleAPICalled:
-			mapHandler = func(event common.PageOnEvent) {
-				queueHandler(event)
-			}
-		case common.EventPageMetricCalled:
-			mapHandler = func(event common.PageOnEvent) {
-				queueHandler(event)
-			}
-		}
-
-		return p.On(eventName, mapHandler) //nolint:wrapcheck
+		return p.On(eventName, queueHandler) //nolint:wrapcheck
 	}
 }
 
