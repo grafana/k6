@@ -447,7 +447,8 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				defer close(c)
 
 				mapping := mapMetricEvent(vu, event)
-				if _, err := handler(sobek.Undefined(), rt.ToValue(mapping)); err != nil {
+				_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
+				if err != nil {
 					return fmt.Errorf("executing page.on('metric') handler: %w", err)
 				}
 
