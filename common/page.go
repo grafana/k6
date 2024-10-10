@@ -483,13 +483,9 @@ func (p *Page) urlTagName(url string) (string, bool) {
 }
 
 func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
-	// If there are no handlers for EventConsoleAPICalled, return
-	p.eventHandlersMu.RLock()
-	if _, ok := p.eventHandlers[EventPageConsoleAPICalled]; !ok {
-		p.eventHandlersMu.RUnlock()
+	if !hasPageOnHandler(p, EventPageConsoleAPICalled) {
 		return
 	}
-	p.eventHandlersMu.RUnlock()
 
 	m, err := p.consoleMsgFromConsoleEvent(event)
 	if err != nil {
