@@ -445,12 +445,7 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, patterns URLTagPatte
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
 func (p *Page) urlTagName(url string) (string, bool) {
-	p.eventHandlersMu.RLock()
-
-	// If there are no handlers for EventConsoleAPICalled.
-	if _, ok := p.eventHandlers[EventPageMetricCalled]; !ok {
-		p.eventHandlersMu.RUnlock()
-
+	if !hasPageOnHandler(p, EventPageMetricCalled) {
 		return "", false
 	}
 
@@ -460,19 +455,21 @@ func (p *Page) urlTagName(url string) (string, bool) {
 		url: url,
 	}
 
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
 	for _, h := range p.eventHandlers[EventPageMetricCalled] {
-		// A handler can register another handler from within itself. This is
-		// the reason to unlock the mutex before calling the handler.
-		p.eventHandlersMu.RUnlock()
+		func() {
+			// Handlers can register other handlers, so we need to
+			// unlock the mutex before calling the next handler.
+			p.eventHandlersMu.RUnlock()
+			defer p.eventHandlersMu.RLock()
 
-		// Call and wait for the handler to complete.
-		h(PageOnEvent{
-			Metric: em,
-		})
-
-		p.eventHandlersMu.RLock()
+			// Call and wait for the handler to complete.
+			h(PageOnEvent{
+				Metric: em,
+			})
+		}()
 	}
-	p.eventHandlersMu.RUnlock()
 
 	// If a match was found then the name field in em will have been updated.
 	if em.isUserURLTagNameExist {
