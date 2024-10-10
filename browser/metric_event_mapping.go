@@ -8,7 +8,7 @@ import (
 
 // mapMetricEvent to the JS module.
 func mapMetricEvent(vu moduleVU, event common.PageOnEvent) mapping {
-	rt := vu.VU.Runtime()
+	rt := vu.Runtime()
 
 	return mapping{
 		"tag": func(urls common.URLTagPatterns) error {
