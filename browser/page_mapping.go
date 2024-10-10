@@ -434,6 +434,9 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		},
 		common.EventPageMetricCalled: {
 			mapp: mapMetricEvent,
+			prep: func() error {
+				return prepK6BrowserRegExChecker(rt)
+			},
 			wait: true,
 		},
 	}
