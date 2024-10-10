@@ -444,21 +444,8 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		}
 
 		if eventName == common.EventPageMetricCalled {
-			// Register a custom regex function for the metric event
-			// that will be used to check URLs against the patterns.
-			// This is needed because we want to use the JavaScript regex
-			// to comply with what users expect when using the `tag` method.
-			_, err := rt.RunString(`
-				function _k6BrowserCheckRegEx(pattern, url) {
-					let r = pattern;
-					if (typeof pattern === 'string') {
-						r = new RegExp(pattern);
-					}
-					return r.test(url);
-				}
-			`)
-			if err != nil {
-				return fmt.Errorf("evaluating regex function: %w", err)
+			if err := prepK6BrowserRegExChecker(rt); err != nil {
+				return err
 			}
 		}
 
@@ -492,6 +479,26 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		// the handler is executed in the event loop.
 		return p.On(eventName, queueHandler) //nolint:wrapcheck
 	}
+}
+
+// prepK6BrowserRegExChecker is a helper function to check the regex pattern
+// on Sobek runtime. Unlike Go's regexp package, Sobek's runtime checks
+// regex patterns using JavaScript's regular expression features.
+func prepK6BrowserRegExChecker(rt *sobek.Runtime) error {
+	_, err := rt.RunString(`
+		function _k6BrowserCheckRegEx(pattern, url) {
+			let r = pattern;
+			if (typeof pattern === 'string') {
+				r = new RegExp(pattern);
+			}
+			return r.test(url);
+		}
+	`)
+	if err != nil {
+		return fmt.Errorf("evaluating regex function: %w", err)
+	}
+
+	return nil
 }
 
 func parseWaitForFunctionArgs(
