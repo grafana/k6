@@ -429,7 +429,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		case common.EventPageConsoleAPICalled:
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
-				_, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
+				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
 			runInTaskQueue = func(event common.PageOnEvent) {
@@ -451,7 +451,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 					defer close(c)
 
 					mapping := mapMetricEvent(vu, event.Metric)
-					if _, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping)); err != nil {
+					if _, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping)); err != nil {
 						return fmt.Errorf("executing page.on('metric') handler: %w", err)
 					}
 
