@@ -203,7 +203,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"mouse": mapMouse(vu, p.GetMouse()),
-		"on": func(event string, handler sobek.Callable) error {
+		"on": func(event common.PageOnEventName, handler sobek.Callable) error {
 			tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 			var runInTaskQueue func(common.PageOnEvent)

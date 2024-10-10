@@ -113,7 +113,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
-		"on": func(event string, handler sobek.Callable) error {
+		"on": func(event common.PageOnEventName, handler sobek.Callable) error {
 			tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {

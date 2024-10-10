@@ -35,11 +35,14 @@ const BlankPage = "about:blank"
 // PageOnEventName represents the name of the page.on event.
 type PageOnEventName string
 
-const (
-	webVitalBinding = "k6browserSendWebVitalMetric"
+const webVitalBinding = "k6browserSendWebVitalMetric"
 
-	EventPageConsoleAPICalled = "console"
-	EventPageMetricCalled     = "metric"
+const (
+	// EventPageConsoleAPICalled represents the page.on('console') event.
+	EventPageConsoleAPICalled PageOnEventName = "console"
+
+	// EventPageMetricCalled represents the page.on('metric') event.
+	EventPageMetricCalled PageOnEventName = "metric"
 )
 
 // MediaType represents the type of media to emulate.
@@ -241,7 +244,7 @@ type Page struct {
 	backgroundPage bool
 
 	eventCh         chan Event
-	eventHandlers   map[string][]func(PageOnEvent)
+	eventHandlers   map[PageOnEventName][]func(PageOnEvent)
 	eventHandlersMu sync.RWMutex
 
 	mainFrameSession *FrameSession
@@ -280,7 +283,7 @@ func NewPage(
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
 		eventCh:          make(chan Event),
-		eventHandlers:    make(map[string][]func(PageOnEvent)),
+		eventHandlers:    make(map[PageOnEventName][]func(PageOnEvent)),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		vu:               k6ext.GetVU(ctx),
@@ -1109,7 +1112,7 @@ type PageOnEvent struct {
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event string, handler func(PageOnEvent)) error {
+func (p *Page) On(event PageOnEventName, handler func(PageOnEvent)) error {
 	switch event {
 	case EventPageConsoleAPICalled:
 	case EventPageMetricCalled:
