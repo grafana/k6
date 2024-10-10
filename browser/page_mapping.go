@@ -445,14 +445,16 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
 
+		// Prepare the environment for the page.on event handler if necessary.
 		if pageOnEvent.prep != nil {
 			if err := pageOnEvent.prep(); err != nil {
 				return fmt.Errorf("initiating page.on('%s'): %w", eventName, err)
 			}
 		}
 
+		// Queue the event handler in the task queue.
+		// Wait for the handler to complete if necessary.
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
-
 		queueHandler := func(event common.PageOnEvent) {
 			done := make(chan struct{})
 
