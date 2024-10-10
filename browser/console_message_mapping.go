@@ -9,11 +9,13 @@ import (
 // mapConsoleMessage to the JS module.
 func mapConsoleMessage(vu moduleVU, event common.PageOnEvent) mapping {
 	rt := vu.Runtime()
+	cm := event.ConsoleMessage
+
 	return mapping{
 		"args": func() *sobek.Object {
 			var (
 				margs []mapping
-				args  = event.ConsoleMessage.Args
+				args  = cm.Args
 			)
 			for _, arg := range args {
 				a := mapJSHandle(vu, arg)
@@ -25,14 +27,14 @@ func mapConsoleMessage(vu moduleVU, event common.PageOnEvent) mapping {
 		// page(), text() and type() are defined as
 		// functions in order to match Playwright's API
 		"page": func() *sobek.Object {
-			mp := mapPage(vu, event.ConsoleMessage.Page)
+			mp := mapPage(vu, cm.Page)
 			return rt.ToValue(mp).ToObject(rt)
 		},
 		"text": func() *sobek.Object {
-			return rt.ToValue(event.ConsoleMessage.Text).ToObject(rt)
+			return rt.ToValue(cm.Text).ToObject(rt)
 		},
 		"type": func() *sobek.Object {
-			return rt.ToValue(event.ConsoleMessage.Type).ToObject(rt)
+			return rt.ToValue(cm.Type).ToObject(rt)
 		},
 	}
 }
