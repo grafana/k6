@@ -423,7 +423,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error { //nolint:funlen
 	rt := vu.Runtime()
 
-	return func(event common.PageOnEventName, handler sobek.Callable) error {
+	return func(eventName common.PageOnEventName, handler sobek.Callable) error {
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 		onEventPageConsoleAPICalled := func(event common.PageOnEvent) {
@@ -458,16 +458,16 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		}
 
 		var mapHandler func(common.PageOnEvent)
-		switch event {
+		switch eventName {
 		case common.EventPageConsoleAPICalled:
 			mapHandler = onEventPageConsoleAPICalled
 		case common.EventPageMetricCalled:
 			mapHandler = onEventPageMetricCalled
 		default:
-			return fmt.Errorf("unknown page event: %q", event)
+			return fmt.Errorf("unknown page event: %q", eventName)
 		}
 
-		if event == common.EventPageMetricCalled {
+		if eventName == common.EventPageMetricCalled {
 			// Register a custom regex function for the metric event
 			// that will be used to check URLs against the patterns.
 			// This is needed because we want to use the JavaScript regex
@@ -486,7 +486,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
-		return p.On(event, mapHandler) //nolint:wrapcheck
+		return p.On(eventName, mapHandler) //nolint:wrapcheck
 	}
 }
 
