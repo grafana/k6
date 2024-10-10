@@ -450,12 +450,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
-		onEventPageConsoleAPICalled := func(event common.PageOnEvent) {
-			mapp = mapConsoleMessage
-			wait = false
-			queueHandler(event)
-		}
-
 		onEventPageMetricCalled := func(event common.PageOnEvent) {
 			mapp = mapMetricEvent
 			wait = true
@@ -465,7 +459,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		var mapHandler func(common.PageOnEvent)
 		switch eventName {
 		case common.EventPageConsoleAPICalled:
-			mapHandler = onEventPageConsoleAPICalled
+			mapHandler = func(event common.PageOnEvent) {
+				mapp = mapConsoleMessage
+				wait = false
+				queueHandler(event)
+			}
 		case common.EventPageMetricCalled:
 			mapHandler = onEventPageMetricCalled
 		default:
