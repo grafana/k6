@@ -445,7 +445,7 @@ type K6BrowserCheckRegEx func(pattern, url string) (bool, error)
 // Tag will find the first match given the URLTagPatterns and the URL from
 // the metric tag and update the name field.
 func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, patterns URLTagPatterns) error {
-	for _, o := range overrides.URLs {
+	for _, o := range patterns.URLs {
 		name := strings.TrimSpace(o.TagName)
 		if name == "" {
 			return fmt.Errorf("name %q is invalid", o.TagName)
