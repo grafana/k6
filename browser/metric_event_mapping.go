@@ -9,6 +9,7 @@ import (
 // mapMetricEvent to the JS module.
 func mapMetricEvent(vu moduleVU, event common.PageOnEvent) mapping {
 	rt := vu.Runtime()
+	em := event.Metric
 
 	return mapping{
 		"tag": func(urls common.URLTagPatterns) error {
@@ -23,7 +24,7 @@ func mapMetricEvent(vu moduleVU, event common.PageOnEvent) mapping {
 				return matched.ToBoolean(), nil
 			}
 
-			return event.Metric.Tag(callback, urls) //nolint:wrapcheck
+			return em.Tag(callback, urls) //nolint:wrapcheck
 		},
 	}
 }
