@@ -203,69 +203,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"mouse": mapMouse(vu, p.GetMouse()),
-		"on": func(event common.PageOnEventName, handler sobek.Callable) error {
-			tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
-
-			var runInTaskQueue func(common.PageOnEvent)
-			switch event {
-			case common.EventPageConsoleAPICalled:
-				mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
-					mapping := mapConsoleMessage(vu, m)
-					_, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
-					return err
-				}
-				runInTaskQueue = func(event common.PageOnEvent) {
-					tq.Queue(func() error {
-						if err := mapMsgAndHandleEvent(event.ConsoleMessage); err != nil {
-							return fmt.Errorf("executing page.on handler: %w", err)
-						}
-						return nil
-					})
-				}
-			case common.EventPageMetricCalled:
-				runInTaskQueue = func(event common.PageOnEvent) {
-					// The function on the taskqueue runs in its own goroutine
-					// so we need to use a channel to wait for it to complete
-					// since we're waiting for updates from the handler which
-					// will be written to the ExportedMetric.
-					c := make(chan bool)
-					tq.Queue(func() error {
-						defer close(c)
-
-						mapping := mapMetricEvent(vu, event.Metric)
-						if _, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping)); err != nil {
-							return fmt.Errorf("executing page.on('metric') handler: %w", err)
-						}
-
-						return nil
-					})
-					<-c
-				}
-			default:
-				return fmt.Errorf("unknown page event: %q", event)
-			}
-
-			if event == common.EventPageMetricCalled {
-				// Register a custom regex function for the metric event
-				// that will be used to check URLs against the patterns.
-				// This is needed because we want to use the JavaScript regex
-				// to comply with what users expect when using the `tag` method.
-				_, err := rt.RunString(`
-					function _k6BrowserCheckRegEx(pattern, url) {
-						let r = pattern;
-						if (typeof pattern === 'string') {
-							r = new RegExp(pattern);
-						}
-						return r.test(url);
-					}
-				`)
-				if err != nil {
-					return fmt.Errorf("evaluating regex function: %w", err)
-				}
-			}
-
-			return p.On(event, runInTaskQueue) //nolint:wrapcheck
-		},
+		"on":    mapPageOn(vu, p),
 		"opener": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return p.Opener(), nil
@@ -478,6 +416,74 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	}
 
 	return maps
+}
+
+// mapPageOn maps the requested page.on event to the Sobek runtime.
+// It generalizes the handling of page.on events on a taskqueue.
+func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error { //nolint:funlen
+	return func(event common.PageOnEventName, handler sobek.Callable) error {
+		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
+
+		var runInTaskQueue func(common.PageOnEvent)
+		switch event {
+		case common.EventPageConsoleAPICalled:
+			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
+				mapping := mapConsoleMessage(vu, m)
+				_, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping))
+				return err
+			}
+			runInTaskQueue = func(event common.PageOnEvent) {
+				tq.Queue(func() error {
+					if err := mapMsgAndHandleEvent(event.ConsoleMessage); err != nil {
+						return fmt.Errorf("executing page.on handler: %w", err)
+					}
+					return nil
+				})
+			}
+		case common.EventPageMetricCalled:
+			runInTaskQueue = func(event common.PageOnEvent) {
+				// The function on the taskqueue runs in its own goroutine
+				// so we need to use a channel to wait for it to complete
+				// since we're waiting for updates from the handler which
+				// will be written to the ExportedMetric.
+				c := make(chan bool)
+				tq.Queue(func() error {
+					defer close(c)
+
+					mapping := mapMetricEvent(vu, event.Metric)
+					if _, err := handler(sobek.Undefined(), vu.VU.Runtime().ToValue(mapping)); err != nil {
+						return fmt.Errorf("executing page.on('metric') handler: %w", err)
+					}
+
+					return nil
+				})
+				<-c
+			}
+		default:
+			return fmt.Errorf("unknown page event: %q", event)
+		}
+
+		if event == common.EventPageMetricCalled {
+			// Register a custom regex function for the metric event
+			// that will be used to check URLs against the patterns.
+			// This is needed because we want to use the JavaScript regex
+			// to comply with what users expect when using the `tag` method.
+			_, err := vu.Runtime().RunString(`
+				function _k6BrowserCheckRegEx(pattern, url) {
+					let r = pattern;
+					if (typeof pattern === 'string') {
+						r = new RegExp(pattern);
+					}
+					return r.test(url);
+				}
+			`)
+			if err != nil {
+				return fmt.Errorf("evaluating regex function: %w", err)
+			}
+		}
+
+		return p.On(event, runInTaskQueue) //nolint:wrapcheck
+	}
 }
 
 func parseWaitForFunctionArgs(
