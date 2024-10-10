@@ -450,12 +450,6 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
-		onEventPageMetricCalled := func(event common.PageOnEvent) {
-			mapp = mapMetricEvent
-			wait = true
-			queueHandler(event)
-		}
-
 		var mapHandler func(common.PageOnEvent)
 		switch eventName {
 		case common.EventPageConsoleAPICalled:
@@ -465,7 +459,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				queueHandler(event)
 			}
 		case common.EventPageMetricCalled:
-			mapHandler = onEventPageMetricCalled
+			mapHandler = func(event common.PageOnEvent) {
+				mapp = mapMetricEvent
+				wait = true
+				queueHandler(event)
+			}
 		default:
 			return fmt.Errorf("unknown page event: %q", eventName)
 		}
