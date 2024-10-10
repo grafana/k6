@@ -429,14 +429,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		var mapHandler func(common.PageOnEvent)
 		switch event {
 		case common.EventPageConsoleAPICalled:
-			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
-				mapping := mapConsoleMessage(vu, m)
-				_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
-				return err
-			}
 			mapHandler = func(event common.PageOnEvent) {
 				tq.Queue(func() error {
-					if err := mapMsgAndHandleEvent(event.ConsoleMessage); err != nil {
+					mapping := mapConsoleMessage(vu, event.ConsoleMessage)
+					_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
+					if err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
 					return nil
