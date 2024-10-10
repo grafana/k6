@@ -426,6 +426,31 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
+		var wait bool // should we wait for the handler to complete?
+		var mapp func(vu moduleVU, m common.PageOnEvent) mapping
+		queueHandler := func(event common.PageOnEvent) {
+			done := make(chan struct{})
+
+			tq.Queue(func() error {
+				defer close(done)
+
+				_, err := handleEvent(
+					sobek.Undefined(),
+					rt.ToValue(mapp(vu, event)),
+				)
+				if err != nil {
+					return fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+				}
+
+				return nil
+			})
+
+			if wait {
+				<-done
+			}
+		}
+		_ = queueHandler
+
 		onEventPageConsoleAPICalled := func(event common.PageOnEvent) {
 			tq.Queue(func() error {
 				mapping := mapConsoleMessage(vu, event)
