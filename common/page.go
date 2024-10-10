@@ -1113,13 +1113,6 @@ type PageOnEvent struct {
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
 func (p *Page) On(event PageOnEventName, handler func(PageOnEvent)) error {
-	switch event {
-	case EventPageConsoleAPICalled:
-	case EventPageMetricCalled:
-	default:
-		return fmt.Errorf("unknown page event: %q", event)
-	}
-
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
