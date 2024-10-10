@@ -421,6 +421,8 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 // mapPageOn maps the requested page.on event to the Sobek runtime.
 // It generalizes the handling of page.on events on a taskqueue.
 func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error { //nolint:funlen
+	rt := vu.Runtime()
+
 	return func(event common.PageOnEventName, handler sobek.Callable) error {
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
@@ -429,7 +431,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		case common.EventPageConsoleAPICalled:
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := mapConsoleMessage(vu, m)
-				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
+				_, err := handler(sobek.Undefined(), rt.ToValue(mapping))
 				return err
 			}
 			runInTaskQueue = func(event common.PageOnEvent) {
@@ -451,7 +453,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 					defer close(c)
 
 					mapping := mapMetricEvent(vu, event.Metric)
-					if _, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping)); err != nil {
+					if _, err := handler(sobek.Undefined(), rt.ToValue(mapping)); err != nil {
 						return fmt.Errorf("executing page.on('metric') handler: %w", err)
 					}
 
@@ -468,7 +470,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			// that will be used to check URLs against the patterns.
 			// This is needed because we want to use the JavaScript regex
 			// to comply with what users expect when using the `tag` method.
-			_, err := vu.Runtime().RunString(`
+			_, err := rt.RunString(`
 				function _k6BrowserCheckRegEx(pattern, url) {
 					let r = pattern;
 					if (typeof pattern === 'string') {
