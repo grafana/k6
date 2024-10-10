@@ -332,7 +332,7 @@ type pageAPI interface {
 	IsVisible(selector string, opts sobek.Value) (bool, error)
 	Locator(selector string, opts sobek.Value) *common.Locator
 	MainFrame() *common.Frame
-	On(event string, handler func(common.PageOnEvent) error) error
+	On(event common.PageOnEventName, handler func(common.PageOnEvent) error) error
 	Opener() pageAPI
 	Press(selector string, key string, opts sobek.Value) error
 	Query(selector string) (*common.ElementHandle, error)
