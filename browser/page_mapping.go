@@ -456,12 +456,12 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		// Wait for the handler to complete if necessary.
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 		queueHandler := func(event common.PageOnEvent) {
+			mapping := pageOnEvent.mapp(vu, event)
+
 			done := make(chan struct{})
 
 			tq.Queue(func() error {
 				defer close(done)
-
-				mapping := pageOnEvent.mapp(vu, event)
 
 				_, err := handleEvent(
 					sobek.Undefined(),
