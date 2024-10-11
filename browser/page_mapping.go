@@ -490,11 +490,7 @@ func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
 	return func() error {
 		_, err := rt.RunString(`
 			function _k6BrowserCheckRegEx(pattern, url) {
-				let r = pattern;
-				if (typeof pattern === 'string') {
-					r = new RegExp(pattern);
-				}
-				return r.test(url);
+				return pattern.test(url);
 			}
 		`)
 		if err != nil {
