@@ -52,7 +52,7 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 				"please use the new xk6 kafka output extension instead - https://github.com/k6io/xk6-output-kafka")
 		},
 		builtinOutputStatsd.String(): func(_ output.Params) (output.Output, error) {
-			return nil, errors.New("the statsd output was deprecated in k6 v0.47.0 and removed in in k6 v0.55.0, " +
+			return nil, errors.New("the statsd output was deprecated in k6 v0.47.0 and removed in k6 v0.55.0, " +
 				"please use the new xk6 statsd output extension instead. " +
 				"It can be found at https://github.com/LeonAdato/xk6-output-statsd and " +
 				"more info at https://github.com/grafana/k6/issues/2982")
