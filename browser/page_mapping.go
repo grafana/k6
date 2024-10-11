@@ -419,14 +419,14 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 }
 
 // mapPageOn maps the requested page.on event to the Sobek runtime.
-// It generalizes the handling of page.on events on a taskqueue.
-func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error { //nolint:funlen
+// It generalizes the handling of page.on events.
+func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error {
 	rt := vu.Runtime()
 
 	pageOnEvents := map[common.PageOnEventName]struct {
 		mapp func(vu moduleVU, event common.PageOnEvent) mapping
-		prep func() error
-		wait bool // should we wait for the handler to complete?
+		init func() error // If set, runs before the event handler.
+		wait bool         // Whether to wait for the handler to complete.
 	}{
 		common.EventPageConsoleAPICalled: {
 			mapp: mapConsoleMessage,
@@ -434,7 +434,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 		},
 		common.EventPageMetricCalled: {
 			mapp: mapMetricEvent,
-			prep: prepK6BrowserRegExChecker(rt),
+			init: prepK6BrowserRegExChecker(rt),
 			wait: true,
 		},
 	}
@@ -445,17 +445,17 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			return fmt.Errorf("unknown page on event: %q", eventName)
 		}
 
-		// Prepare the environment for the page.on event handler if necessary.
-		if pageOnEvent.prep != nil {
-			if err := pageOnEvent.prep(); err != nil {
+		// Initializes the environment for the event handler if necessary.
+		if pageOnEvent.init != nil {
+			if err := pageOnEvent.init(); err != nil {
 				return fmt.Errorf("initiating page.on('%s'): %w", eventName, err)
 			}
 		}
 
-		// Queue the event handler in the task queue.
-		// Wait for the handler to complete if necessary.
+		// Run the the event handler in the task queue to
+		// ensure that the handler is executed on the event loop.
 		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
-		queueHandler := func(event common.PageOnEvent) {
+		eventHandler := func(event common.PageOnEvent) {
 			mapping := pageOnEvent.mapp(vu, event)
 
 			done := make(chan struct{})
@@ -479,9 +479,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
-		// Run the the event handler in the task queue to ensure that
-		// the handler is executed in the event loop.
-		return p.On(eventName, queueHandler) //nolint:wrapcheck
+		return p.On(eventName, eventHandler) //nolint:wrapcheck
 	}
 }
 
