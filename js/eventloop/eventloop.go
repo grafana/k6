@@ -124,7 +124,16 @@ func (e *EventLoop) RegisterCallback() (enqueueCallback func(func() error)) {
 			panic("RegisterCallback called twice")
 		}
 		callbackCalled = true
-		e.queue = append(e.queue, f)
+		wrapFunc := func() error {
+			rt := e.vu.Runtime()
+			callable, _ := sobek.AssertFunction(rt.ToValue(f))
+			_, err := callable(nil)
+			// if there is an exception the err will be nil either way
+
+			return err
+		}
+
+		e.queue = append(e.queue, wrapFunc)
 		e.registeredCallbacks--
 		e.lock.Unlock()
 		e.wakeup()

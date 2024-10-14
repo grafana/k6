@@ -598,7 +598,10 @@ func (r *Runtime) getPromise() *Object {
 func (r *Runtime) wrapPromiseReaction(fObj *Object) func(interface{}) {
 	f, _ := AssertFunction(fObj)
 	return func(x interface{}) {
-		_, _ = f(nil, r.ToValue(x))
+		_, err := f(nil, r.ToValue(x))
+		if err != nil {
+			panic(err)
+		}
 	}
 }
 
