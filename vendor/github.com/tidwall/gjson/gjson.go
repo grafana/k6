@@ -1040,6 +1040,10 @@ func parseObjectPath(path string) (r objectPathResult) {
 	return
 }
 
+var vchars = [256]byte{
+	'"': 2, '{': 3, '(': 3, '[': 3, '}': 1, ')': 1, ']': 1,
+}
+
 func parseSquash(json string, i int) (int, string) {
 	// expects that the lead character is a '[' or '{' or '('
 	// squash the value, ignoring all nested arrays and objects.
@@ -1047,43 +1051,137 @@ func parseSquash(json string, i int) (int, string) {
 	s := i
 	i++
 	depth := 1
-	for ; i < len(json); i++ {
-		if json[i] >= '"' && json[i] <= '}' {
-			switch json[i] {
-			case '"':
+	var c byte
+	for i < len(json) {
+		for i < len(json)-8 {
+			jslice := json[i : i+8]
+			c = vchars[jslice[0]]
+			if c != 0 {
+				i += 0
+				goto token
+			}
+			c = vchars[jslice[1]]
+			if c != 0 {
+				i += 1
+				goto token
+			}
+			c = vchars[jslice[2]]
+			if c != 0 {
+				i += 2
+				goto token
+			}
+			c = vchars[jslice[3]]
+			if c != 0 {
+				i += 3
+				goto token
+			}
+			c = vchars[jslice[4]]
+			if c != 0 {
+				i += 4
+				goto token
+			}
+			c = vchars[jslice[5]]
+			if c != 0 {
+				i += 5
+				goto token
+			}
+			c = vchars[jslice[6]]
+			if c != 0 {
+				i += 6
+				goto token
+			}
+			c = vchars[jslice[7]]
+			if c != 0 {
+				i += 7
+				goto token
+			}
+			i += 8
+		}
+		c = vchars[json[i]]
+		if c == 0 {
+			i++
+			continue
+		}
+	token:
+		if c == 2 {
+			// '"' string
+			i++
+			s2 := i
+		nextquote:
+			for i < len(json)-8 {
+				jslice := json[i : i+8]
+				if jslice[0] == '"' {
+					i += 0
+					goto strchkesc
+				}
+				if jslice[1] == '"' {
+					i += 1
+					goto strchkesc
+				}
+				if jslice[2] == '"' {
+					i += 2
+					goto strchkesc
+				}
+				if jslice[3] == '"' {
+					i += 3
+					goto strchkesc
+				}
+				if jslice[4] == '"' {
+					i += 4
+					goto strchkesc
+				}
+				if jslice[5] == '"' {
+					i += 5
+					goto strchkesc
+				}
+				if jslice[6] == '"' {
+					i += 6
+					goto strchkesc
+				}
+				if jslice[7] == '"' {
+					i += 7
+					goto strchkesc
+				}
+				i += 8
+			}
+			goto strchkstd
+		strchkesc:
+			if json[i-1] != '\\' {
 				i++
-				s2 := i
-				for ; i < len(json); i++ {
-					if json[i] > '\\' {
-						continue
-					}
-					if json[i] == '"' {
-						// look for an escaped slash
-						if json[i-1] == '\\' {
-							n := 0
-							for j := i - 2; j > s2-1; j-- {
-								if json[j] != '\\' {
-									break
-								}
-								n++
-							}
-							if n%2 == 0 {
-								continue
-							}
-						}
-						break
-					}
-				}
-			case '{', '[', '(':
-				depth++
-			case '}', ']', ')':
-				depth--
-				if depth == 0 {
+				continue
+			}
+		strchkstd:
+			for i < len(json) {
+				if json[i] > '\\' || json[i] != '"' {
 					i++
-					return i, json[s:i]
+					continue
 				}
+				// look for an escaped slash
+				if json[i-1] == '\\' {
+					n := 0
+					for j := i - 2; j > s2-1; j-- {
+						if json[j] != '\\' {
+							break
+						}
+						n++
+					}
+					if n%2 == 0 {
+						i++
+						goto nextquote
+					}
+				}
+				break
+			}
+		} else {
+			// '{', '[', '(', '}', ']', ')'
+			// open close tokens
+			depth += int(c) - 2
+			if depth == 0 {
+				i++
+				return i, json[s:i]
 			}
 		}
+		i++
 	}
 	return i, json[s:]
 }
@@ -1252,7 +1350,7 @@ func parseObject(c *parseContext, i int, path string) (int, bool) {
 }
 
 // matchLimit will limit the complexity of the match operation to avoid ReDos
-// attacks from arbritary inputs.
+// attacks from arbitrary inputs.
 // See the github.com/tidwall/match.MatchLimit function for more information.
 func matchLimit(str, pattern string) bool {
 	matched, _ := match.MatchLimit(str, pattern, 10000)
@@ -1917,6 +2015,16 @@ func appendHex16(dst []byte, x uint16) []byte {
 	)
 }
 
+// DisableEscapeHTML will disable the automatic escaping of certain
+// "problamatic" HTML characters when encoding to JSON.
+// These character include '>', '<' and '&', which get escaped to \u003e,
+// \u0026, and \u003c respectively.
+//
+// This is a global flag and will affect all further gjson operations.
+// Ideally, if used, it should be set one time before other gjson functions
+// are called.
+var DisableEscapeHTML = false
+
 // AppendJSONString is a convenience function that converts the provided string
 // to a valid JSON string and appends it to dst.
 func AppendJSONString(dst []byte, s string) []byte {
@@ -1940,7 +2048,8 @@ func AppendJSONString(dst []byte, s string) []byte {
 				dst = append(dst, 'u')
 				dst = appendHex16(dst, uint16(s[i]))
 			}
-		} else if s[i] == '>' || s[i] == '<' || s[i] == '&' {
+		} else if !DisableEscapeHTML &&
+			(s[i] == '>' || s[i] == '<' || s[i] == '&') {
 			dst = append(dst, '\\', 'u')
 			dst = appendHex16(dst, uint16(s[i]))
 		} else if s[i] == '\\' {
@@ -2194,7 +2303,7 @@ func unescape(json string) string {
 }
 
 // Less return true if a token is less than another token.
-// The caseSensitive paramater is used when the tokens are Strings.
+// The caseSensitive parameter is used when the tokens are Strings.
 // The order when comparing two different type is:
 //
 //	Null < False < Number < String < True < JSON
@@ -3353,7 +3462,7 @@ func (t Result) Path(json string) string {
 		goto fail
 	}
 	if !strings.HasPrefix(json[t.Index:], t.Raw) {
-		// Result is not at the JSON index as exepcted.
+		// Result is not at the JSON index as expected.
 		goto fail
 	}
 	for ; i >= 0; i-- {

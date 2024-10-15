@@ -267,7 +267,7 @@ func (r *result) validateExtension(fd *fldDescriptor, handler *reporter.Handler)
 		if extRangeOpts == nil {
 			break
 		}
-		if extRangeOpts.GetVerification() == descriptorpb.ExtensionRangeOptions_UNVERIFIED {
+		if len(extRangeOpts.Declaration) == 0 && extRangeOpts.GetVerification() != descriptorpb.ExtensionRangeOptions_DECLARATION {
 			break
 		}
 		var found bool
@@ -294,7 +294,7 @@ func (r *result) validateExtension(fd *fldDescriptor, handler *reporter.Handler)
 				span, _ := findExtensionRangeOptionSpan(msg.ParentFile(), msg, i, extRange,
 					internal.ExtensionRangeOptionsDeclarationTag, int32(j), internal.ExtensionRangeOptionsDeclarationFullNameTag)
 				err := handler.HandleErrorf(info, "expected extension with number %d to be named %s, not %s, per declaration at %v",
-					fd.Number(), extDecl.GetFullName(), fd.FullName(), span.Start())
+					fd.Number(), strings.TrimPrefix(extDecl.GetFullName(), "."), fd.FullName(), span.Start())
 				if err != nil {
 					return err
 				}
@@ -305,7 +305,7 @@ func (r *result) validateExtension(fd *fldDescriptor, handler *reporter.Handler)
 				span, _ := findExtensionRangeOptionSpan(msg.ParentFile(), msg, i, extRange,
 					internal.ExtensionRangeOptionsDeclarationTag, int32(j), internal.ExtensionRangeOptionsDeclarationTypeTag)
 				err := handler.HandleErrorf(info, "expected extension with number %d to have type %s, not %s, per declaration at %v",
-					fd.Number(), extDecl.GetType(), getTypeName(fd), span.Start())
+					fd.Number(), strings.TrimPrefix(extDecl.GetType(), "."), getTypeName(fd), span.Start())
 				if err != nil {
 					return err
 				}
@@ -520,7 +520,7 @@ func (r *result) validateJSONNamesInEnum(ed *enumDescriptor, handler *reporter.H
 			// With editions, not fully supporting JSON is allowed via feature: json_format == BEST_EFFORT
 			if !isJSONCompliant(ed) {
 				handler.HandleWarningWithPos(r.FileNode().NodeInfo(fldNode), conflictErr)
-			} else if err := handler.HandleErrorf(r.FileNode().NodeInfo(fldNode), conflictErr.Error()); err != nil {
+			} else if err := handler.HandleErrorWithPos(r.FileNode().NodeInfo(fldNode), conflictErr); err != nil {
 				return err
 			}
 		} else {
@@ -590,12 +590,15 @@ func (r *result) validateExtensionDeclarations(md *msgDescriptor, handler *repor
 			// nothing to check
 			continue
 		}
-		if len(opts.GetDeclaration()) > 0 && opts.GetVerification() == descriptorpb.ExtensionRangeOptions_UNVERIFIED {
+		// If any declarations are present, verification is assumed to be
+		// DECLARATION. It's an error for declarations to be present but the
+		// verification field explicitly set to something other than that.
+		if opts.Verification != nil && opts.GetVerification() != descriptorpb.ExtensionRangeOptions_DECLARATION {
 			span, ok := findExtensionRangeOptionSpan(r, md, i, extRange, internal.ExtensionRangeOptionsVerificationTag)
 			if !ok {
 				span, _ = findExtensionRangeOptionSpan(r, md, i, extRange, internal.ExtensionRangeOptionsDeclarationTag, 0)
 			}
-			if err := handler.HandleErrorf(span, "extension range cannot have declarations and have verification of UNVERIFIED"); err != nil {
+			if err := handler.HandleErrorf(span, "extension range cannot have declarations and have verification of %s", opts.GetVerification()); err != nil {
 				return err
 			}
 		}
@@ -652,68 +655,66 @@ func (r *result) validateExtensionDeclarations(md *msgDescriptor, handler *repor
 				}
 			}
 
-			if extDecl.GetReserved() {
-				if extDecl.FullName != nil {
-					span, _ := findExtensionRangeOptionSpan(r, md, i, extRange,
-						internal.ExtensionRangeOptionsDeclarationTag, int32(i), internal.ExtensionRangeOptionsDeclarationFullNameTag)
-					if err := handler.HandleErrorf(span, "extension declaration is marked reserved so full_name should not be present"); err != nil {
-						return err
-					}
-				}
-				if extDecl.Type != nil {
-					span, _ := findExtensionRangeOptionSpan(r, md, i, extRange,
-						internal.ExtensionRangeOptionsDeclarationTag, int32(i), internal.ExtensionRangeOptionsDeclarationTypeTag)
-					if err := handler.HandleErrorf(span, "extension declaration is marked reserved so type should not be present"); err != nil {
-						return err
-					}
-				}
-				continue
-			}
-
-			if extDecl.FullName == nil {
+			if extDecl.FullName == nil && !extDecl.GetReserved() {
 				span, _ := findExtensionRangeOptionSpan(r, md, i, extRange, internal.ExtensionRangeOptionsDeclarationTag, int32(i))
 				if err := handler.HandleErrorf(span, "extension declaration that is not marked reserved must have a full_name"); err != nil {
 					return err
 				}
-			}
-			var extensionFullName protoreflect.FullName
-			extensionNameSpan, _ := findExtensionRangeOptionSpan(r, md, i, extRange,
-				internal.ExtensionRangeOptionsDeclarationTag, int32(i), internal.ExtensionRangeOptionsDeclarationFullNameTag)
-			if !strings.HasPrefix(extDecl.GetFullName(), ".") {
-				if err := handler.HandleErrorf(extensionNameSpan, "extension declaration full name %q should start with a leading dot (.)", extDecl.GetFullName()); err != nil {
+			} else if extDecl.FullName != nil {
+				var extensionFullName protoreflect.FullName
+				extensionNameSpan, _ := findExtensionRangeOptionSpan(r, md, i, extRange,
+					internal.ExtensionRangeOptionsDeclarationTag, int32(i), internal.ExtensionRangeOptionsDeclarationFullNameTag)
+				if !strings.HasPrefix(extDecl.GetFullName(), ".") {
+					if err := handler.HandleErrorf(extensionNameSpan, "extension declaration full name %q should start with a leading dot (.)", extDecl.GetFullName()); err != nil {
+						return err
+					}
+					extensionFullName = protoreflect.FullName(extDecl.GetFullName())
+				} else {
+					extensionFullName = protoreflect.FullName(extDecl.GetFullName()[1:])
+				}
+				if !extensionFullName.IsValid() {
+					if err := handler.HandleErrorf(extensionNameSpan, "extension declaration full name %q is not a valid qualified name", extDecl.GetFullName()); err != nil {
+						return err
+					}
+				}
+				if err := symbols.AddExtensionDeclaration(extensionFullName, md.FullName(), protoreflect.FieldNumber(extDecl.GetNumber()), extensionNameSpan, handler); err != nil {
 					return err
 				}
-				extensionFullName = protoreflect.FullName(extDecl.GetFullName())
-			} else {
-				extensionFullName = protoreflect.FullName(extDecl.GetFullName()[1:])
-			}
-			if !extensionFullName.IsValid() {
-				if err := handler.HandleErrorf(extensionNameSpan, "extension declaration full name %q is not a valid qualified name", extDecl.GetFullName()); err != nil {
-					return err
-				}
-			}
-			if err := symbols.AddExtensionDeclaration(extensionFullName, md.FullName(), protoreflect.FieldNumber(extDecl.GetNumber()), extensionNameSpan, handler); err != nil {
-				return err
 			}
 
-			if extDecl.Type == nil {
+			if extDecl.Type == nil && !extDecl.GetReserved() {
 				span, _ := findExtensionRangeOptionSpan(r, md, i, extRange, internal.ExtensionRangeOptionsDeclarationTag, int32(i))
 				if err := handler.HandleErrorf(span, "extension declaration that is not marked reserved must have a type"); err != nil {
 					return err
 				}
-			}
-			if strings.HasPrefix(extDecl.GetType(), ".") {
-				if !protoreflect.FullName(extDecl.GetType()[1:]).IsValid() {
+			} else if extDecl.Type != nil {
+				if strings.HasPrefix(extDecl.GetType(), ".") {
+					if !protoreflect.FullName(extDecl.GetType()[1:]).IsValid() {
+						span, _ := findExtensionRangeOptionSpan(r, md, i, extRange,
+							internal.ExtensionRangeOptionsDeclarationTag, int32(i), internal.ExtensionRangeOptionsDeclarationTypeTag)
+						if err := handler.HandleErrorf(span, "extension declaration type %q is not a valid qualified name", extDecl.GetType()); err != nil {
+							return err
+						}
+					}
+				} else if !isBuiltinTypeName(extDecl.GetType()) {
 					span, _ := findExtensionRangeOptionSpan(r, md, i, extRange,
 						internal.ExtensionRangeOptionsDeclarationTag, int32(i), internal.ExtensionRangeOptionsDeclarationTypeTag)
-					if err := handler.HandleErrorf(span, "extension declaration type %q is not a valid qualified name", extDecl.GetType()); err != nil {
+					if err := handler.HandleErrorf(span, "extension declaration type %q must be a builtin type or start with a leading dot (.)", extDecl.GetType()); err != nil {
 						return err
 					}
 				}
-			} else if !isBuiltinTypeName(extDecl.GetType()) {
+			}
+
+			if extDecl.GetReserved() && (extDecl.FullName == nil) != (extDecl.Type == nil) {
+				var fieldTag int32
+				if extDecl.FullName != nil {
+					fieldTag = internal.ExtensionRangeOptionsDeclarationFullNameTag
+				} else {
+					fieldTag = internal.ExtensionRangeOptionsDeclarationTypeTag
+				}
 				span, _ := findExtensionRangeOptionSpan(r, md, i, extRange,
-					internal.ExtensionRangeOptionsDeclarationTag, int32(i), internal.ExtensionRangeOptionsDeclarationTypeTag)
-				if err := handler.HandleErrorf(span, "extension declaration type %q must be a builtin type or start with a leading dot (.)", extDecl.GetType()); err != nil {
+					internal.ExtensionRangeOptionsDeclarationTag, int32(i), fieldTag)
+				if err := handler.HandleErrorf(span, "extension declarations that are reserved should specify both full_name and type or neither"); err != nil {
 					return err
 				}
 			}

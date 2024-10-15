@@ -108,7 +108,7 @@ type EnumValueDeclNode interface {
 }
 
 var _ EnumValueDeclNode = (*EnumValueNode)(nil)
-var _ EnumValueDeclNode = NoSourceNode{}
+var _ EnumValueDeclNode = (*NoSourceNode)(nil)
 
 // EnumValueNode represents an enum declaration. Example:
 //

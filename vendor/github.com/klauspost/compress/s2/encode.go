@@ -9,6 +9,9 @@ import (
 	"encoding/binary"
 	"math"
 	"math/bits"
+	"sync"
+
+	"github.com/klauspost/compress/internal/race"
 )
 
 // Encode returns the encoded form of src. The returned slice may be a sub-
@@ -52,6 +55,8 @@ func Encode(dst, src []byte) []byte {
 	return dst[:d]
 }
 
+var estblockPool [2]sync.Pool
+
 // EstimateBlockSize will perform a very fast compression
 // without outputting the result and return the compressed output size.
 // The function returns -1 if no improvement could be achieved.
@@ -61,9 +66,25 @@ func EstimateBlockSize(src []byte) (d int) {
 		return -1
 	}
 	if len(src) <= 1024 {
-		d = calcBlockSizeSmall(src)
+		const sz, pool = 2048, 0
+		tmp, ok := estblockPool[pool].Get().(*[sz]byte)
+		if !ok {
+			tmp = &[sz]byte{}
+		}
+		race.WriteSlice(tmp[:])
+		defer estblockPool[pool].Put(tmp)
+
+		d = calcBlockSizeSmall(src, tmp)
 	} else {
-		d = calcBlockSize(src)
+		const sz, pool = 32768, 1
+		tmp, ok := estblockPool[pool].Get().(*[sz]byte)
+		if !ok {
+			tmp = &[sz]byte{}
+		}
+		race.WriteSlice(tmp[:])
+		defer estblockPool[pool].Put(tmp)
+
+		d = calcBlockSize(src, tmp)
 	}
 
 	if d == 0 {

@@ -62,7 +62,7 @@ func (s *Selection) AddBackFiltered(selector string) *Selection {
 }
 
 // AddBackMatcher reduces the previous set of elements on the stack to those that match
-// the mateher, and adds them to the curernt set.
+// the matcher, and adds them to the current set.
 // It returns a new Selection object containing the current Selection combined
 // with the filtered previous one
 func (s *Selection) AddBackMatcher(m Matcher) *Selection {

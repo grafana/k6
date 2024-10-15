@@ -197,7 +197,7 @@ func (t *AncestorTracker) AsWalkOptions() []WalkOption {
 			t.ancestors = append(t.ancestors, n)
 			return nil
 		}),
-		WithAfter(func(n Node) error {
+		WithAfter(func(_ Node) error {
 			t.ancestors = t.ancestors[:len(t.ancestors)-1]
 			return nil
 		}),

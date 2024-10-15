@@ -317,7 +317,7 @@ func matchLen(a []byte, b []byte) int {
 }
 
 // input must be > inputMargin
-func calcBlockSize(src []byte) (d int) {
+func calcBlockSize(src []byte, _ *[32768]byte) (d int) {
 	// Initialize the hash table.
 	const (
 		tableBits    = 13
@@ -503,7 +503,7 @@ emitRemainder:
 }
 
 // length must be > inputMargin.
-func calcBlockSizeSmall(src []byte) (d int) {
+func calcBlockSizeSmall(src []byte, _ *[2048]byte) (d int) {
 	// Initialize the hash table.
 	const (
 		tableBits    = 9
