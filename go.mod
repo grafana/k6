@@ -7,7 +7,7 @@ toolchain go1.21.13
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
-	github.com/PuerkitoBio/goquery v1.9.2
+	github.com/PuerkitoBio/goquery v1.9.3 // FIXME: update to v1.10.x only when k6 uses go 1.23 and above
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.0
 	github.com/evanw/esbuild v0.21.2
@@ -48,10 +48,10 @@ require (
 	go.opentelemetry.io/otel/sdk v1.29.0
 	go.opentelemetry.io/otel/trace v1.29.0
 	go.uber.org/goleak v1.3.0
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.27.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20240806160748-b2d3a6a4b4d3
-	golang.org/x/net v0.28.0
-	golang.org/x/term v0.23.0
+	golang.org/x/net v0.29.0
+	golang.org/x/term v0.24.0
 	golang.org/x/time v0.6.0
 	google.golang.org/grpc v1.65.0
 	google.golang.org/protobuf v1.34.2
@@ -98,8 +98,8 @@ require (
 	go.opentelemetry.io/otel/sdk/metric v1.28.0 // indirect
 	go.opentelemetry.io/proto/otlp v1.3.1 // indirect
 	golang.org/x/sync v0.8.0 // indirect
-	golang.org/x/sys v0.24.0 // indirect
-	golang.org/x/text v0.17.0 // indirect
+	golang.org/x/sys v0.25.0 // indirect
+	golang.org/x/text v0.18.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20240822170219-fc7c04adadcd // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20240822170219-fc7c04adadcd // indirect
 	gopkg.in/cenkalti/backoff.v1 v1.1.0 // indirect
