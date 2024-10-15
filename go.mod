@@ -14,7 +14,7 @@ require (
 	github.com/fatih/color v1.17.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
-	github.com/gorilla/websocket v1.5.1
+	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/xk6-browser v1.8.5
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-opentelemetry v0.2.0
