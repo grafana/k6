@@ -9,7 +9,7 @@ require (
 	github.com/DataDog/datadog-go v0.0.0-20180330214955-e67964b4021a
 	github.com/PuerkitoBio/goquery v1.9.3 // FIXME: update to v1.10.x only when k6 uses go 1.23 and above
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
-	github.com/andybalholm/brotli v1.1.0
+	github.com/andybalholm/brotli v1.1.1
 	github.com/evanw/esbuild v0.21.2
 	github.com/fatih/color v1.17.0
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
