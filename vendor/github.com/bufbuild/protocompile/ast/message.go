@@ -32,7 +32,7 @@ type MessageDeclNode interface {
 var _ MessageDeclNode = (*MessageNode)(nil)
 var _ MessageDeclNode = (*SyntheticGroupMessageNode)(nil)
 var _ MessageDeclNode = (*SyntheticMapEntryNode)(nil)
-var _ MessageDeclNode = NoSourceNode{}
+var _ MessageDeclNode = (*NoSourceNode)(nil)
 
 // MessageNode represents a message declaration. Example:
 //

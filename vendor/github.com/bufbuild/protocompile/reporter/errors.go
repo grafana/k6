@@ -39,13 +39,18 @@ type ErrorWithPos interface {
 
 // Error creates a new ErrorWithPos from the given error and source position.
 func Error(span ast.SourceSpan, err error) ErrorWithPos {
-	return errorWithSpan{SourceSpan: span, underlying: err}
+	var ewp ErrorWithPos
+	if errors.As(err, &ewp) {
+		// replace existing position with given one
+		return &errorWithSpan{SourceSpan: span, underlying: ewp.Unwrap()}
+	}
+	return &errorWithSpan{SourceSpan: span, underlying: err}
 }
 
 // Errorf creates a new ErrorWithPos whose underlying error is created using the
 // given message format and arguments (via fmt.Errorf).
 func Errorf(span ast.SourceSpan, format string, args ...interface{}) ErrorWithPos {
-	return errorWithSpan{SourceSpan: span, underlying: fmt.Errorf(format, args...)}
+	return Error(span, fmt.Errorf(format, args...))
 }
 
 type errorWithSpan struct {
@@ -53,17 +58,17 @@ type errorWithSpan struct {
 	underlying error
 }
 
-func (e errorWithSpan) Error() string {
+func (e *errorWithSpan) Error() string {
 	sourcePos := e.GetPosition()
 	return fmt.Sprintf("%s: %v", sourcePos, e.underlying)
 }
 
-func (e errorWithSpan) GetPosition() ast.SourcePos {
+func (e *errorWithSpan) GetPosition() ast.SourcePos {
 	return e.Start()
 }
 
-func (e errorWithSpan) Unwrap() error {
+func (e *errorWithSpan) Unwrap() error {
 	return e.underlying
 }
 
-var _ ErrorWithPos = errorWithSpan{}
+var _ ErrorWithPos = (*errorWithSpan)(nil)

@@ -26,7 +26,7 @@ type OptionDeclNode interface {
 }
 
 var _ OptionDeclNode = (*OptionNode)(nil)
-var _ OptionDeclNode = NoSourceNode{}
+var _ OptionDeclNode = (*NoSourceNode)(nil)
 
 // OptionNode represents the declaration of a single option for an element.
 // It is used both for normal option declarations (start with "option" keyword
@@ -410,4 +410,4 @@ var _ NodeWithOptions = RPCDeclNode(nil)
 var _ NodeWithOptions = FieldDeclNode(nil)
 var _ NodeWithOptions = EnumValueDeclNode(nil)
 var _ NodeWithOptions = (*ExtensionRangeNode)(nil)
-var _ NodeWithOptions = NoSourceNode{}
+var _ NodeWithOptions = (*NoSourceNode)(nil)

@@ -1,6 +1,7 @@
 package desc
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 	"sync"
@@ -33,7 +34,7 @@ var (
 // re-processed if the same file is fetched again later.
 func LoadFileDescriptor(file string) (*FileDescriptor, error) {
 	d, err := sourceinfo.GlobalFiles.FindFileByPath(file)
-	if err == protoregistry.NotFound {
+	if errors.Is(err, protoregistry.NotFound) {
 		// for backwards compatibility, see if this matches a known old
 		// alias for the file (older versions of libraries that registered
 		// the files using incorrect/non-canonical paths)
@@ -42,7 +43,7 @@ func LoadFileDescriptor(file string) (*FileDescriptor, error) {
 		}
 	}
 	if err != nil {
-		if err != protoregistry.NotFound {
+		if !errors.Is(err, protoregistry.NotFound) {
 			return nil, internal.ErrNoSuchFile(file)
 		}
 		return nil, err
@@ -64,7 +65,7 @@ func LoadFileDescriptor(file string) (*FileDescriptor, error) {
 func LoadMessageDescriptor(message string) (*MessageDescriptor, error) {
 	mt, err := sourceinfo.GlobalTypes.FindMessageByName(protoreflect.FullName(message))
 	if err != nil {
-		if err == protoregistry.NotFound {
+		if errors.Is(err, protoregistry.NotFound) {
 			return nil, nil
 		}
 		return nil, err
