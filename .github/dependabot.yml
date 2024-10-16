@@ -8,8 +8,20 @@ updates:
       # Keep the experimental modules up-to-date
       - dependency-name: "github.com/grafana/xk6-*"
         dependency-type: "all"
-    commit-message:
-      prefix: "Upgrade experimental module "
-      include: "scope"
+      # golang/x
+      - dependency-name: "golang.org/x/*"
+        dependency-type: "all"
+      # google's grpc and protobuf
+      - dependency-name: "google.golang.org/*"
+        dependency-type: "all"
+      # miscellaneous
+      - dependency-name: "github.com/PuerkitoBio/goquery"
+      - dependency-name: "github.com/andybalholm/brotli"
+      - dependency-name: "github.com/evanw/esbuild"
+      - dependency-name: "github.com/gorilla/websocket"
+      - dependency-name: "github.com/grafana/sobek"
+      - dependency-name: "github.com/jhump/protoreflect"
+      - dependency-name: "github.com/klauspost/compress"
+      - dependency-name: "github.com/tidwall/gjson"
     reviewers:
       - "grafana/k6-core"
