@@ -12,7 +12,7 @@ func mapMetricEvent(vu moduleVU, event common.PageOnEvent) mapping {
 	em := event.Metric
 
 	return mapping{
-		"tag": func(urls common.URLTagPatterns) error {
+		"tag": func(urls common.TagMatches) error {
 			callback := func(pattern, url string) (bool, error) {
 				js := fmt.Sprintf(`_k6BrowserCheckRegEx(%s, '%s')`, pattern, url)
 

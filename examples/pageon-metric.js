@@ -19,7 +19,7 @@ export default async function() {
   page.on('metric', (metric) => {
     metric.tag({
       name:'test',
-      urls: [
+      matches: [
         {url: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/},
       ]
     });
