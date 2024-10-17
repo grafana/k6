@@ -1910,9 +1910,10 @@ func TestPageOnMetric(t *testing.T) {
 	}
 
 	tests := []struct {
-		name string
-		fun  string
-		want string
+		name      string
+		fun       string
+		want      string
+		wantRegex string
 	}{
 		{
 			// Just a single page.on.
@@ -2007,6 +2008,20 @@ func TestPageOnMetric(t *testing.T) {
 			});`,
 			want: "ping-1",
 		},
+		{
+			// When supplying the wrong request method (POST) when it should be GET.
+			// In this case the URLs aren't grouped.
+			name: "wrong_method_should_skip_method_comparison",
+			fun: `page.on('metric', (metric) => {
+				metric.tag({
+					name:'ping-1',
+					matches: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, method: 'POST'},
+					]
+				});
+			});`,
+			wantRegex: `http://127\.0\.0\.1:[0-9]+/ping\?h=[0-9a-z]+`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2045,7 +2060,11 @@ func TestPageOnMetric(t *testing.T) {
 						// Url shouldn't contain any of the hash values, and should
 						// instead take the name that was supplied in the Tag
 						// function on metric in page.on.
-						assert.Equal(t, tt.want, u)
+						if tt.wantRegex != "" {
+							assert.Regexp(t, tt.wantRegex, u)
+						} else {
+							assert.Equal(t, tt.want, u)
+						}
 
 						foundAmended.Add(1)
 					}
