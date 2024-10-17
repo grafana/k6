@@ -384,6 +384,8 @@ type MetricEvent struct {
 	// The URL value from the metric's url tag. It will be used to match
 	// against the URL grouping regexs.
 	url string
+	// The method of the request made to the URL.
+	method string
 
 	// When a match is found this userProvidedURLTagName field should be updated.
 	userProvidedURLTagName string
@@ -455,7 +457,8 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	var newTagName string
 	var urlMatched bool
 	em := &MetricEvent{
-		url: url,
+		url:    url,
+		method: method,
 	}
 
 	p.eventHandlersMu.RLock()
