@@ -322,6 +322,9 @@ type Options struct {
 	// Summary time unit for summary metrics (response times) in CLI output
 	SummaryTimeUnit null.String `json:"summaryTimeUnit" envconfig:"K6_SUMMARY_TIME_UNIT"`
 
+	// Timeout for the handleSummary function
+	HandleSummaryTimeout types.NullDuration `json:"handleSummaryTimeout" envconfig:"K6_HANDLE_SUMMARY_TIMEOUT"`
+
 	// Which system tags to include with metrics ("method", "vu" etc.)
 	// Use pointer for identifying whether user provide any tag or not.
 	SystemTags *metrics.SystemTagSet `json:"systemTags" envconfig:"K6_SYSTEM_TAGS"`
@@ -484,6 +487,9 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.SummaryTimeUnit.Valid {
 		o.SummaryTimeUnit = opts.SummaryTimeUnit
+	}
+	if opts.HandleSummaryTimeout.Valid {
+		o.HandleSummaryTimeout = opts.HandleSummaryTimeout
 	}
 	if opts.SystemTags != nil {
 		o.SystemTags = opts.SystemTags
