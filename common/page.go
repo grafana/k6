@@ -436,6 +436,10 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 			default:
 				return fmt.Errorf("method %q is invalid", m.Method)
 			}
+
+			if method != e.method {
+				continue
+			}
 		}
 
 		// matchesRegex is a function that will perform the regex test in the Sobek
