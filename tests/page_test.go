@@ -1919,8 +1919,9 @@ func TestPageOnMetric(t *testing.T) {
 			name: "single_page.on",
 			fun: `page.on('metric', (metric) => {
 				metric.tag({
-				  urls: [
-						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+				  	name:'ping-1',
+					urls: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
 					]
 				});
 			});`,
@@ -1931,14 +1932,16 @@ func TestPageOnMetric(t *testing.T) {
 			name: "multi_tag",
 			fun: `page.on('metric', (metric) => {
 				metric.tag({
-				  urls: [
-						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+					name:'ping-1',
+					urls: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
 					]
 				});
 				metric.tag({
+					name:'ping-2',
 					urls: [
-						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
-					  ]
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
+					]
 				  });
 			});`,
 			want: "ping-2",
@@ -1948,20 +1951,23 @@ func TestPageOnMetric(t *testing.T) {
 			name: "multi_tag_page.on",
 			fun: `page.on('metric', (metric) => {
 				metric.tag({
-				  urls: [
-						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+					name:'ping-1',
+					urls: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
 					]
 				});
 				metric.tag({
+					name:'ping-2',
 					urls: [
-						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-2'},
+						  {url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
 					  ]
 				  });
 			});
 			page.on('metric', (metric) => {
 				metric.tag({
-				  urls: [
-						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-3'},
+					name:'ping-3',
+					urls: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
 					]
 				});
 			});`,
@@ -1972,14 +1978,16 @@ func TestPageOnMetric(t *testing.T) {
 			name: "multi_page.on_call",
 			fun: `page.on('metric', (metric) => {
 				metric.tag({
-				  urls: [
-						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-1'},
+					name:'ping-1',
+					urls: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
 					]
 				});
 				page.on('metric', (metric) => {
 					metric.tag({
+						name:'ping-4',
 						urls: [
-							{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, name:'ping-4'},
+							{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/},
 						]
 					});
 				});

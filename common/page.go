@@ -394,16 +394,17 @@ type MetricEvent struct {
 
 // URLTagPatterns will contain all the URL groupings.
 type URLTagPatterns struct {
+	// The name to send back to the caller of the handler.
+	TagName string `js:"name"`
+	// The request patterns to match against.
 	URLs []URLTagPattern `js:"urls"`
 }
 
-// URLTagPattern contains the single url regex and the name to give to the metric
-// if a match is found.
+// URLTagPattern contains the fields that will be used to match against
+// metric tags that are about to be emitted.
 type URLTagPattern struct {
 	// This is a regex that will be compared against the existing url tag.
 	URLRegEx string `js:"url"`
-	// The name to send back to the caller of the handler.
-	TagName string `js:"name"`
 }
 
 // K6BrowserCheckRegEx is a function that will be used to check the URL tag
@@ -414,9 +415,9 @@ type K6BrowserCheckRegEx func(pattern, url string) (bool, error)
 // the metric tag and update the name field.
 func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, patterns URLTagPatterns) error {
 	for _, o := range patterns.URLs {
-		name := strings.TrimSpace(o.TagName)
+		name := strings.TrimSpace(patterns.TagName)
 		if name == "" {
-			return fmt.Errorf("name %q is invalid", o.TagName)
+			return fmt.Errorf("name %q is invalid", patterns.TagName)
 		}
 
 		// matchesRegex is a function that will perform the regex test in the Sobek
