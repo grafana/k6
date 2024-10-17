@@ -1914,6 +1914,7 @@ func TestPageOnMetric(t *testing.T) {
 		fun       string
 		want      string
 		wantRegex string
+		wantErr   string
 	}{
 		{
 			// Just a single page.on.
@@ -2022,6 +2023,20 @@ func TestPageOnMetric(t *testing.T) {
 			});`,
 			wantRegex: `http://127\.0\.0\.1:[0-9]+/ping\?h=[0-9a-z]+`,
 		},
+		{
+			// We should get an error back when the name is invalid (empty string)
+			name: "with_invalid_name",
+			fun: `page.on('metric', (metric) => {
+				metric.tag({
+					name:'  ',
+					matches: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, method: 'GET'},
+					]
+				});
+			});`,
+			wantRegex: `http://127\.0\.0\.1:[0-9]+/ping\?h=[0-9a-z]+`,
+			wantErr:   `name "  " is invalid`,
+		},
 	}
 
 	for _, tt := range tests {
@@ -2077,7 +2092,7 @@ func TestPageOnMetric(t *testing.T) {
 			// Some of the business logic is in the mapping layer unfortunately.
 			// To test everything is wried up correctly, we're required to work
 			// with RunPromise.
-			got := vu.RunPromise(t, `
+			gv, err := vu.RunAsync(t, `
 				const page = await browser.newPage()
 
 				%s
@@ -2086,6 +2101,15 @@ func TestPageOnMetric(t *testing.T) {
 
 				await page.close()
 			`, tt.fun, tb.url("/home"))
+
+			if tt.wantErr != "" {
+				assert.ErrorContains(t, err, tt.wantErr)
+			} else {
+				assert.NoError(t, err)
+			}
+
+			got := k6test.ToPromise(t, gv)
+
 			assert.True(t, got.Result().Equals(sobek.Null()))
 
 			close(samples)
