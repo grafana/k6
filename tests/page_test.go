@@ -2010,6 +2010,20 @@ func TestPageOnMetric(t *testing.T) {
 			want: "ping-1",
 		},
 		{
+			// With method field " get ", which is to ensure it is internally
+			// converted to "GET" before comparing.
+			name: "lowercase_needs_trimming",
+			fun: `page.on('metric', (metric) => {
+				metric.tag({
+					name:'ping-1',
+					matches: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, method: ' get '},
+					]
+				});
+			});`,
+			want: "ping-1",
+		},
+		{
 			// When supplying the wrong request method (POST) when it should be GET.
 			// In this case the URLs aren't grouped.
 			name: "wrong_method_should_skip_method_comparison",
