@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -425,6 +426,18 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 	}
 
 	for _, m := range matches.Matches {
+		// Validate the request method type if it has been assigned in a Match.
+		method := strings.TrimSpace(m.Method)
+		if method != "" {
+			method = strings.ToUpper(method)
+			switch method {
+			case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
+				http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace:
+			default:
+				return fmt.Errorf("method %q is invalid", m.Method)
+			}
+		}
+
 		// matchesRegex is a function that will perform the regex test in the Sobek
 		// runtime.
 		matched, err := matchesRegex(m.URLRegEx, e.url)
