@@ -22,7 +22,13 @@ Syntax-wise, it is as close as possible to jQuery, with the same function names 
 
 ## Installation
 
-Please note that starting with version `v1.9.0` of goquery, Go 1.18+ is required due to the use of generics. For previous goquery versions, a Go version of 1.1+ was required because of the `net/html` dependency. Ongoing goquery development is tested on the latest 2 versions of Go.
+Required Go version:
+
+* Starting with version `v1.10.0` of goquery, Go 1.23+ is required due to the use of function-based iterators. 
+* For `v1.9.0` of goquery, Go 1.18+ is required due to the use of generics. 
+* For previous goquery versions, a Go version of 1.1+ was required because of the `net/html` dependency. 
+
+Ongoing goquery development is tested on the latest 2 versions of Go.
 
     $ go get github.com/PuerkitoBio/goquery
 
@@ -40,6 +46,8 @@ Please note that starting with version `v1.9.0` of goquery, Go 1.18+ is required
 
 **Note that goquery's API is now stable, and will not break.**
 
+*    **2024-09-06 (v1.10.0)** : Add `EachIter` which provides an iterator that can be used in `for..range` loops on the `*Selection` object. **goquery now requires Go version 1.23+** (thanks [@amikai](https://github.com/amikai)).
+*    **2024-09-06 (v1.9.3)** : Update `go.mod` dependencies.
 *    **2024-04-29 (v1.9.2)** : Update `go.mod` dependencies.
 *    **2024-02-29 (v1.9.1)** : Improve allocation and performance of the `Map` function and `Selection.Map` method, better document the cascadia differences (thanks [@jwilsson](https://github.com/jwilsson)).
 *    **2024-02-22 (v1.9.0)** : Add a generic `Map` function, **goquery now requires Go version 1.18+** (thanks [@Fesaa](https://github.com/Fesaa)).
@@ -161,6 +169,7 @@ func main() {
 - [goskyr](https://github.com/jakopako/goskyr), an easily configurable command-line scraper written in Go.
 - [goGetJS](https://github.com/davemolk/goGetJS), a tool for extracting, searching, and saving JavaScript files (with optional headless browser).
 - [fitter](https://github.com/PxyUp/fitter), a tool for selecting values from JSON, XML, HTML and XPath formatted pages.
+- [seltabl](github.com/conneroisu/seltabl), an orm-like package and supporting language server for extracting values from HTML
 
 ## Support
 
@@ -183,15 +192,15 @@ There are a number of ways you can support the project:
 
 The [BSD 3-Clause license][bsd], the same as the [Go language][golic]. Cascadia's license is [here][caslic].
 
-[jquery]: http://jquery.com/
-[go]: http://golang.org/
+[jquery]: https://jquery.com/
+[go]: https://go.dev/
 [cascadia]: https://github.com/andybalholm/cascadia
 [cascadiacli]: https://github.com/suntong/cascadia
-[bsd]: http://opensource.org/licenses/BSD-3-Clause
-[golic]: http://golang.org/LICENSE
+[bsd]: https://opensource.org/licenses/BSD-3-Clause
+[golic]: https://go.dev/LICENSE
 [caslic]: https://github.com/andybalholm/cascadia/blob/master/LICENSE
 [doc]: https://pkg.go.dev/github.com/PuerkitoBio/goquery
-[index]: http://api.jquery.com/index/
+[index]: https://api.jquery.com/index/
 [gonet]: https://github.com/golang/net/
 [html]: https://pkg.go.dev/golang.org/x/net/html
 [wiki]: https://github.com/PuerkitoBio/goquery/wiki/Tips-and-tricks

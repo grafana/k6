@@ -1,12 +1,11 @@
 module go.k6.io/k6
 
 go 1.21
-
-toolchain go1.21.13
+toolchain go1.23.2
 
 require (
 	github.com/Azure/go-ntlmssp v0.0.0-20221128193559-754e69321358
-	github.com/PuerkitoBio/goquery v1.9.2
+	github.com/PuerkitoBio/goquery v1.10.0
 	github.com/Soontao/goHttpDigestClient v0.0.0-20170320082612-6d28bb1415c5
 	github.com/andybalholm/brotli v1.1.0
 	github.com/evanw/esbuild v0.21.2
@@ -47,9 +46,9 @@ require (
 	go.opentelemetry.io/otel/sdk v1.29.0
 	go.opentelemetry.io/otel/trace v1.29.0
 	go.uber.org/goleak v1.3.0
-	golang.org/x/crypto v0.26.0
+	golang.org/x/crypto v0.27.0
 	golang.org/x/crypto/x509roots/fallback v0.0.0-20240806160748-b2d3a6a4b4d3
-	golang.org/x/net v0.28.0
+	golang.org/x/net v0.29.0
 	golang.org/x/term v0.25.0
 	golang.org/x/time v0.7.0
 	google.golang.org/grpc v1.65.0
