@@ -1994,6 +1994,19 @@ func TestPageOnMetric(t *testing.T) {
 			});`,
 			want: "ping-4",
 		},
+		{
+			// With method field GET, which is the correct method for the request.
+			name: "with_method",
+			fun: `page.on('metric', (metric) => {
+				metric.tag({
+					name:'ping-1',
+					matches: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, method: 'GET'},
+					]
+				});
+			});`,
+			want: "ping-1",
+		},
 	}
 
 	for _, tt := range tests {
