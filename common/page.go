@@ -408,6 +408,8 @@ type TagMatches struct {
 type Match struct {
 	// This is a regex that will be compared against the existing url tag.
 	URLRegEx string `js:"url"`
+	// This is the request method to match on.
+	Method string `js:"method"`
 }
 
 // K6BrowserCheckRegEx is a function that will be used to check the URL tag
