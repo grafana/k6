@@ -2037,6 +2037,20 @@ func TestPageOnMetric(t *testing.T) {
 			wantRegex: `http://127\.0\.0\.1:[0-9]+/ping\?h=[0-9a-z]+`,
 			wantErr:   `name "  " is invalid`,
 		},
+		{
+			// We should get an error back when the method is invalid.
+			name: "with_invalid_name",
+			fun: `page.on('metric', (metric) => {
+				metric.tag({
+					name:'ping-1',
+					matches: [
+						{url: /^http:\/\/127\.0\.0\.1\:[0-9]+\/ping\?h=[0-9a-z]+$/, method: 'foo'},
+					]
+				});
+			});`,
+			wantRegex: `http://127\.0\.0\.1:[0-9]+/ping\?h=[0-9a-z]+`,
+			wantErr:   `method "foo" is invalid`,
+		},
 	}
 
 	for _, tt := range tests {
