@@ -194,6 +194,10 @@ func (self *_RegExp_parser) scanGroup() {
 		case '[':
 			self.scanBracket()
 		case '.':
+			if self.dotAll {
+				self.pass()
+				break
+			}
 			self.writeString(Re2Dot)
 			self.read()
 		default:
