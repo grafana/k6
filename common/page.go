@@ -415,12 +415,12 @@ type K6BrowserCheckRegEx func(pattern, url string) (bool, error)
 // Tag will find the first match given the URLTagPatterns and the URL from
 // the metric tag and update the name field.
 func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) error {
-	for _, m := range matches.Matches {
-		name := strings.TrimSpace(matches.TagName)
-		if name == "" {
-			return fmt.Errorf("name %q is invalid", matches.TagName)
-		}
+	name := strings.TrimSpace(matches.TagName)
+	if name == "" {
+		return fmt.Errorf("name %q is invalid", matches.TagName)
+	}
 
+	for _, m := range matches.Matches {
 		// matchesRegex is a function that will perform the regex test in the Sobek
 		// runtime.
 		matched, err := matchesRegex(m.URLRegEx, e.url)
