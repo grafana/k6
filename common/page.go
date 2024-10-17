@@ -447,7 +447,7 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 // `page.on('metric')`. The user will need to use `Tag` to supply the
 // url regexes and the matching is done from within there. If a match is found,
 // the supplied name is returned back upstream to the caller of urlTagName.
-func (p *Page) urlTagName(url string) (string, bool) {
+func (p *Page) urlTagName(url string, method string) (string, bool) {
 	if !hasPageOnHandler(p, EventPageMetricCalled) {
 		return "", false
 	}

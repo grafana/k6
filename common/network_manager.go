@@ -58,7 +58,7 @@ func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error 
 }
 
 type metricInterceptor interface {
-	urlTagName(urlTag string) (string, bool)
+	urlTagName(urlTag string, method string) (string, bool)
 }
 
 // NetworkManager manages all frames in HTML document.
@@ -293,7 +293,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 // against user supplied regex. If there's a match a user supplied name will
 // be used instead of the url for the url tag, otherwise the url will be used.
 func handleURLTag(mi metricInterceptor, url string, method string, tags *k6metrics.TagSet) *k6metrics.TagSet {
-	if newTagName, urlMatched := mi.urlTagName(url); urlMatched {
+	if newTagName, urlMatched := mi.urlTagName(url, method); urlMatched {
 		tags = tags.With("url", newTagName)
 		tags = tags.With("name", newTagName)
 		return tags
