@@ -438,9 +438,10 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, patterns TagMatches)
 	return nil
 }
 
-// urlTagName is used to check the incoming metric url tag against user
-// defined url regexes. When a match is found a user defined name, which is to
-// be used in the urls place in the url metric tag, is returned.
+// urlTagName is used to match the given url with the matches defined by the
+// user. Currently matches only contains url. When a match is found a user
+// defined name, which is to be used in the urls place in the url metric tag,
+// is returned.
 //
 // The check is done by calling the handlers that were registered with
 // `page.on('metric')`. The user will need to use `Tag` to supply the
