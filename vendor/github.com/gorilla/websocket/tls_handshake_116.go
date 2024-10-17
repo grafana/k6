@@ -1,5 +1,5 @@
-//go:build go1.17
-// +build go1.17
+//go:build !go1.17
+// +build !go1.17
 
 package websocket
 
@@ -9,7 +9,7 @@ import (
 )
 
 func doHandshake(ctx context.Context, tlsConn *tls.Conn, cfg *tls.Config) error {
-	if err := tlsConn.HandshakeContext(ctx); err != nil {
+	if err := tlsConn.Handshake(); err != nil {
 		return err
 	}
 	if !cfg.InsecureSkipVerify {
