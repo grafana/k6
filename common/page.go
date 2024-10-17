@@ -385,8 +385,8 @@ type MetricEvent struct {
 	// against the URL grouping regexs.
 	url string
 
-	// When a match is found this userProvidedTagName field should be updated.
-	userProvidedTagName string
+	// When a match is found this userProvidedURLTagName field should be updated.
+	userProvidedURLTagName string
 
 	// When a match is found this is set to true.
 	isUserURLTagNameExist bool
@@ -430,7 +430,7 @@ func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) 
 
 		if matched {
 			e.isUserURLTagNameExist = true
-			e.userProvidedTagName = name
+			e.userProvidedURLTagName = name
 			return nil
 		}
 	}
@@ -476,7 +476,7 @@ func (p *Page) urlTagName(url string) (string, bool) {
 
 	// If a match was found then the name field in em will have been updated.
 	if em.isUserURLTagNameExist {
-		newTagName = em.userProvidedTagName
+		newTagName = em.userProvidedURLTagName
 		urlMatched = true
 	}
 
