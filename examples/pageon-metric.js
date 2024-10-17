@@ -20,7 +20,7 @@ export default async function() {
     metric.tag({
       name:'test',
       matches: [
-        {url: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/},
+        {url: /^https:\/\/test\.k6\.io\/\?q=[0-9a-z]+$/, method: 'GET'},
       ]
     });
   });
