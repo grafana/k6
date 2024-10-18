@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"errors"
 	"fmt"
 	"reflect"
 
@@ -126,7 +127,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 							close(c)
 							return nil
 						})
-						<-c
+
+						select {
+						case <-c:
+						case <-ctx.Done():
+							err = errors.New("iteration ended before waitForEvent completed")
+						}
 
 						return rtn, err //nolint:wrapcheck
 					}
