@@ -527,9 +527,13 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
 	for _, h := range p.eventHandlers[EventPageConsoleAPICalled] {
-		h(PageOnEvent{
+		err := h(PageOnEvent{
 			ConsoleMessage: m,
 		})
+		if err != nil {
+			p.logger.Debugf("onConsoleAPICalled", "handler returned an error: %v", err)
+			return
+		}
 	}
 }
 
