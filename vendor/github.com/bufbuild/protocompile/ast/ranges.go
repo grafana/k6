@@ -108,7 +108,7 @@ type RangeDeclNode interface {
 }
 
 var _ RangeDeclNode = (*RangeNode)(nil)
-var _ RangeDeclNode = NoSourceNode{}
+var _ RangeDeclNode = (*NoSourceNode)(nil)
 
 // RangeNode represents a range expression, used in both extension ranges and
 // reserved ranges. Example:
@@ -129,16 +129,16 @@ type RangeNode struct {
 // then so must be exactly one of end or max. If max is non-nil, it indicates a
 // "100 to max" style range. But if end is non-nil, the end of the range is a
 // literal, such as "100 to 200".
-func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, max *KeywordNode) *RangeNode {
+func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, maxEnd *KeywordNode) *RangeNode {
 	if start == nil {
 		panic("start is nil")
 	}
 	numChildren := 1
 	if to != nil {
-		if end == nil && max == nil {
+		if end == nil && maxEnd == nil {
 			panic("to is not nil, but end and max both are")
 		}
-		if end != nil && max != nil {
+		if end != nil && maxEnd != nil {
 			panic("end and max cannot be both non-nil")
 		}
 		numChildren = 3
@@ -146,7 +146,7 @@ func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, max *Ke
 		if end != nil {
 			panic("to is nil, but end is not")
 		}
-		if max != nil {
+		if maxEnd != nil {
 			panic("to is nil, but max is not")
 		}
 	}
@@ -157,7 +157,7 @@ func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, max *Ke
 		if end != nil {
 			children = append(children, end)
 		} else {
-			children = append(children, max)
+			children = append(children, maxEnd)
 		}
 	}
 	return &RangeNode{
@@ -167,7 +167,7 @@ func NewRangeNode(start IntValueNode, to *KeywordNode, end IntValueNode, max *Ke
 		StartVal: start,
 		To:       to,
 		EndVal:   end,
-		Max:      max,
+		Max:      maxEnd,
 	}
 }
 
@@ -189,8 +189,8 @@ func (n *RangeNode) StartValue() interface{} {
 	return n.StartVal.Value()
 }
 
-func (n *RangeNode) StartValueAsInt32(min, max int32) (int32, bool) {
-	return AsInt32(n.StartVal, min, max)
+func (n *RangeNode) StartValueAsInt32(minVal, maxVal int32) (int32, bool) {
+	return AsInt32(n.StartVal, minVal, maxVal)
 }
 
 func (n *RangeNode) EndValue() interface{} {
@@ -200,14 +200,14 @@ func (n *RangeNode) EndValue() interface{} {
 	return n.EndVal.Value()
 }
 
-func (n *RangeNode) EndValueAsInt32(min, max int32) (int32, bool) {
+func (n *RangeNode) EndValueAsInt32(minVal, maxVal int32) (int32, bool) {
 	if n.Max != nil {
-		return max, true
+		return maxVal, true
 	}
 	if n.EndVal == nil {
-		return n.StartValueAsInt32(min, max)
+		return n.StartValueAsInt32(minVal, maxVal)
 	}
-	return AsInt32(n.EndVal, min, max)
+	return AsInt32(n.EndVal, minVal, maxVal)
 }
 
 // ReservedNode represents reserved declaration, which can be used to reserve

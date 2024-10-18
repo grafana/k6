@@ -180,6 +180,27 @@ func SourceAccessorFromMap(srcs map[string]string) func(string) (io.ReadCloser, 
 
 // WithStandardImports returns a new resolver that knows about the same standard
 // imports that are included with protoc.
+//
+// Note that this uses the descriptors embedded in generated code in the packages
+// of the Protobuf Go module, except for "google/protobuf/cpp_features.proto" and
+// "google/protobuf/java_features.proto". For those two files, compiled descriptors
+// are embedded in this module because there is no package in the Protobuf Go module
+// that contains generated code for those files. This resolver also provides results
+// for the "google/protobuf/go_features.proto", which is technically not a standard
+// file (it is not included with protoc) but is included in generated code in the
+// Protobuf Go module.
+//
+// As of v0.14.0 of this module (and v1.34.2 of the Protobuf Go module and v27.0 of
+// Protobuf), the contents of the standard import "google/protobuf/descriptor.proto"
+// contain extension declarations which are *absent* from the descriptors that this
+// resolver returns. That is because extension declarations are only retained in
+// source, not at runtime, which means they are not available in the embedded
+// descriptors in generated code.
+//
+// To use versions of the standard imports that *do* include these extension
+// declarations, see wellknownimports.WithStandardImports instead. As of this
+// writing, the declarations are only needed to prevent source files from
+// illegally re-defining the custom features for C++, Java, and Go.
 func WithStandardImports(r Resolver) Resolver {
 	return ResolverFunc(func(name string) (SearchResult, error) {
 		res, err := r.FindFileByPath(name)
