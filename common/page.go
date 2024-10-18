@@ -485,17 +485,21 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	p.eventHandlersMu.RLock()
 	defer p.eventHandlersMu.RUnlock()
 	for _, h := range p.eventHandlers[EventPageMetricCalled] {
-		func() {
+		err := func() error {
 			// Handlers can register other handlers, so we need to
 			// unlock the mutex before calling the next handler.
 			p.eventHandlersMu.RUnlock()
 			defer p.eventHandlersMu.RLock()
 
 			// Call and wait for the handler to complete.
-			h(PageOnEvent{
+			return h(PageOnEvent{
 				Metric: em,
 			})
 		}()
+		if err != nil {
+			p.logger.Debugf("urlTagName", "handler returned an error: %v", err)
+			return "", false
+		}
 	}
 
 	// If a match was found then the name field in em will have been updated.
