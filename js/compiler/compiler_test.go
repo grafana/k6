@@ -130,7 +130,9 @@ func TestCorruptSourceMap(t *testing.T) {
 	require.NoError(t, err)
 
 	require.Contains(t, msg, `Couldn't load source map for somefile`)
-	require.Contains(t, msg, `json: cannot unmarshal number into Go struct field v3.mappings of type string`)
+	// @mstoykov: this is split as message changed in go1.24
+	require.Contains(t, msg, `json: cannot unmarshal number into Go struct field`)
+	require.Contains(t, msg, `mappings of type string`)
 }
 
 func TestMinimalSourceMap(t *testing.T) {
