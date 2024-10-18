@@ -121,13 +121,15 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
-			runInTaskQueue := func(a common.PageOnEvent) {
+			runInTaskQueue := func(a common.PageOnEvent) error {
 				tq.Queue(func() error {
 					if err := mapMsgAndHandleEvent(a.ConsoleMessage); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
 					return nil
 				})
+
+				return nil
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck

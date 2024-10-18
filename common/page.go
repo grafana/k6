@@ -207,7 +207,7 @@ type ConsoleMessage struct {
 	Type string
 }
 
-type PageOnHandler func(PageOnEvent)
+type PageOnHandler func(PageOnEvent) error
 
 // Page stores Page/tab related context.
 type Page struct {
