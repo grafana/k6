@@ -7,4 +7,10 @@
 // That way, like when invoking protoc, programs need not supply copies of these
 // "builtin" files. Though if copies of the files are provided, they will be
 // used instead of the builtin descriptors.
+//
+// Deprecated: This protoparse package is now just a thin veneer around a newer
+// replacement parser/compiler: [github.com/bufbuild/protocompile]. Users are
+// highly encouraged to directly use protocompile instead of this package.
+//
+// [github.com/bufbuild/protocompile]: https://pkg.go.dev/github.com/bufbuild/protocompile
 package protoparse

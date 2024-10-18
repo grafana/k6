@@ -543,7 +543,7 @@ func (er extRanges) Swap(i, j int) {
 // FindFieldByName finds the field with the given name. If no such field exists
 // then nil is returned. Only regular fields are returned, not extensions.
 func (md *MessageDescriptor) FindFieldByName(fieldName string) *FieldDescriptor {
-	fqn := fmt.Sprintf("%s.%s", md.GetFullyQualifiedName(), fieldName)
+	fqn := md.GetFullyQualifiedName() + "." + fieldName
 	if fd, ok := md.file.symbols[fqn].(*FieldDescriptor); ok && !fd.IsExtension() {
 		return fd
 	} else {
