@@ -452,9 +452,11 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			}
 		}
 
+		ctx := vu.Context()
+
 		// Run the the event handler in the task queue to
 		// ensure that the handler is executed on the event loop.
-		tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
+		tq := vu.taskQueueRegistry.get(ctx, p.TargetID())
 		eventHandler := func(event common.PageOnEvent) {
 			mapping := pageOnEvent.mapp(vu, event)
 
@@ -475,7 +477,10 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 			})
 
 			if pageOnEvent.wait {
-				<-done
+				select {
+				case <-done:
+				case <-ctx.Done():
+				}
 			}
 		}
 
