@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -480,6 +481,7 @@ func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.C
 				select {
 				case <-done:
 				case <-ctx.Done():
+					return errors.New("iteration ended before page.on handler completed executing")
 				}
 			}
 
