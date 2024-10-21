@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/url"
+	"os"
 	"strings"
 	"time"
 
@@ -91,6 +92,24 @@ type BrowserContext struct {
 
 // artifactsDirectory is the prefix for the temporary directory created for downloads.
 const artifactsDirectory = "k6browser-artifacts-"
+
+// setDownloadsPath sets the downloads path.
+// If the provided path is empty, a temporary directory with
+// an artifactsDirectory prefix.
+func (b *BrowserContext) setDownloadsPath(path string) error { //nolint:unparam
+	path = strings.TrimSpace(path)
+	if path != "" {
+		b.DownloadsPath = path
+		return nil
+	}
+	dir, err := os.MkdirTemp(os.TempDir(), artifactsDirectory+"*")
+	if err != nil {
+		return fmt.Errorf("creating temporary directory for downloads: %w", err)
+	}
+	b.DownloadsPath = dir
+
+	return nil
+}
 
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(
