@@ -42,7 +42,7 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		c := New(testutils.NewLogger(t))
 		src := `1+(function() { return 2; )()`
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		_, _, err := c.Parse(src, "script.ts", false)
+		_, _, err := c.Parse(src, "script.ts", false, false)
 		assert.IsType(t, &parser.Error{}, err)
 		assert.Contains(t, err.Error(), `script.ts: Line 1:26 Unexpected ")"`)
 	})
@@ -50,7 +50,7 @@ func TestCompile_experimental_enhanced(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
-		prg, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false)
+		prg, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false, false)
 		require.NoError(t, err)
 		assert.Equal(t, `let t = "something";
 require(t);
@@ -72,7 +72,7 @@ require(t);
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExperimentalEnhanced
 		c.Options.SourceMapLoader = func(_ string) ([]byte, error) { return nil, nil }
-		_, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false)
+		_, code, err := c.Parse(`let t :string = "something"; require(t);`, "script.ts", false, false)
 		require.NoError(t, err)
 		assert.Equal(t, `let t = "something";
 require(t);

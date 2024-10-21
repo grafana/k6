@@ -20,7 +20,7 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		src := `1+(function() { return 2; })()`
-		prg, code, err := c.Parse(src, "script.js", false)
+		prg, code, err := c.Parse(src, "script.js", false, false)
 		require.NoError(t, err)
 		assert.Equal(t, src, code)
 		pgm, err := sobek.CompileAST(prg, true)
@@ -34,7 +34,7 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		src := `exports.d=1+(function() { return 2; })()`
-		prg, code, err := c.Parse(src, "script.js", true)
+		prg, code, err := c.Parse(src, "script.js", true, false)
 		require.NoError(t, err)
 		pgm, err := sobek.CompileAST(prg, true)
 		require.NoError(t, err)
@@ -57,7 +57,7 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		prg, code, err := c.Parse(`import "something"`, "script.js", false)
+		prg, code, err := c.Parse(`import "something"`, "script.js", false, true)
 		require.NoError(t, err)
 		assert.Equal(t, `import "something"`, code)
 		require.NoError(t, err)
@@ -71,7 +71,7 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		prg, code, err := c.Parse(`require("something");`, "script.js", true)
+		prg, code, err := c.Parse(`require("something");`, "script.js", true, false)
 		require.NoError(t, err)
 		assert.Equal(t, `(function(module, exports){require("something");
 })
@@ -98,7 +98,7 @@ func TestCompile(t *testing.T) {
 		t.Parallel()
 		c := New(testutils.NewLogger(t))
 		c.Options.CompatibilityMode = lib.CompatibilityModeExtended
-		_, _, err := c.Parse(`1+(=>2)()`, "script.js", false)
+		_, _, err := c.Parse(`1+(=>2)()`, "script.js", false, false)
 		assert.IsType(t, parser.ErrorList{}, err)
 		assert.Contains(t, err.Error(), `Line 1:4 Unexpected token =>`)
 	})
@@ -122,7 +122,7 @@ func TestCorruptSourceMap(t *testing.T) {
 			return corruptSourceMap, nil
 		},
 	}
-	_, _, err := compiler.Parse("var s = 5;\n//# sourceMappingURL=somefile", "somefile", false)
+	_, _, err := compiler.Parse("var s = 5;\n//# sourceMappingURL=somefile", "somefile", false, false)
 	require.NoError(t, err)
 	entries := hook.Drain()
 	require.Len(t, entries, 1)
@@ -154,7 +154,7 @@ func TestMinimalSourceMap(t *testing.T) {
 			return corruptSourceMap, nil
 		},
 	}
-	_, _, err := compiler.Parse("class s {};\n//# sourceMappingURL=somefile", "somefile", false)
+	_, _, err := compiler.Parse("class s {};\n//# sourceMappingURL=somefile", "somefile", false, false)
 	require.NoError(t, err)
 	require.Empty(t, hook.Drain())
 }
