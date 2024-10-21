@@ -348,8 +348,175 @@ func (r *Runner) IsExecutable(name string) bool {
 	return exists
 }
 
+type MetricData struct {
+	Type     string
+	Contains string
+	Values   map[string]float64
+}
+
+func NewMetricsDataFrom(summary *lib.Summary, m *metrics.Metric, summaryTrendStats []string) MetricData {
+	// TODO: we obtain this from [options.SummaryTrendStats] which is a string slice
+	getMetricValues := metricValueGetter(summaryTrendStats)
+
+	return MetricData{
+		Type:     m.Type.String(),
+		Contains: m.Contains.String(),
+		Values:   getMetricValues(m.Sink, summary.TestRunDuration),
+	}
+}
+
+type ReportMetrics struct {
+	// HTTP contains report data specific to HTTP metrics and is used
+	// to produce the summary HTTP subsection's content.
+	HTTP map[string]MetricData
+	// Execution contains report data specific to Execution metrics and is used
+	// to produce the summary Execution subsection's content.
+	Execution map[string]MetricData
+	// Network contains report data specific to Network metrics and is used
+	// to produce the summary Network subsection's content.
+	Network map[string]MetricData
+
+	Browser map[string]MetricData
+
+	// FIXME: WebVitals are a browser metrics too, and we might want to move them in a browser subsection
+	// of the report
+	WebVitals map[string]MetricData
+
+	// Miscellaneous contains user-defined metric results as well as extensions metrics
+	Miscellaneous map[string]MetricData
+}
+
+type ReportChecksMetrics struct {
+	Total   MetricData `js:"checks_total"`
+	Success MetricData `js:"checks_succeeded"`
+	Fail    MetricData `js:"checks_failed"`
+}
+
+type ReportChecks struct {
+	Metrics       ReportChecksMetrics
+	OrderedChecks []*lib.Check
+}
+
+type Report struct {
+	Metrics   ReportMetrics
+	Checks    ReportChecks
+	Groups    []Report
+	Scenarios []Report
+}
+
+func NewReport() Report {
+	initMetricData := func(t metrics.MetricType) MetricData {
+		return MetricData{
+			Type:     t.String(),
+			Contains: metrics.Default.String(),
+			Values:   make(map[string]float64),
+		}
+	}
+
+	return Report{
+		Metrics: ReportMetrics{
+			HTTP:          make(map[string]MetricData),
+			Execution:     make(map[string]MetricData),
+			Network:       make(map[string]MetricData),
+			Browser:       make(map[string]MetricData),
+			WebVitals:     make(map[string]MetricData),
+			Miscellaneous: make(map[string]MetricData),
+		},
+		Checks: ReportChecks{
+			Metrics: ReportChecksMetrics{
+				Total:   initMetricData(metrics.Counter),
+				Success: initMetricData(metrics.Rate),
+				Fail:    initMetricData(metrics.Rate),
+			},
+		},
+	}
+}
+
+func isHTTPMetric(m *metrics.Metric) bool {
+	return oneOfMetrics(m,
+		metrics.HTTPReqsName,
+		metrics.HTTPReqFailedName,
+		metrics.HTTPReqDurationName,
+		metrics.HTTPReqBlockedName,
+		metrics.HTTPReqConnectingName,
+		metrics.HTTPReqTLSHandshakingName,
+		metrics.HTTPReqSendingName,
+		metrics.HTTPReqWaitingName,
+		metrics.HTTPReqReceivingName,
+	)
+}
+
+func isExecutionMetric(m *metrics.Metric) bool {
+	return oneOfMetrics(m, metrics.VUsName,
+		metrics.VUsMaxName,
+		metrics.IterationsName,
+		metrics.IterationDurationName,
+		metrics.DroppedIterationsName,
+	)
+}
+
+func isNetworkMetric(m *metrics.Metric) bool {
+	return oneOfMetrics(m, metrics.DataSentName, metrics.DataReceivedName)
+}
+
+func isBrowserMetric(m *metrics.Metric) bool {
+	return strings.HasPrefix(m.Name, "browser_") && !isWebVitalsMetric(m)
+}
+
+func isWebVitalsMetric(m *metrics.Metric) bool {
+	return strings.HasPrefix(m.Name, "browser_web_vital_")
+}
+
+func oneOfMetrics(m *metrics.Metric, values ...string) bool {
+	for _, v := range values {
+		if m.Name == v {
+			return true
+		}
+	}
+	return false
+}
+
+// TODO: it would be nicer to only receive summary-specific options here, as opposed to the whole [lib.Options] struct
+func NewReportFrom(summary *lib.Summary, options lib.Options) Report {
+	report := NewReport()
+
+	for _, m := range summary.Metrics {
+		switch {
+		case isHTTPMetric(m):
+			report.Metrics.HTTP[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		case isExecutionMetric(m):
+			report.Metrics.Execution[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		case isNetworkMetric(m):
+			report.Metrics.Network[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		case isBrowserMetric(m):
+			report.Metrics.Browser[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		case isWebVitalsMetric(m):
+			report.Metrics.WebVitals[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		default:
+			report.Metrics.Miscellaneous[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		}
+	}
+
+	totalChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Total)
+	successChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Trues)
+
+	report.Checks.Metrics.Total.Values["count"] = totalChecks                                                                   // Counter metric with total checks
+	report.Checks.Metrics.Total.Values["rate"] = 0.0                                                                            // TODO: Calculate based on summary.TotalTestDuration
+	report.Checks.Metrics.Success = NewMetricsDataFrom(summary, summary.Metrics[metrics.ChecksName], options.SummaryTrendStats) // Rate metric with successes (equivalent to the 'checks' metric)
+	report.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
+	report.Checks.Metrics.Fail.Values["fails"] = successChecks
+	report.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
+
+	report.Checks.OrderedChecks = summary.RootGroup.OrderedChecks
+
+	return report
+}
+
 // HandleSummary calls the specified summary callback, if supplied.
 func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[string]io.Reader, error) {
+	reportData := NewReportFrom(summary, r.Bundle.Options)
+	fmt.Println(reportData)
+
 	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 
 	out := make(chan metrics.SampleContainer, 100)
@@ -360,7 +527,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		}
 	}()
 
-	summaryCtx, cancel := context.WithTimeout(ctx, r.getTimeoutFor(consts.HandleSummaryFn))
+	summaryCtx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
 
 	vu, err := r.newVU(summaryCtx, 0, 0, out)
@@ -375,7 +542,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 	vu.moduleVUImpl.ctx = summaryCtx
 
 	callbackResult := sobek.Undefined()
-	fn := vu.getExported(consts.HandleSummaryFn)
+	fn := vu.getExported(consts.HandleSummaryFn) // TODO: rename to UserDefinedHandleSummaryFn?
 	if fn != nil {
 		handleSummaryFn, ok := sobek.AssertFunction(fn)
 		if !ok {
@@ -403,6 +570,7 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		callbackResult,
 		vu.Runtime.ToValue(r.Bundle.preInitState.RuntimeOptions.SummaryExport.String),
 		vu.Runtime.ToValue(summaryDataForJS),
+		vu.Runtime.ToValue(reportData),
 	}
 	rawResult, _, _, err := vu.runFn(summaryCtx, false, handleSummaryWrapper, nil, wrapperArgs...)
 

@@ -1,4 +1,5 @@
 (function () {
+    // TODO: Find a better name, more descriptive more this variable.
     var jslib = {};
     (function (module, exports) {
         /*JSLIB_SUMMARY_CODE*/;
@@ -59,12 +60,12 @@
         return JSON.stringify(results, null, 4);
     };
 
-    return function (summaryCallbackResult, jsonSummaryPath, data) {
+    return function (summaryCallbackResult, jsonSummaryPath, data, report) {
         var result = summaryCallbackResult;
         if (!result) {
             var enableColors = (!data.options.noColor && data.state.isStdOutTTY);
             result = {
-                'stdout': '\n' + jslib.textSummary(data, {indent: ' ', enableColors: enableColors}) + '\n\n',
+                'stdout': '\n' + jslib.textSummary(data, {indent: ' ', enableColors: enableColors}, report) + '\n\n',
             };
         }
 
