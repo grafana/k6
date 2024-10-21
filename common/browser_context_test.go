@@ -59,6 +59,14 @@ func TestSetDownloadsPath(t *testing.T) {
 		assert.Contains(t, bc.DownloadsPath, artifactsDirectory)
 		assert.DirExists(t, bc.DownloadsPath)
 	})
+	t.Run("non_empty_path", func(t *testing.T) {
+		t.Parallel()
+
+		var bc BrowserContext
+		path := "/my/directory"
+		require.NoError(t, bc.setDownloadsPath(path))
+		assert.Equal(t, path, bc.DownloadsPath)
+	})
 }
 
 func TestFilterCookies(t *testing.T) {
