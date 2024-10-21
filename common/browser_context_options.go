@@ -64,6 +64,7 @@ func (g *Geolocation) Parse(ctx context.Context, opts sobek.Value) error { //nol
 // BrowserContextOptions stores browser context options.
 type BrowserContextOptions struct {
 	AcceptDownloads   bool              `js:"acceptDownloads"`
+	DownloadsPath     string            `js:"downloadsPath"`
 	BypassCSP         bool              `js:"bypassCSP"`
 	ColorScheme       ColorScheme       `js:"colorScheme"`
 	DeviceScaleFactor float64           `js:"deviceScaleFactor"`
