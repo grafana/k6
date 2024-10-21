@@ -84,6 +84,9 @@ type BrowserContext struct {
 	vu              k6modules.VU
 
 	evaluateOnNewDocumentSources []string
+
+	// DownloadsPath is the path where downloads will be stored.
+	DownloadsPath string
 }
 
 // NewBrowserContext creates a new browser context.
