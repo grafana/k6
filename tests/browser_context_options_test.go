@@ -17,6 +17,7 @@ func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 
 	opts := common.NewBrowserContextOptions()
 	assert.False(t, opts.AcceptDownloads)
+	assert.Empty(t, opts.DownloadsPath)
 	assert.False(t, opts.BypassCSP)
 	assert.Equal(t, common.ColorSchemeLight, opts.ColorScheme)
 	assert.Equal(t, 1.0, opts.DeviceScaleFactor)
