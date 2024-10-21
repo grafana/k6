@@ -47,6 +47,20 @@ func TestNewBrowserContext(t *testing.T) {
 	})
 }
 
+func TestSetDownloadsPath(t *testing.T) {
+	t.Parallel()
+
+	t.Run("empty_path", func(t *testing.T) {
+		t.Parallel()
+
+		var bc BrowserContext
+		require.NoError(t, bc.setDownloadsPath(""))
+		assert.NotEmpty(t, bc.DownloadsPath)
+		assert.Contains(t, bc.DownloadsPath, artifactsDirectory)
+		assert.DirExists(t, bc.DownloadsPath)
+	})
+}
+
 func TestFilterCookies(t *testing.T) {
 	t.Parallel()
 

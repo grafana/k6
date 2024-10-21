@@ -96,7 +96,7 @@ const artifactsDirectory = "k6browser-artifacts-"
 // setDownloadsPath sets the downloads path.
 // If the provided path is empty, a temporary directory with
 // an artifactsDirectory prefix.
-func (b *BrowserContext) setDownloadsPath(path string) error { //nolint:unparam
+func (b *BrowserContext) setDownloadsPath(path string) error {
 	path = strings.TrimSpace(path)
 	if path != "" {
 		b.DownloadsPath = path
