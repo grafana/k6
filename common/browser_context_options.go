@@ -112,6 +112,8 @@ func (b *BrowserContextOptions) Parse(ctx context.Context, opts sobek.Value) err
 		switch k {
 		case "acceptDownloads":
 			b.AcceptDownloads = o.Get(k).ToBoolean()
+		case "downloadsPath":
+			b.DownloadsPath = o.Get(k).String()
 		case "bypassCSP":
 			b.BypassCSP = o.Get(k).ToBoolean()
 		case "colorScheme":
