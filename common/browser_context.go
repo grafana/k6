@@ -144,6 +144,9 @@ func NewBrowserContext(
 	if err := b.AddInitScript(js.WebVitalInitScript); err != nil {
 		return nil, fmt.Errorf("adding web vital init script to new browser context: %w", err)
 	}
+	if err := b.setDownloadsPath(opts.DownloadsPath); err != nil {
+		return nil, fmt.Errorf("setting downloads path: %w", err)
+	}
 
 	return &b, nil
 }
