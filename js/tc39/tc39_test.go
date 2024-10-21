@@ -651,7 +651,7 @@ func (ctx *tc39TestCtx) compileOnly(src, name string, compatibilityMode lib.Comp
 		}
 		src = code
 	}
-	astProgram, _, err := comp.Parse(src, name, false)
+	astProgram, _, err := comp.Parse(src, name, false, false)
 	if err != nil {
 		return nil, err
 	}
