@@ -89,6 +89,9 @@ type BrowserContext struct {
 	DownloadsPath string
 }
 
+// artifactsDirectory is the prefix for the temporary directory created for downloads.
+const artifactsDirectory = "k6browser-artifacts-"
+
 // NewBrowserContext creates a new browser context.
 func NewBrowserContext(
 	ctx context.Context, browser *Browser, id cdp.BrowserContextID, opts *BrowserContextOptions, logger *log.Logger,
