@@ -262,8 +262,7 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (sobek.ModuleRe
 	case sobek.PromiseStateFulfilled:
 		return mod, nil
 	default:
-		// TODO(@mstoykov): this will require having some callbacks through the code, but should be doable, just not pretty
-		panic("TLA not supported in k6 at the moment")
+		return mod, nil
 	}
 }
 

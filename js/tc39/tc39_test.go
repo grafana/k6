@@ -56,8 +56,8 @@ var (
 	featuresBlockList = []string{
 		"IsHTMLDDA",                   // not supported at all
 		"async-iteration",             // not supported at all
-		"top-level-await",             // not supported at all
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
+		"dynamic-import",              // not support in k6
 
 		// from Sobek
 		"Symbol.asyncIterator",
