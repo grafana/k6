@@ -737,10 +737,17 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 	moduleRuntime.VU.InitEnvField.CWD = base
 
 	early = false
-	_, err = ms.RunSourceData(&loader.SourceData{
+	result, err := ms.RunSourceData(&loader.SourceData{
 		Data: []byte(src),
 		URL:  u,
 	})
+	if err == nil {
+		var finished bool
+		_, finished, err = result.Result()
+		if !finished {
+			panic("tc39 has no tests where this should happen")
+		}
+	}
 
 	return early, err
 }
