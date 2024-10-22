@@ -214,8 +214,8 @@ func exportRSAKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
 		}
 
 		return bytes, nil
-	// case JwkKeyFormat:
-	// 	return exportECJWK(ck)
+	case JwkKeyFormat:
+		return exportRSAJWK(ck)
 	default:
 		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
 	}
@@ -260,6 +260,8 @@ func (rhkip *RSAHashedImportParams) ImportKey(
 		importFn = importRSAPrivateKey
 	case format == SpkiKeyFormat:
 		importFn = importRSAPublicKey
+	case format == JwkKeyFormat:
+		importFn = importRSAJWK
 	default:
 		return nil, NewError(
 			NotSupportedError,

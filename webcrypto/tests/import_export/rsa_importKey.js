@@ -85,7 +85,7 @@ testVectors.forEach(function(vector) {
 
                 // Test public keys first
                 allValidUsages(vector.publicUsages, true).forEach(function(usages) {
-                    ['spki'].forEach(function(format) { // TODO: add , 'jwk' when supported
+                    ['spki', 'jwk'].forEach(function(format) {
                         var algorithm = {name: vector.name, hash: hash};
                         var data = keyData[size];
                         if (format === "jwk") { // Not all fields used for public keys
@@ -98,7 +98,7 @@ testVectors.forEach(function(vector) {
                 });
 
                 // Next, test private keys
-                ['pkcs8'].forEach(function(format) { // TODO: add , 'jwk' when supported
+                ['pkcs8', 'jwk'].forEach(function(format) {
                     var algorithm = {name: vector.name, hash: hash};
                     var data = keyData[size];
                     allValidUsages(vector.privateUsages).forEach(function(usages) {
