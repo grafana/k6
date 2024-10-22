@@ -76,7 +76,7 @@ func (s wrappedSharedArray) deepFreeze(rt *sobek.Runtime, val sobek.Value) error
 	if o == nil {
 		return nil
 	}
-	for _, key := range o.Keys() {
+	for _, key := range o.Prototype().Keys() {
 		prop := o.Get(key)
 		if prop != nil {
 			// isFrozen returns true for all non objects so it we don't need to check that
