@@ -126,7 +126,7 @@ func TestNewBundle(t *testing.T) {
 	t.Run("InvalidExports", func(t *testing.T) {
 		t.Parallel()
 		_, err := getSimpleBundle(t, "/script.js", `module.exports = null`)
-		require.EqualError(t, err, "GoError: CommonJS's exports must not be null\n") // TODO: try to remove the GoError from herer
+		require.EqualError(t, err, "CommonJS's exports must not be null")
 	})
 	t.Run("DefaultUndefined", func(t *testing.T) {
 		t.Parallel()
@@ -982,4 +982,19 @@ func TestGlobalTimers(t *testing.T) {
 			require.NoError(t, err)
 		})
 	}
+}
+
+func TestTopLevelAwaitErrors(t *testing.T) {
+	t.Parallel()
+	data := `
+		const delay = (delayInms) => {
+			return new Promise(resolve => setTimeout(resolve, delayInms));
+		}
+
+		await delay(10).then(() => {something});
+		export default () => {}
+	`
+
+	_, err := getSimpleBundle(t, "/script.js", data)
+	require.ErrorContains(t, err, "ReferenceError: something is not defined")
 }

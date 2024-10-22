@@ -331,9 +331,10 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 		env:          b.preInitState.RuntimeOptions.Env,
 		moduleVUImpl: vuImpl,
 	}
+	var result *modules.RunSourceDataResult
 	callback := func() error { // this exists so that Sobek catches uncatchable panics such as Interrupt
 		var err error
-		bi.mainModule, err = modSys.RunSourceData(b.sourceData)
+		result, err = modSys.RunSourceData(b.sourceData)
 		return err
 	}
 
@@ -345,6 +346,14 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	})
 
 	<-initDone
+
+	if err == nil {
+		var finished bool
+		bi.mainModule, finished, err = result.Result()
+		if !finished {
+			return nil, errors.New("initializing the main module hasn't finished, this is a bug in k6 please report it")
+		}
+	}
 
 	if err != nil {
 		var exception *sobek.Exception

@@ -34,6 +34,7 @@ func (s *SourceTextModuleInstance) ExecuteModule(rt *Runtime, res, rej func(inte
 		if res != nil {
 			panic("sobek bug where a not async module was executed as async on")
 		}
+		rt.performPromiseThen(s.asyncPromise, rt.ToValue(func() {}), rt.ToValue(func() {}), nil)
 		switch s.asyncPromise.state {
 		case PromiseStateFulfilled:
 			return s, nil

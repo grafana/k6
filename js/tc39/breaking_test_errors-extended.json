@@ -82,6 +82,8 @@
   "test/language/module-code/instn-star-err-not-found.js-strict:true": "test/language/module-code/instn-star-err-not-found.js: error is not an object (Test262: This statement should not be evaluated.)",
   "test/language/module-code/parse-err-hoist-lex-fun.js-strict:true": "test/language/module-code/parse-err-hoist-lex-fun.js: error is not an object (Test262: This statement should not be evaluated.)",
   "test/language/module-code/parse-err-return.js-strict:true": "test/language/module-code/parse-err-return.js: error is not an object (Test262: This statement should not be evaluated.)",
+  "test/language/module-code/top-level-await/new-await.js-strict:true": "test/language/module-code/top-level-await/new-await.js: error is not an object (Test262: This statement should not be evaluated.)",
+  "test/language/module-code/top-level-await/no-operand.js-strict:true": "test/language/module-code/top-level-await/no-operand.js: error is not an object (Test262: This statement should not be evaluated.)",
   "test/language/reserved-words/await-module.js-strict:true": "test/language/reserved-words/await-module.js: error is not an object (Test262: This statement should not be evaluated.)",
   "test/language/statements/class/class-name-ident-await-escaped-module.js-strict:true": "test/language/statements/class/class-name-ident-await-escaped-module.js: error is not an object (Test262: This statement should not be evaluated.)",
   "test/language/statements/class/class-name-ident-await-module.js-strict:true": "test/language/statements/class/class-name-ident-await-module.js: error is not an object (Test262: This statement should not be evaluated.)",
