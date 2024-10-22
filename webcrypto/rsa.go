@@ -3,6 +3,7 @@ package webcrypto
 import (
 	"crypto/rand"
 	"crypto/rsa"
+	"crypto/x509"
 	"reflect"
 
 	"github.com/grafana/sobek"
@@ -183,4 +184,132 @@ func generateRSAKeyPair(
 	// TODO: support setting of the public exponent
 
 	return privateKey, privateKey.Public(), nil
+}
+
+func exportRSAKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
+	if ck.handle == nil {
+		return nil, NewError(OperationError, "key data is not accessible")
+	}
+
+	switch format {
+	case SpkiKeyFormat:
+		if ck.Type != PublicCryptoKeyType {
+			return nil, NewError(InvalidAccessError, "key is not a valid RSA public key")
+		}
+
+		bytes, err := x509.MarshalPKIXPublicKey(ck.handle)
+		if err != nil {
+			return nil, NewError(OperationError, "unable to marshal key to SPKI format: "+err.Error())
+		}
+
+		return bytes, nil
+	case Pkcs8KeyFormat:
+		if ck.Type != PrivateCryptoKeyType {
+			return nil, NewError(InvalidAccessError, "key is not a valid RSA private key")
+		}
+
+		bytes, err := x509.MarshalPKCS8PrivateKey(ck.handle)
+		if err != nil {
+			return nil, NewError(OperationError, "unable to marshal key to PKCS8 format: "+err.Error())
+		}
+
+		return bytes, nil
+	// case JwkKeyFormat:
+	// 	return exportECJWK(ck)
+	default:
+		return nil, NewError(NotSupportedError, unsupportedKeyFormatErrorMsg+" "+format)
+	}
+}
+
+func newRsaHashedImportParams(
+	rt *sobek.Runtime,
+	normalized Algorithm,
+	params sobek.Value,
+) (*RSAHashedImportParams, error) {
+	hashRaw, err := traverseObject(rt, params, "hash")
+	if err != nil {
+		return nil, NewError(SyntaxError, "could not get hash from algorithm parameter")
+	}
+
+	// TODO: hash could be an object if normalized algorithm has it as an object
+	hash, err := extractSupportedHash(rt, hashRaw)
+	if err != nil {
+		return nil, err
+	}
+
+	return &RSAHashedImportParams{
+		Algorithm: normalized,
+		Hash:      hash,
+	}, nil
+}
+
+// Ensure that RSAHashedImportParams implements the KeyImporter interface.
+var _ KeyImporter = &RSAHashedImportParams{}
+
+// ImportKey imports a key according to the algorithm described in the specification.
+// https://www.w3.org/TR/WebCryptoAPI/#ecdh-operations
+func (rhkip *RSAHashedImportParams) ImportKey(
+	format KeyFormat,
+	keyData []byte,
+	_ []CryptoKeyUsage,
+) (*CryptoKey, error) {
+	var importFn func(keyData []byte) (any, CryptoKeyType, error)
+
+	switch {
+	case format == Pkcs8KeyFormat:
+		importFn = importRSAPrivateKey
+	case format == SpkiKeyFormat:
+		importFn = importRSAPublicKey
+	default:
+		return nil, NewError(
+			NotSupportedError,
+			unsupportedKeyFormatErrorMsg+" "+format+" for algorithm "+rhkip.Algorithm.Name,
+		)
+	}
+
+	handle, keyType, err := importFn(keyData)
+	if err != nil {
+		return nil, err
+	}
+
+	return &CryptoKey{
+		Algorithm: RsaHashedKeyAlgorithm{
+			KeyAlgorithm: KeyAlgorithm{
+				Algorithm: rhkip.Algorithm,
+			},
+			Hash: rhkip.Hash,
+		},
+		Type:   keyType,
+		handle: handle,
+	}, nil
+}
+
+func importRSAPrivateKey(keyData []byte) (any, CryptoKeyType, error) {
+	parsedKey, err := x509.ParsePKCS8PrivateKey(keyData)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH private key data: "+err.Error())
+	}
+
+	// check if the key is an RSA key
+	privateKey, ok := parsedKey.(*rsa.PrivateKey)
+	if !ok {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "a private key is not an ECDSA key")
+	}
+
+	return privateKey, PrivateCryptoKeyType, nil
+}
+
+func importRSAPublicKey(keyData []byte) (any, CryptoKeyType, error) {
+	parsedKey, err := x509.ParsePKIXPublicKey(keyData)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
+	}
+
+	// check if the key is an RSA key
+	publicKey, ok := parsedKey.(*rsa.PublicKey)
+	if !ok {
+		return nil, UnknownCryptoKeyType, NewError(DataError, "a public key is not an ECDSA key")
+	}
+
+	return publicKey, PublicCryptoKeyType, nil
 }

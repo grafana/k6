@@ -111,15 +111,12 @@ type RSAHashedKeyGenParams struct {
 // importing any RSA-based key pair: that is, when the algorithm is identified as any
 // of RSASSA-PKCS1-v1_5, RSA-PSS, or RSA-OAEP.
 type RSAHashedImportParams struct {
-	// Name should be set to AlgorithmKindRsassPkcs1v15,
-	// AlgorithmKindRsaPss, or AlgorithmKindRsaOaep depending
-	// on the algorithm you want to use.
-	Name string
+	Algorithm
 
 	// Hash represents the name of the digest function to use.
 	// Note that although you can technically pass SHA-1 here, this is strongly
 	// discouraged as it is considered vulnerable.
-	Hash AlgorithmIdentifier
+	Hash any
 }
 
 // RSAOaepParams represents the object that should be passed as the algorithm parameter

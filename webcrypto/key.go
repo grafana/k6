@@ -218,6 +218,8 @@ func newKeyImporter(rt *sobek.Runtime, normalized Algorithm, params sobek.Value)
 		ki, err = newHMACImportParams(rt, normalized, params)
 	case ECDH, ECDSA:
 		ki, err = newEcKeyImportParams(rt, normalized, params)
+	case RSASsaPkcs1v15, RSAPss, RSAOaep:
+		ki, err = newRsaHashedImportParams(rt, normalized, params)
 	default:
 		return nil, errors.New("key import not implemented for algorithm " + normalized.Name)
 	}
