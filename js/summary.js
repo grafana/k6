@@ -127,7 +127,7 @@ function displayNameForMetric(name) {
 
 function indentForMetric(name) {
 	if (name.indexOf('{') >= 0) {
-		return ''
+		return '  '
 	}
 	return ''
 }
@@ -479,6 +479,11 @@ function generateTextSummary(data, options, report) {
 
 	// METRICS
 	forEach(report.metrics, (sectionName, sectionMetrics) => {
+		// If there are no metrics in this section, skip it
+		if (Object.keys(sectionMetrics).length === 0) {
+			return
+		}
+
 		displayMetricsSectionName(sectionName)
 		displayMetricsSectionBlock(sectionMetrics)
 	})

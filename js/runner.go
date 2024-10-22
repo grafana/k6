@@ -378,9 +378,11 @@ type ReportMetrics struct {
 
 	Browser map[string]MetricData
 
-	// FIXME: WebVitals are a browser metrics too, and we might want to move them in a browser subsection
-	// of the report
 	WebVitals map[string]MetricData
+
+	Grpc map[string]MetricData
+
+	WebSocket map[string]MetricData `js:"websocket"`
 
 	// Miscellaneous contains user-defined metric results as well as extensions metrics
 	Miscellaneous map[string]MetricData
@@ -420,6 +422,8 @@ func NewReport() Report {
 			Network:       make(map[string]MetricData),
 			Browser:       make(map[string]MetricData),
 			WebVitals:     make(map[string]MetricData),
+			Grpc:          make(map[string]MetricData),
+			WebSocket:     make(map[string]MetricData),
 			Miscellaneous: make(map[string]MetricData),
 		},
 		Checks: ReportChecks{
@@ -467,9 +471,21 @@ func isWebVitalsMetric(m *metrics.Metric) bool {
 	return strings.HasPrefix(m.Name, "browser_web_vital_")
 }
 
+func isGrpcMetric(m *metrics.Metric) bool {
+	return strings.HasPrefix(m.Name, "grpc_")
+}
+
+func isWebSocketsMetric(m *metrics.Metric) bool {
+	return strings.HasPrefix(m.Name, "ws_")
+}
+
+func isSkippedMetric(m *metrics.Metric) bool {
+	return oneOfMetrics(m, metrics.ChecksName, metrics.GroupDurationName)
+}
+
 func oneOfMetrics(m *metrics.Metric, values ...string) bool {
 	for _, v := range values {
-		if m.Name == v {
+		if strings.HasPrefix(m.Name, v) {
 			return true
 		}
 	}
@@ -482,6 +498,8 @@ func NewReportFrom(summary *lib.Summary, options lib.Options) Report {
 
 	for _, m := range summary.Metrics {
 		switch {
+		case isSkippedMetric(m):
+			// Do nothing, just skip.
 		case isHTTPMetric(m):
 			report.Metrics.HTTP[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
 		case isExecutionMetric(m):
@@ -490,6 +508,10 @@ func NewReportFrom(summary *lib.Summary, options lib.Options) Report {
 			report.Metrics.Network[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
 		case isBrowserMetric(m):
 			report.Metrics.Browser[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		case isGrpcMetric(m):
+			report.Metrics.Grpc[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
+		case isWebSocketsMetric(m):
+			report.Metrics.WebSocket[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
 		case isWebVitalsMetric(m):
 			report.Metrics.WebVitals[m.Name] = NewMetricsDataFrom(summary, m, options.SummaryTrendStats)
 		default:
@@ -500,9 +522,11 @@ func NewReportFrom(summary *lib.Summary, options lib.Options) Report {
 	totalChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Total)
 	successChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Trues)
 
-	report.Checks.Metrics.Total.Values["count"] = totalChecks                                                                   // Counter metric with total checks
-	report.Checks.Metrics.Total.Values["rate"] = 0.0                                                                            // TODO: Calculate based on summary.TotalTestDuration
+	report.Checks.Metrics.Total.Values["count"] = totalChecks // Counter metric with total checks
+	report.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, summary.TestRunDuration)
+
 	report.Checks.Metrics.Success = NewMetricsDataFrom(summary, summary.Metrics[metrics.ChecksName], options.SummaryTrendStats) // Rate metric with successes (equivalent to the 'checks' metric)
+
 	report.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
 	report.Checks.Metrics.Fail.Values["fails"] = successChecks
 	report.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
