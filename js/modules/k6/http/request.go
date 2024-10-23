@@ -211,7 +211,7 @@ func (c *Client) parseRequest(
 		// Otherwise parameters are treated as standard form field.
 		for k, v := range data {
 			switch ve := v.(type) {
-			case FileData:
+			case *FileData:
 				// writing our own part to handle receiving
 				// different content-type than the default application/octet-stream
 				h := make(textproto.MIMEHeader)
@@ -228,7 +228,11 @@ func (c *Client) parseRequest(
 					return err
 				}
 
-				if _, err := fw.Write(ve.Data); err != nil {
+				data, err := common.ToBytes(ve.Data)
+				if err != nil {
+					return err
+				}
+				if _, err := fw.Write(data); err != nil {
 					return err
 				}
 			default:
@@ -575,7 +579,7 @@ func (c *Client) parseBatchRequest(key interface{}, val interface{}) (*httpext.P
 
 func requestContainsFile(data map[string]interface{}) bool {
 	for _, v := range data {
-		if _, ok := v.(FileData); ok {
+		if _, ok := v.(*FileData); ok {
 			return true
 		}
 	}
