@@ -48,7 +48,7 @@ type (
 	CyclicModuleInstance interface {
 		ModuleInstance
 		HasTLA() bool
-		ExecuteModule(rt *Runtime, res, rej func(interface{})) (CyclicModuleInstance, error)
+		ExecuteModule(rt *Runtime, res, rej func(interface{}) error) (CyclicModuleInstance, error)
 	}
 )
 
