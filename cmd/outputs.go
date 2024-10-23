@@ -3,6 +3,7 @@ package cmd
 import (
 	"errors"
 	"fmt"
+	"go.k6.io/k6/output/summary"
 	"sort"
 	"strings"
 
@@ -38,12 +39,14 @@ const (
 	builtinOutputKafka
 	builtinOutputStatsd
 	builtinOutputExperimentalOpentelemetry
+	builtinOutputSummary
 )
 
 // TODO: move this to an output sub-module after we get rid of the old collectors?
 func getAllOutputConstructors() (map[string]output.Constructor, error) {
 	// Start with the built-in outputs
 	result := map[string]output.Constructor{
+		builtinOutputSummary.String():  summary.New,
 		builtinOutputJSON.String():     json.New,
 		builtinOutputCloud.String():    cloud.New,
 		builtinOutputCSV.String():      csv.New,
