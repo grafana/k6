@@ -29,3 +29,20 @@ func getHashFn(name string) (func() hash.Hash, bool) {
 type hasHash interface {
 	hash() string
 }
+
+func mapHashFn(hash string) (crypto.Hash, error) {
+	unknownHash := crypto.Hash(0)
+
+	switch hash {
+	case SHA1:
+		return crypto.SHA1, nil
+	case SHA256:
+		return crypto.SHA256, nil
+	case SHA384:
+		return crypto.SHA384, nil
+	case SHA512:
+		return crypto.SHA512, nil
+	default:
+		return unknownHash, NewError(NotSupportedError, "hash algorithm is not supported "+hash)
+	}
+}

@@ -1,9 +1,11 @@
 package webcrypto
 
 import (
+	"crypto"
 	"crypto/rand"
 	"crypto/rsa"
 	"crypto/x509"
+	"errors"
 	"reflect"
 
 	"github.com/grafana/sobek"
@@ -22,6 +24,17 @@ type RsaHashedKeyAlgorithm struct {
 	//   * [Sha384]
 	//   * [Sha512]
 	Hash any
+}
+
+func (h RsaHashedKeyAlgorithm) hash() (string, error) {
+	switch v := h.Hash.(type) {
+	case string:
+		return v, nil
+	case Algorithm:
+		return v.Name, nil
+	default:
+		return "", errors.New("unsupported hash type")
+	}
 }
 
 var _ KeyGenerator = &RSAHashedKeyGenParams{}
@@ -67,6 +80,7 @@ func newRsaHashedKeyGenParams(
 
 // TODO: this should be a generic function
 // that uses in any place where we need to extract a hash
+// CONSIDER: replacing it with extractHashFn or extractHash
 func extractSupportedHash(rt *sobek.Runtime, v sobek.Value) (any, error) {
 	if common.IsNullish(v) {
 		return "", NewError(TypeError, "hash is null or undefined")
@@ -112,6 +126,8 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 	// check if the key usages are valid
 	// TODO: ensure that this is the best place to do this
 	if rsakgp.Algorithm.Name == RSASsaPkcs1v15 || rsakgp.Algorithm.Name == RSAPss {
+		privateKeyUsages = []CryptoKeyUsage{SignCryptoKeyUsage}
+		publicKeyUsages = []CryptoKeyUsage{VerifyCryptoKeyUsage}
 		for _, usage := range keyUsages {
 			switch usage {
 			case SignCryptoKeyUsage:
@@ -148,17 +164,14 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 		Type:        PrivateCryptoKeyType,
 		Extractable: extractable,
 		Algorithm:   alg,
-		Usages: UsageIntersection(
-			keyUsages,
-			privateKeyUsages,
-		),
+		Usages:      UsageIntersection(keyUsages, privateKeyUsages),
 	}
 
 	publicKey := &CryptoKey{
 		Type:        PublicCryptoKeyType,
 		Extractable: true,
 		Algorithm:   alg,
-		Usages:      publicKeyUsages,
+		Usages:      UsageIntersection(keyUsages, publicKeyUsages),
 	}
 
 	var err error
@@ -251,7 +264,7 @@ var _ KeyImporter = &RSAHashedImportParams{}
 func (rhkip *RSAHashedImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
-	_ []CryptoKeyUsage,
+	usages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
 	var importFn func(keyData []byte) (any, CryptoKeyType, error)
 
@@ -282,6 +295,7 @@ func (rhkip *RSAHashedImportParams) ImportKey(
 			Hash: rhkip.Hash,
 		},
 		Type:   keyType,
+		Usages: usages,
 		handle: handle,
 	}, nil
 }
@@ -314,4 +328,68 @@ func importRSAPublicKey(keyData []byte) (any, CryptoKeyType, error) {
 	}
 
 	return publicKey, PublicCryptoKeyType, nil
+}
+
+type rsaSsaPkcs1v15SignerVerifier struct{}
+
+var _ SignerVerifier = &rsaSsaPkcs1v15SignerVerifier{}
+
+func (rsasv *rsaSsaPkcs1v15SignerVerifier) Sign(key CryptoKey, data []byte) ([]byte, error) {
+	hash, err := extractHashFromRSAKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	hashedData := hash.New()
+	hashedData.Write(data)
+
+	rsaKey, ok := key.handle.(*rsa.PrivateKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key is not an RSA private key")
+	}
+
+	signature, err := rsa.SignPKCS1v15(rand.Reader, rsaKey, hash, hashedData.Sum(nil))
+	if err != nil {
+		return nil, NewError(OperationError, "could not sign data: "+err.Error())
+	}
+
+	return signature, nil
+}
+
+func (rsasv *rsaSsaPkcs1v15SignerVerifier) Verify(key CryptoKey, signature []byte, data []byte) (bool, error) {
+	hash, err := extractHashFromRSAKey(key)
+	if err != nil {
+		return false, err
+	}
+
+	hashedData := hash.New()
+	hashedData.Write(data)
+
+	rsaKey, ok := key.handle.(*rsa.PublicKey)
+	if !ok {
+		return false, NewError(InvalidAccessError, "key is not an RSA public key")
+	}
+
+	err = rsa.VerifyPKCS1v15(rsaKey, hash, hashedData.Sum(nil), signature)
+	if err != nil {
+		return false, nil //nolint:nilerr
+	}
+
+	return true, nil
+}
+
+func extractHashFromRSAKey(key CryptoKey) (crypto.Hash, error) {
+	unk := crypto.Hash(0)
+
+	rsaHashedAlg, ok := key.Algorithm.(RsaHashedKeyAlgorithm)
+	if !ok {
+		return unk, NewError(InvalidAccessError, "key algorithm is not an RSA hashed key algorithm")
+	}
+
+	hashName, err := rsaHashedAlg.hash()
+	if err != nil {
+		return unk, err
+	}
+
+	return mapHashFn(hashName)
 }
