@@ -367,7 +367,7 @@ func (sc *SubtleCrypto) Verify(algorithm, key, signature, data sobek.Value) *sob
 		}
 
 		if !ck.ContainsUsage(VerifyCryptoKeyUsage) {
-			return NewError(InvalidAccessError, "key does not contain the 'sign' usage")
+			return NewError(InvalidAccessError, "key does not contain the 'verify' usage")
 		}
 
 		return nil
