@@ -2,6 +2,7 @@ package streams
 
 import (
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/common"
 )
 

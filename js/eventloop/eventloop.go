@@ -6,6 +6,7 @@ import (
 	"sync"
 
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/modules"
 )
 
@@ -79,6 +80,8 @@ func (e *EventLoop) wakeup() {
 // scenario has ended). Any error returned by any callback on the main thread
 // will abort the current iteration and no further event loop callbacks will be
 // executed in the same iteration.
+// As errors returned from resolve and reject are Interrupt errors those should
+// be returned.
 //
 // A common pattern for async work is something like this:
 //
@@ -94,11 +97,9 @@ func (e *EventLoop) wakeup() {
 //	        result, err := doTheActualAsyncWork(vu.Context())
 //	        enqueueCallback(func() error {
 //	            if err != nil {
-//	                reject(err)
-//	            } else {
-//	                resolve(result)
+//	                return reject(err)
 //	            }
-//	            return nil  // do not abort the iteration
+//	            return resolve(result)
 //	        })
 //	    }()
 //
@@ -124,7 +125,16 @@ func (e *EventLoop) RegisterCallback() (enqueueCallback func(func() error)) {
 			panic("RegisterCallback called twice")
 		}
 		callbackCalled = true
-		e.queue = append(e.queue, f)
+		wrapFunc := func() error {
+			rt := e.vu.Runtime()
+			callable, _ := sobek.AssertFunction(rt.ToValue(f))
+			_, err := callable(nil)
+			// if there is an exception the err will be nil either way
+
+			return err
+		}
+
+		e.queue = append(e.queue, wrapFunc)
 		e.registeredCallbacks--
 		e.lock.Unlock()
 		e.wakeup()

@@ -1,8 +1,9 @@
 package sobek
 
 import (
-	"github.com/grafana/sobek/unistring"
 	"reflect"
+
+	"github.com/grafana/sobek/unistring"
 )
 
 type PromiseState int
@@ -595,10 +596,11 @@ func (r *Runtime) getPromise() *Object {
 	return ret
 }
 
-func (r *Runtime) wrapPromiseReaction(fObj *Object) func(interface{}) {
+func (r *Runtime) wrapPromiseReaction(fObj *Object) func(interface{}) error {
 	f, _ := AssertFunction(fObj)
-	return func(x interface{}) {
-		_, _ = f(nil, r.ToValue(x))
+	return func(x interface{}) error {
+		_, err := f(nil, r.ToValue(x))
+		return err
 	}
 }
 
@@ -621,7 +623,7 @@ func (r *Runtime) wrapPromiseReaction(fObj *Object) func(interface{}) {
 //	        })
 //	    }()
 //	}
-func (r *Runtime) NewPromise() (promise *Promise, resolve func(result interface{}), reject func(reason interface{})) {
+func (r *Runtime) NewPromise() (promise *Promise, resolve, reject func(result interface{}) error) {
 	p := r.newPromise(r.getPromisePrototype())
 	resolveF, rejectF := p.createResolvingFunctions()
 	return p, r.wrapPromiseReaction(resolveF), r.wrapPromiseReaction(rejectF)

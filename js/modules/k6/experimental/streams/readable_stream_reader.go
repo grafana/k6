@@ -2,6 +2,7 @@ package streams
 
 import (
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -35,10 +36,10 @@ type ReadableStreamGenericReader interface {
 	SetStream(stream *ReadableStream)
 
 	// GetClosed returns a [sobek.Promise] that resolves when the stream is closed.
-	GetClosed() (p *sobek.Promise, resolve func(any), reject func(any))
+	GetClosed() (p *sobek.Promise, resolve, reject func(any) error)
 
 	// SetClosed sets the [sobek.Promise] that resolves when the stream is closed.
-	SetClosed(p *sobek.Promise, resolve func(any), reject func(any))
+	SetClosed(p *sobek.Promise, resolve, reject func(any) error)
 
 	// Cancel returns a [sobek.Promise] that resolves when the stream is canceled.
 	Cancel(reason sobek.Value) *sobek.Promise
@@ -47,8 +48,8 @@ type ReadableStreamGenericReader interface {
 // BaseReadableStreamReader is a base implement
 type BaseReadableStreamReader struct {
 	closedPromise            *sobek.Promise
-	closedPromiseResolveFunc func(resolve any)
-	closedPromiseRejectFunc  func(reason any)
+	closedPromiseResolveFunc func(resolve any) error
+	closedPromiseRejectFunc  func(reason any) error
 
 	// stream is a [ReadableStream] instance that owns this reader
 	stream *ReadableStream
@@ -73,12 +74,12 @@ func (reader *BaseReadableStreamReader) SetStream(stream *ReadableStream) {
 }
 
 // GetClosed returns the reader's closed promise as well as its resolve and reject functions.
-func (reader *BaseReadableStreamReader) GetClosed() (p *sobek.Promise, resolve func(any), reject func(any)) {
+func (reader *BaseReadableStreamReader) GetClosed() (p *sobek.Promise, resolve, reject func(any) error) {
 	return reader.closedPromise, reader.closedPromiseResolveFunc, reader.closedPromiseRejectFunc
 }
 
 // SetClosed sets the reader's closed promise as well as its resolve and reject functions.
-func (reader *BaseReadableStreamReader) SetClosed(p *sobek.Promise, resolve func(any), reject func(any)) {
+func (reader *BaseReadableStreamReader) SetClosed(p *sobek.Promise, resolve, reject func(any) error) {
 	reader.closedPromise = p
 	reader.closedPromiseResolveFunc = resolve
 	reader.closedPromiseRejectFunc = reject

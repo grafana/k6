@@ -60,7 +60,7 @@ type goModuleInstance struct {
 	defaultExport sobek.Value
 }
 
-func (gmi *goModuleInstance) ExecuteModule(_ *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
+func (gmi *goModuleInstance) ExecuteModule(_ *sobek.Runtime, _, _ func(any) error) (sobek.CyclicModuleInstance, error) {
 	return gmi, nil
 }
 func (gmi *goModuleInstance) HasTLA() bool { return false }
