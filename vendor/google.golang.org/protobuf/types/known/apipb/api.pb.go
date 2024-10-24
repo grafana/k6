@@ -94,11 +94,9 @@ type Api struct {
 
 func (x *Api) Reset() {
 	*x = Api{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_api_proto_msgTypes[0]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_api_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *Api) String() string {
@@ -109,7 +107,7 @@ func (*Api) ProtoMessage() {}
 
 func (x *Api) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_api_proto_msgTypes[0]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -197,11 +195,9 @@ type Method struct {
 
 func (x *Method) Reset() {
 	*x = Method{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_api_proto_msgTypes[1]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_api_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *Method) String() string {
@@ -212,7 +208,7 @@ func (*Method) ProtoMessage() {}
 
 func (x *Method) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_api_proto_msgTypes[1]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -368,11 +364,9 @@ type Mixin struct {
 
 func (x *Mixin) Reset() {
 	*x = Mixin{}
-	if protoimpl.UnsafeEnabled {
-		mi := &file_google_protobuf_api_proto_msgTypes[2]
-		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
-		ms.StoreMessageInfo(mi)
-	}
+	mi := &file_google_protobuf_api_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
 }
 
 func (x *Mixin) String() string {
@@ -383,7 +377,7 @@ func (*Mixin) ProtoMessage() {}
 
 func (x *Mixin) ProtoReflect() protoreflect.Message {
 	mi := &file_google_protobuf_api_proto_msgTypes[2]
-	if protoimpl.UnsafeEnabled && x != nil {
+	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
 			ms.StoreMessageInfo(mi)
@@ -515,44 +509,6 @@ func init() { file_google_protobuf_api_proto_init() }
 func file_google_protobuf_api_proto_init() {
 	if File_google_protobuf_api_proto != nil {
 		return
-	}
-	if !protoimpl.UnsafeEnabled {
-		file_google_protobuf_api_proto_msgTypes[0].Exporter = func(v any, i int) any {
-			switch v := v.(*Api); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_google_protobuf_api_proto_msgTypes[1].Exporter = func(v any, i int) any {
-			switch v := v.(*Method); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
-		file_google_protobuf_api_proto_msgTypes[2].Exporter = func(v any, i int) any {
-			switch v := v.(*Mixin); i {
-			case 0:
-				return &v.state
-			case 1:
-				return &v.sizeCache
-			case 2:
-				return &v.unknownFields
-			default:
-				return nil
-			}
-		}
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
