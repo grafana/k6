@@ -103,7 +103,7 @@ type RSAHashedKeyGenParams struct {
 	// Hash represents the name of the digest function to use. You can
 	// use any of the following: DigestKindSha256, DigestKindSha384,
 	// or DigestKindSha512.
-	Hash any
+	Hash Algorithm
 }
 
 // RSAHashedImportParams represents the object that should be passed as the
@@ -116,7 +116,7 @@ type RSAHashedImportParams struct {
 	// Hash represents the name of the digest function to use.
 	// Note that although you can technically pass SHA-1 here, this is strongly
 	// discouraged as it is considered vulnerable.
-	Hash any
+	Hash Algorithm
 }
 
 // RSAOaepParams represents the object that should be passed as the algorithm parameter

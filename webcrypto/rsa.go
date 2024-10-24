@@ -8,10 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"math/big"
-	"reflect"
 
 	"github.com/grafana/sobek"
-	"go.k6.io/k6/js/common"
 )
 
 // RsaHashedKeyAlgorithm represents the RSA key algorithm as defined by the [specification].
@@ -22,23 +20,7 @@ type RsaHashedKeyAlgorithm struct {
 
 	ModulusLength int `js:"modulusLength"`
 
-	// Hash identifies the name of the digest algorithm to use.
-	// You can use any of the following:
-	//   * [Sha256]
-	//   * [Sha384]
-	//   * [Sha512]
-	Hash any
-}
-
-func (h RsaHashedKeyAlgorithm) hash() (string, error) {
-	switch v := h.Hash.(type) {
-	case string:
-		return v, nil
-	case Algorithm:
-		return v.Name, nil
-	default:
-		return "", errors.New("unsupported hash type")
-	}
+	Hash Algorithm
 }
 
 var _ KeyGenerator = &RSAHashedKeyGenParams{}
@@ -63,13 +45,7 @@ func newRsaHashedKeyGenParams(
 		return nil, NewError(OperationError, "publicExponent is not a byte array")
 	}
 
-	hashRaw, err := traverseObject(rt, params, "hash")
-	if err != nil {
-		return nil, NewError(SyntaxError, "could not get hash from algorithm parameter")
-	}
-
-	// TODO: hash could be an object if normalized algorithm has it as an object
-	hash, err := extractSupportedHash(rt, hashRaw)
+	hash, err := extractHash(rt, params)
 	if err != nil {
 		return nil, err
 	}
@@ -80,36 +56,6 @@ func newRsaHashedKeyGenParams(
 		PublicExponent: publicExponent,
 		Hash:           hash,
 	}, nil
-}
-
-// TODO: this should be a generic function
-// that uses in any place where we need to extract a hash
-// CONSIDER: replacing it with extractHashFn or extractHash
-func extractSupportedHash(rt *sobek.Runtime, v sobek.Value) (any, error) {
-	if common.IsNullish(v) {
-		return "", NewError(TypeError, "hash is null or undefined")
-	}
-
-	// try string first
-	if v.ExportType().Kind() == reflect.String {
-		if !isHashAlgorithm(v.ToString().String()) {
-			return nil, NewError(NotSupportedError, "hash algorithm is not supported "+v.ToString().String())
-		}
-
-		return v.ToString().String(), nil
-	}
-
-	// otherwise, it should be an object
-	name := v.ToObject(rt).Get("name")
-	if common.IsNullish(name) {
-		return "", NewError(TypeError, "name is null or undefined")
-	}
-
-	if !isHashAlgorithm(name.ToString().String()) {
-		return nil, NewError(NotSupportedError, "hash algorithm is not supported "+name.ToString().String())
-	}
-
-	return Algorithm{Name: name.String()}, nil
 }
 
 // GenerateKey generates a new RSA key pair.
@@ -131,8 +77,6 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 		return nil, NewError(SyntaxError, "key usages cannot be empty")
 	}
 
-	// check if the key usages are valid
-	// TODO: ensure that this is the best place to do this
 	if rsakgp.Algorithm.Name == RSASsaPkcs1v15 || rsakgp.Algorithm.Name == RSAPss {
 		privateKeyUsages = []CryptoKeyUsage{SignCryptoKeyUsage}
 		publicKeyUsages = []CryptoKeyUsage{VerifyCryptoKeyUsage}
@@ -197,7 +141,7 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 }
 
 // validatePublicExponent validates the public exponent.
-// it's done same way how golang's rsa package does it.
+// it's done same way how golang's rsa package does it + additional check for evenness.
 func validatePublicExponent(e int) error {
 	if e%2 == 0 {
 		return errors.New("public exponent is even")
@@ -272,13 +216,7 @@ func newRsaHashedImportParams(
 	normalized Algorithm,
 	params sobek.Value,
 ) (*RSAHashedImportParams, error) {
-	hashRaw, err := traverseObject(rt, params, "hash")
-	if err != nil {
-		return nil, NewError(SyntaxError, "could not get hash from algorithm parameter")
-	}
-
-	// TODO: hash could be an object if normalized algorithm has it as an object
-	hash, err := extractSupportedHash(rt, hashRaw)
+	hash, err := extractHash(rt, params)
 	if err != nil {
 		return nil, err
 	}
@@ -293,7 +231,6 @@ func newRsaHashedImportParams(
 var _ KeyImporter = &RSAHashedImportParams{}
 
 // ImportKey imports a key according to the algorithm described in the specification.
-// https://www.w3.org/TR/WebCryptoAPI/#ecdh-operations
 func (rhkip *RSAHashedImportParams) ImportKey(
 	format KeyFormat,
 	keyData []byte,
@@ -340,7 +277,6 @@ func importRSAPrivateKey(keyData []byte) (any, CryptoKeyType, int, error) {
 		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "unable to import RSA private key data: "+err.Error())
 	}
 
-	// check if the key is an RSA key
 	privateKey, ok := parsedKey.(*rsa.PrivateKey)
 	if !ok {
 		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "a private key is not a RSA key")
@@ -355,7 +291,6 @@ func importRSAPublicKey(keyData []byte) (any, CryptoKeyType, int, error) {
 		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "unable to import RSA public key data: "+err.Error())
 	}
 
-	// check if the key is an RSA key
 	publicKey, ok := parsedKey.(*rsa.PublicKey)
 	if !ok {
 		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "a public key is not a RSA key")
@@ -420,12 +355,7 @@ func extractHashFromRSAKey(key CryptoKey) (crypto.Hash, error) {
 		return unk, NewError(InvalidAccessError, "key algorithm is not a RSA hashed key algorithm")
 	}
 
-	hashName, err := rsaHashedAlg.hash()
-	if err != nil {
-		return unk, NewError(NotSupportedError, fmt.Sprintf("hash algorithm %q is not supported", hashName))
-	}
-
-	return mapHashFn(hashName)
+	return mapHashFn(rsaHashedAlg.Hash.Name)
 }
 
 func newRSAPssParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*RSAPssParams, error) {

@@ -6,17 +6,17 @@ export default async function () {
       name: "RSA-OAEP",
       modulusLength: 2048,
       publicExponent: new Uint8Array([1, 0, 1]),
-       hash: {name: "SHA-1"},
+      hash: { name: "SHA-1" },
     },
     true,
     ["encrypt", "decrypt"]
   );
 
   const encoded = stringToArrayBuffer("Hello, World!");
-  
+
   const cipherText = await crypto.subtle.encrypt(
     {
-      name: "RSA-OAEP",      
+      name: "RSA-OAEP",
     },
     keyPair.publicKey,
     encoded
@@ -24,11 +24,14 @@ export default async function () {
 
   // ciphertext.byteLength * 8, vector.privateKey.algorithm.modulusLength
   console.log("cipherText's byteLength: ", cipherText.byteLength * 8);
-  console.log("algorithm's modulusLength: ", keyPair.privateKey.algorithm.modulusLength);
+  console.log(
+    "algorithm's modulusLength: ",
+    keyPair.privateKey.algorithm.modulusLength
+  );
 
   const plaintext = await crypto.subtle.decrypt(
     {
-      name: "RSA-OAEP",      
+      name: "RSA-OAEP",
     },
     keyPair.privateKey,
     cipherText

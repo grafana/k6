@@ -317,8 +317,7 @@ func (jwk *rsaJWK) validate() error {
 		return errors.New("exponent (e) is required")
 	}
 
-	// TODO: validate the rest of the fields
-
+	// TODO: consider validating the other fields in future
 	return nil
 }
 
@@ -332,7 +331,7 @@ func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, int, error) {
 		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("invalid RSA JWK key: %w", err)
 	}
 
-	// Decode the various key components
+	// decode the various key components
 	nBytes, err := base64URLDecode(jwk.N)
 	if err != nil {
 		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode modulus: %w", err)
@@ -342,15 +341,14 @@ func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, int, error) {
 		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode exponent: %w", err)
 	}
 
-	// Convert exponent to an integer
+	// convert exponent to an integer
 	eInt := new(big.Int).SetBytes(eBytes).Int64()
-
 	pubKey := rsa.PublicKey{
 		N: new(big.Int).SetBytes(nBytes),
 		E: int(eInt),
 	}
 
-	// If the private exponent is missing, return the public key
+	// if the private exponent is missing, return the public key
 	if jwk.D == "" {
 		return pubKey, PublicCryptoKeyType, pubKey.N.BitLen(), nil
 	}
