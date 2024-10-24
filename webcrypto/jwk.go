@@ -322,24 +322,24 @@ func (jwk *rsaJWK) validate() error {
 	return nil
 }
 
-func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, error) {
+func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, int, error) {
 	var jwk rsaJWK
 	if err := json.Unmarshal(jsonKeyData, &jwk); err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to parse input as RSA JWK key: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to parse input as RSA JWK key: %w", err)
 	}
 
 	if err := jwk.validate(); err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("invalid RSA JWK key: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("invalid RSA JWK key: %w", err)
 	}
 
 	// Decode the various key components
 	nBytes, err := base64URLDecode(jwk.N)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode modulus: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode modulus: %w", err)
 	}
 	eBytes, err := base64URLDecode(jwk.E)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode exponent: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode exponent: %w", err)
 	}
 
 	// Convert exponent to an integer
@@ -352,32 +352,32 @@ func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, error) {
 
 	// If the private exponent is missing, return the public key
 	if jwk.D == "" {
-		return pubKey, PublicCryptoKeyType, nil
+		return pubKey, PublicCryptoKeyType, pubKey.N.BitLen(), nil
 	}
 
 	dBytes, err := base64URLDecode(jwk.D)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode private exponent: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode private exponent: %w", err)
 	}
 	pBytes, err := base64URLDecode(jwk.P)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode first prime factor: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode first prime factor: %w", err)
 	}
 	qBytes, err := base64URLDecode(jwk.Q)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode second prime factor: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode second prime factor: %w", err)
 	}
 	dpBytes, err := base64URLDecode(jwk.Dp)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode first exponent: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode first exponent: %w", err)
 	}
 	dqBytes, err := base64URLDecode(jwk.Dq)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode second exponent: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode second exponent: %w", err)
 	}
 	qiBytes, err := base64URLDecode(jwk.Qi)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to decode coefficient: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode coefficient: %w", err)
 	}
 
 	privKey := &rsa.PrivateKey{
@@ -396,10 +396,10 @@ func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, error) {
 
 	err = privKey.Validate()
 	if err != nil {
-		return nil, UnknownCryptoKeyType, fmt.Errorf("failed to validate private key: %w", err)
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to validate private key: %w", err)
 	}
 
-	return privKey, PrivateCryptoKeyType, nil
+	return privKey, PrivateCryptoKeyType, pubKey.N.BitLen(), nil
 }
 
 func exportRSAJWK(key *CryptoKey) (interface{}, error) {

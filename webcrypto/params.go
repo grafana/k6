@@ -123,8 +123,7 @@ type RSAHashedImportParams struct {
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
 // `SubtleCrypto.UnwrapKey`, when using the RSA_OAEP algorithm.
 type RSAOaepParams struct {
-	// Name should be set to "RSA-OAEP"
-	Name string
+	Algorithm
 
 	// Label holds (an ArrayBuffer, a TypedArray, or a DataView) an array of bytes that does not
 	// itself need to be encrypted but which should be bound to the ciphertext.

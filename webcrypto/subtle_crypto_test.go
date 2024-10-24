@@ -181,6 +181,23 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 
 		assert.NoError(t, gotErr)
 	})
+
+	t.Run("RSA-OAEP", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newConfiguredRuntime(t)
+
+		gotErr := ts.EventLoop.Start(func() error {
+			err := executeTestScripts(ts.VU.Runtime(), "./tests/encrypt_decrypt", "rsa_vectors.js", "rsa.js")
+			require.NoError(t, err)
+
+			_, err = ts.VU.Runtime().RunString(`run_test()`)
+
+			return err
+		})
+
+		assert.NoError(t, gotErr)
+	})
 }
 
 func TestSubtleCryptoSignVerify(t *testing.T) {

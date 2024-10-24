@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"fmt"
+	"reflect"
 
 	"github.com/grafana/sobek"
 )
@@ -26,32 +27,32 @@ type EncryptDecrypter interface {
 // algorithm and parameters `sobek.Value`.
 //
 // The returned instance can be used to encrypt/decrypt data using the
-// corresponding AES algorithm.
+// corresponding algorithm.
 func newEncryptDecrypter(
 	rt *sobek.Runtime,
 	algorithm Algorithm,
 	params sobek.Value,
 ) (EncryptDecrypter, error) {
 	var ed EncryptDecrypter
-	var paramsObjectName string
 	var err error
 
 	switch algorithm.Name {
 	case AESCbc:
 		ed = new(AESCBCParams)
-		paramsObjectName = "AesCbcParams"
 	case AESCtr:
 		ed = new(AESCTRParams)
-		paramsObjectName = "AesCtrParams"
 	case AESGcm:
 		ed = new(AESGCMParams)
-		paramsObjectName = "AesGcmParams"
+	case RSAOaep:
+		ed = new(RSAOaepParams)
 	default:
-		return nil, NewError(NotSupportedError, "unsupported algorithm")
+		return nil, NewError(NotSupportedError, "unsupported algorithm "+algorithm.Name)
 	}
 
 	if err = rt.ExportTo(params, ed); err != nil {
-		errMsg := fmt.Sprintf("invalid algorithm parameters, unable to interpret as %sParams object", paramsObjectName)
+		structType := reflect.TypeOf(ed)
+
+		errMsg := fmt.Sprintf("invalid algorithm parameters, unable to interpret as %q object", structType.Name())
 		return nil, NewError(SyntaxError, errMsg)
 	}
 

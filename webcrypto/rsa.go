@@ -19,6 +19,8 @@ import (
 type RsaHashedKeyAlgorithm struct {
 	KeyAlgorithm
 
+	ModulusLength int `js:"modulusLength"`
+
 	// Hash identifies the name of the digest algorithm to use.
 	// You can use any of the following:
 	//   * [Sha256]
@@ -140,6 +142,8 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 		}
 	}
 	if rsakgp.Algorithm.Name == RSAOaep {
+		privateKeyUsages = []CryptoKeyUsage{DecryptCryptoKeyUsage}
+		publicKeyUsages = []CryptoKeyUsage{EncryptCryptoKeyUsage}
 		for _, usage := range keyUsages {
 			switch usage {
 			case EncryptCryptoKeyUsage:
@@ -154,6 +158,7 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 	}
 
 	alg := RsaHashedKeyAlgorithm{
+		ModulusLength: rsakgp.ModulusLength,
 		KeyAlgorithm: KeyAlgorithm{
 			Algorithm: rsakgp.Algorithm,
 		},
@@ -267,7 +272,7 @@ func (rhkip *RSAHashedImportParams) ImportKey(
 	keyData []byte,
 	usages []CryptoKeyUsage,
 ) (*CryptoKey, error) {
-	var importFn func(keyData []byte) (any, CryptoKeyType, error)
+	var importFn func(keyData []byte) (any, CryptoKeyType, int, error)
 
 	switch {
 	case format == Pkcs8KeyFormat:
@@ -283,13 +288,14 @@ func (rhkip *RSAHashedImportParams) ImportKey(
 		)
 	}
 
-	handle, keyType, err := importFn(keyData)
+	handle, keyType, modusLength, err := importFn(keyData)
 	if err != nil {
 		return nil, err
 	}
 
 	return &CryptoKey{
 		Algorithm: RsaHashedKeyAlgorithm{
+			ModulusLength: modusLength,
 			KeyAlgorithm: KeyAlgorithm{
 				Algorithm: rhkip.Algorithm,
 			},
@@ -301,34 +307,34 @@ func (rhkip *RSAHashedImportParams) ImportKey(
 	}, nil
 }
 
-func importRSAPrivateKey(keyData []byte) (any, CryptoKeyType, error) {
+func importRSAPrivateKey(keyData []byte) (any, CryptoKeyType, int, error) {
 	parsedKey, err := x509.ParsePKCS8PrivateKey(keyData)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH private key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "unable to import RSA private key data: "+err.Error())
 	}
 
 	// check if the key is an RSA key
 	privateKey, ok := parsedKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, UnknownCryptoKeyType, NewError(DataError, "a private key is not an ECDSA key")
+		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "a private key is not a RSA key")
 	}
 
-	return privateKey, PrivateCryptoKeyType, nil
+	return privateKey, PrivateCryptoKeyType, privateKey.PublicKey.N.BitLen(), nil
 }
 
-func importRSAPublicKey(keyData []byte) (any, CryptoKeyType, error) {
+func importRSAPublicKey(keyData []byte) (any, CryptoKeyType, int, error) {
 	parsedKey, err := x509.ParsePKIXPublicKey(keyData)
 	if err != nil {
-		return nil, UnknownCryptoKeyType, NewError(DataError, "unable to import ECDH public key data: "+err.Error())
+		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "unable to import RSA public key data: "+err.Error())
 	}
 
 	// check if the key is an RSA key
 	publicKey, ok := parsedKey.(*rsa.PublicKey)
 	if !ok {
-		return nil, UnknownCryptoKeyType, NewError(DataError, "a public key is not an ECDSA key")
+		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "a public key is not a RSA key")
 	}
 
-	return publicKey, PublicCryptoKeyType, nil
+	return publicKey, PublicCryptoKeyType, publicKey.N.BitLen(), nil
 }
 
 type rsaSsaPkcs1v15SignerVerifier struct{}
@@ -346,7 +352,7 @@ func (rsasv *rsaSsaPkcs1v15SignerVerifier) Sign(key CryptoKey, data []byte) ([]b
 
 	rsaKey, ok := key.handle.(*rsa.PrivateKey)
 	if !ok {
-		return nil, NewError(InvalidAccessError, "key is not an RSA private key")
+		return nil, NewError(InvalidAccessError, "key is not a RSA private key")
 	}
 
 	signature, err := rsa.SignPKCS1v15(rand.Reader, rsaKey, hash, hashedData.Sum(nil))
@@ -368,7 +374,7 @@ func (rsasv *rsaSsaPkcs1v15SignerVerifier) Verify(key CryptoKey, signature []byt
 
 	rsaKey, ok := key.handle.(*rsa.PublicKey)
 	if !ok {
-		return false, NewError(InvalidAccessError, "key is not an RSA public key")
+		return false, NewError(InvalidAccessError, "key is not a RSA public key")
 	}
 
 	err = rsa.VerifyPKCS1v15(rsaKey, hash, hashedData.Sum(nil), signature)
@@ -384,7 +390,7 @@ func extractHashFromRSAKey(key CryptoKey) (crypto.Hash, error) {
 
 	rsaHashedAlg, ok := key.Algorithm.(RsaHashedKeyAlgorithm)
 	if !ok {
-		return unk, NewError(InvalidAccessError, "key algorithm is not an RSA hashed key algorithm")
+		return unk, NewError(InvalidAccessError, "key algorithm is not a RSA hashed key algorithm")
 	}
 
 	hashName, err := rsaHashedAlg.hash()
@@ -413,7 +419,7 @@ var _ SignerVerifier = &RSAPssParams{}
 func (rsasv *RSAPssParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
 	rsaKey, ok := key.handle.(*rsa.PrivateKey)
 	if !ok {
-		return nil, NewError(InvalidAccessError, "key is not an RSA private key")
+		return nil, NewError(InvalidAccessError, "key is not a RSA private key")
 	}
 
 	hash, err := extractHashFromRSAKey(key)
@@ -438,7 +444,7 @@ func (rsasv *RSAPssParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
 func (rsasv *RSAPssParams) Verify(key CryptoKey, signature []byte, data []byte) (bool, error) {
 	rsaKey, ok := key.handle.(*rsa.PublicKey)
 	if !ok {
-		return false, NewError(InvalidAccessError, "key is not an RSA public key")
+		return false, NewError(InvalidAccessError, "key is not a RSA public key")
 	}
 
 	hash, err := extractHashFromRSAKey(key)
@@ -453,4 +459,44 @@ func (rsasv *RSAPssParams) Verify(key CryptoKey, signature []byte, data []byte) 
 		SaltLength: rsasv.SaltLength,
 	})
 	return err == nil, nil
+}
+
+// Encrypt .
+func (rsaoaep *RSAOaepParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
+	rsaKey, ok := key.handle.(*rsa.PublicKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key is not a RSA public key")
+	}
+
+	hash, err := extractHashFromRSAKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	ciphertext, err := rsa.EncryptOAEP(hash.New(), rand.Reader, rsaKey, plaintext, rsaoaep.Label)
+	if err != nil {
+		return nil, NewError(OperationError, "could not encrypt data: "+err.Error())
+	}
+
+	return ciphertext, nil
+}
+
+// Decrypt .
+func (rsaoaep *RSAOaepParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
+	rsaKey, ok := key.handle.(*rsa.PrivateKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key is not a RSA private key")
+	}
+
+	hash, err := extractHashFromRSAKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	plaintext, err := rsa.DecryptOAEP(hash.New(), rand.Reader, rsaKey, ciphertext, rsaoaep.Label)
+	if err != nil {
+		return nil, NewError(OperationError, "could not decrypt data: "+err.Error())
+	}
+
+	return plaintext, nil
 }

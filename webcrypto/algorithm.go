@@ -194,7 +194,7 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 			isEllipticCurve(algorithmName) ||
 			isRSAAlgorithm(algorithmName)
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
-		return isAesAlgorithm(algorithmName)
+		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:
 		return algorithmName == HMAC || algorithmName == ECDSA || algorithmName == RSAPss || algorithmName == RSASsaPkcs1v15
 	default:
