@@ -20,7 +20,7 @@ That said, "how do I..."-type questions are often more suited for community foru
 
 ## Contributing code
 
-If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#style-guide) described below.
+If you'd like to contribute code to k6, this is the basic procedure. Make sure to follow the [style guide](#code-style) described below.
 
 1. Find an issue you'd like to fix. If there is none already, or you'd like to add a feature, please open one, and we can talk about how to do it.  Out of respect for your time, please start a discussion regarding any bigger contributions either in a GitHub Issue, in the community forums **before** you get started on the implementation.
   
