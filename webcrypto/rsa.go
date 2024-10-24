@@ -6,6 +6,7 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"errors"
+	"fmt"
 	"reflect"
 
 	"github.com/grafana/sobek"
@@ -388,8 +389,68 @@ func extractHashFromRSAKey(key CryptoKey) (crypto.Hash, error) {
 
 	hashName, err := rsaHashedAlg.hash()
 	if err != nil {
-		return unk, err
+		return unk, NewError(NotSupportedError, fmt.Sprintf("hash algorithm %q is not supported", hashName))
 	}
 
 	return mapHashFn(hashName)
+}
+
+func newRSAPssParams(rt *sobek.Runtime, normalized Algorithm, params sobek.Value) (*RSAPssParams, error) {
+	saltLength, err := traverseObject(rt, params, "saltLength")
+	if err != nil {
+		return nil, NewError(SyntaxError, "could not get saltLength from algorithm parameter")
+	}
+
+	return &RSAPssParams{
+		Algorithm:  normalized,
+		SaltLength: int(saltLength.ToInteger()),
+	}, nil
+}
+
+var _ SignerVerifier = &RSAPssParams{}
+
+// Sign signs the given data.
+func (rsasv *RSAPssParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
+	rsaKey, ok := key.handle.(*rsa.PrivateKey)
+	if !ok {
+		return nil, NewError(InvalidAccessError, "key is not an RSA private key")
+	}
+
+	hash, err := extractHashFromRSAKey(key)
+	if err != nil {
+		return nil, err
+	}
+
+	hashedData := hash.New()
+	hashedData.Write(data)
+
+	signature, err := rsa.SignPSS(rand.Reader, rsaKey, hash, hashedData.Sum(nil), &rsa.PSSOptions{
+		SaltLength: rsasv.SaltLength,
+	})
+	if err != nil {
+		return nil, NewError(OperationError, "could not sign data: "+err.Error())
+	}
+
+	return signature, nil
+}
+
+// Verify verifies the signature of the given data.
+func (rsasv *RSAPssParams) Verify(key CryptoKey, signature []byte, data []byte) (bool, error) {
+	rsaKey, ok := key.handle.(*rsa.PublicKey)
+	if !ok {
+		return false, NewError(InvalidAccessError, "key is not an RSA public key")
+	}
+
+	hash, err := extractHashFromRSAKey(key)
+	if err != nil {
+		return false, err
+	}
+
+	hashedData := hash.New()
+	hashedData.Write(data)
+
+	err = rsa.VerifyPSS(rsaKey, hash, hashedData.Sum(nil), signature, &rsa.PSSOptions{
+		SaltLength: rsasv.SaltLength,
+	})
+	return err == nil, nil
 }

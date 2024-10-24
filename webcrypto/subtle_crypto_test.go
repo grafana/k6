@@ -236,6 +236,23 @@ func TestSubtleCryptoSignVerify(t *testing.T) {
 
 		assert.NoError(t, gotErr)
 	})
+
+	t.Run("RSA-PSS", func(t *testing.T) {
+		t.Parallel()
+
+		ts := newConfiguredRuntime(t)
+
+		gotErr := ts.EventLoop.Start(func() error {
+			err := executeTestScripts(ts.VU.Runtime(), "./tests/sign_verify", "rsa_pss_vectors.js", "rsa.js")
+			require.NoError(t, err)
+
+			_, err = ts.VU.Runtime().RunString(`run_test()`)
+
+			return err
+		})
+
+		assert.NoError(t, gotErr)
+	})
 }
 
 func TestSubtleCryptoDeriveBitsKeys(t *testing.T) {

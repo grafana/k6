@@ -139,8 +139,7 @@ type RSAOaepParams struct {
 // parameter into `SubtleCrypto.Sign` or `SubtleCrypto.Verify`, when using the
 // RSA-PSS algorithm.
 type RSAPssParams struct {
-	// Name should be set to AlgorithmKindRsaPss.
-	Name AlgorithmIdentifier
+	Algorithm Algorithm
 
 	// SaltLength holds (a Number) the length of the random salt to use, in bytes.
 	// RFC 3447 says that "typical salt lengths" are either 0 or the length of the output
