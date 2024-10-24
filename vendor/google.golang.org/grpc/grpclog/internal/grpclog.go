@@ -1,6 +1,6 @@
 /*
  *
- * Copyright 2015 gRPC authors.
+ * Copyright 2024 gRPC authors.
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -16,19 +16,11 @@
  *
  */
 
-package grpclog
+// Package internal contains functionality internal to the grpclog package.
+package internal
 
-import "google.golang.org/grpc/grpclog/internal"
+// LoggerV2Impl is the logger used for the non-depth log functions.
+var LoggerV2Impl LoggerV2
 
-// Logger mimics golang's standard Logger as an interface.
-//
-// Deprecated: use LoggerV2.
-type Logger internal.Logger
-
-// SetLogger sets the logger that is used in grpc. Call only from
-// init() functions.
-//
-// Deprecated: use SetLoggerV2.
-func SetLogger(l Logger) {
-	internal.LoggerV2Impl = &internal.LoggerWrapper{Logger: l}
-}
+// DepthLoggerV2Impl is the logger used for the depth log functions.
+var DepthLoggerV2Impl DepthLoggerV2
