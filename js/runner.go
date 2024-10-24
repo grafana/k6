@@ -590,7 +590,7 @@ func (r *Runner) getTimeoutFor(stage string) time.Duration {
 	case consts.TeardownFn:
 		return r.Bundle.Options.TeardownTimeout.TimeDuration()
 	case consts.HandleSummaryFn:
-		return 2 * time.Minute // TODO: make configurable
+		return r.Bundle.Options.HandleSummaryTimeout.TimeDuration()
 	}
 	return d
 }
