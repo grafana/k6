@@ -1,17 +1,17 @@
 package compiler
 
 import (
-	"path/filepath"
-
 	"github.com/evanw/esbuild/pkg/api"
 	"github.com/grafana/sobek/file"
 	"github.com/grafana/sobek/parser"
 )
 
-func esbuildTransform(src, filename string) (code string, srcMap []byte, err error) {
+// StripTypes transpiles the input source string and strip types from it.
+// this is done using esbuild
+func StripTypes(src, filename string) (code string, srcMap []byte, err error) {
 	opts := api.TransformOptions{
+		Loader:         api.LoaderTS,
 		Sourcefile:     filename,
-		Loader:         api.LoaderJS,
 		Target:         api.ESNext,
 		Format:         api.FormatDefault,
 		Sourcemap:      api.SourceMapExternal,
@@ -20,10 +20,6 @@ func esbuildTransform(src, filename string) (code string, srcMap []byte, err err
 		Platform:       api.PlatformNeutral,
 		LogLevel:       api.LogLevelSilent,
 		Charset:        api.CharsetUTF8,
-	}
-
-	if filepath.Ext(filename) == ".ts" {
-		opts.Loader = api.LoaderTS
 	}
 
 	result := api.Transform(src, opts)
