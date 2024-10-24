@@ -22,26 +22,29 @@ The current state of the project is that it is an experimental module of the Web
 
 | API                       | AES-CBC | AES-GCM | AES-CTR | RSA-OAEP |
 | :------------------------ | :------ | :------ | :------ | :------- |
-| `crypto.subtle.encrypt()` | ✅      | ✅      | ✅      | ❌       |
-| `crypto.subtle.decrypt()` | ✅      | ✅      | ✅      | ❌       |
+| `crypto.subtle.encrypt()` | ✅      | ✅      | ✅      | ✅       |
+| `crypto.subtle.decrypt()` | ✅      | ✅      | ✅      | ✅       |
 
 ##### Signature
 
 | API                      | HMAC | ECDSA | RSASSA-PKCS1-v1_5 | RSA-PSS |
 | :----------------------- | :--- | :---- | :---------------- | :------ |
-| `crypto.subtle.sign()`   | ✅   | ✅    | ❌                | ❌      |
-| `crypto.subtle.verify()` | ✅   | ✅    | ❌                | ❌      |
+| `crypto.subtle.sign()`   | ✅   | ✅    | ✅                | ✅      |
+| `crypto.subtle.verify()` | ✅   | ✅    | ✅                | ✅      |
+
+> [!WARNING]  
+> Since we use Golang SDK under the hood, the RSA-PSS [doesn't support deterministic signatures](https://github.com/golang/go/blob/master/src/crypto/rsa/pss.go#L293-L297). In other words, even if `saltLength` is set to 0, the signature will be different each time.
 
 ##### Key generation, import and export
 
 | API                           | AES-CBC | AES-GCM | AES-CTR | AES-KW | HMAC | ECDSA | ECDH | RSASSA-PKCS1-v1_5 | RSA-PSS | RSA-OAEP |
 | :---------------------------- | :------ | :------ | :------ | :----- | :--- | :---- | :--- | :---------------- | :------ | :------- |
-| `crypto.subtle.generateKey()` | ✅      | ✅      | ✅      | ❌     | ✅   | ✅    | ✅   | ❌                | ❌      | ❌       |
-| `crypto.subtle.importKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ✅    | ✅   | ❌                | ❌      | ❌       |
-| `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ✅    | ✅   | ❌                | ❌      | ❌       |
+| `crypto.subtle.generateKey()` | ✅      | ✅      | ✅      | ❌     | ✅   | ✅    | ✅   | ✅                | ✅      | ✅       |
+| `crypto.subtle.importKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ✅    | ✅   | ✅                | ✅      | ✅       |
+| `crypto.subtle.exportKey()`   | ✅      | ✅      | ✅      | ❌     | ✅   | ✅    | ✅   | ✅                | ✅      | ✅       |
 
 > [!WARNING]  
-> Currently, only the `raw` and `jwk` (JSON Web Key) formats are supported for import/export operations for the `AES-*` and `HMAC` algorithms. `ECDH` and `ECDSA` have support for `pkcs8`, `spki`, `raw` and `jwk` formats.
+> Currently, only the `raw` and `jwk` (JSON Web Key) formats are supported for import/export operations for the `AES-*` and `HMAC` algorithms. `ECDH` and `ECDSA` have support for `pkcs8`, `spki`, `raw` and `jwk` formats. RSA algorithms have support for `pkcs8`, `spki`  and `jwk` formats.
 
 ##### Key derivation
 
