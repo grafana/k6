@@ -7,6 +7,7 @@ import (
 	"crypto/x509"
 	"errors"
 	"fmt"
+	"math/big"
 	"reflect"
 
 	"github.com/grafana/sobek"
@@ -116,11 +117,15 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 	extractable bool,
 	keyUsages []CryptoKeyUsage,
 ) (CryptoKeyGenerationResult, error) {
-	var keyPairGenerator func(modulusLength int) (any, any, error)
-
 	var privateKeyUsages, publicKeyUsages []CryptoKeyUsage
 
-	keyPairGenerator = generateRSAKeyPair
+	publicExponent := int(new(big.Int).SetBytes(rsakgp.PublicExponent).Int64())
+	if err := validatePublicExponent(publicExponent); err != nil {
+		return nil, NewError(
+			OperationError,
+			fmt.Sprintf("invalid public exponent: %s", err),
+		)
+	}
 
 	if len(keyUsages) == 0 {
 		return nil, NewError(SyntaxError, "key usages cannot be empty")
@@ -165,7 +170,6 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 		Hash: rsakgp.Hash,
 	}
 
-	// wrap the keys in CryptoKey objects
 	privateKey := &CryptoKey{
 		Type:        PrivateCryptoKeyType,
 		Extractable: extractable,
@@ -181,7 +185,7 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 	}
 
 	var err error
-	privateKey.handle, publicKey.handle, err = keyPairGenerator(rsakgp.ModulusLength)
+	privateKey.handle, publicKey.handle, err = generateRSAKeyPair(rsakgp.ModulusLength, publicExponent)
 	if err != nil {
 		return nil, err
 	}
@@ -192,15 +196,38 @@ func (rsakgp *RSAHashedKeyGenParams) GenerateKey(
 	}, nil
 }
 
+// validatePublicExponent validates the public exponent.
+// it's done same way how golang's rsa package does it.
+func validatePublicExponent(e int) error {
+	if e%2 == 0 {
+		return errors.New("public exponent is even")
+	}
+
+	if e < 2 {
+		return errors.New("public exponent too small")
+	}
+	if e > 1<<31-1 {
+		return errors.New("public exponent too large")
+	}
+
+	return nil
+}
+
 func generateRSAKeyPair(
 	modulusLength int,
+	publicExponent int,
 ) (any, any, error) {
 	privateKey, err := rsa.GenerateKey(rand.Reader, modulusLength)
 	if err != nil {
 		return nil, nil, NewError(OperationError, "could not generate RSA key pair")
 	}
 
-	// TODO: support setting of the public exponent
+	privateKey.PublicKey.E = publicExponent
+
+	// validate the key pair, since we are setting the public exponent manually
+	if err := privateKey.Validate(); err != nil {
+		return nil, nil, NewError(OperationError, "could not validate RSA key pair, check public exponent: "+err.Error())
+	}
 
 	return privateKey, privateKey.Public(), nil
 }
