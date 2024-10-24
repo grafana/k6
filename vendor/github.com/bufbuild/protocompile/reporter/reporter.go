@@ -153,13 +153,7 @@ func (h *Handler) HandleError(err error) error {
 // call to HandleError or HandleErrorf), that same error is returned and the
 // given error is not reported.
 func (h *Handler) HandleErrorWithPos(span ast.SourceSpan, err error) error {
-	if ewp, ok := err.(ErrorWithPos); ok {
-		// replace existing position with given one
-		err = errorWithSpan{SourceSpan: span, underlying: ewp.Unwrap()}
-	} else {
-		err = errorWithSpan{SourceSpan: span, underlying: err}
-	}
-	return h.HandleError(err)
+	return h.HandleError(Error(span, err))
 }
 
 // HandleErrorf handles an error with the given source position, creating the
@@ -191,14 +185,7 @@ func (h *Handler) HandleWarning(err ErrorWithPos) {
 // HandleWarningWithPos handles a warning with the given source position. This will
 // delegate to the handler's configured reporter.
 func (h *Handler) HandleWarningWithPos(span ast.SourceSpan, err error) {
-	ewp, ok := err.(ErrorWithPos)
-	if ok {
-		// replace existing position with given one
-		ewp = errorWithSpan{SourceSpan: span, underlying: ewp.Unwrap()}
-	} else {
-		ewp = errorWithSpan{SourceSpan: span, underlying: err}
-	}
-	h.HandleWarning(ewp)
+	h.HandleWarning(Error(span, err))
 }
 
 // HandleWarningf handles a warning with the given source position, creating the

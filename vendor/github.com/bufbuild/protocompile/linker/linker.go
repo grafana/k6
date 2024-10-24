@@ -67,8 +67,10 @@ func Link(parsed parser.Result, dependencies Files, symbols *Symbols, handler *r
 		prefix:               prefix,
 		optionQualifiedNames: map[ast.IdentValueNode]string{},
 	}
+	// First, we create the hierarchy of descendant descriptors.
+	r.createDescendants()
 
-	// First, we put all symbols into a single pool, which lets us ensure there
+	// Then we can put all symbols into a single pool, which lets us ensure there
 	// are no duplicate symbols and will also let us resolve and revise all type
 	// references in next step.
 	if err := symbols.importResult(r, handler); err != nil {

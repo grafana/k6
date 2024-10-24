@@ -108,7 +108,7 @@ type RPCDeclNode interface {
 }
 
 var _ RPCDeclNode = (*RPCNode)(nil)
-var _ RPCDeclNode = NoSourceNode{}
+var _ RPCDeclNode = (*NoSourceNode)(nil)
 
 // RPCNode represents an RPC declaration. Example:
 //

@@ -41,7 +41,7 @@ var _ FieldDeclNode = (*FieldNode)(nil)
 var _ FieldDeclNode = (*GroupNode)(nil)
 var _ FieldDeclNode = (*MapFieldNode)(nil)
 var _ FieldDeclNode = (*SyntheticMapField)(nil)
-var _ FieldDeclNode = NoSourceNode{}
+var _ FieldDeclNode = (*NoSourceNode)(nil)
 
 // FieldNode represents a normal field declaration (not groups or maps). It
 // can represent extension fields as well as non-extension fields (both inside
@@ -394,7 +394,7 @@ type OneofDeclNode interface {
 
 var _ OneofDeclNode = (*OneofNode)(nil)
 var _ OneofDeclNode = (*SyntheticOneof)(nil)
-var _ OneofDeclNode = NoSourceNode{}
+var _ OneofDeclNode = (*NoSourceNode)(nil)
 
 // OneofNode represents a one-of declaration. Example:
 //
