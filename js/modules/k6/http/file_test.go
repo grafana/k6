@@ -28,7 +28,7 @@ func TestHTTPFile(t *testing.T) {
 			"",
 		},
 		{
-			func(*sobek.Runtime) interface{} { return string(input) },
+			func(*sobek.Runtime) interface{} { return input },
 			[]string{"test.txt", "text/plain"},
 			&FileData{Data: input, Filename: "test.txt", ContentType: "text/plain"},
 			"",
