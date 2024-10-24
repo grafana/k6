@@ -184,7 +184,7 @@ func exportRSAKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
 	switch format {
 	case SpkiKeyFormat:
 		if ck.Type != PublicCryptoKeyType {
-			return nil, NewError(InvalidAccessError, "key is not a valid RSA public key")
+			return nil, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPublicKey, "RSA", ck.handle))
 		}
 
 		bytes, err := x509.MarshalPKIXPublicKey(ck.handle)
@@ -195,7 +195,7 @@ func exportRSAKey(ck *CryptoKey, format KeyFormat) (interface{}, error) {
 		return bytes, nil
 	case Pkcs8KeyFormat:
 		if ck.Type != PrivateCryptoKeyType {
-			return nil, NewError(InvalidAccessError, "key is not a valid RSA private key")
+			return nil, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPrivateKey, "RSA", ck.handle))
 		}
 
 		bytes, err := x509.MarshalPKCS8PrivateKey(ck.handle)
@@ -279,7 +279,7 @@ func importRSAPrivateKey(keyData []byte) (any, CryptoKeyType, int, error) {
 
 	privateKey, ok := parsedKey.(*rsa.PrivateKey)
 	if !ok {
-		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "a private key is not a RSA key")
+		return nil, UnknownCryptoKeyType, 0, NewError(DataError, fmt.Sprintf(errMsgNotExpectedPrivateKey, "RSA", privateKey))
 	}
 
 	return privateKey, PrivateCryptoKeyType, privateKey.PublicKey.N.BitLen(), nil
@@ -293,7 +293,7 @@ func importRSAPublicKey(keyData []byte) (any, CryptoKeyType, int, error) {
 
 	publicKey, ok := parsedKey.(*rsa.PublicKey)
 	if !ok {
-		return nil, UnknownCryptoKeyType, 0, NewError(DataError, "a public key is not a RSA key")
+		return nil, UnknownCryptoKeyType, 0, NewError(DataError, fmt.Sprintf(errMsgNotExpectedPublicKey, "RSA", publicKey))
 	}
 
 	return publicKey, PublicCryptoKeyType, publicKey.N.BitLen(), nil
@@ -314,7 +314,7 @@ func (rsasv *rsaSsaPkcs1v15SignerVerifier) Sign(key CryptoKey, data []byte) ([]b
 
 	rsaKey, ok := key.handle.(*rsa.PrivateKey)
 	if !ok {
-		return nil, NewError(InvalidAccessError, "key is not a RSA private key")
+		return nil, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPrivateKey, "RSA", key.handle))
 	}
 
 	signature, err := rsa.SignPKCS1v15(rand.Reader, rsaKey, hash, hashedData.Sum(nil))
@@ -336,7 +336,7 @@ func (rsasv *rsaSsaPkcs1v15SignerVerifier) Verify(key CryptoKey, signature []byt
 
 	rsaKey, ok := key.handle.(*rsa.PublicKey)
 	if !ok {
-		return false, NewError(InvalidAccessError, "key is not a RSA public key")
+		return false, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPublicKey, "RSA", key.handle))
 	}
 
 	err = rsa.VerifyPKCS1v15(rsaKey, hash, hashedData.Sum(nil), signature)
@@ -376,7 +376,7 @@ var _ SignerVerifier = &RSAPssParams{}
 func (rsasv *RSAPssParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
 	rsaKey, ok := key.handle.(*rsa.PrivateKey)
 	if !ok {
-		return nil, NewError(InvalidAccessError, "key is not a RSA private key")
+		return nil, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPrivateKey, "RSA", key.handle))
 	}
 
 	hash, err := extractHashFromRSAKey(key)
@@ -401,7 +401,7 @@ func (rsasv *RSAPssParams) Sign(key CryptoKey, data []byte) ([]byte, error) {
 func (rsasv *RSAPssParams) Verify(key CryptoKey, signature []byte, data []byte) (bool, error) {
 	rsaKey, ok := key.handle.(*rsa.PublicKey)
 	if !ok {
-		return false, NewError(InvalidAccessError, "key is not a RSA public key")
+		return false, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPublicKey, "RSA", key.handle))
 	}
 
 	hash, err := extractHashFromRSAKey(key)
@@ -422,7 +422,7 @@ func (rsasv *RSAPssParams) Verify(key CryptoKey, signature []byte, data []byte) 
 func (rsaoaep *RSAOaepParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, error) {
 	rsaKey, ok := key.handle.(*rsa.PublicKey)
 	if !ok {
-		return nil, NewError(InvalidAccessError, "key is not a RSA public key")
+		return nil, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPublicKey, "RSA", key.handle))
 	}
 
 	hash, err := extractHashFromRSAKey(key)
@@ -442,7 +442,7 @@ func (rsaoaep *RSAOaepParams) Encrypt(plaintext []byte, key CryptoKey) ([]byte, 
 func (rsaoaep *RSAOaepParams) Decrypt(ciphertext []byte, key CryptoKey) ([]byte, error) {
 	rsaKey, ok := key.handle.(*rsa.PrivateKey)
 	if !ok {
-		return nil, NewError(InvalidAccessError, "key is not a RSA private key")
+		return nil, NewError(InvalidAccessError, fmt.Sprintf(errMsgNotExpectedPrivateKey, "RSA", key.handle))
 	}
 
 	hash, err := extractHashFromRSAKey(key)

@@ -40,6 +40,11 @@ const (
 	NotImplemented = "NotImplemented"
 )
 
+const (
+	errMsgNotExpectedPublicKey  = "given CryptoKey is not a public %s key, it's %T"
+	errMsgNotExpectedPrivateKey = "given CryptoKey is not a private %s key, it's %T"
+)
+
 // Error represents a custom error emitted by the
 // Web Crypto API.
 type Error struct {
