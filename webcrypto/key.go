@@ -2,6 +2,7 @@ package webcrypto
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/grafana/sobek"
 )
@@ -191,7 +192,12 @@ func newKeyGenerator(rt *sobek.Runtime, normalized Algorithm, params sobek.Value
 	case RSASsaPkcs1v15, RSAPss, RSAOaep:
 		kg, err = newRsaHashedKeyGenParams(rt, normalized, params)
 	default:
-		return nil, NewError(NotImplemented, "unsupported algorithm for key generation: "+normalized.Name)
+		validAlgorithms := []string{AESCbc, AESCtr, AESGcm, AESKw, HMAC, ECDH, ECDSA, RSASsaPkcs1v15, RSAPss, RSAOaep}
+		return nil, NewError(
+			NotImplemented,
+			"unsupported key generation algorithm '"+normalized.Name+"', "+
+				"accepted values are: "+strings.Join(validAlgorithms, ", "),
+		)
 	}
 
 	if err != nil {

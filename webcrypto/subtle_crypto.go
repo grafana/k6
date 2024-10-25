@@ -446,7 +446,11 @@ func (sc *SubtleCrypto) Digest(algorithm sobek.Value, data sobek.Value) *sobek.P
 		var ok bool
 		hashFn, ok = getHashFn(normalized.Name)
 		if !ok {
-			return NewError(NotSupportedError, "unsupported algorithm, can't map hash function: "+normalized.Name)
+			return NewError(
+				NotSupportedError,
+				"unsupported digest algorithm '"+normalized.Name+"', "+
+					"accepted values are: SHA-1, SHA-256, SHA-384, and SHA-512",
+			)
 		}
 
 		return nil
