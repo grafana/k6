@@ -865,7 +865,7 @@ func (sc *SubtleCrypto) ImportKey( //nolint:funlen // we have a lot of error han
 //
 // The `format` parameter identifies the format of the key data.
 // The `key` parameter is the key to export, as a CryptoKey object.
-func (sc *SubtleCrypto) ExportKey(
+func (sc *SubtleCrypto) ExportKey( //nolint:funlen // we have a lot of error handling
 	format KeyFormat,
 	key sobek.Value,
 ) (*sobek.Promise, error) {
