@@ -16,8 +16,8 @@ type EventBufferUsage struct {
 	Value       float64 `json:"value,omitempty"`       // A number in range [0..1] that indicates the used size of event buffer as a fraction of its total size.
 }
 
-// EventDataCollected contains an bucket of collected trace events. When
-// tracing is stopped collected events will be send as a sequence of
+// EventDataCollected contains a bucket of collected trace events. When
+// tracing is stopped collected events will be sent as a sequence of
 // dataCollected events followed by tracingComplete event.
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/Tracing#event-dataCollected

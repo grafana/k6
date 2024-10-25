@@ -532,7 +532,12 @@ func newTaskQueueRegistry(vu k6modules.VU) *taskQueueRegistry {
 	}
 }
 
-func (t *taskQueueRegistry) get(targetID string) *taskqueue.TaskQueue {
+// get will retrieve the taskqueue associated with the given targetID. If one
+// doesn't exist then a new taskqueue will be created.
+//
+// ctx must be the context from the VU, so that we can automatically close the
+// taskqueue when the iteration ends.
+func (t *taskQueueRegistry) get(ctx context.Context, targetID string) *taskqueue.TaskQueue {
 	t.tqMu.Lock()
 	defer t.tqMu.Unlock()
 
@@ -540,6 +545,14 @@ func (t *taskQueueRegistry) get(targetID string) *taskqueue.TaskQueue {
 	if tq == nil {
 		tq = taskqueue.New(t.vu.RegisterCallback)
 		t.tq[targetID] = tq
+
+		// We want to ensure that the taskqueue is closed when the context is
+		// closed.
+		go func(ctx context.Context) {
+			<-ctx.Done()
+
+			tq.Close()
+		}(ctx)
 	}
 
 	return tq

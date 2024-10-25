@@ -2,6 +2,7 @@ package browser
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"time"
 
@@ -40,7 +41,10 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		},
 		"close": func(opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
+				// It's safe to close the taskqueue for this targetID (if one
+				// exists).
 				vu.taskQueueRegistry.close(p.TargetID())
+
 				return nil, p.Close(opts) //nolint:wrapcheck
 			})
 		},
@@ -200,25 +204,7 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"mouse": mapMouse(vu, p.GetMouse()),
-		"on": func(event string, handler sobek.Callable) error {
-			tq := vu.taskQueueRegistry.get(p.TargetID())
-
-			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
-				mapping := mapConsoleMessage(vu, m)
-				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
-				return err
-			}
-			runInTaskQueue := func(m *common.ConsoleMessage) {
-				tq.Queue(func() error {
-					if err := mapMsgAndHandleEvent(m); err != nil {
-						return fmt.Errorf("executing page.on handler: %w", err)
-					}
-					return nil
-				})
-			}
-
-			return p.On(event, runInTaskQueue) //nolint:wrapcheck
-		},
+		"on":    mapPageOn(vu, p),
 		"opener": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				return p.Opener(), nil
@@ -431,6 +417,97 @@ func mapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 	}
 
 	return maps
+}
+
+// mapPageOn maps the requested page.on event to the Sobek runtime.
+// It generalizes the handling of page.on events.
+func mapPageOn(vu moduleVU, p *common.Page) func(common.PageOnEventName, sobek.Callable) error {
+	rt := vu.Runtime()
+
+	pageOnEvents := map[common.PageOnEventName]struct {
+		mapp func(vu moduleVU, event common.PageOnEvent) mapping
+		init func() error // If set, runs before the event handler.
+		wait bool         // Whether to wait for the handler to complete.
+	}{
+		common.EventPageConsoleAPICalled: {
+			mapp: mapConsoleMessage,
+			wait: false,
+		},
+		common.EventPageMetricCalled: {
+			mapp: mapMetricEvent,
+			init: prepK6BrowserRegExChecker(rt),
+			wait: true,
+		},
+	}
+
+	return func(eventName common.PageOnEventName, handleEvent sobek.Callable) error {
+		pageOnEvent, ok := pageOnEvents[eventName]
+		if !ok {
+			return fmt.Errorf("unknown page on event: %q", eventName)
+		}
+
+		// Initializes the environment for the event handler if necessary.
+		if pageOnEvent.init != nil {
+			if err := pageOnEvent.init(); err != nil {
+				return fmt.Errorf("initiating page.on('%s'): %w", eventName, err)
+			}
+		}
+
+		ctx := vu.Context()
+
+		// Run the the event handler in the task queue to
+		// ensure that the handler is executed on the event loop.
+		tq := vu.taskQueueRegistry.get(ctx, p.TargetID())
+		eventHandler := func(event common.PageOnEvent) error {
+			mapping := pageOnEvent.mapp(vu, event)
+
+			done := make(chan struct{})
+
+			tq.Queue(func() error {
+				defer close(done)
+
+				_, err := handleEvent(
+					sobek.Undefined(),
+					rt.ToValue(mapping),
+				)
+				if err != nil {
+					return fmt.Errorf("executing page.on('%s') handler: %w", eventName, err)
+				}
+
+				return nil
+			})
+
+			if pageOnEvent.wait {
+				select {
+				case <-done:
+				case <-ctx.Done():
+					return errors.New("iteration ended before page.on handler completed executing")
+				}
+			}
+
+			return nil
+		}
+
+		return p.On(eventName, eventHandler) //nolint:wrapcheck
+	}
+}
+
+// prepK6BrowserRegExChecker is a helper function to check the regex pattern
+// on Sobek runtime. Unlike Go's regexp package, Sobek's runtime checks
+// regex patterns using JavaScript's regular expression features.
+func prepK6BrowserRegExChecker(rt *sobek.Runtime) func() error {
+	return func() error {
+		_, err := rt.RunString(`
+			function _k6BrowserCheckRegEx(pattern, url) {
+				return pattern.test(url);
+			}
+		`)
+		if err != nil {
+			return fmt.Errorf("evaluating regex function: %w", err)
+		}
+
+		return nil
+	}
 }
 
 func parseWaitForFunctionArgs(

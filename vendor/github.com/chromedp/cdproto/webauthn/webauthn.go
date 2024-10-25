@@ -99,6 +99,55 @@ func (p *AddVirtualAuthenticatorParams) Do(ctx context.Context) (authenticatorID
 	return res.AuthenticatorID, nil
 }
 
+// SetResponseOverrideBitsParams resets parameters isBogusSignature, isBadUV,
+// isBadUP to false if they are not present.
+type SetResponseOverrideBitsParams struct {
+	AuthenticatorID  AuthenticatorID `json:"authenticatorId"`
+	IsBogusSignature bool            `json:"isBogusSignature,omitempty"` // If isBogusSignature is set, overrides the signature in the authenticator response to be zero. Defaults to false.
+	IsBadUV          bool            `json:"isBadUV,omitempty"`          // If isBadUV is set, overrides the UV bit in the flags in the authenticator response to be zero. Defaults to false.
+	IsBadUP          bool            `json:"isBadUP,omitempty"`          // If isBadUP is set, overrides the UP bit in the flags in the authenticator response to be zero. Defaults to false.
+}
+
+// SetResponseOverrideBits resets parameters isBogusSignature, isBadUV,
+// isBadUP to false if they are not present.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn#method-setResponseOverrideBits
+//
+// parameters:
+//
+//	authenticatorID
+func SetResponseOverrideBits(authenticatorID AuthenticatorID) *SetResponseOverrideBitsParams {
+	return &SetResponseOverrideBitsParams{
+		AuthenticatorID: authenticatorID,
+	}
+}
+
+// WithIsBogusSignature if isBogusSignature is set, overrides the signature
+// in the authenticator response to be zero. Defaults to false.
+func (p SetResponseOverrideBitsParams) WithIsBogusSignature(isBogusSignature bool) *SetResponseOverrideBitsParams {
+	p.IsBogusSignature = isBogusSignature
+	return &p
+}
+
+// WithIsBadUV if isBadUV is set, overrides the UV bit in the flags in the
+// authenticator response to be zero. Defaults to false.
+func (p SetResponseOverrideBitsParams) WithIsBadUV(isBadUV bool) *SetResponseOverrideBitsParams {
+	p.IsBadUV = isBadUV
+	return &p
+}
+
+// WithIsBadUP if isBadUP is set, overrides the UP bit in the flags in the
+// authenticator response to be zero. Defaults to false.
+func (p SetResponseOverrideBitsParams) WithIsBadUP(isBadUP bool) *SetResponseOverrideBitsParams {
+	p.IsBadUP = isBadUP
+	return &p
+}
+
+// Do executes WebAuthn.setResponseOverrideBits against the provided context.
+func (p *SetResponseOverrideBitsParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetResponseOverrideBits, p, nil)
+}
+
 // RemoveVirtualAuthenticatorParams removes the given authenticator.
 type RemoveVirtualAuthenticatorParams struct {
 	AuthenticatorID AuthenticatorID `json:"authenticatorId"`
@@ -341,11 +390,54 @@ func (p *SetAutomaticPresenceSimulationParams) Do(ctx context.Context) (err erro
 	return cdp.Execute(ctx, CommandSetAutomaticPresenceSimulation, p, nil)
 }
 
+// SetCredentialPropertiesParams allows setting credential properties.
+// https://w3c.github.io/webauthn/#sctn-automation-set-credential-properties.
+type SetCredentialPropertiesParams struct {
+	AuthenticatorID   AuthenticatorID `json:"authenticatorId"`
+	CredentialID      string          `json:"credentialId"`
+	BackupEligibility bool            `json:"backupEligibility,omitempty"`
+	BackupState       bool            `json:"backupState,omitempty"`
+}
+
+// SetCredentialProperties allows setting credential properties.
+// https://w3c.github.io/webauthn/#sctn-automation-set-credential-properties.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/WebAuthn#method-setCredentialProperties
+//
+// parameters:
+//
+//	authenticatorID
+//	credentialID
+func SetCredentialProperties(authenticatorID AuthenticatorID, credentialID string) *SetCredentialPropertiesParams {
+	return &SetCredentialPropertiesParams{
+		AuthenticatorID: authenticatorID,
+		CredentialID:    credentialID,
+	}
+}
+
+// WithBackupEligibility [no description].
+func (p SetCredentialPropertiesParams) WithBackupEligibility(backupEligibility bool) *SetCredentialPropertiesParams {
+	p.BackupEligibility = backupEligibility
+	return &p
+}
+
+// WithBackupState [no description].
+func (p SetCredentialPropertiesParams) WithBackupState(backupState bool) *SetCredentialPropertiesParams {
+	p.BackupState = backupState
+	return &p
+}
+
+// Do executes WebAuthn.setCredentialProperties against the provided context.
+func (p *SetCredentialPropertiesParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandSetCredentialProperties, p, nil)
+}
+
 // Command names.
 const (
 	CommandEnable                         = "WebAuthn.enable"
 	CommandDisable                        = "WebAuthn.disable"
 	CommandAddVirtualAuthenticator        = "WebAuthn.addVirtualAuthenticator"
+	CommandSetResponseOverrideBits        = "WebAuthn.setResponseOverrideBits"
 	CommandRemoveVirtualAuthenticator     = "WebAuthn.removeVirtualAuthenticator"
 	CommandAddCredential                  = "WebAuthn.addCredential"
 	CommandGetCredential                  = "WebAuthn.getCredential"
@@ -354,4 +446,5 @@ const (
 	CommandClearCredentials               = "WebAuthn.clearCredentials"
 	CommandSetUserVerified                = "WebAuthn.setUserVerified"
 	CommandSetAutomaticPresenceSimulation = "WebAuthn.setAutomaticPresenceSimulation"
+	CommandSetCredentialProperties        = "WebAuthn.setCredentialProperties"
 )

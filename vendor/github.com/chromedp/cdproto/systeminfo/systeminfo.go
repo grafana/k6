@@ -52,6 +52,45 @@ func (p *GetInfoParams) Do(ctx context.Context) (gpu *GPUInfo, modelName string,
 	return res.Gpu, res.ModelName, res.ModelVersion, res.CommandLine, nil
 }
 
+// GetFeatureStateParams returns information about the feature state.
+type GetFeatureStateParams struct {
+	FeatureState string `json:"featureState"`
+}
+
+// GetFeatureState returns information about the feature state.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/SystemInfo#method-getFeatureState
+//
+// parameters:
+//
+//	featureState
+func GetFeatureState(featureState string) *GetFeatureStateParams {
+	return &GetFeatureStateParams{
+		FeatureState: featureState,
+	}
+}
+
+// GetFeatureStateReturns return values.
+type GetFeatureStateReturns struct {
+	FeatureEnabled bool `json:"featureEnabled,omitempty"`
+}
+
+// Do executes SystemInfo.getFeatureState against the provided context.
+//
+// returns:
+//
+//	featureEnabled
+func (p *GetFeatureStateParams) Do(ctx context.Context) (featureEnabled bool, err error) {
+	// execute
+	var res GetFeatureStateReturns
+	err = cdp.Execute(ctx, CommandGetFeatureState, p, &res)
+	if err != nil {
+		return false, err
+	}
+
+	return res.FeatureEnabled, nil
+}
+
 // GetProcessInfoParams returns information about all running processes.
 type GetProcessInfoParams struct{}
 
@@ -85,6 +124,7 @@ func (p *GetProcessInfoParams) Do(ctx context.Context) (processInfo []*ProcessIn
 
 // Command names.
 const (
-	CommandGetInfo        = "SystemInfo.getInfo"
-	CommandGetProcessInfo = "SystemInfo.getProcessInfo"
+	CommandGetInfo         = "SystemInfo.getInfo"
+	CommandGetFeatureState = "SystemInfo.getFeatureState"
+	CommandGetProcessInfo  = "SystemInfo.getProcessInfo"
 )

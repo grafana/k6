@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"strings"
 	"sync"
 	"time"
@@ -32,10 +33,17 @@ import (
 // BlankPage represents a blank page.
 const BlankPage = "about:blank"
 
-const (
-	webVitalBinding = "k6browserSendWebVitalMetric"
+// PageOnEventName represents the name of the page.on event.
+type PageOnEventName string
 
-	eventPageConsoleAPICalled = "console"
+const webVitalBinding = "k6browserSendWebVitalMetric"
+
+const (
+	// EventPageConsoleAPICalled represents the page.on('console') event.
+	EventPageConsoleAPICalled PageOnEventName = "console"
+
+	// EventPageMetricCalled represents the page.on('metric') event.
+	EventPageMetricCalled PageOnEventName = "metric"
 )
 
 // MediaType represents the type of media to emulate.
@@ -181,8 +189,6 @@ func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
 	}
 }
 
-type consoleEventHandlerFunc func(*ConsoleMessage)
-
 // ConsoleMessage represents a page console message.
 type ConsoleMessage struct {
 	// Args represent the list of arguments passed to a console function call.
@@ -200,6 +206,8 @@ type ConsoleMessage struct {
 	// 'assert', 'profile', 'profileEnd', 'count', 'timeEnd'.
 	Type string
 }
+
+type PageOnHandler func(PageOnEvent) error
 
 // Page stores Page/tab related context.
 type Page struct {
@@ -239,7 +247,7 @@ type Page struct {
 	backgroundPage bool
 
 	eventCh         chan Event
-	eventHandlers   map[string][]consoleEventHandlerFunc
+	eventHandlers   map[PageOnEventName][]PageOnHandler
 	eventHandlersMu sync.RWMutex
 
 	mainFrameSession *FrameSession
@@ -278,7 +286,7 @@ func NewPage(
 		Keyboard:         NewKeyboard(ctx, s),
 		jsEnabled:        true,
 		eventCh:          make(chan Event),
-		eventHandlers:    make(map[string][]consoleEventHandlerFunc),
+		eventHandlers:    make(map[PageOnEventName][]PageOnHandler),
 		frameSessions:    make(map[cdp.FrameID]*FrameSession),
 		workers:          make(map[target.SessionID]*Worker),
 		vu:               k6ext.GetVU(ctx),
@@ -362,6 +370,202 @@ func (p *Page) initEvents() {
 			}
 		}
 	}()
+}
+
+// hasPageOnHandler returns true if there is a handler registered
+// for the given page on event.
+func hasPageOnHandler(p *Page, event PageOnEventName) bool {
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	_, ok := p.eventHandlers[event]
+	return ok
+}
+
+// MetricEvent is the type that is exported to JS. It is currently only used to
+// match on the urlTag and return a name when a match is found.
+type MetricEvent struct {
+	// The URL value from the metric's url tag. It will be used to match
+	// against the URL grouping regexs.
+	url string
+	// The method of the request made to the URL.
+	method string
+
+	// When a match is found this userProvidedURLTagName field should be updated.
+	userProvidedURLTagName string
+
+	// When a match is found this is set to true.
+	isUserURLTagNameExist bool
+}
+
+// TagMatches contains the name tag and matches used to match against existing
+// metric tags that are about to be emitted.
+type TagMatches struct {
+	// The name to send back to the caller of the handler.
+	TagName string `js:"name"`
+	// The patterns to match against.
+	Matches []Match `js:"matches"`
+}
+
+// Match contains the fields that will be used to match against metric tags
+// that are about to be emitted.
+type Match struct {
+	// This is a regex that will be compared against the existing url tag.
+	URLRegEx string `js:"url"`
+	// This is the request method to match on.
+	Method string `js:"method"`
+}
+
+// K6BrowserCheckRegEx is a function that will be used to check the URL tag
+// against the user defined regexes in the Sobek runtime.
+type K6BrowserCheckRegEx func(pattern, url string) (bool, error)
+
+// Tag will find the first match given the URLTagPatterns and the URL from
+// the metric tag and update the name field.
+func (e *MetricEvent) Tag(matchesRegex K6BrowserCheckRegEx, matches TagMatches) error {
+	name := strings.TrimSpace(matches.TagName)
+	if name == "" {
+		return fmt.Errorf("name %q is invalid", matches.TagName)
+	}
+
+	for _, m := range matches.Matches {
+		// Validate the request method type if it has been assigned in a Match.
+		method := strings.TrimSpace(m.Method)
+		if method != "" {
+			method = strings.ToUpper(method)
+			switch method {
+			case http.MethodGet, http.MethodPost, http.MethodPut, http.MethodDelete, http.MethodPatch,
+				http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace:
+			default:
+				return fmt.Errorf("method %q is invalid", m.Method)
+			}
+
+			if method != e.method {
+				continue
+			}
+		}
+
+		// matchesRegex is a function that will perform the regex test in the Sobek
+		// runtime.
+		matched, err := matchesRegex(m.URLRegEx, e.url)
+		if err != nil {
+			return err
+		}
+
+		if matched {
+			e.isUserURLTagNameExist = true
+			e.userProvidedURLTagName = name
+			return nil
+		}
+	}
+
+	return nil
+}
+
+// urlTagName is used to match the given url with the matches defined by the
+// user. Currently matches only contains url. When a match is found a user
+// defined name, which is to be used in the urls place in the url metric tag,
+// is returned.
+//
+// The check is done by calling the handlers that were registered with
+// `page.on('metric')`. The user will need to use `Tag` to supply the
+// url regexes and the matching is done from within there. If a match is found,
+// the supplied name is returned back upstream to the caller of urlTagName.
+func (p *Page) urlTagName(url string, method string) (string, bool) {
+	if !hasPageOnHandler(p, EventPageMetricCalled) {
+		return "", false
+	}
+
+	var newTagName string
+	var urlMatched bool
+	em := &MetricEvent{
+		url:    url,
+		method: method,
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[EventPageMetricCalled] {
+		err := func() error {
+			// Handlers can register other handlers, so we need to
+			// unlock the mutex before calling the next handler.
+			p.eventHandlersMu.RUnlock()
+			defer p.eventHandlersMu.RLock()
+
+			// Call and wait for the handler to complete.
+			return h(PageOnEvent{
+				Metric: em,
+			})
+		}()
+		if err != nil {
+			p.logger.Debugf("urlTagName", "handler returned an error: %v", err)
+			return "", false
+		}
+	}
+
+	// If a match was found then the name field in em will have been updated.
+	if em.isUserURLTagNameExist {
+		newTagName = em.userProvidedURLTagName
+		urlMatched = true
+	}
+
+	p.logger.Debugf("urlTagName", "name: %q nameChanged: %v", newTagName, urlMatched)
+
+	return newTagName, urlMatched
+}
+
+func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
+	if !hasPageOnHandler(p, EventPageConsoleAPICalled) {
+		return
+	}
+
+	m, err := p.consoleMsgFromConsoleEvent(event)
+	if err != nil {
+		p.logger.Errorf("Page:onConsoleAPICalled", "building console message: %v", err)
+		return
+	}
+
+	p.eventHandlersMu.RLock()
+	defer p.eventHandlersMu.RUnlock()
+	for _, h := range p.eventHandlers[EventPageConsoleAPICalled] {
+		err := h(PageOnEvent{
+			ConsoleMessage: m,
+		})
+		if err != nil {
+			p.logger.Debugf("onConsoleAPICalled", "handler returned an error: %v", err)
+			return
+		}
+	}
+}
+
+func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*ConsoleMessage, error) {
+	execCtx, err := p.executionContextForID(e.ExecutionContextID)
+	if err != nil {
+		return nil, err
+	}
+
+	var (
+		objects       = make([]string, 0, len(e.Args))
+		objectHandles = make([]JSHandleAPI, 0, len(e.Args))
+	)
+
+	for _, robj := range e.Args {
+		s, err := parseConsoleRemoteObject(p.logger, robj)
+		if err != nil {
+			p.logger.Errorf("consoleMsgFromConsoleEvent", "failed to parse console message %v", err)
+		}
+
+		objects = append(objects, s)
+		objectHandles = append(objectHandles, NewJSHandle(
+			p.ctx, p.session, execCtx, execCtx.Frame(), robj, p.logger,
+		))
+	}
+
+	return &ConsoleMessage{
+		Args: objectHandles,
+		Page: p,
+		Text: textForConsoleEvent(e, objects),
+		Type: e.Type.String(),
+	}, nil
 }
 
 func (p *Page) closeWorker(sessionID target.SessionID) {
@@ -987,21 +1191,27 @@ func (p *Page) NavigationTimeout() time.Duration {
 	return p.frameManager.timeoutSettings.navigationTimeout()
 }
 
+// PageOnEvent represents a generic page event.
+// Use one of the fields to get the specific event data.
+type PageOnEvent struct {
+	// ConsoleMessage is the console message event.
+	ConsoleMessage *ConsoleMessage
+
+	// Metric is the metric event event.
+	Metric *MetricEvent
+}
+
 // On subscribes to a page event for which the given handler will be executed
 // passing in the ConsoleMessage associated with the event.
 // The only accepted event value is 'console'.
-func (p *Page) On(event string, handler func(*ConsoleMessage)) error {
-	if event != eventPageConsoleAPICalled {
-		return fmt.Errorf("unknown page event: %q, must be %q", event, eventPageConsoleAPICalled)
-	}
-
+func (p *Page) On(event PageOnEventName, handler PageOnHandler) error {
 	p.eventHandlersMu.Lock()
 	defer p.eventHandlersMu.Unlock()
 
-	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
-		p.eventHandlers[eventPageConsoleAPICalled] = make([]consoleEventHandlerFunc, 0, 1)
+	if _, ok := p.eventHandlers[event]; !ok {
+		p.eventHandlers[event] = make([]PageOnHandler, 0, 1)
 	}
-	p.eventHandlers[eventPageConsoleAPICalled] = append(p.eventHandlers[eventPageConsoleAPICalled], handler)
+	p.eventHandlers[event] = append(p.eventHandlers[event], handler)
 
 	return nil
 }
@@ -1361,6 +1571,9 @@ func (p *Page) WaitForSelector(selector string, opts sobek.Value) (*ElementHandl
 func (p *Page) WaitForTimeout(timeout int64) {
 	p.logger.Debugf("Page:WaitForTimeout", "sid:%v timeout:%d", p.sessionID(), timeout)
 
+	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.waitForTimeout")
+	defer span.End()
+
 	p.frameManager.MainFrame().WaitForTimeout(timeout)
 }
 
@@ -1377,60 +1590,6 @@ func (p *Page) Workers() []*Worker {
 // For internal use only.
 func (p *Page) TargetID() string {
 	return p.targetID.String()
-}
-
-func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
-	// If there are no handlers for EventConsoleAPICalled, return
-	p.eventHandlersMu.RLock()
-	if _, ok := p.eventHandlers[eventPageConsoleAPICalled]; !ok {
-		p.eventHandlersMu.RUnlock()
-		return
-	}
-	p.eventHandlersMu.RUnlock()
-
-	m, err := p.consoleMsgFromConsoleEvent(event)
-	if err != nil {
-		p.logger.Errorf("Page:onConsoleAPICalled", "building console message: %v", err)
-		return
-	}
-
-	p.eventHandlersMu.RLock()
-	defer p.eventHandlersMu.RUnlock()
-	for _, h := range p.eventHandlers[eventPageConsoleAPICalled] {
-		h := h
-		h(m)
-	}
-}
-
-func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*ConsoleMessage, error) {
-	execCtx, err := p.executionContextForID(e.ExecutionContextID)
-	if err != nil {
-		return nil, err
-	}
-
-	var (
-		objects       = make([]string, 0, len(e.Args))
-		objectHandles = make([]JSHandleAPI, 0, len(e.Args))
-	)
-
-	for _, robj := range e.Args {
-		s, err := parseConsoleRemoteObject(p.logger, robj)
-		if err != nil {
-			p.logger.Errorf("consoleMsgFromConsoleEvent", "failed to parse console message %v", err)
-		}
-
-		objects = append(objects, s)
-		objectHandles = append(objectHandles, NewJSHandle(
-			p.ctx, p.session, execCtx, execCtx.Frame(), robj, p.logger,
-		))
-	}
-
-	return &ConsoleMessage{
-		Args: objectHandles,
-		Page: p,
-		Text: textForConsoleEvent(e, objects),
-		Type: e.Type.String(),
-	}, nil
 }
 
 // executionContextForID returns the page ExecutionContext for the given ID.

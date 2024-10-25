@@ -170,6 +170,7 @@ func (e *BaseEventEmitter) emit(event string, data any) {
 
 		select {
 		case eh.ch <- eh.queue.read[0]:
+			eh.queue.read[0] = Event{}
 			eh.queue.read = eh.queue.read[1:]
 		case <-eh.ctx.Done():
 			// TODO: handle the error
