@@ -5,6 +5,7 @@ import (
 	"reflect"
 
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -12,14 +13,21 @@ import (
 // newResolvedPromise instantiates a new resolved promise.
 func newResolvedPromise(vu modules.VU, with sobek.Value) *sobek.Promise {
 	promise, resolve, _ := vu.Runtime().NewPromise()
-	resolve(with)
+	err := resolve(with)
+	if err != nil { // TODO(@mstoykov): likely better to actually call Promise.resolve directly
+		panic(err)
+	}
+
 	return promise
 }
 
 // newRejectedPromise instantiates a new rejected promise.
 func newRejectedPromise(vu modules.VU, with any) *sobek.Promise {
 	promise, _, reject := vu.Runtime().NewPromise()
-	reject(with)
+	err := reject(with)
+	if err != nil {
+		panic(err)
+	}
 	return promise
 }
 

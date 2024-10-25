@@ -97,11 +97,11 @@ func (c *Client) asyncRequest(method string, url sobek.Value, args ...sobek.Valu
 	if err != nil {
 		var resp *Response
 		if resp, err = c.handleParseRequestError(err); err != nil {
-			reject(err)
+			err = reject(err)
 		} else {
-			resolve(resp)
+			err = resolve(resp)
 		}
-		return p, nil
+		return p, err
 	}
 
 	callback := c.moduleInstance.vu.RegisterCallback()
@@ -110,12 +110,10 @@ func (c *Client) asyncRequest(method string, url sobek.Value, args ...sobek.Valu
 		resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
 		callback(func() error {
 			if err != nil {
-				reject(err)
-				return nil //nolint:nilerr // we want to reject the promise in this case
+				return reject(err)
 			}
 			c.processResponse(resp, req.ResponseType)
-			resolve(c.responseFromHTTPext(resp))
-			return nil
+			return resolve(c.responseFromHTTPext(resp))
 		})
 	}()
 

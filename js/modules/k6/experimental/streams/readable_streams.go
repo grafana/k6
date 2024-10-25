@@ -4,6 +4,7 @@ import (
 	"errors"
 
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/promises"
@@ -456,7 +457,10 @@ func (stream *ReadableStream) close() {
 	}
 
 	_, resolveFunc, _ := genericReader.GetClosed()
-	resolveFunc(sobek.Undefined())
+	err := resolveFunc(sobek.Undefined())
+	if err != nil {
+		panic(err) // TODO(@mstoykov): propagate as error instead
+	}
 
 	// 6. If reader implements ReadableStreamDefaultReader,
 	defaultReader, ok := reader.(*ReadableStreamDefaultReader)
@@ -503,19 +507,20 @@ func (stream *ReadableStream) error(e any) {
 	}
 
 	// 6. Reject reader.[[closedPromise]] with e.
+	var err error
 	promise, _, rejectFunc := genericReader.GetClosed()
 	if jsErr, ok := e.(*jsError); ok {
-		rejectFunc(jsErr.Err())
+		err = rejectFunc(jsErr.Err())
 	} else {
-		rejectFunc(e)
+		err = rejectFunc(e)
+	}
+	if err != nil {
+		panic(err) // TODO(@mstoykov): propagate as error instead
 	}
 
 	// 7. Set reader.[[closedPromise]].[[PromiseIsHandled]] to true.
 	// See https://github.com/dop251/goja/issues/565
-	var (
-		err       error
-		doNothing = func(sobek.Value) {}
-	)
+	doNothing := func(sobek.Value) {}
 	_, err = promiseThen(stream.vu.Runtime(), promise, doNothing, doNothing)
 	if err != nil {
 		common.Throw(stream.vu.Runtime(), newError(RuntimeError, err.Error()))
