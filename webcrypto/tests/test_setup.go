@@ -1,4 +1,6 @@
-package webcrypto
+//go:build wpt
+
+package tests
 
 import (
 	"io"
@@ -10,6 +12,7 @@ import (
 	"go.k6.io/k6/js/compiler"
 
 	"github.com/grafana/sobek"
+	"github.com/grafana/xk6-webcrypto/webcrypto"
 	"github.com/stretchr/testify/require"
 	k6encoding "go.k6.io/k6/js/modules/k6/encoding"
 	"go.k6.io/k6/js/modulestest"
@@ -28,14 +31,14 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	runtime := modulestest.NewRuntime(t)
 
 	err = runtime.SetupModuleSystem(
-		map[string]interface{}{"k6/x/webcrypto": New()},
+		map[string]interface{}{"k6/x/webcrypto": webcrypto.New()},
 		nil,
 		compiler.New(runtime.VU.InitEnv().Logger),
 	)
 	require.NoError(t, err)
 
 	// We compile the Web Platform testharness script into a sobek.Program
-	harnessProgram, err := CompileFile("./tests/util", "testharness.js")
+	harnessProgram, err := CompileFile("./util", "testharness.js")
 	require.NoError(t, err)
 
 	// We execute the harness script in the goja runtime
@@ -45,7 +48,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	require.NoError(t, err)
 
 	// We compile the Web Platform helpers script into a sobek.Program
-	helpersProgram, err := CompileFile("./tests/util", "helpers.js")
+	helpersProgram, err := CompileFile("./util", "helpers.js")
 	require.NoError(t, err)
 
 	// We execute the helpers script in the goja runtime
@@ -54,7 +57,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	_, err = runtime.VU.Runtime().RunProgram(helpersProgram)
 	require.NoError(t, err)
 
-	m := new(RootModule).NewModuleInstance(runtime.VU)
+	m := new(webcrypto.RootModule).NewModuleInstance(runtime.VU)
 
 	err = runtime.VU.Runtime().Set("crypto", m.Exports().Named["crypto"])
 	require.NoError(t, err)

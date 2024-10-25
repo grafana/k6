@@ -1,4 +1,6 @@
-package webcrypto
+//go:build wpt
+
+package tests
 
 import (
 	"fmt"

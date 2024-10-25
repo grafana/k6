@@ -23,4 +23,4 @@ jobs:
           set -x
           cd webcrypto/tests
           sh checkout.sh
-          go test -race ../... -tags=wpt
+          go test -race ./... -tags=wpt

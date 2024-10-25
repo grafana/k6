@@ -1,4 +1,4 @@
-package tests
+package webcrypto_test
 
 import (
 	"os"
@@ -57,14 +57,14 @@ func TestExamplesInputOutput(t *testing.T) {
 	// and not the unexpected one
 	// it could be a file (ending with .js) or a directory
 	examples := []string{
-		"../../examples/digest.js",
-		"../../examples/getRandomValues.js",
-		"../../examples/randomUUID.js",
-		"../../examples/generateKey",
-		"../../examples/derive_bits",
-		"../../examples/encrypt_decrypt",
-		"../../examples/sign_verify",
-		"../../examples/import_export",
+		"../examples/digest.js",
+		"../examples/getRandomValues.js",
+		"../examples/randomUUID.js",
+		"../examples/generateKey",
+		"../examples/derive_bits",
+		"../examples/encrypt_decrypt",
+		"../examples/sign_verify",
+		"../examples/import_export",
 	}
 
 	for _, path := range examples {
