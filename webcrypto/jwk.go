@@ -414,6 +414,9 @@ func exportRSAJWK(key *CryptoKey) (interface{}, error) {
 		exported.Set("dp", base64URLEncode(rsaKey.Precomputed.Dp.Bytes()))
 		exported.Set("dq", base64URLEncode(rsaKey.Precomputed.Dq.Bytes()))
 		exported.Set("qi", base64URLEncode(rsaKey.Precomputed.Qinv.Bytes()))
+	case *rsa.PublicKey:
+		exported.Set("n", base64URLEncode(rsaKey.N.Bytes()))
+		exported.Set("e", base64URLEncode(big.NewInt(int64(rsaKey.E)).Bytes()))
 	case rsa.PublicKey:
 		exported.Set("n", base64URLEncode(rsaKey.N.Bytes()))
 		exported.Set("e", base64URLEncode(big.NewInt(int64(rsaKey.E)).Bytes()))
