@@ -292,13 +292,13 @@ func (c *Client) AsyncInvoke(
 	method string,
 	req sobek.Value,
 	params sobek.Value,
-) *sobek.Promise {
+) (*sobek.Promise, error) {
 	grpcReq, err := c.buildInvokeRequest(method, req, params)
 
 	promise, resolve, reject := c.vu.Runtime().NewPromise()
 	if err != nil {
-		reject(err)
-		return promise
+		err = reject(err)
+		return promise, err
 	}
 
 	callback := c.vu.RegisterCallback()
@@ -307,15 +307,13 @@ func (c *Client) AsyncInvoke(
 
 		callback(func() error {
 			if err != nil {
-				reject(err)
-				return nil //nolint:nilerr // we don't want to return the error
+				return reject(err)
 			}
-			resolve(res)
-			return nil
+			return resolve(res)
 		})
 	}()
 
-	return promise
+	return promise, nil
 }
 
 // buildInvokeRequest creates a new InvokeRequest from the given method name, request object and parameters
