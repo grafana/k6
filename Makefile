@@ -29,6 +29,10 @@ check-linter-version:
 test:
 	go test -race -timeout 30s ./...
 
+## test: Executes any tests.
+wpt-test:
+	go test -race -timeout 60s ./... -tags=wpt
+
 ## lint: Runs the linters.
 lint: linter-config check-linter-version
 	echo "Running linters..."

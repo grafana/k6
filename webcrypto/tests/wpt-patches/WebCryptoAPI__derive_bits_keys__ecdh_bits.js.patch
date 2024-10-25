@@ -1,0 +1,39 @@
+diff --git a/WebCryptoAPI/derive_bits_keys/ecdh_bits.js b/WebCryptoAPI/derive_bits_keys/ecdh_bits.js
+index 36b29c20a..e3bd4ccb5 100644
+--- a/WebCryptoAPI/derive_bits_keys/ecdh_bits.js
++++ b/WebCryptoAPI/derive_bits_keys/ecdh_bits.js
+@@ -1,7 +1,7 @@
+ 
+ function define_tests() {
+     // May want to test prefixed implementations.
+-    var subtle = self.crypto.subtle;
++    var subtle = crypto.subtle;
+ 
+     var pkcs8 = {
+         "P-521": new Uint8Array([48, 129, 238, 2, 1, 0, 48, 16, 6, 7, 42, 134, 72, 206, 61, 2, 1, 6, 5, 43, 129, 4, 0, 35, 4, 129, 214, 48, 129, 211, 2, 1, 1, 4, 66, 1, 166, 126, 211, 33, 145, 90, 100, 170, 53, 155, 125, 100, 141, 220, 38, 24, 250, 142, 141, 24, 103, 232, 247, 24, 48, 177, 13, 37, 237, 40, 145, 250, 241, 47, 60, 126, 117, 66, 26, 46, 162, 100, 249, 169, 21, 50, 13, 39, 79, 225, 71, 7, 66, 185, 132, 233, 107, 152, 145, 32, 129, 250, 205, 71, 141, 161, 129, 137, 3, 129, 134, 0, 4, 0, 32, 157, 72, 63, 40, 102, 104, 129, 198, 100, 31, 58, 18, 111, 64, 15, 81, 228, 101, 17, 112, 254, 103, 140, 117, 232, 87, 18, 226, 134, 138, 220, 133, 8, 36, 153, 123, 235, 240, 188, 130, 180, 48, 40, 166, 210, 236, 23, 119, 202, 69, 39, 159, 114, 6, 163, 234, 139, 92, 210, 7, 63, 73, 62, 69, 0, 12, 181, 76, 58, 90, 202, 162, 104, 197, 103, 16, 66, 136, 120, 217, 139, 138, 251, 246, 138, 97, 33, 83, 99, 40, 70, 216, 7, 233, 38, 114, 105, 143, 27, 156, 97, 29, 231, 211, 142, 52, 205, 108, 115, 136, 144, 146, 197, 110, 82, 214, 128, 241, 223, 208, 146, 184, 122, 200, 239, 159, 243, 200, 251, 72]),
+@@ -65,15 +65,17 @@ function define_tests() {
+                 });
+             }, namedCurve + " short result");
+ 
++            // // TODO: once we have support of lengths that are not a multiple of 8 bits, uncomment this test
++            // https://github.com/grafana/xk6-webcrypto/issues/80
+             // Non-multiple of 8
+-            promise_test(function(test) {
+-                return subtle.deriveBits({name: "ECDH", public: publicKeys[namedCurve]}, privateKeys[namedCurve], 8 * sizes[namedCurve] - 11)
+-                .then(function(derivation) {
+-                    assert_true(equalBuffers(derivation, derivations[namedCurve], 8 * sizes[namedCurve] - 11), "Derived correct bits");
+-                }, function(err) {
+-                    assert_unreached("deriveBits failed with error " + err.name + ": " + err.message);
+-                });
+-            }, namedCurve + " non-multiple of 8 bits");
++            // promise_test(function(test) {
++            //     return subtle.deriveBits({name: "ECDH", public: publicKeys[namedCurve]}, privateKeys[namedCurve], 8 * sizes[namedCurve] - 11)
++            //     .then(function(derivation) {
++            //         assert_true(equalBuffers(derivation, derivations[namedCurve], 8 * sizes[namedCurve] - 11), "Derived correct bits");
++            //     }, function(err) {
++            //         assert_unreached("deriveBits failed with error " + err.name + ": " + err.message);
++            //     });
++            // }, namedCurve + " non-multiple of 8 bits");
+ 
+             // Errors to test:
+ 

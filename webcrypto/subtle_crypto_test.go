@@ -1,29 +1,40 @@
+//go:build wpt
+
 package webcrypto
 
 import (
+	"os"
 	"testing"
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.k6.io/k6/js/modulestest"
 )
 
-// TestSubtleDigest tests that the cryptographic digests produced by
-// the crypto.digest() are conform with the specification's expectations.
-//
-// It stands as the k6 counterpart of the equivalent [WPT test].
-//
-// [WPT test]: https://github.com/web-platform-tests/wpt/blob/master/WebCryptoAPI/digest/digest.https.any.js
+const webPlatformTestSuite = "./tests/wpt/WebCryptoAPI/"
+
+func newWebPlatformTestRuntime(t testing.TB) *modulestest.Runtime {
+	// check if the test is running in the correct environment
+	info, err := os.Stat(webPlatformTestSuite)
+	if os.IsNotExist(err) || err != nil || !info.IsDir() {
+		t.Fatalf("The Web Platform Test directory does not exist, err: %s", err)
+	}
+
+	return newConfiguredRuntime(t)
+}
+
 func TestSubtleDigest(t *testing.T) {
 	t.Parallel()
 
-	digestTestScript, err := CompileFile("./tests", "digest.js")
-	assert.NoError(t, err)
+	ts := newWebPlatformTestRuntime(t)
 
-	ts := newConfiguredRuntime(t)
 	gotErr := ts.EventLoop.Start(func() error {
-		_, programErr := ts.VU.Runtime().RunProgram(digestTestScript)
-		return programErr
+		return executeTestScripts(
+			ts.VU.Runtime(),
+			webPlatformTestSuite+"digest",
+			"digest.https.any.js",
+		)
 	})
 
 	assert.NoError(t, gotErr)
@@ -35,10 +46,10 @@ func TestSubtleCryptoGenerateKey(t *testing.T) {
 	t.Run("successes", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/generateKey", "successes.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"generateKey", "successes.js")
 			require.NoError(t, err)
 
 			_, err = ts.VU.Runtime().RunString(`run_test()`)
@@ -52,10 +63,10 @@ func TestSubtleCryptoGenerateKey(t *testing.T) {
 	t.Run("failures", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/generateKey", "failures.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"generateKey", "failures.js")
 			require.NoError(t, err)
 
 			_, err = ts.VU.Runtime().RunString(`run_test()`)
@@ -73,10 +84,10 @@ func TestSubtleCryptoImportExportKey(t *testing.T) {
 	t.Run("symmetric", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/import_export", "symmetric.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"import_export", "symmetric_importKey.https.any.js")
 
 			return err
 		})
@@ -87,10 +98,10 @@ func TestSubtleCryptoImportExportKey(t *testing.T) {
 	t.Run("elliptic-curves", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/import_export", "ec_importKey.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"import_export", "ec_importKey.https.any.js")
 
 			return err
 		})
@@ -105,10 +116,10 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 	t.Run("AES CBC", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/encrypt_decrypt", "aes_cbc_vectors.js", "aes.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"encrypt_decrypt", "aes_cbc_vectors.js", "aes.js")
 			require.NoError(t, err)
 
 			_, err = ts.VU.Runtime().RunString(`run_test()`)
@@ -122,10 +133,10 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 	t.Run("AES CTR", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/encrypt_decrypt", "aes_ctr_vectors.js", "aes.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"encrypt_decrypt", "aes_ctr_vectors.js", "aes.js")
 			require.NoError(t, err)
 
 			_, err = ts.VU.Runtime().RunString(`run_test()`)
@@ -143,10 +154,10 @@ func TestSubtleCryptoEncryptDecrypt(t *testing.T) {
 	t.Run("AES GCM 96bits iv", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/encrypt_decrypt", "aes_gcm_96_iv_fixtures.js", "aes_gcm_vectors.js", "aes.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"encrypt_decrypt", "aes_gcm_96_iv_fixtures.js", "aes_gcm_vectors.js", "aes.js")
 			require.NoError(t, err)
 
 			_, err = ts.VU.Runtime().RunString(`run_test()`)
@@ -164,10 +175,10 @@ func TestSubtleCryptoSignVerify(t *testing.T) {
 	t.Run("HMAC", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/sign_verify", "hmac_vectors.js", "hmac.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"sign_verify", "hmac_vectors.js", "hmac.js")
 			require.NoError(t, err)
 
 			_, err = ts.VU.Runtime().RunString(`run_test()`)
@@ -181,10 +192,10 @@ func TestSubtleCryptoSignVerify(t *testing.T) {
 	t.Run("ECDSA", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/sign_verify", "ecdsa_vectors.js", "ecdsa.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"sign_verify", "ecdsa_vectors.js", "ecdsa.js")
 			require.NoError(t, err)
 
 			_, err = ts.VU.Runtime().RunString(`run_test()`)
@@ -202,10 +213,13 @@ func TestSubtleCryptoDeriveBitsKeys(t *testing.T) {
 	t.Run("ecdh", func(t *testing.T) {
 		t.Parallel()
 
-		ts := newConfiguredRuntime(t)
+		ts := newWebPlatformTestRuntime(t)
 
 		gotErr := ts.EventLoop.Start(func() error {
-			err := executeTestScripts(ts.VU.Runtime(), "./tests/derive_bits_keys", "ecdh_bits.js")
+			err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+"derive_bits_keys", "ecdh_bits.js")
+			require.NoError(t, err)
+
+			_, err = ts.VU.Runtime().RunString(`define_tests()`)
 
 			return err
 		})

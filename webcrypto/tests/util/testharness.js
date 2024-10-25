@@ -91,3 +91,13 @@ function assert_in_array(actual, expected, description) {
 function assert_unreached(description) {
     throw `reached unreachable code, reason: ${description}`
 }
+
+// this is a minimal implementation of the promise_test function
+// which used in many web platform tests
+function promise_test(fn, name) {
+    try {
+        fn();  
+    } catch (e) {
+        throw Error(`Error in test "${name}": ${e}`);
+    }
+}

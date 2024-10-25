@@ -1,0 +1,14 @@
+diff --git a/WebCryptoAPI/digest/digest.https.any.js b/WebCryptoAPI/digest/digest.https.any.js
+index 379d9311f..949b1669f 100644
+--- a/WebCryptoAPI/digest/digest.https.any.js
++++ b/WebCryptoAPI/digest/digest.https.any.js
+@@ -119,9 +119,6 @@
+     });
+ 
+ 
+-    done();
+-
+-
+     // Returns a copy of the sourceBuffer it is sent.
+     function copyBuffer(sourceBuffer) {
+         var source = new Uint8Array(sourceBuffer);
