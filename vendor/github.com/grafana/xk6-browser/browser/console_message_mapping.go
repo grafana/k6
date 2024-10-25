@@ -1,16 +1,15 @@
 package browser
 
 import (
-	"github.com/grafana/sobek"
-
 	"github.com/grafana/xk6-browser/common"
 )
 
 // mapConsoleMessage to the JS module.
-func mapConsoleMessage(vu moduleVU, cm *common.ConsoleMessage) mapping {
-	rt := vu.Runtime()
+func mapConsoleMessage(vu moduleVU, event common.PageOnEvent) mapping {
+	cm := event.ConsoleMessage
+
 	return mapping{
-		"args": func() *sobek.Object {
+		"args": func() []mapping {
 			var (
 				margs []mapping
 				args  = cm.Args
@@ -20,19 +19,18 @@ func mapConsoleMessage(vu moduleVU, cm *common.ConsoleMessage) mapping {
 				margs = append(margs, a)
 			}
 
-			return rt.ToValue(margs).ToObject(rt)
+			return margs
 		},
 		// page(), text() and type() are defined as
 		// functions in order to match Playwright's API
-		"page": func() *sobek.Object {
-			mp := mapPage(vu, cm.Page)
-			return rt.ToValue(mp).ToObject(rt)
+		"page": func() mapping {
+			return mapPage(vu, cm.Page)
 		},
-		"text": func() *sobek.Object {
-			return rt.ToValue(cm.Text).ToObject(rt)
+		"text": func() string {
+			return cm.Text
 		},
-		"type": func() *sobek.Object {
-			return rt.ToValue(cm.Type).ToObject(rt)
+		"type": func() string {
+			return cm.Type
 		},
 	}
 }

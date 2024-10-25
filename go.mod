@@ -14,7 +14,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/xk6-browser v1.8.5
+	github.com/grafana/xk6-browser v1.9.1
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-opentelemetry v0.2.0
 	github.com/grafana/xk6-output-prometheus-remote v0.4.0
@@ -66,7 +66,7 @@ require (
 	github.com/bufbuild/protocompile v0.10.0 // indirect
 	github.com/cenkalti/backoff/v4 v4.3.0 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
-	github.com/chromedp/cdproto v0.0.0-20221023212508-67ada9507fb2 // indirect
+	github.com/chromedp/cdproto v0.0.0-20240919203636-12af5e8a671f // indirect
 	github.com/chromedp/sysutil v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect
 	github.com/dgryski/go-rendezvous v0.0.0-20200823014737-9f7001d12a5f // indirect

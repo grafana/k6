@@ -2,6 +2,7 @@ package common
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -12,7 +13,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
-	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/k6ext"
 	"github.com/grafana/xk6-browser/log"
@@ -39,17 +39,21 @@ func (s HTTPMessageSize) Total() int64 {
 
 // Request represents a browser HTTP request.
 type Request struct {
-	ctx                 context.Context
-	frame               *Frame
-	responseMu          sync.RWMutex
-	response            *Response
-	redirectChain       []*Request
-	requestID           network.RequestID
-	documentID          string
-	url                 *url.URL
-	method              string
-	headers             map[string][]string
-	postData            string
+	ctx           context.Context
+	frame         *Frame
+	responseMu    sync.RWMutex
+	response      *Response
+	redirectChain []*Request
+	requestID     network.RequestID
+	documentID    string
+	url           *url.URL
+	method        string
+	headers       map[string][]string
+	// For now we're only going to work with the 0th entry of postDataEntries.
+	// We've not been able to reproduce a situation where more than one entry
+	// occupies the slice. Once we have a better idea of when more than one
+	// entry is in postDataEntries, we should look to export a new API.
+	postDataEntries     []string
 	resourceType        string
 	isNavigationRequest bool
 	allowInterception   bool
@@ -104,13 +108,27 @@ func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
 	isNavigationRequest := string(ev.RequestID) == string(ev.LoaderID) &&
 		ev.Type == network.ResourceTypeDocument
 
+	pd := make([]string, 0, len(ev.Request.PostDataEntries))
+	for _, i := range ev.Request.PostDataEntries {
+		if i == nil {
+			continue
+		}
+
+		decodedBytes, err := base64.StdEncoding.DecodeString(i.Bytes)
+		if err != nil {
+			return nil, fmt.Errorf("decoding postData %q: %w", i.Bytes, err)
+		}
+
+		pd = append(pd, string(decodedBytes))
+	}
+
 	r := Request{
 		url:                 u,
 		frame:               rp.frame,
 		redirectChain:       rp.redirectChain,
 		requestID:           ev.RequestID,
 		method:              ev.Request.Method,
-		postData:            ev.Request.PostData,
+		postDataEntries:     pd,
 		resourceType:        ev.Type.String(),
 		isNavigationRequest: isNavigationRequest,
 		allowInterception:   rp.allowInterception,
@@ -179,14 +197,10 @@ func (r *Request) Frame() *Frame {
 }
 
 // HeaderValue returns the value of the given header.
-func (r *Request) HeaderValue(name string) sobek.Value {
-	rt := r.vu.Runtime()
+func (r *Request) HeaderValue(name string) (string, bool) {
 	headers := r.AllHeaders()
 	val, ok := headers[strings.ToLower(name)]
-	if !ok {
-		return sobek.Null()
-	}
-	return rt.ToValue(val)
+	return val, ok
 }
 
 // Headers returns the request headers.
@@ -220,13 +234,35 @@ func (r *Request) Method() string {
 }
 
 // PostData returns the request post data, if any.
+//
+// If will not attempt to fetch the data if it should have some but nothing is
+// cached locally: https://github.com/grafana/xk6-browser/issues/1470
+//
+// This relies on PostDataEntries. It will only ever return the 0th entry.
+// TODO: Create a PostDataEntries API when we have a better idea of when that
+// is needed.
 func (r *Request) PostData() string {
-	return r.postData
+	if len(r.postDataEntries) > 0 {
+		return r.postDataEntries[0]
+	}
+
+	return ""
 }
 
 // PostDataBuffer returns the request post data as an ArrayBuffer.
+//
+// If will not attempt to fetch the data if it should have some but nothing is
+// cached locally: https://github.com/grafana/xk6-browser/issues/1470
+//
+// This relies on PostDataEntries. It will only ever return the 0th entry.
+// TODO: Create a PostDataEntries API when we have a better idea of when that
+// is needed.
 func (r *Request) PostDataBuffer() []byte {
-	return []byte(r.postData)
+	if len(r.postDataEntries) > 0 {
+		return []byte(r.postDataEntries[0])
+	}
+
+	return nil
 }
 
 // ResourceType returns the request resource type.
@@ -241,30 +277,34 @@ func (r *Request) Response() *Response {
 
 // Size returns the size of the request.
 func (r *Request) Size() HTTPMessageSize {
+	var b int64
+	for _, p := range r.postDataEntries {
+		b += int64(len(p))
+	}
 	return HTTPMessageSize{
-		Body:    int64(len(r.postData)),
+		Body:    b,
 		Headers: r.headersSize(),
 	}
 }
 
-// Timing returns the request timing information.
-func (r *Request) Timing() sobek.Value {
-	type resourceTiming struct {
-		StartTime             float64 `js:"startTime"`
-		DomainLookupStart     float64 `js:"domainLookupStart"`
-		DomainLookupEnd       float64 `js:"domainLookupEnd"`
-		ConnectStart          float64 `js:"connectStart"`
-		SecureConnectionStart float64 `js:"secureConnectionStart"`
-		ConnectEnd            float64 `js:"connectEnd"`
-		RequestStart          float64 `js:"requestStart"`
-		ResponseStart         float64 `js:"responseStart"`
-		ResponseEnd           float64 `js:"responseEnd"`
-	}
+// resourceTiming is the type returned from request.timing.
+type resourceTiming struct {
+	StartTime             float64 `js:"startTime"`
+	DomainLookupStart     float64 `js:"domainLookupStart"`
+	DomainLookupEnd       float64 `js:"domainLookupEnd"`
+	ConnectStart          float64 `js:"connectStart"`
+	SecureConnectionStart float64 `js:"secureConnectionStart"`
+	ConnectEnd            float64 `js:"connectEnd"`
+	RequestStart          float64 `js:"requestStart"`
+	ResponseStart         float64 `js:"responseStart"`
+	ResponseEnd           float64 `js:"responseEnd"`
+}
 
-	rt := r.vu.Runtime()
+// Timing returns the request timing information.
+func (r *Request) Timing() *resourceTiming {
 	timing := r.response.timing
 
-	return rt.ToValue(&resourceTiming{
+	return &resourceTiming{
 		StartTime:             (timing.RequestTime - float64(r.timestamp.Unix()) + float64(r.wallTime.Unix())) * 1000,
 		DomainLookupStart:     timing.DNSStart,
 		DomainLookupEnd:       timing.DNSEnd,
@@ -274,7 +314,7 @@ func (r *Request) Timing() sobek.Value {
 		RequestStart:          timing.SendStart,
 		ResponseStart:         timing.ReceiveHeadersEnd,
 		ResponseEnd:           r.responseEndTiming,
-	})
+	}
 }
 
 // URL returns the request URL.

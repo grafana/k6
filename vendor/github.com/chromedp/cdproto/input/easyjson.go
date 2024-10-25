@@ -51,9 +51,9 @@ func easyjsonC5a4559bDecodeGithubComChromedpCdprotoInput(in *jlexer.Lexer, out *
 		case "tangentialPressure":
 			out.TangentialPressure = float64(in.Float64())
 		case "tiltX":
-			out.TiltX = int64(in.Int64())
+			out.TiltX = float64(in.Float64())
 		case "tiltY":
-			out.TiltY = int64(in.Int64())
+			out.TiltY = float64(in.Float64())
 		case "twist":
 			out.Twist = int64(in.Int64())
 		case "id":
@@ -110,12 +110,12 @@ func easyjsonC5a4559bEncodeGithubComChromedpCdprotoInput(out *jwriter.Writer, in
 	if in.TiltX != 0 {
 		const prefix string = ",\"tiltX\":"
 		out.RawString(prefix)
-		out.Int64(int64(in.TiltX))
+		out.Float64(float64(in.TiltX))
 	}
 	if in.TiltY != 0 {
 		const prefix string = ",\"tiltY\":"
 		out.RawString(prefix)
-		out.Int64(int64(in.TiltY))
+		out.Float64(float64(in.TiltY))
 	}
 	if in.Twist != 0 {
 		const prefix string = ",\"twist\":"
@@ -1412,9 +1412,9 @@ func easyjsonC5a4559bDecodeGithubComChromedpCdprotoInput13(in *jlexer.Lexer, out
 		case "tangentialPressure":
 			out.TangentialPressure = float64(in.Float64())
 		case "tiltX":
-			out.TiltX = int64(in.Int64())
+			out.TiltX = float64(in.Float64())
 		case "tiltY":
-			out.TiltY = int64(in.Int64())
+			out.TiltY = float64(in.Float64())
 		case "twist":
 			out.Twist = int64(in.Int64())
 		case "deltaX":
@@ -1490,12 +1490,12 @@ func easyjsonC5a4559bEncodeGithubComChromedpCdprotoInput13(out *jwriter.Writer, 
 	if in.TiltX != 0 {
 		const prefix string = ",\"tiltX\":"
 		out.RawString(prefix)
-		out.Int64(int64(in.TiltX))
+		out.Float64(float64(in.TiltX))
 	}
 	if in.TiltY != 0 {
 		const prefix string = ",\"tiltY\":"
 		out.RawString(prefix)
-		out.Int64(int64(in.TiltY))
+		out.Float64(float64(in.TiltY))
 	}
 	if in.Twist != 0 {
 		const prefix string = ",\"twist\":"
@@ -1850,4 +1850,63 @@ func (v *DispatchDragEventParams) UnmarshalJSON(data []byte) error {
 // UnmarshalEasyJSON supports easyjson.Unmarshaler interface
 func (v *DispatchDragEventParams) UnmarshalEasyJSON(l *jlexer.Lexer) {
 	easyjsonC5a4559bDecodeGithubComChromedpCdprotoInput15(l, v)
+}
+func easyjsonC5a4559bDecodeGithubComChromedpCdprotoInput16(in *jlexer.Lexer, out *CancelDraggingParams) {
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
+		return
+	}
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(false)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		default:
+			in.SkipRecursive()
+		}
+		in.WantComma()
+	}
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+}
+func easyjsonC5a4559bEncodeGithubComChromedpCdprotoInput16(out *jwriter.Writer, in CancelDraggingParams) {
+	out.RawByte('{')
+	first := true
+	_ = first
+	out.RawByte('}')
+}
+
+// MarshalJSON supports json.Marshaler interface
+func (v CancelDraggingParams) MarshalJSON() ([]byte, error) {
+	w := jwriter.Writer{}
+	easyjsonC5a4559bEncodeGithubComChromedpCdprotoInput16(&w, v)
+	return w.Buffer.BuildBytes(), w.Error
+}
+
+// MarshalEasyJSON supports easyjson.Marshaler interface
+func (v CancelDraggingParams) MarshalEasyJSON(w *jwriter.Writer) {
+	easyjsonC5a4559bEncodeGithubComChromedpCdprotoInput16(w, v)
+}
+
+// UnmarshalJSON supports json.Unmarshaler interface
+func (v *CancelDraggingParams) UnmarshalJSON(data []byte) error {
+	r := jlexer.Lexer{Data: data}
+	easyjsonC5a4559bDecodeGithubComChromedpCdprotoInput16(&r, v)
+	return r.Error()
+}
+
+// UnmarshalEasyJSON supports easyjson.Unmarshaler interface
+func (v *CancelDraggingParams) UnmarshalEasyJSON(l *jlexer.Lexer) {
+	easyjsonC5a4559bDecodeGithubComChromedpCdprotoInput16(l, v)
 }
