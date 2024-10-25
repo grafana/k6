@@ -1,15 +1,7 @@
 diff --git a/WebCryptoAPI/encrypt_decrypt/rsa.js b/WebCryptoAPI/encrypt_decrypt/rsa.js
-index 5eae06e47..4be7c37a5 100644
+index 5eae06e47..819878cf4 100644
 --- a/WebCryptoAPI/encrypt_decrypt/rsa.js
 +++ b/WebCryptoAPI/encrypt_decrypt/rsa.js
-@@ -1,6 +1,6 @@
- 
- function run_test() {
--    var subtle = self.crypto.subtle; // Change to test prefixed implementations
-+    var subtle = crypto.subtle; // Change to test prefixed implementations
- 
-     // When are all these tests really done? When all the promises they use have resolved.
-     var all_promises = [];
 @@ -291,13 +291,7 @@ function run_test() {
          });
  

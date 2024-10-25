@@ -1,15 +1,7 @@
 diff --git a/WebCryptoAPI/encrypt_decrypt/aes.js b/WebCryptoAPI/encrypt_decrypt/aes.js
-index fdeb7963f..1fb5ffc8f 100644
+index fdeb7963f..b2257a320 100644
 --- a/WebCryptoAPI/encrypt_decrypt/aes.js
 +++ b/WebCryptoAPI/encrypt_decrypt/aes.js
-@@ -1,6 +1,6 @@
- 
- function run_test() {
--    var subtle = self.crypto.subtle; // Change to test prefixed implementations
-+    var subtle = crypto.subtle; // Change to test prefixed implementations
- 
-     // When are all these tests really done? When all the promises they use have resolved.
-     var all_promises = [];
 @@ -267,12 +267,6 @@ function run_test() {
          all_promises.push(promise);
      });

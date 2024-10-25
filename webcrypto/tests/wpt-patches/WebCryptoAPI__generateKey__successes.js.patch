@@ -1,16 +1,7 @@
 diff --git a/WebCryptoAPI/generateKey/successes.js b/WebCryptoAPI/generateKey/successes.js
-index a9a168e1a..77d7b909a 100644
+index a9a168e1a..88861ab87 100644
 --- a/WebCryptoAPI/generateKey/successes.js
 +++ b/WebCryptoAPI/generateKey/successes.js
-@@ -2,7 +2,7 @@
- function run_test(algorithmNames, slowTest) {
-     var subtle = crypto.subtle; // Change to test prefixed implementations
- 
--    setup({explicit_timeout: true});
-+    // setup({explicit_timeout: true});
- 
- // These tests check that generateKey successfully creates keys
- // when provided any of a wide set of correct parameters
 @@ -21,17 +21,17 @@ function run_test(algorithmNames, slowTest) {
          {name: "AES-CTR",  resultType: CryptoKey, usages: ["encrypt", "decrypt", "wrapKey", "unwrapKey"], mandatoryUsages: []},
          {name: "AES-CBC",  resultType: CryptoKey, usages: ["encrypt", "decrypt", "wrapKey", "unwrapKey"], mandatoryUsages: []},

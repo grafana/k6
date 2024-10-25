@@ -92,6 +92,8 @@ function assert_unreached(description) {
     throw `reached unreachable code, reason: ${description}`
 }
 
+// overloads of the some test functions
+
 // this is a minimal implementation of the promise_test function
 // which used in many web platform tests
 function promise_test(fn, name) {
@@ -101,3 +103,13 @@ function promise_test(fn, name) {
         throw Error(`Error in test "${name}": ${e}`);
     }
 }
+
+// this is a minimal implementation of the done function
+// which used in many web platform tests
+function done() {}
+
+// this is a minimal implementation of the setup function
+function setup() {}
+
+// some tests use the global object, so we need to define it
+const self = globalThis;

@@ -1,18 +1,7 @@
 diff --git a/WebCryptoAPI/sign_verify/hmac.js b/WebCryptoAPI/sign_verify/hmac.js
-index f5e2ad276..f51cc7bbe 100644
+index f5e2ad276..fcdf65a78 100644
 --- a/WebCryptoAPI/sign_verify/hmac.js
 +++ b/WebCryptoAPI/sign_verify/hmac.js
-@@ -1,8 +1,8 @@
- 
- function run_test() {
--    setup({explicit_done: true});
-+    // setup({explicit_done: true});
- 
--    var subtle = self.crypto.subtle; // Change to test prefixed implementations
-+    var subtle = crypto.subtle; // Change to test prefixed implementations
- 
-     // When are all these tests really done? When all the promises they use have resolved.
-     var all_promises = [];
 @@ -292,13 +292,6 @@ function run_test() {
      });
  

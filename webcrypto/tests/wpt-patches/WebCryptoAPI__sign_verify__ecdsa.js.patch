@@ -1,18 +1,7 @@
 diff --git a/WebCryptoAPI/sign_verify/ecdsa.js b/WebCryptoAPI/sign_verify/ecdsa.js
-index 6bf662adc..7a1eb0178 100644
+index 6bf662adc..dcda1a1b1 100644
 --- a/WebCryptoAPI/sign_verify/ecdsa.js
 +++ b/WebCryptoAPI/sign_verify/ecdsa.js
-@@ -1,8 +1,8 @@
- 
- function run_test() {
--    setup({explicit_done: true});
-+    // setup({explicit_done: true});
- 
--    var subtle = self.crypto.subtle; // Change to test prefixed implementations
-+    var subtle = crypto.subtle; // Change to test prefixed implementations
- 
-     // When are all these tests really done? When all the promises they use have resolved.
-     var all_promises = [];
 @@ -435,12 +435,6 @@ function run_test() {
          all_promises.push(promise);
      });

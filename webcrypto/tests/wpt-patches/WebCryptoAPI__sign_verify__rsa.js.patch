@@ -1,18 +1,7 @@
 diff --git a/WebCryptoAPI/sign_verify/rsa.js b/WebCryptoAPI/sign_verify/rsa.js
-index 5abadd3d4..c1673065a 100644
+index 5abadd3d4..494b707ee 100644
 --- a/WebCryptoAPI/sign_verify/rsa.js
 +++ b/WebCryptoAPI/sign_verify/rsa.js
-@@ -1,8 +1,8 @@
- 
- function run_test() {
--    setup({explicit_done: true});
-+    // setup({explicit_done: true});
- 
--    var subtle = self.crypto.subtle; // Change to test prefixed implementations
-+    var subtle = crypto.subtle; // Change to test prefixed implementations
- 
-     // When are all these tests really done? When all the promises they use have resolved.
-     var all_promises = [];
 @@ -156,7 +156,9 @@ function run_test() {
      // Check for successful signing and verification.
      testVectors.forEach(function(vector) {
