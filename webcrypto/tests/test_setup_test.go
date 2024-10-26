@@ -38,7 +38,7 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	require.NoError(t, err)
 
 	// We compile the Web Platform testharness script into a sobek.Program
-	harnessProgram, err := CompileFile("./util", "testharness.js")
+	harnessProgram, err := compileFile("./util", "testharness.js")
 	require.NoError(t, err)
 
 	// We execute the harness script in the goja runtime
@@ -48,13 +48,19 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	require.NoError(t, err)
 
 	// We compile the Web Platform helpers script into a sobek.Program
-	helpersProgram, err := CompileFile("./util", "helpers.js")
+	helpersProgram, err := compileFile("./util", "helpers.js")
 	require.NoError(t, err)
 
 	// We execute the helpers script in the goja runtime
 	// in order to make the Web Platform helpers available
 	// to the tests.
 	_, err = runtime.VU.Runtime().RunProgram(helpersProgram)
+	require.NoError(t, err)
+
+	// some function overloads for the Web Platform tests
+	overloads, err := compileFile("./util", "overloads.js")
+	require.NoError(t, err)
+	_, err = runtime.VU.Runtime().RunProgram(overloads)
 	require.NoError(t, err)
 
 	m := new(webcrypto.RootModule).NewModuleInstance(runtime.VU)
@@ -74,8 +80,8 @@ func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	return runtime
 }
 
-// CompileFile compiles a javascript file as a sobek.Program.
-func CompileFile(base, name string) (*sobek.Program, error) {
+// compileFile compiles a javascript file as a sobek.Program.
+func compileFile(base, name string) (*sobek.Program, error) {
 	filename := path.Join(base, name)
 
 	//nolint:forbidigo // Allow os.Open in tests

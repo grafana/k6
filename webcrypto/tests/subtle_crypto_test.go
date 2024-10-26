@@ -10,23 +10,21 @@ import (
 
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
-	"go.k6.io/k6/js/modulestest"
 )
 
 const webPlatformTestSuite = "./wpt/WebCryptoAPI/"
 
-func newWebPlatformTestRuntime(t testing.TB) *modulestest.Runtime {
+func TestWebPlatformTestSuite(t *testing.T) {
+	t.Parallel()
+
 	// check if the test is running in the correct environment
 	info, err := os.Stat(webPlatformTestSuite)
 	if os.IsNotExist(err) || err != nil || !info.IsDir() {
-		t.Fatalf("The Web Platform Test directory does not exist, err: %s", err)
+		t.Fatalf(
+			"The Web Platform Test directory does not exist, err: %s. Please check webcrypto/tests/README.md how to setup it",
+			err,
+		)
 	}
-
-	return newConfiguredRuntime(t)
-}
-
-func TestWebPlatformTestSuite(t *testing.T) {
-	t.Parallel()
 
 	tests := []struct {
 		// catalog is the catalog relatively webPlatformTestSuite where to look files
@@ -159,7 +157,7 @@ func TestWebPlatformTestSuite(t *testing.T) {
 		t.Run(testName, func(t *testing.T) {
 			t.Parallel()
 
-			ts := newWebPlatformTestRuntime(t)
+			ts := newConfiguredRuntime(t)
 
 			gotErr := ts.EventLoop.Start(func() error {
 				if err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+tt.catalog, tt.files...); err != nil {
@@ -180,7 +178,7 @@ func TestWebPlatformTestSuite(t *testing.T) {
 
 func executeTestScripts(rt *sobek.Runtime, base string, scripts ...string) error {
 	for _, script := range scripts {
-		program, err := CompileFile(base, script)
+		program, err := compileFile(base, script)
 		if err != nil {
 			return err
 		}
