@@ -201,7 +201,7 @@ func getPreviousRequiringFile(vu VU) (string, error) {
 // sets the provided promise in such way as to ignore falures
 // this is mostly needed as failures are handled separately and we do not want those to lead to stopping the event loop
 func promisesThenIgnore(rt *sobek.Runtime, promise *sobek.Promise) {
-	cal, _ := sobek.AssertFunction(rt.ToValue(promise).ToObject(rt).Get("then"))
+	call, _ := sobek.AssertFunction(rt.ToValue(promise).ToObject(rt).Get("then"))
 	handler := rt.ToValue(func(_ sobek.Value) {})
-	_, _ = cal(rt.ToValue(promise), handler, handler)
+	_, _ = call(rt.ToValue(promise), handler, handler)
 }
