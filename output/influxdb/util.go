@@ -63,12 +63,9 @@ func checkDuplicatedTypeDefinitions(fieldKinds map[string]FieldKind, tag string)
 func MakeFieldKinds(conf Config) (map[string]FieldKind, error) {
 	fieldKinds := make(map[string]FieldKind)
 	for _, tag := range conf.TagsAsFields {
-		var fieldName, fieldType string
-		s := strings.SplitN(tag, ":", 2)
-		if len(s) == 1 {
-			fieldName, fieldType = s[0], "string"
-		} else {
-			fieldName, fieldType = s[0], s[1]
+		fieldName, fieldType, _ := strings.Cut(tag, ":")
+		if fieldType == "" {
+			fieldType = "string"
 		}
 
 		err := checkDuplicatedTypeDefinitions(fieldKinds, fieldName)

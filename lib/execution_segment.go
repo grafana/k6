@@ -108,9 +108,9 @@ func NewExecutionSegmentFromString(toStr string) (result *ExecutionSegment, err 
 		toStr = "1" // an empty string means a full 0:1 execution segment
 	}
 	if strings.ContainsRune(toStr, ':') {
-		fromToStr := strings.SplitN(toStr, ":", 2)
-		toStr = fromToStr[1]
-		if from, err = stringToRat(fromToStr[0]); err != nil {
+		var fromStr string
+		fromStr, toStr, _ = strings.Cut(toStr, ":")
+		if from, err = stringToRat(fromStr); err != nil {
 			return nil, err
 		}
 	}

@@ -127,7 +127,7 @@ func createOutputs(
 	result := make([]output.Output, 0, len(outputs))
 
 	for _, outputFullArg := range outputs {
-		outputType, outputArg := parseOutputArgument(outputFullArg)
+		outputType, outputArg, _ := strings.Cut(outputFullArg, "=")
 		outputConstructor, ok := outputConstructors[outputType]
 		if !ok {
 			return nil, fmt.Errorf(
@@ -172,16 +172,4 @@ func createOutputs(
 	}
 
 	return result, nil
-}
-
-func parseOutputArgument(s string) (t, arg string) {
-	parts := strings.SplitN(s, "=", 2)
-	switch len(parts) {
-	case 0:
-		return "", ""
-	case 1:
-		return parts[0], ""
-	default:
-		return parts[0], parts[1]
-	}
 }
