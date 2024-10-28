@@ -16,7 +16,7 @@ require (
 	github.com/gorilla/websocket v1.5.3
 	github.com/grafana/xk6-browser v1.9.1
 	github.com/grafana/xk6-dashboard v0.7.5
-	github.com/grafana/xk6-output-opentelemetry v0.2.0
+	github.com/grafana/xk6-output-opentelemetry v0.3.0
 	github.com/grafana/xk6-output-prometheus-remote v0.4.0
 	github.com/grafana/xk6-redis v0.3.1
 	github.com/grafana/xk6-webcrypto v0.4.0
