@@ -1,5 +1,5 @@
 diff --git a/WebCryptoAPI/sign_verify/rsa.js b/WebCryptoAPI/sign_verify/rsa.js
-index 5abadd3d4..494b707ee 100644
+index 5abadd3d4..6076bd7de 100644
 --- a/WebCryptoAPI/sign_verify/rsa.js
 +++ b/WebCryptoAPI/sign_verify/rsa.js
 @@ -156,7 +156,9 @@ function run_test() {
@@ -13,16 +13,3 @@ index 5abadd3d4..494b707ee 100644
          var promise = importVectorKeys(vector, ["verify"], ["sign"])
          .then(function(vectors) {
              promise_test(function(test) {
-@@ -364,12 +366,6 @@ function run_test() {
-     });
- 
- 
--    promise_test(function() {
--        return Promise.all(all_promises)
--            .then(function() {done();})
--            .catch(function() {done();})
--    }, "setup");
--
-     // A test vector has all needed fields for signing and verifying, EXCEPT that the
-     // key field may be null. This function replaces that null with the Correct
-     // CryptoKey object.
