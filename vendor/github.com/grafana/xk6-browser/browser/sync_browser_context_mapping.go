@@ -72,7 +72,7 @@ func syncMapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //n
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if popts.PredicateFn != nil {
 					runInTaskQueue = func(p *common.Page) (bool, error) {
-						tq := vu.taskQueueRegistry.get(p.TargetID())
+						tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 						var rtn bool
 						var err error

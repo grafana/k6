@@ -58,7 +58,9 @@ func (cmi *cjsModuleInstance) HasTLA() bool { return false }
 
 func (cmi *cjsModuleInstance) RequestedModules() []string { return cmi.w.RequestedModules() }
 
-func (cmi *cjsModuleInstance) ExecuteModule(rt *sobek.Runtime, _, _ func(any)) (sobek.CyclicModuleInstance, error) {
+func (cmi *cjsModuleInstance) ExecuteModule(
+	rt *sobek.Runtime, _, _ func(any) error,
+) (sobek.CyclicModuleInstance, error) {
 	v, err := rt.RunProgram(cmi.w.prg)
 	if err != nil {
 		return nil, err

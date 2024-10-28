@@ -145,7 +145,7 @@ func (p *CloseTargetParams) Do(ctx context.Context) (err error) {
 
 // ExposeDevToolsProtocolParams inject object to the target's main frame that
 // provides a communication channel with browser target. Injected object will be
-// available as window[bindingName]. The object has the follwing API: -
+// available as window[bindingName]. The object has the following API: -
 // binding.send(json) - a method to send messages over the remote debugging
 // protocol - binding.onmessage = json => handleMessage(json) - a callback that
 // will be called for the protocol notifications and command responses.
@@ -156,7 +156,7 @@ type ExposeDevToolsProtocolParams struct {
 
 // ExposeDevToolsProtocol inject object to the target's main frame that
 // provides a communication channel with browser target. Injected object will be
-// available as window[bindingName]. The object has the follwing API: -
+// available as window[bindingName]. The object has the following API: -
 // binding.send(json) - a method to send messages over the remote debugging
 // protocol - binding.onmessage = json => handleMessage(json) - a callback that
 // will be called for the protocol notifications and command responses.
@@ -293,6 +293,7 @@ type CreateTargetParams struct {
 	EnableBeginFrameControl bool                 `json:"enableBeginFrameControl,omitempty"` // Whether BeginFrames for this target will be controlled via DevTools (headless chrome only, not supported on MacOS yet, false by default).
 	NewWindow               bool                 `json:"newWindow,omitempty"`               // Whether to create a new Window or Tab (chrome-only, false by default).
 	Background              bool                 `json:"background,omitempty"`              // Whether to create the target in background or foreground (chrome-only, false by default).
+	ForTab                  bool                 `json:"forTab,omitempty"`                  // Whether to create the target of type "tab".
 }
 
 // CreateTarget creates a new page.
@@ -345,6 +346,12 @@ func (p CreateTargetParams) WithNewWindow(newWindow bool) *CreateTargetParams {
 // (chrome-only, false by default).
 func (p CreateTargetParams) WithBackground(background bool) *CreateTargetParams {
 	p.Background = background
+	return &p
+}
+
+// WithForTab whether to create the target of type "tab".
+func (p CreateTargetParams) WithForTab(forTab bool) *CreateTargetParams {
+	p.ForTab = forTab
 	return &p
 }
 

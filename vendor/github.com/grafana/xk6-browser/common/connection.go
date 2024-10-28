@@ -17,7 +17,6 @@ import (
 	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/gorilla/websocket"
-	"github.com/grafana/sobek"
 	"github.com/mailru/easyjson"
 	"github.com/mailru/easyjson/jlexer"
 	"github.com/mailru/easyjson/jwriter"
@@ -51,7 +50,7 @@ type executorEmitter interface {
 
 type connection interface {
 	executorEmitter
-	Close(...sobek.Value)
+	Close()
 	IgnoreIOErrors()
 	getSession(target.SessionID) *Session
 }
@@ -566,11 +565,10 @@ func (c *Connection) sendLoop() {
 
 // Close cleanly closes the WebSocket connection.
 // It returns an error if sending the Close control frame fails.
-func (c *Connection) Close(args ...sobek.Value) {
-	code := websocket.CloseGoingAway
-	if len(args) > 0 {
-		code = int(args[0].ToInteger())
-	}
+//
+// Optional code to override default websocket.CloseGoingAway (1001).
+func (c *Connection) Close() {
+	code := websocket.CloseNormalClosure
 	c.logger.Debugf("connection:Close", "wsURL:%q code:%d", c.wsURL, code)
 	_ = c.close(code)
 }

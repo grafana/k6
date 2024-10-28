@@ -7,9 +7,16 @@ import (
 // syncMapRequest is like mapRequest but returns synchronous functions.
 func syncMapRequest(vu moduleVU, r *common.Request) mapping {
 	maps := mapping{
-		"allHeaders":          r.AllHeaders,
-		"frame":               func() mapping { return syncMapFrame(vu, r.Frame()) },
-		"headerValue":         r.HeaderValue,
+		"allHeaders": r.AllHeaders,
+		"frame":      func() mapping { return syncMapFrame(vu, r.Frame()) },
+		"headerValue": func(name string) any {
+			v, ok := r.HeaderValue(name)
+			if !ok {
+				return nil
+			}
+
+			return v
+		},
 		"headers":             r.Headers,
 		"headersArray":        r.HeadersArray,
 		"isNavigationRequest": r.IsNavigationRequest,

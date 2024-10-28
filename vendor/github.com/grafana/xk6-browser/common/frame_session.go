@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/http"
 	"runtime"
 	"strings"
 	"sync"
@@ -121,7 +122,7 @@ func NewFrameSession(
 	if fs.parent != nil {
 		parentNM = fs.parent.networkManager
 	}
-	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM)
+	fs.networkManager, err = NewNetworkManager(ctx, k6Metrics, s, fs.manager, parentNM, fs.manager.page)
 	if err != nil {
 		l.Debugf("NewFrameSession:NewNetworkManager", "sid:%v tid:%v err:%v",
 			s.ID(), tid, err)
@@ -355,7 +356,7 @@ func (fs *FrameSession) parseAndEmitWebVitalMetric(object string) error {
 	state := fs.vu.State()
 	tags := state.Tags.GetCurrentValues().Tags
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = tags.With("url", wv.URL)
+		tags = handleURLTag(fs.page, wv.URL, http.MethodGet, tags)
 	}
 
 	tags = tags.With("rating", wv.Rating)

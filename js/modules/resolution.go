@@ -8,6 +8,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/ast"
 	"github.com/sirupsen/logrus"
+
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/usage"
@@ -103,21 +104,14 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	if cached, ok := mr.cache[specifier.String()]; ok {
 		return cached.mod, cached.err
 	}
-	prg, _, err := mr.compiler.Parse(string(data), specifier.String(), false)
+	prg, _, err := mr.compiler.Parse(string(data), specifier.String(), false, true)
 
 	// if there is an error an we can try to parse it wrapped as CommonJS
 	// if it isn't ESM - we *must* wrap it in order to work
 	if err != nil || !isESM(prg) {
 		var newError error
-		prg, _, newError = mr.compiler.Parse(string(data), specifier.String(), true)
+		prg, _, newError = mr.compiler.Parse(string(data), specifier.String(), true, false)
 		if newError == nil || err == nil {
-			err = newError
-		}
-	}
-	if err != nil {
-		var newError error
-		prg, _, newError = mr.compiler.Parse(string(data), specifier.String(), true)
-		if newError == nil {
 			err = newError
 		}
 	}

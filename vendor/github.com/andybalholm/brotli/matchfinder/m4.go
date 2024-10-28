@@ -56,7 +56,7 @@ func (q *M4) Reset() {
 }
 
 func (q *M4) score(m absoluteMatch) int {
-	return (m.End-m.Start)*256 + bits.LeadingZeros32(uint32(m.Start-m.Match))*q.DistanceBitCost
+	return (m.End-m.Start)*256 + (bits.LeadingZeros32(uint32(m.Start-m.Match))-32)*q.DistanceBitCost
 }
 
 func (q *M4) FindMatches(dst []Match, src []byte) []Match {
@@ -112,7 +112,12 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			// We have found some matches, and we're far enough along that we probably
 			// won't find overlapping matches, so we might as well emit them.
 			if matches[1] != (absoluteMatch{}) {
-				e.trim(matches[1], matches[0].Start, q.MinLength)
+				if matches[1].End > matches[0].Start {
+					matches[1].End = matches[0].Start
+				}
+				if matches[1].End-matches[1].Start >= q.MinLength && q.score(matches[1]) > 0 {
+					e.emit(matches[1])
+				}
 			}
 			e.emit(matches[0])
 			matches = [3]absoluteMatch{}
@@ -139,12 +144,10 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 		// Look for a match.
 		var currentMatch absoluteMatch
 
-		if i-candidate != matches[0].Start-matches[0].Match {
-			if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
-				m := extendMatch2(src, i, candidate, e.NextEmit)
-				if m.End-m.Start > q.MinLength {
-					currentMatch = m
-				}
+		if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
+			m := extendMatch2(src, i, candidate, e.NextEmit)
+			if m.End-m.Start > q.MinLength && q.score(m) > 0 {
+				currentMatch = m
 			}
 		}
 
@@ -157,12 +160,10 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 			if candidate <= 0 || i-candidate > q.MaxDistance {
 				break
 			}
-			if i-candidate != matches[0].Start-matches[0].Match {
-				if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
-					m := extendMatch2(src, i, candidate, e.NextEmit)
-					if m.End-m.Start > q.MinLength && q.score(m) > q.score(currentMatch) {
-						currentMatch = m
-					}
+			if binary.LittleEndian.Uint32(src[candidate:]) == binary.LittleEndian.Uint32(src[i:]) {
+				m := extendMatch2(src, i, candidate, e.NextEmit)
+				if m.End-m.Start > q.MinLength && q.score(m) > q.score(currentMatch) {
+					currentMatch = m
 				}
 			}
 		}
@@ -217,14 +218,24 @@ func (q *M4) FindMatches(dst []Match, src []byte) []Match {
 
 		default:
 			// Emit the first match, shortening it if necessary to avoid overlap with the second.
-			e.trim(matches[2], matches[1].Start, q.MinLength)
+			if matches[2].End > matches[1].Start {
+				matches[2].End = matches[1].Start
+			}
+			if matches[2].End-matches[2].Start >= q.MinLength && q.score(matches[2]) > 0 {
+				e.emit(matches[2])
+			}
 			matches[2] = absoluteMatch{}
 		}
 	}
 
 	// We've found all the matches now; emit the remaining ones.
 	if matches[1] != (absoluteMatch{}) {
-		e.trim(matches[1], matches[0].Start, q.MinLength)
+		if matches[1].End > matches[0].Start {
+			matches[1].End = matches[0].Start
+		}
+		if matches[1].End-matches[1].Start >= q.MinLength && q.score(matches[1]) > 0 {
+			e.emit(matches[1])
+		}
 	}
 	if matches[0] != (absoluteMatch{}) {
 		e.emit(matches[0])
