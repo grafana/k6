@@ -9,7 +9,7 @@ cd ./wpt
 git init
 git remote add origin https://github.com/web-platform-tests/wpt
 git sparse-checkout init --cone
-git sparse-checkout set WebCryptoAPI
+git sparse-checkout set resources WebCryptoAPI
 git fetch origin --depth=1 "${sha}"
 git checkout ${sha}
 

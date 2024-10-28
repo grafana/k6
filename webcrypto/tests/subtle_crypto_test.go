@@ -8,7 +8,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -160,8 +159,8 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			ts := newConfiguredRuntime(t)
 
 			gotErr := ts.EventLoop.Start(func() error {
-				if err := executeTestScripts(ts.VU.Runtime(), webPlatformTestSuite+tt.catalog, tt.files...); err != nil {
-					return err
+				for _, script := range tt.files {
+					compileAndRun(t, ts, webPlatformTestSuite+tt.catalog, script)
 				}
 
 				if tt.callFn == "" {
@@ -174,19 +173,4 @@ func TestWebPlatformTestSuite(t *testing.T) {
 			assert.NoError(t, gotErr)
 		})
 	}
-}
-
-func executeTestScripts(rt *sobek.Runtime, base string, scripts ...string) error {
-	for _, script := range scripts {
-		program, err := compileFile(base, script)
-		if err != nil {
-			return err
-		}
-
-		if _, err = rt.RunProgram(program); err != nil {
-			return err
-		}
-	}
-
-	return nil
 }

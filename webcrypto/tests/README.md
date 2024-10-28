@@ -10,9 +10,7 @@ The entry point is the [`checkout.sh`](./checkout.sh) script, which checks out t
 
 If you work on a new web platfrom test, you could easily re-generate patches by running `./generate-patches.sh`.
 
-We try to keep the diff as small as possible, and we aim to upstream the changes to the wpt repository, but still sometimes
-we need to overload some wpt's functions locally with the minimal or noop implementation to make the tests work. You could find the overloaded functions in the 
-[`util/overloads.js`](./utils/overloads.js) file.
+We try to keep the diff as small as possible, and we aim to upstream the changes to the wpt repository.
 
 **How to use**
 1. Run `./checkout.sh` to check out the web-platform-tests sources.

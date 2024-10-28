@@ -31,7 +31,7 @@ test:
 
 ## test: Executes any tests.
 wpt-test:
-	go test -race -timeout 60s ./... -tags=wpt
+	go test -race -timeout 120s ./... -tags=wpt
 
 ## lint: Runs the linters.
 lint: linter-config check-linter-version

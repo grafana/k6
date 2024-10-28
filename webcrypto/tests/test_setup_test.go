@@ -3,15 +3,10 @@
 package tests
 
 import (
-	"io"
-	"os"
-	"path"
-	"path/filepath"
 	"testing"
 
 	"go.k6.io/k6/js/compiler"
 
-	"github.com/grafana/sobek"
 	"github.com/grafana/xk6-webcrypto/webcrypto"
 	"github.com/stretchr/testify/require"
 	k6encoding "go.k6.io/k6/js/modules/k6/encoding"
@@ -28,84 +23,48 @@ const initGlobals = `
 // main context of k6.
 func newConfiguredRuntime(t testing.TB) *modulestest.Runtime {
 	var err error
-	runtime := modulestest.NewRuntime(t)
+	rt := modulestest.NewRuntime(t)
 
-	err = runtime.SetupModuleSystem(
+	// We want to make the [self] available for Web Platform Tests, as it is used in test harness.
+	_, err = rt.VU.Runtime().RunString("var self = this;")
+	require.NoError(t, err)
+
+	err = rt.SetupModuleSystem(
 		map[string]interface{}{"k6/x/webcrypto": webcrypto.New()},
 		nil,
-		compiler.New(runtime.VU.InitEnv().Logger),
+		compiler.New(rt.VU.InitEnv().Logger),
 	)
 	require.NoError(t, err)
 
 	// We compile the Web Platform testharness script into a sobek.Program
-	harnessProgram, err := compileFile("./util", "testharness.js")
-	require.NoError(t, err)
-
-	// We execute the harness script in the goja runtime
-	// in order to make the Web Platform assertion functions available
-	// to the tests.
-	_, err = runtime.VU.Runtime().RunProgram(harnessProgram)
-	require.NoError(t, err)
+	compileAndRun(t, rt, "./wpt/resources", "testharness.js")
 
 	// We compile the Web Platform helpers script into a sobek.Program
-	helpersProgram, err := compileFile("./util", "helpers.js")
-	require.NoError(t, err)
+	// TODO: check if we need to compile the helpers.js script each time
+	// or it can be just yet another test
+	compileAndRun(t, rt, "./util", "helpers.js")
 
-	// We execute the helpers script in the goja runtime
-	// in order to make the Web Platform helpers available
-	// to the tests.
-	_, err = runtime.VU.Runtime().RunProgram(helpersProgram)
-	require.NoError(t, err)
+	m := new(webcrypto.RootModule).NewModuleInstance(rt.VU)
 
-	// some function overloads for the Web Platform tests
-	overloads, err := compileFile("./util", "overloads.js")
-	require.NoError(t, err)
-	_, err = runtime.VU.Runtime().RunProgram(overloads)
-	require.NoError(t, err)
-
-	m := new(webcrypto.RootModule).NewModuleInstance(runtime.VU)
-
-	err = runtime.VU.Runtime().Set("crypto", m.Exports().Named["crypto"])
+	err = rt.VU.Runtime().Set("crypto", m.Exports().Named["crypto"])
 	require.NoError(t, err)
 
 	// we define the btoa function in the goja runtime
 	// so that the Web Platform tests can use it.
-	encodingModule := k6encoding.New().NewModuleInstance(runtime.VU)
-	err = runtime.VU.Runtime().Set("btoa", encodingModule.Exports().Named["b64encode"])
+	encodingModule := k6encoding.New().NewModuleInstance(rt.VU)
+	err = rt.VU.Runtime().Set("btoa", encodingModule.Exports().Named["b64encode"])
 	require.NoError(t, err)
 
-	_, err = runtime.VU.Runtime().RunString(initGlobals)
+	_, err = rt.VU.Runtime().RunString(initGlobals)
 	require.NoError(t, err)
 
-	return runtime
+	return rt
 }
 
-// compileFile compiles a javascript file as a sobek.Program.
-func compileFile(base, name string) (*sobek.Program, error) {
-	filename := path.Join(base, name)
+func compileAndRun(t testing.TB, runtime *modulestest.Runtime, base, file string) {
+	program, err := modulestest.CompileFile(base, file)
+	require.NoError(t, err)
 
-	//nolint:forbidigo // Allow os.Open in tests
-	f, err := os.Open(filepath.Clean(filename))
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		err = f.Close()
-		if err != nil {
-			panic(err)
-		}
-	}()
-
-	b, err := io.ReadAll(f)
-	if err != nil {
-		return nil, err
-	}
-
-	str := string(b)
-	program, err := sobek.Compile(name, str, false)
-	if err != nil {
-		return nil, err
-	}
-
-	return program, nil
+	_, err = runtime.VU.Runtime().RunProgram(program)
+	require.NoError(t, err)
 }
