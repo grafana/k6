@@ -89,9 +89,7 @@ type PBKDF2Params struct {
 // RSAHashedKeyGenParams represents the object that should be passed as the algorithm
 // parameter into `SubtleCrypto.GenerateKey`, when generating an RSA key pair.
 type RSAHashedKeyGenParams struct {
-	// Name should be set to AlgorithmKindRsassPkcs1v15,
-	// AlgorithmKindRsaPss, or AlgorithmKindRsaOaep.
-	Name AlgorithmIdentifier
+	Algorithm
 
 	// ModulusLength holds (a Number) the length of the RSA modulus, in bits.
 	// This should be at least 2048. Some organizations are now recommending
@@ -105,7 +103,7 @@ type RSAHashedKeyGenParams struct {
 	// Hash represents the name of the digest function to use. You can
 	// use any of the following: DigestKindSha256, DigestKindSha384,
 	// or DigestKindSha512.
-	Hash string
+	Hash Algorithm
 }
 
 // RSAHashedImportParams represents the object that should be passed as the
@@ -113,23 +111,19 @@ type RSAHashedKeyGenParams struct {
 // importing any RSA-based key pair: that is, when the algorithm is identified as any
 // of RSASSA-PKCS1-v1_5, RSA-PSS, or RSA-OAEP.
 type RSAHashedImportParams struct {
-	// Name should be set to AlgorithmKindRsassPkcs1v15,
-	// AlgorithmKindRsaPss, or AlgorithmKindRsaOaep depending
-	// on the algorithm you want to use.
-	Name string
+	Algorithm
 
 	// Hash represents the name of the digest function to use.
 	// Note that although you can technically pass SHA-1 here, this is strongly
 	// discouraged as it is considered vulnerable.
-	Hash AlgorithmIdentifier
+	Hash Algorithm
 }
 
 // RSAOaepParams represents the object that should be passed as the algorithm parameter
 // into `SubtleCrypto.Encrypt`, `SubtleCrypto.Decrypt`, `SubtleCrypto.WrapKey`, or
 // `SubtleCrypto.UnwrapKey`, when using the RSA_OAEP algorithm.
 type RSAOaepParams struct {
-	// Name should be set to "RSA-OAEP"
-	Name string
+	Algorithm
 
 	// Label holds (an ArrayBuffer, a TypedArray, or a DataView) an array of bytes that does not
 	// itself need to be encrypted but which should be bound to the ciphertext.
@@ -144,8 +138,7 @@ type RSAOaepParams struct {
 // parameter into `SubtleCrypto.Sign` or `SubtleCrypto.Verify`, when using the
 // RSA-PSS algorithm.
 type RSAPssParams struct {
-	// Name should be set to AlgorithmKindRsaPss.
-	Name AlgorithmIdentifier
+	Algorithm Algorithm
 
 	// SaltLength holds (a Number) the length of the random salt to use, in bytes.
 	// RFC 3447 says that "typical salt lengths" are either 0 or the length of the output
