@@ -17,7 +17,7 @@ require (
 	github.com/grafana/xk6-browser v1.9.1
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-opentelemetry v0.3.0
-	github.com/grafana/xk6-output-prometheus-remote v0.4.0
+	github.com/grafana/xk6-output-prometheus-remote v0.5.0
 	github.com/grafana/xk6-redis v0.3.1
 	github.com/grafana/xk6-webcrypto v0.5.0
 	github.com/grafana/xk6-websockets v0.7.2
