@@ -286,7 +286,8 @@ func envMap(env map[string]string, prefix string) map[string]string {
 	return result
 }
 
-func parseEnvs(env map[string]string) (Config, error) {
+// TODO: try to migrate to github.com/mstoykov/envconfig like it's done on other projects?
+func parseEnvs(env map[string]string) (Config, error) { //nolint:funlen
 	c := Config{
 		Headers: make(map[string]string),
 	}
