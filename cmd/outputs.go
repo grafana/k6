@@ -3,7 +3,6 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"go.k6.io/k6/output/summary"
 	"sort"
 	"strings"
 
@@ -46,7 +45,6 @@ const (
 func getAllOutputConstructors() (map[string]output.Constructor, error) {
 	// Start with the built-in outputs
 	result := map[string]output.Constructor{
-		builtinOutputSummary.String():  summary.New,
 		builtinOutputJSON.String():     json.New,
 		builtinOutputCloud.String():    cloud.New,
 		builtinOutputCSV.String():      csv.New,

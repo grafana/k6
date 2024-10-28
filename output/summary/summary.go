@@ -2,10 +2,11 @@ package summary
 
 import (
 	"fmt"
-	"go.k6.io/k6/metrics"
 	"strings"
 	"time"
 
+	"go.k6.io/k6/lib"
+	"go.k6.io/k6/metrics"
 	"go.k6.io/k6/output"
 
 	"github.com/sirupsen/logrus"
@@ -29,11 +30,10 @@ type Output struct {
 }
 
 // New returns a new JSON output.
-func New(params output.Params) (output.Output, error) {
+func New(params output.Params) (*Output, error) {
 	return &Output{
 		logger: params.Logger.WithFields(logrus.Fields{
-			"output":   "summary",
-			"filename": params.ConfigArgument,
+			"output": "summary",
 		}),
 		dataModel: NewDataModel(),
 	}, nil
@@ -77,6 +77,7 @@ type MetricData struct {
 type ScenarioData struct {
 	MetricData
 
+	// FIXME: Groups could have groups
 	Groups map[string]AggregatedMetricData
 }
 
@@ -86,14 +87,26 @@ type DataModel struct {
 	Scenarios map[string]AggregatedMetricData
 }
 
-type AggregatedMetricData map[string]metrics.Sink
+type AggregatedMetric struct {
+	Metric *metrics.Metric
+	Sink   metrics.Sink
+}
+
+func NewAggregatedMetric(metric *metrics.Metric) AggregatedMetric {
+	return AggregatedMetric{
+		Metric: metric,
+		Sink:   metrics.NewSink(metric.Type),
+	}
+}
+
+type AggregatedMetricData map[string]AggregatedMetric
 
 func (a AggregatedMetricData) AddSample(sample metrics.Sample) {
 	if _, exists := a[sample.Metric.Name]; !exists {
-		a[sample.Metric.Name] = metrics.NewSink(sample.Metric.Type)
+		a[sample.Metric.Name] = NewAggregatedMetric(sample.Metric)
 	}
 
-	a[sample.Metric.Name].Add(sample)
+	a[sample.Metric.Name].Sink.Add(sample)
 }
 
 func NewDataModel() DataModel {
@@ -127,7 +140,7 @@ func (o *Output) flushMetrics() {
 				o.dataModel.container[sample.Metric.Name] = sample.Metric
 			}
 
-			if groupName, exists := sample.Tags.Get("group"); exists {
+			if groupName, exists := sample.Tags.Get("group"); exists && len(groupName) > 0 {
 				normalizedGroupName := strings.TrimPrefix(groupName, "::")
 
 				if !o.dataModel.GroupStored(normalizedGroupName) {
@@ -147,4 +160,80 @@ func (o *Output) flushMetrics() {
 
 		}
 	}
+}
+
+func (o *Output) MetricsReport(summary *lib.Summary, options lib.Options) lib.Report {
+	report := lib.NewReport()
+
+	storeMetric := func(dest lib.ReportMetrics, m *metrics.Metric, sink metrics.Sink, testDuration time.Duration, summaryTrendStats []string) {
+		switch {
+		case isSkippedMetric(m.Name):
+			// Do nothing, just skip.
+		case isHTTPMetric(m.Name):
+			dest.HTTP[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isExecutionMetric(m.Name):
+			dest.Execution[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isNetworkMetric(m.Name):
+			dest.Network[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isBrowserMetric(m.Name):
+			dest.Browser[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isGrpcMetric(m.Name):
+			dest.Grpc[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isWebSocketsMetric(m.Name):
+			dest.WebSocket[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isWebVitalsMetric(m.Name):
+			dest.WebVitals[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		default:
+			dest.Miscellaneous[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		}
+	}
+
+	for _, m := range summary.Metrics {
+		storeMetric(report.Metrics, m, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+	}
+
+	totalChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Total)
+	successChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Trues)
+
+	report.Checks.Metrics.Total.Values["count"] = totalChecks // Counter metric with total checks
+	report.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, summary.TestRunDuration)
+
+	checksMetric := summary.Metrics[metrics.ChecksName]
+	report.Checks.Metrics.Success = lib.NewReportMetricsDataFrom(checksMetric.Type, checksMetric.Contains, checksMetric.Sink, summary.TestRunDuration, options.SummaryTrendStats) // Rate metric with successes (equivalent to the 'checks' metric)
+
+	report.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
+	report.Checks.Metrics.Fail.Values["fails"] = successChecks
+	report.Checks.Metrics.Fail.Values["rate"] = (totalChecks - successChecks) / totalChecks
+
+	report.Checks.OrderedChecks = summary.RootGroup.OrderedChecks
+
+	for groupName, aggregatedData := range o.dataModel.Groups {
+		report.Groups[groupName] = lib.NewReportMetrics()
+
+		for _, metricData := range aggregatedData {
+			storeMetric(
+				report.Groups[groupName],
+				metricData.Metric,
+				metricData.Sink,
+				summary.TestRunDuration,
+				options.SummaryTrendStats,
+			)
+		}
+	}
+
+	for scenarioName, aggregatedData := range o.dataModel.Scenarios {
+		report.Scenarios[scenarioName] = lib.NewReportMetrics()
+
+		for _, metricData := range aggregatedData {
+			storeMetric(
+				report.Scenarios[scenarioName],
+				metricData.Metric,
+				metricData.Sink,
+				summary.TestRunDuration,
+				options.SummaryTrendStats,
+			)
+		}
+	}
+
+	return report
 }

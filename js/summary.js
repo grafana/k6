@@ -462,7 +462,7 @@ function generateTextSummary(data, options, report) {
 		lines.push('')
 	}
 
-	// START OF GROUP
+	// START OF GLOBAL RESULTS
 	// TITLE
 	lines.push(metricGroupIndent + groupPrefix + ' ' + boldify('GLOBAL RESULTS') + '\n')
 
@@ -487,7 +487,36 @@ function generateTextSummary(data, options, report) {
 		displayMetricsSectionName(sectionName)
 		displayMetricsSectionBlock(sectionMetrics)
 	})
-	// END OF GROUP
+	// END OF GLOBAL RESULTS
+
+	// GROUPS
+	forEach(report.groups, (groupName, groupMetrics) => {
+		lines.push(metricGroupIndent + groupPrefix + ' ' + boldify(`GROUP: ${groupName}`) + '\n')
+		forEach(groupMetrics, (sectionName, sectionMetrics) => {
+			// If there are no metrics in this section, skip it
+			if (Object.keys(sectionMetrics).length === 0) {
+				return
+			}
+
+			displayMetricsSectionName(sectionName)
+			displayMetricsSectionBlock(sectionMetrics)
+		})
+	})
+
+	// SCENARIOS
+	forEach(report.scenarios, (scenarioName, scenarioMetrics) => {
+		lines.push(metricGroupIndent + groupPrefix + ' ' + boldify(`SCENARIO: ${scenarioName}`) + '\n')
+		forEach(scenarioMetrics, (sectionName, sectionMetrics) => {
+			// If there are no metrics in this section, skip it
+			if (Object.keys(sectionMetrics).length === 0) {
+				return
+			}
+
+			displayMetricsSectionName(sectionName)
+			displayMetricsSectionBlock(sectionMetrics)
+		})
+	})
+
 
 	Array.prototype.push.apply(
 		lines,
