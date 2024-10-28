@@ -202,7 +202,7 @@ github.com/grafana/xk6-output-opentelemetry/pkg/opentelemetry
 github.com/grafana/xk6-output-prometheus-remote/pkg/remote
 github.com/grafana/xk6-output-prometheus-remote/pkg/remotewrite
 github.com/grafana/xk6-output-prometheus-remote/pkg/stale
-# github.com/grafana/xk6-redis v0.3.0
+# github.com/grafana/xk6-redis v0.3.1
 ## explicit; go 1.20
 github.com/grafana/xk6-redis/redis
 # github.com/grafana/xk6-webcrypto v0.4.0
