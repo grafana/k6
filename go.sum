@@ -95,8 +95,8 @@ github.com/grafana/xk6-dashboard v0.7.5 h1:TcILyffT/Ea/XD7xG1jMA5lwtusOPRbEQsQDH
 github.com/grafana/xk6-dashboard v0.7.5/go.mod h1:Y75F8xmgCraKT+pBzFH6me9AyH5PkXD+Bxo1dm6Il/M=
 github.com/grafana/xk6-output-opentelemetry v0.3.0 h1:dmclGBFtFVRJijqLncpu2dKVIIvx1GS3y6sQGg4Khl8=
 github.com/grafana/xk6-output-opentelemetry v0.3.0/go.mod h1:5uUg0J2dxrw+DkC9fCsfiKv2jTpccn7nz6vGmRUr4f8=
-github.com/grafana/xk6-output-prometheus-remote v0.4.0 h1:7k3xjuKaD9BwcX8iuu5v6PtAK1L53kvx1r8BaTUfRH4=
-github.com/grafana/xk6-output-prometheus-remote v0.4.0/go.mod h1:esXXthLoVp9JUdGkECRthESVYu0TQTR24wrx2nRM9ak=
+github.com/grafana/xk6-output-prometheus-remote v0.5.0 h1:vRCj0a4sxKRP5IVWqZuMaEsGVLWWtBEYtx0M2cvEFDs=
+github.com/grafana/xk6-output-prometheus-remote v0.5.0/go.mod h1:esXXthLoVp9JUdGkECRthESVYu0TQTR24wrx2nRM9ak=
 github.com/grafana/xk6-redis v0.3.1 h1:RqfmMLNx7vekBxwuTrFP9ErxeY/0H07a3HpQJYXYDjc=
 github.com/grafana/xk6-redis v0.3.1/go.mod h1:3e/U9i1Nm3WEaMy4nZSGMjVf8ZsFau+aXurYJhJ7MfQ=
 github.com/grafana/xk6-webcrypto v0.5.0 h1:a5NMG/4itLDWprn5XbGaARwUdGPy9wO9z35Z7bDjG1k=
