@@ -51,7 +51,7 @@ func getColor(noColor bool, attributes ...color.Attribute) *color.Color {
 }
 
 func getBanner(noColor bool) string {
-	c := setColor(noColor, color.RGB(0xFF, 0x67, 0x1d))
+	c := setColor(noColor, color.RGB(0xFF, 0x67, 0x1d).Add(color.Bold))
 	return c.Sprint(consts.Banner())
 }
 
