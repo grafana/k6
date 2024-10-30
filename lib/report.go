@@ -6,66 +6,70 @@ import (
 	"time"
 )
 
-type ReportMetricData struct {
+type ReportMetricInfo struct {
+	Name     string
 	Type     string
 	Contains string
-	Values   map[string]float64
 }
 
-func NewReportMetricsDataFrom(
-	mType metrics.MetricType, vType metrics.ValueType, sink metrics.Sink,
+type ReportMetric struct {
+	ReportMetricInfo
+	Values map[string]float64
+}
+
+func NewReportMetricFrom(
+	info ReportMetricInfo, sink metrics.Sink,
 	testDuration time.Duration, summaryTrendStats []string,
-) ReportMetricData {
+) ReportMetric {
 	// TODO: we obtain this from [options.SummaryTrendStats] which is a string slice
 	getMetricValues := metricValueGetter(summaryTrendStats)
 
-	return ReportMetricData{
-		Type:     mType.String(),
-		Contains: vType.String(),
-		Values:   getMetricValues(sink, testDuration),
+	return ReportMetric{
+		ReportMetricInfo: info,
+		Values:           getMetricValues(sink, testDuration),
 	}
 }
 
 type ReportMetrics struct {
 	// HTTP contains report data specific to HTTP metrics and is used
 	// to produce the summary HTTP subsection's content.
-	HTTP map[string]ReportMetricData
+	HTTP map[string]ReportMetric
 	// Execution contains report data specific to Execution metrics and is used
 	// to produce the summary Execution subsection's content.
-	Execution map[string]ReportMetricData
+	Execution map[string]ReportMetric
 	// Network contains report data specific to Network metrics and is used
 	// to produce the summary Network subsection's content.
-	Network map[string]ReportMetricData
+	Network map[string]ReportMetric
 
-	Browser map[string]ReportMetricData
+	Browser map[string]ReportMetric
 
-	WebVitals map[string]ReportMetricData
+	WebVitals map[string]ReportMetric
 
-	Grpc map[string]ReportMetricData
+	Grpc map[string]ReportMetric
 
-	WebSocket map[string]ReportMetricData `js:"websocket"`
+	WebSocket map[string]ReportMetric `js:"websocket"`
 
 	// Miscellaneous contains user-defined metric results as well as extensions metrics
-	Miscellaneous map[string]ReportMetricData
+	Miscellaneous map[string]ReportMetric
 }
 
 func NewReportMetrics() ReportMetrics {
 	return ReportMetrics{
-		HTTP:          make(map[string]ReportMetricData),
-		Execution:     make(map[string]ReportMetricData),
-		Network:       make(map[string]ReportMetricData),
-		Browser:       make(map[string]ReportMetricData),
-		WebVitals:     make(map[string]ReportMetricData),
-		Grpc:          make(map[string]ReportMetricData),
-		WebSocket:     make(map[string]ReportMetricData),
-		Miscellaneous: make(map[string]ReportMetricData),
+		HTTP:          make(map[string]ReportMetric),
+		Execution:     make(map[string]ReportMetric),
+		Network:       make(map[string]ReportMetric),
+		Browser:       make(map[string]ReportMetric),
+		WebVitals:     make(map[string]ReportMetric),
+		Grpc:          make(map[string]ReportMetric),
+		WebSocket:     make(map[string]ReportMetric),
+		Miscellaneous: make(map[string]ReportMetric),
 	}
 }
 
 type ReportChecksMetrics struct {
-	Total   ReportMetricData `js:"checks_total"`
-	Success ReportMetricData `js:"checks_succeeded"`
-	Fail    ReportMetricData `js:"checks_failed"`
+	Total   ReportMetric `js:"checks_total"`
+	Success ReportMetric `js:"checks_succeeded"`
+	Fail    ReportMetric `js:"checks_failed"`
 }
 
 type ReportChecks struct {
@@ -93,11 +97,14 @@ type Report struct {
 }
 
 func NewReport() Report {
-	initMetricData := func(t metrics.MetricType) ReportMetricData {
-		return ReportMetricData{
-			Type:     t.String(),
-			Contains: metrics.Default.String(),
-			Values:   make(map[string]float64),
+	initMetricData := func(name string, t metrics.MetricType) ReportMetric {
+		return ReportMetric{
+			ReportMetricInfo: ReportMetricInfo{
+				Name:     name,
+				Type:     t.String(),
+				Contains: metrics.Default.String(),
+			},
+			Values: make(map[string]float64),
 		}
 	}
 
@@ -108,9 +115,9 @@ func NewReport() Report {
 		},
 		Checks: ReportChecks{
 			Metrics: ReportChecksMetrics{
-				Total:   initMetricData(metrics.Counter),
-				Success: initMetricData(metrics.Rate),
-				Fail:    initMetricData(metrics.Rate),
+				Total:   initMetricData("checks_total", metrics.Counter),
+				Success: initMetricData("checks_succeeded", metrics.Rate),
+				Fail:    initMetricData("checks_failed", metrics.Rate),
 			},
 		},
 		Scenarios: make(map[string]ReportGroup),

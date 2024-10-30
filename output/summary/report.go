@@ -87,7 +87,16 @@ func populateReportChecks(report *lib.Report, summary *lib.Summary, options lib.
 	report.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, summary.TestRunDuration)
 
 	checksMetric := summary.Metrics[metrics.ChecksName]
-	report.Checks.Metrics.Success = lib.NewReportMetricsDataFrom(checksMetric.Type, checksMetric.Contains, checksMetric.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+	report.Checks.Metrics.Success = lib.NewReportMetricFrom(
+		lib.ReportMetricInfo{
+			Name:     "checks_succeeded",
+			Type:     checksMetric.Type.String(),
+			Contains: checksMetric.Contains.String(),
+		},
+		checksMetric.Sink,
+		summary.TestRunDuration,
+		options.SummaryTrendStats,
+	)
 
 	report.Checks.Metrics.Fail.Values["passes"] = totalChecks - successChecks
 	report.Checks.Metrics.Fail.Values["fails"] = successChecks
@@ -97,33 +106,37 @@ func populateReportChecks(report *lib.Report, summary *lib.Summary, options lib.
 }
 
 func populateReportGroup(reportGroup *lib.ReportGroup, groupData aggregatedGroupData, summary *lib.Summary, options lib.Options) {
-	storeMetric := func(dest lib.ReportMetrics, m *metrics.Metric, sink metrics.Sink, testDuration time.Duration, summaryTrendStats []string) {
+	storeMetric := func(dest lib.ReportMetrics, info lib.ReportMetricInfo, sink metrics.Sink, testDuration time.Duration, summaryTrendStats []string) {
 		switch {
-		case isSkippedMetric(m.Name):
+		case isSkippedMetric(info.Name):
 			// Do nothing, just skip.
-		case isHTTPMetric(m.Name):
-			dest.HTTP[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
-		case isExecutionMetric(m.Name):
-			dest.Execution[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
-		case isNetworkMetric(m.Name):
-			dest.Network[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
-		case isBrowserMetric(m.Name):
-			dest.Browser[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
-		case isGrpcMetric(m.Name):
-			dest.Grpc[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
-		case isWebSocketsMetric(m.Name):
-			dest.WebSocket[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
-		case isWebVitalsMetric(m.Name):
-			dest.WebVitals[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isHTTPMetric(info.Name):
+			dest.HTTP[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isExecutionMetric(info.Name):
+			dest.Execution[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isNetworkMetric(info.Name):
+			dest.Network[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isBrowserMetric(info.Name):
+			dest.Browser[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isGrpcMetric(info.Name):
+			dest.Grpc[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isWebSocketsMetric(info.Name):
+			dest.WebSocket[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
+		case isWebVitalsMetric(info.Name):
+			dest.WebVitals[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
 		default:
-			dest.Miscellaneous[m.Name] = lib.NewReportMetricsDataFrom(m.Type, m.Contains, m.Sink, summary.TestRunDuration, options.SummaryTrendStats)
+			dest.Miscellaneous[info.Name] = lib.NewReportMetricFrom(info, sink, summary.TestRunDuration, options.SummaryTrendStats)
 		}
 	}
 
 	for _, metricData := range groupData.Metrics {
 		storeMetric(
 			reportGroup.Metrics,
-			metricData.Metric,
+			lib.ReportMetricInfo{
+				Name:     metricData.Metric.Name,
+				Type:     metricData.Metric.Type.String(),
+				Contains: metricData.Metric.Contains.String(),
+			},
 			metricData.Sink,
 			summary.TestRunDuration,
 			options.SummaryTrendStats,
