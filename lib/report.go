@@ -73,12 +73,23 @@ type ReportChecks struct {
 	OrderedChecks []*Check
 }
 
-type Report struct {
+type ReportGroup struct {
 	Metrics ReportMetrics
-	Checks  ReportChecks
-	// FIXME: Groups could have groups
-	Groups    map[string]ReportMetrics
-	Scenarios map[string]ReportMetrics
+	Groups  map[string]ReportGroup
+}
+
+func NewReportGroup() ReportGroup {
+	return ReportGroup{
+		Metrics: NewReportMetrics(),
+		Groups:  make(map[string]ReportGroup),
+	}
+}
+
+type Report struct {
+	Checks ReportChecks
+
+	ReportGroup
+	Scenarios map[string]ReportGroup
 }
 
 func NewReport() Report {
@@ -91,7 +102,10 @@ func NewReport() Report {
 	}
 
 	return Report{
-		Metrics: NewReportMetrics(),
+		ReportGroup: ReportGroup{
+			Metrics: NewReportMetrics(),
+			Groups:  make(map[string]ReportGroup),
+		},
 		Checks: ReportChecks{
 			Metrics: ReportChecksMetrics{
 				Total:   initMetricData(metrics.Counter),
@@ -99,8 +113,7 @@ func NewReport() Report {
 				Fail:    initMetricData(metrics.Rate),
 			},
 		},
-		Groups:    make(map[string]ReportMetrics),
-		Scenarios: make(map[string]ReportMetrics),
+		Scenarios: make(map[string]ReportGroup),
 	}
 }
 

@@ -433,6 +433,7 @@ function generateTextSummary(data, options, report) {
 	const RESET = ANSI_CODES.reset;
 	const boldify = (text) => BOLD + text + RESET
 
+	const defaultIndent = ' '
 	const metricGroupIndent = '  '
 
 	/**
@@ -441,7 +442,7 @@ function generateTextSummary(data, options, report) {
 	 * @param sectionName
 	 * @param options [DisplayMetricsSectionNameOptions={bold: true}]
 	 */
-	const displayMetricsSectionName = (sectionName, options) => {
+	const displayMetricsBlockName = (sectionName, options) => {
 		let bold = true;
 		if (options && options.bold === false) {
 			bold = false
@@ -453,10 +454,14 @@ function generateTextSummary(data, options, report) {
 			normalizedSectionName = boldify(normalizedSectionName)
 		}
 
-		lines.push(metricGroupIndent + metricGroupIndent + normalizedSectionName)
+		let indent = '    '
+		if (options && options.metricsBlockIndent) {
+			indent += options.metricsBlockIndent
+		}
+		lines.push(indent + normalizedSectionName)
 	}
 
-	const displayMetricsSectionBlock = (sectionMetrics, opts) => {
+	const displayMetricsBlock = (sectionMetrics, opts) => {
 		const summarizeOpts = Object.assign({}, mergedOpts, opts)
 		Array.prototype.push.apply(lines, summarizeMetrics(summarizeOpts, {metrics: sectionMetrics}, decorate))
 		lines.push('')
@@ -464,12 +469,12 @@ function generateTextSummary(data, options, report) {
 
 	// START OF GLOBAL RESULTS
 	// TITLE
-	lines.push(metricGroupIndent + groupPrefix + ' ' + boldify('GLOBAL RESULTS') + '\n')
+	lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify('GLOBAL RESULTS') + '\n')
 
 	// CHECKS
-	displayMetricsSectionBlock(report.checks.metrics, {sortByName: false})
+	displayMetricsBlock(report.checks.metrics, {sortByName: false})
 
-	displayMetricsSectionName('CHECKS', { bold: false })
+	displayMetricsBlockName('CHECKS', {bold: false})
 	for (var i = 0; i < report.checks.ordered_checks.length; i++) {
 		lines.push(summarizeCheck(metricGroupIndent + metricGroupIndent, report.checks.ordered_checks[i], decorate))
 	}
@@ -484,38 +489,79 @@ function generateTextSummary(data, options, report) {
 			return
 		}
 
-		displayMetricsSectionName(sectionName)
-		displayMetricsSectionBlock(sectionMetrics)
+		displayMetricsBlockName(sectionName)
+		displayMetricsBlock(sectionMetrics)
 	})
 	// END OF GLOBAL RESULTS
 
 	// GROUPS
-	forEach(report.groups, (groupName, groupMetrics) => {
+	/**
+	 *
+	 * @typedef {Object} GroupData
+	 * @param groupName string
+	 * @param groupData
+	 */
+
+	const summarize = (prefix, indent) => {
+		return (groupName, groupData) => {
+			console.log('summarizeNestedGroups', groupName, JSON.stringify(groupData))
+
+			lines.push(metricGroupIndent + indent + prefix + defaultIndent + boldify(`GROUP: ${groupName}`) + '\n')
+			forEach(groupData.metrics, (sectionName, sectionMetrics) => {
+				// If there are no metrics in this section, skip it
+				if (Object.keys(sectionMetrics).length === 0) {
+					return
+				}
+
+				displayMetricsBlockName(sectionName, {metricsBlockIndent: indent})
+				displayMetricsBlock(sectionMetrics, {indent: indent + defaultIndent})
+			})
+			if (groupData.groups !== undefined) {
+				forEach(groupData.groups, summarize(detailsPrefix, indent + metricGroupIndent));
+			}
+		}
+	}
+
+	const summarizeNestedGroups = (groupName, groupData) => {
+		console.log('summarizeNestedGroups', groupName, JSON.stringify(groupData))
+
 		lines.push(metricGroupIndent + groupPrefix + ' ' + boldify(`GROUP: ${groupName}`) + '\n')
-		forEach(groupMetrics, (sectionName, sectionMetrics) => {
+		forEach(groupData.metrics, (sectionName, sectionMetrics) => {
 			// If there are no metrics in this section, skip it
 			if (Object.keys(sectionMetrics).length === 0) {
 				return
 			}
 
-			displayMetricsSectionName(sectionName)
-			displayMetricsSectionBlock(sectionMetrics)
+			displayMetricsBlockName(sectionName)
+			displayMetricsBlock(sectionMetrics)
 		})
-	})
+		if (groupData.groups !== undefined) {
+			forEach(groupData.groups, summarizeNestedGroups);
+		}
+	}
+
+	if (report.groups !== undefined) {
+		forEach(report.groups, summarize(groupPrefix, defaultIndent));
+	}
 
 	// SCENARIOS
-	forEach(report.scenarios, (scenarioName, scenarioMetrics) => {
-		lines.push(metricGroupIndent + groupPrefix + ' ' + boldify(`SCENARIO: ${scenarioName}`) + '\n')
-		forEach(scenarioMetrics, (sectionName, sectionMetrics) => {
-			// If there are no metrics in this section, skip it
-			if (Object.keys(sectionMetrics).length === 0) {
-				return
-			}
+	if (report.scenarios !== undefined) {
+		forEach(report.scenarios, (scenarioName, scenarioData) => {
+			lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify(`SCENARIO: ${scenarioName}`) + '\n')
+			forEach(scenarioData.metrics, (sectionName, sectionMetrics) => {
+				// If there are no metrics in this section, skip it
+				if (Object.keys(sectionMetrics).length === 0) {
+					return
+				}
 
-			displayMetricsSectionName(sectionName)
-			displayMetricsSectionBlock(sectionMetrics)
+				displayMetricsBlockName(sectionName)
+				displayMetricsBlock(sectionMetrics)
+			})
+			if (scenarioData.groups !== undefined) {
+				forEach(scenarioData.groups, summarize(detailsPrefix, metricGroupIndent));
+			}
 		})
-	})
+	}
 
 
 	Array.prototype.push.apply(

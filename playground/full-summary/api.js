@@ -20,6 +20,14 @@ export function apiTest() {
 			})
 		)
 
+		group('authorized crocodiles', () => {
+			const res = http.get('https://httpbin.org/get')
+
+			check(res, {
+				'status is 200 OK': (r) => r.status === 200,
+			})
+		})
+
 		check(res, {
 			'status is 201 CREATED': (r) => r.status === 201,
 		})
