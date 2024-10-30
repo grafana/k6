@@ -98,6 +98,9 @@ const (
 	FgMagenta
 	FgCyan
 	FgWhite
+
+	// used internally for 256 and 24-bit coloring
+	foreground
 )
 
 // Foreground Hi-Intensity text colors
@@ -122,6 +125,9 @@ const (
 	BgMagenta
 	BgCyan
 	BgWhite
+
+	// used internally for 256 and 24-bit coloring
+	background
 )
 
 // Background Hi-Intensity text colors
@@ -147,6 +153,30 @@ func New(value ...Attribute) *Color {
 	}
 
 	c.Add(value...)
+	return c
+}
+
+// RGB returns a new foreground color in 24-bit RGB.
+func RGB(r, g, b int) *Color {
+	return New(foreground, 2, Attribute(r), Attribute(g), Attribute(b))
+}
+
+// BgRGB returns a new background color in 24-bit RGB.
+func BgRGB(r, g, b int) *Color {
+	return New(background, 2, Attribute(r), Attribute(g), Attribute(b))
+}
+
+// AddRGB is used to chain foreground RGB SGR parameters. Use as many as parameters to combine
+// and create custom color objects. Example: .Add(34, 0, 12).Add(255, 128, 0).
+func (c *Color) AddRGB(r, g, b int) *Color {
+	c.params = append(c.params, foreground, 2, Attribute(r), Attribute(g), Attribute(b))
+	return c
+}
+
+// AddRGB is used to chain background RGB SGR parameters. Use as many as parameters to combine
+// and create custom color objects. Example: .Add(34, 0, 12).Add(255, 128, 0).
+func (c *Color) AddBgRGB(r, g, b int) *Color {
+	c.params = append(c.params, background, 2, Attribute(r), Attribute(g), Attribute(b))
 	return c
 }
 
@@ -401,7 +431,7 @@ func (c *Color) format() string {
 
 func (c *Color) unformat() string {
 	//return fmt.Sprintf("%s[%dm", escape, Reset)
-	//for each element in sequence let's use the speficic reset escape, ou the generic one if not found
+	//for each element in sequence let's use the specific reset escape, or the generic one if not found
 	format := make([]string, len(c.params))
 	for i, v := range c.params {
 		format[i] = strconv.Itoa(int(Reset))
