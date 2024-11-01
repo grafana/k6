@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"strings"
 	"sync"
 	"time"
 
@@ -563,15 +564,35 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	return handle, nil
 }
 
-func (f *Frame) waitFor(selector string, opts *FrameWaitForSelectorOptions) error {
+func (f *Frame) waitFor(selector string, opts *FrameWaitForSelectorOptions, retryCount int) error {
 	f.log.Debugf("Frame:waitFor", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
+
+	retryCount--
+	if retryCount < 0 {
+		return errors.New("waitFor retry threshold reached")
+	}
 
 	document, err := f.document()
 	if err != nil {
+		if strings.Contains(err.Error(), "Cannot find context with specified id") {
+			return f.waitFor(selector, opts, retryCount)
+		}
 		return err
 	}
 
 	_, err = document.waitForSelector(f.ctx, selector, opts)
+	if err != nil {
+		if strings.Contains(err.Error(), "Inspected target navigated or closed") {
+			return f.waitFor(selector, opts, retryCount)
+		}
+		if strings.Contains(err.Error(), "Cannot find context with specified id") {
+			return f.waitFor(selector, opts, retryCount)
+		}
+		if strings.Contains(err.Error(), "Execution context was destroyed") {
+			return f.waitFor(selector, opts, retryCount)
+		}
+	}
+
 	return err
 }
 

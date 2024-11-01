@@ -984,7 +984,6 @@ class InjectedScript {
 
   waitForSelector(selector, root, strict, state, polling, timeout, ...args) {
     let lastElement;
-    let previewNode = this.previewNode;
     const predicate = () => {
       const elements = this.querySelectorAll(selector, root || document);
       const element = elements[0];
@@ -993,7 +992,7 @@ class InjectedScript {
       if (lastElement !== element) {
         lastElement = element;
         if (!element) {
-          console.log(`  selector did not resolve to any element`);
+          console.log(`  ${selector} did not match any elements`);
         } else {
           if (elements.length > 1) {
             if (strict) {

@@ -93,6 +93,15 @@ type EventPseudoElementAdded struct {
 // See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#event-topLayerElementsUpdated
 type EventTopLayerElementsUpdated struct{}
 
+// EventScrollableFlagUpdated fired when a node's scrollability state
+// changes.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/DOM#event-scrollableFlagUpdated
+type EventScrollableFlagUpdated struct {
+	NodeID       cdp.NodeID `json:"nodeId"`       // The id of the node.
+	IsScrollable bool       `json:"isScrollable"` // If the node is scrollable.
+}
+
 // EventPseudoElementRemoved called when a pseudo element is removed from an
 // element.
 //

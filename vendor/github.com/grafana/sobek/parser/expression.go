@@ -1536,7 +1536,7 @@ func (self *_parser) reinterpretAsArrayBindingPattern(left *ast.ArrayLiteral) as
 			rest = self.reinterpretAsDestructBindingTarget(spread.Expression)
 			value = value[:len(value)-1]
 		} else {
-			value[i] = self.reinterpretAsBindingElement(item)
+			value[i] = self.reinterpretAsAssignmentElement(item)
 		}
 	}
 	return &ast.ArrayPattern{

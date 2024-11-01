@@ -57,6 +57,10 @@ func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error 
 	return nil
 }
 
+type metricInterceptor interface {
+	urlTagName(urlTag string, method string) (string, bool)
+}
+
 // NetworkManager manages all frames in HTML document.
 type NetworkManager struct {
 	BaseEventEmitter
@@ -70,6 +74,7 @@ type NetworkManager struct {
 	resolver      k6netext.Resolver
 	vu            k6modules.VU
 	customMetrics *k6ext.CustomMetrics
+	mi            metricInterceptor
 
 	// TODO: manage inflight requests separately (move them between the two maps
 	// as they transition from inflight -> completed)
@@ -88,7 +93,12 @@ type NetworkManager struct {
 
 // NewNetworkManager creates a new network manager.
 func NewNetworkManager(
-	ctx context.Context, customMetrics *k6ext.CustomMetrics, s session, fm *FrameManager, parent *NetworkManager,
+	ctx context.Context,
+	customMetrics *k6ext.CustomMetrics,
+	s session,
+	fm *FrameManager,
+	parent *NetworkManager,
+	mi metricInterceptor,
 ) (*NetworkManager, error) {
 	vu := k6ext.GetVU(ctx)
 	state := vu.State()
@@ -114,6 +124,7 @@ func NewNetworkManager(
 		attemptedAuth:    make(map[fetch.RequestID]bool),
 		extraHTTPHeaders: make(map[string]string),
 		networkProfile:   NewNetworkProfile(),
+		mi:               mi,
 	}
 	m.initEvents()
 	if err := m.initDomains(); err != nil {
@@ -181,7 +192,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = tags.With("url", req.URL())
+		tags = handleURLTag(m.mi, req.URL(), req.method, tags)
 	}
 
 	k6metrics.PushIfNotDone(m.vu.Context(), state.Samples, k6metrics.ConnectedSamples{
@@ -234,7 +245,7 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 		tags = tags.With("method", req.method)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagURL) {
-		tags = tags.With("url", url)
+		tags = handleURLTag(m.mi, url, req.method, tags)
 	}
 	if state.Options.SystemTags.Has(k6metrics.TagIP) {
 		tags = tags.With("ip", ipAddress)
@@ -276,6 +287,22 @@ func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 			},
 		})
 	}
+}
+
+// handleURLTag will check if the url tag needs to be grouped by testing
+// against user supplied regex. If there's a match a user supplied name will
+// be used instead of the url for the url tag, otherwise the url will be used.
+func handleURLTag(mi metricInterceptor, url string, method string, tags *k6metrics.TagSet) *k6metrics.TagSet {
+	if newTagName, urlMatched := mi.urlTagName(url, method); urlMatched {
+		tags = tags.With("url", newTagName)
+		tags = tags.With("name", newTagName)
+		return tags
+	}
+
+	tags = tags.With("url", url)
+	tags = tags.With("name", url)
+
+	return tags
 }
 
 func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime) {

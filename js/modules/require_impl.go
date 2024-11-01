@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/loader"
 )
 
@@ -47,6 +48,7 @@ func (ms *ModuleSystem) Require(specifier string) (*sobek.Object, error) {
 	} else {
 		panic(fmt.Sprintf("expected sobek.CyclicModuleRecord, but for some reason got a %T", m))
 	}
+	promisesThenIgnore(rt, promise)
 	switch promise.State() {
 	case sobek.PromiseStateRejected:
 		err = promise.Result().Export().(error) //nolint:forcetypeassert
@@ -194,4 +196,12 @@ func getPreviousRequiringFile(vu VU) (string, error) {
 		return vu.InitEnv().CWD.JoinPath("./-").String(), nil
 	}
 	return result, nil
+}
+
+// sets the provided promise in such way as to ignore falures
+// this is mostly needed as failures are handled separately and we do not want those to lead to stopping the event loop
+func promisesThenIgnore(rt *sobek.Runtime, promise *sobek.Promise) {
+	call, _ := sobek.AssertFunction(rt.ToValue(promise).ToObject(rt).Get("then"))
+	handler := rt.ToValue(func(_ sobek.Value) {})
+	_, _ = call(rt.ToValue(promise), handler, handler)
 }

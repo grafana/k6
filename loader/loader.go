@@ -83,15 +83,15 @@ func Resolve(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 
 func resolveFilePath(pwd *url.URL, moduleSpecifier string) (*url.URL, error) {
 	if pwd.Opaque != "" { // this is a loader reference
-		parts := strings.SplitN(pwd.Opaque, "/", 2)
+		base, dir, _ := strings.Cut(pwd.Opaque, "/")
 		if moduleSpecifier[0] == '/' {
-			return &url.URL{Opaque: path.Join(parts[0], moduleSpecifier)}, nil
+			return &url.URL{Opaque: path.Join(base, moduleSpecifier)}, nil
 		}
-		return &url.URL{Opaque: path.Join(parts[0], path.Join(path.Dir(parts[1]+"/"), moduleSpecifier))}, nil
+		return &url.URL{Opaque: path.Join(base, path.Join(path.Dir(dir+"/"), moduleSpecifier))}, nil
 	}
 
 	// The file is in format like C:/something/path.js. But this will be decoded as scheme `C`
-	// ... which is not what we want we want it to be decode as file:///C:/something/path.js
+	// ... which is not what we want, we want it to be decoded as file:///C:/something/path.js
 	if filepath.VolumeName(moduleSpecifier) != "" {
 		moduleSpecifier = "/" + moduleSpecifier
 	}

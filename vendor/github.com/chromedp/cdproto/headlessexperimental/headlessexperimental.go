@@ -103,39 +103,7 @@ func (p *BeginFrameParams) Do(ctx context.Context) (hasDamage bool, screenshotDa
 	return res.HasDamage, dec, nil
 }
 
-// DisableParams disables headless events for the target.
-type DisableParams struct{}
-
-// Disable disables headless events for the target.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/HeadlessExperimental#method-disable
-func Disable() *DisableParams {
-	return &DisableParams{}
-}
-
-// Do executes HeadlessExperimental.disable against the provided context.
-func (p *DisableParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandDisable, nil, nil)
-}
-
-// EnableParams enables headless events for the target.
-type EnableParams struct{}
-
-// Enable enables headless events for the target.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/HeadlessExperimental#method-enable
-func Enable() *EnableParams {
-	return &EnableParams{}
-}
-
-// Do executes HeadlessExperimental.enable against the provided context.
-func (p *EnableParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandEnable, nil, nil)
-}
-
 // Command names.
 const (
 	CommandBeginFrame = "HeadlessExperimental.beginFrame"
-	CommandDisable    = "HeadlessExperimental.disable"
-	CommandEnable     = "HeadlessExperimental.enable"
 )

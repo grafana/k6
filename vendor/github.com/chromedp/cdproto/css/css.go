@@ -24,9 +24,10 @@ import (
 // AddRuleParams inserts a new rule with the given ruleText in a stylesheet
 // with given styleSheetId, at the position specified by location.
 type AddRuleParams struct {
-	StyleSheetID StyleSheetID `json:"styleSheetId"` // The css style sheet identifier where a new rule should be inserted.
-	RuleText     string       `json:"ruleText"`     // The text of a new rule.
-	Location     *SourceRange `json:"location"`     // Text position of a new rule in the target style sheet.
+	StyleSheetID                    StyleSheetID `json:"styleSheetId"`                              // The css style sheet identifier where a new rule should be inserted.
+	RuleText                        string       `json:"ruleText"`                                  // The text of a new rule.
+	Location                        *SourceRange `json:"location"`                                  // Text position of a new rule in the target style sheet.
+	NodeForPropertySyntaxValidation cdp.NodeID   `json:"nodeForPropertySyntaxValidation,omitempty"` // NodeId for the DOM node in whose context custom property declarations for registered properties should be validated. If omitted, declarations in the new rule text can only be validated statically, which may produce incorrect results if the declaration contains a var() for example.
 }
 
 // AddRule inserts a new rule with the given ruleText in a stylesheet with
@@ -45,6 +46,16 @@ func AddRule(styleSheetID StyleSheetID, ruleText string, location *SourceRange) 
 		RuleText:     ruleText,
 		Location:     location,
 	}
+}
+
+// WithNodeForPropertySyntaxValidation nodeId for the DOM node in whose
+// context custom property declarations for registered properties should be
+// validated. If omitted, declarations in the new rule text can only be
+// validated statically, which may produce incorrect results if the declaration
+// contains a var() for example.
+func (p AddRuleParams) WithNodeForPropertySyntaxValidation(nodeForPropertySyntaxValidation cdp.NodeID) *AddRuleParams {
+	p.NodeForPropertySyntaxValidation = nodeForPropertySyntaxValidation
+	return &p
 }
 
 // AddRuleReturns return values.
@@ -361,14 +372,19 @@ func GetMatchedStylesForNode(nodeID cdp.NodeID) *GetMatchedStylesForNodeParams {
 
 // GetMatchedStylesForNodeReturns return values.
 type GetMatchedStylesForNodeReturns struct {
-	InlineStyle             *Style                           `json:"inlineStyle,omitempty"`             // Inline style for the specified DOM node.
-	AttributesStyle         *Style                           `json:"attributesStyle,omitempty"`         // Attribute-defined element style (e.g. resulting from "width=20 height=100%").
-	MatchedCSSRules         []*RuleMatch                     `json:"matchedCSSRules,omitempty"`         // CSS rules matching this node, from all applicable stylesheets.
-	PseudoElements          []*PseudoElementMatches          `json:"pseudoElements,omitempty"`          // Pseudo style matches for this node.
-	Inherited               []*InheritedStyleEntry           `json:"inherited,omitempty"`               // A chain of inherited styles (from the immediate node parent up to the DOM tree root).
-	InheritedPseudoElements []*InheritedPseudoElementMatches `json:"inheritedPseudoElements,omitempty"` // A chain of inherited pseudo element styles (from the immediate node parent up to the DOM tree root).
-	CSSKeyframesRules       []*KeyframesRule                 `json:"cssKeyframesRules,omitempty"`       // A list of CSS keyframed animations matching this node.
-	ParentLayoutNodeID      cdp.NodeID                       `json:"parentLayoutNodeId,omitempty"`      // Id of the first parent element that does not have display: contents.
+	InlineStyle                 *Style                           `json:"inlineStyle,omitempty"`                 // Inline style for the specified DOM node.
+	AttributesStyle             *Style                           `json:"attributesStyle,omitempty"`             // Attribute-defined element style (e.g. resulting from "width=20 height=100%").
+	MatchedCSSRules             []*RuleMatch                     `json:"matchedCSSRules,omitempty"`             // CSS rules matching this node, from all applicable stylesheets.
+	PseudoElements              []*PseudoElementMatches          `json:"pseudoElements,omitempty"`              // Pseudo style matches for this node.
+	Inherited                   []*InheritedStyleEntry           `json:"inherited,omitempty"`                   // A chain of inherited styles (from the immediate node parent up to the DOM tree root).
+	InheritedPseudoElements     []*InheritedPseudoElementMatches `json:"inheritedPseudoElements,omitempty"`     // A chain of inherited pseudo element styles (from the immediate node parent up to the DOM tree root).
+	CSSKeyframesRules           []*KeyframesRule                 `json:"cssKeyframesRules,omitempty"`           // A list of CSS keyframed animations matching this node.
+	CSSPositionTryRules         []*PositionTryRule               `json:"cssPositionTryRules,omitempty"`         // A list of CSS @position-try rules matching this node, based on the position-try-fallbacks property.
+	ActivePositionFallbackIndex int64                            `json:"activePositionFallbackIndex,omitempty"` // Index of the active fallback in the applied position-try-fallback property, will not be set if there is no active position-try fallback.
+	CSSPropertyRules            []*PropertyRule                  `json:"cssPropertyRules,omitempty"`            // A list of CSS at-property rules matching this node.
+	CSSPropertyRegistrations    []*PropertyRegistration          `json:"cssPropertyRegistrations,omitempty"`    // A list of CSS property registrations matching this node.
+	CSSFontPaletteValuesRule    *FontPaletteValuesRule           `json:"cssFontPaletteValuesRule,omitempty"`    // A font-palette-values rule matching this node.
+	ParentLayoutNodeID          cdp.NodeID                       `json:"parentLayoutNodeId,omitempty"`          // Id of the first parent element that does not have display: contents.
 }
 
 // Do executes CSS.getMatchedStylesForNode against the provided context.
@@ -382,16 +398,21 @@ type GetMatchedStylesForNodeReturns struct {
 //	inherited - A chain of inherited styles (from the immediate node parent up to the DOM tree root).
 //	inheritedPseudoElements - A chain of inherited pseudo element styles (from the immediate node parent up to the DOM tree root).
 //	cssKeyframesRules - A list of CSS keyframed animations matching this node.
+//	cssPositionTryRules - A list of CSS @position-try rules matching this node, based on the position-try-fallbacks property.
+//	activePositionFallbackIndex - Index of the active fallback in the applied position-try-fallback property, will not be set if there is no active position-try fallback.
+//	cssPropertyRules - A list of CSS at-property rules matching this node.
+//	cssPropertyRegistrations - A list of CSS property registrations matching this node.
+//	cssFontPaletteValuesRule - A font-palette-values rule matching this node.
 //	parentLayoutNodeID - Id of the first parent element that does not have display: contents.
-func (p *GetMatchedStylesForNodeParams) Do(ctx context.Context) (inlineStyle *Style, attributesStyle *Style, matchedCSSRules []*RuleMatch, pseudoElements []*PseudoElementMatches, inherited []*InheritedStyleEntry, inheritedPseudoElements []*InheritedPseudoElementMatches, cssKeyframesRules []*KeyframesRule, parentLayoutNodeID cdp.NodeID, err error) {
+func (p *GetMatchedStylesForNodeParams) Do(ctx context.Context) (inlineStyle *Style, attributesStyle *Style, matchedCSSRules []*RuleMatch, pseudoElements []*PseudoElementMatches, inherited []*InheritedStyleEntry, inheritedPseudoElements []*InheritedPseudoElementMatches, cssKeyframesRules []*KeyframesRule, cssPositionTryRules []*PositionTryRule, activePositionFallbackIndex int64, cssPropertyRules []*PropertyRule, cssPropertyRegistrations []*PropertyRegistration, cssFontPaletteValuesRule *FontPaletteValuesRule, parentLayoutNodeID cdp.NodeID, err error) {
 	// execute
 	var res GetMatchedStylesForNodeReturns
 	err = cdp.Execute(ctx, CommandGetMatchedStylesForNode, p, &res)
 	if err != nil {
-		return nil, nil, nil, nil, nil, nil, nil, 0, err
+		return nil, nil, nil, nil, nil, nil, nil, nil, 0, nil, nil, nil, 0, err
 	}
 
-	return res.InlineStyle, res.AttributesStyle, res.MatchedCSSRules, res.PseudoElements, res.Inherited, res.InheritedPseudoElements, res.CSSKeyframesRules, res.ParentLayoutNodeID, nil
+	return res.InlineStyle, res.AttributesStyle, res.MatchedCSSRules, res.PseudoElements, res.Inherited, res.InheritedPseudoElements, res.CSSKeyframesRules, res.CSSPositionTryRules, res.ActivePositionFallbackIndex, res.CSSPropertyRules, res.CSSPropertyRegistrations, res.CSSFontPaletteValuesRule, res.ParentLayoutNodeID, nil
 }
 
 // GetMediaQueriesParams returns all media queries parsed by the rendering
@@ -554,6 +575,52 @@ func (p *GetLayersForNodeParams) Do(ctx context.Context) (rootLayer *LayerData, 
 	return res.RootLayer, nil
 }
 
+// GetLocationForSelectorParams given a CSS selector text and a style sheet
+// ID, getLocationForSelector returns an array of locations of the CSS selector
+// in the style sheet.
+type GetLocationForSelectorParams struct {
+	StyleSheetID StyleSheetID `json:"styleSheetId"`
+	SelectorText string       `json:"selectorText"`
+}
+
+// GetLocationForSelector given a CSS selector text and a style sheet ID,
+// getLocationForSelector returns an array of locations of the CSS selector in
+// the style sheet.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/CSS#method-getLocationForSelector
+//
+// parameters:
+//
+//	styleSheetID
+//	selectorText
+func GetLocationForSelector(styleSheetID StyleSheetID, selectorText string) *GetLocationForSelectorParams {
+	return &GetLocationForSelectorParams{
+		StyleSheetID: styleSheetID,
+		SelectorText: selectorText,
+	}
+}
+
+// GetLocationForSelectorReturns return values.
+type GetLocationForSelectorReturns struct {
+	Ranges []*SourceRange `json:"ranges,omitempty"`
+}
+
+// Do executes CSS.getLocationForSelector against the provided context.
+//
+// returns:
+//
+//	ranges
+func (p *GetLocationForSelectorParams) Do(ctx context.Context) (ranges []*SourceRange, err error) {
+	// execute
+	var res GetLocationForSelectorReturns
+	err = cdp.Execute(ctx, CommandGetLocationForSelector, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.Ranges, nil
+}
+
 // TrackComputedStyleUpdatesParams starts tracking the given computed styles
 // for updates. The specified array of properties replaces the one previously
 // specified. Pass empty array to disable tracking. Use takeComputedStyleUpdates
@@ -604,14 +671,14 @@ func TakeComputedStyleUpdates() *TakeComputedStyleUpdatesParams {
 
 // TakeComputedStyleUpdatesReturns return values.
 type TakeComputedStyleUpdatesReturns struct {
-	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // The list of node Ids that have their tracked computed styles updated
+	NodeIDs []cdp.NodeID `json:"nodeIds,omitempty"` // The list of node Ids that have their tracked computed styles updated.
 }
 
 // Do executes CSS.takeComputedStyleUpdates against the provided context.
 //
 // returns:
 //
-//	nodeIDs - The list of node Ids that have their tracked computed styles updated
+//	nodeIDs - The list of node Ids that have their tracked computed styles updated.
 func (p *TakeComputedStyleUpdatesParams) Do(ctx context.Context) (nodeIDs []cdp.NodeID, err error) {
 	// execute
 	var res TakeComputedStyleUpdatesReturns
@@ -652,6 +719,52 @@ func SetEffectivePropertyValueForNode(nodeID cdp.NodeID, propertyName string, va
 // Do executes CSS.setEffectivePropertyValueForNode against the provided context.
 func (p *SetEffectivePropertyValueForNodeParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetEffectivePropertyValueForNode, p, nil)
+}
+
+// SetPropertyRulePropertyNameParams modifies the property rule property
+// name.
+type SetPropertyRulePropertyNameParams struct {
+	StyleSheetID StyleSheetID `json:"styleSheetId"`
+	Range        *SourceRange `json:"range"`
+	PropertyName string       `json:"propertyName"`
+}
+
+// SetPropertyRulePropertyName modifies the property rule property name.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/CSS#method-setPropertyRulePropertyName
+//
+// parameters:
+//
+//	styleSheetID
+//	range
+//	propertyName
+func SetPropertyRulePropertyName(styleSheetID StyleSheetID, rangeVal *SourceRange, propertyName string) *SetPropertyRulePropertyNameParams {
+	return &SetPropertyRulePropertyNameParams{
+		StyleSheetID: styleSheetID,
+		Range:        rangeVal,
+		PropertyName: propertyName,
+	}
+}
+
+// SetPropertyRulePropertyNameReturns return values.
+type SetPropertyRulePropertyNameReturns struct {
+	PropertyName *Value `json:"propertyName,omitempty"` // The resulting key text after modification.
+}
+
+// Do executes CSS.setPropertyRulePropertyName against the provided context.
+//
+// returns:
+//
+//	propertyName - The resulting key text after modification.
+func (p *SetPropertyRulePropertyNameParams) Do(ctx context.Context) (propertyName *Value, err error) {
+	// execute
+	var res SetPropertyRulePropertyNameReturns
+	err = cdp.Execute(ctx, CommandSetPropertyRulePropertyName, p, &res)
+	if err != nil {
+		return nil, err
+	}
+
+	return res.PropertyName, nil
 }
 
 // SetKeyframeKeyParams modifies the keyframe rule key text.
@@ -969,7 +1082,8 @@ func (p *SetStyleSheetTextParams) Do(ctx context.Context) (sourceMapURL string, 
 // SetStyleTextsParams applies specified style edits one after another in the
 // given order.
 type SetStyleTextsParams struct {
-	Edits []*StyleDeclarationEdit `json:"edits"`
+	Edits                           []*StyleDeclarationEdit `json:"edits"`
+	NodeForPropertySyntaxValidation cdp.NodeID              `json:"nodeForPropertySyntaxValidation,omitempty"` // NodeId for the DOM node in whose context custom property declarations for registered properties should be validated. If omitted, declarations in the new rule text can only be validated statically, which may produce incorrect results if the declaration contains a var() for example.
 }
 
 // SetStyleTexts applies specified style edits one after another in the given
@@ -984,6 +1098,16 @@ func SetStyleTexts(edits []*StyleDeclarationEdit) *SetStyleTextsParams {
 	return &SetStyleTextsParams{
 		Edits: edits,
 	}
+}
+
+// WithNodeForPropertySyntaxValidation nodeId for the DOM node in whose
+// context custom property declarations for registered properties should be
+// validated. If omitted, declarations in the new rule text can only be
+// validated statically, which may produce incorrect results if the declaration
+// contains a var() for example.
+func (p SetStyleTextsParams) WithNodeForPropertySyntaxValidation(nodeForPropertySyntaxValidation cdp.NodeID) *SetStyleTextsParams {
+	p.NodeForPropertySyntaxValidation = nodeForPropertySyntaxValidation
+	return &p
 }
 
 // SetStyleTextsReturns return values.
@@ -1133,9 +1257,11 @@ const (
 	CommandGetPlatformFontsForNode          = "CSS.getPlatformFontsForNode"
 	CommandGetStyleSheetText                = "CSS.getStyleSheetText"
 	CommandGetLayersForNode                 = "CSS.getLayersForNode"
+	CommandGetLocationForSelector           = "CSS.getLocationForSelector"
 	CommandTrackComputedStyleUpdates        = "CSS.trackComputedStyleUpdates"
 	CommandTakeComputedStyleUpdates         = "CSS.takeComputedStyleUpdates"
 	CommandSetEffectivePropertyValueForNode = "CSS.setEffectivePropertyValueForNode"
+	CommandSetPropertyRulePropertyName      = "CSS.setPropertyRulePropertyName"
 	CommandSetKeyframeKey                   = "CSS.setKeyframeKey"
 	CommandSetMediaText                     = "CSS.setMediaText"
 	CommandSetContainerQueryText            = "CSS.setContainerQueryText"

@@ -4,6 +4,14 @@ updates:
     directory: "/"
     schedule:
       interval: "daily"
+    open-pull-requests-limit: 50
+    groups:
+      golangx:
+        patterns:
+          - "golang.org/x/*"
+      googles:
+        patterns:
+          -  "google.golang.org/*"
     allow:
       # Keep the experimental modules up-to-date
       - dependency-name: "github.com/grafana/xk6-*"
@@ -23,5 +31,3 @@ updates:
       - dependency-name: "github.com/jhump/protoreflect"
       - dependency-name: "github.com/klauspost/compress"
       - dependency-name: "github.com/tidwall/gjson"
-    reviewers:
-      - "grafana/k6-core"

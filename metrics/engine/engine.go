@@ -62,19 +62,17 @@ func (me *MetricsEngine) CreateIngester() *OutputIngester {
 }
 
 func (me *MetricsEngine) getThresholdMetricOrSubmetric(name string) (*metrics.Metric, error) {
-	// TODO: replace with strings.Cut after Go 1.18
-	nameParts := strings.SplitN(name, "{", 2)
+	metricDefinition, submetricDefinition, _ := strings.Cut(name, "{")
 
-	metric := me.registry.Get(nameParts[0])
+	metric := me.registry.Get(metricDefinition)
 	if metric == nil {
-		return nil, fmt.Errorf("metric '%s' does not exist in the script", nameParts[0])
+		return nil, fmt.Errorf("metric '%s' does not exist in the script", metricDefinition)
 	}
 
-	if len(nameParts) == 1 { // no sub-metric
+	if len(submetricDefinition) == 0 { // no sub-metric
 		return metric, nil
 	}
 
-	submetricDefinition := nameParts[1]
 	if submetricDefinition[len(submetricDefinition)-1] != '}' {
 		return nil, fmt.Errorf("missing ending bracket, sub-metric format needs to be 'metric{key:value}'")
 	}
