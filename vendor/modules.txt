@@ -23,11 +23,14 @@ github.com/andybalholm/cascadia
 # github.com/beorn7/perks v1.0.1
 ## explicit; go 1.11
 github.com/beorn7/perks/quantile
-# github.com/bufbuild/protocompile v0.10.0
-## explicit; go 1.20
+# github.com/bufbuild/protocompile v0.14.1
+## explicit; go 1.21
 github.com/bufbuild/protocompile
 github.com/bufbuild/protocompile/ast
 github.com/bufbuild/protocompile/internal
+github.com/bufbuild/protocompile/internal/editions
+github.com/bufbuild/protocompile/internal/featuresext
+github.com/bufbuild/protocompile/internal/messageset
 github.com/bufbuild/protocompile/linker
 github.com/bufbuild/protocompile/options
 github.com/bufbuild/protocompile/parser
@@ -231,8 +234,8 @@ github.com/inconshreveable/mousetrap
 github.com/influxdata/influxdb1-client/models
 github.com/influxdata/influxdb1-client/pkg/escape
 github.com/influxdata/influxdb1-client/v2
-# github.com/jhump/protoreflect v1.16.0
-## explicit; go 1.19
+# github.com/jhump/protoreflect v1.17.0
+## explicit; go 1.21
 github.com/jhump/protoreflect/desc
 github.com/jhump/protoreflect/desc/internal
 github.com/jhump/protoreflect/desc/protoparse

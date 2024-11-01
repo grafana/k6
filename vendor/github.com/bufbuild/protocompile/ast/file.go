@@ -25,7 +25,7 @@ type FileDeclNode interface {
 }
 
 var _ FileDeclNode = (*FileNode)(nil)
-var _ FileDeclNode = NoSourceNode{}
+var _ FileDeclNode = (*NoSourceNode)(nil)
 
 // FileNode is the root of the AST hierarchy. It represents an entire
 // protobuf source file.
