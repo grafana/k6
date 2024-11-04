@@ -295,7 +295,7 @@ type browserContextAPI interface {
 	Pages() []*common.Page
 	SetDefaultNavigationTimeout(timeout int64)
 	SetDefaultTimeout(timeout int64)
-	SetGeolocation(geolocation sobek.Value) error
+	SetGeolocation(geolocation *common.Geolocation) error
 	SetHTTPCredentials(httpCredentials sobek.Value) error
 	SetOffline(offline bool) error
 	WaitForEvent(event string, optsOrPredicate sobek.Value) (any, error)
