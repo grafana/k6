@@ -16,8 +16,8 @@ import (
 	"go.k6.io/k6/lib/netext/grpcext"
 
 	"github.com/grafana/sobek"
-	"github.com/jhump/protoreflect/desc"
-	"github.com/jhump/protoreflect/desc/protoparse"
+	"github.com/jhump/protoreflect/desc"            //nolint:staticcheck // FIXME: #4035
+	"github.com/jhump/protoreflect/desc/protoparse" //nolint:staticcheck // FIXME: #4035
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"

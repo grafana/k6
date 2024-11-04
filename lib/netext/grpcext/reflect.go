@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/jhump/protoreflect/desc"
+	"github.com/jhump/protoreflect/desc" //nolint:staticcheck // FIXME: #4035
 	"github.com/jhump/protoreflect/grpcreflect"
 	"google.golang.org/grpc"
 	"google.golang.org/protobuf/types/descriptorpb"
