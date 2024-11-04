@@ -456,7 +456,7 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 					"that in the future open will open relative path relative to the module/file it is written in. "+
 					"You can future proof this by using `import.meta.resolve()` to get relative paths to the file it "+
 					"is written in the current k6 version.", pwd, otherPath)
-				err = b.preInitState.Usage.Uint64("depracations/openRelativity", 1)
+				err = b.preInitState.Usage.Uint64("deprecations/openRelativity", 1)
 				if err != nil {
 					logger.WithError(err).Warn("failed reporting usage of deprecated relativity of open()")
 				}
