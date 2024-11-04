@@ -84,10 +84,14 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 		},
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
-		"setGeolocation": func(geolocation sobek.Value) *sobek.Promise {
+		"setGeolocation": func(geolocation sobek.Value) (*sobek.Promise, error) {
+			gl := common.NewGeolocation()
+			if err := gl.Parse(vu.Context(), geolocation); err != nil {
+				return nil, fmt.Errorf("parsing geo location: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, bc.SetGeolocation(geolocation) //nolint:wrapcheck
-			})
+				return nil, bc.SetGeolocation(gl)
+			}), nil
 		},
 		"setHTTPCredentials": func(httpCredentials sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
