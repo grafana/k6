@@ -15,7 +15,7 @@ import (
 type Geolocation struct {
 	Latitude  float64 `js:"latitude"`
 	Longitude float64 `js:"longitude"`
-	Accurracy float64 `js:"accurracy"`
+	Accuracy  float64 `js:"accuracy"`
 }
 
 // NewGeolocation creates a new instance of Geolocation.
@@ -35,7 +35,7 @@ func (g *Geolocation) Parse(ctx context.Context, sopts sobek.Value) error { //no
 	for _, k := range opts.Keys() {
 		switch k {
 		case "accuracy":
-			newgl.Accurracy = opts.Get(k).ToFloat()
+			newgl.Accuracy = opts.Get(k).ToFloat()
 		case "latitude":
 			newgl.Latitude = opts.Get(k).ToFloat()
 		case "longitude":
@@ -49,8 +49,8 @@ func (g *Geolocation) Parse(ctx context.Context, sopts sobek.Value) error { //no
 	if newgl.Latitude < -90 || newgl.Latitude > 90 {
 		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, newgl.Latitude)
 	}
-	if newgl.Accurracy < 0 {
-		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, newgl.Accurracy)
+	if newgl.Accuracy < 0 {
+		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, newgl.Accuracy)
 	}
 
 	*g = newgl

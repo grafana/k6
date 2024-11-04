@@ -1136,7 +1136,7 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 		action := emulation.SetGeolocationOverride().
 			WithLatitude(geolocation.Latitude).
 			WithLongitude(geolocation.Longitude).
-			WithAccuracy(geolocation.Accurracy)
+			WithAccuracy(geolocation.Accuracy)
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
 			return fmt.Errorf("%w", err)
 		}
