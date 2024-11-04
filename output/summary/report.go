@@ -80,13 +80,19 @@ func newAggregatedMetric(metric *metrics.Metric) aggregatedMetric {
 }
 
 func populateReportChecks(report *lib.Report, summary *lib.Summary, options lib.Options) {
-	totalChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Total)
-	successChecks := float64(summary.Metrics[metrics.ChecksName].Sink.(*metrics.RateSink).Trues)
+	checksMetric, exists := summary.Metrics[metrics.ChecksName]
+	if !exists {
+		return
+	}
+
+	report.Checks = lib.NewReportChecks()
+
+	totalChecks := float64(checksMetric.Sink.(*metrics.RateSink).Total)
+	successChecks := float64(checksMetric.Sink.(*metrics.RateSink).Trues)
 
 	report.Checks.Metrics.Total.Values["count"] = totalChecks
 	report.Checks.Metrics.Total.Values["rate"] = calculateCounterRate(totalChecks, summary.TestRunDuration)
 
-	checksMetric := summary.Metrics[metrics.ChecksName]
 	report.Checks.Metrics.Success = lib.NewReportMetricFrom(
 		lib.ReportMetricInfo{
 			Name:     "checks_succeeded",

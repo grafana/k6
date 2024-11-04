@@ -472,14 +472,16 @@ function generateTextSummary(data, options, report) {
 	lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify('GLOBAL RESULTS') + '\n')
 
 	// CHECKS
-	displayMetricsBlock(report.checks.metrics, {sortByName: false})
+	if (report.checks !== undefined && report.checks !== null) {
+		displayMetricsBlock(report.checks.metrics, {sortByName: false})
 
-	displayMetricsBlockName('CHECKS', {bold: false})
-	for (var i = 0; i < report.checks.ordered_checks.length; i++) {
-		lines.push(summarizeCheck(metricGroupIndent + metricGroupIndent, report.checks.ordered_checks[i], decorate))
-	}
-	if (report.checks.ordered_checks.length > 0) {
-		lines.push('')
+		displayMetricsBlockName('CHECKS', {bold: false})
+		for (var i = 0; i < report.checks.ordered_checks.length; i++) {
+			lines.push(summarizeCheck(metricGroupIndent + metricGroupIndent, report.checks.ordered_checks[i], decorate))
+		}
+		if (report.checks.ordered_checks.length > 0) {
+			lines.push('')
+		}
 	}
 
 	// METRICS

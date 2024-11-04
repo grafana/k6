@@ -77,6 +77,27 @@ type ReportChecks struct {
 	OrderedChecks []*Check
 }
 
+func NewReportChecks() *ReportChecks {
+	initChecksMetricData := func(name string, t metrics.MetricType) ReportMetric {
+		return ReportMetric{
+			ReportMetricInfo: ReportMetricInfo{
+				Name:     name,
+				Type:     t.String(),
+				Contains: metrics.Default.String(),
+			},
+			Values: make(map[string]float64),
+		}
+	}
+
+	return &ReportChecks{
+		Metrics: ReportChecksMetrics{
+			Total:   initChecksMetricData("checks_total", metrics.Counter),
+			Success: initChecksMetricData("checks_succeeded", metrics.Rate),
+			Fail:    initChecksMetricData("checks_failed", metrics.Rate),
+		},
+	}
+}
+
 type ReportGroup struct {
 	Metrics ReportMetrics
 	Groups  map[string]ReportGroup
@@ -90,35 +111,19 @@ func NewReportGroup() ReportGroup {
 }
 
 type Report struct {
-	Checks ReportChecks
+	// Checks is a pointer to ReportChecks because checks metrics
+	// are not always present (only when checks are used).
+	Checks *ReportChecks
 
 	ReportGroup
 	Scenarios map[string]ReportGroup
 }
 
 func NewReport() Report {
-	initMetricData := func(name string, t metrics.MetricType) ReportMetric {
-		return ReportMetric{
-			ReportMetricInfo: ReportMetricInfo{
-				Name:     name,
-				Type:     t.String(),
-				Contains: metrics.Default.String(),
-			},
-			Values: make(map[string]float64),
-		}
-	}
-
 	return Report{
 		ReportGroup: ReportGroup{
 			Metrics: NewReportMetrics(),
 			Groups:  make(map[string]ReportGroup),
-		},
-		Checks: ReportChecks{
-			Metrics: ReportChecksMetrics{
-				Total:   initMetricData("checks_total", metrics.Counter),
-				Success: initMetricData("checks_succeeded", metrics.Rate),
-				Fail:    initMetricData("checks_failed", metrics.Rate),
-			},
 		},
 		Scenarios: make(map[string]ReportGroup),
 	}
