@@ -325,3 +325,23 @@ func TestFilterCookies(t *testing.T) {
 		})
 	}
 }
+
+func TestBrowserContextSetGeolocation(t *testing.T) {
+	vu := k6test.NewVU(t)
+
+	var opts BrowserContextOptions
+	err := opts.Parse(vu.Context(), vu.ToSobekValue((struct {
+		GeoLocation *Geolocation `js:"geolocation"`
+	}{
+		GeoLocation: &Geolocation{
+			Latitude:  1.0,
+			Longitude: 2.0,
+			Accuracy:  3.0,
+		},
+	})))
+	assert.NoError(t, err)
+	assert.NotNil(t, opts)
+	assert.Equal(t, 1.0, opts.Geolocation.Latitude)
+	assert.Equal(t, 2.0, opts.Geolocation.Longitude)
+	assert.Equal(t, 3.0, opts.Geolocation.Accuracy)
+}
