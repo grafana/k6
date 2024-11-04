@@ -41,16 +41,16 @@ func NewCredentials() *Credentials {
 
 // Parse credentials details from a given sobek credentials value.
 func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if credentials != nil && !sobek.IsUndefined(credentials) && !sobek.IsNull(credentials) {
-		credentials := credentials.ToObject(rt)
-		for _, k := range credentials.Keys() {
-			switch k {
-			case "username":
-				c.Username = credentials.Get(k).String()
-			case "password":
-				c.Password = credentials.Get(k).String()
-			}
+	if !sobekValueExists(credentials) {
+		return errors.New("credentials are required")
+	}
+	o := credentials.ToObject(k6ext.Runtime(ctx))
+	for _, k := range o.Keys() {
+		switch k {
+		case "username":
+			c.Username = o.Get(k).String()
+		case "password":
+			c.Password = o.Get(k).String()
 		}
 	}
 
