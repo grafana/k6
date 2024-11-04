@@ -93,10 +93,14 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				return nil, bc.SetGeolocation(gl)
 			}), nil
 		},
-		"setHTTPCredentials": func(httpCredentials sobek.Value) *sobek.Promise {
+		"setHTTPCredentials": func(httpCredentials sobek.Value) (*sobek.Promise, error) {
+			pc := common.NewCredentials()
+			if err := pc.Parse(vu.Context(), httpCredentials); err != nil {
+				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, bc.SetHTTPCredentials(httpCredentials) //nolint:staticcheck,wrapcheck
-			})
+				return nil, bc.SetHTTPCredentials(pc) //nolint:staticcheck
+			}), nil
 		},
 		"setOffline": func(offline bool) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
