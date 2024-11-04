@@ -150,23 +150,3 @@ func (w *WaitForEventOptions) Parse(ctx context.Context, optsOrPredicate sobek.V
 type GrantPermissionsOptions struct {
 	Origin string
 }
-
-// NewGrantPermissionsOptions returns a new GrantPermissionsOptions.
-func NewGrantPermissionsOptions() *GrantPermissionsOptions {
-	return &GrantPermissionsOptions{}
-}
-
-// Parse parses the options from opts if opts exists in the sobek runtime.
-func (g *GrantPermissionsOptions) Parse(ctx context.Context, opts sobek.Value) {
-	rt := k6ext.Runtime(ctx)
-
-	if sobekValueExists(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			if k == "origin" {
-				g.Origin = opts.Get(k).String()
-				break
-			}
-		}
-	}
-}

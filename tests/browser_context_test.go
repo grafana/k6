@@ -912,7 +912,10 @@ func TestBrowserContextGrantPermissions(t *testing.T) {
 			bCtx, err := tb.NewContext(nil)
 			require.NoError(t, err)
 
-			err = bCtx.GrantPermissions([]string{tc.permission}, common.NewGrantPermissionsOptions())
+			err = bCtx.GrantPermissions(
+				[]string{tc.permission},
+				common.GrantPermissionsOptions{},
+			)
 
 			if tc.wantErr == "" {
 				assert.NoError(t, err)
@@ -968,7 +971,10 @@ func TestBrowserContextClearPermissions(t *testing.T) {
 
 		require.False(t, hasPermission(tb, p, "geolocation"))
 
-		err = bCtx.GrantPermissions([]string{"geolocation"}, common.NewGrantPermissionsOptions())
+		err = bCtx.GrantPermissions(
+			[]string{"geolocation"},
+			common.GrantPermissionsOptions{},
+		)
 		require.NoError(t, err)
 		require.True(t, hasPermission(tb, p, "geolocation"))
 

@@ -131,7 +131,7 @@ func NewBrowserContext(
 	}
 
 	if len(opts.Permissions) > 0 {
-		err := b.GrantPermissions(opts.Permissions, NewGrantPermissionsOptions())
+		err := b.GrantPermissions(opts.Permissions, GrantPermissionsOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -206,7 +206,7 @@ func (b *BrowserContext) Close() error {
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
-func (b *BrowserContext) GrantPermissions(permissions []string, opts *GrantPermissionsOptions) error {
+func (b *BrowserContext) GrantPermissions(permissions []string, opts GrantPermissionsOptions) error {
 	b.logger.Debugf("BrowserContext:GrantPermissions", "bctxid:%v", b.id)
 
 	permsToProtocol := map[string]cdpbrowser.PermissionType{

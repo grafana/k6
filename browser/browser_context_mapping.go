@@ -74,13 +74,14 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				return bc.Cookies(urls...) //nolint:wrapcheck
 			})
 		},
-		"grantPermissions": func(permissions []string, opts sobek.Value) *sobek.Promise {
+		"grantPermissions": func(permissions []string, opts sobek.Value) (*sobek.Promise, error) {
+			popts, err := exportTo[common.GrantPermissionsOptions](vu.Runtime(), opts)
+			if err != nil {
+				return nil, fmt.Errorf("parsing grant permission options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				popts := common.NewGrantPermissionsOptions()
-				popts.Parse(vu.Context(), opts)
-
-				return nil, bc.GrantPermissions(permissions, popts) //nolint:wrapcheck
-			})
+				return nil, bc.GrantPermissions(permissions, popts)
+			}), nil
 		},
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,

@@ -49,10 +49,11 @@ func syncMapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //n
 		"close":            bc.Close,
 		"cookies":          bc.Cookies,
 		"grantPermissions": func(permissions []string, opts sobek.Value) error {
-			pOpts := common.NewGrantPermissionsOptions()
-			pOpts.Parse(vu.Context(), opts)
-
-			return bc.GrantPermissions(permissions, pOpts) //nolint:wrapcheck
+			popts, err := exportTo[common.GrantPermissionsOptions](vu.Runtime(), opts)
+			if err != nil {
+				return fmt.Errorf("parsing grant permission options: %w", err)
+			}
+			return bc.GrantPermissions(permissions, popts)
 		},
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
