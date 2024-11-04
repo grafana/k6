@@ -1,6 +1,7 @@
 package browser
 
 import (
+	"context"
 	"fmt"
 
 	"github.com/grafana/sobek"
@@ -36,8 +37,8 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
 			return b.IsConnected(), nil
 		},
 		"newContext": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewBrowserContextOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseBrowserContextOptions(vu.Context(), opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -71,8 +72,8 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
 			return b.Version(), nil
 		},
 		"newPage": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewBrowserContextOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseBrowserContextOptions(vu.Context(), opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -106,4 +107,97 @@ func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
 	}
 
 	return nil
+}
+
+// parseBrowserContextOptions parses the [common.BrowserContext] options from a Sobek value.
+func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.BrowserContextOptions, error) { //nolint:cyclop,funlen,gocognit,lll
+	if !sobekValueExists(opts) {
+		return nil, nil //nolint:nilnil
+	}
+
+	b := common.NewBrowserContextOptions()
+
+	rt := k6ext.Runtime(ctx)
+	o := opts.ToObject(rt)
+	for _, k := range o.Keys() {
+		switch k {
+		case "acceptDownloads":
+			b.AcceptDownloads = o.Get(k).ToBoolean()
+		case "downloadsPath":
+			b.DownloadsPath = o.Get(k).String()
+		case "bypassCSP":
+			b.BypassCSP = o.Get(k).ToBoolean()
+		case "colorScheme":
+			switch common.ColorScheme(o.Get(k).String()) { //nolint:exhaustive
+			case "light":
+				b.ColorScheme = common.ColorSchemeLight
+			case "dark":
+				b.ColorScheme = common.ColorSchemeDark
+			default:
+				b.ColorScheme = common.ColorSchemeNoPreference
+			}
+		case "deviceScaleFactor":
+			b.DeviceScaleFactor = o.Get(k).ToFloat()
+		case "extraHTTPHeaders":
+			headers := o.Get(k).ToObject(rt)
+			for _, k := range headers.Keys() {
+				b.ExtraHTTPHeaders[k] = headers.Get(k).String()
+			}
+		case "geolocation":
+			geolocation := common.NewGeolocation()
+			if err := geolocation.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+				return nil, fmt.Errorf("parsing geolocation options: %w", err)
+			}
+			b.Geolocation = geolocation
+		case "hasTouch":
+			b.HasTouch = o.Get(k).ToBoolean()
+		case "httpCredentials":
+			credentials := common.NewCredentials()
+			if err := credentials.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+				return nil, fmt.Errorf("parsing HTTP credential options: %w", err)
+			}
+			b.HttpCredentials = credentials
+		case "ignoreHTTPSErrors":
+			b.IgnoreHTTPSErrors = o.Get(k).ToBoolean()
+		case "isMobile":
+			b.IsMobile = o.Get(k).ToBoolean()
+		case "javaScriptEnabled":
+			b.JavaScriptEnabled = o.Get(k).ToBoolean()
+		case "locale":
+			b.Locale = o.Get(k).String()
+		case "offline":
+			b.Offline = o.Get(k).ToBoolean()
+		case "permissions":
+			if ps, ok := o.Get(k).Export().([]any); ok {
+				for _, p := range ps {
+					b.Permissions = append(b.Permissions, fmt.Sprintf("%v", p))
+				}
+			}
+		case "reducedMotion":
+			switch common.ReducedMotion(o.Get(k).String()) { //nolint:exhaustive
+			case "reduce":
+				b.ReducedMotion = common.ReducedMotionReduce
+			default:
+				b.ReducedMotion = common.ReducedMotionNoPreference
+			}
+		case "screen":
+			var screen common.Screen
+			if err := screen.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+				return nil, fmt.Errorf("parsing screen options: %w", err)
+			}
+			b.Screen = &screen
+		case "timezoneID":
+			b.TimezoneID = o.Get(k).String()
+		case "userAgent":
+			b.UserAgent = o.Get(k).String()
+		case "viewport":
+			var viewport common.Viewport
+			if err := viewport.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+				return nil, fmt.Errorf("parsing viewport options: %w", err)
+			}
+			b.Viewport = &viewport
+		}
+	}
+
+	return b, nil
 }
