@@ -24,39 +24,36 @@ func NewGeolocation() *Geolocation {
 }
 
 // Parse parses the geolocation options.
-func (g *Geolocation) Parse(ctx context.Context, opts sobek.Value) error { //nolint:cyclop
-	rt := k6ext.Runtime(ctx)
-	longitude := 0.0
-	latitude := 0.0
-	accuracy := 0.0
+func (g *Geolocation) Parse(ctx context.Context, sopts sobek.Value) error { //nolint:cyclop
+	var newgl Geolocation
 
-	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
-		opts := opts.ToObject(rt)
-		for _, k := range opts.Keys() {
-			switch k {
-			case "accuracy":
-				accuracy = opts.Get(k).ToFloat()
-			case "latitude":
-				latitude = opts.Get(k).ToFloat()
-			case "longitude":
-				longitude = opts.Get(k).ToFloat()
-			}
+	if !sobekValueExists(sopts) {
+		return fmt.Errorf("geolocation options are required")
+	}
+
+	opts := sopts.ToObject(k6ext.Runtime(ctx))
+	for _, k := range opts.Keys() {
+		switch k {
+		case "accuracy":
+			newgl.Accurracy = opts.Get(k).ToFloat()
+		case "latitude":
+			newgl.Latitude = opts.Get(k).ToFloat()
+		case "longitude":
+			newgl.Longitude = opts.Get(k).ToFloat()
 		}
 	}
 
-	if longitude < -180 || longitude > 180 {
-		return fmt.Errorf(`invalid longitude "%.2f": precondition -180 <= LONGITUDE <= 180 failed`, longitude)
+	if newgl.Longitude < -180 || newgl.Longitude > 180 {
+		return fmt.Errorf(`invalid longitude "%.2f": precondition -180 <= LONGITUDE <= 180 failed`, newgl.Longitude)
 	}
-	if latitude < -90 || latitude > 90 {
-		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, latitude)
+	if newgl.Latitude < -90 || newgl.Latitude > 90 {
+		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, newgl.Latitude)
 	}
-	if accuracy < 0 {
-		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, accuracy)
+	if newgl.Accurracy < 0 {
+		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, newgl.Accurracy)
 	}
 
-	g.Accurracy = accuracy
-	g.Latitude = latitude
-	g.Longitude = longitude
+	*g = newgl
 
 	return nil
 }
