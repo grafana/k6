@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/grafana/sobek"
 
@@ -185,4 +186,43 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			})
 		},
 	}
+}
+
+// parseWaitForEventOptions parses optsOrPredicate into a WaitForEventOptions.
+// It returns a WaitForEventOptions with the default timeout if optsOrPredicate is nil,
+// or not a callable predicate function.
+// It can parse only a callable predicate function or an object which contains a
+// callable predicate function and a timeout.
+func parseWaitForEventOptions(
+	rt *sobek.Runtime, optsOrPredicate sobek.Value, defaultTime time.Duration,
+) (*common.WaitForEventOptions, error) {
+	w := &common.WaitForEventOptions{
+		Timeout: defaultTime,
+	}
+
+	if !sobekValueExists(optsOrPredicate) {
+		return w, nil
+	}
+	var isCallable bool
+	w.PredicateFn, isCallable = sobek.AssertFunction(optsOrPredicate)
+	if isCallable {
+		return w, nil
+	}
+
+	opts := optsOrPredicate.ToObject(rt)
+	for _, k := range opts.Keys() {
+		switch k {
+		case "predicate":
+			w.PredicateFn, isCallable = sobek.AssertFunction(opts.Get(k))
+			if !isCallable {
+				return nil, errors.New("predicate function is not callable")
+			}
+		case "timeout":
+			w.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+		default:
+			return nil, fmt.Errorf("unknown option: %s", k)
+		}
+	}
+
+	return w, nil
 }
