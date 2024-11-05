@@ -144,11 +144,11 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 				b.ExtraHTTPHeaders[k] = headers.Get(k).String()
 			}
 		case "geolocation":
-			geolocation := common.NewGeolocation()
-			if err := geolocation.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+			gl, err := exportTo[*common.Geolocation](rt, o.Get(k))
+			if err != nil {
 				return nil, fmt.Errorf("parsing geolocation options: %w", err)
 			}
-			b.Geolocation = geolocation
+			b.Geolocation = gl
 		case "hasTouch":
 			b.HasTouch = o.Get(k).ToBoolean()
 		case "httpCredentials":
