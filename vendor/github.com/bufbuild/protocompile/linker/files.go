@@ -28,7 +28,7 @@ import (
 
 // File is like a super-powered protoreflect.FileDescriptor. It includes helpful
 // methods for looking up elements in the descriptor and can be used to create a
-// resolver for all the file's transitive closure of dependencies. (See
+// resolver for the entire transitive closure of the file's dependencies. (See
 // ResolverFromFile.)
 type File interface {
 	protoreflect.FileDescriptor
@@ -131,6 +131,8 @@ type file struct {
 	deps  Files
 }
 
+var _ File = (*file)(nil)
+
 func (f *file) FindDescriptorByName(name protoreflect.FullName) protoreflect.Descriptor {
 	return f.descs[name]
 }
@@ -143,7 +145,9 @@ func (f *file) FindExtensionByNumber(msg protoreflect.FullName, tag protoreflect
 	return findExtension(f, msg, tag)
 }
 
-var _ File = (*file)(nil)
+func (f *file) Unwrap() protoreflect.FileDescriptor {
+	return f.FileDescriptor
+}
 
 // Files represents a set of protobuf files. It is a slice of File values, but
 // also provides a method for easily looking up files by path and name.
@@ -186,8 +190,8 @@ type Resolver interface {
 // Note that this function does not compute any additional indexes for efficient
 // search, so queries generally take linear time, O(n) where n is the number of
 // files whose elements are visible to the given file. Queries for an extension
-// by number are linear with the number of messages and extensions defined across
-// those files.
+// by number have runtime complexity that is linear with the number of messages
+// and extensions defined across those files.
 func ResolverFromFile(f File) Resolver {
 	return fileResolver{f: f}
 }

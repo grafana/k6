@@ -83,48 +83,48 @@ func toV1AlphaRequest(v1 *refv1.ServerReflectionRequest) *refv1alpha.ServerRefle
 	return &v1alpha
 }
 
-func toV1AlphaResponse(v1 *refv1.ServerReflectionResponse) *refv1alpha.ServerReflectionResponse {
-	var v1alpha refv1alpha.ServerReflectionResponse
-	v1alpha.ValidHost = v1.ValidHost
-	if v1.OriginalRequest != nil {
-		v1alpha.OriginalRequest = toV1AlphaRequest(v1.OriginalRequest)
+func toV1Response(v1alpha *refv1alpha.ServerReflectionResponse) *refv1.ServerReflectionResponse {
+	var v1 refv1.ServerReflectionResponse
+	v1.ValidHost = v1alpha.ValidHost
+	if v1alpha.OriginalRequest != nil {
+		v1.OriginalRequest = toV1Request(v1alpha.OriginalRequest)
 	}
-	switch mr := v1.MessageResponse.(type) {
-	case *refv1.ServerReflectionResponse_FileDescriptorResponse:
+	switch mr := v1alpha.MessageResponse.(type) {
+	case *refv1alpha.ServerReflectionResponse_FileDescriptorResponse:
 		if mr != nil {
-			v1alpha.MessageResponse = &refv1alpha.ServerReflectionResponse_FileDescriptorResponse{
-				FileDescriptorResponse: &refv1alpha.FileDescriptorResponse{
+			v1.MessageResponse = &refv1.ServerReflectionResponse_FileDescriptorResponse{
+				FileDescriptorResponse: &refv1.FileDescriptorResponse{
 					FileDescriptorProto: mr.FileDescriptorResponse.GetFileDescriptorProto(),
 				},
 			}
 		}
-	case *refv1.ServerReflectionResponse_AllExtensionNumbersResponse:
+	case *refv1alpha.ServerReflectionResponse_AllExtensionNumbersResponse:
 		if mr != nil {
-			v1alpha.MessageResponse = &refv1alpha.ServerReflectionResponse_AllExtensionNumbersResponse{
-				AllExtensionNumbersResponse: &refv1alpha.ExtensionNumberResponse{
+			v1.MessageResponse = &refv1.ServerReflectionResponse_AllExtensionNumbersResponse{
+				AllExtensionNumbersResponse: &refv1.ExtensionNumberResponse{
 					BaseTypeName:    mr.AllExtensionNumbersResponse.GetBaseTypeName(),
 					ExtensionNumber: mr.AllExtensionNumbersResponse.GetExtensionNumber(),
 				},
 			}
 		}
-	case *refv1.ServerReflectionResponse_ListServicesResponse:
+	case *refv1alpha.ServerReflectionResponse_ListServicesResponse:
 		if mr != nil {
-			svcs := make([]*refv1alpha.ServiceResponse, len(mr.ListServicesResponse.GetService()))
+			svcs := make([]*refv1.ServiceResponse, len(mr.ListServicesResponse.GetService()))
 			for i, svc := range mr.ListServicesResponse.GetService() {
-				svcs[i] = &refv1alpha.ServiceResponse{
+				svcs[i] = &refv1.ServiceResponse{
 					Name: svc.GetName(),
 				}
 			}
-			v1alpha.MessageResponse = &refv1alpha.ServerReflectionResponse_ListServicesResponse{
-				ListServicesResponse: &refv1alpha.ListServiceResponse{
+			v1.MessageResponse = &refv1.ServerReflectionResponse_ListServicesResponse{
+				ListServicesResponse: &refv1.ListServiceResponse{
 					Service: svcs,
 				},
 			}
 		}
-	case *refv1.ServerReflectionResponse_ErrorResponse:
+	case *refv1alpha.ServerReflectionResponse_ErrorResponse:
 		if mr != nil {
-			v1alpha.MessageResponse = &refv1alpha.ServerReflectionResponse_ErrorResponse{
-				ErrorResponse: &refv1alpha.ErrorResponse{
+			v1.MessageResponse = &refv1.ServerReflectionResponse_ErrorResponse{
+				ErrorResponse: &refv1.ErrorResponse{
 					ErrorCode:    mr.ErrorResponse.GetErrorCode(),
 					ErrorMessage: mr.ErrorResponse.GetErrorMessage(),
 				},
@@ -133,5 +133,5 @@ func toV1AlphaResponse(v1 *refv1.ServerReflectionResponse) *refv1alpha.ServerRef
 	default:
 		// no value set
 	}
-	return &v1alpha
+	return &v1
 }

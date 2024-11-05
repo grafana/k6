@@ -54,7 +54,7 @@ var _ ValueNode = (*SpecialFloatLiteralNode)(nil)
 var _ ValueNode = (*SignedFloatLiteralNode)(nil)
 var _ ValueNode = (*ArrayLiteralNode)(nil)
 var _ ValueNode = (*MessageLiteralNode)(nil)
-var _ ValueNode = NoSourceNode{}
+var _ ValueNode = (*NoSourceNode)(nil)
 
 // StringValueNode is an AST node that represents a string literal.
 // Such a node can be a single literal (*StringLiteralNode) or a
@@ -141,12 +141,12 @@ type IntValueNode interface {
 
 // AsInt32 range checks the given int value and returns its value is
 // in the range or 0, false if it is outside the range.
-func AsInt32(n IntValueNode, min, max int32) (int32, bool) {
+func AsInt32(n IntValueNode, minVal, maxVal int32) (int32, bool) {
 	i, ok := n.AsInt64()
 	if !ok {
 		return 0, false
 	}
-	if i < int64(min) || i > int64(max) {
+	if i < int64(minVal) || i > int64(maxVal) {
 		return 0, false
 	}
 	return int32(i), true
