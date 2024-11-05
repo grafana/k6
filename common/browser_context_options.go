@@ -21,6 +21,20 @@ func NewGeolocation() *Geolocation {
 	return &Geolocation{}
 }
 
+// Validate validates the [Geolocation].
+func (g *Geolocation) Validate() error {
+	if g.Longitude < -180 || g.Longitude > 180 {
+		return fmt.Errorf(`invalid longitude "%.2f": precondition -180 <= LONGITUDE <= 180 failed`, g.Longitude)
+	}
+	if g.Latitude < -90 || g.Latitude > 90 {
+		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, g.Latitude)
+	}
+	if g.Accuracy < 0 {
+		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, g.Accuracy)
+	}
+	return nil
+}
+
 // Parse parses the geolocation options.
 func (g *Geolocation) Parse(ctx context.Context, sopts sobek.Value) error { //nolint:cyclop
 	var newgl Geolocation
@@ -39,16 +53,6 @@ func (g *Geolocation) Parse(ctx context.Context, sopts sobek.Value) error { //no
 		case "longitude":
 			newgl.Longitude = opts.Get(k).ToFloat()
 		}
-	}
-
-	if newgl.Longitude < -180 || newgl.Longitude > 180 {
-		return fmt.Errorf(`invalid longitude "%.2f": precondition -180 <= LONGITUDE <= 180 failed`, newgl.Longitude)
-	}
-	if newgl.Latitude < -90 || newgl.Latitude > 90 {
-		return fmt.Errorf(`invalid latitude "%.2f": precondition -90 <= LATITUDE <= 90 failed`, newgl.Latitude)
-	}
-	if newgl.Accuracy < 0 {
-		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, newgl.Accuracy)
 	}
 
 	*g = newgl
