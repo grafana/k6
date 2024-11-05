@@ -199,8 +199,8 @@ type waitForEventOptions struct {
 // callable predicate function and a timeout.
 func parseWaitForEventOptions(
 	rt *sobek.Runtime, optsOrPredicate sobek.Value, defaultTime time.Duration,
-) (*common.WaitForEventOptions, error) {
-	w := &common.WaitForEventOptions{
+) (*waitForEventOptions, error) {
+	w := &waitForEventOptions{
 		Timeout: defaultTime,
 	}
 
