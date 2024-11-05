@@ -3,7 +3,6 @@ package common
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/grafana/sobek"
 
@@ -95,12 +94,6 @@ func NewBrowserContextOptions() *BrowserContextOptions {
 		Screen:            &Screen{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
 		Viewport:          &Viewport{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
 	}
-}
-
-// WaitForEventOptions are the options used by the browserContext.waitForEvent API.
-type WaitForEventOptions struct {
-	Timeout     time.Duration
-	PredicateFn sobek.Callable
 }
 
 // GrantPermissionsOptions is used by BrowserContext.GrantPermissions.
