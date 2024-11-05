@@ -16,7 +16,7 @@ export function grpcTest() {
 		longitude: -747127767
 	})
 
-	check(response, {"status is OK": (r) => r && r.status === grpc.StatusOK});
+	check(response, {"gRPCC status is OK": (r) => r && r.status === grpc.StatusOK});
 	console.log(JSON.stringify(response.message))
 
 	client.close()

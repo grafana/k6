@@ -99,6 +99,7 @@ func NewReportChecks() *ReportChecks {
 }
 
 type ReportGroup struct {
+	Checks  *ReportChecks // Not always present, thus we use a pointer.
 	Metrics ReportMetrics
 	Groups  map[string]ReportGroup
 }
@@ -111,10 +112,6 @@ func NewReportGroup() ReportGroup {
 }
 
 type Report struct {
-	// Checks is a pointer to ReportChecks because checks metrics
-	// are not always present (only when checks are used).
-	Checks *ReportChecks
-
 	ReportGroup
 	Scenarios map[string]ReportGroup
 }

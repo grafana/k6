@@ -1,3 +1,6 @@
+/**
+ * @typedef {{sortByName: boolean, bold: boolean, indent: string, metricsBlockIndent: string}} DisplayOptions
+ */
 var forEach = function (obj, callback) {
 	for (var key in obj) {
 		if (obj.hasOwnProperty(key)) {
@@ -438,13 +441,12 @@ function generateTextSummary(data, options, report) {
 
 	/**
 	 *
-	 * @typedef {{bold: boolean}} DisplayMetricsSectionNameOptions
 	 * @param sectionName
-	 * @param options [DisplayMetricsSectionNameOptions={bold: true}]
+	 * @param {DisplayOptions} opts
 	 */
-	const displayMetricsBlockName = (sectionName, options) => {
+	const displayMetricsBlockName = (sectionName, opts) => {
 		let bold = true;
-		if (options && options.bold === false) {
+		if (opts && opts.bold === false) {
 			bold = false
 		}
 
@@ -455,16 +457,40 @@ function generateTextSummary(data, options, report) {
 		}
 
 		let indent = '    '
-		if (options && options.metricsBlockIndent) {
-			indent += options.metricsBlockIndent
+		if (opts && opts.metricsBlockIndent) {
+			indent += opts.metricsBlockIndent
 		}
 		lines.push(indent + normalizedSectionName)
 	}
 
+	/**
+	 *
+	 * @param {Object[]} sectionMetrics
+	 * @param {DisplayOptions} opts
+	 */
 	const displayMetricsBlock = (sectionMetrics, opts) => {
 		const summarizeOpts = Object.assign({}, mergedOpts, opts)
 		Array.prototype.push.apply(lines, summarizeMetrics(summarizeOpts, {metrics: sectionMetrics}, decorate))
 		lines.push('')
+	}
+
+
+	/**
+	 *
+	 * @param {Object[]} checks
+	 * @param {Partial<DisplayOptions>} opts
+	 */
+	const displayChecks = (checks, opts = { indent: '' }) => {
+		if (checks === undefined || checks === null) {
+			return
+		}
+		displayMetricsBlock(checks.metrics, {...opts, indent: opts.indent + defaultIndent, sortByName: false})
+		for (var i = 0; i < checks.ordered_checks.length; i++) {
+			lines.push(summarizeCheck(metricGroupIndent + metricGroupIndent + opts.indent, checks.ordered_checks[i], decorate))
+		}
+		if (checks.ordered_checks.length > 0) {
+			lines.push('')
+		}
 	}
 
 	// START OF GLOBAL RESULTS
@@ -472,18 +498,7 @@ function generateTextSummary(data, options, report) {
 	lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify('GLOBAL RESULTS') + '\n')
 
 	// CHECKS
-	if (report.checks !== undefined && report.checks !== null) {
-		displayMetricsBlock(report.checks.metrics, {sortByName: false})
-
-		displayMetricsBlockName('CHECKS', {bold: false})
-		for (var i = 0; i < report.checks.ordered_checks.length; i++) {
-			lines.push(summarizeCheck(metricGroupIndent + metricGroupIndent, report.checks.ordered_checks[i], decorate))
-		}
-		if (report.checks.ordered_checks.length > 0) {
-			lines.push('')
-		}
-	}
-
+	displayChecks(report.checks)
 	// METRICS
 	forEach(report.metrics, (sectionName, sectionMetrics) => {
 		// If there are no metrics in this section, skip it
@@ -506,9 +521,8 @@ function generateTextSummary(data, options, report) {
 
 	const summarize = (prefix, indent) => {
 		return (groupName, groupData) => {
-			console.log('summarizeNestedGroups', groupName, JSON.stringify(groupData))
-
 			lines.push(metricGroupIndent + indent + prefix + defaultIndent + boldify(`GROUP: ${groupName}`) + '\n')
+			displayChecks(groupData.checks, {indent: indent})
 			forEach(groupData.metrics, (sectionName, sectionMetrics) => {
 				// If there are no metrics in this section, skip it
 				if (Object.keys(sectionMetrics).length === 0) {
@@ -550,6 +564,7 @@ function generateTextSummary(data, options, report) {
 	if (report.scenarios !== undefined) {
 		forEach(report.scenarios, (scenarioName, scenarioData) => {
 			lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify(`SCENARIO: ${scenarioName}`) + '\n')
+			displayChecks(scenarioData.checks)
 			forEach(scenarioData.metrics, (sectionName, sectionMetrics) => {
 				// If there are no metrics in this section, skip it
 				if (Object.keys(sectionMetrics).length === 0) {

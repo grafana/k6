@@ -53,10 +53,10 @@ func (o *Output) Start() error {
 func (o *Output) Stop() error {
 	o.periodicFlusher.Stop()
 
-	for groupName, aggregatedData := range o.dataModel.Groups {
+	for groupName, aggregatedData := range o.dataModel.groupsData {
 		o.logger.Warning(groupName)
 
-		for metricName, sink := range aggregatedData.Metrics {
+		for metricName, sink := range aggregatedData.metrics {
 			o.logger.Warning(fmt.Sprintf("  %s: %+v", metricName, sink))
 		}
 	}
@@ -76,7 +76,7 @@ func (o *Output) flushMetrics() {
 
 func (o *Output) storeSample(sample metrics.Sample) {
 	// First, we store the sample data into the global metrics.
-	o.dataModel.Metrics.storeSample(sample)
+	o.dataModel.storeSample(sample)
 
 	// Then, we'll proceed to store the sample data into each group
 	// metrics. However, we need to determine whether the groups tree
@@ -84,7 +84,7 @@ func (o *Output) storeSample(sample metrics.Sample) {
 	groupData := o.dataModel.aggregatedGroupData
 	if scenarioName, hasScenario := sample.Tags.Get("scenario"); hasScenario {
 		groupData = o.dataModel.groupDataFor(scenarioName)
-		groupData.Metrics.addSample(sample)
+		groupData.addSample(sample)
 	}
 
 	if groupTag, exists := sample.Tags.Get("group"); exists && len(groupTag) > 0 {
@@ -93,10 +93,10 @@ func (o *Output) storeSample(sample metrics.Sample) {
 
 		for i, groupName := range groupNames {
 			groupData.groupDataFor(groupName)
-			groupData.Groups[groupName].Metrics.addSample(sample)
+			groupData.groupsData[groupName].addSample(sample)
 
 			if i < len(groupNames)-1 {
-				groupData = groupData.Groups[groupName]
+				groupData = groupData.groupsData[groupName]
 			}
 		}
 	}
@@ -105,16 +105,26 @@ func (o *Output) storeSample(sample metrics.Sample) {
 func (o *Output) MetricsReport(summary *lib.Summary, options lib.Options) lib.Report {
 	report := lib.NewReport()
 
-	// Populate report checks.
-	populateReportChecks(&report, summary, options)
+	testRunDuration := summary.TestRunDuration
+	summaryTrendStats := options.SummaryTrendStats
 
 	// Populate root group and nested groups recursively.
-	populateReportGroup(&report.ReportGroup, o.dataModel.aggregatedGroupData, summary, options)
+	populateReportGroup(
+		&report.ReportGroup,
+		o.dataModel.aggregatedGroupData,
+		testRunDuration,
+		summaryTrendStats,
+	)
 
 	// Populate scenario groups and nested groups recursively.
 	for scenarioName, scenarioData := range o.dataModel.scenarios {
 		scenarioReportGroup := lib.NewReportGroup()
-		populateReportGroup(&scenarioReportGroup, scenarioData, summary, options)
+		populateReportGroup(
+			&scenarioReportGroup,
+			scenarioData,
+			testRunDuration,
+			summaryTrendStats,
+		)
 		report.Scenarios[scenarioName] = scenarioReportGroup
 	}
 

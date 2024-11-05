@@ -4,8 +4,8 @@ import {check, group} from 'k6'
 export function apiTest() {
 	const res = http.get('https://httpbin.org/get')
 	check(res, {
-		'test api is up': (r) => r.status === 200,
-		'test api is 500': (r) => r.status === 500,
+		'httpbin.org is up': (r) => r.status === 200,
+		'httpbin.org is down': (r) => r.status === 500,
 	})
 
 	group('auth', () => {
@@ -27,7 +27,7 @@ export function apiTest() {
 			const res = http.get('https://httpbin.org/get')
 
 			check(res, {
-				'status is 200 OK': (r) => r.status === 200,
+				'authorized crocodiles are 200 OK': (r) => r.status === 200,
 			})
 		})
 	})
@@ -36,7 +36,7 @@ export function apiTest() {
 		const res = http.get('https://httpbin.org/get')
 
 		check(res, {
-			'status is 200 OK': (r) => r.status === 200,
+			'my crocodiles are 200 OK': (r) => r.status === 200,
 		})
 	})
 }
