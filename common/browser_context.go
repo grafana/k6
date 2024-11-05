@@ -295,6 +295,10 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 func (b *BrowserContext) SetGeolocation(g *Geolocation) error {
 	b.logger.Debugf("BrowserContext:SetGeolocation", "bctxid:%v", b.id)
 
+	if err := g.Validate(); err != nil {
+		return fmt.Errorf("validating geo location: %w", err)
+	}
+
 	b.opts.Geolocation = g
 	for _, p := range b.browser.getPages() {
 		if err := p.updateGeolocation(); err != nil {
