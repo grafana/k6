@@ -2,7 +2,6 @@ package common
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"time"
 
@@ -102,48 +101,6 @@ func NewBrowserContextOptions() *BrowserContextOptions {
 type WaitForEventOptions struct {
 	Timeout     time.Duration
 	PredicateFn sobek.Callable
-}
-
-// NewWaitForEventOptions created a new instance of WaitForEventOptions with a
-// default timeout.
-func NewWaitForEventOptions(defaultTimeout time.Duration) *WaitForEventOptions {
-	return &WaitForEventOptions{
-		Timeout: defaultTimeout,
-	}
-}
-
-// Parse will parse the options or a callable predicate function. It can parse
-// only a callable predicate function or an object which contains a callable
-// predicate function and a timeout.
-func (w *WaitForEventOptions) Parse(ctx context.Context, optsOrPredicate sobek.Value) error {
-	if !sobekValueExists(optsOrPredicate) {
-		return nil
-	}
-
-	var (
-		isCallable bool
-		rt         = k6ext.Runtime(ctx)
-	)
-
-	w.PredicateFn, isCallable = sobek.AssertFunction(optsOrPredicate)
-	if isCallable {
-		return nil
-	}
-
-	opts := optsOrPredicate.ToObject(rt)
-	for _, k := range opts.Keys() {
-		switch k {
-		case "predicate":
-			w.PredicateFn, isCallable = sobek.AssertFunction(opts.Get(k))
-			if !isCallable {
-				return errors.New("predicate function is not callable")
-			}
-		case "timeout": //nolint:goconst
-			w.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
-		}
-	}
-
-	return nil
 }
 
 // GrantPermissionsOptions is used by BrowserContext.GrantPermissions.
