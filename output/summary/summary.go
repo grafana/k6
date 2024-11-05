@@ -3,6 +3,7 @@ package summary
 import (
 	"fmt"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"go.k6.io/k6/lib"
@@ -56,7 +57,7 @@ func (o *Output) Stop() error {
 	for groupName, aggregatedData := range o.dataModel.groupsData {
 		o.logger.Warning(groupName)
 
-		for metricName, sink := range aggregatedData.metrics {
+		for metricName, sink := range aggregatedData.aggregatedMetrics {
 			o.logger.Warning(fmt.Sprintf("  %s: %+v", metricName, sink))
 		}
 	}
@@ -69,14 +70,14 @@ func (o *Output) flushMetrics() {
 	for _, sc := range samples {
 		samples := sc.GetSamples()
 		for _, sample := range samples {
-			o.storeSample(sample)
+			o.flushSample(sample)
 		}
 	}
 }
 
-func (o *Output) storeSample(sample metrics.Sample) {
-	// First, we store the sample data into the global metrics.
-	o.dataModel.storeSample(sample)
+func (o *Output) flushSample(sample metrics.Sample) {
+	// First, we store the sample data into the metrics stored at the k6 metrics registry level.
+	o.storeSample(sample)
 
 	// Then, we'll proceed to store the sample data into each group
 	// metrics. However, we need to determine whether the groups tree
@@ -129,4 +130,20 @@ func (o *Output) MetricsReport(summary *lib.Summary, options lib.Options) lib.Re
 	}
 
 	return report
+}
+
+// storeSample relays the sample to the k6 metrics registry relevant metric.
+//
+// If it's a check-specific metric, it will also update the check's pass/fail counters.
+func (o *Output) storeSample(sample metrics.Sample) {
+	o.dataModel.aggregatedMetrics.relayMetricFrom(sample)
+
+	if checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String()); hasCheckTag && sample.Metric.Name == metrics.ChecksName {
+		check := o.dataModel.checks.checkFor(checkName)
+		if sample.Value == 0 {
+			atomic.AddInt64(&check.Fails, 1)
+		} else {
+			atomic.AddInt64(&check.Passes, 1)
+		}
+	}
 }

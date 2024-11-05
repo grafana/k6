@@ -14,22 +14,6 @@ type dataModel struct {
 	scenarios map[string]aggregatedGroupData
 }
 
-// storeSample differs from addSample in that it stores the metric and the metric sink from the sample,
-// while addSample updates the internally stored metric sink with the sample, which differs from the
-// original metric sink.
-func (d dataModel) storeSample(sample metrics.Sample) {
-	d.metrics.storeSample(sample)
-
-	if checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String()); hasCheckTag && sample.Metric.Name == metrics.ChecksName {
-		check := d.checks.checkFor(checkName)
-		if sample.Value == 0 {
-			atomic.AddInt64(&check.Fails, 1)
-		} else {
-			atomic.AddInt64(&check.Passes, 1)
-		}
-	}
-}
-
 func newDataModel() dataModel {
 	return dataModel{
 		aggregatedGroupData: newAggregatedGroupData(),
@@ -46,16 +30,16 @@ func (d dataModel) groupDataFor(scenario string) aggregatedGroupData {
 }
 
 type aggregatedGroupData struct {
-	checks     *aggregatedChecksData
-	metrics    aggregatedMetricData
-	groupsData map[string]aggregatedGroupData
+	checks            *aggregatedChecksData
+	aggregatedMetrics aggregatedMetricData
+	groupsData        map[string]aggregatedGroupData
 }
 
 func newAggregatedGroupData() aggregatedGroupData {
 	return aggregatedGroupData{
-		checks:     newAggregatedChecksData(),
-		metrics:    make(map[string]aggregatedMetric),
-		groupsData: make(map[string]aggregatedGroupData),
+		checks:            newAggregatedChecksData(),
+		aggregatedMetrics: make(map[string]aggregatedMetric),
+		groupsData:        make(map[string]aggregatedGroupData),
 	}
 }
 
@@ -67,11 +51,11 @@ func (a aggregatedGroupData) groupDataFor(group string) aggregatedGroupData {
 	return a.groupsData[group]
 }
 
-// addSample differs from storeSample in that it updates the internally stored metric sink with the sample,
-// which differs from the original metric sink, while storeSample stores the metric and the metric sink from
+// addSample differs from relayMetricFrom in that it updates the internally stored metric sink with the sample,
+// which differs from the original metric sink, while relayMetricFrom stores the metric and the metric sink from
 // the sample.
 func (a aggregatedGroupData) addSample(sample metrics.Sample) {
-	a.metrics.addSample(sample)
+	a.aggregatedMetrics.addSample(sample)
 
 	if checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String()); hasCheckTag && sample.Metric.Name == metrics.ChecksName {
 		check := a.checks.checkFor(checkName)
@@ -83,17 +67,15 @@ func (a aggregatedGroupData) addSample(sample metrics.Sample) {
 	}
 }
 
+// aggregatedMetricData is a container that can either hold a reference to a k6 metric stored in the registry, or
+// hold a pointer to such metric but keeping a separated Sink of values in order to keep an aggregated view of the
+// metric values. The latter is useful for tracking aggregated metric values specific to a group or scenario.
 type aggregatedMetricData map[string]aggregatedMetric
 
-func (a aggregatedMetricData) addSample(sample metrics.Sample) {
-	if _, exists := a[sample.Metric.Name]; !exists {
-		a[sample.Metric.Name] = newAggregatedMetric(sample.Metric)
-	}
-
-	a[sample.Metric.Name].Sink.Add(sample)
-}
-
-func (a aggregatedMetricData) storeSample(sample metrics.Sample) {
+// relayMetricFrom stores the metric and the metric sink from the sample. It makes the underlying metric of our
+// report's aggregatedMetricData point directly to a metric in the k6 registry, and relies on that specific pointed
+// at metrics internal state for its computations.
+func (a aggregatedMetricData) relayMetricFrom(sample metrics.Sample) {
 	if _, exists := a[sample.Metric.Name]; !exists {
 		a[sample.Metric.Name] = aggregatedMetric{
 			Metric: sample.Metric,
@@ -102,9 +84,28 @@ func (a aggregatedMetricData) storeSample(sample metrics.Sample) {
 	}
 }
 
+// addSample stores the value of the sample in a separate internal sink completely detached from the underlying metrics.
+// This allows to keep an aggregated view of the values specific to a group or scenario.
+func (a aggregatedMetricData) addSample(sample metrics.Sample) {
+	if _, exists := a[sample.Metric.Name]; !exists {
+		a[sample.Metric.Name] = newAggregatedMetric(sample.Metric)
+	}
+
+	a[sample.Metric.Name].Sink.Add(sample)
+}
+
+// FIXME (@joan): rename this to make it explicit this is different from an actual k6 metric, and this is used
+// only to keep an aggregated view of specific metric-check-group-scenario-thresholds set of values.
 type aggregatedMetric struct {
+	// FIXME (@joan): Drop this and replace it with a concrete copy of the metric data we want to track
+	// to avoid any potential confusion.
 	Metric *metrics.Metric
-	Sink   metrics.Sink
+
+	// FIXME (@joan): Introduce our own way of tracking thresholds, and whether they're crossed or not.
+	// Without relying on the internal submetrics the engine maintains specifically for thresholds.
+	// Thresholds []OurThreshold // { crossed: boolean }
+
+	Sink metrics.Sink
 }
 
 func newAggregatedMetric(metric *metrics.Metric) aggregatedMetric {
@@ -174,7 +175,7 @@ func populateReportGroup(
 		}
 	}
 
-	for _, metricData := range groupData.metrics {
+	for _, metricData := range groupData.aggregatedMetrics {
 		storeMetric(
 			reportGroup.Metrics,
 			lib.ReportMetricInfo{
@@ -203,7 +204,7 @@ func populateReportChecks(
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) {
-	checksMetric, exists := groupData.metrics[metrics.ChecksName]
+	checksMetric, exists := groupData.aggregatedMetrics[metrics.ChecksName]
 	if !exists {
 		return
 	}
