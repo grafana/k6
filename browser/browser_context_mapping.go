@@ -186,6 +186,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 	}
 }
 
+// waitForEventOptions are the options used by the browserContext.waitForEvent API.
+type waitForEventOptions struct {
+	Timeout     time.Duration
+	PredicateFn sobek.Callable
+}
+
 // parseWaitForEventOptions parses optsOrPredicate into a WaitForEventOptions.
 // It returns a WaitForEventOptions with the default timeout if optsOrPredicate is nil,
 // or not a callable predicate function.
