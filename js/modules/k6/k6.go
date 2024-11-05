@@ -3,7 +3,6 @@ package k6
 
 import (
 	"errors"
-	"fmt"
 	"math/rand"
 	"strings"
 	"time"
@@ -23,9 +22,6 @@ var (
 	// ErrCheckInInitContext is returned when check() are using in the init context.
 	ErrCheckInInitContext = common.NewInitContextError("Using check() in the init context is not supported")
 )
-
-const asyncFunctionNotSupportedMsg = "%s() does not support async functions as arguments, " +
-	"please see https://grafana.com/docs/k6/latest/javascript-api/k6/group/#working-with-async-functions for more info"
 
 type (
 	// RootModule is the global module instance that will create module
@@ -104,7 +100,8 @@ func (mi *K6) Group(name string, val sobek.Value) (sobek.Value, error) {
 		return nil, errors.New("group() requires a callback as a second argument")
 	}
 	if common.IsAsyncFunction(mi.vu.Runtime(), val) {
-		return sobek.Undefined(), fmt.Errorf(asyncFunctionNotSupportedMsg, "group")
+		return sobek.Undefined(), errors.New("group() does not support async functions as arguments, " +
+			"please see https://grafana.com/docs/k6/latest/javascript-api/k6/group/#working-with-async-functions for more info")
 	}
 	oldGroupName, _ := state.Tags.GetCurrentValues().Tags.Get(metrics.TagGroup.String())
 	// TODO: what are we doing if group is not tagged
@@ -182,7 +179,9 @@ func (mi *K6) Check(arg0, checks sobek.Value, extras ...sobek.Value) (bool, erro
 		}
 
 		if common.IsAsyncFunction(rt, val) {
-			return false, fmt.Errorf(asyncFunctionNotSupportedMsg, "check")
+			return false, errors.New("built-in check() does not support async functions as arguments, " +
+				"please switch to JavaScript replacement, see " +
+				"https://grafana.com/docs/k6/latest/javascript-api/jslib/utils/check/ for more info")
 		}
 
 		// Resolve callables into values.
