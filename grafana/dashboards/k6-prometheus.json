@@ -1571,13 +1571,13 @@
               },
               "Value #D": {
                 "aggregations": [
-                  "mean"
+                  "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
               "Value #E": {
                 "aggregations": [
-                  "mean"
+                  "lastNotNull"
                 ],
                 "operation": "aggregate"
               },
@@ -1618,9 +1618,9 @@
               "Value #C": "max",
               "Value #C (max)": "max",
               "Value #D": "p95",
-              "Value #D (mean)": "p95",
+              "Value #D (lastNotNull)": "p95",
               "Value #E": "p99",
-              "Value #E (mean)": "p99"
+              "Value #E (lastNotNull)": "p99"
             }
           }
         }
