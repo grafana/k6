@@ -464,7 +464,7 @@ func (h *ElementHandle) scrollRectIntoViewIfNeeded(apiCtx context.Context, rect 
 	return nil
 }
 
-func (h *ElementHandle) press(apiCtx context.Context, key string, opts *KeyboardOptions) error {
+func (h *ElementHandle) press(apiCtx context.Context, key string, opts KeyboardOptions) error {
 	err := h.focus(apiCtx, true)
 	if err != nil {
 		return err
@@ -611,7 +611,7 @@ func (h *ElementHandle) textContent(apiCtx context.Context) (any, error) {
 	return h.eval(apiCtx, opts, js)
 }
 
-func (h *ElementHandle) typ(apiCtx context.Context, text string, opts *KeyboardOptions) error {
+func (h *ElementHandle) typ(apiCtx context.Context, text string, opts KeyboardOptions) error {
 	err := h.focus(apiCtx, true)
 	if err != nil {
 		return err

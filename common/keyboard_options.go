@@ -8,12 +8,14 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 )
 
+// KeyboardOptions represents the options for the keyboard.
 type KeyboardOptions struct {
 	Delay int64 `json:"delay"`
 }
 
-func NewKeyboardOptions() *KeyboardOptions {
-	return &KeyboardOptions{
+// NewKeyboardOptions returns a new KeyboardOptions.
+func NewKeyboardOptions() KeyboardOptions {
+	return KeyboardOptions{
 		Delay: 0,
 	}
 }
@@ -30,5 +32,6 @@ func (o *KeyboardOptions) Parse(ctx context.Context, opts sobek.Value) error {
 			}
 		}
 	}
+
 	return nil
 }
