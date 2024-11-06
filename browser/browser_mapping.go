@@ -110,94 +110,13 @@ func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
 }
 
 // parseBrowserContextOptions parses the [common.BrowserContext] options from a Sobek value.
-func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.BrowserContextOptions, error) { //nolint:cyclop,funlen,gocognit,lll
+func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.BrowserContextOptions, error) {
 	if !sobekValueExists(opts) {
 		return nil, nil //nolint:nilnil
 	}
-
 	b := common.NewBrowserContextOptions()
-
-	rt := k6ext.Runtime(ctx)
-	o := opts.ToObject(rt)
-	for _, k := range o.Keys() {
-		switch k {
-		case "acceptDownloads":
-			b.AcceptDownloads = o.Get(k).ToBoolean()
-		case "downloadsPath":
-			b.DownloadsPath = o.Get(k).String()
-		case "bypassCSP":
-			b.BypassCSP = o.Get(k).ToBoolean()
-		case "colorScheme":
-			switch common.ColorScheme(o.Get(k).String()) { //nolint:exhaustive
-			case "light":
-				b.ColorScheme = common.ColorSchemeLight
-			case "dark":
-				b.ColorScheme = common.ColorSchemeDark
-			default:
-				b.ColorScheme = common.ColorSchemeNoPreference
-			}
-		case "deviceScaleFactor":
-			b.DeviceScaleFactor = o.Get(k).ToFloat()
-		case "extraHTTPHeaders":
-			headers := o.Get(k).ToObject(rt)
-			for _, k := range headers.Keys() {
-				b.ExtraHTTPHeaders[k] = headers.Get(k).String()
-			}
-		case "geolocation":
-			gl, err := exportTo[*common.Geolocation](rt, o.Get(k))
-			if err != nil {
-				return nil, fmt.Errorf("parsing geolocation options: %w", err)
-			}
-			b.Geolocation = gl
-		case "hasTouch":
-			b.HasTouch = o.Get(k).ToBoolean()
-		case "httpCredentials":
-			var err error
-			b.HTTPCredentials, err = exportTo[common.Credentials](rt, o.Get(k))
-			if err != nil {
-				return nil, fmt.Errorf("parsing HTTP credential options: %w", err)
-			}
-		case "ignoreHTTPSErrors":
-			b.IgnoreHTTPSErrors = o.Get(k).ToBoolean()
-		case "isMobile":
-			b.IsMobile = o.Get(k).ToBoolean()
-		case "javaScriptEnabled":
-			b.JavaScriptEnabled = o.Get(k).ToBoolean()
-		case "locale":
-			b.Locale = o.Get(k).String()
-		case "offline":
-			b.Offline = o.Get(k).ToBoolean()
-		case "permissions":
-			var err error
-			b.Permissions, err = exportTo[[]string](rt, o.Get(k))
-			if err != nil {
-				return nil, fmt.Errorf("parsing permissions options: %w", err)
-			}
-		case "reducedMotion":
-			switch common.ReducedMotion(o.Get(k).String()) { //nolint:exhaustive
-			case "reduce":
-				b.ReducedMotion = common.ReducedMotionReduce
-			default:
-				b.ReducedMotion = common.ReducedMotionNoPreference
-			}
-		case "screen":
-			var err error
-			b.Screen, err = exportTo[common.Screen](rt, o.Get(k))
-			if err != nil {
-				return nil, fmt.Errorf("parsing screen options: %w", err)
-			}
-		case "timezoneID":
-			b.TimezoneID = o.Get(k).String()
-		case "userAgent":
-			b.UserAgent = o.Get(k).String()
-		case "viewport":
-			var err error
-			b.Viewport, err = exportTo[common.Viewport](rt, o.Get(k))
-			if err != nil {
-				return nil, fmt.Errorf("parsing viewport options: %w", err)
-			}
-		}
+	if err := k6ext.Runtime(ctx).ExportTo(opts, &b); err != nil {
+		return nil, err //nolint:wrapcheck
 	}
-
 	return b, nil
 }
