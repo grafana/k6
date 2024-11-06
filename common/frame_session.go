@@ -1149,7 +1149,7 @@ func (fs *FrameSession) updateHTTPCredentials(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateHttpCredentials", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	credentials := fs.page.browserCtx.opts.HTTPCredentials
-	if !initial || credentials != (Credentials{}) {
+	if !initial || !credentials.IsEmpty() {
 		return fs.networkManager.Authenticate(credentials)
 	}
 

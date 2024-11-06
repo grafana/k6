@@ -614,7 +614,7 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 	case m.attemptedAuth[rid]:
 		delete(m.attemptedAuth, rid)
 		res = fetch.AuthChallengeResponseResponseCancelAuth
-	case m.credentials != Credentials{}:
+	case !m.credentials.IsEmpty():
 		// TODO: remove requests from attemptedAuth when:
 		//       - request is redirected
 		//       - loading finished
@@ -721,7 +721,7 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 // Authenticate sets HTTP authentication credentials to use.
 func (m *NetworkManager) Authenticate(credentials Credentials) error {
 	m.credentials = credentials
-	if credentials != (Credentials{}) {
+	if !credentials.IsEmpty() {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
