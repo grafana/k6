@@ -20,6 +20,11 @@ const (
 	ModifierKeyShift
 )
 
+// KeyboardOptions represents the options for the keyboard.
+type KeyboardOptions struct {
+	Delay int64 `json:"delay"`
+}
+
 // Keyboard represents a keyboard input device.
 // Each Page has a publicly accessible Keyboard.
 type Keyboard struct {
