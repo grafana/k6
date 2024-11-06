@@ -461,7 +461,7 @@ func NewFramePressOptions(defaultTimeout time.Duration) *FramePressOptions {
 
 // ToKeyboardOptions converts FramePressOptions to KeyboardOptions.
 func (o *FramePressOptions) ToKeyboardOptions() KeyboardOptions {
-	o2 := NewKeyboardOptions()
+	var o2 KeyboardOptions
 	o2.Delay = o.Delay
 	return o2
 }
@@ -583,7 +583,7 @@ func NewFrameTypeOptions(defaultTimeout time.Duration) *FrameTypeOptions {
 
 // ToKeyboardOptions converts FrameTypeOptions to KeyboardOptions.
 func (o *FrameTypeOptions) ToKeyboardOptions() KeyboardOptions {
-	o2 := NewKeyboardOptions()
+	var o2 KeyboardOptions
 	o2.Delay = o.Delay
 	return o2
 }
