@@ -1085,7 +1085,7 @@ func (h *ElementHandle) Press(key string, opts sobek.Value) error {
 	}
 
 	press := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return nil, handle.press(apiCtx, key, NewKeyboardOptions())
+		return nil, handle.press(apiCtx, key, KeyboardOptions{})
 	}
 	pressAction := h.newAction(
 		[]string{}, press, false, popts.NoWaitAfter, popts.Timeout,
@@ -1457,7 +1457,7 @@ func (h *ElementHandle) Type(text string, opts sobek.Value) error {
 	}
 
 	typ := func(apiCtx context.Context, handle *ElementHandle) (any, error) {
-		return nil, handle.typ(apiCtx, text, NewKeyboardOptions())
+		return nil, handle.typ(apiCtx, text, KeyboardOptions{})
 	}
 	typeAction := h.newAction(
 		[]string{}, typ, false, popts.NoWaitAfter, popts.Timeout,
