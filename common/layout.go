@@ -102,12 +102,12 @@ func (v Viewport) String() string {
 	return fmt.Sprintf("%dx%d", v.Width, v.Height)
 }
 
-// calculateInset depending on a given operating system and,
-// add the calculated inset width and height to Viewport.
-// It won't update the Viewport if headless is true.
-func (v *Viewport) calculateInset(headless bool, os string) {
+// recalculateInset is used to calculate the inset width and height
+// depending on the operating system and add it to the given v, and
+// return a new Viewport. It returns the same Viewport if headless is true.
+func (v Viewport) recalculateInset(headless bool, os string) Viewport {
 	if headless {
-		return
+		return v
 	}
 	// TODO: popup windows have their own insets.
 	var inset Viewport
@@ -123,6 +123,9 @@ func (v *Viewport) calculateInset(headless bool, os string) {
 		// on my Mac and w:0 h:79 works best.
 		inset = Viewport{Width: 0, Height: 79}
 	}
-	v.Width += inset.Width
-	v.Height += inset.Height
+
+	return Viewport{
+		Width:  v.Width + inset.Width,
+		Height: v.Height + inset.Height,
+	}
 }

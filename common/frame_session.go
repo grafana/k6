@@ -1232,7 +1232,7 @@ func (fs *FrameSession) updateViewport() error {
 	if fs.hasUIWindow {
 		// add an inset to viewport depending on the operating system.
 		// this won't add an inset if we're running in headless mode.
-		viewport.calculateInset(
+		viewport = viewport.recalculateInset(
 			fs.page.browserCtx.browser.browserOpts.Headless,
 			runtime.GOOS,
 		)

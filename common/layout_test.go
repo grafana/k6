@@ -14,7 +14,7 @@ func TestViewportCalculateInset(t *testing.T) {
 		t.Parallel()
 
 		headless, vp := true, Viewport{}
-		vp.calculateInset(headless, "any os")
+		vp = vp.recalculateInset(headless, "any os")
 		assert.Equal(t, vp, Viewport{},
 			"should not change the viewport if headless is true")
 	})
@@ -26,7 +26,7 @@ func TestViewportCalculateInset(t *testing.T) {
 			headless bool
 			vp       Viewport
 		)
-		vp.calculateInset(headless, "any os")
+		vp = vp.recalculateInset(headless, "any os")
 		assert.NotEqual(t, vp, Viewport{},
 			"should add the default inset to the viewport if the"+
 				" operating system is unrecognized by the addInset.")
@@ -44,10 +44,10 @@ func TestViewportCalculateInset(t *testing.T) {
 				vp       Viewport
 			)
 			// add the default inset to the viewport
-			vp.calculateInset(headless, "any os")
+			vp = vp.recalculateInset(headless, "any os")
 			defaultVp := vp
 			// add an os specific inset to the viewport
-			vp.calculateInset(headless, os)
+			vp = vp.recalculateInset(headless, os)
 
 			assert.NotEqual(t, vp, defaultVp, "inset for %q should exist", os)
 			// we multiply the default viewport by two to detect
