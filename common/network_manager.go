@@ -26,7 +26,6 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
-	"github.com/grafana/sobek"
 )
 
 // Credentials holds HTTP authentication credentials.
@@ -729,12 +728,6 @@ func (m *NetworkManager) Authenticate(credentials Credentials) error {
 	}
 
 	return nil
-}
-
-// ExtraHTTPHeaders returns the currently set extra HTTP request headers.
-func (m *NetworkManager) ExtraHTTPHeaders() sobek.Value {
-	rt := m.vu.Runtime()
-	return rt.ToValue(m.extraHTTPHeaders)
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
