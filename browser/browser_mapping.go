@@ -191,11 +191,11 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 		case "userAgent":
 			b.UserAgent = o.Get(k).String()
 		case "viewport":
-			var viewport common.Viewport
-			if err := viewport.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+			var err error
+			b.Viewport, err = exportTo[common.Viewport](rt, o.Get(k))
+			if err != nil {
 				return nil, fmt.Errorf("parsing viewport options: %w", err)
 			}
-			b.Viewport = viewport
 		}
 	}
 
