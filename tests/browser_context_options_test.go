@@ -32,7 +32,7 @@ func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 	assert.False(t, opts.Offline)
 	assert.Empty(t, opts.Permissions)
 	assert.Equal(t, common.ReducedMotionNoPreference, opts.ReducedMotion)
-	assert.Equal(t, &common.Screen{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Screen)
+	assert.Equal(t, common.Screen{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Screen)
 	assert.Equal(t, "", opts.TimezoneID)
 	assert.Equal(t, "", opts.UserAgent)
 	assert.Equal(t, &common.Viewport{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Viewport)

@@ -178,11 +178,11 @@ func (c *ColorScheme) UnmarshalJSON(b []byte) error {
 // EmulatedSize represents the emulated viewport and screen sizes.
 type EmulatedSize struct {
 	Viewport *Viewport
-	Screen   *Screen
+	Screen   Screen
 }
 
 // NewEmulatedSize creates and returns a new EmulatedSize.
-func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
+func NewEmulatedSize(viewport *Viewport, screen Screen) *EmulatedSize {
 	return &EmulatedSize{
 		Viewport: viewport,
 		Screen:   screen,
@@ -743,7 +743,7 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}
-	screen := &Screen{
+	screen := Screen{
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}

@@ -185,7 +185,7 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 			if err := screen.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
 				return nil, fmt.Errorf("parsing screen options: %w", err)
 			}
-			b.Screen = &screen
+			b.Screen = screen
 		case "timezoneID":
 			b.TimezoneID = o.Get(k).String()
 		case "userAgent":

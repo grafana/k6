@@ -78,7 +78,7 @@ type BrowserContextOptions struct {
 	Offline           bool              `js:"offline"`
 	Permissions       []string          `js:"permissions"`
 	ReducedMotion     ReducedMotion     `js:"reducedMotion"`
-	Screen            *Screen           `js:"screen"`
+	Screen            Screen            `js:"screen"`
 	TimezoneID        string            `js:"timezoneID"`
 	UserAgent         string            `js:"userAgent"`
 	VideosPath        string            `js:"videosPath"`
@@ -95,7 +95,7 @@ func NewBrowserContextOptions() *BrowserContextOptions {
 		Locale:            DefaultLocale,
 		Permissions:       []string{},
 		ReducedMotion:     ReducedMotionNoPreference,
-		Screen:            &Screen{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
+		Screen:            Screen{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
 		Viewport:          &Viewport{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
 	}
 }
