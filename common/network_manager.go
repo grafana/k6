@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -32,6 +33,15 @@ import (
 type Credentials struct {
 	Username string `js:"username"`
 	Password string `js:"password"`
+}
+
+// IsEmpty returns true if the credentials are empty.
+func (c Credentials) IsEmpty() bool {
+	c = Credentials{
+		Username: strings.TrimSpace(c.Username),
+		Password: strings.TrimSpace(c.Password),
+	}
+	return c == (Credentials{})
 }
 
 type metricInterceptor interface {
