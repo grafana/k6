@@ -110,12 +110,9 @@ func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
 
 // parseBrowserContextOptions parses the [common.BrowserContext] options from a Sobek value.
 func parseBrowserContextOptions(rt *sobek.Runtime, opts sobek.Value) (*common.BrowserContextOptions, error) {
-	if !sobekValueExists(opts) {
-		return nil, nil //nolint:nilnil
-	}
 	b := common.NewBrowserContextOptions()
-	if err := rt.ExportTo(opts, &b); err != nil {
-		return nil, err //nolint:wrapcheck
+	if err := mergeWith(rt, b, opts); err != nil {
+		return nil, err
 	}
 	return b, nil
 }
