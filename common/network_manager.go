@@ -47,7 +47,7 @@ type NetworkManager struct {
 	session       session
 	parent        *NetworkManager
 	frameManager  *FrameManager
-	credentials   *Credentials
+	credentials   Credentials
 	resolver      k6netext.Resolver
 	vu            k6modules.VU
 	customMetrics *k6ext.CustomMetrics
@@ -604,7 +604,7 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 	case m.attemptedAuth[rid]:
 		delete(m.attemptedAuth, rid)
 		res = fetch.AuthChallengeResponseResponseCancelAuth
-	case m.credentials != nil:
+	case m.credentials != Credentials{}:
 		// TODO: remove requests from attemptedAuth when:
 		//       - request is redirected
 		//       - loading finished
@@ -709,9 +709,9 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 }
 
 // Authenticate sets HTTP authentication credentials to use.
-func (m *NetworkManager) Authenticate(credentials *Credentials) error {
+func (m *NetworkManager) Authenticate(credentials Credentials) error {
 	m.credentials = credentials
-	if credentials != nil {
+	if credentials != (Credentials{}) {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {

@@ -96,7 +96,7 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			}), nil
 		},
 		"setHTTPCredentials": func(httpCredentials sobek.Value) (*sobek.Promise, error) {
-			creds, err := exportTo[*common.Credentials](rt, httpCredentials)
+			creds, err := exportTo[common.Credentials](rt, httpCredentials)
 			if err != nil {
 				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
 			}
