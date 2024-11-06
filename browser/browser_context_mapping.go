@@ -96,12 +96,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			}), nil
 		},
 		"setHTTPCredentials": func(httpCredentials sobek.Value) (*sobek.Promise, error) {
-			pc := common.NewCredentials()
-			if err := pc.Parse(vu.Context(), httpCredentials); err != nil {
+			creds, err := exportTo[*common.Credentials](rt, httpCredentials)
+			if err != nil {
 				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, bc.SetHTTPCredentials(pc) //nolint:staticcheck
+				return nil, bc.SetHTTPCredentials(creds) //nolint:staticcheck
 			}), nil
 		},
 		"setOffline": func(offline bool) *sobek.Promise {
