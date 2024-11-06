@@ -106,29 +106,6 @@ type Screen struct {
 	Height int64 `js:"height"`
 }
 
-const (
-	screenWidth  = "width"
-	screenHeight = "height"
-)
-
-// Parse parses the given screen options.
-func (s *Screen) Parse(ctx context.Context, screen sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if screen != nil && !sobek.IsUndefined(screen) && !sobek.IsNull(screen) {
-		screen := screen.ToObject(rt)
-		for _, k := range screen.Keys() {
-			switch k {
-			case screenWidth:
-				s.Width = screen.Get(k).ToInteger()
-			case screenHeight:
-				s.Height = screen.Get(k).ToInteger()
-			}
-		}
-	}
-
-	return nil
-}
-
 // ColorScheme represents a browser color scheme.
 type ColorScheme string
 
