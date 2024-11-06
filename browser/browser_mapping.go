@@ -1,7 +1,6 @@
 package browser
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/grafana/sobek"
@@ -37,7 +36,7 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
 			return b.IsConnected(), nil
 		},
 		"newContext": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseBrowserContextOptions(vu.Context(), opts)
+			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
 			}
@@ -72,7 +71,7 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
 			return b.Version(), nil
 		},
 		"newPage": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts, err := parseBrowserContextOptions(vu.Context(), opts)
+			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
 			}
@@ -110,12 +109,12 @@ func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
 }
 
 // parseBrowserContextOptions parses the [common.BrowserContext] options from a Sobek value.
-func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.BrowserContextOptions, error) {
+func parseBrowserContextOptions(rt *sobek.Runtime, opts sobek.Value) (*common.BrowserContextOptions, error) {
 	if !sobekValueExists(opts) {
 		return nil, nil //nolint:nilnil
 	}
 	b := common.NewBrowserContextOptions()
-	if err := k6ext.Runtime(ctx).ExportTo(opts, &b); err != nil {
+	if err := rt.ExportTo(opts, &b); err != nil {
 		return nil, err //nolint:wrapcheck
 	}
 	return b, nil

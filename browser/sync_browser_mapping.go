@@ -32,7 +32,7 @@ func syncMapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			return b.IsConnected(), nil
 		},
 		"newContext": func(opts sobek.Value) (*sobek.Object, error) {
-			popts, err := parseBrowserContextOptions(vu.Context(), opts)
+			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
 			}
@@ -69,7 +69,7 @@ func syncMapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
 			return b.Version(), nil
 		},
 		"newPage": func(opts sobek.Value) (mapping, error) {
-			popts, err := parseBrowserContextOptions(vu.Context(), opts)
+			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
 			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
 			}

@@ -12,7 +12,7 @@ import (
 func TestBrowserContextOptionsPermissions(t *testing.T) {
 	vu := k6test.NewVU(t)
 
-	opts, err := parseBrowserContextOptions(vu.Context(), vu.ToSobekValue((struct {
+	opts, err := parseBrowserContextOptions(vu.Runtime(), vu.ToSobekValue((struct {
 		Permissions []any `js:"permissions"`
 	}{
 		Permissions: []any{"camera", "microphone"},
@@ -25,7 +25,7 @@ func TestBrowserContextOptionsPermissions(t *testing.T) {
 func TestBrowserContextSetGeolocation(t *testing.T) {
 	vu := k6test.NewVU(t)
 
-	opts, err := parseBrowserContextOptions(vu.Context(), vu.ToSobekValue((struct {
+	opts, err := parseBrowserContextOptions(vu.Runtime(), vu.ToSobekValue((struct {
 		GeoLocation *common.Geolocation `js:"geolocation"`
 	}{
 		GeoLocation: &common.Geolocation{
