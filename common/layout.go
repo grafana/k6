@@ -80,24 +80,6 @@ type Viewport struct {
 	Height int64 `js:"height"`
 }
 
-// Parse viewport details from a given sobek viewport value.
-func (v *Viewport) Parse(ctx context.Context, viewport sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if viewport != nil && !sobek.IsUndefined(viewport) && !sobek.IsNull(viewport) {
-		viewport := viewport.ToObject(rt)
-		for _, k := range viewport.Keys() {
-			switch k {
-			case "width":
-				v.Width = viewport.Get(k).ToInteger()
-			case "height":
-				v.Height = viewport.Get(k).ToInteger()
-			}
-		}
-	}
-
-	return nil
-}
-
 // IsEmpty returns true if the viewport is empty.
 func (v Viewport) IsEmpty() bool {
 	return v.Width == 0 && v.Height == 0
