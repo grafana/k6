@@ -181,11 +181,11 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 				b.ReducedMotion = common.ReducedMotionNoPreference
 			}
 		case "screen":
-			var screen common.Screen
-			if err := screen.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+			var err error
+			b.Screen, err = exportTo[common.Screen](rt, o.Get(k))
+			if err != nil {
 				return nil, fmt.Errorf("parsing screen options: %w", err)
 			}
-			b.Screen = screen
 		case "timezoneID":
 			b.TimezoneID = o.Get(k).String()
 		case "userAgent":
