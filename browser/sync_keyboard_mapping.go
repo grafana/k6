@@ -13,7 +13,7 @@ func syncMapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 		"down": kb.Down,
 		"up":   kb.Up,
 		"press": func(key string, opts sobek.Value) error {
-			kbdOpts := common.NewKeyboardOptions()
+			var kbdOpts common.KeyboardOptions
 			if err := kbdOpts.Parse(vu.Context(), opts); err != nil {
 				return fmt.Errorf("parsing keyboard options: %w", err)
 			}
@@ -21,7 +21,7 @@ func syncMapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 			return kb.Press(key, kbdOpts) //nolint:wrapcheck
 		},
 		"type": func(text string, opts sobek.Value) error {
-			kbdOpts := common.NewKeyboardOptions()
+			var kbdOpts common.KeyboardOptions
 			if err := kbdOpts.Parse(vu.Context(), opts); err != nil {
 				return fmt.Errorf("parsing keyboard options: %w", err)
 			}
