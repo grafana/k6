@@ -1,12 +1,7 @@
 package common
 
 import (
-	"context"
 	"fmt"
-
-	"github.com/grafana/sobek"
-
-	"github.com/grafana/xk6-browser/k6ext"
 )
 
 // Geolocation represents a geolocation.
@@ -32,31 +27,6 @@ func (g *Geolocation) Validate() error {
 	if g.Accuracy < 0 {
 		return fmt.Errorf(`invalid accuracy "%.2f": precondition 0 <= ACCURACY failed`, g.Accuracy)
 	}
-	return nil
-}
-
-// Parse parses the geolocation options.
-func (g *Geolocation) Parse(ctx context.Context, sopts sobek.Value) error { //nolint:cyclop
-	var newgl Geolocation
-
-	if !sobekValueExists(sopts) {
-		return fmt.Errorf("geolocation options are required")
-	}
-
-	opts := sopts.ToObject(k6ext.Runtime(ctx))
-	for _, k := range opts.Keys() {
-		switch k {
-		case "accuracy":
-			newgl.Accuracy = opts.Get(k).ToFloat()
-		case "latitude":
-			newgl.Latitude = opts.Get(k).ToFloat()
-		case "longitude":
-			newgl.Longitude = opts.Get(k).ToFloat()
-		}
-	}
-
-	*g = newgl
-
 	return nil
 }
 
