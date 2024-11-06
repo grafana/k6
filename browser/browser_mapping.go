@@ -168,10 +168,10 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 		case "offline":
 			b.Offline = o.Get(k).ToBoolean()
 		case "permissions":
-			if ps, ok := o.Get(k).Export().([]any); ok {
-				for _, p := range ps {
-					b.Permissions = append(b.Permissions, fmt.Sprintf("%v", p))
-				}
+			var err error
+			b.Permissions, err = exportTo[[]string](rt, o.Get(k))
+			if err != nil {
+				return nil, fmt.Errorf("parsing permissions options: %w", err)
 			}
 		case "reducedMotion":
 			switch common.ReducedMotion(o.Get(k).String()) { //nolint:exhaustive
