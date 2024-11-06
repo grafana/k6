@@ -34,29 +34,6 @@ type Credentials struct {
 	Password string `js:"password"`
 }
 
-// NewCredentials return a new Credentials.
-func NewCredentials() *Credentials {
-	return &Credentials{}
-}
-
-// Parse credentials details from a given sobek credentials value.
-func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error {
-	if !sobekValueExists(credentials) {
-		return errors.New("credentials are required")
-	}
-	o := credentials.ToObject(k6ext.Runtime(ctx))
-	for _, k := range o.Keys() {
-		switch k {
-		case "username":
-			c.Username = o.Get(k).String()
-		case "password":
-			c.Password = o.Get(k).String()
-		}
-	}
-
-	return nil
-}
-
 type metricInterceptor interface {
 	urlTagName(urlTag string, method string) (string, bool)
 }
