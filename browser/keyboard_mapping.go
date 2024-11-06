@@ -32,12 +32,11 @@ func mapKeyboard(vu moduleVU, kb *common.Keyboard) mapping {
 		},
 		"type": func(text string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				var kbdOpts common.KeyboardOptions
-				if err := kbdOpts.Parse(vu.Context(), opts); err != nil {
+				kbopts, err := exportTo[common.KeyboardOptions](vu.Runtime(), opts)
+				if err != nil {
 					return nil, fmt.Errorf("parsing keyboard options: %w", err)
 				}
-
-				return nil, kb.Type(text, kbdOpts) //nolint:wrapcheck
+				return nil, kb.Type(text, kbopts)
 			})
 		},
 		"insertText": func(text string) *sobek.Promise {
