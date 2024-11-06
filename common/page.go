@@ -275,7 +275,7 @@ func NewPage(
 
 	// We need to init viewport and screen size before initializing the main frame session,
 	// as that's where the emulation is activated.
-	if bctx.opts.Viewport != (Viewport{}) {
+	if !bctx.opts.Viewport.IsEmpty() {
 		p.emulatedSize = NewEmulatedSize(bctx.opts.Viewport, bctx.opts.Screen)
 	}
 
