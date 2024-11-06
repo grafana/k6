@@ -82,7 +82,7 @@ type BrowserContextOptions struct {
 	TimezoneID        string            `js:"timezoneID"`
 	UserAgent         string            `js:"userAgent"`
 	VideosPath        string            `js:"videosPath"`
-	Viewport          *Viewport         `js:"viewport"`
+	Viewport          Viewport          `js:"viewport"`
 }
 
 // NewBrowserContextOptions creates a default set of browser context options.
@@ -96,7 +96,7 @@ func NewBrowserContextOptions() *BrowserContextOptions {
 		Permissions:       []string{},
 		ReducedMotion:     ReducedMotionNoPreference,
 		Screen:            Screen{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
-		Viewport:          &Viewport{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
+		Viewport:          Viewport{Width: DefaultScreenWidth, Height: DefaultScreenHeight},
 	}
 }
 

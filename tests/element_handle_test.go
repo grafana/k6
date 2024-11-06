@@ -183,7 +183,7 @@ func TestElementHandleClickConcealedLink(t *testing.T) {
 	tb := newTestBrowser(t, withFileServer())
 
 	bcopts := common.NewBrowserContextOptions()
-	bcopts.Viewport = &common.Viewport{
+	bcopts.Viewport = common.Viewport{
 		Width:  500,
 		Height: 240,
 	}

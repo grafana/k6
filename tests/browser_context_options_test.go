@@ -35,7 +35,7 @@ func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 	assert.Equal(t, common.Screen{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Screen)
 	assert.Equal(t, "", opts.TimezoneID)
 	assert.Equal(t, "", opts.UserAgent)
-	assert.Equal(t, &common.Viewport{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Viewport)
+	assert.Equal(t, common.Viewport{Width: common.DefaultScreenWidth, Height: common.DefaultScreenHeight}, opts.Viewport)
 }
 
 func TestBrowserContextOptionsDefaultViewport(t *testing.T) {
@@ -53,7 +53,7 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 
 	tb := newTestBrowser(t)
 	opts := common.NewBrowserContextOptions()
-	opts.Viewport = &common.Viewport{
+	opts.Viewport = common.Viewport{
 		Width:  800,
 		Height: 600,
 	}

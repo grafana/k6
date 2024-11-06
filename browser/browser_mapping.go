@@ -195,7 +195,7 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 			if err := viewport.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
 				return nil, fmt.Errorf("parsing viewport options: %w", err)
 			}
-			b.Viewport = &viewport
+			b.Viewport = viewport
 		}
 	}
 

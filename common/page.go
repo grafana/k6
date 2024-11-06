@@ -154,12 +154,12 @@ func (c *ColorScheme) UnmarshalJSON(b []byte) error {
 
 // EmulatedSize represents the emulated viewport and screen sizes.
 type EmulatedSize struct {
-	Viewport *Viewport
+	Viewport Viewport
 	Screen   Screen
 }
 
 // NewEmulatedSize creates and returns a new EmulatedSize.
-func NewEmulatedSize(viewport *Viewport, screen Screen) *EmulatedSize {
+func NewEmulatedSize(viewport Viewport, screen Screen) *EmulatedSize {
 	return &EmulatedSize{
 		Viewport: viewport,
 		Screen:   screen,
@@ -275,7 +275,7 @@ func NewPage(
 
 	// We need to init viewport and screen size before initializing the main frame session,
 	// as that's where the emulation is activated.
-	if bctx.opts.Viewport != nil {
+	if bctx.opts.Viewport != (Viewport{}) {
 		p.emulatedSize = NewEmulatedSize(bctx.opts.Viewport, bctx.opts.Screen)
 	}
 
@@ -716,7 +716,7 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 	p.logger.Debugf("Page:setViewportSize", "sid:%v vps:%v",
 		p.sessionID(), viewportSize)
 
-	viewport := &Viewport{
+	viewport := Viewport{
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}
