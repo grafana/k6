@@ -138,7 +138,7 @@ func TestKeyboardPress(t *testing.T) {
 				return nil
 			},
 		)
-		assert.NoError(t, err)
+		require.NoError(t, err)
 
 		// Wait for the new tab to complete loading.
 		assert.NoError(t, newTab.WaitForLoadState("load", nil))
