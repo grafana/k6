@@ -136,6 +136,32 @@ func (ms *ModuleSystem) CurrentlyRequiredModule() (*url.URL, error) {
 	return loader.Dir(u), nil
 }
 
+// ShouldWarnOnParentDirNotMatchingCurrentModuleParentDir is a helper function to figure out if the provided url
+// is the same folder that an import will be to.
+// It also checks if the modulesystem is locked which means we are past the first init context.
+// If false is returned means that we are not in the init context or the path is matching - so no warning should be done
+// If true, the returned path is the module path that it should be relative to - the one that is checked against.
+func (ms *ModuleSystem) ShouldWarnOnParentDirNotMatchingCurrentModuleParentDir(vu VU, parentModulePwd *url.URL,
+) (string, bool) {
+	if ms.resolver.locked {
+		return "", false
+	}
+	normalizePathToURL := func(path string) string {
+		u, err := url.Parse(path)
+		if err != nil {
+			return path
+		}
+		return loader.Dir(u).String()
+	}
+	parentModuleDir := parentModulePwd.String()
+	parentModuleStr2 := getCurrentModuleScript(vu)
+	parentModuleStr2Dir := normalizePathToURL(parentModuleStr2)
+	if parentModuleDir != parentModuleStr2Dir {
+		return parentModuleStr2, true
+	}
+	return "", false
+}
+
 func toESModuleExports(exp Exports) interface{} {
 	if exp.Named == nil {
 		return exp.Default

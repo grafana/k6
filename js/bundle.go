@@ -9,6 +9,7 @@ import (
 	"net/url"
 	"path/filepath"
 	"runtime"
+	"strings"
 
 	"github.com/grafana/sobek"
 	"github.com/sirupsen/logrus"
@@ -455,6 +456,22 @@ func (b *Bundle) setInitGlobals(rt *sobek.Runtime, vu *moduleVUImpl, modSys *mod
 		if err != nil {
 			return nil, err
 		}
+		if !(strings.HasPrefix(filename, "file://") || filepath.IsAbs(filename)) {
+			otherPath, shouldWarn := modSys.ShouldWarnOnParentDirNotMatchingCurrentModuleParentDir(vu, pwd)
+			logger := b.preInitState.Logger
+			if shouldWarn {
+				logger.Warningf("open() was used and is currently relative to '%s', but in the future "+
+					"it will be aligned with how `require` and imports work and will be relative to '%s'. This means "+
+					"that in the future open will open relative path relative to the module/file it is written in. "+
+					"You can future proof this by using `import.meta.resolve()` to get relative paths to the file it "+
+					"is written in the current k6 version.", pwd, otherPath)
+				err = b.preInitState.Usage.Uint64("deprecations/openRelativity", 1)
+				if err != nil {
+					logger.WithError(err).Warn("failed reporting usage of deprecated relativity of open()")
+				}
+			}
+		}
+
 		return openImpl(rt, b.filesystems["file"], pwd, filename, args...)
 	})
 	warnAboutModuleMixing := func(name string) {
