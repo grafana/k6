@@ -152,11 +152,11 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 		case "hasTouch":
 			b.HasTouch = o.Get(k).ToBoolean()
 		case "httpCredentials":
-			credentials := common.NewCredentials()
-			if err := credentials.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
+			var err error
+			b.HTTPCredentials, err = exportTo[*common.Credentials](rt, o.Get(k))
+			if err != nil {
 				return nil, fmt.Errorf("parsing HTTP credential options: %w", err)
 			}
-			b.HTTPCredentials = credentials
 		case "ignoreHTTPSErrors":
 			b.IgnoreHTTPSErrors = o.Get(k).ToBoolean()
 		case "isMobile":
