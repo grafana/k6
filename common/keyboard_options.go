@@ -13,13 +13,6 @@ type KeyboardOptions struct {
 	Delay int64 `json:"delay"`
 }
 
-// NewKeyboardOptions returns a new KeyboardOptions.
-func NewKeyboardOptions() KeyboardOptions {
-	return KeyboardOptions{
-		Delay: 0,
-	}
-}
-
 // Parse parses the keyboard options.
 func (o *KeyboardOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	rt := k6ext.Runtime(ctx)
