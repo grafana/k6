@@ -16,6 +16,14 @@ func panicIfFatalError(ctx context.Context, err error) {
 	}
 }
 
+// mergeWith merges the Sobek value with the existing Go value.
+func mergeWith[T any](rt *sobek.Runtime, src T, v sobek.Value) error {
+	if !sobekValueExists(v) {
+		return nil
+	}
+	return rt.ExportTo(v, &src) //nolint:wrapcheck
+}
+
 // exportTo exports the Sobek value to a Go value.
 // It returns the zero value of T if obj does not exist in the Sobek runtime.
 // It's caller's responsibility to check for nilness.
