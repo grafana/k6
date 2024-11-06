@@ -98,6 +98,11 @@ func (v *Viewport) Parse(ctx context.Context, viewport sobek.Value) error {
 	return nil
 }
 
+// IsEmpty returns true if the viewport is empty.
+func (v Viewport) IsEmpty() bool {
+	return v.Width == 0 && v.Height == 0
+}
+
 func (v Viewport) String() string {
 	return fmt.Sprintf("%dx%d", v.Width, v.Height)
 }
