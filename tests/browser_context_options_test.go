@@ -24,7 +24,7 @@ func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 	assert.Empty(t, opts.ExtraHTTPHeaders)
 	assert.Nil(t, opts.Geolocation)
 	assert.False(t, opts.HasTouch)
-	assert.Nil(t, opts.HttpCredentials)
+	assert.Nil(t, opts.HTTPCredentials)
 	assert.False(t, opts.IgnoreHTTPSErrors)
 	assert.False(t, opts.IsMobile)
 	assert.True(t, opts.JavaScriptEnabled)

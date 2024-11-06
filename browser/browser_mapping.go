@@ -156,7 +156,7 @@ func parseBrowserContextOptions(ctx context.Context, opts sobek.Value) (*common.
 			if err := credentials.Parse(ctx, o.Get(k).ToObject(rt)); err != nil {
 				return nil, fmt.Errorf("parsing HTTP credential options: %w", err)
 			}
-			b.HttpCredentials = credentials
+			b.HTTPCredentials = credentials
 		case "ignoreHTTPSErrors":
 			b.IgnoreHTTPSErrors = o.Get(k).ToBoolean()
 		case "isMobile":

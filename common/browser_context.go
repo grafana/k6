@@ -320,7 +320,7 @@ func (b *BrowserContext) SetHTTPCredentials(hc *Credentials) error {
 		" Create a new BrowserContext with httpCredentials instead.")
 	b.logger.Debugf("BrowserContext:SetHTTPCredentials", "bctxid:%v", b.id)
 
-	b.opts.HttpCredentials = hc
+	b.opts.HTTPCredentials = hc
 	for _, p := range b.browser.getPages() {
 		if err := p.updateHTTPCredentials(); err != nil {
 			return fmt.Errorf("setting HTTP credentials in target ID %s: %w", p.targetID, err)

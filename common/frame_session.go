@@ -1148,7 +1148,7 @@ func (fs *FrameSession) updateGeolocation(initial bool) error {
 func (fs *FrameSession) updateHTTPCredentials(initial bool) error {
 	fs.logger.Debugf("NewFrameSession:updateHttpCredentials", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
-	credentials := fs.page.browserCtx.opts.HttpCredentials
+	credentials := fs.page.browserCtx.opts.HTTPCredentials
 	if !initial || credentials != nil {
 		return fs.networkManager.Authenticate(credentials)
 	}

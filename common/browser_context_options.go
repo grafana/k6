@@ -70,7 +70,7 @@ type BrowserContextOptions struct {
 	ExtraHTTPHeaders  map[string]string `js:"extraHTTPHeaders"`
 	Geolocation       *Geolocation      `js:"geolocation"`
 	HasTouch          bool              `js:"hasTouch"`
-	HttpCredentials   *Credentials      `js:"httpCredentials"`
+	HTTPCredentials   *Credentials      `js:"httpCredentials"`
 	IgnoreHTTPSErrors bool              `js:"ignoreHTTPSErrors"`
 	IsMobile          bool              `js:"isMobile"`
 	JavaScriptEnabled bool              `js:"javaScriptEnabled"`
