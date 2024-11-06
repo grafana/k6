@@ -26,7 +26,7 @@ func TestKeyboardPress(t *testing.T) {
 		layout := keyboardlayout.GetKeyboardLayout("us")
 
 		for k := range layout.Keys {
-			assert.NoError(t, kb.Press(string(k), common.NewKeyboardOptions()))
+			assert.NoError(t, kb.Press(string(k), common.KeyboardOptions{}))
 		}
 	})
 
@@ -43,12 +43,12 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))
 
-		require.NoError(t, kb.Type("Hello World!", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Type("Hello World!", common.KeyboardOptions{}))
 		v, err := el.InputValue(nil)
 		require.NoError(t, err)
 		require.Equal(t, "Hello World!", v)
 
-		require.NoError(t, kb.Press("Backspace", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press("Backspace", common.KeyboardOptions{}))
 		v, err = el.InputValue(nil)
 		require.NoError(t, err)
 		assert.Equal(t, "Hello World", v)
@@ -67,17 +67,17 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))
 
-		require.NoError(t, kb.Press("Shift++", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+=", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+@", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+6", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+KeyA", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+b", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+C", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press("Shift++", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+=", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+@", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+6", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+KeyA", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+b", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+C", common.KeyboardOptions{}))
 
-		require.NoError(t, kb.Press("Control+KeyI", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Control+J", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Control+k", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press("Control+KeyI", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Control+J", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Control+k", common.KeyboardOptions{}))
 
 		v, err := el.InputValue(nil)
 		require.NoError(t, err)
@@ -166,9 +166,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))
 
-		require.NoError(t, kb.Press("Shift+KeyA", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+b", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Shift+C", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press("Shift+KeyA", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+b", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Shift+C", common.KeyboardOptions{}))
 
 		v, err := el.InputValue(nil)
 		require.NoError(t, err)
@@ -178,8 +178,8 @@ func TestKeyboardPress(t *testing.T) {
 		if runtime.GOOS == "darwin" {
 			metaKey = "Meta"
 		}
-		require.NoError(t, kb.Press(metaKey+"+A", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Delete", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press(metaKey+"+A", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Delete", common.KeyboardOptions{}))
 		v, err = el.InputValue(nil)
 		require.NoError(t, err)
 		assert.Equal(t, "", v)
@@ -198,7 +198,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("textarea", nil))
 
-		require.NoError(t, kb.Type("L+m+KeyN", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Type("L+m+KeyN", common.KeyboardOptions{}))
 		v, err := el.InputValue(nil)
 		require.NoError(t, err)
 		assert.Equal(t, "L+m+KeyN", v)
@@ -217,9 +217,9 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("textarea", nil))
 
-		require.NoError(t, kb.Press("C", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("d", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("KeyE", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press("C", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("d", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("KeyE", common.KeyboardOptions{}))
 
 		require.NoError(t, kb.Down("Shift"))
 		require.NoError(t, kb.Down("f"))
@@ -249,7 +249,7 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, p.Focus("textarea", nil))
 
 		require.NoError(t, kb.Down("Shift"))
-		require.NoError(t, kb.Type("oPqR", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Type("oPqR", common.KeyboardOptions{}))
 		require.NoError(t, kb.Up("Shift"))
 
 		v, err := el.InputValue(nil)
@@ -270,10 +270,10 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("textarea", nil))
 
-		require.NoError(t, kb.Type("Hello", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Enter", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Press("Enter", common.NewKeyboardOptions()))
-		require.NoError(t, kb.Type("World!", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Type("Hello", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Enter", common.KeyboardOptions{}))
+		require.NoError(t, kb.Press("Enter", common.KeyboardOptions{}))
+		require.NoError(t, kb.Type("World!", common.KeyboardOptions{}))
 		v, err := el.InputValue(nil)
 		require.NoError(t, err)
 		assert.Equal(t, "Hello\n\nWorld!", v)
@@ -293,21 +293,21 @@ func TestKeyboardPress(t *testing.T) {
 		require.NoError(t, err)
 		require.NoError(t, p.Focus("input", nil))
 
-		require.NoError(t, kb.Type("Hello World!", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Type("Hello World!", common.KeyboardOptions{}))
 		v, err := el.InputValue(nil)
 		require.NoError(t, err)
 		require.Equal(t, "Hello World!", v)
 
-		require.NoError(t, kb.Press("ArrowLeft", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press("ArrowLeft", common.KeyboardOptions{}))
 		// Should hold the key until Up() is called.
 		require.NoError(t, kb.Down("Shift"))
 		for i := 0; i < len(" World"); i++ {
-			require.NoError(t, kb.Press("ArrowLeft", common.NewKeyboardOptions()))
+			require.NoError(t, kb.Press("ArrowLeft", common.KeyboardOptions{}))
 		}
 		// Should release the key but the selection should remain active.
 		require.NoError(t, kb.Up("Shift"))
 		// Should delete the selection.
-		require.NoError(t, kb.Press("Backspace", common.NewKeyboardOptions()))
+		require.NoError(t, kb.Press("Backspace", common.KeyboardOptions{}))
 
 		require.NoError(t, err)
 		require.NoError(t, err)
