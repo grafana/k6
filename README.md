@@ -1,10 +1,16 @@
 # xk6-webcrypto
 
-This is a **work in progress** project implementation of the [WebCrypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) specification for k6.
+This is an implementation of the [WebCrypto API](https://developer.mozilla.org/en-US/docs/Web/API/Web_Crypto_API) specification for k6.
 
 ## Current state
 
-The current state of the project is that it is an experimental module of the WebCrypto API specification. While we consider it ready for production use, it is still missing some features and is not yet fully compliant with the specification.
+Starting the version 0.44.0, this implementation is available in k6 as an experimental module. To use it, you need to import it in your script.
+
+```javascript
+import webcrypto from 'k6/experimental/webcrypto';
+```
+
+While we consider it ready for production use, it is still missing some features and is not yet fully compliant with the specification.
 
 ### Supported APIs and algorithms
 
@@ -32,10 +38,7 @@ The current state of the project is that it is an experimental module of the Web
 | `crypto.subtle.sign()`   | ✅   | ✅    | ✅                | ✅      |
 | `crypto.subtle.verify()` | ✅   | ✅    | ✅                | ✅      |
 
-> [!WARNING]  
-> Since we use Golang SDK under the hood, the RSA-PSS [doesn't support deterministic signatures](https://github.com/golang/go/blob/master/src/crypto/rsa/pss.go#L293-L297). In other words, even if `saltLength` is set to 0, the signature will be different each time.
-
-##### Key generation, import and export
+##### Key generation, import, and export
 
 | API                           | AES-CBC | AES-GCM | AES-CTR | AES-KW | HMAC | ECDSA | ECDH | RSASSA-PKCS1-v1_5 | RSA-PSS | RSA-OAEP |
 | :---------------------------- | :------ | :------ | :------ | :----- | :--- | :---- | :--- | :---------------- | :------ | :------- |
@@ -63,8 +66,9 @@ Note: `deriveBits` currently doesn't support length parameter non-multiple of 8.
 
 ### APIs and algorithms with limited support
 
-- **AES-KW**: in the current state of things, this module does not support the AES-KW (JSON Key Wrap) algorithm. The reason for it is that the Go standard library does not support it. We are looking into alternatives, but for now, this is a limitation of the module.
-- **AES-GCM**: although the algorithm is supported, and can already be used, it is not fully compliant with the specification. The reason for this is that the Go standard library only supports a 12-byte nonce/iv, while the specification allows for a wider range of sizes. We do not expect to address this limitation unless the Go standard library adds support for it.
+- **WebCrypto API support**: Even though we implemented the vast majority of the WebCrypto API, there are still some APIs and algorithms that are not yet supported. By looking at the [WebCrypto API Compliant](https://github.com/grafana/xk6-webcrypto/issues?q=is%3Aissue+state%3Aopen+label%3A%22WebCrypto+API+Compliant%22) label, you can see what is missing.
+- **AES-GCM**: Although the algorithm is supported, and can already be used, it is not fully compliant with the specification. The reason for this is that the Go standard library only supports a 12-byte nonce/iv, while the specification allows for a wider range of sizes. We do not expect to address this limitation unless the Go standard library adds support for it.
+- **RSA-PSS**: Since we use Golang SDK under the hood, the RSA-PSS [doesn't support deterministic signatures](https://github.com/golang/go/blob/master/src/crypto/rsa/pss.go#L293-L297). In other words, even if `saltLength` is set to 0, the signature will be different each time.
 
 ## Contributing
 
@@ -72,10 +76,10 @@ Contributions are welcome! If the module is missing a feature you need, or if yo
 
 ### Practices
 
-The [WebCrypto API specification](https://www.w3.org/TR/WebCryptoAPI) is quite large, and it is not always easy to understand what is going on. To help with that, we have adopted a few practices that we hope will make it easier for contributors to understand the codebase.
-
-#### Algorithm steps numbered comments
-
-Contributors will likely notice that the codebase is annotated with comments of the form `// {some number}.`. Those comments are used to track the progress of the implementation of the specification and to ensure the correctness of the implementation of the algorithms. The numbers are the section numbers of the specification. For example, the comment `// 8.` in the `SubtleCrypto.GenerateKey` function refers to [step 8 of the `generateKey` algorithm from the specification](https://www.w3.org/TR/WebCryptoAPI/#SubtleCrypto-method-generateKey).
+In our implementation we rely on [WebCrypto API specification](https://www.w3.org/TR/WebCryptoAPI). Sometimes it feels quite large, and it is not always easy to understand what is going on. To help with that, we have adopted a few practices that we hope will make it easier for contributors to understand the codebase.
 
 Following this convention allows us to document why certain operations are made in a certain way, and to track the progress of the implementation. We do not always add them, but we try to do so when it makes sense, and encourage contributors to do the same.
+
+### Web Platform Tests
+
+We aim to be compliant with the WebCrypto API specification. To ensure that, we test our implementation against the [Web Platform Tests](https://web-platform-tests.org/), this is a part of the CI, and it's expected to implement the missing tests when it's needed. See the [webcrypto/tests/README.md](./webcrypto/tests/README.md) for more details.
