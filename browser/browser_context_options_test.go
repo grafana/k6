@@ -62,3 +62,75 @@ func TestBrowserContextDefaultOptions(t *testing.T) {
 	assert.NotEqual(t, defaults.DeviceScaleFactor, opts.DeviceScaleFactor)
 	assert.Equal(t, defaults.Locale, opts.Locale) // should remain as default
 }
+
+func TestBrowserContextAllOptions(t *testing.T) {
+	vu := k6test.NewVU(t)
+	opts, err := vu.Runtime().RunString(`const opts = {
+			acceptDownloads: true,
+			downloadsPath: '/tmp',
+			bypassCSP: true,
+			colorScheme: 'dark',
+			deviceScaleFactor: 1,
+			extraHTTPHeaders: {
+				'X-Header': 'value',
+			},
+			geolocation: { latitude: 51.509865, longitude: -0.118092, accuracy: 1 },
+			hasTouch: true,
+			httpCredentials: { username: 'admin', password: 'password' },
+			ignoreHTTPSErrors: true,
+			isMobile: true,
+			javaScriptEnabled: true,
+			locale: 'fr-FR',
+			offline: true,
+			permissions: ['camera', 'microphone'],
+			reducedMotion: 'no-preference',
+			screen: { width: 800, height: 600 },
+			timezoneID: 'Europe/Paris',
+			userAgent: 'my agent',
+			viewport: { width: 800, height: 600 },
+		};
+		opts;
+	`)
+	require.NoError(t, err)
+
+	parsedOpts, err := parseBrowserContextOptions(vu.Runtime(), opts)
+	require.NoError(t, err)
+
+	assert.Equal(t, &common.BrowserContextOptions{
+		AcceptDownloads:   true,
+		DownloadsPath:     "/tmp",
+		BypassCSP:         true,
+		ColorScheme:       common.ColorSchemeDark,
+		DeviceScaleFactor: 1,
+		ExtraHTTPHeaders: map[string]string{
+			"X-Header": "value",
+		},
+		Geolocation: &common.Geolocation{
+			Latitude:  51.509865,
+			Longitude: -0.118092,
+			Accuracy:  1,
+		},
+		HasTouch: true,
+		HTTPCredentials: common.Credentials{
+			Username: "admin",
+			Password: "password",
+		},
+		IgnoreHTTPSErrors: true,
+		IsMobile:          true,
+		JavaScriptEnabled: true,
+		Locale:            "fr-FR",
+		Offline:           true,
+		Permissions:       []string{"camera", "microphone"},
+		ReducedMotion:     common.ReducedMotionNoPreference,
+		Screen: common.Screen{
+			Width:  800,
+			Height: 600,
+		},
+		TimezoneID: "Europe/Paris",
+		UserAgent:  "my agent",
+		Viewport: common.Viewport{
+			Width:  800,
+			Height: 600,
+		},
+	}, parsedOpts)
+}
