@@ -11,11 +11,6 @@ type Geolocation struct {
 	Accuracy  float64 `js:"accuracy"`
 }
 
-// NewGeolocation creates a new instance of Geolocation.
-func NewGeolocation() *Geolocation {
-	return &Geolocation{}
-}
-
 // Validate validates the [Geolocation].
 func (g *Geolocation) Validate() error {
 	if g.Longitude < -180 || g.Longitude > 180 {
