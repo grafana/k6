@@ -15,7 +15,7 @@ import (
 func TestBrowserContextOptionsDefaultValues(t *testing.T) {
 	t.Parallel()
 
-	opts := common.NewBrowserContextOptions()
+	opts := common.DefaultBrowserContextOptions()
 	assert.False(t, opts.AcceptDownloads)
 	assert.Empty(t, opts.DownloadsPath)
 	assert.False(t, opts.BypassCSP)
@@ -52,7 +52,7 @@ func TestBrowserContextOptionsSetViewport(t *testing.T) {
 	t.Parallel()
 
 	tb := newTestBrowser(t)
-	opts := common.NewBrowserContextOptions()
+	opts := common.DefaultBrowserContextOptions()
 	opts.Viewport = common.Viewport{
 		Width:  800,
 		Height: 600,
@@ -77,7 +77,7 @@ func TestBrowserContextOptionsExtraHTTPHeaders(t *testing.T) {
 
 	tb := newTestBrowser(t, withHTTPServer())
 
-	opts := common.NewBrowserContextOptions()
+	opts := common.DefaultBrowserContextOptions()
 	opts.ExtraHTTPHeaders = map[string]string{
 		"Some-Header": "Some-Value",
 	}

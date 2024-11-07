@@ -157,7 +157,7 @@ func (b *Browser) connect() error {
 	}
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
-	b.defaultContext, err = NewBrowserContext(b.vuCtx, b, "", NewBrowserContextOptions(), b.logger)
+	b.defaultContext, err = NewBrowserContext(b.vuCtx, b, "", DefaultBrowserContextOptions(), b.logger)
 	if err != nil {
 		return fmt.Errorf("browser connect: %w", err)
 	}

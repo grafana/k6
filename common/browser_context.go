@@ -116,7 +116,7 @@ func NewBrowserContext(
 ) (*BrowserContext, error) {
 	// set the default options if none provided.
 	if opts == nil {
-		opts = NewBrowserContextOptions()
+		opts = DefaultBrowserContextOptions()
 	}
 
 	b := BrowserContext{

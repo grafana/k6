@@ -113,7 +113,7 @@ func TestBasicAuth(t *testing.T) {
 
 		browser := newTestBrowser(t, withHTTPServer())
 
-		bcopts := common.NewBrowserContextOptions()
+		bcopts := common.DefaultBrowserContextOptions()
 		bcopts.HTTPCredentials = common.Credentials{
 			Username: validUser,
 			Password: validPassword,

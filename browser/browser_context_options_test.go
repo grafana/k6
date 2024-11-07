@@ -45,7 +45,7 @@ func TestBrowserContextSetGeolocation(t *testing.T) {
 func TestBrowserContextDefaultOptions(t *testing.T) {
 	vu := k6test.NewVU(t)
 
-	defaults := common.NewBrowserContextOptions()
+	defaults := common.DefaultBrowserContextOptions()
 
 	// gets the default options by default
 	opts, err := parseBrowserContextOptions(vu.Runtime(), nil)

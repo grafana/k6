@@ -55,8 +55,8 @@ type BrowserContextOptions struct {
 	Viewport          Viewport          `js:"viewport"`
 }
 
-// NewBrowserContextOptions creates a default set of browser context options.
-func NewBrowserContextOptions() *BrowserContextOptions {
+// DefaultBrowserContextOptions returns the default browser context options.
+func DefaultBrowserContextOptions() *BrowserContextOptions {
 	return &BrowserContextOptions{
 		ColorScheme:       ColorSchemeLight,
 		DeviceScaleFactor: 1.0,
