@@ -18,5 +18,5 @@ type EventLayerPainted struct {
 //
 // See: https://chromedevtools.github.io/devtools-protocol/tot/LayerTree#event-layerTreeDidChange
 type EventLayerTreeDidChange struct {
-	Layers []*Layer `json:"layers,omitempty"` // Layer tree, absent if not in the comspositing mode.
+	Layers []*Layer `json:"layers,omitempty"` // Layer tree, absent if not in the compositing mode.
 }

@@ -133,31 +133,6 @@ func (p *RemoveEventListenerBreakpointParams) Do(ctx context.Context) (err error
 	return cdp.Execute(ctx, CommandRemoveEventListenerBreakpoint, p, nil)
 }
 
-// RemoveInstrumentationBreakpointParams removes breakpoint on particular
-// native event.
-type RemoveInstrumentationBreakpointParams struct {
-	EventName string `json:"eventName"` // Instrumentation name to stop on.
-}
-
-// RemoveInstrumentationBreakpoint removes breakpoint on particular native
-// event.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/DOMDebugger#method-removeInstrumentationBreakpoint
-//
-// parameters:
-//
-//	eventName - Instrumentation name to stop on.
-func RemoveInstrumentationBreakpoint(eventName string) *RemoveInstrumentationBreakpointParams {
-	return &RemoveInstrumentationBreakpointParams{
-		EventName: eventName,
-	}
-}
-
-// Do executes DOMDebugger.removeInstrumentationBreakpoint against the provided context.
-func (p *RemoveInstrumentationBreakpointParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandRemoveInstrumentationBreakpoint, p, nil)
-}
-
 // RemoveXHRBreakpointParams removes breakpoint from XMLHttpRequest.
 type RemoveXHRBreakpointParams struct {
 	URL string `json:"url"` // Resource URL substring.
@@ -261,30 +236,6 @@ func (p *SetEventListenerBreakpointParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandSetEventListenerBreakpoint, p, nil)
 }
 
-// SetInstrumentationBreakpointParams sets breakpoint on particular native
-// event.
-type SetInstrumentationBreakpointParams struct {
-	EventName string `json:"eventName"` // Instrumentation name to stop on.
-}
-
-// SetInstrumentationBreakpoint sets breakpoint on particular native event.
-//
-// See: https://chromedevtools.github.io/devtools-protocol/tot/DOMDebugger#method-setInstrumentationBreakpoint
-//
-// parameters:
-//
-//	eventName - Instrumentation name to stop on.
-func SetInstrumentationBreakpoint(eventName string) *SetInstrumentationBreakpointParams {
-	return &SetInstrumentationBreakpointParams{
-		EventName: eventName,
-	}
-}
-
-// Do executes DOMDebugger.setInstrumentationBreakpoint against the provided context.
-func (p *SetInstrumentationBreakpointParams) Do(ctx context.Context) (err error) {
-	return cdp.Execute(ctx, CommandSetInstrumentationBreakpoint, p, nil)
-}
-
 // SetXHRBreakpointParams sets breakpoint on XMLHttpRequest.
 type SetXHRBreakpointParams struct {
 	URL string `json:"url"` // Resource URL substring. All XHRs having this substring in the URL will get stopped upon.
@@ -310,14 +261,12 @@ func (p *SetXHRBreakpointParams) Do(ctx context.Context) (err error) {
 
 // Command names.
 const (
-	CommandGetEventListeners               = "DOMDebugger.getEventListeners"
-	CommandRemoveDOMBreakpoint             = "DOMDebugger.removeDOMBreakpoint"
-	CommandRemoveEventListenerBreakpoint   = "DOMDebugger.removeEventListenerBreakpoint"
-	CommandRemoveInstrumentationBreakpoint = "DOMDebugger.removeInstrumentationBreakpoint"
-	CommandRemoveXHRBreakpoint             = "DOMDebugger.removeXHRBreakpoint"
-	CommandSetBreakOnCSPViolation          = "DOMDebugger.setBreakOnCSPViolation"
-	CommandSetDOMBreakpoint                = "DOMDebugger.setDOMBreakpoint"
-	CommandSetEventListenerBreakpoint      = "DOMDebugger.setEventListenerBreakpoint"
-	CommandSetInstrumentationBreakpoint    = "DOMDebugger.setInstrumentationBreakpoint"
-	CommandSetXHRBreakpoint                = "DOMDebugger.setXHRBreakpoint"
+	CommandGetEventListeners             = "DOMDebugger.getEventListeners"
+	CommandRemoveDOMBreakpoint           = "DOMDebugger.removeDOMBreakpoint"
+	CommandRemoveEventListenerBreakpoint = "DOMDebugger.removeEventListenerBreakpoint"
+	CommandRemoveXHRBreakpoint           = "DOMDebugger.removeXHRBreakpoint"
+	CommandSetBreakOnCSPViolation        = "DOMDebugger.setBreakOnCSPViolation"
+	CommandSetDOMBreakpoint              = "DOMDebugger.setDOMBreakpoint"
+	CommandSetEventListenerBreakpoint    = "DOMDebugger.setEventListenerBreakpoint"
+	CommandSetXHRBreakpoint              = "DOMDebugger.setXHRBreakpoint"
 )

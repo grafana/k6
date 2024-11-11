@@ -22,7 +22,12 @@ func mapRequest(vu moduleVU, r *common.Request) mapping {
 		},
 		"headerValue": func(name string) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return r.HeaderValue(name), nil
+				v, ok := r.HeaderValue(name)
+				if !ok {
+					return nil, nil
+				}
+
+				return v, nil
 			})
 		},
 		"headers": r.Headers,

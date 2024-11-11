@@ -97,11 +97,11 @@ func (c *Client) asyncRequest(method string, url sobek.Value, args ...sobek.Valu
 	if err != nil {
 		var resp *Response
 		if resp, err = c.handleParseRequestError(err); err != nil {
-			reject(err)
+			err = reject(err)
 		} else {
-			resolve(resp)
+			err = resolve(resp)
 		}
-		return p, nil
+		return p, err
 	}
 
 	callback := c.moduleInstance.vu.RegisterCallback()
@@ -110,12 +110,10 @@ func (c *Client) asyncRequest(method string, url sobek.Value, args ...sobek.Valu
 		resp, err := httpext.MakeRequest(c.moduleInstance.vu.Context(), state, req)
 		callback(func() error {
 			if err != nil {
-				reject(err)
-				return nil //nolint:nilerr // we want to reject the promise in this case
+				return reject(err)
 			}
 			c.processResponse(resp, req.ResponseType)
-			resolve(c.responseFromHTTPext(resp))
-			return nil
+			return resolve(c.responseFromHTTPext(resp))
 		})
 	}()
 
@@ -211,7 +209,7 @@ func (c *Client) parseRequest(
 		// Otherwise parameters are treated as standard form field.
 		for k, v := range data {
 			switch ve := v.(type) {
-			case FileData:
+			case *FileData:
 				// writing our own part to handle receiving
 				// different content-type than the default application/octet-stream
 				h := make(textproto.MIMEHeader)
@@ -228,7 +226,11 @@ func (c *Client) parseRequest(
 					return err
 				}
 
-				if _, err := fw.Write(ve.Data); err != nil {
+				data, err := common.ToBytes(ve.Data)
+				if err != nil {
+					return err
+				}
+				if _, err := fw.Write(data); err != nil {
 					return err
 				}
 			default:
@@ -575,7 +577,7 @@ func (c *Client) parseBatchRequest(key interface{}, val interface{}) (*httpext.P
 
 func requestContainsFile(data map[string]interface{}) bool {
 	for _, v := range data {
-		if _, ok := v.(FileData); ok {
+		if _, ok := v.(*FileData); ok {
 			return true
 		}
 	}

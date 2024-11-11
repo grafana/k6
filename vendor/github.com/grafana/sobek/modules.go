@@ -48,7 +48,7 @@ type (
 	CyclicModuleInstance interface {
 		ModuleInstance
 		HasTLA() bool
-		ExecuteModule(rt *Runtime, res, rej func(interface{})) (CyclicModuleInstance, error)
+		ExecuteModule(rt *Runtime, res, rej func(interface{}) error) (CyclicModuleInstance, error)
 	}
 )
 
@@ -155,7 +155,16 @@ func newEvaluationState() *evaluationState {
 }
 
 // TODO have resolve as part of runtime
-func (r *Runtime) CyclicModuleRecordEvaluate(c CyclicModuleRecord, resolve HostResolveImportedModuleFunc) *Promise {
+func (r *Runtime) CyclicModuleRecordEvaluate(c CyclicModuleRecord, resolve HostResolveImportedModuleFunc) (promise *Promise) {
+	defer func() {
+		if x := recover(); x != nil {
+			if ex := asUncatchableException(x); ex != nil {
+				r.evaluationState.topLevelCapability[c].reject(r.ToValue(ex))
+			} else {
+				panic(x)
+			}
+		}
+	}()
 	if r.modules == nil {
 		r.modules = make(map[ModuleRecord]ModuleInstance)
 	}
@@ -168,6 +177,7 @@ func (r *Runtime) CyclicModuleRecordEvaluate(c CyclicModuleRecord, resolve HostR
 		return cap.promise.Export().(*Promise)
 	}
 	capability := r.newPromiseCapability(r.getPromise())
+	promise = capability.promise.Export().(*Promise)
 	r.evaluationState.topLevelCapability[c] = capability
 	state := r.evaluationState
 	_, err := r.innerModuleEvaluation(state, c, &stackInstance, 0, resolve)
@@ -186,7 +196,7 @@ func (r *Runtime) CyclicModuleRecordEvaluate(c CyclicModuleRecord, resolve HostR
 	if len(r.vm.callStack) == 0 {
 		r.leave()
 	}
-	return state.topLevelCapability[c].promise.Export().(*Promise)
+	return
 }
 
 func (r *Runtime) innerModuleEvaluation(

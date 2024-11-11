@@ -7,18 +7,21 @@ import (
 
 	"github.com/sirupsen/logrus"
 	"github.com/stretchr/testify/require"
+
 	"go.k6.io/k6/lib/fsext"
 	"go.k6.io/k6/lib/testutils"
 )
 
 // This whole file is about tests around https://github.com/grafana/k6/issues/2674
 
-func TestOpenPathResolution(t *testing.T) {
+func TestPathResolution(t *testing.T) {
 	t.Parallel()
 	testCases := map[string]struct {
-		fsMap map[string]any
+		fsMap         map[string]any
+		expectedLogs  []string
+		expectedError string
 	}{
-		"simple": {
+		"open simple": {
 			fsMap: map[string]any{
 				"/A/B/data.txt": "data file",
 				"/A/A/A/A/script.js": `
@@ -30,7 +33,7 @@ func TestOpenPathResolution(t *testing.T) {
 				`,
 			},
 		},
-		"intermediate": {
+		"open intermediate": {
 			fsMap: map[string]any{
 				"/A/B/data.txt": "data file",
 				"/A/C/B/script.js": `
@@ -45,7 +48,7 @@ func TestOpenPathResolution(t *testing.T) {
 				`,
 			},
 		},
-		"complex": {
+		"open complex": {
 			fsMap: map[string]any{
 				"/A/B/data.txt": "data file",
 				"/A/C/B/script.js": `
@@ -63,8 +66,11 @@ func TestOpenPathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
+			expectedLogs: []string{
+				`open() was used and is currently relative to 'file:///A/B/B/', but in the future it will be aligned with how`,
+			},
 		},
-		"space in path": {
+		"open space in path": {
 			fsMap: map[string]any{
 				"/A/B D/data.txt": "data file",
 				"/A/C D/B/script.js": `
@@ -82,35 +88,11 @@ func TestOpenPathResolution(t *testing.T) {
 					export default function() {}
 				`,
 			},
+			expectedLogs: []string{
+				`open() was used and is currently relative to 'file:///A/B%20D/B/', but in the future it will be aligned with how `,
+			},
 		},
-	}
-
-	for name, testCase := range testCases {
-		name, testCase := name, testCase
-
-		t.Run(name, func(t *testing.T) {
-			t.Parallel()
-			fs := fsext.NewMemMapFs()
-			err := writeToFs(fs, testCase.fsMap)
-			fs = fsext.NewCacheOnReadFs(fs, fsext.NewMemMapFs(), 0)
-			require.NoError(t, err)
-			b, err := getSimpleBundle(t, "/main.js", `export { default } from "/A/A/A/A/script.js"`, fs)
-			require.NoError(t, err)
-
-			_, err = b.Instantiate(context.Background(), 0)
-			require.NoError(t, err)
-		})
-	}
-}
-
-func TestRequirePathResolution(t *testing.T) {
-	t.Parallel()
-	testCases := map[string]struct {
-		fsMap         map[string]any
-		expectedLogs  []string
-		expectedError string
-	}{
-		"simple": {
+		"require simple": {
 			fsMap: map[string]any{
 				"/A/B/data.js": "module.exports='export content'",
 				"/A/A/A/A/script.js": `
@@ -122,7 +104,7 @@ func TestRequirePathResolution(t *testing.T) {
 				`,
 			},
 		},
-		"intermediate": {
+		"require intermediate": {
 			fsMap: map[string]any{
 				"/A/B/data.js": "module.exports='export content'",
 				"/A/C/B/script.js": `
@@ -137,7 +119,7 @@ func TestRequirePathResolution(t *testing.T) {
 				`,
 			},
 		},
-		"complex": {
+		"require complex": {
 			fsMap: map[string]any{
 				"/A/B/data.js": "module.exports='export content'",
 				"/A/C/B/script.js": `
@@ -155,7 +137,7 @@ func TestRequirePathResolution(t *testing.T) {
 				`,
 			},
 		},
-		"complex wrong": {
+		"require complex wrong": {
 			fsMap: map[string]any{
 				"/A/B/data.js": "module.exports='export content'",
 				"/A/C/B/script.js": `

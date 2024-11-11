@@ -214,7 +214,7 @@ func (p *InsertTextParams) Do(ctx context.Context) (err error) {
 }
 
 // ImeSetCompositionParams this method sets the current candidate text for
-// ime. Use imeCommitComposition to commit the final text. Use imeSetComposition
+// IME. Use imeCommitComposition to commit the final text. Use imeSetComposition
 // with empty string as text to cancel composition.
 type ImeSetCompositionParams struct {
 	Text             string `json:"text"`                       // The text to insert
@@ -224,7 +224,7 @@ type ImeSetCompositionParams struct {
 	ReplacementEnd   int64  `json:"replacementEnd,omitempty"`   // replacement end
 }
 
-// ImeSetComposition this method sets the current candidate text for ime. Use
+// ImeSetComposition this method sets the current candidate text for IME. Use
 // imeCommitComposition to commit the final text. Use imeSetComposition with
 // empty string as text to cancel composition.
 //
@@ -272,8 +272,8 @@ type DispatchMouseEventParams struct {
 	ClickCount         int64                         `json:"clickCount,omitempty"`         // Number of times the mouse button was clicked (default: 0).
 	Force              float64                       `json:"force,omitempty"`              // The normalized pressure, which has a range of [0,1] (default: 0).
 	TangentialPressure float64                       `json:"tangentialPressure,omitempty"` // The normalized tangential pressure, which has a range of [-1,1] (default: 0).
-	TiltX              int64                         `json:"tiltX,omitempty"`              // The plane angle between the Y-Z plane and the plane containing both the stylus axis and the Y axis, in degrees of the range [-90,90], a positive tiltX is to the right (default: 0).
-	TiltY              int64                         `json:"tiltY,omitempty"`              // The plane angle between the X-Z plane and the plane containing both the stylus axis and the X axis, in degrees of the range [-90,90], a positive tiltY is towards the user (default: 0).
+	TiltX              float64                       `json:"tiltX,omitempty"`              // The plane angle between the Y-Z plane and the plane containing both the stylus axis and the Y axis, in degrees of the range [-90,90], a positive tiltX is to the right (default: 0).
+	TiltY              float64                       `json:"tiltY,omitempty"`              // The plane angle between the X-Z plane and the plane containing both the stylus axis and the X axis, in degrees of the range [-90,90], a positive tiltY is towards the user (default: 0).
 	Twist              int64                         `json:"twist,omitempty"`              // The clockwise rotation of a pen stylus around its own major axis, in degrees in the range [0,359] (default: 0).
 	DeltaX             float64                       `json:"deltaX"`                       // X delta in CSS pixels for mouse wheel event (default: 0).
 	DeltaY             float64                       `json:"deltaY"`                       // Y delta in CSS pixels for mouse wheel event (default: 0).
@@ -347,7 +347,7 @@ func (p DispatchMouseEventParams) WithTangentialPressure(tangentialPressure floa
 // WithTiltX the plane angle between the Y-Z plane and the plane containing
 // both the stylus axis and the Y axis, in degrees of the range [-90,90], a
 // positive tiltX is to the right (default: 0).
-func (p DispatchMouseEventParams) WithTiltX(tiltX int64) *DispatchMouseEventParams {
+func (p DispatchMouseEventParams) WithTiltX(tiltX float64) *DispatchMouseEventParams {
 	p.TiltX = tiltX
 	return &p
 }
@@ -355,7 +355,7 @@ func (p DispatchMouseEventParams) WithTiltX(tiltX int64) *DispatchMouseEventPara
 // WithTiltY the plane angle between the X-Z plane and the plane containing
 // both the stylus axis and the X axis, in degrees of the range [-90,90], a
 // positive tiltY is towards the user (default: 0).
-func (p DispatchMouseEventParams) WithTiltY(tiltY int64) *DispatchMouseEventParams {
+func (p DispatchMouseEventParams) WithTiltY(tiltY float64) *DispatchMouseEventParams {
 	p.TiltY = tiltY
 	return &p
 }
@@ -429,6 +429,21 @@ func (p DispatchTouchEventParams) WithTimestamp(timestamp *TimeSinceEpoch) *Disp
 // Do executes Input.dispatchTouchEvent against the provided context.
 func (p *DispatchTouchEventParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandDispatchTouchEvent, p, nil)
+}
+
+// CancelDraggingParams cancels any active dragging in the page.
+type CancelDraggingParams struct{}
+
+// CancelDragging cancels any active dragging in the page.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Input#method-cancelDragging
+func CancelDragging() *CancelDraggingParams {
+	return &CancelDraggingParams{}
+}
+
+// Do executes Input.cancelDragging against the provided context.
+func (p *CancelDraggingParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandCancelDragging, nil, nil)
 }
 
 // EmulateTouchFromMouseEventParams emulates touch event from the mouse event
@@ -764,6 +779,7 @@ const (
 	CommandImeSetComposition          = "Input.imeSetComposition"
 	CommandDispatchMouseEvent         = "Input.dispatchMouseEvent"
 	CommandDispatchTouchEvent         = "Input.dispatchTouchEvent"
+	CommandCancelDragging             = "Input.cancelDragging"
 	CommandEmulateTouchFromMouseEvent = "Input.emulateTouchFromMouseEvent"
 	CommandSetIgnoreInputEvents       = "Input.setIgnoreInputEvents"
 	CommandSetInterceptDrags          = "Input.setInterceptDrags"

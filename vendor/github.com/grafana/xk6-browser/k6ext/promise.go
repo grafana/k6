@@ -4,15 +4,7 @@ import (
 	"context"
 
 	"github.com/grafana/sobek"
-)
-
-// eventLoopDirective determines whether the event
-// loop should be aborted if the promise is rejected.
-type eventLoopDirective int
-
-const (
-	continueEventLoop eventLoopDirective = iota + 1
-	abortEventLoop
+	"go.k6.io/k6/js/promises"
 )
 
 // PromisifiedFunc is a type of the function to run as a promise.
@@ -23,33 +15,18 @@ type PromisifiedFunc func() (result any, reason error)
 //     first result value fn returns.
 //   - Otherwise, rejects the promise with the error fn returns.
 func Promise(ctx context.Context, fn PromisifiedFunc) *sobek.Promise {
-	return promise(ctx, fn, continueEventLoop)
+	return promise(ctx, fn)
 }
 
-// AbortingPromise is like Promise, but it aborts the event loop if an error occurs.
-func AbortingPromise(ctx context.Context, fn PromisifiedFunc) *sobek.Promise {
-	return promise(ctx, fn, abortEventLoop)
-}
-
-func promise(ctx context.Context, fn PromisifiedFunc, d eventLoopDirective) *sobek.Promise {
-	var (
-		vu                 = GetVU(ctx)
-		cb                 = vu.RegisterCallback()
-		p, resolve, reject = vu.Runtime().NewPromise()
-	)
+func promise(ctx context.Context, fn PromisifiedFunc) *sobek.Promise {
+	p, resolve, reject := promises.New(GetVU(ctx))
 	go func() {
 		v, err := fn()
-		cb(func() error {
-			if err != nil {
-				reject(err)
-			} else {
-				resolve(v)
-			}
-			if d == continueEventLoop {
-				err = nil
-			}
-			return err
-		})
+		if err != nil {
+			reject(err)
+			return
+		}
+		resolve(v)
 	}()
 
 	return p

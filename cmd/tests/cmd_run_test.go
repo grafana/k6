@@ -476,11 +476,11 @@ func TestSubMetricThresholdNoData(t *testing.T) {
 func getTestServer(tb testing.TB, routes map[string]http.Handler) *httptest.Server {
 	mux := http.HandlerFunc(func(resp http.ResponseWriter, req *http.Request) {
 		for methodAndRoute, handler := range routes {
-			methodRouteTuple := strings.SplitN(methodAndRoute, " ", 2)
-			regex, err := regexp.Compile(methodRouteTuple[1])
+			method, route, _ := strings.Cut(methodAndRoute, " ")
+			routeRegexp, err := regexp.Compile(route)
 			require.NoError(tb, err)
 
-			if req.Method == methodRouteTuple[0] && regex.Match([]byte(req.URL.String())) {
+			if req.Method == method && routeRegexp.Match([]byte(req.URL.String())) {
 				handler.ServeHTTP(resp, req)
 				return
 			}

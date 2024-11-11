@@ -112,7 +112,7 @@ func validateNoFeatures(res *result, syntax protoreflect.Syntax, scope string, o
 		// Editions is allowed to use features
 		return nil
 	}
-	if index, err := internal.FindFirstOption(res, handler, scope, opts, "features"); err != nil {
+	if index, err := internal.FindFirstOption(res, handler.HandleErrorf, scope, opts, "features"); err != nil {
 		return err
 	} else if index >= 0 {
 		optNode := res.OptionNode(opts[index])
@@ -135,7 +135,7 @@ func validateMessage(res *result, syntax protoreflect.Syntax, name protoreflect.
 		}
 	}
 
-	if index, err := internal.FindOption(res, handler, scope, md.Options.GetUninterpretedOption(), "map_entry"); err != nil {
+	if index, err := internal.FindOption(res, handler.HandleErrorf, scope, md.Options.GetUninterpretedOption(), "map_entry"); err != nil {
 		return err
 	} else if index >= 0 {
 		optNode := res.OptionNode(md.Options.GetUninterpretedOption()[index])
@@ -331,7 +331,7 @@ func validateEnum(res *result, syntax protoreflect.Syntax, name protoreflect.Ful
 
 	allowAlias := false
 	var allowAliasOpt *descriptorpb.UninterpretedOption
-	if index, err := internal.FindOption(res, handler, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
+	if index, err := internal.FindOption(res, handler.HandleErrorf, scope, ed.Options.GetUninterpretedOption(), "allow_alias"); err != nil {
 		return err
 	} else if index >= 0 {
 		allowAliasOpt = ed.Options.UninterpretedOption[index]
@@ -481,7 +481,7 @@ func validateField(res *result, syntax protoreflect.Syntax, name protoreflect.Fu
 					return err
 				}
 			}
-			if index, err := internal.FindOption(res, handler, scope, fld.Options.GetUninterpretedOption(), "packed"); err != nil {
+			if index, err := internal.FindOption(res, handler.HandleErrorf, scope, fld.Options.GetUninterpretedOption(), "packed"); err != nil {
 				return err
 			} else if index >= 0 {
 				optNode := res.OptionNode(fld.Options.GetUninterpretedOption()[index])
@@ -491,7 +491,7 @@ func validateField(res *result, syntax protoreflect.Syntax, name protoreflect.Fu
 				}
 			}
 		} else if syntax == protoreflect.Proto3 {
-			if index, err := internal.FindOption(res, handler, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
+			if index, err := internal.FindOption(res, handler.HandleErrorf, scope, fld.Options.GetUninterpretedOption(), "default"); err != nil {
 				return err
 			} else if index >= 0 {
 				optNode := res.OptionNode(fld.Options.GetUninterpretedOption()[index])

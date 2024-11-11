@@ -10,12 +10,12 @@ import (
 
 func TestHTTPFile(t *testing.T) {
 	t.Parallel()
-	input := []byte{104, 101, 108, 108, 111}
+	input := "hello"
 
 	testCases := []struct {
 		input    func(rt *sobek.Runtime) interface{}
 		args     []string
-		expected FileData
+		expected *FileData
 		expErr   string
 	}{
 		// We can't really test without specifying a filename argument,
@@ -24,22 +24,22 @@ func TestHTTPFile(t *testing.T) {
 		{
 			func(*sobek.Runtime) interface{} { return input },
 			[]string{"test.bin"},
-			FileData{Data: input, Filename: "test.bin", ContentType: "application/octet-stream"},
+			&FileData{Data: input, Filename: "test.bin", ContentType: "application/octet-stream"},
 			"",
 		},
 		{
-			func(*sobek.Runtime) interface{} { return string(input) },
+			func(*sobek.Runtime) interface{} { return input },
 			[]string{"test.txt", "text/plain"},
-			FileData{Data: input, Filename: "test.txt", ContentType: "text/plain"},
+			&FileData{Data: input, Filename: "test.txt", ContentType: "text/plain"},
 			"",
 		},
 		{
-			func(rt *sobek.Runtime) interface{} { return rt.NewArrayBuffer(input) },
+			func(rt *sobek.Runtime) interface{} { return rt.NewArrayBuffer([]byte(input)) },
 			[]string{"test-ab.bin"},
-			FileData{Data: input, Filename: "test-ab.bin", ContentType: "application/octet-stream"},
+			&FileData{Data: input, Filename: "test-ab.bin", ContentType: "application/octet-stream"},
 			"",
 		},
-		{func(*sobek.Runtime) interface{} { return struct{}{} }, []string{}, FileData{}, "GoError: invalid type struct {}, expected string, []byte or ArrayBuffer"},
+		{func(*sobek.Runtime) interface{} { return struct{}{} }, []string{}, &FileData{}, "GoError: invalid type struct {}, expected string or ArrayBuffer"},
 	}
 
 	for i, tc := range testCases {

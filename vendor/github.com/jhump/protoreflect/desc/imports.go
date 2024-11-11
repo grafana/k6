@@ -34,10 +34,6 @@ var (
 // package or when the alternate path is only used from one file (so you don't
 // want the alternate path used when loading every other file), use an
 // ImportResolver instead.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func RegisterImportPath(registerPath, importPath string) {
 	if len(importPath) == 0 {
 		panic("import path cannot be empty")
@@ -60,10 +56,6 @@ func RegisterImportPath(registerPath, importPath string) {
 // ResolveImport resolves the given import path. If it has been registered as an
 // alternate via RegisterImportPath, the registered path is returned. Otherwise,
 // the given import path is returned unchanged.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func ResolveImport(importPath string) string {
 	importPath = clean(importPath)
 	globalImportPathMu.RLock()
@@ -244,10 +236,6 @@ func (r *ImportResolver) registerImportPathFrom(registerPath, importPath, source
 // LoadFileDescriptor is the same as the package function of the same name, but
 // any alternate paths configured in this resolver are used when linking the
 // given descriptor proto.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadFileDescriptor(filePath string) (*FileDescriptor, error) {
 	return LoadFileDescriptor(filePath)
 }
@@ -255,10 +243,6 @@ func (r *ImportResolver) LoadFileDescriptor(filePath string) (*FileDescriptor, e
 // LoadMessageDescriptor is the same as the package function of the same name,
 // but any alternate paths configured in this resolver are used when linking
 // files for the returned descriptor.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadMessageDescriptor(msgName string) (*MessageDescriptor, error) {
 	return LoadMessageDescriptor(msgName)
 }
@@ -266,10 +250,6 @@ func (r *ImportResolver) LoadMessageDescriptor(msgName string) (*MessageDescript
 // LoadMessageDescriptorForMessage is the same as the package function of the
 // same name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadMessageDescriptorForMessage(msg proto.Message) (*MessageDescriptor, error) {
 	return LoadMessageDescriptorForMessage(msg)
 }
@@ -277,10 +257,6 @@ func (r *ImportResolver) LoadMessageDescriptorForMessage(msg proto.Message) (*Me
 // LoadMessageDescriptorForType is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadMessageDescriptorForType(msgType reflect.Type) (*MessageDescriptor, error) {
 	return LoadMessageDescriptorForType(msgType)
 }
@@ -288,10 +264,6 @@ func (r *ImportResolver) LoadMessageDescriptorForType(msgType reflect.Type) (*Me
 // LoadEnumDescriptorForEnum is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadEnumDescriptorForEnum(enum protoEnum) (*EnumDescriptor, error) {
 	return LoadEnumDescriptorForEnum(enum)
 }
@@ -299,10 +271,6 @@ func (r *ImportResolver) LoadEnumDescriptorForEnum(enum protoEnum) (*EnumDescrip
 // LoadEnumDescriptorForType is the same as the package function of the same
 // name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadEnumDescriptorForType(enumType reflect.Type) (*EnumDescriptor, error) {
 	return LoadEnumDescriptorForType(enumType)
 }
@@ -310,10 +278,6 @@ func (r *ImportResolver) LoadEnumDescriptorForType(enumType reflect.Type) (*Enum
 // LoadFieldDescriptorForExtension is the same as the package function of the
 // same name, but any alternate paths configured in this resolver are used when
 // linking files for the returned descriptor.
-//
-// Deprecated: the new protobuf runtime (v1.4+) verifies that import paths are
-// correct and that descriptors can be linked during package initialization. So
-// registering alternate paths is no longer useful or necessary.
 func (r *ImportResolver) LoadFieldDescriptorForExtension(ext *proto.ExtensionDesc) (*FieldDescriptor, error) {
 	return LoadFieldDescriptorForExtension(ext)
 }

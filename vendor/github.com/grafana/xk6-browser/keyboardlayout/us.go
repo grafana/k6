@@ -152,6 +152,7 @@ func initUS() {
 		"Clear":              true,
 		"Shift":              true,
 		"Control":            true,
+		"ControlOrMeta":      true,
 		"Alt":                true,
 		"Accept":             true,
 		"ModeChange":         true,

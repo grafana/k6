@@ -58,6 +58,7 @@ type parsingState struct {
 	commonJSWrapped   bool // whether the original source is wrapped in a function to make it a CommonJS module
 	compatibilityMode lib.CompatibilityMode
 	compiler          *Compiler
+	esm               bool
 
 	loader func(string) ([]byte, error)
 }
@@ -66,13 +67,14 @@ type parsingState struct {
 // The returned program can be compiled directly by Sobek.
 // Additionally, it returns the end code that has been parsed including any required transformations.
 func (c *Compiler) Parse(
-	src, filename string, commonJSWrap bool,
+	src, filename string, commonJSWrap bool, esm bool,
 ) (prg *ast.Program, finalCode string, err error) {
 	state := &parsingState{
 		loader:            c.Options.SourceMapLoader,
 		compatibilityMode: c.Options.CompatibilityMode,
 		commonJSWrapped:   commonJSWrap,
 		compiler:          c,
+		esm:               esm,
 	}
 	return state.parseImpl(src, filename, commonJSWrap)
 }
@@ -98,7 +100,7 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 		opts = append(opts, parser.WithDisableSourceMaps)
 	}
 
-	if !commonJSWrap {
+	if ps.esm {
 		opts = append(opts, parser.IsModule)
 	}
 
@@ -117,11 +119,11 @@ func (ps *parsingState) parseImpl(src, filename string, commonJSWrap bool) (*ast
 		return prg, code, nil
 	}
 
-	if ps.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+	if ps.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced && strings.HasSuffix(filename, ".ts") {
 		if err := ps.compiler.usage.Uint64(usageParsedTSFilesKey, 1); err != nil {
 			ps.compiler.logger.WithError(err).Warn("couldn't report usage for " + usageParsedTSFilesKey)
 		}
-		code, ps.srcMap, err = esbuildTransform(src, filename)
+		code, ps.srcMap, err = StripTypes(src, filename)
 		if err != nil {
 			return nil, "", err
 		}

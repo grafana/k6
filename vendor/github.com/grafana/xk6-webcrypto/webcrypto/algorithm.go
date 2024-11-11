@@ -1,6 +1,7 @@
 package webcrypto
 
 import (
+	"fmt"
 	"reflect"
 	"strings"
 
@@ -145,16 +146,30 @@ func normalizeAlgorithm(rt *sobek.Runtime, v sobek.Value, op AlgorithmIdentifier
 		return Algorithm{}, NewError(SyntaxError, "algorithm cannot be interpreted as a string or an object")
 	}
 
-	// Algorithm identifiers are always upper cased.
-	// A registered algorithm provided in lower case format, should
-	// be considered valid.
-	algorithm.Name = strings.ToUpper(algorithm.Name)
+	algorithm.Name = normalizeAlgorithmName(algorithm.Name)
 
 	if !isRegisteredAlgorithm(algorithm.Name, op) {
-		return Algorithm{}, NewError(NotSupportedError, "unsupported algorithm: "+algorithm.Name)
+		return Algorithm{}, NewError(
+			NotSupportedError,
+			fmt.Sprintf("algorithm %q doesn't support (in implementation) operation %q", algorithm.Name, op),
+		)
 	}
 
 	return algorithm, nil
+}
+
+func normalizeAlgorithmName(name string) string {
+	// Algorithm identifiers are always upper cased.
+	// A registered algorithm provided in lower case format, should
+	// be considered valid.
+	name = strings.ToUpper(name)
+
+	// exception is made for RSASSA-PKCS1-v1_5
+	if name == strings.ToUpper(RSASsaPkcs1v15) {
+		return RSASsaPkcs1v15
+	}
+
+	return name
 }
 
 // isRegisteredAlgorithm returns true if the given algorithm name is registered
@@ -171,13 +186,17 @@ func isRegisteredAlgorithm(algorithmName string, forOperation string) bool {
 		return isAesAlgorithm(algorithmName) ||
 			isHashAlgorithm(algorithmName) ||
 			algorithmName == HMAC ||
-			isEllipticCurve(algorithmName)
+			isEllipticCurve(algorithmName) ||
+			isRSAAlgorithm(algorithmName)
 	case OperationIdentifierExportKey, OperationIdentifierImportKey:
-		return isAesAlgorithm(algorithmName) || algorithmName == HMAC || isEllipticCurve(algorithmName)
+		return isAesAlgorithm(algorithmName) ||
+			algorithmName == HMAC ||
+			isEllipticCurve(algorithmName) ||
+			isRSAAlgorithm(algorithmName)
 	case OperationIdentifierEncrypt, OperationIdentifierDecrypt:
-		return isAesAlgorithm(algorithmName)
+		return isAesAlgorithm(algorithmName) || algorithmName == RSAOaep
 	case OperationIdentifierSign, OperationIdentifierVerify:
-		return algorithmName == HMAC || algorithmName == ECDSA
+		return algorithmName == HMAC || algorithmName == ECDSA || algorithmName == RSAPss || algorithmName == RSASsaPkcs1v15
 	default:
 		return false
 	}
@@ -189,6 +208,10 @@ func isAesAlgorithm(algorithmName string) bool {
 
 func isHashAlgorithm(algorithmName string) bool {
 	return algorithmName == SHA1 || algorithmName == SHA256 || algorithmName == SHA384 || algorithmName == SHA512
+}
+
+func isRSAAlgorithm(algorithmName string) bool {
+	return algorithmName == RSASsaPkcs1v15 || algorithmName == RSAPss || algorithmName == RSAOaep
 }
 
 // hasAlg an internal interface that helps us to identify
