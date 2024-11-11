@@ -523,15 +523,16 @@ func (f *Frame) waitForSelectorRetry(
 	return nil, err
 }
 
+// waitForSelector will wait for the given selector to reach a defined state in
+// opts.
+//
+// It will auto retry on certain errors until the retryCount is below 0. The
+// retry workaround is needed since the underlying DOM can change when the
+// wait action is performed during a navigation.
 func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptions) (_ *ElementHandle, rerr error) {
 	f.log.Debugf("Frame:waitForSelector", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
-	document, err := f.document()
-	if err != nil {
-		return nil, err
-	}
-
-	handle, err := document.waitForSelector(f.ctx, selector, opts)
+	handle, err := f.waitFor(selector, opts, 20)
 	if err != nil {
 		return nil, err
 	}
