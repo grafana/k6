@@ -691,6 +691,19 @@ func (b *Browser) fetchVersion() (browserVersion, error) {
 		return browserVersion{}, fmt.Errorf("getting browser version information: %w", err)
 	}
 
+	// Adjust the user agent to remove the headless part.
+	//
+	// Including Headless might cause issues with some websites that treat headless
+	// browsers differently. Later on, [BrowserContext] will set the user agent to
+	// this user agent if not set by the user. This will force [FrameSession] to
+	// set the user agent to the browser's user agent.
+	//
+	// Doing this here provides a consistent user agent across all browser contexts.
+	// Also, it makes it consistent to query the user agent from the browser.
+	if b.browserOpts.Headless {
+		bv.userAgent = strings.ReplaceAll(bv.userAgent, "Headless", "")
+	}
+
 	return bv, nil
 }
 
