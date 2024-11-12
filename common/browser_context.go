@@ -118,6 +118,11 @@ func NewBrowserContext(
 	if opts == nil {
 		opts = DefaultBrowserContextOptions()
 	}
+	// Always use the [Browser]'s user agent if it's not set by the user.
+	// Setting this forces [FrameSession] to set Chromium's user agent.
+	if strings.TrimSpace(opts.UserAgent) == "" {
+		opts.UserAgent = browser.UserAgent()
+	}
 
 	b := BrowserContext{
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
