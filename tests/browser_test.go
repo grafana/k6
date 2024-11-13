@@ -220,13 +220,12 @@ func TestBrowserUserAgent(t *testing.T) {
 
 	b := newTestBrowser(t)
 
-	// testBrowserVersion() tests the version already
-	// just look for "Headless" in UserAgent
 	ua := b.UserAgent()
 	if prefix := "Mozilla/5.0"; !strings.HasPrefix(ua, prefix) {
 		t.Errorf("UserAgent should start with %q, but got: %q", prefix, ua)
 	}
-	assert.Contains(t, ua, "Headless")
+	// We default to removing the "Headless" part of the user agent string.
+	assert.NotContains(t, ua, "Headless")
 }
 
 func TestBrowserCrashErr(t *testing.T) {
