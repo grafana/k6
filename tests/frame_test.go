@@ -168,7 +168,10 @@ func TestFrameTitle(t *testing.T) {
 		nil,
 	)
 	require.NoError(t, err)
-	assert.Equal(t, "Some title", p.MainFrame().Title())
+
+	title, err := p.MainFrame().Title()
+	assert.NoError(t, err)
+	assert.Equal(t, "Some title", title)
 }
 
 func TestFrameGetAttribute(t *testing.T) {

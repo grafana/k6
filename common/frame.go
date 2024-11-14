@@ -1738,15 +1738,20 @@ func (f *Frame) Timeout() time.Duration {
 }
 
 // Title returns the title of the frame.
-func (f *Frame) Title() string {
+func (f *Frame) Title() (string, error) {
 	f.log.Debugf("Frame:Title", "fid:%s furl:%q", f.ID(), f.URL())
 
-	script := `() => document.title`
+	js := `() => document.title`
+	v, err := f.Evaluate(js)
+	if err != nil {
+		return "", fmt.Errorf("getting frame title: %w", err)
+	}
+	s, ok := v.(string)
+	if !ok {
+		return "", fmt.Errorf("getting frame title: expected string, got %T", v)
+	}
 
-	// TODO: return error
-
-	v, _ := f.Evaluate(script)
-	return v.(string) //nolint:forcetypeassert
+	return s, nil
 }
 
 // Type text on the first element found matches the selector.
