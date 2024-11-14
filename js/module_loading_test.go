@@ -617,36 +617,40 @@ func TestDefaultNamedExports(t *testing.T) {
 
 func TestStarImport(t *testing.T) {
 	t.Parallel()
-	fs := fsext.NewMemMapFs()
-	err := writeToFs(fs, map[string]any{
-		"/commonjs_file.js": `exports.something = 5;`,
+
+	t.Run("esm_spec", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+		err := writeToFs(fs, map[string]any{
+			"/commonjs_file.js": `exports.something = 5;`,
+		})
+		require.NoError(t, err)
+
+		r1, err := getSimpleRunner(t, "/script.js", `
+			import * as cjs from "./commonjs_file.js"; // commonjs
+			import * as k6 from "k6"; // "new" go module
+			// go module that only exports default object, but we want it to
+			// export as a namespace object.
+			import * as http from "k6/http";
+			// TODO: test with basic go module maybe
+	
+			if (cjs.something != 5) {
+				throw "cjs.something has wrong value" + cjs.something;
+			}
+			if (typeof k6.sleep != "function") {
+				throw "k6.sleep has wrong type" + typeof k6.sleep;
+			}
+			if (typeof http.get != "function") {
+				throw "http.get has wrong type" + typeof http.get;
+			}
+			export default () => {}
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+		require.NoError(t, err)
+
+		arc := r1.MakeArchive()
+		_, err = getSimpleArchiveRunner(t, arc)
+		require.NoError(t, err)
 	})
-	require.NoError(t, err)
-
-	r1, err := getSimpleRunner(t, "/script.js", `
-		import * as cjs from "./commonjs_file.js"; // commonjs
-		import * as k6 from "k6"; // "new" go module
-		// go module that only exports default object, but we want it to
-		// export as a namespace object.
-		import * as http from "k6/http";
-		// TODO: test with basic go module maybe
-
-		if (cjs.something != 5) {
-			throw "cjs.something has wrong value" + cjs.something;
-		}
-		if (typeof k6.sleep != "function") {
-			throw "k6.sleep has wrong type" + typeof k6.sleep;
-		}
-		if (typeof http.get != "function") {
-			throw "http.get has wrong type" + typeof http.get;
-		}
-		export default () => {}
-	`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
-	require.NoError(t, err)
-
-	arc := r1.MakeArchive()
-	_, err = getSimpleArchiveRunner(t, arc)
-	require.NoError(t, err)
 }
 
 func TestIndirectExportDefault(t *testing.T) {
