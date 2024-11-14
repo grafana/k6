@@ -143,8 +143,6 @@ github.com/evanw/esbuild/pkg/api
 # github.com/fatih/color v1.18.0
 ## explicit; go 1.17
 github.com/fatih/color
-# github.com/fsnotify/fsnotify v1.5.4
-## explicit; go 1.16
 # github.com/go-logr/logr v1.4.2
 ## explicit; go 1.18
 github.com/go-logr/logr
@@ -286,12 +284,14 @@ github.com/mstoykov/atlas
 # github.com/mstoykov/envconfig v1.5.0
 ## explicit
 github.com/mstoykov/envconfig
-# github.com/mstoykov/k6-taskqueue-lib v0.1.0
-## explicit; go 1.17
+# github.com/mstoykov/k6-taskqueue-lib v0.1.2
+## explicit; go 1.21
 github.com/mstoykov/k6-taskqueue-lib/taskqueue
 # github.com/nu7hatch/gouuid v0.0.0-20131221200532-179d4d0c4d8d
 ## explicit
 github.com/nu7hatch/gouuid
+# github.com/nxadm/tail v1.4.11
+## explicit; go 1.13
 # github.com/pkg/browser v0.0.0-20210911075715-681adbf594b8
 ## explicit; go 1.14
 github.com/pkg/browser
@@ -617,8 +617,6 @@ gopkg.in/cenkalti/backoff.v1
 # gopkg.in/guregu/null.v3 v3.3.0
 ## explicit
 gopkg.in/guregu/null.v3
-# gopkg.in/tomb.v1 v1.0.0-20141024135613-dd632973f1e7
-## explicit
 # gopkg.in/yaml.v3 v3.0.1
 ## explicit
 gopkg.in/yaml.v3
