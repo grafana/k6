@@ -28,6 +28,9 @@ func TestCreateReport(t *testing.T) {
 	s, err := execution.NewScheduler(&lib.TestRunState{
 		TestPreInitState: &lib.TestPreInitState{
 			Logger: logger,
+			LookupEnv: func(_ string) (val string, ok bool) {
+				return "", true
+			},
 		},
 		Options: opts,
 	}, local.NewController())
@@ -46,4 +49,5 @@ func TestCreateReport(t *testing.T) {
 	assert.EqualValues(t, 6, m["vus_max"])
 	assert.EqualValues(t, 170, m["iterations"])
 	assert.NotEqual(t, "0s", m["duration"])
+	assert.EqualValues(t, map[string]any{"ci": true}, m["env"])
 }

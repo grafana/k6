@@ -28,6 +28,11 @@ func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string
 	}
 	m["executors"] = executors
 
+	_, isCI := execScheduler.GetState().Test.LookupEnv("CI")
+	m["env"] = map[string]any{
+		"ci": isCI,
+	}
+
 	return m
 }
 
