@@ -645,6 +645,41 @@ func TestStarImport(t *testing.T) {
 		_, err = getSimpleArchiveRunner(t, arc)
 		require.NoError(t, err)
 	})
+
+	t.Run("default_to_namespaced_object", func(t *testing.T) {
+		t.Parallel()
+
+		r1, err := getSimpleRunner(t, "/script.js", `
+			import http from "k6/http";
+			import * as httpNO from "k6/http";
+
+			const httpKeys = Object.keys(http);
+			const httpNOKeys = Object.keys(httpNO);
+
+			// 1. Check if both have the same number of properties
+			if (httpKeys.length !== httpNOKeys.length) {
+				throw "Objects have a different number of properties.";
+			}
+
+			// 2. Check if all properties match
+			for (const key of httpKeys) {
+				if (!Object.prototype.hasOwnProperty.call(httpNO, key)) {
+					throw `+"`Property ${key} is missing in the second object.`"+`;
+				}
+
+				if (http[key] !== httpNO[key]) {
+					throw `+"`Property ${key} does not match between the objects.`"+`;
+				}
+			}
+
+			export default () => {}
+		`, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+		require.NoError(t, err)
+
+		arc := r1.MakeArchive()
+		_, err = getSimpleArchiveRunner(t, arc)
+		require.NoError(t, err)
+	})
 }
 
 func TestIndirectExportDefault(t *testing.T) {
