@@ -26,6 +26,14 @@ func (gm *goModule) Instantiate(rt *sobek.Runtime) (sobek.CyclicModuleInstance, 
 		named := mi.Exports().Named
 
 		switch {
+		case len(named) == 0 && mi.Exports().Default != nil:
+			// If named length is 0 but default is defined, then try to work with
+			// default and extract the names of the object's properties. This
+			// behavior isn't ESM compatible, but we do want to allow defaults to
+			// be imported as namespaced object, which is also how node works.
+			if obj, ok := mi.Exports().Default.(*sobek.Object); ok {
+				gm.exportedNames = obj.GetOwnPropertyNames()
+			}
 		default:
 			gm.exportedNames = make([]string, len(named))
 			for name := range named {
