@@ -25,10 +25,14 @@ func (gm *goModule) Instantiate(rt *sobek.Runtime) (sobek.CyclicModuleInstance, 
 	if gm.exportedNames == nil {
 		named := mi.Exports().Named
 
-		gm.exportedNames = make([]string, len(named))
-		for name := range named {
-			gm.exportedNames = append(gm.exportedNames, name)
+		switch {
+		default:
+			gm.exportedNames = make([]string, len(named))
+			for name := range named {
+				gm.exportedNames = append(gm.exportedNames, name)
+			}
 		}
+
 		for _, callback := range gm.exportedNamesCallbacks {
 			callback(gm.exportedNames)
 		}
