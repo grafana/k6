@@ -35,7 +35,7 @@ func (gm *goModule) Instantiate(rt *sobek.Runtime) (sobek.CyclicModuleInstance, 
 				gm.exportedNames = obj.GetOwnPropertyNames()
 			}
 		default:
-			gm.exportedNames = make([]string, len(named))
+			gm.exportedNames = make([]string, 0, len(named))
 			for name := range named {
 				gm.exportedNames = append(gm.exportedNames, name)
 			}
