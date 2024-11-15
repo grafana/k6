@@ -63,7 +63,8 @@ func (r *RootModule) NewModuleInstance(vu modules.VU) modules.Instance {
 	validateArgCount := func(methodName string, args ...sobek.Value) {
 		numberOfArgs := len(args)
 		if numberOfArgs > 2 {
-			vu.State().Logger.Warningf("http.%s method has more than two arguments, but %d were provided", methodName, len(args))
+			vu.State().Logger.Warningf("http.%s method has more than two arguments, but %d were provided",
+				methodName, numberOfArgs)
 		}
 	}
 
