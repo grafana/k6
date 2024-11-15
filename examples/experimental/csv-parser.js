@@ -5,12 +5,8 @@ export const options = {
 	iterations: 10,
 }
 
-let file;
-let parser;
-(async function () {
-	file = await open('data.csv');
-	parser = new csv.Parser(file);
-})();
+const file = await open('data.csv');;
+const parser = new csv.Parser(file);;
 
 export default async function() {
 	// The parser `next` method attempts to read the next row from the CSV file.
@@ -18,7 +14,7 @@ export default async function() {
 	// It returns an iterator-like object with a `done` property that indicates whether
 	// there are more rows to read, and a `value` property that contains the row fields
 	// as an array.
-	const {done, value} = await parser.next();
+	const { done, value } = await parser.next();
 	if (done) {
 		throw new Error("No more rows to read");
 	}

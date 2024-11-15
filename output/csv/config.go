@@ -69,22 +69,22 @@ func ParseArg(arg string) (Config, error) {
 
 	pairs := strings.Split(arg, ",")
 	for _, pair := range pairs {
-		r := strings.SplitN(pair, "=", 2)
-		if len(r) != 2 {
+		k, v, _ := strings.Cut(pair, "=")
+		if v == "" {
 			return c, fmt.Errorf("couldn't parse %q as argument for csv output", arg)
 		}
-		switch r[0] {
+		switch k {
 		case "saveInterval":
-			err := c.SaveInterval.UnmarshalText([]byte(r[1]))
+			err := c.SaveInterval.UnmarshalText([]byte(v))
 			if err != nil {
 				return c, err
 			}
 		case "fileName":
-			c.FileName = null.StringFrom(r[1])
+			c.FileName = null.StringFrom(v)
 		case "timeFormat":
-			c.TimeFormat = null.StringFrom(r[1])
+			c.TimeFormat = null.StringFrom(v)
 		default:
-			return c, fmt.Errorf("unknown key %q as argument for csv output", r[0])
+			return c, fmt.Errorf("unknown key %q as argument for csv output", k)
 		}
 	}
 

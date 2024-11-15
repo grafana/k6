@@ -5,12 +5,12 @@ import (
 	"strings"
 	"time"
 
-	"go.k6.io/k6/js/common"
+	"github.com/grafana/sobek"
 )
 
 // FileData represents a binary file requiring multipart request encoding
 type FileData struct {
-	Data        []byte
+	Data        any
 	Filename    string
 	ContentType string
 }
@@ -22,7 +22,7 @@ func escapeQuotes(s string) string {
 }
 
 // File returns a FileData object.
-func (mi *ModuleInstance) file(data interface{}, args ...string) FileData {
+func (mi *ModuleInstance) file(data any, args ...string) (*FileData, error) {
 	// supply valid default if filename and content-type are not specified
 	fname, ct := fmt.Sprintf("%d", time.Now().UnixNano()), "application/octet-stream"
 
@@ -34,14 +34,15 @@ func (mi *ModuleInstance) file(data interface{}, args ...string) FileData {
 		}
 	}
 
-	dt, err := common.ToBytes(data)
-	if err != nil {
-		common.Throw(mi.vu.Runtime(), err)
+	switch data.(type) {
+	case string, sobek.ArrayBuffer:
+	default:
+		return nil, fmt.Errorf("invalid type %T, expected string or ArrayBuffer", data)
 	}
 
-	return FileData{
-		Data:        dt,
+	return &FileData{
+		Data:        data,
 		Filename:    fname,
 		ContentType: ct,
-	}
+	}, nil
 }

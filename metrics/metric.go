@@ -48,15 +48,15 @@ func (m *Metric) AddSubmetric(keyValues string) (*Submetric, error) {
 		if kv == "" {
 			continue
 		}
-		parts := strings.SplitN(kv, ":", 2)
+		k, v, _ := strings.Cut(kv, ":")
 
-		key := strings.Trim(strings.TrimSpace(parts[0]), `"'`)
-		if len(parts) != 2 {
+		key := strings.Trim(strings.TrimSpace(k), `"'`)
+		if v == "" {
 			tags = tags.With(key, "")
 			continue
 		}
 
-		value := strings.Trim(strings.TrimSpace(parts[1]), `"'`)
+		value := strings.Trim(strings.TrimSpace(v), `"'`)
 		tags = tags.With(key, value)
 	}
 
@@ -133,9 +133,9 @@ func ParseMetricName(name string) (string, []string, error) {
 
 	// For each tag definition, ensure it is correctly formed
 	for i, t := range tags {
-		keyValue := strings.SplitN(t, ":", 2)
+		_, value, _ := strings.Cut(t, ":")
 
-		if len(keyValue) != 2 || keyValue[1] == "" {
+		if value == "" {
 			return "", nil, fmt.Errorf("%w, metric %q tag expression is malformed", ErrMetricNameParsing, t)
 		}
 

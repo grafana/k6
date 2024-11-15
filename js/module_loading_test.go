@@ -617,30 +617,69 @@ func TestDefaultNamedExports(t *testing.T) {
 
 func TestStarImport(t *testing.T) {
 	t.Parallel()
-	fs := fsext.NewMemMapFs()
-	err := writeToFs(fs, map[string]any{
-		"/commonjs_file.js": `exports.something = 5;`,
+
+	t.Run("esm_spec", func(t *testing.T) {
+		t.Parallel()
+		fs := fsext.NewMemMapFs()
+		err := writeToFs(fs, map[string]any{
+			"/commonjs_file.js": `exports.something = 5;`,
+		})
+		require.NoError(t, err)
+
+		r1, err := getSimpleRunner(t, "/script.js", `
+			import * as cjs from "./commonjs_file.js"; // commonjs
+			import * as k6 from "k6"; // "new" go module
+			// TODO: test with basic go module maybe
+	
+			if (cjs.something != 5) {
+				throw "cjs.something has wrong value" + cjs.something;
+			}
+			if (typeof k6.sleep != "function") {
+				throw "k6.sleep has wrong type" + typeof k6.sleep;
+			}
+			export default () => {}
+		`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+		require.NoError(t, err)
+
+		arc := r1.MakeArchive()
+		_, err = getSimpleArchiveRunner(t, arc)
+		require.NoError(t, err)
 	})
-	require.NoError(t, err)
 
-	r1, err := getSimpleRunner(t, "/script.js", `
-		import * as cjs from "./commonjs_file.js"; // commonjs
-		import * as k6 from "k6"; // "new" go module
-		// TODO: test with basic go module maybe
+	t.Run("default_to_namespaced_object", func(t *testing.T) {
+		t.Parallel()
 
-		if (cjs.something != 5) {
-			throw "cjs.something has wrong value" + cjs.something;
-		}
-		if (typeof k6.sleep != "function") {
-			throw "k6.sleep has wrong type" + typeof k6.sleep;
-		}
-		export default () => {}
-	`, fs, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
-	require.NoError(t, err)
+		r1, err := getSimpleRunner(t, "/script.js", `
+			import http from "k6/http";
+			import * as httpNO from "k6/http";
 
-	arc := r1.MakeArchive()
-	_, err = getSimpleArchiveRunner(t, arc)
-	require.NoError(t, err)
+			const httpKeys = Object.keys(http);
+			const httpNOKeys = Object.keys(httpNO);
+
+			// 1. Check if both have the same number of properties
+			if (httpKeys.length !== httpNOKeys.length) {
+				throw "Objects have a different number of properties.";
+			}
+
+			// 2. Check if all properties match
+			for (const key of httpKeys) {
+				if (!Object.prototype.hasOwnProperty.call(httpNO, key)) {
+					throw `+"`Property ${key} is missing in the second object.`"+`;
+				}
+
+				if (http[key] !== httpNO[key]) {
+					throw `+"`Property ${key} does not match between the objects.`"+`;
+				}
+			}
+
+			export default () => {}
+		`, lib.RuntimeOptions{CompatibilityMode: null.StringFrom("extended")})
+		require.NoError(t, err)
+
+		arc := r1.MakeArchive()
+		_, err = getSimpleArchiveRunner(t, arc)
+		require.NoError(t, err)
+	})
 }
 
 func TestIndirectExportDefault(t *testing.T) {

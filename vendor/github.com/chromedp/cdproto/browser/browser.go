@@ -124,7 +124,7 @@ func (p *ResetPermissionsParams) Do(ctx context.Context) (err error) {
 
 // SetDownloadBehaviorParams set the behavior when downloading a file.
 type SetDownloadBehaviorParams struct {
-	Behavior         SetDownloadBehaviorBehavior `json:"behavior"`                   // Whether to allow all or deny all download requests, or use default Chrome behavior if available (otherwise deny). |allowAndName| allows download and names files according to their dowmload guids.
+	Behavior         SetDownloadBehaviorBehavior `json:"behavior"`                   // Whether to allow all or deny all download requests, or use default Chrome behavior if available (otherwise deny). |allowAndName| allows download and names files according to their download guids.
 	BrowserContextID cdp.BrowserContextID        `json:"browserContextId,omitempty"` // BrowserContext to set download behavior. When omitted, default browser context is used.
 	DownloadPath     string                      `json:"downloadPath,omitempty"`     // The default path to save downloaded files to. This is required if behavior is set to 'allow' or 'allowAndName'.
 	EventsEnabled    bool                        `json:"eventsEnabled,omitempty"`    // Whether to emit download events (defaults to false).
@@ -136,7 +136,7 @@ type SetDownloadBehaviorParams struct {
 //
 // parameters:
 //
-//	behavior - Whether to allow all or deny all download requests, or use default Chrome behavior if available (otherwise deny). |allowAndName| allows download and names files according to their dowmload guids.
+//	behavior - Whether to allow all or deny all download requests, or use default Chrome behavior if available (otherwise deny). |allowAndName| allows download and names files according to their download guids.
 func SetDownloadBehavior(behavior SetDownloadBehaviorBehavior) *SetDownloadBehaviorParams {
 	return &SetDownloadBehaviorParams{
 		Behavior: behavior,
@@ -319,7 +319,7 @@ func (p *GetBrowserCommandLineParams) Do(ctx context.Context) (arguments []strin
 // GetHistogramsParams get Chrome histograms.
 type GetHistogramsParams struct {
 	Query string `json:"query,omitempty"` // Requested substring in name. Only histograms which have query as a substring in their name are extracted. An empty or absent query returns all histograms.
-	Delta bool   `json:"delta,omitempty"` // If true, retrieve delta since last call.
+	Delta bool   `json:"delta,omitempty"` // If true, retrieve delta since last delta call.
 }
 
 // GetHistograms get Chrome histograms.
@@ -339,7 +339,7 @@ func (p GetHistogramsParams) WithQuery(query string) *GetHistogramsParams {
 	return &p
 }
 
-// WithDelta if true, retrieve delta since last call.
+// WithDelta if true, retrieve delta since last delta call.
 func (p GetHistogramsParams) WithDelta(delta bool) *GetHistogramsParams {
 	p.Delta = delta
 	return &p
@@ -369,7 +369,7 @@ func (p *GetHistogramsParams) Do(ctx context.Context) (histograms []*Histogram, 
 // GetHistogramParams get a Chrome histogram by name.
 type GetHistogramParams struct {
 	Name  string `json:"name"`            // Requested histogram name.
-	Delta bool   `json:"delta,omitempty"` // If true, retrieve delta since last call.
+	Delta bool   `json:"delta,omitempty"` // If true, retrieve delta since last delta call.
 }
 
 // GetHistogram get a Chrome histogram by name.
@@ -385,7 +385,7 @@ func GetHistogram(name string) *GetHistogramParams {
 	}
 }
 
-// WithDelta if true, retrieve delta since last call.
+// WithDelta if true, retrieve delta since last delta call.
 func (p GetHistogramParams) WithDelta(delta bool) *GetHistogramParams {
 	p.Delta = delta
 	return &p
@@ -579,23 +579,51 @@ func (p *ExecuteBrowserCommandParams) Do(ctx context.Context) (err error) {
 	return cdp.Execute(ctx, CommandExecuteBrowserCommand, p, nil)
 }
 
+// AddPrivacySandboxEnrollmentOverrideParams allows a site to use privacy
+// sandbox features that require enrollment without the site actually being
+// enrolled. Only supported on page targets.
+type AddPrivacySandboxEnrollmentOverrideParams struct {
+	URL string `json:"url"`
+}
+
+// AddPrivacySandboxEnrollmentOverride allows a site to use privacy sandbox
+// features that require enrollment without the site actually being enrolled.
+// Only supported on page targets.
+//
+// See: https://chromedevtools.github.io/devtools-protocol/tot/Browser#method-addPrivacySandboxEnrollmentOverride
+//
+// parameters:
+//
+//	url
+func AddPrivacySandboxEnrollmentOverride(url string) *AddPrivacySandboxEnrollmentOverrideParams {
+	return &AddPrivacySandboxEnrollmentOverrideParams{
+		URL: url,
+	}
+}
+
+// Do executes Browser.addPrivacySandboxEnrollmentOverride against the provided context.
+func (p *AddPrivacySandboxEnrollmentOverrideParams) Do(ctx context.Context) (err error) {
+	return cdp.Execute(ctx, CommandAddPrivacySandboxEnrollmentOverride, p, nil)
+}
+
 // Command names.
 const (
-	CommandSetPermission         = "Browser.setPermission"
-	CommandGrantPermissions      = "Browser.grantPermissions"
-	CommandResetPermissions      = "Browser.resetPermissions"
-	CommandSetDownloadBehavior   = "Browser.setDownloadBehavior"
-	CommandCancelDownload        = "Browser.cancelDownload"
-	CommandClose                 = "Browser.close"
-	CommandCrash                 = "Browser.crash"
-	CommandCrashGpuProcess       = "Browser.crashGpuProcess"
-	CommandGetVersion            = "Browser.getVersion"
-	CommandGetBrowserCommandLine = "Browser.getBrowserCommandLine"
-	CommandGetHistograms         = "Browser.getHistograms"
-	CommandGetHistogram          = "Browser.getHistogram"
-	CommandGetWindowBounds       = "Browser.getWindowBounds"
-	CommandGetWindowForTarget    = "Browser.getWindowForTarget"
-	CommandSetWindowBounds       = "Browser.setWindowBounds"
-	CommandSetDockTile           = "Browser.setDockTile"
-	CommandExecuteBrowserCommand = "Browser.executeBrowserCommand"
+	CommandSetPermission                       = "Browser.setPermission"
+	CommandGrantPermissions                    = "Browser.grantPermissions"
+	CommandResetPermissions                    = "Browser.resetPermissions"
+	CommandSetDownloadBehavior                 = "Browser.setDownloadBehavior"
+	CommandCancelDownload                      = "Browser.cancelDownload"
+	CommandClose                               = "Browser.close"
+	CommandCrash                               = "Browser.crash"
+	CommandCrashGpuProcess                     = "Browser.crashGpuProcess"
+	CommandGetVersion                          = "Browser.getVersion"
+	CommandGetBrowserCommandLine               = "Browser.getBrowserCommandLine"
+	CommandGetHistograms                       = "Browser.getHistograms"
+	CommandGetHistogram                        = "Browser.getHistogram"
+	CommandGetWindowBounds                     = "Browser.getWindowBounds"
+	CommandGetWindowForTarget                  = "Browser.getWindowForTarget"
+	CommandSetWindowBounds                     = "Browser.setWindowBounds"
+	CommandSetDockTile                         = "Browser.setDockTile"
+	CommandExecuteBrowserCommand               = "Browser.executeBrowserCommand"
+	CommandAddPrivacySandboxEnrollmentOverride = "Browser.addPrivacySandboxEnrollmentOverride"
 )

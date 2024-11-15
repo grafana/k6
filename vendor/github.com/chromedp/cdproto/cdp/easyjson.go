@@ -669,6 +669,8 @@ func easyjsonC5a4559bDecodeGithubComChromedpCdprotoCdp4(in *jlexer.Lexer, out *N
 				}
 				(*out.AssignedSlot).UnmarshalEasyJSON(in)
 			}
+		case "isScrollable":
+			out.IsScrollable = bool(in.Bool())
 		default:
 			in.SkipRecursive()
 		}
@@ -893,6 +895,11 @@ func easyjsonC5a4559bEncodeGithubComChromedpCdprotoCdp4(out *jwriter.Writer, in 
 		const prefix string = ",\"assignedSlot\":"
 		out.RawString(prefix)
 		(*in.AssignedSlot).MarshalEasyJSON(out)
+	}
+	if in.IsScrollable {
+		const prefix string = ",\"isScrollable\":"
+		out.RawString(prefix)
+		out.Bool(bool(in.IsScrollable))
 	}
 	out.RawByte('}')
 }

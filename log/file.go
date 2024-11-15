@@ -42,8 +42,8 @@ func FileHookFromConfigLine(
 		loglines:       make(chan []byte, fileHookBufferSize),
 	}
 
-	parts := strings.SplitN(line, "=", 2)
-	if parts[0] != "file" {
+	logOutput, _, _ := strings.Cut(line, "=")
+	if logOutput != "file" {
 		return nil, fmt.Errorf("logfile configuration should be in the form `file=path-to-local-file` but is `%s`", line)
 	}
 	if err := hook.parseArgs(line); err != nil {

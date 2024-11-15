@@ -18,12 +18,11 @@ import (
 	"strings"
 	"sync"
 
-	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/reflect/protoreflect"
-	"google.golang.org/protobuf/types/descriptorpb"
 
 	"github.com/bufbuild/protocompile/ast"
 	"github.com/bufbuild/protocompile/internal"
+	"github.com/bufbuild/protocompile/protoutil"
 	"github.com/bufbuild/protocompile/reporter"
 	"github.com/bufbuild/protocompile/walk"
 )
@@ -53,7 +52,7 @@ type packageSymbols struct {
 	children map[protoreflect.FullName]*packageSymbols
 	files    map[protoreflect.FileDescriptor]struct{}
 	symbols  map[protoreflect.FullName]symbolEntry
-	exts     map[extNumber]ast.SourcePos
+	exts     map[extNumber]ast.SourceSpan
 }
 
 type extNumber struct {
@@ -68,7 +67,7 @@ type symbolEntry struct {
 }
 
 type extDecl struct {
-	pos      ast.SourcePos
+	span     ast.SourceSpan
 	extendee protoreflect.FullName
 	tag      protoreflect.FieldNumber
 }
@@ -174,15 +173,15 @@ func (s *Symbols) importPackages(pkgSpan ast.SourceSpan, pkg protoreflect.FullNa
 		return &s.pkgTrie, nil
 	}
 
-	parts := strings.Split(string(pkg), ".")
-	for i := 1; i < len(parts); i++ {
-		parts[i] = parts[i-1] + "." + parts[i]
-	}
-
 	cur := &s.pkgTrie
-	for _, p := range parts {
+	enumerator := nameEnumerator{name: pkg}
+	for {
+		p, ok := enumerator.next()
+		if !ok {
+			return cur, nil
+		}
 		var err error
-		cur, err = cur.importPackage(pkgSpan, protoreflect.FullName(p), handler)
+		cur, err = cur.importPackage(pkgSpan, p, handler)
 		if err != nil {
 			return nil, err
 		}
@@ -190,8 +189,6 @@ func (s *Symbols) importPackages(pkgSpan ast.SourceSpan, pkg protoreflect.FullNa
 			return nil, nil
 		}
 	}
-
-	return cur, nil
 }
 
 func (s *packageSymbols) importPackage(pkgSpan ast.SourceSpan, pkg protoreflect.FullName, handler *reporter.Handler) (*packageSymbols, error) {
@@ -232,29 +229,29 @@ func (s *packageSymbols) importPackage(pkgSpan ast.SourceSpan, pkg protoreflect.
 	return child, nil
 }
 
-func (s *Symbols) getPackage(pkg protoreflect.FullName) *packageSymbols {
+func (s *Symbols) getPackage(pkg protoreflect.FullName, exact bool) *packageSymbols {
 	if pkg == "" {
 		return &s.pkgTrie
 	}
-
-	parts := strings.Split(string(pkg), ".")
-	for i := 1; i < len(parts); i++ {
-		parts[i] = parts[i-1] + "." + parts[i]
-	}
-
 	cur := &s.pkgTrie
-	for _, p := range parts {
+	enumerator := nameEnumerator{name: pkg}
+	for {
+		p, ok := enumerator.next()
+		if !ok {
+			return cur
+		}
 		cur.mu.RLock()
-		next := cur.children[protoreflect.FullName(p)]
+		next := cur.children[p]
 		cur.mu.RUnlock()
 
 		if next == nil {
-			return nil
+			if exact {
+				return nil
+			}
+			return cur
 		}
 		cur = next
 	}
-
-	return cur
 }
 
 func reportSymbolCollision(span ast.SourceSpan, fqn protoreflect.FullName, additionIsEnumVal bool, existing symbolEntry, handler *reporter.Handler) error {
@@ -321,6 +318,9 @@ func sourceSpanFor(d protoreflect.Descriptor) ast.SourceSpan {
 	file := d.ParentFile()
 	if file == nil {
 		return ast.UnknownSpan(unknownFilePath)
+	}
+	if result, ok := file.(*result); ok {
+		return nameSpan(result.FileNode(), result.Node(protoutil.ProtoFromDescriptor(d)))
 	}
 	path, ok := internal.ComputePath(d)
 	if !ok {
@@ -405,7 +405,7 @@ func (s *packageSymbols) commitFileLocked(f protoreflect.FileDescriptor) {
 		s.symbols = map[protoreflect.FullName]symbolEntry{}
 	}
 	if s.exts == nil {
-		s.exts = map[extNumber]ast.SourcePos{}
+		s.exts = map[extNumber]ast.SourceSpan{}
 	}
 	_ = walk.Descriptors(f, func(d protoreflect.Descriptor) error {
 		span := sourceSpanFor(d)
@@ -471,32 +471,33 @@ func (s *packageSymbols) importResult(r *result, handler *reporter.Handler) (boo
 	}
 
 	// second pass: commit all symbols
-	s.commitResultLocked(r)
+	s.commitFileLocked(r)
 
 	return true, nil
 }
 
 func (s *packageSymbols) checkResultLocked(r *result, handler *reporter.Handler) error {
 	resultSyms := map[protoreflect.FullName]symbolEntry{}
-	return walk.DescriptorProtos(r.FileDescriptorProto(), func(fqn protoreflect.FullName, d proto.Message) error {
-		_, isEnumVal := d.(*descriptorpb.EnumValueDescriptorProto)
+	return walk.Descriptors(r, func(d protoreflect.Descriptor) error {
+		_, isEnumVal := d.(protoreflect.EnumValueDescriptor)
 		file := r.FileNode()
-		node := r.Node(d)
+		name := d.FullName()
+		node := r.Node(protoutil.ProtoFromDescriptor(d))
 		span := nameSpan(file, node)
 		// check symbols already in this symbol table
-		if existing, ok := s.symbols[fqn]; ok {
-			if err := reportSymbolCollision(span, fqn, isEnumVal, existing, handler); err != nil {
+		if existing, ok := s.symbols[name]; ok {
+			if err := reportSymbolCollision(span, name, isEnumVal, existing, handler); err != nil {
 				return err
 			}
 		}
 
 		// also check symbols from this result (that are not yet in symbol table)
-		if existing, ok := resultSyms[fqn]; ok {
-			if err := reportSymbolCollision(span, fqn, isEnumVal, existing, handler); err != nil {
+		if existing, ok := resultSyms[name]; ok {
+			if err := reportSymbolCollision(span, name, isEnumVal, existing, handler); err != nil {
 				return err
 			}
 		}
-		resultSyms[fqn] = symbolEntry{
+		resultSyms[name] = symbolEntry{
 			span:        span,
 			isEnumValue: isEnumVal,
 		}
@@ -538,26 +539,6 @@ func nameSpan(file ast.FileDeclNode, n ast.Node) ast.SourceSpan {
 	}
 }
 
-func (s *packageSymbols) commitResultLocked(r *result) {
-	if s.symbols == nil {
-		s.symbols = map[protoreflect.FullName]symbolEntry{}
-	}
-	if s.exts == nil {
-		s.exts = map[extNumber]ast.SourcePos{}
-	}
-	_ = walk.DescriptorProtos(r.FileDescriptorProto(), func(fqn protoreflect.FullName, d proto.Message) error {
-		span := nameSpan(r.FileNode(), r.Node(d))
-		_, isEnumValue := d.(protoreflect.EnumValueDescriptor)
-		s.symbols[fqn] = symbolEntry{span: span, isEnumValue: isEnumValue}
-		return nil
-	})
-
-	if s.files == nil {
-		s.files = map[protoreflect.FileDescriptor]struct{}{}
-	}
-	s.files[r] = struct{}{}
-}
-
 // AddExtension records the given extension, which is used to ensure that no two files
 // attempt to extend the same message using the same tag. The given pkg should be the
 // package that defines extendee.
@@ -567,7 +548,7 @@ func (s *Symbols) AddExtension(pkg, extendee protoreflect.FullName, tag protoref
 			return handler.HandleErrorf(span, "could not register extension: extendee %q does not match package %q", extendee, pkg)
 		}
 	}
-	pkgSyms := s.getPackage(pkg)
+	pkgSyms := s.getPackage(pkg, true)
 	if pkgSyms == nil {
 		// should never happen
 		return handler.HandleErrorf(span, "could not register extension: missing package symbols for %q", pkg)
@@ -581,13 +562,13 @@ func (s *packageSymbols) addExtension(extendee protoreflect.FullName, tag protor
 
 	extNum := extNumber{extendee: extendee, tag: tag}
 	if existing, ok := s.exts[extNum]; ok {
-		return handler.HandleErrorf(span, "extension with tag %d for message %s already defined at %v", tag, extendee, existing)
+		return handler.HandleErrorf(span, "extension with tag %d for message %s already defined at %v", tag, extendee, existing.Start())
 	}
 
 	if s.exts == nil {
-		s.exts = map[extNumber]ast.SourcePos{}
+		s.exts = map[extNumber]ast.SourceSpan{}
 	}
-	s.exts[extNum] = span.Start()
+	s.exts[extNum] = span
 	return nil
 }
 
@@ -602,15 +583,53 @@ func (s *Symbols) AddExtensionDeclaration(extension, extendee protoreflect.FullN
 			// This is a declaration that has already been added. Ignore.
 			return nil
 		}
-		return handler.HandleErrorf(span, "extension %s already declared as extending %s with tag %d at %v", extension, existing.extendee, existing.tag, existing.pos)
+		return handler.HandleErrorf(span, "extension %s already declared as extending %s with tag %d at %v", extension, existing.extendee, existing.tag, existing.span.Start())
 	}
 	if s.extDecls == nil {
 		s.extDecls = map[protoreflect.FullName]extDecl{}
 	}
 	s.extDecls[extension] = extDecl{
-		pos:      span.Start(),
+		span:     span,
 		extendee: extendee,
 		tag:      tag,
 	}
 	return nil
+}
+
+// Lookup finds the registered location of the given name. If the given name has
+// not been seen/registered, nil is returned.
+func (s *Symbols) Lookup(name protoreflect.FullName) ast.SourceSpan {
+	// note: getPackage never returns nil when exact=false
+	pkgSyms := s.getPackage(name, false)
+	if entry, ok := pkgSyms.symbols[name]; ok {
+		return entry.span
+	}
+	return nil
+}
+
+// LookupExtension finds the registered location of the given extension. If the given
+// extension has not been seen/registered, nil is returned.
+func (s *Symbols) LookupExtension(messageName protoreflect.FullName, extensionNumber protoreflect.FieldNumber) ast.SourceSpan {
+	// note: getPackage never returns nil when exact=false
+	pkgSyms := s.getPackage(messageName, false)
+	return pkgSyms.exts[extNumber{messageName, extensionNumber}]
+}
+
+type nameEnumerator struct {
+	name  protoreflect.FullName
+	start int
+}
+
+func (e *nameEnumerator) next() (protoreflect.FullName, bool) {
+	if e.start < 0 {
+		return "", false
+	}
+	pos := strings.IndexByte(string(e.name[e.start:]), '.')
+	if pos == -1 {
+		e.start = -1
+		return e.name, true
+	}
+	pos += e.start
+	e.start = pos + 1
+	return e.name[:pos], true
 }

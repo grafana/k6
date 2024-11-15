@@ -8,6 +8,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/ast"
 	"github.com/sirupsen/logrus"
+
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/usage"
@@ -103,21 +104,14 @@ func (mr *ModuleResolver) resolveLoaded(basePWD *url.URL, arg string, data []byt
 	if cached, ok := mr.cache[specifier.String()]; ok {
 		return cached.mod, cached.err
 	}
-	prg, _, err := mr.compiler.Parse(string(data), specifier.String(), false)
+	prg, _, err := mr.compiler.Parse(string(data), specifier.String(), false, true)
 
 	// if there is an error an we can try to parse it wrapped as CommonJS
 	// if it isn't ESM - we *must* wrap it in order to work
 	if err != nil || !isESM(prg) {
 		var newError error
-		prg, _, newError = mr.compiler.Parse(string(data), specifier.String(), true)
+		prg, _, newError = mr.compiler.Parse(string(data), specifier.String(), true, false)
 		if newError == nil || err == nil {
-			err = newError
-		}
-	}
-	if err != nil {
-		var newError error
-		prg, _, newError = mr.compiler.Parse(string(data), specifier.String(), true)
-		if newError == nil {
 			err = newError
 		}
 	}
@@ -239,10 +233,7 @@ func NewModuleSystem(resolver *ModuleResolver, vu VU) *ModuleSystem {
 // RunSourceData runs the provided sourceData and adds it to the cache.
 // If a module with the same specifier as the source is already cached
 // it will be used instead of reevaluating the source from the provided SourceData.
-//
-// TODO: this API will likely change as native ESM support will likely not let us have the exports
-// as one big sobek.Value that we can manipulate
-func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (sobek.ModuleRecord, error) {
+func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (*RunSourceDataResult, error) {
 	specifier := source.URL.String()
 	pwd := source.URL.JoinPath("../")
 	if _, err := ms.resolver.resolveLoaded(pwd, specifier, source.Data); err != nil {
@@ -262,14 +253,32 @@ func (ms *ModuleSystem) RunSourceData(source *loader.SourceData) (sobek.ModuleRe
 	}
 	rt := ms.vu.Runtime()
 	promise := rt.CyclicModuleRecordEvaluate(ci, ms.resolver.sobekModuleResolver)
-	switch promise.State() {
+
+	promisesThenIgnore(rt, promise)
+
+	return &RunSourceDataResult{
+		promise: promise,
+		mod:     mod,
+	}, nil
+}
+
+// RunSourceDataResult helps with the asynchronous nature of ESM
+// it wraps the promise that is returned from Sobek while at the same time allowing access to the module record
+type RunSourceDataResult struct {
+	promise *sobek.Promise
+	mod     sobek.ModuleRecord
+}
+
+// Result returns either the underlying module or error if the promise has been completed and true,
+// or false if the promise still hasn't been completed
+func (r *RunSourceDataResult) Result() (sobek.ModuleRecord, bool, error) {
+	switch r.promise.State() {
 	case sobek.PromiseStateRejected:
-		return nil, promise.Result().Export().(error) //nolint:forcetypeassert
+		return nil, true, r.promise.Result().Export().(error) //nolint:forcetypeassert
 	case sobek.PromiseStateFulfilled:
-		return mod, nil
+		return r.mod, true, nil
 	default:
-		// TODO(@mstoykov): this will require having some callbacks through the code, but should be doable, just not pretty
-		panic("TLA not supported in k6 at the moment")
+		return nil, false, nil
 	}
 }
 

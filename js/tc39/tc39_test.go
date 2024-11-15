@@ -24,6 +24,8 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/grafana/sobek/parser"
 	"github.com/stretchr/testify/assert"
+	"gopkg.in/yaml.v3"
+
 	"go.k6.io/k6/js/compiler"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modulestest"
@@ -31,7 +33,6 @@ import (
 	"go.k6.io/k6/lib/testutils"
 	"go.k6.io/k6/loader"
 	"go.k6.io/k6/usage"
-	"gopkg.in/yaml.v3"
 )
 
 const (
@@ -55,8 +56,8 @@ var (
 	featuresBlockList = []string{
 		"IsHTMLDDA",                   // not supported at all
 		"async-iteration",             // not supported at all
-		"top-level-await",             // not supported at all
 		"String.prototype.replaceAll", // not supported at all, Stage 4 since 2020
+		"dynamic-import",              // not support in k6
 
 		// from Sobek
 		"Symbol.asyncIterator",
@@ -643,8 +644,14 @@ func (ctx *tc39TestCtx) runFile(base, name string, vm *sobek.Runtime) error {
 
 func (ctx *tc39TestCtx) compileOnly(src, name string, compatibilityMode lib.CompatibilityMode) (*sobek.Program, error) {
 	comp := ctx.compiler()
-	comp.Options = compiler.Options{CompatibilityMode: compatibilityMode}
-	astProgram, _, err := comp.Parse(src, name, false)
+	if compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+		code, _, err := compiler.StripTypes(src, name)
+		if err != nil {
+			return nil, err
+		}
+		src = code
+	}
+	astProgram, _, err := comp.Parse(src, name, false, false)
 	if err != nil {
 		return nil, err
 	}
@@ -713,7 +720,16 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 	base := u.JoinPath("..")
 	mr := modules.NewModuleResolver(nil,
 		func(specifier *url.URL, _ string) ([]byte, error) {
-			return fs.ReadFile(os.DirFS("."), specifier.Path[1:])
+			b, err := fs.ReadFile(os.DirFS("."), specifier.Path[1:])
+
+			if ctx.compatibilityMode == lib.CompatibilityModeExperimentalEnhanced {
+				code, _, err := compiler.StripTypes(string(b), name)
+				if err != nil {
+					return nil, err
+				}
+				b = []byte(code)
+			}
+			return b, err
 		},
 		ctx.compiler(), base, usage.New(), testutils.NewLogger(ctx.t))
 
@@ -721,10 +737,17 @@ func (ctx *tc39TestCtx) runTC39Module(name, src string, includes []string, vm *s
 	moduleRuntime.VU.InitEnvField.CWD = base
 
 	early = false
-	_, err = ms.RunSourceData(&loader.SourceData{
+	result, err := ms.RunSourceData(&loader.SourceData{
 		Data: []byte(src),
 		URL:  u,
 	})
+	if err == nil {
+		var finished bool
+		_, finished, err = result.Result()
+		if !finished {
+			panic("tc39 has no tests where this should happen")
+		}
+	}
 
 	return early, err
 }

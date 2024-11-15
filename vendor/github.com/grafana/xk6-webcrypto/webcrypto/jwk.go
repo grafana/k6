@@ -4,6 +4,7 @@ import (
 	"crypto/ecdh"
 	"crypto/ecdsa"
 	"crypto/elliptic"
+	"crypto/rsa"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -289,4 +290,139 @@ func importECDHJWK(_ EllipticCurveKind, jsonKeyData []byte) (any, CryptoKeyType,
 	default:
 		return nil, UnknownCryptoKeyType, errors.New("input isn't a valid ECDH key")
 	}
+}
+
+type rsaJWK struct {
+	Kty string `json:"kty"`          // Key Type
+	N   string `json:"n"`            // Modulus
+	E   string `json:"e"`            // Exponent
+	D   string `json:"d,omitempty"`  // Private exponent
+	P   string `json:"p,omitempty"`  // First prime factor
+	Q   string `json:"q,omitempty"`  // Second prime factor
+	Dp  string `json:"dp,omitempty"` // Exponent1
+	Dq  string `json:"dq,omitempty"` // Exponent2
+	Qi  string `json:"qi,omitempty"` // Coefficient
+}
+
+func (jwk *rsaJWK) validate() error {
+	if jwk.Kty != "RSA" {
+		return fmt.Errorf("invalid key type: %s", jwk.Kty)
+	}
+
+	if jwk.N == "" {
+		return errors.New("modulus (n) is required")
+	}
+
+	if jwk.E == "" {
+		return errors.New("exponent (e) is required")
+	}
+
+	// TODO: consider validating the other fields in future
+	return nil
+}
+
+func importRSAJWK(jsonKeyData []byte) (any, CryptoKeyType, int, error) {
+	var jwk rsaJWK
+	if err := json.Unmarshal(jsonKeyData, &jwk); err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to parse input as RSA JWK key: %w", err)
+	}
+
+	if err := jwk.validate(); err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("invalid RSA JWK key: %w", err)
+	}
+
+	// decode the various key components
+	nBytes, err := base64URLDecode(jwk.N)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode modulus: %w", err)
+	}
+	eBytes, err := base64URLDecode(jwk.E)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode exponent: %w", err)
+	}
+
+	// convert exponent to an integer
+	eInt := new(big.Int).SetBytes(eBytes).Int64()
+	pubKey := rsa.PublicKey{
+		N: new(big.Int).SetBytes(nBytes),
+		E: int(eInt),
+	}
+
+	// if the private exponent is missing, return the public key
+	if jwk.D == "" {
+		return pubKey, PublicCryptoKeyType, pubKey.N.BitLen(), nil
+	}
+
+	dBytes, err := base64URLDecode(jwk.D)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode private exponent: %w", err)
+	}
+	pBytes, err := base64URLDecode(jwk.P)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode first prime factor: %w", err)
+	}
+	qBytes, err := base64URLDecode(jwk.Q)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode second prime factor: %w", err)
+	}
+	dpBytes, err := base64URLDecode(jwk.Dp)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode first exponent: %w", err)
+	}
+	dqBytes, err := base64URLDecode(jwk.Dq)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode second exponent: %w", err)
+	}
+	qiBytes, err := base64URLDecode(jwk.Qi)
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to decode coefficient: %w", err)
+	}
+
+	privKey := &rsa.PrivateKey{
+		PublicKey: pubKey,
+		D:         new(big.Int).SetBytes(dBytes),
+		Primes: []*big.Int{
+			new(big.Int).SetBytes(pBytes),
+			new(big.Int).SetBytes(qBytes),
+		},
+		Precomputed: rsa.PrecomputedValues{
+			Dp:   new(big.Int).SetBytes(dpBytes),
+			Dq:   new(big.Int).SetBytes(dqBytes),
+			Qinv: new(big.Int).SetBytes(qiBytes),
+		},
+	}
+
+	err = privKey.Validate()
+	if err != nil {
+		return nil, UnknownCryptoKeyType, 0, fmt.Errorf("failed to validate private key: %w", err)
+	}
+
+	return privKey, PrivateCryptoKeyType, pubKey.N.BitLen(), nil
+}
+
+func exportRSAJWK(key *CryptoKey) (interface{}, error) {
+	exported := &JsonWebKey{}
+	exported.Set("kty", "RSA")
+
+	switch rsaKey := key.handle.(type) {
+	case *rsa.PrivateKey:
+		exported.Set("n", base64URLEncode(rsaKey.N.Bytes()))
+		exported.Set("e", base64URLEncode(big.NewInt(int64(rsaKey.E)).Bytes()))
+		exported.Set("d", base64URLEncode(rsaKey.D.Bytes()))
+		exported.Set("p", base64URLEncode(rsaKey.Primes[0].Bytes()))
+		exported.Set("q", base64URLEncode(rsaKey.Primes[1].Bytes()))
+		exported.Set("dp", base64URLEncode(rsaKey.Precomputed.Dp.Bytes()))
+		exported.Set("dq", base64URLEncode(rsaKey.Precomputed.Dq.Bytes()))
+		exported.Set("qi", base64URLEncode(rsaKey.Precomputed.Qinv.Bytes()))
+	case *rsa.PublicKey:
+		exported.Set("n", base64URLEncode(rsaKey.N.Bytes()))
+		exported.Set("e", base64URLEncode(big.NewInt(int64(rsaKey.E)).Bytes()))
+	case rsa.PublicKey:
+		exported.Set("n", base64URLEncode(rsaKey.N.Bytes()))
+		exported.Set("e", base64URLEncode(big.NewInt(int64(rsaKey.E)).Bytes()))
+	default:
+		return nil, fmt.Errorf("key's handle isn't an RSA public/private key, got: %T", key.handle)
+	}
+
+	return exported, nil
 }

@@ -368,10 +368,9 @@ func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary) (map[s
 		return nil, err
 	}
 
-	go func() {
-		<-summaryCtx.Done()
+	_ = context.AfterFunc(summaryCtx, func() {
 		vu.Runtime.Interrupt(context.Canceled)
-	}()
+	})
 	vu.moduleVUImpl.ctx = summaryCtx
 
 	callbackResult := sobek.Undefined()
@@ -540,10 +539,9 @@ func (r *Runner) runPart(
 		return sobek.Undefined(), nil
 	}
 
-	go func() {
-		<-ctx.Done()
+	_ = context.AfterFunc(ctx, func() {
 		vu.Runtime.Interrupt(context.Canceled)
-	}()
+	})
 	vu.moduleVUImpl.ctx = ctx
 
 	groupPath, err := lib.NewGroupPath(lib.RootGroupPath, name)
@@ -706,9 +704,8 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		return avu.scIterGlobal
 	}
 
-	go func() {
-		// Wait for the run context to be over
-		<-ctx.Done()
+	// Wait for the run context to be over
+	context.AfterFunc(ctx, func() {
 		// Interrupt the JS runtime
 		u.Runtime.Interrupt(context.Canceled)
 		// Wait for the VU to stop running, if it was, and prevent it from
@@ -718,7 +715,7 @@ func (u *VU) Activate(params *lib.VUActivationParams) lib.ActiveVU {
 		if params.DeactivateCallback != nil {
 			params.DeactivateCallback(u)
 		}
-	}()
+	})
 
 	return avu
 }

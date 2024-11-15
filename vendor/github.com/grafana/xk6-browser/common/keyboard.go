@@ -3,12 +3,12 @@ package common
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/input"
-	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/keyboardlayout"
 )
@@ -62,12 +62,7 @@ func (k *Keyboard) Up(key string) error {
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
 // A press message consists of successive key down and up messages.
-func (k *Keyboard) Press(key string, opts sobek.Value) error {
-	kbdOpts := NewKeyboardOptions()
-	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		return fmt.Errorf("parsing keyboard options: %w", err)
-	}
-
+func (k *Keyboard) Press(key string, kbdOpts *KeyboardOptions) error {
 	if err := k.comboPress(key, kbdOpts); err != nil {
 		return fmt.Errorf("pressing key: %w", err)
 	}
@@ -88,11 +83,7 @@ func (k *Keyboard) InsertText(text string) error {
 //
 // It sends an insertText message if a character is not among
 // valid characters in the keyboard's layout.
-func (k *Keyboard) Type(text string, opts sobek.Value) error {
-	kbdOpts := NewKeyboardOptions()
-	if err := kbdOpts.Parse(k.ctx, opts); err != nil {
-		return fmt.Errorf("parsing keyboard options: %w", err)
-	}
+func (k *Keyboard) Type(text string, kbdOpts *KeyboardOptions) error {
 	if err := k.typ(text, kbdOpts); err != nil {
 		return fmt.Errorf("typing text: %w", err)
 	}
@@ -100,6 +91,8 @@ func (k *Keyboard) Type(text string, opts sobek.Value) error {
 }
 
 func (k *Keyboard) down(key string) error {
+	key = k.platformSpecificResolution(key)
+
 	keyInput := keyboardlayout.KeyInput(key)
 	if _, ok := k.layout.ValidKeys[keyInput]; !ok {
 		return fmt.Errorf("%q is not a valid key for layout %q", key, k.layoutName)
@@ -134,6 +127,8 @@ func (k *Keyboard) down(key string) error {
 }
 
 func (k *Keyboard) up(key string) error {
+	key = k.platformSpecificResolution(key)
+
 	keyInput := keyboardlayout.KeyInput(key)
 	if _, ok := k.layout.ValidKeys[keyInput]; !ok {
 		return fmt.Errorf("'%s' is not a valid key for layout '%s'", key, k.layoutName)
@@ -237,6 +232,17 @@ func (k *Keyboard) modifierBitFromKeyName(key string) int64 {
 		return ModifierKeyShift
 	}
 	return 0
+}
+
+func (k *Keyboard) platformSpecificResolution(key string) string {
+	if key == "ControlOrMeta" {
+		if runtime.GOOS == "darwin" {
+			key = "Meta"
+		} else {
+			key = "Control"
+		}
+	}
+	return key
 }
 
 func (k *Keyboard) comboPress(keys string, opts *KeyboardOptions) error {

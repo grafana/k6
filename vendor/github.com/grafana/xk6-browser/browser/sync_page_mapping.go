@@ -103,7 +103,7 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 		"isEnabled":  p.IsEnabled,
 		"isHidden":   p.IsHidden,
 		"isVisible":  p.IsVisible,
-		"keyboard":   rt.ToValue(p.GetKeyboard()).ToObject(rt),
+		"keyboard":   syncMapKeyboard(vu, p.GetKeyboard()),
 		"locator": func(selector string, opts sobek.Value) *sobek.Object {
 			ml := syncMapLocator(vu, p.Locator(selector, opts))
 			return rt.ToValue(ml).ToObject(rt)
@@ -113,21 +113,23 @@ func syncMapPage(vu moduleVU, p *common.Page) mapping { //nolint:gocognit,cyclop
 			return rt.ToValue(mf).ToObject(rt)
 		},
 		"mouse": rt.ToValue(p.GetMouse()).ToObject(rt),
-		"on": func(event string, handler sobek.Callable) error {
-			tq := vu.taskQueueRegistry.get(p.TargetID())
+		"on": func(event common.PageOnEventName, handler sobek.Callable) error {
+			tq := vu.taskQueueRegistry.get(vu.Context(), p.TargetID())
 
 			mapMsgAndHandleEvent := func(m *common.ConsoleMessage) error {
 				mapping := syncMapConsoleMessage(vu, m)
 				_, err := handler(sobek.Undefined(), vu.Runtime().ToValue(mapping))
 				return err
 			}
-			runInTaskQueue := func(m *common.ConsoleMessage) {
+			runInTaskQueue := func(a common.PageOnEvent) error {
 				tq.Queue(func() error {
-					if err := mapMsgAndHandleEvent(m); err != nil {
+					if err := mapMsgAndHandleEvent(a.ConsoleMessage); err != nil {
 						return fmt.Errorf("executing page.on handler: %w", err)
 					}
 					return nil
 				})
+
+				return nil
 			}
 
 			return p.On(event, runInTaskQueue) //nolint:wrapcheck

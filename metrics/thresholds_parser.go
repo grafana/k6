@@ -142,9 +142,9 @@ var operatorTokens = [7]string{ //nolint:gochecknoglobals
 // their spaces.
 func scanThresholdExpression(input string) (string, string, string, error) {
 	for _, op := range operatorTokens {
-		substrings := strings.SplitN(input, op, 2)
-		if len(substrings) == 2 {
-			return strings.TrimSpace(substrings[0]), op, strings.TrimSpace(substrings[1]), nil
+		left, right, _ := strings.Cut(input, op)
+		if right != "" {
+			return strings.TrimSpace(left), op, strings.TrimSpace(right), nil
 		}
 	}
 

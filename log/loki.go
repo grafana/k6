@@ -55,8 +55,8 @@ func LokiFromConfigLine(fallbackLogger logrus.FieldLogger, line string) (AsyncHo
 	h.fallbackLogger = fallbackLogger
 
 	if line != "loki" {
-		parts := strings.SplitN(line, "=", 2)
-		if parts[0] != "loki" {
+		logOutput, _, _ := strings.Cut(line, "=")
+		if logOutput != "loki" {
 			return nil, fmt.Errorf("loki configuration should be in the form `loki=url-to-push` but is `%s`", line)
 		}
 

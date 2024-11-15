@@ -2,6 +2,7 @@ package streams
 
 import (
 	"github.com/grafana/sobek"
+
 	"go.k6.io/k6/js/common"
 )
 
@@ -63,15 +64,25 @@ func (reader *ReadableStreamDefaultReader) Read() *sobek.Promise {
 	readRequest := ReadRequest{
 		chunkSteps: func(chunk any) {
 			// Resolve promise with «[ "value" → chunk, "done" → false ]».
-			resolve(map[string]any{"value": chunk, "done": false})
+			// TODO(@mstoykov): propagate as error?
+			err := resolve(map[string]any{"value": chunk, "done": false})
+			if err != nil {
+				panic(err)
+			}
 		},
 		closeSteps: func() {
 			// Resolve promise with «[ "value" → undefined, "done" → true ]».
-			resolve(map[string]any{"value": sobek.Undefined(), "done": true})
+			err := resolve(map[string]any{"value": sobek.Undefined(), "done": true})
+			if err != nil {
+				panic(err)
+			}
 		},
 		errorSteps: func(e any) {
 			// Reject promise with e.
-			reject(e)
+			err := reject(e)
+			if err != nil {
+				panic(err)
+			}
 		},
 	}
 

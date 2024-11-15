@@ -5,16 +5,11 @@ export const options = {
 	iterations: 1000,
 };
 
-// k6 doesn't support async in the init context. We use a top-level async function for `await`.
-//
 // Each Virtual User gets its own `file` copy.
 // So, operations like `seek` or `read` won't impact other VUs.
-let file;
-(async function () {
-	file = await open("bonjour.txt");
-})();
+const file = await open("bonjour.txt");
 
-export default async function () {
+export default async function() {
 	// About information about the file
 	const fileinfo = await file.stat();
 	if (fileinfo.name != "bonjour.txt") {

@@ -32,14 +32,3 @@ func (e *matchEmitter) emit(m absoluteMatch) {
 	})
 	e.NextEmit = m.End
 }
-
-// trim shortens m if it extends past maxEnd. Then if the length is at least
-// minLength, the match is emitted.
-func (e *matchEmitter) trim(m absoluteMatch, maxEnd int, minLength int) {
-	if m.End > maxEnd {
-		m.End = maxEnd
-	}
-	if m.End-m.Start >= minLength {
-		e.emit(m)
-	}
-}

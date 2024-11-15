@@ -14,7 +14,6 @@ import (
 	"go.k6.io/k6/output/csv"
 	"go.k6.io/k6/output/influxdb"
 	"go.k6.io/k6/output/json"
-	"go.k6.io/k6/output/statsd"
 
 	"github.com/grafana/xk6-dashboard/dashboard"
 	"github.com/grafana/xk6-output-opentelemetry/pkg/opentelemetry"
@@ -52,12 +51,11 @@ func getAllOutputConstructors() (map[string]output.Constructor, error) {
 			return nil, errors.New("the kafka output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
 				"please use the new xk6 kafka output extension instead - https://github.com/k6io/xk6-output-kafka")
 		},
-		builtinOutputStatsd.String(): func(params output.Params) (output.Output, error) {
-			params.Logger.Warn("The statsd output is deprecated, and will be removed in k6 v0.55.0 " +
-				"Please use the new xk6 statsd output extension instead. " +
+		builtinOutputStatsd.String(): func(_ output.Params) (output.Output, error) {
+			return nil, errors.New("the statsd output was deprecated in k6 v0.47.0 and removed in k6 v0.55.0, " +
+				"please use the new xk6 statsd output extension instead. " +
 				"It can be found at https://github.com/LeonAdato/xk6-output-statsd and " +
-				"more info at https://github.com/grafana/k6/issues/2982.")
-			return statsd.New(params)
+				"more info at https://github.com/grafana/k6/issues/2982")
 		},
 		builtinOutputDatadog.String(): func(_ output.Params) (output.Output, error) {
 			return nil, errors.New("the datadog output was deprecated in k6 v0.32.0 and removed in k6 v0.34.0, " +
@@ -129,7 +127,7 @@ func createOutputs(
 	result := make([]output.Output, 0, len(outputs))
 
 	for _, outputFullArg := range outputs {
-		outputType, outputArg := parseOutputArgument(outputFullArg)
+		outputType, outputArg, _ := strings.Cut(outputFullArg, "=")
 		outputConstructor, ok := outputConstructors[outputType]
 		if !ok {
 			return nil, fmt.Errorf(
@@ -174,16 +172,4 @@ func createOutputs(
 	}
 
 	return result, nil
-}
-
-func parseOutputArgument(s string) (t, arg string) {
-	parts := strings.SplitN(s, "=", 2)
-	switch len(parts) {
-	case 0:
-		return "", ""
-	case 1:
-		return parts[0], ""
-	default:
-		return parts[0], parts[1]
-	}
 }

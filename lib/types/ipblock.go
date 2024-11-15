@@ -41,8 +41,8 @@ func getIPBlock(s string) (*ipBlock, error) {
 }
 
 func ipBlockFromRange(s string) (*ipBlock, error) {
-	ss := strings.SplitN(s, "-", 2)
-	ip0, ip1 := net.ParseIP(ss[0]), net.ParseIP(ss[1])
+	ip0Str, ip1Str, _ := strings.Cut(s, "-")
+	ip0, ip1 := net.ParseIP(ip0Str), net.ParseIP(ip1Str)
 	if ip0 == nil || ip1 == nil {
 		return nil, errors.New("wrong IP range format: " + s)
 	}

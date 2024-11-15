@@ -198,11 +198,11 @@ func (c *DNSConfig) UnmarshalText(text []byte) error {
 	values := strings.Split(string(text), ",")
 	params := make(map[string]string, len(values))
 	for _, value := range values {
-		args := strings.SplitN(value, "=", 2)
-		if len(args) != 2 {
+		k, v, _ := strings.Cut(value, "=")
+		if v == "" {
 			return fmt.Errorf("no value for key %s", value)
 		}
-		params[args[0]] = args[1]
+		params[k] = v
 	}
 	return c.unmarshal(params)
 }

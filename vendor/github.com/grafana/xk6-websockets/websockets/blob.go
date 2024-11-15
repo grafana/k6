@@ -59,16 +59,22 @@ func (r *WebSocketsAPI) blob(call sobek.ConstructorCall) *sobek.Object {
 
 	must(rt, obj.Set("arrayBuffer", func(_ sobek.FunctionCall) sobek.Value {
 		promise, resolve, _ := rt.NewPromise()
-		resolve(rt.NewArrayBuffer(b.data.Bytes()))
+		err := resolve(rt.NewArrayBuffer(b.data.Bytes()))
+		if err != nil {
+			panic(err)
+		}
 		return rt.ToValue(promise)
 	}))
 	must(rt, obj.Set("bytes", func(_ sobek.FunctionCall) sobek.Value {
 		promise, resolve, reject := rt.NewPromise()
 		data, err := rt.New(rt.Get("Uint8Array"), rt.ToValue(b.data.Bytes()))
 		if err == nil {
-			resolve(data)
+			err = resolve(data)
 		} else {
-			reject(fmt.Errorf("failed to create Uint8Array: %w", err))
+			err = reject(fmt.Errorf("failed to create Uint8Array: %w", err))
+		}
+		if err != nil {
+			panic(err)
 		}
 		return rt.ToValue(promise)
 	}))
@@ -77,7 +83,10 @@ func (r *WebSocketsAPI) blob(call sobek.ConstructorCall) *sobek.Object {
 	}))
 	must(rt, obj.Set("text", func(_ sobek.FunctionCall) sobek.Value {
 		promise, resolve, _ := rt.NewPromise()
-		resolve(b.text())
+		err := resolve(b.text())
+		if err != nil {
+			panic(err)
+		}
 		return rt.ToValue(promise)
 	}))
 	must(rt, obj.Set("stream", func(_ sobek.FunctionCall) sobek.Value {
