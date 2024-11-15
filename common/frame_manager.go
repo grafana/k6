@@ -245,7 +245,7 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 	isMainFrame := parentFrameID == ""
 	frame := m.frames[frameID]
 
-	if !(isMainFrame || frame != nil) {
+	if !isMainFrame && frame == nil {
 		return errors.New("we either navigate top level or have old version of the navigated frame")
 	}
 
