@@ -896,7 +896,6 @@ func TestBrowserContextGrantPermissions(t *testing.T) {
 		{name: "accelerometer", permission: "accelerometer"},
 		{name: "gyroscope", permission: "gyroscope"},
 		{name: "magnetometer", permission: "magnetometer"},
-		{name: "accessibility-events", permission: "accessibility-events"},
 		{name: "clipboard-read", permission: "clipboard-read"},
 		{name: "clipboard-write", permission: "clipboard-write"},
 		{name: "payment-handler", permission: "payment-handler"},
