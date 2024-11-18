@@ -459,12 +459,14 @@ func NewFramePressOptions(defaultTimeout time.Duration) *FramePressOptions {
 	}
 }
 
-func (o *FramePressOptions) ToKeyboardOptions() *KeyboardOptions {
-	o2 := NewKeyboardOptions()
+// ToKeyboardOptions converts FramePressOptions to KeyboardOptions.
+func (o *FramePressOptions) ToKeyboardOptions() KeyboardOptions {
+	var o2 KeyboardOptions
 	o2.Delay = o.Delay
 	return o2
 }
 
+// NewFrameSelectOptionOptions creates and returns a new instance of FrameSelectOptionOptions.
 func NewFrameSelectOptionOptions(defaultTimeout time.Duration) *FrameSelectOptionOptions {
 	return &FrameSelectOptionOptions{
 		ElementHandleBaseOptions: *NewElementHandleBaseOptions(defaultTimeout),
@@ -579,8 +581,9 @@ func NewFrameTypeOptions(defaultTimeout time.Duration) *FrameTypeOptions {
 	}
 }
 
-func (o *FrameTypeOptions) ToKeyboardOptions() *KeyboardOptions {
-	o2 := NewKeyboardOptions()
+// ToKeyboardOptions converts FrameTypeOptions to KeyboardOptions.
+func (o *FrameTypeOptions) ToKeyboardOptions() KeyboardOptions {
+	var o2 KeyboardOptions
 	o2.Delay = o.Delay
 	return o2
 }

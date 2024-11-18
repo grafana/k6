@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -25,7 +26,6 @@ import (
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/fetch"
 	"github.com/chromedp/cdproto/network"
-	"github.com/grafana/sobek"
 )
 
 // Credentials holds HTTP authentication credentials.
@@ -34,27 +34,13 @@ type Credentials struct {
 	Password string `js:"password"`
 }
 
-// NewCredentials return a new Credentials.
-func NewCredentials() *Credentials {
-	return &Credentials{}
-}
-
-// Parse credentials details from a given sobek credentials value.
-func (c *Credentials) Parse(ctx context.Context, credentials sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if credentials != nil && !sobek.IsUndefined(credentials) && !sobek.IsNull(credentials) {
-		credentials := credentials.ToObject(rt)
-		for _, k := range credentials.Keys() {
-			switch k {
-			case "username":
-				c.Username = credentials.Get(k).String()
-			case "password":
-				c.Password = credentials.Get(k).String()
-			}
-		}
+// IsEmpty returns true if the credentials are empty.
+func (c Credentials) IsEmpty() bool {
+	c = Credentials{
+		Username: strings.TrimSpace(c.Username),
+		Password: strings.TrimSpace(c.Password),
 	}
-
-	return nil
+	return c == (Credentials{})
 }
 
 type metricInterceptor interface {
@@ -70,7 +56,7 @@ type NetworkManager struct {
 	session       session
 	parent        *NetworkManager
 	frameManager  *FrameManager
-	credentials   *Credentials
+	credentials   Credentials
 	resolver      k6netext.Resolver
 	vu            k6modules.VU
 	customMetrics *k6ext.CustomMetrics
@@ -627,7 +613,7 @@ func (m *NetworkManager) onAuthRequired(event *fetch.EventAuthRequired) {
 	case m.attemptedAuth[rid]:
 		delete(m.attemptedAuth, rid)
 		res = fetch.AuthChallengeResponseResponseCancelAuth
-	case m.credentials != nil:
+	case !m.credentials.IsEmpty():
 		// TODO: remove requests from attemptedAuth when:
 		//       - request is redirected
 		//       - loading finished
@@ -732,9 +718,9 @@ func (m *NetworkManager) updateProtocolRequestInterception() error {
 }
 
 // Authenticate sets HTTP authentication credentials to use.
-func (m *NetworkManager) Authenticate(credentials *Credentials) error {
+func (m *NetworkManager) Authenticate(credentials Credentials) error {
 	m.credentials = credentials
-	if credentials != nil {
+	if !credentials.IsEmpty() {
 		m.userReqInterceptionEnabled = true
 	}
 	if err := m.updateProtocolRequestInterception(); err != nil {
@@ -742,12 +728,6 @@ func (m *NetworkManager) Authenticate(credentials *Credentials) error {
 	}
 
 	return nil
-}
-
-// ExtraHTTPHeaders returns the currently set extra HTTP request headers.
-func (m *NetworkManager) ExtraHTTPHeaders() sobek.Value {
-	rt := m.vu.Runtime()
-	return rt.ToValue(m.extraHTTPHeaders)
 }
 
 // SetExtraHTTPHeaders sets extra HTTP request headers to be sent with every request.
