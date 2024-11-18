@@ -58,7 +58,7 @@ func TestCreateReport(t *testing.T) {
 		assert.EqualValues(t, 6, m["vus_max"])
 		assert.EqualValues(t, 170, m["iterations"])
 		assert.NotEqual(t, "0s", m["duration"])
-		assert.EqualValues(t, map[string]any{"ci": false}, m["env"])
+		assert.EqualValues(t, false, m["is_ci"])
 	})
 
 	t.Run("CI=false", func(t *testing.T) {
@@ -80,7 +80,7 @@ func TestCreateReport(t *testing.T) {
 		assert.EqualValues(t, 0, m["vus_max"])
 		assert.EqualValues(t, 0, m["iterations"])
 		assert.Equal(t, "0s", m["duration"])
-		assert.EqualValues(t, map[string]any{"ci": false}, m["env"])
+		assert.EqualValues(t, false, m["is_ci"])
 	})
 
 	t.Run("CI=true", func(t *testing.T) {
@@ -102,6 +102,6 @@ func TestCreateReport(t *testing.T) {
 		assert.EqualValues(t, 0, m["vus_max"])
 		assert.EqualValues(t, 0, m["iterations"])
 		assert.Equal(t, "0s", m["duration"])
-		assert.EqualValues(t, map[string]any{"ci": true}, m["env"])
+		assert.EqualValues(t, true, m["is_ci"])
 	})
 }

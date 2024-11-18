@@ -28,9 +28,7 @@ func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string
 		executors[ec.GetType()]++
 	}
 	m["executors"] = executors
-	m["env"] = map[string]any{
-		"ci": isCI(execState.Test.LookupEnv),
-	}
+	m["is_ci"] = isCI(execState.Test.LookupEnv)
 
 	return m
 }
