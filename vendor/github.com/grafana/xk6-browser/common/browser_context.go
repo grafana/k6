@@ -13,7 +13,6 @@ import (
 	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/storage"
 	"github.com/chromedp/cdproto/target"
-	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6error"
@@ -117,7 +116,12 @@ func NewBrowserContext(
 ) (*BrowserContext, error) {
 	// set the default options if none provided.
 	if opts == nil {
-		opts = NewBrowserContextOptions()
+		opts = DefaultBrowserContextOptions()
+	}
+	// Always use the [Browser]'s user agent if it's not set by the user.
+	// Setting this forces [FrameSession] to set Chromium's user agent.
+	if strings.TrimSpace(opts.UserAgent) == "" {
+		opts.UserAgent = browser.UserAgent()
 	}
 
 	b := BrowserContext{
@@ -132,7 +136,7 @@ func NewBrowserContext(
 	}
 
 	if len(opts.Permissions) > 0 {
-		err := b.GrantPermissions(opts.Permissions, NewGrantPermissionsOptions())
+		err := b.GrantPermissions(opts.Permissions, GrantPermissionsOptions{})
 		if err != nil {
 			return nil, err
 		}
@@ -207,7 +211,7 @@ func (b *BrowserContext) Close() error {
 }
 
 // GrantPermissions enables the specified permissions, all others will be disabled.
-func (b *BrowserContext) GrantPermissions(permissions []string, opts *GrantPermissionsOptions) error {
+func (b *BrowserContext) GrantPermissions(permissions []string, opts GrantPermissionsOptions) error {
 	b.logger.Debugf("BrowserContext:GrantPermissions", "bctxid:%v", b.id)
 
 	permsToProtocol := map[string]cdpbrowser.PermissionType{
@@ -293,12 +297,11 @@ func (b *BrowserContext) SetDefaultTimeout(timeout int64) {
 }
 
 // SetGeolocation overrides the geo location of the user.
-func (b *BrowserContext) SetGeolocation(geolocation sobek.Value) error {
+func (b *BrowserContext) SetGeolocation(g *Geolocation) error {
 	b.logger.Debugf("BrowserContext:SetGeolocation", "bctxid:%v", b.id)
 
-	g := NewGeolocation()
-	if err := g.Parse(b.ctx, geolocation); err != nil {
-		return fmt.Errorf("parsing geo location: %w", err)
+	if err := g.Validate(); err != nil {
+		return fmt.Errorf("validating geo location: %w", err)
 	}
 
 	b.opts.Geolocation = g
@@ -317,17 +320,12 @@ func (b *BrowserContext) SetGeolocation(geolocation sobek.Value) error {
 // See for details:
 // - https://github.com/microsoft/playwright/issues/2196#issuecomment-627134837
 // - https://github.com/microsoft/playwright/pull/2763
-func (b *BrowserContext) SetHTTPCredentials(httpCredentials sobek.Value) error {
+func (b *BrowserContext) SetHTTPCredentials(hc Credentials) error {
 	b.logger.Warnf("setHTTPCredentials", "setHTTPCredentials is deprecated."+
 		" Create a new BrowserContext with httpCredentials instead.")
 	b.logger.Debugf("BrowserContext:SetHTTPCredentials", "bctxid:%v", b.id)
 
-	c := NewCredentials()
-	if err := c.Parse(b.ctx, httpCredentials); err != nil {
-		return fmt.Errorf("parsing HTTP credentials: %w", err)
-	}
-
-	b.opts.HttpCredentials = c
+	b.opts.HTTPCredentials = hc
 	for _, p := range b.browser.getPages() {
 		if err := p.updateHTTPCredentials(); err != nil {
 			return fmt.Errorf("setting HTTP credentials in target ID %s: %w", p.targetID, err)

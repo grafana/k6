@@ -49,10 +49,11 @@ func syncMapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //n
 		"close":            bc.Close,
 		"cookies":          bc.Cookies,
 		"grantPermissions": func(permissions []string, opts sobek.Value) error {
-			pOpts := common.NewGrantPermissionsOptions()
-			pOpts.Parse(vu.Context(), opts)
-
-			return bc.GrantPermissions(permissions, pOpts) //nolint:wrapcheck
+			popts, err := exportTo[common.GrantPermissionsOptions](vu.Runtime(), opts)
+			if err != nil {
+				return fmt.Errorf("parsing grant permission options: %w", err)
+			}
+			return bc.GrantPermissions(permissions, popts)
 		},
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
@@ -60,14 +61,12 @@ func syncMapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //n
 		"setHTTPCredentials":          bc.SetHTTPCredentials, //nolint:staticcheck
 		"setOffline":                  bc.SetOffline,
 		"waitForEvent": func(event string, optsOrPredicate sobek.Value) (*sobek.Promise, error) {
-			ctx := vu.Context()
-			popts := common.NewWaitForEventOptions(
-				bc.Timeout(),
-			)
-			if err := popts.Parse(ctx, optsOrPredicate); err != nil {
-				return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
+			popts, err := parseWaitForEventOptions(vu.Runtime(), optsOrPredicate, bc.Timeout())
+			if err != nil {
+				return nil, fmt.Errorf("parsing wait for event options: %w", err)
 			}
 
+			ctx := vu.Context()
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if popts.PredicateFn != nil {

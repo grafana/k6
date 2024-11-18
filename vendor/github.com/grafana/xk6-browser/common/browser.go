@@ -157,7 +157,7 @@ func (b *Browser) connect() error {
 	}
 
 	// We don't need to lock this because `connect()` is called only in NewBrowser
-	b.defaultContext, err = NewBrowserContext(b.vuCtx, b, "", NewBrowserContextOptions(), b.logger)
+	b.defaultContext, err = NewBrowserContext(b.vuCtx, b, "", DefaultBrowserContextOptions(), b.logger)
 	if err != nil {
 		return fmt.Errorf("browser connect: %w", err)
 	}
@@ -689,6 +689,19 @@ func (b *Browser) fetchVersion() (browserVersion, error) {
 		Do(cdp.WithExecutor(b.vuCtx, b.conn))
 	if err != nil {
 		return browserVersion{}, fmt.Errorf("getting browser version information: %w", err)
+	}
+
+	// Adjust the user agent to remove the headless part.
+	//
+	// Including Headless might cause issues with some websites that treat headless
+	// browsers differently. Later on, [BrowserContext] will set the user agent to
+	// this user agent if not set by the user. This will force [FrameSession] to
+	// set the user agent to the browser's user agent.
+	//
+	// Doing this here provides a consistent user agent across all browser contexts.
+	// Also, it makes it consistent to query the user agent from the browser.
+	if b.browserOpts.Headless {
+		bv.userAgent = strings.ReplaceAll(bv.userAgent, "Headless", "")
 	}
 
 	return bv, nil
