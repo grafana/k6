@@ -14,7 +14,7 @@ require (
 	github.com/go-sourcemap/sourcemap v2.1.4+incompatible
 	github.com/golang/protobuf v1.5.4
 	github.com/gorilla/websocket v1.5.3
-	github.com/grafana/xk6-browser v1.9.1
+	github.com/grafana/xk6-browser v1.9.2-0.20241118153201-d741e4540a3a
 	github.com/grafana/xk6-dashboard v0.7.5
 	github.com/grafana/xk6-output-opentelemetry v0.3.0
 	github.com/grafana/xk6-output-prometheus-remote v0.5.0

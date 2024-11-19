@@ -20,6 +20,11 @@ const (
 	ModifierKeyShift
 )
 
+// KeyboardOptions represents the options for the keyboard.
+type KeyboardOptions struct {
+	Delay int64 `json:"delay"`
+}
+
 // Keyboard represents a keyboard input device.
 // Each Page has a publicly accessible Keyboard.
 type Keyboard struct {
@@ -62,7 +67,7 @@ func (k *Keyboard) Up(key string) error {
 // Press sends a key press message to a session target.
 // It delays the action if `Delay` option is specified.
 // A press message consists of successive key down and up messages.
-func (k *Keyboard) Press(key string, kbdOpts *KeyboardOptions) error {
+func (k *Keyboard) Press(key string, kbdOpts KeyboardOptions) error {
 	if err := k.comboPress(key, kbdOpts); err != nil {
 		return fmt.Errorf("pressing key: %w", err)
 	}
@@ -83,7 +88,7 @@ func (k *Keyboard) InsertText(text string) error {
 //
 // It sends an insertText message if a character is not among
 // valid characters in the keyboard's layout.
-func (k *Keyboard) Type(text string, kbdOpts *KeyboardOptions) error {
+func (k *Keyboard) Type(text string, kbdOpts KeyboardOptions) error {
 	if err := k.typ(text, kbdOpts); err != nil {
 		return fmt.Errorf("typing text: %w", err)
 	}
@@ -245,7 +250,7 @@ func (k *Keyboard) platformSpecificResolution(key string) string {
 	return key
 }
 
-func (k *Keyboard) comboPress(keys string, opts *KeyboardOptions) error {
+func (k *Keyboard) comboPress(keys string, opts KeyboardOptions) error {
 	if opts.Delay > 0 {
 		if err := wait(k.ctx, opts.Delay); err != nil {
 			return err
@@ -291,7 +296,7 @@ func split(keys string) []string {
 	return kk
 }
 
-func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
+func (k *Keyboard) press(key string, opts KeyboardOptions) error {
 	if opts.Delay > 0 {
 		if err := wait(k.ctx, opts.Delay); err != nil {
 			return err
@@ -303,7 +308,7 @@ func (k *Keyboard) press(key string, opts *KeyboardOptions) error {
 	return k.up(key)
 }
 
-func (k *Keyboard) typ(text string, opts *KeyboardOptions) error {
+func (k *Keyboard) typ(text string, opts KeyboardOptions) error {
 	layout := keyboardlayout.GetKeyboardLayout(k.layoutName)
 	for _, c := range text {
 		if opts.Delay > 0 {

@@ -230,7 +230,7 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 		},
 		"title": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.Title(), nil
+				return f.Title()
 			})
 		},
 		"type": func(selector, text string, opts sobek.Value) *sobek.Promise {

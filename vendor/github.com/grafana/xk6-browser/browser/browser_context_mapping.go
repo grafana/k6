@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"reflect"
+	"time"
 
 	"github.com/grafana/sobek"
 
@@ -74,25 +75,34 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 				return bc.Cookies(urls...) //nolint:wrapcheck
 			})
 		},
-		"grantPermissions": func(permissions []string, opts sobek.Value) *sobek.Promise {
+		"grantPermissions": func(permissions []string, opts sobek.Value) (*sobek.Promise, error) {
+			popts, err := exportTo[common.GrantPermissionsOptions](vu.Runtime(), opts)
+			if err != nil {
+				return nil, fmt.Errorf("parsing grant permission options: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				popts := common.NewGrantPermissionsOptions()
-				popts.Parse(vu.Context(), opts)
-
-				return nil, bc.GrantPermissions(permissions, popts) //nolint:wrapcheck
-			})
+				return nil, bc.GrantPermissions(permissions, popts)
+			}), nil
 		},
 		"setDefaultNavigationTimeout": bc.SetDefaultNavigationTimeout,
 		"setDefaultTimeout":           bc.SetDefaultTimeout,
-		"setGeolocation": func(geolocation sobek.Value) *sobek.Promise {
+		"setGeolocation": func(geolocation sobek.Value) (*sobek.Promise, error) {
+			gl, err := exportTo[common.Geolocation](vu.Runtime(), geolocation)
+			if err != nil {
+				return nil, fmt.Errorf("parsing geo location: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, bc.SetGeolocation(geolocation) //nolint:wrapcheck
-			})
+				return nil, bc.SetGeolocation(&gl)
+			}), nil
 		},
-		"setHTTPCredentials": func(httpCredentials sobek.Value) *sobek.Promise {
+		"setHTTPCredentials": func(httpCredentials sobek.Value) (*sobek.Promise, error) {
+			creds, err := exportTo[common.Credentials](rt, httpCredentials)
+			if err != nil {
+				return nil, fmt.Errorf("parsing HTTP credentials: %w", err)
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, bc.SetHTTPCredentials(httpCredentials) //nolint:staticcheck,wrapcheck
-			})
+				return nil, bc.SetHTTPCredentials(creds) //nolint:staticcheck
+			}), nil
 		},
 		"setOffline": func(offline bool) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -100,14 +110,12 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			})
 		},
 		"waitForEvent": func(event string, optsOrPredicate sobek.Value) (*sobek.Promise, error) {
-			ctx := vu.Context()
-			popts := common.NewWaitForEventOptions(
-				bc.Timeout(),
-			)
-			if err := popts.Parse(ctx, optsOrPredicate); err != nil {
-				return nil, fmt.Errorf("parsing waitForEvent options: %w", err)
+			popts, err := parseWaitForEventOptions(vu.Runtime(), optsOrPredicate, bc.Timeout())
+			if err != nil {
+				return nil, fmt.Errorf("parsing wait for event options: %w", err)
 			}
 
+			ctx := vu.Context()
 			return k6ext.Promise(ctx, func() (result any, reason error) {
 				var runInTaskQueue func(p *common.Page) (bool, error)
 				if popts.PredicateFn != nil {
@@ -176,4 +184,49 @@ func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolin
 			})
 		},
 	}
+}
+
+// waitForEventOptions are the options used by the browserContext.waitForEvent API.
+type waitForEventOptions struct {
+	Timeout     time.Duration
+	PredicateFn sobek.Callable
+}
+
+// parseWaitForEventOptions parses optsOrPredicate into a WaitForEventOptions.
+// It returns a WaitForEventOptions with the default timeout if optsOrPredicate is nil,
+// or not a callable predicate function.
+// It can parse only a callable predicate function or an object which contains a
+// callable predicate function and a timeout.
+func parseWaitForEventOptions(
+	rt *sobek.Runtime, optsOrPredicate sobek.Value, defaultTime time.Duration,
+) (*waitForEventOptions, error) {
+	w := &waitForEventOptions{
+		Timeout: defaultTime,
+	}
+
+	if !sobekValueExists(optsOrPredicate) {
+		return w, nil
+	}
+	var isCallable bool
+	w.PredicateFn, isCallable = sobek.AssertFunction(optsOrPredicate)
+	if isCallable {
+		return w, nil
+	}
+
+	opts := optsOrPredicate.ToObject(rt)
+	for _, k := range opts.Keys() {
+		switch k {
+		case "predicate":
+			w.PredicateFn, isCallable = sobek.AssertFunction(opts.Get(k))
+			if !isCallable {
+				return nil, errors.New("predicate function is not callable")
+			}
+		case "timeout":
+			w.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
+		default:
+			return nil, fmt.Errorf("unknown option: %s", k)
+		}
+	}
+
+	return w, nil
 }

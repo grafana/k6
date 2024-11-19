@@ -106,29 +106,6 @@ type Screen struct {
 	Height int64 `js:"height"`
 }
 
-const (
-	screenWidth  = "width"
-	screenHeight = "height"
-)
-
-// Parse parses the given screen options.
-func (s *Screen) Parse(ctx context.Context, screen sobek.Value) error {
-	rt := k6ext.Runtime(ctx)
-	if screen != nil && !sobek.IsUndefined(screen) && !sobek.IsNull(screen) {
-		screen := screen.ToObject(rt)
-		for _, k := range screen.Keys() {
-			switch k {
-			case screenWidth:
-				s.Width = screen.Get(k).ToInteger()
-			case screenHeight:
-				s.Height = screen.Get(k).ToInteger()
-			}
-		}
-	}
-
-	return nil
-}
-
 // ColorScheme represents a browser color scheme.
 type ColorScheme string
 
@@ -177,12 +154,12 @@ func (c *ColorScheme) UnmarshalJSON(b []byte) error {
 
 // EmulatedSize represents the emulated viewport and screen sizes.
 type EmulatedSize struct {
-	Viewport *Viewport
-	Screen   *Screen
+	Viewport Viewport
+	Screen   Screen
 }
 
 // NewEmulatedSize creates and returns a new EmulatedSize.
-func NewEmulatedSize(viewport *Viewport, screen *Screen) *EmulatedSize {
+func NewEmulatedSize(viewport Viewport, screen Screen) *EmulatedSize {
 	return &EmulatedSize{
 		Viewport: viewport,
 		Screen:   screen,
@@ -298,7 +275,7 @@ func NewPage(
 
 	// We need to init viewport and screen size before initializing the main frame session,
 	// as that's where the emulation is activated.
-	if bctx.opts.Viewport != nil {
+	if !bctx.opts.Viewport.IsEmpty() {
 		p.emulatedSize = NewEmulatedSize(bctx.opts.Viewport, bctx.opts.Screen)
 	}
 
@@ -739,11 +716,11 @@ func (p *Page) setViewportSize(viewportSize *Size) error {
 	p.logger.Debugf("Page:setViewportSize", "sid:%v vps:%v",
 		p.sessionID(), viewportSize)
 
-	viewport := &Viewport{
+	viewport := Viewport{
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}
-	screen := &Screen{
+	screen := Screen{
 		Width:  int64(viewportSize.Width),
 		Height: int64(viewportSize.Height),
 	}

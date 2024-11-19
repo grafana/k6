@@ -16,6 +16,26 @@ func panicIfFatalError(ctx context.Context, err error) {
 	}
 }
 
+// mergeWith merges the Sobek value with the existing Go value.
+func mergeWith[T any](rt *sobek.Runtime, src T, v sobek.Value) error {
+	if !sobekValueExists(v) {
+		return nil
+	}
+	return rt.ExportTo(v, &src) //nolint:wrapcheck
+}
+
+// exportTo exports the Sobek value to a Go value.
+// It returns the zero value of T if obj does not exist in the Sobek runtime.
+// It's caller's responsibility to check for nilness.
+func exportTo[T any](rt *sobek.Runtime, obj sobek.Value) (T, error) {
+	var t T
+	if !sobekValueExists(obj) {
+		return t, nil
+	}
+	err := rt.ExportTo(obj, &t)
+	return t, err //nolint:wrapcheck
+}
+
 // exportArg exports the value and returns it.
 // It returns nil if the value is undefined or null.
 func exportArg(gv sobek.Value) any {

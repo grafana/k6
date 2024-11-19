@@ -245,8 +245,20 @@ func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.Fra
 	isMainFrame := parentFrameID == ""
 	frame := m.frames[frameID]
 
-	if !(isMainFrame || frame != nil) {
-		return errors.New("we either navigate top level or have old version of the navigated frame")
+	if !isMainFrame && frame == nil {
+		m.logger.Debugf("FrameManager:frameNavigated:nil frame",
+			"fmid:%d fid:%v pfid:%v docid:%s fname:%s furl:%s initial:%t",
+			m.ID(), frameID, parentFrameID, documentID, name, url, initial)
+
+		// If the frame is nil at this point, then the cause of this is likely
+		// due to chrome not sending a frameAttached event ahead of time. This
+		// isn't a bug in chrome, and seems to be intended behavior. Instead
+		// of worrying about the nil frame and causing the test to fail when
+		// the frame is nil, we can instead return early. The frame will
+		// be initialized when getFrameTree CDP request is made, which will
+		// call onFrameAttached and onFrameNavigated.
+
+		return nil
 	}
 
 	m.logger.Debugf("FrameManager:frameNavigated:removeFrames",

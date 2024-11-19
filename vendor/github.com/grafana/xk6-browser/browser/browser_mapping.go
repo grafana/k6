@@ -36,8 +36,8 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
 			return b.IsConnected(), nil
 		},
 		"newContext": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewBrowserContextOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newContext options: %w", err)
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -71,8 +71,8 @@ func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
 			return b.Version(), nil
 		},
 		"newPage": func(opts sobek.Value) (*sobek.Promise, error) {
-			popts := common.NewBrowserContextOptions()
-			if err := popts.Parse(vu.Context(), opts); err != nil {
+			popts, err := parseBrowserContextOptions(vu.Runtime(), opts)
+			if err != nil {
 				return nil, fmt.Errorf("parsing browser.newPage options: %w", err)
 			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -106,4 +106,13 @@ func initBrowserContext(bctx *common.BrowserContext, testRunID string) error {
 	}
 
 	return nil
+}
+
+// parseBrowserContextOptions parses the [common.BrowserContext] options from a Sobek value.
+func parseBrowserContextOptions(rt *sobek.Runtime, opts sobek.Value) (*common.BrowserContextOptions, error) {
+	b := common.DefaultBrowserContextOptions()
+	if err := mergeWith(rt, b, opts); err != nil {
+		return nil, err
+	}
+	return b, nil
 }
