@@ -60,6 +60,13 @@ jobs:
                "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
             export XK6_K6_REPO="github.com/${{ github.event.pull_request.head.repo.full_name }}"
           fi
+          # The following is a workaround for Windows, cause when using 'shell: bash', the PATH is expressed  
+          # with ':' as separator, but Go code, running on a Windows OS, expects ';' as separator.
+          XPATH="$PATH"
+          if [[ "${{ matrix.platform }}" == "windows-latest" || "${{ matrix.platform }}" == "windows-2019" ]]; then
+            XPATH="$HOME/sdk/gotip/bin;$XPATH"
+          fi
+          PATH="$XPATH" \
           GOPRIVATE="go.k6.io/k6" xk6 build "$COMMIT_ID" \
             --output ./k6ext \
             --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
