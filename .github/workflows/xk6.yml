@@ -17,7 +17,7 @@ jobs:
       matrix:
         go: [stable, tip]
         platform: [ubuntu-latest, windows-2019, macos-latest]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
