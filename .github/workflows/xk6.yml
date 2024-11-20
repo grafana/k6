@@ -17,20 +17,26 @@ jobs:
       matrix:
         go: [stable, tip]
         platform: [ubuntu-latest, windows-2019, macos-latest]
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
       - name: Install Go
+        if: matrix.go != 'tip'
         uses: actions/setup-go@v5
         with:
           go-version: 1.23.x
           check-latest: true
+      - name: Download Go tip
+        if: matrix.go == 'tip'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download ${{ matrix.platform }} --repo grafana/gotip --pattern 'go.zip'
       - name: Install Go tip
         if: matrix.go == 'tip'
         run: |
-          go install golang.org/dl/gotip@latest
-          gotip download
+          unzip go.zip -d $HOME/sdk
           echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
@@ -54,6 +60,13 @@ jobs:
                "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
             export XK6_K6_REPO="github.com/${{ github.event.pull_request.head.repo.full_name }}"
           fi
+          # The following is a workaround for Windows, cause when using 'shell: bash', the PATH is expressed  
+          # with ':' as separator, but Go code, running on a Windows OS, expects ';' as separator.
+          XPATH="$PATH"
+          if [[ "${{ matrix.platform }}" == "windows-latest" || "${{ matrix.platform }}" == "windows-2019" ]]; then
+            XPATH="$HOME/sdk/gotip/bin;$XPATH"
+          fi
+          PATH="$XPATH" \
           GOPRIVATE="go.k6.io/k6" xk6 build "$COMMIT_ID" \
             --output ./k6ext \
             --with github.com/grafana/xk6-js-test="$(pwd)/xk6-js-test" \
