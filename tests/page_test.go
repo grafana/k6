@@ -264,6 +264,11 @@ func TestPageEvaluateMappingError(t *testing.T) {
 			script:  "(6)",
 			wantErr: "Given expression does not evaluate to a function",
 		},
+		{
+			name:    "void",
+			script:  "",
+			wantErr: "evaluate requires a page function",
+		},
 	}
 
 	for _, tt := range tests {
