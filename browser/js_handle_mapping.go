@@ -1,6 +1,8 @@
 package browser
 
 import (
+	"fmt"
+
 	"github.com/grafana/sobek"
 
 	"github.com/grafana/xk6-browser/common"
@@ -15,26 +17,32 @@ func mapJSHandle(vu moduleVU, jsh common.JSHandleAPI) mapping {
 		},
 		"dispose": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return nil, jsh.Dispose() //nolint:wrapcheck
+				return nil, jsh.Dispose()
 			})
 		},
-		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) *sobek.Promise {
+		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluate requires a page function")
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				args := make([]any, 0, len(gargs))
 				for _, a := range gargs {
 					args = append(args, exportArg(a))
 				}
-				return jsh.Evaluate(pageFunc.String(), args...) //nolint:wrapcheck
-			})
+				return jsh.Evaluate(pageFunc.String(), args...)
+			}), nil
 		},
-		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) *sobek.Promise {
+		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluateHandle requires a page function")
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
 				h, err := jsh.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 				return mapJSHandle(vu, h), nil
-			})
+			}), nil
 		},
 		"getProperties": func() *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
