@@ -389,7 +389,10 @@ func (m *FrameManager) frameRequestedNavigation(frameID cdp.FrameID, url string,
 		m.logger.Debugf("FrameManager:frameRequestedNavigation:nilFrame:return",
 			"fmid:%d fid:%v url:%s docid:%s", m.ID(), frameID, url, documentID)
 
-		return fmt.Errorf("no frame exists with ID %s", frameID)
+		// If a frame doesn't exist then the call to this method (which
+		// originates from a EventFrameRequestedNavigation CDP event) is on a
+		// stale frame that no longer exists in memory.
+		return nil
 	}
 
 	m.barriersMu.RLock()
