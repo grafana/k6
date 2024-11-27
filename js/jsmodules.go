@@ -8,6 +8,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modules/k6"
+	"go.k6.io/k6/js/modules/k6/cloud"
 	"go.k6.io/k6/js/modules/k6/crypto"
 	"go.k6.io/k6/js/modules/k6/crypto/x509"
 	"go.k6.io/k6/js/modules/k6/data"
@@ -32,6 +33,7 @@ import (
 func getInternalJSModules() map[string]interface{} {
 	return map[string]interface{}{
 		"k6":                         k6.New(),
+		"k6/cloud":                   cloud.New(),
 		"k6/crypto":                  crypto.New(),
 		"k6/crypto/x509":             x509.New(),
 		"k6/data":                    data.New(),
