@@ -37,7 +37,7 @@ func newScreenshotPersister(envLookup env.LookupFunc) (filePersister, error) {
 // url=https://127.0.0.1/,basePath=/screenshots,header.1=a,header.2=b
 // and return them.
 //
-//nolint:cyclop
+
 func parsePresignedURLEnvVar(envVarValue string) (presignedURLConfig, error) {
 	ss := strings.Split(envVarValue, ",")
 

@@ -59,7 +59,7 @@ func convertArgument(
 			unserVal = "-Infinity"
 		default:
 			if math.IsNaN(a) {
-				unserVal = "NaN" //nolint: goconst
+				unserVal = "NaN"
 			}
 		}
 

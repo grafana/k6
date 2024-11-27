@@ -201,7 +201,7 @@ func (b *Browser) getPages() []*Page {
 	return pages
 }
 
-func (b *Browser) initEvents() error { //nolint:cyclop
+func (b *Browser) initEvents() error {
 	chHandler := make(chan Event)
 
 	// Using the internal context here. Using vuCtx would close the connection/subprocess

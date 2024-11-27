@@ -120,7 +120,6 @@ func TestEventEmitterAllEvents(t *testing.T) {
 	})
 }
 
-//nolint:gocognit
 func TestBaseEventEmitter(t *testing.T) {
 	t.Parallel()
 

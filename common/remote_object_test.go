@@ -84,9 +84,9 @@ func TestValueFromRemoteObject(t *testing.T) {
 			require.NotNil(t, arg)
 			require.IsType(t, float64(0), arg)
 			if v.value == "NaN" {
-				require.True(t, math.IsNaN(arg.(float64))) //nolint:forcetypeassert
+				require.True(t, math.IsNaN(arg.(float64)))
 			} else {
-				require.Equal(t, v.expected, arg.(float64)) //nolint:forcetypeassert
+				require.Equal(t, v.expected, arg.(float64))
 			}
 		}
 	})

@@ -34,7 +34,6 @@ func TestErrorFromDOMError(t *testing.T) {
 	}
 }
 
-//nolint:funlen
 func TestQueryAll(t *testing.T) {
 	t.Parallel()
 

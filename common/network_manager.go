@@ -509,7 +509,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.frameManager.requestStarted(req)
 }
 
-func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) { //nolint:funlen
+func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	m.logger.Debugf("NetworkManager:onRequestPaused",
 		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",

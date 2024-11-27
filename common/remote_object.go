@@ -78,7 +78,6 @@ func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, err
 	return obj, errors.Join(result...)
 }
 
-//nolint:cyclop
 func parseRemoteObjectValue(
 	t cdpruntime.Type, st cdpruntime.Subtype, val string, op *cdpruntime.ObjectPreview,
 ) (any, error) {
@@ -228,7 +227,6 @@ func parseConsoleRemoteArrayPreview(logger *log.Logger, op *cdpruntime.ObjectPre
 	return string(bb), nil
 }
 
-//nolint:cyclop
 func parseConsoleRemoteObjectValue(
 	logger *log.Logger,
 	t cdpruntime.Type,

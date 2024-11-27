@@ -152,7 +152,7 @@ func (o *ElementHandleBaseOptions) Parse(ctx context.Context, opts sobek.Value) 
 		switch k {
 		case "force":
 			o.Force = gopts.Get(k).ToBoolean()
-		case "noWaitAfter": //nolint:goconst
+		case "noWaitAfter":
 			o.NoWaitAfter = gopts.Get(k).ToBoolean()
 		case "timeout":
 			o.Timeout = time.Duration(gopts.Get(k).ToInteger()) * time.Millisecond
@@ -220,7 +220,7 @@ func (f *Files) addFile(ctx context.Context, file sobek.Value) error {
 	}
 	rt := k6ext.Runtime(ctx)
 	fileType := file.ExportType()
-	switch fileType.Kind() { //nolint:exhaustive
+	switch fileType.Kind() {
 	case reflect.Map: // file descriptor object
 		var parsedFile File
 		if err := rt.ExportTo(file, &parsedFile); err != nil {
@@ -242,7 +242,7 @@ func (f *Files) Parse(ctx context.Context, files sobek.Value) error {
 	}
 
 	optsType := files.ExportType()
-	switch optsType.Kind() { //nolint:exhaustive
+	switch optsType.Kind() {
 	case reflect.Slice: // array of filePaths or array of file descriptor objects
 		gopts := files.ToObject(rt)
 		for _, k := range gopts.Keys() {
@@ -435,7 +435,7 @@ func NewElementHandleScreenshotOptions(defaultTimeout time.Duration) *ElementHan
 }
 
 // Parse parses the ElementHandleScreenshotOptions from the given opts.
-func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error { //nolint:cyclop
+func (o *ElementHandleScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if !sobekValueExists(opts) {
 		return nil
 	}

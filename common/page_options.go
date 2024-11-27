@@ -100,7 +100,7 @@ func NewPageScreenshotOptions() *PageScreenshotOptions {
 }
 
 // Parse parses the page screenshot options.
-func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error { //nolint:cyclop
+func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if !sobekValueExists(opts) {
 		return nil
 	}
