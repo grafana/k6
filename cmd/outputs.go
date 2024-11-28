@@ -113,6 +113,7 @@ func createOutputs(
 		StdOut:         gs.Stdout,
 		StdErr:         gs.Stderr,
 		FS:             gs.FS,
+		ScriptOptions:  test.derivedConfig.Options,
 		RuntimeOptions: test.preInitState.RuntimeOptions,
 		ExecutionPlan:  executionPlan,
 		Usage:          test.preInitState.Usage,
@@ -141,19 +142,10 @@ func createOutputs(
 			}
 		}
 
-		jsonConfig := test.derivedConfig.Collectors[outputType]
-		if isCloudOutput(outputType) {
-			jsonConfig, err = createCloudTest(gs, test, executionPlan, outputType, outputArg)
-			if err != nil {
-				return nil, fmt.Errorf("could not create the '%s' output: %w", outputType, err)
-			}
-		}
-
 		params := baseParams
 		params.OutputType = outputType
 		params.ConfigArgument = outputArg
-		params.JSONConfig = jsonConfig
-		params.ScriptOptions = test.derivedConfig.Options
+		params.JSONConfig = test.derivedConfig.Collectors[outputType]
 
 		out, err := outputConstructor(params)
 		if err != nil {

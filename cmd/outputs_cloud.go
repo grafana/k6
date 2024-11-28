@@ -21,8 +21,14 @@ import (
 
 const defaultTestName = "k6 test"
 
-func isCloudOutput(outputType string) bool {
-	return outputType == builtinOutputCloud.String()
+func findCloudOutput(outputs []string) (string, string, bool) {
+	for _, outFullArg := range outputs {
+		outType, outArg, _ := strings.Cut(outFullArg, "=")
+		if outType == builtinOutputCloud.String() {
+			return outType, outArg, true
+		}
+	}
+	return "", "", false
 }
 
 // createCloudTest performs some test and Cloud configuration validations and if everything
@@ -30,10 +36,7 @@ func isCloudOutput(outputType string) bool {
 // It is also responsible for filling the test run id on the test options, so it can be used later.
 // It returns the resulting Cloud configuration as a json.RawMessage, as expected by the Cloud output,
 // or an error if something goes wrong.
-func createCloudTest(
-	gs *state.GlobalState, test *loadedAndConfiguredTest, executionPlan []lib.ExecutionStep,
-	outputType, outputArg string,
-) (json.RawMessage, error) {
+func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outputType, outputArg string) error {
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
 		test.derivedConfig.Collectors[outputType],
 		gs.Env,
@@ -42,7 +45,7 @@ func createCloudTest(
 		test.derivedConfig.Options.External,
 	)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if warn != "" {
@@ -52,14 +55,14 @@ func createCloudTest(
 	logger := gs.Logger.WithFields(logrus.Fields{"output": "cloud"})
 
 	if err := validateRequiredSystemTags(test.derivedConfig.Options.SystemTags); err != nil {
-		return nil, err
+		return err
 	}
 
 	if !conf.Name.Valid || conf.Name.String == "" {
 		scriptPath := test.source.URL.String()
 		if scriptPath == "" {
 			// Script from stdin without a name, likely from stdin
-			return nil, errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
+			return errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
 		}
 
 		conf.Name = null.StringFrom(filepath.Base(scriptPath))
@@ -68,18 +71,17 @@ func createCloudTest(
 		conf.Name = null.StringFrom(defaultTestName)
 	}
 
-	// We need to propagate the test run id to the derived config
-	// and to the init runner options, so they can be used later.
-	setTestRunId := func(id null.String) error {
-		// TODO: Not sure if this is a good idea :thinking:
-		runnerOpts := test.initRunner.GetOptions()
-		runnerOpts.TestRunID = id
-		err := test.initRunner.SetOptions(runnerOpts)
+	// We need to propagate the test run id to the derived config,
+	// and update the Cloud configuration that later will be used
+	// by the Cloud output.
+	setTestRunIdAndConfig := func(id null.String, conf cloudapi.Config) error {
+		raw, err := cloudConfToRawMessage(conf)
 		if err != nil {
 			return err
 		}
 
 		test.derivedConfig.TestRunID = id
+		test.derivedConfig.Collectors["cloud"] = raw
 		return nil
 	}
 
@@ -88,10 +90,10 @@ func createCloudTest(
 	// as we don't need to create any test run.
 	// Precisely, the identifier of the test run is conf.PushRefID.
 	if conf.PushRefID.Valid {
-		if err := setTestRunId(conf.PushRefID); err != nil {
-			return nil, err
+		if err := setTestRunIdAndConfig(conf.PushRefID, conf); err != nil {
+			return err
 		}
-		return cloudConfToRawMessage(conf)
+		return nil
 	}
 
 	// If not, we continue with the creation of the test run.
@@ -102,18 +104,27 @@ func createCloudTest(
 		}
 	}
 
+	et, err := lib.NewExecutionTuple(
+		test.derivedConfig.Options.ExecutionSegment,
+		test.derivedConfig.Options.ExecutionSegmentSequence,
+	)
+	if err != nil {
+		return err
+	}
+	executionPlan := test.derivedConfig.Options.Scenarios.GetFullExecutionRequirements(et)
+
 	duration, testEnds := lib.GetEndOffset(executionPlan)
 	if !testEnds {
-		return nil, errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
+		return errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
 	}
 
 	if conf.MetricPushConcurrency.Int64 < 1 {
-		return nil, fmt.Errorf("metrics push concurrency must be a positive number but is %d",
+		return fmt.Errorf("metrics push concurrency must be a positive number but is %d",
 			conf.MetricPushConcurrency.Int64)
 	}
 
 	if conf.MaxTimeSeriesInBatch.Int64 < 1 {
-		return nil, fmt.Errorf("max allowed number of time series in a single batch must be a positive number but is %d",
+		return fmt.Errorf("max allowed number of time series in a single batch must be a positive number but is %d",
 			conf.MaxTimeSeriesInBatch.Int64)
 	}
 
@@ -136,7 +147,7 @@ func createCloudTest(
 
 	response, err := apiClient.CreateTestRun(testRun)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	if response.ConfigOverride != nil {
@@ -145,11 +156,11 @@ func createCloudTest(
 	}
 
 	testRunId := null.NewString(response.ReferenceID, true)
-	if err := setTestRunId(testRunId); err != nil {
-		return nil, err
+	if err := setTestRunIdAndConfig(testRunId, conf); err != nil {
+		return err
 	}
 
-	return cloudConfToRawMessage(conf)
+	return nil
 }
 
 // validateRequiredSystemTags checks if all required tags are present.
