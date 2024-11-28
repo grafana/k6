@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -183,13 +182,9 @@ func (c *cmdCloud) run(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
+	refID := cloudTestRun.ReferenceID
 	if cloudTestRun.ConfigOverride != nil {
 		cloudConfig = cloudConfig.Apply(*cloudTestRun.ConfigOverride)
-	}
-
-	refID := cloudTestRun.ReferenceID
-	if err := storeTestRunIdInCloudOptions(testRunState, refID); err != nil {
-		return err
 	}
 
 	// Trap Interrupts, SIGINTs and SIGTERMs.
@@ -426,24 +421,4 @@ func exactCloudArgs() cobra.PositionalArgs {
 
 		return nil
 	}
-}
-
-const testRunIdKey = "testRunId"
-
-func storeTestRunIdInCloudOptions(testRunState *lib.TestRunState, testRunId string) error {
-	tmpConfig, err := cloudapi.GetTemporaryCloudConfig(testRunState.Options.Cloud, nil)
-	if err != nil {
-		return err
-	}
-
-	tmpConfig[testRunIdKey] = testRunId
-
-	buffer := &bytes.Buffer{}
-	if err := json.NewEncoder(buffer).Encode(tmpConfig); err != nil {
-		return err
-	}
-
-	testRunState.Options.Cloud = buffer.Bytes()
-
-	return nil
 }

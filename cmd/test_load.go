@@ -265,7 +265,7 @@ func loadSystemCertPool(logger logrus.FieldLogger) {
 func (lct *loadedAndConfiguredTest) buildTestRunState(
 	configToReinject lib.Options,
 ) (*lib.TestRunState, error) {
-	// This might be the full derived or just the consodlidated options
+	// This might be the full derived or just the consolidated options
 	if err := lct.initRunner.SetOptions(configToReinject); err != nil {
 		return nil, err
 	}

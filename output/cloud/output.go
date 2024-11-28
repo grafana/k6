@@ -4,11 +4,10 @@ package cloud
 import (
 	"errors"
 	"fmt"
-	"path/filepath"
-	"strings"
 	"time"
 
 	"github.com/sirupsen/logrus"
+
 	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/lib"
@@ -17,11 +16,7 @@ import (
 	"go.k6.io/k6/output"
 	cloudv2 "go.k6.io/k6/output/cloud/expv2"
 	"go.k6.io/k6/usage"
-	"gopkg.in/guregu/null.v3"
 )
-
-// TestName is the default k6 Cloud test name
-const TestName = "k6 test"
 
 // versionedOutput represents an output implementing
 // metrics samples aggregation and flushing to the
@@ -56,17 +51,8 @@ type Output struct {
 	config    cloudapi.Config
 	testRunID string
 
-	executionPlan []lib.ExecutionStep
-	duration      int64 // in seconds
-	thresholds    map[string][]*metrics.Threshold
-
-	// testArchive is the test archive to be uploaded to the cloud
-	// before the output is Start()-ed.
-	//
-	// It is set by the SetArchive method. If it is nil, the output
-	// will not upload any test archive, such as when the user
-	// uses the --no-archive-upload flag.
-	testArchive *lib.Archive
+	duration   int64 // in seconds
+	thresholds map[string][]*metrics.Threshold
 
 	client       *cloudapi.Client
 	testStopFunc func(error)
@@ -103,74 +89,23 @@ func newOutput(params output.Params) (*Output, error) {
 		params.Logger.Warn(warn)
 	}
 
-	if err := validateRequiredSystemTags(params.ScriptOptions.SystemTags); err != nil {
-		return nil, err
-	}
-
 	logger := params.Logger.WithFields(logrus.Fields{"output": "cloud"})
 
-	if !conf.Name.Valid || conf.Name.String == "" {
-		scriptPath := params.ScriptPath.String()
-		if scriptPath == "" {
-			// Script from stdin without a name, likely from stdin
-			return nil, errors.New("script name not set, please specify K6_CLOUD_NAME or options.cloud.name")
-		}
-
-		conf.Name = null.StringFrom(filepath.Base(scriptPath))
-	}
-	if conf.Name.String == "-" {
-		conf.Name = null.StringFrom(TestName)
-	}
-
-	duration, testEnds := lib.GetEndOffset(params.ExecutionPlan)
-	if !testEnds {
-		return nil, errors.New("tests with unspecified duration are not allowed when outputting data to k6 cloud")
-	}
-
-	if conf.MetricPushConcurrency.Int64 < 1 {
-		return nil, fmt.Errorf("metrics push concurrency must be a positive number but is %d",
-			conf.MetricPushConcurrency.Int64)
-	}
-
-	if conf.MaxTimeSeriesInBatch.Int64 < 1 {
-		return nil, fmt.Errorf("max allowed number of time series in a single batch must be a positive number but is %d",
-			conf.MaxTimeSeriesInBatch.Int64)
-	}
+	duration, _ := lib.GetEndOffset(params.ExecutionPlan)
 
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration())
 
-	return &Output{
-		config:        conf,
-		client:        apiClient,
-		executionPlan: params.ExecutionPlan,
-		duration:      int64(duration / time.Second),
-		logger:        logger,
-		usage:         params.Usage,
-	}, nil
-}
+	testRunID := params.ScriptOptions.TestRunID.String
 
-// validateRequiredSystemTags checks if all required tags are present.
-func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
-	missingRequiredTags := []string{}
-	requiredTags := metrics.SystemTagSet(metrics.TagName |
-		metrics.TagMethod |
-		metrics.TagStatus |
-		metrics.TagError |
-		metrics.TagCheck |
-		metrics.TagGroup)
-	for _, tag := range metrics.SystemTagValues() {
-		if requiredTags.Has(tag) && !scriptTags.Has(tag) {
-			missingRequiredTags = append(missingRequiredTags, tag.String())
-		}
-	}
-	if len(missingRequiredTags) > 0 {
-		return fmt.Errorf(
-			"the cloud output needs the following system tags enabled: %s",
-			strings.Join(missingRequiredTags, ", "),
-		)
-	}
-	return nil
+	return &Output{
+		config:    conf,
+		testRunID: testRunID,
+		client:    apiClient,
+		duration:  int64(duration / time.Second),
+		logger:    logger,
+		usage:     params.Usage,
+	}, nil
 }
 
 // Start calls the k6 Cloud API to initialize the test run, and then starts the
@@ -182,36 +117,7 @@ func (out *Output) Start() error {
 		return out.startVersionedOutput()
 	}
 
-	thresholds := make(map[string][]string)
-	for name, t := range out.thresholds {
-		for _, threshold := range t {
-			thresholds[name] = append(thresholds[name], threshold.Source)
-		}
-	}
-
-	testRun := &cloudapi.TestRun{
-		Name:       out.config.Name.String,
-		ProjectID:  out.config.ProjectID.Int64,
-		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)),
-		Thresholds: thresholds,
-		Duration:   out.duration,
-		Archive:    out.testArchive,
-	}
-
-	response, err := out.client.CreateTestRun(testRun)
-	if err != nil {
-		return err
-	}
-	out.testRunID = response.ReferenceID
-
-	if response.ConfigOverride != nil {
-		out.logger.WithFields(logrus.Fields{
-			"override": response.ConfigOverride,
-		}).Debug("overriding config options")
-		out.config = out.config.Apply(*response.ConfigOverride)
-	}
-
-	err = out.startVersionedOutput()
+	err := out.startVersionedOutput()
 	if err != nil {
 		return fmt.Errorf("the Gateway Output failed to start a versioned output: %w", err)
 	}
@@ -243,14 +149,6 @@ func (out *Output) SetThresholds(scriptThresholds map[string]metrics.Thresholds)
 func (out *Output) SetTestRunStopCallback(stopFunc func(error)) {
 	out.testStopFunc = stopFunc
 }
-
-// SetArchive receives the test artifact to be uploaded to the cloud
-// before the output is Start()-ed.
-func (out *Output) SetArchive(archive *lib.Archive) {
-	out.testArchive = archive
-}
-
-var _ output.WithArchive = &Output{}
 
 // Stop gracefully stops all metric emission from the output: when all metric
 // samples are emitted, it makes a cloud API call to finish the test run.

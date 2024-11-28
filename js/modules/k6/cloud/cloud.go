@@ -2,8 +2,6 @@
 package cloud
 
 import (
-	"bytes"
-	"encoding/json"
 	"errors"
 
 	"github.com/grafana/sobek"
@@ -74,20 +72,9 @@ func (mi *ModuleInstance) testRunId() (sobek.Value, error) {
 		return sobek.Undefined(), errRunInInitContext
 	}
 
-	if vuState.Options.Cloud == nil {
+	if !vuState.Options.TestRunID.Valid {
 		return sobek.Undefined(), nil
 	}
 
-	config := make(map[string]interface{})
-	reader := bytes.NewReader(vuState.Options.Cloud)
-	if err := json.NewDecoder(reader).Decode(&config); err != nil {
-		return nil, err
-	}
-
-	testRunId, hasTestRunId := config["testRunId"]
-	if !hasTestRunId {
-		return sobek.Undefined(), nil
-	}
-
-	return rt.ToValue(testRunId), nil
+	return rt.ToValue(vuState.Options.TestRunID.String), nil
 }
