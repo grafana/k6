@@ -13,10 +13,10 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/grafana/sobek"
-	"go.opentelemetry.io/otel/attribute"
-
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6ext"
+	k6common "go.k6.io/k6/js/common"
+	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
@@ -479,7 +479,7 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts KeyboardO
 //nolint:funlen,gocognit,cyclop
 func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value) (any, error) {
 	convertSelectOptionValues := func(values sobek.Value) ([]any, error) {
-		if sobek.IsNull(values) || sobek.IsUndefined(values) {
+		if k6common.IsNullish(values) {
 			return nil, nil
 		}
 
@@ -489,38 +489,41 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 			rt   = h.execCtx.vu.Runtime()
 		)
 		switch values.ExportType().Kind() {
-		case reflect.Map:
-			s := reflect.ValueOf(t)
-			for i := 0; i < s.Len(); i++ {
-				item := s.Index(i)
-				switch item.Kind() {
-				case reflect.TypeOf(nil).Kind():
-					return nil, fmt.Errorf("options[%d]: expected object, got null", i)
-				case reflect.TypeOf(&ElementHandle{}).Kind():
-					opts = append(opts, t.(*ElementHandle))
-				case reflect.TypeOf(sobek.Object{}).Kind():
-					obj := values.ToObject(rt)
-					opt := SelectOption{}
-					for _, k := range obj.Keys() {
-						switch k {
-						case "value":
-							opt.Value = new(string)
-							*opt.Value = obj.Get(k).String()
-						case "label":
-							opt.Label = new(string)
-							*opt.Label = obj.Get(k).String()
-						case "index":
-							opt.Index = new(int64)
-							*opt.Index = obj.Get(k).ToInteger()
-						}
-					}
-					opts = append(opts, &opt)
-				case reflect.String:
+		case reflect.Slice:
+			var sl []interface{}
+			if err := rt.ExportTo(values, &sl); err != nil {
+				return nil, fmt.Errorf("options: expected array, got %T", values)
+			}
+
+			for _, item := range sl {
+				switch item := item.(type) {
+				case string:
 					opt := SelectOption{Value: new(string)}
-					*opt.Value = item.String()
+					*opt.Value = item
 					opts = append(opts, &opt)
+				case map[string]interface{}:
+					opt, err := extractSelectOptionFromMap(item)
+					if err != nil {
+						return nil, err
+					}
+
+					opts = append(opts, opt)
+				default:
+					return nil, fmt.Errorf("options: expected string or object, got %T", item)
 				}
 			}
+		case reflect.Map:
+			var raw map[string]interface{}
+			if err := rt.ExportTo(values, &raw); err != nil {
+				return nil, fmt.Errorf("options: expected object, got %T", values)
+			}
+
+			opt, err := extractSelectOptionFromMap(raw)
+			if err != nil {
+				return nil, err
+			}
+
+			opts = append(opts, opt)
 		case reflect.TypeOf(&ElementHandle{}).Kind():
 			opts = append(opts, t.(*ElementHandle))
 		case reflect.TypeOf(sobek.Object{}).Kind():
@@ -544,6 +547,8 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 			opt := SelectOption{Value: new(string)}
 			*opt.Value = t.(string)
 			opts = append(opts, &opt)
+		default:
+			return nil, fmt.Errorf("options: unsupported type %T", values)
 		}
 
 		return opts, nil
@@ -573,6 +578,44 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 		}
 	}
 	return result, nil
+}
+
+func extractSelectOptionFromMap(v map[string]interface{}) (*SelectOption, error) {
+	opt := &SelectOption{}
+	for k, raw := range v {
+		switch k {
+		case "value":
+			opt.Value = new(string)
+
+			v, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("options[%v]: expected string, got %T", k, raw)
+			}
+
+			*opt.Value = v
+		case "label":
+			opt.Label = new(string)
+
+			v, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("options[%v]: expected string, got %T", k, raw)
+			}
+			*opt.Label = v
+		case "index":
+			opt.Index = new(int64)
+
+			switch raw := raw.(type) {
+			case int:
+				*opt.Index = int64(raw)
+			case int64:
+				*opt.Index = raw
+			default:
+				return nil, fmt.Errorf("options[%v]: expected int, got %T", k, raw)
+			}
+		}
+	}
+
+	return opt, nil
 }
 
 func (h *ElementHandle) selectText(apiCtx context.Context) error {
