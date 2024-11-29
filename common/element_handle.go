@@ -13,10 +13,12 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/grafana/sobek"
+	"go.opentelemetry.io/otel/attribute"
+
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6ext"
+
 	k6common "go.k6.io/k6/js/common"
-	"go.opentelemetry.io/otel/attribute"
 )
 
 const (
