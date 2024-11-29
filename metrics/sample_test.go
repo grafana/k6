@@ -137,7 +137,6 @@ func testPushIfNotDoneRace() {
 	}()
 
 	time.AfterFunc(time.Millisecond*100, cancel)
-	for i := 0; i < 1000000; i++ {
-		PushIfNotDone(ctx, output, Sample{})
+	for PushIfNotDone(ctx, output, Sample{}) {
 	}
 }

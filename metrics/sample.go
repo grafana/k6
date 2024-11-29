@@ -132,8 +132,12 @@ func PushIfNotDone(ctx context.Context, output chan<- SampleContainer, sample Sa
 	if ctx.Err() != nil {
 		return false
 	}
-	output <- sample
-	return true
+	select {
+	case <-ctx.Done():
+		return false
+	case output <- sample:
+		return true
+	}
 }
 
 // GetResolversForTrendColumns checks if passed trend columns are valid for use in
