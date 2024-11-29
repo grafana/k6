@@ -1,7 +1,9 @@
 package metrics
 
 import (
+	"context"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
@@ -109,4 +111,33 @@ func createTestTrendSink(count int) *TrendSink {
 	}
 
 	return sink
+}
+
+func TestPushIfNotDoneRace(t *testing.T) {
+	t.Parallel()
+	wg := new(sync.WaitGroup)
+	for i := 0; i < 1000; i++ {
+		wg.Add(1)
+
+		go func() {
+			defer wg.Done()
+			testPushIfNotDoneRace()
+		}()
+	}
+	wg.Done()
+}
+
+func testPushIfNotDoneRace() {
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	output := make(chan SampleContainer, 10)
+	go func() {
+		defer close(output)
+		<-ctx.Done()
+	}()
+
+	time.AfterFunc(time.Millisecond*100, cancel)
+	for i := 0; i < 1000000; i++ {
+		PushIfNotDone(ctx, output, Sample{})
+	}
 }
