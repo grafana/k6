@@ -115,7 +115,6 @@ linters:
     - prealloc
     - predeclared
     - promlinter
-    - revive
     - reassign
     - rowserrcheck
     - sqlclosecheck
