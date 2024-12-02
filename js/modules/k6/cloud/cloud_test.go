@@ -5,7 +5,6 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"gopkg.in/guregu/null.v3"
 
 	"go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
@@ -45,7 +44,7 @@ func TestGetTestRunId(t *testing.T) {
 		tRt := setupCloudTestEnv(t)
 		tRt.MoveToVUContext(&lib.State{
 			Options: lib.Options{
-				TestRunID: null.NewString("123", true),
+				Cloud: []byte(`{"testRunID": "123"}`),
 			},
 		})
 		testRunId, err := tRt.VU.Runtime().RunString(`cloud.testRunId`)

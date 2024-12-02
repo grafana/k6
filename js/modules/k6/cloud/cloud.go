@@ -6,6 +6,7 @@ import (
 
 	"github.com/grafana/sobek"
 
+	"go.k6.io/k6/cloudapi"
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 )
@@ -72,9 +73,16 @@ func (mi *ModuleInstance) testRunId() (sobek.Value, error) {
 		return sobek.Undefined(), errRunInInitContext
 	}
 
-	if !vuState.Options.TestRunID.Valid {
+	if vuState.Options.Cloud == nil {
 		return sobek.Undefined(), nil
 	}
 
-	return rt.ToValue(vuState.Options.TestRunID.String), nil
+	// We pass almost all values to zero/nil because here we only care about the cloud configuration present in options.
+	// TODO: Technically I guess we can do it only once and "cache" the value, as it shouldn't change over the test run.
+	conf, _, err := cloudapi.GetConsolidatedConfig(vuState.Options.Cloud, nil, "", nil, nil)
+	if err != nil {
+		return sobek.Undefined(), err
+	}
+
+	return rt.ToValue(conf.TestRunID.String), nil
 }

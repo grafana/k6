@@ -32,11 +32,16 @@ type Config struct {
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
-	// PushRefID represents the test run id.
-	// Note: It is a legacy name used by the backend, the code in k6 open-source
-	// references it as test run id.
-	// Currently, a renaming is not planned.
+	// PushRefID is the identifier used by Cloud systems to correlate all the things that
+	// belong to the same test run/execution. Currently, it is equivalent to the TestRunID.
+	// But, in the future, or in future solutions (e.g. Synthetic Monitoring), there might be
+	// no TestRunID and we may still need an identifier to correlate all the things.
 	PushRefID null.String `json:"pushRefID" envconfig:"K6_CLOUD_PUSH_REF_ID"`
+
+	// TestRunID is the test run id, a unique identifier across all the test runs.
+	// It might be used to correlate all the things that belong to the same test run/execution,
+	// see PushRefID for more details.
+	TestRunID null.String `json:"testRunID" envconfig:"K6_CLOUD_TEST_RUN_ID"`
 
 	// Defines the max allowed number of time series in a single batch.
 	MaxTimeSeriesInBatch null.Int `json:"maxTimeSeriesInBatch" envconfig:"K6_CLOUD_MAX_TIME_SERIES_IN_BATCH"`
@@ -120,6 +125,9 @@ func (c Config) Apply(cfg Config) Config {
 	}
 	if cfg.PushRefID.Valid {
 		c.PushRefID = cfg.PushRefID
+	}
+	if cfg.TestRunID.Valid {
+		c.TestRunID = cfg.TestRunID
 	}
 	if cfg.WebAppURL.Valid {
 		c.WebAppURL = cfg.WebAppURL

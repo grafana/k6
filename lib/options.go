@@ -311,12 +311,6 @@ type Options struct {
 	// Cloud is the configuration for the k6 Cloud, formerly known as ext.loadimpact.
 	Cloud json.RawMessage `json:"cloud,omitempty"`
 
-	// TestRunID represents the test run id.
-	// It relies on the `K6_CLOUD_PUSH_REF_ID` environment variable,
-	// because that's the variable the k6-agent uses to populates it.
-	// It is equivalent to cloudapi.Config.PushRefID.
-	TestRunID null.String `json:"testRunId" envconfig:"K6_CLOUD_PUSH_REF_ID"`
-
 	// These values are for third party collectors' benefit.
 	// Can't be set through env vars.
 	External map[string]json.RawMessage `json:"ext" ignored:"true"`
@@ -480,9 +474,6 @@ func (o Options) Apply(opts Options) Options {
 	}
 	if opts.Cloud != nil {
 		o.Cloud = opts.Cloud
-	}
-	if opts.TestRunID.Valid {
-		o.TestRunID = opts.TestRunID
 	}
 	if opts.External != nil {
 		o.External = opts.External

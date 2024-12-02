@@ -52,8 +52,16 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outpu
 		gs.Logger.Warn(warn)
 	}
 
-	logger := gs.Logger.WithFields(logrus.Fields{"output": "cloud"})
+	// If this is true, then it means that this code is being executed in the k6 Cloud.
+	// Therefore, we don't need to continue with the test run creation,
+	// as we don't need to create any test run.
+	//
+	// Precisely, the identifier of the test run is conf.TestRunID.
+	if conf.TestRunID.Valid {
+		return nil
+	}
 
+	// If not, we continue with some validations and the creation of the test run.
 	if err := validateRequiredSystemTags(test.derivedConfig.Options.SystemTags); err != nil {
 		return err
 	}
@@ -71,32 +79,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outpu
 		conf.Name = null.StringFrom(defaultTestName)
 	}
 
-	// We need to propagate the test run id to the derived config,
-	// and update the Cloud configuration that later will be used
-	// by the Cloud output.
-	setTestRunIdAndConfig := func(id null.String, conf cloudapi.Config) error {
-		raw, err := cloudConfToRawMessage(conf)
-		if err != nil {
-			return err
-		}
-
-		test.derivedConfig.TestRunID = id
-		test.derivedConfig.Collectors["cloud"] = raw
-		return nil
-	}
-
-	// If this is true, then it means that this code is being executed in the k6 Cloud.
-	// Therefore, we don't need to continue with the test run creation,
-	// as we don't need to create any test run.
-	// Precisely, the identifier of the test run is conf.PushRefID.
-	if conf.PushRefID.Valid {
-		if err := setTestRunIdAndConfig(conf.PushRefID, conf); err != nil {
-			return err
-		}
-		return nil
-	}
-
-	// If not, we continue with the creation of the test run.
 	thresholds := make(map[string][]string)
 	for name, t := range test.derivedConfig.Thresholds {
 		for _, threshold := range t.Thresholds {
@@ -142,6 +124,8 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outpu
 		Archive:    testArchive,
 	}
 
+	logger := gs.Logger.WithFields(logrus.Fields{"output": "cloud"})
+
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration())
 
@@ -155,10 +139,14 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outpu
 		conf = conf.Apply(*response.ConfigOverride)
 	}
 
-	testRunId := null.NewString(response.ReferenceID, true)
-	if err := setTestRunIdAndConfig(testRunId, conf); err != nil {
-		return err
+	conf.TestRunID = null.NewString(response.ReferenceID, true)
+
+	raw, err := cloudConfToRawMessage(conf)
+	if err != nil {
+		return fmt.Errorf("could not serialize cloud configuration: %w", err)
 	}
+
+	test.derivedConfig.Collectors["cloud"] = raw
 
 	return nil
 }

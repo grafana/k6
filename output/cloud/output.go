@@ -96,11 +96,9 @@ func newOutput(params output.Params) (*Output, error) {
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration())
 
-	testRunID := params.ScriptOptions.TestRunID.String
-
 	return &Output{
 		config:    conf,
-		testRunID: testRunID,
+		testRunID: conf.TestRunID.String,
 		client:    apiClient,
 		duration:  int64(duration / time.Second),
 		logger:    logger,
