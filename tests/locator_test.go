@@ -732,20 +732,20 @@ func TestSelectOption(t *testing.T) {
 			if (selectedValue !== 'five') {
 				throw new Error('Expected "five" but got ' + selectedValue);
 			}
-			await options.selectOption({value:'five'});
+			await options.selectOption({value:'four'});
 			selectedValue = await options.inputValue();
-			if (selectedValue !== 'five') {
-				throw new Error('Expected "five" but got ' + selectedValue);
+			if (selectedValue !== 'four') {
+				throw new Error('Expected "four" but got ' + selectedValue);
 			}
-			await options.selectOption([{label:'Five'}]);
+			await options.selectOption([{label:'One'}]);
 			selectedValue = await options.inputValue();
-			if (selectedValue !== 'five') {
-				throw new Error('Expected "five" but got ' + selectedValue);
+			if (selectedValue !== 'one') {
+				throw new Error('Expected "one" but got ' + selectedValue);
 			}
-			await options.selectOption(['five']); // Value
+			await options.selectOption(['two']); // Value
 			selectedValue = await options.inputValue();
-			if (selectedValue !== 'five') {
-				throw new Error('Expected "five" but got ' + selectedValue);
+			if (selectedValue !== 'two') {
+				throw new Error('Expected "two" but got ' + selectedValue);
 			}
 			await options.selectOption('five'); // Value
 			selectedValue = await options.inputValue();
