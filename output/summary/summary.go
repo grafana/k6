@@ -79,6 +79,26 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	// First, we store the sample data into the metrics stored at the k6 metrics registry level.
 	o.storeSample(sample)
 
+	hasThresholds := func(metric *metrics.Metric) bool {
+		return metric.Thresholds.Thresholds != nil && len(metric.Thresholds.Thresholds) > 0
+	}
+
+	printThresholds := func(metric *metrics.Metric) {
+		for _, threshold := range metric.Thresholds.Thresholds {
+			fmt.Printf("Metric=%s, Threshold=%+v\n", metric.Name, threshold)
+		}
+	}
+
+	if hasThresholds(sample.Metric) {
+		printThresholds(sample.Metric)
+	}
+
+	for _, submetric := range sample.Metric.Submetrics {
+		if hasThresholds(submetric.Metric) {
+			printThresholds(submetric.Metric)
+		}
+	}
+
 	// Then, we'll proceed to store the sample data into each group
 	// metrics. However, we need to determine whether the groups tree
 	// is within a scenario or not.

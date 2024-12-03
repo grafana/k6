@@ -5,7 +5,7 @@ export {wsTest} from './ws.js';
 
 export const options = {
 	thresholds: {
-		'http_reqs{group: ::auth}': ['count>1'],
+		'http_reqs{group: ::auth}': ['count>1', 'count<5'],
 		'http_reqs{scenario: api}': ['count>1'],
 	},
 	scenarios: {
