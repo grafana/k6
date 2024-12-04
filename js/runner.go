@@ -350,14 +350,12 @@ func (r *Runner) IsExecutable(name string) bool {
 
 // HandleSummary calls the specified summary callback, if supplied.
 func (r *Runner) HandleSummary(ctx context.Context, summary *lib.Summary, report lib.Report) (map[string]io.Reader, error) {
-	fmt.Println(report)
-
 	summaryDataForJS := summarizeMetricsToObject(summary, r.Bundle.Options, r.setupData)
 
 	out := make(chan metrics.SampleContainer, 100)
 	defer close(out)
 
-	go func() { // discard all metrics
+	go func() {         // discard all metrics
 		for range out { //nolint:revive
 		}
 	}()

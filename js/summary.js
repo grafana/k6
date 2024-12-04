@@ -539,8 +539,6 @@ function generateTextSummary(data, options, report) {
 	}
 
 	const summarizeNestedGroups = (groupName, groupData) => {
-		console.log('summarizeNestedGroups', groupName, JSON.stringify(groupData))
-
 		lines.push(metricGroupIndent + groupPrefix + ' ' + boldify(`GROUP: ${groupName}`) + '\n')
 		forEach(groupData.metrics, (sectionName, sectionMetrics) => {
 			// If there are no metrics in this section, skip it

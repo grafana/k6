@@ -98,6 +98,19 @@ func NewReportChecks() *ReportChecks {
 	}
 }
 
+type ReportThreshold struct {
+	Source string       `js:"source"`
+	Metric ReportMetric `js:"metric"`
+	Ok     bool         `js:"ok"`
+}
+
+type ReportThresholds map[string][]*ReportThreshold
+
+func NewReportThresholds() ReportThresholds {
+	thresholds := make(ReportThresholds)
+	return thresholds
+}
+
 type ReportGroup struct {
 	Checks  *ReportChecks // Not always present, thus we use a pointer.
 	Metrics ReportMetrics
@@ -112,12 +125,14 @@ func NewReportGroup() ReportGroup {
 }
 
 type Report struct {
+	ReportThresholds
 	ReportGroup
 	Scenarios map[string]ReportGroup
 }
 
 func NewReport() Report {
 	return Report{
+		ReportThresholds: NewReportThresholds(),
 		ReportGroup: ReportGroup{
 			Metrics: NewReportMetrics(),
 			Groups:  make(map[string]ReportGroup),

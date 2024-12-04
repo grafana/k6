@@ -10,6 +10,7 @@ import (
 )
 
 type dataModel struct {
+	thresholds
 	aggregatedGroupData
 	scenarios map[string]aggregatedGroupData
 }
@@ -21,12 +22,26 @@ func newDataModel() dataModel {
 	}
 }
 
-func (d dataModel) groupDataFor(scenario string) aggregatedGroupData {
+func (d *dataModel) groupDataFor(scenario string) aggregatedGroupData {
 	if groupData, exists := d.scenarios[scenario]; exists {
 		return groupData
 	}
 	d.scenarios[scenario] = newAggregatedGroupData()
 	return d.scenarios[scenario]
+}
+
+func (d *dataModel) storeThresholdsFor(m *metrics.Metric) {
+	for _, threshold := range m.Thresholds.Thresholds {
+		d.thresholds = append(d.thresholds, struct {
+			*metrics.Threshold
+			Metric *metrics.Metric
+		}{Metric: m, Threshold: threshold})
+	}
+}
+
+type thresholds []struct {
+	*metrics.Threshold
+	Metric *metrics.Metric
 }
 
 type aggregatedGroupData struct {
@@ -76,11 +91,9 @@ type aggregatedMetricData map[string]aggregatedMetric
 // report's aggregatedMetricData point directly to a metric in the k6 registry, and relies on that specific pointed
 // at metrics internal state for its computations.
 func (a aggregatedMetricData) relayMetricFrom(sample metrics.Sample) {
-	if _, exists := a[sample.Metric.Name]; !exists {
-		a[sample.Metric.Name] = aggregatedMetric{
-			Metric: sample.Metric,
-			Sink:   sample.Metric.Sink,
-		}
+	a[sample.Metric.Name] = aggregatedMetric{
+		Metric: sample.Metric,
+		Sink:   sample.Metric.Sink,
 	}
 }
 
@@ -150,6 +163,7 @@ func populateReportGroup(
 	// First, we populate the checks metrics, which are treated independently.
 	populateReportChecks(reportGroup, groupData, testRunDuration, summaryTrendStats)
 
+	// Then, we store the metrics.
 	storeMetric := func(dest lib.ReportMetrics, info lib.ReportMetricInfo, sink metrics.Sink, testDuration time.Duration, summaryTrendStats []string) {
 		reportMetric := lib.NewReportMetricFrom(info, sink, testDuration, summaryTrendStats)
 
@@ -189,11 +203,41 @@ func populateReportGroup(
 		)
 	}
 
+	// Finally, we keep moving down the hierarchy and populate the nested groups.
 	for groupName, subGroupData := range groupData.groupsData {
 		subReportGroup := lib.NewReportGroup()
 		populateReportGroup(&subReportGroup, subGroupData, testRunDuration, summaryTrendStats)
 		reportGroup.Groups[groupName] = subReportGroup
 	}
+}
+
+func reportThresholds(
+	thresholds thresholds,
+	testRunDuration time.Duration,
+	summaryTrendStats []string,
+) lib.ReportThresholds {
+	rts := make(map[string][]*lib.ReportThreshold, len(thresholds))
+	for _, threshold := range thresholds {
+		metric := threshold.Metric
+		if _, exists := rts[metric.Name]; !exists {
+			rts[metric.Name] = make([]*lib.ReportThreshold, 0)
+		}
+		rts[metric.Name] = append(rts[metric.Name], &lib.ReportThreshold{
+			Source: threshold.Source,
+			Metric: lib.NewReportMetricFrom(
+				lib.ReportMetricInfo{
+					Name:     metric.Name,
+					Type:     metric.Type.String(),
+					Contains: metric.Contains.String(),
+				},
+				metric.Sink,
+				testRunDuration,
+				summaryTrendStats,
+			),
+			Ok: !threshold.LastFailed,
+		})
+	}
+	return rts
 }
 
 // FIXME: This function is a bit flurry, we should consider refactoring it.

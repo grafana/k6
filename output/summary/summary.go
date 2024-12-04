@@ -1,7 +1,6 @@
 package summary
 
 import (
-	"fmt"
 	"strings"
 	"sync/atomic"
 	"time"
@@ -53,15 +52,6 @@ func (o *Output) Start() error {
 
 func (o *Output) Stop() error {
 	o.periodicFlusher.Stop()
-
-	for groupName, aggregatedData := range o.dataModel.groupsData {
-		o.logger.Warning(groupName)
-
-		for metricName, sink := range aggregatedData.aggregatedMetrics {
-			o.logger.Warning(fmt.Sprintf("  %s: %+v", metricName, sink))
-		}
-	}
-
 	return nil
 }
 
@@ -79,26 +69,6 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	// First, we store the sample data into the metrics stored at the k6 metrics registry level.
 	o.storeSample(sample)
 
-	hasThresholds := func(metric *metrics.Metric) bool {
-		return metric.Thresholds.Thresholds != nil && len(metric.Thresholds.Thresholds) > 0
-	}
-
-	printThresholds := func(metric *metrics.Metric) {
-		for _, threshold := range metric.Thresholds.Thresholds {
-			fmt.Printf("Metric=%s, Threshold=%+v\n", metric.Name, threshold)
-		}
-	}
-
-	if hasThresholds(sample.Metric) {
-		printThresholds(sample.Metric)
-	}
-
-	for _, submetric := range sample.Metric.Submetrics {
-		if hasThresholds(submetric.Metric) {
-			printThresholds(submetric.Metric)
-		}
-	}
-
 	// Then, we'll proceed to store the sample data into each group
 	// metrics. However, we need to determine whether the groups tree
 	// is within a scenario or not.
@@ -109,17 +79,17 @@ func (o *Output) flushSample(sample metrics.Sample) {
 	}
 
 	if groupTag, exists := sample.Tags.Get("group"); exists && len(groupTag) > 0 {
-		normalizedGroupName := strings.TrimPrefix(groupTag, "::")
-		groupNames := strings.Split(normalizedGroupName, "::")
+		normalizedGroupName := strings.TrimPrefix(groupTag, lib.GroupSeparator)
+		groupNames := strings.Split(normalizedGroupName, lib.GroupSeparator)
 
-		for i, groupName := range groupNames {
+		// We traverse over all the groups to create a nested structure,
+		// but we only add the sample to the group the sample belongs to,
+		// cause by definition every group is independent.
+		for _, groupName := range groupNames {
 			groupData.groupDataFor(groupName)
-			groupData.groupsData[groupName].addSample(sample)
-
-			if i < len(groupNames)-1 {
-				groupData = groupData.groupsData[groupName]
-			}
+			groupData = groupData.groupsData[groupName]
 		}
+		groupData.addSample(sample)
 	}
 }
 
@@ -128,6 +98,9 @@ func (o *Output) MetricsReport(summary *lib.Summary, options lib.Options) lib.Re
 
 	testRunDuration := summary.TestRunDuration
 	summaryTrendStats := options.SummaryTrendStats
+
+	// Populate the thresholds.
+	report.ReportThresholds = reportThresholds(o.dataModel.thresholds, testRunDuration, summaryTrendStats)
 
 	// Populate root group and nested groups recursively.
 	populateReportGroup(
@@ -156,7 +129,16 @@ func (o *Output) MetricsReport(summary *lib.Summary, options lib.Options) lib.Re
 //
 // If it's a check-specific metric, it will also update the check's pass/fail counters.
 func (o *Output) storeSample(sample metrics.Sample) {
-	o.dataModel.aggregatedMetrics.relayMetricFrom(sample)
+	// If it's the first time we see this metric, we relay the metric from the sample
+	// and, we store the thresholds for that particular metric, and its sub-metrics.
+	if _, exists := o.dataModel.aggregatedMetrics[sample.Metric.Name]; !exists {
+		o.dataModel.aggregatedMetrics.relayMetricFrom(sample)
+
+		o.dataModel.storeThresholdsFor(sample.Metric)
+		for _, sub := range sample.Metric.Submetrics {
+			o.dataModel.storeThresholdsFor(sub.Metric)
+		}
+	}
 
 	if checkName, hasCheckTag := sample.Tags.Get(metrics.TagCheck.String()); hasCheckTag && sample.Metric.Name == metrics.ChecksName {
 		check := o.dataModel.checks.checkFor(checkName)
