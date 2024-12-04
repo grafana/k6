@@ -1,4 +1,6 @@
 /**
+ * @typedef {{source: string, ok: boolean}} Threshold
+ * @typedef {{name: string, type: string, contains: string, values: Record<string, number>, thresholds?: Threshold[]}} ReportMetric
  * @typedef {{sortByName: boolean, bold: boolean, indent: string, metricsBlockIndent: string}} DisplayOptions
  */
 var forEach = function (obj, callback) {
@@ -244,6 +246,7 @@ function nonTrendMetricValueForSum(metric, timeUnit) {
 	}
 }
 
+// FIXME (@oleiade) split this code up for reusability (for instance in the summarizeThreshold function below)
 function summarizeMetrics(options, data, decorate) {
 	var indent = options.indent + ' '
 	var result = []
@@ -387,6 +390,146 @@ function summarizeMetrics(options, data, decorate) {
 	return result
 }
 
+/**
+ * @typedef {{metrics: Record<string, ReportMetric>}} ReportData
+ *
+ * @param options
+ * @param {ReportData} data
+ * @param decorate
+ * @returns {string[]}
+ */
+function summarizeMetricsWithThresholds(options, data, decorate) {
+	var indent = options.indent + ' '
+	var result = []
+
+	var names = []
+	var nameLenMax = 0
+
+	var nonTrendValues = {}
+	var nonTrendValueMaxLen = 0
+	var nonTrendExtras = {}
+	var nonTrendExtraMaxLens = [0, 0]
+
+	var trendCols = {}
+	var numTrendColumns = options.summaryTrendStats.length
+	var trendColMaxLens = new Array(numTrendColumns).fill(0)
+	forEach(data.metrics, function (name, metric) {
+		names.push(name)
+		// When calculating widths for metrics, account for the indentation on submetrics.
+		var displayNameWidth = strWidth(name)
+		if (displayNameWidth > nameLenMax) {
+			nameLenMax = displayNameWidth
+		}
+
+		if (metric.type == 'trend') {
+			var cols = []
+			for (var i = 0; i < numTrendColumns; i++) {
+				var tc = options.summaryTrendStats[i]
+				var value = metric.values[tc]
+				if (tc === 'count') {
+					value = value.toString()
+				} else {
+					value = humanizeValue(value, metric, options.summaryTimeUnit)
+				}
+				var valLen = strWidth(value)
+				if (valLen > trendColMaxLens[i]) {
+					trendColMaxLens[i] = valLen
+				}
+				cols[i] = value
+			}
+			trendCols[name] = cols
+			return
+		}
+		var values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
+		nonTrendValues[name] = values[0]
+		var valueLen = strWidth(values[0])
+		if (valueLen > nonTrendValueMaxLen) {
+			nonTrendValueMaxLen = valueLen
+		}
+		nonTrendExtras[name] = values.slice(1)
+		for (var i = 1; i < values.length; i++) {
+			var extraLen = strWidth(values[i])
+			if (extraLen > nonTrendExtraMaxLens[i - 1]) {
+				nonTrendExtraMaxLens[i - 1] = extraLen
+			}
+		}
+	})
+
+	// sort all metrics but keep sub metrics grouped with their parent metrics
+	if (options.sortByName) {
+		names.sort(function (metric1, metric2) {
+			var parent1 = metric1.split('{', 1)[0]
+			var parent2 = metric2.split('{', 1)[0]
+			var result = parent1.localeCompare(parent2)
+			if (result !== 0) {
+				return result
+			}
+			var sub1 = metric1.substring(parent1.length)
+			var sub2 = metric2.substring(parent2.length)
+			return sub1.localeCompare(sub2)
+		})
+	}
+
+	var getData = function (name) {
+		if (trendCols.hasOwnProperty(name)) {
+			var cols = trendCols[name]
+			var tmpCols = new Array(numTrendColumns)
+			for (var i = 0; i < cols.length; i++) {
+				tmpCols[i] =
+					options.summaryTrendStats[i] +
+					'=' +
+					decorate(cols[i], palette.cyan) +
+					' '.repeat(trendColMaxLens[i] - strWidth(cols[i]))
+			}
+			return tmpCols.join(' ')
+		}
+
+		var value = nonTrendValues[name]
+		var fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
+
+		var extras = nonTrendExtras[name]
+		if (extras.length == 1) {
+			fmtData = fmtData + ' ' + decorate(extras[0], palette.cyan, palette.faint)
+		} else if (extras.length > 1) {
+			var parts = new Array(extras.length)
+			for (var i = 0; i < extras.length; i++) {
+				parts[i] =
+					decorate(extras[i], palette.cyan, palette.faint) +
+					' '.repeat(nonTrendExtraMaxLens[i] - strWidth(extras[i]))
+			}
+			fmtData = fmtData + ' ' + parts.join(' ')
+		}
+
+		return fmtData
+	}
+
+	for (var name of names) {
+		var metric = data.metrics[name]
+		var mark = ' '
+		var markColor = function (text) {
+			return text
+		} // noop
+
+		var fmtName =
+			name +
+			decorate(
+				'.'.repeat(nameLenMax - strWidth(name) + 3) + ':',
+				palette.faint
+			)
+
+		result.push(indent + markColor(mark) + ' ' + fmtName + ' ' + getData(name))
+		if (metric.thresholds) {
+			forEach(metric.thresholds, function (name, threshold) {
+				const resultIndent = threshold.ok ? '    ' : '  ';
+				const thresholdResult = threshold.ok ? decorate('SATISFIED', palette.green) : decorate('UNSATISFIED', palette.red);
+				result.push(indent + indent + '  ' + thresholdResult + resultIndent + decorate(`'${threshold.source}'`, palette.faint))
+			})
+		}
+	}
+
+	return result
+}
+
 function generateTextSummary(data, options, report) {
 	var mergedOpts = Object.assign({}, defaultOptions, data.options, options)
 	var lines = []
@@ -474,13 +617,12 @@ function generateTextSummary(data, options, report) {
 		lines.push('')
 	}
 
-
 	/**
 	 *
 	 * @param {Object[]} checks
 	 * @param {Partial<DisplayOptions>} opts
 	 */
-	const displayChecks = (checks, opts = { indent: '' }) => {
+	const displayChecks = (checks, opts = {indent: ''}) => {
 		if (checks === undefined || checks === null) {
 			return
 		}
@@ -493,12 +635,44 @@ function generateTextSummary(data, options, report) {
 		}
 	}
 
-	// START OF GLOBAL RESULTS
-	// TITLE
-	lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify('GLOBAL RESULTS') + '\n')
+	/**
+	 * @typedef {{name: string, type: string, contains: string, values: Record<string, number>}} Metric
+	 * @typedef {{metric: Metric, thresholds: Threshold[]}} ReportThreshold
+	 *
+	 * @param {Record<string, ReportThreshold>} thresholds
+	 * @param {Partial<DisplayOptions>} opts
+	 */
+	const displayThresholds = (thresholds, opts = {indent: ''}) => {
+		if (thresholds === undefined || thresholds === null) {
+			return
+		}
+
+		lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify('THRESHOLDS') + '\n')
+
+		const mergedOpts = Object.assign({}, defaultOptions, data.options, options)
+
+		let metrics = {};
+		forEach(thresholds, (_, threshold) => {
+			metrics[threshold.metric.name] = {...threshold.metric, thresholds: threshold.thresholds}
+		});
+
+		Array.prototype.push.apply(lines, summarizeMetricsWithThresholds(
+			{...mergedOpts, indent: mergedOpts.indent + defaultIndent},
+			{metrics},
+			decorate),
+		)
+		lines.push('')
+	};
+
+	// THRESHOLDS
+	displayThresholds(report.thresholds)
+
+	// TOTAL RESULTS
+	lines.push(metricGroupIndent + groupPrefix + defaultIndent + boldify('TOTAL RESULTS') + '\n')
 
 	// CHECKS
 	displayChecks(report.checks)
+
 	// METRICS
 	forEach(report.metrics, (sectionName, sectionMetrics) => {
 		// If there are no metrics in this section, skip it
@@ -509,16 +683,9 @@ function generateTextSummary(data, options, report) {
 		displayMetricsBlockName(sectionName)
 		displayMetricsBlock(sectionMetrics)
 	})
-	// END OF GLOBAL RESULTS
+	// END OF TOTAL RESULTS
 
 	// GROUPS
-	/**
-	 *
-	 * @typedef {Object} GroupData
-	 * @param groupName string
-	 * @param groupData
-	 */
-
 	const summarize = (prefix, indent) => {
 		return (groupName, groupData) => {
 			lines.push(metricGroupIndent + indent + prefix + defaultIndent + boldify(`GROUP: ${groupName}`) + '\n')
@@ -577,14 +744,6 @@ function generateTextSummary(data, options, report) {
 			}
 		})
 	}
-
-
-	Array.prototype.push.apply(
-		lines,
-		summarizeGroup(mergedOpts.indent + '    ', data.root_group, decorate)
-	)
-
-	Array.prototype.push.apply(lines, summarizeMetrics(mergedOpts, data, decorate))
 
 	return lines.join('\n')
 }

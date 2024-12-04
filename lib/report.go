@@ -99,12 +99,16 @@ func NewReportChecks() *ReportChecks {
 }
 
 type ReportThreshold struct {
-	Source string       `js:"source"`
-	Metric ReportMetric `js:"metric"`
-	Ok     bool         `js:"ok"`
+	Source string `js:"source"`
+	Ok     bool   `js:"ok"`
 }
 
-type ReportThresholds map[string][]*ReportThreshold
+type MetricThresholds struct {
+	Metric     ReportMetric      `js:"metric"`
+	Thresholds []ReportThreshold `js:"thresholds"`
+}
+
+type ReportThresholds map[string]MetricThresholds
 
 func NewReportThresholds() ReportThresholds {
 	thresholds := make(ReportThresholds)
@@ -125,7 +129,7 @@ func NewReportGroup() ReportGroup {
 }
 
 type Report struct {
-	ReportThresholds
+	ReportThresholds `js:"thresholds"`
 	ReportGroup
 	Scenarios map[string]ReportGroup
 }

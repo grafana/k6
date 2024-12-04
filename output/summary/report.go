@@ -216,26 +216,31 @@ func reportThresholds(
 	testRunDuration time.Duration,
 	summaryTrendStats []string,
 ) lib.ReportThresholds {
-	rts := make(map[string][]*lib.ReportThreshold, len(thresholds))
+	rts := make(map[string]lib.MetricThresholds, len(thresholds))
 	for _, threshold := range thresholds {
 		metric := threshold.Metric
-		if _, exists := rts[metric.Name]; !exists {
-			rts[metric.Name] = make([]*lib.ReportThreshold, 0)
+
+		mt, exists := rts[metric.Name]
+		if !exists {
+			mt = lib.MetricThresholds{
+				Metric: lib.NewReportMetricFrom(
+					lib.ReportMetricInfo{
+						Name:     metric.Name,
+						Type:     metric.Type.String(),
+						Contains: metric.Contains.String(),
+					},
+					metric.Sink,
+					testRunDuration,
+					summaryTrendStats,
+				),
+			}
 		}
-		rts[metric.Name] = append(rts[metric.Name], &lib.ReportThreshold{
+
+		mt.Thresholds = append(rts[metric.Name].Thresholds, lib.ReportThreshold{
 			Source: threshold.Source,
-			Metric: lib.NewReportMetricFrom(
-				lib.ReportMetricInfo{
-					Name:     metric.Name,
-					Type:     metric.Type.String(),
-					Contains: metric.Contains.String(),
-				},
-				metric.Sink,
-				testRunDuration,
-				summaryTrendStats,
-			),
-			Ok: !threshold.LastFailed,
+			Ok:     !threshold.LastFailed,
 		})
+		rts[metric.Name] = mt
 	}
 	return rts
 }
