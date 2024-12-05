@@ -40,17 +40,33 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 
 	details := consts.VersionDetails()
 	if exts := ext.GetAll(); len(exts) > 0 {
-		ext := make([]map[string]string, 0, len(exts))
-		for _, e := range exts {
-			ext = append(ext, map[string]string{
-				"name":    e.Name,
-				"type":    e.Type.String(),
-				"version": e.Version,
-				"path":    e.Path,
-			})
+		type extInfo struct {
+			Module  string   `json:"module"`
+			Version string   `json:"version"`
+			Imports []string `json:"imports"`
 		}
 
-		details["extensions"] = ext
+		ext := make(map[string]extInfo)
+		for _, e := range exts {
+			if v, ok := ext[e.Path]; ok {
+				v.Imports = append(v.Imports, e.Name)
+				ext[e.Path] = v
+				continue
+			}
+
+			ext[e.Path] = extInfo{
+				Module:  e.Path,
+				Version: e.Version,
+				Imports: []string{e.Name},
+			}
+		}
+
+		list := make([]extInfo, 0, len(ext))
+		for _, v := range ext {
+			list = append(list, v)
+		}
+
+		details["extensions"] = list
 	}
 
 	jsonDetails, err := json.Marshal(details)
