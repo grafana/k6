@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
 	"strings"
 
@@ -24,16 +25,54 @@ func versionString() string {
 	return v
 }
 
-func getCmdVersion(_ *state.GlobalState) *cobra.Command {
-	// versionCmd represents the version command.
-	return &cobra.Command{
+type versionCmd struct {
+	gs     *state.GlobalState
+	isJSON bool
+}
+
+func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
+	if !c.isJSON {
+		root := cmd.Root()
+		root.SetArgs([]string{"--version"})
+		_ = root.Execute()
+		return nil
+	}
+
+	details := consts.VersionDetails()
+	if exts := ext.GetAll(); len(exts) > 0 {
+		ext := make([]map[string]string, 0, len(exts))
+		for _, e := range exts {
+			ext = append(ext, map[string]string{
+				"name":    e.Name,
+				"type":    e.Type.String(),
+				"version": e.Version,
+				"path":    e.Path,
+			})
+		}
+
+		details["extensions"] = ext
+	}
+
+	jsonDetails, err := json.Marshal(details)
+	if err != nil {
+		return fmt.Errorf("failed produce a JSON version details: %w", err)
+	}
+
+	_, err = fmt.Fprintln(c.gs.Stdout, string(jsonDetails))
+	return err
+}
+
+func getCmdVersion(gs *state.GlobalState) *cobra.Command {
+	versionCmd := &versionCmd{gs: gs}
+
+	cmd := &cobra.Command{
 		Use:   "version",
 		Short: "Show application version",
 		Long:  `Show the application version and exit.`,
-		Run: func(cmd *cobra.Command, _ []string) {
-			root := cmd.Root()
-			root.SetArgs([]string{"--version"})
-			_ = root.Execute()
-		},
+		RunE:  versionCmd.run,
 	}
+
+	cmd.Flags().BoolVar(&versionCmd.isJSON, "json", false, "if set, output version information will be in JSON format")
+
+	return cmd
 }
