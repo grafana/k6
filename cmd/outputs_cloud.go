@@ -21,26 +21,16 @@ import (
 
 const defaultTestName = "k6 test"
 
-func findCloudOutput(outputs []string) (string, string, bool) {
-	for _, outFullArg := range outputs {
-		outType, outArg, _ := strings.Cut(outFullArg, "=")
-		if outType == builtinOutputCloud.String() {
-			return outType, outArg, true
-		}
-	}
-	return "", "", false
-}
-
 // createCloudTest performs some test and Cloud configuration validations and if everything
 // looks good, then it creates a test run in the k6 Cloud, unless k6 is already running in the Cloud.
 // It is also responsible for filling the test run id on the test options, so it can be used later.
 // It returns the resulting Cloud configuration as a json.RawMessage, as expected by the Cloud output,
 // or an error if something goes wrong.
-func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outputType, outputArg string) error {
+func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
-		test.derivedConfig.Collectors[outputType],
+		test.derivedConfig.Collectors[builtinOutputCloud.String()],
 		gs.Env,
-		outputArg,
+		"", // Historically used for -o cloud=..., no longer used (deprecated).
 		test.derivedConfig.Options.Cloud,
 		test.derivedConfig.Options.External,
 	)
@@ -124,7 +114,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outpu
 		Archive:    testArchive,
 	}
 
-	logger := gs.Logger.WithFields(logrus.Fields{"output": "cloud"})
+	logger := gs.Logger.WithFields(logrus.Fields{"output": builtinOutputCloud.String()})
 
 	apiClient := cloudapi.NewClient(
 		logger, conf.Token.String, conf.Host.String, consts.Version, conf.Timeout.TimeDuration())
@@ -146,7 +136,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest, outpu
 		return fmt.Errorf("could not serialize cloud configuration: %w", err)
 	}
 
-	test.derivedConfig.Collectors["cloud"] = raw
+	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
 
 	return nil
 }

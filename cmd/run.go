@@ -123,15 +123,6 @@ func (c *cmdRun) run(cmd *cobra.Command, args []string) (err error) {
 		}
 	}
 
-	// Although outputs are created below, is at this point, before building
-	// the test run state, when we want to create the Cloud test run, if needed
-	// so that we can set the test run ID on the test options.
-	if outType, outArg, found := findCloudOutput(test.derivedConfig.Out); found {
-		if err := createCloudTest(c.gs, test, outType, outArg); err != nil {
-			return fmt.Errorf("could not create the '%s' output: %w", outType, err)
-		}
-	}
-
 	// Write the full consolidated *and derived* options back to the Runner.
 	conf := test.derivedConfig
 	testRunState, err := test.buildTestRunState(conf.Options)

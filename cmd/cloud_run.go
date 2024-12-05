@@ -131,6 +131,25 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
+		// We know this execution requires a test run to be created in the Cloud.
+		// So, we create it before delegating the actual execution to the run command.
+		// To do that, we need to load the test and configure it.
+		test, err := loadAndConfigureLocalTest(c.runCmd.gs, cmd, args, getCloudRunLocalExecutionConfig)
+		if err != nil {
+			return fmt.Errorf("could not load and configure the test: %w", err)
+		}
+
+		// As we've already loaded the test, we can modify the init function to
+		// reuse the initialized one.
+		c.runCmd.loadConfiguredTest = func(*cobra.Command, []string) (*loadedAndConfiguredTest, execution.Controller, error) {
+			return test, local.NewController(), nil
+		}
+
+		// After that, we can create the remote test run.
+		if err := createCloudTest(c.runCmd.gs, test); err != nil {
+			return fmt.Errorf("could not create the cloud test run: %w", err)
+		}
+
 		return c.runCmd.run(cmd, args)
 	}
 
