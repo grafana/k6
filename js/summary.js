@@ -1,7 +1,70 @@
 /**
- * @typedef {{source: string, ok: boolean}} Threshold
- * @typedef {{name: string, type: string, contains: string, values: Record<string, number>, thresholds?: Threshold[]}} ReportMetric
- * @typedef {{sortByName: boolean, bold: boolean, indent: string, metricsBlockIndent: string}} DisplayOptions
+ * @typedef {Object} Threshold
+ * @property {string} source - The threshold expression source.
+ * @property {boolean} ok - Whether the threshold was satisfied or not.
+ */
+
+/**
+ * @typedef {Object} Check
+ * @property {string} id - The check ID.
+ * @property {string} name - The check name.
+ * @property {string} path - The check path.
+ * @property {number} passes - The number of successful checks.
+ * @property {number} fails - The number of failed checks.
+ */
+
+/**
+ * @typedef {Object} ReportMetric
+ * @property {string} name - The metric name.
+ * @property {string} type - The type of the metric (e.g., "counter", "gauge", "rate", "trend").
+ * @property {string} contains - The type of data contained in the metric (e.g., "time", "data", "default").
+ * @property {Record<string, number>} values - Key-value pairs of metric statistics (e.g. min, max, avg).
+ * @property {Threshold[]} [thresholds] - Optional array of thresholds associated with this metric.
+ */
+
+/**
+ * @typedef {Object} ReportThreshold
+ * @property {string} source - The threshold expression source.
+ * @property {boolean} ok - Whether the threshold was satisfied or not.
+ */
+
+/**
+ * @typedef {Object} ReportChecksMetrics
+ * @property {ReportMetric[]} total - The total metrics.
+ * @property {ReportMetric} success - The successful metrics.
+ * @property {ReportMetric} fail - The failed metrics.
+ */
+
+/**
+ * @typedef {Object} MetricThresholds
+ * @property {ReportMetric} metric - The metric object.
+ * @property {ReportThreshold[]} thresholds - The thresholds for the metric.
+ */
+
+/**
+ * @typedef {Object} ReportChecks
+ * @property {ReportChecksMetrics} metrics - The metrics for checks.
+ * @property {Check[]} ordered_checks - The ordered checks.
+ */
+
+/**
+ * @typedef {Object} DisplayOptions
+ * @property {boolean} sortByName - Whether metrics should be sorted by name.
+ * @property {boolean} bold - Whether to display section names in bold.
+ * @property {string} indent - Indentation string for the output.
+ * @property {string} metricsBlockIndent - Additional indentation for metrics blocks.
+ */
+
+/**
+ * @typedef {Object} ReportData
+ * @property {Record<string, ReportMetric>} metrics - Collection of metrics keyed by their names.
+ */
+
+/**
+ * A simple iteration utility function for objects.
+ *
+ * @param {Object} obj - the object to iterate over
+ * @param {(key: string, value: any) => (boolean|void)} callback - Callback invoked with (key, value)
  */
 var forEach = function (obj, callback) {
 	for (var key in obj) {
@@ -13,6 +76,7 @@ var forEach = function (obj, callback) {
 	}
 }
 
+/** A palette of ANSI color codes for terminal output. */
 var palette = {
 	bold: 1,
 	faint: 2,
@@ -34,8 +98,13 @@ var defaultOptions = {
 	sortByName: true,
 }
 
-// strWidth tries to return the actual width the string will take up on the
-// screen, without any terminal formatting, unicode ligatures, etc.
+/**
+ * Compute the width of a string as displayed in a terminal, excluding ANSI codes, terminal
+ * formatting, Unicode ligatures, etc.
+ *
+ * @param {string} s - The string to measure
+ * @returns {number} The display width of the string
+ */
 function strWidth(s) {
 	// TODO: determine if NFC or NFKD are not more appropriate? or just give up? https://hsivonen.fi/string-length/
 	var data = s.normalize('NFKC') // This used to be NFKD in Go, but this should be better
@@ -73,6 +142,14 @@ function strWidth(s) {
 	return width
 }
 
+/**
+ * Summarizes single check result.
+ *
+ * @param {string} indent
+ * @param {{name: string, passes: number, fails: number}} check - The check object with name, passes and fails
+ * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors.
+ * @returns {string} - A formatted line summarizing the check.
+ */
 function summarizeCheck(indent, check, decorate) {
 	if (check.fails == 0) {
 		return decorate(indent + succMark + ' ' + check.name, palette.green)
@@ -102,6 +179,14 @@ function summarizeCheck(indent, check, decorate) {
 	)
 }
 
+/**
+ * Summarizes a group of checks, recursively handling nested groups.
+ *
+ * @param {string} indent -The indentation for the group.
+ * @param {{name: string, checks: Object[], groups: Object[]}} group - Group object with name, checks, and subgroups.
+ * @param {(text: string, ...colors: number[]) => string} decorate = Function to decorate text with ANSI colors.
+ * @returns {string[]} - An array of formatted lines summarizing the group and its checks
+ */
 function summarizeGroup(indent, group, decorate) {
 	var result = []
 	if (group.name != '') {
@@ -122,6 +207,12 @@ function summarizeGroup(indent, group, decorate) {
 	return result
 }
 
+/**
+ * Extracts a display name for a metric, handling sub-metrics (e.g. "metric{sub}" -> "{ sub }").
+ *
+ * @param {string} name - The metric name.
+ * @returns {string} - The display name
+ */
 function displayNameForMetric(name) {
 	var subMetricPos = name.indexOf('{')
 	if (subMetricPos >= 0) {
@@ -130,6 +221,12 @@ function displayNameForMetric(name) {
 	return name
 }
 
+/**
+ * Determines the indentation for a metric line based on whether it has submetrics.
+ *
+ * @param {string} name - The metric name.
+ * @returns {string} - Indentation string.
+ */
 function indentForMetric(name) {
 	if (name.indexOf('{') >= 0) {
 		return '  '
@@ -137,6 +234,12 @@ function indentForMetric(name) {
 	return ''
 }
 
+/**
+ * Converts a number of bytes into a human-readable string with units.
+ *
+ * @param {number} bytes - The number of bytes.
+ * @returns {string} A human-readable string (e.g. "10 kB").
+ */
 function humanizeBytes(bytes) {
 	var units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
 	var base = 1000
@@ -156,16 +259,37 @@ var unitMap = {
 	us: {unit: 'µs', coef: 1000},
 }
 
+/**
+ * Converts a number to a fixed decimal string, removing trailing zeros.
+ *
+ * @param {number} val - The number to convert.
+ * @param {number} prec - Decimal precision.
+ * @returns {string} A string representation of the number without trailing zeros.
+ */
 function toFixedNoTrailingZeros(val, prec) {
 	// TODO: figure out something better?
 	return parseFloat(val.toFixed(prec)).toString()
 }
 
+/**
+ * Truncates a number to a certain precision without rounding, then removes trailing zeros.
+ *
+ * @param {number} val - The number to truncate.
+ * @param {number} prec - Decimal precision.
+ * @returns {string} A truncated, not rounded string representation.
+ */
 function toFixedNoTrailingZerosTrunc(val, prec) {
 	var mult = Math.pow(10, prec)
 	return toFixedNoTrailingZeros(Math.trunc(mult * val) / mult, prec)
 }
 
+/**
+ * Humanizes a duration (in milliseconds) to a human-readable string,
+ * choosing appropriate units (ns, µs, ms, s, m, h).
+ *
+ * @param {number} dur - The duration in milliseconds.
+ * @returns {string} Human-readable duration (e.g. "2.5ms", "3s", "1m30s").
+ */
 function humanizeGenericDuration(dur) {
 	if (dur === 0) {
 		return '0s'
@@ -199,6 +323,13 @@ function humanizeGenericDuration(dur) {
 	return rem + 'h' + result
 }
 
+/**
+ * Humanizes a duration according to a specified time unit or uses a generic formatting.
+ *
+ * @param {number} dur - The duration in milliseconds.
+ * @param {string|null} timeUnit - Optional time unit (e.g. "ms", "s").
+ * @returns {string} A human-readable duration string.
+ */
 function humanizeDuration(dur, timeUnit) {
 	if (timeUnit !== '' && unitMap.hasOwnProperty(timeUnit)) {
 		return (dur * unitMap[timeUnit].coef).toFixed(2) + unitMap[timeUnit].unit
@@ -207,6 +338,14 @@ function humanizeDuration(dur, timeUnit) {
 	return humanizeGenericDuration(dur)
 }
 
+/**
+ * Formats a metric value into a human-readable form, depending on the metric type and content.
+ *
+ * @param {number} val - The metric value.
+ * @param {ReportMetric} metric - The metric object.
+ * @param {string|null} timeUnit - The time unit for duration metrics.
+ * @returns {string} The humanized metric value.
+ */
 function humanizeValue(val, metric, timeUnit) {
 	if (metric.type == 'rate') {
 		// Truncate instead of round when decreasing precision to 2 decimal places
@@ -223,6 +362,13 @@ function humanizeValue(val, metric, timeUnit) {
 	}
 }
 
+/**
+ * Returns the summary values for non-trend metrics (counter, gauge, rate).
+ *
+ * @param {ReportMetric} metric - The metric to summarize.
+ * @param {string|null} timeUnit - The time unit for durations.
+ * @returns {string[]} - An array of summary values.
+ */
 function nonTrendMetricValueForSum(metric, timeUnit) {
 	switch (metric.type) {
 		case 'counter':
@@ -247,6 +393,14 @@ function nonTrendMetricValueForSum(metric, timeUnit) {
 }
 
 // FIXME (@oleiade) split this code up for reusability (for instance in the summarizeThreshold function below)
+/**
+ * Summarizes given metrics into an array of formatted lines.
+ *
+ * @param {Object} options - Display options merged with defaultOptions.
+ * @param {ReportData} data - The data object containing metrics.
+ * @param {(text: string, ...colors: number[]) => string} decorate - A decoration function for ANSI colors.
+ * @returns {string[]} Array of formatted lines.
+ */
 function summarizeMetrics(options, data, decorate) {
 	var indent = options.indent + ' '
 	var result = []
@@ -391,12 +545,12 @@ function summarizeMetrics(options, data, decorate) {
 }
 
 /**
- * @typedef {{metrics: Record<string, ReportMetric>}} ReportData
+ * Summarizes metrics and their thresholds into formatted lines.
  *
- * @param options
- * @param {ReportData} data
- * @param decorate
- * @returns {string[]}
+ * @param {Object} options - Options merged with defaults.
+ * @param {ReportData} data - The data containing metrics.
+ * @param {(text: string, ...colors: number[]) => string} decorate - Decoration function.
+ * @returns {string[]} - Array of formatted lines including threshold statuses.
  */
 function summarizeMetricsWithThresholds(options, data, decorate) {
 	var indent = options.indent + ' '
@@ -530,12 +684,27 @@ function summarizeMetricsWithThresholds(options, data, decorate) {
 	return result
 }
 
+/**
+ * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
+ *
+ * @param {Object} data - The data input for the summary (includes options, metrics, etc.).
+ * @param {Object} options - Additional options that override defaults.
+ * @param {Object} report - The report object containing thresholds, checks, metrics, groups, and scenarios.
+ * @returns {string} A formatted summary of the test results.
+ */
 function generateTextSummary(data, options, report) {
 	var mergedOpts = Object.assign({}, defaultOptions, data.options, options)
 	var lines = []
 
 	// TODO: move all of these functions into an object with methods?
-	var decorate = function (text) {
+	/**
+	 * Decorates text with ANSI color codes.
+	 *
+	 * @param text
+	 * @param _
+	 * @returns {*}
+	 */
+	let decorate = function (text, _) {
 		return text
 	}
 	if (mergedOpts.enableColors) {
@@ -583,9 +752,10 @@ function generateTextSummary(data, options, report) {
 	const metricGroupIndent = '  '
 
 	/**
+	 * Displays a metrics block name (section heading).
 	 *
-	 * @param sectionName
-	 * @param {DisplayOptions} opts
+	 * @param {string} sectionName - The section name (e.g., "checks", "http_req_duration").
+	 * @param {Partial<DisplayOptions>} opts - Display options.
 	 */
 	const displayMetricsBlockName = (sectionName, opts) => {
 		let bold = true;
@@ -607,9 +777,10 @@ function generateTextSummary(data, options, report) {
 	}
 
 	/**
+	 * Displays a block of metrics with the given options.
 	 *
-	 * @param {Object[]} sectionMetrics
-	 * @param {DisplayOptions} opts
+	 * @param {Object[]} sectionMetrics - The metrics to display.
+	 * @param {Partial<DisplayOptions>} opts - Display options.
 	 */
 	const displayMetricsBlock = (sectionMetrics, opts) => {
 		const summarizeOpts = Object.assign({}, mergedOpts, opts)
@@ -618,9 +789,10 @@ function generateTextSummary(data, options, report) {
 	}
 
 	/**
+	 * Displays checks within a certain context (indentation, etc.).
 	 *
-	 * @param {Object[]} checks
-	 * @param {Partial<DisplayOptions>} opts
+	 * @param {Object} checks - Checks data, containing `metrics` and `ordered_checks`.
+	 * @param {Partial<DisplayOptions>} [opts={indent: ''}] - Options including indentation.
 	 */
 	const displayChecks = (checks, opts = {indent: ''}) => {
 		if (checks === undefined || checks === null) {
@@ -636,11 +808,10 @@ function generateTextSummary(data, options, report) {
 	}
 
 	/**
-	 * @typedef {{name: string, type: string, contains: string, values: Record<string, number>}} Metric
-	 * @typedef {{metric: Metric, thresholds: Threshold[]}} ReportThreshold
+	 * Displays thresholds and their satisfaction status.
 	 *
-	 * @param {Record<string, ReportThreshold>} thresholds
-	 * @param {Partial<DisplayOptions>} opts
+	 * @param {Record<string, {metric: ReportMetric, thresholds: Threshold[]}>} thresholds - Threshold data.
+	 * @param {Partial<DisplayOptions>} [opts={indent: ''}] - Display options.
 	 */
 	const displayThresholds = (thresholds, opts = {indent: ''}) => {
 		if (thresholds === undefined || thresholds === null) {
