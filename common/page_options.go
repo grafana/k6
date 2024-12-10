@@ -32,7 +32,9 @@ type PageScreenshotOptions struct {
 	Quality        int64          `json:"quality"`
 }
 
-func NewPageEmulateMediaOptions(defaultMedia MediaType, defaultColorScheme ColorScheme, defaultReducedMotion ReducedMotion) *PageEmulateMediaOptions {
+func NewPageEmulateMediaOptions(
+	defaultMedia MediaType, defaultColorScheme ColorScheme, defaultReducedMotion ReducedMotion,
+) *PageEmulateMediaOptions {
 	return &PageEmulateMediaOptions{
 		ColorScheme:   defaultColorScheme,
 		Media:         defaultMedia,

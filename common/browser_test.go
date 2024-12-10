@@ -171,7 +171,7 @@ func TestBrowserNewPageInContext(t *testing.T) {
 		}
 
 		var cancel func()
-		tc.b.vuCtx, cancel = context.WithCancel(tc.b.vuCtx)
+		tc.b.vuCtx, cancel = context.WithCancel(tc.b.vuCtx) //nolint:fatcontext
 		// let newPageInContext return a context cancelation error by canceling the context before
 		// running the method.
 		cancel()

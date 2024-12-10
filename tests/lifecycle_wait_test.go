@@ -614,7 +614,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 		tb := newTestBrowser(t, withHTTPServer())
 		p := tb.NewPage(nil)
 		tb.withHandler("/home", func(w http.ResponseWriter, _ *http.Request) {
-			fmt.Fprintf(w, `
+			_, err := fmt.Fprintf(w, `
 			<html>
 				<head></head>
 				<body>
@@ -623,6 +623,7 @@ func TestLifecycleGotoNetworkIdle(t *testing.T) {
 				</body>
 			</html>
 			`)
+			require.NoError(t, err)
 		})
 
 		withPingJSHandler(t, tb, false, nil, false)
@@ -719,7 +720,8 @@ func withPingHandler(t *testing.T, tb *testBrowser, slow time.Duration, ch chan 
 		time.Sleep(slow)
 
 		counter++
-		fmt.Fprintf(w, "pong %d", counter)
+		_, err := fmt.Fprintf(w, "pong %d", counter)
+		require.NoError(t, err)
 	})
 }
 
@@ -744,7 +746,8 @@ func withPingJSHandler(t *testing.T, tb *testBrowser, slow bool, ch chan bool, w
 
 			` + script
 		}
-		fmt.Fprint(w, script)
+		_, err := fmt.Fprint(w, script)
+		require.NoError(t, err)
 
 		if ch != nil {
 			close(ch)

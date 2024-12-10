@@ -67,7 +67,8 @@ func TestTracing(t *testing.T) {
 	// Start test server
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, html)
+			_, err := fmt.Fprint(w, html)
+			require.NoError(t, err)
 		},
 	))
 	defer ts.Close()
@@ -183,7 +184,8 @@ func TestNavigationSpanCreation(t *testing.T) {
 	// Start test server
 	ts := httptest.NewServer(http.HandlerFunc(
 		func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprint(w, html)
+			_, err := fmt.Fprint(w, html)
+			require.NoError(t, err)
 		},
 	))
 	defer ts.Close()

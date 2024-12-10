@@ -126,7 +126,7 @@ func newBrowser(
 		browserCancelFn:     cancelFn,
 		vuCtx:               vuCtx,
 		vuCtxCancelFn:       vuCtxCancelFn,
-		state:               int64(BrowserStateOpen),
+		state:               BrowserStateOpen,
 		browserProc:         browserProc,
 		browserOpts:         browserOpts,
 		pages:               make(map[target.ID]*Page),
@@ -469,10 +469,10 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 			tid := <-targetID
 
 			b.logger.Debugf("Browser:newPageInContext:createWaitForEventHandler",
-				"tid:%v ptid:%v bctxid:%v", tid, e.(*Page).targetID, id)
+				"tid:%v ptid:%v bctxid:%v", tid, e.(*Page).targetID, id) //nolint:forcetypeassert
 
 			// we are only interested in the new page.
-			return e.(*Page).targetID == tid
+			return e.(*Page).targetID == tid //nolint:forcetypeassert
 		},
 	)
 	defer removeEventHandler()

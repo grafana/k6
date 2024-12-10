@@ -27,7 +27,7 @@ func TestFrameNilDocument(t *testing.T) {
 	stub := &executionContextTestStub{
 		evalFn: func(apiCtx context.Context, opts evalOptions, js string, args ...any) (res any, err error) {
 			// return nil to test for panic
-			return nil, nil
+			return nil, nil //nolint:nilnil
 		},
 	}
 
@@ -105,7 +105,7 @@ type executionContextTestStub struct {
 	) (res any, err error)
 }
 
-func (e executionContextTestStub) eval(
+func (e *executionContextTestStub) eval( // this needs to be a pointer as otherwise it will copy the mutex inside of it
 	apiCtx context.Context, opts evalOptions, js string, args ...any,
 ) (res any, err error) {
 	return e.evalFn(apiCtx, opts, js, args...)

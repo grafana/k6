@@ -690,7 +690,7 @@ func TestNewTab(t *testing.T) {
 	t.Cleanup(s.Close)
 
 	const (
-		slash = string(os.PathSeparator)
+		slash = string(os.PathSeparator) //nolint:forbidigo
 		path  = slash + testBrowserStaticDir + slash
 	)
 	fs := http.FileServer(http.Dir(testBrowserStaticDir))
@@ -743,7 +743,8 @@ func TestBrowserContextTimeout(t *testing.T) {
 
 			tb.withHandler("/slow", func(w http.ResponseWriter, _ *http.Request) {
 				time.Sleep(100 * time.Millisecond)
-				fmt.Fprintf(w, `sorry for being so slow`)
+				_, err := fmt.Fprintf(w, `sorry for being so slow`)
+				require.NoError(t, err)
 			})
 
 			bc, err := tb.NewContext(nil)

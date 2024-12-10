@@ -21,14 +21,14 @@ type browserProcessMeta interface {
 // localBrowserProcessMeta holds the metadata for local
 // browser process.
 type localBrowserProcessMeta struct {
-	process     *os.Process
+	process     *os.Process //nolint:forbidigo
 	userDataDir *storage.Dir
 }
 
 // newLocalBrowserProcessMeta returns a new BrowserProcessMeta
 // for the given OS process and storage directory.
 func newLocalBrowserProcessMeta(
-	process *os.Process, userDataDir *storage.Dir,
+	process *os.Process, userDataDir *storage.Dir, //nolint:forbidigo
 ) *localBrowserProcessMeta {
 	return &localBrowserProcessMeta{
 		process,

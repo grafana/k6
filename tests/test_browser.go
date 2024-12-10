@@ -178,7 +178,7 @@ func (b *testBrowser) withFileServer() *testBrowser {
 	b.t.Helper()
 
 	const (
-		slash = string(os.PathSeparator)
+		slash = string(os.PathSeparator) //nolint:forbidigo
 		path  = slash + testBrowserStaticDir + slash
 	)
 

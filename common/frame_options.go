@@ -658,8 +658,7 @@ func (o *FrameWaitForLoadStateOptions) Parse(ctx context.Context, opts sobek.Val
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "timeout":
+			if k == "timeout" {
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			}
 		}

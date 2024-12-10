@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+//nolint:paralleltest // the linter is having problems, maybe this should just be dropped and we should just have separate functions
 func TestTimeoutSettings(t *testing.T) {
 	t.Parallel()
 

@@ -70,7 +70,6 @@ linters:
     - bidichk
     - bodyclose
     - canonicalheader
-    - contextcheck
     - cyclop
     - dogsled
     - dupl

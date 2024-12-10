@@ -558,6 +558,7 @@ func TestPageInputSpecialCharacters(t *testing.T) {
 	}
 }
 
+//nolint:paralleltest
 func TestPageFill(t *testing.T) {
 	// these tests are not parallel by intention because
 	// they're testing the same page instance and they're
@@ -1327,7 +1328,8 @@ func TestPageTimeout(t *testing.T) {
 
 			tb.withHandler("/slow", func(w http.ResponseWriter, _ *http.Request) {
 				time.Sleep(100 * time.Millisecond)
-				fmt.Fprintf(w, `sorry for being so slow`)
+				_, err := fmt.Fprintf(w, `sorry for being so slow`)
+				require.NoError(t, err)
 			})
 
 			p := tb.NewPage(nil)
@@ -1483,7 +1485,8 @@ func TestPageThrottleNetwork(t *testing.T) {
 				bb, err := io.ReadAll(req.Body)
 				require.NoError(t, err)
 
-				fmt.Fprint(w, string(bb))
+				_, err = fmt.Fprint(w, string(bb))
+				require.NoError(t, err)
 			})
 
 			page := tb.NewPage(nil)
@@ -1533,7 +1536,8 @@ func TestPageThrottleCPU(t *testing.T) {
 		bb, err := io.ReadAll(req.Body)
 		require.NoError(t, err)
 
-		fmt.Fprint(w, string(bb))
+		_, err = fmt.Fprint(w, string(bb))
+		require.NoError(t, err)
 	})
 
 	page := tb.NewPage(nil)
@@ -1731,7 +1735,7 @@ func TestShadowDOMAndDocumentFragment(t *testing.T) {
 	t.Cleanup(s.Close)
 
 	const (
-		slash = string(os.PathSeparator)
+		slash = string(os.PathSeparator) //nolint:forbidigo
 		path  = slash + testBrowserStaticDir + slash
 	)
 	fs := http.FileServer(http.Dir(testBrowserStaticDir))

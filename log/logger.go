@@ -13,7 +13,7 @@ import (
 )
 
 type Logger struct {
-	*logrus.Logger
+	*logrus.Logger //nolint:forbidigo
 	mu             sync.Mutex
 	lastLogCall    int64
 	iterID         string
@@ -37,7 +37,7 @@ func New(logger logrus.FieldLogger, iterID string) *Logger {
 
 	if logger == nil {
 		ll.Warnf("Logger", "no logger supplied, using default")
-	} else if l, ok := logger.(*logrus.Logger); !ok {
+	} else if l, ok := logger.(*logrus.Logger); !ok { //nolint:forbidigo
 		ll.Warnf("Logger", "invalid logger type %T, using default", logger)
 	} else {
 		ll.Logger = l

@@ -25,7 +25,7 @@ func (te *TestExecutor) GetExecutionRequirements(*k6lib.ExecutionTuple) []k6lib.
 
 // NewExecutor is a dummy implementation that just returns nil.
 func (te *TestExecutor) NewExecutor(*k6lib.ExecutionState, *logrus.Entry) (k6lib.Executor, error) {
-	return nil, nil
+	return nil, nil //nolint:nilnil
 }
 
 // HasWork is a dummy implementation that returns true.

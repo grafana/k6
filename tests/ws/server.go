@@ -144,6 +144,8 @@ func WithEchoHandler(path string) func(*Server) {
 }
 
 // WithCDPHandler attaches a custom CDP handler function to Server.
+//
+//nolint:funlen,gocognit
 func WithCDPHandler(
 	path string,
 	fn func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}),
@@ -257,12 +259,9 @@ func CDPDefaultHandler(conn *websocket.Conn, msg *cdproto.Message, writeCh chan 
 	)
 
 	if msg.SessionID != "" && msg.Method != "" {
-		switch msg.Method {
-		default:
-			writeCh <- cdproto.Message{
-				ID:        msg.ID,
-				SessionID: msg.SessionID,
-			}
+		writeCh <- cdproto.Message{
+			ID:        msg.ID,
+			SessionID: msg.SessionID,
 		}
 	} else if msg.Method != "" {
 		switch msg.Method {

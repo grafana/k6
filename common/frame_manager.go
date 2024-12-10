@@ -44,7 +44,7 @@ type FrameManager struct {
 }
 
 // frameManagerID is used for giving a unique ID to a frame manager.
-var frameManagerID int64
+var frameManagerID int64 //nolint:gochecknoglobals // TODO(@mstoykov): move it to the module instance
 
 // NewFrameManager creates a new HTML document frame manager.
 func NewFrameManager(
@@ -233,7 +233,10 @@ func (m *FrameManager) frameLoadingStopped(frameID cdp.FrameID) {
 	}
 }
 
-func (m *FrameManager) frameNavigated(frameID cdp.FrameID, parentFrameID cdp.FrameID, documentID string, name string, url string, initial bool) error {
+//nolint:funlen
+func (m *FrameManager) frameNavigated(
+	frameID cdp.FrameID, parentFrameID cdp.FrameID, documentID string, name string, url string, initial bool,
+) error {
 	m.logger.Debugf("FrameManager:frameNavigated",
 		"fmid:%d fid:%v pfid:%v docid:%s fname:%s furl:%s initial:%t",
 		m.ID(), frameID, parentFrameID, documentID, name, url, initial)
@@ -602,7 +605,7 @@ func (m *FrameManager) MainFrameURL() string {
 
 // NavigateFrame will navigate specified frame to specified URL.
 //
-//nolint:funlen,cyclop
+//nolint:funlen
 func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *FrameGotoOptions) (*Response, error) {
 	var (
 		fmid = m.ID()
@@ -675,7 +678,7 @@ func (m *FrameManager) NavigateFrame(frame *Frame, url string, parsedOpts *Frame
 		// It's a navigation within the same document (e.g. via anchor links or
 		// the History API), so don't wait for a response nor any lifecycle
 		// events.
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	// unblock the waiter goroutine

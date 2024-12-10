@@ -64,6 +64,7 @@ type FrameSession struct {
 
 	// To understand the concepts of Isolated Worlds, Contexts and Frames and
 	// the relationship betwween them have a look at the following doc:
+	//nolint:lll
 	// https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md
 	contextIDToContextMu sync.Mutex
 	contextIDToContext   map[cdpruntime.ExecutionContextID]*ExecutionContext
@@ -224,6 +225,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
+//nolint:funlen,cyclop
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -269,7 +271,7 @@ func (fs *FrameSession) initEvents() {
 			case event := <-fs.eventCh:
 				switch ev := event.data.(type) {
 				case *inspector.EventTargetCrashed:
-					fs.onTargetCrashed(ev)
+					fs.onTargetCrashed()
 				case *cdplog.EventEntryAdded:
 					fs.onLogEntryAdded(ev)
 				case *cdppage.EventFrameAttached:
@@ -552,17 +554,9 @@ func (fs *FrameSession) initOptions() error {
 	if err := fs.updateHTTPCredentials(true); err != nil {
 		return err
 	}
-	if err := fs.updateEmulateMedia(true); err != nil {
+	if err := fs.updateEmulateMedia(); err != nil {
 		return err
 	}
-
-	// if (screencastOptions)
-	//   promises.push(this._startVideoRecording(screencastOptions));
-
-	/*for (const source of this._crPage._browserContext._evaluateOnNewDocumentSources)
-	      promises.push(this._evaluateOnNewDocument(source, 'main'));
-	  for (const source of this._crPage._page._evaluateOnNewDocumentSources)
-	      promises.push(this._evaluateOnNewDocument(source, 'main'));*/
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
@@ -1013,7 +1007,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		return nil
 	}
 	// Remove all children of the previously attached frame.
-	fs.manager.removeChildFramesRecursively(fr)
+	err := fs.manager.removeChildFramesRecursively(fr)
+	if err != nil {
+		fs.logger.Debugf("FrameSession:attachIFrameToTarget:return",
+			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q, can't remove child frames recursively: %q",
+			fs.session.ID(), fs.targetID, sid, ti.TargetID, ti.BrowserContextID, ti.Type, err)
+	}
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
@@ -1050,7 +1049,7 @@ func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarg
 	fs.page.closeWorker(event.SessionID)
 }
 
-func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
+func (fs *FrameSession) onTargetCrashed() {
 	fs.logger.Debugf("FrameSession:onTargetCrashed", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// TODO:?
@@ -1062,7 +1061,7 @@ func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
 	fs.page.didCrash()
 }
 
-func (fs *FrameSession) updateEmulateMedia(initial bool) error {
+func (fs *FrameSession) updateEmulateMedia() error {
 	fs.logger.Debugf("NewFrameSession:updateEmulateMedia", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	features := make([]*emulation.MediaFeature, 0)

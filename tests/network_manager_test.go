@@ -176,7 +176,7 @@ func TestInterceptBeforePageLoad(t *testing.T) {
 			// page to never finish loading.
 			window.location.href='/trap';
 		`
-		fmt.Fprintf(w, `
+		_, err := fmt.Fprintf(w, `
 			<html>
 				<head>
 					<script>
@@ -186,11 +186,13 @@ func TestInterceptBeforePageLoad(t *testing.T) {
 				<body />
 			</html>
 		`, runBeforePageOnLoad)
+		require.NoError(t, err)
 	})
 
 	// this handler will be called before the main page is loaded
 	tb.withHandler("/trap", func(w http.ResponseWriter, r *http.Request) {
-		fmt.Fprint(w, "ok")
+		_, err := fmt.Fprint(w, "ok")
+		require.NoError(t, err)
 	})
 
 	// go to the main page and wait for the redirect to happen

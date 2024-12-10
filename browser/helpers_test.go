@@ -8,6 +8,7 @@ import (
 )
 
 func TestSobekEmptyString(t *testing.T) {
+	t.Parallel()
 	// SobekEmpty string should return true if the argument
 	// is an empty string or not defined in the Sobek runtime.
 	rt := sobek.New()

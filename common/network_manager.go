@@ -291,7 +291,9 @@ func handleURLTag(mi metricInterceptor, url string, method string, tags *k6metri
 	return tags
 }
 
-func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime) {
+func (m *NetworkManager) handleRequestRedirect(
+	req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime,
+) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
 	req.responseMu.Lock()
 	req.response = resp

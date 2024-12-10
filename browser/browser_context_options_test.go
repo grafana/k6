@@ -11,6 +11,7 @@ import (
 )
 
 func TestBrowserContextOptionsPermissions(t *testing.T) {
+	t.Parallel()
 	vu := k6test.NewVU(t)
 
 	opts, err := parseBrowserContextOptions(vu.Runtime(), vu.ToSobekValue((struct {
@@ -24,6 +25,7 @@ func TestBrowserContextOptionsPermissions(t *testing.T) {
 }
 
 func TestBrowserContextSetGeolocation(t *testing.T) {
+	t.Parallel()
 	vu := k6test.NewVU(t)
 
 	opts, err := parseBrowserContextOptions(vu.Runtime(), vu.ToSobekValue((struct {
@@ -43,6 +45,7 @@ func TestBrowserContextSetGeolocation(t *testing.T) {
 }
 
 func TestBrowserContextDefaultOptions(t *testing.T) {
+	t.Parallel()
 	vu := k6test.NewVU(t)
 
 	defaults := common.DefaultBrowserContextOptions()
@@ -64,6 +67,7 @@ func TestBrowserContextDefaultOptions(t *testing.T) {
 }
 
 func TestBrowserContextAllOptions(t *testing.T) {
+	t.Parallel()
 	vu := k6test.NewVU(t)
 	opts, err := vu.Runtime().RunString(`const opts = {
 			acceptDownloads: true,

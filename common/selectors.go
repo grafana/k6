@@ -65,28 +65,30 @@ func (s *Selector) appendPart(p *SelectorPart, capture bool) error {
 	return nil
 }
 
+//nolint:cyclop
 func (s *Selector) parse() error {
 	parsePart := func(selector string, start, index int) (*SelectorPart, bool) {
 		part := strings.TrimSpace(selector[start:index])
 		eqIndex := strings.Index(part, "=")
 		var name, body string
 
-		if eqIndex != -1 && reQueryEngine.Match([]byte(strings.TrimSpace(part[0:eqIndex]))) {
+		switch {
+		case eqIndex != -1 && reQueryEngine.Match([]byte(strings.TrimSpace(part[0:eqIndex]))):
 			name = strings.TrimSpace(part[0:eqIndex])
 			body = part[eqIndex+1:]
-		} else if len(part) > 1 && part[0] == '"' && part[len(part)-1] == '"' {
+		case len(part) > 1 && part[0] == '"' && part[len(part)-1] == '"':
 			name = "text"
 			body = part
-		} else if len(part) > 1 && part[0] == '\'' && part[len(part)-1] == '\'' {
+		case len(part) > 1 && part[0] == '\'' && part[len(part)-1] == '\'':
 			name = "text"
 			body = part
-		} else if reXPathSelector.Match([]byte(part)) || strings.HasPrefix(part, "..") {
+		case reXPathSelector.Match([]byte(part)) || strings.HasPrefix(part, ".."):
 			// If selector starts with '//' or '//' prefixed with multiple opening
 			// parenthesis, consider xpath. @see https://github.com/microsoft/playwright/issues/817
 			// If selector starts with '..', consider xpath as well.
 			name = "xpath"
 			body = part
-		} else {
+		default:
 			name = "css"
 			body = part
 		}
@@ -115,15 +117,16 @@ func (s *Selector) parse() error {
 
 	for index < len(s.Selector) {
 		c := s.Selector[index]
-		if c == '\\' && index+1 < len(s.Selector) {
+		switch {
+		case c == '\\' && index+1 < len(s.Selector):
 			index += 2
-		} else if c == quote {
+		case c == quote:
 			quote = byte(0)
 			index++
-		} else if quote == 0 && (c == '"' || c == '\'' || c == '`') {
+		case quote == 0 && (c == '"' || c == '\'' || c == '`'):
 			quote = c
 			index++
-		} else if quote == 0 && c == '>' && s.Selector[index+1] == '>' {
+		case quote == 0 && c == '>' && s.Selector[index+1] == '>':
 			part, capture := parsePart(s.Selector, start, index)
 			err := s.appendPart(part, capture)
 			if err != nil {
@@ -131,7 +134,7 @@ func (s *Selector) parse() error {
 			}
 			index += 2
 			start = index
-		} else {
+		default:
 			index++
 		}
 	}

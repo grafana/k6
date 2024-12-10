@@ -289,7 +289,7 @@ func TestBrowserRegistry(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		var cancel context.CancelFunc
-		vu.CtxField, cancel = context.WithCancel(vu.CtxField)
+		vu.CtxField, cancel = context.WithCancel(vu.CtxField) //nolint:fatcontext
 		browserRegistry := newBrowserRegistry(context.Background(), vu, remoteRegistry, &pidRegistry{}, nil)
 
 		vu.ActivateVU()
@@ -320,6 +320,7 @@ func TestBrowserRegistry(t *testing.T) {
 }
 
 func TestParseTracesMetadata(t *testing.T) {
+	t.Parallel()
 	testCases := []struct {
 		name        string
 		env         map[string]string
@@ -388,6 +389,7 @@ func TestParseTracesMetadata(t *testing.T) {
 	for _, tc := range testCases {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
 			lookup := func(key string) (string, bool) {
 				v, ok := tc.env[key]
 				return v, ok

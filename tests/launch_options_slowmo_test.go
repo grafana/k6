@@ -301,10 +301,6 @@ func TestBrowserOptionsSlowMo(t *testing.T) {
 			})
 		})
 	})
-
-	// TODO implement this
-	t.Run("ElementHandle", func(t *testing.T) {
-	})
 }
 
 func testSlowMoImpl(t *testing.T, tb *testBrowser, fn func(*testBrowser)) {

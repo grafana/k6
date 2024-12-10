@@ -64,7 +64,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 	p := tb.NewPage(nil)
 
 	tb.withHandler("/first", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
+		_, err := fmt.Fprintf(w, `
 		<html>
 			<head>
 				<title>First page</title>
@@ -74,9 +74,10 @@ func TestWaitForFrameNavigation(t *testing.T) {
 			</body>
 		</html>
 		`)
+		require.NoError(t, err)
 	})
 	tb.withHandler("/second", func(w http.ResponseWriter, _ *http.Request) {
-		fmt.Fprintf(w, `
+		_, err := fmt.Fprintf(w, `
 		<html>
 			<head>
 				<title>Second page</title>
@@ -86,6 +87,7 @@ func TestWaitForFrameNavigation(t *testing.T) {
 			</body>
 		</html>
 		`)
+		require.NoError(t, err)
 	})
 
 	opts := &common.FrameGotoOptions{

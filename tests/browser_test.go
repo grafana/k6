@@ -75,10 +75,10 @@ func TestBrowserNewContext(t *testing.T) {
 func TestTmpDirCleanup(t *testing.T) {
 	t.Parallel()
 
-	tmpDirPath, err := os.MkdirTemp("./", "")
+	tmpDirPath, err := os.MkdirTemp("./", "") //nolint:forbidigo
 	t.Cleanup(
 		func() {
-			err := os.RemoveAll(tmpDirPath)
+			err := os.RemoveAll(tmpDirPath) //nolint:forbidigo
 			require.NoError(t, err)
 		},
 	)
@@ -118,10 +118,10 @@ func TestTmpDirCleanup(t *testing.T) {
 func TestTmpDirCleanupOnContextClose(t *testing.T) {
 	t.Parallel()
 
-	tmpDirPath, err := os.MkdirTemp("./", "")
+	tmpDirPath, err := os.MkdirTemp("./", "") //nolint:forbidigo
 	t.Cleanup(
 		func() {
-			err := os.RemoveAll(tmpDirPath)
+			err := os.RemoveAll(tmpDirPath) //nolint:forbidigo
 			require.NoError(t, err)
 		},
 	)
@@ -282,6 +282,7 @@ func TestBrowserLogIterationID(t *testing.T) {
 	assert.Equal(t, len(tb.logCache.entries), tracedEvts)
 }
 
+//nolint:paralleltest
 func TestMultiBrowserPanic(t *testing.T) {
 	// this test should run sequentially.
 	// don't use t.Parallel() here.
@@ -308,13 +309,13 @@ func TestMultiBrowserPanic(t *testing.T) {
 	assertProcess := func(t *testing.T, pid int, n int) {
 		t.Helper()
 
-		p, err := os.FindProcess(pid)
+		p, err := os.FindProcess(pid) //nolint:forbidigo
 		if err != nil {
 			// process is already dead.
 			// no need to check if it's dead with Signal(0).
 			return
 		}
-		if err = p.Signal(syscall.Signal(0)); !errors.Is(err, os.ErrProcessDone) {
+		if err = p.Signal(syscall.Signal(0)); !errors.Is(err, os.ErrProcessDone) { //nolint:forbidigo
 			assert.Errorf(t, err, "process #%d should be dead, but exists", n)
 		}
 	}
@@ -390,6 +391,7 @@ func TestCloseContext(t *testing.T) {
 }
 
 func TestIsolateBrowserContexts(t *testing.T) {
+	t.Parallel()
 	tb := newTestBrowser(t)
 
 	b1 := tb.Browser

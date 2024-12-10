@@ -144,7 +144,7 @@ func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 	return p.resetViewport()
 }
 
-//nolint:funlen,cyclop
+//nolint:funlen
 func (s *screenshotter) screenshot(
 	sess session, doc, viewport *Rect, format ImageFormat, omitBackground bool, quality int64, path string,
 ) ([]byte, error) {
@@ -165,7 +165,6 @@ func (s *screenshotter) screenshot(
 
 	// Add common options
 	capture.WithQuality(quality)
-	// nolint:exhaustive
 	switch format {
 	case ImageFormatJPEG:
 		capture.WithFormat(cdppage.CaptureScreenshotFormatJpeg)
@@ -231,7 +230,7 @@ func (s *screenshotter) screenshot(
 	return buf, nil
 }
 
-//nolint:funlen,cyclop
+//nolint:funlen
 func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 	viewportSize, originalViewportSize, err := s.originalViewportSize(h.frame.page)
@@ -257,7 +256,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 
 	var overriddenViewportSize *Size
 	fitsViewport := bbox.Width <= viewportSize.Width && bbox.Height <= viewportSize.Height
-	if !fitsViewport {
+	if !fitsViewport { //nolint:nestif
 		overriddenViewportSize = Size{
 			Width:  math.Max(viewportSize.Width, bbox.Width),
 			Height: math.Max(viewportSize.Height, bbox.Height),
@@ -317,7 +316,6 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	return buf, nil
 }
 
-//nolint:funlen,cyclop,gocognit
 func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 
@@ -333,7 +331,7 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) ([]
 		return nil, fmt.Errorf("getting original viewport size: %w", err)
 	}
 
-	if opts.FullPage {
+	if opts.FullPage { //nolint:nestif
 		fullPageSize, err := s.fullPageSize(p)
 		if err != nil {
 			return nil, fmt.Errorf("getting full page size: %w", err)

@@ -6,7 +6,6 @@ import (
 	"testing"
 
 	"github.com/chromedp/cdproto/runtime"
-	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/mailru/easyjson"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -96,7 +95,7 @@ func TestValueFromRemoteObject(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		remoteObject := &runtime.RemoteObject{
-			Type: cdpruntime.TypeUndefined,
+			Type: runtime.TypeUndefined,
 		}
 
 		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
@@ -109,8 +108,8 @@ func TestValueFromRemoteObject(t *testing.T) {
 
 		vu := k6test.NewVU(t)
 		remoteObject := &runtime.RemoteObject{
-			Type:    cdpruntime.TypeObject,
-			Subtype: cdpruntime.SubtypeNull,
+			Type:    runtime.TypeObject,
+			Subtype: runtime.SubtypeNull,
 		}
 
 		arg, err := valueFromRemoteObject(vu.Context(), remoteObject)
@@ -263,7 +262,7 @@ func TestParseRemoteObject(t *testing.T) {
 				Subtype:  runtime.Subtype(tc.subtype),
 				ObjectID: runtime.RemoteObjectID("object_id_0123456789"),
 				Preview:  tc.preview,
-				Value:    easyjson.RawMessage(tc.value),
+				Value:    tc.value,
 			}
 			val, err := parseRemoteObject(remoteObject)
 			assert.Equal(t, tc.expected, val)

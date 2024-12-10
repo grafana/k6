@@ -76,8 +76,8 @@ func attachLogCache(tb testing.TB, fl logrus.FieldLogger) *logCache {
 	tb.Helper()
 
 	var ok bool
-	var logger *logrus.Logger
-	if logger, ok = fl.(*logrus.Logger); !ok {
+	var logger *logrus.Logger                  //nolint:forbidigo
+	if logger, ok = fl.(*logrus.Logger); !ok { //nolint:forbidigo
 		// TODO: Fix this to always work with logrus.FieldLoger.
 		// See: https://github.com/grafana/xk6-browser/issues/818
 		tb.Fatalf("logCache: unexpected logger type: %T", fl)

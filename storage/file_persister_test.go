@@ -56,7 +56,7 @@ func TestLocalFilePersister(t *testing.T) {
 			// data and therefore overwrites existing data. This sets up a file
 			// with some existing data that should be overwritten.
 			if tt.truncates {
-				err := os.WriteFile(p, []byte(tt.existingData), 0o600)
+				err := os.WriteFile(p, []byte(tt.existingData), 0o600) //nolint:forbidigo
 				require.NoError(t, err)
 			}
 
@@ -64,11 +64,11 @@ func TestLocalFilePersister(t *testing.T) {
 			err := l.Persist(context.Background(), p, strings.NewReader(tt.data))
 			assert.NoError(t, err)
 
-			i, err := os.Stat(p)
+			i, err := os.Stat(p) //nolint:forbidigo
 			require.NoError(t, err)
 			assert.False(t, i.IsDir())
 
-			bb, err := os.ReadFile(filepath.Clean(p))
+			bb, err := os.ReadFile(filepath.Clean(p)) //nolint:forbidigo
 			require.NoError(t, err)
 
 			if tt.truncates {

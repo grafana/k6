@@ -63,7 +63,7 @@ func (p *testBrowserProxy) connHandler() http.Handler {
 		defer in.Close() //nolint:errcheck
 
 		// Connect to testBrowser CDP WS
-		out, _, err := websocket.DefaultDialer.Dial(p.tb.wsURL, nil)
+		out, _, err := websocket.DefaultDialer.Dial(p.tb.wsURL, nil) //nolint:bodyclose
 		if err != nil {
 			p.t.Fatalf("error connecting to test browser: %v", err)
 		}

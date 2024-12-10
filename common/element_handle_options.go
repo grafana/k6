@@ -376,8 +376,7 @@ func (o *ElementHandleHoverOptions) Parse(ctx context.Context, opts sobek.Value)
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "modifiers":
+			if k == "modifiers" {
 				var m []string
 				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
 					return err
@@ -489,8 +488,7 @@ func (o *ElementHandleSetCheckedOptions) Parse(ctx context.Context, opts sobek.V
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "strict":
+			if k == "strict" {
 				o.Strict = opts.Get(k).ToBoolean()
 			}
 		}
@@ -514,8 +512,7 @@ func (o *ElementHandleTapOptions) Parse(ctx context.Context, opts sobek.Value) e
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "modifiers":
+			if k == "modifiers" {
 				var m []string
 				if err := rt.ExportTo(opts.Get(k), &m); err != nil {
 					return err
@@ -574,8 +571,7 @@ func (o *ElementHandleWaitForElementStateOptions) Parse(ctx context.Context, opt
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "timeout":
+			if k == "timeout" {
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			}
 		}

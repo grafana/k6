@@ -13,12 +13,10 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 
 	"go.k6.io/k6/event"
-	k6event "go.k6.io/k6/event"
 	k6common "go.k6.io/k6/js/common"
-	k6eventloop "go.k6.io/k6/js/eventloop"
+	"go.k6.io/k6/js/eventloop"
 	k6modulestest "go.k6.io/k6/js/modulestest"
 	"go.k6.io/k6/lib"
-	k6lib "go.k6.io/k6/lib"
 	k6executor "go.k6.io/k6/lib/executor"
 	k6testutils "go.k6.io/k6/lib/testutils"
 	k6trace "go.k6.io/k6/lib/trace"
@@ -32,8 +30,8 @@ import (
 // EventLoop from modulestest.Runtime.EventLoop.
 type VU struct {
 	*k6modulestest.VU
-	Loop      *k6eventloop.EventLoop
-	toBeState *k6lib.State
+	Loop      *eventloop.EventLoop
+	toBeState *lib.State
 	samples   chan k6metrics.SampleContainer
 	TestRT    *k6modulestest.Runtime
 }
@@ -82,7 +80,7 @@ type WithIteration = int64
 //   - WithIteration: sets the iteration (default 0).
 func (v *VU) StartIteration(tb testing.TB, opts ...any) {
 	tb.Helper()
-	v.iterEvent(tb, k6event.IterStart, "IterStart", opts...)
+	v.iterEvent(tb, event.IterStart, "IterStart", opts...)
 }
 
 // EndIteration generates a new IterEnd event through the VU event system.
@@ -93,14 +91,14 @@ func (v *VU) StartIteration(tb testing.TB, opts ...any) {
 //   - WithIteration: sets the iteration (default 0).
 func (v *VU) EndIteration(tb testing.TB, opts ...any) {
 	tb.Helper()
-	v.iterEvent(tb, k6event.IterEnd, "IterEnd", opts...)
+	v.iterEvent(tb, event.IterEnd, "IterEnd", opts...)
 }
 
 // iterEvent generates an iteration event for the VU.
 func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, opts ...any) {
 	tb.Helper()
 
-	data := k6event.IterData{
+	data := event.IterData{
 		Iteration:    0,
 		VUID:         1,
 		ScenarioName: "default",
@@ -117,9 +115,9 @@ func (v *VU) iterEvent(tb testing.TB, eventType event.Type, eventName string, op
 		}
 	}
 
-	events, ok := v.EventsField.Local.(*k6event.System)
-	require.True(tb, ok, "want *k6event.System; got %T", events)
-	waitDone := events.Emit(&k6event.Event{
+	events, ok := v.EventsField.Local.(*event.System)
+	require.True(tb, ok, "want *event.System; got %T", events)
+	waitDone := events.Emit(&event.Event{
 		Type: eventType,
 		Data: data,
 	})
@@ -176,7 +174,7 @@ func ToPromise(tb testing.TB, gv sobek.Value) *sobek.Promise {
 type WithSamples chan k6metrics.SampleContainer
 
 // WithTracerProvider allows to set the VU TracerProvider.
-type WithTracerProvider k6lib.TracerProvider
+type WithTracerProvider lib.TracerProvider
 
 // NewVU returns a mock k6 VU.
 //
@@ -188,9 +186,9 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	tb.Helper()
 
 	var (
-		samples                             = make(chan k6metrics.SampleContainer, 1000)
-		lookupFunc                          = env.EmptyLookup
-		tracerProvider k6lib.TracerProvider = k6trace.NewNoopTracerProvider()
+		samples                           = make(chan k6metrics.SampleContainer, 1000)
+		lookupFunc                        = env.EmptyLookup
+		tracerProvider lib.TracerProvider = k6trace.NewNoopTracerProvider()
 	)
 	for _, opt := range opts {
 		switch opt := opt.(type) {
@@ -208,12 +206,12 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	testRT := k6modulestest.NewRuntime(tb)
 	testRT.VU.InitEnvField.LookupEnv = lookupFunc
 	testRT.VU.EventsField = k6common.Events{
-		Global: k6event.NewEventSystem(100, logger),
-		Local:  k6event.NewEventSystem(100, logger),
+		Global: event.NewEventSystem(100, logger),
+		Local:  event.NewEventSystem(100, logger),
 	}
 
-	state := &k6lib.State{
-		Options: k6lib.Options{
+	state := &lib.State{
+		Options: lib.Options{
 			MaxRedirects: null.IntFrom(10),
 			UserAgent:    null.StringFrom("TestUserAgent"),
 			Throw:        null.BoolFrom(true),
@@ -221,10 +219,10 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 			Batch:        null.IntFrom(20),
 			BatchPerHost: null.IntFrom(20),
 			// HTTPDebug:    null.StringFrom("full"),
-			Scenarios: k6lib.ScenarioConfigs{
+			Scenarios: lib.ScenarioConfigs{
 				"default": &TestExecutor{
 					BaseConfig: k6executor.BaseConfig{
-						Options: &k6lib.ScenarioOptions{
+						Options: &lib.ScenarioOptions{
 							Browser: map[string]any{
 								"type": "chromium",
 							},
@@ -234,9 +232,9 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 			},
 		},
 		Logger:     logger,
-		BufferPool: k6lib.NewBufferPool(),
+		BufferPool: lib.NewBufferPool(),
 		Samples:    samples,
-		Tags: k6lib.NewVUStateTags(
+		Tags: lib.NewVUStateTags(
 			testRT.VU.InitEnvField.Registry.RootTagSet().With("group", lib.RootGroupPath),
 		),
 		BuiltinMetrics: k6metrics.RegisterBuiltinMetrics(k6metrics.NewRegistry()),
@@ -244,7 +242,7 @@ func NewVU(tb testing.TB, opts ...any) *VU {
 	}
 
 	ctx := k6ext.WithVU(testRT.VU.CtxField, testRT.VU)
-	ctx = k6lib.WithScenarioState(ctx, &k6lib.ScenarioState{Name: "default"})
+	ctx = lib.WithScenarioState(ctx, &lib.ScenarioState{Name: "default"})
 	testRT.VU.CtxField = ctx
 
 	return &VU{VU: testRT.VU, Loop: testRT.EventLoop, toBeState: state, samples: samples, TestRT: testRT}

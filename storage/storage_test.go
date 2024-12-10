@@ -13,14 +13,14 @@ import (
 func TestDirMake(t *testing.T) {
 	t.Parallel()
 
-	tmpDir := os.TempDir()
+	tmpDir := os.TempDir() //nolint:forbidigo
 
 	t.Run("dir_provided", func(t *testing.T) {
 		t.Parallel()
 
-		dir, err := os.MkdirTemp("", "*")
+		dir, err := os.MkdirTemp("", "*") //nolint:forbidigo
 		require.NoError(t, err)
-		t.Cleanup(func() { _ = os.RemoveAll(dir) })
+		t.Cleanup(func() { _ = os.RemoveAll(dir) }) //nolint:forbidigo
 
 		var s Dir
 		require.NoError(t, s.Make("", dir))

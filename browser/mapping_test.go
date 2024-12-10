@@ -282,7 +282,7 @@ type browserAPI interface {
 }
 
 // browserContextAPI is the public interface of a CDP browser context.
-type browserContextAPI interface {
+type browserContextAPI interface { //nolint:interfacebloat
 	AddCookies(cookies []*common.Cookie) error
 	AddInitScript(script sobek.Value, arg sobek.Value) error
 	Browser() *common.Browser
@@ -302,7 +302,7 @@ type browserContextAPI interface {
 }
 
 // pageAPI is the interface of a single browser tab.
-type pageAPI interface {
+type pageAPI interface { //nolint:interfacebloat
 	BringToFront() error
 	Check(selector string, opts sobek.Value) error
 	Click(selector string, opts sobek.Value) error
@@ -382,7 +382,7 @@ type metricEventAPI interface {
 }
 
 // frameAPI is the interface of a CDP target frame.
-type frameAPI interface {
+type frameAPI interface { //nolint:interfacebloat
 	Check(selector string, opts sobek.Value) error
 	ChildFrames() []*common.Frame
 	Click(selector string, opts sobek.Value) error
@@ -436,7 +436,7 @@ type frameAPI interface {
 }
 
 // elementHandleAPI is the interface of an in-page DOM element.
-type elementHandleAPI interface {
+type elementHandleAPI interface { //nolint:interfacebloat
 	common.JSHandleAPI
 
 	BoundingBox() (*common.Rect, error)
@@ -477,7 +477,7 @@ type elementHandleAPI interface {
 }
 
 // requestAPI is the interface of an HTTP request.
-type requestAPI interface {
+type requestAPI interface { //nolint:interfacebloat
 	AllHeaders() map[string]string
 	Frame() *common.Frame
 	HeaderValue(string) sobek.Value
@@ -495,7 +495,7 @@ type requestAPI interface {
 }
 
 // responseAPI is the interface of an HTTP response.
-type responseAPI interface {
+type responseAPI interface { //nolint:interfacebloat
 	AllHeaders() map[string]string
 	Body() ([]byte, error)
 	Frame() *common.Frame
@@ -516,7 +516,7 @@ type responseAPI interface {
 }
 
 // locatorAPI represents a way to find element(s) on a page at any moment.
-type locatorAPI interface {
+type locatorAPI interface { //nolint:interfacebloat
 	Clear(opts *common.FrameFillOptions) error
 	Click(opts sobek.Value) error
 	Dblclick(opts sobek.Value) error

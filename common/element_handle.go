@@ -358,6 +358,7 @@ func (h *ElementHandle) innerText(apiCtx context.Context) (any, error) {
 }
 
 func (h *ElementHandle) inputValue(apiCtx context.Context) (any, error) {
+	//nolint:lll
 	js := `
 		(element) => {
 			if (element.nodeType !== Node.ELEMENT_NODE || (element.nodeName !== 'INPUT' && element.nodeName !== 'TEXTAREA' && element.nodeName !== 'SELECT')) {
@@ -478,7 +479,7 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts KeyboardO
 	return nil
 }
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,gocognit
 func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value) (any, error) {
 	convertSelectOptionValues := func(values sobek.Value) ([]any, error) {
 		if k6common.IsNullish(values) {
@@ -527,7 +528,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 
 			opts = append(opts, opt)
 		case reflect.TypeOf(&ElementHandle{}).Kind():
-			opts = append(opts, t.(*ElementHandle))
+			opts = append(opts, t.(*ElementHandle)) //nolint:forcetypeassert
 		case reflect.TypeOf(sobek.Object{}).Kind():
 			obj := values.ToObject(rt)
 			opt := SelectOption{}
@@ -547,7 +548,7 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 			opts = append(opts, &opt)
 		case reflect.String:
 			opt := SelectOption{Value: new(string)}
-			*opt.Value = t.(string)
+			*opt.Value = t.(string) //nolint:forcetypeassert
 			opts = append(opts, &opt)
 		default:
 			return nil, fmt.Errorf("options: unsupported type %T", values)
@@ -569,12 +570,12 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(apiCtx, opts, fn, convValues)
+	result, err := h.evalWithScript(apiCtx, opts, fn, convValues) //nolint:asasalint
 	if err != nil {
 		return nil, err
 	}
-	switch result := result.(type) {
-	case string: // An error happened (returned as "error:..." from JS)
+	if result, ok := result.(string); ok {
+		// An error happened (returned as "error:..." from JS)
 		if result != resultDone {
 			return nil, errorFromDOMError(result)
 		}
@@ -634,8 +635,7 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 	if err != nil {
 		return err
 	}
-	switch result := result.(type) {
-	case string: // Either we're done or an error happened (returned as "error:..." from JS)
+	if result, ok := result.(string); ok {
 		if result != resultDone {
 			return errorFromDOMError(result)
 		}
@@ -721,7 +721,9 @@ func (h *ElementHandle) waitForElementState(
 		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
-func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+func (h *ElementHandle) waitForSelector(
+	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
+) (*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, err
@@ -747,7 +749,7 @@ func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string,
 	case *ElementHandle:
 		return r, nil
 	default:
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 }
 
@@ -1616,7 +1618,7 @@ func (h *ElementHandle) newAction(
 	}
 }
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,gocognit
 func (h *ElementHandle) newPointerAction(
 	fn elementHandlePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {

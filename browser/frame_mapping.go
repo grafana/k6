@@ -11,8 +11,8 @@ import (
 
 // mapFrame to the JS module.
 //
-//nolint:funlen
-func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
+//nolint:funlen,gocognit
+func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

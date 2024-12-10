@@ -50,8 +50,7 @@ func TestSessionCreateSession(t *testing.T) {
 	cmdsReceived := make([]cdproto.MethodType, 0)
 	handler := func(conn *websocket.Conn, msg *cdproto.Message, writeCh chan cdproto.Message, done chan struct{}) {
 		if msg.SessionID != "" && msg.Method != "" {
-			switch msg.Method {
-			case cdproto.MethodType(cdproto.CommandPageEnable):
+			if msg.Method == cdproto.MethodType(cdproto.CommandPageEnable) {
 				writeCh <- cdproto.Message{
 					ID:        msg.ID,
 					SessionID: msg.SessionID,
