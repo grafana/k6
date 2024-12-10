@@ -1,9 +1,6 @@
 package tests
 
 import (
-	"bytes"
-	"fmt"
-	"net/http"
 	"testing"
 	"time"
 
@@ -12,10 +9,6 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/grafana/xk6-browser/common"
-
-	"go.k6.io/k6/cmd"
-	k6tests "go.k6.io/k6/cmd/tests"
-	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"
 )
 
 // Strict mode:
@@ -676,85 +669,56 @@ func TestLocatorShadowDOM(t *testing.T) {
 func TestSelectOption(t *testing.T) {
 	t.Parallel()
 
-	tb := k6httpmultibin.NewHTTPMultiBin(t)
-	ts := k6tests.NewGlobalTestState(t)
-	tb.Mux.HandleFunc("/favicon.ico", func(w http.ResponseWriter, _ *http.Request) {
-		_, _ = fmt.Fprint(w, "")
-	})
-	tb.Mux.HandleFunc("/selectOption", func(w http.ResponseWriter, _ *http.Request) {
-		_, err := fmt.Fprint(w, `
-		<html>
-		<body>
-			<select name="numbers" id="numbers-options" onchange="selectOnChange(this)" multiple>
-				<option value="zero">Zero</option>
-				<option value="one">One</option>
-				<option value="two">Two</option>
-				<option value="three">Three</option>
-				<option value="four">Four</option>
-				<option value="five">Five</option>
-			</select>
-		</body>
-		</html>
-		`)
-		assert.NoError(t, err)
-	})
+	tb := newTestBrowser(t,
+		withFileServer(),
+	)
+	defer tb.Browser.Close()
 
-	ts.CmdArgs = []string{
-		"k6", "run", "-",
-	}
-	ts.Stdin = bytes.NewBufferString(tb.Replacer.Replace(`
-		import { browser } from 'k6/browser';
+	vu, _, _, cleanUp := startIteration(t)
+	defer cleanUp()
 
-		export const options = {
-		scenarios: {
-			browser: {
-				executor: 'shared-iterations',
-				options: {
-				browser: {
-					type: 'chromium',
-				},
-				},
-			},
-		},
-		};
+	got := vu.RunPromise(t, `
+		const page = await browser.newPage();
 
-		export default async function () {
-			const page = await browser.newPage();
-			await page.goto('HTTPBIN_IP_URL/selectOption');
-			const options = page.locator('#numbers-options');
-			await options.selectOption({label:'Five'});
-			let selectedValue = await options.inputValue();
-			if (selectedValue !== 'five') {
-				throw new Error('Expected "five" but got ' + selectedValue);
-			}
-			await options.selectOption({index:5});
-			selectedValue = await options.inputValue();
-			if (selectedValue !== 'five') {
-				throw new Error('Expected "five" but got ' + selectedValue);
-			}
-			await options.selectOption({value:'four'});
-			selectedValue = await options.inputValue();
-			if (selectedValue !== 'four') {
-				throw new Error('Expected "four" but got ' + selectedValue);
-			}
-			await options.selectOption([{label:'One'}]);
-			selectedValue = await options.inputValue();
-			if (selectedValue !== 'one') {
-				throw new Error('Expected "one" but got ' + selectedValue);
-			}
-			await options.selectOption(['two']); // Value
-			selectedValue = await options.inputValue();
-			if (selectedValue !== 'two') {
-				throw new Error('Expected "two" but got ' + selectedValue);
-			}
-			await options.selectOption('five'); // Value
-			selectedValue = await options.inputValue();
-			if (selectedValue !== 'five') {
-				throw new Error('Expected "five" but got ' + selectedValue);
-			}
+		await page.goto('%s');
+
+		const options = page.locator('#numbers-options');
+
+		await options.selectOption({label:'Five'});
+		let selectedValue = await options.inputValue();
+		if (selectedValue !== 'five') {
+			throw new Error('Expected "five" but got ' + selectedValue);
 		}
-	`))
-	cmd.ExecuteWithGlobalState(ts.GlobalState)
 
-	assert.Empty(t, ts.Stderr.String())
+		await options.selectOption({index:5});
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'five') {
+			throw new Error('Expected "five" but got ' + selectedValue);
+		}
+
+		await options.selectOption({value:'four'});
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'four') {
+			throw new Error('Expected "four" but got ' + selectedValue);
+		}
+
+		await options.selectOption([{label:'One'}]);
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'one') {
+			throw new Error('Expected "one" but got ' + selectedValue);
+		}
+
+		await options.selectOption(['two']); // Value
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'two') {
+			throw new Error('Expected "two" but got ' + selectedValue);
+		}
+
+		await options.selectOption('five'); // Value
+		selectedValue = await options.inputValue();
+		if (selectedValue !== 'five') {
+			throw new Error('Expected "five" but got ' + selectedValue);
+		}
+	`, tb.staticURL("select_options.html"))
+	assert.Equal(t, sobek.Undefined(), got.Result())
 }
