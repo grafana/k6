@@ -49,8 +49,7 @@ jobs:
           echo "::set-output name=Version::$(head -n 1 "${GITHUB_WORKSPACE}/.golangci.yml" | tr -d '# ')"
         id: version
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v4
+        uses: golangci/golangci-lint-action@349d20632dbaed38f0a492cc991152e3d351e854 # latest commit at the time that uses node20
         with:
           # Required: the version of golangci-lint is required and must be specified without patch version: we always use the latest patch version.
           version: ${{ steps.version.outputs.Version }}
-          only-new-issues: true
