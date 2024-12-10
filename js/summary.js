@@ -66,8 +66,8 @@
  * @param {Object} obj - the object to iterate over
  * @param {(key: string, value: any) => (boolean|void)} callback - Callback invoked with (key, value)
  */
-var forEach = function (obj, callback) {
-	for (var key in obj) {
+function forEach(obj, callback) {
+	for (const key in obj) {
 		if (obj.hasOwnProperty(key)) {
 			if (callback(key, obj[key])) {
 				break
@@ -77,7 +77,7 @@ var forEach = function (obj, callback) {
 }
 
 /** A palette of ANSI color codes for terminal output. */
-var palette = {
+const palette = {
 	bold: 1,
 	faint: 2,
 	red: 31,
@@ -86,11 +86,11 @@ var palette = {
 	//TODO: add others?
 }
 
-var groupPrefix = '█'
-var detailsPrefix = '↳'
-var succMark = '✓'
-var failMark = '✗'
-var defaultOptions = {
+const groupPrefix = '█'
+const detailsPrefix = '↳'
+const succMark = '✓'
+const failMark = '✗'
+const defaultOptions = {
 	indent: ' ',
 	enableColors: true,
 	summaryTimeUnit: null,
@@ -107,21 +107,21 @@ var defaultOptions = {
  */
 function strWidth(s) {
 	// TODO: determine if NFC or NFKD are not more appropriate? or just give up? https://hsivonen.fi/string-length/
-	var data = s.normalize('NFKC') // This used to be NFKD in Go, but this should be better
-	var inEscSeq = false
-	var inLongEscSeq = false
-	var width = 0
-	for (var char of data) {
+	const data = s.normalize('NFKC') // This used to be NFKD in Go, but this should be better
+	let inEscSeq = false
+	let inLongEscSeq = false
+	let width = 0
+	for (const char of data) {
 		if (char.done) {
 			break
 		}
 
 		// Skip over ANSI escape codes.
-		if (char == '\x1b') {
+		if (char === '\x1b') {
 			inEscSeq = true
 			continue
 		}
-		if (inEscSeq && char == '[') {
+		if (inEscSeq && char === '[') {
 			inLongEscSeq = true
 			continue
 		}
@@ -151,11 +151,11 @@ function strWidth(s) {
  * @returns {string} - A formatted line summarizing the check.
  */
 function summarizeCheck(indent, check, decorate) {
-	if (check.fails == 0) {
+	if (check.fails === 0) {
 		return decorate(indent + succMark + ' ' + check.name, palette.green)
 	}
 
-	var succPercent = Math.floor((100 * check.passes) / (check.passes + check.fails))
+	const succPercent = Math.floor((100 * check.passes) / (check.passes + check.fails))
 	return decorate(
 		indent +
 		failMark +
@@ -180,41 +180,13 @@ function summarizeCheck(indent, check, decorate) {
 }
 
 /**
- * Summarizes a group of checks, recursively handling nested groups.
- *
- * @param {string} indent -The indentation for the group.
- * @param {{name: string, checks: Object[], groups: Object[]}} group - Group object with name, checks, and subgroups.
- * @param {(text: string, ...colors: number[]) => string} decorate = Function to decorate text with ANSI colors.
- * @returns {string[]} - An array of formatted lines summarizing the group and its checks
- */
-function summarizeGroup(indent, group, decorate) {
-	var result = []
-	if (group.name != '') {
-		result.push(indent + groupPrefix + ' ' + group.name + '\n')
-		indent = indent + '  '
-	}
-
-	for (var i = 0; i < group.checks.length; i++) {
-		result.push(summarizeCheck(indent, group.checks[i], decorate))
-	}
-	if (group.checks.length > 0) {
-		result.push('')
-	}
-	for (var i = 0; i < group.groups.length; i++) {
-		Array.prototype.push.apply(result, summarizeGroup(indent, group.groups[i], decorate))
-	}
-
-	return result
-}
-
-/**
  * Extracts a display name for a metric, handling sub-metrics (e.g. "metric{sub}" -> "{ sub }").
  *
  * @param {string} name - The metric name.
  * @returns {string} - The display name
  */
 function displayNameForMetric(name) {
-	var subMetricPos = name.indexOf('{')
+	const subMetricPos = name.indexOf('{')
 	if (subMetricPos >= 0) {
 		return '{ ' + name.substring(subMetricPos + 1, name.length - 1) + ' }'
 	}
@@ -241,19 +213,19 @@ function indentForMetric(name) {
  * @returns {string} A human-readable string (e.g. "10 kB").
  */
 function humanizeBytes(bytes) {
-	var units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
-	var base = 1000
+	const units = ['B', 'kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB']
+	const base = 1000
 	if (bytes < 10) {
 		return bytes + ' B'
 	}
 
-	var e = Math.floor(Math.log(bytes) / Math.log(base))
-	var suffix = units[e | 0]
-	var val = Math.floor((bytes / Math.pow(base, e)) * 10 + 0.5) / 10
+	const e = Math.floor(Math.log(bytes) / Math.log(base))
+	const suffix = units[e | 0]
+	const val = Math.floor((bytes / Math.pow(base, e)) * 10 + 0.5) / 10
 	return val.toFixed(val < 10 ? 1 : 0) + ' ' + suffix
 }
 
-var unitMap = {
+const unitMap = {
 	s: {unit: 's', coef: 0.001},
 	ms: {unit: 'ms', coef: 1},
 	us: {unit: 'µs', coef: 1000},
@@ -279,7 +251,7 @@ function toFixedNoTrailingZeros(val, prec) {
  * @returns {string} A truncated, not rounded string representation.
  */
 function toFixedNoTrailingZerosTrunc(val, prec) {
-	var mult = Math.pow(10, prec)
+	const mult = Math.pow(10, prec)
 	return toFixedNoTrailingZeros(Math.trunc(mult * val) / mult, prec)
 }
 
@@ -287,40 +259,40 @@ function toFixedNoTrailingZerosTrunc(val, prec) {
  * Humanizes a duration (in milliseconds) to a human-readable string,
  * choosing appropriate units (ns, µs, ms, s, m, h).
  *
- * @param {number} dur - The duration in milliseconds.
+ * @param {number} duration - The duration in milliseconds.
  * @returns {string} Human-readable duration (e.g. "2.5ms", "3s", "1m30s").
  */
-function humanizeGenericDuration(dur) {
-	if (dur === 0) {
+function humanizeGenericDuration(duration) {
+	if (duration === 0) {
 		return '0s'
 	}
 
-	if (dur < 0.001) {
+	if (duration < 0.001) {
 		// smaller than a microsecond, print nanoseconds
-		return Math.trunc(dur * 1000000) + 'ns'
+		return Math.trunc(duration * 1000000) + 'ns'
 	}
-	if (dur < 1) {
+	if (duration < 1) {
 		// smaller than a millisecond, print microseconds
-		return toFixedNoTrailingZerosTrunc(dur * 1000, 2) + 'µs'
+		return toFixedNoTrailingZerosTrunc(duration * 1000, 2) + 'µs'
 	}
-	if (dur < 1000) {
+	if (duration < 1000) {
 		// duration is smaller than a second
-		return toFixedNoTrailingZerosTrunc(dur, 2) + 'ms'
+		return toFixedNoTrailingZerosTrunc(duration, 2) + 'ms'
 	}
 
-	var result = toFixedNoTrailingZerosTrunc((dur % 60000) / 1000, dur > 60000 ? 0 : 2) + 's'
-	var rem = Math.trunc(dur / 60000)
+	let fixedDuration= toFixedNoTrailingZerosTrunc((duration % 60000) / 1000, duration > 60000 ? 0 : 2) + 's'
+	let rem = Math.trunc(duration / 60000)
 	if (rem < 1) {
 		// less than a minute
-		return result
+		return fixedDuration
 	}
-	result = (rem % 60) + 'm' + result
+	fixedDuration = (rem % 60) + 'm' + fixedDuration
 	rem = Math.trunc(rem / 60)
 	if (rem < 1) {
 		// less than an hour
-		return result
+		return fixedDuration
 	}
-	return rem + 'h' + result
+	return rem + 'h' + fixedDuration
 }
 
 /**
@@ -347,7 +319,7 @@ function humanizeDuration(dur, timeUnit) {
  * @returns {string} The humanized metric value.
  */
 function humanizeValue(val, metric, timeUnit) {
-	if (metric.type == 'rate') {
+	if (metric.type === 'rate') {
 		// Truncate instead of round when decreasing precision to 2 decimal places
 		return (Math.trunc(val * 100 * 100) / 100).toFixed(2) + '%'
 	}
@@ -397,45 +369,45 @@ function nonTrendMetricValueForSum(metric, timeUnit) {
  * Summarizes given metrics into an array of formatted lines.
  *
  * @param {Object} options - Display options merged with defaultOptions.
- * @param {ReportData} data - The data object containing metrics.
+ * @param {{metrics: Object[]}} data - The data object containing metrics.
  * @param {(text: string, ...colors: number[]) => string} decorate - A decoration function for ANSI colors.
  * @returns {string[]} Array of formatted lines.
  */
 function summarizeMetrics(options, data, decorate) {
-	var indent = options.indent + ' '
-	var result = []
+	const indent = options.indent + ' '
+	let result = []
 
-	var names = []
-	var nameLenMax = 0
+	const names = []
+	let nameLenMax = 0
 
-	var nonTrendValues = {}
-	var nonTrendValueMaxLen = 0
-	var nonTrendExtras = {}
-	var nonTrendExtraMaxLens = [0, 0]
+	const nonTrendValues = {}
+	let nonTrendValueMaxLen = 0
+	const nonTrendExtras = {}
+	const nonTrendExtraMaxLens = [0, 0]
 
-	var trendCols = {}
-	var numTrendColumns = options.summaryTrendStats.length
-	var trendColMaxLens = new Array(numTrendColumns).fill(0)
+	const trendCols = {}
+	const numTrendColumns = options.summaryTrendStats.length
+	const trendColMaxLens = new Array(numTrendColumns).fill(0)
 	forEach(data.metrics, function (name, metric) {
 		names.push(name)
 		// When calculating widths for metrics, account for the indentation on submetrics.
-		var displayName = indentForMetric(name) + displayNameForMetric(name)
-		var displayNameWidth = strWidth(displayName)
+		const displayName = indentForMetric(name) + displayNameForMetric(name)
+		const displayNameWidth = strWidth(displayName)
 		if (displayNameWidth > nameLenMax) {
 			nameLenMax = displayNameWidth
 		}
 
-		if (metric.type == 'trend') {
-			var cols = []
-			for (var i = 0; i < numTrendColumns; i++) {
-				var tc = options.summaryTrendStats[i]
-				var value = metric.values[tc]
+		if (metric.type === 'trend') {
+			const cols = []
+			for (let i = 0; i < numTrendColumns; i++) {
+				const tc = options.summaryTrendStats[i]
+				let value = metric.values[tc]
 				if (tc === 'count') {
 					value = value.toString()
 				} else {
 					value = humanizeValue(value, metric, options.summaryTimeUnit)
 				}
-				var valLen = strWidth(value)
+				const valLen = strWidth(value)
 				if (valLen > trendColMaxLens[i]) {
 					trendColMaxLens[i] = valLen
 				}
@@ -444,15 +416,15 @@ function summarizeMetrics(options, data, decorate) {
 			trendCols[name] = cols
 			return
 		}
-		var values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
+		const values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
 		nonTrendValues[name] = values[0]
-		var valueLen = strWidth(values[0])
+		const valueLen = strWidth(values[0])
 		if (valueLen > nonTrendValueMaxLen) {
 			nonTrendValueMaxLen = valueLen
 		}
 		nonTrendExtras[name] = values.slice(1)
-		for (var i = 1; i < values.length; i++) {
-			var extraLen = strWidth(values[i])
+		for (let i = 1; i < values.length; i++) {
+			const extraLen = strWidth(values[i])
 			if (extraLen > nonTrendExtraMaxLens[i - 1]) {
 				nonTrendExtraMaxLens[i - 1] = extraLen
 			}
@@ -462,23 +434,23 @@ function summarizeMetrics(options, data, decorate) {
 	// sort all metrics but keep sub metrics grouped with their parent metrics
 	if (options.sortByName) {
 		names.sort(function (metric1, metric2) {
-			var parent1 = metric1.split('{', 1)[0]
-			var parent2 = metric2.split('{', 1)[0]
-			var result = parent1.localeCompare(parent2)
+			const parent1 = metric1.split('{', 1)[0]
+			const parent2 = metric2.split('{', 1)[0]
+			const result = parent1.localeCompare(parent2)
 			if (result !== 0) {
 				return result
 			}
-			var sub1 = metric1.substring(parent1.length)
-			var sub2 = metric2.substring(parent2.length)
+			const sub1 = metric1.substring(parent1.length)
+			const sub2 = metric2.substring(parent2.length)
 			return sub1.localeCompare(sub2)
 		})
 	}
 
-	var getData = function (name) {
+	const getData = function (name) {
 		if (trendCols.hasOwnProperty(name)) {
-			var cols = trendCols[name]
-			var tmpCols = new Array(numTrendColumns)
-			for (var i = 0; i < cols.length; i++) {
+			const cols = trendCols[name]
+			const tmpCols = new Array(numTrendColumns)
+			for (let i = 0; i < cols.length; i++) {
 				tmpCols[i] =
 					options.summaryTrendStats[i] +
 					'=' +
@@ -488,15 +460,15 @@ function summarizeMetrics(options, data, decorate) {
 			return tmpCols.join(' ')
 		}
 
-		var value = nonTrendValues[name]
-		var fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
+		const value = nonTrendValues[name]
+		let fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
 
-		var extras = nonTrendExtras[name]
-		if (extras.length == 1) {
+		const extras = nonTrendExtras[name]
+		if (extras.length === 1) {
 			fmtData = fmtData + ' ' + decorate(extras[0], palette.cyan, palette.faint)
 		} else if (extras.length > 1) {
-			var parts = new Array(extras.length)
-			for (var i = 0; i < extras.length; i++) {
+			const parts = new Array(extras.length)
+			for (let i = 0; i < extras.length; i++) {
 				parts[i] =
 					decorate(extras[i], palette.cyan, palette.faint) +
 					' '.repeat(nonTrendExtraMaxLens[i] - strWidth(extras[i]))
@@ -507,10 +479,10 @@ function summarizeMetrics(options, data, decorate) {
 		return fmtData
 	}
 
-	for (var name of names) {
-		var metric = data.metrics[name]
-		var mark = ' '
-		var markColor = function (text) {
+	for (const name of names) {
+		const metric = data.metrics[name]
+		let mark = ' '
+		let markColor = function (text) {
 			return text
 		} // noop
 
@@ -529,8 +501,8 @@ function summarizeMetrics(options, data, decorate) {
 				}
 			})
 		}
-		var fmtIndent = indentForMetric(name)
-		var fmtName = displayNameForMetric(name)
+		const fmtIndent = indentForMetric(name)
+		let fmtName = displayNameForMetric(name)
 		fmtName =
 			fmtName +
 			decorate(
@@ -553,39 +525,39 @@ function summarizeMetrics(options, data, decorate) {
  * @returns {string[]} - Array of formatted lines including threshold statuses.
  */
 function summarizeMetricsWithThresholds(options, data, decorate) {
-	var indent = options.indent + ' '
-	var result = []
+	const indent = options.indent + ' '
+	const result = []
 
-	var names = []
-	var nameLenMax = 0
+	const names = []
+	let nameLenMax = 0
 
-	var nonTrendValues = {}
-	var nonTrendValueMaxLen = 0
-	var nonTrendExtras = {}
-	var nonTrendExtraMaxLens = [0, 0]
+	const nonTrendValues = {}
+	let nonTrendValueMaxLen = 0
+	const nonTrendExtras = {}
+	let nonTrendExtraMaxLens = [0, 0]
 
-	var trendCols = {}
-	var numTrendColumns = options.summaryTrendStats.length
-	var trendColMaxLens = new Array(numTrendColumns).fill(0)
+	const trendCols = {}
+	const numTrendColumns = options.summaryTrendStats.length
+	const trendColMaxLens = new Array(numTrendColumns).fill(0)
 	forEach(data.metrics, function (name, metric) {
 		names.push(name)
 		// When calculating widths for metrics, account for the indentation on submetrics.
-		var displayNameWidth = strWidth(name)
+		const displayNameWidth = strWidth(name)
 		if (displayNameWidth > nameLenMax) {
 			nameLenMax = displayNameWidth
 		}
 
-		if (metric.type == 'trend') {
-			var cols = []
-			for (var i = 0; i < numTrendColumns; i++) {
-				var tc = options.summaryTrendStats[i]
-				var value = metric.values[tc]
+		if (metric.type === 'trend') {
+			const cols = []
+			for (let i = 0; i < numTrendColumns; i++) {
+				const tc = options.summaryTrendStats[i]
+				let value = metric.values[tc]
 				if (tc === 'count') {
 					value = value.toString()
 				} else {
 					value = humanizeValue(value, metric, options.summaryTimeUnit)
 				}
-				var valLen = strWidth(value)
+				const valLen = strWidth(value)
 				if (valLen > trendColMaxLens[i]) {
 					trendColMaxLens[i] = valLen
 				}
@@ -594,15 +566,15 @@ function summarizeMetricsWithThresholds(options, data, decorate) {
 			trendCols[name] = cols
 			return
 		}
-		var values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
+		let values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
 		nonTrendValues[name] = values[0]
-		var valueLen = strWidth(values[0])
+		const valueLen = strWidth(values[0])
 		if (valueLen > nonTrendValueMaxLen) {
 			nonTrendValueMaxLen = valueLen
 		}
 		nonTrendExtras[name] = values.slice(1)
-		for (var i = 1; i < values.length; i++) {
-			var extraLen = strWidth(values[i])
+		for (let i = 1; i < values.length; i++) {
+			const extraLen = strWidth(values[i])
 			if (extraLen > nonTrendExtraMaxLens[i - 1]) {
 				nonTrendExtraMaxLens[i - 1] = extraLen
 			}
@@ -612,23 +584,23 @@ function summarizeMetricsWithThresholds(options, data, decorate) {
 	// sort all metrics but keep sub metrics grouped with their parent metrics
 	if (options.sortByName) {
 		names.sort(function (metric1, metric2) {
-			var parent1 = metric1.split('{', 1)[0]
-			var parent2 = metric2.split('{', 1)[0]
-			var result = parent1.localeCompare(parent2)
+			const parent1 = metric1.split('{', 1)[0]
+			const parent2 = metric2.split('{', 1)[0]
+			const result = parent1.localeCompare(parent2)
 			if (result !== 0) {
 				return result
 			}
-			var sub1 = metric1.substring(parent1.length)
-			var sub2 = metric2.substring(parent2.length)
+			const sub1 = metric1.substring(parent1.length)
+			const sub2 = metric2.substring(parent2.length)
 			return sub1.localeCompare(sub2)
 		})
 	}
 
-	var getData = function (name) {
+	const getData = function (name) {
 		if (trendCols.hasOwnProperty(name)) {
-			var cols = trendCols[name]
-			var tmpCols = new Array(numTrendColumns)
-			for (var i = 0; i < cols.length; i++) {
+			const cols = trendCols[name]
+			const tmpCols = new Array(numTrendColumns)
+			for (let i = 0; i < cols.length; i++) {
 				tmpCols[i] =
 					options.summaryTrendStats[i] +
 					'=' +
@@ -638,15 +610,15 @@ function summarizeMetricsWithThresholds(options, data, decorate) {
 			return tmpCols.join(' ')
 		}
 
-		var value = nonTrendValues[name]
-		var fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
+		const value = nonTrendValues[name]
+		let fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
 
-		var extras = nonTrendExtras[name]
-		if (extras.length == 1) {
+		const extras = nonTrendExtras[name]
+		if (extras.length === 1) {
 			fmtData = fmtData + ' ' + decorate(extras[0], palette.cyan, palette.faint)
 		} else if (extras.length > 1) {
-			var parts = new Array(extras.length)
-			for (var i = 0; i < extras.length; i++) {
+			const parts = new Array(extras.length)
+			for (let i = 0; i < extras.length; i++) {
 				parts[i] =
 					decorate(extras[i], palette.cyan, palette.faint) +
 					' '.repeat(nonTrendExtraMaxLens[i] - strWidth(extras[i]))
@@ -657,14 +629,14 @@ function summarizeMetricsWithThresholds(options, data, decorate) {
 		return fmtData
 	}
 
-	for (var name of names) {
-		var metric = data.metrics[name]
-		var mark = ' '
-		var markColor = function (text) {
+	for (const name of names) {
+		const metric = data.metrics[name]
+		const mark = ' '
+		const markColor = function (text) {
 			return text
 		} // noop
 
-		var fmtName =
+		const fmtName =
 			name +
 			decorate(
 				'.'.repeat(nameLenMax - strWidth(name) + 3) + ':',
@@ -693,8 +665,8 @@ function summarizeMetricsWithThresholds(options, data, decorate) {
  * @returns {string} A formatted summary of the test results.
  */
 function generateTextSummary(data, options, report) {
-	var mergedOpts = Object.assign({}, defaultOptions, data.options, options)
-	var lines = []
+	const mergedOpts = Object.assign({}, defaultOptions, data.options, options)
+	const lines = []
 
 	// TODO: move all of these functions into an object with methods?
 	/**
@@ -709,15 +681,15 @@ function generateTextSummary(data, options, report) {
 	}
 	if (mergedOpts.enableColors) {
 		decorate = function (text, color /*, ...rest*/) {
-			var result = '\x1b[' + color
-			for (var i = 2; i < arguments.length; i++) {
+			let result = '\x1b[' + color
+			for (let i = 2; i < arguments.length; i++) {
 				result += ';' + arguments[i]
 			}
 			return result + 'm' + text + '\x1b[0m'
 		}
 	}
 
-	const ANSI_CODES = {
+	const ANSI= {
 		reset: "\x1b[0m",
 
 		// Standard Colors
@@ -745,7 +717,7 @@ function generateTextSummary(data, options, report) {
 	};
 
 	const BOLD = '\u001b[1m'
-	const RESET = ANSI_CODES.reset;
+	const RESET = ANSI.reset;
 	const boldify = (text) => BOLD + text + RESET
 
 	const defaultIndent = ' '
@@ -755,7 +727,7 @@ function generateTextSummary(data, options, report) {
 	 * Displays a metrics block name (section heading).
 	 *
 	 * @param {string} sectionName - The section name (e.g., "checks", "http_req_duration").
-	 * @param {Partial<DisplayOptions>} opts - Display options.
+	 * @param {Partial<DisplayOptions>} [opts] - Display options.
 	 */
 	const displayMetricsBlockName = (sectionName, opts) => {
 		let bold = true;
@@ -780,7 +752,7 @@ function generateTextSummary(data, options, report) {
 	 * Displays a block of metrics with the given options.
 	 *
 	 * @param {Object[]} sectionMetrics - The metrics to display.
-	 * @param {Partial<DisplayOptions>} opts - Display options.
+	 * @param {Partial<DisplayOptions>} [opts] - Display options.
 	 */
 	const displayMetricsBlock = (sectionMetrics, opts) => {
 		const summarizeOpts = Object.assign({}, mergedOpts, opts)
@@ -799,7 +771,7 @@ function generateTextSummary(data, options, report) {
 			return
 		}
 		displayMetricsBlock(checks.metrics, {...opts, indent: opts.indent + defaultIndent, sortByName: false})
-		for (var i = 0; i < checks.ordered_checks.length; i++) {
+		for (let i = 0; i < checks.ordered_checks.length; i++) {
 			lines.push(summarizeCheck(metricGroupIndent + metricGroupIndent + opts.indent, checks.ordered_checks[i], decorate))
 		}
 		if (checks.ordered_checks.length > 0) {
@@ -811,9 +783,8 @@ function generateTextSummary(data, options, report) {
 	 * Displays thresholds and their satisfaction status.
 	 *
 	 * @param {Record<string, {metric: ReportMetric, thresholds: Threshold[]}>} thresholds - Threshold data.
-	 * @param {Partial<DisplayOptions>} [opts={indent: ''}] - Display options.
 	 */
-	const displayThresholds = (thresholds, opts = {indent: ''}) => {
+	const displayThresholds = (thresholds) => {
 		if (thresholds === undefined || thresholds === null) {
 			return
 		}
