@@ -14,8 +14,8 @@ import (
 	"fmt"
 	"hash"
 
-	"golang.org/x/crypto/md4"       //nolint:staticcheck // #nosec G501 // MD4 is weak, but we need it for compatibility
-	"golang.org/x/crypto/ripemd160" // no lint:staticcheck // #nosec G501 // RIPEMD160 is weak, but we need it for compatibility
+	"golang.org/x/crypto/md4"       //nolint:staticcheck,gosec // MD4 is weak, but we need it for compatibility
+	"golang.org/x/crypto/ripemd160" //nolint:staticcheck,gosec // RIPEMD160 is weak, but we need it for compatibility
 
 	"github.com/grafana/sobek"
 

@@ -47,7 +47,7 @@ func MakeBatchRequests(
 		result <- err
 	}
 
-	counter, i32reqCount := int32(-1), int32(reqCount)
+	counter, i32reqCount := int32(-1), int32(reqCount) //nolint:gosec
 	for i := 0; i < workers; i++ {
 		go func() {
 			for {

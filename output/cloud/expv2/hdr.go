@@ -212,12 +212,12 @@ func resolveBucketIndex(val float64) uint32 {
 	//          = (n-k+1)<<k + u>>(n-k) - (1<<k) =
 	//          = (n-k)<<k + u>>(n-k)
 	//
-	nkdiff := uint64(bits.Len64(upscaled>>k)) - 1 // msb index
+	nkdiff := uint64(bits.Len64(upscaled>>k)) - 1 //nolint:gosec // msb index
 
 	// We cast safely downscaling because we don't expect we may hit the uint32 limit
 	// with the bucket index. The bucket represented from the index as MaxUint32
 	// would be a very huge number bigger than the trackable limits.
-	return uint32((nkdiff << k) + (upscaled >> nkdiff))
+	return uint32((nkdiff << k) + (upscaled >> nkdiff)) //nolint:gosec
 }
 
 // Add implements the metricValue interface.

@@ -96,7 +96,7 @@ func (pvic PerVUIterationsConfig) GetExecutionRequirements(et *lib.ExecutionTupl
 	return []lib.ExecutionStep{
 		{
 			TimeOffset: 0,
-			PlannedVUs: uint64(pvic.GetVUs(et)),
+			PlannedVUs: uint64(pvic.GetVUs(et)), //nolint:gosec
 		},
 		{
 			TimeOffset: pvic.MaxDuration.TimeDuration() + pvic.GracefulStop.TimeDuration(),
@@ -150,11 +150,11 @@ func (pvi PerVUIterations) Run(parentCtx context.Context, out chan<- metrics.Sam
 		"vus": numVUs, "iterations": iterations, "maxDuration": duration, "type": pvi.config.GetType(),
 	}).Debug("Starting executor run...")
 
-	totalIters := uint64(numVUs * iterations)
+	totalIters := numVUs * iterations
 	doneIters := new(uint64)
 
 	vusFmt := pb.GetFixedLengthIntFormat(numVUs)
-	itersFmt := pb.GetFixedLengthIntFormat(int64(totalIters))
+	itersFmt := pb.GetFixedLengthIntFormat(totalIters)
 	progressFn := func() (float64, []string) {
 		spent := time.Since(startTime)
 		progVUs := fmt.Sprintf(vusFmt+" VUs", numVUs)

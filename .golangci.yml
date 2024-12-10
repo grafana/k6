@@ -1,4 +1,4 @@
-# v1.60.1
+# v1.62.2
 # Please don't remove the first line. It uses in CI to determine the golangci version
 run:
   timeout: 5m

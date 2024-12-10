@@ -30,18 +30,18 @@ func GetFixedLengthIntFormat(maxValue int64) (formatStr string) {
 // returned string corresponds to the number of digits in the supplied maxValue
 // and the desired precision.
 func GetFixedLengthFloatFormat(maxValue float64, precision uint) (formatStr string) {
-	resLen := 1
+	resLen := uint(1)
 	if maxValue < 0 {
 		maxValue = -maxValue
 		resLen++
 	}
 	if maxValue >= 10 {
-		resLen += int(math.Log10(maxValue))
+		resLen += uint(math.Log10(maxValue))
 	}
 	if precision > 0 {
-		resLen += int(precision + 1)
+		resLen += precision + 1
 	}
-	return "%0" + strconv.Itoa(resLen) + "." + strconv.Itoa(int(precision)) + "f"
+	return "%0" + strconv.FormatUint(uint64(resLen), 10) + "." + strconv.Itoa(int(precision)) + "f"
 }
 
 // GetFixedLengthDuration takes a *positive* duration and its max value and
@@ -68,7 +68,7 @@ func GetFixedLengthDuration(d, maxDuration time.Duration) (result string) {
 	// Positions:    0    1    2    3    4    5    6    7    8    9    10   11   12   13   14   15   16   17
 	buf := [18]byte{'0', '0', '0', '0', '0', '0', 'd', '0', '0', 'h', '0', '0', 'm', '0', '0', '.', '0', 's'}
 
-	u := uint64(d.Round(rounding) / (rounding))
+	u := d.Round(rounding) / (rounding)
 	u, buf[16] = u/10, byte(u%10)+'0'
 	u, buf[14] = u/10, byte(u%10)+'0'
 	if maxDuration < 10*time.Second {

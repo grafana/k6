@@ -36,20 +36,20 @@ func WithAbortReasonIfNone(err error, abortReason AbortReason) error {
 		// The given error already has an abort reason, do nothing
 		return err
 	}
-	return withAbortReason{err, abortReason}
+	return withAbortReasonError{err, abortReason}
 }
 
-type withAbortReason struct {
+type withAbortReasonError struct {
 	error
 	abortReason AbortReason
 }
 
-func (ar withAbortReason) Unwrap() error {
+func (ar withAbortReasonError) Unwrap() error {
 	return ar.error
 }
 
-func (ar withAbortReason) AbortReason() AbortReason {
+func (ar withAbortReasonError) AbortReason() AbortReason {
 	return ar.abortReason
 }
 
-var _ HasAbortReason = withAbortReason{}
+var _ HasAbortReason = withAbortReasonError{}

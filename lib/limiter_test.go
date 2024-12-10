@@ -70,7 +70,7 @@ func TestSlotLimiters(t *testing.T) {
 				}()
 			}
 			wg.Wait()
-			assert.Equal(t, uint32(tc.expMid), atomic.LoadUint32(&counter))
+			assert.EqualValues(t, tc.expMid, atomic.LoadUint32(&counter))
 
 			if tc.limit != 0 && tc.limit < tc.launches {
 				wg.Add(tc.launches - tc.limit)
@@ -78,7 +78,7 @@ func TestSlotLimiters(t *testing.T) {
 					l.End()
 				}
 				wg.Wait()
-				assert.Equal(t, uint32(tc.launches), atomic.LoadUint32(&counter))
+				assert.EqualValues(t, tc.launches, atomic.LoadUint32(&counter))
 			}
 		})
 	}

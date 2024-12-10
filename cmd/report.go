@@ -21,7 +21,7 @@ func createReport(u *usage.Usage, execScheduler *execution.Scheduler) map[string
 	m["duration"] = execState.GetCurrentTestRunDuration().String()
 	m["goos"] = runtime.GOOS
 	m["goarch"] = runtime.GOARCH
-	m["vus_max"] = uint64(execState.GetInitializedVUsCount())
+	m["vus_max"] = uint64(execState.GetInitializedVUsCount()) //nolint:gosec
 	m["iterations"] = execState.GetFullIterationCount()
 	executors := make(map[string]int)
 	for _, ec := range execScheduler.GetExecutorConfigs() {

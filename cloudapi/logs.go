@@ -226,11 +226,11 @@ func (sfn sleeperFunc) Sleep(d time.Duration) {
 // between the latest iteration and the next retry.
 // Interval is used as the base to compute an exponential backoff,
 // if the computed interval overtakes the max interval then max will be used.
-func retry(s sleeper, attempts uint, interval, maxDuration time.Duration, do func() error) (err error) {
+func retry(s sleeper, attempts int, interval, maxDuration time.Duration, do func() error) (err error) {
 	baseInterval := math.Abs(interval.Truncate(time.Second).Seconds())
 	r := rand.New(rand.NewSource(time.Now().UnixNano())) //nolint:gosec
 
-	for i := 0; i < int(attempts); i++ {
+	for i := 0; i < attempts; i++ {
 		if i > 0 {
 			// wait = (interval ^ i) + random milliseconds
 			wait := time.Duration(math.Pow(baseInterval, float64(i))) * time.Second

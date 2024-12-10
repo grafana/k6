@@ -28,7 +28,7 @@ func TestFormat(t *testing.T) {
 
 	t.Run("Exception", func(t *testing.T) {
 		t.Parallel()
-		err := fakeException{error: errors.New("simple error"), stack: "stack trace"}
+		err := fakeExceptionError{error: errors.New("simple error"), stack: "stack trace"}
 		errorText, fields := errext.Format(err)
 		assert.Equal(t, "stack trace", errorText)
 		assert.Empty(t, fields)
@@ -44,27 +44,27 @@ func TestFormat(t *testing.T) {
 
 	t.Run("ExceptionWithHint", func(t *testing.T) {
 		t.Parallel()
-		err := fakeException{error: errext.WithHint(errors.New("error with hint"), "hint message"), stack: "stack trace"}
+		err := fakeExceptionError{error: errext.WithHint(errors.New("error with hint"), "hint message"), stack: "stack trace"}
 		errorText, fields := errext.Format(err)
 		assert.Equal(t, "stack trace", errorText)
 		assert.Equal(t, map[string]interface{}{"hint": "hint message"}, fields)
 	})
 }
 
-type fakeException struct {
+type fakeExceptionError struct {
 	error
 	stack string
 	abort errext.AbortReason
 }
 
-func (e fakeException) StackTrace() string {
+func (e fakeExceptionError) StackTrace() string {
 	return e.stack
 }
 
-func (e fakeException) AbortReason() errext.AbortReason {
+func (e fakeExceptionError) AbortReason() errext.AbortReason {
 	return e.abort
 }
 
-func (e fakeException) Unwrap() error {
+func (e fakeExceptionError) Unwrap() error {
 	return e.error
 }
