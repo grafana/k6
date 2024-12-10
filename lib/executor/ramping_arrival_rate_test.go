@@ -281,7 +281,7 @@ func BenchmarkRampingArrivalRateRun(b *testing.B) {
 			testRunState := getTestRunState(b, lib.Options{}, runner)
 			es := lib.NewExecutionState(
 				testRunState, mustNewExecutionTuple(nil, nil),
-				uint64(tc.prealloc.Int64), uint64(tc.prealloc.Int64),
+				uint64(tc.prealloc.Int64), uint64(tc.prealloc.Int64), //nolint:gosec
 			)
 
 			// an high target to get the highest rate
@@ -578,8 +578,8 @@ func sqrtRat(x *big.Rat) *big.Rat {
 	var z, a, b big.Rat
 	var ns, ds big.Int
 	ni, di := x.Num(), x.Denom()
-	z.SetFrac(ns.Rsh(ni, uint(ni.BitLen())/2), ds.Rsh(di, uint(di.BitLen())/2))
-	for i := 10; i > 0; i-- { // TODO: better termination
+	z.SetFrac(ns.Rsh(ni, uint(ni.BitLen())/2), ds.Rsh(di, uint(di.BitLen())/2)) //nolint:gosec
+	for i := 10; i > 0; i-- {                                                   // TODO: better termination
 		a.Sub(a.Mul(&z, &z), x)
 		f, _ := a.Float64()
 		if f == 0 {

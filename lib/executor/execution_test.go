@@ -44,19 +44,19 @@ func TestExecutionStateVUIDs(t *testing.T) {
 			es := lib.NewExecutionState(nil, et, 0, 0)
 
 			idl, idg := es.GetUniqueVUIdentifiers()
-			assert.Equal(t, uint64(1), idl)
+			assert.EqualValues(t, 1, idl)
 			expGlobal := start + 1
-			assert.Equal(t, uint64(expGlobal), idg)
+			assert.EqualValues(t, expGlobal, idg)
 
 			idl, idg = es.GetUniqueVUIdentifiers()
-			assert.Equal(t, uint64(2), idl)
+			assert.EqualValues(t, 2, idl)
 			expGlobal += offsets[0]
-			assert.Equal(t, uint64(expGlobal), idg)
+			assert.EqualValues(t, expGlobal, idg)
 
 			idl, idg = es.GetUniqueVUIdentifiers()
-			assert.Equal(t, uint64(3), idl)
+			assert.EqualValues(t, 3, idl)
 			expGlobal += offsets[0]
-			assert.Equal(t, uint64(expGlobal), idg)
+			assert.EqualValues(t, expGlobal, idg)
 
 			seed := time.Now().UnixNano()
 			r := rand.New(rand.NewSource(seed)) //nolint:gosec
@@ -72,8 +72,8 @@ func TestExecutionStateVUIDs(t *testing.T) {
 			}
 			wg.Wait()
 			idl, idg = es.GetUniqueVUIdentifiers()
-			assert.Equal(t, uint64(4+count), idl)
-			assert.Equal(t, uint64((3+count)*int(offsets[0])+int(start+1)), idg)
+			assert.EqualValues(t, 4+count, idl)
+			assert.EqualValues(t, (3+count)*int(offsets[0])+int(start+1), idg)
 		})
 	}
 }

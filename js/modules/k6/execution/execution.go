@@ -127,15 +127,15 @@ func (mi *ModuleInstance) newScenarioInfo() (*sobek.Object, error) {
 	return newInfoObj(rt, si)
 }
 
-//nolint:lll,gochecknoglobals
-var instanceInfoInitContextErr = common.NewInitContextError("getting instance information in the init context is not supported")
+//nolint:lll
+var errInstanceInfoInitContext = common.NewInitContextError("getting instance information in the init context is not supported")
 
 // newInstanceInfo returns a sobek.Object with property accessors to retrieve
 // information about the local instance stats.
 func (mi *ModuleInstance) newInstanceInfo() (*sobek.Object, error) {
 	es := lib.GetExecutionState(mi.vu.Context())
 	if es == nil {
-		return nil, instanceInfoInitContextErr
+		return nil, errInstanceInfoInitContext
 	}
 	rt := mi.vu.Runtime()
 
@@ -160,8 +160,7 @@ func (mi *ModuleInstance) newInstanceInfo() (*sobek.Object, error) {
 	return newInfoObj(rt, ti)
 }
 
-//nolint:gochecknoglobals
-var testInfoInitContextErr = common.NewInitContextError("getting test options in the init context is not supported")
+var errTestInfoInitContext = common.NewInitContextError("getting test options in the init context is not supported")
 
 // newTestInfo returns a sobek.Object with property accessors to retrieve
 // information and control execution of the overall test run.
@@ -184,7 +183,7 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 		"options": func() interface{} {
 			vuState := mi.vu.State()
 			if vuState == nil {
-				common.Throw(rt, testInfoInitContextErr)
+				common.Throw(rt, errTestInfoInitContext)
 			}
 			if optionsObject == nil {
 				opts, err := optionsAsObject(rt, vuState.Options)
@@ -200,15 +199,14 @@ func (mi *ModuleInstance) newTestInfo() (*sobek.Object, error) {
 	return newInfoObj(rt, ti)
 }
 
-//nolint:gochecknoglobals
-var vuInfoInitContextErr = common.NewInitContextError("getting VU information in the init context is not supported")
+var errVUInfoInitContex = common.NewInitContextError("getting VU information in the init context is not supported")
 
 // newVUInfo returns a sobek.Object with property accessors to retrieve
 // information about the currently executing VU.
 func (mi *ModuleInstance) newVUInfo() (*sobek.Object, error) {
 	vuState := mi.vu.State()
 	if vuState == nil {
-		return nil, vuInfoInitContextErr
+		return nil, errVUInfoInitContex
 	}
 	rt := mi.vu.Runtime()
 

@@ -173,7 +173,7 @@ func TestSetTimeoutContextCancel(t *testing.T) {
 	for i := 0; i < 2000; i++ {
 		ctx, cancel := context.WithCancel(context.Background())
 		runtime.CancelContext = cancel
-		runtime.VU.CtxField = ctx
+		runtime.VU.CtxField = ctx //nolint:fatcontext
 		runtime.VU.RuntimeField.ClearInterrupt()
 		const interruptMsg = "definitely an interrupt"
 		go func() {

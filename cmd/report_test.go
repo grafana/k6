@@ -45,7 +45,7 @@ func TestCreateReport(t *testing.T) {
 		require.NoError(t, err)
 
 		s.GetState().ModInitializedVUsCount(6)
-		s.GetState().AddFullIterations(uint64(opts.Iterations.Int64))
+		s.GetState().AddFullIterations(uint64(opts.Iterations.Int64)) //nolint:gosec
 		s.GetState().MarkStarted()
 		time.Sleep(10 * time.Millisecond)
 		s.GetState().MarkEnded()

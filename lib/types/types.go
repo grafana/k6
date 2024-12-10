@@ -173,7 +173,7 @@ func getInt64(v interface{}) (int64, error) {
 	case int64:
 		return n, nil
 	case uint:
-		return int64(n), nil
+		return int64(n), nil //nolint:gosec
 	case uint8:
 		return int64(n), nil
 	case uint16:

@@ -296,7 +296,7 @@ func (b *Bundle) newCompiler(logger logrus.FieldLogger) *compiler.Compiler {
 
 func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance, error) {
 	rt := vuImpl.runtime
-	err := b.setupJSRuntime(rt, int64(vuID), b.preInitState.Logger)
+	err := b.setupJSRuntime(rt, vuID, b.preInitState.Logger)
 	if err != nil {
 		return nil, err
 	}
@@ -375,7 +375,7 @@ func (b *Bundle) instantiate(vuImpl *moduleVUImpl, vuID uint64) (*BundleInstance
 	return bi, nil
 }
 
-func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID int64, logger logrus.FieldLogger) error {
+func (b *Bundle) setupJSRuntime(rt *sobek.Runtime, vuID uint64, logger logrus.FieldLogger) error {
 	rt.SetFieldNameMapper(common.FieldNameMapper{})
 	rt.SetRandSource(common.NewRandSource())
 

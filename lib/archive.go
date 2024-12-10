@@ -125,7 +125,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 			}
 			return nil, err
 		}
-		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA {
+		if hdr.Typeflag != tar.TypeReg && hdr.Typeflag != tar.TypeRegA { //nolint:staticcheck
 			continue
 		}
 
@@ -166,7 +166,7 @@ func ReadArchive(in io.Reader) (*Archive, error) {
 		case "https", "file":
 			fileSystem := arc.getFs(pfx)
 			name = filepath.FromSlash(name)
-			if err = fsext.WriteFile(fileSystem, name, data, fs.FileMode(hdr.Mode)); err != nil {
+			if err = fsext.WriteFile(fileSystem, name, data, fs.FileMode(hdr.Mode)); err != nil { //nolint:gosec
 				return nil, err
 			}
 			if err = fileSystem.Chtimes(name, hdr.AccessTime, hdr.ModTime); err != nil {

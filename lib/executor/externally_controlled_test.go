@@ -104,6 +104,6 @@ func TestExternallyControlledRun(t *testing.T) {
 
 	wg.Wait()
 	require.NoError(t, <-errCh)
-	assert.InDelta(t, 48, int(atomic.LoadUint64(doneIters)), 2)
+	assert.InDelta(t, 48, atomic.LoadUint64(doneIters), 2)
 	assert.Equal(t, [][]int64{{2, 10}, {4, 10}, {8, 20}, {4, 10}, {0, 10}}, resultVUCount)
 }

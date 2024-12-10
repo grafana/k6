@@ -30,20 +30,20 @@ func WithExitCodeIfNone(err error, exitCode exitcodes.ExitCode) error {
 		// The given error already has an exit code, do nothing
 		return err
 	}
-	return withExitCode{err, exitCode}
+	return withExitCodeError{err, exitCode}
 }
 
-type withExitCode struct {
+type withExitCodeError struct {
 	error
 	exitCode exitcodes.ExitCode
 }
 
-func (wh withExitCode) Unwrap() error {
+func (wh withExitCodeError) Unwrap() error {
 	return wh.error
 }
 
-func (wh withExitCode) ExitCode() exitcodes.ExitCode {
+func (wh withExitCodeError) ExitCode() exitcodes.ExitCode {
 	return wh.exitCode
 }
 
-var _ HasExitCode = withExitCode{}
+var _ HasExitCode = withExitCodeError{}

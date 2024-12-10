@@ -207,7 +207,7 @@ func NewExecutionState(
 	resumeNotify := make(chan struct{})
 	close(resumeNotify) // By default the ExecutionState starts unpaused
 
-	maxUnplannedUninitializedVUs := int64(maxPossibleVUs - maxPlannedVUs)
+	maxUnplannedUninitializedVUs := int64(maxPossibleVUs - maxPlannedVUs) //nolint:gosec
 
 	segIdx := NewSegmentedIndex(et)
 	return &ExecutionState{
@@ -240,7 +240,7 @@ func (es *ExecutionState) GetUniqueVUIdentifiers() (uint64, uint64) {
 	es.vuIDSegIndexMx.Lock()
 	defer es.vuIDSegIndexMx.Unlock()
 	scaled, unscaled := es.vuIDSegIndex.Next()
-	return uint64(scaled), uint64(unscaled)
+	return uint64(scaled), uint64(unscaled) //nolint:gosec
 }
 
 // GetInitializedVUsCount returns the total number of currently initialized VUs.

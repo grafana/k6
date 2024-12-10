@@ -870,15 +870,15 @@ func TestBundleNotSharable(t *testing.T) {
 	require.NoError(t, err)
 
 	bundles := map[string]*Bundle{"Source": b1, "Archive": b2}
-	vus, iters := 10, 1000
+	var vus, iters uint64 = 10, 1000
 	for name, b := range bundles {
 		b := b
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			for i := 0; i < vus; i++ {
-				bi, err := b.Instantiate(context.Background(), uint64(i))
+			for i := uint64(0); i < vus; i++ {
+				bi, err := b.Instantiate(context.Background(), i)
 				require.NoError(t, err)
-				for j := 0; j < iters; j++ {
+				for j := uint64(0); j < iters; j++ {
 					require.NoError(t, bi.Runtime.Set("__ITER", j))
 					_, err := bi.getCallableExport(consts.DefaultFn)(sobek.Undefined())
 					require.NoError(t, err)
