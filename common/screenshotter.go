@@ -150,7 +150,6 @@ func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 	return p.resetViewport()
 }
 
-//nolint:funlen
 func (s *screenshotter) screenshot(
 	sess session, doc, viewport *Rect, format ImageFormat, omitBackground bool, quality int64, path string,
 ) ([]byte, error) {
@@ -178,30 +177,9 @@ func (s *screenshotter) screenshot(
 		capture.WithFormat(cdppage.CaptureScreenshotFormatPng)
 	}
 
-	// Add clip region
-	//nolint:dogsled
-	_, _, _, _, visualViewport, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(s.ctx, sess))
+	visualViewportScale, visualViewportPageX, visualViewportPageY, err := getViewPortDimensions(s.ctx, sess, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("getting layout metrics for screenshot: %w", err)
-	}
-
-	visualViewportScale := 1.0
-	visualViewportPageX, visualViewportPageY := 0.0, 0.0
-	// we had a null pointer panic cases, when visualViewport is nil
-	// instead of the erroring out, we fallback to defaults and still try to do a screenshot
-	if visualViewport != nil {
-		visualViewportScale = visualViewport.Scale
-		visualViewportPageX = visualViewport.PageX
-		visualViewportPageY = visualViewport.PageY
-	} else {
-		s.logger.Warnf(
-			"Screenshotter::screenshot",
-			"chrome browser returned nil on page.getLayoutMetrics, falling back to defaults for visualViewport "+
-				"(scale: %v, pageX: %v, pageY: %v)."+
-				"This is non-standard behavior, if possible please report this issue (with reproducible script) "+
-				"to the https://github.com/grafana/xk6-browser/issues/1502.",
-			visualViewportScale, visualViewportPageX, visualViewportPageY,
-		)
+		return nil, err
 	}
 
 	if doc == nil {
@@ -253,6 +231,42 @@ func (s *screenshotter) screenshot(
 	}
 
 	return buf, nil
+}
+
+func getViewPortDimensions(ctx context.Context, sess session, logger *log.Logger) (float64, float64, float64, error) {
+	visualViewportScale := 1.0
+	visualViewportPageX, visualViewportPageY := 0.0, 0.0
+
+	// Add clip region
+	//nolint:dogsled
+	_, visualViewport, _, _, cssVisualViewport, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(ctx, sess))
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("getting layout metrics for screenshot: %w", err)
+	}
+
+	// we had a null pointer panic cases, when visualViewport is nil
+	// instead of the erroring out, we fallback to defaults and still try to do a screenshot
+	switch {
+	case cssVisualViewport != nil:
+		visualViewportScale = cssVisualViewport.Scale
+		visualViewportPageX = cssVisualViewport.PageX
+		visualViewportPageY = cssVisualViewport.PageY
+	case visualViewport != nil:
+		visualViewportScale = visualViewport.Scale
+		visualViewportPageX = visualViewport.PageX
+		visualViewportPageY = visualViewport.PageY
+	default:
+		logger.Warnf(
+			"Screenshotter::screenshot",
+			"chrome browser returned nil on page.getLayoutMetrics, falling back to defaults for visualViewport "+
+				"(scale: %v, pageX: %v, pageY: %v)."+
+				"This is non-standard behavior, if possible please report this issue (with reproducible script) "+
+				"to the https://github.com/grafana/xk6-browser/issues/1502.",
+			visualViewportScale, visualViewportPageX, visualViewportPageY,
+		)
+	}
+
+	return visualViewportScale, visualViewportPageX, visualViewportPageY, nil
 }
 
 //nolint:funlen
