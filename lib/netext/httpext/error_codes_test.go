@@ -189,7 +189,7 @@ func TestHTTP2StreamError(t *testing.T) {
 			panic("expected http.ResponseWriter to be http.Flusher")
 		}
 		f.Flush()
-		time.Sleep(time.Millisecond * 2)
+		time.Sleep(time.Millisecond * 200)
 		panic("expected internal error")
 	})
 	client := http.Client{
