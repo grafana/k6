@@ -60,14 +60,18 @@ jobs:
         with:
           go-version: 1.23.x
           check-latest: true
+      - name: Remove the default Go installation
+        if: matrix.platform == 'windows-latest' || matrix.platform == 'windows-2019'
+        shell: pwsh
+        run: |
+          $go_path = (Get-Command go).Source
+          Write-Host "Removing Go executable from: $go_path"
+          Remove-Item -Force $go_path
       - name: Install Go tip
         run: |
+          go version
           go install golang.org/dl/gotip@latest
           gotip download
-          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
-          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
-          echo "$HOME/go/bin" >> "$GITHUB_PATH"
-          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
       - name: Run tests
         run: |
           set -x
