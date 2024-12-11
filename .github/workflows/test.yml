@@ -64,7 +64,6 @@ jobs:
         run: |
           go install golang.org/dl/gotip@latest
           gotip download
-          unzip go.zip -d $HOME/sdk
           echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
           echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
