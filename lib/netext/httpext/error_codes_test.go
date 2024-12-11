@@ -315,6 +315,9 @@ func TestHTTP2ConnectionError(t *testing.T) {
 func TestHTTP2GoAwayError(t *testing.T) {
 	t.Parallel()
 
+	if runtime.GOOS == "windows" {
+		t.Skip("Skipped due to https://github.com/grafana/k6/issues/4098")
+	}
 	tb := getHTTP2ServerWithCustomConnContext(t)
 	tb.Mux.HandleFunc("/tsr", func(_ http.ResponseWriter, req *http.Request) {
 		conn := req.Context().Value(connKey).(*tls.Conn)
