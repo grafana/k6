@@ -53,13 +53,6 @@ jobs:
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      - name: Install Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: 1.23.x
-          check-latest: true
       - name: Remove the default Go installation
         if: matrix.platform == 'windows-latest' || matrix.platform == 'windows-2019'
         shell: pwsh
@@ -67,6 +60,13 @@ jobs:
           $go_path = (Get-Command go).Source
           Write-Host "Removing Go executable from: $go_path"
           Remove-Item -Force $go_path
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.23.x
+          check-latest: true
       - name: Install Go tip
         run: |
           go version
