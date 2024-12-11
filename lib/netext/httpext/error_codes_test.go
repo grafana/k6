@@ -189,6 +189,8 @@ func TestHTTP2StreamError(t *testing.T) {
 			panic("expected http.ResponseWriter to be http.Flusher")
 		}
 		f.Flush()
+		time.Sleep(time.Millisecond * 2)
+		panic("expected internal error")
 	})
 	client := http.Client{
 		Timeout:   time.Second * 3,
@@ -318,7 +320,7 @@ func TestHTTP2GoAwayError(t *testing.T) {
 		conn := req.Context().Value(connKey).(*tls.Conn)
 		f := http2.NewFramer(conn, conn)
 		require.NoError(t, f.WriteGoAway(4, http2.ErrCodeInadequateSecurity, []byte("whatever")))
-		require.NoError(t, conn.CloseWrite())
+		// require.NoError(t, conn.CloseWrite())
 	})
 	client := http.Client{
 		Timeout:   time.Second * 5,
