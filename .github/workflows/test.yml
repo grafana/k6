@@ -81,7 +81,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          go test "${args[@]}" -timeout 800s ./...
+          gotip test "${args[@]}" -timeout 800s ./...
 
   test-current-cov:
     strategy:
