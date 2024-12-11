@@ -13,6 +13,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // ScreenshotPersister is the type that all file persisters must implement. It's job is
@@ -67,10 +68,15 @@ func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 type screenshotter struct {
 	ctx       context.Context
 	persister ScreenshotPersister
+	logger    *log.Logger
 }
 
-func newScreenshotter(ctx context.Context, sp ScreenshotPersister) *screenshotter {
-	return &screenshotter{ctx, sp}
+func newScreenshotter(
+	ctx context.Context,
+	sp ScreenshotPersister,
+	logger *log.Logger,
+) *screenshotter {
+	return &screenshotter{ctx, sp, logger}
 }
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
@@ -183,11 +189,19 @@ func (s *screenshotter) screenshot(
 	visualViewportPageX, visualViewportPageY := 0.0, 0.0
 	// we had a null pointer panic cases, when visualViewport is nil
 	// instead of the erroring out, we fallback to defaults and still try to do a screenshot
-	// ideally this case also should be logged
 	if visualViewport != nil {
 		visualViewportScale = visualViewport.Scale
 		visualViewportPageX = visualViewport.PageX
 		visualViewportPageY = visualViewport.PageY
+	} else {
+		s.logger.Warnf(
+			"Screenshotter::screenshot",
+			"chrome browser returned nil on page.getLayoutMetrics, falling back to defaults for visualViewport "+
+				"(scale: %v, pageX: %v, pageY: %v)."+
+				"This is non-standard behavior, if possible please report this issue (with reproducible script) "+
+				"to the https://github.com/grafana/xk6-browser/issues/1502.",
+			visualViewportScale, visualViewportPageX, visualViewportPageY,
+		)
 	}
 
 	if doc == nil {

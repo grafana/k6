@@ -1327,7 +1327,7 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp)
+	s := newScreenshotter(spanCtx, sp, p.logger)
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
 		err := fmt.Errorf("taking screenshot of page: %w", err)

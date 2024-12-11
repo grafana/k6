@@ -1317,7 +1317,7 @@ func (h *ElementHandle) Screenshot(
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp)
+	s := newScreenshotter(spanCtx, sp, h.logger)
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
 		err := fmt.Errorf("taking screenshot of elementHandle: %w", err)
