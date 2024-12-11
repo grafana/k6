@@ -174,19 +174,30 @@ func (s *screenshotter) screenshot(
 
 	// Add clip region
 	//nolint:dogsled
-	_, visualViewport, _, _, _, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(s.ctx, sess))
+	_, _, _, _, visualViewport, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(s.ctx, sess))
 	if err != nil {
 		return nil, fmt.Errorf("getting layout metrics for screenshot: %w", err)
 	}
 
+	visualViewportScale := 1.0
+	visualViewportPageX, visualViewportPageY := 0.0, 0.0
+	// we had a null pointer panic cases, when visualViewport is nil
+	// instead of the erroring out, we fallback to defaults and still try to do a screenshot
+	// ideally this case also should be logged
+	if visualViewport != nil {
+		visualViewportScale = visualViewport.Scale
+		visualViewportPageX = visualViewport.PageX
+		visualViewportPageY = visualViewport.PageY
+	}
+
 	if doc == nil {
 		s := Size{
-			Width:  viewport.Width / visualViewport.Scale,
-			Height: viewport.Height / visualViewport.Scale,
+			Width:  viewport.Width / visualViewportScale,
+			Height: viewport.Height / visualViewportScale,
 		}.enclosingIntSize()
 		doc = &Rect{
-			X:      visualViewport.PageX + viewport.X,
-			Y:      visualViewport.PageY + viewport.Y,
+			X:      visualViewportPageX + viewport.X,
+			Y:      visualViewportPageY + viewport.Y,
 			Width:  s.Width,
 			Height: s.Height,
 		}
@@ -194,7 +205,7 @@ func (s *screenshotter) screenshot(
 
 	scale := 1.0
 	if viewport != nil {
-		scale = visualViewport.Scale
+		scale = visualViewportScale
 	}
 	clip = &cdppage.Viewport{
 		X:      doc.X,
