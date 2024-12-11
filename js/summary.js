@@ -1,3 +1,6 @@
+// FIXME (@oleiade): We need a more consistent and central way to manage indentations
+// FIXME (@oleiade): We call them "options" everywhere but they're actually configuration I would argue
+
 /**
  * @typedef {Object} Threshold
  * @property {string} source - The threshold expression source.
@@ -142,42 +145,6 @@ function strWidth(s) {
 	return width
 }
 
-/**
- * Summarizes single check result.
- *
- * @param {string} indent
- * @param {{name: string, passes: number, fails: number}} check - The check object with name, passes and fails
- * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors.
- * @returns {string} - A formatted line summarizing the check.
- */
-function summarizeCheck(indent, check, decorate) {
-	if (check.fails === 0) {
-		return decorate(indent + succMark + ' ' + check.name, palette.green)
-	}
-
-	const succPercent = Math.floor((100 * check.passes) / (check.passes + check.fails))
-	return decorate(
-		indent +
-		failMark +
-		' ' +
-		check.name +
-		'\n' +
-		indent +
-		' ' +
-		detailsPrefix +
-		'  ' +
-		succPercent +
-		'% — ' +
-		succMark +
-		' ' +
-		check.passes +
-		' / ' +
-		failMark +
-		' ' +
-		check.fails,
-		palette.red
-	)
-}
 
 /**
  * Extracts a display name for a metric, handling sub-metrics (e.g. "metric{sub}" -> "{ sub }").
@@ -364,296 +331,385 @@ function nonTrendMetricValueForSum(metric, timeUnit) {
 	}
 }
 
-// FIXME (@oleiade) split this code up for reusability (for instance in the summarizeThreshold function below)
+
 /**
- * Summarizes given metrics into an array of formatted lines.
+ * Sorts metrics by name, keeping submetrics grouped with their parent metrics.
  *
- * @param {Object} options - Display options merged with defaultOptions.
- * @param {{metrics: Object[]}} data - The data object containing metrics.
- * @param {(text: string, ...colors: number[]) => string} decorate - A decoration function for ANSI colors.
- * @returns {string[]} Array of formatted lines.
+ * @param {string[]} metricNames - The metric names to sort.
+ * @returns {string[]} - The sorted metric names.
  */
-function summarizeMetrics(options, data, decorate) {
-	const indent = options.indent + ' '
-	let result = []
-
-	const names = []
-	let nameLenMax = 0
-
-	const nonTrendValues = {}
-	let nonTrendValueMaxLen = 0
-	const nonTrendExtras = {}
-	const nonTrendExtraMaxLens = [0, 0]
-
-	const trendCols = {}
-	const numTrendColumns = options.summaryTrendStats.length
-	const trendColMaxLens = new Array(numTrendColumns).fill(0)
-	forEach(data.metrics, function (name, metric) {
-		names.push(name)
-		// When calculating widths for metrics, account for the indentation on submetrics.
-		const displayName = indentForMetric(name) + displayNameForMetric(name)
-		const displayNameWidth = strWidth(displayName)
-		if (displayNameWidth > nameLenMax) {
-			nameLenMax = displayNameWidth
+function sortMetricsByName(metricNames) {
+	metricNames.sort(function (lhsMetricName, rhsMetricName) {
+		const lhsParent = lhsMetricName.split('{', 1)[0]
+		const rhsParent = rhsMetricName.split('{', 1)[0]
+		const result = lhsParent.localeCompare(rhsParent)
+		if (result !== 0) {
+			return result
 		}
-
-		if (metric.type === 'trend') {
-			const cols = []
-			for (let i = 0; i < numTrendColumns; i++) {
-				const tc = options.summaryTrendStats[i]
-				let value = metric.values[tc]
-				if (tc === 'count') {
-					value = value.toString()
-				} else {
-					value = humanizeValue(value, metric, options.summaryTimeUnit)
-				}
-				const valLen = strWidth(value)
-				if (valLen > trendColMaxLens[i]) {
-					trendColMaxLens[i] = valLen
-				}
-				cols[i] = value
-			}
-			trendCols[name] = cols
-			return
-		}
-		const values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
-		nonTrendValues[name] = values[0]
-		const valueLen = strWidth(values[0])
-		if (valueLen > nonTrendValueMaxLen) {
-			nonTrendValueMaxLen = valueLen
-		}
-		nonTrendExtras[name] = values.slice(1)
-		for (let i = 1; i < values.length; i++) {
-			const extraLen = strWidth(values[i])
-			if (extraLen > nonTrendExtraMaxLens[i - 1]) {
-				nonTrendExtraMaxLens[i - 1] = extraLen
-			}
-		}
+		const lhsSub = lhsMetricName.substring(lhsParent.length)
+		const rhsSub = rhsMetricName.substring(rhsParent.length)
+		return lhsSub.localeCompare(rhsSub)
 	})
 
-	// sort all metrics but keep sub metrics grouped with their parent metrics
-	if (options.sortByName) {
-		names.sort(function (metric1, metric2) {
-			const parent1 = metric1.split('{', 1)[0]
-			const parent2 = metric2.split('{', 1)[0]
-			const result = parent1.localeCompare(parent2)
-			if (result !== 0) {
-				return result
-			}
-			const sub1 = metric1.substring(parent1.length)
-			const sub2 = metric2.substring(parent2.length)
-			return sub1.localeCompare(sub2)
-		})
-	}
-
-	const getData = function (name) {
-		if (trendCols.hasOwnProperty(name)) {
-			const cols = trendCols[name]
-			const tmpCols = new Array(numTrendColumns)
-			for (let i = 0; i < cols.length; i++) {
-				tmpCols[i] =
-					options.summaryTrendStats[i] +
-					'=' +
-					decorate(cols[i], palette.cyan) +
-					' '.repeat(trendColMaxLens[i] - strWidth(cols[i]))
-			}
-			return tmpCols.join(' ')
-		}
-
-		const value = nonTrendValues[name]
-		let fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
-
-		const extras = nonTrendExtras[name]
-		if (extras.length === 1) {
-			fmtData = fmtData + ' ' + decorate(extras[0], palette.cyan, palette.faint)
-		} else if (extras.length > 1) {
-			const parts = new Array(extras.length)
-			for (let i = 0; i < extras.length; i++) {
-				parts[i] =
-					decorate(extras[i], palette.cyan, palette.faint) +
-					' '.repeat(nonTrendExtraMaxLens[i] - strWidth(extras[i]))
-			}
-			fmtData = fmtData + ' ' + parts.join(' ')
-		}
-
-		return fmtData
-	}
-
-	for (const name of names) {
-		const metric = data.metrics[name]
-		let mark = ' '
-		let markColor = function (text) {
-			return text
-		} // noop
-
-		if (metric.thresholds) {
-			mark = succMark
-			markColor = function (text) {
-				return decorate(text, palette.green)
-			}
-			forEach(metric.thresholds, function (name, threshold) {
-				if (!threshold.ok) {
-					mark = failMark
-					markColor = function (text) {
-						return decorate(text, palette.red)
-					}
-					return true // break
-				}
-			})
-		}
-		const fmtIndent = indentForMetric(name)
-		let fmtName = displayNameForMetric(name)
-		fmtName =
-			fmtName +
-			decorate(
-				'.'.repeat(nameLenMax - strWidth(fmtName) - strWidth(fmtIndent) + 3) + ':',
-				palette.faint
-			)
-
-		result.push(indent + fmtIndent + markColor(mark) + ' ' + fmtName + ' ' + getData(name))
-	}
-
-	return result
+	return metricNames
 }
 
 /**
- * Summarizes metrics and their thresholds into formatted lines.
+ * Renders a single check into a formatted line ready for output.
+ *
+ * @param {string} indent
+ * @param {{name: string, passes: number, fails: number}} check - The check object with name, passes and fails
+ * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors.
+ * @returns {string} - A formatted line summarizing the check.
+ */
+function renderCheck(indent, check, decorate) {
+	if (check.fails === 0) {
+		return decorate(indent + succMark + ' ' + check.name, palette.green)
+	}
+
+	const succPercent = Math.floor((100 * check.passes) / (check.passes + check.fails))
+	return decorate(
+		indent +
+		failMark +
+		' ' +
+		check.name +
+		'\n' +
+		indent +
+		' ' +
+		detailsPrefix +
+		'  ' +
+		succPercent +
+		'% — ' +
+		succMark +
+		' ' +
+		check.passes +
+		' / ' +
+		failMark +
+		' ' +
+		check.fails,
+		palette.red
+	)
+}
+
+/**
+ * @typedef {Object} summarizeMetricsOptions
+ * @property {string} indent - The indentation string.
+ * @property {boolean} enableColors - Whether to enable ANSI colors.
+ * @property {string} summaryTimeUnit - The time unit for duration metrics.
+ * @property {string[]} summaryTrendStats - The trend statistics to summarize.
+ * @property {boolean} sortByName - Whether to sort metrics by name.
+ * @property {boolean} noColor - Whether to disable ANSI colors.
+ */
+
+/**
+ * Summarizes metrics into an array of formatted lines ready to be printed to stdout.
+ *
+ * @param {{metrics: Object[]}} data - The data object containing metrics.
+ * @param {summarizeMetricsOptions} options - Display options merged with defaultOptions.
+ * @param {(text: string, ...colors: number[]) => string} decorate - A decoration function for ANSI colors.
+ * @returns {string[]}
+ */
+function renderMetrics(data, decorate, options) {
+	const indent = options.indent + ' ' // FIXME @oleiade shouldn't we provide this at the caller?
+
+	// Extract all metric names
+	let metricNames = Object.keys(data.metrics)
+
+	// If sorting by name is required, do it now
+	if (options.sortByName) {
+		metricNames = sortMetricsByName(metricNames)
+	}
+
+	// Precompute all formatting information
+	const summaryInfo = computeSummaryInfo(metricNames, data, options)
+
+	// Format each metric line
+	return metricNames.map((name) => {
+		const metric = data.metrics[name]
+		return renderMetricLine(
+			name,
+			metric,
+			summaryInfo,
+			options,
+			decorate,
+			indent,
+		)
+	})
+}
+
+/**
+ * @typedef {Object} SummaryInfo
+ * @property {number} maxNameWidth - The maximum width of the metric names.
+ * @property {Object} nonTrendValues - The non-trend metric values.
+ * @property {Object} nonTrendExtras - The non-trend metric extras.
+ * @property {Object} trendCols - The trend columns.
+ * @property {number[]} trendColMaxLens - The trend column maximum lengths.
+ * @property {number} numTrendColumns - The number of trend columns.
+ * @property {string[]} trendStats - The trend statistics.
+ * @property {number} maxNonTrendValueLen - The maximum non-trend value length.
+ * @property {number[]} nonTrendExtraMaxLens - The non-trend extra maximum lengths.
+ */
+
+/**
+ * Compute all necessary formatting information such as maximum lengths, trend columns and non-trend values for each
+ * metric.
+ *
+ * @param {string[]} metricNames
+ * @param {{metrics: Object[]}} data - The data object containing metrics.
+ * @param {summarizeMetricsOptions} options
+ * @returns {SummaryInfo}
+*/
+function computeSummaryInfo(metricNames, data, options) {
+	const trendStats = options.summaryTrendStats
+	const numTrendColumns = trendStats.length
+
+	const nonTrendValues = {}
+	const nonTrendExtras = {}
+	const trendCols = {}
+
+	let maxNameWidth = 0
+	let maxNonTrendValueLen = 0
+	let nonTrendExtraMaxLens = []  // FIXME: "lens"?
+
+	// Initialize tracking arrays for trend widths
+	const trendColMaxLens = new Array(numTrendColumns).fill(0)
+
+	for (const name of metricNames) {
+		const metric = data.metrics[name]
+		const displayName = indentForMetric(name) + displayNameForMetric(name);
+		maxNameWidth = Math.max(maxNameWidth, strWidth(displayName))
+
+		if (metric.type === 'trend') {
+			const cols = trendStats.map(stat => formatTrendValue(metric.values[stat], stat, metric, options))
+
+			// Compute max column widths
+			cols.forEach((col, index) => {
+				trendColMaxLens[index] = Math.max(trendColMaxLens[index], strWidth(col))
+			})
+			trendCols[name] = cols
+		} else {
+			const values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
+			const mainValue = values[0]  // FIXME (@oleiade) we should assert that the index exists here
+			nonTrendValues[name] = mainValue
+			maxNonTrendValueLen = Math.max(maxNonTrendValueLen, strWidth(mainValue))
+
+			// FIXME (@oleiade): what the fuck is an extra, really?
+			const extras = values.slice(1)
+			nonTrendExtras[name] = extras
+			extras.forEach((value, index) => {
+				const width = strWidth(value)
+				if (nonTrendExtraMaxLens[index] === undefined || width > nonTrendExtraMaxLens[index]) {
+					nonTrendExtraMaxLens[index] = width
+				}
+			})
+		}
+	}
+
+	return {
+		maxNameWidth,
+		nonTrendValues,
+		nonTrendExtras,
+		trendCols,
+		trendColMaxLens,
+		numTrendColumns,
+		trendStats,
+		maxNonTrendValueLen,
+		nonTrendExtraMaxLens
+	}
+}
+
+/**
+ *
+ * @param value
+ * @param stat
+ * @param metric
+ * @param options
+ * @returns {string}
+ */
+function formatTrendValue(value, stat, metric, options) {
+	if (stat === 'count') {
+		return value.toString();
+	}
+	return humanizeValue(value, metric, options.summaryTimeUnit);
+}
+
+/**
+ * Renders a metric line into a formatted string for display.
+ *
+ * @param {string} name - The name of the metric.
+ * @param {ReportMetric} metric - The metric object containing details about the metric.
+ * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
+ * @param {summarizeMetricsOptions} options - Configuration options for summarizing metrics.
+ * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors to text.
+ * @param {string} indent - The indentation string to use for the output.
+ * @returns {string} - The formatted metric line.
+ */
+function renderMetricLine(name, metric, info, options, decorate, indent) {
+	const { maxNameWidth } = info;
+
+	const displayedName = displayNameForMetric(name);
+	const fmtIndent = indentForMetric(name);
+
+	// Compute the trailing dots:
+	// Use `3` as a spacing offset as per original code.
+	const dotsCount = maxNameWidth - strWidth(displayedName) - strWidth(fmtIndent) + 3;
+	const dottedName = displayedName + decorate('.'.repeat(dotsCount) + ':', palette.faint);
+
+	const dataPart = (metric.type === 'trend')
+		? formatTrendData(name, info, decorate)
+		: formatNonTrendData(name, info, decorate);
+
+	// FIXME (@oleiade): We need a more consistent and central way to manage indentations
+	// FIXME (@oleiade): We call them "options" everywhere but they're actually configuration I would argue
+	return indent + fmtIndent + '  ' + dottedName + ' ' + dataPart;
+}
+
+// FIXME (@oleiade): summarizeMetricsOptions needs a better name "DisplayConfig"?
+// FIXME (@oleiade): decorate function should have a dedicated typedef
+/**
+ * Formats a submetric (metric+tags key/value pairs) line for output.
+ *
+ * @param {string} name - name of the submetric
+ * @param {ReportMetric} metric - submetric object (submetric really are just a specialized metric with a tags set and a pointer to their parent)
+ * @param {SummaryInfo} info - summary information object
+ * @param {summarizeMetricsOptions} options - display options
+ * @param {(text: string, ...colors: number[]) => string}  decorate - decoration function
+ * @param indent indentation string
+ * @returns {string} submetric report line in the form: `{submetric name}...: {value} {extra}`
+ */
+function formatSubmetricLine(name, metric, info, options, decorate, indent) {
+	const { maxNameWidth } = info;
+
+	// Compute the trailing dots:
+	// Use `3` as a spacing offset as per original code.
+	let dotsCount = maxNameWidth - strWidth(name) - strWidth(indent) + 3;
+	dotsCount = Math.max(1, dotsCount)
+	const dottedName = name + decorate('.'.repeat(dotsCount) + ':', palette.faint);
+
+	const dataPart = (metric.type === 'trend')
+		? formatTrendData(name, info, decorate)
+		: formatNonTrendData(name, info, decorate);
+
+	return indent + '  ' + dottedName + ' ' + dataPart;
+}
+
+/**
+ * Format data for trend metrics.
+ */
+function formatTrendData(name, info, decorate) {
+	const { trendStats, trendCols, trendColMaxLens } = info;
+	const cols = trendCols[name];
+
+	return cols.map((col, i) => {
+		const statName = trendStats[i];
+		const padding = ' '.repeat(trendColMaxLens[i] - strWidth(col));
+		return statName + '=' + decorate(col, palette.cyan) + padding;
+	}).join(' ');
+}
+
+/**
+ * Format data for non-trend metrics.
+ *
+ * @param {string} name - The metric name.
+ * @param {Object} info - The summary information object.
+ * @param {(text: string, ...colors: number[]) => string} decorate - A decoration function for ANSI colors.
+ */
+function formatNonTrendData(name, info, decorate) {
+	const { nonTrendValues, nonTrendExtras, maxNonTrendValueLen, nonTrendExtraMaxLens } = info;
+
+	const value = nonTrendValues[name];
+	const extras = nonTrendExtras[name] || [];
+
+	let result = decorate(value, palette.cyan);
+	result += ' '.repeat(maxNonTrendValueLen - strWidth(value));
+
+	if (extras.length === 1) {
+		// Single extra value
+		result += ' ' + decorate(extras[0], palette.cyan, palette.faint);
+	} else if (extras.length > 1) {
+		// Multiple extras need their own spacing
+		const parts = extras.map((val, i) => {
+			const extraSpace = ' '.repeat(nonTrendExtraMaxLens[i] - strWidth(val));
+			return decorate(val, palette.cyan, palette.faint) + extraSpace;
+		});
+		result += ' ' + parts.join(' ');
+	}
+
+	return result;
+}
+
+/**
+ * Renders each thresholds results into a formatted set of lines ready for display in the terminal.
+ *
+ * Thresholds are rendered in the format:
+ * {metric/submetric}...: {value} {extra}
+ *  {SATISFIED|UNSATISFIED} {source}
+ *  //... additional threshold lines
  *
  * @param {Object} options - Options merged with defaults.
  * @param {ReportData} data - The data containing metrics.
  * @param {(text: string, ...colors: number[]) => string} decorate - Decoration function.
  * @returns {string[]} - Array of formatted lines including threshold statuses.
  */
-function summarizeMetricsWithThresholds(options, data, decorate) {
+function renderThresholds(data, decorate, options) {
 	const indent = options.indent + ' '
-	const result = []
 
-	const names = []
-	let nameLenMax = 0
-
-	const nonTrendValues = {}
-	let nonTrendValueMaxLen = 0
-	const nonTrendExtras = {}
-	let nonTrendExtraMaxLens = [0, 0]
-
-	const trendCols = {}
-	const numTrendColumns = options.summaryTrendStats.length
-	const trendColMaxLens = new Array(numTrendColumns).fill(0)
-	forEach(data.metrics, function (name, metric) {
-		names.push(name)
-		// When calculating widths for metrics, account for the indentation on submetrics.
-		const displayNameWidth = strWidth(name)
-		if (displayNameWidth > nameLenMax) {
-			nameLenMax = displayNameWidth
-		}
-
-		if (metric.type === 'trend') {
-			const cols = []
-			for (let i = 0; i < numTrendColumns; i++) {
-				const tc = options.summaryTrendStats[i]
-				let value = metric.values[tc]
-				if (tc === 'count') {
-					value = value.toString()
-				} else {
-					value = humanizeValue(value, metric, options.summaryTimeUnit)
-				}
-				const valLen = strWidth(value)
-				if (valLen > trendColMaxLens[i]) {
-					trendColMaxLens[i] = valLen
-				}
-				cols[i] = value
-			}
-			trendCols[name] = cols
-			return
-		}
-		let values = nonTrendMetricValueForSum(metric, options.summaryTimeUnit)
-		nonTrendValues[name] = values[0]
-		const valueLen = strWidth(values[0])
-		if (valueLen > nonTrendValueMaxLen) {
-			nonTrendValueMaxLen = valueLen
-		}
-		nonTrendExtras[name] = values.slice(1)
-		for (let i = 1; i < values.length; i++) {
-			const extraLen = strWidth(values[i])
-			if (extraLen > nonTrendExtraMaxLens[i - 1]) {
-				nonTrendExtraMaxLens[i - 1] = extraLen
-			}
-		}
-	})
-
-	// sort all metrics but keep sub metrics grouped with their parent metrics
+	// Extract and optionally sort metric names
+	let metricNames = Object.keys(data.metrics)
 	if (options.sortByName) {
-		names.sort(function (metric1, metric2) {
-			const parent1 = metric1.split('{', 1)[0]
-			const parent2 = metric2.split('{', 1)[0]
-			const result = parent1.localeCompare(parent2)
-			if (result !== 0) {
-				return result
-			}
-			const sub1 = metric1.substring(parent1.length)
-			const sub2 = metric2.substring(parent2.length)
-			return sub1.localeCompare(sub2)
-		})
+		metricNames = sortMetricsByName(metricNames)
 	}
 
-	const getData = function (name) {
-		if (trendCols.hasOwnProperty(name)) {
-			const cols = trendCols[name]
-			const tmpCols = new Array(numTrendColumns)
-			for (let i = 0; i < cols.length; i++) {
-				tmpCols[i] =
-					options.summaryTrendStats[i] +
-					'=' +
-					decorate(cols[i], palette.cyan) +
-					' '.repeat(trendColMaxLens[i] - strWidth(cols[i]))
-			}
-			return tmpCols.join(' ')
-		}
+	// Precompute all formatting information
+	const summaryInfo = computeSummaryInfo(metricNames, data, options)
 
-		const value = nonTrendValues[name]
-		let fmtData = decorate(value, palette.cyan) + ' '.repeat(nonTrendValueMaxLen - strWidth(value))
-
-		const extras = nonTrendExtras[name]
-		if (extras.length === 1) {
-			fmtData = fmtData + ' ' + decorate(extras[0], palette.cyan, palette.faint)
-		} else if (extras.length > 1) {
-			const parts = new Array(extras.length)
-			for (let i = 0; i < extras.length; i++) {
-				parts[i] =
-					decorate(extras[i], palette.cyan, palette.faint) +
-					' '.repeat(nonTrendExtraMaxLens[i] - strWidth(extras[i]))
-			}
-			fmtData = fmtData + ' ' + parts.join(' ')
-		}
-
-		return fmtData
-	}
-
-	for (const name of names) {
+	// Format each threshold line by preparing each metric affected by a threshold, as
+	// well as the thresholds results for each expression.
+	const result = []
+	for (const name of metricNames) {
 		const metric = data.metrics[name]
-		const mark = ' '
-		const markColor = function (text) {
-			return text
-		} // noop
+		const line = formatSubmetricLine(name, metric, summaryInfo, options, decorate, '')
+		result.push(line)
 
-		const fmtName =
-			name +
-			decorate(
-				'.'.repeat(nameLenMax - strWidth(name) + 3) + ':',
-				palette.faint
-			)
-
-		result.push(indent + markColor(mark) + ' ' + fmtName + ' ' + getData(name))
 		if (metric.thresholds) {
-			forEach(metric.thresholds, function (name, threshold) {
-				const resultIndent = threshold.ok ? '    ' : '  ';
-				const thresholdResult = threshold.ok ? decorate('SATISFIED', palette.green) : decorate('UNSATISFIED', palette.red);
-				result.push(indent + indent + '  ' + thresholdResult + resultIndent + decorate(`'${threshold.source}'`, palette.faint))
-			})
+			// TODO (@oleiade): make sure the arguments are always ordered consistently across functions (indent, decorate, etc.)
+			const thresholdLines = renderThresholdResults(metric.thresholds, indent, decorate)
+			result.push(...thresholdLines)
 		}
 	}
 
 	return result
+}
+
+/**
+ * Renders each threshold result into a formatted set of lines ready for display in the terminal.
+ *
+ * @param {Object} thresholds - The thresholds to render.
+ * @param {string} indent - The indentation string to use for the output.
+ * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors to text.
+ * @returns {string[]} - An array of formatted lines including threshold statuses.
+ */
+function renderThresholdResults(thresholds, indent, decorate) {
+	const lines = []
+
+	forEach(thresholds, (_, threshold) => {
+		const isSatisfied = threshold.ok
+		const statusText = isSatisfied
+			? decorate('SATISFIED', palette.green)
+			: decorate('UNSATISFIED', palette.red)
+
+		// Extra indentation for threshold lines
+		// Adjusting spacing so that it aligns nicely under the metric line
+		const additionalIndent = isSatisfied ? '    ' : '  '
+		const sourceText = decorate(`'${threshold.source}'`, palette.faint)
+
+		// Here we push a line describing the threshold's result
+		lines.push(
+			indent + indent + ' ' + statusText + additionalIndent + sourceText
+		)
+	})
+
+	return lines
 }
 
 /**
@@ -689,7 +745,7 @@ function generateTextSummary(data, options, report) {
 		}
 	}
 
-	const ANSI= {
+	const ANSI = {
 		reset: "\x1b[0m",
 
 		// Standard Colors
@@ -715,7 +771,6 @@ function generateTextSummary(data, options, report) {
 		// Dark Colors
 		darkGrey: "\x1b[90m",
 	};
-
 	const BOLD = '\u001b[1m'
 	const RESET = ANSI.reset;
 	const boldify = (text) => BOLD + text + RESET
@@ -754,9 +809,10 @@ function generateTextSummary(data, options, report) {
 	 * @param {Object[]} sectionMetrics - The metrics to display.
 	 * @param {Partial<DisplayOptions>} [opts] - Display options.
 	 */
+	// FIXME
 	const displayMetricsBlock = (sectionMetrics, opts) => {
 		const summarizeOpts = Object.assign({}, mergedOpts, opts)
-		Array.prototype.push.apply(lines, summarizeMetrics(summarizeOpts, {metrics: sectionMetrics}, decorate))
+		Array.prototype.push.apply(lines, renderMetrics({metrics: sectionMetrics}, decorate, summarizeOpts))
 		lines.push('')
 	}
 
@@ -772,7 +828,7 @@ function generateTextSummary(data, options, report) {
 		}
 		displayMetricsBlock(checks.metrics, {...opts, indent: opts.indent + defaultIndent, sortByName: false})
 		for (let i = 0; i < checks.ordered_checks.length; i++) {
-			lines.push(summarizeCheck(metricGroupIndent + metricGroupIndent + opts.indent, checks.ordered_checks[i], decorate))
+			lines.push(renderCheck(metricGroupIndent + metricGroupIndent + opts.indent, checks.ordered_checks[i], decorate))
 		}
 		if (checks.ordered_checks.length > 0) {
 			lines.push('')
@@ -798,11 +854,12 @@ function generateTextSummary(data, options, report) {
 			metrics[threshold.metric.name] = {...threshold.metric, thresholds: threshold.thresholds}
 		});
 
-		Array.prototype.push.apply(lines, summarizeMetricsWithThresholds(
-			{...mergedOpts, indent: mergedOpts.indent + defaultIndent},
-			{metrics},
-			decorate),
-		)
+		// Array.prototype.push.apply(lines, summarizeMetricsWithThresholds(
+		// 	{...mergedOpts, indent: mergedOpts.indent + defaultIndent},
+		// 	{metrics},
+		// 	decorate),
+		// )
+		Array.prototype.push.apply(lines, renderThresholds({metrics}, decorate, {...mergedOpts, indent: mergedOpts.indent + defaultIndent}))
 		lines.push('')
 	};
 
