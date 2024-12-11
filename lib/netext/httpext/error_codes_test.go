@@ -316,11 +316,16 @@ func TestHTTP2GoAwayError(t *testing.T) {
 	t.Parallel()
 
 	tb := getHTTP2ServerWithCustomConnContext(t)
-	tb.Mux.HandleFunc("/tsr", func(_ http.ResponseWriter, req *http.Request) {
+	tb.Mux.HandleFunc("/tsr", func(rw http.ResponseWriter, req *http.Request) {
 		conn := req.Context().Value(connKey).(*tls.Conn)
 		f := http2.NewFramer(conn, conn)
 		require.NoError(t, f.WriteGoAway(4, http2.ErrCodeInadequateSecurity, []byte("whatever")))
-		// require.NoError(t, conn.CloseWrite())
+		flusher, ok := rw.(http.Flusher)
+		if !ok {
+			panic("expected http.ResponseWriter to be http.Flusher")
+		}
+		flusher.Flush()
+		require.NoError(t, conn.CloseWrite())
 	})
 	client := http.Client{
 		Timeout:   time.Second * 5,
