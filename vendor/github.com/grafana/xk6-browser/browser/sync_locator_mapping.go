@@ -10,7 +10,7 @@ import (
 )
 
 // syncMapLocator is like mapLocator but returns synchronous functions.
-func syncMapLocator(vu moduleVU, lo *common.Locator) mapping { //nolint:funlen
+func syncMapLocator(vu moduleVU, lo *common.Locator) mapping {
 	return mapping{
 		"clear": func(opts sobek.Value) error {
 			ctx := vu.Context()

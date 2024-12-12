@@ -55,7 +55,7 @@ func NewRemoteBrowserOptions() *BrowserOptions {
 }
 
 // Parse parses browser options from a JS object.
-func (bo *BrowserOptions) Parse( //nolint:cyclop
+func (bo *BrowserOptions) Parse(
 	ctx context.Context, logger *log.Logger, opts map[string]any, envLookup env.LookupFunc,
 ) error {
 	// Parse opts

@@ -10,7 +10,7 @@ import (
 )
 
 // mapBrowser to the JS module.
-func mapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop,gocognit
+func mapBrowser(vu moduleVU) mapping { //nolint:funlen,gocognit
 	return mapping{
 		"context": func() (mapping, error) {
 			b, err := vu.browser()

@@ -22,7 +22,7 @@ func GetHooks(ctx context.Context) *Hooks {
 	if v == nil {
 		return nil
 	}
-	return v.(*Hooks)
+	return v.(*Hooks) //nolint:forcetypeassert
 }
 
 // WithIterationID adds an identifier for the current iteration to the context.

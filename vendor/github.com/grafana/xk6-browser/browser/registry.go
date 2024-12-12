@@ -253,7 +253,7 @@ func newBrowserRegistry(
 	return r
 }
 
-func (r *browserRegistry) handleIterEvents( //nolint:funlen
+func (r *browserRegistry) handleIterEvents(
 	ctx context.Context, eventsCh <-chan *k6event.Event, unsubscribeFn func(),
 ) {
 	var (
@@ -291,7 +291,7 @@ func (r *browserRegistry) handleIterEvents( //nolint:funlen
 			continue
 		}
 
-		switch e.Type { //nolint:exhaustive
+		switch e.Type {
 		case k6event.IterStart:
 			// Because VU.State is nil when browser registry is initialized,
 			// we have to initialize traces registry on the first VU iteration
@@ -454,7 +454,7 @@ func (r *tracesRegistry) startIterationTrace(ctx context.Context, data k6event.I
 
 	spanCtx, span := r.tracer.Start(ctx, "iteration", oteltrace.WithAttributes(
 		attribute.Int64("test.iteration.number", data.Iteration),
-		attribute.Int64("test.vu", int64(data.VUID)),
+		attribute.Int64("test.vu", int64(data.VUID)), //nolint:gosec
 		attribute.String("test.scenario", data.ScenarioName),
 	))
 

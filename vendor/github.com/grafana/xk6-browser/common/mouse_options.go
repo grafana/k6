@@ -131,8 +131,7 @@ func (o *MouseMoveOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "steps":
+			if k == "steps" {
 				o.Steps = opts.Get(k).ToInteger()
 			}
 		}

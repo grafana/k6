@@ -37,11 +37,8 @@ func (e BigIntParseError) Error() string {
 
 // Is satisfies the builtin error Is interface.
 func (e BigIntParseError) Is(target error) bool {
-	switch target.(type) {
-	case BigIntParseError:
-		return true
-	}
-	return false
+	_, ok := target.(BigIntParseError)
+	return ok
 }
 
 // Unwrap satisfies the builtin error Unwrap interface.

@@ -182,25 +182,6 @@ func (f *Frame) deleteRequest(id network.RequestID) {
 	delete(f.inflightRequests, id)
 }
 
-func (f *Frame) inflightRequestsLen() int {
-	f.inflightRequestsMu.RLock()
-	defer f.inflightRequestsMu.RUnlock()
-
-	return len(f.inflightRequests)
-}
-
-func (f *Frame) cloneInflightRequests() map[network.RequestID]bool {
-	f.inflightRequestsMu.RLock()
-	defer f.inflightRequestsMu.RUnlock()
-
-	ifr := make(map[network.RequestID]bool)
-	for k, v := range f.inflightRequests {
-		ifr[k] = v
-	}
-
-	return ifr
-}
-
 func (f *Frame) clearLifecycle() {
 	f.log.Debugf("Frame:clearLifecycle", "fid:%s furl:%q", f.ID(), f.URL())
 
@@ -411,37 +392,6 @@ func (f *Frame) removeChildFrame(child *Frame) {
 	delete(f.childFrames, child)
 }
 
-func (f *Frame) requestByID(reqID network.RequestID) (*Request, bool) {
-	frameSession := f.page.getFrameSession(cdp.FrameID(f.ID()))
-	if frameSession != nil {
-		if frameSession.networkManager == nil {
-			f.log.Warnf("Frame:requestByID:nil:frameSession.networkManager", "fid:%s furl:%q rid:%s",
-				f.ID(), f.URL(), reqID)
-		}
-		return frameSession.networkManager.requestFromID(reqID)
-	}
-
-	f.log.Debugf("Frame:requestByID:nil:frameSession", "fid:%s furl:%q rid:%s",
-		f.ID(), f.URL(), reqID)
-
-	// For unknown reasons mainFrameSession or mainFrameSession.networkManager
-	// (it's unknown exactly which one) are nil, which has caused NPDs. We're
-	// now logging to see what components are nil to try and work out what is
-	// causing the NPD.
-
-	if f.page.mainFrameSession == nil {
-		f.log.Warnf("Frame:requestByID:nil:mainFrameSession", "fid:%s furl:%q rid:%s",
-			f.ID(), f.URL(), reqID)
-	}
-
-	if f.page.mainFrameSession.networkManager == nil {
-		f.log.Warnf("Frame:requestByID:nil:mainFrameSession.networkManager", "fid:%s furl:%q rid:%s",
-			f.ID(), f.URL(), reqID)
-	}
-
-	return frameSession.networkManager.requestFromID(reqID)
-}
-
 func (f *Frame) setContext(world executionWorld, execCtx frameExecutionContext) {
 	f.executionContextMu.Lock()
 	defer f.executionContextMu.Unlock()
@@ -565,7 +515,9 @@ func (f *Frame) waitForSelector(selector string, opts *FrameWaitForSelectorOptio
 	return handle, nil
 }
 
-func (f *Frame) waitFor(selector string, opts *FrameWaitForSelectorOptions, retryCount int) (_ *ElementHandle, rerr error) {
+func (f *Frame) waitFor(
+	selector string, opts *FrameWaitForSelectorOptions, retryCount int,
+) (_ *ElementHandle, rerr error) {
 	f.log.Debugf("Frame:waitFor", "fid:%s furl:%q sel:%q", f.ID(), f.URL(), selector)
 
 	retryCount--
@@ -1823,7 +1775,7 @@ func (f *Frame) WaitForFunction(js string, opts *FrameWaitForFunctionOptions, js
 
 	// prevent passing a non-nil interface to the upper layers.
 	if result == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	return result, err
@@ -1880,7 +1832,7 @@ func (f *Frame) waitForFunction(
 	}
 	// prevent passing a non-nil interface to the upper layers.
 	if result == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	return result, nil
@@ -1934,7 +1886,7 @@ func (f *Frame) WaitForLoadState(state string, opts sobek.Value) error {
 
 // WaitForNavigation waits for the given navigation lifecycle event to happen.
 //
-//nolint:funlen,cyclop
+//nolint:funlen
 func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Response, error) {
 	f.log.Debugf("Frame:WaitForNavigation",
 		"fid:%s furl:%s", f.ID(), f.URL())
@@ -2014,7 +1966,7 @@ func (f *Frame) WaitForNavigation(opts *FrameWaitForNavigationOptions) (*Respons
 	// Since response will be in an interface, it will never be nil,
 	// so we need to return nil explicitly.
 	if resp == nil {
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 
 	return resp, nil

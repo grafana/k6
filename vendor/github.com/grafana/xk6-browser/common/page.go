@@ -16,9 +16,7 @@ import (
 	"github.com/chromedp/cdproto/dom"
 	"github.com/chromedp/cdproto/emulation"
 	"github.com/chromedp/cdproto/page"
-	cdppage "github.com/chromedp/cdproto/page"
 	"github.com/chromedp/cdproto/runtime"
-	cdpruntime "github.com/chromedp/cdproto/runtime"
 	"github.com/chromedp/cdproto/target"
 	"github.com/grafana/sobek"
 	"go.opentelemetry.io/otel/attribute"
@@ -341,7 +339,7 @@ func (p *Page) initEvents() {
 					"sid:%v tid:%v", p.session.ID(), p.targetID)
 				return
 			case event := <-p.eventCh:
-				if ev, ok := event.data.(*cdpruntime.EventConsoleAPICalled); ok {
+				if ev, ok := event.data.(*runtime.EventConsoleAPICalled); ok {
 					p.onConsoleAPICalled(ev)
 				}
 			}
@@ -490,7 +488,7 @@ func (p *Page) urlTagName(url string, method string) (string, bool) {
 	return newTagName, urlMatched
 }
 
-func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
+func (p *Page) onConsoleAPICalled(event *runtime.EventConsoleAPICalled) {
 	if !hasPageOnHandler(p, EventPageConsoleAPICalled) {
 		return
 	}
@@ -514,7 +512,7 @@ func (p *Page) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICalled) {
 	}
 }
 
-func (p *Page) consoleMsgFromConsoleEvent(e *cdpruntime.EventConsoleAPICalled) (*ConsoleMessage, error) {
+func (p *Page) consoleMsgFromConsoleEvent(e *runtime.EventConsoleAPICalled) (*ConsoleMessage, error) {
 	execCtx, err := p.executionContextForID(e.ExecutionContextID)
 	if err != nil {
 		return nil, err
@@ -607,7 +605,7 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 
 	parentSession := p.getFrameSession(cdp.FrameID(rootFrame.ID()))
 	action := dom.GetFrameOwner(cdp.FrameID(f.ID()))
-	backendNodeId, _, err := action.Do(cdp.WithExecutor(p.ctx, parentSession.session))
+	backendNodeID, _, err := action.Do(cdp.WithExecutor(p.ctx, parentSession.session))
 	if err != nil {
 		if strings.Contains(err.Error(), "frame with the given id was not found") {
 			return nil, errors.New("frame has been detached")
@@ -619,7 +617,7 @@ func (p *Page) getFrameElement(f *Frame) (handle *ElementHandle, _ error) {
 	if parent == nil {
 		return nil, errors.New("frame has been detached 2")
 	}
-	return parent.adoptBackendNodeID(mainWorld, backendNodeId)
+	return parent.adoptBackendNodeID(mainWorld, backendNodeID)
 }
 
 func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.FrameID, error) {
@@ -644,13 +642,13 @@ func (p *Page) getOwnerFrame(apiCtx context.Context, h *ElementHandle) (cdp.Fram
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v err:%v", p.sessionID(), err)
 		return "", nil
 	}
-	switch result.(type) {
+	switch result.(type) { //nolint:gocritic
 	case nil:
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v result:nil", p.sessionID())
 		return "", nil
 	}
 
-	documentElement := result.(*ElementHandle)
+	documentElement := result.(*ElementHandle) //nolint:forcetypeassert
 	if documentElement == nil {
 		p.logger.Debugf("Page:getOwnerFrame:return", "sid:%v docel:nil", p.sessionID())
 		return "", nil
@@ -806,7 +804,7 @@ func (p *Page) viewportSize() Size {
 func (p *Page) BringToFront() error {
 	p.logger.Debugf("Page:BringToFront", "sid:%v", p.sessionID())
 
-	action := cdppage.BringToFront()
+	action := page.BringToFront()
 	if err := action.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		return fmt.Errorf("bringing page to front: %w", err)
 	}
@@ -937,7 +935,7 @@ func (p *Page) EmulateMedia(opts sobek.Value) error {
 
 	p.frameSessionsMu.RLock()
 	for _, fs := range p.frameSessions {
-		if err := fs.updateEmulateMedia(false); err != nil {
+		if err := fs.updateEmulateMedia(); err != nil {
 			p.frameSessionsMu.RUnlock()
 			return fmt.Errorf("emulating media: %w", err)
 		}
@@ -1220,7 +1218,7 @@ func (p *Page) QueryAll(selector string) ([]*ElementHandle, error) {
 }
 
 // Reload will reload the current page.
-func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen,cyclop
+func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen
 	p.logger.Debugf("Page:Reload", "sid:%v", p.sessionID())
 	_, span := TraceAPICall(p.ctx, p.targetID.String(), "page.reload")
 	defer span.End()
@@ -1258,7 +1256,7 @@ func (p *Page) Reload(opts sobek.Value) (*Response, error) { //nolint:funlen,cyc
 		})
 	defer cancelWaitingForLifecycleEvent()
 
-	reloadAction := cdppage.Reload()
+	reloadAction := page.Reload()
 	if err := reloadAction.Do(cdp.WithExecutor(p.ctx, p.session)); err != nil {
 		err := fmt.Errorf("reloading page: %w", err)
 		spanRecordError(span, err)
@@ -1329,7 +1327,7 @@ func (p *Page) Screenshot(opts *PageScreenshotOptions, sp ScreenshotPersister) (
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp)
+	s := newScreenshotter(spanCtx, sp, p.logger)
 	buf, err := s.screenshotPage(p, opts)
 	if err != nil {
 		err := fmt.Errorf("taking screenshot of page: %w", err)
@@ -1571,7 +1569,7 @@ func (p *Page) TargetID() string {
 
 // executionContextForID returns the page ExecutionContext for the given ID.
 func (p *Page) executionContextForID(
-	executionContextID cdpruntime.ExecutionContextID,
+	executionContextID runtime.ExecutionContextID,
 ) (*ExecutionContext, error) {
 	p.frameSessionsMu.RLock()
 	defer p.frameSessionsMu.RUnlock()
@@ -1596,7 +1594,7 @@ func (p *Page) sessionID() (sid target.SessionID) {
 
 // textForConsoleEvent generates the text representation for a consoleAPICalled event
 // mimicking Playwright's behavior.
-func textForConsoleEvent(e *cdpruntime.EventConsoleAPICalled, args []string) string {
+func textForConsoleEvent(e *runtime.EventConsoleAPICalled, args []string) string {
 	if e.Type.String() == "dir" || e.Type.String() == "dirxml" ||
 		e.Type.String() == "table" {
 		if len(e.Args) > 0 {

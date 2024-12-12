@@ -25,11 +25,11 @@ func (l *LocalFilePersister) Persist(_ context.Context, path string, data io.Rea
 	cp := filepath.Clean(path)
 
 	dir := filepath.Dir(cp)
-	if err = os.MkdirAll(dir, 0o755); err != nil {
+	if err = os.MkdirAll(dir, 0o755); err != nil { //nolint:forbidigo,gosec
 		return fmt.Errorf("creating a local directory %q: %w", dir, err)
 	}
 
-	f, err := os.OpenFile(cp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	f, err := os.OpenFile(cp, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600) //nolint:forbidigo
 	if err != nil {
 		return fmt.Errorf("creating a local file %q: %w", cp, err)
 	}

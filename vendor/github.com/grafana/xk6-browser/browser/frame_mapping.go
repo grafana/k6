@@ -11,8 +11,8 @@ import (
 
 // mapFrame to the JS module.
 //
-//nolint:funlen
-func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
+//nolint:funlen,gocognit
+func mapFrame(vu moduleVU, f *common.Frame) mapping {
 	maps := mapping{
 		"check": func(selector string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {
@@ -59,19 +59,25 @@ func mapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop
 				return nil, f.DispatchEvent(selector, typ, exportArg(eventInit), popts) //nolint:wrapcheck
 			}), nil
 		},
-		"evaluate": func(pageFunction sobek.Value, gargs ...sobek.Value) *sobek.Promise {
+		"evaluate": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluate requires a page function")
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				return f.Evaluate(pageFunction.String(), exportArgs(gargs)...) //nolint:wrapcheck
-			})
+				return f.Evaluate(pageFunc.String(), exportArgs(gargs)...)
+			}), nil
 		},
-		"evaluateHandle": func(pageFunction sobek.Value, gargs ...sobek.Value) *sobek.Promise {
+		"evaluateHandle": func(pageFunc sobek.Value, gargs ...sobek.Value) (*sobek.Promise, error) {
+			if sobekEmptyString(pageFunc) {
+				return nil, fmt.Errorf("evaluateHandle requires a page function")
+			}
 			return k6ext.Promise(vu.Context(), func() (any, error) {
-				jsh, err := f.EvaluateHandle(pageFunction.String(), exportArgs(gargs)...)
+				jsh, err := f.EvaluateHandle(pageFunc.String(), exportArgs(gargs)...)
 				if err != nil {
 					return nil, err //nolint:wrapcheck
 				}
 				return mapJSHandle(vu, jsh), nil
-			})
+			}), nil
 		},
 		"fill": func(selector, value string, opts sobek.Value) *sobek.Promise {
 			return k6ext.Promise(vu.Context(), func() (any, error) {

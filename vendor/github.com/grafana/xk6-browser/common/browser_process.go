@@ -169,7 +169,7 @@ func execute(
 	// We must start the cmd before calling cmd.Wait, as otherwise the two
 	// can run into a data race.
 	err = cmd.Start()
-	if os.IsNotExist(err) {
+	if os.IsNotExist(err) { //nolint:forbidigo
 		return command{}, fmt.Errorf("file does not exist: %s", path)
 	}
 	if err != nil {

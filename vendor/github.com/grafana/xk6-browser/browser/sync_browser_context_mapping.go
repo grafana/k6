@@ -12,7 +12,7 @@ import (
 )
 
 // syncMapBrowserContext is like mapBrowserContext but returns synchronous functions.
-func syncMapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen,gocognit,cyclop
+func syncMapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen,gocognit
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies": bc.AddCookies,

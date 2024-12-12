@@ -3,6 +3,7 @@ package browser
 import (
 	"context"
 	"errors"
+	"strings"
 
 	"github.com/grafana/sobek"
 
@@ -60,4 +61,9 @@ func exportArgs(gargs []sobek.Value) []any {
 // (defined and not null) in the sobek runtime.
 func sobekValueExists(v sobek.Value) bool {
 	return v != nil && !sobek.IsUndefined(v) && !sobek.IsNull(v)
+}
+
+// sobekEmptyString returns true if a given value is not nil or an empty string.
+func sobekEmptyString(v sobek.Value) bool {
+	return !sobekValueExists(v) || strings.TrimSpace(v.String()) == ""
 }

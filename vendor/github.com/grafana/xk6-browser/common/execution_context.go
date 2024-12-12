@@ -154,6 +154,8 @@ func (e *ExecutionContext) adoptElementHandle(eh *ElementHandle) (*ElementHandle
 
 // eval evaluates the provided JavaScript within this execution context and
 // returns a value or handle.
+//
+//nolint:funlen
 func (e *ExecutionContext) eval(
 	apiCtx context.Context, opts evalOptions, js string, args ...any,
 ) (any, error) {
@@ -307,9 +309,7 @@ func (e *ExecutionContext) Eval(apiCtx context.Context, js string, args ...any) 
 		returnByValue: true,
 	}
 	evalArgs := make([]any, 0, len(args))
-	for _, a := range args {
-		evalArgs = append(evalArgs, a)
-	}
+	evalArgs = append(evalArgs, args...)
 
 	return e.eval(apiCtx, opts, js, evalArgs...)
 }
@@ -325,9 +325,7 @@ func (e *ExecutionContext) EvalHandle(apiCtx context.Context, js string, args ..
 		returnByValue: false,
 	}
 	evalArgs := make([]any, 0, len(args))
-	for _, a := range args {
-		evalArgs = append(evalArgs, a)
-	}
+	evalArgs = append(evalArgs, args...)
 	res, err := e.eval(apiCtx, opts, js, evalArgs...)
 	if err != nil {
 		return nil, err

@@ -11,6 +11,8 @@ type Device struct {
 }
 
 // GetDevices returns predefined emulation settings for many end-user devices.
+//
+//nolint:lll,funlen
 func GetDevices() map[string]Device {
 	return map[string]Device{
 		"Blackberry PlayBook": {

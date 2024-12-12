@@ -8,7 +8,7 @@ import (
 )
 
 // mapResponse to the JS module.
-func mapResponse(vu moduleVU, r *common.Response) mapping { //nolint:funlen
+func mapResponse(vu moduleVU, r *common.Response) mapping {
 	if r == nil {
 		return nil
 	}
