@@ -17,6 +17,8 @@ import (
 
 	"github.com/grafana/xk6-browser/common/js"
 	"github.com/grafana/xk6-browser/k6ext"
+
+	k6common "go.k6.io/k6/js/common"
 )
 
 const (
@@ -356,6 +358,7 @@ func (h *ElementHandle) innerText(apiCtx context.Context) (any, error) {
 }
 
 func (h *ElementHandle) inputValue(apiCtx context.Context) (any, error) {
+	//nolint:lll
 	js := `
 		(element) => {
 			if (element.nodeType !== Node.ELEMENT_NODE || (element.nodeName !== 'INPUT' && element.nodeName !== 'TEXTAREA' && element.nodeName !== 'SELECT')) {
@@ -476,10 +479,10 @@ func (h *ElementHandle) press(apiCtx context.Context, key string, opts KeyboardO
 	return nil
 }
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,gocognit
 func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value) (any, error) {
 	convertSelectOptionValues := func(values sobek.Value) ([]any, error) {
-		if sobek.IsNull(values) || sobek.IsUndefined(values) {
+		if k6common.IsNullish(values) {
 			return nil, nil
 		}
 
@@ -489,40 +492,43 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 			rt   = h.execCtx.vu.Runtime()
 		)
 		switch values.ExportType().Kind() {
-		case reflect.Map:
-			s := reflect.ValueOf(t)
-			for i := 0; i < s.Len(); i++ {
-				item := s.Index(i)
-				switch item.Kind() {
-				case reflect.TypeOf(nil).Kind():
-					return nil, fmt.Errorf("options[%d]: expected object, got null", i)
-				case reflect.TypeOf(&ElementHandle{}).Kind():
-					opts = append(opts, t.(*ElementHandle))
-				case reflect.TypeOf(sobek.Object{}).Kind():
-					obj := values.ToObject(rt)
-					opt := SelectOption{}
-					for _, k := range obj.Keys() {
-						switch k {
-						case "value":
-							opt.Value = new(string)
-							*opt.Value = obj.Get(k).String()
-						case "label":
-							opt.Label = new(string)
-							*opt.Label = obj.Get(k).String()
-						case "index":
-							opt.Index = new(int64)
-							*opt.Index = obj.Get(k).ToInteger()
-						}
-					}
-					opts = append(opts, &opt)
-				case reflect.String:
+		case reflect.Slice:
+			var sl []interface{}
+			if err := rt.ExportTo(values, &sl); err != nil {
+				return nil, fmt.Errorf("options: expected array, got %T", values)
+			}
+
+			for _, item := range sl {
+				switch item := item.(type) {
+				case string:
 					opt := SelectOption{Value: new(string)}
-					*opt.Value = item.String()
+					*opt.Value = item
 					opts = append(opts, &opt)
+				case map[string]interface{}:
+					opt, err := extractSelectOptionFromMap(item)
+					if err != nil {
+						return nil, err
+					}
+
+					opts = append(opts, opt)
+				default:
+					return nil, fmt.Errorf("options: expected string or object, got %T", item)
 				}
 			}
+		case reflect.Map:
+			var raw map[string]interface{}
+			if err := rt.ExportTo(values, &raw); err != nil {
+				return nil, fmt.Errorf("options: expected object, got %T", values)
+			}
+
+			opt, err := extractSelectOptionFromMap(raw)
+			if err != nil {
+				return nil, err
+			}
+
+			opts = append(opts, opt)
 		case reflect.TypeOf(&ElementHandle{}).Kind():
-			opts = append(opts, t.(*ElementHandle))
+			opts = append(opts, t.(*ElementHandle)) //nolint:forcetypeassert
 		case reflect.TypeOf(sobek.Object{}).Kind():
 			obj := values.ToObject(rt)
 			opt := SelectOption{}
@@ -542,8 +548,10 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 			opts = append(opts, &opt)
 		case reflect.String:
 			opt := SelectOption{Value: new(string)}
-			*opt.Value = t.(string)
+			*opt.Value = t.(string) //nolint:forcetypeassert
 			opts = append(opts, &opt)
+		default:
+			return nil, fmt.Errorf("options: unsupported type %T", values)
 		}
 
 		return opts, nil
@@ -562,17 +570,55 @@ func (h *ElementHandle) selectOption(apiCtx context.Context, values sobek.Value)
 		forceCallable: true,
 		returnByValue: false,
 	}
-	result, err := h.evalWithScript(apiCtx, opts, fn, convValues)
+	result, err := h.evalWithScript(apiCtx, opts, fn, convValues) //nolint:asasalint
 	if err != nil {
 		return nil, err
 	}
-	switch result := result.(type) {
-	case string: // An error happened (returned as "error:..." from JS)
+	if result, ok := result.(string); ok {
+		// An error happened (returned as "error:..." from JS)
 		if result != resultDone {
 			return nil, errorFromDOMError(result)
 		}
 	}
 	return result, nil
+}
+
+func extractSelectOptionFromMap(v map[string]interface{}) (*SelectOption, error) {
+	opt := &SelectOption{}
+	for k, raw := range v {
+		switch k {
+		case "value":
+			opt.Value = new(string)
+
+			v, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("options[%v]: expected string, got %T", k, raw)
+			}
+
+			*opt.Value = v
+		case "label":
+			opt.Label = new(string)
+
+			v, ok := raw.(string)
+			if !ok {
+				return nil, fmt.Errorf("options[%v]: expected string, got %T", k, raw)
+			}
+			*opt.Label = v
+		case "index":
+			opt.Index = new(int64)
+
+			switch raw := raw.(type) {
+			case int:
+				*opt.Index = int64(raw)
+			case int64:
+				*opt.Index = raw
+			default:
+				return nil, fmt.Errorf("options[%v]: expected int, got %T", k, raw)
+			}
+		}
+	}
+
+	return opt, nil
 }
 
 func (h *ElementHandle) selectText(apiCtx context.Context) error {
@@ -589,8 +635,7 @@ func (h *ElementHandle) selectText(apiCtx context.Context) error {
 	if err != nil {
 		return err
 	}
-	switch result := result.(type) {
-	case string: // Either we're done or an error happened (returned as "error:..." from JS)
+	if result, ok := result.(string); ok {
 		if result != resultDone {
 			return errorFromDOMError(result)
 		}
@@ -676,7 +721,9 @@ func (h *ElementHandle) waitForElementState(
 		"waiting for states %v of element %q", states, reflect.TypeOf(result))
 }
 
-func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions) (*ElementHandle, error) {
+func (h *ElementHandle) waitForSelector(
+	apiCtx context.Context, selector string, opts *FrameWaitForSelectorOptions,
+) (*ElementHandle, error) {
 	parsedSelector, err := NewSelector(selector)
 	if err != nil {
 		return nil, err
@@ -702,7 +749,7 @@ func (h *ElementHandle) waitForSelector(apiCtx context.Context, selector string,
 	case *ElementHandle:
 		return r, nil
 	default:
-		return nil, nil
+		return nil, nil //nolint:nilnil
 	}
 }
 
@@ -1270,7 +1317,7 @@ func (h *ElementHandle) Screenshot(
 
 	span.SetAttributes(attribute.String("screenshot.path", opts.Path))
 
-	s := newScreenshotter(spanCtx, sp)
+	s := newScreenshotter(spanCtx, sp, h.logger)
 	buf, err := s.screenshotElement(h, opts)
 	if err != nil {
 		err := fmt.Errorf("taking screenshot of elementHandle: %w", err)
@@ -1571,7 +1618,7 @@ func (h *ElementHandle) newAction(
 	}
 }
 
-//nolint:funlen,gocognit,cyclop
+//nolint:funlen,gocognit
 func (h *ElementHandle) newPointerAction(
 	fn elementHandlePointerActionFunc, opts *ElementHandleBasePointerOptions,
 ) func(apiCtx context.Context, resultCh chan any, errCh chan error) {

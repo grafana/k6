@@ -291,7 +291,9 @@ func handleURLTag(mi metricInterceptor, url string, method string, tags *k6metri
 	return tags
 }
 
-func (m *NetworkManager) handleRequestRedirect(req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime) {
+func (m *NetworkManager) handleRequestRedirect(
+	req *Request, redirectResponse *network.Response, timestamp *cdp.MonotonicTime,
+) {
 	resp := NewHTTPResponse(m.ctx, req, redirectResponse, timestamp)
 	req.responseMu.Lock()
 	req.response = resp
@@ -509,7 +511,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 	m.frameManager.requestStarted(req)
 }
 
-func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) { //nolint:funlen
+func (m *NetworkManager) onRequestPaused(event *fetch.EventRequestPaused) {
 	m.logger.Debugf("NetworkManager:onRequestPaused",
 		"sid:%s url:%v", m.session.ID(), event.Request.URL)
 	defer m.logger.Debugf("NetworkManager:onRequestPaused:return",

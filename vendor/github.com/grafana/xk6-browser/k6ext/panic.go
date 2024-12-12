@@ -64,7 +64,7 @@ func sharedPanic(ctx context.Context, failFunc func(rt *sobek.Runtime, a ...any)
 		return
 	}
 	for _, pid := range pidder.Pids() {
-		p, err := os.FindProcess(pid)
+		p, err := os.FindProcess(pid) //nolint:forbidigo
 		if err != nil {
 			// optimistically skip and don't kill the process
 			continue

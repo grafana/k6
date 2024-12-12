@@ -101,7 +101,7 @@ func (b *BrowserContext) setDownloadsPath(path string) error {
 		b.DownloadsPath = path
 		return nil
 	}
-	dir, err := os.MkdirTemp(os.TempDir(), artifactsDirectory+"*")
+	dir, err := os.MkdirTemp(os.TempDir(), artifactsDirectory+"*") //nolint:forbidigo
 	if err != nil {
 		return fmt.Errorf("creating temporary directory for downloads: %w", err)
 	}

@@ -10,7 +10,7 @@ import (
 )
 
 // mapElementHandle to the JS module.
-func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,cyclop,funlen
+func mapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,funlen
 	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": func() *sobek.Promise {

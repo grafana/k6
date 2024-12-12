@@ -14,7 +14,7 @@ import (
 )
 
 // mapBrowserContext to the JS module.
-func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen,gocognit,cyclop
+func mapBrowserContext(vu moduleVU, bc *common.BrowserContext) mapping { //nolint:funlen,gocognit
 	rt := vu.Runtime()
 	return mapping{
 		"addCookies": func(cookies []*common.Cookie) *sobek.Promise {

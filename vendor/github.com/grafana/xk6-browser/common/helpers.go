@@ -14,7 +14,9 @@ import (
 	"github.com/grafana/xk6-browser/k6ext"
 )
 
-func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, objHandle *BaseJSHandle) (*cdpruntime.CallArgument, error) {
+func convertBaseJSHandleTypes(
+	_ context.Context, execCtx *ExecutionContext, objHandle *BaseJSHandle,
+) (*cdpruntime.CallArgument, error) {
 	if objHandle.execCtx != execCtx {
 		return nil, ErrWrongExecutionContext
 	}
@@ -32,7 +34,6 @@ func convertBaseJSHandleTypes(ctx context.Context, execCtx *ExecutionContext, ob
 	return &cdpruntime.CallArgument{ObjectID: objHandle.remoteObject.ObjectID}, nil
 }
 
-// nolint: cyclop
 func convertArgument(
 	ctx context.Context, execCtx *ExecutionContext, arg any,
 ) (*cdpruntime.CallArgument, error) {
@@ -59,7 +60,7 @@ func convertArgument(
 			unserVal = "-Infinity"
 		default:
 			if math.IsNaN(a) {
-				unserVal = "NaN" //nolint: goconst
+				unserVal = "NaN"
 			}
 		}
 
@@ -124,6 +125,7 @@ func stringSliceContains(s []string, e string) bool {
 	return false
 }
 
+//nolint:gocognit
 func createWaitForEventHandler(
 	ctx context.Context,
 	emitter EventEmitter, events []string,
@@ -212,6 +214,8 @@ func createWaitForEventPredicateHandler(
 }
 
 // panicOrSlowMo panics if err is not nil, otherwise applies slow motion.
+//
+//nolint:unused
 func panicOrSlowMo(ctx context.Context, err error) {
 	if err != nil {
 		k6ext.Panic(ctx, "%w", err)

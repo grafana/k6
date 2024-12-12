@@ -64,6 +64,7 @@ type FrameSession struct {
 
 	// To understand the concepts of Isolated Worlds, Contexts and Frames and
 	// the relationship betwween them have a look at the following doc:
+	//nolint:lll
 	// https://chromium.googlesource.com/chromium/src/+/master/third_party/blink/renderer/bindings/core/v8/V8BindingDesign.md
 	contextIDToContextMu sync.Mutex
 	contextIDToContext   map[cdpruntime.ExecutionContextID]*ExecutionContext
@@ -224,6 +225,7 @@ func (fs *FrameSession) initDomains() error {
 	return nil
 }
 
+//nolint:funlen,cyclop
 func (fs *FrameSession) initEvents() {
 	fs.logger.Debugf("NewFrameSession:initEvents",
 		"sid:%v tid:%v", fs.session.ID(), fs.targetID)
@@ -269,7 +271,7 @@ func (fs *FrameSession) initEvents() {
 			case event := <-fs.eventCh:
 				switch ev := event.data.(type) {
 				case *inspector.EventTargetCrashed:
-					fs.onTargetCrashed(ev)
+					fs.onTargetCrashed()
 				case *cdplog.EventEntryAdded:
 					fs.onLogEntryAdded(ev)
 				case *cdppage.EventFrameAttached:
@@ -552,17 +554,9 @@ func (fs *FrameSession) initOptions() error {
 	if err := fs.updateHTTPCredentials(true); err != nil {
 		return err
 	}
-	if err := fs.updateEmulateMedia(true); err != nil {
+	if err := fs.updateEmulateMedia(); err != nil {
 		return err
 	}
-
-	// if (screencastOptions)
-	//   promises.push(this._startVideoRecording(screencastOptions));
-
-	/*for (const source of this._crPage._browserContext._evaluateOnNewDocumentSources)
-	      promises.push(this._evaluateOnNewDocument(source, 'main'));
-	  for (const source of this._crPage._page._evaluateOnNewDocumentSources)
-	      promises.push(this._evaluateOnNewDocument(source, 'main'));*/
 
 	for _, action := range optActions {
 		if err := action.Do(cdp.WithExecutor(fs.ctx, fs.session)); err != nil {
@@ -644,11 +638,11 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 		WithField("source", "browser").
 		WithField("browser_source", "console-api")
 
-		/* accessing the state Group while not on the eventloop is racy
-		if s := fs.vu.State(); s.Group.Path != "" {
-			l = l.WithField("group", s.Group.Path)
-		}
-		*/
+	/* accessing the state Group while not on the eventloop is racy
+	if s := fs.vu.State(); s.Group.Path != "" {
+		l = l.WithField("group", s.Group.Path)
+	}
+	*/
 
 	parsedObjects := make([]string, 0, len(event.Args))
 	for _, robj := range event.Args {
@@ -661,18 +655,9 @@ func (fs *FrameSession) onConsoleAPICalled(event *cdpruntime.EventConsoleAPICall
 
 	msg := strings.Join(parsedObjects, " ")
 
-	switch event.Type {
-	case "log", "info":
-		l.Info(msg)
-	case "warning":
-		l.Warn(msg)
-	case "error":
-		l.Error(msg)
-	default:
-		// this is where debug & other console.* apis will default to (such as
-		// console.table).
-		l.Debug(msg)
-	}
+	// this is where debug & other console.* apis will default to (such as
+	// console.table).
+	l.Debug(msg)
 }
 
 func (fs *FrameSession) onExceptionThrown(event *cdpruntime.EventExceptionThrown) {
@@ -894,21 +879,14 @@ func (fs *FrameSession) onLogEntryAdded(event *cdplog.EventEntryAdded) {
 		WithField("url", event.Entry.URL).
 		WithField("browser_source", event.Entry.Source.String()).
 		WithField("line_number", event.Entry.LineNumber)
-		/* accessing the state Group while not on the eventloop is racy
-		if s := fs.vu.State(); s.Group.Path != "" {
-			l = l.WithField("group", s.Group.Path)
-		}
-		*/
-	switch event.Entry.Level {
-	case "info":
-		l.Info(event.Entry.Text)
-	case "warning":
-		l.Warn(event.Entry.Text)
-	case "error":
-		l.WithField("stacktrace", event.Entry.StackTrace).Error(event.Entry.Text)
-	default:
-		l.Debug(event.Entry.Text)
+
+	/* accessing the state Group while not on the eventloop is racy
+	if s := fs.vu.State(); s.Group.Path != "" {
+		l = l.WithField("group", s.Group.Path)
 	}
+	*/
+
+	l.Debug(event.Entry.Text)
 }
 
 func (fs *FrameSession) onPageLifecycle(event *cdppage.EventLifecycleEvent) {
@@ -1029,7 +1007,12 @@ func (fs *FrameSession) attachIFrameToTarget(ti *target.Info, sid target.Session
 		return nil
 	}
 	// Remove all children of the previously attached frame.
-	fs.manager.removeChildFramesRecursively(fr)
+	err := fs.manager.removeChildFramesRecursively(fr)
+	if err != nil {
+		fs.logger.Debugf("FrameSession:attachIFrameToTarget:return",
+			"sid:%v tid:%v esid:%v etid:%v ebctxid:%v type:%q, can't remove child frames recursively: %q",
+			fs.session.ID(), fs.targetID, sid, ti.TargetID, ti.BrowserContextID, ti.Type, err)
+	}
 
 	nfs, err := NewFrameSession(
 		fs.ctx,
@@ -1066,7 +1049,7 @@ func (fs *FrameSession) onDetachedFromTarget(event *target.EventDetachedFromTarg
 	fs.page.closeWorker(event.SessionID)
 }
 
-func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
+func (fs *FrameSession) onTargetCrashed() {
 	fs.logger.Debugf("FrameSession:onTargetCrashed", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	// TODO:?
@@ -1078,7 +1061,7 @@ func (fs *FrameSession) onTargetCrashed(event *inspector.EventTargetCrashed) {
 	fs.page.didCrash()
 }
 
-func (fs *FrameSession) updateEmulateMedia(initial bool) error {
+func (fs *FrameSession) updateEmulateMedia() error {
 	fs.logger.Debugf("NewFrameSession:updateEmulateMedia", "sid:%v tid:%v", fs.session.ID(), fs.targetID)
 
 	features := make([]*emulation.MediaFeature, 0)

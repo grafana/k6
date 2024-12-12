@@ -10,7 +10,6 @@ import (
 
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/runtime"
-	cdpruntime "github.com/chromedp/cdproto/runtime"
 )
 
 // JSHandleAPI is the interface of an in-page JS object.
@@ -25,7 +24,7 @@ type JSHandleAPI interface {
 	EvaluateHandle(pageFunc string, args ...any) (JSHandleAPI, error)
 	GetProperties() (map[string]JSHandleAPI, error)
 	JSONValue() (string, error)
-	ObjectID() cdpruntime.RemoteObjectID
+	ObjectID() runtime.RemoteObjectID
 }
 
 type jsHandle interface {

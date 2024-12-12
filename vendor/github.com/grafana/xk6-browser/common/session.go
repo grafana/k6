@@ -107,7 +107,9 @@ func (s *Session) readLoop() {
 }
 
 // Execute implements the cdp.Executor interface.
-func (s *Session) Execute(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
+func (s *Session) Execute(
+	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+) error {
 	s.logger.Debugf("Session:Execute", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	if s.crashed {
 		s.logger.Debugf("Session:Execute:return", "sid:%v tid:%v method:%q crashed", s.id, s.targetID, method)
@@ -124,13 +126,15 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 		for {
 			select {
 			case <-evCancelCtx.Done():
-				s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():return", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
+				s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():return", "sid:%v tid:%v method:%q",
+					s.id, s.targetID, method)
 				return
 			case ev := <-chEvHandler:
 				if msg, ok := ev.data.(*cdproto.Message); ok && msg.ID == id {
 					select {
 					case <-evCancelCtx.Done():
-						s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():2:return", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
+						s.logger.Debugf("Session:Execute:<-evCancelCtx.Done():2:return", "sid:%v tid:%v method:%q",
+							s.id, s.targetID, method)
 					case ch <- msg:
 						// We expect only one response with the matching message ID,
 						// then remove event handler by cancelling context and stopping goroutine.
@@ -163,10 +167,13 @@ func (s *Session) Execute(ctx context.Context, method string, params easyjson.Ma
 	return s.conn.send(contextWithDoneChan(ctx, s.done), msg, ch, res)
 }
 
-func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler) error {
+func (s *Session) ExecuteWithoutExpectationOnReply(
+	ctx context.Context, method string, params easyjson.Marshaler, res easyjson.Unmarshaler,
+) error {
 	s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q", s.id, s.targetID, method)
 	if s.crashed {
-		s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q, ErrTargetCrashed", s.id, s.targetID, method)
+		s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply", "sid:%v tid:%v method:%q, ErrTargetCrashed",
+			s.id, s.targetID, method)
 		return ErrTargetCrashed
 	}
 
@@ -177,7 +184,8 @@ func (s *Session) ExecuteWithoutExpectationOnReply(ctx context.Context, method s
 		var err error
 		buf, err = easyjson.Marshal(params)
 		if err != nil {
-			s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid:%v tid:%v method:%q err=%v", s.id, s.targetID, method, err)
+			s.logger.Debugf("Session:ExecuteWithoutExpectationOnReply:Marshal", "sid:%v tid:%v method:%q err=%v",
+				s.id, s.targetID, method, err)
 			return err
 		}
 	}

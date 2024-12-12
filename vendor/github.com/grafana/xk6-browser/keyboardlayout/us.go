@@ -1,5 +1,6 @@
 package keyboardlayout
 
+//nolint:funlen
 func initUS() {
 	validKeys := map[KeyInput]bool{
 		"0":                  true,
