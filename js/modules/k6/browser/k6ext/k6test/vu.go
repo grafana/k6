@@ -9,8 +9,8 @@ import (
 	"github.com/stretchr/testify/require"
 	"gopkg.in/guregu/null.v3"
 
-	"github.com/grafana/xk6-browser/env"
-	"github.com/grafana/xk6-browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/env"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
 
 	"go.k6.io/k6/event"
 	k6common "go.k6.io/k6/js/common"

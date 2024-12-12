@@ -9,7 +9,7 @@ import (
 	"github.com/grafana/sobek"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/common"
 
 	k6common "go.k6.io/k6/js/common"
 	k6modulestest "go.k6.io/k6/js/modulestest"
@@ -43,7 +43,7 @@ func customMappings() map[string]string {
 		"frameAPI.evaluateWithContext": "",
 		// TODO: browser.on method is unexposed until more event
 		// types other than 'disconnect' are supported.
-		// See: https://github.com/grafana/xk6-browser/issues/913
+		// See: https://go.k6.io/k6/js/modules/k6/browser/issues/913
 		"browserAPI.on": "",
 	}
 }

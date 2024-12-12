@@ -3,8 +3,8 @@ package browser
 import (
 	"context"
 
-	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
 )

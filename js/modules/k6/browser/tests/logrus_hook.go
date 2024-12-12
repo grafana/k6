@@ -79,7 +79,7 @@ func attachLogCache(tb testing.TB, fl logrus.FieldLogger) *logCache {
 	var logger *logrus.Logger                  //nolint:forbidigo
 	if logger, ok = fl.(*logrus.Logger); !ok { //nolint:forbidigo
 		// TODO: Fix this to always work with logrus.FieldLoger.
-		// See: https://github.com/grafana/xk6-browser/issues/818
+		// See: https://go.k6.io/k6/js/modules/k6/browser/issues/818
 		tb.Fatalf("logCache: unexpected logger type: %T", fl)
 	}
 

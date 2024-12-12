@@ -7,8 +7,8 @@ import (
 	"sort"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/env"
+	"go.k6.io/k6/js/modules/k6/browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/env"
 
 	k6lib "go.k6.io/k6/lib"
 	k6types "go.k6.io/k6/lib/types"

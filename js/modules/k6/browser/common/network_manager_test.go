@@ -7,9 +7,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/k6ext/k6test"
-	"github.com/grafana/xk6-browser/log"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 
 	k6lib "go.k6.io/k6/lib"
 	k6mockresolver "go.k6.io/k6/lib/testutils/mockresolver"

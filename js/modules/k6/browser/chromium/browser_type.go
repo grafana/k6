@@ -12,11 +12,11 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/env"
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/log"
-	"github.com/grafana/xk6-browser/storage"
+	"go.k6.io/k6/js/modules/k6/browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/env"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/log"
+	"go.k6.io/k6/js/modules/k6/browser/storage"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"

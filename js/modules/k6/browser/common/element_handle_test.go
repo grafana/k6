@@ -5,7 +5,7 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/grafana/xk6-browser/common/js"
+	"go.k6.io/k6/js/modules/k6/browser/common/js"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

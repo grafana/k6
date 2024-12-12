@@ -13,7 +13,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
-	"github.com/grafana/xk6-browser/log"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 )
 
 // ScreenshotPersister is the type that all file persisters must implement. It's job is
@@ -261,7 +261,7 @@ func getViewPortDimensions(ctx context.Context, sess session, logger *log.Logger
 			"chrome browser returned nil on page.getLayoutMetrics, falling back to defaults for visualViewport "+
 				"(scale: %v, pageX: %v, pageY: %v)."+
 				"This is non-standard behavior, if possible please report this issue (with reproducible script) "+
-				"to the https://github.com/grafana/xk6-browser/issues/1502.",
+				"to the https://go.k6.io/k6/js/modules/k6/browser/issues/1502.",
 			visualViewportScale, visualViewportPageX, visualViewportPageY,
 		)
 	}

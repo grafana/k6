@@ -20,8 +20,8 @@ import (
 	"github.com/stretchr/testify/require"
 	k6metrics "go.k6.io/k6/metrics"
 
-	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6ext/k6test"
+	"go.k6.io/k6/js/modules/k6/browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext/k6test"
 )
 
 type emulateMediaOpts struct {
@@ -530,7 +530,7 @@ func TestPageInputValue(t *testing.T) {
 	assert.Equal(t, got, want)
 }
 
-// test for: https://github.com/grafana/xk6-browser/issues/132
+// test for: https://go.k6.io/k6/js/modules/k6/browser/issues/132
 func TestPageInputSpecialCharacters(t *testing.T) {
 	t.Parallel()
 

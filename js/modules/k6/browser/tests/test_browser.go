@@ -13,11 +13,11 @@ import (
 	"github.com/stretchr/testify/require"
 	"golang.org/x/sync/errgroup"
 
-	"github.com/grafana/xk6-browser/chromium"
-	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/env"
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/k6ext/k6test"
+	"go.k6.io/k6/js/modules/k6/browser/chromium"
+	"go.k6.io/k6/js/modules/k6/browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/env"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext/k6test"
 
 	k6http "go.k6.io/k6/js/modules/k6/http"
 	k6httpmultibin "go.k6.io/k6/lib/testutils/httpmultibin"

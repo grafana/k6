@@ -14,8 +14,8 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/network"
 
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/log"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
 )
@@ -236,7 +236,7 @@ func (r *Request) Method() string {
 // PostData returns the request post data, if any.
 //
 // If will not attempt to fetch the data if it should have some but nothing is
-// cached locally: https://github.com/grafana/xk6-browser/issues/1470
+// cached locally: https://go.k6.io/k6/js/modules/k6/browser/issues/1470
 //
 // This relies on PostDataEntries. It will only ever return the 0th entry.
 // TODO: Create a PostDataEntries API when we have a better idea of when that
@@ -252,7 +252,7 @@ func (r *Request) PostData() string {
 // PostDataBuffer returns the request post data as an ArrayBuffer.
 //
 // If will not attempt to fetch the data if it should have some but nothing is
-// cached locally: https://github.com/grafana/xk6-browser/issues/1470
+// cached locally: https://go.k6.io/k6/js/modules/k6/browser/issues/1470
 //
 // This relies on PostDataEntries. It will only ever return the 0th entry.
 // TODO: Create a PostDataEntries API when we have a better idea of when that
@@ -372,7 +372,7 @@ func NewHTTPResponse(
 	r := Response{
 		ctx: ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
-		// See https://github.com/grafana/xk6-browser/issues/54
+		// See https://go.k6.io/k6/js/modules/k6/browser/issues/54
 		logger:            log.New(state.Logger, GetIterationID(ctx)),
 		request:           req,
 		remoteAddress:     &RemoteAddress{IPAddress: resp.RemoteIPAddress, Port: resp.RemotePort},

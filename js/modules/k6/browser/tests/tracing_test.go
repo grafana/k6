@@ -15,9 +15,9 @@ import (
 	"go.opentelemetry.io/otel/trace"
 	"go.opentelemetry.io/otel/trace/embedded"
 
-	"github.com/grafana/xk6-browser/browser"
-	"github.com/grafana/xk6-browser/k6ext/k6test"
-	browsertrace "github.com/grafana/xk6-browser/trace"
+	"go.k6.io/k6/js/modules/k6/browser/browser"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext/k6test"
+	browsertrace "go.k6.io/k6/js/modules/k6/browser/trace"
 
 	k6lib "go.k6.io/k6/lib"
 )

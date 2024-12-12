@@ -10,8 +10,8 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/keyboardlayout"
+	"go.k6.io/k6/js/modules/k6/browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/keyboardlayout"
 )
 
 func TestKeyboardPress(t *testing.T) {
@@ -155,7 +155,7 @@ func TestKeyboardPress(t *testing.T) {
 
 	t.Run("meta", func(t *testing.T) {
 		t.Parallel()
-		t.Skip("FIXME") // See https://github.com/grafana/xk6-browser/issues/424
+		t.Skip("FIXME") // See https://go.k6.io/k6/js/modules/k6/browser/issues/424
 		tb := newTestBrowser(t)
 		p := tb.NewPage(nil)
 		kb := p.GetKeyboard()

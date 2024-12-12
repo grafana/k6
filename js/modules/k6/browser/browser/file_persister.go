@@ -6,8 +6,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/grafana/xk6-browser/env"
-	"github.com/grafana/xk6-browser/storage"
+	"go.k6.io/k6/js/modules/k6/browser/env"
+	"go.k6.io/k6/js/modules/k6/browser/storage"
 )
 
 type presignedURLConfig struct {

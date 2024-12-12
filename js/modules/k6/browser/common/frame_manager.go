@@ -7,8 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 
-	"github.com/grafana/xk6-browser/k6ext"
-	"github.com/grafana/xk6-browser/log"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 
 	k6modules "go.k6.io/k6/js/modules"
 

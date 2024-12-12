@@ -8,6 +8,7 @@ import (
 	"go.k6.io/k6/js/common"
 	"go.k6.io/k6/js/modules"
 	"go.k6.io/k6/js/modules/k6"
+	"go.k6.io/k6/js/modules/k6/browser/browser"
 	"go.k6.io/k6/js/modules/k6/crypto"
 	"go.k6.io/k6/js/modules/k6/crypto/x509"
 	"go.k6.io/k6/js/modules/k6/data"
@@ -23,7 +24,6 @@ import (
 	"go.k6.io/k6/js/modules/k6/timers"
 	"go.k6.io/k6/js/modules/k6/ws"
 
-	"github.com/grafana/xk6-browser/browser"
 	"github.com/grafana/xk6-redis/redis"
 	"github.com/grafana/xk6-webcrypto/webcrypto"
 	expws "github.com/grafana/xk6-websockets/websockets"

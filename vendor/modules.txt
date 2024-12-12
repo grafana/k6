@@ -179,19 +179,6 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/xk6-browser v1.10.0
-## explicit; go 1.21
-github.com/grafana/xk6-browser/browser
-github.com/grafana/xk6-browser/chromium
-github.com/grafana/xk6-browser/common
-github.com/grafana/xk6-browser/common/js
-github.com/grafana/xk6-browser/env
-github.com/grafana/xk6-browser/k6error
-github.com/grafana/xk6-browser/k6ext
-github.com/grafana/xk6-browser/keyboardlayout
-github.com/grafana/xk6-browser/log
-github.com/grafana/xk6-browser/storage
-github.com/grafana/xk6-browser/trace
 # github.com/grafana/xk6-dashboard v0.7.5
 ## explicit; go 1.20
 github.com/grafana/xk6-dashboard/dashboard
@@ -465,6 +452,7 @@ golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
 # golang.org/x/sync v0.10.0
 ## explicit; go 1.18
+golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
 # golang.org/x/sys v0.28.0
 ## explicit; go 1.18

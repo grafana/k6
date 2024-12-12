@@ -11,9 +11,9 @@ import (
 	"sync"
 	"time"
 
-	"github.com/grafana/xk6-browser/log"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 
-	"github.com/grafana/xk6-browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
 
 	k6modules "go.k6.io/k6/js/modules"
 	k6lib "go.k6.io/k6/lib"
@@ -98,7 +98,7 @@ func NewNetworkManager(
 		BaseEventEmitter: NewBaseEventEmitter(ctx),
 		ctx:              ctx,
 		// TODO: Pass an internal logger instead of basing it on k6's logger?
-		// See https://github.com/grafana/xk6-browser/issues/54
+		// See https://go.k6.io/k6/js/modules/k6/browser/issues/54
 		logger:           log.New(state.Logger, GetIterationID(ctx)),
 		session:          s,
 		parent:           parent,

@@ -7,7 +7,7 @@ import (
 
 	"github.com/grafana/sobek"
 
-	"github.com/grafana/xk6-browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
 )
 
 // Position represents a position.

@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/grafana/xk6-browser/env"
-	"github.com/grafana/xk6-browser/log"
+	"go.k6.io/k6/js/modules/k6/browser/env"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 
 	"go.k6.io/k6/lib/types"
 )
@@ -26,7 +26,7 @@ type BrowserOptions struct {
 	IgnoreDefaultArgs []string
 	LogCategoryFilter string
 	// TODO: Do not expose slowMo option by now.
-	// See https://github.com/grafana/xk6-browser/issues/857.
+	// See https://go.k6.io/k6/js/modules/k6/browser/issues/857.
 	SlowMo  time.Duration
 	Timeout time.Duration
 

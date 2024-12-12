@@ -3,8 +3,8 @@ package browser
 import (
 	"github.com/grafana/sobek"
 
-	"github.com/grafana/xk6-browser/common"
-	"github.com/grafana/xk6-browser/k6ext"
+	"go.k6.io/k6/js/modules/k6/browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/k6ext"
 )
 
 // mapTouchscreen to the JS module.

@@ -2,7 +2,7 @@
 package chromium
 
 import (
-	"github.com/grafana/xk6-browser/common"
+	"go.k6.io/k6/js/modules/k6/browser/common"
 )
 
 // Browser is the public interface of a CDP browser.
