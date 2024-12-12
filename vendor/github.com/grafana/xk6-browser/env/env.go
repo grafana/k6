@@ -95,7 +95,7 @@ type LookupFunc func(key string) (string, bool)
 func EmptyLookup(_ string) (string, bool) { return "", false }
 
 // Lookup is a LookupFunc that uses os.LookupEnv.
-func Lookup(key string) (string, bool) { return os.LookupEnv(key) }
+func Lookup(key string) (string, bool) { return os.LookupEnv(key) } //nolint:forbidigo
 
 // ConstLookup is a LookupFunc that always returns the given value and true
 // if the key matches the given key. Otherwise it returns EmptyLookup

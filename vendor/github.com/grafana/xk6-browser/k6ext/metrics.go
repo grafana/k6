@@ -59,7 +59,6 @@ func RegisterCustomMetrics(registry *k6metrics.Registry) *CustomMetrics {
 		webVitals[k] = registry.MustNewMetric(v, k6metrics.Trend, t)
 	}
 
-	//nolint:lll
 	return &CustomMetrics{
 		WebVitals:              webVitals,
 		BrowserDataSent:        registry.MustNewMetric(browserDataSentName, k6metrics.Counter, k6metrics.Data),

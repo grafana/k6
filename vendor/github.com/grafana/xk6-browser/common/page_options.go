@@ -32,7 +32,9 @@ type PageScreenshotOptions struct {
 	Quality        int64          `json:"quality"`
 }
 
-func NewPageEmulateMediaOptions(defaultMedia MediaType, defaultColorScheme ColorScheme, defaultReducedMotion ReducedMotion) *PageEmulateMediaOptions {
+func NewPageEmulateMediaOptions(
+	defaultMedia MediaType, defaultColorScheme ColorScheme, defaultReducedMotion ReducedMotion,
+) *PageEmulateMediaOptions {
 	return &PageEmulateMediaOptions{
 		ColorScheme:   defaultColorScheme,
 		Media:         defaultMedia,
@@ -100,7 +102,7 @@ func NewPageScreenshotOptions() *PageScreenshotOptions {
 }
 
 // Parse parses the page screenshot options.
-func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error { //nolint:cyclop
+func (o *PageScreenshotOptions) Parse(ctx context.Context, opts sobek.Value) error {
 	if !sobekValueExists(opts) {
 		return nil
 	}

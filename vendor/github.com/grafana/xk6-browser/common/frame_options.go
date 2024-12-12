@@ -626,7 +626,7 @@ func (o *FrameWaitForFunctionOptions) Parse(ctx context.Context, opts sobek.Valu
 		case "timeout":
 			o.Timeout = time.Duration(v.ToInteger()) * time.Millisecond
 		case "polling":
-			switch v.ExportType().Kind() { //nolint: exhaustive
+			switch v.ExportType().Kind() {
 			case reflect.Int64:
 				o.Polling = PollingInterval
 				o.Interval = v.ToInteger()
@@ -658,8 +658,7 @@ func (o *FrameWaitForLoadStateOptions) Parse(ctx context.Context, opts sobek.Val
 	if opts != nil && !sobek.IsUndefined(opts) && !sobek.IsNull(opts) {
 		opts := opts.ToObject(rt)
 		for _, k := range opts.Keys() {
-			switch k {
-			case "timeout":
+			if k == "timeout" {
 				o.Timeout = time.Duration(opts.Get(k).ToInteger()) * time.Millisecond
 			}
 		}

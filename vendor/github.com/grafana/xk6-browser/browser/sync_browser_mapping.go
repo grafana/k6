@@ -7,7 +7,7 @@ import (
 )
 
 // syncMapBrowser is like mapBrowser but returns synchronous functions.
-func syncMapBrowser(vu moduleVU) mapping { //nolint:funlen,cyclop
+func syncMapBrowser(vu moduleVU) mapping { //nolint:funlen
 	rt := vu.Runtime()
 	return mapping{
 		"context": func() (mapping, error) {

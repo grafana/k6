@@ -10,7 +10,7 @@ import (
 )
 
 // syncMapFrame is like mapFrame but returns synchronous functions.
-func syncMapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,cyclop,funlen
+func syncMapFrame(vu moduleVU, f *common.Frame) mapping { //nolint:gocognit,funlen
 	rt := vu.Runtime()
 	maps := mapping{
 		"check": f.Check,

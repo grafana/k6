@@ -13,6 +13,7 @@ import (
 	"github.com/chromedp/cdproto/cdp"
 	"github.com/chromedp/cdproto/emulation"
 	cdppage "github.com/chromedp/cdproto/page"
+	"github.com/grafana/xk6-browser/log"
 )
 
 // ScreenshotPersister is the type that all file persisters must implement. It's job is
@@ -67,10 +68,15 @@ func (f *ImageFormat) UnmarshalJSON(b []byte) error {
 type screenshotter struct {
 	ctx       context.Context
 	persister ScreenshotPersister
+	logger    *log.Logger
 }
 
-func newScreenshotter(ctx context.Context, sp ScreenshotPersister) *screenshotter {
-	return &screenshotter{ctx, sp}
+func newScreenshotter(
+	ctx context.Context,
+	sp ScreenshotPersister,
+	logger *log.Logger,
+) *screenshotter {
+	return &screenshotter{ctx, sp, logger}
 }
 
 func (s *screenshotter) fullPageSize(p *Page) (*Size, error) {
@@ -144,7 +150,6 @@ func (s *screenshotter) restoreViewport(p *Page, originalViewport *Size) error {
 	return p.resetViewport()
 }
 
-//nolint:funlen,cyclop
 func (s *screenshotter) screenshot(
 	sess session, doc, viewport *Rect, format ImageFormat, omitBackground bool, quality int64, path string,
 ) ([]byte, error) {
@@ -165,7 +170,6 @@ func (s *screenshotter) screenshot(
 
 	// Add common options
 	capture.WithQuality(quality)
-	// nolint:exhaustive
 	switch format {
 	case ImageFormatJPEG:
 		capture.WithFormat(cdppage.CaptureScreenshotFormatJpeg)
@@ -173,21 +177,19 @@ func (s *screenshotter) screenshot(
 		capture.WithFormat(cdppage.CaptureScreenshotFormatPng)
 	}
 
-	// Add clip region
-	//nolint:dogsled
-	_, visualViewport, _, _, _, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(s.ctx, sess))
+	visualViewportScale, visualViewportPageX, visualViewportPageY, err := getViewPortDimensions(s.ctx, sess, s.logger)
 	if err != nil {
-		return nil, fmt.Errorf("getting layout metrics for screenshot: %w", err)
+		return nil, err
 	}
 
 	if doc == nil {
 		s := Size{
-			Width:  viewport.Width / visualViewport.Scale,
-			Height: viewport.Height / visualViewport.Scale,
+			Width:  viewport.Width / visualViewportScale,
+			Height: viewport.Height / visualViewportScale,
 		}.enclosingIntSize()
 		doc = &Rect{
-			X:      visualViewport.PageX + viewport.X,
-			Y:      visualViewport.PageY + viewport.Y,
+			X:      visualViewportPageX + viewport.X,
+			Y:      visualViewportPageY + viewport.Y,
 			Width:  s.Width,
 			Height: s.Height,
 		}
@@ -195,7 +197,7 @@ func (s *screenshotter) screenshot(
 
 	scale := 1.0
 	if viewport != nil {
-		scale = visualViewport.Scale
+		scale = visualViewportScale
 	}
 	clip = &cdppage.Viewport{
 		X:      doc.X,
@@ -231,7 +233,43 @@ func (s *screenshotter) screenshot(
 	return buf, nil
 }
 
-//nolint:funlen,cyclop
+func getViewPortDimensions(ctx context.Context, sess session, logger *log.Logger) (float64, float64, float64, error) {
+	visualViewportScale := 1.0
+	visualViewportPageX, visualViewportPageY := 0.0, 0.0
+
+	// Add clip region
+	//nolint:dogsled
+	_, visualViewport, _, _, cssVisualViewport, _, err := cdppage.GetLayoutMetrics().Do(cdp.WithExecutor(ctx, sess))
+	if err != nil {
+		return 0, 0, 0, fmt.Errorf("getting layout metrics for screenshot: %w", err)
+	}
+
+	// we had a null pointer panic cases, when visualViewport is nil
+	// instead of the erroring out, we fallback to defaults and still try to do a screenshot
+	switch {
+	case cssVisualViewport != nil:
+		visualViewportScale = cssVisualViewport.Scale
+		visualViewportPageX = cssVisualViewport.PageX
+		visualViewportPageY = cssVisualViewport.PageY
+	case visualViewport != nil:
+		visualViewportScale = visualViewport.Scale
+		visualViewportPageX = visualViewport.PageX
+		visualViewportPageY = visualViewport.PageY
+	default:
+		logger.Warnf(
+			"Screenshotter::screenshot",
+			"chrome browser returned nil on page.getLayoutMetrics, falling back to defaults for visualViewport "+
+				"(scale: %v, pageX: %v, pageY: %v)."+
+				"This is non-standard behavior, if possible please report this issue (with reproducible script) "+
+				"to the https://github.com/grafana/xk6-browser/issues/1502.",
+			visualViewportScale, visualViewportPageX, visualViewportPageY,
+		)
+	}
+
+	return visualViewportScale, visualViewportPageX, visualViewportPageY, nil
+}
+
+//nolint:funlen
 func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 	viewportSize, originalViewportSize, err := s.originalViewportSize(h.frame.page)
@@ -257,7 +295,7 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 
 	var overriddenViewportSize *Size
 	fitsViewport := bbox.Width <= viewportSize.Width && bbox.Height <= viewportSize.Height
-	if !fitsViewport {
+	if !fitsViewport { //nolint:nestif
 		overriddenViewportSize = Size{
 			Width:  math.Max(viewportSize.Width, bbox.Width),
 			Height: math.Max(viewportSize.Height, bbox.Height),
@@ -317,7 +355,6 @@ func (s *screenshotter) screenshotElement(h *ElementHandle, opts *ElementHandleS
 	return buf, nil
 }
 
-//nolint:funlen,cyclop,gocognit
 func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) ([]byte, error) {
 	format := opts.Format
 
@@ -333,7 +370,7 @@ func (s *screenshotter) screenshotPage(p *Page, opts *PageScreenshotOptions) ([]
 		return nil, fmt.Errorf("getting original viewport size: %w", err)
 	}
 
-	if opts.FullPage {
+	if opts.FullPage { //nolint:nestif
 		fullPageSize, err := s.fullPageSize(p)
 		if err != nil {
 			return nil, fmt.Errorf("getting full page size: %w", err)

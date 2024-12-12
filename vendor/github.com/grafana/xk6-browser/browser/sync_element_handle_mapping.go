@@ -10,7 +10,7 @@ import (
 )
 
 // syncMapElementHandle is like mapElementHandle but returns synchronous functions.
-func syncMapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,cyclop,funlen
+func syncMapElementHandle(vu moduleVU, eh *common.ElementHandle) mapping { //nolint:gocognit,funlen
 	rt := vu.Runtime()
 	maps := mapping{
 		"boundingBox": eh.BoundingBox,

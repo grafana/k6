@@ -13,7 +13,6 @@ import (
 	"github.com/grafana/xk6-browser/log"
 
 	"github.com/chromedp/cdproto/runtime"
-	cdpruntime "github.com/chromedp/cdproto/runtime"
 )
 
 var bigIntRegex = regexp.MustCompile("^[0-9]*n$")
@@ -59,7 +58,7 @@ func (e *remoteObjectParseError) Unwrap() error {
 	return e.error
 }
 
-func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, error) {
+func parseRemoteObjectPreview(op *runtime.ObjectPreview) (map[string]any, error) {
 	obj := make(map[string]any)
 	var result []error
 	if op.Overflow {
@@ -78,28 +77,27 @@ func parseRemoteObjectPreview(op *cdpruntime.ObjectPreview) (map[string]any, err
 	return obj, errors.Join(result...)
 }
 
-//nolint:cyclop
 func parseRemoteObjectValue(
-	t cdpruntime.Type, st cdpruntime.Subtype, val string, op *cdpruntime.ObjectPreview,
+	t runtime.Type, st runtime.Subtype, val string, op *runtime.ObjectPreview,
 ) (any, error) {
-	switch t {
-	case cdpruntime.TypeAccessor:
+	switch t { //nolint:exhaustive
+	case runtime.TypeAccessor:
 		return "accessor", nil
-	case cdpruntime.TypeBigint:
-		n, err := strconv.ParseInt(strings.Replace(val, "n", "", -1), 10, 64)
+	case runtime.TypeBigint:
+		n, err := strconv.ParseInt(strings.ReplaceAll(val, "n", ""), 10, 64)
 		if err != nil {
 			return nil, BigIntParseError{err}
 		}
 		return n, nil
-	case cdpruntime.TypeFunction:
+	case runtime.TypeFunction:
 		return "function()", nil
-	case cdpruntime.TypeString:
+	case runtime.TypeString:
 		if !strings.HasPrefix(val, `"`) {
 			return val, nil
 		}
-	case cdpruntime.TypeSymbol:
+	case runtime.TypeSymbol:
 		return val, nil
-	case cdpruntime.TypeObject:
+	case runtime.TypeObject:
 		if op != nil {
 			return parseRemoteObjectPreview(op)
 		}
@@ -109,7 +107,7 @@ func parseRemoteObjectValue(
 		if st == runtime.SubtypeNull {
 			return nil, nil //nolint:nilnil
 		}
-	case cdpruntime.TypeUndefined:
+	case runtime.TypeUndefined:
 		return "undefined", nil
 	}
 
@@ -126,7 +124,7 @@ func parseRemoteObjectValue(
 	return v, nil
 }
 
-func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
+func parseExceptionDetails(exc *runtime.ExceptionDetails) string {
 	if exc == nil {
 		return ""
 	}
@@ -144,7 +142,7 @@ func parseExceptionDetails(exc *cdpruntime.ExceptionDetails) string {
 
 // parseRemoteObject is to be used by callers that require the string value
 // to be parsed to a Go type.
-func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
+func parseRemoteObject(obj *runtime.RemoteObject) (any, error) {
 	uv := obj.UnserializableValue
 
 	if uv == "" {
@@ -176,7 +174,7 @@ func parseRemoteObject(obj *cdpruntime.RemoteObject) (any, error) {
 	return nil, UnserializableValueError{uv}
 }
 
-func valueFromRemoteObject(_ context.Context, robj *cdpruntime.RemoteObject) (any, error) {
+func valueFromRemoteObject(_ context.Context, robj *runtime.RemoteObject) (any, error) {
 	val, err := parseRemoteObject(robj)
 	if val == "undefined" {
 		return nil, err
@@ -184,10 +182,10 @@ func valueFromRemoteObject(_ context.Context, robj *cdpruntime.RemoteObject) (an
 	return val, err
 }
 
-func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) (string, error) {
+func parseConsoleRemoteObjectPreview(logger *log.Logger, op *runtime.ObjectPreview) (string, error) {
 	obj := make(map[string]string)
 	if op.Overflow {
-		logger.Infof("parseConsoleRemoteObjectPreview", "object is too large and will be parsed partially")
+		logger.Debugf("parseConsoleRemoteObjectPreview", "object is too large and will be parsed partially")
 	}
 
 	for _, p := range op.Properties {
@@ -206,10 +204,10 @@ func parseConsoleRemoteObjectPreview(logger *log.Logger, op *cdpruntime.ObjectPr
 	return string(bb), nil
 }
 
-func parseConsoleRemoteArrayPreview(logger *log.Logger, op *cdpruntime.ObjectPreview) (string, error) {
+func parseConsoleRemoteArrayPreview(logger *log.Logger, op *runtime.ObjectPreview) (string, error) {
 	arr := make([]any, 0, len(op.Properties))
 	if op.Overflow {
-		logger.Infof("parseConsoleRemoteArrayPreview", "array is too large and will be parsed partially")
+		logger.Debugf("parseConsoleRemoteArrayPreview", "array is too large and will be parsed partially")
 	}
 
 	for _, p := range op.Properties {
@@ -228,25 +226,24 @@ func parseConsoleRemoteArrayPreview(logger *log.Logger, op *cdpruntime.ObjectPre
 	return string(bb), nil
 }
 
-//nolint:cyclop
 func parseConsoleRemoteObjectValue(
 	logger *log.Logger,
-	t cdpruntime.Type,
-	st cdpruntime.Subtype,
+	t runtime.Type,
+	st runtime.Subtype,
 	val string,
-	op *cdpruntime.ObjectPreview,
+	op *runtime.ObjectPreview,
 ) (string, error) {
 	switch t {
-	case cdpruntime.TypeAccessor:
+	case runtime.TypeAccessor:
 		return "accessor", nil
-	case cdpruntime.TypeFunction:
+	case runtime.TypeFunction:
 		return "function()", nil
-	case cdpruntime.TypeString:
+	case runtime.TypeString:
 		if strings.HasPrefix(val, `"`) {
 			val = strings.TrimPrefix(val, `"`)
 			val = strings.TrimSuffix(val, `"`)
 		}
-	case cdpruntime.TypeObject:
+	case runtime.TypeObject:
 		if op != nil {
 			if st == "array" {
 				return parseConsoleRemoteArrayPreview(logger, op)
@@ -259,14 +256,14 @@ func parseConsoleRemoteObjectValue(
 		if st == "null" {
 			return "null", nil
 		}
-	case cdpruntime.TypeUndefined:
+	case runtime.TypeUndefined:
 		return "undefined", nil
 	// The following cases are here to clarify that all cases have been
 	// considered, but that the result will return val without processing it.
-	case cdpruntime.TypeNumber:
-	case cdpruntime.TypeBoolean:
-	case cdpruntime.TypeSymbol:
-	case cdpruntime.TypeBigint:
+	case runtime.TypeNumber:
+	case runtime.TypeBoolean:
+	case runtime.TypeSymbol:
+	case runtime.TypeBigint:
 	}
 
 	return val, nil
@@ -275,7 +272,7 @@ func parseConsoleRemoteObjectValue(
 // parseConsoleRemoteObject is to be used by callers that are working with
 // console messages that are written to Chrome's console by the website under
 // test.
-func parseConsoleRemoteObject(logger *log.Logger, obj *cdpruntime.RemoteObject) (string, error) {
+func parseConsoleRemoteObject(logger *log.Logger, obj *runtime.RemoteObject) (string, error) {
 	if obj.UnserializableValue != "" {
 		return obj.UnserializableValue.String(), nil
 	}

@@ -39,7 +39,7 @@ func (d *Dir) Make(tmpDir string, dir any) error {
 
 	// create a temporary dir because the provided dir is empty.
 	if d.fsMkdirTemp == nil {
-		d.fsMkdirTemp = os.MkdirTemp
+		d.fsMkdirTemp = os.MkdirTemp //nolint:forbidigo
 	}
 	var err error
 	if d.Dir, err = d.fsMkdirTemp(tmpDir, k6BrowserDataDirPattern); err != nil {
@@ -72,7 +72,7 @@ func (d *Dir) Cleanup() error {
 	}
 
 	if d.fsRemoveAll == nil {
-		d.fsRemoveAll = os.RemoveAll
+		d.fsRemoveAll = os.RemoveAll //nolint:forbidigo
 	}
 
 	return d.fsRemoveAll(d.Dir)

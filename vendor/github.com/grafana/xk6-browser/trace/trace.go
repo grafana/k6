@@ -8,6 +8,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+	"go.opentelemetry.io/otel/trace/noop"
 
 	k6lib "go.k6.io/k6/lib"
 )
@@ -189,4 +190,4 @@ func (NoopSpan) AddEvent(string, ...trace.EventOption) {}
 func (NoopSpan) SetName(string) {}
 
 // TracerProvider returns a noop tracer provider.
-func (NoopSpan) TracerProvider() trace.TracerProvider { return trace.NewNoopTracerProvider() }
+func (NoopSpan) TracerProvider() trace.TracerProvider { return noop.NewTracerProvider() }
