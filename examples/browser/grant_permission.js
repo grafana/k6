@@ -1,4 +1,4 @@
-import { browser } from 'k6/x/browser/async';
+import { browser } from 'k6/browser';
 
 export const options = {
   scenarios: {
