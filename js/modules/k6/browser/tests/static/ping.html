@@ -1,0 +1,29 @@
+<html>
+  <head>
+    <title>Ping duration test</title>
+  </head>
+  <body>
+    <div id="waiting">NA</div>
+    <script>
+        asd()
+
+        async function asd() {
+            var sendDate = (new Date()).getTime();
+
+            var receiveDate = 0;
+            await fetch('/ping', {
+                method: 'POST',
+                body: JSON.stringify('0'.repeat(1024))
+            })
+            .then(response => response.json())
+            .then(data => {
+                receiveDate = (new Date()).getTime();
+            })
+            
+            var responseTimeMs = receiveDate - sendDate;
+
+            document.getElementById("waiting").innerHTML = `<div id="result">${responseTimeMs}</div>`;
+        }
+    </script>
+  </body>
+</html>

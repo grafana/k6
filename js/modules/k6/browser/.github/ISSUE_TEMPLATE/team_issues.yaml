@@ -1,0 +1,43 @@
+name: Team issue template
+description: This template is reserved for team members.
+title: "Keep the title concise. Use the common language we can use to identify the issue."
+body:
+  - type: textarea
+    attributes:
+      label: What?
+      description: A concise (or detailed) description of this issue's goal.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: Why?
+      description: A concise (or detailed) explanation of why we need this issue.
+    validations:
+      required: true
+  - type: textarea
+    attributes:
+      label: How?
+      description: Do you have any suggestions/solutions for solving the issue?
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Tasks
+      description: Feel free to remove the tasklist items that are not relevant to this issue.
+      value: |
+        ```[tasklist]
+        ### Tasks
+        - [ ] Subissue
+        - [ ] PR
+        - [ ] Docs PR
+        - [ ] TypeScript Definitions PR
+        - [ ] Update the k6 release notes and release tasks
+        ```
+    validations:
+      required: false
+  - type: textarea
+    attributes:
+      label: Related PR(s)/Issue(s)
+      description: Related issues, PRs, external reference links, etc.
+    validations:
+      required: false

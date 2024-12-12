@@ -1,0 +1,23 @@
+<html>
+
+<head>
+    <title>Non-clickable test</title>
+    <style>
+        p {
+            z-index: 9998;
+            margin: 0;
+            padding: 0;
+            left: 0px;
+            bottom: 0px;
+            width: 100%;
+            height: 100%;
+            position: fixed;
+            background-color: black;
+        }
+    </style>
+</head>
+<body>
+    <p>I'm preventing clicking on elements</p>
+    <a href="#" id="non-clickable" onclick="event.preventDefault()">I am non clickable</a>
+</body>
+</html>

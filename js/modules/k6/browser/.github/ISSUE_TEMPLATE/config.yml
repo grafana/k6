@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Community Forum
+    url: https://community.grafana.com/c/grafana-k6/k6-browser/79
+    about: Please ask and answer questions here.
+  - name: Documentation
+    url: https://github.com/grafana/k6-docs
+    about: Please add any documentation related issues here.
+  - name: Migration Guide
+    url: https://k6.io/docs/using-k6-browser/migrating-to-k6-v0-46/
+    about: Please review the guide if you're migrating to k6 v0.46+ from an older version of xk6-browser.

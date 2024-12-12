@@ -1,0 +1,69 @@
+<!--
+  This web page has sleeps to mimic getting things over the
+  network that could affect a web page as it is being loaded.
+  This helps the web vital library to measure and emit web
+  vitals. A perfect page where everything loads instantly
+  will only emit a couple of web vital metrics as there will
+  not be enough data to work with.
+-->
+
+<html>
+  <head>
+    <title>for web vital</title>
+  </head>
+  <script type="text/javascript">
+    async function myFunction() {
+      await new Promise(r => setTimeout(r, 200));
+
+      document.getElementById("onLoadDiv").innerText = "⏳";
+
+      await new Promise(r => setTimeout(r, 200));
+
+      const link = document.createElement('a');
+      link.setAttribute("id", "clickMe");
+      link.href = "javascript:clickMeFunction()"
+      link.text = "Click me"
+      document.body.insertBefore(link, document.getElementById("theTable"));
+
+      document.getElementById("onLoadDiv").innerText = "⌛️";
+    }
+    async function clickMeFunction() {
+      document.getElementById("amendableDiv").innerText = "👍";
+      await new Promise(r => setTimeout(r, 200));
+      location.reload();
+    }
+  </script>
+  <div id="amendableDiv"></div>
+  <div id="onLoadDiv"></div>
+  <div id="textBlock">
+    Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore
+    et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut
+    aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum
+    dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui
+    officia deserunt mollit anim id est laborum.
+  </div>
+  <body onload="myFunction()">
+    <table id="theTable">
+      <tr>
+        <td>Title</td>
+        <td>Review</td>
+      </tr>
+      <tr>
+        <td>Book A</td>
+        <td>Good</td>
+      </tr>
+      <tr>
+        <td>Book B</td>
+        <td>Ok</td>
+      </tr>
+      <tr>
+        <td>Book C</td>
+        <td>Not good</td>
+      </tr>
+      <tr>
+        <td>Book D</td>
+        <td>Very good</td>
+      </tr>
+    </table>
+  </body>
+</html>

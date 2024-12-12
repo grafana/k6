@@ -1,0 +1,26 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+/*.html
+
+# Text and log files
+*.txt
+*.log
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# OSX directory entries
+.DS_Store
+
+# Screenshot example output
+screenshots

@@ -1,0 +1,29 @@
+version: 2
+updates:
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 10
+    allow:
+      - dependency-name: "go.k6.io/k6"
+        dependency-type: "all"
+      - dependency-name: "github.com/chromedp/cdproto"
+        dependency-type: "all"
+      - dependency-name: "github.com/mstoykov/k6-taskqueue-lib"
+        dependency-type: "all"
+      - dependency-name: "github.com/stretchr/testify"
+        dependency-type: "all"
+      - dependency-name: "github.com/gorilla/websocket"
+        dependency-type: "all"
+      - dependency-name: "github.com/mccutchen/go-httpbin"
+        dependency-type: "all"
+    target-branch: "main"
+    commit-message:
+      prefix: "Bump "
+      include: scope
+    assignees:
+      - "octocat"
+    reviewers:
+      - "inancgumus"
+      - "ankur22"
