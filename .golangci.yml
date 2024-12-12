@@ -26,6 +26,10 @@ issues:
        - funlen
        - lll
        - forcetypeassert
+   - path: js\/modules\/k6\/browser\/.*\.go
+     linters:
+       - revive
+       - contextcheck
    - path: js\/modules\/k6\/html\/.*\.go
      text: "exported: exported "
      linters:
