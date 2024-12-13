@@ -15,7 +15,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.22.x]
-        platform: [ubuntu-latest-8-cores, windows-latest-8-cores]
+        platform: [ubuntu-latest-8-cores, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -49,7 +49,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        platform: [ubuntu-latest-8-cores, windows-latest-8-cores]
+        platform: [ubuntu-latest-8-cores, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     continue-on-error: true
     steps:
@@ -87,7 +87,7 @@ jobs:
       fail-fast: false
       matrix:
         go-version: [1.23.x]
-        platform: [ubuntu-latest-8-cores, windows-latest-8-cores]
+        platform: [ubuntu-latest-8-cores, github-hosted-windows-x64-large]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
