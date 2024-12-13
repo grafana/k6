@@ -131,13 +131,15 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 
 		ext := make(map[string]extInfo)
 		for _, e := range exts {
-			if v, ok := ext[e.Path]; ok {
+			key := e.Path + "@" + e.Version
+
+			if v, ok := ext[key]; ok {
 				v.Imports = append(v.Imports, e.Name)
-				ext[e.Path] = v
+				ext[key] = v
 				continue
 			}
 
-			ext[e.Path] = extInfo{
+			ext[key] = extInfo{
 				Module:  e.Path,
 				Version: e.Version,
 				Imports: []string{e.Name},
