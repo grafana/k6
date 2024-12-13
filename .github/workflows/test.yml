@@ -43,7 +43,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          go test "${args[@]}" -timeout 800s ./...
+          K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 800s ./...
 
   test-tip:
     strategy:
@@ -80,7 +80,7 @@ jobs:
             args[1]="1"
             export GOMAXPROCS=1
           fi
-          go test "${args[@]}" -timeout 800s ./...
+          K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 800s ./...
 
   test-current-cov:
     strategy:
@@ -115,7 +115,7 @@ jobs:
                   list=$(echo "$list" | cut -f1 -d ' ' | sort -u | paste -sd, -)
               fi
 
-              go test "${args[@]}" -timeout 800s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
+              K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 800s --coverpkg="$list" -coverprofile=$(echo $pkg | tr / -).coverage $pkg
           done
           grep -h -v "^mode:" *.coverage >> coverage.txt
           rm -f *.coverage
