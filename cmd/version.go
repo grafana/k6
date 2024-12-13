@@ -3,6 +3,8 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
+	"runtime/debug"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -11,8 +13,89 @@ import (
 	"go.k6.io/k6/lib/consts"
 )
 
+const (
+	commitKey      = "commit"
+	commitDirtyKey = "commit_dirty"
+)
+
+// fullVersion returns the maximally full version and build information for
+// the currently running k6 executable.
+func fullVersion() string {
+	details := versionDetails()
+
+	goVersionArch := fmt.Sprintf("%s, %s/%s", details["go_version"], details["go_os"], details["go_arch"])
+
+	k6version := fmt.Sprintf("%s", details["version"])
+	// for the fallback case when the version is not in the expected format
+	// cobra adds a "v" prefix to the version
+	k6version = strings.TrimLeft(k6version, "v")
+
+	commit, ok := details[commitKey].(string)
+	if !ok || commit == "" {
+		return fmt.Sprintf("%s (%s)", k6version, goVersionArch)
+	}
+
+	isDirty, ok := details[commitDirtyKey].(bool)
+	if ok && isDirty {
+		commit += "-dirty"
+	}
+
+	return fmt.Sprintf("%s (commit/%s, %s)", k6version, commit, goVersionArch)
+}
+
+// versionDetails returns the structured details about version
+func versionDetails() map[string]interface{} {
+	v := consts.Version
+	if !strings.HasPrefix(v, "v") {
+		v = "v" + v
+	}
+
+	details := map[string]interface{}{
+		"version":    v,
+		"go_version": runtime.Version(),
+		"go_os":      runtime.GOOS,
+		"go_arch":    runtime.GOARCH,
+	}
+
+	buildInfo, ok := debug.ReadBuildInfo()
+	if !ok {
+		return details
+	}
+
+	var (
+		commit string
+		dirty  bool
+	)
+	for _, s := range buildInfo.Settings {
+		switch s.Key {
+		case "vcs.revision":
+			commitLen := 10
+			if len(s.Value) < commitLen {
+				commitLen = len(s.Value)
+			}
+			commit = s.Value[:commitLen]
+		case "vcs.modified":
+			if s.Value == "true" {
+				dirty = true
+			}
+		default:
+		}
+	}
+
+	if commit == "" {
+		return details
+	}
+
+	details[commitKey] = commit
+	if dirty {
+		details[commitDirtyKey] = true
+	}
+
+	return details
+}
+
 func versionString() string {
-	v := consts.FullVersion()
+	v := fullVersion()
 
 	if exts := ext.GetAll(); len(exts) > 0 {
 		extsDesc := make([]string, 0, len(exts))
@@ -38,7 +121,7 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 		return nil
 	}
 
-	details := consts.VersionDetails()
+	details := versionDetails()
 	if exts := ext.GetAll(); len(exts) > 0 {
 		type extInfo struct {
 			Module  string   `json:"module"`

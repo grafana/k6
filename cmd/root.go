@@ -19,7 +19,6 @@ import (
 	"go.k6.io/k6/cmd/state"
 	"go.k6.io/k6/errext"
 	"go.k6.io/k6/errext/exitcodes"
-	"go.k6.io/k6/lib/consts"
 	"go.k6.io/k6/log"
 )
 
@@ -79,7 +78,7 @@ func (c *rootCommand) persistentPreRunE(_ *cobra.Command, _ []string) error {
 	if err != nil {
 		return err
 	}
-	c.globalState.Logger.Debugf("k6 version: v%s", consts.FullVersion())
+	c.globalState.Logger.Debugf("k6 version: v%s", fullVersion())
 	return nil
 }
 
