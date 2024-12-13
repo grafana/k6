@@ -1,0 +1,42 @@
+<html>
+
+<head></head>
+
+<body>
+    <a href="/home" id="homeLink">Home</a>
+    <div id="pingRequestText">Waiting...</div>
+    <div id="pingJSText">Waiting...</div>
+
+    <script>
+        var pingRequestTextOutput = document.getElementById("pingRequestText");
+        var parentOutput = window.parent.document.getElementById('subFramePingRequestText');
+
+        var p = pingRequestText();
+        p.then(() => {
+            pingRequestTextOutput.innerText += ' - for loop complete';
+            if (parentOutput) {
+                parentOutput.innerText = pingRequestTextOutput.innerText;
+            }
+        })
+
+        async function pingRequestText() {
+            const queryString = window.location.search;
+            const urlParams = new URLSearchParams(queryString);
+            const pingCount = urlParams.get('pingCount')
+
+            for (var i = 0; i < pingCount; i++) {
+                await fetch('/ping')
+                    .then(response => response.text())
+                    .then((data) => {
+                        pingRequestTextOutput.innerText = 'Waiting... ' + data;
+                        if (parentOutput) {
+                            parentOutput.innerText = pingRequestTextOutput.innerText;
+                        }
+                    });
+            }
+        }
+    </script>
+    <script src="/ping.js" async></script>
+</body>
+
+</html>

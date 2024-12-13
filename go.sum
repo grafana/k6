@@ -87,8 +87,6 @@ github.com/gorilla/websocket v1.5.3 h1:saDtZ6Pbx/0u+bgYQ3q96pZgCzfhKXGPqt7kZ72aN
 github.com/gorilla/websocket v1.5.3/go.mod h1:YR8l580nyteQvAITg2hZ9XVh4b55+EU/adAjf1fMHhE=
 github.com/grafana/sobek v0.0.0-20241024150027-d91f02b05e9b h1:hzfIt1lf19Zx1jIYdeHvuWS266W+jL+7dxbpvH2PZMQ=
 github.com/grafana/sobek v0.0.0-20241024150027-d91f02b05e9b/go.mod h1:FmcutBFPLiGgroH42I4/HBahv7GxVjODcVWFTw1ISes=
-github.com/grafana/xk6-browser v1.10.0 h1:nj7CdQRtfEnBC8UpiFJVqfoXeWktMO+v5FV1ST44aFw=
-github.com/grafana/xk6-browser v1.10.0/go.mod h1:fCdTCgN4x154XOj5bRajxsCjvMA3dShkGQa59Br34xI=
 github.com/grafana/xk6-dashboard v0.7.5 h1:TcILyffT/Ea/XD7xG1jMA5lwtusOPRbEQsQDHmO30Mk=
 github.com/grafana/xk6-dashboard v0.7.5/go.mod h1:Y75F8xmgCraKT+pBzFH6me9AyH5PkXD+Bxo1dm6Il/M=
 github.com/grafana/xk6-output-opentelemetry v0.3.0 h1:dmclGBFtFVRJijqLncpu2dKVIIvx1GS3y6sQGg4Khl8=
