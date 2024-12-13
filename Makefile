@@ -28,6 +28,10 @@ lint: check-linter-version
 tests:
 	go test -race -timeout 210s ./...
 
+## test: Executes browser tests.
+browser-tests:
+	go test -race -timeout 120s ./... -tags=browser_tests
+
 ## check: Runs the linters and tests.
 check: lint tests
 

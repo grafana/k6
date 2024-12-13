@@ -1,3 +1,5 @@
+//go:build browser_tests
+
 package tests
 
 import (
@@ -2135,7 +2137,7 @@ func TestPageOnMetric(t *testing.T) {
 				const page = await browser.newPage()
 
 				%s
-				
+
 				await page.goto('%s', {waitUntil: 'networkidle'});
 
 				await page.close()

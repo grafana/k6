@@ -1,0 +1,83 @@
+name: Browser Tests
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test-prev:
+    strategy:
+      fail-fast: false
+      matrix:
+        go-version: [1.22.x, 1.23.x]
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Get the k6 version
+        id: get_k6_version
+        run: |
+          echo "Running tests on '${GITHUB_REF}' with '$(git describe --tags --always --long --dirty)' checked out..."
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: ${{ matrix.go-version }}
+          check-latest: true
+      - name: Run tests
+        run: |
+          set -x
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          # Run with less concurrency on Windows/MacOS to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == macos* ]]; then
+            unset args[2]
+            args[1]="1"
+            export GOMAXPROCS=1
+          fi
+          K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 800s -tags=browser_tests go.k6.io/k6/js/modules/k6/browser/tests
+
+  test-tip:
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [ubuntu-latest]
+    runs-on: ${{ matrix.platform }}
+    continue-on-error: true
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Download Go tip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download ${{ matrix.platform }} --repo grafana/gotip --pattern 'go.zip'
+      - name: Install Go tip
+        run: |
+          unzip go.zip -d $HOME/sdk
+          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
+          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Run tests
+        run: |
+          set -x
+          which go
+          go version
+          export GOMAXPROCS=2
+          args=("-p" "2" "-race")
+          # Run with less concurrency on Windows/MacOS to minimize flakiness.
+          if [[ "${{ matrix.platform }}" == windows* || "${{ matrix.platform }}" == macos* ]]; then
+            unset args[2]
+            args[1]="1"
+            export GOMAXPROCS=1
+          fi
+          K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome K6_BROWSER_HEADLESS=true go test "${args[@]}" -timeout 800s -tags=browser_tests go.k6.io/k6/js/modules/k6/browser/tests

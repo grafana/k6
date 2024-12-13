@@ -1,3 +1,5 @@
+//go:build browser_tests
+
 package tests
 
 import (
