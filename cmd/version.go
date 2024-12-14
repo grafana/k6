@@ -154,13 +154,11 @@ func (c *versionCmd) run(cmd *cobra.Command, _ []string) error {
 		details["extensions"] = list
 	}
 
-	jsonDetails, err := json.Marshal(details)
-	if err != nil {
-		return fmt.Errorf("failed produce a JSON version details: %w", err)
+	if err := json.NewEncoder(c.gs.Stdout).Encode(details); err != nil {
+		return fmt.Errorf("failed to encode/output version details: %w", err)
 	}
 
-	_, err = fmt.Fprintln(c.gs.Stdout, string(jsonDetails))
-	return err
+	return nil
 }
 
 func getCmdVersion(gs *state.GlobalState) *cobra.Command {
