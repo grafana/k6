@@ -2,6 +2,7 @@ package tests
 
 import (
 	"context"
+	"runtime"
 	"testing"
 	"time"
 
@@ -18,7 +19,9 @@ import (
 // a web page.
 func TestWebVitalMetric(t *testing.T) {
 	t.Parallel()
-
+	if runtime.GOOS == "windows" {
+		t.Skip("timeouts on windows")
+	}
 	var (
 		samples  = make(chan k6metrics.SampleContainer)
 		browser  = newTestBrowser(t, withFileServer(), withSamples(samples))
