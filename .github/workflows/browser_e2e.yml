@@ -17,21 +17,19 @@ defaults:
 jobs:
   test:
     strategy:
+      fail-fast: false
       matrix:
         go: [stable, tip]
         platform: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
-        if: matrix.go != 'tip' || matrix.platform != 'windows-latest'
         uses: actions/checkout@v4
       - name: Install Go
-        if: matrix.go != 'tip' || matrix.platform != 'windows-latest'
         uses: actions/setup-go@v5
         with:
           go-version: 1.x
       - name: Install Go tip
-        if: matrix.go == 'tip' && matrix.platform != 'windows-latest'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
@@ -42,7 +40,6 @@ jobs:
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
           echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
       - name: Build k6
-        if: matrix.go != 'tip' || matrix.platform != 'windows-latest'
         run: |
           which go
           go version
@@ -50,7 +47,6 @@ jobs:
           go build .
           ./k6 version
       - name: Run E2E tests
-        if: matrix.go != 'tip' || matrix.platform != 'windows-latest'
         run: |
           set -x
           if [ "$RUNNER_OS" == "Linux" ]; then
@@ -65,6 +61,5 @@ jobs:
             ./k6 run -q "$f"
           done
       - name: Check screenshot
-        if: matrix.go != 'tip' || matrix.platform != 'windows-latest'
         # TODO: Do something more sophisticated?
         run: test -s screenshot.png
