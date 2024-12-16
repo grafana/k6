@@ -273,7 +273,7 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 	// Here, where we get the consolidated options, is where we check if any
 	// of the deprecated options is being used, and we report it.
 	if _, isPresent := configToReinject.External["loadimpact"]; isPresent {
-		if err := lct.preInitState.Usage.Strings("deprecated_options", "ext.loadimpact"); err != nil {
+		if err := lct.preInitState.Usage.Uint64("deprecations/options.ext.loadimpact", 1); err != nil {
 			return nil, err
 		}
 	}
