@@ -79,16 +79,6 @@ function forEach(obj, callback) {
 	}
 }
 
-/** A palette of ANSI color codes for terminal output. */
-const palette = {
-	bold: 1,
-	faint: 2,
-	red: 31,
-	green: 32,
-	cyan: 36,
-	//TODO: add others?
-};
-
 const groupPrefix = '█';
 const detailsPrefix = '↳';
 const succMark = '✓';
@@ -373,18 +363,21 @@ function sortMetricsByName(metricNames) {
  *
  * @param {string} indent
  * @param {{name: string, passes: number, fails: number}} check - The check object with name, passes and fails
- * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors.
+ * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
  * @returns {string} - A formatted line summarizing the check.
  */
-function renderCheck(indent, check, decorate) {
+function renderCheck(indent, check, formatter) {
 	if (check.fails === 0) {
-		return decorate(indent + succMark + ' ' + check.name, palette.green);
+		return formatter.decorate(
+			indent + succMark + ' ' + check.name,
+			'green',
+		);
 	}
 
 	const succPercent = Math.floor(
 		(100 * check.passes) / (check.passes + check.fails),
 	);
-	return decorate(
+	return formatter.decorate(
 		indent +
 			failMark +
 			' ' +
@@ -403,7 +396,7 @@ function renderCheck(indent, check, decorate) {
 			failMark +
 			' ' +
 			check.fails,
-		palette.red,
+		'red',
 	);
 }
 
@@ -422,11 +415,11 @@ function renderCheck(indent, check, decorate) {
  *
  * @param {{metrics: Object[]}} data - The data object containing metrics.
  * @param {summarizeMetricsOptions} options - Display options merged with defaultOptions.
- * @param {(text: string, ...colors: number[]) => string} decorate - A decoration function for ANSI colors.
+ * @param {ANSIFormatter} formatter - An ANSIFormatter function for ANSI colors.
  * @returns {string[]}
  */
-function renderMetrics(data, decorate, options) {
-	const indent = options.indent + ' '; // FIXME @oleiade shouldn't we provide this at the caller?
+function renderMetrics(data, formatter, options) {
+	const indent = options.indent + ' ';
 
 	// Extract all metric names
 	let metricNames = Object.keys(data.metrics);
@@ -447,7 +440,7 @@ function renderMetrics(data, decorate, options) {
 			metric,
 			summaryInfo,
 			options,
-			decorate,
+			formatter,
 			indent,
 		);
 	});
@@ -570,11 +563,11 @@ function formatTrendValue(value, stat, metric, options) {
  * @param {ReportMetric} metric - The metric object containing details about the metric.
  * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
  * @param {summarizeMetricsOptions} options - Configuration options for summarizing metrics.
- * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors to text.
+ * @param {ANSIFormatter} formatter - A function to apply ANSI colors to text.
  * @param {string} indent - The indentation string to use for the output.
  * @returns {string} - The formatted metric line.
  */
-function renderMetricLine(name, metric, info, options, decorate, indent) {
+function renderMetricLine(name, metric, info, options, formatter, indent) {
 	const { maxNameWidth } = info;
 
 	const displayedName = displayNameForMetric(name);
@@ -585,12 +578,13 @@ function renderMetricLine(name, metric, info, options, decorate, indent) {
 	const dotsCount =
 		maxNameWidth - strWidth(displayedName) - strWidth(fmtIndent) + 3;
 	const dottedName =
-		displayedName + decorate('.'.repeat(dotsCount) + ':', palette.faint);
+		displayedName +
+		formatter.decorate('.'.repeat(dotsCount) + ':', 'white', 'faint');
 
 	const dataPart =
 		metric.type === 'trend'
-			? formatTrendData(name, info, decorate)
-			: formatNonTrendData(name, info, decorate);
+			? renderTrendData(name, info, formatter)
+			: renderNonTrendData(name, info, formatter);
 
 	// FIXME (@oleiade): We need a more consistent and central way to manage indentations
 	// FIXME (@oleiade): We call them "options" everywhere but they're actually configuration I would argue
@@ -598,7 +592,6 @@ function renderMetricLine(name, metric, info, options, decorate, indent) {
 }
 
 // FIXME (@oleiade): summarizeMetricsOptions needs a better name "DisplayConfig"?
-// FIXME (@oleiade): decorate function should have a dedicated typedef
 /**
  * Formats a submetric (metric+tags key/value pairs) line for output.
  *
@@ -606,11 +599,11 @@ function renderMetricLine(name, metric, info, options, decorate, indent) {
  * @param {ReportMetric} metric - submetric object (submetric really are just a specialized metric with a tags set and a pointer to their parent)
  * @param {SummaryInfo} info - summary information object
  * @param {summarizeMetricsOptions} options - display options
- * @param {(text: string, ...colors: number[]) => string}  decorate - decoration function
+ * @param {ANSIFormatter}  formatter - ANSI formatter
  * @param indent indentation string
  * @returns {string} submetric report line in the form: `{submetric name}...: {value} {extra}`
  */
-function formatSubmetricLine(name, metric, info, options, decorate, indent) {
+function formatSubmetricLine(name, metric, info, options, formatter, indent) {
 	const { maxNameWidth } = info;
 
 	// Compute the trailing dots:
@@ -618,12 +611,13 @@ function formatSubmetricLine(name, metric, info, options, decorate, indent) {
 	let dotsCount = maxNameWidth - strWidth(name) - strWidth(indent) + 3;
 	dotsCount = Math.max(1, dotsCount);
 	const dottedName =
-		name + decorate('.'.repeat(dotsCount) + ':', palette.faint);
+		name +
+		formatter.decorate('.'.repeat(dotsCount) + ':', 'white', 'faint');
 
 	const dataPart =
 		metric.type === 'trend'
-			? formatTrendData(name, info, decorate)
-			: formatNonTrendData(name, info, decorate);
+			? renderTrendData(name, info, formatter)
+			: renderNonTrendData(name, info, formatter);
 
 	return indent + '  ' + dottedName + ' ' + dataPart;
 }
@@ -631,7 +625,8 @@ function formatSubmetricLine(name, metric, info, options, decorate, indent) {
 /**
  * Format data for trend metrics.
  */
-function formatTrendData(name, info, decorate) {
+// FIXME (@oleiade): rename
+function renderTrendData(name, info, formatter) {
 	const { trendStats, trendCols, trendColMaxLens } = info;
 	const cols = trendCols[name];
 
@@ -639,7 +634,7 @@ function formatTrendData(name, info, decorate) {
 		.map((col, i) => {
 			const statName = trendStats[i];
 			const padding = ' '.repeat(trendColMaxLens[i] - strWidth(col));
-			return statName + '=' + decorate(col, palette.cyan) + padding;
+			return statName + '=' + formatter.decorate(col, 'cyan') + padding;
 		})
 		.join(' ');
 }
@@ -649,9 +644,9 @@ function formatTrendData(name, info, decorate) {
  *
  * @param {string} name - The metric name.
  * @param {Object} info - The summary information object.
- * @param {(text: string, ...colors: number[]) => string} decorate - A decoration function for ANSI colors.
+ * @param {ANSIFormatter} formatter - A decoration function for ANSI colors.
  */
-function formatNonTrendData(name, info, decorate) {
+function renderNonTrendData(name, info, formatter) {
 	const {
 		nonTrendValues,
 		nonTrendExtras,
@@ -662,19 +657,19 @@ function formatNonTrendData(name, info, decorate) {
 	const value = nonTrendValues[name];
 	const extras = nonTrendExtras[name] || [];
 
-	let result = decorate(value, palette.cyan);
+	let result = formatter.decorate(value, 'cyan');
 	result += ' '.repeat(maxNonTrendValueLen - strWidth(value));
 
 	if (extras.length === 1) {
 		// Single extra value
-		result += ' ' + decorate(extras[0], palette.cyan, palette.faint);
+		result += ' ' + formatter.decorate(extras[0], 'cyan', 'faint');
 	} else if (extras.length > 1) {
 		// Multiple extras need their own spacing
 		const parts = extras.map((val, i) => {
 			const extraSpace = ' '.repeat(
 				nonTrendExtraMaxLens[i] - strWidth(val),
 			);
-			return decorate(val, palette.cyan, palette.faint) + extraSpace;
+			return formatter.decorate(val, 'cyan', 'faint') + extraSpace;
 		});
 		result += ' ' + parts.join(' ');
 	}
@@ -692,10 +687,10 @@ function formatNonTrendData(name, info, decorate) {
  *
  * @param {Object} options - Options merged with defaults.
  * @param {ReportData} data - The data containing metrics.
- * @param {(text: string, ...colors: number[]) => string} decorate - Decoration function.
+ * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
  * @returns {string[]} - Array of formatted lines including threshold statuses.
  */
-function renderThresholds(data, decorate, options) {
+function renderThresholds(data, formatter, options) {
 	const indent = options.indent + ' ';
 
 	// Extract and optionally sort metric names
@@ -717,7 +712,7 @@ function renderThresholds(data, decorate, options) {
 			metric,
 			summaryInfo,
 			options,
-			decorate,
+			formatter,
 			'',
 		);
 		result.push(line);
@@ -727,7 +722,7 @@ function renderThresholds(data, decorate, options) {
 			const thresholdLines = renderThresholdResults(
 				metric.thresholds,
 				indent,
-				decorate,
+				formatter,
 			);
 			result.push(...thresholdLines);
 		}
@@ -741,22 +736,26 @@ function renderThresholds(data, decorate, options) {
  *
  * @param {Object} thresholds - The thresholds to render.
  * @param {string} indent - The indentation string to use for the output.
- * @param {(text: string, ...colors: number[]) => string} decorate - A function to apply ANSI colors to text.
+ * @param {ANSIFormatter} formatter - ANSIFormatter used for decorating text.
  * @returns {string[]} - An array of formatted lines including threshold statuses.
  */
-function renderThresholdResults(thresholds, indent, decorate) {
+function renderThresholdResults(thresholds, indent, formatter) {
 	const lines = [];
 
 	forEach(thresholds, (_, threshold) => {
 		const isSatisfied = threshold.ok;
 		const statusText = isSatisfied
-			? decorate('SATISFIED', palette.green)
-			: decorate('UNSATISFIED', palette.red);
+			? formatter.decorate('SATISFIED', 'green')
+			: formatter.decorate('UNSATISFIED', 'red');
 
 		// Extra indentation for threshold lines
 		// Adjusting spacing so that it aligns nicely under the metric line
 		const additionalIndent = isSatisfied ? '    ' : '  ';
-		const sourceText = decorate(`'${threshold.source}'`, palette.faint);
+		const sourceText = formatter.decorate(
+			`'${threshold.source}'`,
+			'white',
+			'faint',
+		);
 
 		// Here we push a line describing the threshold's result
 		lines.push(
@@ -765,6 +764,109 @@ function renderThresholdResults(thresholds, indent, decorate) {
 	});
 
 	return lines;
+}
+
+/**
+ */
+/**
+ * ANSIColor maps ANSI color names to their respective escape codes.
+ *
+ * @typedef {'reset'|'black'|'red'|'green'|'yellow'|'blue'|'magenta'|'cyan'|
+ *           'white'|'brightRed'|'brightGreen'|'brightYellow'} ANSIColor
+ *
+ * @typedef {Record<ANSIColor, string>} ANSIColors
+ */
+const ANSIColors = {
+	reset: '\x1b[0m',
+
+	// Standard Colors
+	black: '30',
+	red: '31',
+	green: '32',
+	yellow: '33',
+	blue: '34',
+	magenta: '35',
+	cyan: '36',
+	white: '37',
+
+	// Bright Colors
+	brightRed: '91',
+	brightGreen: '92',
+	brightYellow: '93',
+};
+
+/**
+ * ANSIStyle maps ANSI style names to their respective escape codes.
+ *
+ * @typedef {'bold' | 'faint' | 'underline' | 'reversed'} ANSIStyle
+ *
+ * @typedef {Record<ANSIStyle, string>} ANSIStyles
+ */
+const ANSIStyles = {
+	bold: '1',
+	faint: '2',
+	underline: '4',
+	reversed: '7',
+};
+
+class ANSIFormatter {
+	/**
+	 * Constructs an ANSIFormatter with configurable color and styling options
+	 * @param {Object} options - Configuration options for formatting
+	 * @param {boolean} [options.enableColors=true] - Whether to enable color output
+	 */
+	constructor(options = {}) {
+		this.options = {
+			enableColors: true,
+			...options,
+		};
+	}
+
+	/**
+	 * Decorates text with ANSI color and style.
+	 * @param {string} text - The text to decorate.
+	 * @param {ANSIColor} color - The ANSI color to apply.
+	 * @param {...ANSIStyle} styles - optional additional styles to apply.
+	 * @returns {string} - Decorated text, or plain text if colors are disabled.
+	 */
+	decorate(text, color, ...styles) {
+		if (!this.options.enableColors) {
+			return text;
+		}
+
+		const colorCode = ANSIColors[color] || ANSIColors.white;
+		const styleCodes = styles
+			.map((style) => ANSIStyles[style])
+			.filter(Boolean);
+
+		const fullCodes = styleCodes.length
+			? [...styleCodes, colorCode].join(';')
+			: colorCode;
+
+		const fullSequence = `\x1b[${fullCodes}m`;
+
+		return `${fullSequence}${text}\x1b[0m`;
+	}
+
+	/**
+	 * Applies bold styling to text
+	 * @param {string} text - Text to make bold
+	 * @returns {string} Bold text
+	 */
+	boldify(text) {
+		return this.decorate(text, 'white', 'bold');
+	}
+
+	/**
+	 * Colorizes text with optional styling.
+	 * @param {string} text - The text to colorize.
+	 * @param {ANSIColor} [color=ANSIColors.white] - Color to apply.
+	 * @param {...ANSIStyle} styles - Additional styles.
+	 * @returns {string} - Colorized text.
+	 */
+	colorize(text, color = ANSIColors.white, ...styles) {
+		return this.decorate(text, color, ...styles);
+	}
 }
 
 /**
@@ -779,56 +881,8 @@ function generateTextSummary(data, options, report) {
 	const mergedOpts = Object.assign({}, defaultOptions, data.options, options);
 	const lines = [];
 
-	// TODO: move all of these functions into an object with methods?
-	/**
-	 * Decorates text with ANSI color codes.
-	 *
-	 * @param text
-	 * @param _
-	 * @returns {*}
-	 */
-	let decorate = function (text, _) {
-		return text;
-	};
-	if (mergedOpts.enableColors) {
-		decorate = function (text, color /*, ...rest*/) {
-			let result = '\x1b[' + color;
-			for (let i = 2; i < arguments.length; i++) {
-				result += ';' + arguments[i];
-			}
-			return result + 'm' + text + '\x1b[0m';
-		};
-	}
-
-	const ANSI = {
-		reset: '\x1b[0m',
-
-		// Standard Colors
-		black: '\x1b[30m',
-		red: '\x1b[31m',
-		green: '\x1b[32m',
-		yellow: '\x1b[33m',
-		blue: '\x1b[34m',
-		magenta: '\x1b[35m',
-		cyan: '\x1b[36m',
-		white: '\x1b[37m',
-
-		// Bright Colors
-		brightBlack: '\x1b[90m',
-		brightRed: '\x1b[91m',
-		brightGreen: '\x1b[92m',
-		brightYellow: '\x1b[93m',
-		brightBlue: '\x1b[94m',
-		brightMagenta: '\x1b[95m',
-		brightCyan: '\x1b[96m',
-		brightWhite: '\x1b[97m',
-
-		// Dark Colors
-		darkGrey: '\x1b[90m',
-	};
-	const BOLD = '\u001b[1m';
-	const RESET = ANSI.reset;
-	const boldify = (text) => BOLD + text + RESET;
+	// Create a formatter with default settings (colors enabled)
+	const formatter = new ANSIFormatter();
 
 	const defaultIndent = ' ';
 	const metricGroupIndent = '  ';
@@ -848,7 +902,7 @@ function generateTextSummary(data, options, report) {
 		let normalizedSectionName = sectionName.toUpperCase();
 
 		if (bold) {
-			normalizedSectionName = boldify(normalizedSectionName);
+			normalizedSectionName = formatter.boldify(normalizedSectionName);
 		}
 
 		let indent = '    ';
@@ -864,12 +918,15 @@ function generateTextSummary(data, options, report) {
 	 * @param {Object[]} sectionMetrics - The metrics to display.
 	 * @param {Partial<DisplayOptions>} [opts] - Display options.
 	 */
-	// FIXME
 	const displayMetricsBlock = (sectionMetrics, opts) => {
 		const summarizeOpts = Object.assign({}, mergedOpts, opts);
 		Array.prototype.push.apply(
 			lines,
-			renderMetrics({ metrics: sectionMetrics }, decorate, summarizeOpts),
+			renderMetrics(
+				{ metrics: sectionMetrics },
+				formatter,
+				summarizeOpts,
+			),
 		);
 		lines.push('');
 	};
@@ -894,7 +951,7 @@ function generateTextSummary(data, options, report) {
 				renderCheck(
 					metricGroupIndent + metricGroupIndent + opts.indent,
 					checks.ordered_checks[i],
-					decorate,
+					formatter,
 				),
 			);
 		}
@@ -917,7 +974,7 @@ function generateTextSummary(data, options, report) {
 			metricGroupIndent +
 				groupPrefix +
 				defaultIndent +
-				boldify('THRESHOLDS') +
+				formatter.boldify('THRESHOLDS') +
 				'\n',
 		);
 
@@ -936,14 +993,9 @@ function generateTextSummary(data, options, report) {
 			};
 		});
 
-		// Array.prototype.push.apply(lines, summarizeMetricsWithThresholds(
-		// 	{...mergedOpts, indent: mergedOpts.indent + defaultIndent},
-		// 	{metrics},
-		// 	decorate),
-		// )
 		Array.prototype.push.apply(
 			lines,
-			renderThresholds({ metrics }, decorate, {
+			renderThresholds({ metrics }, formatter, {
 				...mergedOpts,
 				indent: mergedOpts.indent + defaultIndent,
 			}),
@@ -959,7 +1011,7 @@ function generateTextSummary(data, options, report) {
 		metricGroupIndent +
 			groupPrefix +
 			defaultIndent +
-			boldify('TOTAL RESULTS') +
+			formatter.boldify('TOTAL RESULTS') +
 			'\n',
 	);
 
@@ -986,7 +1038,7 @@ function generateTextSummary(data, options, report) {
 					indent +
 					prefix +
 					defaultIndent +
-					boldify(`GROUP: ${groupName}`) +
+					formatter.boldify(`GROUP: ${groupName}`) +
 					'\n',
 			);
 			displayChecks(groupData.checks, { indent: indent });
@@ -1017,7 +1069,7 @@ function generateTextSummary(data, options, report) {
 			metricGroupIndent +
 				groupPrefix +
 				' ' +
-				boldify(`GROUP: ${groupName}`) +
+				formatter.boldify(`GROUP: ${groupName}`) +
 				'\n',
 		);
 		forEach(groupData.metrics, (sectionName, sectionMetrics) => {
@@ -1045,7 +1097,7 @@ function generateTextSummary(data, options, report) {
 				metricGroupIndent +
 					groupPrefix +
 					defaultIndent +
-					boldify(`SCENARIO: ${scenarioName}`) +
+					formatter.boldify(`SCENARIO: ${scenarioName}`) +
 					'\n',
 			);
 			displayChecks(scenarioData.checks);
