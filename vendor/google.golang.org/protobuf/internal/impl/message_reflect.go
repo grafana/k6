@@ -85,7 +85,9 @@ func (mi *MessageInfo) makeKnownFieldsFunc(si structInfo) {
 	mi.oneofs = map[protoreflect.Name]*oneofInfo{}
 	for i := 0; i < md.Oneofs().Len(); i++ {
 		od := md.Oneofs().Get(i)
-		mi.oneofs[od.Name()] = makeOneofInfo(od, si, mi.Exporter)
+		if !od.IsSynthetic() {
+			mi.oneofs[od.Name()] = makeOneofInfo(od, si, mi.Exporter)
+		}
 	}
 
 	mi.denseFields = make([]*fieldInfo, fds.Len()*2)
@@ -205,6 +207,11 @@ func (mi *MessageInfo) makeFieldTypes(si structInfo) {
 		case fd.IsList():
 			if fd.Enum() != nil || fd.Message() != nil {
 				ft = fs.Type.Elem()
+
+				if ft.Kind() == reflect.Slice {
+					ft = ft.Elem()
+				}
+
 			}
 			isMessage = fd.Message() != nil
 		case fd.Enum() != nil:
