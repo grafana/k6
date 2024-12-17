@@ -16,7 +16,7 @@ jobs:
     strategy:
       matrix:
         go: [stable, tip]
-        platform: [ubuntu-latest, windows-2019, macos-latest]
+        platform: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.platform }}
     steps:
       - name: Checkout code
@@ -60,10 +60,10 @@ jobs:
                "${{ github.event.pull_request.head.repo.full_name }}" != "${{ github.repository }}" ]; then
             export XK6_K6_REPO="github.com/${{ github.event.pull_request.head.repo.full_name }}"
           fi
-          # The following is a workaround for Windows, cause when using 'shell: bash', the PATH is expressed  
+          # The following is a workaround for Windows, cause when using 'shell: bash', the PATH is expressed
           # with ':' as separator, but Go code, running on a Windows OS, expects ';' as separator.
           XPATH="$PATH"
-          if [[ "${{ matrix.platform }}" == "windows-latest" || "${{ matrix.platform }}" == "windows-2019" ]]; then
+          if [[ "${{ matrix.platform }}" == "windows-latest" || "${{ matrix.platform }}" == "windows-latest" ]]; then
             XPATH="$HOME/sdk/gotip/bin;$XPATH"
           fi
           PATH="$XPATH" \

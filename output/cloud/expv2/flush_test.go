@@ -35,7 +35,7 @@ func TestMetricSetBuilderAddTimeBucket(t *testing.T) {
 
 	assert.Contains(t, msb.metrics, m1)
 	require.Contains(t, msb.seriesIndex, timeSeries)
-	assert.Equal(t, uint(0), msb.seriesIndex[timeSeries]) // TODO: assert with another number
+	assert.Equal(t, 0, msb.seriesIndex[timeSeries]) // TODO: assert with another number
 
 	require.Len(t, msb.MetricSet.Metrics, 1)
 	assert.Len(t, msb.MetricSet.Metrics[0].TimeSeries, 1)

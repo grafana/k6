@@ -151,7 +151,7 @@ func (e *Scheduler) getRunStats() string {
 		status = fmt.Sprintf("%s (%s)", status, pb.GetFixedLengthDuration(dur, e.maxDuration))
 	}
 
-	vusFmt := pb.GetFixedLengthIntFormat(int64(e.maxPossibleVUs))
+	vusFmt := pb.GetFixedLengthIntFormat(int64(e.maxPossibleVUs)) //nolint:gosec
 	return fmt.Sprintf(
 		"%s, "+vusFmt+"/"+vusFmt+" VUs, %d complete and %d interrupted iterations",
 		status, e.state.GetCurrentlyActiveVUsCount(), e.state.GetInitializedVUsCount(),
@@ -268,7 +268,7 @@ func (e *Scheduler) initVUsAndExecutors(ctx context.Context, samplesOut chan<- m
 	doneInits := e.initVUsConcurrently(subctx, samplesOut, vusToInitialize, runtime.GOMAXPROCS(0), logger)
 
 	initializedVUs := new(uint64)
-	vusFmt := pb.GetFixedLengthIntFormat(int64(vusToInitialize))
+	vusFmt := pb.GetFixedLengthIntFormat(int64(vusToInitialize)) //nolint:gosec
 	e.initProgress.Modify(
 		pb.WithProgress(func() (float64, []string) {
 			doneVUs := atomic.LoadUint64(initializedVUs)

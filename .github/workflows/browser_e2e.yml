@@ -1,0 +1,65 @@
+name: E2E
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+  pull_request:
+  schedule:
+    # At 06:00 AM UTC from Monday through Friday
+    - cron:  '0 6 * * 1-5'
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        go: [stable, tip]
+        platform: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Install Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 1.x
+      - name: Install Go tip
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release download ${{ matrix.platform }} --repo grafana/gotip --pattern 'go.zip'
+          unzip go.zip -d $HOME/sdk
+          echo "GOROOT=$HOME/sdk/gotip" >> "$GITHUB_ENV"
+          echo "GOPATH=$HOME/go" >> "$GITHUB_ENV"
+          echo "$HOME/go/bin" >> "$GITHUB_PATH"
+          echo "$HOME/sdk/gotip/bin" >> "$GITHUB_PATH"
+      - name: Build k6
+        run: |
+          which go
+          go version
+
+          go build .
+          ./k6 version
+      - name: Run E2E tests
+        run: |
+          set -x
+          if [ "$RUNNER_OS" == "Linux" ]; then
+            export K6_BROWSER_EXECUTABLE_PATH=/usr/bin/google-chrome
+          fi
+          export K6_BROWSER_HEADLESS=true
+          for f in examples/browser/*.js; do
+            if [ "$f" == "examples/browser/hosts.js" ] && [ "$RUNNER_OS" == "Windows" ]; then
+              echo "skipping $f on Windows"
+              continue
+            fi
+            ./k6 run -q "$f"
+          done
+      - name: Check screenshot
+        # TODO: Do something more sophisticated?
+        run: test -s screenshot.png

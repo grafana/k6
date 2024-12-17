@@ -1204,7 +1204,7 @@ func TestVUIntegrationTLSConfig(t *testing.T) {
 			"",
 		},
 		"UnsupportedVersion": {
-			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}},
+			lib.Options{TLSVersion: &lib.TLSVersions{Min: tls.VersionSSL30, Max: tls.VersionSSL30}}, //nolint:staticcheck
 			unsupportedVersionErrorMsg,
 		},
 	}
@@ -2070,7 +2070,7 @@ func TestSystemTags(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 
-			vu, err := r.NewVU(ctx, uint64(num), 0, samples)
+			vu, err := r.NewVU(ctx, uint64(num), 0, samples) //nolint:gosec
 			require.NoError(t, err)
 			activeVU := vu.Activate(&lib.VUActivationParams{
 				RunContext: ctx,

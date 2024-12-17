@@ -192,7 +192,7 @@ func (out *Output) Start() error {
 	testRun := &cloudapi.TestRun{
 		Name:       out.config.Name.String,
 		ProjectID:  out.config.ProjectID.Int64,
-		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)),
+		VUsMax:     int64(lib.GetMaxPossibleVUs(out.executionPlan)), //nolint:gosec
 		Thresholds: thresholds,
 		Duration:   out.duration,
 		Archive:    out.testArchive,

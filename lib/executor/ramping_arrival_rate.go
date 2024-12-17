@@ -122,8 +122,8 @@ func (varc RampingArrivalRateConfig) GetExecutionRequirements(et *lib.ExecutionT
 	return []lib.ExecutionStep{
 		{
 			TimeOffset:      0,
-			PlannedVUs:      uint64(et.ScaleInt64(varc.PreAllocatedVUs.Int64)),
-			MaxUnplannedVUs: uint64(et.ScaleInt64(varc.MaxVUs.Int64) - et.ScaleInt64(varc.PreAllocatedVUs.Int64)),
+			PlannedVUs:      uint64(et.ScaleInt64(varc.PreAllocatedVUs.Int64)),                                    //nolint:gosec
+			MaxUnplannedVUs: uint64(et.ScaleInt64(varc.MaxVUs.Int64) - et.ScaleInt64(varc.PreAllocatedVUs.Int64)), //nolint:gosec
 		},
 		{
 			TimeOffset:      sumStagesDuration(varc.Stages) + varc.GracefulStop.TimeDuration(),

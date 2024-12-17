@@ -125,7 +125,7 @@ func decryptPrivateKey(key, password []byte) ([]byte, error) {
 	   being used here because it is deprecated due to it not supporting *good* cryptography
 	   ultimately though we want to support something so we will be using it for now.
 	*/
-	decryptedKey, err := x509.DecryptPEMBlock(block, password)
+	decryptedKey, err := x509.DecryptPEMBlock(block, password) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}

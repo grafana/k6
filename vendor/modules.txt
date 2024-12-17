@@ -179,19 +179,6 @@ github.com/grafana/sobek/ftoa/internal/fast
 github.com/grafana/sobek/parser
 github.com/grafana/sobek/token
 github.com/grafana/sobek/unistring
-# github.com/grafana/xk6-browser v1.9.2-0.20241118153201-d741e4540a3a
-## explicit; go 1.21
-github.com/grafana/xk6-browser/browser
-github.com/grafana/xk6-browser/chromium
-github.com/grafana/xk6-browser/common
-github.com/grafana/xk6-browser/common/js
-github.com/grafana/xk6-browser/env
-github.com/grafana/xk6-browser/k6error
-github.com/grafana/xk6-browser/k6ext
-github.com/grafana/xk6-browser/keyboardlayout
-github.com/grafana/xk6-browser/log
-github.com/grafana/xk6-browser/storage
-github.com/grafana/xk6-browser/trace
 # github.com/grafana/xk6-dashboard v0.7.5
 ## explicit; go 1.20
 github.com/grafana/xk6-dashboard/dashboard
@@ -444,7 +431,7 @@ go.opentelemetry.io/proto/otlp/trace/v1
 ## explicit; go 1.20
 go.uber.org/goleak
 go.uber.org/goleak/internal/stack
-# golang.org/x/crypto v0.29.0
+# golang.org/x/crypto v0.31.0
 ## explicit; go 1.20
 golang.org/x/crypto/md4
 golang.org/x/crypto/ocsp
@@ -452,7 +439,7 @@ golang.org/x/crypto/ripemd160
 # golang.org/x/crypto/x509roots/fallback v0.0.0-20240806160748-b2d3a6a4b4d3
 ## explicit; go 1.20
 golang.org/x/crypto/x509roots/fallback
-# golang.org/x/net v0.31.0
+# golang.org/x/net v0.32.0
 ## explicit; go 1.18
 golang.org/x/net/context
 golang.org/x/net/html
@@ -463,19 +450,20 @@ golang.org/x/net/http2/hpack
 golang.org/x/net/idna
 golang.org/x/net/internal/timeseries
 golang.org/x/net/trace
-# golang.org/x/sync v0.9.0
+# golang.org/x/sync v0.10.0
 ## explicit; go 1.18
+golang.org/x/sync/errgroup
 golang.org/x/sync/semaphore
-# golang.org/x/sys v0.27.0
+# golang.org/x/sys v0.28.0
 ## explicit; go 1.18
 golang.org/x/sys/plan9
 golang.org/x/sys/unix
 golang.org/x/sys/windows
 golang.org/x/sys/windows/registry
-# golang.org/x/term v0.26.0
+# golang.org/x/term v0.27.0
 ## explicit; go 1.18
 golang.org/x/term
-# golang.org/x/text v0.20.0
+# golang.org/x/text v0.21.0
 ## explicit; go 1.18
 golang.org/x/text/cases
 golang.org/x/text/collate

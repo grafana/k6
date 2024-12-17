@@ -178,7 +178,7 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 
 	// Reserve the scaled StartVUs at the beginning
 	scaled, unscaled := index.GoTo(fromVUs)
-	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(scaled)})
+	steps = append(steps, lib.ExecutionStep{TimeOffset: 0, PlannedVUs: uint64(scaled)}) //nolint:gosec
 	addStep := func(timeOffset time.Duration, plannedVUs uint64) {
 		if steps[len(steps)-1].PlannedVUs != plannedVUs {
 			steps = append(steps, lib.ExecutionStep{TimeOffset: timeOffset, PlannedVUs: plannedVUs})
@@ -196,7 +196,7 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 		}
 		if stageDuration == 0 {
 			scaled, unscaled = index.GoTo(stageEndVUs)
-			addStep(timeTillEnd, uint64(scaled))
+			addStep(timeTillEnd, uint64(scaled)) //nolint:gosec
 			fromVUs = stageEndVUs
 			continue
 		}
@@ -212,14 +212,14 @@ func (vlvc RampingVUsConfig) getRawExecutionSteps(et *lib.ExecutionTuple, zeroEn
 					// but we are ramping down so we should go 1 down, but because we want to not
 					// stop VUs immediately we stop it on the next unscaled VU's time
 					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-unscaled+1)/stageVUDiff),
-					uint64(scaled-1),
+					uint64(scaled-1), //nolint:gosec
 				)
 			}
 		} else {
 			for ; unscaled <= stageEndVUs; scaled, unscaled = index.Next() {
 				addStep(
 					timeTillEnd-time.Duration(int64(stageDuration)*(stageEndVUs-unscaled)/stageVUDiff),
-					uint64(scaled),
+					uint64(scaled), //nolint:gosec
 				)
 			}
 		}
@@ -574,7 +574,7 @@ type rampingVUsRunState struct {
 }
 
 func (rs *rampingVUsRunState) makeProgressFn(regular time.Duration) (progressFn func() (float64, []string)) {
-	vusFmt := pb.GetFixedLengthIntFormat(int64(rs.maxVUs))
+	vusFmt := pb.GetFixedLengthIntFormat(int64(rs.maxVUs)) //nolint:gosec
 	regularDuration := pb.GetFixedLengthDuration(regular, regular)
 
 	return func() (float64, []string) {

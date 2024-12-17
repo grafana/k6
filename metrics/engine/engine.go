@@ -249,7 +249,7 @@ func (me *MetricsEngine) evaluateThresholds(
 		sort.Strings(breachedThresholds)
 		me.logger.Debugf("Thresholds on %d metrics crossed: %v", len(breachedThresholds), breachedThresholds)
 	}
-	atomic.StoreUint32(&me.breachedThresholdsCount, uint32(len(breachedThresholds)))
+	atomic.StoreUint32(&me.breachedThresholdsCount, uint32(len(breachedThresholds))) //nolint:gosec
 	return breachedThresholds, shouldAbort
 }
 

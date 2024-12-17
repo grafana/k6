@@ -180,7 +180,7 @@ func decryptPrivateKey(privKey, password string) ([]byte, error) {
 	   being used here because it is deprecated due to it not supporting *good* crypography
 	   ultimately though we want to support something so we will be using it for now.
 	*/
-	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password))
+	decryptedKey, err := x509.DecryptPEMBlock(block, []byte(password)) //nolint:staticcheck
 	if err != nil {
 		return nil, err
 	}

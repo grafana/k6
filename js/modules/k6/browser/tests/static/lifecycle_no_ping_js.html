@@ -1,0 +1,28 @@
+<html>
+
+<head></head>
+
+<body>
+    <div id="pingRequestText">Waiting...</div>
+
+    <script>
+        var pingRequestTextOutput = document.getElementById("pingRequestText");
+
+        var p = requestPings();
+        p.then(() => {
+            pingRequestTextOutput.innerText += ' - for loop complete';
+        })
+
+        async function requestPings() {
+            for (var i = 0; i < 10; i++) {
+                await fetch('/ping')
+                    .then(response => response.text())
+                    .then((data) => {
+                        pingRequestTextOutput.innerText = 'Waiting... ' + data;
+                    });
+            }
+        }
+    </script>
+</body>
+
+</html>

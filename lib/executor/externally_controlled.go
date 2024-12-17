@@ -123,7 +123,7 @@ func (mec ExternallyControlledConfig) Validate() []error {
 func (mec ExternallyControlledConfig) GetExecutionRequirements(et *lib.ExecutionTuple) []lib.ExecutionStep {
 	startVUs := lib.ExecutionStep{
 		TimeOffset:      0,
-		PlannedVUs:      uint64(et.ScaleInt64(mec.MaxVUs.Int64)), // user-configured, VUs to be pre-initialized
+		PlannedVUs:      uint64(et.ScaleInt64(mec.MaxVUs.Int64)), //nolint:gosec
 		MaxUnplannedVUs: 0,                                       // intentional, see function comment
 	}
 

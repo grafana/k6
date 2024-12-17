@@ -270,6 +270,14 @@ func (lct *loadedAndConfiguredTest) buildTestRunState(
 		return nil, err
 	}
 
+	// Here, where we get the consolidated options, is where we check if any
+	// of the deprecated options is being used, and we report it.
+	if _, isPresent := configToReinject.External["loadimpact"]; isPresent {
+		if err := lct.preInitState.Usage.Uint64("deprecations/options.ext.loadimpact", 1); err != nil {
+			return nil, err
+		}
+	}
+
 	// it pre-loads system certificates to avoid doing it on the first TLS request.
 	// This is done async to avoid blocking the rest of the loading process as it will not stop if it fails.
 	go loadSystemCertPool(lct.preInitState.Logger)
