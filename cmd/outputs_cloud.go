@@ -19,7 +19,10 @@ import (
 	"go.k6.io/k6/metrics"
 )
 
-const defaultTestName = "k6 test"
+const (
+	defaultTestName = "k6 test"
+	testRunIDKey    = "K6_CLOUDRUN_TEST_RUN_ID"
+)
 
 // createCloudTest performs some test and Cloud configuration validations and if everything
 // looks good, then it creates a test run in the k6 Cloud, unless k6 is already running in the Cloud.
@@ -27,6 +30,16 @@ const defaultTestName = "k6 test"
 // It returns the resulting Cloud configuration as a json.RawMessage, as expected by the Cloud output,
 // or an error if something goes wrong.
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
+	// If the "K6_CLOUDRUN_TEST_RUN_ID" is set, then it means that this code is being executed in the k6 Cloud.
+	// Therefore, we don't need to continue with the test run creation, as we don't need to create any test run.
+	//
+	// This should technically never happen, as k6, when executed in the Cloud, it uses the standard "run"
+	// command "locally", but we add this early return just in case, for safety.
+	if _, isSet := gs.Env[testRunIDKey]; isSet {
+		return nil
+	}
+
+	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
 		test.derivedConfig.Collectors[builtinOutputCloud.String()],
 		gs.Env,
@@ -40,15 +53,6 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 
 	if warn != "" {
 		gs.Logger.Warn(warn)
-	}
-
-	// If this is true, then it means that this code is being executed in the k6 Cloud.
-	// Therefore, we don't need to continue with the test run creation,
-	// as we don't need to create any test run.
-	//
-	// Precisely, the identifier of the test run is conf.TestRunID.
-	if conf.TestRunID.Valid {
-		return nil
 	}
 
 	// If not, we continue with some validations and the creation of the test run.
@@ -129,14 +133,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		conf = conf.Apply(*response.ConfigOverride)
 	}
 
-	conf.TestRunID = null.NewString(response.ReferenceID, true)
-
-	raw, err := cloudConfToRawMessage(conf)
-	if err != nil {
-		return fmt.Errorf("could not serialize cloud configuration: %w", err)
-	}
-
-	test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
+	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
 
 	return nil
 }

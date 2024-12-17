@@ -177,12 +177,6 @@ func validateRequiredSystemTags(scriptTags *metrics.SystemTagSet) error {
 // Start calls the k6 Cloud API to initialize the test run, and then starts the
 // goroutine that would listen for metric samples and send them to the cloud.
 func (out *Output) Start() error {
-	if out.config.TestRunID.Valid {
-		out.testRunID = out.config.TestRunID.String
-	} else if out.config.PushRefID.Valid {
-		out.testRunID = out.config.PushRefID.String
-	}
-
 	if out.testRunID != "" {
 		out.logger.WithField("testRunId", out.testRunID).Debug("Directly pushing metrics without init")
 		return out.startVersionedOutput()
