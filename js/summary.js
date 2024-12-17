@@ -1,6 +1,3 @@
-// FIXME (@oleiade): We need a more consistent and central way to manage indentations
-// FIXME (@oleiade): We call them "options" everywhere but they're actually configuration I would argue
-
 /**
  * @typedef {Object} Threshold
  * @property {string} source - The threshold expression source.
@@ -64,6 +61,14 @@
  */
 
 /**
+ * @typedef {Object} Options
+ * @property {boolean} [enableColors = true] - Whether to enable ANSI colors.
+ * @property {string | null} [summaryTimeUnit = null] - The time unit for duration metrics.
+ * @property {string[] | null} [summaryTrendStats = null] - The trend statistics to summarize.
+ * @property {boolean} [sortByName = true] - Whether to sort metrics by name.
+ */
+
+/**
  * A simple iteration utility function for objects.
  *
  * @param {Object} obj - the object to iterate over
@@ -79,13 +84,12 @@ function forEach(obj, callback) {
 	}
 }
 
-const groupPrefix = '█';
-const detailsPrefix = '↳';
-const succMark = '✓';
+const titlePrefix = '█';
+const subtitlePrefix = '↳';
+const successMark = '✓';
 const failMark = '✗';
 const defaultOptions = {
-	indent: ' ',
-	enableColors: true,
+	enableColors: true, // FIXME (@oleiade): we should ensure we respect this flag
 	summaryTimeUnit: null,
 	summaryTrendStats: null,
 	sortByName: true,
@@ -157,19 +161,6 @@ function displayNameForMetric(name) {
 		return '{ ' + name.substring(subMetricPos + 1, name.length - 1) + ' }';
 	}
 	return name;
-}
-
-/**
- * Determines the indentation for a metric line based on whether it has submetrics.
- *
- * @param {string} name - The metric name.
- * @returns {string} - Indentation string.
- */
-function indentForMetric(name) {
-	if (name.indexOf('{') >= 0) {
-		return '  ';
-	}
-	return '';
 }
 
 /**
@@ -361,35 +352,32 @@ function sortMetricsByName(metricNames) {
 /**
  * Renders a single check into a formatted line ready for output.
  *
- * @param {string} indent
  * @param {{name: string, passes: number, fails: number}} check - The check object with name, passes and fails
  * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @returns {string} - A formatted line summarizing the check.
  */
-function renderCheck(indent, check, formatter) {
+function renderCheck(check, formatter, renderContext) {
+	// If the check was successful, immediately render a green line indicating success
 	if (check.fails === 0) {
-		return formatter.decorate(
-			indent + succMark + ' ' + check.name,
-			'green',
+		return renderContext.indent(
+			formatter.decorate(successMark + ' ' + check.name, 'green'),
 		);
 	}
 
-	const succPercent = Math.floor(
+	// Other we want to display both the check name and the percentage of successful checks
+	// in red, along with the number of passes and fails.
+	const successfulPct = Math.floor(
 		(100 * check.passes) / (check.passes + check.fails),
 	);
-	return formatter.decorate(
-		indent +
-			failMark +
-			' ' +
-			check.name +
-			'\n' +
-			indent +
-			' ' +
-			detailsPrefix +
+
+	const checkName = formatter.decorate(failMark + ' ' + check.name, 'red');
+	const results = formatter.decorate(
+		subtitlePrefix +
 			'  ' +
-			succPercent +
+			successfulPct +
 			'% — ' +
-			succMark +
+			successMark +
 			' ' +
 			check.passes +
 			' / ' +
@@ -398,29 +386,65 @@ function renderCheck(indent, check, formatter) {
 			check.fails,
 		'red',
 	);
+
+	return (
+		renderContext.indent(checkName) +
+		'\n' +
+		renderContext.indent(results, renderContext.baseIndentationLevel + 1)
+	);
 }
 
 /**
- * @typedef {Object} summarizeMetricsOptions
- * @property {string} indent - The indentation string.
- * @property {boolean} enableColors - Whether to enable ANSI colors.
- * @property {string} summaryTimeUnit - The time unit for duration metrics.
- * @property {string[]} summaryTrendStats - The trend statistics to summarize.
- * @property {boolean} sortByName - Whether to sort metrics by name.
- * @property {boolean} noColor - Whether to disable ANSI colors.
+ * Renders checks into a formatted set of lines ready for display in the terminal.
+ *
+ * @param checks
+ * @param formatter
+ * @param {RenderContext} renderContext
+ * @param options
+ * @returns {*[]}
  */
+function renderChecks(checks, formatter, renderContext, options = {}) {
+	// If no checks exist, return empty array
+	if (!checks || !checks.ordered_checks) {
+		return [];
+	}
+
+	// Add indentation to the render context for checks
+	renderContext = renderContext.indentedContext(1);
+
+	const { showPassedChecks = true, showFailedChecks = true } = options;
+
+	// Process each check and filter based on options
+	const renderedChecks = checks.ordered_checks
+		.filter((check) => {
+			// Filter logic for passed/failed checks
+			if (check.fails === 0 && !showPassedChecks) return false;
+			return !(check.fails > 0 && !showFailedChecks);
+		})
+		.map((check) => renderCheck(check, formatter, renderContext));
+
+	// Render metrics for checks if they exist
+	const checkMetrics = checks.metrics
+		? renderMetrics({ metrics: checks.metrics }, formatter, renderContext, {
+				...options,
+				sortByName: false,
+			})
+		: [];
+
+	// Combine metrics and checks
+	return [...checkMetrics, ...renderedChecks];
+}
 
 /**
  * Summarizes metrics into an array of formatted lines ready to be printed to stdout.
  *
  * @param {{metrics: Object[]}} data - The data object containing metrics.
- * @param {summarizeMetricsOptions} options - Display options merged with defaultOptions.
  * @param {ANSIFormatter} formatter - An ANSIFormatter function for ANSI colors.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @param {summarizeMetricsOptions} options - Display options merged with defaultOptions.
  * @returns {string[]}
  */
-function renderMetrics(data, formatter, options) {
-	const indent = options.indent + ' ';
-
+function renderMetrics(data, formatter, renderContext, options) {
 	// Extract all metric names
 	let metricNames = Object.keys(data.metrics);
 
@@ -430,7 +454,12 @@ function renderMetrics(data, formatter, options) {
 	}
 
 	// Precompute all formatting information
-	const summaryInfo = computeSummaryInfo(metricNames, data, options);
+	const summaryInfo = computeSummaryInfo(
+		metricNames,
+		data,
+		renderContext,
+		options,
+	);
 
 	// Format each metric line
 	return metricNames.map((name) => {
@@ -441,7 +470,7 @@ function renderMetrics(data, formatter, options) {
 			summaryInfo,
 			options,
 			formatter,
-			indent,
+			renderContext,
 		);
 	});
 }
@@ -464,11 +493,12 @@ function renderMetrics(data, formatter, options) {
  * metric.
  *
  * @param {string[]} metricNames
- * @param {{metrics: Object[]}} data - The data object containing metrics.
+ * @param {ReportData} data - The data object containing metrics.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @param {summarizeMetricsOptions} options
  * @returns {SummaryInfo}
  */
-function computeSummaryInfo(metricNames, data, options) {
+function computeSummaryInfo(metricNames, data, renderContext, options) {
 	const trendStats = options.summaryTrendStats;
 	const numTrendColumns = trendStats.length;
 
@@ -485,7 +515,9 @@ function computeSummaryInfo(metricNames, data, options) {
 
 	for (const name of metricNames) {
 		const metric = data.metrics[name];
-		const displayName = indentForMetric(name) + displayNameForMetric(name);
+		const displayName = renderContext.indent(
+			name + displayNameForMetric(name),
+		);
 		maxNameWidth = Math.max(maxNameWidth, strWidth(displayName));
 
 		if (metric.type === 'trend') {
@@ -564,14 +596,21 @@ function formatTrendValue(value, stat, metric, options) {
  * @param {SummaryInfo} info - An object containing summary information such as maximum name width and trend columns.
  * @param {summarizeMetricsOptions} options - Configuration options for summarizing metrics.
  * @param {ANSIFormatter} formatter - A function to apply ANSI colors to text.
- * @param {string} indent - The indentation string to use for the output.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @returns {string} - The formatted metric line.
  */
-function renderMetricLine(name, metric, info, options, formatter, indent) {
+function renderMetricLine(
+	name,
+	metric,
+	info,
+	options,
+	formatter,
+	renderContext,
+) {
 	const { maxNameWidth } = info;
 
 	const displayedName = displayNameForMetric(name);
-	const fmtIndent = indentForMetric(name);
+	const fmtIndent = renderContext.indentLevel();
 
 	// Compute the trailing dots:
 	// Use `3` as a spacing offset as per original code.
@@ -586,9 +625,7 @@ function renderMetricLine(name, metric, info, options, formatter, indent) {
 			? renderTrendData(name, info, formatter)
 			: renderNonTrendData(name, info, formatter);
 
-	// FIXME (@oleiade): We need a more consistent and central way to manage indentations
-	// FIXME (@oleiade): We call them "options" everywhere but they're actually configuration I would argue
-	return indent + fmtIndent + '  ' + dottedName + ' ' + dataPart;
+	return renderContext.indent(dottedName + ' ' + dataPart);
 }
 
 // FIXME (@oleiade): summarizeMetricsOptions needs a better name "DisplayConfig"?
@@ -600,15 +637,26 @@ function renderMetricLine(name, metric, info, options, formatter, indent) {
  * @param {SummaryInfo} info - summary information object
  * @param {summarizeMetricsOptions} options - display options
  * @param {ANSIFormatter}  formatter - ANSI formatter
- * @param indent indentation string
+ * @param {RenderContext} renderContext - render context
  * @returns {string} submetric report line in the form: `{submetric name}...: {value} {extra}`
  */
-function formatSubmetricLine(name, metric, info, options, formatter, indent) {
+function formatSubmetricLine(
+	name,
+	metric,
+	info,
+	options,
+	formatter,
+	renderContext,
+) {
 	const { maxNameWidth } = info;
 
 	// Compute the trailing dots:
 	// Use `3` as a spacing offset as per original code.
-	let dotsCount = maxNameWidth - strWidth(name) - strWidth(indent) + 3;
+	let dotsCount =
+		maxNameWidth -
+		strWidth(name) -
+		strWidth(renderContext.indentLevel()) +
+		3;
 	dotsCount = Math.max(1, dotsCount);
 	const dottedName =
 		name +
@@ -619,7 +667,7 @@ function formatSubmetricLine(name, metric, info, options, formatter, indent) {
 			? renderTrendData(name, info, formatter)
 			: renderNonTrendData(name, info, formatter);
 
-	return indent + '  ' + dottedName + ' ' + dataPart;
+	return renderContext.indent(dottedName + ' ' + dataPart);
 }
 
 /**
@@ -685,14 +733,13 @@ function renderNonTrendData(name, info, formatter) {
  *  {SATISFIED|UNSATISFIED} {source}
  *  //... additional threshold lines
  *
- * @param {Object} options - Options merged with defaults.
  * @param {ReportData} data - The data containing metrics.
  * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @param {Object} options - Options merged with defaults.
  * @returns {string[]} - Array of formatted lines including threshold statuses.
  */
-function renderThresholds(data, formatter, options) {
-	const indent = options.indent + ' ';
-
+function renderThresholds(data, formatter, renderContext, options) {
 	// Extract and optionally sort metric names
 	let metricNames = Object.keys(data.metrics);
 	if (options.sortByName) {
@@ -700,7 +747,12 @@ function renderThresholds(data, formatter, options) {
 	}
 
 	// Precompute all formatting information
-	const summaryInfo = computeSummaryInfo(metricNames, data, options);
+	const summaryInfo = computeSummaryInfo(
+		metricNames,
+		data,
+		renderContext,
+		options,
+	);
 
 	// Format each threshold line by preparing each metric affected by a threshold, as
 	// well as the thresholds results for each expression.
@@ -713,7 +765,7 @@ function renderThresholds(data, formatter, options) {
 			summaryInfo,
 			options,
 			formatter,
-			'',
+			renderContext,
 		);
 		result.push(line);
 
@@ -721,8 +773,8 @@ function renderThresholds(data, formatter, options) {
 			// TODO (@oleiade): make sure the arguments are always ordered consistently across functions (indent, decorate, etc.)
 			const thresholdLines = renderThresholdResults(
 				metric.thresholds,
-				indent,
 				formatter,
+				renderContext.indentedContext(1),
 			);
 			result.push(...thresholdLines);
 		}
@@ -735,11 +787,11 @@ function renderThresholds(data, formatter, options) {
  * Renders each threshold result into a formatted set of lines ready for display in the terminal.
  *
  * @param {Object} thresholds - The thresholds to render.
- * @param {string} indent - The indentation string to use for the output.
  * @param {ANSIFormatter} formatter - ANSIFormatter used for decorating text.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @returns {string[]} - An array of formatted lines including threshold statuses.
  */
-function renderThresholdResults(thresholds, indent, formatter) {
+function renderThresholdResults(thresholds, formatter, renderContext) {
 	const lines = [];
 
 	forEach(thresholds, (_, threshold) => {
@@ -759,11 +811,36 @@ function renderThresholdResults(thresholds, indent, formatter) {
 
 		// Here we push a line describing the threshold's result
 		lines.push(
-			indent + indent + ' ' + statusText + additionalIndent + sourceText,
+			renderContext.indent(statusText + additionalIndent + sourceText),
 		);
 	});
 
 	return lines;
+}
+
+/**
+ * Renders a section title with a specified formatter, indentation level, and options.
+ *
+ * For example, a bold section title at first indentation level with a block prefix and newline suffix:
+ *  █ THRESHOLDS
+ *
+ * @param {string} title - The section title to render.
+ * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
+ * @param {RenderContext} renderContext - The render context to use for text rendering.
+ * @param {Object} options - Additional options for rendering the section title.
+ * @param {string} [options.prefix=titlePrefix] - The prefix to use for the section title.
+ * @param {string} [options.suffix='\n'] - The suffix to use for the section title.
+ * @returns {string} - The formatted section title.
+ */
+function renderTitle(
+	title,
+	formatter,
+	renderContext,
+	options = { prefix: titlePrefix, suffix: '\n' },
+) {
+	return renderContext.indent(
+		`${options.prefix} ${formatter.boldify(title)} ${options.suffix}`,
+	);
 }
 
 /**
@@ -809,6 +886,9 @@ const ANSIStyles = {
 	reversed: '7',
 };
 
+/**
+ * ANSIFormatter provides methods for decorating text with ANSI color and style codes.
+ */
 class ANSIFormatter {
 	/**
 	 * Constructs an ANSIFormatter with configurable color and styling options
@@ -869,6 +949,299 @@ class ANSIFormatter {
 	}
 }
 
+class RenderContext {
+	constructor(baseIndentationLevel = 0) {
+		this.baseIndentationLevel = baseIndentationLevel;
+	}
+
+	/**
+	 * Returns a string of spaces for a given indentation level.
+	 *
+	 * @param {number} [level]
+	 * @returns {string}
+	 */
+	indentLevel(level = 1) {
+		return ' '.repeat((this.baseIndentationLevel + level) * 2);
+	}
+
+	/**
+	 * @param {string} text - The text to indent.
+	 * @param {number} [level]
+	 * @returns {string}
+	 */
+	indent(text, level = 1) {
+		return this.indentLevel(level) + text;
+	}
+
+	/**
+	 * indentedContext returns a new RenderContext with an incremented base indentation level.
+	 *
+	 * This allows to easily obtain a new RenderContext from a parent one with an
+	 * increased indentation level.
+	 *
+	 * @param {number} increment - The increment to apply to the base indentation level.
+	 * @returns {RenderContext}
+	 */
+	indentedContext(increment = 1) {
+		return new RenderContext(this.baseIndentationLevel + increment);
+	}
+}
+
+/**
+ * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
+ */
+class TestReportGenerator {
+	/**
+	 * Constructs a TestReportGenerator with a specified formatter
+	 *
+	 * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
+	 * @param {RenderContext} renderContext - The render context to use for text rendering.
+	 * // FIXME (@oleiade): needs JSDoc
+	 * @param options
+	 */
+	constructor(formatter, renderContext, options = {}) {
+		this.formatter = formatter;
+		this.renderContext = renderContext;
+		this.options = {
+			defaultIndent: ' ',
+			metricGroupIndent: '  ',
+			...options,
+		};
+	}
+
+	// FIXME (@oleiade): needs JSDoc
+	/**
+	 * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
+	 *
+	 * @param data
+	 * @param report
+	 * @returns {*}
+	 */
+	generate(data, report) {
+		const reportBuilder = new ReportBuilder(
+			this.formatter,
+			this.renderContext,
+			this.options,
+		);
+		return reportBuilder
+			.addThresholds(report.thresholds)
+			.addTotalResults(report)
+			.addGroups(report.groups)
+			.addScenarios(report.scenarios)
+			.build();
+	}
+}
+
+/**
+ * Exposes methods for generating a textual summary of test results.
+ */
+class ReportBuilder {
+	/**
+	 * Creates a new ReportBuilder with a specified formatter and options.
+	 *
+	 * // FIXME: ANSIFormatter could be an attribute of the render context
+	 * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
+	 * @param {RenderContext} renderContext - The render context to use for text rendering.
+	 * @param options
+	 */
+	constructor(formatter, renderContext, options) {
+		this.formatter = formatter;
+		this.renderContext = renderContext;
+		this.options = options;
+		this.sections = [];
+	}
+
+	addThresholds(thresholds) {
+		if (!thresholds) return this;
+
+		this.sections.push({
+			title: 'THRESHOLDS',
+			content: this._renderThresholds(thresholds),
+		});
+		return this;
+	}
+
+	addTotalResults(report) {
+		this.sections.push({
+			title: 'TOTAL RESULTS',
+			content: [
+				...this._renderChecks(report.checks),
+				...'\n',
+				...this._renderMetrics(report.metrics),
+			],
+		});
+		return this;
+	}
+
+	addGroups(groups) {
+		if (!groups) return this;
+
+		Object.entries(groups).forEach(([groupName, groupData]) => {
+			this.sections.push({
+				title: `GROUP: ${groupName}`,
+				content: this._renderGroupContent(groupData),
+			});
+		});
+		return this;
+	}
+
+	addScenarios(scenarios) {
+		if (!scenarios) return this;
+
+		Object.entries(scenarios).forEach(([scenarioName, scenarioData]) => {
+			this.sections.push({
+				title: `SCENARIO: ${scenarioName}`,
+				content: this._renderScenarioContent(scenarioData),
+			});
+		});
+		return this;
+	}
+
+	build() {
+		return this.sections
+			.map((section) => [
+				renderTitle(section.title, this.formatter, this.renderContext),
+				...section.content,
+				'\n',
+			])
+			.flat()
+			.join('\n');
+	}
+
+	/**
+	 * @param {Object} thresholds
+	 * @param {RenderContext} [renderContext]
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderThresholds(thresholds, renderContext) {
+		// The thresholds list should be indent one level higher than the title
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		// Implement threshold rendering logic
+		return renderThresholds(
+			{ metrics: this._processThresholds(thresholds) },
+			this.formatter,
+			renderContext,
+			this.options,
+		);
+	}
+
+	/**
+	 * @param checks
+	 * @param {RenderContext} [renderContext] - The render context to use for text rendering.
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderChecks(checks, renderContext) {
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		return checks
+			? renderChecks(checks, this.formatter, renderContext, this.options)
+			: [];
+	}
+
+	/**
+	 * @param metrics
+	 * @param {RenderContext} [renderContext]
+	 * @returns {string[]}
+	 * @private
+	 */
+	_renderMetrics(metrics, renderContext) {
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		// Implement metrics rendering logic
+		return Object.entries(metrics)
+			.filter(
+				([_, sectionMetrics]) => Object.keys(sectionMetrics).length > 0,
+			)
+			.flatMap(([sectionName, sectionMetrics]) => [
+				renderContext.indent(
+					this.formatter.boldify(sectionName.toUpperCase()),
+				),
+				...renderMetrics(
+					{ metrics: sectionMetrics },
+					this.formatter,
+					renderContext,
+					this.options,
+				),
+			]);
+	}
+
+	/**
+	 * @param groupData
+	 * @param {RenderContext} [renderContext]
+	 * @returns {*[]}
+	 * @private
+	 */
+	_renderGroupContent(groupData, renderContext) {
+		renderContext = renderContext || this.renderContext;
+
+		// Implement group content rendering
+		return [
+			...this._renderChecks(groupData.checks, renderContext),
+			...this._renderMetrics(groupData.metrics, renderContext),
+			...(groupData.groups
+				? this._renderNestedGroups(groupData.groups)
+				: []),
+		];
+	}
+
+	/**
+	 * @param scenarioData
+	 * @param {RenderContext} [renderContext]
+	 * @returns {*[]}
+	 * @private
+	 */
+	_renderScenarioContent(scenarioData, renderContext) {
+		renderContext = renderContext || this.renderContext;
+
+		// Similar to group content rendering
+		return [
+			...this._renderChecks(scenarioData.checks, renderContext),
+			...this._renderMetrics(scenarioData.metrics, renderContext),
+			...(scenarioData.groups
+				? this._renderNestedGroups(scenarioData.groups)
+				: []),
+		];
+	}
+
+	/**
+	 * @param groups
+	 * @param {RenderContext} [renderContext]
+	 * @returns {*[]}
+	 * @private
+	 */
+	_renderNestedGroups(groups, renderContext) {
+		renderContext = renderContext || this.renderContext;
+		renderContext = renderContext.indentedContext(1);
+
+		// Render nested groups recursively
+		return Object.entries(groups).flatMap(([groupName, groupData]) => [
+			renderTitle(`GROUP: ${groupName}`, this.formatter, renderContext, {
+				prefix: subtitlePrefix,
+			}),
+			...this._renderGroupContent(groupData),
+		]);
+	}
+
+	// Private rendering methods
+	_processThresholds(thresholds) {
+		// Transform thresholds into a format suitable for rendering
+		const metrics = {};
+		Object.values(thresholds).forEach((threshold) => {
+			metrics[threshold.metric.name] = {
+				...threshold.metric,
+				thresholds: threshold.thresholds,
+			};
+		});
+		return metrics;
+	}
+}
+
 /**
  * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
  *
@@ -879,247 +1252,20 @@ class ANSIFormatter {
  */
 function generateTextSummary(data, options, report) {
 	const mergedOpts = Object.assign({}, defaultOptions, data.options, options);
-	const lines = [];
+
+	// Create a render context holding information such as indentation level to apply
+	const context = new RenderContext(0);
 
 	// Create a formatter with default settings (colors enabled)
 	const formatter = new ANSIFormatter();
 
-	const defaultIndent = ' ';
-	const metricGroupIndent = '  ';
-
-	/**
-	 * Displays a metrics block name (section heading).
-	 *
-	 * @param {string} sectionName - The section name (e.g., "checks", "http_req_duration").
-	 * @param {Partial<DisplayOptions>} [opts] - Display options.
-	 */
-	const displayMetricsBlockName = (sectionName, opts) => {
-		let bold = true;
-		if (opts && opts.bold === false) {
-			bold = false;
-		}
-
-		let normalizedSectionName = sectionName.toUpperCase();
-
-		if (bold) {
-			normalizedSectionName = formatter.boldify(normalizedSectionName);
-		}
-
-		let indent = '    ';
-		if (opts && opts.metricsBlockIndent) {
-			indent += opts.metricsBlockIndent;
-		}
-		lines.push(indent + normalizedSectionName);
-	};
-
-	/**
-	 * Displays a block of metrics with the given options.
-	 *
-	 * @param {Object[]} sectionMetrics - The metrics to display.
-	 * @param {Partial<DisplayOptions>} [opts] - Display options.
-	 */
-	const displayMetricsBlock = (sectionMetrics, opts) => {
-		const summarizeOpts = Object.assign({}, mergedOpts, opts);
-		Array.prototype.push.apply(
-			lines,
-			renderMetrics(
-				{ metrics: sectionMetrics },
-				formatter,
-				summarizeOpts,
-			),
-		);
-		lines.push('');
-	};
-
-	/**
-	 * Displays checks within a certain context (indentation, etc.).
-	 *
-	 * @param {Object} checks - Checks data, containing `metrics` and `ordered_checks`.
-	 * @param {Partial<DisplayOptions>} [opts={indent: ''}] - Options including indentation.
-	 */
-	const displayChecks = (checks, opts = { indent: '' }) => {
-		if (checks === undefined || checks === null) {
-			return;
-		}
-		displayMetricsBlock(checks.metrics, {
-			...opts,
-			indent: opts.indent + defaultIndent,
-			sortByName: false,
-		});
-		for (let i = 0; i < checks.ordered_checks.length; i++) {
-			lines.push(
-				renderCheck(
-					metricGroupIndent + metricGroupIndent + opts.indent,
-					checks.ordered_checks[i],
-					formatter,
-				),
-			);
-		}
-		if (checks.ordered_checks.length > 0) {
-			lines.push('');
-		}
-	};
-
-	/**
-	 * Displays thresholds and their satisfaction status.
-	 *
-	 * @param {Record<string, {metric: ReportMetric, thresholds: Threshold[]}>} thresholds - Threshold data.
-	 */
-	const displayThresholds = (thresholds) => {
-		if (thresholds === undefined || thresholds === null) {
-			return;
-		}
-
-		lines.push(
-			metricGroupIndent +
-				groupPrefix +
-				defaultIndent +
-				formatter.boldify('THRESHOLDS') +
-				'\n',
-		);
-
-		const mergedOpts = Object.assign(
-			{},
-			defaultOptions,
-			data.options,
-			options,
-		);
-
-		let metrics = {};
-		forEach(thresholds, (_, threshold) => {
-			metrics[threshold.metric.name] = {
-				...threshold.metric,
-				thresholds: threshold.thresholds,
-			};
-		});
-
-		Array.prototype.push.apply(
-			lines,
-			renderThresholds({ metrics }, formatter, {
-				...mergedOpts,
-				indent: mergedOpts.indent + defaultIndent,
-			}),
-		);
-		lines.push('');
-	};
-
-	// THRESHOLDS
-	displayThresholds(report.thresholds);
-
-	// TOTAL RESULTS
-	lines.push(
-		metricGroupIndent +
-			groupPrefix +
-			defaultIndent +
-			formatter.boldify('TOTAL RESULTS') +
-			'\n',
+	const reportGenerator = new TestReportGenerator(
+		formatter,
+		context,
+		mergedOpts,
 	);
 
-	// CHECKS
-	displayChecks(report.checks);
-
-	// METRICS
-	forEach(report.metrics, (sectionName, sectionMetrics) => {
-		// If there are no metrics in this section, skip it
-		if (Object.keys(sectionMetrics).length === 0) {
-			return;
-		}
-
-		displayMetricsBlockName(sectionName);
-		displayMetricsBlock(sectionMetrics);
-	});
-	// END OF TOTAL RESULTS
-
-	// GROUPS
-	const summarize = (prefix, indent) => {
-		return (groupName, groupData) => {
-			lines.push(
-				metricGroupIndent +
-					indent +
-					prefix +
-					defaultIndent +
-					formatter.boldify(`GROUP: ${groupName}`) +
-					'\n',
-			);
-			displayChecks(groupData.checks, { indent: indent });
-			forEach(groupData.metrics, (sectionName, sectionMetrics) => {
-				// If there are no metrics in this section, skip it
-				if (Object.keys(sectionMetrics).length === 0) {
-					return;
-				}
-
-				displayMetricsBlockName(sectionName, {
-					metricsBlockIndent: indent,
-				});
-				displayMetricsBlock(sectionMetrics, {
-					indent: indent + defaultIndent,
-				});
-			});
-			if (groupData.groups !== undefined) {
-				forEach(
-					groupData.groups,
-					summarize(detailsPrefix, indent + metricGroupIndent),
-				);
-			}
-		};
-	};
-
-	const summarizeNestedGroups = (groupName, groupData) => {
-		lines.push(
-			metricGroupIndent +
-				groupPrefix +
-				' ' +
-				formatter.boldify(`GROUP: ${groupName}`) +
-				'\n',
-		);
-		forEach(groupData.metrics, (sectionName, sectionMetrics) => {
-			// If there are no metrics in this section, skip it
-			if (Object.keys(sectionMetrics).length === 0) {
-				return;
-			}
-
-			displayMetricsBlockName(sectionName);
-			displayMetricsBlock(sectionMetrics);
-		});
-		if (groupData.groups !== undefined) {
-			forEach(groupData.groups, summarizeNestedGroups);
-		}
-	};
-
-	if (report.groups !== undefined) {
-		forEach(report.groups, summarize(groupPrefix, defaultIndent));
-	}
-
-	// SCENARIOS
-	if (report.scenarios !== undefined) {
-		forEach(report.scenarios, (scenarioName, scenarioData) => {
-			lines.push(
-				metricGroupIndent +
-					groupPrefix +
-					defaultIndent +
-					formatter.boldify(`SCENARIO: ${scenarioName}`) +
-					'\n',
-			);
-			displayChecks(scenarioData.checks);
-			forEach(scenarioData.metrics, (sectionName, sectionMetrics) => {
-				// If there are no metrics in this section, skip it
-				if (Object.keys(sectionMetrics).length === 0) {
-					return;
-				}
-
-				displayMetricsBlockName(sectionName);
-				displayMetricsBlock(sectionMetrics);
-			});
-			if (scenarioData.groups !== undefined) {
-				forEach(
-					scenarioData.groups,
-					summarize(detailsPrefix, metricGroupIndent),
-				);
-			}
-		});
-	}
-
-	return lines.join('\n');
+	return reportGenerator.generate(data, report);
 }
 
 exports.humanizeValue = humanizeValue;
