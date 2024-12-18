@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/grafana/sobek"
-	"github.com/grafana/xk6-websockets/websockets/events"
+	"go.k6.io/k6/js/modules/k6/experimental/websockets/events"
 )
 
 // eventListeners keeps track of the eventListeners for each event type
