@@ -493,12 +493,22 @@ func (b *Browser) newPageInContext(id cdp.BrowserContextID) (*Page, error) {
 		page = b.pages[tid]
 		b.pagesMu.RUnlock()
 	case <-ctx.Done():
+		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, ctx.Err())
+	}
+
+	if err = ctx.Err(); err != nil {
 		err = &k6ext.UserFriendlyError{
 			Err:     ctx.Err(),
 			Timeout: b.browserOpts.Timeout,
 		}
-		b.logger.Debugf("Browser:newPageInContext:<-ctx.Done", "tid:%v bctxid:%v err:%v", tid, id, err)
 	}
+
+	if err == nil && page == nil {
+		err = &k6ext.UserFriendlyError{
+			Err: errors.New("can't fetch the page for unknown reason"),
+		}
+	}
+
 	return page, err
 }
 

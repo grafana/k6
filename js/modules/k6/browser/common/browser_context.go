@@ -269,9 +269,7 @@ func (b *BrowserContext) NewPage() (*Page, error) {
 	if b != nil {
 		bctxid = b.id
 	}
-	if p != nil {
-		ptid = p.targetID
-	}
+
 	b.logger.Debugf("BrowserContext:NewPage:return", "bctxid:%v ptid:%s", bctxid, ptid)
 
 	return p, nil
