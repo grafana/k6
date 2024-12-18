@@ -1,0 +1,14 @@
+name: CI
+on:
+  # Enable manually triggering this workflow via the API or web UI
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - v*
+  pull_request:
+
+jobs:
+  checks:
+    uses: grafana/k6-ci/.github/workflows/all.yml@main
