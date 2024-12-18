@@ -63,33 +63,46 @@ function humanizeValue(val, metric, timeUnit) {
 }
 
 /**
- * @typedef {Object} Threshold
- * @property {string} source - The threshold expression source.
- * @property {boolean} ok - Whether the threshold was satisfied or not.
- */
-
-/**
- * @typedef {Object} Check
- * @property {string} id - The check ID.
- * @property {string} name - The check name.
- * @property {string} path - The check path.
- * @property {number} passes - The number of successful checks.
- * @property {number} fails - The number of failed checks.
- */
-
-/**
- * @typedef {Object} ReportMetric
- * @property {string} name - The metric name.
- * @property {string} type - The type of the metric (e.g., "counter", "gauge", "rate", "trend").
- * @property {string} contains - The type of data contained in the metric (e.g., "time", "data", "default").
- * @property {Record<string, number>} values - Key-value pairs of metric statistics (e.g. min, max, avg).
- * @property {Threshold[]} [thresholds] - Optional array of thresholds associated with this metric.
+ * @typedef {Object} Report
+ * @property {Record<string, ReportThreshold>} thresholds - The thresholds report.
+ * @property {ReportMetrics} metrics - The metrics report.
+ * @property {Record<string, ReportGroup>} groups - The groups report.
+ * @property {Record<string, ReportGroup>} scenarios - The scenarios report.
  */
 
 /**
  * @typedef {Object} ReportThreshold
  * @property {string} source - The threshold expression source.
  * @property {boolean} ok - Whether the threshold was satisfied or not.
+ */
+
+// FIXME (@oleiade): Could use a better name as it's not really a group in the k6 sense?
+/**
+ * @typedef {Object} ReportGroup
+ * @property {ReportChecks} checks - The checks report.
+ * @property {ReportMetrics} metrics - The metrics report.
+ * @property {Record<string, ReportGroup>} groups - The nested groups report.
+ */
+
+/**
+ * @typedef {Object} ReportMetric
+ * @property {string} name - The name of the reported metric.
+ * @property {"counter"|"gauge"|"rate"|"trend"} type - The type of the metric.
+ * @property {"time"|"data"|"default"} contains - The type of data contained in the metric
+ * @property {Record<string, number>} values - Key-value pairs of metric statistics (e.g. min, max, avg).
+ * @property {EngineThreshold[]} [thresholds] - Optional array of thresholds associated with this metric.
+ */
+
+/**
+ * @typedef {Object} ReportMetrics
+ * @property {Record<string, ReportMetric>} http - The HTTP metrics.
+ * @property {Record<string, ReportMetric>} execution - The execution-related metrics.
+ * @property {Record<string, ReportMetric>} network - The network-related metrics.
+ * @property {Record<string, ReportMetric>} browser - The browser-related metrics.
+ * @property {Record<string, ReportMetric>} webvitals - The web vitals metrics.
+ * @property {Record<string, ReportMetric>} grpc - The grpc-related metrics.
+ * @property {Record<string, ReportMetric>} websocket - The websocket-related metrics.
+ * @property {Record<string, ReportMetric>} miscelaneous - The custom metrics.
  */
 
 /**
@@ -100,28 +113,35 @@ function humanizeValue(val, metric, timeUnit) {
  */
 
 /**
- * @typedef {Object} MetricThresholds
+ * @typedef {Object} ReportChecks
+ * @property {ReportChecksMetrics} metrics - The metrics for checks.
+ * @property {EngineCheck[]} ordered_checks - The ordered checks.
+ */
+
+/**
+ * @typedef {Object} ReportMetricThresholds
  * @property {ReportMetric} metric - The metric object.
  * @property {ReportThreshold[]} thresholds - The thresholds for the metric.
  */
 
 /**
- * @typedef {Object} ReportChecks
- * @property {ReportChecksMetrics} metrics - The metrics for checks.
- * @property {Check[]} ordered_checks - The ordered checks.
- */
-
-/**
- * @typedef {Object} DisplayOptions
- * @property {boolean} sortByName - Whether metrics should be sorted by name.
- * @property {boolean} bold - Whether to display section names in bold.
- * @property {string} indent - Indentation string for the output.
- * @property {string} metricsBlockIndent - Additional indentation for metrics blocks.
- */
-
-/**
  * @typedef {Object} ReportData
  * @property {Record<string, ReportMetric>} metrics - Collection of metrics keyed by their names.
+ */
+
+/**
+ * @typedef {Object} EngineCheck
+ * @property {string} id - The check ID.
+ * @property {string} name - The check name.
+ * @property {string} path - The check path.
+ * @property {number} passes - The number of successful checks.
+ * @property {number} fails - The number of failed checks.
+ */
+
+/**
+ * @typedef {Object} EngineThreshold
+ * @property {string} source - The threshold expression source.
+ * @property {boolean} ok - Whether the threshold was satisfied or not.
  */
 
 /**
@@ -141,28 +161,21 @@ class TestReportGenerator {
 	 *
 	 * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
 	 * @param {RenderContext} renderContext - The render context to use for text rendering.
-	 * // FIXME (@oleiade): needs JSDoc
-	 * @param options
+	 * @param {Options} [options = {}]
 	 */
 	constructor(formatter, renderContext, options = {}) {
 		this.formatter = formatter;
 		this.renderContext = renderContext;
-		this.options = {
-			defaultIndent: ' ',
-			metricGroupIndent: '  ',
-			...options,
-		};
+		this.options = options;
 	}
 
-	// FIXME (@oleiade): needs JSDoc
 	/**
 	 * Generates a textual summary of test results, including checks, metrics, thresholds, groups, and scenarios.
 	 *
-	 * @param data
-	 * @param report
-	 * @returns {*}
+	 * @param {Report} report - The report object containing thresholds, checks, metrics, groups, and scenarios as provided by k6.
+	 * @returns {string} - A formatted summary of the test results.
 	 */
-	generate(data, report) {
+	generate(report) {
 		const reportBuilder = new ReportBuilder(
 			this.formatter,
 			this.renderContext,
@@ -184,7 +197,6 @@ class ReportBuilder {
 	/**
 	 * Creates a new ReportBuilder with a specified formatter and options.
 	 *
-	 * // FIXME: ANSIFormatter could be an attribute of the render context
 	 * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
 	 * @param {RenderContext} renderContext - The render context to use for text rendering.
 	 * @param options
@@ -196,6 +208,12 @@ class ReportBuilder {
 		this.sections = [];
 	}
 
+	/**
+	 * Adds a thresholds section to the report.
+	 *
+	 * @param {Record<string, ReportThreshold>} thresholds - The thresholds to add to the report.
+	 * @returns {ReportBuilder}
+	 */
 	addThresholds(thresholds) {
 		if (!thresholds) return this;
 
@@ -206,6 +224,12 @@ class ReportBuilder {
 		return this;
 	}
 
+	/**
+	 * Adds a total results section to the report.
+	 *
+	 * @param {Report} report - The report object containing thresholds, checks, metrics, groups, and scenarios as provided by k6.
+	 * @returns {ReportBuilder}
+	 */
 	addTotalResults(report) {
 		this.sections.push({
 			title: 'TOTAL RESULTS',
@@ -218,6 +242,12 @@ class ReportBuilder {
 		return this;
 	}
 
+	/**
+	 * Adds groups sections to the report.
+	 *
+	 * @param {Record<string, ReportGroup>} groups
+	 * @returns {ReportBuilder}
+	 */
 	addGroups(groups) {
 		if (!groups) return this;
 
@@ -230,6 +260,12 @@ class ReportBuilder {
 		return this;
 	}
 
+	/**
+	 * Adds scenarios sections to the report.
+	 *
+	 * @param {Record<string, ReportGroup>} scenarios - The scenarios to add to the report.
+	 * @returns {ReportBuilder}
+	 */
 	addScenarios(scenarios) {
 		if (!scenarios) return this;
 
@@ -242,6 +278,12 @@ class ReportBuilder {
 		return this;
 	}
 
+	/**
+	 * Builds the final report by concatenating all sections together, resulting
+	 * in a formatted string ready to be printed to the terminal.
+	 *
+	 * @returns {string}
+	 */
 	build() {
 		return this.sections
 			.map((section) => [
@@ -254,7 +296,7 @@ class ReportBuilder {
 	}
 
 	/**
-	 * @param {Object} thresholds
+	 * @param {Record<string, ReportThreshold>} thresholds
 	 * @param {RenderContext} [renderContext]
 	 * @returns {string[]}
 	 * @private
@@ -289,7 +331,7 @@ class ReportBuilder {
 	}
 
 	/**
-	 * @param metrics
+	 * @param {ReportMetrics} metrics
 	 * @param {RenderContext} [renderContext]
 	 * @returns {string[]}
 	 * @private
@@ -317,28 +359,26 @@ class ReportBuilder {
 	}
 
 	/**
-	 * @param groupData
+	 * @param {ReportGroup} group - The group data to render.
 	 * @param {RenderContext} [renderContext]
-	 * @returns {*[]}
+	 * @returns {string[]}
 	 * @private
 	 */
-	_renderGroupContent(groupData, renderContext) {
+	_renderGroupContent(group, renderContext) {
 		renderContext = renderContext || this.renderContext;
 
 		// Implement group content rendering
 		return [
-			...this._renderChecks(groupData.checks, renderContext),
-			...this._renderMetrics(groupData.metrics, renderContext),
-			...(groupData.groups
-				? this._renderNestedGroups(groupData.groups)
-				: []),
+			...this._renderChecks(group.checks, renderContext),
+			...this._renderMetrics(group.metrics, renderContext),
+			...(group.groups ? this._renderNestedGroups(group.groups) : []),
 		];
 	}
 
 	/**
-	 * @param scenarioData
+	 * @param {ReportGroup} scenarioData
 	 * @param {RenderContext} [renderContext]
-	 * @returns {*[]}
+	 * @returns {string[]}
 	 * @private
 	 */
 	_renderScenarioContent(scenarioData, renderContext) {
@@ -355,9 +395,9 @@ class ReportBuilder {
 	}
 
 	/**
-	 * @param groups
+	 * @param {Record<string, ReportGroup>} groups
 	 * @param {RenderContext} [renderContext]
-	 * @returns {*[]}
+	 * @returns {string[]}
 	 * @private
 	 */
 	_renderNestedGroups(groups, renderContext) {
@@ -374,6 +414,12 @@ class ReportBuilder {
 	}
 
 	// Private rendering methods
+	/**
+	 *
+	 * @param {ReportMetricThresholds} thresholds
+	 * @returns {{}}
+	 * @private
+	 */
 	_processThresholds(thresholds) {
 		// Transform thresholds into a format suitable for rendering
 		const metrics = {};
@@ -387,6 +433,18 @@ class ReportBuilder {
 	}
 }
 
+/**
+ * RenderContext is a helper class that provides methods for rendering text
+ * with indentation.
+ *
+ * It is used to keep track of the current indentation level and provide
+ * methods for rendering text with the correct indentation.
+ *
+ * It also facilitates the creation of new RenderContext instances with
+ * different indentation levels. That way the indentation level can be
+ * easily adjusted relatively to a parent indentation level without having
+ * to manage some dedicated state manually.
+ */
 class RenderContext {
 	constructor(baseIndentationLevel = 0) {
 		this.baseIndentationLevel = baseIndentationLevel;
@@ -527,7 +585,7 @@ const ANSIStyles = {
  * @param {string} title - The section title to render.
  * @param {ANSIFormatter} formatter - The ANSI formatter to use for text decoration.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
- * @param {Object} options - Additional options for rendering the section title.
+ * @param {Options & Object} options - Additional options for rendering the section title.
  * @param {string} [options.prefix=titlePrefix] - The prefix to use for the section title.
  * @param {string} [options.suffix='\n'] - The suffix to use for the section title.
  * @returns {string} - The formatted section title.
@@ -546,7 +604,7 @@ function renderTitle(
 /**
  * Renders a single check into a formatted line ready for output.
  *
- * @param {{name: string, passes: number, fails: number}} check - The check object with name, passes and fails
+ * @param {EngineCheck} check - The check object with name, passes and fails
  * @param {ANSIFormatter} formatter - ANSI formatter used for decorating text.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @returns {string} - A formatted line summarizing the check.
@@ -591,7 +649,7 @@ function renderCheck(check, formatter, renderContext) {
 /**
  * Renders checks into a formatted set of lines ready for display in the terminal.
  *
- * @param checks
+ * @param {ReportChecks} checks
  * @param formatter
  * @param {RenderContext} renderContext
  * @param options
@@ -629,10 +687,11 @@ function renderChecks(checks, formatter, renderContext, options = {}) {
 	return [...checkMetrics, ...renderedChecks];
 }
 
+//FIXME (@oleiade): We should clarify the data argument's type and give it a better name and typedef
 /**
  * Summarizes metrics into an array of formatted lines ready to be printed to stdout.
  *
- * @param {{metrics: Object[]}} data - The data object containing metrics.
+ * @param {ReportChecks} data - The data object containing metrics.
  * @param {ANSIFormatter} formatter - An ANSIFormatter function for ANSI colors.
  * @param {RenderContext} renderContext - The render context to use for text rendering.
  * @param {Options} options - Display options merged with defaultOptions.
@@ -864,7 +923,7 @@ function renderTrendData(name, info, formatter) {
  * Format data for non-trend metrics.
  *
  * @param {string} name - The metric name.
- * @param {Object} info - The summary information object.
+ * @param {SummaryInfo} info - The summary information object.
  * @param {ANSIFormatter} formatter - A decoration function for ANSI colors.
  */
 function renderNonTrendData(name, info, formatter) {
@@ -900,10 +959,10 @@ function renderNonTrendData(name, info, formatter) {
 
 /**
  *
- * @param value
- * @param stat
- * @param metric
- * @param options
+ * @param {number} value
+ * @param {string} stat
+ * @param {ReportMetric} metric
+ * @param {Options} options
  * @returns {string}
  */
 function renderTrendValue(value, stat, metric, options) {
