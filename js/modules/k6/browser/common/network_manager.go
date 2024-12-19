@@ -193,6 +193,7 @@ func (m *NetworkManager) emitRequestMetrics(req *Request) {
 	})
 }
 
+//nolint:funlen
 func (m *NetworkManager) emitResponseMetrics(resp *Response, req *Request) {
 	state := m.vu.State()
 
