@@ -25,20 +25,15 @@ const (
 )
 
 // createCloudTest performs some test and Cloud configuration validations and if everything
-// looks good, then it creates a test run in the k6 Cloud, unless k6 is already running in the Cloud.
-// It is also responsible for filling the test run id on the test options, so it can be used later.
-// It returns the resulting Cloud configuration as a json.RawMessage, as expected by the Cloud output,
-// or an error if something goes wrong.
+// looks good, then it creates a test run in the k6 Cloud, using the Cloud API, meant to be used
+// for streaming test results.
+//
+// This method is also responsible for filling the test run id on the test environment, so it can be used later,
+// and to populate the Cloud configuration back in case the Cloud API returned some overrides,
+// as expected by the Cloud output.
+//
+//nolint:funlen
 func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error {
-	// If the "K6_CLOUDRUN_TEST_RUN_ID" is set, then it means that this code is being executed in the k6 Cloud.
-	// Therefore, we don't need to continue with the test run creation, as we don't need to create any test run.
-	//
-	// This should technically never happen, as k6, when executed in the Cloud, it uses the standard "run"
-	// command "locally", but we add this early return just in case, for safety.
-	if _, isSet := gs.Env[testRunIDKey]; isSet {
-		return nil
-	}
-
 	// Otherwise, we continue normally with the creation of the test run in the k6 Cloud backend services.
 	conf, warn, err := cloudapi.GetConsolidatedConfig(
 		test.derivedConfig.Collectors[builtinOutputCloud.String()],
@@ -112,7 +107,7 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 	testRun := &cloudapi.TestRun{
 		Name:       conf.Name.String,
 		ProjectID:  conf.ProjectID.Int64,
-		VUsMax:     int64(lib.GetMaxPossibleVUs(executionPlan)),
+		VUsMax:     int64(lib.GetMaxPossibleVUs(executionPlan)), //nolint:gosec
 		Thresholds: thresholds,
 		Duration:   int64(duration / time.Second),
 		Archive:    testArchive,
@@ -128,12 +123,24 @@ func createCloudTest(gs *state.GlobalState, test *loadedAndConfiguredTest) error
 		return err
 	}
 
+	// We store the test run id in the environment, so it can be used later.
+	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
+
+	// If the Cloud API returned configuration overrides, we apply them to the current configuration.
+	// Then, we serialize the overridden configuration back, so it can be used by the Cloud output.
 	if response.ConfigOverride != nil {
 		logger.WithFields(logrus.Fields{"override": response.ConfigOverride}).Debug("overriding config options")
-		conf = conf.Apply(*response.ConfigOverride)
-	}
 
-	test.preInitState.RuntimeOptions.Env[testRunIDKey] = response.ReferenceID
+		raw, err := cloudConfToRawMessage(conf.Apply(*response.ConfigOverride))
+		if err != nil {
+			return fmt.Errorf("could not serialize overridden cloud configuration: %w", err)
+		}
+
+		if test.derivedConfig.Collectors == nil {
+			test.derivedConfig.Collectors = make(map[string]json.RawMessage)
+		}
+		test.derivedConfig.Collectors[builtinOutputCloud.String()] = raw
+	}
 
 	return nil
 }

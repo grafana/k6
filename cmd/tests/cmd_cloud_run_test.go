@@ -7,16 +7,16 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+
+	"go.k6.io/k6/cloudapi"
+	"go.k6.io/k6/cmd"
 	"go.k6.io/k6/errext/exitcodes"
 	"go.k6.io/k6/lib/fsext"
-
-	"github.com/stretchr/testify/require"
-	"go.k6.io/k6/cloudapi"
-
-	"github.com/stretchr/testify/assert"
-	"go.k6.io/k6/cmd"
 )
 
 func TestK6CloudRun(t *testing.T) {
@@ -168,6 +168,36 @@ export default function() {};`
 		t.Log(stdout)
 		assert.Contains(t, stdout, "execution: local")
 		assert.Contains(t, stdout, "output: cloud (https://some.other.url/foo/tests/org/1337?bar=baz)")
+	})
+
+	t.Run("the script can read the test run id to the environment", func(t *testing.T) {
+		t.Parallel()
+
+		script := `
+export const options = {
+  cloud: {
+      name: 'Hello k6 Cloud!',
+      projectID: 123456,
+  },
+};
+
+export default function() {
+	` + "console.log(`The test run id is ${__ENV.K6_CLOUDRUN_TEST_RUN_ID}`);" + `
+};`
+
+		ts := makeTestState(t, script, []string{"--local-execution", "--log-output=stdout"}, 0)
+
+		const testRunID = 1337
+		srv := getCloudTestEndChecker(t, testRunID, nil, cloudapi.RunStatusFinished, cloudapi.ResultStatusPassed)
+		ts.Env["K6_CLOUD_HOST"] = srv.URL
+
+		cmd.ExecuteWithGlobalState(ts.GlobalState)
+
+		stdout := ts.Stdout.String()
+		t.Log(stdout)
+		assert.Contains(t, stdout, "execution: local")
+		assert.Contains(t, stdout, "output: cloud (https://app.k6.io/runs/1337)")
+		assert.Contains(t, stdout, "The test run id is "+strconv.Itoa(testRunID))
 	})
 }
 

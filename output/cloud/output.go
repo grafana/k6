@@ -21,8 +21,10 @@ import (
 	"go.k6.io/k6/usage"
 )
 
-// TestName is the default k6 Cloud test name
-const TestName = "k6 test"
+const (
+	defaultTestName = "k6 test"
+	testRunIDKey    = "K6_CLOUDRUN_TEST_RUN_ID"
+)
 
 // versionedOutput represents an output implementing
 // metrics samples aggregation and flushing to the
@@ -120,7 +122,7 @@ func newOutput(params output.Params) (*Output, error) {
 		conf.Name = null.StringFrom(filepath.Base(scriptPath))
 	}
 	if conf.Name.String == "-" {
-		conf.Name = null.StringFrom(TestName)
+		conf.Name = null.StringFrom(defaultTestName)
 	}
 
 	duration, testEnds := lib.GetEndOffset(params.ExecutionPlan)
@@ -148,6 +150,7 @@ func newOutput(params output.Params) (*Output, error) {
 		duration:      int64(duration / time.Second),
 		logger:        logger,
 		usage:         params.Usage,
+		testRunID:     params.RuntimeOptions.Env[testRunIDKey],
 	}, nil
 }
 

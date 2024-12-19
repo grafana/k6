@@ -131,25 +131,27 @@ func (c *cmdCloudRun) preRun(cmd *cobra.Command, args []string) error {
 
 func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 	if c.localExecution {
-		// We know this execution requires a test run to be created in the Cloud.
-		// So, we create it before delegating the actual execution to the run command.
-		// To do that, we need to load the test and configure it.
-		test, err := loadAndConfigureLocalTest(c.runCmd.gs, cmd, args, getCloudRunLocalExecutionConfig)
-		if err != nil {
-			return fmt.Errorf("could not load and configure the test: %w", err)
-		}
-
-		// As we've already loaded the test, we can modify the init function to
-		// reuse the initialized one.
 		c.runCmd.loadConfiguredTest = func(*cobra.Command, []string) (*loadedAndConfiguredTest, execution.Controller, error) {
+			test, err := loadAndConfigureLocalTest(c.runCmd.gs, cmd, args, getCloudRunLocalExecutionConfig)
+			if err != nil {
+				return nil, nil, fmt.Errorf("could not load and configure the test: %w", err)
+			}
+
+			// If the "K6_CLOUDRUN_TEST_RUN_ID" is set, then it means that this code is being executed in the k6 Cloud.
+			// Therefore, we don't need to continue with the test run creation, as we don't need to create any test run.
+			// This should technically never happen, as k6, when executed in the Cloud, it uses the standard "run"
+			// command "locally", but we add this early return just in case, for safety.
+			//
+			// If not, we know this execution requires a test run to be created in the Cloud.
+			// So, we create it as part of the process of loading and configuring the test.
+			if _, isSet := c.runCmd.gs.Env[testRunIDKey]; !isSet {
+				if err := createCloudTest(c.runCmd.gs, test); err != nil {
+					return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
+				}
+			}
+
 			return test, local.NewController(), nil
 		}
-
-		// After that, we can create the remote test run.
-		if err := createCloudTest(c.runCmd.gs, test); err != nil {
-			return fmt.Errorf("could not create the cloud test run: %w", err)
-		}
-
 		return c.runCmd.run(cmd, args)
 	}
 
