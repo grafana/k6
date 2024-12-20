@@ -20,6 +20,30 @@ import (
 	k6modules "go.k6.io/k6/js/modules"
 )
 
+// These ResourceTypes are duplicates of CDP's network.ResourceType. We want to work
+// with our version of ResourceType to catch any breaking changes early.
+const (
+	ResourceTypeDocument           string = "Document"
+	ResourceTypeStylesheet         string = "Stylesheet"
+	ResourceTypeImage              string = "Image"
+	ResourceTypeMedia              string = "Media"
+	ResourceTypeFont               string = "Font"
+	ResourceTypeScript             string = "Script"
+	ResourceTypeTextTrack          string = "TextTrack"
+	ResourceTypeXHR                string = "XHR"
+	ResourceTypeFetch              string = "Fetch"
+	ResourceTypePrefetch           string = "Prefetch"
+	ResourceTypeEventSource        string = "EventSource"
+	ResourceTypeWebSocket          string = "WebSocket"
+	ResourceTypeManifest           string = "Manifest"
+	ResourceTypeSignedExchange     string = "SignedExchange"
+	ResourceTypePing               string = "Ping"
+	ResourceTypeCSPViolationReport string = "CSPViolationReport"
+	ResourceTypePreflight          string = "Preflight"
+	ResourceTypeOther              string = "Other"
+	ResourceTypeUnknown            string = "Unknown"
+)
+
 // HTTPHeader is a single HTTP header.
 type HTTPHeader struct {
 	Name  string `json:"name"`
