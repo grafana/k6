@@ -32,7 +32,7 @@ type Config struct {
 	StopOnError    null.Bool   `json:"stopOnError" envconfig:"K6_CLOUD_STOP_ON_ERROR"`
 	APIVersion     null.Int    `json:"apiVersion" envconfig:"K6_CLOUD_API_VERSION"`
 
-	// PushRefID is the identifier used by Cloud systems to correlate all the things that
+	// PushRefID is the identifier used by k6 Cloud to correlate all the things that
 	// belong to the same test run/execution. Currently, it is equivalent to the test run id.
 	// But, in the future, or in future solutions (e.g. Synthetic Monitoring), there might be
 	// no test run id, and we may still need an identifier to correlate all the things.
