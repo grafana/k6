@@ -153,7 +153,7 @@ func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*
 		requestID:           ev.RequestID,
 		method:              ev.Request.Method,
 		postDataEntries:     pd,
-		resourceType:        ev.Type.String(),
+		resourceType:        validateResourceType(logger, ev.Type.String()),
 		isNavigationRequest: isNavigationRequest,
 		allowInterception:   rp.allowInterception,
 		interceptionID:      rp.interceptionID,
