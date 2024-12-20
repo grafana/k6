@@ -10,6 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"go.k6.io/k6/js/modules/k6/browser/k6ext/k6test"
+	"go.k6.io/k6/js/modules/k6/browser/log"
 )
 
 func TestRequest(t *testing.T) {
@@ -30,7 +31,7 @@ func TestRequest(t *testing.T) {
 		WallTime:  &wt,
 	}
 	vu := k6test.NewVU(t)
-	req, err := NewRequest(vu.Context(), NewRequestParams{
+	req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 		event:          evt,
 		interceptionID: "intercept",
 	})
@@ -51,7 +52,7 @@ func TestRequest(t *testing.T) {
 			WallTime:  &wt,
 		}
 		vu := k6test.NewVU(t)
-		req, err := NewRequest(vu.Context(), NewRequestParams{
+		req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 			event:          evt,
 			interceptionID: "intercept",
 		})

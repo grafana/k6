@@ -281,7 +281,7 @@ func TestNetworkManagerEmitRequestResponseMetricsTimingSkew(t *testing.T) {
 			)
 			vu.ActivateVU()
 
-			req, err := NewRequest(vu.Context(), NewRequestParams{
+			req, err := NewRequest(vu.Context(), log.NewNullLogger(), NewRequestParams{
 				event: &network.EventRequestWillBeSent{
 					Request:   &network.Request{},
 					Timestamp: (*cdp.MonotonicTime)(&tt.req.ts),
