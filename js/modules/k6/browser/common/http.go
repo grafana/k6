@@ -174,6 +174,41 @@ func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
 	return &r, nil
 }
 
+// validateResourceType will validate network.ResourceType string values against our own
+// ResourceType string values.
+//   - If a new network.ResourceType is added, this will log a warn and return
+//     ResourceTypeUnknown.
+//   - If an existing network.ResourceType is amended, this will log a warn and return
+//     ResourceTypeUnknown.
+//   - If a network.ResourceType is deleted then we will get a compilation error.
+func validateResourceType(logger *log.Logger, t string) string {
+	switch t {
+	case ResourceTypeDocument:
+	case ResourceTypeStylesheet:
+	case ResourceTypeImage:
+	case ResourceTypeMedia:
+	case ResourceTypeFont:
+	case ResourceTypeScript:
+	case ResourceTypeTextTrack:
+	case ResourceTypeXHR:
+	case ResourceTypeFetch:
+	case ResourceTypePrefetch:
+	case ResourceTypeEventSource:
+	case ResourceTypeWebSocket:
+	case ResourceTypeManifest:
+	case ResourceTypeSignedExchange:
+	case ResourceTypePing:
+	case ResourceTypeCSPViolationReport:
+	case ResourceTypePreflight:
+	case ResourceTypeOther:
+	default:
+		t = ResourceTypeUnknown
+		logger.Warnf("http:resourceType", "unknown network.ResourceType %q detected", t)
+	}
+
+	return t
+}
+
 func (r *Request) getFrame() *Frame {
 	return r.frame
 }
