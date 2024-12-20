@@ -491,7 +491,7 @@ func (m *NetworkManager) onRequest(event *network.EventRequestWillBeSent, interc
 			event.Request.URL, event.Request.Method, event.Initiator.Type, event.FrameID)
 	}
 
-	req, err := NewRequest(m.ctx, NewRequestParams{
+	req, err := NewRequest(m.ctx, m.logger, NewRequestParams{
 		event:             event,
 		frame:             frame,
 		redirectChain:     redirectChain,

@@ -112,7 +112,7 @@ type NewRequestParams struct {
 }
 
 // NewRequest creates a new HTTP request.
-func NewRequest(ctx context.Context, rp NewRequestParams) (*Request, error) {
+func NewRequest(ctx context.Context, logger *log.Logger, rp NewRequestParams) (*Request, error) {
 	ev := rp.event
 
 	documentID := cdp.LoaderID("")
