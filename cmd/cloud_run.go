@@ -137,17 +137,8 @@ func (c *cmdCloudRun) run(cmd *cobra.Command, args []string) error {
 				return nil, nil, fmt.Errorf("could not load and configure the test: %w", err)
 			}
 
-			// If the "K6_CLOUDRUN_TEST_RUN_ID" is set, then it means that this code is being executed in the k6 Cloud.
-			// Therefore, we don't need to continue with the test run creation, as we don't need to create any test run.
-			// This should technically never happen, as k6, when executed in the Cloud, it uses the standard "run"
-			// command "locally", but we add this early return just in case, for safety.
-			//
-			// If not, we know this execution requires a test run to be created in the Cloud.
-			// So, we create it as part of the process of loading and configuring the test.
-			if _, isSet := c.runCmd.gs.Env[testRunIDKey]; !isSet {
-				if err := createCloudTest(c.runCmd.gs, test); err != nil {
-					return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
-				}
+			if err := createCloudTest(c.runCmd.gs, test); err != nil {
+				return nil, nil, fmt.Errorf("could not create the cloud test run: %w", err)
 			}
 
 			return test, local.NewController(), nil
